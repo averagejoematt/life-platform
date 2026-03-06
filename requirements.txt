@@ -1,6 +1,0 @@
-# boto3 is pre-installed in the AWS Lambda Python 3.12 runtime.
-# No additional packages are required; all HTTP calls use the stdlib urllib.
-#
-# If you run lambda_function.py locally, install boto3 with:
-#   pip install boto3
-boto3
