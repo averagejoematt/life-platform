@@ -369,3 +369,23 @@ aws lambda invoke --function-name withings-data-ingestion --payload '{}' /tmp/te
 9. Register new MCP tools if applicable and bump MCP version
 10. If new tool is heavy (>1s compute), consider adding to cache warmer (12 tools currently)
 11. Update RUNBOOK.md, USER_GUIDE.md, FEATURES.md, MCP_TOOL_CATALOG.md as applicable
+12. Commit and push: `git add -A && git commit -m "vX.XX.X: <summary>" && git push`
+
+---
+
+## Session Close Checklist
+
+At the end of every working session:
+
+1. Write handover to `handovers/YYYY-MM-DD_<topic>.md`
+2. Update `docs/HANDOVER_LATEST.md` pointer
+3. Update `docs/CHANGELOG.md`
+4. Update `docs/PROJECT_PLAN.md` (completed items, next steps)
+5. Update additional docs as needed (ARCHITECTURE, SCHEMA, RUNBOOK, FEATURES, MCP_TOOL_CATALOG)
+6. Commit and push to GitHub:
+   ```bash
+   git add -A && git commit -m "vX.XX.X: <what changed>" && git push
+   ```
+
+**GitHub repo:** `git@github.com:averagejoematt/life-platform.git` (SSH, private)
+**Never commit:** `datadrops/`, `lambdas/dashboard/data.json`, `lambdas/dashboard/clinical.json`, `*.env`, `.config.json`
