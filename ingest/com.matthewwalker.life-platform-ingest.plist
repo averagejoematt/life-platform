@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.matthewwalker.life-platform-ingest</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/matthewwalker/Documents/Claude/life-platform/ingest/process_all_drops.sh</string>
+    </array>
+
+    <!-- Watch all drop folders — launchd fires whenever any file changes in any of them -->
+    <key>WatchPaths</key>
+    <array>
+        <string>/Users/matthewwalker/Documents/Claude/life-platform/datadrops/habits_drop</string>
+        <string>/Users/matthewwalker/Documents/Claude/life-platform/datadrops/macrofactor_drop</string>
+        <string>/Users/matthewwalker/Documents/Claude/life-platform/datadrops/apple_health_drop</string>
+    </array>
+
+    <!-- Also run once at login to catch any files dropped while the Mac was off -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/matthewwalker/Documents/Claude/life-platform/ingest/ingest.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/matthewwalker/Documents/Claude/life-platform/ingest/ingest.log</string>
+</dict>
+</plist>

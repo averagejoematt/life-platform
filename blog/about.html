@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — The Measured Life</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .about-header {
+      margin: 32px 0 28px;
+    }
+    .about-header h1 {
+      font-style: normal;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .about-header .subtitle {
+      font-family: -apple-system, sans-serif;
+      font-size: 14px;
+      color: #999;
+      margin-top: 4px;
+    }
+
+    /* ── Audio Player ────────────────────────── */
+    .audio-card {
+      background: #f5f5f0;
+      border: 1px solid #e5e5e0;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin: 28px 0 36px;
+    }
+    .audio-card .card-label {
+      font-family: -apple-system, sans-serif;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #999;
+      margin-bottom: 10px;
+    }
+    .audio-card .card-title {
+      font-size: 16px;
+      font-weight: 400;
+      color: #333;
+      margin-bottom: 16px;
+    }
+    .player {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .play-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid #555;
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+    }
+    .play-btn:hover {
+      border-color: #1a1a1a;
+      background: #1a1a1a;
+    }
+    .play-btn:hover svg { fill: #fff; }
+    .play-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: #555;
+      transition: fill 0.2s ease;
+    }
+    .play-btn .pause-icon { display: none; }
+    .play-btn.playing .play-icon { display: none; }
+    .play-btn.playing .pause-icon { display: block; }
+    .player-track {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 4px;
+      background: #ddd;
+      border-radius: 2px;
+      cursor: pointer;
+      position: relative;
+      overflow: visible;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #555;
+      border-radius: 2px;
+      width: 0%;
+      position: relative;
+      transition: width 0.1s linear;
+    }
+    .progress-fill::after {
+      content: '';
+      position: absolute;
+      right: -5px;
+      top: -3px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #555;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .progress-bar:hover .progress-fill::after { opacity: 1; }
+    .time-display {
+      display: flex;
+      justify-content: space-between;
+      font-family: -apple-system, sans-serif;
+      font-size: 11px;
+      color: #999;
+    }
+
+    /* ── Waveform visualization ────────────── */
+    .waveform {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      height: 24px;
+      margin-bottom: 6px;
+    }
+    .waveform .bar {
+      width: 3px;
+      border-radius: 1.5px;
+      background: #ccc;
+      transition: background 0.2s;
+    }
+    .waveform .bar.active { background: #555; }
+
+    /* ── Bio sections ────────────────────────── */
+    .bio-section {
+      margin-bottom: 32px;
+    }
+    .bio-section h2 {
+      font-family: -apple-system, sans-serif;
+      font-size: 12px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #999;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .bio-section p {
+      font-size: 17px;
+      margin-bottom: 14px;
+    }
+    .publication-list {
+      font-size: 15px;
+      color: #666;
+      font-style: italic;
+    }
+    .series-info {
+      background: #f5f5f0;
+      border-left: 3px solid #d4d4c8;
+      padding: 20px 24px;
+      margin: 32px 0;
+    }
+    .series-info p {
+      font-size: 15px;
+      color: #555;
+      margin-bottom: 10px;
+    }
+    .series-info p:last-child { margin-bottom: 0; }
+    .back-link {
+      display: inline-block;
+      margin-top: 12px;
+      font-family: -apple-system, sans-serif;
+      font-size: 13px;
+      color: #666;
+      text-decoration: none;
+    }
+    .back-link:hover { color: #333; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="index.html" class="series-title">The Measured Life</a>
+    <div class="byline">A weekly chronicle by Elena Voss</div>
+    <nav class="site-nav"><a href="index.html">Archive</a><a href="about.html">About</a></nav>
+  </header>
+  <main>
+    <article>
+      <div class="about-header">
+        <h1>About the Author</h1>
+        <div class="subtitle">Elena Voss · Freelance journalist · Brooklyn, NY</div>
+      </div>
+
+      <!-- Audio Player -->
+      <div class="audio-card">
+        <div class="card-label">Audio Introduction</div>
+        <div class="card-title">"Welcome to The Measured Life" — 0:30</div>
+        <div class="waveform" id="waveform"></div>
+        <div class="player">
+          <button class="play-btn" id="playBtn" aria-label="Play audio">
+            <svg class="play-icon" viewBox="0 0 16 16"><polygon points="4,2 14,8 4,14"/></svg>
+            <svg class="pause-icon" viewBox="0 0 16 16"><rect x="3" y="2" width="4" height="12"/><rect x="9" y="2" width="4" height="12"/></svg>
+          </button>
+          <div class="player-track">
+            <div class="progress-bar" id="progressBar">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="time-display">
+              <span id="currentTime">0:00</span>
+              <span id="duration">0:00</span>
+            </div>
+          </div>
+        </div>
+        <audio id="audio" preload="metadata">
+          <source src="audio/elena-intro.mp3" type="audio/mpeg">
+        </audio>
+      </div>
+
+      <!-- Bio -->
+      <div class="bio-section">
+        <h2>Background</h2>
+        <p>Elena Voss is a freelance journalist and narrative nonfiction writer based in Brooklyn, New York. She specializes in immersive, long-form reporting — the kind where you move in, stay longer than anyone expected, and write about what you find when people stop performing for the press.</p>
+        <p>She spent five years on staff at Wired, where she covered the intersection of technology and human behavior. Her features on a longevity clinic in Marin County, a competitive eater's qualification circuit, and a chronic insomniac's six-year experiment in sleeplessness earned her a National Magazine Award nomination and a reputation for finding stories that are never quite about what they appear to be about.</p>
+      </div>
+
+      <div class="bio-section">
+        <h2>Selected Work</h2>
+        <p class="publication-list">Harper's · Wired · The Ringer · The Atlantic · GQ · California Sunday Magazine</p>
+        <p>Her work has been anthologized in "The Best American Science and Nature Writing" and "The Best Technology Writing." She holds a master's in journalism from Columbia University, where she now occasionally guest-lectures on immersive reporting methodology.</p>
+      </div>
+
+      <div class="bio-section">
+        <h2>About This Series</h2>
+        <p>In February 2026, a friend showed Elena a screenshot of a daily health brief — a dense, AI-generated morning report that graded a man's previous day across eight dimensions, tracked sixty-five habit streaks, and featured coaching advice from a simulated panel of experts. The man had built the entire system himself. He wasn't an engineer.</p>
+        <p>She pitched herself the story that afternoon.</p>
+        <p>"The Measured Life" follows Matthew — a Senior Director at a Seattle SaaS company who, after watching his weight cross 300 pounds, decided to build a comprehensive health intelligence platform from scratch. Nineteen data sources. Over a hundred daily metrics. Automated coaching. An AI that reads his journal entries and knows when he's lying to himself.</p>
+        <p>The question driving the series: Can a system this sophisticated actually change a person? Or does the system become the thing — the project you perfect instead of the life you transform?</p>
+      </div>
+
+      <div class="series-info">
+        <p><strong>Format:</strong> Weekly narrative installments, published every Wednesday morning.</p>
+        <p><strong>Access:</strong> Elena has full, unfettered access to Matthew's platform — biometrics, nutrition, sleep architecture, habit scores, training data, and private journal entries. Journal content is treated as deep background and is never quoted directly.</p>
+        <p><strong>Perspective:</strong> Third-person observational. Elena is not a coach, advisor, or cheerleader. She writes what she sees.</p>
+      </div>
+
+      <a href="index.html" class="back-link">← Back to the archive</a>
+    </article>
+  </main>
+  <footer>
+    The Measured Life · A chronicle by Elena Voss · Est. 2026
+  </footer>
+
+  <script>
+    // ── Audio Player ──────────────────────────────────────────────
+    const audio = document.getElementById('audio');
+    const playBtn = document.getElementById('playBtn');
+    const progressBar = document.getElementById('progressBar');
+    const progressFill = document.getElementById('progressFill');
+    const currentTimeEl = document.getElementById('currentTime');
+    const durationEl = document.getElementById('duration');
+    const waveform = document.getElementById('waveform');
+
+    // Generate waveform bars (decorative, simulates waveform shape)
+    const barCount = 60;
+    const pattern = [];
+    // Create a natural-looking waveform pattern
+    for (let i = 0; i < barCount; i++) {
+      const pos = i / barCount;
+      // Simulate speech waveform: quieter start, varied middle, taper end
+      let h;
+      if (pos < 0.05) h = 4 + Math.random() * 6;
+      else if (pos < 0.15) h = 8 + Math.random() * 14;
+      else if (pos < 0.85) h = 6 + Math.random() * 18;
+      else h = 4 + Math.random() * 8;
+      pattern.push(h);
+    }
+    pattern.forEach(h => {
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.style.height = h + 'px';
+      waveform.appendChild(bar);
+    });
+
+    function formatTime(s) {
+      if (isNaN(s)) return '0:00';
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
+      return m + ':' + (sec < 10 ? '0' : '') + sec;
+    }
+
+    audio.addEventListener('loadedmetadata', () => {
+      durationEl.textContent = formatTime(audio.duration);
+    });
+
+    audio.addEventListener('timeupdate', () => {
+      const pct = (audio.currentTime / audio.duration) * 100;
+      progressFill.style.width = pct + '%';
+      currentTimeEl.textContent = formatTime(audio.currentTime);
+
+      // Update waveform active bars
+      const bars = waveform.querySelectorAll('.bar');
+      const activeCount = Math.floor((pct / 100) * bars.length);
+      bars.forEach((bar, i) => {
+        bar.classList.toggle('active', i < activeCount);
+      });
+    });
+
+    audio.addEventListener('ended', () => {
+      playBtn.classList.remove('playing');
+      const bars = waveform.querySelectorAll('.bar');
+      bars.forEach(bar => bar.classList.remove('active'));
+    });
+
+    playBtn.addEventListener('click', () => {
+      if (audio.paused) {
+        audio.play();
+        playBtn.classList.add('playing');
+      } else {
+        audio.pause();
+        playBtn.classList.remove('playing');
+      }
+    });
+
+    progressBar.addEventListener('click', (e) => {
+      const rect = progressBar.getBoundingClientRect();
+      const pct = (e.clientX - rect.left) / rect.width;
+      audio.currentTime = pct * audio.duration;
+    });
+  </script>
+</body>
+</html>

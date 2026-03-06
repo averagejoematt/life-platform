@@ -3,15 +3,33 @@
 Local MCP stdio bridge for life-platform Lambda.
 Claude Desktop runs this as a subprocess and communicates via stdin/stdout.
 This script forwards MCP JSON-RPC messages to the Lambda and returns responses.
+
+Configuration is read from .config.json (gitignored) — never hardcode secrets.
 """
 
 import sys
 import json
+import os
 import boto3
 
-FUNCTION_NAME = "life-platform-mcp"
-REGION        = "us-west-2"
-API_KEY       = "Wny86yQFjgIkWPwSLhUA5dxY-JT3KmAzOCeSczpy6Ks"
+# ── Configuration ─────────────────────────────────────────────────────────────
+# Read from .config.json alongside this script (gitignored, never committed)
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_CONFIG_PATH = os.path.join(_SCRIPT_DIR, ".config.json")
+
+def _load_config():
+    if not os.path.exists(_CONFIG_PATH):
+        print(f"ERROR: Config file not found: {_CONFIG_PATH}", file=sys.stderr)
+        print("Create .config.json with: {\"api_key\": \"...\", \"function_name\": \"...\", \"region\": \"...\"}", file=sys.stderr)
+        sys.exit(1)
+    with open(_CONFIG_PATH) as f:
+        return json.load(f)
+
+_config = _load_config()
+
+FUNCTION_NAME = _config.get("function_name", "life-platform-mcp")
+REGION        = _config.get("region", "us-west-2")
+API_KEY       = _config["api_key"]  # Required — fail loudly if missing
 
 lambda_client = boto3.client("lambda", region_name=REGION)
 

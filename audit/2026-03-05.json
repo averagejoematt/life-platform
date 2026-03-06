@@ -1,0 +1,1264 @@
+{
+  "snapshot_version": "1.0.0",
+  "generated_at": "2026-03-05T20:45:38.170282+00:00",
+  "generated_date": "2026-03-05",
+  "lambdas": [
+    {
+      "name": "health-auto-export-webhook",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 30,
+      "handler": "health_auto_export_lambda.lambda_handler",
+      "code_size_bytes": 12926,
+      "last_modified": "2026-03-05T20:10:44.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "weekly-plate",
+      "runtime": "python3.12",
+      "memory_mb": 512,
+      "timeout_s": 120,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 10241,
+      "last_modified": "2026-03-04T01:58:43.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "apple-health-ingestion",
+      "runtime": "python3.12",
+      "memory_mb": 1024,
+      "timeout_s": 600,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 4637,
+      "last_modified": "2026-02-28T02:39:39.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "macrofactor-data-ingestion",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 60,
+      "handler": "macrofactor_lambda.lambda_handler",
+      "code_size_bytes": 5899,
+      "last_modified": "2026-03-01T16:30:08.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "journal-enrichment",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 120,
+      "handler": "journal_enrichment_lambda.lambda_handler",
+      "code_size_bytes": 6694,
+      "last_modified": "2026-03-05T18:55:14.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "whoop-data-ingestion",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 60,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 7306,
+      "last_modified": "2026-02-28T15:17:02.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "monthly-digest",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 120,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 15238,
+      "last_modified": "2026-03-02T23:14:48.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "eightsleep-data-ingestion",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 60,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 8592,
+      "last_modified": "2026-02-28T17:27:06.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "nutrition-review",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 120,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 12382,
+      "last_modified": "2026-03-02T23:15:21.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "adaptive-mode-compute",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 60,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 3314,
+      "last_modified": "2026-03-05T19:55:57.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "weather-data-ingestion",
+      "runtime": "python3.12",
+      "memory_mb": 128,
+      "timeout_s": 30,
+      "handler": "weather_lambda.lambda_handler",
+      "code_size_bytes": 1962,
+      "last_modified": "2026-02-28T02:40:25.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "notion-journal-ingestion",
+      "runtime": "python3.12",
+      "memory_mb": 128,
+      "timeout_s": 120,
+      "handler": "notion_lambda.lambda_handler",
+      "code_size_bytes": 12621,
+      "last_modified": "2026-03-03T17:12:48.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "dashboard-refresh",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 60,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 7946,
+      "last_modified": "2026-03-04T01:59:24.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "life-platform-data-export",
+      "runtime": "python3.12",
+      "memory_mb": 512,
+      "timeout_s": 300,
+      "handler": "data_export_lambda.lambda_handler",
+      "code_size_bytes": 2316,
+      "last_modified": "2026-03-05T18:55:27.460+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "anomaly-detector",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 90,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 7433,
+      "last_modified": "2026-03-02T02:52:53.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "dropbox-poll",
+      "runtime": "python3.12",
+      "memory_mb": 128,
+      "timeout_s": 120,
+      "handler": "dropbox_poll_lambda.lambda_handler",
+      "code_size_bytes": 4276,
+      "last_modified": "2026-02-28T02:40:29.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "habitify-data-ingestion",
+      "runtime": "python3.12",
+      "memory_mb": 128,
+      "timeout_s": 60,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 5474,
+      "last_modified": "2026-03-04T21:34:58.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "daily-brief",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 300,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 47839,
+      "last_modified": "2026-03-05T20:03:09.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "garmin-data-ingestion",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 120,
+      "handler": "garmin_lambda.lambda_handler",
+      "code_size_bytes": 5367851,
+      "last_modified": "2026-02-28T17:53:21.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "character-sheet-compute",
+      "runtime": "python3.12",
+      "memory_mb": 512,
+      "timeout_s": 60,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 14726,
+      "last_modified": "2026-03-03T03:14:27.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "life-platform-freshness-checker",
+      "runtime": "python3.12",
+      "memory_mb": 128,
+      "timeout_s": 30,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 1874,
+      "last_modified": "2026-03-01T21:10:24.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "todoist-data-ingestion",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 30,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 2256,
+      "last_modified": "2026-03-01T16:30:05.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "life-platform-mcp",
+      "runtime": "python3.12",
+      "memory_mb": 1024,
+      "timeout_s": 300,
+      "handler": "mcp_server.lambda_handler",
+      "code_size_bytes": 216645,
+      "last_modified": "2026-03-05T19:51:27.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "insight-email-parser",
+      "runtime": "python3.12",
+      "memory_mb": 128,
+      "timeout_s": 30,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 3791,
+      "last_modified": "2026-02-28T02:39:55.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "withings-data-ingestion",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 60,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 5038,
+      "last_modified": "2026-03-01T21:10:35.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "weekly-digest",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 120,
+      "handler": "digest_handler.lambda_handler",
+      "code_size_bytes": 20775,
+      "last_modified": "2026-03-05T18:14:00.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "strava-data-ingestion",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 120,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 5871,
+      "last_modified": "2026-03-01T16:30:06.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "activity-enrichment",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 180,
+      "handler": "enrichment_lambda.lambda_handler",
+      "code_size_bytes": 3872,
+      "last_modified": "2026-03-01T16:30:07.000+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "life-platform-key-rotator",
+      "runtime": "python3.12",
+      "memory_mb": 128,
+      "timeout_s": 30,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 1858,
+      "last_modified": "2026-03-01T16:54:47.412+0000",
+      "reserved_concurrency": null
+    },
+    {
+      "name": "wednesday-chronicle",
+      "runtime": "python3.12",
+      "memory_mb": 256,
+      "timeout_s": 120,
+      "handler": "lambda_function.lambda_handler",
+      "code_size_bytes": 21109,
+      "last_modified": "2026-03-04T17:13:18.000+0000",
+      "reserved_concurrency": null
+    }
+  ],
+  "alarms": [
+    {
+      "name": "daily-brief-duration-high",
+      "state": "OK",
+      "metric": "Duration",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "daily-brief"
+      },
+      "period_s": 86400,
+      "threshold": 240000.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "daily-brief-no-invocations-24h",
+      "state": "OK",
+      "metric": "Invocations",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "daily-brief"
+      },
+      "period_s": 86400,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "dropbox-poll-errors",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "dropbox-poll"
+      },
+      "period_s": 86400,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "freshness-checker-errors",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "life-platform-freshness-checker"
+      },
+      "period_s": 86400,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "garmin-data-ingestion-errors",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "garmin-data-ingestion"
+      },
+      "period_s": 86400,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "habitify-ingestion-errors",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "habitify-data-ingestion"
+      },
+      "period_s": 86400,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "health-auto-export-no-invocations-24h",
+      "state": "OK",
+      "metric": "Invocations",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "health-auto-export-webhook"
+      },
+      "period_s": 86400,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "ingestion-error-apple-health",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "apple-health-ingestion"
+      },
+      "period_s": 900,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "ingestion-error-eightsleep",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "eightsleep-data-ingestion"
+      },
+      "period_s": 900,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "ingestion-error-enrichment",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "activity-enrichment"
+      },
+      "period_s": 86400,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "ingestion-error-macrofactor",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "macrofactor-data-ingestion"
+      },
+      "period_s": 900,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "ingestion-error-strava",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "strava-data-ingestion"
+      },
+      "period_s": 900,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "ingestion-error-todoist",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "todoist-data-ingestion"
+      },
+      "period_s": 900,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "ingestion-error-whoop",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "whoop-data-ingestion"
+      },
+      "period_s": 900,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "ingestion-error-withings",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "withings-data-ingestion"
+      },
+      "period_s": 900,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "insight-email-parser-errors",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "insight-email-parser"
+      },
+      "period_s": 86400,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "journal-enrichment-errors",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "journal-enrichment"
+      },
+      "period_s": 86400,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "key-rotator-errors",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "life-platform-key-rotator"
+      },
+      "period_s": 86400,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "life-platform-anomaly-detector-errors",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "anomaly-detector"
+      },
+      "period_s": 300,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "life-platform-daily-brief-errors",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "daily-brief"
+      },
+      "period_s": 300,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "life-platform-ingestion-failures",
+      "state": "OK",
+      "metric": "NumberOfMessagesSent",
+      "namespace": "AWS/SQS",
+      "dimensions": {
+        "QueueName": "life-platform-ingestion-dlq"
+      },
+      "period_s": 300,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "life-platform-lambda-errors",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "life-platform-mcp"
+      },
+      "period_s": 300,
+      "threshold": 3.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "life-platform-monthly-digest-errors",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "monthly-digest"
+      },
+      "period_s": 300,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "life-platform-recursive-loop",
+      "state": "OK",
+      "metric": "RecursiveInvocationsDropped",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "life-platform-mcp"
+      },
+      "period_s": 60,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "life-platform-weekly-digest-errors",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "weekly-digest"
+      },
+      "period_s": 300,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "mcp-server-duration-high",
+      "state": "OK",
+      "metric": "Duration",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "life-platform-mcp"
+      },
+      "period_s": 86400,
+      "threshold": 240000.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "notion-ingestion-errors",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "notion-journal-ingestion"
+      },
+      "period_s": 86400,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "nutrition-review-errors",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "nutrition-review"
+      },
+      "period_s": 86400,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "weather-data-ingestion-errors",
+      "state": "OK",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "weather-data-ingestion"
+      },
+      "period_s": 86400,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    },
+    {
+      "name": "wednesday-chronicle-errors",
+      "state": "ALARM",
+      "metric": "Errors",
+      "namespace": "AWS/Lambda",
+      "dimensions": {
+        "FunctionName": "wednesday-chronicle"
+      },
+      "period_s": 86400,
+      "threshold": 1.0,
+      "actions": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+      ]
+    }
+  ],
+  "log_groups": [
+    {
+      "name": "/aws/lambda/activity-enrichment",
+      "retention_days": 30,
+      "stored_bytes": 130733
+    },
+    {
+      "name": "/aws/lambda/adaptive-mode-compute",
+      "retention_days": null,
+      "stored_bytes": 0
+    },
+    {
+      "name": "/aws/lambda/anomaly-detector",
+      "retention_days": 30,
+      "stored_bytes": 31564
+    },
+    {
+      "name": "/aws/lambda/apple-health-ingestion",
+      "retention_days": 30,
+      "stored_bytes": 495965
+    },
+    {
+      "name": "/aws/lambda/character-sheet-compute",
+      "retention_days": null,
+      "stored_bytes": 3178
+    },
+    {
+      "name": "/aws/lambda/daily-brief",
+      "retention_days": 30,
+      "stored_bytes": 52748
+    },
+    {
+      "name": "/aws/lambda/dashboard-refresh",
+      "retention_days": null,
+      "stored_bytes": 6156
+    },
+    {
+      "name": "/aws/lambda/dropbox-poll",
+      "retention_days": 30,
+      "stored_bytes": 308080
+    },
+    {
+      "name": "/aws/lambda/eightsleep-data-ingestion",
+      "retention_days": 30,
+      "stored_bytes": 15185
+    },
+    {
+      "name": "/aws/lambda/garmin-data-ingestion",
+      "retention_days": 30,
+      "stored_bytes": 44183
+    },
+    {
+      "name": "/aws/lambda/habitify-data-ingestion",
+      "retention_days": 30,
+      "stored_bytes": 19647
+    },
+    {
+      "name": "/aws/lambda/health-auto-export-webhook",
+      "retention_days": 30,
+      "stored_bytes": 39919
+    },
+    {
+      "name": "/aws/lambda/insight-email-parser",
+      "retention_days": 30,
+      "stored_bytes": 1818
+    },
+    {
+      "name": "/aws/lambda/journal-enrichment",
+      "retention_days": 30,
+      "stored_bytes": 8400
+    },
+    {
+      "name": "/aws/lambda/life-platform-data-export",
+      "retention_days": null,
+      "stored_bytes": 0
+    },
+    {
+      "name": "/aws/lambda/life-platform-freshness-checker",
+      "retention_days": 30,
+      "stored_bytes": 25133
+    },
+    {
+      "name": "/aws/lambda/life-platform-key-rotator",
+      "retention_days": null,
+      "stored_bytes": 1826
+    },
+    {
+      "name": "/aws/lambda/life-platform-mcp",
+      "retention_days": 30,
+      "stored_bytes": 273474
+    },
+    {
+      "name": "/aws/lambda/macrofactor-data-ingestion",
+      "retention_days": 30,
+      "stored_bytes": 29925
+    },
+    {
+      "name": "/aws/lambda/monthly-digest",
+      "retention_days": 30,
+      "stored_bytes": 3569
+    },
+    {
+      "name": "/aws/lambda/notion-journal-ingestion",
+      "retention_days": 30,
+      "stored_bytes": 16957
+    },
+    {
+      "name": "/aws/lambda/nutrition-review",
+      "retention_days": null,
+      "stored_bytes": 3482
+    },
+    {
+      "name": "/aws/lambda/strava-data-ingestion",
+      "retention_days": 30,
+      "stored_bytes": 35018
+    },
+    {
+      "name": "/aws/lambda/todoist-data-ingestion",
+      "retention_days": 30,
+      "stored_bytes": 11327
+    },
+    {
+      "name": "/aws/lambda/us-east-1.life-platform-buddy-auth",
+      "retention_days": null,
+      "stored_bytes": 48374
+    },
+    {
+      "name": "/aws/lambda/us-east-1.life-platform-cf-auth",
+      "retention_days": null,
+      "stored_bytes": 82111
+    },
+    {
+      "name": "/aws/lambda/weather-data-ingestion",
+      "retention_days": 30,
+      "stored_bytes": 5123
+    },
+    {
+      "name": "/aws/lambda/wednesday-chronicle",
+      "retention_days": null,
+      "stored_bytes": 7366
+    },
+    {
+      "name": "/aws/lambda/weekly-digest",
+      "retention_days": 30,
+      "stored_bytes": 23197
+    },
+    {
+      "name": "/aws/lambda/weekly-plate",
+      "retention_days": null,
+      "stored_bytes": 5720
+    },
+    {
+      "name": "/aws/lambda/whoop-data-ingestion",
+      "retention_days": 30,
+      "stored_bytes": 68264
+    },
+    {
+      "name": "/aws/lambda/withings-data-ingestion",
+      "retention_days": 30,
+      "stored_bytes": 27043
+    }
+  ],
+  "dlq": [
+    {
+      "queue_url": "https://sqs.us-west-2.amazonaws.com/205930651321/life-platform-ingestion-dlq",
+      "queue_name": "life-platform-ingestion-dlq",
+      "messages_available": 5,
+      "messages_in_flight": 0
+    }
+  ],
+  "dynamodb": {
+    "table": {
+      "item_count": 15420,
+      "size_bytes": 21616128,
+      "billing_mode": "PAY_PER_REQUEST",
+      "deletion_protection": true,
+      "pitr_enabled": true,
+      "gsi_count": 0
+    },
+    "sources_discovered": [
+      "apple_health",
+      "dexa",
+      "dropbox_tracker",
+      "genome",
+      "habit_scores",
+      "habitify",
+      "macrofactor",
+      "notion"
+    ],
+    "source_record_counts": {
+      "apple_health": 2518,
+      "dexa": 1,
+      "dropbox_tracker": 0,
+      "genome": 0,
+      "habit_scores": 10,
+      "habitify": 10,
+      "macrofactor": 100,
+      "notion": 1
+    }
+  },
+  "cost": {
+    "current_month": {
+      "period": "2026-03-01 to 2026-03-05",
+      "services": {
+        "AWS Secrets Manager": 0.7234,
+        "Amazon CloudFront": 0.0051,
+        "Amazon DynamoDB": 0.0119,
+        "Amazon Route 53": 0.5025,
+        "Amazon Simple Storage Service": 0.0093,
+        "Tax": 0.13
+      },
+      "total": 1.3822
+    },
+    "last_month": {
+      "period": "2026-02-01 to 2026-03-01",
+      "services": {
+        "AWS Cost Explorer": 0.09,
+        "AWS Secrets Manager": 0.9992,
+        "Amazon DynamoDB": 0.0465,
+        "Amazon Route 53": 0.5003,
+        "Amazon Simple Storage Service": 0.1269,
+        "Tax": 0.16
+      },
+      "total": 1.9229
+    }
+  },
+  "secrets": {
+    "count": 12
+  },
+  "eventbridge": [
+    {
+      "name": "life-platform-freshness-check",
+      "state": "ENABLED",
+      "schedule": "cron(45 16 * * ? *)"
+    },
+    {
+      "name": "life-platform-monthly-export",
+      "state": "ENABLED",
+      "schedule": "cron(0 11 1 * ? *)"
+    },
+    {
+      "name": "life-platform-nightly-warmer",
+      "state": "ENABLED",
+      "schedule": "cron(0 16 * * ? *)"
+    },
+    {
+      "name": "activity-enrichment-nightly",
+      "state": "ENABLED",
+      "schedule": "cron(30 14 * * ? *)"
+    },
+    {
+      "name": "anomaly-detector-daily",
+      "state": "ENABLED",
+      "schedule": "cron(5 15 * * ? *)"
+    },
+    {
+      "name": "daily-brief-schedule",
+      "state": "ENABLED",
+      "schedule": "cron(0 17 * * ? *)"
+    },
+    {
+      "name": "dropbox-poll-schedule",
+      "state": "ENABLED",
+      "schedule": "rate(30 minutes)"
+    },
+    {
+      "name": "eightsleep-daily-ingestion",
+      "state": "ENABLED",
+      "schedule": "cron(0 14 * * ? *)"
+    },
+    {
+      "name": "garmin-daily-ingestion",
+      "state": "ENABLED",
+      "schedule": "cron(0 13 * * ? *)"
+    },
+    {
+      "name": "habitify-daily-ingest",
+      "state": "ENABLED",
+      "schedule": "cron(15 13 * * ? *)"
+    },
+    {
+      "name": "journal-enrichment-daily",
+      "state": "ENABLED",
+      "schedule": "cron(30 13 * * ? *)"
+    },
+    {
+      "name": "macrofactor-daily-ingestion",
+      "state": "ENABLED",
+      "schedule": "cron(0 15 * * ? *)"
+    },
+    {
+      "name": "monthly-digest-schedule",
+      "state": "ENABLED",
+      "schedule": "cron(0 15 ? * 1#1 *)"
+    },
+    {
+      "name": "notion-daily-ingest",
+      "state": "ENABLED",
+      "schedule": "cron(0 13 * * ? *)"
+    },
+    {
+      "name": "strava-daily-ingestion",
+      "state": "ENABLED",
+      "schedule": "cron(30 13 * * ? *)"
+    },
+    {
+      "name": "todoist-daily-ingestion",
+      "state": "ENABLED",
+      "schedule": "cron(45 13 * * ? *)"
+    },
+    {
+      "name": "weather-daily-ingestion",
+      "state": "ENABLED",
+      "schedule": "cron(45 12 * * ? *)"
+    },
+    {
+      "name": "weekly-digest-sunday",
+      "state": "ENABLED",
+      "schedule": "cron(0 15 ? * SUN *)"
+    },
+    {
+      "name": "whoop-daily-ingestion",
+      "state": "ENABLED",
+      "schedule": "cron(0 13 * * ? *)"
+    },
+    {
+      "name": "whoop-recovery-refresh",
+      "state": "ENABLED",
+      "schedule": "cron(30 16 * * ? *)"
+    },
+    {
+      "name": "withings-daily-ingestion",
+      "state": "ENABLED",
+      "schedule": "cron(15 13 * * ? *)"
+    }
+  ],
+  "mcp_config": {
+    "file_exists": true,
+    "version": "2.50.0",
+    "sources_list": [
+      "whoop",
+      "withings",
+      "strava",
+      "todoist",
+      "apple_health",
+      "hevy",
+      "eightsleep",
+      "chronicling",
+      "macrofactor",
+      "garmin",
+      "habitify",
+      "notion",
+      "labs",
+      "dexa",
+      "genome",
+      "weather",
+      "supplements",
+      "state_of_mind",
+      "habit_scores"
+    ],
+    "sot_domains": [
+      "cardio",
+      "strength",
+      "physiology",
+      "nutrition",
+      "sleep",
+      "sleep_environment",
+      "journal",
+      "body",
+      "steps",
+      "tasks",
+      "habits",
+      "stress",
+      "body_battery",
+      "gait",
+      "energy_expenditure",
+      "cgm",
+      "water",
+      "caffeine",
+      "supplements",
+      "weather",
+      "state_of_mind"
+    ],
+    "tool_modules": [
+      "tools_adaptive.py",
+      "tools_board.py",
+      "tools_cgm.py",
+      "tools_character.py",
+      "tools_correlation.py",
+      "tools_data.py",
+      "tools_habits.py",
+      "tools_health.py",
+      "tools_journal.py",
+      "tools_labs.py",
+      "tools_lifestyle.py",
+      "tools_nutrition.py",
+      "tools_sleep.py",
+      "tools_social.py",
+      "tools_strength.py",
+      "tools_training.py"
+    ],
+    "tool_module_count": 16
+  },
+  "docs": [
+    {
+      "name": "ARCHITECTURE.md",
+      "size_bytes": 35074,
+      "modified_at": "2026-03-05T19:03:11.836551+00:00",
+      "version_detected": "v2.72.0"
+    },
+    {
+      "name": "AVATAR_DESIGN_STRATEGY.md",
+      "size_bytes": 24052,
+      "modified_at": "2026-03-03T15:34:54.382569+00:00",
+      "version_detected": null
+    },
+    {
+      "name": "CHANGELOG.md",
+      "size_bytes": 142312,
+      "modified_at": "2026-03-05T20:14:44.235596+00:00",
+      "version_detected": "v2.74.0"
+    },
+    {
+      "name": "CHANGELOG_ARCHIVE.md",
+      "size_bytes": 6160,
+      "modified_at": "2026-02-24T16:51:56.832489+00:00",
+      "version_detected": "v2.11.0"
+    },
+    {
+      "name": "COST_TRACKER.md",
+      "size_bytes": 4085,
+      "modified_at": "2026-03-03T22:11:02.840733+00:00",
+      "version_detected": "v2.63.0"
+    },
+    {
+      "name": "DATA_DICTIONARY.md",
+      "size_bytes": 12670,
+      "modified_at": "2026-03-03T23:27:53.769668+00:00",
+      "version_detected": "v2.64.0"
+    },
+    {
+      "name": "FEATURES.md",
+      "size_bytes": 45886,
+      "modified_at": "2026-03-05T19:04:11.241019+00:00",
+      "version_detected": "v2.72.0"
+    },
+    {
+      "name": "HANDOVER_LATEST.md",
+      "size_bytes": 3351,
+      "modified_at": "2026-03-05T20:15:09.530162+00:00",
+      "version_detected": "v2.73.0"
+    },
+    {
+      "name": "INCIDENT_LOG.md",
+      "size_bytes": 6185,
+      "modified_at": "2026-03-03T18:31:34.125137+00:00",
+      "version_detected": "v2.61.0"
+    },
+    {
+      "name": "INFRASTRUCTURE.md",
+      "size_bytes": 6900,
+      "modified_at": "2026-03-04T21:58:35.478815+00:00",
+      "version_detected": "v2.67.0"
+    },
+    {
+      "name": "MCP_TOOL_CATALOG.md",
+      "size_bytes": 25976,
+      "modified_at": "2026-03-05T19:05:23.449974+00:00",
+      "version_detected": "v2.72.0"
+    },
+    {
+      "name": "PIR-2026-02-28-ingestion-outage.md",
+      "size_bytes": 9622,
+      "modified_at": "2026-02-28T18:03:23.033039+00:00",
+      "version_detected": null
+    },
+    {
+      "name": "PROJECT_PLAN.md",
+      "size_bytes": 42047,
+      "modified_at": "2026-03-05T20:39:43.279849+00:00",
+      "version_detected": "v2.74.0"
+    },
+    {
+      "name": "PROJECT_PLAN_ARCHIVE.md",
+      "size_bytes": 4854,
+      "modified_at": "2026-02-24T16:53:11.926404+00:00",
+      "version_detected": null
+    },
+    {
+      "name": "REVIEW_RUNBOOK.md",
+      "size_bytes": 7737,
+      "modified_at": "2026-02-28T22:22:20.354065+00:00",
+      "version_detected": null
+    },
+    {
+      "name": "RUNBOOK.md",
+      "size_bytes": 16107,
+      "modified_at": "2026-03-05T19:07:01.006732+00:00",
+      "version_detected": "v2.72.0"
+    },
+    {
+      "name": "SCHEMA.md",
+      "size_bytes": 53823,
+      "modified_at": "2026-03-05T19:06:31.900665+00:00",
+      "version_detected": "v2.72.0"
+    },
+    {
+      "name": "USER_GUIDE.md",
+      "size_bytes": 29345,
+      "modified_at": "2026-03-04T04:26:40.339399+00:00",
+      "version_detected": "v2.66.1"
+    },
+    {
+      "name": "avatar-design-strategy.md",
+      "size_bytes": 27989,
+      "modified_at": "2026-03-03T03:54:34.794689+00:00",
+      "version_detected": null
+    }
+  ],
+  "changelog_version": "v2.74.0",
+  "summary": {
+    "lambda_count": 30,
+    "alarm_count": 30,
+    "log_groups_without_retention": 10,
+    "alarms_in_alarm": [
+      "wednesday-chronicle-errors"
+    ],
+    "dlq_total_messages": 5,
+    "ddb_sources_discovered": 8,
+    "ddb_item_count": 15420,
+    "mcp_config_version": "2.50.0",
+    "changelog_version": "v2.74.0",
+    "docs_count": 19,
+    "cost_current_month": 1.3822
+  }
+}
