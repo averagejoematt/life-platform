@@ -1,0 +1,132 @@
+{
+  "_comment": "Show & Tell data manifest. Update this file before each run. Everything in the PDF that changes version-to-version lives here.",
+  "meta": {
+    "version": "v2.80.1",
+    "git_objects": "741",
+    "sessions": "~80",
+    "date": "March 2026"
+  },
+  "platform_stats": {
+    "lambdas": 30,
+    "tools": 122,
+    "sources": 19,
+    "modules": 26,
+    "alarms": 35,
+    "dlq_lambdas": 20,
+    "cost_per_month": "$3",
+    "handover_files": "125+",
+    "changelog_entries": "106+",
+    "incidents_logged": "24+",
+    "rca_documents": 1
+  },
+  "cover_kpis": [
+    {
+      "val": "19",
+      "label": "Data Sources"
+    },
+    {
+      "val": "122",
+      "label": "MCP Tools"
+    },
+    {
+      "val": "30",
+      "label": "Lambdas"
+    },
+    {
+      "val": "~80",
+      "label": "Sessions Built In"
+    },
+    {
+      "val": "~$3/mo",
+      "label": "AWS Cost"
+    },
+    {
+      "val": "v2.80.1",
+      "label": "Version"
+    }
+  ],
+  "story_stats": [
+    {
+      "val": "19 sources",
+      "sub": "unified into one"
+    },
+    {
+      "val": "4 years",
+      "sub": "of health data"
+    },
+    {
+      "val": "~80 sessions",
+      "sub": "with Claude to build"
+    },
+    {
+      "val": "$3/month",
+      "sub": "fully operational"
+    },
+    {
+      "val": "0 days",
+      "sub": "manual data entry"
+    },
+    {
+      "val": "v2.80.1",
+      "sub": "current version"
+    }
+  ],
+  "architecture": {
+    "pipeline_description": "Data Sources (19 sources) \u2192 Ingest (EventBridge + 30 Lambdas + API Gateway + SQS DLQs) \u2192 Storage (DynamoDB + S3) \u2192 Compute (nightly Lambdas) \u2192 Delivery (SES + CloudFront + MCP)",
+    "git_repo": "v2.80.1 \u2014 555 objects"
+  },
+  "incidents": {
+    "resiliency_subtitle": "DLQs \u00b7 alarms \u00b7 gap-aware backfill \u00b7 3 incidents resolved <1hr each",
+    "dlq_count": 20,
+    "alarm_count": 35,
+    "p1_count": 2,
+    "p2_count": 5,
+    "resolved_under_1hr": 3,
+    "resolved_examples": [
+      {
+        "title": "Secrets consolidation",
+        "detail": "stale SECRET_NAME env var on 2 Lambdas \u2014 CloudWatch surfaced immediately, env var patched"
+      },
+      {
+        "title": "CloudFront double-pathing",
+        "detail": "origin path '/dashboard' caused 403 on avatar assets \u2014 URL path analysis resolved in <20 min"
+      },
+      {
+        "title": "Handler filename mismatch",
+        "detail": "Weekly Digest used wrong zip entry \u2014 CloudWatch import error on first invocation, corrected in one redeploy"
+      }
+    ]
+  },
+  "roadmap_near_term": [
+    {
+      "feature": "Monarch Money",
+      "status": "Auth done",
+      "detail": "Financial data as health input: spend, savings rate, net worth alongside health scores"
+    },
+    {
+      "feature": "Reward System (Ph.4)",
+      "status": "Partial",
+      "detail": "User-defined rewards triggered by Character Sheet milestones \u2014 weekend away, spa day, new gear, dinner out, concert tickets"
+    },
+    {
+      "feature": "Conversational Coach",
+      "status": "Designed",
+      "detail": "iOS Shortcut \u2192 voice check-in \u2192 Lambda \u2192 Claude \u2192 structured journal entry"
+    },
+    {
+      "feature": "Google Calendar",
+      "status": "Designed",
+      "detail": "Demand-side context: meeting load, travel days, and schedule density as health inputs"
+    },
+    {
+      "feature": "LLM Failover Router",
+      "status": "Planned",
+      "detail": "If Anthropic API is unavailable, a router Lambda retries with OpenAI GPT-4o as fallback \u2014 keeps all 9 weekly emails firing even during outages"
+    }
+  ],
+  "board_personas": "Dr. Lisa Park (sleep), Dr. Sarah Chen (training), Dr. Marcus Webb (nutrition), Dr. Peter Attia (metabolic), Coach Rodriguez (behavioral), Dr. Paul Conti (psychiatry), Dr. Vivek Murthy (social), Elena Voss (narrator)",
+  "key_learning_versions": {
+    "handover_version": "v2.80",
+    "incident_count_1hr": 3
+  }
+}
