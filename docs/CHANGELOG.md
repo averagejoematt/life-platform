@@ -1,5 +1,18 @@
 # Life Platform — Changelog
 
+## v2.80.2 — 2026-03-06: Show & Tell PDF + Pipeline
+- Built complete Show & Tell PDF (v5) for internal presentation — boss/peers/delegates audience
+- Privacy redactions: habit substance rows (shot02/05), weight numbers (shot06/16/18), Brittany vulnerable content (shot07)
+- Content reframe: removed personal weight loss narrative → data aggregation framing throughout
+- New PDF section 12: Documentation System (changelog, handovers, incident log, RCA)
+- New PDF section: Source-of-truth callout in Data Model
+- Board of Directors concept box rebuilt as Paragraph layout (text wraps correctly)
+- Tier progression diagram: consistent pixel art avatars across all 5 tiers
+- Built `show_and_tell/` pipeline: setup.sh, run.sh, manifest.json, update_manifest.py, capture_screenshots.py, redact_screenshots.py, build_pdf.py
+- Pipeline reduces future Show & Tell prep from ~1 day → ~20 min
+- update_manifest.py auto-reads version/incidents/handovers/tools from live docs
+- redact_screenshots.py codifies all redaction rules with documented reasons and resolution-independent coordinates
+
 ## v2.80.1 — 2026-03-06: Git/GitHub setup
 - Added `.gitignore` rules for `datadrops/`, Lambda backups, dashboard data JSON, `.tar.gz` files
 - Set up SSH key auth (`~/.ssh/id_ed25519`) for GitHub — no more token-in-URL
