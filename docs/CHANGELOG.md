@@ -1,5 +1,13 @@
 # Life Platform — Changelog
 
+## v2.80.1 — 2026-03-06: Git/GitHub setup
+- Added `.gitignore` rules for `datadrops/`, Lambda backups, dashboard data JSON, `.tar.gz` files
+- Set up SSH key auth (`~/.ssh/id_ed25519`) for GitHub — no more token-in-URL
+- Committed and pushed full platform catch-up to `git@github.com:averagejoematt/life-platform.git` (555 objects)
+- Added Session Close Checklist to `docs/RUNBOOK.md`
+- Updated session close ritual to include `git add -A && git commit && git push`
+
+
 > Recent versions only. For older entries, see CHANGELOG_ARCHIVE.md.
 
 ---
