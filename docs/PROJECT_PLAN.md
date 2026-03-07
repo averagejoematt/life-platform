@@ -1,17 +1,17 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-06 (v2.78.0 — 124 MCP tools, 29 Lambdas, 19 data sources, 6 secrets, 35 alarms)
+> Last update: 2026-03-07 (v2.82.0 — 124 MCP tools, 32 Lambdas, 19 data sources, 6 secrets, 35 alarms)
 
 ---
 
 ## Current State
 
-- **Platform version:** v2.79.0
+- **Platform version:** v2.82.0
 - **MCP Server:** 121 tools across 26-module package, serving health data through Claude Desktop + claude.ai + Claude mobile (1024 MB, 12 tools pre-cached nightly)
 - **Remote MCP:** Function URL `c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` with OAuth auto-approve + HMAC Bearer token validation
 - **Data Sources:** 19 (12 scheduled + 1 webhook + 3 manual/periodic + 2 MCP-managed + 1 State of Mind via webhook)
-- **Lambdas:** 30 (13 ingestion + 1 webhook + 2 enrichment + 6 email/digest + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 dashboard-refresh + 1 data-export)
+- **Lambdas:** 32 (13 ingestion + 1 webhook + 2 enrichment + 6 email/digest + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 daily-metrics-compute + 1 dashboard-refresh + 1 data-export + 1 qa-smoke)
 - **Cost:** Under $25/month (~$3/month projected after secrets consolidation)
 - **Secrets Manager:** 6 secrets (was 12 — consolidated anthropic/todoist/habitify/health-auto-export/notion/dropbox into `life-platform/api-keys`)
 - **CloudWatch Alarms:** 35 (all Lambdas now monitored)
@@ -106,6 +106,7 @@
 9:00 AM   MCP cache warmer
 9:30 AM   Whoop recovery refresh (today's data)
 9:35 AM   Character Sheet compute (reads yesterday's data, stores to DDB)
+9:40 AM   Daily Metrics compute (day grade, readiness, streaks, TSB, HRV, weight → computed_metrics)
 9:45 AM   Freshness check
 10:00 AM  Daily Brief email (reads character_sheet record)
 2:00 PM   Dashboard refresh (lightweight, no AI — updates weight/glucose/zone2/TSB/buddy)
@@ -161,7 +162,7 @@
 
 | # | Item | Description | Effort | 💰 |
 |---|------|-------------|--------|----|
-| 53 | **Daily Brief compute refactor** | Daily Brief currently performs multi-range DynamoDB scans and inline computation (TSB, HRV averages, weight delta, sleep debt, habit scores, readiness) that should be pre-computed and stored. Pattern: new `daily-metrics-compute` Lambda runs at 9:40 AM PT (after Whoop refresh, before brief), writes `pk=USER#matthew#SOURCE#computed_metrics, sk=DATE#YYYY-MM-DD` with all derived fields. Brief becomes pure read + render — zero derivation logic. Fixes dual `day_grade` write paths, makes computed values reusable by MCP tools and dashboard refresh. Follows established `character-sheet-compute` pattern. | 4-6 hr (1-2 sessions) | $0 |
+| ~~53~~ | ~~**Daily Brief compute refactor**~~ ✅ | Daily Brief compute refactor: `daily-metrics-compute` Lambda at 9:40 AM PT, `SOURCE#computed_metrics` DDB partition, Brief reads pre-computed values with inline fallback. v2.82.0. | ~~4-6 hr~~ | $0 |
 | 14 | **⚠️ COST: WAF rate limiting** | Basic rate rule on Lambda Function URL. Protects against abuse/runaway costs. | 1 hr | **⚠️ +$5/mo (25%)** |
 | ~~15~~ | ~~**MCP API key rotation**~~ | 90-day Secrets Manager auto-rotation with Lambda rotator function. Security hygiene. | 30 min | ~$0 |
 | 16 | **Grip strength tracking** | Monthly manual log via Notion. $15 dynamometer. Strongest all-cause mortality predictor after VO2max (Attia). Trend + percentile vs age norms. | 2 hr | $0 |

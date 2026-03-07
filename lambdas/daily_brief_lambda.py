@@ -1,5 +1,5 @@
 """
-Daily Brief Lambda — v2.77.0 (Monolith extraction: html_builder, ai_calls, output_writers)
+Daily Brief Lambda — v2.82.0 (Compute refactor: reads pre-computed metrics from daily-metrics-compute Lambda)
 Fires at 10:00am PT daily (18:00 UTC via EventBridge).
 
 v2.2 changes:
@@ -1123,7 +1123,7 @@ def lambda_handler(event, context):
         return _regrade_handler(regrade_dates, profile)
 
     demo_mode = event.get("demo_mode", False)
-    print("[INFO] Daily Brief v2.77.0 starting..." + (" [DEMO MODE]" if demo_mode else ""))
+    print("[INFO] Daily Brief v2.82.0 starting..." + (" [DEMO MODE]" if demo_mode else ""))
     profile = fetch_profile()
     if not profile:
         print("[ERROR] No profile found")
@@ -1148,20 +1148,52 @@ def lambda_handler(event, context):
                 float(a.get("moving_time_seconds") or 0) for a in strava["activities"])
             print("[INFO] Dedup: " + str(orig_count) + " → " + str(deduped_count) + " activities")
 
+    # Try to read pre-computed metrics from daily-metrics-compute Lambda (9:40 AM PT).
+    # If the record exists, we skip all inline scoring and stores — they already happened.
+    # Fallback to inline computation if record is missing (Lambda not yet deployed, backfill, etc.).
+    _computed = None
     try:
-        day_grade_score, grade, component_scores, component_details = compute_day_grade(data, profile)
-        print("[INFO] Day Grade: " + str(day_grade_score) + " (" + grade + ")")
-    except Exception as e:
-        print("[WARN] compute_day_grade failed, using defaults: " + str(e))
-        day_grade_score, grade, component_scores, component_details = None, "—", {}, {}
+        _computed = fetch_date("computed_metrics", yesterday)
+        if _computed:
+            print("[INFO] Using pre-computed metrics for " + yesterday)
+        else:
+            print("[WARN] No pre-computed metrics for " + yesterday + " — computing inline (fallback)")
+    except Exception as _e:
+        print("[WARN] Could not fetch computed_metrics: " + str(_e))
 
-    if day_grade_score is not None and not demo_mode:
+    if _computed:
+        # Read pre-computed values — daily-metrics-compute already stored day_grade + habit_scores
+        _cm_score = _computed.get("day_grade_score")
+        day_grade_score = int(float(_cm_score)) if _cm_score is not None else None
+        grade = _computed.get("day_grade_letter", "—")
+        component_scores  = {k: int(float(v)) if v is not None else None
+                             for k, v in _computed.get("component_scores", {}).items()}
+        component_details = _computed.get("component_details", {})
+        # Overwrite data dict with pre-computed derived values for HTML rendering
+        if _computed.get("tsb")              is not None: data["tsb"]              = float(_computed["tsb"])
+        if _computed.get("hrv_7d")           is not None: data["hrv"]["hrv_7d"]    = float(_computed["hrv_7d"])
+        if _computed.get("hrv_30d")          is not None: data["hrv"]["hrv_30d"]   = float(_computed["hrv_30d"])
+        if _computed.get("sleep_debt_7d_hrs") is not None: data["sleep_debt_7d_hrs"] = float(_computed["sleep_debt_7d_hrs"])
+        if _computed.get("latest_weight"):   data["latest_weight"]   = float(_computed["latest_weight"])
+        if _computed.get("week_ago_weight"): data["week_ago_weight"] = float(_computed["week_ago_weight"])
+        if _computed.get("avatar_weight"):   data["avatar_weight"]   = float(_computed["avatar_weight"])
+        print("[INFO] Day Grade (pre-computed): " + str(day_grade_score) + " (" + grade + ")")
+    else:
+        # Fallback: compute inline and store (pre-computed Lambda not yet run)
         try:
-            store_day_grade(yesterday, day_grade_score, grade, component_scores,
-                            profile.get("day_grade_weights", {}),
-                            profile.get("day_grade_algorithm_version", "1.1"))
+            day_grade_score, grade, component_scores, component_details = compute_day_grade(data, profile)
+            print("[INFO] Day Grade (inline): " + str(day_grade_score) + " (" + grade + ")")
         except Exception as e:
-            print("[WARN] store_day_grade failed: " + str(e))
+            print("[WARN] compute_day_grade failed, using defaults: " + str(e))
+            day_grade_score, grade, component_scores, component_details = None, "—", {}, {}
+
+        if day_grade_score is not None and not demo_mode:
+            try:
+                store_day_grade(yesterday, day_grade_score, grade, component_scores,
+                                profile.get("day_grade_weights", {}),
+                                profile.get("day_grade_algorithm_version", "1.1"))
+            except Exception as e:
+                print("[WARN] store_day_grade failed: " + str(e))
 
     # Fetch pre-computed adaptive mode (computed by adaptive-mode-compute Lambda at 9:36 AM)
     brief_mode = "standard"
@@ -1191,26 +1223,36 @@ def lambda_handler(event, context):
     except Exception as e:
         print("[WARN] character_sheet fetch failed: " + str(e))
 
-    try:
-        readiness_score, readiness_colour = compute_readiness(data)
-    except Exception as e:
-        print("[WARN] compute_readiness failed: " + str(e))
-        readiness_score, readiness_colour = None, "gray"
-
-    try:
-        streak_data = compute_habit_streaks(profile, yesterday)
-        mvp_streak = streak_data.get("tier0_streak", 0)
-        full_streak = streak_data.get("tier01_streak", 0)
-        vice_streaks = streak_data.get("vice_streaks", {})
-    except Exception as e:
-        print("[WARN] compute_habit_streaks failed: " + str(e))
-        mvp_streak, full_streak, vice_streaks = 0, 0, {}
-
-    if not demo_mode:
+    if _computed:
+        _cm_r = _computed.get("readiness_score")
+        readiness_score  = int(float(_cm_r)) if _cm_r is not None else None
+        readiness_colour = _computed.get("readiness_colour", "gray")
+    else:
         try:
-            store_habit_scores(yesterday, component_details, component_scores, vice_streaks, profile)
+            readiness_score, readiness_colour = compute_readiness(data)
         except Exception as e:
-            print("[WARN] store_habit_scores failed: " + str(e))
+            print("[WARN] compute_readiness failed: " + str(e))
+            readiness_score, readiness_colour = None, "gray"
+
+    if _computed:
+        mvp_streak   = int(float(_computed.get("tier0_streak",  0)))
+        full_streak  = int(float(_computed.get("tier01_streak", 0)))
+        vice_streaks = {k: int(float(v)) for k, v in _computed.get("vice_streaks", {}).items()}
+    else:
+        try:
+            streak_data  = compute_habit_streaks(profile, yesterday)
+            mvp_streak   = streak_data.get("tier0_streak",  0)
+            full_streak  = streak_data.get("tier01_streak", 0)
+            vice_streaks = streak_data.get("vice_streaks",  {})
+        except Exception as e:
+            print("[WARN] compute_habit_streaks failed: " + str(e))
+            mvp_streak, full_streak, vice_streaks = 0, 0, {}
+
+        if not demo_mode:
+            try:
+                store_habit_scores(yesterday, component_details, component_scores, vice_streaks, profile)
+            except Exception as e:
+                print("[WARN] store_habit_scores failed: " + str(e))
 
     # AI calls (all optional — brief works without them)
     api_key = None
