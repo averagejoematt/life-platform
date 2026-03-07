@@ -21,6 +21,7 @@ import json
 import time
 import urllib.error
 import urllib.request
+from datetime import date as _date_cls
 
 # ==============================================================================
 # MODULE STATE (set by init())
@@ -54,6 +55,208 @@ def _safe_float(rec, field, default=None):
 def _avg(vals):
     v = [x for x in vals if x is not None]
     return round(sum(v)/len(v), 1) if v else None
+
+
+# ==============================================================================
+# P2: JOURNEY CONTEXT BLOCK
+# Injected into every AI call — week number, stage, stage-appropriate coaching.
+# ==============================================================================
+
+def _build_journey_context(profile, current_date_str=None):
+    """
+    Compute week number into transformation journey and return stage-appropriate
+    coaching context. Prevents AI from coaching a Week-2 beginner at 300+ lbs
+    like an intermediate athlete.
+
+    Returns a dict with:
+      week_num, days_in, stage, stage_label, coaching_principles (list[str])
+    """
+    start_str = profile.get("journey_start_date", "2026-02-22")
+    try:
+        start = _date_cls.fromisoformat(start_str)
+        today = _date_cls.fromisoformat(current_date_str) if current_date_str else _date_cls.today()
+        days_in = max(1, (today - start).days + 1)
+        week_num = max(1, (days_in + 6) // 7)
+    except Exception:
+        days_in = 1
+        week_num = 1
+
+    start_weight = profile.get("journey_start_weight_lbs", 302)
+    goal_weight  = profile.get("goal_weight_lbs", 185)
+
+    if week_num <= 4:
+        stage = "Foundation"
+        principles = [
+            f"WEEK {week_num} of transformation — form and consistency beat intensity at this stage.",
+            f"Starting weight: {start_weight} lbs. At this bodyweight, a 45-min walk burns ~300-400 kcal and carries significant cardiovascular load — treat it as a PRIMARY training session, not a footnote.",
+            "Walking IS the workout right now. Acknowledge distance, duration, and pace improvements as meaningful athletic progress.",
+            "The primary goal this phase is HABIT FORMATION. All movement is meaningful, even if it looks simple to someone at half this bodyweight.",
+            "Protein target adherence and calorie consistency matter more than macro fine-tuning at this stage.",
+        ]
+    elif week_num <= 12:
+        stage = "Momentum"
+        principles = [
+            f"WEEK {week_num} — {days_in} days in. Habit foundation established. Progressive overload now appropriate.",
+            "Training intensity can begin scaling. Recovery metrics should guide session intensity day-to-day.",
+            f"Bodyweight ({start_weight}+ lbs at start) means bodyweight-adjusted benchmarks apply — not absolute pace/power/load standards.",
+            "Consistency over weeks is more predictive of outcome than any single session's intensity.",
+        ]
+    elif week_num <= 26:
+        stage = "Building"
+        principles = [
+            f"WEEK {week_num} — {days_in} days in. Meaningful base established.",
+            "Progressive overload, periodization, and recovery optimization are primary training levers.",
+            "Performance metrics (pace, load, HR drift) now carry coaching signal.",
+        ]
+    else:
+        stage = "Advanced"
+        principles = [
+            f"WEEK {week_num} — {days_in} days in. Sustained transformation in progress.",
+            "Performance coaching fully applicable. Data-driven periodization and protocol refinement are the levers.",
+        ]
+
+    return {
+        "week_num": week_num,
+        "days_in": days_in,
+        "stage": stage,
+        "stage_label": f"Week {week_num} ({stage} Stage, Day {days_in})",
+        "start_weight": start_weight,
+        "goal_weight": goal_weight,
+        "coaching_principles": principles,
+    }
+
+
+def _format_journey_context(jctx):
+    """Format journey context as a compact string for prompt injection."""
+    lines = [f"JOURNEY CONTEXT: {jctx['stage_label']} | {jctx['start_weight']}→{jctx['goal_weight']} lbs"]
+    lines.append("Stage-appropriate coaching principles:")
+    for p in jctx["coaching_principles"]:
+        lines.append(f"  • {p}")
+    return "\n".join(lines)
+
+
+# ==============================================================================
+# P5: TDEE / DEFICIT CONTEXT
+# ==============================================================================
+
+def _build_tdee_context(data, profile):
+    """
+    Build TDEE + deficit context for nutrition AI calls.
+    MacroFactor computes estimated TDEE; if not available, derive from phase targets.
+    """
+    mf = data.get("macrofactor") or {}
+    # MacroFactor may store estimated TDEE as tdee_kcal or estimated_tdee_kcal
+    tdee = _safe_float(mf, "tdee_kcal") or _safe_float(mf, "estimated_tdee_kcal")
+
+    cal_target = profile.get("calorie_target", 1800)
+
+    # Derive from current phase if MacroFactor doesn't expose TDEE
+    if tdee is None:
+        # Check weight phases for deficit target
+        phases = profile.get("weight_loss_phases", [])
+        latest_weight = data.get("latest_weight")
+        deficit_target = 1500  # Phase 1 default
+        for p in phases:
+            if latest_weight and latest_weight >= p.get("end_lbs", 0):
+                deficit_target = p.get("calorie_deficit_target", 1500)
+                break
+        tdee = cal_target + deficit_target
+
+    # Actual intake
+    actual_cal = _safe_float(mf, "total_calories_kcal")
+    if actual_cal is None:
+        return f"Estimated TDEE: ~{int(tdee)} kcal | Target: {cal_target} kcal/day"
+
+    actual_deficit = tdee - actual_cal
+    deficit_pct = round(actual_deficit / tdee * 100, 1)
+
+    lines = [f"Estimated TDEE: ~{int(tdee)} kcal"]
+    lines.append(f"Calorie target: {cal_target} kcal (planned deficit: ~{int(tdee - cal_target)} kcal)")
+    lines.append(f"Actual intake: {int(actual_cal)} kcal → actual deficit: ~{int(actual_deficit)} kcal ({deficit_pct}% of TDEE)")
+
+    if actual_cal < cal_target * 0.75:
+        lines.append("⚠ VERY LOW INTAKE: >25% below target — may be a logging gap or aggressive restriction. Check for logging completeness before coaching deficit.")
+    elif actual_cal > cal_target * 1.10:
+        lines.append("⚠ ABOVE TARGET: more than 10% over calorie goal.")
+
+    return "\n".join(lines)
+
+
+# ==============================================================================
+# P4: HABIT → OUTCOME PATTERNS (simplified)
+# Traces causal links between habit completion and downstream metrics.
+# ==============================================================================
+
+def _build_habit_outcome_context(data, profile):
+    """
+    Simplified habit→outcome pattern context.
+    Shows 7-day T0/T1 completion trend alongside key metric outcomes,
+    so the AI can identify and call out causal chains rather than listing
+    habit gaps and metric scores independently.
+    """
+    habitify_7d = data.get("habitify_7d") or []
+    registry = profile.get("habit_registry", {})
+    if not registry or not habitify_7d:
+        return ""
+
+    # Build causal mapping: habit → outcome metric it supports
+    HABIT_OUTCOME_MAP = {
+        # Sleep habits → sleep quality
+        "wind_down_routine": "sleep_score",
+        "no_screens_1hr_before_bed": "sleep_score",
+        "no_screens_before_bed": "sleep_score",
+        "consistent_bedtime": "sleep_score",
+        "caffeine_cutoff": "sleep_score",
+        "caffeine_cutoff_2pm": "sleep_score",
+        # Nutrition habits → calorie/protein adherence
+        "track_macros": "nutrition",
+        "log_food": "nutrition",
+        "protein_first": "protein_g",
+        "meal_prep": "nutrition",
+        # Movement habits → steps/exercise
+        "morning_walk": "steps",
+        "steps_goal": "steps",
+        "exercise": "movement",
+    }
+
+    tier0_names = [n for n, m in registry.items()
+                   if m.get("tier") == 0 and m.get("status") == "active"]
+    tier1_names = [n for n, m in registry.items()
+                   if m.get("tier") == 1 and m.get("status") == "active"]
+
+    # 7-day completion trend
+    trend_lines = []
+    for day_rec in habitify_7d[-7:]:
+        date_str = day_rec.get("sk", "").replace("DATE#", "")
+        habits_map = day_rec.get("habits", {}) if isinstance(day_rec, dict) else {}
+        t0_done = sum(1 for h in tier0_names
+                      if habits_map.get(h) is not None and float(habits_map.get(h, 0)) >= 1)
+        t1_done = sum(1 for h in tier1_names
+                      if habits_map.get(h) is not None and float(habits_map.get(h, 0)) >= 1)
+        trend_lines.append(f"  {date_str}: T0 {t0_done}/{len(tier0_names)}, T1 {t1_done}/{len(tier1_names)}")
+
+    # Known habit-outcome relationships to surface to the AI
+    causal_pairs = []
+    for h_name, meta in registry.items():
+        if meta.get("status") != "active" or meta.get("tier", 2) > 1:
+            continue
+        outcome = HABIT_OUTCOME_MAP.get(h_name.lower().replace(" ", "_"))
+        why = meta.get("why_matthew", "")
+        if why and outcome:
+            causal_pairs.append(f"  {h_name} → impacts {outcome}: {why[:80]}")
+
+    lines = ["HABIT→OUTCOME CONTEXT:"]
+    if trend_lines:
+        lines.append("7-day T0/T1 completion trend:")
+        lines.extend(trend_lines)
+    if causal_pairs:
+        lines.append("Known causal chains (name the connection if habit was missed):")
+        lines.extend(causal_pairs[:8])  # cap at 8 to avoid prompt bloat
+    lines.append("INSTRUCTION: When a T0/T1 habit was missed, TRACE THE CAUSAL CHAIN. "
+                 "Don't just list 'missed X' — connect it to the metric it's designed to support. "
+                 "E.g. 'Wind-down missed → sleep efficiency 71% (vs your ~82% baseline).'")
+
+    return "\n".join(lines)
 
 
 # ==============================================================================
@@ -253,7 +456,7 @@ def _build_recent_training_summary(data):
 # ==============================================================================
 
 def call_training_nutrition_coach(data, profile, api_key):
-    """AI call: Training coach + Nutritionist combined."""
+    """AI call: Training coach + Nutritionist combined. (P2+P3+P5 aware)"""
     data_summary = build_data_summary(data, profile)
     food_summary = build_food_summary(data)
     activity_summary = build_activity_summary(data)
@@ -261,33 +464,55 @@ def call_training_nutrition_coach(data, profile, api_key):
     weight_ctx = _build_weight_context(data, profile)
     recent_training = _build_recent_training_summary(data)
 
-    prompt = """You are two coaches speaking to Matthew, a 36yo man in Phase 1 of weight loss (""" + weight_ctx + """, 1800 cal/day, 190g protein target).
-Tone: direct, specific, no-BS. Reference specific numbers.
+    # P2: Journey context
+    jctx = _build_journey_context(profile, data.get("date"))
+    journey_block = _format_journey_context(jctx)
+
+    # P5: TDEE context
+    tdee_ctx = _build_tdee_context(data, profile)
+
+    cal_target = profile.get("calorie_target", 1800)
+    protein_target = profile.get("protein_target_g", 190)
+    fat_target = profile.get("fat_target_g", 60)
+    carb_target = profile.get("carb_target_g", 125)
+
+    prompt = f"""You are two coaches speaking to Matthew ({journey_block}).
+
+{tdee_ctx}
 
 LAST 7 DAYS TRAINING CONTEXT:
-""" + recent_training + """
+{recent_training}
 
 STRAVA ACTIVITIES YESTERDAY:
-""" + activity_summary + """
+{activity_summary}
 
 STRENGTH TRAINING DETAIL (from MacroFactor):
-""" + workout_summary + """
+{workout_summary}
 
 FOOD LOG YESTERDAY (with timestamps):
-""" + food_summary + """
+{food_summary}
 
-MACRO TOTALS: """ + json.dumps({k: data_summary[k] for k in ["calories", "protein_g", "fat_g", "carbs_g", "fiber_g"] if k in data_summary}, default=str) + """
-TARGETS: 1800 cal, P190g, F60g, C125g
+MACRO TOTALS: {json.dumps({k: data_summary[k] for k in ["calories", "protein_g", "fat_g", "carbs_g", "fiber_g"] if k in data_summary}, default=str)}
+TARGETS: {cal_target} cal, P{protein_target}g, F{fat_target}g, C{carb_target}g
 
-INSTRUCTIONS:
-- For TRAINING: Give per-activity feedback. For strength sessions, comment on exercise selection, volume, intensity (RIR), and how it connects to goals. For casual walks, just a brief NEAT acknowledgment. Do NOT give generic training advice. IMPORTANT: Consider the 7-day training context above. If yesterday was a rest day or light day after recent strength sessions, acknowledge that recovery is appropriate — do NOT panic about "zero strength training".
-- For NUTRITION: Comment on macro adherence AND meal timing/distribution. When was protein consumed? Any long gaps? Be specific about what to adjust TODAY. Reference actual food items from the log.
+TRAINING COACHING RULES (READ CAREFULLY):
+- You are coaching someone at Week {jctx['week_num']} of transformation, starting weight {jctx['start_weight']} lbs.
+- WALKS ARE PRIMARY TRAINING at this stage. A 45-min walk at {jctx['start_weight']}+ lbs carries ~300-400 kcal load and real cardiovascular demand. DO NOT give them "a brief NEAT acknowledgment." Give them real coaching: comment on pace, duration, HR if available, and connect to the aerobic base being built.
+- For strength sessions: comment on exercise selection, volume, intensity (RIR), and how it connects to goals.
+- Consider the 7-day training context. If yesterday was an appropriate rest day after recent training, say so — don't panic about low load.
+- Evaluate distance, pace, and duration improvements relative to bodyweight and stage — NOT relative to absolute athlete benchmarks.
+
+NUTRITION COACHING RULES:
+- Reference TDEE context above to reason about deficit size.
+- If intake is >25% below target, flag possible logging gap before assuming great adherence.
+- Comment on macro adherence AND meal timing/distribution. When was protein consumed? Any long gaps?
+- Be specific about what to adjust TODAY. Reference actual food items from the log.
 
 Respond in EXACTLY this JSON format, no other text:
-{"training": "2-4 sentences from sports scientist. Per-activity analysis. Reference specific exercises, sets, weights. Brief for walks.", "nutrition": "2-3 sentences from nutritionist about macro adherence + meal timing. Reference specific foods and timestamps. What to adjust today."}"""
+{{"training": "2-4 sentences from sports scientist. Per-activity analysis. Walks evaluated as primary sessions at Week {jctx['week_num']}. Reference specific metrics.", "nutrition": "2-3 sentences from nutritionist about macro adherence + meal timing + deficit context. Reference specific foods and timestamps. What to adjust today."}}"""
 
     try:
-        raw = call_anthropic(prompt, api_key, max_tokens=450)
+        raw = call_anthropic(prompt, api_key, max_tokens=500)
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
@@ -316,12 +541,15 @@ def call_journal_coach(data, profile, api_key):
     obstacles_str = ", ".join(obstacles) if obstacles else "none specified"
     weight_ctx = _build_weight_context(data, profile)
 
-    prompt = """You are a wise, warm-but-direct inner coach reading Matthew's journal from yesterday. He's 36, on a weight loss journey (""" + weight_ctx + """), battling: """ + obstacles_str + """.
+    # P2: Journey context in journal coach too
+    jctx = _build_journey_context(profile, data.get("date"))
 
+    prompt = f"""You are a wise, warm-but-direct inner coach reading Matthew's journal from yesterday.
+He's 36, {jctx['stage_label']} of transformation ({weight_ctx}), battling: {obstacles_str}.
 His coaching tone: Jocko's discipline meets Attia's precision meets Brene Brown's vulnerability.
 
 JOURNAL ENTRIES:
-""" + journal_text + """
+{journal_text}
 
 Write EXACTLY two parts separated by " || ":
 Part 1: A perspective/reflection on what he wrote — something profound, motivating, or reframing. Not a summary. A mirror that shows him something he might not see. 2 sentences max.
@@ -338,9 +566,6 @@ No labels, no formatting. Natural voice. Max 80 words total."""
 
 
 # -- Board of Directors prompt builder -----------------------------------------
-
-_FALLBACK_BOD_INTRO = None  # replaced by dynamic _build_daily_bod_intro_from_config()
-
 
 def _build_daily_bod_intro_from_config(data=None, profile=None):
     """Build the Board of Directors role intro from S3 config."""
@@ -465,6 +690,13 @@ def call_board_of_directors(data, profile, day_grade, grade, component_scores, a
         if cs_effects:
             character_ctx += "\nACTIVE EFFECTS: " + ", ".join(e.get("name", "") for e in cs_effects)
 
+    # P2: Journey context
+    jctx = _build_journey_context(profile, data.get("date"))
+    journey_block = _format_journey_context(jctx)
+
+    # P4: Habit → outcome patterns
+    habit_outcome_ctx = _build_habit_outcome_context(data, profile)
+
     # Try config-driven intro, fall back to dynamic default
     bod_intro = _build_daily_bod_intro_from_config(data, profile)
     if not bod_intro:
@@ -474,19 +706,27 @@ def call_board_of_directors(data, profile, day_grade, grade, component_scores, a
                      f"Speaking to Matthew, 36yo, weight loss journey ({weight_ctx}). Phase 1 Ignition: 3 lbs/week, 1500 kcal deficit, 1800 cal daily.\n"
                      "Tone: direct, empathetic, no-BS.")
 
-    prompt = bod_intro + """
-""" + health_ctx + """
+    prompt = bod_intro + f"""
+
+{journey_block}
+{health_ctx}
 
 YESTERDAY'S DATA:
-""" + json.dumps(data_summary, indent=2, default=str) + """
+{json.dumps(data_summary, indent=2, default=str)}
 
-DAY GRADE: """ + str(day_grade if day_grade is not None else "N/A") + "/100 (" + grade + """)
-""" + component_summary + """
-""" + habit_ctx + """
-""" + character_ctx + """
-""" + journal_ctx + """
+DAY GRADE: {str(day_grade if day_grade is not None else "N/A")}/100 ({grade})
+{component_summary}
+{habit_ctx}
+{habit_outcome_ctx}
+{character_ctx}
+{journal_ctx}
 
-Write 2-3 sentences. Reference specific numbers (at least two). Connect yesterday to today. Celebrate wins briefly, name gaps directly — if a Tier 0 habit was missed, NAME it. If a synergy stack is broken, note it. If there are LEVEL EVENTS, mention them — these are rare and meaningful. If there are ACTIVE EFFECTS like Sleep Drag, note the impact. DO NOT start with "Matthew". Max 60 words."""
+Write 2-3 sentences. Reference specific numbers (at least two). Connect yesterday to today.
+Celebrate wins briefly, name gaps directly — if a Tier 0 habit was missed, NAME it.
+If a synergy stack is broken, note it. If there are LEVEL EVENTS, mention them.
+If there are ACTIVE EFFECTS like Sleep Drag, note the impact.
+CRITICAL: If habit gaps connect to metric outcomes (e.g. missed wind-down → low sleep efficiency), NAME THE CAUSAL CHAIN. Don't just list the gap.
+DO NOT start with "Matthew". Max 60 words."""
 
     if brief_mode == "flourishing":
         prompt += "\n\nTONE: He is FLOURISHING — engagement is high, habits strong, trajectory improving. Lead with reinforcement. Be energising. Name what's working specifically. One brief forward-looking note."
@@ -498,7 +738,7 @@ Write 2-3 sentences. Reference specific numbers (at least two). Connect yesterda
 
 def call_tldr_and_guidance(data, profile, day_grade, grade, component_scores, component_details,
                             readiness_score, readiness_colour, api_key):
-    """v2.2: Combined TL;DR + Smart Guidance — one AI call that returns both."""
+    """v2.3: Combined TL;DR + Smart Guidance — one AI call that returns both. (P2+P4+P5 aware)"""
     data_summary = build_data_summary(data, profile)
 
     # Missed habits context
@@ -540,39 +780,59 @@ def call_tldr_and_guidance(data, profile, day_grade, grade, component_scores, co
 
     weight_ctx = _build_weight_context(data, profile)
 
-    prompt = """You are the intelligence engine behind Matthew's Life Platform daily brief. Your job: synthesize ALL of yesterday's data into (1) one TL;DR sentence and (2) 3-4 smart, personalized guidance items for TODAY.
+    # P2: Journey context
+    jctx = _build_journey_context(profile, data.get("date"))
+    journey_block = _format_journey_context(jctx)
 
-Matthew: 36yo, weight loss journey (""" + weight_ctx + """). Phase 1: 1800 cal/day, 190g protein, 16:8 IF.
+    # P5: TDEE context
+    tdee_ctx = _build_tdee_context(data, profile)
+
+    # P4: Habit → outcome patterns
+    habit_outcome_ctx = _build_habit_outcome_context(data, profile)
+
+    prompt = f"""You are the intelligence engine behind Matthew's Life Platform daily brief.
+Your job: synthesize ALL of yesterday's data into (1) one TL;DR sentence and (2) 3-4 smart, personalized guidance items for TODAY.
+
+{journey_block}
+
+{tdee_ctx}
 
 YESTERDAY'S SIGNALS:
-- Day grade: """ + str(day_grade) + "/100 (" + grade + """)
-- Components: """ + ", ".join(comp_lines) + """
-- Recovery/readiness: """ + str(readiness_score) + " (" + readiness_colour + """)
-- HRV: """ + str(data_summary.get("hrv_yesterday")) + "ms yesterday, 7d avg " + str(data_summary.get("hrv_7d_avg")) + "ms, 30d avg " + str(data_summary.get("hrv_30d_avg")) + """ms
-- TSB (training stress balance): """ + str(data_summary.get("tsb")) + """
-- Sleep: """ + str(data_summary.get("sleep_duration_hrs")) + "hrs, score " + str(data_summary.get("sleep_score")) + ", efficiency " + str(data_summary.get("sleep_efficiency_pct")) + "%. " + sleep_arch + """
-- 7-day sleep debt: """ + str(data.get("sleep_debt_7d_hrs")) + """hrs
-- Calories: """ + str(data_summary.get("calories")) + "/1800, Protein: " + str(data_summary.get("protein_g")) + """/190g
-- Glucose: avg """ + str(data_summary.get("glucose_avg")) + " mg/dL, TIR " + str(data_summary.get("glucose_tir")) + """%, overnight low """ + str(data_summary.get("glucose_min")) + """ mg/dL
-- Gait: walking speed """ + str(data_summary.get("walking_speed_mph")) + " mph, step length " + str(data_summary.get("walking_step_length_in")) + " in, asymmetry " + str(data_summary.get("walking_asymmetry_pct")) + """%
-- Steps: """ + str(data_summary.get("steps")) + """
-- Weight: """ + str(data_summary.get("current_weight")) + " lbs (week ago: " + str(data_summary.get("week_ago_weight")) + """)
-- Missed habits: """ + (", ".join(missed_mvp) if missed_mvp else "none — all completed") + """
-- Missed habit context: """ + ("; ".join(missed_context[:5]) if missed_context else "n/a") + """
-- Journal mood: """ + str(data_summary.get("journal_mood")) + "/5, stress: " + str(data_summary.get("journal_stress")) + """/5
+- Day grade: {day_grade}/100 ({grade})
+- Components: {", ".join(comp_lines)}
+- Recovery/readiness: {readiness_score} ({readiness_colour})
+- HRV: {data_summary.get("hrv_yesterday")}ms yesterday, 7d avg {data_summary.get("hrv_7d_avg")}ms, 30d avg {data_summary.get("hrv_30d_avg")}ms
+- TSB (training stress balance): {data_summary.get("tsb")}
+- Sleep: {data_summary.get("sleep_duration_hrs")}hrs, score {data_summary.get("sleep_score")}, efficiency {data_summary.get("sleep_efficiency_pct")}%. {sleep_arch}
+- 7-day sleep debt: {data.get("sleep_debt_7d_hrs")}hrs
+- Calories: {data_summary.get("calories")}/target, Protein: {data_summary.get("protein_g")}g/{profile.get("protein_target_g", 190)}g
+- Glucose: avg {data_summary.get("glucose_avg")} mg/dL, TIR {data_summary.get("glucose_tir")}%, overnight low {data_summary.get("glucose_min")} mg/dL
+- Gait: walking speed {data_summary.get("walking_speed_mph")} mph, step length {data_summary.get("walking_step_length_in")} in, asymmetry {data_summary.get("walking_asymmetry_pct")}%
+- Steps: {data_summary.get("steps")}
+- Weight: {data_summary.get("current_weight")} lbs (week ago: {data_summary.get("week_ago_weight")})
+- Missed habits: {(", ".join(missed_mvp) if missed_mvp else "none — all completed")}
+- Missed habit context: {("; ".join(missed_context[:5]) if missed_context else "n/a")}
+- Journal mood: {data_summary.get("journal_mood")}/5, stress: {data_summary.get("journal_stress")}/5
+
+{habit_outcome_ctx}
 
 RULES:
 - TL;DR: One sentence, max 20 words. The single most important takeaway from yesterday. Specific. Not generic.
-- Guidance: 3-4 items, each with an emoji prefix and 1 sentence. These must be SMART — derived from the data above, not static advice. Each item should be something that could ONLY apply to TODAY given this specific data combination. Avoid repeating daily constants (IF window, supplements, bedtime) unless there is a data-driven reason to modify them today.
-- Examples of smart guidance: "HRV down 15% + high stress yesterday — do Zone 2 instead of planned HIIT", "Protein 40g short yesterday — front-load with 50g shake before first meal", "3.2hr sleep debt this week — prioritize nap or 30min earlier bedtime tonight"
-- Examples of BAD guidance (too generic): "Stay hydrated", "Get 7.5 hours of sleep", "Caffeine cutoff at noon"
-- NEVER suggest hydration tips if hydration shows NO DATA — the sync is broken, not the behaviour. Suggesting hydration when we have no data is misleading.
+- Guidance: 3-4 items, each with an emoji prefix and 1 sentence. SMART — derived from the data above, not static advice. Each item should be something that could ONLY apply to TODAY given this specific data combination.
+- TDEE-aware nutrition guidance: use the TDEE context to reason about whether today's intake target should be maintained, increased (recovery day), or whether yesterday's intake looks like a logging gap vs genuine restriction.
+- Walk/movement coaching is STAGE-APPROPRIATE: at Week {jctx['week_num']}, if steps were high, that's a genuine training achievement — acknowledge it as such.
+- If habit gaps connect to metric outcomes, the guidance should NAME THE CAUSAL CHAIN (e.g. "Wind-down missed again last night — your sleep efficiency dropped to 71%. One habit change tonight would move that number.")
+- Avoid repeating daily constants (IF window, supplements, bedtime) unless there is a data-driven reason to modify them today.
+- NEVER suggest hydration tips if hydration shows NO DATA — the sync is broken, not the behaviour.
+
+Examples of SMART guidance: "HRV down 15% + high stress yesterday — do Zone 2 instead of planned HIIT", "Protein 40g short yesterday — front-load with 50g shake before first meal"
+Examples of BAD guidance (too generic): "Stay hydrated", "Get 7.5 hours of sleep", "Caffeine cutoff at noon"
 
 Respond in EXACTLY this JSON format, no other text:
-{"tldr": "One sentence TL;DR", "guidance": ["emoji + sentence 1", "emoji + sentence 2", "emoji + sentence 3"]}"""
+{{"tldr": "One sentence TL;DR", "guidance": ["emoji + sentence 1", "emoji + sentence 2", "emoji + sentence 3"]}}"""
 
     try:
-        raw = call_anthropic(prompt, api_key, max_tokens=400)
+        raw = call_anthropic(prompt, api_key, max_tokens=450)
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
