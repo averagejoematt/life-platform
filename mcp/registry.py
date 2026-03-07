@@ -19,6 +19,7 @@ from mcp.tools_character import *
 from mcp.tools_social import *
 from mcp.tools_longevity import *
 from mcp.tools_adaptive import *
+from mcp.tools_todoist import *
 
 TOOLS = {
     "get_sources": {
@@ -2684,6 +2685,211 @@ TOOLS = {
                     "target_ml":  {"type": "number", "description": "Override daily target in ml (default: 35ml/kg bodyweight)."},
                 },
                 "required": [],
+            },
+        },
+    },
+    # ── Todoist Integration ──
+    "get_task_completion_trend": {
+        "fn": get_task_completion_trend,
+        "schema": {
+            "name": "get_task_completion_trend",
+            "description": (
+                "Task completion trend over the last N days with 7-day rolling average and summary stats. "
+                "Shows daily completed count, zero-completion days, current streak, and peak day. "
+                "Use for: 'how productive have I been in Todoist?', 'task completion trend', "
+                "'how many tasks am I completing per day?', 'productivity streak', 'Todoist stats'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "days": {"type": "integer", "description": "Number of days to analyze (default: 30, max: 90)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "get_task_load_summary": {
+        "fn": get_task_load_summary,
+        "schema": {
+            "name": "get_task_load_summary",
+            "description": (
+                "Current task load snapshot: active count, overdue count, due-today count, priority breakdown. "
+                "Includes cognitive load signal (LOW/MODERATE/ELEVATED/HIGH) based on overdue backlog. "
+                "The decision fatigue indicator — high active + high overdue = cognitive overhead that suppresses habits. "
+                "Use for: 'how many tasks do I have?', 'task load', 'overdue tasks', 'due today', "
+                "'how overwhelmed am I?', 'decision fatigue', 'task backlog', 'Todoist load'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "days": {"type": "integer", "description": "Days of recent completion history to include (default: 7)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "get_project_activity": {
+        "fn": get_project_activity,
+        "schema": {
+            "name": "get_project_activity",
+            "description": (
+                "Completion breakdown by Todoist project over the last N days. "
+                "Shows which life domains (Health, Finance, Growth, Relationships, Home) are getting attention "
+                "and which are being neglected. Includes percentage of total and average per day. "
+                "Use for: 'which projects am I completing tasks in?', 'project activity', 'life domain attention', "
+                "'which areas am I neglecting?', 'Todoist project breakdown', 'where am I spending effort?'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "days": {"type": "integer", "description": "Number of days to analyze (default: 30, max: 90)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "get_decision_fatigue_signal": {
+        "fn": get_decision_fatigue_signal,
+        "schema": {
+            "name": "get_decision_fatigue_signal",
+            "description": (
+                "Correlates Todoist task load (active + overdue) with Habitify T0 habit completion rate. "
+                "Identifies the overdue-task threshold above which habit compliance drops — the knowing-doing gap made quantifiable. "
+                "Returns Pearson r correlation, load threshold analysis, and daily breakdown. "
+                "Roadmap item #34. Requires both Todoist and Habitify data in the same date range. "
+                "Use for: 'does task overload hurt my habits?', 'decision fatigue', 'knowing-doing gap', "
+                "'does having too many tasks affect my habits?', 'task load vs habit completion'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "days": {"type": "integer", "description": "Days to analyze (default: 30, min: 14, max: 60)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "get_todoist_day": {
+        "fn": get_todoist_day,
+        "schema": {
+            "name": "get_todoist_day",
+            "description": (
+                "Full Todoist snapshot for a specific date (default: yesterday). "
+                "Returns completed tasks list with project names, overdue/active/due-today counts, "
+                "priority breakdown, and completions by project. "
+                "Use for: 'what tasks did I complete yesterday?', 'Todoist day summary', "
+                "'what was my task load on [date]?', 'show me my completed tasks'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "date": {"type": "string", "description": "Date YYYY-MM-DD (default: yesterday)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    # ── Todoist write tools ──
+    "get_todoist_projects": {
+        "fn": get_todoist_projects,
+        "schema": {
+            "name": "get_todoist_projects",
+            "description": "List all Todoist projects with IDs and names. Call this first before creating or moving tasks to get valid project_id values.",
+            "inputSchema": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    "list_todoist_tasks": {
+        "fn": list_todoist_tasks,
+        "schema": {
+            "name": "list_todoist_tasks",
+            "description": (
+                "List active Todoist tasks with IDs, due dates, and recurrence strings. "
+                "Supports Todoist filter syntax: 'overdue', 'today', 'no date', 'p1', '#Health & Body'. "
+                "Use before updating tasks to get task IDs and inspect current due/recurrence settings."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "filter_str": {"type": "string", "description": "Todoist filter string e.g. 'overdue', '#Health & Body', 'no date'."},
+                    "limit": {"type": "integer", "description": "Max tasks to return (default: 200)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "update_todoist_task": {
+        "fn": update_todoist_task,
+        "schema": {
+            "name": "update_todoist_task",
+            "description": (
+                "Update an existing Todoist task — reschedule, change recurrence, rename, change priority or project. "
+                "IMPORTANT: Always use 'every!' (with exclamation mark) for recurring due_string to reschedule from "
+                "completion date, not original due date. This prevents pile-up when tasks are missed. "
+                "Examples: due_string='every! week', 'every! month', 'every! 3 months', 'every! year'. "
+                "To set first-fire date AND recurrence: set due_string='every! month' AND due_date='2026-04-01'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "task_id":     {"type": "string", "description": "Task ID from list_todoist_tasks."},
+                    "due_string":  {"type": "string", "description": "Recurrence e.g. 'every! week', 'every! month'. Use every! not every."},
+                    "due_date":    {"type": "string", "description": "First-fire date YYYY-MM-DD."},
+                    "content":     {"type": "string", "description": "New task name."},
+                    "description": {"type": "string", "description": "Task description/notes."},
+                    "priority":    {"type": "integer", "description": "1=urgent 2=high 3=medium 4=normal."},
+                    "project_id":  {"type": "string", "description": "Move to project ID."},
+                },
+                "required": ["task_id"],
+            },
+        },
+    },
+    "create_todoist_task": {
+        "fn": create_todoist_task,
+        "schema": {
+            "name": "create_todoist_task",
+            "description": (
+                "Create a new Todoist task with optional recurrence and due date. "
+                "Always use 'every!' for recurring tasks. Get project_id from get_todoist_projects first."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "content":     {"type": "string", "description": "Task name."},
+                    "project_id":  {"type": "string", "description": "Project ID from get_todoist_projects."},
+                    "due_string":  {"type": "string", "description": "e.g. 'every! Sunday', 'every! month'. Use every! for recurring."},
+                    "due_date":    {"type": "string", "description": "YYYY-MM-DD for one-time or first-fire date."},
+                    "priority":    {"type": "integer", "description": "1=urgent 2=high 3=medium 4=normal."},
+                    "description": {"type": "string", "description": "Task description."},
+                },
+                "required": ["content"],
+            },
+        },
+    },
+    "close_todoist_task": {
+        "fn": close_todoist_task,
+        "schema": {
+            "name": "close_todoist_task",
+            "description": "Mark a Todoist task as complete. For recurring tasks, advances to next occurrence. For one-time tasks, removes from active list.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string", "description": "Task ID from list_todoist_tasks."},
+                },
+                "required": ["task_id"],
+            },
+        },
+    },
+    "delete_todoist_task": {
+        "fn": delete_todoist_task,
+        "schema": {
+            "name": "delete_todoist_task",
+            "description": "Permanently delete a Todoist task. Cannot be undone. Use only for duplicates or stale tasks, not for completing.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string", "description": "Task ID from list_todoist_tasks."},
+                },
+                "required": ["task_id"],
             },
         },
     },

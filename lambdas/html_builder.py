@@ -882,6 +882,54 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
     except Exception as _e:
         html += _section_error_html("Blood Pressure", _e)
 
+    # --- Task Load (Todoist) ---
+    try:
+        html += '<!-- S:task_load -->'
+        todoist = data.get("todoist")
+        if todoist:
+            active = int(todoist.get("active_count", 0))
+            overdue = int(todoist.get("overdue_count", 0))
+            due_today = int(todoist.get("due_today_count", 0))
+            completed = int(todoist.get("completed_count", 0))
+            by_project = todoist.get("completions_by_project", {})
+
+            # Cognitive load colour
+            if overdue > 30:
+                load_color = "#dc2626"; load_label = "HIGH"
+            elif overdue > 15:
+                load_color = "#d97706"; load_label = "ELEVATED"
+            elif overdue > 5:
+                load_color = "#eab308"; load_label = "MODERATE"
+            else:
+                load_color = "#059669"; load_label = "CLEAR"
+
+            html += ('<div style="background:#16213e;padding:16px 24px;border-bottom:1px solid #2d2d5e;">'
+                     '<p style="color:#64748b;font-size:10px;margin:0 0 10px;font-weight:700;letter-spacing:1px;">TASK LOAD</p>'
+                     '<div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;">'
+                     '<div><p style="color:#e2e8f0;font-size:20px;font-weight:700;margin:0;">'
+                     + str(completed) + '</p><p style="color:#475569;font-size:9px;margin:0;">DONE YESTERDAY</p></div>'
+                     '<div><p style="color:' + load_color + ';font-size:20px;font-weight:700;margin:0;">'
+                     + str(overdue) + '</p><p style="color:#475569;font-size:9px;margin:0;">OVERDUE</p></div>'
+                     '<div><p style="color:#94a3b8;font-size:20px;font-weight:700;margin:0;">'
+                     + str(due_today) + '</p><p style="color:#475569;font-size:9px;margin:0;">DUE TODAY</p></div>'
+                     '<div><p style="color:#94a3b8;font-size:20px;font-weight:700;margin:0;">'
+                     + str(active) + '</p><p style="color:#475569;font-size:9px;margin:0;">ACTIVE</p></div>'
+                     '<div style="margin-left:auto;"><p style="color:' + load_color + ';font-size:11px;font-weight:700;margin:0;">'
+                     + load_label + '</p><p style="color:#475569;font-size:9px;margin:0;">LOAD SIGNAL</p></div>'
+                     '</div>')
+
+            if by_project:
+                top_proj = sorted(by_project.items(), key=lambda x: x[1], reverse=True)[:3]
+                if top_proj:
+                    html += '<p style="color:#475569;font-size:10px;margin:8px 0 4px;">Yesterday — '
+                    html += ' · '.join(f'<span style="color:#94a3b8;">{p}</span> {c}' for p, c in top_proj)
+                    html += '</p>'
+
+            html += '</div>'
+        html += '<!-- /S:task_load -->'
+    except Exception as _e:
+        html += _section_error_html("Task Load", _e)
+
     # --- Weight Phase ---
     try:
         html += '<!-- S:weight_phase -->'

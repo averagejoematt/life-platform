@@ -291,6 +291,9 @@ def gather_daily_data(profile, yesterday):
     supplements_7d = fetch_range("supplements", (today - timedelta(days=7)).isoformat(), yesterday)
     habitify_7d = fetch_range("habitify", (today - timedelta(days=7)).isoformat(), yesterday)
 
+    # Todoist — task load snapshot for decision fatigue signal
+    todoist_yesterday = fetch_date("todoist", yesterday)
+
     # Weather — yesterday + today (pre-populated by weather-data-ingestion Lambda)
     weather_yesterday = fetch_date("weather", yesterday)
     weather_today = fetch_date("weather", today.isoformat())
@@ -363,6 +366,7 @@ def gather_daily_data(profile, yesterday):
         "travel_active": travel_active,
         "bp_data": bp_data,
         "strava_7d": strava_7d,
+        "todoist": todoist_yesterday,
     }
 
 

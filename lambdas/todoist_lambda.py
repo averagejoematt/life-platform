@@ -95,6 +95,30 @@ def get_active_tasks(api_token):
     return result.get("items", result.get("results", result)) if isinstance(result, dict) else result
 
 
+def get_filtered_tasks(api_token, filter_str):
+    """Fetch tasks matching a Todoist filter string (e.g. 'overdue', 'today')."""
+    try:
+        all_tasks = []
+        cursor = None
+        while True:
+            params = {"filter": filter_str, "limit": 200}
+            if cursor:
+                params["cursor"] = cursor
+            result = api_get("/tasks", api_token, params)
+            items = result.get("items", result.get("results", result)) if isinstance(result, dict) else result
+            if not isinstance(items, list):
+                break
+            all_tasks.extend(items)
+            next_cursor = result.get("next_cursor") if isinstance(result, dict) else None
+            if not next_cursor or not items:
+                break
+            cursor = next_cursor
+        return all_tasks
+    except Exception as e:
+        print(f"Warning: filter query '{filter_str}' failed: {e}")
+        return []
+
+
 def normalize_completed_task(task, project_map):
     """Normalize a completed task from the v1 API."""
     return {
@@ -147,13 +171,44 @@ def lambda_handler(event, context):
         proj = task["project_name"]
         by_project[proj] = by_project.get(proj, 0) + 1
 
+    # Priority breakdown of active tasks
+    priority_map = {1: "p1_urgent", 2: "p2_high", 3: "p3_medium", 4: "p4_normal"}
+    priority_breakdown = {"p1_urgent": 0, "p2_high": 0, "p3_medium": 0, "p4_normal": 0}
+    for t in active_tasks:
+        p = t.get("priority", 4)
+        key = priority_map.get(p, "p4_normal")
+        priority_breakdown[key] += 1
+
+    # Overdue and due-today counts via filter API
+    overdue_tasks = get_filtered_tasks(api_token, "overdue")
+    due_today_tasks = get_filtered_tasks(api_token, "today")
+    overdue_count = len(overdue_tasks)
+    due_today_count = len(due_today_tasks)
+    print(f"Overdue: {overdue_count}, Due today: {due_today_count}")
+
+    # Lightweight due-today task list for Daily Brief context
+    tasks_due_today = [
+        {
+            "task_id": str(t.get("id", "")),
+            "task_name": t.get("content", ""),
+            "project_id": str(t.get("project_id", "")),
+            "project_name": project_map.get(str(t.get("project_id", "")), "Unknown"),
+            "priority": t.get("priority", 4),
+        }
+        for t in due_today_tasks[:50]  # cap at 50
+    ]
+
     s3_payload = {
         "date": date_str,
         "ingested_at": datetime.now(timezone.utc).isoformat(),
         "completed_count": len(normalized),
         "active_count": active_count,
+        "overdue_count": overdue_count,
+        "due_today_count": due_today_count,
+        "priority_breakdown": priority_breakdown,
         "completed_tasks": normalized,
         "completions_by_project": by_project,
+        "tasks_due_today": tasks_due_today,
     }
 
     key = f"raw/todoist/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
@@ -173,8 +228,12 @@ def lambda_handler(event, context):
         "ingested_at": datetime.now(timezone.utc).isoformat(),
         "completed_count": len(normalized),
         "active_count": active_count,
+        "overdue_count": overdue_count,
+        "due_today_count": due_today_count,
+        "priority_breakdown": priority_breakdown,
         "completed_tasks": normalized,
         "completions_by_project": by_project,
+        "tasks_due_today": tasks_due_today,
     }
     table.put_item(Item=floats_to_decimal(db_item))
     print(f"Saved to DynamoDB for {date_str}")
@@ -184,6 +243,8 @@ def lambda_handler(event, context):
         "body": json.dumps({
             "completed_tasks": len(normalized),
             "active_tasks": active_count,
+            "overdue_tasks": overdue_count,
+            "due_today": due_today_count,
             "projects": len(project_map),
         })
     }
