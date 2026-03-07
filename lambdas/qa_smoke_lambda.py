@@ -264,7 +264,46 @@ def check_blog_links():
 
 
 # ---------------------------------------------------------------------------
-# CHECK 5 — Avatar PNG assets
+# CHECK 5 — Lambda secret health
+# ---------------------------------------------------------------------------
+
+def check_lambda_secrets():
+    """Verify every Lambda's SECRET_NAME env var points to an existing secret."""
+    lm  = boto3.client("lambda",         region_name=REGION)
+    sm  = boto3.client("secretsmanager", region_name=REGION)
+
+    # Build set of existing (non-deleted) secrets
+    existing = set()
+    try:
+        paginator = sm.get_paginator("list_secrets")
+        for page in paginator.paginate():
+            for s in page["SecretList"]:
+                if s.get("DeletedDate") is None:
+                    existing.add(s["Name"])
+    except Exception as e:
+        return [Check("secrets:inventory", "Lambda Secrets").fail(f"Cannot list secrets: {e}")]
+
+    stale = []
+    try:
+        paginator = lm.get_paginator("list_functions")
+        for page in paginator.paginate():
+            for fn in page["Functions"]:
+                secret_name = fn.get("Environment", {}).get("Variables", {}).get("SECRET_NAME")
+                if secret_name and secret_name not in existing:
+                    stale.append(f"{fn['FunctionName']} → {secret_name}")
+    except Exception as e:
+        return [Check("secrets:sweep", "Lambda Secrets").fail(f"Cannot list functions: {e}")]
+
+    c = Check("secrets:lambda_refs", "Lambda Secrets")
+    if stale:
+        c.fail(f"{len(stale)} stale SECRET_NAME(s): " + "; ".join(stale))
+    else:
+        c.ok(f"All Lambda SECRET_NAME references resolve ({len(existing)} secrets in inventory)")
+    return [c]
+
+
+# ---------------------------------------------------------------------------
+# CHECK 6 — Avatar PNG assets
 # ---------------------------------------------------------------------------
 
 def check_avatar_assets():
@@ -359,6 +398,7 @@ def lambda_handler(event, context):
     all_checks += check_s3_freshness()
     all_checks += check_score_sanity()
     all_checks += check_blog_links()
+    all_checks += check_lambda_secrets()
     all_checks += check_avatar_assets()
 
     html = build_report_html(all_checks, run_time_str)
