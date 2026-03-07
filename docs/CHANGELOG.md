@@ -1,5 +1,31 @@
 # Life Platform — Changelog
 
+## v2.85.0 — 2026-03-07: Prompt Intelligence Fixes (P1–P5) + IC-1 Platform Memory
+
+### Prompt Intelligence
+- **P1 — Weekly Plate memory** (`weekly_plate_lambda.py`): loads last 4 plate summaries from DDB `platform_memory` partition before AI call; stores new plate summary after generation. Anti-repeat rules injected into prompt: Wildcard must change each week, recipes can't repeat, Greatest Hits gets fresh angles. Fixes "cottage cheese" problem where AI rediscovers same foods weekly.
+- **P2 — Journey context block** (`ai_calls.py`): new `_build_journey_context()` injects week number, days-in, stage label (Foundation/Momentum/Building/Advanced), and stage-appropriate coaching principles into all 4 AI calls. Prevents AI from coaching Week 2 like an intermediate athlete.
+- **P3 — Walk coaching rewrite** (`ai_calls.py`): training coach prompt overhauled to treat walks as PRIMARY training sessions at Foundation stage. At 300+ lbs, a 45-min walk carries real cardiovascular load. Old "brief NEAT acknowledgment" language removed. Walk coaching now covers pace, duration, HR, and bodyweight-adjusted progress.
+- **P4 — Habit→outcome connector** (`ai_calls.py`): new `_build_habit_outcome_context()` passes 7-day T0/T1 completion trend to BoD + TL;DR calls, with known causal mappings (wind-down → sleep_score, protein-first → protein_g, etc.). Explicit prompt instruction to trace causal chain when habits were missed.
+- **P5 — TDEE/deficit context** (`ai_calls.py`): new `_build_tdee_context()` surfaces estimated TDEE (from MacroFactor or derived as calorie_target + phase deficit). Nutrition prompt now includes TDEE, planned deficit, actual intake, actual deficit %, and flag if intake is >25% below target (possible logging gap).
+
+### IC-1: Platform Memory DDB Partition
+- **New module:** `mcp/tools_memory.py` (28th module, 4 new tools: 136–139)
+- **DDB pattern:** `pk=USER#matthew#SOURCE#platform_memory`, `sk=MEMORY#<category>#<date>`
+- **Tools:** `write_platform_memory`, `read_platform_memory`, `list_memory_categories`, `delete_platform_memory`
+- **Categories seeded:** `weekly_plate` (live via P1), `failure_pattern`, `what_worked`, `coaching_calibration`, `personal_curves`, `journey_milestone`, `insight`, `experiment_result`
+- This is the compounding substrate enabling IC-2 through IC-14. No new Lambda — reads/writes via existing MCP Lambda.
+
+### deploy_lambda.sh Multi-Module Fix
+- Added `--extra-files file1.py file2.py ...` flag to `deploy/deploy_lambda.sh`
+- Validates all extra files exist before deploying
+- Main handler verification updated to check presence (not uniqueness) — works with multi-file zips
+- Fixes latent redeploy risk for `daily-brief` (which imports `html_builder`, `ai_calls`, `output_writers`, `board_loader`)
+
+### Counts
+- **MCP tools:** 139 (+4) | **Modules:** 28 (+1: tools_memory.py)
+- **Lambdas:** 32 (unchanged)
+
 ## v2.84.4 — 2026-03-07: Prompt Intelligence Audit + Tier 7 Roadmap
 
 - **Full prompt audit:** Evaluated every AI-facing prompt across all 5 Lambdas (ai_calls.py, weekly_plate, nutrition_review, weekly_digest, wednesday_chronicle)

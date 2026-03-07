@@ -29,6 +29,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from collections import Counter, defaultdict
+import re
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -48,6 +49,9 @@ secrets    = boto3.client("secretsmanager", region_name=REGION)
 s3_client  = boto3.client("s3", region_name=REGION)
 S3_BUCKET  = os.environ.get("S3_BUCKET", "matthew-life-platform")
 
+USER_PREFIX_MEMORY = f"USER#{USER_ID}#SOURCE#platform_memory"
+MAX_PLATE_HISTORY = 4  # past plates to inject for anti-repeat context
+
 # Board of Directors config loader (optional — for voice customization)
 try:
     import board_loader
@@ -55,6 +59,105 @@ try:
 except ImportError:
     _HAS_BOARD_LOADER = False
     logger.warning("[weekly_plate] board_loader not available — using fallback prompt")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PLATE MEMORY (P1) — load/store plate history to prevent weekly repeats
+# ══════════════════════════════════════════════════════════════════════════════
+
+def load_plate_history(today_str):
+    """Load last MAX_PLATE_HISTORY weekly plate summaries from DynamoDB platform_memory."""
+    try:
+        start_date = (datetime.strptime(today_str, "%Y-%m-%d") - timedelta(days=70)).strftime("%Y-%m-%d")
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
+            ExpressionAttributeValues={
+                ":pk": USER_PREFIX_MEMORY,
+                ":s": f"MEMORY#weekly_plate#{start_date}",
+                ":e": f"MEMORY#weekly_plate#{today_str}",
+            },
+            ScanIndexForward=False,
+            Limit=MAX_PLATE_HISTORY,
+        )
+        items = [d2f(i) for i in resp.get("Items", [])]
+        logger.info(f"Plate history: {len(items)} past plates loaded")
+        return items
+    except Exception as e:
+        logger.warning(f"load_plate_history failed: {e}")
+        return []
+
+
+def build_plate_history_context(history):
+    """Format plate history as anti-repeat block for the AI."""
+    if not history:
+        return ""
+    lines = ["PREVIOUS WEEKLY PLATE EDITIONS (anti-repeat — you MUST avoid these):"]
+    for i, rec in enumerate(history, 1):
+        date_str = rec.get("plate_date", "?")
+        top_foods = rec.get("top_foods", [])
+        wildcard = rec.get("wildcard", "")
+        recipes = rec.get("recipes", [])
+        lines.append(f"  Week -{i} ({date_str}):")
+        if top_foods:
+            lines.append(f"    Greatest Hits featured: {', '.join(top_foods[:6])}")
+        if wildcard:
+            lines.append(f"    Wildcard was: {wildcard}  ← DO NOT REPEAT THIS")
+        if recipes:
+            lines.append(f"    Recipes suggested: {', '.join(recipes[:4])}  ← DO NOT REPEAT THESE")
+    lines.append("")
+    lines.append("ANTI-REPEAT RULES:")
+    lines.append("  • The Wildcard MUST be a different ingredient than any previous wildcard.")
+    lines.append("  • Recipes must not repeat names or be obvious variations of past suggestions.")
+    lines.append("  • Greatest Hits should reflect actual data frequency — if same foods recur, add new angle.")
+    return "\n".join(lines)
+
+
+def extract_plate_summary(ai_content, top_food_names, date_str):
+    """Extract a condensed summary from the AI plate HTML for storage."""
+    summary = {
+        "plate_date": date_str,
+        "top_foods": top_food_names[:8],
+        "wildcard": "",
+        "recipes": [],
+    }
+    # Extract wildcard: look for text following Wildcard section header
+    wc_match = re.search(r'(?i)wildcard[^>]*>[^<]{0,30}<[^>]+>([^<]{8,80})', ai_content)
+    if not wc_match:
+        wc_match = re.search(r'(?i)wildcard[^<>]*>\s*([A-Z][a-z][^<]{5,60})', ai_content)
+    if wc_match:
+        summary["wildcard"] = wc_match.group(1).strip()[:80]
+    # Extract recipe names: bold/heading text in Try This area, capitalized multi-word
+    recipe_matches = re.findall(r'(?:font-weight:\s*[6-9]00[^>]*>|<strong>|<b>)([A-Z][^<]{6,60})<', ai_content)
+    skip = {"try this", "greatest hits", "the wildcard", "grocery run", "this week on",
+             "life platform", "weekly plate", "section", "the grocery run", "your greatest hits"}
+    recipes = []
+    for name in recipe_matches:
+        if name.lower().strip() not in skip and len(name.strip()) > 8 and len(recipes) < 5:
+            recipes.append(name.strip())
+    summary["recipes"] = recipes
+    return summary
+
+
+def store_plate_summary(summary, today_str):
+    """Store condensed plate summary to platform_memory DDB partition."""
+    try:
+        item = {
+            "pk": USER_PREFIX_MEMORY,
+            "sk": f"MEMORY#weekly_plate#{today_str}",
+            "category": "weekly_plate",
+            "plate_date": summary.get("plate_date", today_str),
+            "stored_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if summary.get("top_foods"):
+            item["top_foods"] = summary["top_foods"]
+        if summary.get("wildcard"):
+            item["wildcard"] = summary["wildcard"]
+        if summary.get("recipes"):
+            item["recipes"] = summary["recipes"]
+        table.put_item(Item=item)
+        logger.info(f"Plate summary stored: {today_str} | wildcard='{summary.get('wildcard', '')}' | recipes={len(summary.get('recipes', []))}")
+    except Exception as e:
+        logger.warning(f"store_plate_summary failed (non-fatal): {e}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -428,8 +531,15 @@ def lambda_handler(event, context):
 
     logger.info(f"Food data: {len(days)} days, {len(all_foods)} food items")
 
+    # P1: Load plate history to prevent repeats
+    today_str = datetime.now(timezone.utc).date().isoformat()
+    plate_history = load_plate_history(today_str)
+    history_context = build_plate_history_context(plate_history)
+
     user_message = build_user_message(data)
-    logger.info(f"Prompt size: {len(user_message)} chars")
+    if history_context:
+        user_message = history_context + "\n\n" + user_message
+    logger.info(f"Prompt size: {len(user_message)} chars | plate history: {len(plate_history)} weeks loaded")
 
     system_prompt = build_system_prompt(profile, data["withings"])
 
@@ -444,6 +554,16 @@ def lambda_handler(event, context):
 
     weight_info = extract_weight_trend(data["withings"])
     html = build_email_html(ai_content, dates, weight_info)
+
+    # P1: Store plate summary for future anti-repeat context
+    try:
+        _, all_foods_store = extract_food_data(data["macrofactor"])
+        patterns_store = analyze_food_patterns(all_foods_store)
+        top_food_names = [f["name"] for f in patterns_store.get("top_foods", [])[:8]]
+        plate_summary = extract_plate_summary(ai_content, top_food_names, dates["end"])
+        store_plate_summary(plate_summary, today_str)
+    except Exception as e:
+        logger.warning(f"Plate summary storage failed (non-fatal): {e}")
 
     try:
         dt_end_dt = datetime.strptime(dates["end"], "%Y-%m-%d")

@@ -20,6 +20,7 @@ from mcp.tools_social import *
 from mcp.tools_longevity import *
 from mcp.tools_adaptive import *
 from mcp.tools_todoist import *
+from mcp.tools_memory import *
 
 TOOLS = {
     "get_sources": {
@@ -2890,6 +2891,82 @@ TOOLS = {
                     "task_id": {"type": "string", "description": "Task ID from list_todoist_tasks."},
                 },
                 "required": ["task_id"],
+            },
+        },
+    },
+
+    # ── IC-1: Platform Memory (tools 136–139) ──────────────────────────────────
+    "write_platform_memory": {
+        "fn": tool_write_platform_memory,
+        "schema": {
+            "name": "write_platform_memory",
+            "description": (
+                "Store a structured memory record in the platform_memory partition. "
+                "The compounding intelligence substrate — use to record failure patterns, "
+                "what worked, coaching calibrations, journey milestones, and episodic wins. "
+                "Valid categories: weekly_plate, failure_pattern, what_worked, "
+                "coaching_calibration, personal_curves, journey_milestone, insight, experiment_result."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string", "description": "Memory category (e.g. 'failure_pattern', 'what_worked', 'journey_milestone')."},
+                    "content":  {"type": "object", "description": "Key-value dict of data to store. E.g. {\"pattern\": \"high-stress Tuesdays correlate with missed nutrition\", \"conditions\": [...]}"},
+                    "date":     {"type": "string", "description": "Date for the record (YYYY-MM-DD). Defaults to today."},
+                    "overwrite": {"type": "boolean", "description": "Overwrite if record exists (default true)."},
+                },
+                "required": ["category", "content"],
+            },
+        },
+    },
+    "read_platform_memory": {
+        "fn": tool_read_platform_memory,
+        "schema": {
+            "name": "read_platform_memory",
+            "description": (
+                "Retrieve recent memory records for a given category from the platform_memory partition. "
+                "Use to pull coaching calibration, failure patterns, or episodic wins into context."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string", "description": "Memory category to retrieve."},
+                    "days":     {"type": "integer", "description": "How many days back to look (default 30, max 365)."},
+                    "limit":    {"type": "integer", "description": "Max records to return (default 10, max 50)."},
+                },
+                "required": ["category"],
+            },
+        },
+    },
+    "list_memory_categories": {
+        "fn": tool_list_memory_categories,
+        "schema": {
+            "name": "list_memory_categories",
+            "description": (
+                "List all platform_memory categories that have records, with record counts and date ranges. "
+                "Use to understand what intelligence the platform has accumulated so far."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "days": {"type": "integer", "description": "How many days back to scan (default 90)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "delete_platform_memory": {
+        "fn": tool_delete_platform_memory,
+        "schema": {
+            "name": "delete_platform_memory",
+            "description": "Delete a specific platform_memory record by category + date. Use to correct bad memories or remove stale records.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string", "description": "Memory category."},
+                    "date":     {"type": "string", "description": "Date of the record to delete (YYYY-MM-DD)."},
+                },
+                "required": ["category", "date"],
             },
         },
     },
