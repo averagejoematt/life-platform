@@ -394,6 +394,7 @@ def store_computed_metrics(
     readiness_score, readiness_colour, streak_data,
     tsb, hrv_7d, hrv_30d, sleep_debt_7d_hrs,
     latest_weight, week_ago_weight, avatar_weight,
+    source_fingerprints=None,
 ):
     """Write computed_metrics record — primary output of this Lambda."""
     item = {
@@ -432,6 +433,10 @@ def store_computed_metrics(
     vs = streak_data.get("vice_streaks", {})
     if vs:
         item["vice_streaks"] = {k: Decimal(str(v)) for k, v in vs.items()}
+
+    # Source fingerprints — used for data-aware idempotency on subsequent runs
+    if source_fingerprints:
+        item["source_fingerprints"] = source_fingerprints
 
     item = {k: v for k, v in item.items() if v is not None}
     table.put_item(Item=item)
@@ -536,6 +541,34 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
 # ==============================================================================
 # DATA ASSEMBLY
 # ==============================================================================
+
+def get_source_fingerprints(yesterday_str, sources=None):
+    """Return dict of source → webhook_ingested_at for the key daily sources.
+
+    Used for data-aware idempotency: if any source has a newer ingested_at
+    than the stored fingerprint, the compute record is stale and needs a rerun.
+    """
+    if sources is None:
+        sources = ["whoop", "apple_health", "macrofactor", "strava", "habitify", "withings"]
+    fps = {}
+    for src in sources:
+        rec = fetch_date(src, yesterday_str)
+        ts  = (rec or {}).get("webhook_ingested_at") or (rec or {}).get("ingested_at")
+        if ts:
+            fps[src] = str(ts)
+    return fps
+
+
+def fingerprints_changed(stored_fps, current_fps):
+    """Return True if any source in current_fps is newer than stored_fps."""
+    for src, current_ts in current_fps.items():
+        stored_ts = stored_fps.get(src)
+        if not stored_ts:
+            return True          # new source appeared
+        if current_ts > stored_ts:  # ISO string comparison works for UTC timestamps
+            return True
+    return False
+
 
 def assemble_data(yesterday_str, profile):
     """Fetch all raw data needed for scoring (not HTML rendering).
@@ -662,24 +695,39 @@ def lambda_handler(event, context):
         today         = datetime.now(timezone.utc).date()
         yesterday_str = (today - timedelta(days=1)).isoformat()
 
-    # Idempotency — skip if already computed (unless forced)
+    # Idempotency — data-aware: recompute if any source has updated since last run
     if not event.get("force"):
         existing = fetch_date("computed_metrics", yesterday_str)
         if existing:
-            logger.info(
-                "Already computed for %s (grade=%s) — skipping",
-                yesterday_str, existing.get("day_grade_letter", "?"),
-            )
-            return {
-                "statusCode":       200,
-                "body":             f"Already computed for {yesterday_str}",
-                "day_grade_letter": existing.get("day_grade_letter"),
-            }
+            stored_fps  = existing.get("source_fingerprints", {})
+            current_fps = get_source_fingerprints(yesterday_str)
+            if stored_fps and not fingerprints_changed(stored_fps, current_fps):
+                logger.info(
+                    "Already computed for %s (grade=%s) and inputs unchanged — skipping",
+                    yesterday_str, existing.get("day_grade_letter", "?"),
+                )
+                return {
+                    "statusCode":       200,
+                    "body":             f"Already computed for {yesterday_str} (inputs unchanged)",
+                    "day_grade_letter": existing.get("day_grade_letter"),
+                    "skipped":          True,
+                }
+            if not stored_fps:
+                reason = "no fingerprint stored (legacy record)"
+            else:
+                changed = [s for s, ts in current_fps.items()
+                           if ts > stored_fps.get(s, "")]
+                reason = f"newer data in: {', '.join(changed)}"
+            logger.info("Recomputing %s — %s", yesterday_str, reason)
 
     profile = fetch_profile()
     if not profile:
         logger.error("No profile found — aborting")
         return {"statusCode": 500, "body": "No profile found"}
+
+    # ── Capture source fingerprints before assembling (same fetches, cached by DDB) ──
+    source_fps = get_source_fingerprints(yesterday_str)
+    logger.info("Source fingerprints: %s", source_fps)
 
     # ── Assemble raw data ──
     data, hrv_7d_avg, hrv_30d_avg = assemble_data(yesterday_str, profile)
@@ -711,6 +759,7 @@ def lambda_handler(event, context):
         data.get("tsb"), hrv_7d_avg, hrv_30d_avg,
         data.get("sleep_debt_7d_hrs", 0),
         data.get("latest_weight"), data.get("week_ago_weight"), data.get("avatar_weight"),
+        source_fingerprints=source_fps,
     )
 
     if day_grade_score is not None:
