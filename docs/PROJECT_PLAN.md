@@ -161,6 +161,7 @@
 
 | # | Item | Description | Effort | 💰 |
 |---|------|-------------|--------|----|
+| 53 | **Daily Brief compute refactor** | Daily Brief currently performs multi-range DynamoDB scans and inline computation (TSB, HRV averages, weight delta, sleep debt, habit scores, readiness) that should be pre-computed and stored. Pattern: new `daily-metrics-compute` Lambda runs at 9:40 AM PT (after Whoop refresh, before brief), writes `pk=USER#matthew#SOURCE#computed_metrics, sk=DATE#YYYY-MM-DD` with all derived fields. Brief becomes pure read + render — zero derivation logic. Fixes dual `day_grade` write paths, makes computed values reusable by MCP tools and dashboard refresh. Follows established `character-sheet-compute` pattern. | 4-6 hr (1-2 sessions) | $0 |
 | 14 | **⚠️ COST: WAF rate limiting** | Basic rate rule on Lambda Function URL. Protects against abuse/runaway costs. | 1 hr | **⚠️ +$5/mo (25%)** |
 | ~~15~~ | ~~**MCP API key rotation**~~ | 90-day Secrets Manager auto-rotation with Lambda rotator function. Security hygiene. | 30 min | ~$0 |
 | 16 | **Grip strength tracking** | Monthly manual log via Notion. $15 dynamometer. Strongest all-cause mortality predictor after VO2max (Attia). Trend + percentile vs age norms. | 2 hr | $0 |

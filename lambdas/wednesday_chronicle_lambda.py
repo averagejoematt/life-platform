@@ -1174,7 +1174,7 @@ def build_blog_index(installments):
             l_date_display = l_dt.strftime("%B %-d, %Y")
         except Exception:
             l_date_display = l_date
-        l_filename = f"week-{l_wn:02d}.html" if isinstance(l_wn, int) else f"week-{l_wn}.html"
+        l_filename = f"week-{int(l_wn):02d}.html" if l_wn is not None else "week-01.html"
         l_kicker = "Prologue" if l_wn == 0 else f"Week {l_wn}"
         l_stats = latest.get("stats_line", "")
         l_stats_html = f'<p style="font-family:-apple-system,sans-serif;font-size:12px;color:#bbb;margin-top:4px;">{l_stats}</p>' if l_stats else ""
@@ -1196,7 +1196,7 @@ def build_blog_index(installments):
             date_display = dt.strftime("%B %-d, %Y")
         except Exception:
             date_display = date
-        filename = f"week-{wn:02d}.html" if isinstance(wn, int) else f"week-{wn}.html"
+        filename = f"week-{int(wn):02d}.html" if wn is not None else "week-01.html"
         label = "Prologue" if wn == 0 else f"Week {wn}"
         entries_html += f'''<li>
           <a href="{filename}">\"{title}\" <span class="label">{label}</span></a>
