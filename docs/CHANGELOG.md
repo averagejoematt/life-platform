@@ -1,5 +1,18 @@
 # Life Platform — Changelog
 
+## v2.84.4 — 2026-03-07: Prompt Intelligence Audit + Tier 7 Roadmap
+
+- **Full prompt audit:** Evaluated every AI-facing prompt across all 5 Lambdas (ai_calls.py, weekly_plate, nutrition_review, weekly_digest, wednesday_chronicle)
+- **5 prompt intelligence fixes identified and added to PROJECT_PLAN.md (P1–P5):**
+  - P1: Weekly Plate memory (no stored history — cottage cheese bug)
+  - P2: Journey context block (no week number / fitness baseline / stage-aware coaching)
+  - P3: Training coach walk/early fitness rewrite (walks wrongly dismissed as "NEAT" at Week 2)
+  - P4: Habit → outcome connector (causal chain not traced; pre-compute not feeding AI)
+  - P5: TDEE / deficit context in nutrition prompts
+- **Tier 7 Intelligence Compounding added to PROJECT_PLAN.md (IC-1 through IC-14):** Architecture foundation (platform_memory DDB partition, pre-compute insight Lambda, chain-of-thought two-pass); near-term (failure pattern recognition, momentum detection, milestone architecture, cross-pillar trade-off reasoning, intent vs execution gap); medium-term (episodic memory, personalized response curves, coaching calibration); longer-term (coaching effectiveness feedback loop, vector store, personal knowledge graph)
+- **Architecture Decision Record documented:** Vector store / RAG deferred (corpus too small, cost too high); local LLM not appropriate for reasoning tasks; fine-tuning wrong solution for a reasoning gap; `platform_memory` DDB + pre-compute Lambda are the right infrastructure additions
+- No code deployed — planning and documentation session
+
 ## v2.84.3 — 2026-03-07: Data-Aware Idempotency for Daily Metrics Compute
 
 - **Problem fixed:** `daily-metrics-compute` used time-based idempotency ("skip if computed today") — late-arriving data (e.g. HAE syncing after 9:40 AM) produced stale scores with missing hydration/glucose components
