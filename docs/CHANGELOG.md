@@ -10,6 +10,7 @@
 - **Backfill-friendly:** event payload supports `{"date": "YYYY-MM-DD", "force": true}` for any historical date
 - **Zip:** `lambda_function.py` + `scoring_engine.py` (512 MB, 120s timeout)
 - **Deploy:** `deploy/deploy_daily_metrics_compute.sh`
+- **CloudWatch alarms:** `daily-metrics-compute-errors` (≥1 error/day) + `daily-metrics-compute-duration-high` (p99 > 90s of 120s timeout)
 
 ## v2.81.0 — 2026-03-07: QA Smoke Test + Blog Cleanup
 - **31st Lambda:** `life-platform-qa-smoke` — daily 10:30 AM PT health check email (5 categories, 20+ assertions)
