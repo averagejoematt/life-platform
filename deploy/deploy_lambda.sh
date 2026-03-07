@@ -6,13 +6,13 @@
 # Usage (single-file Lambda):
 #   ./deploy/deploy_lambda.sh <function-name> <source-file>
 #
-# Usage (multi-module Lambda — e.g. daily-brief):
+# Usage (multi-module Lambda):
 #   ./deploy/deploy_lambda.sh <function-name> <source-file> --extra-files file1.py file2.py ...
 #
 # Examples:
 #   ./deploy/deploy_lambda.sh health-auto-export-webhook lambdas/health_auto_export_lambda.py
 #   ./deploy/deploy_lambda.sh daily-brief lambdas/daily_brief_lambda.py \
-#       --extra-files lambdas/html_builder.py lambdas/ai_calls.py lambdas/output_writers.py lambdas/board_loader.py
+#       --extra-files lambdas/ai_calls.py lambdas/html_builder.py lambdas/output_writers.py lambdas/board_loader.py
 
 set -euo pipefail
 
@@ -28,13 +28,13 @@ FUNCTION_NAME="$1"
 SOURCE_FILE="$2"
 shift 2
 
-# ── Parse --extra-files ──
-EXTRA_FILES=()
-while [[ $# -gt 0 ]]; do
+# ── Parse --extra-files (safe with empty set) ──
+declare -a EXTRA_FILES=()
+while [ $# -gt 0 ]; do
     case "$1" in
         --extra-files)
             shift
-            while [[ $# -gt 0 && "$1" != --* ]]; do
+            while [ $# -gt 0 ] && [[ "$1" != --* ]]; do
                 EXTRA_FILES+=("$1")
                 shift
             done
@@ -49,7 +49,7 @@ if [ ! -f "$SOURCE_FILE" ]; then
 fi
 
 # Validate extra files exist before doing any work
-for extra in "${EXTRA_FILES[@]}"; do
+for extra in "${EXTRA_FILES[@]+"${EXTRA_FILES[@]}"}"; do
     if [ ! -f "$extra" ]; then
         echo "❌ Extra file not found: $extra"
         exit 1
@@ -76,27 +76,29 @@ WORK_DIR=$(mktemp -d)
 cp "$SOURCE_FILE" "$WORK_DIR/$EXPECTED_FILENAME"
 
 # Copy any extra files (retain original basename — handler imports them by name)
-EXTRA_BASENAMES=()
-for extra in "${EXTRA_FILES[@]}"; do
-    basename_extra=$(basename "$extra")
-    cp "$extra" "$WORK_DIR/$basename_extra"
-    EXTRA_BASENAMES+=("$basename_extra")
-    echo "   + $basename_extra"
+declare -a EXTRA_BASENAMES=()
+for extra in "${EXTRA_FILES[@]+"${EXTRA_FILES[@]}"}"; do
+    bn=$(basename "$extra")
+    cp "$extra" "$WORK_DIR/$bn"
+    EXTRA_BASENAMES+=("$bn")
+    echo "   + $bn"
 done
 
-# Build the zip
-(cd "$WORK_DIR" && zip -q deploy.zip "$EXPECTED_FILENAME" "${EXTRA_BASENAMES[@]+"${EXTRA_BASENAMES[@]}"}")
-
-if [ ${#EXTRA_FILES[@]} -gt 0 ]; then
-    echo "📦 Packaged $(basename "$SOURCE_FILE") + ${#EXTRA_FILES[@]} extra file(s) → zip"
+# Build the zip — handle empty extras safely
+if [ ${#EXTRA_BASENAMES[@]} -gt 0 ]; then
+    (cd "$WORK_DIR" && zip -q deploy.zip "$EXPECTED_FILENAME" "${EXTRA_BASENAMES[@]}")
+    echo "📦 Packaged $(basename "$SOURCE_FILE") + ${#EXTRA_BASENAMES[@]} extra file(s) → zip"
 else
+    (cd "$WORK_DIR" && zip -q deploy.zip "$EXPECTED_FILENAME")
     echo "📦 Packaged $(basename "$SOURCE_FILE") → $EXPECTED_FILENAME in zip"
 fi
 
 # ── Step 3: Verify main handler is in the zip ──
-ZIP_MAIN=$(unzip -l "$WORK_DIR/deploy.zip" | grep "\.py$" | awk '{print $4}' | grep "^${EXPECTED_FILENAME}$" || true)
-if [ -z "$ZIP_MAIN" ]; then
+# unzip -l columns: Length Date Time Name — use $NF (last field) for filename
+ZIP_FILES=$(unzip -l "$WORK_DIR/deploy.zip" | awk 'NR>3 && NF==4 {print $NF}')
+if ! echo "$ZIP_FILES" | grep -qx "$EXPECTED_FILENAME"; then
     echo "❌ FATAL: Zip does not contain handler entry '$EXPECTED_FILENAME'"
+    echo "   Zip contains: $(echo "$ZIP_FILES" | tr '\n' ' ')"
     rm -rf "$WORK_DIR"
     exit 1
 fi
