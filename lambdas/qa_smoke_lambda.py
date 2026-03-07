@@ -366,7 +366,11 @@ def lambda_handler(event, context):
     fails  = [c for c in all_checks if c.passed is False]
     warns  = [c for c in all_checks if c.passed is None]
 
-    subject = (f"✅ QA: All clear — {run_time.strftime('%b %-d')}" if not fails
+    if not fails and not warns:
+        print(f"[QA] All clear — no email sent (green-only suppression)")
+        return {"statusCode": 200, "body": json.dumps({"failed": 0, "warned": 0, "emailed": False})}
+
+    subject = (f"⚠️ QA: {len(warns)} warning{'s' if len(warns)>1 else ''} — {run_time.strftime('%b %-d')}" if not fails
                else f"🔴 QA: {len(fails)} failure{'s' if len(fails)>1 else ''} — {run_time.strftime('%b %-d')}")
 
     ses.send_email(
@@ -378,5 +382,5 @@ def lambda_handler(event, context):
         }},
     )
 
-    print(f"[QA] Done — {len(fails)} failures, {len(warns)} warnings")
-    return {"statusCode": 200, "body": json.dumps({"failed": len(fails), "warned": len(warns)})}
+    print(f"[QA] Done — {len(fails)} failures, {len(warns)} warnings, email sent")
+    return {"statusCode": 200, "body": json.dumps({"failed": len(fails), "warned": len(warns), "emailed": True})}
