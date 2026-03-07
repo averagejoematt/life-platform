@@ -1,5 +1,28 @@
 # Life Platform — Changelog
 
+## v2.84.3 — 2026-03-07: Data-Aware Idempotency for Daily Metrics Compute
+
+- **Problem fixed:** `daily-metrics-compute` used time-based idempotency ("skip if computed today") — late-arriving data (e.g. HAE syncing after 9:40 AM) produced stale scores with missing hydration/glucose components
+- **Solution:** Compute is now data-aware. On each run it compares `source_fingerprints` (per-source `webhook_ingested_at` timestamps stored in the computed_metrics record) against current DDB values. If any source has updated since the last compute, it reruns automatically.
+- **New functions:** `get_source_fingerprints()`, `fingerprints_changed()` in `daily_metrics_compute_lambda.py`
+- **`store_computed_metrics()`:** now persists `source_fingerprints` map alongside scores
+- **EventBridge:** New `daily-metrics-compute-catchup` rule (`rate(30 minutes)`) — fires every 30 min all day; costs pennies and is a no-op after inputs stabilise
+- **Net effect:** Any late-arriving source data (HAE, Notion, MacroFactor) self-heals within 30 minutes; `force=true` still available for manual overrides
+
+## v2.84.2 — 2026-03-07: Secret Sweep + QA Infrastructure Health Check
+
+- **Root cause found:** `health-auto-export-webhook` and `notion-journal-ingestion` had stale `SECRET_NAME` env vars pointing to deleted per-service secrets (`life-platform/health-auto-export`, `life-platform/notion`) — both broken since v2.75.0 secret consolidation
+- **Impact:** Every HAE sync since v2.75.0 silently rejected at auth layer — no Apple Health data written for affected dates; Notion journal similarly affected
+- **Fixed:** Both Lambdas updated to `SECRET_NAME=life-platform/api-keys` via `aws lambda update-function-configuration`
+- **`tests/validate_lambda_secrets.py`:** New sweep script — checks all Lambda `SECRET_NAME` env vars against live Secrets Manager inventory; `--fix` flag auto-corrects stale refs to `life-platform/api-keys`. Run after any secret rename/delete.
+- **`lambdas/qa_smoke_lambda.py`:** New `check_lambda_secrets()` check (CHECK 5) — sweeps all Lambda functions and flags any `SECRET_NAME` pointing to a missing/deleted secret. Fires daily at 10:30 AM PT. IAM inline policy `qa-smoke-infra-read` added to `lambda-weekly-digest-role` (`lambda:ListFunctions`, `secretsmanager:ListSecrets`).
+- **QA green suppression:** Email now suppressed entirely when all checks pass (warnings also trigger email); warnings-only subject fixed from ✅ to ⚠️
+
+## v2.84.1 — 2026-03-07: Daily Brief Hotfix + QA Green Suppression
+
+- **Hotfix:** `daily-brief` zip was missing `html_builder.py`, `ai_calls.py`, `output_writers.py`, `board_loader.py` after todoist deploy — redeployed with all local module dependencies bundled
+- **QA smoke:** Email suppressed when all checks green (no-op run); warnings-only state now shows ⚠️ subject instead of ✅
+
 ## v2.84.0 — 2026-03-07: Todoist Life OS — Bulk Rescheduling + Write Tools
 
 - **`patches/todoist_reschedule.py`:** one-shot bulk rescheduler — fetches all ~292 tasks live from Todoist API, applies `every!` completion-based recurrence (except hard-date anchored tasks: birthdays, anniversaries, holidays), and intelligently scatters first-fire dates across 12 months
