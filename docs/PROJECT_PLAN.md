@@ -267,6 +267,72 @@
 
 ---
 
+## Prompt Intelligence Fixes — Identified 2026-03-07
+
+> Audit of all AI-facing prompts across the ecosystem revealed 5 concrete gaps where coaching output is canned/generic rather than compounding and personalized. These are the immediate fixes before Tier 7 intelligence compounding work begins.
+
+| # | Fix | Problem | Effort |
+|---|-----|---------|--------|
+| P1 | **Weekly Plate memory** | No stored history — AI rediscovers the same foods every week (cottage cheese problem). Fix: store each plate output to DDB, load last 4 plate summaries as context, add explicit anti-repeat instruction for Wildcard and recipes. | 2–3 hr |
+| P2 | **Journey context block** | All prompts know start/goal weight but not week number, fitness baseline, or early-stage coaching principles. A 2-week-in walker at 302 lbs being coached the same as an intermediate athlete. Fix: centralized `_build_journey_context()` function injected into all AI calls with week number, stage label, and stage-appropriate coaching principles. | 2–3 hr |
+| P3 | **Training coach — walk/early fitness rewrite** | Current prompt instructs coach to give walks "a brief NEAT acknowledgment" — written for an intermediate athlete. At Week 2 of a 117 lb journey, a 45-min walk IS the workout. Fix: week-aware, bodyweight-relative benchmarking; walking pace/distance evaluated relative to current weight and week, not absolute standards. | 1–2 hr |
+| P4 | **Habit → outcome connector** | Coach sees missed habits and metric scores in the same prompt but isn't instructed to trace the causal chain. Fix: pre-process habit completion × metric correlation before AI calls (which nights did sleep efficiency degrade when wind-down habit was missed?), inject as structured context + explicit prompt instruction to connect cause and effect. | 3–4 hr |
+| P5 | **TDEE / deficit context in nutrition** | Prompts state targets (1800 cal) but AI doesn't know estimated maintenance TDEE, so it can't reason about deficit size or intelligently flag days significantly below target as either disciplined or a logging gap. Fix: surface MacroFactor estimated TDEE in nutrition prompts, add deficit-aware protein prioritization rules for aggressive deficit days. | 1–2 hr |
+
+---
+
+## Tier 7 — Intelligence Compounding
+
+> Identified 2026-03-07 via expert panel review (LLM architect, behavioral data scientist, ML engineer, health intelligence product lead). These features transform the platform from a stateless data observer into a compounding intelligence engine that learns Matthew's specific biology, psychology, and failure patterns over time. Grouped by when sufficient data exists to make them meaningful.
+
+### Architecture Foundation (build first, enables everything else)
+
+| # | Feature | Description | Effort | When |
+|---|---------|-------------|--------|------|
+| IC-1 | **`platform_memory` DDB partition** | Structured key-value memory store for computed insights: `MEMORY#failure_pattern`, `MEMORY#what_worked`, `MEMORY#coaching_calibration`, `MEMORY#personal_curves`. No external service — pure DynamoDB. Every AI call pulls relevant memory records as context. The compounding substrate that makes all other IC features possible. DDB key pattern: `pk=USER#matthew#SOURCE#platform_memory`, `sk=MEMORY#<category>#<date>`. | 2–3 hr | Now |
+| IC-2 | **Pre-compute insight pass** | New `daily-insight-compute` Lambda at 9:42 AM PT (between daily-metrics and daily-brief). Pulls 7 days of metrics, computes habit×outcome correlations, flags leading indicators, pulls relevant platform_memory records, outputs structured JSON for the Daily Brief AI calls to consume. AI receives curated intelligence rather than raw data. Replaces single-shot prompting with a reasoned context handoff. | 4–6 hr | Now |
+| IC-3 | **Chain-of-thought reasoning on high-stakes calls** | Two-pass approach for BoD + TL;DR + training coach: Pass 1 identifies patterns and causal chains in structured JSON; Pass 2 writes the coaching output using Pass 1 analysis. ~2× token cost but material quality improvement — model identifies patterns before writing rather than simultaneously. No data maturity requirement. | 3–4 hr | Now |
+
+### Near-term (Month 1–2, enough behavioral data to detect patterns)
+
+| # | Feature | Description | Effort | When |
+|---|---------|-------------|--------|------|
+| IC-4 | **Failure pattern recognition** | Weekly attribution pass after day grades computed. When a component scores <50, tag with contextual conditions (day of week, preceding sleep, Todoist load, journal stress). After 6–8 weeks: personal failure map stored in `platform_memory`. Daily Brief proactively injects failure-condition warnings on days that match known patterns. "This is your third high-load Tuesday — last two ended in failed nutrition weeks." | 4–5 hr | Month 2 |
+| IC-5 | **Momentum detection / early warning** | Leading-indicator signal computed 2–3 days before a struggling week develops. Triggers when 2+ early warning markers appear simultaneously (journal entry length declining, meal log gaps, habit completion 80→65%, HRV 3+ consecutive down days). Brief shifts tone and intervention proactively, not reactively. Highest-leverage behavioral intervention window is when slippage begins, not after it's established. | 3–4 hr | Month 2 |
+| IC-6 | **Milestone architecture** | Computed once, stored in profile: weight/health milestones with specific biological/performance significance for Matthew. "At 285 lbs: sleep apnea risk drops substantially (genome flag). At 270 lbs: walking pace will naturally improve ~0.3 mph from reduced load. At 250 lbs: Zone 2 achievable at a pace that feels like a real workout. At 225 lbs: FFMI crosses athletic range if muscle preserved." Surfaced in coaching prompts when approaching each threshold. Converts abstract goal into a progression of meaningful waypoints. | 2–3 hr | Month 1 |
+| IC-7 | **Cross-pillar trade-off reasoning** | Explicit optimization instruction added to BoD + Weekly Digest prompts. AI told to reason about trade-offs between pillars, not each in isolation. Enables: "Movement is strong but Sleep is degrading — at current TSB, adding training volume will compound sleep debt. Optimization call: hold training, invest in sleep." Currently the 7 pillars are analyzed independently. | 1–2 hr | Month 1 |
+| IC-8 | **Intent vs execution gap** | Dedicated journal analysis pass comparing stated intentions ("going to meal prep Sunday", "need to get to bed by 10") against next-day metrics. Builds personal intention-completion rate and identifies which intention types Matthew follows through on vs doesn't. Coaching AI told: "He said he'd do X. He didn't. This is the 4th time. Friction point is likely Y." The knowing-doing gap made quantifiable and specific. | 4–5 hr | Month 2 |
+
+### Medium-term (Month 3–5, requires sustained longitudinal data)
+
+| # | Feature | Description | Effort | When |
+|---|---------|-------------|--------|------|
+| IC-9 | **Episodic memory — "what worked for you"** | Structured library appended weekly when above-baseline outcomes occur. Captures: conditions (what was true), behaviors (what Matthew did), outcomes (what improved). Each AI call pulls 3–5 most relevant entries as context. "The last time you had a week like this — high stress, strong habits, moderate training — your best lever was X." Lightweight RAG without a vector store. | 3–4 hr | Month 3 |
+| IC-10 | **Personalized response curves** | Compute Matthew's actual response curves from his own data (not population averages): weight loss rate vs. calorie intake, sleep quality vs. TSB, protein threshold vs. recovery, meal timing vs. glucose. Replace static targets with personalized ones. "Based on your 12 weeks of data, you lose 2.3 lbs/week at 1650 cal with minimal recovery impact — 1800 is probably your maintenance, not your deficit target." | 4–6 hr | Month 4 |
+| IC-11 | **Coaching calibration record** | Monthly-updated `MEMORY#coaching_calibration` record: observed response patterns (responds to direct challenge vs. encouragement, engages with meal-specific feedback vs. ignores macro summaries, journal patterns that produce better entries the following week). Injected into all coaching prompts. Voices stop being generic expert personas and become specifically tuned to Matthew Walker the individual. | 3–4 hr | Month 3 |
+
+### Longer-term (Month 5–6+, requires corpus size and data maturity)
+
+| # | Feature | Description | Effort | When |
+|---|---------|-------------|--------|------|
+| IC-12 | **Coaching effectiveness feedback loop** | Implicit feedback: after each Daily Brief, track whether metrics the AI flagged as priority actually improved over following 3 days. When coach said "front-load protein today" — did protein hit target? Build coaching effectiveness score per insight type. Eliminate low-follow-through guidance, amplify high-follow-through patterns. Platform measures whether its advice lands and self-optimizes. | 5–6 hr | Month 5 |
+| IC-13 | **Vector store / semantic search** | Cross-platform semantic search over journal corpus, Chronicle installments, and Board commentary. Enables: "Find every time my body responded badly to a high-carb week" or "journal entries where I felt isolated after a good training week." Minimum viable corpus: ~150–300 journal entries, 20+ Chronicle installments (approximately Month 4–5). Infrastructure: Pinecone or pgvector, nightly embedding Lambda. Note: `platform_memory` + episodic memory (IC-9) cover 80% of the use case until corpus is large enough. | 6–8 hr | Month 5 |
+| IC-14 | **Personal knowledge graph** | Graph of relationships between health entities: supplements → biomarkers → symptoms → journal themes → life events. "What downstream effects does magnesium have in my data?" DynamoDB adjacency lists (no external graph DB required). Monthly rebuild Lambda. Requires 6+ months of longitudinal data for meaningful graph density. Feeds into roadmap item #51. | 8–10 hr | Month 6+ |
+
+### Architecture Decision Record — What NOT to Build
+
+> Documented 2026-03-07 to prevent revisiting these decisions.
+
+**Vector store / RAG — not now:** Corpus too small (2–3 weeks of data), cost too high ($70–100/month for managed service vs $25/month platform budget), and `platform_memory` covers the use case adequately until Month 4–5. Revisit when journal corpus exceeds 150 entries.
+
+**Local / small LLM — not appropriate:** Quality delta vs. Claude Haiku/Sonnet is large and visible on health coaching, behavioral synthesis, and narrative tasks. Only potential future use: embedding generation (small model like `all-MiniLM-L6-v2` in Lambda to avoid per-embedding API costs when building IC-13). Not a current need.
+
+**Fine-tuning — wrong solution:** Fine-tuning addresses style/format consistency, not reasoning quality. The coaching quality gap is a reasoning and context problem. Fine-tuning on 2-week-old data would overfit to initial state, the opposite of an adaptive system.
+
+**The right infrastructure additions are:** `platform_memory` DDB partition (IC-1) and the pre-compute insight pass Lambda (IC-2) — both use existing AWS services, zero new cost, and are the compounding substrate for every other IC feature.
+
+---
+
 ## Completed (Recent)
 
 Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
