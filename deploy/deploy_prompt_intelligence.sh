@@ -23,8 +23,8 @@ sleep 10
 
 # 2. Weekly Plate (P1: plate memory)
 echo "2/3 Deploying weekly-plate-schedule (P1 plate memory)..."
-bash deploy/deploy_lambda.sh weekly-plate-schedule lambdas/weekly_plate_lambda.py
-echo "    ✅ weekly-plate-schedule"
+bash deploy/deploy_lambda.sh weekly-plate lambdas/weekly_plate_lambda.py
+echo "    ✅ weekly-plate"
 sleep 10
 
 # 3. MCP server (IC-1: platform_memory module)
