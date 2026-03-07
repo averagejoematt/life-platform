@@ -1,5 +1,24 @@
 # Life Platform — Changelog
 
+## v2.84.0 — 2026-03-07: Todoist Life OS — Bulk Rescheduling + Write Tools
+
+- **`patches/todoist_reschedule.py`:** one-shot bulk rescheduler — fetches all ~292 tasks live from Todoist API, applies `every!` completion-based recurrence (except hard-date anchored tasks: birthdays, anniversaries, holidays), and intelligently scatters first-fire dates across 12 months
+- **Smart scatter logic:** Finance → Health → Growth → Home sequencing across all cadences; weekly tasks spread across 4 onboarding weeks (not all at once); monthly tasks stagger across Mar/Apr/May by domain; quarterly spread across Apr/May/Jun; semi-annual in two waves (Apr/May/Jun + Oct/Nov/Dec); annual tasks keyword-matched to logical calendar month + deferred high-effort tasks (DEXA, cognitive baseline, hearing test) pushed to H2 2026
+- **Day-of-week by domain:** Sunday=review/reflection, Monday=Finance, Wednesday=Health, Thursday=Growth, Saturday=Home
+- **Dry-run mode:** prints full plan table + monthly distribution bar chart before any writes; `--apply` flag to commit
+- **6 Todoist write tools** added to `mcp/tools_todoist.py` (tools 130-135): `get_todoist_projects`, `list_todoist_tasks`, `update_todoist_task` (supports `every!` syntax), `create_todoist_task`, `close_todoist_task`, `delete_todoist_task`
+- **`mcp/registry.py`:** 6 additional write tool registrations (total tools: 135)
+- **Bug fixed:** `todoist-data-ingestion` Lambda had stale `SECRET_NAME=life-platform/todoist` env var (old per-service secret deleted during v2.75.0 consolidation) — updated to `life-platform/api-keys` via `aws lambda update-function-configuration`
+
+## v2.83.0 — 2026-03-07: Todoist Integration — MCP Tools + Daily Brief Task Load
+- **Enhanced `todoist_lambda.py`:** now captures `overdue_count`, `due_today_count`, `priority_breakdown` (P1-P4), `tasks_due_today[]` via Todoist filter API. New `get_filtered_tasks()` helper with pagination + graceful fallback.
+- **New `mcp/tools_todoist.py`:** 5 MCP tools — `get_task_completion_trend`, `get_task_load_summary`, `get_project_activity`, `get_decision_fatigue_signal`, `get_todoist_day`
+- **`mcp/registry.py`:** import + 5 tool registrations added (tools 125-129)
+- **`html_builder.py`:** new TASK LOAD section (after blood pressure tile) — shows completed/overdue/due-today/active with cognitive load signal (CLEAR/MODERATE/ELEVATED/HIGH) + top 3 projects by completion
+- **`daily_brief_lambda.py`:** `gather_daily_data()` fetches `todoist_yesterday` and passes to html_builder via `data["todoist"]`
+- **Roadmap item #34 (decision fatigue):** now live via `get_decision_fatigue_signal` — correlates task load with T0 habit compliance, Pearson r, load threshold analysis
+- **Deploy:** `deploy/deploy_todoist_integration.sh` (3 Lambdas: todoist-data-ingestion → life-platform-mcp → daily-brief)
+
 ## v2.82.0 — 2026-03-07: Daily Metrics Compute Lambda (#53)
 - **32nd Lambda:** `daily-metrics-compute` — pre-computes all derived metrics at 9:40 AM PT (between character-sheet-compute at 9:35 and daily-brief at 10:00)
 - **New DDB partition:** `SOURCE#computed_metrics` stores: day_grade score/letter/component scores+details, readiness score/colour, habit streaks (tier0/tier01/vice), TSB, HRV 7d/30d avgs, sleep debt, weight (latest/week-ago/avatar)

@@ -1,14 +1,14 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-07 (v2.82.0 — 124 MCP tools, 32 Lambdas, 19 data sources, 6 secrets, 35 alarms)
+> Last update: 2026-03-07 (v2.84.0 — 135 MCP tools, 32 Lambdas, 19 data sources, 6 secrets, 35 alarms)
 
 ---
 
 ## Current State
 
-- **Platform version:** v2.82.0
-- **MCP Server:** 121 tools across 26-module package, serving health data through Claude Desktop + claude.ai + Claude mobile (1024 MB, 12 tools pre-cached nightly)
+- **Platform version:** v2.84.0
+- **MCP Server:** 135 tools across 27-module package, serving health data through Claude Desktop + claude.ai + Claude mobile (1024 MB, 12 tools pre-cached nightly)
 - **Remote MCP:** Function URL `c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` with OAuth auto-approve + HMAC Bearer token validation
 - **Data Sources:** 19 (12 scheduled + 1 webhook + 3 manual/periodic + 2 MCP-managed + 1 State of Mind via webhook)
 - **Lambdas:** 32 (13 ingestion + 1 webhook + 2 enrichment + 6 email/digest + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 daily-metrics-compute + 1 dashboard-refresh + 1 data-export + 1 qa-smoke)
@@ -170,6 +170,7 @@
 | ~~18~~ | ~~**Automated threshold learning**~~ | Replace static anomaly thresholds with personalized baselines computed from rolling 30-day history. Each metric gets its own "normal" range. Reduces false positives. | 3-4 hr | $0 |
 | ~~19~~ | ~~**Data export & portability**~~ | ~~One-click full data dump: all DynamoDB items → JSON/CSV in S3. Monthly automated backup beyond PITR. Your data, your ownership.~~ | ~~2-3 hr~~ | ~~$0.10/mo~~ |
 | 20 | **MCP tool response compression** | Gzip large tool responses before sending over MCP bridge. Reduces latency for data-heavy tools (food_log, activity search, lab trends). | 1-2 hr | $0 |
+| 54 | **LLM provider failover (OpenRouter)** | Add retry-with-fallback pattern to all email Lambdas: try Anthropic first, catch 5xx errors, fall back to OpenRouter (which also carries Claude models, so quality is preserved; GPT-4 as last resort). One shared `llm_client.py` utility, `OPENROUTER_API_KEY` in Secrets Manager. Primary value: pattern study for enterprise AI redundancy — same thinking applies to any critical workflow with a single-vendor AI dependency. | 2-3 hr | ~$0 |
 
 ### Tier 4 — Big Features (multi-session)
 
