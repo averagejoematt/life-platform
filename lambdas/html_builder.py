@@ -912,7 +912,7 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
                 delta_color = "#22c55e" if delta < 0 else "#ef4444" if delta > 0.5 else "#f59e0b"
                 delta_str = ("−" if delta < 0 else "+") + str(abs(delta))
                 html += ('<p style="color:' + delta_color + ';font-size:14px;font-weight:600;margin:0;">'
-                         + delta_str + ' lbs this week</p>')
+                         + delta_str + ' lbs vs 7d ago</p>')
             html += '</div>'
 
             html += ('<div style="background:#374151;border-radius:6px;height:8px;margin-bottom:6px;">'

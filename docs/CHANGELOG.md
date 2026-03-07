@@ -1,5 +1,13 @@
 # Life Platform — Changelog
 
+## v2.81.0 — 2026-03-07: QA Smoke Test + Blog Cleanup
+- **31st Lambda:** `life-platform-qa-smoke` — daily 10:30 AM PT health check email (5 categories, 20+ assertions)
+- **3 new test/patch scripts:** `tests/smoke_test.py`, `tests/validate_links.py`, `lambdas/qa_smoke_lambda.py`
+- **Deploy fix:** corrected role name `lambda-weekly-digest-role` in deploy script
+- **Dashboard freshness threshold:** 2h → 4h (correct for pre-DST 5 PM PT evening refresh)
+- **Blog:** deleted ghost DDB record ("The Week Everything Leveled Up"), rebuilt index from scratch, restored week-02.html with correct Empty Journal content
+- **Roadmap:** added #53 Daily Brief compute refactor (Tier 3)
+
 ## v2.80.2 — 2026-03-06: Show & Tell PDF + Pipeline
 - Built complete Show & Tell PDF (v5) for internal presentation — boss/peers/delegates audience
 - Privacy redactions: habit substance rows (shot02/05), weight numbers (shot06/16/18), Brittany vulnerable content (shot07)

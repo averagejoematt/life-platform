@@ -1164,7 +1164,15 @@ def write_buddy_json(data, profile, yesterday, character_sheet=None):
                 "level": character_sheet.get("character_level", 1),
                 "tier": character_sheet.get("character_tier"),
                 "tier_emoji": character_sheet.get("character_tier_emoji"),
+                "xp": character_sheet.get("character_xp", 0),
                 "events": character_sheet.get("level_events", []),
+                "pillars": {
+                    pn: {
+                        "level": (character_sheet.get("pillar_" + pn) or {}).get("level"),
+                        "tier": (character_sheet.get("pillar_" + pn) or {}).get("tier"),
+                    }
+                    for pn in _PILLAR_ORDER
+                },
             } if character_sheet else None,
             "avatar": _build_avatar_data(character_sheet, profile, current_weight),
         }
