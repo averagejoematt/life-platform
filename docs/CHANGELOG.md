@@ -9,6 +9,7 @@
 - Fixed `deploy_p3_lambdas.sh`: bash `-u` nounset error on empty `extra_files` array; role ARN now per-function.
 - Added `deploy/setup_p3_iam_roles.sh` for the two new roles + KMS policy update.
 - Both new roles added to KMS key policy (35 → 37 principals).
+- `life-platform/api-keys` secret scheduled for deletion (30-day recovery window, permanent deletion ~2026-04-07).
 
 ---
 

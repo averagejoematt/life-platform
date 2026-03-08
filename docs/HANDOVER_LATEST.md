@@ -3,8 +3,8 @@ _Generated: 2026-03-08_
 
 ## Platform State
 - **Version:** v3.1.3
-- **Lambdas:** 37 | **MCP Tools:** 144 | **Modules:** 30 | **Data Sources:** 19
-- **CloudWatch Alarms:** ~39 | **Secrets:** 9 active | **KMS principals:** 35
+- **Lambdas:** 39 | **MCP Tools:** 144 | **Modules:** 30 | **Data Sources:** 19
+- **CloudWatch Alarms:** ~39 | **Secrets:** 8 active | **KMS principals:** 37
 
 ---
 
@@ -25,14 +25,7 @@ _Generated: 2026-03-08_
 
 ## NEXT SESSION — Suggested order
 
-### 1. Delete api-keys bundle (30-day window is running)
-P3 deployed + Monday Compass Todoist confirmed working. Safe to delete:
-```bash
-aws secretsmanager delete-secret --secret-id life-platform/api-keys \
-  --recovery-window-in-days 30 --region us-west-2
-```
-
-### 2. Next feature: Brittany weekly email
+### 1. Next feature: Brittany weekly email
 
 ---
 
