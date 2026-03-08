@@ -11,7 +11,7 @@
 - **MCP Server:** 144 tools across 30-module package (tools_decisions.py added), serving health data through Claude Desktop + claude.ai + Claude mobile (1024 MB, 12 tools pre-cached nightly)
 - **Remote MCP:** Function URL `c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` with OAuth auto-approve + HMAC Bearer token validation
 - **Data Sources:** 19 (12 scheduled + 1 webhook + 3 manual/periodic + 2 MCP-managed + 1 State of Mind via webhook)
-- **Lambdas:** 33 (13 ingestion + 1 webhook + 2 enrichment + 6 email/digest + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 daily-metrics-compute + 1 dashboard-refresh + 1 data-export + 1 qa-smoke)
+- **Lambdas:** 34 (13 ingestion + 1 webhook + 2 enrichment + 6 email/digest + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 daily-metrics-compute + 1 daily-insight-compute + 1 hypothesis-engine + 1 dashboard-refresh + 1 data-export + 1 qa-smoke)
 - **Cost:** Under $25/month (~$3/month projected after secrets consolidation)
 - **Secrets Manager:** 6 secrets (was 12 — consolidated anthropic/todoist/habitify/health-auto-export/notion/dropbox into `life-platform/api-keys`)
 - **CloudWatch Alarms:** 35 (all Lambdas now monitored)
