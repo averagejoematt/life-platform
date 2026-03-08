@@ -9,6 +9,10 @@ import boto3
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+# ── AI model constants (env-overridable to avoid silent deprecation failures) ──
+AI_MODEL       = os.environ.get("AI_MODEL",       "claude-sonnet-4-6")
+AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+
 # ── Environment variables (with backwards-compatible defaults) ──
 _REGION         = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME      = os.environ.get("TABLE_NAME", "life-platform")

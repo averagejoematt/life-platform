@@ -54,6 +54,9 @@ table    = dynamodb.Table(TABLE_NAME)
 ses      = boto3.client("sesv2", region_name=REGION)
 secrets  = boto3.client("secretsmanager", region_name=REGION)
 
+# AI model constant — read from env so model can be updated without redeployment
+AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+
 RECIPIENT = "awsdev@mattsusername.com"
 SENDER    = "awsdev@mattsusername.com"
 MIN_BASELINE_DAYS = 7
@@ -345,7 +348,7 @@ def call_anthropic_with_retry(req, timeout=30, max_attempts=2, backoff_s=5):
 
 def call_haiku_hypothesis(flagged, context, api_key):
     payload = json.dumps({
-        "model": "claude-haiku-4-5-20251001",
+        "model": AI_MODEL_HAIKU,
         "max_tokens": 250,
         "messages": [{
             "role": "user",

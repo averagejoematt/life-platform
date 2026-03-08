@@ -1,5 +1,23 @@
 # Life Platform — Changelog
 
+## v2.92.0 — 2026-03-08: P0 Security Hardening
+
+### IAM Role Decomposition
+- **New:** `life-platform-compute-role` — 5 compute Lambdas (DDB read+write, no SES, no blog S3)
+- **New:** `life-platform-email-role` — 6 email Lambdas (DDB read-only, SES, S3 dashboard/buddy)
+- **New:** `life-platform-digest-role` — 2 digest Lambdas (DDB read-only, SES, S3 blog+dashboard)
+- **Deprecated:** `lambda-weekly-digest-role` (was shared by 10+ Lambdas — blast radius eliminated)
+- Deploy script: `deploy/p0_iam_role_decomposition.sh`
+
+### Anthropic Secret Isolation
+- `deploy/p0_split_secret.sh` already authored (prior session) — creates `life-platform/ai-keys` containing only `anthropic_api_key`; updates `ANTHROPIC_SECRET` env var on 10 AI-calling Lambdas
+- All AI Lambdas already use `AI_MODEL`/`AI_MODEL_HAIKU` env-var pattern (no hardcoded model strings)
+
+### Verification
+- New: `deploy/p0_verify.sh` — automated P0 checks (secret existence, env vars, role assignments)
+
+---
+
 ## v2.91.0 — 2026-03-08: Monday Compass — Weekly Planning Email
 
 ### Monday Compass (`monday-compass` Lambda)

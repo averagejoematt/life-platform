@@ -18,10 +18,15 @@ Exports:
 """
 
 import json
+import os
 import time
 import urllib.error
 import urllib.request
 from datetime import date as _date_cls
+
+# AI model constants — read from env so model can be updated without redeployment
+AI_MODEL       = os.environ.get("AI_MODEL",       "claude-sonnet-4-6")
+AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 # ==============================================================================
 # MODULE STATE (set by init())
@@ -1005,7 +1010,7 @@ def build_workout_summary(data):
 
 def call_anthropic(prompt, api_key, max_tokens=200):
     payload = json.dumps({
-        "model": "claude-sonnet-4-6",
+        "model": AI_MODEL,
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}]
     }).encode()
