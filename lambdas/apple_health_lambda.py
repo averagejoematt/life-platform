@@ -295,7 +295,7 @@ def save_day(date_str, day):
         ContentEncoding="gzip",
     )
 
-    db_item = {"pk": f"USER#{USER_ID}#SOURCE#apple_health", "sk": f"DATE#{date_str}"}
+    db_item = {"pk": f"USER#{USER_ID}#SOURCE#apple_health", "sk": f"DATE#{date_str}", "schema_version": 1}
     db_item.update(day)
     table.put_item(Item=floats_to_decimal(db_item))
 

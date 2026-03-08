@@ -424,6 +424,7 @@ def save_to_dynamodb(date_str, activities):
         "sk": f"DATE#{date_str}",
         "date": date_str,
         "source": "strava",
+        "schema_version": 1,
         "ingested_at": datetime.now(timezone.utc).isoformat(),
         "activity_count": len(activities),
         "activities": activities,

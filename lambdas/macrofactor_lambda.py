@@ -293,11 +293,12 @@ def build_day_items(rows):
 
 
         item = {
-            "pk":            PK,
-            "sk":            f"DATE#{date_str}",
-            "date":          date_str,
-            "source":        "macrofactor",
-            "ingested_at":   ingested_at,
+            "pk":             PK,
+            "sk":             f"DATE#{date_str}",
+            "date":           date_str,
+            "source":         "macrofactor",
+            "schema_version": 1,
+            "ingested_at":    ingested_at,
             "entries_count": len(food_log),
             "food_log":      food_log,
             **totals_prefixed,
@@ -415,6 +416,7 @@ def build_workout_day_items(rows):
             "sk":               f"DATE#{date_str}",
             "date":             date_str,
             "source":           "macrofactor_workouts",
+            "schema_version":   1,
             "ingested_at":      ingested_at,
             "workouts_count":   len(workouts),
             "total_sets":       total_sets,

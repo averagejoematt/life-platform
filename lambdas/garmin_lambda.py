@@ -747,11 +747,12 @@ def ingest_day(target_date: str, secret: dict, api=None) -> dict:
     print(f"S3: s3://{S3_BUCKET}/{s3_key}")
 
     db_item = {
-        "pk":          f"USER#{USER_ID}#SOURCE#garmin",
-        "sk":          f"DATE#{target_date}",
-        "date":        target_date,
-        "source":      "garmin",
-        "ingested_at": datetime.now(timezone.utc).isoformat(),
+        "pk":             f"USER#{USER_ID}#SOURCE#garmin",
+        "sk":             f"DATE#{target_date}",
+        "date":           target_date,
+        "source":         "garmin",
+        "schema_version": 1,
+        "ingested_at":    datetime.now(timezone.utc).isoformat(),
         **record,
     }
     table.put_item(Item=floats_to_decimal(db_item))

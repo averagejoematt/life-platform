@@ -97,6 +97,7 @@ def lambda_handler(event, context):
             "pk": f"USER#{USER_ID}#SOURCE#weather",
             "sk": f"DATE#{date_str}",
             "source": "weather",
+            "schema_version": 1,
             "ingested_at": datetime.now(timezone.utc).isoformat(),
             **record,
         }

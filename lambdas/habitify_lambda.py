@@ -243,6 +243,7 @@ def process_day(api_key, area_map, target_date):
         "sk": f"DATE#{target_date}",
         "date": target_date,
         "source": "habitify",
+        "schema_version": 1,
         # ── Chronicling-compatible fields (MCP tools read these) ──────────────
         "habits": habits,                    # {name: 1/0}
         "by_group": by_group,                # {Group: {completed, possible, pct, habits_done}}
@@ -292,6 +293,7 @@ def bridge_supplements(item):
         "sk": f"DATE#{date_str}",
         "date": date_str,
         "source": "supplements",
+        "schema_version": 1,
         "supplements": entries,
         "bridge_source": "habitify",
         "updated_at": datetime.now(timezone.utc).isoformat(),
