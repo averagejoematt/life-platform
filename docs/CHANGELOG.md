@@ -1,5 +1,31 @@
 # Life Platform — Changelog
 
+## v3.1.6 — 2026-03-08: DATA-2 full rollout + AI-2 causal language fixes
+
+### DATA-2: Ingestion validator wired into all 13 ingestion Lambdas (complete)
+- **10 remaining Lambdas wired:** eightsleep, withings, habitify, notion, todoist, weather, apple_health, garmin, enrichment (comment only), journal_enrichment (comment only)
+- **enrichment + journal_enrichment:** Not wired — both use `update_item` to patch existing records. Validator runs at source ingestion time (strava, notion respectively). Comments added.
+- **habitify:** No s3_client — CRITICAL triggers log + `return` (no archive). `date_str` extracted from `item["sk"]`. Wired in `write_to_dynamo()` function.
+- **notion:** Two `put_item` sites (multi-per-day loop + single-entry). CRITICAL triggers `continue` (not return). No archive.
+- **weather:** Uses `s3` variable name (not `s3_client`) — standard pattern otherwise.
+- **DATA-2 status:** ✅ Complete (13/13 ingestion Lambdas)
+
+### AI-2: Causal language fixed throughout ai_calls.py
+- IC-3 JSON schema field: `causal_chain` → `likely_connection` with correlation framing; backward-compat fallback in consumer
+- IC-3 output label: `"Causal chain:"` → `"Likely pattern (correlation):"`
+- Habit context block: `"Known causal chains"` → `"Known habit→metric correlations"`
+- `"TRACE THE CAUSAL CHAIN"` → `"NAME THE LIKELY CORRELATIVE PATTERN"` + explicit correlation caveat
+- BoD narrative prompt: same softening + "frame as a pattern to investigate, not a certainty"
+- Guidance prompt: same softening + `"may move"` instead of `"would move"`
+- hypothesis_engine_lambda.py audited — already well-framed, no changes needed
+- **AI-2 status:** ✅ Complete
+
+### Deploy
+- 11 Lambdas deployed: eightsleep, withings, habitify, notion, todoist, weather, apple-health, garmin, enrichment, journal-enrich, daily-brief
+- `git commit -m "v3.1.6: DATA-2 full rollout (all 13 ingestion Lambdas) + AI-2 causal language fixes"`
+
+---
+
 ## v3.1.5 — 2026-03-08: 7-item doc + wiring sprint
 
 ### Items 1–3: Safety modules wired
