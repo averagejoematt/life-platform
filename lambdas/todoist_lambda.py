@@ -236,8 +236,21 @@ def lambda_handler(event, context):
         "completions_by_project": by_project,
         "tasks_due_today": tasks_due_today,
     }
-    table.put_item(Item=floats_to_decimal(db_item))
-    print(f"Saved to DynamoDB for {date_str}")
+    # DATA-2: Validate before write
+    try:
+        from ingestion_validator import validate_item as _validate_item
+        _vr = _validate_item("todoist", floats_to_decimal(db_item), date_str)
+        if _vr.should_skip_ddb:
+            logger.error(f"[DATA-2] CRITICAL: Skipping todoist DDB write for {date_str}: {_vr.errors}")
+            _vr.archive_to_s3(s3_client, bucket=S3_BUCKET, item=db_item)
+        else:
+            if _vr.warnings:
+                logger.warning(f"[DATA-2] Validation warnings for todoist/{date_str}: {_vr.warnings}")
+            table.put_item(Item=floats_to_decimal(db_item))
+            print(f"Saved to DynamoDB for {date_str}")
+    except ImportError:
+        table.put_item(Item=floats_to_decimal(db_item))
+        print(f"Saved to DynamoDB for {date_str}")
 
     return {
         "statusCode": 200,

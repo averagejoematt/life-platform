@@ -360,8 +360,21 @@ def save_to_dynamo(date_str: str, measurements: dict):
     }
     item.update(float_to_decimal(measurements))
 
-    table.put_item(Item=item)
-    print(f"Saved to DynamoDB: pk={DYNAMO_PK}, sk=DATE#{date_str}")
+    # DATA-2: Validate before write
+    try:
+        from ingestion_validator import validate_item as _validate_item
+        _vr = _validate_item("withings", item, date_str)
+        if _vr.should_skip_ddb:
+            logger.error(f"[DATA-2] CRITICAL: Skipping withings DDB write for {date_str}: {_vr.errors}")
+            _vr.archive_to_s3(s3_client, bucket=S3_BUCKET, item=item)
+        else:
+            if _vr.warnings:
+                logger.warning(f"[DATA-2] Validation warnings for withings/{date_str}: {_vr.warnings}")
+            table.put_item(Item=item)
+            print(f"Saved to DynamoDB: pk={DYNAMO_PK}, sk=DATE#{date_str}")
+    except ImportError:
+        table.put_item(Item=item)
+        print(f"Saved to DynamoDB: pk={DYNAMO_PK}, sk=DATE#{date_str}")
 
 
 

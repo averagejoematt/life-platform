@@ -238,6 +238,7 @@ def apply_defense_enrichment(item, defense_data):
         return False
 
     update_expr = "SET " + ", ".join(update_parts)
+    # DATA-2 note: journal enrichment updates existing notion records — validator runs at notion ingestion time
     table.update_item(
         Key={"pk": item["pk"], "sk": item["sk"]},
         UpdateExpression=update_expr,

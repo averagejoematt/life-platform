@@ -452,6 +452,17 @@ def write_entries(entries_by_date):
                     item["pk"] = PK
                     item["sk"] = sk
                     item["schema_version"] = 1
+                    # DATA-2: Validate before write
+                    try:
+                        from ingestion_validator import validate_item as _validate_item
+                        _vr = _validate_item("notion", item, date_str)
+                        if _vr.should_skip_ddb:
+                            logger.error(f"[DATA-2] CRITICAL: Skipping notion DDB write for {sk}: {_vr.errors}")
+                            continue
+                        if _vr.warnings:
+                            logger.warning(f"[DATA-2] Validation warnings for notion/{sk}: {_vr.warnings}")
+                    except ImportError:
+                        pass
                     table.put_item(Item=item)
                     written += 1
                     logger.info(f"Wrote {sk} ({template})")
@@ -469,6 +480,17 @@ def write_entries(entries_by_date):
                 item["pk"] = PK
                 item["sk"] = sk
                 item["schema_version"] = 1
+                # DATA-2: Validate before write
+                try:
+                    from ingestion_validator import validate_item as _validate_item
+                    _vr = _validate_item("notion", item, date_str)
+                    if _vr.should_skip_ddb:
+                        logger.error(f"[DATA-2] CRITICAL: Skipping notion DDB write for {sk}: {_vr.errors}")
+                        continue
+                    if _vr.warnings:
+                        logger.warning(f"[DATA-2] Validation warnings for notion/{sk}: {_vr.warnings}")
+                except ImportError:
+                    pass
                 table.put_item(Item=item)
                 written += 1
                 logger.info(f"Wrote {sk} ({template})")

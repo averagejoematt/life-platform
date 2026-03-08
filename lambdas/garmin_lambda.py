@@ -755,8 +755,21 @@ def ingest_day(target_date: str, secret: dict, api=None) -> dict:
         "ingested_at":    datetime.now(timezone.utc).isoformat(),
         **record,
     }
-    table.put_item(Item=floats_to_decimal(db_item))
-    print(f"DynamoDB: DATE#{target_date} → {len(record)} fields written")
+    # DATA-2: Validate before write
+    try:
+        from ingestion_validator import validate_item as _validate_item
+        _vr = _validate_item("garmin", floats_to_decimal(db_item), target_date)
+        if _vr.should_skip_ddb:
+            logger.error(f"[DATA-2] CRITICAL: Skipping garmin DDB write for {target_date}: {_vr.errors}")
+            _vr.archive_to_s3(s3_client, bucket=S3_BUCKET, item=db_item)
+        else:
+            if _vr.warnings:
+                logger.warning(f"[DATA-2] Validation warnings for garmin/{target_date}: {_vr.warnings}")
+            table.put_item(Item=floats_to_decimal(db_item))
+            print(f"DynamoDB: DATE#{target_date} → {len(record)} fields written")
+    except ImportError:
+        table.put_item(Item=floats_to_decimal(db_item))
+        print(f"DynamoDB: DATE#{target_date} → {len(record)} fields written")
 
     return record
 
