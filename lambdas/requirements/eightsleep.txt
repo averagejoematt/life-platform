@@ -1,0 +1,2 @@
+# eightsleep-data-ingestion
+# No third-party dependencies — uses stdlib urllib only.
