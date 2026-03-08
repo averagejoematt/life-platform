@@ -21,6 +21,7 @@ from mcp.tools_longevity import *
 from mcp.tools_adaptive import *
 from mcp.tools_todoist import *
 from mcp.tools_memory import *
+from mcp.tools_decisions import *
 
 TOOLS = {
     "get_sources": {
@@ -2967,6 +2968,75 @@ TOOLS = {
                     "date":     {"type": "string", "description": "Date of the record to delete (YYYY-MM-DD)."},
                 },
                 "required": ["category", "date"],
+            },
+        },
+    },
+    # ── IC-19: Decision Journal ────────────────────────────────────────────────
+    "log_decision": {
+        "fn": tool_log_decision,
+        "schema": {
+            "name": "log_decision",
+            "description": (
+                "IC-19: Log a platform-guided decision for trust calibration. Record what the platform recommended, "
+                "whether Matthew followed or overrode the advice, and why. Outcome recorded later via update_decision_outcome. "
+                "Use for: 'the brief said rest day but I trained', 'followed protein advice', 'platform recommended X and I did Y'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "decision":        {"type": "string", "description": "What the platform recommended (e.g. 'Take a rest day', 'Front-load protein')."},
+                    "followed":        {"type": "boolean", "description": "True if Matthew followed the advice, False if overridden. Omit if not yet decided."},
+                    "override_reason": {"type": "string", "description": "Why Matthew chose differently (if overridden). Optional."},
+                    "source":          {"type": "string", "description": "Which digest/email made the recommendation. Default: daily_brief.",
+                                        "enum": ["daily_brief", "weekly_digest", "monthly_digest", "nutrition_review", "chronicle", "mcp"]},
+                    "pillars":         {"type": "array", "items": {"type": "string"},
+                                        "description": "Pillars this decision touches (e.g. ['sleep', 'movement'])."},
+                    "date":            {"type": "string", "description": "Date of the decision (YYYY-MM-DD). Defaults to today."},
+                },
+                "required": ["decision"],
+            },
+        },
+    },
+    "get_decisions": {
+        "fn": tool_get_decisions,
+        "schema": {
+            "name": "get_decisions",
+            "description": (
+                "IC-19: Retrieve recent platform-guided decisions with outcomes and trust calibration. "
+                "Shows follow vs override patterns and which approach produces better outcomes. "
+                "Use for: 'how often do I follow platform advice?', 'should I trust the system?', "
+                "'decision journal', 'when do my overrides work?'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "days":         {"type": "integer", "description": "Look back N days (default 30)."},
+                    "pillar":       {"type": "string", "description": "Filter by pillar (e.g. 'sleep', 'nutrition')."},
+                    "outcome_only": {"type": "boolean", "description": "If true, only return decisions with recorded outcomes."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "update_decision_outcome": {
+        "fn": tool_update_decision_outcome,
+        "schema": {
+            "name": "update_decision_outcome",
+            "description": (
+                "IC-19: Record the outcome of a past decision. Call 1-3 days after logging a decision "
+                "to capture what actually happened. Over time builds trust calibration: when to follow "
+                "vs override platform advice. Use for: 'that rest day advice worked', 'I ignored the protein tip and felt fine'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "sk":             {"type": "string", "description": "Sort key of the decision to update (from get_decisions)."},
+                    "outcome_metric": {"type": "string", "description": "Which metric was affected (e.g. 'HRV', 'sleep_score', 'protein_g')."},
+                    "outcome_delta":  {"type": "number", "description": "Change in the metric (positive = improved, negative = worsened)."},
+                    "outcome_notes":  {"type": "string", "description": "Free-text notes on what happened."},
+                    "effectiveness":  {"type": "integer", "description": "1-5 rating: 1=bad outcome, 3=neutral, 5=great outcome."},
+                },
+                "required": ["sk"],
             },
         },
     },

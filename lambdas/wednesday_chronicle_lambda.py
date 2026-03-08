@@ -57,7 +57,13 @@ try:
     _HAS_BOARD_LOADER = True
 except ImportError:
     _HAS_BOARD_LOADER = False
-    logger.warning("[chronicle] board_loader not available — using fallback prompts")
+
+try:
+    import insight_writer
+    insight_writer.init(table, "matthew")
+    _HAS_INSIGHT_WRITER = True
+except ImportError:
+    _HAS_INSIGHT_WRITER = False
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1395,6 +1401,16 @@ def lambda_handler(event, context):
         print("[INFO] Using fallback hardcoded Elena prompt")
         elena_prompt = _FALLBACK_ELENA_PROMPT
 
+    # IC-16: Progressive context — narrative-relevant insight threads
+    if _HAS_INSIGHT_WRITER:
+        try:
+            prev_ctx = insight_writer.build_insights_context(
+                days=30, max_items=5, label="PLATFORM INSIGHTS (context for narrative)")
+            if prev_ctx:
+                user_message = prev_ctx + "\n\n" + user_message
+        except Exception as e:
+            print(f"[WARN] IC-16 failed: {e}")
+
     # Call Sonnet
     api_key = get_anthropic_key()
     logger.info("Calling Sonnet 4.5 for Elena's installment...")
@@ -1461,6 +1477,20 @@ def lambda_handler(event, context):
         }},
     )
     logger.info(f"Email sent: {subject}")
+
+    # IC-15: Persist chronicle as narrative insight
+    if _HAS_INSIGHT_WRITER:
+        try:
+            insight_writer.write_insight(
+                digest_type="chronicle", insight_type="observation",
+                text=f"Week {week_num}: {title}. {raw_installment[:600]}",
+                pillars=insight_writer._extract_pillars_from_text(raw_installment[:500]),
+                tags=["chronicle", "narrative", f"week_{week_num}"],
+                confidence="high", actionable=False,
+                date=data["dates"]["end"])
+            print("[INFO] IC-15: chronicle insight persisted")
+        except Exception as e:
+            print(f"[WARN] IC-15 failed: {e}")
 
     return {
         "statusCode": 200,

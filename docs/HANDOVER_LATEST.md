@@ -1,2 +1,2 @@
 <!-- This file is auto-updated at session close. See the dated handover file for full details. -->
-See: handovers/2026-03-07_ic15_ic17_insight_ledger.md
+See: handovers/2026-03-07_ic_phase2_complete.md

@@ -1,5 +1,61 @@
 # Life Platform — Changelog
 
+## v2.88.0 — 2026-03-07: IC-23/24/25 + IC-16 All Digests + IC-19 Decision Journal
+
+### IC-23: Attention-Weighted Prompt Budgeting
+- **New in `ai_calls.py`:** `_compute_surprise_scores(data)` + `_build_surprise_context()`
+- Computes per-metric surprise score (0–1) based on deviation from 7-day rolling baselines
+- Domains: HRV, sleep, nutrition, steps, glucose, recovery
+- Only surfaces metrics above 0.4 surprise threshold — zero prompt bloat on normal days
+- Injected into BoD + TL;DR + Guidance calls — AI prioritizes coaching on unexpected signals
+
+### IC-24: Data Quality Scoring
+- **New in `ai_calls.py`:** `_compute_data_quality(data, profile)`
+- Per-source confidence score: nutrition (50%/75% of target thresholds), sleep (sync detection), Apple Health (field completeness), Habitify, journal
+- Weighted overall score (nutrition 25%, sleep 25%, Apple Health 20%, habits 15%, activity 10%, journal 5%)
+- Compact prompt block: “⚠️ Nutrition: 800 cal — likely INCOMPLETE”
+- Injected into BoD, TL;DR, AND training/nutrition coach (most susceptible to logging gap errors)
+- Instruction: “Do NOT coach assertively on incomplete data”
+
+### IC-25: Diminishing Returns Detector
+- **New in `ai_calls.py`:** `_compute_diminishing_returns(character_sheet, data, profile)`
+- Reads Character Sheet pillar scores + habit completion rates
+- Detects: saturated pillars (high effort + score 70+), underinvested pillars (low score + low effort)
+- Outputs leverage analysis: “Sleep optimization mature at 82 — biggest lever is Movement at 45%”
+- Injected into BoD + TL;DR calls
+
+### IC-16: Progressive Context — All 6 Email Lambdas
+- `insight_writer.py` imported and initialized in all 5 remaining digest Lambdas
+- Before AI calls: `build_insights_context()` retrieves recent high-value insights
+- After email send: writes structured insight records back to Insight Ledger
+- **Per-digest context windows:** Daily Brief (14d), Weekly Digest (30d), Monthly Digest (90d), Chronicle (30d narrative), Nutrition Review (14d nutrition pillar), Weekly Plate (14d nutrition)
+- Every email now reads as if written by someone who’s been following the data for weeks
+
+### IC-19: Decision Journal (3 new MCP tools — 139→142)
+- **New module:** `mcp/tools_decisions.py`
+- **DDB key pattern:** `pk=USER#matthew#SOURCE#decisions`, `sk=DECISION#<ISO-timestamp>`
+- **`log_decision`** — Record platform-guided decisions (what was recommended, followed/overridden, reason)
+- **`get_decisions`** — Retrieve decisions with trust calibration stats (follow vs override effectiveness)
+- **`update_decision_outcome`** — Record outcome 1-3 days later, compute effectiveness score
+- Builds dataset: when to trust the system vs override it
+
+### Roadmap Update
+- Added IC-23–30 to PROJECT_PLAN Tier 7 Phase 3 (Expert Panel Recommendations)
+- IC-1/2/3/6/15/16/17/19/23/24/25 now complete (11 of 30 IC features built)
+
+### Files Changed
+- `lambdas/ai_calls.py` — IC-23, IC-24, IC-25 (+~350 lines)
+- `lambdas/weekly_digest_lambda.py` — IC-16 (import + progressive context + insight write)
+- `lambdas/monthly_digest_lambda.py` — IC-16
+- `lambdas/wednesday_chronicle_lambda.py` — IC-16
+- `lambdas/nutrition_review_lambda.py` — IC-16
+- `lambdas/weekly_plate_lambda.py` — IC-16
+- `mcp/tools_decisions.py` — NEW (IC-19)
+- `mcp/registry.py` — IC-19 tool registrations
+- `deploy/deploy_ic_phase2.sh` — NEW (7-Lambda deploy script)
+
+---
+
 ## v2.87.0 — 2026-03-07: IC-15 Insight Ledger + IC-17 Red Team + Roadmap IC-15–IC-22
 
 ### IC-15: Insight Ledger — Universal Write Utility
