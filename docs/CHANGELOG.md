@@ -1,5 +1,58 @@
 # Life Platform — Changelog
 
+## v3.0.0 — 2026-03-08: P3 hardening complete
+
+### OBS-1: Structured JSON Logging (`platform_logger.py`)
+- `PlatformLogger` class — drop-in replacement for stdlib logging across all 37 Lambdas
+- Every log line → single-line JSON: `{timestamp, level, source, lambda, correlation_id, message, ...kwargs}`
+- `get_logger(source)` singleton + `logger.set_date(date)` sets `correlation_id: "source#YYYY-MM-DD"` for CWL Insights cross-Lambda queries
+- Convenience helpers: `ingestion_start/complete`, `source_missing`, `ai_call_start/complete/failed`, `validation_error`, `email_sent`, `ddb_write`, `s3_write`
+- `CWL_QUERIES` dict with ready-to-paste CloudWatch Logs Insights queries
+- Migration pattern: `from platform_logger import get_logger; logger = get_logger("daily-brief")`
+- Incremental migration — existing `logger.info(msg)` calls still work
+
+### DATA-2: Ingestion Validation Layer (`ingestion_validator.py`)
+- Per-source validation schemas for all 19 sources
+- `validate_item(source, item, date_str)` → `ValidationResult` with severity (CRITICAL / WARNING)
+- CRITICAL (errors): skip DDB write, archive to S3 `validation-errors/{source}/{date}/`
+- WARNING: write proceeds, issue logged
+- Convenience wrapper: `validate_and_write(table, s3_client, bucket, source, item, date_str)`
+- Checks: required fields, type correctness, numeric range, critical bounds, at-least-one-of, date format, schema_version
+
+### AI-3: AI Output Validation (`ai_output_validator.py`)
+- Post-processing safety layer on all AI coaching before delivery
+- `validate_ai_output(text, output_type, health_context, ...)` → `AIValidationResult`
+- BLOCK (safe fallback substituted): empty/None, too short, truncated, aggressive training + red recovery, calorie rec <800
+- WARN (log, proceed): aggressive training + borderline recovery, generic phrases, causal language, >max_length, starts with "Matthew"
+- `AIOutputType` enum: BOD_COACHING, TLDR, GUIDANCE, TRAINING_COACH, NUTRITION_COACH, JOURNAL_COACH, CHRONICLE, WEEKLY_DIGEST, MONTHLY_DIGEST, GENERIC
+- Convenience: `validate_daily_brief_outputs(bod, training_nutrition, journal, tldr, health_context)` → safe versions + `validation_warnings`
+
+### DATA-3: Weekly Reconciliation Job (`data_reconciliation_lambda.py`)
+- EventBridge: Monday 07:30 UTC (Sun 11:30 PM PT), after weekly digest
+- Checks last 7 days of DDB coverage for all 19 sources
+- Per-source expected_days config (7=daily, 5=weekdays, 6=most days)
+- Severity: 🟢 GREEN (all full) / 🟡 YELLOW (1-3 sources, 1-2 gaps) / 🔴 RED (3+ gaps or 4+ sources gapped)
+- HTML email with per-day ✅/❌ coverage table + S3 JSON at `reconciliation/{date}_weekly_reconciliation.json`
+- Lambda name: `life-platform-data-reconciliation`
+
+### SEC-5: Monthly pip-audit (`pip_audit_lambda.py`)
+- EventBridge: every Monday 17:00 UTC; Lambda self-guards to first Monday of month (day ≤ 7)
+- Bypass: invoke with `{"force": true}`
+- Lists `config/requirements/*.txt` from S3, installs `pip-audit==2.7.3` into `/tmp` on cold start
+- HTML email: 🟢 clean / 🔴 vulnerable with per-Lambda CVE table
+- Lambda name: `life-platform-pip-audit`
+
+### REL-3 follow-up: safe_put_item wired into strava + macrofactor
+- `strava_lambda.py`: `save_to_dynamodb()` now calls `safe_put_item` (replaces 30-line inline block)
+- `macrofactor_lambda.py`: `lambda_handler()` write loop now calls `safe_put_item` (replaces inline CW metric + put_item)
+- Both Lambdas fall back gracefully if `item_size_guard` not bundled (ImportError → direct put_item)
+
+### Deploy
+- `deploy/deploy_p3_lambdas.sh` — builds + deploys all 4 Lambdas (data-reconciliation, pip-audit, strava, macrofactor)
+- `deploy/setup_p3_schedules.sh` — creates EventBridge rules + Lambda permissions for both new Lambdas
+
+---
+
 ## v2.99.0 — 2026-03-08: P2 hardening complete
 
 ### OBS-2: CloudWatch operational dashboard

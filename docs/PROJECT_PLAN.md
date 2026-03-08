@@ -1,17 +1,17 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-08 (v2.91.0 — 144 MCP tools, 35 Lambdas, 30 modules, 19 data sources, 6 secrets, 35 alarms)
+> Last update: 2026-03-08 (v3.0.0 — 144 MCP tools, 37 Lambdas, 30 modules, 19 data sources, 6 secrets, 35 alarms)
 
 ---
 
 ## Current State
 
-- **Platform version:** v2.91.0
+- **Platform version:** v3.0.0
 - **MCP Server:** 144 tools across 30-module package (tools_decisions.py added), serving health data through Claude Desktop + claude.ai + Claude mobile (1024 MB, 12 tools pre-cached nightly)
 - **Remote MCP:** Function URL `c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` with OAuth auto-approve + HMAC Bearer token validation
 - **Data Sources:** 19 (12 scheduled + 1 webhook + 3 manual/periodic + 2 MCP-managed + 1 State of Mind via webhook)
-- **Lambdas:** 35 (13 ingestion + 1 webhook + 2 enrichment + 7 email/digest [incl. monday-compass] + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 daily-metrics-compute + 1 daily-insight-compute + 1 hypothesis-engine + 1 dashboard-refresh + 1 data-export + 1 qa-smoke)
+- **Lambdas:** 37 (13 ingestion + 1 webhook + 2 enrichment + 7 email/digest [incl. monday-compass] + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 daily-metrics-compute + 1 daily-insight-compute + 1 hypothesis-engine + 1 dashboard-refresh + 1 data-export + 1 qa-smoke + 1 data-reconciliation + 1 pip-audit)
 - **Cost:** Under $25/month (~$3/month projected after secrets consolidation)
 - **Secrets Manager:** 6 secrets (was 12 — consolidated anthropic/todoist/habitify/health-auto-export/notion/dropbox into `life-platform/api-keys`)
 - **CloudWatch Alarms:** 35 (all Lambdas now monitored)

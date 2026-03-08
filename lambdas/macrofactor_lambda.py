@@ -486,29 +486,22 @@ def lambda_handler(event, context):
         print(f"Unknown CSV format. Headers: {list(rows[0].keys())[:10]}")
         return {"statusCode": 200, "body": "Unknown CSV format — skipped"}
 
+    # REL-3: import safe_put_item once for the whole batch
+    try:
+        from item_size_guard import safe_put_item as _safe_put
+        _use_safe_put = True
+    except ImportError:
+        print("[WARN] item_size_guard not available — falling back to direct put_item")
+        _use_safe_put = False
+
     written = 0
     for date_str_key, item in day_items.items():
-        # ── Item size estimation + CloudWatch metric (P1.10) ─────────────────────
-        item_json = json.dumps(floats_to_decimal(item), default=str)
-        item_size_kb = len(item_json.encode('utf-8')) / 1024
-        if item_size_kb > 350:
-            print(f"[SIZE-WARNING] ⚠️ MacroFactor item for {date_str_key} is {item_size_kb:.0f}KB — approaching 400KB DynamoDB limit!")
-        elif item_size_kb > 250:
-            print(f"[SIZE-INFO] MacroFactor item for {date_str_key} is {item_size_kb:.0f}KB")
-        try:
-            cw = boto3.client("cloudwatch", region_name=REGION)
-            cw.put_metric_data(
-                Namespace="LifePlatform/Ingestion",
-                MetricData=[{
-                    "MetricName": "DynamoDBItemSizeKB",
-                    "Dimensions": [{"Name": "Source", "Value": "macrofactor"}],
-                    "Value": item_size_kb,
-                    "Unit": "Kilobytes",
-                }],
-            )
-        except Exception as e:
-            print(f"[WARN] CloudWatch item size metric failed (non-fatal): {e}")
-        table.put_item(Item=floats_to_decimal(item))
+        # ── REL-3: safe_put_item handles 400KB limit, CW metrics, and truncation ──
+        source_label = item.get("source", csv_type)
+        if _use_safe_put:
+            _safe_put(table, floats_to_decimal(item), source=source_label, date_str=date_str_key)
+        else:
+            table.put_item(Item=floats_to_decimal(item))
         written += 1
 
     print(f"Written {written} DynamoDB items ({csv_type})")
