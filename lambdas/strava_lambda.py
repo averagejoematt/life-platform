@@ -436,28 +436,14 @@ def save_to_dynamodb(date_str, activities):
         "total_zone2_seconds": sum(a.get("zone2_seconds") or 0 for a in activities),
     }
 
-    # ── Item size estimation + CloudWatch metric (P1.10) ─────────────────────
-    item_json = json.dumps(floats_to_decimal(item), default=str)
-    item_size_kb = len(item_json.encode('utf-8')) / 1024
-    if item_size_kb > 350:
-        print(f"[SIZE-WARNING] ⚠️ Strava item for {date_str} is {item_size_kb:.0f}KB — approaching 400KB DynamoDB limit!")
-    elif item_size_kb > 250:
-        print(f"[SIZE-INFO] Strava item for {date_str} is {item_size_kb:.0f}KB")
+    # ── REL-3: safe_put_item handles 400KB limit, CW metrics, and truncation ──
     try:
-        cw = boto3.client("cloudwatch", region_name=REGION)
-        cw.put_metric_data(
-            Namespace="LifePlatform/Ingestion",
-            MetricData=[{
-                "MetricName": "DynamoDBItemSizeKB",
-                "Dimensions": [{"Name": "Source", "Value": "strava"}],
-                "Value": item_size_kb,
-                "Unit": "Kilobytes",
-            }],
-        )
-    except Exception as e:
-        print(f"[WARN] CloudWatch item size metric failed (non-fatal): {e}")
-
-    table.put_item(Item=floats_to_decimal(item))
+        from item_size_guard import safe_put_item
+        safe_put_item(table, floats_to_decimal(item), source="strava", date_str=date_str)
+    except ImportError:
+        # Fallback if item_size_guard not bundled (should not happen in production)
+        print(f"[WARN] item_size_guard not available — falling back to direct put_item")
+        table.put_item(Item=floats_to_decimal(item))
     print(f"Saved {len(activities)} activities to DynamoDB for {date_str}")
 
 
