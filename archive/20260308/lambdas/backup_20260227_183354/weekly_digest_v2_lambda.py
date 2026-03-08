@@ -1,5 +1,5 @@
 """
-Weekly Digest Lambda — v4.0.0 (Weekly Digest v2)
+Weekly Digest Lambda — v4.2.0 (Weekly Digest v2)
 Fires Sunday 8:30 AM PT via EventBridge.
 
 Major rewrite from v3.3.0:
@@ -25,13 +25,16 @@ Sections:
   9. Habits (Habitify MVP + groups)
   10. Nutrition (MacroFactor)
   11. Weight & Body Composition
-  12. CGM & Glucose (Apple Health)
+  12. Steps, CGM & Mobility (Apple Health)
   13. Journal & Mood (Notion)
   14. Productivity (Todoist)
   15. Open Insights
+  16. Journey Assessment (12-week trajectory + next week focus)
 """
 
 import json
+import os
+import logging
 import math
 import statistics
 import time
@@ -42,26 +45,26 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from collections import defaultdict
 
-import os
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
-_REGION    = os.environ.get("AWS_REGION", "us-west-2")
+
+# ── Config (env vars with backwards-compatible defaults) ──
+REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-RECIPIENT  = os.environ.get("EMAIL_RECIPIENT", "awsdev@mattsusername.com")
-SENDER     = os.environ.get("EMAIL_SENDER", "awsdev@mattsusername.com")
+USER_ID    = os.environ.get("USER_ID", "matthew")
 
-dynamodb = boto3.resource("dynamodb", region_name=_REGION)
+dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table    = dynamodb.Table(TABLE_NAME)
-ses      = boto3.client("sesv2", region_name=_REGION)
-secrets  = boto3.client("secretsmanager", region_name=_REGION)
+ses      = boto3.client("sesv2", region_name=REGION)
+secrets  = boto3.client("secretsmanager", region_name=REGION)
+s3       = boto3.client("s3", region_name=REGION)
 
-# IC-15/16: Insight Ledger — progressive context + insight persistence
-try:
-    import insight_writer
-    insight_writer.init(table, "matthew")
-    _HAS_INSIGHT_WRITER = True
-except ImportError:
-    _HAS_INSIGHT_WRITER = False
+RECIPIENT = "awsdev@mattsusername.com"
+SENDER    = "awsdev@mattsusername.com"
+DASHBOARD_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+CLINICAL_KEY = "dashboard/clinical.json"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -69,8 +72,8 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def get_anthropic_key():
-    secret = secrets.get_secret_value(SecretId=os.environ.get("ANTHROPIC_SECRET", "life-platform/api-keys"))
-    return json.loads(secret["SecretString"])["anthropic_api_key"]
+    secret = secrets.get_secret_value(SecretId="life-platform/anthropic")
+    return json.loads(secret["SecretString"])["api_key"]
 
 def d2f(obj):
     if isinstance(obj, list):    return [d2f(i) for i in obj]
@@ -97,7 +100,7 @@ def fmt_num(val):
 
 def fetch_profile():
     try:
-        r = table.get_item(Key={"pk": "USER#matthew", "sk": "PROFILE#v1"})
+        r = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
         return d2f(r.get("Item", {}))
     except Exception as e:
         print(f"[ERROR] fetch_profile: {e}")
@@ -105,7 +108,7 @@ def fetch_profile():
 
 def query_range(source, start_date, end_date):
     """Batch query all records for a source in a date range."""
-    pk = f"USER#matthew#SOURCE#{source}"
+    pk = f"USER#{USER_ID}#SOURCE#{source}"
     records = {}
     kwargs = {
         "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
@@ -129,7 +132,7 @@ def query_journal_range(start_date, end_date):
     kwargs = {
         "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
         "ExpressionAttributeValues": {
-            ":pk": "USER#matthew#SOURCE#notion",
+            ":pk": f"USER#{USER_ID}#SOURCE#notion",
             ":s": f"DATE#{start_date}#journal#",
             ":e": f"DATE#{end_date}#journal#zzz",
         },
@@ -249,50 +252,37 @@ def ex_whoop(recs_dict):
             "rhr_avg": avg(rhrs), "strain_avg": avg(strains), "days": len(recs)}
 
 
-def _normalize_whoop_sleep(item):
-    """Map Whoop DynamoDB fields to normalised sleep analysis fields (v2.55.0)."""
-    out = dict(item)
-    if "sleep_quality_score" in item and "sleep_score" not in item:
-        out["sleep_score"] = item["sleep_quality_score"]
-    if "sleep_efficiency_percentage" in item and "sleep_efficiency_pct" not in item:
-        out["sleep_efficiency_pct"] = item["sleep_efficiency_percentage"]
-    dur = None
-    try:
-        dur = float(item["sleep_duration_hours"]) if item.get("sleep_duration_hours") else None
-    except (ValueError, TypeError):
-        pass
-    if dur and dur > 0:
-        for src_field, pct_field in [
-            ("slow_wave_sleep_hours", "deep_pct"),
-            ("rem_sleep_hours",      "rem_pct"),
-            ("light_sleep_hours",    "light_pct"),
-        ]:
-            val = item.get(src_field)
-            if val is not None and pct_field not in item:
-                try:
-                    out[pct_field] = round(float(val) / dur * 100, 1)
-                except (ValueError, TypeError, ZeroDivisionError):
-                    pass
-    if "time_awake_hours" in item and "waso_hours" not in item:
-        out["waso_hours"] = item["time_awake_hours"]
-    if "disturbance_count" in item and "toss_and_turns" not in item:
-        out["toss_and_turns"] = item["disturbance_count"]
-    return out
-
-
-def ex_whoop_sleep(recs_dict):
-    """Extract sleep metrics from Whoop records (SOT for sleep duration/staging v2.55.0)."""
-    recs = [_normalize_whoop_sleep(r) for r in (recs_dict.values() if recs_dict else [])]
+def ex_eightsleep(recs_dict):
+    recs = list(recs_dict.values()) if recs_dict else []
     if not recs: return None
     scores = [float(r["sleep_score"]) for r in recs if "sleep_score" in r]
+    # Support both old and new field names
     durs = []
     for r in recs:
         d = safe_float(r, "sleep_duration_hours")
+        if d is None:
+            d = safe_float(r, "total_sleep_seconds")
+            if d is not None: d = d / 3600
         if d is not None: durs.append(d)
-    effs = [safe_float(r, "sleep_efficiency_pct") for r in recs]
-    effs = [e for e in effs if e is not None]
+    effs = []
+    for r in recs:
+        e = safe_float(r, "sleep_efficiency_pct") or safe_float(r, "sleep_efficiency")
+        if e is not None: effs.append(e)
     deep_pcts = [float(r["deep_pct"]) for r in recs if "deep_pct" in r]
     rem_pcts = [float(r["rem_pct"]) for r in recs if "rem_pct" in r]
+    # Fallback to seconds-based deep/rem
+    if not deep_pcts:
+        for r in recs:
+            ds = safe_float(r, "deep_sleep_seconds")
+            ts = safe_float(r, "total_sleep_seconds")
+            if ds is not None and ts and ts > 0:
+                deep_pcts.append(ds / ts * 100)
+    if not rem_pcts:
+        for r in recs:
+            rs = safe_float(r, "rem_sleep_seconds")
+            ts = safe_float(r, "total_sleep_seconds")
+            if rs is not None and ts and ts > 0:
+                rem_pcts.append(rs / ts * 100)
     return {"score_avg": avg(scores), "score_min": min(scores, default=None),
             "duration_avg_hrs": avg(durs), "efficiency_avg": avg(effs),
             "deep_pct": avg(deep_pcts), "rem_pct": avg(rem_pcts),
@@ -362,6 +352,10 @@ def ex_macrofactor(recs_dict, profile):
     fats = [float(r["total_fat_g"]) for r in recs if "total_fat_g" in r]
     carbs = [float(r["total_carbs_g"]) for r in recs if "total_carbs_g" in r]
     fibers = [float(r["total_fiber_g"]) for r in recs if "total_fiber_g" in r]
+    alcohols = [float(r["total_alcohol_g"]) for r in recs if "total_alcohol_g" in r and float(r.get("total_alcohol_g", 0)) > 0]
+    # 1 standard drink = 14g pure alcohol
+    total_alcohol_g = sum(alcohols) if alcohols else 0
+    total_drinks = round(total_alcohol_g / 14, 1) if total_alcohol_g > 0 else 0
     return {
         "calories_avg": avg(cals), "protein_avg_g": avg(prots),
         "fat_avg_g": avg(fats), "carbs_avg_g": avg(carbs), "fiber_avg_g": avg(fibers),
@@ -369,6 +363,7 @@ def ex_macrofactor(recs_dict, profile):
         "protein_hit_rate": round(sum(1 for p in prots if p >= prot_target) / len(prots) * 100) if prots else None,
         "calorie_hit_rate": round(sum(1 for c in cals if c <= cal_target * 1.10) / len(cals) * 100) if cals else None,
         "protein_target": prot_target, "calorie_target": cal_target,
+        "alcohol_drinks": total_drinks, "alcohol_days": len(alcohols),
     }
 
 
@@ -514,83 +509,6 @@ def ex_journal(entries_by_date):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# CHARACTER SHEET EXTRACTION (v2.71.0)
-# ══════════════════════════════════════════════════════════════════════════════
-
-def ex_character_sheet(recs_dict):
-    """Extract weekly character sheet summary from pre-computed records."""
-    if not recs_dict:
-        return None
-
-    pillar_order = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
-    tier_order = ["Foundation", "Momentum", "Discipline", "Mastery", "Elite"]
-    dates = sorted(recs_dict.keys())
-    latest = recs_dict[dates[-1]] if dates else {}
-    earliest = recs_dict[dates[0]] if dates else {}
-
-    levels = [recs_dict[d].get("character_level", 0) for d in dates]
-    start_level = levels[0] if levels else 0
-    end_level = levels[-1] if levels else 0
-
-    all_events = []
-    for d in dates:
-        for ev in recs_dict[d].get("level_events", []):
-            all_events.append({**ev, "date": d})
-
-    pillar_summary = {}
-    for p in pillar_order:
-        start_pd = earliest.get(f"pillar_{p}", {})
-        end_pd = latest.get(f"pillar_{p}", {})
-        xp_earned = sum(recs_dict[d].get(f"pillar_{p}", {}).get("xp_delta", 0) for d in dates)
-        raw_scores = [recs_dict[d].get(f"pillar_{p}", {}).get("raw_score") for d in dates]
-        raw_scores = [r for r in raw_scores if r is not None]
-        avg_raw = round(sum(raw_scores) / len(raw_scores), 1) if raw_scores else None
-
-        pillar_summary[p] = {
-            "start_level": start_pd.get("level", 0),
-            "end_level": end_pd.get("level", 0),
-            "level_delta": end_pd.get("level", 0) - start_pd.get("level", 0),
-            "tier": end_pd.get("tier", "Foundation"),
-            "tier_emoji": end_pd.get("tier_emoji", "\U0001f528"),
-            "xp_earned": xp_earned,
-            "avg_raw": avg_raw,
-        }
-
-    # Closest to next tier transition
-    closest_to_tier = None
-    min_gap = 999
-    for p in pillar_order:
-        end_pd = latest.get(f"pillar_{p}", {})
-        level = end_pd.get("level", 0)
-        tier = end_pd.get("tier", "Foundation")
-        tier_idx = tier_order.index(tier) if tier in tier_order else 0
-        if tier_idx < len(tier_order) - 1:
-            next_min = [1, 21, 41, 61, 81][tier_idx + 1]
-            gap = next_min - level
-            if 0 < gap < min_gap:
-                min_gap = gap
-                closest_to_tier = {
-                    "pillar": p, "current_level": level,
-                    "current_tier": tier, "next_tier": tier_order[tier_idx + 1],
-                    "levels_needed": gap,
-                }
-
-    return {
-        "character_level_start": start_level,
-        "character_level_end": end_level,
-        "character_level_delta": end_level - start_level,
-        "character_tier": latest.get("character_tier", "Foundation"),
-        "character_tier_emoji": latest.get("character_tier_emoji", "\U0001f528"),
-        "character_xp": latest.get("character_xp", 0),
-        "pillar_summary": pillar_summary,
-        "events": all_events,
-        "closest_to_tier": closest_to_tier,
-        "days_with_data": len(dates),
-        "active_effects": latest.get("active_effects", []),
-    }
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 # TRAINING LOAD (Banister)
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -621,7 +539,7 @@ def compute_4week_trends(weekly_data):
         ("weight", "withings", "weight_avg"),
         ("hrv", "whoop", "hrv_avg"),
         ("recovery", "whoop", "recovery_avg"),
-        ("sleep", "sleep", "score_avg"),
+        ("sleep", "eightsleep", "score_avg"),
         ("rhr", "whoop", "rhr_avg"),
         ("day_grade", "day_grades", "avg_score"),
     ]:
@@ -661,12 +579,14 @@ def weight_projection(w4_weight_avgs, goal_weight, current_weight):
 # SLEEP DEBT
 # ══════════════════════════════════════════════════════════════════════════════
 
-def compute_sleep_debt(whoop_dict, target_hrs=7.5):
-    """Compute 7-day sleep debt from Whoop records (SOT for sleep duration v2.55.0)."""
-    if not whoop_dict: return None
+def compute_sleep_debt(eightsleep_dict, target_hrs=7.5):
+    if not eightsleep_dict: return None
     durs = []
-    for r in whoop_dict.values():
+    for r in eightsleep_dict.values():
         d = safe_float(r, "sleep_duration_hours")
+        if d is None:
+            d = safe_float(r, "total_sleep_seconds")
+            if d is not None: d = d / 3600
         if d is not None: durs.append(d)
     if not durs: return None
     debt = round(max(0, (target_hrs * len(durs)) - sum(durs)), 1)
@@ -682,7 +602,7 @@ def fetch_stale_insights(days_threshold=7):
         r = table.query(
             KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
             ExpressionAttributeValues={
-                ":pk": "USER#matthew#SOURCE#insights",
+                ":pk": f"USER#{USER_ID}#SOURCE#insights",
                 ":s": "INSIGHT#0", ":e": "INSIGHT#z"})
         items = r.get("Items", [])
     except Exception as e:
@@ -748,7 +668,7 @@ def gather_all():
     this = {
         "day_grades": ex_day_grades(raw_this["day_grade"]),
         "whoop": ex_whoop(raw_this["whoop"]),
-        "sleep": ex_whoop_sleep(raw_this["whoop"]),
+        "eightsleep": ex_eightsleep(raw_this["eightsleep"]),
         "strava": ex_strava(raw_this["strava"], profile),
         "apple": ex_apple_health(raw_this["apple_health"]),
         "macrofactor": ex_macrofactor(raw_this["macrofactor"], profile),
@@ -761,7 +681,7 @@ def gather_all():
     prior = {
         "day_grades": ex_day_grades(raw_prior["day_grade"]),
         "whoop": ex_whoop(raw_prior["whoop"]),
-        "sleep": ex_whoop_sleep(raw_prior["whoop"]),
+        "eightsleep": ex_eightsleep(raw_prior["eightsleep"]),
         "strava": ex_strava(raw_prior["strava"], profile),
         "apple": ex_apple_health(raw_prior["apple_health"]),
         "macrofactor": ex_macrofactor(raw_prior["macrofactor"], profile),
@@ -791,7 +711,7 @@ def gather_all():
     weekly_extractions = {}
     for src_key, extractor, src_name in [
         ("whoop", ex_whoop, "whoop"),
-        ("sleep", ex_whoop_sleep, "whoop"),
+        ("eightsleep", ex_eightsleep, "eightsleep"),
         ("withings", ex_withings, "withings"),
     ]:
         weeks = []
@@ -814,7 +734,7 @@ def gather_all():
     training_load = compute_banister(strava_60d)
 
     # ── Sleep debt ──
-    sleep_debt = compute_sleep_debt(raw_this["whoop"],
+    sleep_debt = compute_sleep_debt(raw_this["eightsleep"],
                                      profile.get("sleep_target_hours_ideal", 7.5))
 
     # ── Weight projection ──
@@ -828,20 +748,11 @@ def gather_all():
     # Open insights
     open_insights = fetch_stale_insights(days_threshold=7)
 
-    # ── Character Sheet (Phase 4 v2.71.0) ──
-    cs_this_raw = query_range("character_sheet", w1_start, w1_end)
-    cs_prior_raw = query_range("character_sheet", w2_start, w2_end)
-    character_sheet = ex_character_sheet(cs_this_raw)
-    character_sheet_prior = ex_character_sheet(cs_prior_raw)
-    print(f"  character_sheet: {len(cs_this_raw)} days this week, {len(cs_prior_raw)} prior")
-
     return {
         "this": this, "prior": prior, "profile": profile,
         "training_load": training_load, "trends": trends,
         "sleep_debt": sleep_debt, "projection": projection,
         "open_insights": open_insights,
-        "character_sheet": character_sheet,
-        "character_sheet_prior": character_sheet_prior,
         "dates": {"this_start": w1_start, "this_end": w1_end,
                   "prior_start": w2_start, "prior_end": w2_end},
     }, profile
@@ -850,6 +761,42 @@ def gather_all():
 # ══════════════════════════════════════════════════════════════════════════════
 # CLAUDE HAIKU — BOARD OF DIRECTORS
 # ══════════════════════════════════════════════════════════════════════════════
+
+JOURNEY_PROMPT = """You are the Board of Directors for Matthew's health transformation — providing a quarterly-style executive assessment based on the full data history available.
+
+CONTEXT:
+Matthew Walker, 36, Seattle. Senior Director at a SaaS company. Goal: lose ~117 lbs (302→185),
+build muscle, improve sleep and stress management. Current phase: Phase 1 Ignition (1800 cal/day,
+190g protein, 3 lbs/week target). He tracks obsessively but struggles with consistency.
+
+JOURNEY DATA:
+{journey_json}
+
+THIS WEEK'S SUMMARY:
+{week_summary}
+
+RULES:
+- This is NOT a weekly recap. This is a 12-week trajectory assessment.
+- Identify what's working (systems, not single weeks) and what's stalling.
+- Be honest about plateaus, regression, or missing data.
+- Name structural issues (not just "try harder").
+- End with exactly ONE concrete focus area for next week, justified by the trajectory data.
+- Be direct. 200 words max.
+
+Write exactly these sections with these exact headers:
+
+📊 TRAJECTORY ASSESSMENT
+3-4 sentences on the 12-week arc. Is Matthew building momentum, plateauing, or regressing? Which systems are working and which aren't? Reference the grade trend and weight trajectory specifically.
+
+🔍 BIGGEST STRUCTURAL GAP
+2-3 sentences. What single system or behaviour pattern, if fixed, would have the largest compound effect? This should be something visible across multiple weeks, not a one-off.
+
+🎯 NEXT WEEK'S FOCUS
+2-3 sentences. One specific, measurable focus for next week that addresses the structural gap. Include a concrete target number or behaviour. Explain why this week specifically.
+
+💪 MOMENTUM CHECK
+1 sentence. Honest acknowledgment of what IS working, grounded in data."""
+
 
 BOARD_PROMPT = """You are the coordinating intelligence for Matthew's Weekly Health Board of Advisors.
 
@@ -860,8 +807,6 @@ build muscle, improve sleep and stress management. Current phase: Phase 1 Igniti
 
 DAY GRADES THIS WEEK (0-100 composite of sleep, recovery, nutrition, movement, habits, hydration, journal, glucose):
 {grade_summary}
-
-{previous_insights}
 
 THIS WEEK'S DATA vs PRIOR WEEK (+ 4-week trends):
 {data_json}
@@ -891,19 +836,33 @@ Long-term trajectory. What does the 4-week trend say? What leading indicator is 
 🧠 COACH MAYA RODRIGUEZ — BEHAVIOURAL PERFORMANCE
 The gap between knowing and doing. Where did Matthew underperform vs his own standards? Use journal data (mood, themes, avoidance flags, cognitive patterns) + habit data + day grades to connect subjective experience with objective performance. Be direct and human.
 
-🎯 THE CHAIR — VERDICT & PRIORITY
-4–6 sentences. Clear verdict. Reference day grade average and trend. Name ONE priority for next week with specific data justification. One sentence of genuine encouragement grounded in data.
+🎯 THE CHAIR — WEEKLY VERDICT
+4–6 sentences. Clear verdict on THIS week only. Reference day grade average and trend. Name the single biggest win and single biggest miss. Do NOT recommend next-week actions — that’s the Journey Assessment’s job. Close with one sentence of genuine encouragement grounded in data.
 
 💡 INSIGHT OF THE WEEK
 One sentence. Concrete. Specific. Actionable in 7 days. Must reference actual numbers.
 
+ADDITIONAL RULES:
+- If data for your domain is missing or has <3 days, say 'Insufficient data this week' rather than speculating.
+- If another advisor has already covered a topic, reference their name (e.g. 'As Dr. Park noted...') rather than re-analyzing the same data.
+
 Be honest. Be a coach, not a cheerleader."""
 
 
-def call_anthropic_with_retry(req, timeout=55, max_attempts=None, backoff_s=None):
-    # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
-    import retry_utils
-    return retry_utils.call_anthropic_raw(req, timeout=timeout)
+def call_anthropic_with_retry(req, timeout=35, max_attempts=2, backoff_s=5):
+    for attempt in range(1, max_attempts + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            print(f"[WARN] Anthropic HTTP {e.code} attempt {attempt}")
+            if attempt < max_attempts and e.code in (429, 529, 500, 502, 503, 504):
+                time.sleep(backoff_s)
+            else: raise
+        except urllib.error.URLError as e:
+            print(f"[WARN] Anthropic network error attempt {attempt}: {e}")
+            if attempt < max_attempts: time.sleep(backoff_s)
+            else: raise
 
 
 def call_haiku(data, profile, api_key):
@@ -923,21 +882,144 @@ def call_haiku(data, profile, api_key):
         grade_lines.append(f"  Weekly avg: {grades['avg_score']}")
     grade_summary = "\n".join(grade_lines) if grade_lines else "No day grade data available."
 
-    # IC-16: Progressive context — inject recent high-value insights
-    previous_insights = ""
-    if _HAS_INSIGHT_WRITER:
-        try:
-            previous_insights = insight_writer.build_insights_context(
-                days=30, max_items=8, label="PREVIOUS INSIGHTS (last 30 days)")
-        except Exception as e:
-            print(f"[WARN] IC-16 progressive context failed: {e}")
-
     payload = json.dumps({
-        "model": os.environ.get("AI_MODEL", "claude-sonnet-4-6"), "max_tokens": 1500,
+        "model": "claude-haiku-4-5-20251001", "max_tokens": 1500,
         "messages": [{"role": "user", "content": BOARD_PROMPT.format(
             data_json=json.dumps(pd, indent=2, default=str),
-            grade_summary=grade_summary,
-            previous_insights=previous_insights)}]
+            grade_summary=grade_summary)}]
+    }).encode()
+    req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=payload,
+        headers={"Content-Type": "application/json", "x-api-key": api_key,
+                 "anthropic-version": "2023-06-01"}, method="POST")
+    resp = call_anthropic_with_retry(req)
+    return resp["content"][0]["text"]
+
+
+def gather_journey_context(profile):
+    """Query 12 weeks of day grade weekly averages + weight trajectory for journey assessment."""
+    today = datetime.now(timezone.utc).date()
+    w12_start = (today - timedelta(days=84)).isoformat()
+    w1_end = (today - timedelta(days=1)).isoformat()
+
+    # 12 weeks of day grades
+    all_grades = query_range("day_grade", w12_start, w1_end)
+    weekly_avgs = []
+    for week_num in range(12, 0, -1):
+        ws = (today - timedelta(days=week_num * 7)).isoformat()
+        we = (today - timedelta(days=(week_num - 1) * 7)).isoformat()
+        week_scores = []
+        for d, r in all_grades.items():
+            if ws <= d <= we:
+                s = safe_float(r, "total_score")
+                if s is not None:
+                    week_scores.append(s)
+        weekly_avgs.append({
+            "week": f"W-{week_num}",
+            "dates": f"{ws} to {we}",
+            "avg_score": round(sum(week_scores) / len(week_scores), 1) if week_scores else None,
+            "days_graded": len(week_scores),
+        })
+
+    # 12 weeks of Whoop HRV
+    all_whoop = query_range("whoop", w12_start, w1_end)
+    weekly_hrvs = []
+    for week_num in range(12, 0, -1):
+        ws = (today - timedelta(days=week_num * 7)).isoformat()
+        we = (today - timedelta(days=(week_num - 1) * 7)).isoformat()
+        wk_hrvs = []
+        for d, r in all_whoop.items():
+            if ws <= d <= we:
+                h = safe_float(r, "hrv")
+                if h is not None:
+                    wk_hrvs.append(h)
+        weekly_hrvs.append({
+            "week": f"W-{week_num}",
+            "hrv_avg": round(sum(wk_hrvs) / len(wk_hrvs), 1) if wk_hrvs else None,
+            "days": len(wk_hrvs),
+        })
+
+    # 12 weeks of nutrition logging
+    all_mf = query_range("macrofactor", w12_start, w1_end)
+    weekly_nutrition = []
+    for week_num in range(12, 0, -1):
+        ws = (today - timedelta(days=week_num * 7)).isoformat()
+        we = (today - timedelta(days=(week_num - 1) * 7)).isoformat()
+        wk_days = 0
+        wk_cals = []
+        wk_prots = []
+        for d, r in all_mf.items():
+            if ws <= d <= we:
+                wk_days += 1
+                c = safe_float(r, "total_calories_kcal")
+                p = safe_float(r, "total_protein_g")
+                if c is not None: wk_cals.append(c)
+                if p is not None: wk_prots.append(p)
+        weekly_nutrition.append({
+            "week": f"W-{week_num}",
+            "days_logged": wk_days,
+            "cal_avg": round(sum(wk_cals) / len(wk_cals)) if wk_cals else None,
+            "protein_avg": round(sum(wk_prots) / len(wk_prots)) if wk_prots else None,
+        })
+
+    # 12 weeks of weight
+    all_weight = query_range("withings", w12_start, w1_end)
+    weekly_weights = []
+    for week_num in range(12, 0, -1):
+        ws = (today - timedelta(days=week_num * 7)).isoformat()
+        we = (today - timedelta(days=(week_num - 1) * 7)).isoformat()
+        wk_weights = []
+        for d, r in all_weight.items():
+            if ws <= d <= we:
+                w = safe_float(r, "weight_lbs")
+                if w is not None:
+                    wk_weights.append(w)
+        weekly_weights.append({
+            "week": f"W-{week_num}",
+            "avg_weight": round(sum(wk_weights) / len(wk_weights), 1) if wk_weights else None,
+        })
+
+    # Overall grade stats from all 12 weeks
+    all_scores = [safe_float(r, "total_score") for r in all_grades.values() if safe_float(r, "total_score") is not None]
+    grade_dist = defaultdict(int)
+    for r in all_grades.values():
+        g = r.get("letter_grade", "")
+        if g.startswith("A"): grade_dist["A"] += 1
+        elif g.startswith("B"): grade_dist["B"] += 1
+        elif g.startswith("C"): grade_dist["C"] += 1
+        elif g == "D": grade_dist["D"] += 1
+        elif g == "F": grade_dist["F"] += 1
+
+    start_weight = profile.get("journey_start_weight_lbs", 302)
+    goal_weight = profile.get("goal_weight_lbs", 185)
+    latest_weight = None
+    for ww in reversed(weekly_weights):
+        if ww.get("avg_weight"):
+            latest_weight = ww["avg_weight"]
+            break
+
+    return {
+        "weekly_grade_avgs": weekly_avgs,
+        "weekly_hrvs": weekly_hrvs,
+        "weekly_nutrition": weekly_nutrition,
+        "weekly_weights": weekly_weights,
+        "overall_12wk_avg": round(sum(all_scores) / len(all_scores), 1) if all_scores else None,
+        "overall_12wk_grade_dist": dict(grade_dist),
+        "total_days_graded": len(all_scores),
+        "journey_start_weight": start_weight,
+        "goal_weight": goal_weight,
+        "latest_weight": latest_weight,
+        "total_lost": round(start_weight - latest_weight, 1) if latest_weight else None,
+        "pct_to_goal": round((start_weight - latest_weight) / (start_weight - goal_weight) * 100) if latest_weight and start_weight > goal_weight else None,
+    }
+
+
+def call_journey_haiku(journey_ctx, week_summary, api_key):
+    """Second Haiku call for journey-level assessment."""
+    payload = json.dumps({
+        "model": "claude-haiku-4-5-20251001", "max_tokens": 800,
+        "messages": [{"role": "user", "content": JOURNEY_PROMPT.format(
+            journey_json=json.dumps(journey_ctx, indent=2, default=str),
+            week_summary=week_summary)}]
     }).encode()
     req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=payload,
         headers={"Content-Type": "application/json", "x-api-key": api_key,
@@ -956,7 +1038,7 @@ def grade_colour(grade):
     if grade.startswith("C"): return "#d97706"
     return "#dc2626"
 
-def build_html(data, commentary, profile):
+def build_html(data, commentary, journey_commentary, profile):
     t = data["this"]
     p = data["prior"]
     tl = data["training_load"]
@@ -1063,98 +1145,6 @@ def build_html(data, commentary, profile):
         )
 
     # ══════════════════════════════════════════════════════════════════════════
-    # CHARACTER SHEET WEEKLY SUMMARY (Phase 4)
-    # ══════════════════════════════════════════════════════════════════════════
-    character_section = ""
-    cs = data.get("character_sheet")
-    cs_prior = data.get("character_sheet_prior")
-    if cs:
-        tier_colors = {
-            "Foundation": {"bg": "#f3f4f6", "bar": "#6b7280", "text": "#374151"},
-            "Momentum":   {"bg": "#fef3c7", "bar": "#d97706", "text": "#92400e"},
-            "Discipline": {"bg": "#dbeafe", "bar": "#2563eb", "text": "#1e40af"},
-            "Mastery":    {"bg": "#d1fae5", "bar": "#059669", "text": "#065f46"},
-            "Elite":      {"bg": "#fae8ff", "bar": "#9333ea", "text": "#6b21a8"},
-        }
-        cs_tier = cs.get("character_tier", "Foundation")
-        cs_emoji = cs.get("character_tier_emoji", "\U0001f528")
-        tc = tier_colors.get(cs_tier, tier_colors["Foundation"])
-        lvl_end = cs.get("character_level_end", 0)
-        lvl_delta = cs.get("character_level_delta", 0)
-        lvl_arrow = f' <span style="color:#059669;font-size:12px;">(+{lvl_delta})</span>' if lvl_delta > 0 else (f' <span style="color:#d97706;font-size:12px;">({lvl_delta})</span>' if lvl_delta < 0 else '')
-        xp_total = cs.get("character_xp", 0)
-
-        cs_html = (f'<div style="background:{tc["bg"]};border-left:4px solid {tc["bar"]};'
-                   f'border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:4px;">'
-                   f'<table style="width:100%;"><tr><td>'
-                   f'<span style="font-size:20px;">{cs_emoji}</span> '
-                   f'<span style="font-size:18px;font-weight:800;color:{tc["text"]};">Level {lvl_end}</span>{lvl_arrow} '
-                   f'<span style="font-size:11px;color:{tc["text"]};font-weight:600;">{cs_tier.upper()}</span>'
-                   f'</td><td style="text-align:right;">'
-                   f'<span style="font-size:10px;color:#9ca3af;">{xp_total:,} XP</span>'
-                   f'</td></tr></table>')
-
-        # Pillar mini-table with weekly deltas
-        pillar_emojis = {"sleep": "\U0001f634", "movement": "\U0001f3cb", "nutrition": "\U0001f957",
-                         "metabolic": "\U0001fa7a", "mind": "\U0001f9e0", "relationships": "\U0001f91d",
-                         "consistency": "\U0001f3af"}
-        ps = cs.get("pillar_summary", {})
-        cs_html += '<div style="margin-top:8px;">'
-        for p_name in ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]:
-            pd = ps.get(p_name, {})
-            p_level = pd.get("end_level", 0)
-            p_delta = pd.get("level_delta", 0)
-            p_tier = pd.get("tier", "Foundation")
-            p_tc = tier_colors.get(p_tier, tier_colors["Foundation"])
-            p_emoji = pillar_emojis.get(p_name, "")
-            p_avg = pd.get("avg_raw")
-            avg_str = f' avg {round(p_avg)}' if p_avg is not None else ''
-            delta_str = ''
-            if p_delta > 0:
-                delta_str = f' <span style="color:#059669;">+{p_delta}</span>'
-            elif p_delta < 0:
-                delta_str = f' <span style="color:#d97706;">{p_delta}</span>'
-            cs_html += (f'<div style="margin:2px 0;"><table style="width:100%;"><tr>'
-                        f'<td style="width:90px;font-size:10px;color:#6b7280;">{p_emoji} {p_name.capitalize()}</td>'
-                        f'<td><div style="background:#e5e7eb;border-radius:3px;height:5px;">'
-                        f'<div style="background:{p_tc["bar"]};border-radius:3px;height:5px;width:{p_level}%;"></div></div></td>'
-                        f'<td style="width:80px;text-align:right;font-size:10px;color:{p_tc["text"]};font-weight:600;">Lv{p_level}{delta_str}{avg_str}</td>'
-                        f'</tr></table></div>')
-        cs_html += '</div>'
-
-        # Weekly events
-        cs_events = cs.get("events", [])
-        if cs_events:
-            cs_html += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #e5e7eb;">'
-            for ev in cs_events:
-                ev_type = ev.get("type", "")
-                ev_pillar = ev.get("pillar", "").replace("_", " ").title()
-                ev_date = ev.get("date", "")
-                is_up = "up" in ev_type
-                ev_col = "#059669" if is_up else "#d97706"
-                ev_icon = "\u2B06" if is_up else "\u2B07"
-                if "tier" in ev_type:
-                    ev_label = f'{ev_pillar}: {ev.get("old_tier", "")} \u2192 {ev.get("new_tier", "")}'
-                elif "character" in ev_type:
-                    ev_label = f'Character Level {ev.get("old_level", "")} \u2192 {ev.get("new_level", "")}'
-                else:
-                    ev_label = f'{ev_pillar} Lv{ev.get("old_level", "")} \u2192 {ev.get("new_level", "")}'
-                cs_html += (f'<span style="display:inline-block;background:#fff;border:1px solid {ev_col};'
-                            f'border-radius:12px;padding:2px 8px;font-size:10px;color:{ev_col};'
-                            f'margin:2px 3px 2px 0;font-weight:600;">{ev_icon} {ev_label}</span>')
-            cs_html += '</div>'
-
-        # Closest to tier-up nudge
-        ctt = cs.get("closest_to_tier")
-        if ctt:
-            cs_html += (f'<div style="margin-top:6px;font-size:10px;color:#6b7280;">'
-                        f'\U0001f4a1 <b>{ctt["pillar"].capitalize()}</b> is {ctt["levels_needed"]} levels from '
-                        f'{ctt["next_tier"]} tier</div>')
-
-        cs_html += '</div>'
-        character_section = section("Character Sheet", cs_emoji, cs_html)
-
-    # ══════════════════════════════════════════════════════════════════════════
     # SCORECARD (matching daily brief 8 components)
     # ══════════════════════════════════════════════════════════════════════════
     def sc_cell(label, val, emoji, detail=""):
@@ -1181,7 +1171,7 @@ def build_html(data, commentary, profile):
             comp_avgs[comp] = avg(vals) if vals else None
 
     # Fallback: compute from extracted data
-    sleep_avg = comp_avgs.get("sleep_quality") or (t["sleep"]["score_avg"] if t.get("sleep") else None)
+    sleep_avg = comp_avgs.get("sleep_quality") or (t["eightsleep"]["score_avg"] if t.get("eightsleep") else None)
     recovery_avg = comp_avgs.get("recovery") or (t["whoop"]["recovery_avg"] if t.get("whoop") else None)
     nutrition_avg = comp_avgs.get("nutrition")
     movement_avg = comp_avgs.get("movement")
@@ -1272,8 +1262,8 @@ def build_html(data, commentary, profile):
 
     # ── Sleep ──
     sl_rows = ""
-    if t.get("sleep"):
-        s = t["sleep"]; sp = p.get("sleep") or {}
+    if t.get("eightsleep"):
+        s = t["eightsleep"]; sp = p.get("eightsleep") or {}
         sl_rows += row("Avg Sleep Score", fmt(s.get("score_avg"), "%"),
             delta_html(s.get("score_avg"), sp.get("score_avg"), "%") + f' <span style="font-size:11px;color:#888;">4wk {tr.get("sleep","→")}</span>', highlight=True)
         sl_rows += row("Worst Night", fmt(s.get("score_min"), "%"))
@@ -1327,6 +1317,9 @@ def build_html(data, commentary, profile):
         if m.get("fat_avg_g"): nu_rows += row("Avg Fat", fmt(m["fat_avg_g"], "g"))
         if m.get("carbs_avg_g"): nu_rows += row("Avg Carbs", fmt(m["carbs_avg_g"], "g"))
         if m.get("fiber_avg_g"): nu_rows += row("Avg Fiber", fmt(m["fiber_avg_g"], "g"))
+        if m.get("alcohol_drinks") and m["alcohol_drinks"] > 0:
+            acol = "#e74c3c" if m["alcohol_drinks"] >= 7 else "#e67e22" if m["alcohol_drinks"] >= 3 else "#27ae60"
+            nu_rows += row("🍺 Alcohol", f'<span style="color:{acol};font-weight:700;">{m["alcohol_drinks"]} drinks</span> ({m["alcohol_days"]} days)')
         nu_rows += row("Days Logged", str(m.get("days_logged", 0)))
     nutrition_section = section("Nutrition", "🥗", tbl(nu_rows)) if nu_rows else ""
 
@@ -1366,13 +1359,23 @@ def build_html(data, commentary, profile):
             tir_col = "#059669" if a["glucose_tir_avg"] >= 90 else "#d97706"
             cgm_rows += row("Time in Range", f'<span style="color:{tir_col};">{fmt(a["glucose_tir_avg"], "%")}</span>')
         cgm_rows += row("Days w/ CGM Data", str(a.get("glucose_days", 0)))
+    # Steps
+    if t.get("apple") and t["apple"].get("steps_avg"):
+        a = t["apple"]; ap = p.get("apple") or {}
+        step_target = profile.get("step_target", 8000)
+        sa = a["steps_avg"]
+        scol = "#059669" if sa >= step_target else "#d97706" if sa >= step_target * 0.75 else "#dc2626"
+        cgm_rows += row("Avg Steps", f'<span style="color:{scol};font-weight:700;">{fmt_num(sa)}</span> (target {fmt_num(step_target)})',
+            delta_html(sa, ap.get("steps_avg"), ""), highlight=True)
+        if a.get("steps_total"):
+            cgm_rows += row("Total Steps", fmt_num(a["steps_total"]))
     # Gait
     if t.get("apple") and t["apple"].get("gait_speed_avg"):
         a = t["apple"]
         gs = a["gait_speed_avg"]
         gs_col = "#059669" if gs >= 3.0 else "#d97706" if gs >= 2.24 else "#dc2626"
         cgm_rows += row("Walking Speed", f'<span style="color:{gs_col};">{fmt(gs, " mph")}</span> ({a.get("gait_days", 0)} days)')
-    cgm_section = section("CGM & Mobility", "📊", tbl(cgm_rows)) if cgm_rows else ""
+    cgm_section = section("Steps, CGM & Mobility", "📊", tbl(cgm_rows)) if cgm_rows else ""
 
     # ── Journal ──
     jn_rows = ""
@@ -1430,6 +1433,23 @@ def build_html(data, commentary, profile):
     board_section = section("Board of Advisors", "📋",
         f'<div style="background:#f0f4ff;border-left:4px solid #4a6cf7;padding:16px;border-radius:0 8px 8px 0;">{board_html}</div>')
 
+    # ── Journey Assessment (second AI call) ──
+    journey_html = ""
+    if journey_commentary:
+        jc_html = ""
+        for line in journey_commentary.strip().split("\n"):
+            if any(line.startswith(e) for e in ("📊", "🔍", "🎯", "💪")):
+                jc_html += f'<p style="font-size:13px;font-weight:700;color:#1a1a2e;margin:16px 0 4px;">{line}</p>'
+            elif line.strip():
+                jc_html += f'<p style="font-size:13px;color:#333;line-height:1.6;margin:0 0 8px;">{line}</p>'
+        journey_html = (
+            f'<div style="margin-bottom:28px;">'
+            f'<h2 style="font-size:15px;font-weight:700;color:#1a1a2e;margin:0 0 8px;'
+            f'border-bottom:2px solid #e8e8f0;padding-bottom:6px;">🏁 Journey Assessment — Board of Directors</h2>'
+            f'<div style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border-left:4px solid #059669;'
+            f'padding:16px;border-radius:0 8px 8px 0;">{jc_html}</div></div>'
+        )
+
     # ── Assemble ──
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -1441,11 +1461,10 @@ def build_html(data, commentary, profile):
 </div>
 <div style="padding:28px 32px;">
 {grade_section}
-{character_section}
 {scorecard_html}
-{insights_html}
 {insight_box}
 {board_section}
+{insights_html}
 {training_section}
 {banister_section}
 {recovery_section}
@@ -1456,16 +1475,338 @@ def build_html(data, commentary, profile):
 {cgm_section}
 {journal_section}
 {productivity_section}
+{journey_html}
 </div>
 <div style="background:#f8f8fc;padding:16px 32px;border-top:1px solid #e8e8f0;">
-<p style="color:#999;font-size:11px;margin:0;">Life Platform v4.0 · Whoop · Eight Sleep · Withings · Strava · MacroFactor · Habitify · Notion · Apple Health · Todoist · AWS us-west-2</p>
-<p style="color:#bbb;font-size:9px;margin:6px 0 0;">⚕️ Personal health tracking only — not medical advice. Consult a qualified healthcare professional before making changes to your diet, exercise, or supplement regimen.</p>
+<p style="color:#999;font-size:11px;margin:0;">Life Platform v4.2 · Whoop · Eight Sleep · Withings · Strava · MacroFactor · Habitify · Notion · Apple Health · Todoist · AWS us-west-2</p>
 </div></div></body></html>"""
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
+
+# ==============================================================================
+# CLINICAL JSON — Dashboard Phase 2 (v2.39.0)
+# ==============================================================================
+
+def _query_source_all(source):
+    """Query all items for a source partition (labs, dexa, etc)."""
+    pk = f"USER#{USER_ID}#SOURCE#{source}"
+    kwargs = {
+        "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+        "ExpressionAttributeValues": {":pk": pk, ":prefix": "DATE#"},
+    }
+    items = []
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(resp.get("Items", []))
+        if not resp.get("LastEvaluatedKey"):
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    return d2f(sorted(items, key=lambda x: x.get("sk", "")))
+
+
+def _query_genome_all():
+    """Query all genome items."""
+    pk = f"USER#{USER_ID}#SOURCE#genome"
+    kwargs = {
+        "KeyConditionExpression": "pk = :pk",
+        "ExpressionAttributeValues": {":pk": pk},
+    }
+    items = []
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(resp.get("Items", []))
+        if not resp.get("LastEvaluatedKey"):
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    return d2f(items)
+
+
+def write_clinical_json(data, profile):
+    """Build and write clinical.json to S3 for the clinical summary page."""
+    try:
+        today = datetime.now(timezone.utc).date()
+        thirty_ago = (today - timedelta(days=30)).isoformat()
+        yesterday = (today - timedelta(days=1)).isoformat()
+
+        # ── LABS ──
+        lab_draws = _query_source_all("labs")
+        labs_section = {}
+        labs_flagged = []
+
+        if lab_draws:
+            latest_draw = lab_draws[-1]
+            labs_section["latest_draw_date"] = latest_draw.get("draw_date")
+            labs_section["provider"] = latest_draw.get("lab_provider")
+            labs_section["total_draws"] = len(lab_draws)
+
+            # Build markers table from latest draw
+            markers = []
+            bms = latest_draw.get("biomarkers", {})
+            priority_cats = ["lipids", "metabolic", "diabetes", "cbc", "thyroid",
+                             "liver", "kidney", "inflammation", "hormones"]
+            all_keys = []
+            for k, v in bms.items():
+                cat = v.get("category", "")
+                pri = priority_cats.index(cat) if cat in priority_cats else 99
+                all_keys.append((pri, k, v))
+            all_keys.sort()
+
+            for _, key, bm in all_keys:
+                val = bm.get("value_numeric") or bm.get("value")
+                flag = bm.get("flag")
+                rl, rh = bm.get("ref_low"), bm.get("ref_high")
+                range_str = ""
+                if rl is not None and rh is not None:
+                    range_str = f"{rl}-{rh}"
+                elif rl is not None:
+                    range_str = f">{rl}"
+                elif rh is not None:
+                    range_str = f"<{rh}"
+                norm_flag = flag.upper() if flag and flag not in ("normal", None) else None
+                markers.append({
+                    "name": bm.get("name", key),
+                    "value": val,
+                    "unit": bm.get("unit", ""),
+                    "range": range_str,
+                    "flag": norm_flag,
+                    "category": bm.get("category", ""),
+                })
+            labs_section["markers"] = markers
+            labs_section["flagged_count"] = sum(1 for m in markers if m.get("flag"))
+
+            # Out-of-range history
+            oor_map = {}
+            for draw in lab_draws:
+                for key, bm in draw.get("biomarkers", {}).items():
+                    if bm.get("flag") in ("high", "low"):
+                        if key not in oor_map:
+                            oor_map[key] = {"name": bm.get("name", key), "count": 0,
+                                            "latest_value": None}
+                        oor_map[key]["count"] += 1
+                        oor_map[key]["latest_value"] = bm.get("value_numeric") or bm.get("value")
+
+            for key, info in sorted(oor_map.items(), key=lambda x: -x[1]["count"]):
+                tested = sum(1 for d in lab_draws if key in d.get("biomarkers", {}))
+                rate = round(100 * info["count"] / max(tested, 1), 1)
+                persistence = "chronic" if rate >= 60 else ("recurring" if rate >= 30 else "occasional")
+                labs_flagged.append({
+                    "name": info["name"],
+                    "persistence": persistence,
+                    "draws_flagged": info["count"],
+                    "total_draws": tested,
+                    "latest_value": info["latest_value"],
+                })
+
+        # ── DEXA ──
+        dexa_scans = _query_source_all("dexa")
+        body_comp = {}
+        if dexa_scans:
+            scan = dexa_scans[-1]
+            bc = scan.get("body_composition", {})
+            height_in = profile.get("height_inches", 72)
+            height_m = height_in * 0.0254
+            lean_lb = bc.get("lean_mass_lb") or 0
+            lean_kg = lean_lb * 0.4536
+            ffmi = round(lean_kg / (height_m ** 2), 1) if height_m > 0 else None
+            body_comp = {
+                "scan_date": scan.get("scan_date"),
+                "body_fat_pct": bc.get("body_fat_pct"),
+                "lean_mass_lbs": lean_lb,
+                "ffmi": ffmi,
+                "visceral_fat_area_cm2": bc.get("visceral_fat_area_cm2") or bc.get("visceral_fat_g"),
+                "bmd_t_score": bc.get("bmd_t_score"),
+            }
+
+        # ── SUPPLEMENTS ──
+        supp_recs = query_range("supplements", thirty_ago, yesterday)
+        seen_supps = {}
+        for date_key, rec in supp_recs.items():
+            entries = rec.get("entries", [])
+            if isinstance(entries, list):
+                for e in entries:
+                    name = (e.get("name") or "").strip()
+                    if name and name not in seen_supps:
+                        seen_supps[name] = {
+                            "name": name,
+                            "dose": e.get("dose"),
+                            "unit": e.get("unit", ""),
+                            "timing": e.get("timing", ""),
+                            "category": e.get("category", "supplement"),
+                        }
+        supplements = list(seen_supps.values())
+
+        # ── GENOME FLAGS ──
+        genome_all = _query_genome_all()
+        genome_flags = []
+        for snp in genome_all:
+            if snp.get("sk", "").startswith("GENE#"):
+                risk = snp.get("risk_level", "")
+                if risk in ("unfavorable", "mixed"):
+                    genome_flags.append({
+                        "gene": snp.get("gene"),
+                        "rsid": snp.get("rsid"),
+                        "variant": snp.get("genotype"),
+                        "risk": risk,
+                        "category": snp.get("category", ""),
+                        "note": snp.get("summary", ""),
+                    })
+        genome_flags.sort(key=lambda x: (0 if x["risk"] == "unfavorable" else 1, x.get("category", "")))
+
+        # ── 30-DAY SLEEP ──
+        sleep_recs = query_range("eightsleep", thirty_ago, yesterday)
+        sleep_summary = {}
+        if sleep_recs:
+            scores = [safe_float(r, "sleep_score") for r in sleep_recs.values() if safe_float(r, "sleep_score")]
+            durations = [safe_float(r, "sleep_duration_hours") for r in sleep_recs.values() if safe_float(r, "sleep_duration_hours")]
+            effs = [safe_float(r, "sleep_efficiency_pct") for r in sleep_recs.values() if safe_float(r, "sleep_efficiency_pct")]
+            deeps = [safe_float(r, "deep_pct") for r in sleep_recs.values() if safe_float(r, "deep_pct")]
+            rems = [safe_float(r, "rem_pct") for r in sleep_recs.values() if safe_float(r, "rem_pct")]
+            sleep_summary = {
+                "avg_score": avg(scores),
+                "avg_duration_hrs": avg(durations),
+                "avg_efficiency_pct": avg(effs),
+                "avg_deep_pct": avg(deeps),
+                "avg_rem_pct": avg(rems),
+                "days_with_data": len(scores),
+            }
+
+        # ── 30-DAY ACTIVITY ──
+        strava_recs = query_range("strava", thirty_ago, yesterday)
+        activity_summary = {}
+        if strava_recs:
+            max_hr = profile.get("max_heart_rate", 184)
+            z2_lo, z2_hi = max_hr * 0.60, max_hr * 0.70
+            total_sessions = 0
+            z2_total_min = 0.0
+            type_counts = {}
+            for day_rec in strava_recs.values():
+                for act in (day_rec.get("activities") or []):
+                    total_sessions += 1
+                    sport = act.get("sport_type") or act.get("type") or "Other"
+                    type_counts[sport] = type_counts.get(sport, 0) + 1
+                    avg_hr = safe_float(act, "average_heartrate")
+                    dur_s = safe_float(act, "moving_time_seconds") or 0
+                    if avg_hr and z2_lo <= avg_hr <= z2_hi:
+                        z2_total_min += dur_s / 60
+
+            weeks = max(1, (today - datetime.strptime(thirty_ago, "%Y-%m-%d").date()).days / 7)
+            activity_summary = {
+                "total_sessions_30d": total_sessions,
+                "zone2_weekly_avg_min": round(z2_total_min / weeks),
+                "types": type_counts,
+            }
+
+        # Avg strain from Whoop
+        whoop_recs = query_range("whoop", thirty_ago, yesterday)
+        vitals_summary = {}
+        if whoop_recs:
+            strains = [safe_float(r, "strain") for r in whoop_recs.values() if safe_float(r, "strain")]
+            if strains:
+                activity_summary["avg_strain"] = avg(strains)
+
+            rhrs = [safe_float(r, "resting_heart_rate") for r in whoop_recs.values() if safe_float(r, "resting_heart_rate")]
+            hrvs = [safe_float(r, "hrv") for r in whoop_recs.values() if safe_float(r, "hrv")]
+            if rhrs:
+                vitals_summary["rhr_avg"] = avg(rhrs)
+                first_half, second_half = rhrs[:len(rhrs)//2], rhrs[len(rhrs)//2:]
+                if first_half and second_half:
+                    diff = avg(second_half) - avg(first_half)
+                    vitals_summary["rhr_trend"] = "declining" if diff < -1 else ("rising" if diff > 1 else "stable")
+            if hrvs:
+                vitals_summary["hrv_avg_ms"] = avg(hrvs)
+                first_half, second_half = hrvs[:len(hrvs)//2], hrvs[len(hrvs)//2:]
+                if first_half and second_half:
+                    diff = avg(second_half) - avg(first_half)
+                    vitals_summary["hrv_trend"] = "improving" if diff > 1 else ("declining" if diff < -1 else "stable")
+
+        # ── 30-DAY GLUCOSE ──
+        apple_recs = query_range("apple_health", thirty_ago, yesterday)
+        glucose_summary = {}
+        if apple_recs:
+            avgs = [safe_float(r, "blood_glucose_avg") for r in apple_recs.values() if safe_float(r, "blood_glucose_avg")]
+            tirs = [safe_float(r, "blood_glucose_time_in_range_pct") for r in apple_recs.values() if safe_float(r, "blood_glucose_time_in_range_pct")]
+            sds = [safe_float(r, "blood_glucose_std_dev") for r in apple_recs.values() if safe_float(r, "blood_glucose_std_dev")]
+            mins = [safe_float(r, "blood_glucose_min") for r in apple_recs.values() if safe_float(r, "blood_glucose_min")]
+            glucose_summary = {
+                "avg_mg_dl": avg(avgs),
+                "time_in_range_pct": avg(tirs),
+                "variability_sd": avg(sds),
+                "fasting_proxy_mg_dl": avg(mins),
+                "days_with_data": len(avgs),
+            }
+
+        # ── WEIGHT (from Withings) ──
+        withings_recs = query_range("withings", thirty_ago, yesterday)
+        weight_current = None
+        weight_30d_delta = None
+        if withings_recs:
+            sorted_dates = sorted(withings_recs.keys())
+            for d in reversed(sorted_dates):
+                w = safe_float(withings_recs[d], "weight_lbs")
+                if w:
+                    weight_current = round(w, 1)
+                    break
+            # Find weight ~30 days ago for delta
+            if weight_current and sorted_dates:
+                earliest_w = None
+                for d in sorted_dates[:5]:  # first few days of range
+                    w = safe_float(withings_recs[d], "weight_lbs")
+                    if w:
+                        earliest_w = round(w, 1)
+                        break
+                if earliest_w:
+                    weight_30d_delta = round(weight_current - earliest_w, 1)
+        vitals_summary["weight_current_lbs"] = weight_current
+        vitals_summary["weight_30d_delta_lbs"] = weight_30d_delta
+
+        # ── STEPS (from Apple Health) ──
+        steps_vals = [safe_float(r, "steps") for r in apple_recs.values() if safe_float(r, "steps")]
+        if steps_vals:
+            vitals_summary["avg_daily_steps"] = round(avg(steps_vals))
+
+        # ── METADATA ──
+        source_count = sum(1 for x in [withings_recs, sleep_recs, strava_recs,
+                                        whoop_recs, apple_recs, supp_recs,
+                                        lab_draws, dexa_scans, genome_all]
+                           if x)
+
+        # ── ASSEMBLE ──
+        clinical = {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_by": "weekly-digest",
+            "period": "30-day",
+            "patient_name": profile.get("name", "Matthew Walker"),
+            "report_date": yesterday,
+            "report_period": f"30 days ending {yesterday}",
+            "sources_active": source_count,
+            "vitals_summary": vitals_summary,
+            "labs": labs_section,
+            "labs_flagged": labs_flagged,
+            "supplements": supplements,
+            "body_composition": body_comp,
+            "sleep_summary": sleep_summary,
+            "activity_summary": activity_summary,
+            "glucose_summary": glucose_summary,
+            "genome_flags": genome_flags,
+        }
+
+        s3.put_object(
+            Bucket=DASHBOARD_BUCKET,
+            Key=CLINICAL_KEY,
+            Body=json.dumps(clinical, default=str),
+            ContentType="application/json",
+            CacheControl="max-age=3600",
+        )
+        print("[INFO] Clinical JSON written to s3://" + DASHBOARD_BUCKET + "/" + CLINICAL_KEY)
+
+    except Exception as e:
+        print("[WARN] Clinical JSON write failed: " + str(e))
+        import traceback
+        traceback.print_exc()
+
 
 def lambda_handler(event, context):
     print("[INFO] Weekly Digest v4.0 starting...")
@@ -1489,7 +1830,36 @@ def lambda_handler(event, context):
         commentary = ("🎯 THE CHAIR — OVERVIEW\nCommentary unavailable.\n"
                       "💡 INSIGHT OF THE WEEK\nReview data sections below.")
 
-    html = build_html(data, commentary, profile)
+    # ── Journey Assessment (second AI call) ──
+    print("[INFO] Gathering 12-week journey context...")
+    journey_ctx = gather_journey_context(profile)
+    # Build a compact week summary for the journey prompt
+    dg = data["this"].get("day_grades")
+    week_summary_parts = []
+    if dg:
+        week_summary_parts.append(f"Day grade avg: {dg['avg_score']} ({dg['days_graded']}d)")
+    if data["this"].get("whoop"):
+        week_summary_parts.append(f"Recovery: {data['this']['whoop'].get('recovery_avg')}%, HRV: {data['this']['whoop'].get('hrv_avg')}ms")
+    if data["this"].get("eightsleep"):
+        week_summary_parts.append(f"Sleep score: {data['this']['eightsleep'].get('score_avg')}%")
+    if data["this"].get("macrofactor"):
+        week_summary_parts.append(f"Calories: {data['this']['macrofactor'].get('calories_avg')} kcal, Protein: {data['this']['macrofactor'].get('protein_avg_g')}g")
+    if data["this"].get("withings"):
+        week_summary_parts.append(f"Weight: {data['this']['withings'].get('weight_latest')} lbs")
+    if data["this"].get("strava"):
+        week_summary_parts.append(f"Zone 2: {data['this']['strava'].get('zone2_minutes')} min")
+    if data["this"].get("habitify"):
+        week_summary_parts.append(f"MVP habits: {data['this']['habitify'].get('mvp_avg_pct')}%")
+    week_summary = " | ".join(week_summary_parts)
+
+    journey_commentary = None
+    print("[INFO] Calling Haiku for Journey Assessment...")
+    try:
+        journey_commentary = call_journey_haiku(journey_ctx, week_summary, api_key)
+    except Exception as e:
+        print(f"[WARN] Journey Haiku failed: {e}")
+
+    html = build_html(data, commentary, journey_commentary, profile)
 
     dg = data["this"].get("day_grades")
     grade_str = f'{round(dg["avg_score"])} ({dg["days_graded"]}d)' if dg else "—"
@@ -1504,24 +1874,10 @@ def lambda_handler(event, context):
     )
     print("[INFO] Sent.")
 
-    # IC-15: Persist insights from this digest
-    if _HAS_INSIGHT_WRITER and commentary:
-        try:
-            insights = []
-            # Write the full Board commentary as a coaching insight
-            insights.append({
-                "digest_type": "weekly_digest",
-                "insight_type": "coaching",
-                "text": commentary[:800],
-                "pillars": ["sleep", "movement", "nutrition", "mind", "consistency"],
-                "tags": ["weekly", "board", "coaching"],
-                "confidence": "high",
-                "actionable": True,
-                "date": dates.get("this_end", ""),
-            })
-            written = insight_writer.write_insights_batch(insights)
-            print(f"[INFO] IC-15: {written} weekly insights persisted")
-        except Exception as e:
-            print(f"[WARN] IC-15 insight write failed (non-fatal): {e}")
+    # Write clinical JSON to S3 for dashboard clinical view (non-fatal)
+    try:
+        write_clinical_json(data, profile)
+    except Exception as e:
+        print(f"[WARN] Clinical JSON top-level failed: {e}")
 
     return {"statusCode": 200, "body": "Digest v4.0 sent."}
