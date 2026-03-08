@@ -1,5 +1,15 @@
 # Life Platform — Changelog
 
+## v3.1.1 — 2026-03-08: IAM-1 audit follow-up
+
+### IAM fixes (from audit report)
+- Scoped `ses:SendEmail` from `*` to `arn:aws:ses:.../identity/mattsusername.com` on dlq-consumer, email-role (anomaly-detector), canary
+- Updated `api-keys-read` inline policy on 8 ingestion roles to reference domain-specific secret ARNs
+- Added 13 new per-function IAM roles to KMS key policy principal list
+- `deploy/fix_iam1_audit_findings.sh`
+
+---
+
 ## v3.1.0 — 2026-03-08: Security hardening complete
 
 ### SEC-1: IAM Role Decomposition
