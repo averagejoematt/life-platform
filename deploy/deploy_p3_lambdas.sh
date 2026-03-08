@@ -9,7 +9,8 @@ set -euo pipefail
 
 REGION="us-west-2"
 ACCOUNT="205930651321"
-ROLE_ARN="arn:aws:iam::${ACCOUNT}:role/life-platform-lambda-role"
+ROLE_ARN_RECON="arn:aws:iam::${ACCOUNT}:role/lambda-data-reconciliation-role"
+ROLE_ARN_AUDIT="arn:aws:iam::${ACCOUNT}:role/lambda-pip-audit-role"
 BUCKET="matthew-life-platform"
 LAMBDAS_DIR="lambdas"
 DEPLOY_DIR="deploy/zips"
@@ -45,8 +46,8 @@ build_zip() {
     fi
   done
 
-  # Copy any extra files
-  for extra in "${extra_files[@]}"; do
+  # Copy any extra files (guard against empty array with -u nounset)
+  for extra in "${extra_files[@]+"${extra_files[@]}"}" ; do
     if [ -f "$LAMBDAS_DIR/$extra" ]; then
       cp "$LAMBDAS_DIR/$extra" "$tmp_dir/"
     fi
@@ -64,8 +65,9 @@ deploy_lambda() {
   local zip_file="$2"
   local handler="$3"           # e.g. data_reconciliation_lambda.lambda_handler
   local description="$4"
-  local timeout="${5:-60}"
-  local memory="${6:-256}"
+  local role_arn="$5"          # dedicated IAM role ARN
+  local timeout="${6:-60}"
+  local memory="${7:-256}"
 
   echo ""
   echo "── Deploying $function_name ────────────────────────────────────────"
@@ -96,7 +98,7 @@ deploy_lambda() {
     aws lambda create-function \
       --function-name "$function_name" \
       --runtime python3.12 \
-      --role "$ROLE_ARN" \
+      --role "${role_arn}" \
       --handler "$handler" \
       --description "$description" \
       --timeout "$timeout" \
@@ -123,6 +125,7 @@ deploy_lambda \
   "data-reconciliation.zip" \
   "data_reconciliation_lambda.lambda_handler" \
   "DATA-3: Weekly source coverage reconciliation. Checks 19 sources x 7 days. Emails gap report." \
+  "$ROLE_ARN_RECON" \
   120 256
 
 # ── 2. pip-audit (SEC-5) ─────────────────────────────────────────────────────
@@ -132,6 +135,7 @@ deploy_lambda \
   "pip-audit.zip" \
   "pip_audit_lambda.lambda_handler" \
   "SEC-5: Monthly pip-audit dependency vulnerability scan. Installs pip-audit at runtime." \
+  "$ROLE_ARN_AUDIT" \
   300 512
 
 # ── 3. strava (REL-3: safe_put_item now called) ──────────────────────────────
