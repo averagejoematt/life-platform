@@ -890,7 +890,8 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights, alg
                 "date": date_str, "total_score": Decimal(str(total_score)),
                 "letter_grade": grade, "algorithm_version": algo_version,
                 "weights_snapshot": json.loads(json.dumps(weights), parse_float=Decimal) if weights else {},
-                "computed_at": datetime.now(timezone.utc).isoformat()}
+                "computed_at": datetime.now(timezone.utc).isoformat(),
+                "schema_version": 1}
         for comp, score in component_scores.items():
             if score is not None:
                 item["component_" + comp] = Decimal(str(score))
@@ -1173,13 +1174,35 @@ def lambda_handler(event, context):
     # If the record exists, we skip all inline scoring and stores — they already happened.
     # Fallback to inline computation if record is missing (Lambda not yet deployed, backfill, etc.).
     _computed = None
+    _compute_stale = False   # REL-1: flag stale/missing compute for email banner
+    _compute_age_msg = ""
     try:
         _computed = fetch_date("computed_metrics", yesterday)
         if _computed:
-            print("[INFO] Using pre-computed metrics for " + yesterday)
+            # REL-1: Check computed_at timestamp — warn if >4 hours old
+            _computed_at_str = _computed.get("computed_at", "")
+            if _computed_at_str:
+                try:
+                    from datetime import timezone
+                    _computed_at = datetime.fromisoformat(_computed_at_str.replace("Z", "+00:00"))
+                    _age_hours = (datetime.now(timezone.utc) - _computed_at).total_seconds() / 3600
+                    if _age_hours > 4:
+                        _compute_stale = True
+                        _compute_age_msg = f"{_age_hours:.1f}h ago"
+                        print(f"[WARN] REL-1: computed_metrics is stale ({_compute_age_msg}) — metrics may be estimated")
+                    else:
+                        print(f"[INFO] Using pre-computed metrics for {yesterday} (age: {_age_hours:.1f}h)")
+                except Exception as _ts_e:
+                    print("[WARN] REL-1: could not parse computed_at: " + str(_ts_e))
+            else:
+                print("[INFO] Using pre-computed metrics for " + yesterday)
         else:
+            _compute_stale = True
+            _compute_age_msg = "not available"
             print("[WARN] No pre-computed metrics for " + yesterday + " — computing inline (fallback)")
     except Exception as _e:
+        _compute_stale = True
+        _compute_age_msg = "fetch error"
         print("[WARN] Could not fetch computed_metrics: " + str(_e))
 
     if _computed:
@@ -1338,7 +1361,8 @@ def lambda_handler(event, context):
             training_nutrition, journal_coach_text, mvp_streak, full_streak, vice_streaks,
             character_sheet=character_sheet, brief_mode=brief_mode,
             engagement_score=engagement_score,
-            triggered_rewards=triggered_rewards, protocol_recs=protocol_recs)
+            triggered_rewards=triggered_rewards, protocol_recs=protocol_recs,
+            compute_stale=_compute_stale, compute_age_msg=_compute_age_msg)
     except Exception as e:
         print("[ERROR] build_html crashed, sending minimal brief: " + str(e))
         html = ('<!DOCTYPE html><html><body style="font-family:sans-serif;padding:20px;">'
