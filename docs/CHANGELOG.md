@@ -1,5 +1,17 @@
 # Life Platform — Changelog
 
+## v3.1.3 — 2026-03-08: P3 Lambdas deployed
+
+- **data-reconciliation** (DATA-3): weekly gap report Lambda live. EventBridge Monday 07:30 UTC. First run: RED (17 gaps / 6 sources — all bootstrap noise or expected absence, zero real ingestion failures). Created `lambda-data-reconciliation-role` (DDB read + KMS + SES + S3 config).
+- **pip-audit** (SEC-5): monthly dependency vulnerability scan Lambda live. First-Monday guard confirmed working. Created `lambda-pip-audit-role` (SES + S3 audit-results).
+- **strava + macrofactor** redeployed with REL-3 `safe_put_item` changes.
+- **Monday Compass** Todoist secret wiring verified — tasks populated correctly from `life-platform/todoist`.
+- Fixed `deploy_p3_lambdas.sh`: bash `-u` nounset error on empty `extra_files` array; role ARN now per-function.
+- Added `deploy/setup_p3_iam_roles.sh` for the two new roles + KMS policy update.
+- Both new roles added to KMS key policy (35 → 37 principals).
+
+---
+
 ## v3.1.1 — 2026-03-08: IAM-1 audit follow-up
 
 ### IAM fixes (from audit report)
