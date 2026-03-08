@@ -1,5 +1,26 @@
 # Life Platform — Changelog
 
+## v2.89.0 — 2026-03-07: IC-7 Cross-Pillar Trade-offs + IC-18 Hypothesis Engine
+
+### IC-7: Cross-Pillar Trade-off Reasoning
+- **New in `ai_calls.py`:** `_build_cross_pillar_tradeoffs(component_scores, data, profile)`
+- Detects 6 trade-off patterns: sleep vs movement conflict, nutrition deficit vs TSB, stress vs recovery mismatch, metabolic lag (high glucose + low activity), consistency trailing pillar strength, compounding deficits (2+ pillars below 50)
+- Injected into `call_board_of_directors` + `call_tldr_and_guidance`
+- Board now explicitly reasons about pillar interactions, not each in isolation
+
+### IC-18: Cross-Domain Hypothesis Engine (34th Lambda)
+- **New Lambda:** `hypothesis-engine` (256 MB, 120s timeout)
+- **Schedule:** EventBridge Sunday 11 AM PT / 19:00 UTC (`hypothesis-engine-weekly`)
+- **Workflow:** Pull 14d all-pillar data → check pending hypotheses → generate 3-5 new cross-domain hypotheses → write monitoring context to `platform_memory`
+- **Hypothesis lifecycle:** `pending` → `confirming` → `confirmed` → `archived` (or `refuted` → `archived`)
+- **DDB key pattern:** `pk=USER#matthew#SOURCE#hypotheses`, `sk=HYPOTHESIS#<ISO-timestamp>`
+- **AI models:** Sonnet 4.6 for generation (~$0.03/week), Haiku 4.5 for per-hypothesis checks (~$0.01/week)
+- **Memory integration:** Confirmed hypotheses written to `platform_memory` for IC-16 progressive context
+- **2 new MCP tools:** `get_hypotheses`, `update_hypothesis_outcome` (142 → 144 tools)
+- **New module:** `mcp/tools_hypotheses.py` (30th module)
+
+---
+
 ## v2.88.0 — 2026-03-07: IC-23/24/25 + IC-16 All Digests + IC-19 Decision Journal
 
 ### IC-23: Attention-Weighted Prompt Budgeting

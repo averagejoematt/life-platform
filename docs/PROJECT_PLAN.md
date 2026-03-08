@@ -1,14 +1,14 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-07 (v2.88.0 — 142 MCP tools, 33 Lambdas, 29 modules, 19 data sources, 6 secrets, 35 alarms)
+> Last update: 2026-03-07 (v2.89.0 — 144 MCP tools, 34 Lambdas, 30 modules, 19 data sources, 6 secrets, 35 alarms)
 
 ---
 
 ## Current State
 
-- **Platform version:** v2.88.0
-- **MCP Server:** 142 tools across 29-module package (tools_decisions.py added), serving health data through Claude Desktop + claude.ai + Claude mobile (1024 MB, 12 tools pre-cached nightly)
+- **Platform version:** v2.89.0
+- **MCP Server:** 144 tools across 30-module package (tools_decisions.py added), serving health data through Claude Desktop + claude.ai + Claude mobile (1024 MB, 12 tools pre-cached nightly)
 - **Remote MCP:** Function URL `c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` with OAuth auto-approve + HMAC Bearer token validation
 - **Data Sources:** 19 (12 scheduled + 1 webhook + 3 manual/periodic + 2 MCP-managed + 1 State of Mind via webhook)
 - **Lambdas:** 33 (13 ingestion + 1 webhook + 2 enrichment + 6 email/digest + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 daily-metrics-compute + 1 dashboard-refresh + 1 data-export + 1 qa-smoke)
@@ -300,7 +300,7 @@
 | IC-4 | **Failure pattern recognition** | Weekly attribution pass after day grades computed. When a component scores <50, tag with contextual conditions (day of week, preceding sleep, Todoist load, journal stress). After 6–8 weeks: personal failure map stored in `platform_memory`. Daily Brief proactively injects failure-condition warnings on days that match known patterns. "This is your third high-load Tuesday — last two ended in failed nutrition weeks." | 4–5 hr | Month 2 |
 | IC-5 | **Momentum detection / early warning** | Leading-indicator signal computed 2–3 days before a struggling week develops. Triggers when 2+ early warning markers appear simultaneously (journal entry length declining, meal log gaps, habit completion 80→65%, HRV 3+ consecutive down days). Brief shifts tone and intervention proactively, not reactively. Highest-leverage behavioral intervention window is when slippage begins, not after it's established. | 3–4 hr | Month 2 |
 | ~~IC-6~~ | ~~**Milestone architecture**~~ | Computed once, stored in profile: weight/health milestones with specific biological/performance significance for Matthew. "At 285 lbs: sleep apnea risk drops substantially (genome flag). At 270 lbs: walking pace will naturally improve ~0.3 mph from reduced load. At 250 lbs: Zone 2 achievable at a pace that feels like a real workout. At 225 lbs: FFMI crosses athletic range if muscle preserved." Surfaced in coaching prompts when approaching each threshold. Converts abstract goal into a progression of meaningful waypoints. | 2–3 hr | Month 1 |
-| IC-7 | **Cross-pillar trade-off reasoning** | Explicit optimization instruction added to BoD + Weekly Digest prompts. AI told to reason about trade-offs between pillars, not each in isolation. Enables: "Movement is strong but Sleep is degrading — at current TSB, adding training volume will compound sleep debt. Optimization call: hold training, invest in sleep." Currently the 7 pillars are analyzed independently. | 1–2 hr | Month 1 |
+| ~~IC-7~~ | ~~**Cross-pillar trade-off reasoning**~~ | Explicit optimization instruction added to BoD + Weekly Digest prompts. AI told to reason about trade-offs between pillars, not each in isolation. Enables: "Movement is strong but Sleep is degrading — at current TSB, adding training volume will compound sleep debt. Optimization call: hold training, invest in sleep." Currently the 7 pillars are analyzed independently. | 1–2 hr | Month 1 |
 | IC-8 | **Intent vs execution gap** | Dedicated journal analysis pass comparing stated intentions ("going to meal prep Sunday", "need to get to bed by 10") against next-day metrics. Builds personal intention-completion rate and identifies which intention types Matthew follows through on vs doesn't. Coaching AI told: "He said he'd do X. He didn't. This is the 4th time. Friction point is likely Y." The knowing-doing gap made quantifiable and specific. | 4–5 hr | Month 2 |
 
 ### Medium-term (Month 3–5, requires sustained longitudinal data)
@@ -330,7 +330,7 @@
 | ~~IC-15~~ | ~~**Insight Ledger — universal write**~~ | Extend IC-1 (`platform_memory`): every email/digest Lambda writes structured insight records to `SOURCE#insights` after generation. Schema: pillar(s), data_sources, confidence, actionable vs observational, semantic tags, digest_type, generated_text hash. The raw material for every downstream compounding feature. Shared `write_insight()` utility in a common module. | 3–4 hr | $0 |
 | ~~IC-16~~ | ~~**Progressive Context — all digests**~~ | Extend IC-2 beyond Daily Brief. Weekly Digest, Monthly Digest, Chronicle, Nutrition Review, and Weekly Plate all get a retrieval step: query recent high-value insights filtered by relevant pillars, inject as "Previously" context. Weekly Digest gets 30-day window; Monthly gets quarterly; Chronicle gets narrative-relevant threads. Each digest reads as if written by someone who has followed Matthew for months. ~500–1500 extra tokens per call. | 4–5 hr | ~$0.02/mo |
 | ~~IC-17~~ | ~~**Contrarian "Red Team" analysis pass**~~ | New Board persona: The Skeptic. Explicitly tasked to challenge consensus in BoD coaching calls — question whether correlations are causal, flag misleading data, identify when insights are obvious vs. genuinely novel. Prompt-only change, injected into existing BoD call structure. Zero infrastructure, zero cost. Counteracts single-model confirmation bias. | 1–2 hr | $0 |
-| IC-18 | **Cross-Domain Hypothesis Engine** | Weekly Lambda (Sunday, after Weekly Digest). Pulls 14 days of all-pillar data, prompts Claude to identify non-obvious cross-domain correlations the existing 135 tools don't explicitly monitor. Writes hypothesis records (`SOURCE#hypotheses`, `sk=HYPOTHESIS#<timestamp>`) with confirmation criteria and monitoring instructions. Subsequent insight compute + digest prompts told to watch for confirming/refuting evidence. Hypotheses that hold graduate to permanent checks; refuted ones archived. Scientific method loop on personal data. | 4–5 hr | ~$0.05/wk |
+| ~~IC-18~~ | ~~**Cross-Domain Hypothesis Engine**~~ | Weekly Lambda (Sunday, after Weekly Digest). Pulls 14 days of all-pillar data, prompts Claude to identify non-obvious cross-domain correlations the existing 135 tools don't explicitly monitor. Writes hypothesis records (`SOURCE#hypotheses`, `sk=HYPOTHESIS#<timestamp>`) with confirmation criteria and monitoring instructions. Subsequent insight compute + digest prompts told to watch for confirming/refuting evidence. Hypotheses that hold graduate to permanent checks; refuted ones archived. Scientific method loop on personal data. | 4–5 hr | ~$0.05/wk |
 | ~~IC-19~~ | ~~**Decision Journal**~~ | Track platform-guided decisions and their outcomes. When coaching says "take a rest day" or "front-load protein" — did Matthew follow the advice? What happened? Structured records in `SOURCE#decisions` with `decision`, `followed` (bool), `outcome_metric`, `outcome_delta`. Builds trust-calibration dataset: when to follow the system vs. override it. Can be logged via MCP tool or inferred from journal + metrics. | 3–4 hr | $0 |
 
 #### Month 3–4 (requires insight corpus to accumulate)
@@ -393,6 +393,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | Version | What | Date |
 |---------|------|------|
+| v2.89.0 | IC-7 Cross-Pillar Trade-offs (ai_calls.py) + IC-18 Hypothesis Engine (34th Lambda, Sunday 11 AM PT, 2 MCP tools, 144 total) | 2026-03-07 |
 | v2.88.0 | IC-23/24/25 (Surprise Scoring, Data Quality, Diminishing Returns) + IC-16 (Progressive Context all 6 digests) + IC-19 (Decision Journal, 3 MCP tools, 142 total) | 2026-03-07 |
 | v2.87.0 | IC-15 Insight Ledger (insight_writer.py shared module, DDB insights partition, Daily Brief integration) + IC-17 Red Team (contrarian challenge field in IC-3 analysis pass, RED TEAM CHECK in BoD + TL;DR prompts) + Roadmap IC-15–IC-22 | 2026-03-07 |
 | v2.86.0 | IC-2 Daily Insight Compute Lambda (33rd Lambda, 9:42 AM PT), IC-3 Chain-of-Thought two-pass (BoD + TL;DR), IC-6 Milestone Architecture (6 weight milestones with biological significance) | 2026-03-07 |
