@@ -62,26 +62,23 @@ Rewrote `deploy/deploy_unified.sh` to cover all 35 current Lambdas. Old version 
 
 ---
 
-## Scripts to Run (in order)
+## Scripts Run ✅
 
 ```bash
-cd ~/Documents/Claude/life-platform
+# ✅ DONE 2026-03-08
+bash deploy/p3_secret_name_audit_fix.sh   # SECRET_NAME removed from habitify
+bash deploy/p3_deploy_pillar_map.sh        # project_pillar_map.json uploaded to S3
+```
 
-# 1. Fix stale SECRET_NAME on habitify Lambda
-chmod +x deploy/p3_secret_name_audit_fix.sh
-./deploy/p3_secret_name_audit_fix.sh
+## Scripts Remaining
 
-# 2. Upload corrected project_pillar_map.json to S3
-chmod +x deploy/p3_deploy_pillar_map.sh
-./deploy/p3_deploy_pillar_map.sh
+```bash
+# (Optional, when ready) Build + attach Lambda Layers
+bash deploy/p3_build_garmin_layer.sh        # capture ARN in output
+bash deploy/p3_build_shared_utils_layer.sh  # capture ARN in output
+bash deploy/p3_attach_shared_utils_layer.sh <SHARED_UTILS_ARN>
 
-# 3. (Optional, when ready) Build + attach Lambda Layers
-chmod +x deploy/p3_build_garmin_layer.sh deploy/p3_build_shared_utils_layer.sh deploy/p3_attach_shared_utils_layer.sh
-./deploy/p3_build_garmin_layer.sh        # capture ARN in output
-./deploy/p3_build_shared_utils_layer.sh  # capture ARN in output
-./deploy/p3_attach_shared_utils_layer.sh <SHARED_UTILS_ARN>
-
-# 4. Git commit
+# Git commit
 git add -A && git commit -m "v2.94.0: P3 infra cleanup, KMS docs, SECRET_NAME audit, Lambda Layer scripts, pillar map fix" && git push
 ```
 
