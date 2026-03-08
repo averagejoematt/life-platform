@@ -451,6 +451,7 @@ def write_entries(entries_by_date):
                     sk = build_sk(date_str, template, seq)
                     item["pk"] = PK
                     item["sk"] = sk
+                    item["schema_version"] = 1
                     table.put_item(Item=item)
                     written += 1
                     logger.info(f"Wrote {sk} ({template})")
@@ -467,6 +468,7 @@ def write_entries(entries_by_date):
                 sk = build_sk(date_str, template)
                 item["pk"] = PK
                 item["sk"] = sk
+                item["schema_version"] = 1
                 table.put_item(Item=item)
                 written += 1
                 logger.info(f"Wrote {sk} ({template})")

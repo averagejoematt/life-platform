@@ -225,6 +225,7 @@ def lambda_handler(event, context):
         "sk": f"DATE#{date_str}",
         "date": date_str,
         "source": "todoist",
+        "schema_version": 1,
         "ingested_at": datetime.now(timezone.utc).isoformat(),
         "completed_count": len(normalized),
         "active_count": active_count,

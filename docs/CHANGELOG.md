@@ -1,5 +1,27 @@
 # Life Platform — Changelog
 
+## v2.98.0 — 2026-03-08: DATA-1 complete + cleanup
+
+### DATA-1: schema_version=1 on all remaining ingestion Lambdas
+Added `"schema_version": 1` to `put_item` calls in:
+- `garmin_lambda.py`, `eightsleep_lambda.py`, `strava_lambda.py`, `habitify_lambda.py` (habits + supplement bridge)
+- `withings_lambda.py`, `apple_health_lambda.py`, `macrofactor_lambda.py` (nutrition + workouts)
+- `todoist_lambda.py`, `notion_lambda.py`, `weather_lambda.py`
+- `health_auto_export_lambda.py` skipped (uses `update_item`, not `put_item`)
+
+### MAINT-2: Layer attach completed
+- Layer attached to `dashboard-refresh-afternoon` + `dashboard-refresh-evening`
+- `deploy_unified.sh`: `apple-health` target registered (`apple-health-ingestion`)
+
+### Cleanup
+- `lambda-weekly-digest-role` deleted
+- `life-platform/api-keys` bundle deleted (7-day recovery window)
+
+### Deploy
+- `deploy/deploy_v2.98.0.sh` — deploys all 11 ingestion Lambdas + layer attach + cleanup commands
+
+---
+
 ## v2.97.0 — 2026-03-08: P1 Hardening Batch (SEC-2, SEC-3, MAINT-2, REL-1, DATA-1, AI-2)
 
 ### SEC-2: Secret Split

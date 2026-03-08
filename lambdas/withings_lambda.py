@@ -351,11 +351,12 @@ def save_to_dynamo(date_str: str, measurements: dict):
         return
 
     item = {
-        "pk":          DYNAMO_PK,
-        "sk":          f"DATE#{date_str}",
-        "source":      "withings",
-        "date":        date_str,
-        "captured_at": datetime.now(timezone.utc).isoformat(),
+        "pk":             DYNAMO_PK,
+        "sk":             f"DATE#{date_str}",
+        "source":         "withings",
+        "date":           date_str,
+        "schema_version": 1,
+        "captured_at":    datetime.now(timezone.utc).isoformat(),
     }
     item.update(float_to_decimal(measurements))
 

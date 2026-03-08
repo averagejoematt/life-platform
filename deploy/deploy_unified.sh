@@ -57,6 +57,7 @@ register "macrofactor"   "macrofactor-data-ingestion" "lambdas/macrofactor_lambd
 register "notion"        "notion-journal-ingestion"   "lambdas/notion_lambda.py"
 register "todoist"       "todoist-data-ingestion"     "lambdas/todoist_lambda.py"
 register "weather"       "weather-data-ingestion"     "lambdas/weather_lambda.py"
+register "apple-health" "apple-health-ingestion"     "lambdas/apple_health_lambda.py"
 register "hae-webhook"   "health-auto-export-webhook" "lambdas/health_auto_export_lambda.py"
 register "enrichment"    "activity-enrichment"        "lambdas/enrichment_lambda.py"
 register "journal-enrich" "journal-enrichment"        "lambdas/journal_enrichment_lambda.py"

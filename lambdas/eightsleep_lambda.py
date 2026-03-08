@@ -599,11 +599,12 @@ def ingest_day(wake_date: str, secret: dict) -> dict:
 
     # ── DynamoDB ───────────────────────────────────────────────────────────────
     db_item = {
-        "pk":          f"USER#{USER_ID}#SOURCE#eightsleep",
-        "sk":          f"DATE#{wake_date}",
-        "date":        wake_date,
-        "source":      "eightsleep",
-        "ingested_at": datetime.now(timezone.utc).isoformat(),
+        "pk":             f"USER#{USER_ID}#SOURCE#eightsleep",
+        "sk":             f"DATE#{wake_date}",
+        "date":           wake_date,
+        "source":         "eightsleep",
+        "schema_version": 1,
+        "ingested_at":    datetime.now(timezone.utc).isoformat(),
         **parsed,
         **(floats_to_decimal(temp_data) if temp_data else {}),
     }
