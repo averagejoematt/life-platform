@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-03-05 (v2.75.0)
+> Last updated: 2026-03-08 (v2.91.0)
 
 ---
 
@@ -55,7 +55,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Function URL (remote) | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/` |
 | Auth (remote) | HMAC Bearer token via `life-platform/mcp-api-key` secret (auto-rotates every 90 days) |
 | Auth (local) | `mcp_bridge.py` → `.config.json` → Function URL |
-| Tools | 121 across 26 modules |
+| Tools | 144 across 30 modules |
 | Cache warmer | 12 tools pre-computed nightly at 9:00 AM PT |
 
 ---
@@ -148,16 +148,19 @@ Consolidated from 12 → 6 on 2026-03-05 (saves $2.40/month). Static API keys me
 
 ---
 
-## Lambdas (29)
+## Lambdas (35)
 
 ### Ingestion (13)
 `whoop-data-ingestion` · `eightsleep-data-ingestion` · `garmin-data-ingestion` · `strava-data-ingestion` · `withings-data-ingestion` · `habitify-data-ingestion` · `macrofactor-data-ingestion` · `notion-journal-ingestion` · `todoist-data-ingestion` · `weather-data-ingestion` · `health-auto-export-webhook` · `journal-enrichment` · `activity-enrichment`
 
 ### Email / Digest (7)
-`daily-brief` · `weekly-digest` · `monthly-digest` · `nutrition-review` · `wednesday-chronicle` · `weekly-plate` · `anomaly-detector`
+`daily-brief` · `weekly-digest` · `monthly-digest` · `nutrition-review` · `wednesday-chronicle` · `weekly-plate` · `monday-compass` · `anomaly-detector`
 
-### Infrastructure (9)
-`life-platform-freshness-checker` · `dropbox-poll` · `insight-email-parser` · `life-platform-key-rotator` · `character-sheet-compute` · `adaptive-mode-compute` · `dashboard-refresh` · `life-platform-data-export` · `life-platform-mcp`
+### Compute (5)
+`character-sheet-compute` · `adaptive-mode-compute` · `daily-metrics-compute` · `daily-insight-compute` · `hypothesis-engine`
+
+### Infrastructure (10)
+`life-platform-freshness-checker` · `dropbox-poll` · `insight-email-parser` · `life-platform-key-rotator` · `dashboard-refresh` · `life-platform-data-export` · `life-platform-qa-smoke` · `life-platform-mcp`
 
 ### Lambda@Edge (us-east-1)
 `life-platform-cf-auth` (dashboard) · `life-platform-buddy-auth` (buddy page)
@@ -177,6 +180,7 @@ See PROJECT_PLAN.md "Ingestion Schedule" section for full timing.
 | `config/profile.json` | Personal targets (wake time, macros, weight phases, eating window) |
 | `config/board_of_directors.json` | 13 expert personas for AI-generated content (incl. Conti + Murthy) |
 | `config/character_sheet.json` | 7 pillar weights, tier definitions, leveling thresholds |
+| `config/project_pillar_map.json` | Todoist project → platform pillar mapping (Monday Compass) |
 
 ---
 
@@ -186,7 +190,7 @@ See PROJECT_PLAN.md "Ingestion Schedule" section for full timing.
 ~/Documents/Claude/life-platform/
 ├── mcp_server.py          # MCP Lambda source
 ├── mcp_bridge.py          # Local Claude Desktop bridge
-├── mcp/                   # 26 tool modules
+├── mcp/                   # 30 tool modules
 ├── lambdas/               # Lambda source + zips
 ├── deploy/                # Deploy scripts (run in terminal, never via MCP)
 ├── config/                # Local copies of S3 configs

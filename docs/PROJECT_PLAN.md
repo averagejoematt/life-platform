@@ -1,17 +1,17 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-08 (v2.90.0 — 144 MCP tools, 34 Lambdas, 30 modules, 19 data sources, 6 secrets, 35 alarms)
+> Last update: 2026-03-08 (v2.91.0 — 144 MCP tools, 35 Lambdas, 30 modules, 19 data sources, 6 secrets, 35 alarms)
 
 ---
 
 ## Current State
 
-- **Platform version:** v2.90.0
+- **Platform version:** v2.91.0
 - **MCP Server:** 144 tools across 30-module package (tools_decisions.py added), serving health data through Claude Desktop + claude.ai + Claude mobile (1024 MB, 12 tools pre-cached nightly)
 - **Remote MCP:** Function URL `c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` with OAuth auto-approve + HMAC Bearer token validation
 - **Data Sources:** 19 (12 scheduled + 1 webhook + 3 manual/periodic + 2 MCP-managed + 1 State of Mind via webhook)
-- **Lambdas:** 34 (13 ingestion + 1 webhook + 2 enrichment + 6 email/digest + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 daily-metrics-compute + 1 daily-insight-compute + 1 hypothesis-engine + 1 dashboard-refresh + 1 data-export + 1 qa-smoke)
+- **Lambdas:** 35 (13 ingestion + 1 webhook + 2 enrichment + 7 email/digest [incl. monday-compass] + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 daily-metrics-compute + 1 daily-insight-compute + 1 hypothesis-engine + 1 dashboard-refresh + 1 data-export + 1 qa-smoke)
 - **Cost:** Under $25/month (~$3/month projected after secrets consolidation)
 - **Secrets Manager:** 6 secrets (was 12 — consolidated anthropic/todoist/habitify/health-auto-export/notion/dropbox into `life-platform/api-keys`)
 - **CloudWatch Alarms:** 35 (all Lambdas now monitored)
@@ -82,17 +82,17 @@
 - Cost: ~$0.01/month (S3 + CloudFront free tier)
 
 ### Email Cadence
-| Email | Schedule | Status |
+| Email | Schedule (PDT) | Status |
 |-------|----------|--------|
-| Daily Brief v2.2 | 10:00 AM PT daily | ✅ Live |
-| Weekly Digest v4.2 | Sunday 8:30 AM PT | ✅ Live |
-| **Brittany Weekly** | **Sunday 9:30 AM PT** | **✅ Live** |
-| Monthly Digest | 1st Sunday 8:00 AM PT | ✅ Live |
-| Anomaly Detector | 8:05 AM PT daily | ✅ Live |
-| Freshness Alerter | 9:45 AM PT daily | ✅ Live |
-| Nutrition Review | Saturday 9:00 AM PT | ✅ Live |
-| Wednesday Chronicle | Wednesday 7:00 AM PT | ✅ Live |
-| The Weekly Plate | Friday 6:00 PM PT | ✅ Live |
+| Monday Compass v1.0 | Monday 8:00 AM | ✅ Live |
+| Daily Brief v2.62 | Every day 11:00 AM | ✅ Live |
+| Anomaly Detector v2.1 | Every day 9:05 AM | ✅ Live |
+| Freshness Alerter | Every day 10:45 AM | ✅ Live |
+| Wednesday Chronicle v1.1 | Wednesday 8:00 AM | ✅ Live |
+| The Weekly Plate v1.0 | Friday 7:00 PM | ✅ Live |
+| Weekly Digest v4.3 | Sunday 9:00 AM | ✅ Live |
+| Nutrition Review v1.1 | Saturday 10:00 AM | ✅ Live |
+| Monthly Digest v1.1 | 1st Monday 9:00 AM | ✅ Live |
 
 ### Ingestion Schedule (PT)
 ```
@@ -393,6 +393,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | Version | What | Date |
 |---------|------|------|
+| v2.91.0 | Monday Compass weekly planning email (35th Lambda, monday-compass, Monday 8 AM PDT, Todoist + health + Board + Keystone, deploy_monday_compass.sh) | 2026-03-08 |
 | v2.90.0 | IC-8 Intent vs Execution Gap (daily-insight-compute v1.1.0, Haiku intention evaluator, platform_memory intention_tracking partition) | 2026-03-08 |
 | v2.89.0 | IC-7 Cross-Pillar Trade-offs (ai_calls.py) + IC-18 Hypothesis Engine (34th Lambda, Sunday 11 AM PT, 2 MCP tools, 144 total) | 2026-03-07 |
 | v2.88.0 | IC-23/24/25 (Surprise Scoring, Data Quality, Diminishing Returns) + IC-16 (Progressive Context all 6 digests) + IC-19 (Decision Journal, 3 MCP tools, 142 total) | 2026-03-07 |

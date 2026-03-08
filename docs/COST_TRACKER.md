@@ -1,6 +1,6 @@
 # Life Platform — Cost Tracker
 
-Last updated: 2026-03-05 (v2.75.0)
+Last updated: 2026-03-08 (v2.91.0)
 
 > Budget target: **$25/month**. Design constraint: every feature must justify its cost.
 
@@ -11,11 +11,11 @@ Last updated: 2026-03-05 (v2.75.0)
 | Service | Cost/Month | Notes |
 |---------|-----------|-------|
 | **Secrets Manager** | $2.40 | 6 secrets × $0.40/secret/month (consolidated from 12 — saves $2.40/mo) |
-| **Lambda** | ~$0.50 | ~2,200 invocations/month (13 ingestion + 29 Lambda schedule runs + MCP on-demand + Dropbox poll) |
+| **Lambda** | ~$0.50 | ~2,500 invocations/month (13 ingestion + 35 Lambda schedule runs + MCP on-demand + Dropbox poll) |
 | **DynamoDB** | ~$0.30 | On-demand pay-per-request, ~5,000 WCU + ~15,000 RCU/month |
 | **S3** | ~$0.05 | ~2.5 GB stored (raw archives + dashboard + blog + buddy + avatar), minimal GET/PUT |
 | **CloudWatch** | ~$0.20 | 35 alarms, 26 log groups (30-day retention) |
-| **SES** | ~$0.01 | ~51 emails/month (daily brief + weekly + monthly + anomaly + freshness + nutrition review + chronicle + weekly plate) |
+| **SES** | ~$0.01 | ~55 emails/month (daily brief + weekly + monthly + anomaly + freshness + nutrition review + chronicle + weekly plate + monday compass) |
 | **API Gateway** | ~$0.01 | ~180 webhook invocations/month (Health Auto Export, ~4h × 30 days) |
 | **SNS** | $0.00 | Free tier (alert topic, low volume) |
 | **CloudTrail** | $0.00 | Management events free; S3 storage negligible |
@@ -23,7 +23,7 @@ Last updated: 2026-03-05 (v2.75.0)
 | **PITR (DynamoDB)** | ~$0.10 | 35-day continuous backup on single table |
 | **CloudFront** | ~$0.01 | CDN for `dash.averagejoematt.com`, `blog.averagejoematt.com`, `buddy.averagejoematt.com` (free tier) |
 | **Route 53** | ~$0.50 | 1 hosted zone — flat monthly fee |
-| **Total** | **~$3.00/month** | Well under $25 target |
+| **Total** | **~$10/month** | Well under $25 target — higher than $3 estimate due to Anthropic API costs (~$3/mo) and additional CloudWatch alarms |
 
 ---
 
