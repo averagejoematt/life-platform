@@ -435,13 +435,26 @@ def save_to_dynamodb(date_str, activities):
         "total_zone2_seconds": sum(a.get("zone2_seconds") or 0 for a in activities),
     }
 
-    # ── Item size estimation (F2.1) ────────────────────────────────────────
+    # ── Item size estimation + CloudWatch metric (P1.10) ─────────────────────
     item_json = json.dumps(floats_to_decimal(item), default=str)
     item_size_kb = len(item_json.encode('utf-8')) / 1024
     if item_size_kb > 350:
         print(f"[SIZE-WARNING] ⚠️ Strava item for {date_str} is {item_size_kb:.0f}KB — approaching 400KB DynamoDB limit!")
     elif item_size_kb > 250:
         print(f"[SIZE-INFO] Strava item for {date_str} is {item_size_kb:.0f}KB")
+    try:
+        cw = boto3.client("cloudwatch", region_name=REGION)
+        cw.put_metric_data(
+            Namespace="LifePlatform/Ingestion",
+            MetricData=[{
+                "MetricName": "DynamoDBItemSizeKB",
+                "Dimensions": [{"Name": "Source", "Value": "strava"}],
+                "Value": item_size_kb,
+                "Unit": "Kilobytes",
+            }],
+        )
+    except Exception as e:
+        print(f"[WARN] CloudWatch item size metric failed (non-fatal): {e}")
 
     table.put_item(Item=floats_to_decimal(item))
     print(f"Saved {len(activities)} activities to DynamoDB for {date_str}")

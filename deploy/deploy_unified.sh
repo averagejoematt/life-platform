@@ -1,21 +1,20 @@
 #!/usr/bin/env bash
-# deploy_unified.sh — Unified deployment for all Life Platform Lambdas
+# deploy_unified.sh — Canonical deploy tool for all Life Platform Lambdas
+#
+# Delegates to deploy_lambda.sh (which auto-reads handler config from AWS
+# to determine correct zip entry filename — prevents handler mismatch bugs).
 #
 # Usage:
 #   ./deploy/deploy_unified.sh <target>
+#   ./deploy/deploy_unified.sh list
+#   ./deploy/deploy_unified.sh all
 #
-# Targets:
-#   mcp           — MCP server (package: mcp_server.py + mcp/)
-#   daily-brief   — Daily Brief email
-#   weekly-digest — Weekly Digest email
-#   whoop         — Whoop ingestion
-#   garmin        — Garmin ingestion
-#   strava        — Strava ingestion
-#   ... (any Lambda short name)
-#   all           — Deploy everything (with 10s pauses)
-#   list          — Show all available targets
+# Examples:
+#   ./deploy/deploy_unified.sh daily-brief
+#   ./deploy/deploy_unified.sh mcp
+#   ./deploy/deploy_unified.sh garmin          # (uses fix_garmin_deps.sh for layer)
 #
-# v1.0.0 — 2026-02-28
+# v2.0.0 — 2026-03-08 — Updated for v2.93.0 (35 Lambdas), delegates to deploy_lambda.sh
 
 set -euo pipefail
 
@@ -28,159 +27,168 @@ warn()  { echo "[WARN]  $*"; }
 error() { echo "[ERROR] $*" >&2; exit 1; }
 
 # ── Lambda registry ──────────────────────────────────────────────────────────
-# Format: SHORT_NAME|AWS_FUNCTION_NAME|SOURCE_FILE|ZIP_ENTRY_NAME
-# ZIP_ENTRY_NAME: what the file is called inside the zip (must match handler module)
-# Special: "PACKAGE" means the MCP package deploy
-REGISTRY=(
-    "mcp|life-platform-mcp|PACKAGE|PACKAGE"
-    "daily-brief|daily-brief|lambdas/daily_brief_lambda.py|lambda_function.py"
-    "weekly-digest|weekly-digest|lambdas/weekly_digest_v2_lambda.py|digest_handler.py"
-    "monthly-digest|monthly-digest|lambdas/monthly_digest_lambda.py|lambda_function.py"
-    "anomaly|anomaly-detector|lambdas/anomaly_detector_lambda.py|lambda_function.py"
-    "freshness|life-platform-freshness-checker|lambdas/freshness_checker_lambda.py|lambda_function.py"
-    "whoop|whoop-data-ingestion|lambdas/whoop_lambda.py|lambda_function.py"
-    "garmin|garmin-data-ingestion|lambdas/garmin_lambda.py|garmin_lambda.py"
-    "strava|strava-data-ingestion|lambdas/strava_lambda.py|strava_lambda.py"
-    "eightsleep|eightsleep-data-ingestion|lambdas/eightsleep_lambda.py|eightsleep_lambda.py"
-    "withings|withings-data-ingestion|lambdas/withings_lambda.py|withings_lambda.py"
-    "macrofactor|macrofactor-data-ingestion|lambdas/macrofactor_lambda.py|macrofactor_lambda.py"
-    "todoist|todoist-data-ingestion|lambdas/todoist_lambda.py|lambda_function.py"
-    "notion|notion-journal-ingestion|lambdas/notion_lambda.py|notion_lambda.py"
-    "habitify|habitify-data-ingestion|lambdas/habitify_lambda.py|habitify_lambda.py"
-    "apple-health|apple-health-ingestion|lambdas/apple_health_lambda.py|lambda_function.py"
-    "hae-webhook|health-auto-export-webhook|lambdas/health_auto_export_lambda.py|health_auto_export_lambda.py"
-    "enrichment|activity-enrichment|lambdas/enrichment_lambda.py|enrichment_lambda.py"
-    "journal-enrich|journal-enrichment|lambdas/journal_enrichment_lambda.py|journal_enrichment_lambda.py"
-    "dropbox|dropbox-poll|lambdas/dropbox_poll_lambda.py|dropbox_poll_lambda.py"
-    "weather|weather-data-ingestion|lambdas/weather_lambda.py|weather_lambda.py"
-    "insight-email|insight-email-parser|lambdas/insight_email_parser_lambda.py|lambda_function.py"
-)
+# Format: SHORT_NAME|AWS_FUNCTION_NAME|SOURCE_FILE|EXTRA_FILES (space-separated, or "PACKAGE" for MCP)
+#
+# EXTRA_FILES are bundled alongside the main source in the zip.
+# Shared modules (retry_utils, board_loader, insight_writer) should be listed
+# as extras for the Lambdas that need them.
+#
+# Note: Garmin uses fix_garmin_deps.sh (not deploy_lambda.sh) due to
+# garminconnect/garth dependency bundle. See "garmin" case below.
 
-# ── Functions ─────────────────────────────────────────────────────────────────
+declare -A REGISTRY
+declare -a REGISTRY_ORDER
 
-list_targets() {
-    echo "Available targets:"
-    echo ""
-    printf "  %-18s %-40s %s\n" "SHORT NAME" "AWS FUNCTION" "SOURCE"
-    printf "  %-18s %-40s %s\n" "──────────" "────────────" "──────"
-    for entry in "${REGISTRY[@]}"; do
-        IFS='|' read -r short aws_name source zip_name <<< "$entry"
-        printf "  %-18s %-40s %s\n" "$short" "$aws_name" "$source"
-    done
-    echo ""
-    echo "  all               Deploy everything (with 10s pauses)"
+register() {
+    local short="$1" aws_name="$2" source="$3" extras="${4:-}"
+    REGISTRY["$short"]="$aws_name|$source|$extras"
+    REGISTRY_ORDER+=("$short")
 }
 
-deploy_single_lambda() {
-    local source_file="$1"
-    local zip_entry="$2"
-    local aws_name="$3"
-    local zip_file="/tmp/${aws_name}.zip"
+# ── Ingestion ──
+register "whoop"         "whoop-data-ingestion"      "lambdas/whoop_lambda.py"
+register "eightsleep"    "eightsleep-data-ingestion"  "lambdas/eightsleep_lambda.py"
+# garmin: registered but handled specially (deps bundle required)
+register "garmin"        "garmin-data-ingestion"      "lambdas/garmin_lambda.py"
+register "strava"        "strava-data-ingestion"      "lambdas/strava_lambda.py"
+register "withings"      "withings-data-ingestion"    "lambdas/withings_lambda.py"
+register "habitify"      "habitify-data-ingestion"    "lambdas/habitify_lambda.py"
+register "macrofactor"   "macrofactor-data-ingestion" "lambdas/macrofactor_lambda.py"
+register "notion"        "notion-journal-ingestion"   "lambdas/notion_lambda.py"
+register "todoist"       "todoist-data-ingestion"     "lambdas/todoist_lambda.py"
+register "weather"       "weather-data-ingestion"     "lambdas/weather_lambda.py"
+register "hae-webhook"   "health-auto-export-webhook" "lambdas/health_auto_export_lambda.py"
+register "enrichment"    "activity-enrichment"        "lambdas/enrichment_lambda.py"
+register "journal-enrich" "journal-enrichment"        "lambdas/journal_enrichment_lambda.py"
 
-    # Verify source exists
-    [ -f "$PROJECT_DIR/$source_file" ] || error "Source not found: $source_file"
+# ── Email / Digest ──
+# AI Lambdas need retry_utils + board_loader bundled
+AI_SHARED="lambdas/retry_utils.py lambdas/board_loader.py lambdas/insight_writer.py"
+register "daily-brief"   "daily-brief"                "lambdas/daily_brief_lambda.py"         "lambdas/ai_calls.py lambdas/html_builder.py lambdas/output_writers.py lambdas/board_loader.py lambdas/scoring_engine.py lambdas/retry_utils.py lambdas/insight_writer.py"
+register "weekly-digest" "weekly-digest"              "lambdas/weekly_digest_v2_lambda.py"    "$AI_SHARED"
+register "monthly-digest" "monthly-digest"            "lambdas/monthly_digest_lambda.py"      "$AI_SHARED"
+register "nutrition-review" "nutrition-review"        "lambdas/nutrition_review_lambda.py"    "$AI_SHARED"
+register "chronicle"     "wednesday-chronicle"        "lambdas/wednesday_chronicle_lambda.py" "$AI_SHARED"
+register "weekly-plate"  "weekly-plate"               "lambdas/weekly_plate_lambda.py"        "$AI_SHARED"
+register "monday-compass" "monday-compass"            "lambdas/monday_compass_lambda.py"      "$AI_SHARED"
+register "anomaly"       "anomaly-detector"           "lambdas/anomaly_detector_lambda.py"    "lambdas/board_loader.py"
 
-    # Syntax check
-    python3 -c "import py_compile; py_compile.compile('$PROJECT_DIR/$source_file', doraise=True)" 2>/dev/null \
-        || error "Syntax error in $source_file"
+# ── Compute ──
+register "character-sheet" "character-sheet-compute"  "lambdas/character_sheet_compute_lambda.py" "lambdas/scoring_engine.py"
+register "adaptive-mode"   "adaptive-mode-compute"    "lambdas/adaptive_mode_compute_lambda.py"
+register "daily-metrics"   "daily-metrics-compute"    "lambdas/daily_metrics_compute_lambda.py"
+register "daily-insight"   "daily-insight-compute"    "lambdas/daily_insight_compute_lambda.py"   "lambdas/insight_writer.py"
+register "hypothesis"      "hypothesis-engine"        "lambdas/hypothesis_engine_lambda.py"        "lambdas/insight_writer.py"
 
-    # Create zip with correct entry name
-    rm -f "$zip_file"
-    if [ "$source_file" = "$zip_entry" ] || [ "$(basename "$source_file")" = "$zip_entry" ]; then
-        # Source name matches zip entry — zip directly
-        (cd "$PROJECT_DIR" && zip -j "$zip_file" "$source_file")
-    else
-        # Need to rename: copy to temp, zip with correct name
-        local tmp_dir=$(mktemp -d)
-        cp "$PROJECT_DIR/$source_file" "$tmp_dir/$zip_entry"
-        (cd "$tmp_dir" && zip -j "$zip_file" "$zip_entry")
-        rm -rf "$tmp_dir"
-    fi
+# ── Infrastructure ──
+register "freshness"     "life-platform-freshness-checker" "lambdas/freshness_checker_lambda.py"
+register "dropbox"       "dropbox-poll"               "lambdas/dropbox_poll_lambda.py"
+register "insight-email" "insight-email-parser"       "lambdas/insight_email_parser_lambda.py"
+register "key-rotator"   "life-platform-key-rotator"  "lambdas/key_rotator_lambda.py"
+register "dashboard-refresh" "dashboard-refresh"      "lambdas/dashboard_refresh_lambda.py"
+register "data-export"   "life-platform-data-export"  "lambdas/data_export_lambda.py"
+register "qa-smoke"      "life-platform-qa-smoke"     "lambdas/qa_smoke_lambda.py"
 
-    # Deploy
-    aws lambda update-function-code \
-        --function-name "$aws_name" \
-        --zip-file "fileb://$zip_file" \
-        --region "$REGION" \
-        --output text --query 'FunctionName' > /dev/null
+# ── MCP (special package deploy) ──
+register "mcp"           "life-platform-mcp"          "PACKAGE"
 
-    aws lambda wait function-updated \
-        --function-name "$aws_name" \
-        --region "$REGION"
+# ── Helpers ──────────────────────────────────────────────────────────────────
 
-    rm -f "$zip_file"
-    info "✅ $aws_name deployed"
+list_targets() {
+    echo ""
+    echo "Life Platform Lambda Registry (v2.93.0 — 35 Lambdas)"
+    echo "══════════════════════════════════════════════════════"
+    printf "  %-18s  %s\n" "SHORT NAME" "AWS FUNCTION NAME"
+    printf "  %-18s  %s\n" "──────────" "─────────────────"
+    for short in "${REGISTRY_ORDER[@]}"; do
+        IFS='|' read -r aws_name source extras <<< "${REGISTRY[$short]}"
+        printf "  %-18s  %s\n" "$short" "$aws_name"
+    done
+    echo ""
+    echo "  Special: 'all' deploys everything with 10s pauses"
+    echo ""
+    echo "Usage: ./deploy/deploy_unified.sh <target>"
 }
 
 deploy_mcp_package() {
-    info "Deploying MCP package..."
-    # Use the dedicated MCP split deploy script if available
-    if [ -x "$SCRIPT_DIR/deploy_mcp_split.sh" ]; then
-        "$SCRIPT_DIR/deploy_mcp_split.sh"
-    else
-        # Inline MCP deploy
-        cd "$PROJECT_DIR"
-        [ -d "mcp" ] || error "mcp/ package not found"
-        local zip_file="/tmp/mcp_server.zip"
-        rm -f "$zip_file"
-        zip -j "$zip_file" mcp_server.py
-        zip -r "$zip_file" mcp/ -x "mcp/__pycache__/*" "mcp/*.pyc"
-        aws lambda update-function-code \
-            --function-name "life-platform-mcp" \
-            --zip-file "fileb://$zip_file" \
-            --region "$REGION" \
-            --output text --query 'FunctionName' > /dev/null
-        aws lambda wait function-updated \
-            --function-name "life-platform-mcp" \
-            --region "$REGION"
-        rm -f "$zip_file"
-        info "✅ life-platform-mcp deployed"
-    fi
+    info "Deploying MCP package (mcp_server.py + mcp/ directory)..."
+    cd "$PROJECT_DIR"
+    [ -d "mcp" ] || error "mcp/ package directory not found"
+    local zip_file="/tmp/life-platform-mcp.zip"
+    rm -f "$zip_file"
+    zip -j "$zip_file" mcp_server.py > /dev/null
+    zip -r "$zip_file" mcp/ -x "mcp/__pycache__/*" "mcp/*.pyc" > /dev/null
+    aws lambda update-function-code \
+        --function-name "life-platform-mcp" \
+        --zip-file "fileb://$zip_file" \
+        --region "$REGION" \
+        --no-cli-pager > /dev/null
+    rm -f "$zip_file"
+    info "✅ life-platform-mcp deployed"
+}
+
+deploy_garmin_with_deps() {
+    info "Deploying garmin-data-ingestion with garminconnect/garth bundle..."
+    info "(This takes ~60s to pip install deps for linux/x86_64)"
+    bash "$SCRIPT_DIR/fix_garmin_deps.sh"
 }
 
 deploy_target() {
     local target="$1"
-    for entry in "${REGISTRY[@]}"; do
-        IFS='|' read -r short aws_name source zip_name <<< "$entry"
-        if [ "$short" = "$target" ]; then
-            if [ "$source" = "PACKAGE" ]; then
-                deploy_mcp_package
-            else
-                deploy_single_lambda "$source" "$zip_name" "$aws_name"
-            fi
-            return 0
-        fi
-    done
-    error "Unknown target: $target. Run with 'list' to see available targets."
+    [ "${REGISTRY[$target]+exists}" ] || error "Unknown target: '$target'. Run 'list' for options."
+
+    IFS='|' read -r aws_name source extras <<< "${REGISTRY[$target]}"
+
+    if [ "$source" = "PACKAGE" ]; then
+        deploy_mcp_package
+        return
+    fi
+
+    if [ "$target" = "garmin" ]; then
+        deploy_garmin_with_deps
+        return
+    fi
+
+    # Build --extra-files args
+    local extra_args=()
+    if [ -n "$extras" ]; then
+        extra_args=(--extra-files)
+        for f in $extras; do
+            [ -f "$PROJECT_DIR/$f" ] && extra_args+=("$PROJECT_DIR/$f") || warn "Extra file not found: $f (skipping)"
+        done
+    fi
+
+    cd "$PROJECT_DIR"
+    bash "$SCRIPT_DIR/deploy_lambda.sh" "$aws_name" "$source" "${extra_args[@]+"${extra_args[@]}"}"
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 [ $# -ge 1 ] || { list_targets; exit 0; }
 TARGET="$1"
 
-cd "$PROJECT_DIR"
-
 case "$TARGET" in
     list)
         list_targets
         ;;
     all)
-        info "Deploying ALL ${#REGISTRY[@]} Lambdas..."
+        info "Deploying ALL ${#REGISTRY_ORDER[@]} Lambdas..."
         DEPLOYED=0
         FAILED=0
-        for entry in "${REGISTRY[@]}"; do
-            IFS='|' read -r short aws_name source zip_name <<< "$entry"
-            info "── Deploying $short ($aws_name) ──"
-            if deploy_target "$short" 2>/dev/null; then
+        FAILED_NAMES=()
+        for short in "${REGISTRY_ORDER[@]}"; do
+            info "── $short ──"
+            if deploy_target "$short"; then
                 DEPLOYED=$((DEPLOYED + 1))
             else
-                warn "Failed: $short"
+                warn "FAILED: $short"
                 FAILED=$((FAILED + 1))
+                FAILED_NAMES+=("$short")
             fi
             sleep 10
         done
         echo ""
         info "Complete: $DEPLOYED deployed, $FAILED failed"
+        [ $FAILED -eq 0 ] || warn "Failed: ${FAILED_NAMES[*]}"
         ;;
     *)
         deploy_target "$TARGET"

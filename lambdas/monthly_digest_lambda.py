@@ -486,24 +486,10 @@ One sentence. Actionable over the next 30 days. Must cite real numbers. This is 
 Be honest. A month of data deserves a month's worth of insight."""
 
 
-def call_anthropic_with_retry(req, timeout=30, max_attempts=2, backoff_s=5):
-    """Call Anthropic API with 2-attempt retry and 5s backoff on transient errors."""
-    for attempt in range(1, max_attempts + 1):
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return json.loads(r.read())
-        except urllib.error.HTTPError as e:
-            print(f"[WARN] Anthropic API HTTP {e.code} on attempt {attempt}/{max_attempts}")
-            if attempt < max_attempts and e.code in (429, 529, 500, 502, 503, 504):
-                time.sleep(backoff_s)
-            else:
-                raise
-        except urllib.error.URLError as e:
-            print(f"[WARN] Anthropic API network error on attempt {attempt}/{max_attempts}: {e}")
-            if attempt < max_attempts:
-                time.sleep(backoff_s)
-            else:
-                raise
+def call_anthropic_with_retry(req, timeout=55, max_attempts=None, backoff_s=None):
+    # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
+    import retry_utils
+    return retry_utils.call_anthropic_raw(req, timeout=timeout)
 
 
 def call_haiku_monthly(data, goals, api_key):
@@ -540,7 +526,7 @@ def call_haiku_monthly(data, goals, api_key):
             print(f"[WARN] IC-16 failed: {e}")
 
     payload = json.dumps({
-        "model": "claude-sonnet-4-6",
+        "model": os.environ.get("AI_MODEL", "claude-sonnet-4-6"),
         "max_tokens": 2500,
         "messages": [{"role": "user", "content": prompt}]
     }).encode()
@@ -902,6 +888,14 @@ def build_html(data, goals, commentary, windows):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def lambda_handler(event, context):
+    # P1.6: Scheduler fires on the 1st of each month (America/Los_Angeles).
+    # Guard: only send on Mondays so cadence matches original "1st Monday" intent.
+    from datetime import date
+    today = date.today()
+    if today.weekday() != 0:  # 0 = Monday
+        print(f"[SKIP] Monthly digest: today is {today.strftime('%A')} — only runs on Mondays. Exiting.")
+        return {"statusCode": 200, "body": "skipped — not Monday"}
+
     print("[INFO] Monthly Coach's Letter v1.1.0 (Board Centralization) starting...")
     data, goals = gather_all()
     windows = data["windows"]

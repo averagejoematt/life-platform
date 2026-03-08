@@ -6,7 +6,7 @@ Handles all four AI calls plus data-summary builders consumed by those calls.
 
 Exports:
   init(s3_client, bucket, has_board_loader)  — must call before using module
-  call_anthropic(prompt, api_key, max_tokens) — raw Anthropic API call
+  call_anthropic(prompt, api_key, max_tokens, system) — raw Anthropic API call with exponential backoff + token metrics
   call_training_nutrition_coach(data, profile, api_key)
   call_journal_coach(data, profile, api_key)
   call_board_of_directors(data, profile, day_grade, grade, component_scores, api_key, ...)
@@ -24,9 +24,59 @@ import urllib.error
 import urllib.request
 from datetime import date as _date_cls
 
+import boto3
+
 # AI model constants — read from env so model can be updated without redeployment
 AI_MODEL       = os.environ.get("AI_MODEL",       "claude-sonnet-4-6")
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+
+# CloudWatch client for token usage + failure metrics (P1.8/P1.9)
+_cw = boto3.client("cloudwatch", region_name=os.environ.get("AWS_REGION", "us-west-2"))
+_LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "unknown")
+_CW_NAMESPACE = "LifePlatform/AI"
+
+# Exponential backoff delays (seconds) between retry attempts
+_BACKOFF_DELAYS = [5, 15, 45]  # attempts 1→2, 2→3, 3→4
+
+
+def _emit_token_metrics(input_tokens, output_tokens):
+    """Emit per-Lambda Anthropic token usage to CloudWatch (P1.9)."""
+    try:
+        _cw.put_metric_data(
+            Namespace=_CW_NAMESPACE,
+            MetricData=[
+                {
+                    "MetricName": "AnthropicInputTokens",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": input_tokens,
+                    "Unit": "Count",
+                },
+                {
+                    "MetricName": "AnthropicOutputTokens",
+                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                    "Value": output_tokens,
+                    "Unit": "Count",
+                },
+            ],
+        )
+    except Exception as e:
+        print(f"[WARN] CloudWatch token metric emit failed (non-fatal): {e}")
+
+
+def _emit_failure_metric():
+    """Emit API failure metric to CloudWatch (P1.8)."""
+    try:
+        _cw.put_metric_data(
+            Namespace=_CW_NAMESPACE,
+            MetricData=[{
+                "MetricName": "AnthropicAPIFailure",
+                "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
+                "Value": 1,
+                "Unit": "Count",
+            }],
+        )
+    except Exception as e:
+        print(f"[WARN] CloudWatch failure metric emit failed (non-fatal): {e}")
 
 # ==============================================================================
 # MODULE STATE (set by init())
@@ -1008,31 +1058,64 @@ def build_workout_summary(data):
 # ANTHROPIC API
 # ==============================================================================
 
-def call_anthropic(prompt, api_key, max_tokens=200):
-    payload = json.dumps({
+def call_anthropic(prompt, api_key, max_tokens=200, system=None):
+    """Call Anthropic API with exponential backoff (4 attempts: 5s/15s/45s delays).
+
+    P1.8: Exponential backoff replaces fixed 2-attempt/5s retry.
+    P1.9: Token usage emitted to CloudWatch LifePlatform/AI namespace.
+    Returns text string (unchanged interface — callers require no updates).
+    """
+    body = {
         "model": AI_MODEL,
         "max_tokens": max_tokens,
-        "messages": [{"role": "user", "content": prompt}]
-    }).encode()
-    req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=payload,
-        headers={"Content-Type": "application/json", "x-api-key": api_key,
-                 "anthropic-version": "2023-06-01"}, method="POST")
-    for attempt in range(1, 3):
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    if system:
+        body["system"] = system
+
+    payload = json.dumps(body).encode()
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+        },
+        method="POST",
+    )
+
+    max_attempts = len(_BACKOFF_DELAYS) + 1  # 4
+    for attempt in range(1, max_attempts + 1):
         try:
-            with urllib.request.urlopen(req, timeout=25) as r:
+            with urllib.request.urlopen(req, timeout=55) as r:
                 resp = json.loads(r.read())
+                # P1.9: emit token usage metrics
+                usage = resp.get("usage", {})
+                if usage:
+                    _emit_token_metrics(
+                        usage.get("input_tokens", 0),
+                        usage.get("output_tokens", 0),
+                    )
                 return resp["content"][0]["text"].strip()
         except urllib.error.HTTPError as e:
-            print("[WARN] Anthropic HTTP " + str(e.code) + " attempt " + str(attempt))
-            if attempt < 2 and e.code in (429, 529, 500, 502, 503, 504):
-                time.sleep(5)
+            retryable = e.code in (429, 529, 500, 502, 503, 504)
+            print(f"[WARN] Anthropic HTTP {e.code} attempt {attempt}/{max_attempts}")
+            if retryable and attempt < max_attempts:
+                delay = _BACKOFF_DELAYS[attempt - 1]
+                print(f"[INFO] Retrying in {delay}s...")
+                time.sleep(delay)
             else:
+                _emit_failure_metric()
                 raise
         except urllib.error.URLError as e:
-            print("[WARN] Anthropic network error attempt " + str(attempt) + ": " + str(e))
-            if attempt < 2:
-                time.sleep(5)
+            print(f"[WARN] Anthropic network error attempt {attempt}/{max_attempts}: {e}")
+            if attempt < max_attempts:
+                delay = _BACKOFF_DELAYS[attempt - 1]
+                print(f"[INFO] Retrying in {delay}s...")
+                time.sleep(delay)
             else:
+                _emit_failure_metric()
                 raise
 
 
