@@ -1,20 +1,20 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-08 (v3.0.0 — 144 MCP tools, 37 Lambdas, 30 modules, 19 data sources, 6 secrets, 35 alarms)
+> Last update: 2026-03-08 (v3.1.3 — 144 MCP tools, 39 Lambdas, 30 modules, 19 data sources, 8 secrets, ~47 alarms)
 
 ---
 
 ## Current State
 
-- **Platform version:** v3.0.0
+- **Platform version:** v3.1.3
 - **MCP Server:** 144 tools across 30-module package (tools_decisions.py added), serving health data through Claude Desktop + claude.ai + Claude mobile (1024 MB, 12 tools pre-cached nightly)
 - **Remote MCP:** Function URL `c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` with OAuth auto-approve + HMAC Bearer token validation
 - **Data Sources:** 19 (12 scheduled + 1 webhook + 3 manual/periodic + 2 MCP-managed + 1 State of Mind via webhook)
-- **Lambdas:** 37 (13 ingestion + 1 webhook + 2 enrichment + 7 email/digest [incl. monday-compass] + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 daily-metrics-compute + 1 daily-insight-compute + 1 hypothesis-engine + 1 dashboard-refresh + 1 data-export + 1 qa-smoke + 1 data-reconciliation + 1 pip-audit)
-- **Cost:** Under $25/month (~$3/month projected after secrets consolidation)
-- **Secrets Manager:** 6 secrets (was 12 — consolidated anthropic/todoist/habitify/health-auto-export/notion/dropbox into `life-platform/api-keys`)
-- **CloudWatch Alarms:** 35 (all Lambdas now monitored)
+- **Lambdas:** 39 (13 ingestion + 1 webhook + 2 enrichment + 7 email/digest [incl. monday-compass] + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 daily-metrics-compute + 1 daily-insight-compute + 1 hypothesis-engine + 1 dashboard-refresh + 1 data-export + 1 qa-smoke + 1 data-reconciliation + 1 pip-audit + **1 dlq-consumer + 1 canary**)
+- **Cost:** ~$25/month
+- **Secrets Manager:** 8 secrets (split from api-keys bundle — ai-keys, todoist, notion now separate; api-keys pending deletion ~2026-04-07)
+- **CloudWatch Alarms:** ~47 (all Lambdas + canary + item size + ops dashboard alarms)
 - **Web Dashboard:** CloudFront — `https://dash.averagejoematt.com/` (Lambda@Edge auth)
 - **Blog:** CloudFront — `https://blog.averagejoematt.com/` (public, no auth) — "The Measured Life" by Elena Voss
 - **Buddy Page:** CloudFront — `https://buddy.averagejoematt.com/` (Lambda@Edge auth, separate password) — accountability partner interface for Tom
@@ -488,7 +488,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | # | Task | Priority | Effort | Model | Status |
 |---|------|----------|--------|-------|--------|
-| OBS-1 | **Standardize structured logging across all Lambdas.** `platform_logger.py` built. **⚠️ Not wired — zero Lambdas migrated.** Next: wire into daily-brief first, then incremental rollout. | P1 | L (6-8 hr) | Sonnet | ⚠️ Built |
+| OBS-1 | **Standardize structured logging across all Lambdas.** `platform_logger.py` built and wired into `daily-brief`. Emits structured JSON with `correlation_id` field. Incremental rollout to other Lambdas ongoing. | P1 | L (6-8 hr) | Sonnet | ⚠️ Partial (daily-brief wired) |
 | OBS-2 | **Create operational health CloudWatch dashboard.** `life-platform-ops`: 23 widgets, 47 alarms, KPIs, error matrix, AI tokens. | P2 | M (3-4 hr) | Sonnet | ✅ v2.99.0 |
 | OBS-3 | **Define SLOs for critical paths.** Daily Brief by 11 AM (99%), sources fresh within 24h (99%), MCP cold start <2s (95%), AI success 99%. | P3 | S (1-2 hr) | **Opus** | 🔴 |
 
@@ -514,7 +514,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 | # | Task | Priority | Effort | Model | Status |
 |---|------|----------|--------|-------|--------|
 | DATA-1 | **Add schema_version to all DDB items.** All ingestion Lambdas + backfill script run. | P1 | S (2 hr) | Sonnet | ✅ v2.98.0 |
-| DATA-2 | **Add ingestion validation layer.** `ingestion_validator.py` built with 19-source schemas. **⚠️ Not wired — zero Lambdas call it.** Next: wire into whoop, strava, macrofactor first. | P1 | M (4-6 hr) | Sonnet | ⚠️ Built |
+| DATA-2 | **Add ingestion validation layer.** `ingestion_validator.py` built with 19-source schemas. Wired into whoop, strava, macrofactor. CRITICAL failures archive to S3 + skip DDB write; logs as `[DATA-2]`. Incremental rollout to remaining 10+ Lambdas ongoing. | P1 | M (4-6 hr) | Sonnet | ⚠️ Partial (3 of 13 wired) |
 | DATA-3 | **Implement weekly reconciliation job.** Weekly Lambda live, email report + S3 archive. First run: RED (bootstrap noise, zero real failures). | P3 | M (3-4 hr) | Sonnet | ✅ v3.1.3 |
 
 #### Epic: AI Trustworthiness & Validation
@@ -523,7 +523,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 |---|------|----------|--------|-------|--------|
 | AI-1 | **Add health disclaimer to all AI-generated coaching.** Footer on every email. | P0 | S (1 hr) | Sonnet | ✅ v2.95.0 |
 | AI-2 | **Rename correlation tools / fix causal language in prompts.** All prompts referencing correlations include "correlation, not proven causal." IC hypotheses framed as "to investigate." | P2 | S (2 hr) | Sonnet | 🔴 |
-| AI-3 | **Add output validation for AI coaching.** `ai_output_validator.py` built with BLOCK/WARN/PASS tiers. **⚠️ Not wired — not integrated into ai_calls.py.** | P1 | M (4-6 hr) | **Opus** | ⚠️ Built |
+| AI-3 | **Add output validation for AI coaching.** `ai_output_validator.py` built with BLOCK/WARN/PASS tiers. Wired into `daily-brief` — all 4 AI outputs validated before HTML build; blocked outputs replaced with safe fallbacks; logs as `[AI-3]`. | P1 | M (4-6 hr) | **Opus** | ⚠️ Partial (daily-brief wired) |
 | AI-4 | **Validate IC hypothesis engine outputs.** Minimum effect size threshold, minimum sample days, confidence intervals, 30-day expiry on unconfirmed hypotheses. | P2 | M (3-4 hr) | **Opus** | 🔴 |
 
 #### Epic: Platform Simplification
@@ -545,13 +545,12 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 | Status | Count | Items |
 |--------|-------|-------|
 | ✅ **Done** | 20 | SEC-1, SEC-2, SEC-3, SEC-5, IAM-1, IAM-2, REL-1, REL-2, REL-3, REL-4, OBS-2, COST-1, COST-3, MAINT-1, MAINT-2, DATA-1, DATA-3, AI-1 |
-| ⚠️ **Built, not wired** | 3 | OBS-1 (platform_logger), DATA-2 (ingestion_validator), AI-3 (ai_output_validator) |
-| ⚠️ **Partial** | 1 | MAINT-3 (lambdas/ cleaned, deploy/ still messy, 6 stale .zips) |
-| 🔴 **Open** | 11 | SEC-4, OBS-3, COST-2, MAINT-3 (finish), MAINT-4, AI-2, AI-4, SIMP-1, SIMP-2, PROD-1, PROD-2 |
+| ⚠️ **Partial rollout** | 4 | OBS-1 (daily-brief wired), DATA-2 (whoop/strava/macrofactor wired), AI-3 (daily-brief wired), MAINT-3 (lambdas/ cleaned, 6 stale .zips pending move) |
+| 🔴 **Open** | 11 | SEC-4, OBS-3, COST-2, MAINT-4, AI-2, AI-4, SIMP-1, SIMP-2, PROD-1, PROD-2 |
 
-**Immediate next (7 items, Sonnet, ~6 hr):** Wire 3 safety modules + update 4 stale docs + clean zips. See `handovers/2026-03-08_architecture_review_v2.md`.
+**Next hardening priorities:** Complete OBS-1/DATA-2/AI-3 rollout across remaining Lambdas. Finish MAINT-3 (.zip cleanup). Then AI-2 (causal language), SEC-4, COST-2.
 
-**Model breakdown for remaining:** 8 Sonnet tasks, 5 Opus tasks (MAINT-4, OBS-3, AI-4, PROD-1, PROD-2, SIMP-2).
+**Model breakdown for remaining open:** Sonnet: SEC-4, OBS-3, COST-2, AI-2, SIMP-1. Opus: MAINT-4, AI-4, SIMP-2, PROD-1, PROD-2.
 
 ---
 

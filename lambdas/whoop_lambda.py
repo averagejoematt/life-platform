@@ -341,14 +341,28 @@ def ingest_day(date_str, access_token, s3_client, table, verbose=True, call_dela
 
     # ── DynamoDB: daily item ───────────────────────────────────────────────────
     if normalized:
-        table.put_item(Item={
+        _whoop_item = {
             "pk": f"USER#{USER_ID}#SOURCE#whoop",
             "sk": f"DATE#{date_str}",
             "date": date_str,
             "schema_version": 1,
             **normalized,
-        })
-        log(f"[INFO] DynamoDB daily item written ({len(normalized)} fields)")
+        }
+        # DATA-2: Validate before write
+        try:
+            from ingestion_validator import validate_item as _validate_item
+            _vr = _validate_item("whoop", _whoop_item, date_str)
+            if _vr.should_skip_ddb:
+                log(f"[DATA-2] CRITICAL: Skipping whoop DDB write for {date_str}: {_vr.errors}")
+                _vr.archive_to_s3(s3_client, bucket=S3_BUCKET, item=_whoop_item)
+            else:
+                if _vr.warnings:
+                    log(f"[DATA-2] Validation warnings for whoop/{date_str}: {_vr.warnings}")
+                table.put_item(Item=_whoop_item)
+                log(f"[INFO] DynamoDB daily item written ({len(normalized)} fields)")
+        except ImportError:
+            table.put_item(Item=_whoop_item)
+            log(f"[INFO] DynamoDB daily item written ({len(normalized)} fields)")
 
     # ── DynamoDB: workout items ────────────────────────────────────────────────
     for workout in workout_records:

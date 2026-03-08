@@ -66,19 +66,18 @@ for fn in "${LAMBDAS[@]}"; do
 
     # Build merged layer list: existing + new (deduplicated by layer name prefix)
     # Strip any previous version of this same layer, then add new version
-    NEW_LAYERS=$(python3 -c "
-import json, sys
+    NEW_LAYERS=$(EXISTING_JSON="$EXISTING" NEW_ARN="$LAYER_ARN" python3 -c "
+import json, os
 
-raw = '$EXISTING'
+raw = os.environ.get('EXISTING_JSON', '[]')
 try:
     parsed = json.loads(raw)
 except Exception:
-    parsed = None
+    parsed = []
 existing = parsed if isinstance(parsed, list) else []
-new_arn = '$LAYER_ARN'
-layer_base = ':'.join(new_arn.split(':')[:-1])  # strip version number
+new_arn = os.environ.get('NEW_ARN', '')
+layer_base = ':'.join(new_arn.split(':')[:-1])
 
-# Remove old version of same layer, append new
 filtered = [a for a in existing if not a.startswith(layer_base)]
 filtered.append(new_arn)
 print(' '.join(filtered))

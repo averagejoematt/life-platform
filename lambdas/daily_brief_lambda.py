@@ -90,6 +90,23 @@ except ImportError:
     _HAS_INSIGHT_WRITER = False
     print("[WARN] insight_writer not available — insights will not be persisted")
 
+# AI-3: Output Validator — validates coaching text before delivery
+try:
+    from ai_output_validator import validate_daily_brief_outputs
+    _HAS_AI_VALIDATOR = True
+except ImportError:
+    _HAS_AI_VALIDATOR = False
+    print("[WARN] ai_output_validator not available — AI output validation skipped")
+
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("daily-brief")
+except ImportError:
+    import logging as _log
+    logger = _log.getLogger("daily-brief")
+    logger.setLevel(_log.INFO)
+
 # -- Extracted module imports ---------------------------------------------------
 import html_builder
 import ai_calls
@@ -1153,6 +1170,11 @@ def lambda_handler(event, context):
 
     today = datetime.now(timezone.utc).date()
     yesterday = (today - timedelta(days=1)).isoformat()
+    # OBS-1: Set correlation_id so all structured logs tie to this execution date
+    try:
+        logger.set_date(yesterday)
+    except Exception:
+        pass
 
     data = gather_daily_data(profile, yesterday)
     print("[INFO] Date: " + yesterday + " | sources: " +
@@ -1340,6 +1362,32 @@ def lambda_handler(event, context):
             print("[INFO] TL;DR+Guidance: " + str(tldr_guidance.get("tldr", ""))[:80])
         except Exception as e:
             print("[WARN] TL;DR+Guidance failed: " + str(e))
+
+    # AI-3: Validate all AI outputs before delivery
+    if api_key and _HAS_AI_VALIDATOR:
+        try:
+            _health_ctx = {
+                "recovery_score": (data.get("whoop") or {}).get("recovery_score"),
+                "tsb": data.get("tsb"),
+            }
+            _validated = validate_daily_brief_outputs(
+                bod_insight=bod_insight,
+                training_nutrition=training_nutrition,
+                journal_coach_text=journal_coach_text,
+                tldr_guidance=tldr_guidance,
+                health_context=_health_ctx,
+            )
+            bod_insight        = _validated["bod_insight"]
+            training_nutrition = _validated["training_nutrition"]
+            journal_coach_text = _validated["journal_coach_text"]
+            tldr_guidance      = _validated["tldr_guidance"]
+            _v_warnings        = _validated.get("validation_warnings", [])
+            if _v_warnings:
+                print(f"[AI-3] {len(_v_warnings)} validation warning(s): {_v_warnings[:5]}")
+            else:
+                print("[AI-3] All AI outputs passed validation")
+        except Exception as _v_e:
+            print(f"[WARN] AI-3 validation failed (non-fatal): {_v_e}")
 
     # Pre-compute rewards + protocol recs (passed to html_builder as params)
     triggered_rewards = []
