@@ -28,8 +28,6 @@ Logic:
 """
 
 import json
-import os
-import logging
 import math
 import statistics
 import time
@@ -39,23 +37,11 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
 # ── AWS clients ───────────────────────────────────────────────────────────────
-
-# ── Config (env vars with backwards-compatible defaults) ──
-REGION     = os.environ.get("AWS_REGION", "us-west-2")
-TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
-
-dynamodb = boto3.resource("dynamodb", region_name=REGION)
-table    = dynamodb.Table(TABLE_NAME)
-ses      = boto3.client("sesv2", region_name=REGION)
-secrets  = boto3.client("secretsmanager", region_name=REGION)
-
-# AI model constant — read from env so model can be updated without redeployment
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+dynamodb = boto3.resource("dynamodb", region_name="us-west-2")
+table    = dynamodb.Table("life-platform")
+ses      = boto3.client("sesv2", region_name="us-west-2")
+secrets  = boto3.client("secretsmanager", region_name="us-west-2")
 
 RECIPIENT = "awsdev@mattsusername.com"
 SENDER    = "awsdev@mattsusername.com"
@@ -82,8 +68,8 @@ METRICS = [
     ("whoop",       "recovery_score",       "Recovery Score",      True),
     ("whoop",       "hrv",                  "HRV",                 True),
     ("whoop",       "resting_heart_rate",   "Resting Heart Rate",  False),
-    ("whoop",       "sleep_quality_score",  "Sleep Score",         True),
-    ("whoop",       "sleep_efficiency_percentage", "Sleep Efficiency", True),
+    ("eightsleep",  "sleep_score",          "Sleep Score",         True),
+    ("eightsleep",  "sleep_efficiency",     "Sleep Efficiency",    True),
     ("withings",    "weight_lbs",           "Weight",              None),
     ("apple_health","steps",                "Steps",               True),
     ("apple_health","walking_speed_mph",    "Walking Speed",       True),
@@ -102,9 +88,8 @@ METRICS = [
 # ══════════════════════════════════════════════════════════════════════════════
 
 def get_anthropic_key():
-    secret_name = os.environ.get("ANTHROPIC_SECRET", "life-platform/api-keys")
-    secret = secrets.get_secret_value(SecretId=secret_name)
-    return json.loads(secret["SecretString"])["anthropic_api_key"]
+    secret = secrets.get_secret_value(SecretId="life-platform/anthropic")
+    return json.loads(secret["SecretString"])["api_key"]
 
 def d2f(obj):
     if isinstance(obj, list):    return [d2f(i) for i in obj]
@@ -114,7 +99,7 @@ def d2f(obj):
 
 
 # ── Travel awareness (v2.1.0) ─────────────────────────────────────────────────
-TRAVEL_PK = f"USER#{USER_ID}#SOURCE#travel"
+TRAVEL_PK = "USER#matthew#SOURCE#travel"
 
 def _check_travel(date_str):
     """Check if date falls within an active trip. Returns trip dict or None."""
@@ -137,7 +122,7 @@ def _check_travel(date_str):
 
 def fetch_date(source, date_str):
     try:
-        r = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#{source}", "sk": f"DATE#{date_str}"})
+        r = table.get_item(Key={"pk": f"USER#matthew#SOURCE#{source}", "sk": f"DATE#{date_str}"})
         return d2f(r.get("Item") or {})
     except Exception:
         return {}
@@ -147,7 +132,7 @@ def fetch_range(source, start, end):
         r = table.query(
             KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
             ExpressionAttributeValues={
-                ":pk": f"USER#{USER_ID}#SOURCE#{source}",
+                ":pk": f"USER#matthew#SOURCE#{source}",
                 ":s":  f"DATE#{start}",
                 ":e":  f"DATE#{end}"
             })
@@ -348,7 +333,7 @@ def call_anthropic_with_retry(req, timeout=30, max_attempts=2, backoff_s=5):
 
 def call_haiku_hypothesis(flagged, context, api_key):
     payload = json.dumps({
-        "model": AI_MODEL_HAIKU,
+        "model": "claude-haiku-4-5-20251001",
         "max_tokens": 250,
         "messages": [{
             "role": "user",
@@ -379,7 +364,7 @@ def call_haiku_hypothesis(flagged, context, api_key):
 def write_anomaly_record(date_str, flagged, alert_sent, hypothesis, severity,
                          travel_mode=False, travel_dest=None):
     item = {
-        "pk":               f"USER#{USER_ID}#SOURCE#anomalies",
+        "pk":               "USER#matthew#SOURCE#anomalies",
         "sk":               f"DATE#{date_str}",
         "date":             date_str,
         "anomalous_metrics": flagged,
@@ -469,7 +454,6 @@ def build_alert_html(flagged, hypothesis, date_str):
       <p style="color:#9ca3af;font-size:10px;margin:0;text-align:center;">
         Life Platform - Anomaly Detector v2.1.0 - Adaptive thresholds (CV-based) - 2+ source rule - Travel aware
       </p>
-      <p style="color:#b0b0b0;font-size:8px;margin:4px 0 0;text-align:center;">&#9874;&#65039; Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your health regimen.</p>
     </div>
   </div>
 </body>

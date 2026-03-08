@@ -1,19 +1,14 @@
 """
-Monthly Coach's Letter Lambda — v1.1.0 (Board Centralization)
+Monthly Coach's Letter Lambda — v1.0.0
 Fires first Sunday of each month at 16:00 UTC (8am PT).
 EventBridge cron: cron(0 16 ? * 1#1 *)
 
 Delivers a narrative coach's letter: 30-day current vs 30-day prior month,
-6-person council loaded from centralized S3 config, annual goals tracking,
+same 6-person council as weekly digest, annual goals tracking,
 condensed section summaries.
-
-v1.1.0: Board prompt now dynamically built from s3://matthew-life-platform/config/board_of_directors.json
-        Falls back to hardcoded _FALLBACK_MONTHLY_PROMPT if S3 read fails.
 """
 
 import json
-import os
-import logging
 import math
 import statistics
 import time
@@ -23,36 +18,11 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
 # ── AWS clients ───────────────────────────────────────────────────────────────
-
-# ── Config (env vars with backwards-compatible defaults) ──
-REGION     = os.environ.get("AWS_REGION", "us-west-2")
-TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
-
-dynamodb  = boto3.resource("dynamodb", region_name=REGION)
-table     = dynamodb.Table(TABLE_NAME)
-ses       = boto3.client("sesv2", region_name=REGION)
-secrets   = boto3.client("secretsmanager", region_name=REGION)
-s3_client = boto3.client("s3", region_name=REGION)
-S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
-
-# Board of Directors config loader
-try:
-    import board_loader
-    _HAS_BOARD_LOADER = True
-except ImportError:
-    _HAS_BOARD_LOADER = False
-
-try:
-    import insight_writer
-    insight_writer.init(table, "matthew")
-    _HAS_INSIGHT_WRITER = True
-except ImportError:
-    _HAS_INSIGHT_WRITER = False
+dynamodb = boto3.resource("dynamodb", region_name="us-west-2")
+table    = dynamodb.Table("life-platform")
+ses      = boto3.client("sesv2", region_name="us-west-2")
+secrets  = boto3.client("secretsmanager", region_name="us-west-2")
 
 RECIPIENT         = "awsdev@mattsusername.com"
 SENDER            = "awsdev@mattsusername.com"
@@ -68,9 +38,8 @@ ZONE2_HR_HIGH     = 129
 # ══════════════════════════════════════════════════════════════════════════════
 
 def get_anthropic_key():
-    secret_name = os.environ.get("ANTHROPIC_SECRET", "life-platform/api-keys")
-    secret = secrets.get_secret_value(SecretId=secret_name)
-    return json.loads(secret["SecretString"])["anthropic_api_key"]
+    secret = secrets.get_secret_value(SecretId="life-platform/anthropic")
+    return json.loads(secret["SecretString"])["api_key"]
 
 def d2f(obj):
     if isinstance(obj, list):    return [d2f(i) for i in obj]
@@ -82,7 +51,7 @@ def fetch_range(source, start, end):
     try:
         r = table.query(
             KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={":pk": f"USER#{USER_ID}#SOURCE#{source}",
+            ExpressionAttributeValues={":pk": f"USER#matthew#SOURCE#{source}",
                                        ":s": f"DATE#{start}", ":e": f"DATE#{end}"})
         return r.get("Items", [])
     except Exception: return []
@@ -146,44 +115,19 @@ def ex_withings(recs):
             "weight_max": max(weights, default=None), "body_fat_avg": avg(bodyfats),
             "measurements": len(recs)}
 
-def _normalize_whoop_sleep(item):
-    """Map Whoop DynamoDB fields to normalised sleep analysis fields (v2.55.0)."""
-    out = dict(item)
-    if "sleep_quality_score" in item and "sleep_score" not in item:
-        out["sleep_score"] = item["sleep_quality_score"]
-    if "sleep_efficiency_percentage" in item and "sleep_efficiency_pct" not in item:
-        out["sleep_efficiency_pct"] = item["sleep_efficiency_percentage"]
-    dur = None
-    try:
-        dur = float(item["sleep_duration_hours"]) if item.get("sleep_duration_hours") else None
-    except (ValueError, TypeError):
-        pass
-    if dur and dur > 0:
-        for src_field, pct_field in [
-            ("slow_wave_sleep_hours", "deep_pct"),
-            ("rem_sleep_hours",      "rem_pct"),
-        ]:
-            val = item.get(src_field)
-            if val is not None and pct_field not in item:
-                try:
-                    out[pct_field] = round(float(val) / dur * 100, 1)
-                except (ValueError, TypeError, ZeroDivisionError):
-                    pass
-    return out
-
-
-def ex_whoop_sleep(recs):
-    """Extract sleep metrics from Whoop records (SOT for sleep duration/staging v2.55.0)."""
+def ex_eightsleep(recs):
     if not recs: return None
-    normed = [_normalize_whoop_sleep(r) for r in recs]
-    scores = [float(r["sleep_score"]) for r in normed if "sleep_score" in r]
-    durs   = [float(r["sleep_duration_hours"]) for r in normed if "sleep_duration_hours" in r]
-    effs   = [float(r["sleep_efficiency_pct"]) for r in normed if "sleep_efficiency_pct" in r]
-    deep_pcts = [float(r["deep_pct"]) for r in normed if "deep_pct" in r]
-    rem_pcts  = [float(r["rem_pct"])  for r in normed if "rem_pct"  in r]
+    scores = [float(r["sleep_score"])             for r in recs if "sleep_score"          in r]
+    durs   = [float(r["total_sleep_seconds"])/3600 for r in recs if "total_sleep_seconds" in r]
+    effs   = [float(r["sleep_efficiency"])         for r in recs if "sleep_efficiency"     in r]
+    rems   = [float(r["rem_sleep_seconds"])/3600   for r in recs if "rem_sleep_seconds"   in r]
+    deeps  = [float(r["deep_sleep_seconds"])/3600  for r in recs if "deep_sleep_seconds"  in r]
+    total_avg = avg(durs) or 0
+    rem_pct  = round(avg(rems)  / total_avg * 100, 1) if total_avg and avg(rems)  else None
+    deep_pct = round(avg(deeps) / total_avg * 100, 1) if total_avg and avg(deeps) else None
     return {"score_avg": avg(scores), "duration_avg_hrs": avg(durs),
-            "efficiency_avg": avg(effs), "rem_pct": avg(rem_pcts),
-            "deep_pct": avg(deep_pcts), "nights": len(recs)}
+            "efficiency_avg": avg(effs), "rem_pct": rem_pct,
+            "deep_pct": deep_pct, "nights": len(recs)}
 
 def ex_strava(recs):
     if not recs: return None
@@ -226,32 +170,6 @@ def ex_macrofactor(recs):
             "days_logged": days,
             "protein_hit_rate": round(sum(1 for p in prots if p>=PROTEIN_TARGET_G)/days*100) if days else None,
             "calorie_hit_rate": round(sum(1 for c in cals  if c<=CALORIE_TARGET   )/days*100) if days else None}
-
-def ex_character_sheet(recs):
-    """Extract character sheet metrics from pre-computed DynamoDB records."""
-    if not recs: return None
-    recs.sort(key=lambda r: r.get("sk", ""))
-    latest = recs[-1]
-    char_level = float(latest.get("character_level") or latest.get("level") or 0)
-    char_xp    = float(latest.get("character_xp")    or latest.get("xp")    or 0)
-    char_tier  = str(latest.get("character_tier")    or latest.get("tier")  or "Foundation")
-    char_tier_emoji = str(latest.get("character_tier_emoji") or "🔨")
-    pillars = {}
-    for p in ("sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"):
-        pd = latest.get(f"pillar_{p}") or {}
-        if isinstance(pd, dict):
-            pillars[p] = {"level": float(pd.get("level") or 0), "tier": str(pd.get("tier") or "Foundation")}
-    xp_vals = [float(r.get("character_xp") or 0) for r in recs]
-    xp_delta = round(xp_vals[-1] - xp_vals[0], 0) if len(xp_vals) >= 2 else 0
-    return {
-        "character_level": char_level,
-        "character_xp":    char_xp,
-        "character_tier":  f"{char_tier_emoji} {char_tier}",
-        "xp_delta_30d":    xp_delta,
-        "pillars":         pillars,
-        "days_tracked":    len(recs),
-    }
-
 
 def ex_chronicling(recs):
     if not recs: return None
@@ -307,7 +225,7 @@ def compute_annual_goals(cur, windows):
     w = cur.get("withings")
     if w and w.get("weight_latest"):
         try:
-            p = table.get_item(Key={"pk":f"USER#{USER_ID}","sk":"PROFILE"}).get("Item",{})
+            p = table.get_item(Key={"pk":"USER#matthew","sk":"PROFILE"}).get("Item",{})
             journey_start_weight = float(p.get("journey_start_weight_lbs", 300))
             goal_weight = float(p.get("goal_weight_lbs", GOAL_WEIGHT_LBS))
             journey_start_date_str = str(p.get("journey_start_date",""))
@@ -350,83 +268,7 @@ def compute_annual_goals(cur, windows):
 # HAIKU — MONTHLY COUNCIL PROMPT
 # ══════════════════════════════════════════════════════════════════════════════
 
-
-def _build_monthly_prompt_from_config():
-    """Build the monthly council prompt dynamically from S3 board config.
-
-    Returns the prompt template string (with {data_json} and {goals_json} placeholders),
-    or None if config unavailable.
-    """
-    if not _HAS_BOARD_LOADER:
-        return None
-
-    config = board_loader.load_board(s3_client, S3_BUCKET)
-    if not config:
-        return None
-
-    members = board_loader.get_feature_members(config, "monthly_digest")
-    if not members:
-        logger.warning("[monthly] No members configured for 'monthly_digest' feature")
-        return None
-
-    # Build per-member section instructions
-    section_blocks = []
-    for mid, member, feat_cfg in members:
-        header = feat_cfg.get("section_header", f"{member.get('emoji', '')} {member['name'].upper()}")
-        focus = feat_cfg.get("prompt_focus", "Provide your monthly analysis.")
-        voice = board_loader.build_member_voice(member)
-        block = f"{header}\n{focus}"
-        if voice:
-            block += f"\n{voice}"
-        section_blocks.append(block)
-
-    sections_text = "\n\n".join(section_blocks)
-
-    prompt = f"""You are the coordinating intelligence for Matthew's Monthly Health Board of Advisors.
-
-CONTEXT:
-Matthew Walker, 36, Seattle. Senior Director at a SaaS company. Goal: lose ~117 lbs (302→185),
-build muscle, improve sleep and stress management. Current phase: Phase 1 Ignition (1800 cal/day,
-190g protein, 3 lbs/week target). He tracks obsessively but struggles to translate data into
-consistent behavioural change.
-
-This is a MONTHLY review — not a weekly summary. Your job is to identify the arc and narrative
-of the past 30 days, not describe individual weeks. Look for:
-- Month-over-month directional change (improving / plateauing / declining)
-- Cross-domain patterns that span the full month
-- Progress against annual goals (weight trajectory, training consistency, habit adherence)
-- What to focus on for the NEXT 30 days
-
-THIS MONTH'S DATA vs PRIOR MONTH:
-{{data_json}}
-
-ANNUAL GOALS CONTEXT:
-{{goals_json}}
-
-RULES FOR ALL ADVISORS:
-- This is a MONTHLY reflection — write about the month's arc, not week-by-week detail.
-- Do NOT summarise numbers Matthew can already read in the data tables below.
-- DO identify trends, momentum, and cross-domain patterns across the full 30 days.
-- Reference specific numbers only when they illuminate a larger pattern.
-- If data is missing, mock, or unavailable, say so and note what it prevents you from seeing.
-- Each advisor has a distinct domain and must NOT repeat observations from others.
-- Be direct. A month of data deserves a month's worth of insight.
-
-Write exactly these sections with these exact headers:
-
-{sections_text}
-
-💡 INSIGHT OF THE MONTH
-One sentence. Actionable over the next 30 days. Must cite real numbers. This is the single most important thing Matthew can change to make next month's letter better.
-
-Be honest. A month of data deserves a month's worth of insight."""
-
-    logger.info("[monthly] Built prompt from config with %d board members", len(members))
-    return prompt
-
-
-# Fallback prompt (original hardcoded version, used if S3 config unavailable)
-_FALLBACK_MONTHLY_PROMPT = """You are the coordinating intelligence for Matthew's Monthly Health Board of Advisors.
+MONTHLY_PROMPT = """You are the coordinating intelligence for Matthew's Monthly Health Board of Advisors.
 
 CONTEXT:
 Matthew Walker, 36, Seattle. Senior Director at a SaaS company. Goal: lose ~80 lbs, build muscle,
@@ -486,10 +328,24 @@ One sentence. Actionable over the next 30 days. Must cite real numbers. This is 
 Be honest. A month of data deserves a month's worth of insight."""
 
 
-def call_anthropic_with_retry(req, timeout=55, max_attempts=None, backoff_s=None):
-    # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
-    import retry_utils
-    return retry_utils.call_anthropic_raw(req, timeout=timeout)
+def call_anthropic_with_retry(req, timeout=30, max_attempts=2, backoff_s=5):
+    """Call Anthropic API with 2-attempt retry and 5s backoff on transient errors."""
+    for attempt in range(1, max_attempts + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            print(f"[WARN] Anthropic API HTTP {e.code} on attempt {attempt}/{max_attempts}")
+            if attempt < max_attempts and e.code in (429, 529, 500, 502, 503, 504):
+                time.sleep(backoff_s)
+            else:
+                raise
+        except urllib.error.URLError as e:
+            print(f"[WARN] Anthropic API network error on attempt {attempt}/{max_attempts}: {e}")
+            if attempt < max_attempts:
+                time.sleep(backoff_s)
+            else:
+                raise
 
 
 def call_haiku_monthly(data, goals, api_key):
@@ -502,33 +358,13 @@ def call_haiku_monthly(data, goals, api_key):
         if st and "activities" in st:
             del st["activities"]
 
-    # Try config-driven prompt first, fall back to hardcoded
-    prompt_template = _build_monthly_prompt_from_config()
-    if prompt_template:
-        print("[INFO] Using config-driven monthly board prompt")
-    else:
-        print("[INFO] Using fallback hardcoded monthly board prompt")
-        prompt_template = _FALLBACK_MONTHLY_PROMPT
-
-    prompt = prompt_template.format(
-        data_json=json.dumps(clean_data, indent=2),
-        goals_json=json.dumps(clean_goals, indent=2)
-    )
-
-    # IC-16: Progressive context — quarterly insights window
-    if _HAS_INSIGHT_WRITER:
-        try:
-            prev_ctx = insight_writer.build_insights_context(
-                days=90, max_items=10, label="PREVIOUS INSIGHTS (last 90 days)")
-            if prev_ctx:
-                prompt = prev_ctx + "\n\n" + prompt
-        except Exception as e:
-            print(f"[WARN] IC-16 failed: {e}")
-
     payload = json.dumps({
-        "model": os.environ.get("AI_MODEL", "claude-sonnet-4-6"),
+        "model": "claude-haiku-4-5-20251001",
         "max_tokens": 2500,
-        "messages": [{"role": "user", "content": prompt}]
+        "messages": [{"role": "user", "content": MONTHLY_PROMPT.format(
+            data_json=json.dumps(clean_data, indent=2),
+            goals_json=json.dumps(clean_goals, indent=2)
+        )}]
     }).encode()
     req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=payload,
         headers={"Content-Type": "application/json", "x-api-key": api_key,
@@ -547,7 +383,7 @@ def gather_all():
     sources = ["whoop","withings","strava","eightsleep","hevy","macrofactor","todoist","chronicling"]
     extractors = {
         "whoop": ex_whoop, "withings": ex_withings, "strava": ex_strava,
-        "hevy": ex_hevy, "macrofactor": ex_macrofactor,
+        "eightsleep": ex_eightsleep, "hevy": ex_hevy, "macrofactor": ex_macrofactor,
         "chronicling": ex_chronicling,
     }
 
@@ -557,32 +393,11 @@ def gather_all():
     cur   = {s: extractors[s](raw_cur[s])   for s in extractors}
     prior = {s: extractors[s](raw_prior[s]) for s in extractors}
 
-    # Sleep: extracted from Whoop (SOT for duration/staging v2.55.0)
-    cur["sleep"]   = ex_whoop_sleep(raw_cur["whoop"])
-    prior["sleep"] = ex_whoop_sleep(raw_prior["whoop"])
-
     # Todoist (simple count, no extractor above)
     td_cur   = raw_cur.get("todoist",  [])
     td_prior = raw_prior.get("todoist",[])
     cur["todoist"]   = {"tasks_completed": sum(int(r.get("tasks_completed",0)) for r in td_cur),   "days": len(td_cur)}
     prior["todoist"] = {"tasks_completed": sum(int(r.get("tasks_completed",0)) for r in td_prior), "days": len(td_prior)}
-
-    # Character sheet (pre-computed daily records)
-    cs_recs_cur = cs_recs_prior = []
-    try:
-        cs_pk = f"USER#{USER_ID}#SOURCE#character_sheet"
-        def _cs_fetch(s, e):
-            resp = table.query(
-                KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-                ExpressionAttributeValues={":pk": cs_pk, ":s": f"DATE#{s}", ":e": f"DATE#{e}"}
-            )
-            return [d2f(i) for i in resp.get("Items", [])]
-        cs_recs_cur   = _cs_fetch(wins["cur_start"],   wins["cur_end"])
-        cs_recs_prior = _cs_fetch(wins["prior_start"], wins["prior_end"])
-    except Exception as e_cs:
-        print(f"[WARN] Character sheet fetch failed: {e_cs}")
-    cur["character_sheet"]   = ex_character_sheet(cs_recs_cur)
-    prior["character_sheet"] = ex_character_sheet(cs_recs_prior)
 
     # Banister (60d Strava)
     strava_60d = fetch_range("strava",
@@ -591,7 +406,7 @@ def gather_all():
 
     # Profile
     try:
-        p = table.get_item(Key={"pk":f"USER#{USER_ID}","sk":"PROFILE"}).get("Item",{})
+        p = table.get_item(Key={"pk":"USER#matthew","sk":"PROFILE"}).get("Item",{})
         profile = {
             "goal_weight_lbs": float(p.get("goal_weight_lbs", GOAL_WEIGHT_LBS)),
             "journey_start_weight_lbs": float(p["journey_start_weight_lbs"]) if p.get("journey_start_weight_lbs") else None,
@@ -691,8 +506,8 @@ def build_html(data, goals, commentary, windows):
 
     w_c  = cur.get("whoop")
     w_p  = prior.get("whoop")  or {}
-    s_c  = cur.get("sleep")
-    s_p  = prior.get("sleep") or {}
+    s_c  = cur.get("eightsleep")
+    s_p  = prior.get("eightsleep") or {}
     st_c = cur.get("strava")
     st_p = prior.get("strava") or {}
     ch_c = cur.get("chronicling")
@@ -818,37 +633,6 @@ def build_html(data, goals, commentary, windows):
         hab_rows = '<tr><td colspan="2" style="padding:12px;color:#999;font-size:13px;font-style:italic;">Chronicling data not available</td></tr>'
     habits_section = section("Habits & P40 — 30 Days","🎯", tbl(hab_rows))
 
-    # ── Character Sheet ──
-    cs_c = cur.get("character_sheet")
-    cs_p = prior.get("character_sheet") or {}
-    cs_html = ""
-    if cs_c:
-        level = cs_c.get("character_level", 0)
-        tier  = cs_c.get("character_tier", "🔨 Foundation")
-        xp    = cs_c.get("character_xp", 0)
-        xp_d  = cs_c.get("xp_delta_30d", 0)
-        p_level = cs_p.get("character_level")
-        xp_str = f"+{int(xp_d)} XP" if xp_d >= 0 else f"{int(xp_d)} XP"
-        xp_col = "#27ae60" if xp_d >= 0 else "#e74c3c"
-        lvl_delta = delta(level, p_level) if p_level else ""
-        cs_rows  = row("Character Level",
-            f'<span style="font-size:15px;font-weight:700;">Level {int(level)}</span> — {tier}',
-            lvl_delta, highlight=True)
-        cs_rows += row("XP This Month", f'<span style="color:{xp_col};font-weight:700;">{xp_str}</span>')
-        cs_rows += row("Total XP", f'{int(xp):,}')
-        _PILLAR_EMOJI = {"sleep":"😴","movement":"🏋️","nutrition":"🥗",
-                         "metabolic":"📊","mind":"🧠","relationships":"💬","consistency":"🎯"}
-        for pname in ("sleep","movement","nutrition","metabolic","mind","relationships","consistency"):
-            pd = cs_c.get("pillars", {}).get(pname)
-            if not pd: continue
-            plvl  = pd.get("level", 0)
-            ptier = pd.get("tier", "")
-            prev  = (cs_p.get("pillars") or {}).get(pname, {}).get("level") if cs_p else None
-            dlt   = delta(plvl, prev) if prev else ""
-            emoji = _PILLAR_EMOJI.get(pname, "")
-            cs_rows += row(f"{emoji} {pname.capitalize()}", f"Level {int(plvl)} — {ptier}", dlt)
-        cs_html = section("Character Sheet — 30 Days","🎮", tbl(cs_rows))
-
     return f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -872,12 +656,10 @@ def build_html(data, goals, commentary, windows):
       {weight_section}
       {nutrition_section}
       {habits_section}
-      {cs_html}
     </div>
 
     <div style="background:#f8f8fc;padding:16px 32px;border-top:1px solid #e8e8f0;">
       <p style="color:#999;font-size:11px;margin:0;">Life Platform Monthly · All sources · AWS us-west-2</p>
-      <p style="color:#bbb;font-size:9px;margin:6px 0 0;">⚕️ Personal health tracking only — not medical advice. Consult a qualified healthcare professional before making changes to your diet, exercise, or supplement regimen.</p>
     </div>
   </div>
 </body>
@@ -889,15 +671,7 @@ def build_html(data, goals, commentary, windows):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def lambda_handler(event, context):
-    # P1.6: Scheduler fires on the 1st of each month (America/Los_Angeles).
-    # Guard: only send on Mondays so cadence matches original "1st Monday" intent.
-    from datetime import date
-    today = date.today()
-    if today.weekday() != 0:  # 0 = Monday
-        print(f"[SKIP] Monthly digest: today is {today.strftime('%A')} — only runs on Mondays. Exiting.")
-        return {"statusCode": 200, "body": "skipped — not Monday"}
-
-    print("[INFO] Monthly Coach's Letter v1.1.0 (Board Centralization) starting...")
+    print("[INFO] Monthly Coach's Letter v1 starting...")
     data, goals = gather_all()
     windows = data["windows"]
     print(f"[INFO] {windows['month_label']} | {windows['cur_start']} → {windows['cur_end']}")
@@ -923,18 +697,4 @@ def lambda_handler(event, context):
         }},
     )
     print(f"[INFO] Sent: Monthly Coach's Letter · {month}")
-
-    # IC-15: Persist monthly insights
-    if _HAS_INSIGHT_WRITER and commentary and "unavailable" not in commentary[:50]:
-        try:
-            insight_writer.write_insight(
-                digest_type="monthly_digest", insight_type="coaching",
-                text=commentary[:800],
-                pillars=["sleep", "movement", "nutrition", "mind", "metabolic", "consistency"],
-                tags=["monthly", "board", "coaching"],
-                confidence="high", actionable=True, date=month)
-            print("[INFO] IC-15: monthly insight persisted")
-        except Exception as e:
-            print(f"[WARN] IC-15 failed: {e}")
-
     return {"statusCode": 200, "body": f"Monthly letter sent: {month}"}

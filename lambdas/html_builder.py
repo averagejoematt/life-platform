@@ -1103,6 +1103,8 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
         active_sources.append("Notion")
     source_str = " &middot; ".join(active_sources) if active_sources else "No data sources"
     html += '<div style="background:#f8f8fc;padding:10px 24px;border-top:1px solid #e8e8f0;margin-top:12px;">'
-    html += '<p style="color:#9ca3af;font-size:9px;margin:0;text-align:center;">Life Platform v2.36 &middot; ' + date_str + ' &middot; ' + source_str + '</p></div>'
+    html += '<p style="color:#9ca3af;font-size:9px;margin:0;text-align:center;">Life Platform v2.36 &middot; ' + date_str + ' &middot; ' + source_str + '</p>'
+    html += '<p style="color:#b0b0b0;font-size:8px;margin:4px 0 0;text-align:center;">&#9874;&#65039; Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your diet, exercise, or supplement regimen.</p>'
+    html += '</div>'
     html += '</div></body></html>'
     return html

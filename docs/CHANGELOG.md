@@ -1,5 +1,30 @@
 # Life Platform — Changelog
 
+## v2.95.0 — 2026-03-08: Hardening Batch 1 (AI-1 + MAINT-3 + COST-1 + SEC-4 + IAM-2)
+
+### AI-1: Health Disclaimers (all 8 email Lambdas)
+- Added "⚕️ Personal health tracking only — not medical advice" footer line to every email Lambda
+- Files updated: `html_builder.py` (Daily Brief), `weekly_digest_lambda.py`, `monday_compass_lambda.py`, `nutrition_review_lambda.py`, `wednesday_chronicle_lambda.py`, `weekly_plate_lambda.py`, `anomaly_detector_lambda.py`
+- Monthly Digest already had disclaimer (added previously)
+
+### MAINT-3: Stale File Cleanup
+- `deploy/maint3_cleanup.sh` — archives `.backup`, `.broken`, old `.zip`, superseded versioned deploy scripts, and orphaned copies (scoring_engine.py, patch scripts) to `archive/YYYYMMDD/`
+- `generate_habit_registry.py` moved to `seeds/` (one-off seed script, not a deploy script)
+
+### COST-1: S3 Glacier Lifecycle Rule
+- `deploy/cost1_s3_lifecycle.sh` — applies lifecycle rule: `raw/` objects >90 days → Glacier Instant Retrieval
+
+### SEC-4: API Gateway Rate Limiting
+- `deploy/sec4_api_gateway_throttle.sh` — applies 1.67 req/s sustained + burst 10 to Health Auto Export HTTP API (`health-auto-export-api`, `$default` stage)
+
+### IAM-2: IAM Access Analyzer
+- `deploy/iam2_access_analyzer.sh` — creates `life-platform-analyzer` (ACCOUNT type, us-west-2); free service that identifies unused permissions and external access
+
+### Deploy
+- `deploy/deploy_v2.95.0.sh` — redeploys all 7 email Lambdas with updated disclaimers
+
+---
+
 ## v2.94.1 — 2026-03-08: Architecture Review
 
 ### Full Architecture Review Conducted

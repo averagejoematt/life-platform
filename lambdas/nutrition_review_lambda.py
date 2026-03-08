@@ -657,6 +657,7 @@ def build_email_html(summary_table, ai_content, dates, weight_info):
     {ai_content}
     <div style="text-align:center;padding:16px 0;border-top:1px solid #2a2d4a;margin-top:24px;">
         <div style="color:#6b7280;font-size:11px;">Life Platform - Saturday Nutrition Review</div>
+        <div style="color:#9ca3af;font-size:9px;margin-top:6px;">&#9874;&#65039; Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your diet, exercise, or supplement regimen.</div>
     </div>
 </div>'''
 

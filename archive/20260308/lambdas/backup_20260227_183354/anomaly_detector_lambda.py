@@ -54,9 +54,6 @@ table    = dynamodb.Table(TABLE_NAME)
 ses      = boto3.client("sesv2", region_name=REGION)
 secrets  = boto3.client("secretsmanager", region_name=REGION)
 
-# AI model constant — read from env so model can be updated without redeployment
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
-
 RECIPIENT = "awsdev@mattsusername.com"
 SENDER    = "awsdev@mattsusername.com"
 MIN_BASELINE_DAYS = 7
@@ -82,8 +79,8 @@ METRICS = [
     ("whoop",       "recovery_score",       "Recovery Score",      True),
     ("whoop",       "hrv",                  "HRV",                 True),
     ("whoop",       "resting_heart_rate",   "Resting Heart Rate",  False),
-    ("whoop",       "sleep_quality_score",  "Sleep Score",         True),
-    ("whoop",       "sleep_efficiency_percentage", "Sleep Efficiency", True),
+    ("eightsleep",  "sleep_score",          "Sleep Score",         True),
+    ("eightsleep",  "sleep_efficiency",     "Sleep Efficiency",    True),
     ("withings",    "weight_lbs",           "Weight",              None),
     ("apple_health","steps",                "Steps",               True),
     ("apple_health","walking_speed_mph",    "Walking Speed",       True),
@@ -102,9 +99,8 @@ METRICS = [
 # ══════════════════════════════════════════════════════════════════════════════
 
 def get_anthropic_key():
-    secret_name = os.environ.get("ANTHROPIC_SECRET", "life-platform/api-keys")
-    secret = secrets.get_secret_value(SecretId=secret_name)
-    return json.loads(secret["SecretString"])["anthropic_api_key"]
+    secret = secrets.get_secret_value(SecretId="life-platform/anthropic")
+    return json.loads(secret["SecretString"])["api_key"]
 
 def d2f(obj):
     if isinstance(obj, list):    return [d2f(i) for i in obj]
@@ -348,7 +344,7 @@ def call_anthropic_with_retry(req, timeout=30, max_attempts=2, backoff_s=5):
 
 def call_haiku_hypothesis(flagged, context, api_key):
     payload = json.dumps({
-        "model": AI_MODEL_HAIKU,
+        "model": "claude-haiku-4-5-20251001",
         "max_tokens": 250,
         "messages": [{
             "role": "user",
@@ -469,7 +465,6 @@ def build_alert_html(flagged, hypothesis, date_str):
       <p style="color:#9ca3af;font-size:10px;margin:0;text-align:center;">
         Life Platform - Anomaly Detector v2.1.0 - Adaptive thresholds (CV-based) - 2+ source rule - Travel aware
       </p>
-      <p style="color:#b0b0b0;font-size:8px;margin:4px 0 0;text-align:center;">&#9874;&#65039; Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your health regimen.</p>
     </div>
   </div>
 </body>
