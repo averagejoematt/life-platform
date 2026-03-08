@@ -421,6 +421,348 @@ def _build_habit_outcome_context(data, profile):
 
 
 # ==============================================================================
+# IC-24: DATA QUALITY SCORING
+# Per-source confidence scores injected into AI prompts so the model knows
+# when data is incomplete or suspicious. Eliminates coaching on logging gaps.
+# ==============================================================================
+
+def _compute_data_quality(data, profile):
+    """Compute per-source data quality / confidence for yesterday's data.
+
+    Returns a compact prompt block and a dict of source -> confidence (0-1).
+    AI calls use the block to calibrate advice confidence.
+    """
+    signals = []
+    scores = {}
+
+    # --- Nutrition (MacroFactor) ---
+    mf = data.get("macrofactor") or {}
+    cal = _safe_float(mf, "total_calories_kcal")
+    protein = _safe_float(mf, "total_protein_g")
+    food_log = mf.get("food_log", [])
+    cal_target = profile.get("calorie_target", 1800)
+
+    if cal is None or cal == 0:
+        signals.append("\u274c Nutrition (MacroFactor): NO DATA logged")
+        scores["nutrition"] = 0.0
+    else:
+        # Check against 7-day average for consistency
+        apple_7d = data.get("apple_7d") or []
+        # Use simple heuristic: if calories < 50% of target, likely incomplete
+        if cal < cal_target * 0.50:
+            signals.append(f"\u26a0\ufe0f Nutrition: {int(cal)} cal logged \u2014 likely INCOMPLETE (target {cal_target}). Treat with skepticism.")
+            scores["nutrition"] = 0.3
+        elif cal < cal_target * 0.75:
+            signals.append(f"\u26a0\ufe0f Nutrition: {int(cal)} cal \u2014 possibly incomplete or aggressive restriction. Verify before coaching.")
+            scores["nutrition"] = 0.6
+        else:
+            meal_count = len(food_log) if food_log else 0
+            if meal_count < 2 and cal > 500:
+                signals.append(f"\u26a0\ufe0f Nutrition: {int(cal)} cal but only {meal_count} meal(s) logged \u2014 may be partial logging")
+                scores["nutrition"] = 0.7
+            else:
+                scores["nutrition"] = 1.0
+
+    # --- Sleep (Whoop) ---
+    sleep = data.get("sleep") or {}
+    sleep_score = _safe_float(sleep, "sleep_score")
+    sleep_dur = _safe_float(sleep, "sleep_duration_hours")
+
+    if sleep_score is None and sleep_dur is None:
+        signals.append("\u274c Sleep (Whoop): NO DATA \u2014 device may not have synced")
+        scores["sleep"] = 0.0
+    elif sleep_dur is not None and sleep_dur < 2.0:
+        signals.append(f"\u26a0\ufe0f Sleep: {sleep_dur}h logged \u2014 suspiciously short, possible sync issue")
+        scores["sleep"] = 0.4
+    else:
+        scores["sleep"] = 1.0
+
+    # --- Activity (Strava) ---
+    strava = data.get("strava") or {}
+    activity_count = strava.get("activity_count", 0)
+    # No activity isn't a quality issue \u2014 could be a rest day
+    scores["activity"] = 1.0
+
+    # --- Apple Health (steps, CGM, gait) ---
+    apple = data.get("apple") or {}
+    steps = _safe_float(apple, "steps")
+    glucose_avg = _safe_float(apple, "blood_glucose_avg")
+
+    if not apple or (steps is None and glucose_avg is None):
+        signals.append("\u274c Apple Health: NO DATA \u2014 phone sync gap")
+        scores["apple_health"] = 0.0
+    else:
+        missing = []
+        if steps is None:
+            missing.append("steps")
+        if glucose_avg is None:
+            missing.append("CGM")
+        if _safe_float(apple, "water_intake_ml") is None:
+            missing.append("water")
+        if missing:
+            signals.append(f"\u26a0\ufe0f Apple Health: partial \u2014 missing {', '.join(missing)}")
+            scores["apple_health"] = 0.6
+        else:
+            scores["apple_health"] = 1.0
+
+    # --- Habitify ---
+    habitify = data.get("habitify") or {}
+    if not habitify or habitify.get("total_possible", 0) == 0:
+        signals.append("\u26a0\ufe0f Habits (Habitify): NO DATA")
+        scores["habits"] = 0.0
+    else:
+        scores["habits"] = 1.0
+
+    # --- Journal ---
+    journal_entries = data.get("journal_entries", [])
+    if not journal_entries:
+        scores["journal"] = 0.0
+        # Not a signal \u2014 missing journal is common and handled elsewhere
+    else:
+        scores["journal"] = 1.0
+
+    # Build overall score
+    weighted_sources = {
+        "nutrition": 0.25, "sleep": 0.25, "apple_health": 0.20,
+        "habits": 0.15, "activity": 0.10, "journal": 0.05,
+    }
+    overall = sum(scores.get(s, 0) * w for s, w in weighted_sources.items())
+
+    # Build prompt block
+    if not signals:
+        block = f"DATA QUALITY: {int(overall * 100)}% \u2014 all sources complete and consistent."
+    else:
+        lines = [f"DATA QUALITY: {int(overall * 100)}%"]
+        for s in signals:
+            lines.append(f"  {s}")
+        lines.append("INSTRUCTION: Adjust confidence of advice for flagged sources. Do NOT coach assertively on incomplete data.")
+        block = "\n".join(lines)
+
+    return block, scores
+
+
+# ==============================================================================
+# IC-23: ATTENTION-WEIGHTED PROMPT BUDGETING
+# Computes "surprise scores" for metrics \u2014 how far they deviate from personal
+# rolling baseline. High-surprise gets expanded context; low-surprise compresses.
+# Information theory applied to prompt engineering.
+# ==============================================================================
+
+def _compute_surprise_scores(data):
+    """Compute per-metric surprise scores (0-1) based on deviation from 7-day baselines.
+
+    Returns a dict of domain -> {surprise: float, direction: up|down|normal, detail: str}.
+    Prompt builders use this to allocate context dynamically.
+    """
+    surprises = {}
+
+    # --- HRV ---
+    hrv_data = data.get("hrv", {})
+    hrv_yesterday = hrv_data.get("hrv_yesterday")
+    hrv_7d = hrv_data.get("hrv_7d")
+    if hrv_yesterday is not None and hrv_7d and hrv_7d > 0:
+        dev = abs(hrv_yesterday - hrv_7d) / hrv_7d
+        direction = "up" if hrv_yesterday > hrv_7d else "down"
+        surprises["hrv"] = {
+            "surprise": min(1.0, dev * 2.5),  # 40% deviation = surprise 1.0
+            "direction": direction,
+            "detail": f"{hrv_yesterday:.0f}ms vs 7d avg {hrv_7d:.0f}ms ({'+' if direction == 'up' else '-'}{dev*100:.0f}%)",
+        }
+
+    # --- Sleep ---
+    sleep = data.get("sleep") or {}
+    sleep_score = _safe_float(sleep, "sleep_score")
+    sleep_7d = data.get("sleep_7d") or []
+    if sleep_score is not None and sleep_7d:
+        scores_7d = [_safe_float(s, "sleep_score") for s in sleep_7d if _safe_float(s, "sleep_score") is not None]
+        if scores_7d:
+            avg_score = sum(scores_7d) / len(scores_7d)
+            if avg_score > 0:
+                dev = abs(sleep_score - avg_score) / avg_score
+                direction = "up" if sleep_score > avg_score else "down"
+                surprises["sleep"] = {
+                    "surprise": min(1.0, dev * 3.0),  # 33% deviation = surprise 1.0
+                    "direction": direction,
+                    "detail": f"Score {sleep_score:.0f} vs 7d avg {avg_score:.0f} ({'+' if direction == 'up' else '-'}{dev*100:.0f}%)",
+                }
+
+    # --- Nutrition (calories) ---
+    mf = data.get("macrofactor") or {}
+    cal = _safe_float(mf, "total_calories_kcal")
+    cal_target = 1800  # Will be overridden by profile in caller if needed
+    if cal is not None and cal > 0:
+        dev_from_target = abs(cal - cal_target) / cal_target
+        direction = "up" if cal > cal_target else "down"
+        surprises["nutrition"] = {
+            "surprise": min(1.0, dev_from_target * 2.0),  # 50% off target = surprise 1.0
+            "direction": direction,
+            "detail": f"{int(cal)} cal vs {cal_target} target ({'+' if direction == 'up' else '-'}{dev_from_target*100:.0f}%)",
+        }
+
+    # --- Steps ---
+    apple = data.get("apple") or {}
+    steps = _safe_float(apple, "steps")
+    apple_7d = data.get("apple_7d") or []
+    if steps is not None and apple_7d:
+        steps_7d = [_safe_float(d, "steps") for d in apple_7d if _safe_float(d, "steps") is not None]
+        if steps_7d:
+            avg_steps = sum(steps_7d) / len(steps_7d)
+            if avg_steps > 0:
+                dev = abs(steps - avg_steps) / avg_steps
+                direction = "up" if steps > avg_steps else "down"
+                surprises["steps"] = {
+                    "surprise": min(1.0, dev * 2.0),
+                    "direction": direction,
+                    "detail": f"{int(steps)} vs 7d avg {int(avg_steps)} ({'+' if direction == 'up' else '-'}{dev*100:.0f}%)",
+                }
+
+    # --- Glucose ---
+    glucose_avg = _safe_float(apple, "blood_glucose_avg")
+    if glucose_avg is not None and apple_7d:
+        gluc_7d = [_safe_float(d, "blood_glucose_avg") for d in apple_7d if _safe_float(d, "blood_glucose_avg") is not None]
+        if gluc_7d:
+            avg_gluc = sum(gluc_7d) / len(gluc_7d)
+            if avg_gluc > 0:
+                dev = abs(glucose_avg - avg_gluc) / avg_gluc
+                direction = "up" if glucose_avg > avg_gluc else "down"
+                surprises["glucose"] = {
+                    "surprise": min(1.0, dev * 5.0),  # Glucose is tighter: 20% deviation = surprise 1.0
+                    "direction": direction,
+                    "detail": f"{glucose_avg:.0f} mg/dL vs 7d avg {avg_gluc:.0f} ({'+' if direction == 'up' else '-'}{dev*100:.0f}%)",
+                }
+
+    # --- Recovery (Whoop) ---
+    whoop = data.get("whoop") or {}
+    recovery = _safe_float(whoop, "recovery_score")
+    if recovery is not None:
+        # Recovery has known range 0-100, simple threshold-based surprise
+        if recovery < 33:
+            surprises["recovery"] = {"surprise": 0.9, "direction": "down", "detail": f"Recovery {recovery:.0f}% (red zone)"}
+        elif recovery > 85:
+            surprises["recovery"] = {"surprise": 0.6, "direction": "up", "detail": f"Recovery {recovery:.0f}% (peak)"}
+        else:
+            surprises["recovery"] = {"surprise": 0.1, "direction": "normal", "detail": f"Recovery {recovery:.0f}%"}
+
+    return surprises
+
+
+def _build_surprise_context(surprises, threshold=0.4):
+    """Build a compact context block highlighting surprising metrics.
+
+    Only surfaces metrics above the surprise threshold.
+    Returns empty string if nothing is surprising (zero prompt bloat on normal days).
+    """
+    high_surprise = {k: v for k, v in surprises.items() if v["surprise"] >= threshold}
+    if not high_surprise:
+        return ""
+
+    sorted_items = sorted(high_surprise.items(), key=lambda x: x[1]["surprise"], reverse=True)
+    lines = ["\u26a1 ATTENTION-WORTHY SIGNALS (unusual vs recent baseline):"]
+    for domain, info in sorted_items:
+        icon = "\u2b06\ufe0f" if info["direction"] == "up" else "\u2b07\ufe0f" if info["direction"] == "down" else "\u27a1\ufe0f"
+        lines.append(f"  {icon} {domain.upper()}: {info['detail']} (surprise: {info['surprise']:.1f})")
+    lines.append("INSTRUCTION: Prioritize coaching on high-surprise signals. Low-surprise metrics need less attention today.")
+    return "\n".join(lines)
+
+
+# ==============================================================================
+# IC-25: DIMINISHING RETURNS DETECTOR
+# Identifies pillars where effort is high but score trajectory is flat.
+# Redirects coaching to highest-leverage opportunities.
+# ==============================================================================
+
+def _compute_diminishing_returns(character_sheet, data, profile):
+    """Detect pillars with high effort + flat/declining trajectory.
+
+    Returns a prompt block redirecting coaching to highest-leverage pillar.
+    Empty string if no diminishing returns detected or character sheet unavailable.
+    """
+    if not character_sheet:
+        return ""
+
+    registry = profile.get("habit_registry", {})
+    habitify = data.get("habitify") or {}
+    habits_map = habitify.get("habits", {}) if isinstance(habitify, dict) else {}
+
+    # Map habits to pillars
+    HABIT_PILLAR_MAP = {
+        "sleep": ["wind_down_routine", "no_screens_before_bed", "no_screens_1hr_before_bed",
+                  "consistent_bedtime", "caffeine_cutoff", "caffeine_cutoff_2pm"],
+        "movement": ["morning_walk", "steps_goal", "exercise"],
+        "nutrition": ["track_macros", "log_food", "protein_first", "meal_prep"],
+        "mind": ["journal", "meditation", "gratitude"],
+        "consistency": [],  # Meta-pillar, derived from others
+    }
+
+    pillar_analysis = []
+
+    for pillar_name in ["sleep", "movement", "nutrition", "mind", "metabolic", "relationships", "consistency"]:
+        pd = character_sheet.get(f"pillar_{pillar_name}", {})
+        raw_score = pd.get("raw_score")
+        level = pd.get("level", 0)
+
+        if raw_score is None:
+            continue
+
+        # Compute effort: how many active habits for this pillar are being completed?
+        pillar_habits = HABIT_PILLAR_MAP.get(pillar_name, [])
+        active_habits = [h for h in pillar_habits if registry.get(h, {}).get("status") == "active"]
+        if active_habits:
+            completed = sum(1 for h in active_habits
+                          if habits_map.get(h) is not None and float(habits_map.get(h, 0)) >= 1)
+            effort_pct = round(completed / len(active_habits) * 100) if active_habits else 0
+        else:
+            effort_pct = None  # No habits mapped to this pillar
+
+        pillar_analysis.append({
+            "pillar": pillar_name,
+            "score": raw_score,
+            "level": level,
+            "effort_pct": effort_pct,
+        })
+
+    if not pillar_analysis:
+        return ""
+
+    # Find highest-leverage opportunity: lowest score with room to grow
+    scored = [p for p in pillar_analysis if p["score"] is not None]
+    if not scored:
+        return ""
+
+    # Sort by score ascending \u2014 lowest score = most room for improvement
+    scored.sort(key=lambda x: x["score"])
+    lowest = scored[0]
+    highest = scored[-1]
+
+    # Detect diminishing returns: high effort + high score (above 75)
+    saturated = [p for p in scored if p["effort_pct"] is not None
+                 and p["effort_pct"] >= 80 and p["score"] >= 70]
+
+    # Detect underinvested: low score + low effort (or no habits)
+    underinvested = [p for p in scored if p["score"] < 50
+                     and (p["effort_pct"] is None or p["effort_pct"] < 50)]
+
+    lines = []
+
+    if saturated and lowest["score"] < highest["score"] - 20:
+        sat_names = ", ".join(p["pillar"].capitalize() for p in saturated)
+        lines.append(f"LEVERAGE ANALYSIS:")
+        lines.append(f"  \u26a0\ufe0f Diminishing returns on: {sat_names} (high effort, score already {saturated[0]['score']:.0f}+)")
+        lines.append(f"  \u2b06\ufe0f Highest leverage: {lowest['pillar'].capitalize()} (score {lowest['score']:.0f}, most room for improvement)")
+        if underinvested:
+            ui_names = ", ".join(p["pillar"].capitalize() for p in underinvested)
+            lines.append(f"  \ud83c\udfaf Underinvested: {ui_names} (low score + low effort = high ROI)")
+        lines.append("INSTRUCTION: Redirect coaching effort toward highest-leverage pillars. Don't over-optimize what's already strong.")
+    elif underinvested:
+        ui_names = ", ".join(p["pillar"].capitalize() for p in underinvested)
+        lines.append(f"LEVERAGE ANALYSIS:")
+        lines.append(f"  \ud83c\udfaf Underinvested pillars: {ui_names} (low score + low effort \u2014 small changes here have outsized impact)")
+        lines.append("INSTRUCTION: Nudge coaching toward underinvested pillars where effort-to-outcome ratio is highest.")
+
+    return "\n".join(lines)
+
+
+# ==============================================================================
 # DATA SUMMARY BUILDERS (used by AI prompt construction)
 # ==============================================================================
 
@@ -632,12 +974,17 @@ def call_training_nutrition_coach(data, profile, api_key):
     # P5: TDEE context
     tdee_ctx = _build_tdee_context(data, profile)
 
+    # IC-24: Data quality (critical for nutrition coaching)
+    data_quality_block, _quality_scores = _compute_data_quality(data, profile)
+
     cal_target = profile.get("calorie_target", 1800)
     protein_target = profile.get("protein_target_g", 190)
     fat_target = profile.get("fat_target_g", 60)
     carb_target = profile.get("carb_target_g", 125)
 
     prompt = f"""You are two coaches speaking to Matthew ({journey_block}).
+
+{data_quality_block}
 
 {tdee_ctx}
 
@@ -868,6 +1215,16 @@ def call_board_of_directors(data, profile, day_grade, grade, component_scores, a
     # IC-6: Milestone architecture
     milestone_ctx = _build_milestone_context(profile, data.get("latest_weight"))
 
+    # IC-24: Data quality scoring
+    data_quality_block, _quality_scores = _compute_data_quality(data, profile)
+
+    # IC-23: Surprise scoring (attention-weighted prompt budgeting)
+    surprises = _compute_surprise_scores(data)
+    surprise_ctx = _build_surprise_context(surprises)
+
+    # IC-25: Diminishing returns detector
+    diminishing_ctx = _compute_diminishing_returns(character_sheet, data, profile)
+
     # Try config-driven intro, fall back to dynamic default
     bod_intro = _build_daily_bod_intro_from_config(data, profile)
     if not bod_intro:
@@ -894,6 +1251,9 @@ DAY GRADE: {str(day_grade if day_grade is not None else "N/A")}/100 ({grade})
 {journal_ctx}
 {insights_ctx}
 {analysis_block}
+{data_quality_block}
+{surprise_ctx}
+{diminishing_ctx}
 
 Write 2-3 sentences. Reference specific numbers (at least two). Connect yesterday to today.
 Celebrate wins briefly, name gaps directly — if a Tier 0 habit was missed, NAME it.
@@ -978,6 +1338,13 @@ def call_tldr_and_guidance(data, profile, day_grade, grade, component_scores, co
     # IC-6: Milestone
     milestone_ctx = _build_milestone_context(profile, data_summary.get("current_weight"))
 
+    # IC-24: Data quality scoring
+    data_quality_block, _quality_scores = _compute_data_quality(data, profile)
+
+    # IC-23: Surprise scoring
+    surprises = _compute_surprise_scores(data)
+    surprise_ctx = _build_surprise_context(surprises)
+
     prompt = f"""You are the intelligence engine behind Matthew's Life Platform daily brief.
 Your job: synthesize ALL of yesterday's data into (1) one TL;DR sentence and (2) 3-4 smart, personalized guidance items for TODAY.
 
@@ -1006,6 +1373,8 @@ YESTERDAY'S SIGNALS:
 {insights_ctx}
 {milestone_ctx}
 {analysis_block}
+{data_quality_block}
+{surprise_ctx}
 
 RULES:
 - TL;DR: One sentence, max 20 words. The single most important takeaway from yesterday. Specific. Not generic.

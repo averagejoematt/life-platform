@@ -53,6 +53,14 @@ except ImportError:
     _HAS_BOARD_LOADER = False
     logger.warning("[nutrition] board_loader not available — using fallback prompts")
 
+# IC-15/16: Insight Ledger
+try:
+    import insight_writer
+    insight_writer.init(table, "matthew")
+    _HAS_INSIGHT_WRITER = True
+except ImportError:
+    _HAS_INSIGHT_WRITER = False
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
@@ -729,6 +737,17 @@ def lambda_handler(event, context):
             protein_target_g=pro_target,
         )
 
+    # IC-16: Progressive context for nutrition insights
+    if _HAS_INSIGHT_WRITER:
+        try:
+            prev_ctx = insight_writer.build_insights_context(
+                days=30, pillars=["nutrition"], max_items=5,
+                label="PREVIOUS NUTRITION INSIGHTS (last 30 days)")
+            if prev_ctx:
+                user_message = prev_ctx + "\n\n" + user_message
+        except Exception as e:
+            print(f"[WARN] IC-16 failed: {e}")
+
     api_key = get_anthropic_key()
     logger.info("Calling Sonnet for analysis...")
     try:
@@ -756,5 +775,17 @@ def lambda_handler(event, context):
     logger.info(f"Sent: {subject}")
 
     store_weekly_summary(dates, summary)
+
+    # IC-15: Persist nutrition insights
+    if _HAS_INSIGHT_WRITER and ai_content and not ai_content.startswith("<div"):
+        try:
+            insight_writer.write_insight(
+                digest_type="nutrition_review", insight_type="coaching",
+                text=ai_content[:800], pillars=["nutrition"],
+                data_sources=["macrofactor"], tags=["nutrition", "weekly", "coaching"],
+                confidence="high", actionable=True, date=dates.get("this_end", ""))
+            print("[INFO] IC-15: nutrition insight persisted")
+        except Exception as e:
+            print(f"[WARN] IC-15 failed: {e}")
 
     return {"statusCode": 200, "body": f"Nutrition review sent: {subject}"}

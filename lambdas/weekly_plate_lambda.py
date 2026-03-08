@@ -58,7 +58,13 @@ try:
     _HAS_BOARD_LOADER = True
 except ImportError:
     _HAS_BOARD_LOADER = False
-    logger.warning("[weekly_plate] board_loader not available — using fallback prompt")
+
+try:
+    import insight_writer
+    insight_writer.init(table, "matthew")
+    _HAS_INSIGHT_WRITER = True
+except ImportError:
+    _HAS_INSIGHT_WRITER = False
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -543,6 +549,17 @@ def lambda_handler(event, context):
 
     system_prompt = build_system_prompt(profile, data["withings"])
 
+    # IC-16: Progressive context — nutrition insights for meal planning
+    if _HAS_INSIGHT_WRITER:
+        try:
+            prev_ctx = insight_writer.build_insights_context(
+                days=14, pillars=["nutrition"], max_items=3,
+                label="RECENT NUTRITION INSIGHTS (context for meal planning)")
+            if prev_ctx:
+                user_message = prev_ctx + "\n\n" + user_message
+        except Exception as e:
+            print(f"[WARN] IC-16 failed: {e}")
+
     api_key = get_anthropic_key()
     logger.info("Calling Sonnet for The Weekly Plate...")
     try:
@@ -581,5 +598,17 @@ def lambda_handler(event, context):
         }},
     )
     logger.info(f"Sent: {subject}")
+
+    # IC-15: Persist plate insight
+    if _HAS_INSIGHT_WRITER and ai_content and "unavailable" not in ai_content[:50]:
+        try:
+            insight_writer.write_insight(
+                digest_type="weekly_plate", insight_type="coaching",
+                text=ai_content[:800], pillars=["nutrition"],
+                data_sources=["macrofactor"], tags=["plate", "meal_plan", "nutrition"],
+                confidence="medium", actionable=True, date=dates.get("end", ""))
+            print("[INFO] IC-15: plate insight persisted")
+        except Exception as e:
+            print(f"[WARN] IC-15 failed: {e}")
 
     return {"statusCode": 200, "body": f"The Weekly Plate sent: {subject}"}

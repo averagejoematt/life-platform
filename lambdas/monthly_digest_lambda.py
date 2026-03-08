@@ -46,7 +46,13 @@ try:
     _HAS_BOARD_LOADER = True
 except ImportError:
     _HAS_BOARD_LOADER = False
-    logger.warning("[monthly] board_loader not available — using fallback prompts")
+
+try:
+    import insight_writer
+    insight_writer.init(table, "matthew")
+    _HAS_INSIGHT_WRITER = True
+except ImportError:
+    _HAS_INSIGHT_WRITER = False
 
 RECIPIENT         = "awsdev@mattsusername.com"
 SENDER            = "awsdev@mattsusername.com"
@@ -523,6 +529,16 @@ def call_haiku_monthly(data, goals, api_key):
         goals_json=json.dumps(clean_goals, indent=2)
     )
 
+    # IC-16: Progressive context — quarterly insights window
+    if _HAS_INSIGHT_WRITER:
+        try:
+            prev_ctx = insight_writer.build_insights_context(
+                days=90, max_items=10, label="PREVIOUS INSIGHTS (last 90 days)")
+            if prev_ctx:
+                prompt = prev_ctx + "\n\n" + prompt
+        except Exception as e:
+            print(f"[WARN] IC-16 failed: {e}")
+
     payload = json.dumps({
         "model": "claude-sonnet-4-6",
         "max_tokens": 2500,
@@ -912,4 +928,18 @@ def lambda_handler(event, context):
         }},
     )
     print(f"[INFO] Sent: Monthly Coach's Letter · {month}")
+
+    # IC-15: Persist monthly insights
+    if _HAS_INSIGHT_WRITER and commentary and "unavailable" not in commentary[:50]:
+        try:
+            insight_writer.write_insight(
+                digest_type="monthly_digest", insight_type="coaching",
+                text=commentary[:800],
+                pillars=["sleep", "movement", "nutrition", "mind", "metabolic", "consistency"],
+                tags=["monthly", "board", "coaching"],
+                confidence="high", actionable=True, date=month)
+            print("[INFO] IC-15: monthly insight persisted")
+        except Exception as e:
+            print(f"[WARN] IC-15 failed: {e}")
+
     return {"statusCode": 200, "body": f"Monthly letter sent: {month}"}

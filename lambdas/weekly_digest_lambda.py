@@ -55,6 +55,14 @@ table    = dynamodb.Table(TABLE_NAME)
 ses      = boto3.client("sesv2", region_name=_REGION)
 secrets  = boto3.client("secretsmanager", region_name=_REGION)
 
+# IC-15/16: Insight Ledger — progressive context + insight persistence
+try:
+    import insight_writer
+    insight_writer.init(table, "matthew")
+    _HAS_INSIGHT_WRITER = True
+except ImportError:
+    _HAS_INSIGHT_WRITER = False
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
@@ -853,6 +861,8 @@ build muscle, improve sleep and stress management. Current phase: Phase 1 Igniti
 DAY GRADES THIS WEEK (0-100 composite of sleep, recovery, nutrition, movement, habits, hydration, journal, glucose):
 {grade_summary}
 
+{previous_insights}
+
 THIS WEEK'S DATA vs PRIOR WEEK (+ 4-week trends):
 {data_json}
 
@@ -923,11 +933,21 @@ def call_haiku(data, profile, api_key):
         grade_lines.append(f"  Weekly avg: {grades['avg_score']}")
     grade_summary = "\n".join(grade_lines) if grade_lines else "No day grade data available."
 
+    # IC-16: Progressive context — inject recent high-value insights
+    previous_insights = ""
+    if _HAS_INSIGHT_WRITER:
+        try:
+            previous_insights = insight_writer.build_insights_context(
+                days=30, max_items=8, label="PREVIOUS INSIGHTS (last 30 days)")
+        except Exception as e:
+            print(f"[WARN] IC-16 progressive context failed: {e}")
+
     payload = json.dumps({
         "model": "claude-sonnet-4-6", "max_tokens": 1500,
         "messages": [{"role": "user", "content": BOARD_PROMPT.format(
             data_json=json.dumps(pd, indent=2, default=str),
-            grade_summary=grade_summary)}]
+            grade_summary=grade_summary,
+            previous_insights=previous_insights)}]
     }).encode()
     req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=payload,
         headers={"Content-Type": "application/json", "x-api-key": api_key,
@@ -1492,4 +1512,25 @@ def lambda_handler(event, context):
         }},
     )
     print("[INFO] Sent.")
+
+    # IC-15: Persist insights from this digest
+    if _HAS_INSIGHT_WRITER and commentary:
+        try:
+            insights = []
+            # Write the full Board commentary as a coaching insight
+            insights.append({
+                "digest_type": "weekly_digest",
+                "insight_type": "coaching",
+                "text": commentary[:800],
+                "pillars": ["sleep", "movement", "nutrition", "mind", "consistency"],
+                "tags": ["weekly", "board", "coaching"],
+                "confidence": "high",
+                "actionable": True,
+                "date": dates.get("this_end", ""),
+            })
+            written = insight_writer.write_insights_batch(insights)
+            print(f"[INFO] IC-15: {written} weekly insights persisted")
+        except Exception as e:
+            print(f"[WARN] IC-15 insight write failed (non-fatal): {e}")
+
     return {"statusCode": 200, "body": "Digest v4.0 sent."}
