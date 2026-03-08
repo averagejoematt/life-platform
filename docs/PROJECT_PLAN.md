@@ -1,17 +1,17 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-07 (v2.85.0 — 139 MCP tools, 32 Lambdas, 28 modules, 19 data sources, 6 secrets, 35 alarms)
+> Last update: 2026-03-07 (v2.87.0 — 139 MCP tools, 33 Lambdas, 28 modules, 19 data sources, 6 secrets, 35 alarms)
 
 ---
 
 ## Current State
 
-- **Platform version:** v2.85.0
+- **Platform version:** v2.87.0
 - **MCP Server:** 139 tools across 28-module package, serving health data through Claude Desktop + claude.ai + Claude mobile (1024 MB, 12 tools pre-cached nightly)
 - **Remote MCP:** Function URL `c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` with OAuth auto-approve + HMAC Bearer token validation
 - **Data Sources:** 19 (12 scheduled + 1 webhook + 3 manual/periodic + 2 MCP-managed + 1 State of Mind via webhook)
-- **Lambdas:** 32 (13 ingestion + 1 webhook + 2 enrichment + 6 email/digest + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 daily-metrics-compute + 1 dashboard-refresh + 1 data-export + 1 qa-smoke)
+- **Lambdas:** 33 (13 ingestion + 1 webhook + 2 enrichment + 6 email/digest + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 daily-metrics-compute + 1 dashboard-refresh + 1 data-export + 1 qa-smoke)
 - **Cost:** Under $25/month (~$3/month projected after secrets consolidation)
 - **Secrets Manager:** 6 secrets (was 12 — consolidated anthropic/todoist/habitify/health-auto-export/notion/dropbox into `life-platform/api-keys`)
 - **CloudWatch Alarms:** 35 (all Lambdas now monitored)
@@ -289,9 +289,9 @@
 
 | # | Feature | Description | Effort | When |
 |---|---------|-------------|--------|------|
-| IC-1 | **`platform_memory` DDB partition** | Structured key-value memory store for computed insights: `MEMORY#failure_pattern`, `MEMORY#what_worked`, `MEMORY#coaching_calibration`, `MEMORY#personal_curves`. No external service — pure DynamoDB. Every AI call pulls relevant memory records as context. The compounding substrate that makes all other IC features possible. DDB key pattern: `pk=USER#matthew#SOURCE#platform_memory`, `sk=MEMORY#<category>#<date>`. | 2–3 hr | Now |
-| IC-2 | **Pre-compute insight pass** | New `daily-insight-compute` Lambda at 9:42 AM PT (between daily-metrics and daily-brief). Pulls 7 days of metrics, computes habit×outcome correlations, flags leading indicators, pulls relevant platform_memory records, outputs structured JSON for the Daily Brief AI calls to consume. AI receives curated intelligence rather than raw data. Replaces single-shot prompting with a reasoned context handoff. | 4–6 hr | Now |
-| IC-3 | **Chain-of-thought reasoning on high-stakes calls** | Two-pass approach for BoD + TL;DR + training coach: Pass 1 identifies patterns and causal chains in structured JSON; Pass 2 writes the coaching output using Pass 1 analysis. ~2× token cost but material quality improvement — model identifies patterns before writing rather than simultaneously. No data maturity requirement. | 3–4 hr | Now |
+| ~~IC-1~~ | ~~**`platform_memory` DDB partition**~~ | Structured key-value memory store for computed insights: `MEMORY#failure_pattern`, `MEMORY#what_worked`, `MEMORY#coaching_calibration`, `MEMORY#personal_curves`. No external service — pure DynamoDB. Every AI call pulls relevant memory records as context. The compounding substrate that makes all other IC features possible. DDB key pattern: `pk=USER#matthew#SOURCE#platform_memory`, `sk=MEMORY#<category>#<date>`. | 2–3 hr | Now |
+| ~~IC-2~~ | ~~**Pre-compute insight pass**~~ | New `daily-insight-compute` Lambda at 9:42 AM PT (between daily-metrics and daily-brief). Pulls 7 days of metrics, computes habit×outcome correlations, flags leading indicators, pulls relevant platform_memory records, outputs structured JSON for the Daily Brief AI calls to consume. AI receives curated intelligence rather than raw data. Replaces single-shot prompting with a reasoned context handoff. | 4–6 hr | Now |
+| ~~IC-3~~ | ~~**Chain-of-thought reasoning on high-stakes calls**~~ | Two-pass approach for BoD + TL;DR + training coach: Pass 1 identifies patterns and causal chains in structured JSON; Pass 2 writes the coaching output using Pass 1 analysis. ~2× token cost but material quality improvement — model identifies patterns before writing rather than simultaneously. No data maturity requirement. | 3–4 hr | Now |
 
 ### Near-term (Month 1–2, enough behavioral data to detect patterns)
 
@@ -299,7 +299,7 @@
 |---|---------|-------------|--------|------|
 | IC-4 | **Failure pattern recognition** | Weekly attribution pass after day grades computed. When a component scores <50, tag with contextual conditions (day of week, preceding sleep, Todoist load, journal stress). After 6–8 weeks: personal failure map stored in `platform_memory`. Daily Brief proactively injects failure-condition warnings on days that match known patterns. "This is your third high-load Tuesday — last two ended in failed nutrition weeks." | 4–5 hr | Month 2 |
 | IC-5 | **Momentum detection / early warning** | Leading-indicator signal computed 2–3 days before a struggling week develops. Triggers when 2+ early warning markers appear simultaneously (journal entry length declining, meal log gaps, habit completion 80→65%, HRV 3+ consecutive down days). Brief shifts tone and intervention proactively, not reactively. Highest-leverage behavioral intervention window is when slippage begins, not after it's established. | 3–4 hr | Month 2 |
-| IC-6 | **Milestone architecture** | Computed once, stored in profile: weight/health milestones with specific biological/performance significance for Matthew. "At 285 lbs: sleep apnea risk drops substantially (genome flag). At 270 lbs: walking pace will naturally improve ~0.3 mph from reduced load. At 250 lbs: Zone 2 achievable at a pace that feels like a real workout. At 225 lbs: FFMI crosses athletic range if muscle preserved." Surfaced in coaching prompts when approaching each threshold. Converts abstract goal into a progression of meaningful waypoints. | 2–3 hr | Month 1 |
+| ~~IC-6~~ | ~~**Milestone architecture**~~ | Computed once, stored in profile: weight/health milestones with specific biological/performance significance for Matthew. "At 285 lbs: sleep apnea risk drops substantially (genome flag). At 270 lbs: walking pace will naturally improve ~0.3 mph from reduced load. At 250 lbs: Zone 2 achievable at a pace that feels like a real workout. At 225 lbs: FFMI crosses athletic range if muscle preserved." Surfaced in coaching prompts when approaching each threshold. Converts abstract goal into a progression of meaningful waypoints. | 2–3 hr | Month 1 |
 | IC-7 | **Cross-pillar trade-off reasoning** | Explicit optimization instruction added to BoD + Weekly Digest prompts. AI told to reason about trade-offs between pillars, not each in isolation. Enables: "Movement is strong but Sleep is degrading — at current TSB, adding training volume will compound sleep debt. Optimization call: hold training, invest in sleep." Currently the 7 pillars are analyzed independently. | 1–2 hr | Month 1 |
 | IC-8 | **Intent vs execution gap** | Dedicated journal analysis pass comparing stated intentions ("going to meal prep Sunday", "need to get to bed by 10") against next-day metrics. Builds personal intention-completion rate and identifies which intention types Matthew follows through on vs doesn't. Coaching AI told: "He said he'd do X. He didn't. This is the 4th time. Friction point is likely Y." The knowing-doing gap made quantifiable and specific. | 4–5 hr | Month 2 |
 
@@ -318,6 +318,28 @@
 | IC-12 | **Coaching effectiveness feedback loop** | Implicit feedback: after each Daily Brief, track whether metrics the AI flagged as priority actually improved over following 3 days. When coach said "front-load protein today" — did protein hit target? Build coaching effectiveness score per insight type. Eliminate low-follow-through guidance, amplify high-follow-through patterns. Platform measures whether its advice lands and self-optimizes. | 5–6 hr | Month 5 |
 | IC-13 | **Vector store / semantic search** | Cross-platform semantic search over journal corpus, Chronicle installments, and Board commentary. Enables: "Find every time my body responded badly to a high-carb week" or "journal entries where I felt isolated after a good training week." Minimum viable corpus: ~150–300 journal entries, 20+ Chronicle installments (approximately Month 4–5). Infrastructure: Pinecone or pgvector, nightly embedding Lambda. Note: `platform_memory` + episodic memory (IC-9) cover 80% of the use case until corpus is large enough. | 6–8 hr | Month 5 |
 | IC-14 | **Personal knowledge graph** | Graph of relationships between health entities: supplements → biomarkers → symptoms → journal themes → life events. "What downstream effects does magnesium have in my data?" DynamoDB adjacency lists (no external graph DB required). Monthly rebuild Lambda. Requires 6+ months of longitudinal data for meaningful graph density. Feeds into roadmap item #51. | 8–10 hr | Month 6+ |
+
+### Intelligence Compounding — Phase 2 (added 2026-03-07)
+
+> Expert panel consensus: the infrastructure is mature (19 sources, 135+ tools, 33 Lambdas). The gap is not data collection — it's that intelligence generated from the data doesn't persist, compound, or self-improve. These features close that gap.
+
+#### Build Now (no data maturity requirement)
+
+| # | Feature | Description | Effort | 💰 |
+|---|---------|-------------|--------|----|
+| ~~IC-15~~ | ~~**Insight Ledger — universal write**~~ | Extend IC-1 (`platform_memory`): every email/digest Lambda writes structured insight records to `SOURCE#insights` after generation. Schema: pillar(s), data_sources, confidence, actionable vs observational, semantic tags, digest_type, generated_text hash. The raw material for every downstream compounding feature. Shared `write_insight()` utility in a common module. | 3–4 hr | $0 |
+| IC-16 | **Progressive Context — all digests** | Extend IC-2 beyond Daily Brief. Weekly Digest, Monthly Digest, Chronicle, Nutrition Review, and Weekly Plate all get a retrieval step: query recent high-value insights filtered by relevant pillars, inject as "Previously" context. Weekly Digest gets 30-day window; Monthly gets quarterly; Chronicle gets narrative-relevant threads. Each digest reads as if written by someone who has followed Matthew for months. ~500–1500 extra tokens per call. | 4–5 hr | ~$0.02/mo |
+| ~~IC-17~~ | ~~**Contrarian "Red Team" analysis pass**~~ | New Board persona: The Skeptic. Explicitly tasked to challenge consensus in BoD coaching calls — question whether correlations are causal, flag misleading data, identify when insights are obvious vs. genuinely novel. Prompt-only change, injected into existing BoD call structure. Zero infrastructure, zero cost. Counteracts single-model confirmation bias. | 1–2 hr | $0 |
+| IC-18 | **Cross-Domain Hypothesis Engine** | Weekly Lambda (Sunday, after Weekly Digest). Pulls 14 days of all-pillar data, prompts Claude to identify non-obvious cross-domain correlations the existing 135 tools don't explicitly monitor. Writes hypothesis records (`SOURCE#hypotheses`, `sk=HYPOTHESIS#<timestamp>`) with confirmation criteria and monitoring instructions. Subsequent insight compute + digest prompts told to watch for confirming/refuting evidence. Hypotheses that hold graduate to permanent checks; refuted ones archived. Scientific method loop on personal data. | 4–5 hr | ~$0.05/wk |
+| IC-19 | **Decision Journal** | Track platform-guided decisions and their outcomes. When coaching says "take a rest day" or "front-load protein" — did Matthew follow the advice? What happened? Structured records in `SOURCE#decisions` with `decision`, `followed` (bool), `outcome_metric`, `outcome_delta`. Builds trust-calibration dataset: when to follow the system vs. override it. Can be logged via MCP tool or inferred from journal + metrics. | 3–4 hr | $0 |
+
+#### Month 3–4 (requires insight corpus to accumulate)
+
+| # | Feature | Description | Effort | 💰 |
+|---|---------|-------------|--------|----|
+| IC-20 | **Lightweight semantic similarity (Titan embeddings)** | Embed each insight at write time using Amazon Bedrock Titan embeddings (~$0.0001/1K tokens). Store vector as DDB attribute on insight record. Cosine similarity at retrieval time enables: deduplication (don't tell Matthew the same thing twice), pattern threading (connect today's insight to one from 6 weeks ago), smarter context injection for Progressive Context. No external vector store — pure DDB. Replaces IC-13 for 80% of use cases at 1% of the cost. | 4–5 hr | ~$0.10/mo |
+| IC-21 | **Annualized Personal Baselines** | After 12+ weeks of data, compute personal reference ranges replacing population norms. Matthew's "normal" HRV, seasonal sleep patterns, training load sweet spot, protein threshold, optimal calorie target. Slowly-updating profile record (`MEMORY#personal_baselines`) recomputed monthly. Injected into every analysis prompt. Every insight becomes calibrated to Matthew, not to generic ranges. Extends Character Sheet baseline concept to the analytical layer. | 3–4 hr | $0 |
+| IC-22 | **Quarterly Meta-Analysis / Prompt Evolution** | Quarterly Lambda reviews the insight corpus: which insight types scored highest? Which pillars generated most actionable guidance? Which Board personas produced best results? Where are blind spots — pillars with data but few insights? Output: prompt tuning recommendations for each digest Lambda. Matthew reviews and applies manually (human in the loop). The system does prompt engineering on itself, guided by feedback signal. Slowest loop but most powerful over 12 months. | 3–4 hr | ~$0.15/qtr |
 
 ### Architecture Decision Record — What NOT to Build
 
@@ -339,6 +361,9 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | Version | What | Date |
 |---------|------|------|
+| v2.87.0 | IC-15 Insight Ledger (insight_writer.py shared module, DDB insights partition, Daily Brief integration) + IC-17 Red Team (contrarian challenge field in IC-3 analysis pass, RED TEAM CHECK in BoD + TL;DR prompts) + Roadmap IC-15–IC-22 | 2026-03-07 |
+| v2.86.0 | IC-2 Daily Insight Compute Lambda (33rd Lambda, 9:42 AM PT), IC-3 Chain-of-Thought two-pass (BoD + TL;DR), IC-6 Milestone Architecture (6 weight milestones with biological significance) | 2026-03-07 |
+| v2.85.0 | Todoist write tools (130-135) + bulk reschedule + stale SECRET_NAME fixes + QA smoke | 2026-03-07 |
 | v2.77.1 | Housekeeping: State of Mind resolved (iPhone permissions toggle), Phase 4 reward machinery confirmed complete, reward ideation menu generated for Matthew + Brittany. No code deployed. | 2026-03-05 |
 | v2.77.0 | Daily Brief monolith extraction: html_builder.py, ai_calls.py, output_writers.py. 4,002 → 1,366 lines (66% reduction). Clean deploy confirmed. | 2026-03-05 |
 | v2.76.1 | dropbox-poll fix: stale `SECRET_NAME` env var + key name mismatch from secrets consolidation. Three alarms investigated; two self-cleared. | 2026-03-05 |

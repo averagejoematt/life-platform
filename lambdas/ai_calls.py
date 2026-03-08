@@ -176,11 +176,13 @@ COMPONENT SCORES (0-100): {comp_str}
 {insights_ctx or ''}
 {habit_miss_context}
 
-Identify the most important patterns. Output this exact JSON structure:
-{{"key_patterns": ["specific data observation 1", "specific data observation 2"], "causal_chain": "habit/metric X likely caused metric Y result because ...", "priority": "single most important coaching focus for today", "tone": "celebrate|challenge|support"}}"""
+Identify the most important patterns. Then play devil's advocate on your own analysis.
+
+Output this exact JSON structure:
+{{"key_patterns": ["specific data observation 1", "specific data observation 2"], "causal_chain": "habit/metric X likely caused metric Y result because ...", "challenge": "One reason this analysis might be wrong or misleading — e.g. confounding factor, insufficient data, correlation ≠ causation, or the obvious insight hiding a subtler one", "priority": "single most important coaching focus for today", "tone": "celebrate|challenge|support"}}"""
 
     try:
-        raw = call_anthropic(prompt, api_key, max_tokens=150)
+        raw = call_anthropic(prompt, api_key, max_tokens=200)
         raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
@@ -207,6 +209,9 @@ def _format_analysis(analysis):
     priority = analysis.get("priority", "")
     if priority:
         lines.append(f"  Today's priority: {priority}")
+    challenge = analysis.get("challenge", "")
+    if challenge:
+        lines.append(f"  ⚠️ Red Team challenge: {challenge}")
     tone = analysis.get("tone", "")
     if tone:
         lines.append(f"  Tone: {tone}")
@@ -895,6 +900,7 @@ Celebrate wins briefly, name gaps directly — if a Tier 0 habit was missed, NAM
 If a synergy stack is broken, note it. If there are LEVEL EVENTS, mention them.
 If there are ACTIVE EFFECTS like Sleep Drag, note the impact.
 CRITICAL: If habit gaps connect to metric outcomes (e.g. missed wind-down → low sleep efficiency), NAME THE CAUSAL CHAIN. Don't just list the gap.
+RED TEAM CHECK: If the analysis pass flagged a challenge (⚠️ above), consider it. If the correlation might be misleading or there's a confounding factor, adjust your coaching accordingly — don't give confident advice based on shaky signal. Intellectual honesty > false certainty.
 DO NOT start with "Matthew". Max 60 words."""
 
     if brief_mode == "flourishing":
@@ -1009,6 +1015,7 @@ RULES:
 - If habit gaps connect to metric outcomes, the guidance should NAME THE CAUSAL CHAIN (e.g. "Wind-down missed again last night — your sleep efficiency dropped to 71%. One habit change tonight would move that number.")
 - Avoid repeating daily constants (IF window, supplements, bedtime) unless there is a data-driven reason to modify them today.
 - NEVER suggest hydration tips if hydration shows NO DATA — the sync is broken, not the behaviour.
+- RED TEAM CHECK: If the analysis pass flagged a challenge (⚠️ above), factor it into your guidance. Don't build today's plan on a correlation that might be misleading. If confidence in a pattern is low, say so — e.g. "sleep dipped but only 2 days of data — monitor rather than react."
 
 Examples of SMART guidance: "HRV down 15% + high stress yesterday — do Zone 2 instead of planned HIIT", "Protein 40g short yesterday — front-load with 50g shake before first meal"
 Examples of BAD guidance (too generic): "Stay hydrated", "Get 7.5 hours of sleep", "Caffeine cutoff at noon"

@@ -1,5 +1,43 @@
 # Life Platform — Changelog
 
+## v2.87.0 — 2026-03-07: IC-15 Insight Ledger + IC-17 Red Team + Roadmap IC-15–IC-22
+
+### IC-15: Insight Ledger — Universal Write Utility
+- **New file:** `lambdas/insight_writer.py` — shared module bundled with email Lambdas
+- **DDB key pattern:** `pk=USER#matthew#SOURCE#insights`, `sk=INSIGHT#<ISO-timestamp>#<digest_type>`
+- **Schema per record:** pillars, data_sources, confidence, insight_type (coaching/guidance/observation/alert/hypothesis), actionable, semantic tags, text (truncated 800 chars), text_hash (SHA-256 dedup), component_scores snapshot, 180-day TTL
+- **Daily Brief integration:** `extract_daily_brief_insights()` extracts BoD coaching, TL;DR, guidance items, training/nutrition coaching, journal coach → `write_insights_batch()` after email send
+- **Read API:** `get_recent_insights(days, pillars, digest_type)` + `build_insights_context()` for prompt injection
+- **Auto-pillar detection:** `_extract_pillars_from_text()` maps keywords to 7 Character Sheet pillars
+- **Non-fatal:** all writes wrapped in try/except, Lambda succeeds even if insight write fails
+- **Foundation for:** IC-16 Progressive Context (all digests), IC-20 Semantic Similarity, IC-12 Feedback Loop, IC-22 Meta-Analysis
+
+### IC-17: Contrarian "Red Team" Analysis Pass
+- **IC-3 analysis pass extended:** JSON output now includes `challenge` field — forces model to play devil’s advocate on its own pattern identification ("one reason this analysis might be wrong or misleading")
+- **`_format_analysis()` updated:** surfaces challenge as `⚠️ Red Team challenge:` in context block
+- **BoD prompt:** added `RED TEAM CHECK` instruction — coaching adjusts when correlation might be misleading
+- **TL;DR+Guidance prompt:** same Red Team instruction — guidance avoids overconfident advice on weak signal
+- **Analysis pass max_tokens:** 150 → 200 to accommodate challenge field
+- **Cost:** $0 — no new API calls, just richer output from existing IC-3 pass
+- **Effect:** counteracts single-model confirmation bias; coaching will now say "monitor rather than react" when data is insufficient
+
+### Roadmap: Intelligence Compounding Phase 2 (IC-15–IC-22)
+- Added 8 new roadmap items to PROJECT_PLAN.md Tier 7:
+  - IC-15 Insight Ledger (✅ built), IC-16 Progressive Context (all digests), IC-17 Red Team (✅ built)
+  - IC-18 Cross-Domain Hypothesis Engine, IC-19 Decision Journal
+  - IC-20 Lightweight Semantic Similarity (Titan embeddings), IC-21 Annualized Personal Baselines
+  - IC-22 Quarterly Meta-Analysis / Prompt Evolution
+- Architecture Decision: Titan embeddings in DDB (IC-20) replaces IC-13 vector store for 80% of use cases at 1% cost
+
+### Files Changed
+- `lambdas/insight_writer.py` — NEW (shared Insight Ledger module)
+- `lambdas/ai_calls.py` — IC-17 Red Team (challenge field + RED TEAM CHECK instructions)
+- `lambdas/daily_brief_lambda.py` — IC-15 integration (import + post-email insight write)
+- `deploy/deploy_ic15_ic17.sh` — NEW deploy script
+- `docs/PROJECT_PLAN.md` — Tier 7 Phase 2 section (IC-15–IC-22)
+
+---
+
 ## v2.86.0 — 2026-03-07: IC-2 Daily Insight Compute + IC-3 Chain-of-Thought + IC-6 Milestones
 
 ### IC-2: Daily Insight Compute Lambda (new — 33rd Lambda)

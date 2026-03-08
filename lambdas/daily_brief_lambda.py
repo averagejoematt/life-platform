@@ -81,6 +81,15 @@ except ImportError:
     import logging as _log
     _log.getLogger().warning("[daily] board_loader not available — using fallback prompts")
 
+# Insight Ledger (IC-15)
+try:
+    import insight_writer
+    insight_writer.init(table, USER_ID)
+    _HAS_INSIGHT_WRITER = True
+except ImportError:
+    _HAS_INSIGHT_WRITER = False
+    print("[WARN] insight_writer not available — insights will not be persisted")
+
 # -- Extracted module imports ---------------------------------------------------
 import html_builder
 import ai_calls
@@ -1371,5 +1380,21 @@ def lambda_handler(event, context):
             component_details=component_details, character_sheet=character_sheet)
         output_writers.write_clinical_json(data, profile, yesterday)
         output_writers.write_buddy_json(data, profile, yesterday, character_sheet=character_sheet)
+
+        # IC-15: Insight Ledger — persist AI-generated insights for compounding
+        if _HAS_INSIGHT_WRITER:
+            try:
+                insights_list = insight_writer.extract_daily_brief_insights(
+                    bod_insight=bod_insight,
+                    tldr_guidance=tldr_guidance,
+                    training_nutrition=training_nutrition,
+                    journal_coach_text=journal_coach_text,
+                    date=yesterday.isoformat(),
+                    component_scores=component_scores,
+                )
+                written = insight_writer.write_insights_batch(insights_list)
+                print(f"[INFO] IC-15: {written}/{len(insights_list)} insights persisted")
+            except Exception as e:
+                print(f"[WARN] IC-15 insight write failed (non-fatal): {e}")
 
     return {"statusCode": 200, "body": "Daily brief v2.77.0 sent: " + subject}
