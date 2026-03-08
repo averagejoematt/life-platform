@@ -1,5 +1,44 @@
 # Life Platform — Changelog
 
+## v2.99.0 — 2026-03-08: P2 hardening complete
+
+### OBS-2: CloudWatch operational dashboard
+- `life-platform-ops` dashboard: 23 widgets, 47 alarms wired, KPIs, error matrix, AI token section, DDB item size
+- `deploy/create_obs2_dashboard.py`
+
+### REL-2: DLQ consumer Lambda
+- `life-platform-dlq-consumer`: classifies transient/permanent, retries, archives to S3, SES alerts
+- Every 6 hours via EventBridge. Drained 4 real DLQ messages on first run.
+- IAM role: `lambda-dlq-consumer-role` (scoped to DLQ + archive prefix + ingestion Lambda invoke)
+
+### COST-3: AI token usage alarms
+- 14 CloudWatch alarms on `LifePlatform/AI` namespace (was already emitting from ai_calls.py)
+- Per-Lambda daily output token budgets + platform-wide 33K/day ($15/mo) threshold
+- `deploy/deploy_cost3_token_alarm.py`
+
+### MAINT-1: requirements.txt per Lambda
+- 18 files in `lambdas/requirements/` with README
+- Finding: only `garmin` has third-party deps (garminconnect + garth). `pip-audit` clean.
+
+### REL-4: Synthetic canary
+- `life-platform-canary`: DDB write/read + S3 write/read + MCP tools/list every 4h
+- 4 CloudWatch alarms in `LifePlatform/Canary` namespace
+- IAM scoped to `CANARY#*` pk only — cannot touch real data
+
+### REL-3: DynamoDB 400KB item size monitoring
+- `lambdas/item_size_guard.py`: safe_put_item() with 300KB warn / 380KB truncate thresholds
+- `LifePlatform/DynamoDB / ItemSizeBytes` CW metric per source
+- `life-platform-ddb-item-size-warning` alarm at 300KB
+- strava, macrofactor, health-auto-export bundled with guard module
+
+### Incident fix: todoist stale SECRET_NAME
+- DLQ consumer revealed todoist-data-ingestion had been failing since 2026-03-06
+- Root cause: `SECRET_NAME` env var pointed to secret marked for deletion (P1 secrets consolidation remnant)
+- Fix: `deploy/fix_todoist_secret_name.sh` — removed stale override
+- Gap-aware backfill will self-heal the 2-day data gap on next scheduled run
+
+---
+
 ## v2.98.0 — 2026-03-08: DATA-1 complete + cleanup
 
 ### DATA-1: schema_version=1 on all remaining ingestion Lambdas

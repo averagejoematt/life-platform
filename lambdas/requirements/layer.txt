@@ -1,0 +1,6 @@
+# Lambda Layer: life-platform-shared-utils
+# Modules: board_loader, character_engine, ai_calls, insight_writer,
+#          html_builder, output_writers, scoring_engine, retry_utils
+#
+# No third-party dependencies — all modules use stdlib + boto3 only.
+# boto3/botocore provided by Lambda runtime.

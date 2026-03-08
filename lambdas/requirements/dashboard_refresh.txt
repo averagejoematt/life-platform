@@ -1,0 +1,2 @@
+# dashboard-refresh
+# No third-party dependencies — uses stdlib + boto3 only.
