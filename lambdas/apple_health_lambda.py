@@ -297,6 +297,18 @@ def save_day(date_str, day):
 
     db_item = {"pk": f"USER#{USER_ID}#SOURCE#apple_health", "sk": f"DATE#{date_str}", "schema_version": 1}
     db_item.update(day)
+    # DATA-2: Validate before write
+    try:
+        from ingestion_validator import validate_item as _validate_item
+        _vr = _validate_item("apple_health", floats_to_decimal(db_item), date_str)
+        if _vr.should_skip_ddb:
+            logger.error(f"[DATA-2] CRITICAL: Skipping apple_health DDB write for {date_str}: {_vr.errors}")
+            _vr.archive_to_s3(s3_client, bucket=S3_BUCKET, item=db_item)
+            return
+        if _vr.warnings:
+            logger.warning(f"[DATA-2] Validation warnings for apple_health/{date_str}: {_vr.warnings}")
+    except ImportError:
+        pass
     table.put_item(Item=floats_to_decimal(db_item))
 
 

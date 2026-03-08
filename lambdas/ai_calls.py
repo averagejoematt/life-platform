@@ -234,7 +234,7 @@ COMPONENT SCORES (0-100): {comp_str}
 Identify the most important patterns. Then play devil's advocate on your own analysis.
 
 Output this exact JSON structure:
-{{"key_patterns": ["specific data observation 1", "specific data observation 2"], "causal_chain": "habit/metric X likely caused metric Y result because ...", "challenge": "One reason this analysis might be wrong or misleading — e.g. confounding factor, insufficient data, correlation ≠ causation, or the obvious insight hiding a subtler one", "priority": "single most important coaching focus for today", "tone": "celebrate|challenge|support"}}"""
+{{"key_patterns": ["specific data observation 1", "specific data observation 2"], "likely_connection": "habit/metric X correlates with metric Y result — note this is a pattern, not proven causation", "challenge": "One reason this analysis might be wrong or misleading — e.g. confounding factor, insufficient data, correlation ≠ causation, or the obvious insight hiding a subtler one", "priority": "single most important coaching focus for today", "tone": "celebrate|challenge|support"}}"""
 
     try:
         raw = call_anthropic(prompt, api_key, max_tokens=200)
@@ -258,9 +258,9 @@ def _format_analysis(analysis):
     if patterns:
         for p in patterns:
             lines.append(f"  • {p}")
-    chain = analysis.get("causal_chain", "")
+    chain = analysis.get("likely_connection", "") or analysis.get("causal_chain", "")  # AI-2: causal_chain renamed to likely_connection
     if chain:
-        lines.append(f"  Causal chain: {chain}")
+        lines.append(f"  Likely pattern (correlation): {chain}")
     priority = analysis.get("priority", "")
     if priority:
         lines.append(f"  Today's priority: {priority}")
@@ -466,11 +466,11 @@ def _build_habit_outcome_context(data, profile):
         lines.append("7-day T0/T1 completion trend:")
         lines.extend(trend_lines)
     if causal_pairs:
-        lines.append("Known causal chains (name the connection if habit was missed):")
+        lines.append("Known habit→metric correlations (name the likely connection if habit was missed):")
         lines.extend(causal_pairs[:8])  # cap at 8 to avoid prompt bloat
-    lines.append("INSTRUCTION: When a T0/T1 habit was missed, TRACE THE CAUSAL CHAIN. "
+    lines.append("INSTRUCTION: When a T0/T1 habit was missed, NAME THE LIKELY CORRELATIVE PATTERN. "
                  "Don't just list 'missed X' — connect it to the metric it's designed to support. "
-                 "E.g. 'Wind-down missed → sleep efficiency 71% (vs your ~82% baseline).'")
+                 "Frame as correlation, not proven causation: e.g. 'Wind-down missed → sleep efficiency 71% (vs your ~82% baseline — consistent pattern but not proven causal).'")
 
     return "\n".join(lines)
 
@@ -1462,7 +1462,7 @@ Write 2-3 sentences. Reference specific numbers (at least two). Connect yesterda
 Celebrate wins briefly, name gaps directly — if a Tier 0 habit was missed, NAME it.
 If a synergy stack is broken, note it. If there are LEVEL EVENTS, mention them.
 If there are ACTIVE EFFECTS like Sleep Drag, note the impact.
-CRITICAL: If habit gaps connect to metric outcomes (e.g. missed wind-down → low sleep efficiency), NAME THE CAUSAL CHAIN. Don't just list the gap.
+CRITICAL: If habit gaps connect to metric outcomes (e.g. missed wind-down → low sleep efficiency), NAME THE LIKELY CORRELATIVE PATTERN (correlation, not proven causal). Don't just list the gap — connect the dots, but frame as a pattern to investigate, not a certainty.
 CROSS-PILLAR: If the trade-off analysis above identifies a limiting factor or optimization call, incorporate it — don't coach conflicting pillars independently.
 RED TEAM CHECK: If the analysis pass flagged a challenge (⚠️ above), consider it. If the correlation might be misleading or there's a confounding factor, adjust your coaching accordingly — don't give confident advice based on shaky signal. Intellectual honesty > false certainty.
 DO NOT start with "Matthew". Max 60 words."""
@@ -1590,7 +1590,7 @@ RULES:
 - CROSS-PILLAR TRADE-OFFS: If the trade-off analysis above identifies a limiting factor or optimization call, let it shape guidance priority. When pillars conflict, guide toward the constraint, not all pillars simultaneously.
 - TDEE-aware nutrition guidance: use the TDEE context to reason about whether today's intake target should be maintained, increased (recovery day), or whether yesterday's intake looks like a logging gap vs genuine restriction.
 - Walk/movement coaching is STAGE-APPROPRIATE: at Week {jctx['week_num']}, if steps were high, that's a genuine training achievement — acknowledge it as such.
-- If habit gaps connect to metric outcomes, the guidance should NAME THE CAUSAL CHAIN (e.g. "Wind-down missed again last night — your sleep efficiency dropped to 71%. One habit change tonight would move that number.")
+- If habit gaps connect to metric outcomes, name the likely correlative pattern (correlation, not proven causal) — e.g. "Wind-down missed again last night — sleep efficiency dropped to 71% (consistent pattern). One habit change tonight may move that number."
 - Avoid repeating daily constants (IF window, supplements, bedtime) unless there is a data-driven reason to modify them today.
 - NEVER suggest hydration tips if hydration shows NO DATA — the sync is broken, not the behaviour.
 - RED TEAM CHECK: If the analysis pass flagged a challenge (⚠️ above), factor it into your guidance. Don't build today's plan on a correlation that might be misleading. If confidence in a pattern is low, say so — e.g. "sleep dipped but only 2 days of data — monitor rather than react."

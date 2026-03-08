@@ -304,7 +304,20 @@ def bridge_supplements(item):
 
 def write_to_dynamo(item):
     """Write item to DynamoDB, then bridge supplements."""
-    table.put_item(Item=item)
+    date_str = item.get("sk", "").replace("DATE#", "")
+    # DATA-2: Validate before write
+    try:
+        from ingestion_validator import validate_item as _validate_item
+        _vr = _validate_item("habitify", item, date_str)
+        if _vr.should_skip_ddb:
+            logger.error(f"[DATA-2] CRITICAL: Skipping habitify DDB write for {date_str}: {_vr.errors}")
+            return  # no s3_client in habitify — log only
+        else:
+            if _vr.warnings:
+                logger.warning(f"[DATA-2] Validation warnings for habitify/{date_str}: {_vr.warnings}")
+            table.put_item(Item=item)
+    except ImportError:
+        table.put_item(Item=item)
     logger.info(f"Wrote {item['sk']} — pct={item['completion_pct']}, "
                 f"completed={item['total_completed']}/{item['total_possible']}"
                 f"{', mood=' + str(item.get('mood', '')) if item.get('mood') else ''}")

@@ -260,6 +260,7 @@ def enrich_date_range(start_date: str, end_date: str):
 
         if day_changed:
             # Write updated activities list back to DynamoDB
+            # DATA-2 note: enrichment updates existing strava records — validator runs at strava ingestion time
             table.update_item(
                 Key={
                     "pk": f"{USER_PREFIX}strava",

@@ -608,8 +608,21 @@ def ingest_day(wake_date: str, secret: dict) -> dict:
         **parsed,
         **(floats_to_decimal(temp_data) if temp_data else {}),
     }
-    table.put_item(Item=floats_to_decimal(db_item))
-    print(f"DynamoDB: DATE#{wake_date} → {len(parsed)} fields written")
+    # DATA-2: Validate before write
+    try:
+        from ingestion_validator import validate_item as _validate_item
+        _vr = _validate_item("eightsleep", floats_to_decimal(db_item), wake_date)
+        if _vr.should_skip_ddb:
+            logger.error(f"[DATA-2] CRITICAL: Skipping eightsleep DDB write for {wake_date}: {_vr.errors}")
+            _vr.archive_to_s3(s3_client, bucket=S3_BUCKET, item=db_item)
+        else:
+            if _vr.warnings:
+                logger.warning(f"[DATA-2] Validation warnings for eightsleep/{wake_date}: {_vr.warnings}")
+            table.put_item(Item=floats_to_decimal(db_item))
+            print(f"DynamoDB: DATE#{wake_date} → {len(parsed)} fields written")
+    except ImportError:
+        table.put_item(Item=floats_to_decimal(db_item))
+        print(f"DynamoDB: DATE#{wake_date} → {len(parsed)} fields written")
 
     return parsed
 

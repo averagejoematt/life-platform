@@ -101,9 +101,23 @@ def lambda_handler(event, context):
             "ingested_at": datetime.now(timezone.utc).isoformat(),
             **record,
         }
-        table.put_item(Item=floats_to_decimal(db_item))
-        records_written += 1
-        print(f"  {date_str}: temp={record.get('temp_avg_f')}°F, daylight={record.get('daylight_hours')}h, precip={record.get('precipitation_mm')}mm")
+        # DATA-2: Validate before write
+        try:
+            from ingestion_validator import validate_item as _validate_item
+            _vr = _validate_item("weather", floats_to_decimal(db_item), date_str)
+            if _vr.should_skip_ddb:
+                logger.error(f"[DATA-2] CRITICAL: Skipping weather DDB write for {date_str}: {_vr.errors}")
+                _vr.archive_to_s3(s3, bucket=S3_BUCKET, item=db_item)
+            else:
+                if _vr.warnings:
+                    logger.warning(f"[DATA-2] Validation warnings for weather/{date_str}: {_vr.warnings}")
+                table.put_item(Item=floats_to_decimal(db_item))
+                records_written += 1
+                print(f"  {date_str}: temp={record.get('temp_avg_f')}°F, daylight={record.get('daylight_hours')}h, precip={record.get('precipitation_mm')}mm")
+        except ImportError:
+            table.put_item(Item=floats_to_decimal(db_item))
+            records_written += 1
+            print(f"  {date_str}: temp={record.get('temp_avg_f')}°F, daylight={record.get('daylight_hours')}h, precip={record.get('precipitation_mm')}mm")
     
     # S3 raw backup
     s3.put_object(
