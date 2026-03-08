@@ -343,6 +343,13 @@ def gather_daily_data(profile, yesterday):
         else:
             bp_data["class"] = "Normal"; bp_data["class_color"] = "#059669"
 
+    # IC-2: Pre-computed insight context (written by daily-insight-compute Lambda at 9:42 AM)
+    computed_insights = fetch_date("computed_insights", yesterday)
+    if computed_insights:
+        print("[INFO] Computed insights loaded for " + yesterday)
+    else:
+        print("[INFO] No computed_insights for " + yesterday + " — IC-2 Lambda may not have run yet")
+
     return {
         "date": yesterday,
         "whoop": whoop, "whoop_today": whoop_today, "sleep": sleep,
@@ -367,6 +374,7 @@ def gather_daily_data(profile, yesterday):
         "bp_data": bp_data,
         "strava_7d": strava_7d,
         "todoist": todoist_yesterday,
+        "computed_insights": computed_insights,
     }
 
 
