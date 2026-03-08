@@ -1,88 +1,74 @@
-# Life Platform — Handover v2.95.0
+# Life Platform — Handover v2.96.0
 **Date:** 2026-03-08  
-**Session:** Architecture Review Hardening — Batch 1 (5 Quick-Win Tasks)
+**Session:** Architecture Review Hardening — Batch 1 complete + SEC-1 IAM decomposition
 
 ---
 
 ## What Was Done This Session
 
-### AI-1: Health Disclaimers ✅
-Added "⚕️ Personal health tracking only — not medical advice" footer to all 8 email Lambdas.
+### Hardening Batch 1 — All 5 Quick Wins ✅
+- **AI-1** — Health disclaimers on all 8 email Lambdas (deployed)
+- **MAINT-3** — 39 stale files archived to `archive/20260308/`
+- **COST-1** — S3 Glacier lifecycle on `raw/` prefix (90 days)
+- **SEC-4** — API Gateway throttle: 1.67 req/s on `health-auto-export-api`
+- **IAM-2** — `life-platform-analyzer` (IAM Access Analyzer) live
 
-Files edited (source files on disk, not yet deployed):
-- `lambdas/html_builder.py` — Daily Brief footer
-- `lambdas/weekly_digest_lambda.py` — Weekly Digest footer
-- `lambdas/monday_compass_lambda.py` — Monday Compass footer
-- `lambdas/nutrition_review_lambda.py` — Saturday Nutrition Review footer
-- `lambdas/wednesday_chronicle_lambda.py` — Wednesday Chronicle email footer
-- `lambdas/weekly_plate_lambda.py` — The Weekly Plate footer
-- `lambdas/anomaly_detector_lambda.py` — Anomaly Detector footer
-- `lambdas/monthly_digest_lambda.py` — **already had disclaimer**, no change needed
+### SEC-1 — IAM Role Decomposition ✅ COMPLETE
+Live audit showed the bulk of the work was already done by a prior session. Only 2 Lambdas remained on the shared `lambda-weekly-digest-role`:
 
-### MAINT-3: Stale File Cleanup ✅
-`deploy/maint3_cleanup.sh` written. Moves to `archive/YYYYMMDD/`:
-- `.backup` / `.broken` files in `lambdas/`
-- Old `.zip` files in `lambdas/` and `deploy/`
-- Superseded versioned deploy scripts (`deploy_daily_brief_v21.sh` etc.)
-- Orphaned copies (`scoring_engine.py`, `patch_*.py` in `deploy/`)
-- `generate_habit_registry.py` → moves to `seeds/`
-- Old `backup_2026*/` directories
-- **Review the script before running** — nothing deleted, only moved.
+| Lambda | Old Role | New Role |
+|--------|----------|----------|
+| `brittany-weekly-email` | `lambda-weekly-digest-role` | `life-platform-email-role` |
+| `life-platform-qa-smoke` | `lambda-weekly-digest-role` | `life-platform-compute-role` |
 
-### COST-1: S3 Glacier Lifecycle ✅
-`deploy/cost1_s3_lifecycle.sh` — applies `raw/` → Glacier Instant Retrieval after 90 days.
+**Result:** `lambda-weekly-digest-role` has zero Lambda users. Tagged `status=deprecated, deprecated-date=2026-03-08`.
 
-### SEC-4: API Gateway Rate Limiting ✅
-`deploy/sec4_api_gateway_throttle.sh` — 1.67 req/s + burst 10 on Health Auto Export HTTP API.
-
-### IAM-2: IAM Access Analyzer ✅
-`deploy/iam2_access_analyzer.sh` — creates `life-platform-analyzer` (free, ACCOUNT type).
+**All 35 Lambdas are now on scoped roles:**
+- `life-platform-compute-role` — 5 compute Lambdas (no SES, no blog S3)
+- `life-platform-email-role` — 8 email Lambdas (daily-brief, monday-compass, nutrition-review, wednesday-chronicle, weekly-plate, anomaly-detector, brittany-weekly-email + freshness-checker)
+- `life-platform-digest-role` — 2 digest Lambdas (weekly-digest, monthly-digest)
+- 20 dedicated per-function roles — all ingestion, MCP, enrichment, utility Lambdas
 
 ---
 
-## What Still Needs to Run
+## Pending Action: Delete Deprecated Role (7 days)
 
-**Step 1 — Deploy email Lambdas (AI-1):**
-```bash
-bash deploy/deploy_v2.95.0.sh
-```
-Deploys: daily-brief, weekly-digest, monday-compass, nutrition-review, wednesday-chronicle, weekly-plate-schedule, anomaly-detector
+After confirming clean operation on 2026-03-15, delete `lambda-weekly-digest-role`:
 
-**Step 2 — Infra one-shots (idempotent):**
 ```bash
-bash deploy/cost1_s3_lifecycle.sh
-bash deploy/sec4_api_gateway_throttle.sh
-bash deploy/iam2_access_analyzer.sh
+# List its policies first
+aws iam list-role-policies --role-name lambda-weekly-digest-role --no-cli-pager
+aws iam list-attached-role-policies --role-name lambda-weekly-digest-role --no-cli-pager
+
+# Then delete inline policies, detach managed policies, delete role
+# (run manually — don't script a delete of a role until you've confirmed what's attached)
 ```
 
-**Step 3 — Cleanup (review first):**
-```bash
-# Read through maint3_cleanup.sh, then:
-bash deploy/maint3_cleanup.sh
-```
+---
 
-**Step 4 — Git commit:**
+## Commit
+
 ```bash
-git add -A && git commit -m "v2.95.0: Hardening batch 1 — AI-1 disclaimers, MAINT-3 cleanup, COST-1 lifecycle, SEC-4 throttle, IAM-2 analyzer" && git push
+git add -A && git commit -m "v2.96.0: SEC-1 complete — lambda-weekly-digest-role deprecated, all 35 Lambdas on scoped roles" && git push
 ```
 
 ---
 
 ## Hardening Roadmap Status
 
-### ✅ Done (Quick Wins)
+### ✅ Done
 | Task | Description |
 |------|-------------|
-| AI-1 | Health disclaimer on all 8 email Lambdas |
-| MAINT-3 | Stale file cleanup scripts written |
-| COST-1 | S3 Glacier lifecycle script written |
-| SEC-4 | API Gateway throttle script written |
-| IAM-2 | IAM Access Analyzer script written |
+| AI-1 | Health disclaimers on all email Lambdas |
+| MAINT-3 | Stale file cleanup |
+| COST-1 | S3 Glacier lifecycle |
+| SEC-4 | API Gateway rate limiting |
+| IAM-2 | IAM Access Analyzer |
+| SEC-1 | IAM role decomposition — shared role deprecated |
 
-### 🔴 Next Up (P0/P1 — Next 2 Weeks)
+### 🔴 Next Up (P1 — Next 2 Weeks)
 | Task | Priority | Description |
 |------|----------|-------------|
-| SEC-1 | P0 | Decompose `lambda-weekly-digest-role` (used by 10+ Lambdas) into per-function roles |
 | SEC-2 | P1 | Split `life-platform/api-keys` into domain-specific secrets |
 | SEC-3 | P1 | Input validation on MCP tool arguments |
 | MAINT-1 | P1 | `requirements.txt` per Lambda with pinned versions |
@@ -90,15 +76,14 @@ git add -A && git commit -m "v2.95.0: Hardening batch 1 — AI-1 disclaimers, MA
 | DATA-1 | P1 | Add `schema_version` to all DynamoDB items |
 | REL-1 | P1 | Graceful degradation when compute Lambdas fail |
 
+### Note on SEC-2
+`p0_split_secret.sh` already exists in `deploy/` — read it before running to understand what it does and whether it's current.
+
 ---
 
-## Key Files
-- `docs/REVIEW_2026-03-08.md` — Full 35-finding review
-- `docs/PROJECT_PLAN.md` — Full hardening roadmap with all 35 tasks
-- `docs/CHANGELOG.md` — v2.95.0 entry added
-
 ## Platform State
-- **Version:** v2.95.0
-- **Lambdas:** 35
+- **Version:** v2.96.0
+- **Lambdas:** 35 (all on scoped IAM roles)
 - **MCP Tools:** 144
 - **Modules:** 30
+- **IAM:** No shared roles. `lambda-weekly-digest-role` deprecated.

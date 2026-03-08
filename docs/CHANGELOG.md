@@ -1,5 +1,17 @@
 # Life Platform — Changelog
 
+## v2.96.0 — 2026-03-08: SEC-1 IAM Role Decomposition Complete
+
+### SEC-1: lambda-weekly-digest-role Fully Deprecated
+- `brittany-weekly-email` → `life-platform-email-role`
+- `life-platform-qa-smoke` → `life-platform-compute-role`
+- `lambda-weekly-digest-role` now has zero Lambda users; tagged `status=deprecated`
+- All 35 Lambdas now on scoped roles: compute (5), email (8), digest (2), plus 20 dedicated per-function ingestion/utility roles
+- `deploy/sec1_finish_iam_decomposition.sh` — script used; safe to re-run
+- Delete `lambda-weekly-digest-role` after 7 days of clean operation
+
+---
+
 ## v2.95.0 — 2026-03-08: Hardening Batch 1 (AI-1 + MAINT-3 + COST-1 + SEC-4 + IAM-2)
 
 ### AI-1: Health Disclaimers (all 8 email Lambdas)
