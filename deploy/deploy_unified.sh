@@ -36,13 +36,33 @@ error() { echo "[ERROR] $*" >&2; exit 1; }
 # Note: Garmin uses fix_garmin_deps.sh (not deploy_lambda.sh) due to
 # garminconnect/garth dependency bundle. See "garmin" case below.
 
-declare -A REGISTRY
-declare -a REGISTRY_ORDER
+# Registry stored as flat array of "short|aws_name|source|extras" entries
+# (avoids declare -A which requires bash 4+, unavailable on macOS default shell)
+REGISTRY_ENTRIES=()
 
 register() {
     local short="$1" aws_name="$2" source="$3" extras="${4:-}"
-    REGISTRY["$short"]="$aws_name|$source|$extras"
-    REGISTRY_ORDER+=("$short")
+    REGISTRY_ENTRIES+=("$short|$aws_name|$source|$extras")
+}
+
+# Lookup: sets _SHORT _AWS_NAME _SOURCE _EXTRAS for the given short name
+# Returns 0 if found, 1 if not found
+_registry_lookup() {
+    local target="$1"
+    for entry in "${REGISTRY_ENTRIES[@]}"; do
+        local s; s="${entry%%|*}"
+        if [ "$s" = "$target" ]; then
+            _SHORT="$s"
+            local rest="${entry#*|}"
+            _AWS_NAME="${rest%%|*}"; rest="${rest#*|}"
+            _SOURCE="${rest%%|*}"
+            _EXTRAS="${rest#*|}"
+            # If extras == source (no extras field), clear it
+            [ "$_EXTRAS" = "$_SOURCE" ] && _EXTRAS=""
+            return 0
+        fi
+    done
+    return 1
 }
 
 # ── Ingestion ──
@@ -101,8 +121,10 @@ list_targets() {
     echo "══════════════════════════════════════════════════════"
     printf "  %-18s  %s\n" "SHORT NAME" "AWS FUNCTION NAME"
     printf "  %-18s  %s\n" "──────────" "─────────────────"
-    for short in "${REGISTRY_ORDER[@]}"; do
-        IFS='|' read -r aws_name source extras <<< "${REGISTRY[$short]}"
+    for entry in "${REGISTRY_ENTRIES[@]}"; do
+        local short="${entry%%|*}"
+        local rest="${entry#*|}"
+        local aws_name="${rest%%|*}"
         printf "  %-18s  %s\n" "$short" "$aws_name"
     done
     echo ""
@@ -136,9 +158,8 @@ deploy_garmin_with_deps() {
 
 deploy_target() {
     local target="$1"
-    [ "${REGISTRY[$target]+exists}" ] || error "Unknown target: '$target'. Run 'list' for options."
-
-    IFS='|' read -r aws_name source extras <<< "${REGISTRY[$target]}"
+    _registry_lookup "$target" || error "Unknown target: '$target'. Run 'list' for options."
+    local aws_name="$_AWS_NAME" source="$_SOURCE" extras="$_EXTRAS"
 
     if [ "$source" = "PACKAGE" ]; then
         deploy_mcp_package
@@ -172,11 +193,12 @@ case "$TARGET" in
         list_targets
         ;;
     all)
-        info "Deploying ALL ${#REGISTRY_ORDER[@]} Lambdas..."
+        info "Deploying ALL ${#REGISTRY_ENTRIES[@]} Lambdas..."
         DEPLOYED=0
         FAILED=0
         FAILED_NAMES=()
-        for short in "${REGISTRY_ORDER[@]}"; do
+        for entry in "${REGISTRY_ENTRIES[@]}"; do
+            local short="${entry%%|*}"
             info "── $short ──"
             if deploy_target "$short"; then
                 DEPLOYED=$((DEPLOYED + 1))

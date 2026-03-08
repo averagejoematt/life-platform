@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-08 (v2.91.0 — 144 tools, 30-module MCP package, 19 data sources, 35 Lambdas, 6 secrets, 35 alarms, 6 email/digest Lambdas, IC features 1–8 live)
+Last updated: 2026-03-08 (v3.1.3 — 144 tools, 30-module MCP package, 19 data sources, 39 Lambdas, 8 secrets, ~47 alarms, 7 email/digest Lambdas, IC features 1–8 live, Tier 8 hardening complete)
 
 ---
 
@@ -70,7 +70,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | Lambda Function URL (MCP) | MCP HTTPS endpoint | `https://votqefkra435xwrccmapxxbj6y0jawgn.lambda-url.us-west-2.on.aws/` (AuthType NONE — auth handled in Lambda via API key header) |
 | Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` (OAuth 2.1 auto-approve + HMAC Bearer) |
 | API Gateway | HTTP endpoint | `health-auto-export-api` (a76xwxt2wa) — webhook ingest |
-| Secrets Manager | Credential store | `life-platform/api-keys` (consolidated) + 5 OAuth secrets = **6 secrets total** |
+| Secrets Manager | Credential store | 8 secrets: 4 OAuth (`whoop`, `withings`, `strava`, `garmin`) + `eightsleep` + `life-platform/ai-keys` (Anthropic) + `life-platform/todoist` + `life-platform/notion` + `life-platform/dropbox` — **`life-platform/api-keys` pending deletion** |
 | SNS topic | Alert routing | `life-platform-alerts` |
 | CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` (`d14jnhrgfrte42.cloudfront.net`) → S3 `/dashboard`, Lambda@Edge auth (`life-platform-cf-auth`), alias `dash.averagejoematt.com` |
 | CloudFront (blog) | CDN (public) | `E1JOC1V6E6DDYI` (`d1aufb59hb2r1q.cloudfront.net`) → S3 `/blog`, NO auth, alias `blog.averagejoematt.com` |
@@ -144,7 +144,7 @@ These are not data ingestion — they compute, alert, or deliver intelligence.
 | QA Smoke | `qa-smoke` | on-demand | — | — | `lambda-weekly-digest-role` |
 | Data Export | `data-export` | on-demand | — | — | `lambda-weekly-digest-role` |
 
-**Note:** `lambda-weekly-digest-role` is shared by all email/digest/compute Lambdas (10 functions). This role has DynamoDB read/write, Secrets Manager (`life-platform/api-keys` for Anthropic key), and SES SendEmail scoped to `mattsusername.com`.
+**Note:** As of v3.1.3, all Lambdas have **dedicated per-function IAM roles** (13 ingestion + 26 email/compute/operational = 39 total). The shared `lambda-weekly-digest-role` was deleted after migration. Each role is least-privilege scoped to only the AWS resources that function needs.
 
 ### File-triggered ingestion (S3 → Lambda)
 
@@ -179,7 +179,12 @@ These are not data ingestion — they compute, alert, or deliver intelligence.
 
 ### Failure handling
 
-DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq` (SQS). Request/response pattern Lambdas (`life-platform-mcp`, `health-auto-export-webhook`) excluded. CloudWatch metric alarms: **35 total**, all Lambdas monitored. Alarm actions → SNS `life-platform-alerts`. 24-hour evaluation period, `TreatMissingData: notBreaching`.
+DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq` (SQS). Request/response pattern Lambdas (`life-platform-mcp`, `health-auto-export-webhook`) excluded. CloudWatch metric alarms: **~47 total**, all Lambdas monitored. Alarm actions → SNS `life-platform-alerts`. 24-hour evaluation period, `TreatMissingData: notBreaching`.
+
+**Additional failure safeguards (v3.1.3):**
+- **DLQ Consumer Lambda** (`dlq-consumer`): Drains `life-platform-ingestion-dlq` on a schedule, logs failed message details to CloudWatch with structured context for triage.
+- **Canary Lambda** (`life-platform-canary`): Synthetic health check — writes a test record, reads it back, deletes it. Fires every 30 min. Alarms if roundtrip fails.
+- **Item size guard** (`item_size_guard.py`): Intercepts all DDB `put_item` calls in ingestion Lambdas; truncates oversized items, emits `ItemSizeWarning` CloudWatch metric before write.
 
 ### OAuth token management
 
@@ -351,19 +356,21 @@ Health Auto Export → API Gateway → Webhook → DynamoDB + S3
 
 ## IAM Security Model
 
-Each Lambda has a dedicated, least-privilege IAM role. Shared roles where functions are functionally identical:
+Each Lambda has a **dedicated, least-privilege IAM role** (39 roles total as of v3.1.3). No shared roles.
 
 - **Ingestion roles (13 dedicated):** DynamoDB write, S3 write, Secrets Manager read (scoped to own secret), SQS DLQ send
 - **MCP role:** DynamoDB `GetItem` + `Query` + `PutItem`; S3 `GetObject` on `raw/cgm_readings/*`
-- **Email/digest/compute role** (`lambda-weekly-digest-role`, shared by ~10 Lambdas): DynamoDB read/write, `life-platform/api-keys` secret, SES SendEmail scoped to `mattsusername.com`, S3 PutObject on `dashboard/*` and `buddy/*`
-- **Anomaly detector role:** DynamoDB read/write, `life-platform/api-keys` (Anthropic key), SES SendEmail
+- **Email/digest roles (7 dedicated):** DynamoDB read/write, `life-platform/ai-keys` secret, SES SendEmail scoped to `mattsusername.com`, S3 PutObject on `dashboard/*` and `buddy/*`
+- **Compute roles (5 dedicated):** DynamoDB read/write, `life-platform/ai-keys` (IC compute Lambdas that call Anthropic)
+- **Operational roles (14 dedicated):** scoped per function (e.g. canary: DDB write+read+delete only; dlq-consumer: SQS ReceiveMessage + DDB write)
 - No role has `dynamodb:Scan` or cross-account permissions
+- **Deleted:** `lambda-weekly-digest-role` (was shared by ~10 Lambdas — now replaced by per-function roles)
 
 ---
 
 ## Secrets Manager
 
-**6 secrets** at $0.40/month each = **~$2.40/month**
+**8 active secrets** at $0.40/month each = **~$3.20/month**
 
 | Secret | Used By | Contents |
 |---|---|---|
@@ -372,7 +379,10 @@ Each Lambda has a dedicated, least-privilege IAM role. Shared roles where functi
 | `life-platform/strava` | Strava Lambda | OAuth2 tokens (auto-updated) |
 | `life-platform/garmin` | Garmin Lambda | garth OAuth tokens (auto-updated) |
 | `life-platform/eightsleep` | Eight Sleep Lambda | Username + password (JWT refreshed each run) |
-| `life-platform/api-keys` | All email/compute/MCP Lambdas | Anthropic key, Todoist key, Habitify key, health-auto-export bearer, Notion key, Dropbox OAuth, MCP API key (consolidated from 12 → 6 in v2.85.0) |
+| `life-platform/ai-keys` | All email/compute/MCP Lambdas | Anthropic API key + MCP API key (90-day auto-rotation) |
+| `life-platform/todoist` | Todoist Lambda | Todoist API key |
+| `life-platform/notion` | Notion Lambda | Notion integration key |
+| ~~`life-platform/api-keys`~~ | ~~Legacy~~ | ~~**PENDING DELETION** (~2026-04-07). Verify all Lambdas migrated before deleting.~~ |
 
 ---
 

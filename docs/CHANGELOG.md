@@ -1,5 +1,25 @@
 # Life Platform — Changelog
 
+## v3.1.5 — 2026-03-08: 7-item doc + wiring sprint
+
+### Items 1–3: Safety modules wired
+- **Item 1 (AI-3):** `ai_output_validator.py` wired into `daily-brief` — all 4 AI outputs validated (BLOCK/WARN/PASS); blocked outputs replaced with safe fallbacks; `[AI-3]` CloudWatch logs
+- **Item 2 (DATA-2):** `ingestion_validator.py` wired into whoop, strava, macrofactor — CRITICAL failures archive to S3 + skip DDB write; `[DATA-2]` CloudWatch logs
+- **Item 3 (OBS-1):** `platform_logger.py` wired into `daily-brief` — structured JSON logs with `correlation_id: "daily-brief#YYYY-MM-DD"`; `set_date()` called after `yesterday` computed
+- Layer rebuilt: `p3_build_shared_utils_layer.sh` now includes `ai_output_validator.py` + `platform_logger.py`
+
+### Items 4–6: Documentation updated
+- **ARCHITECTURE.md:** IAM model updated (39 dedicated per-function roles, `lambda-weekly-digest-role` deleted); failure handling section (DLQ consumer, canary, item_size_guard); Secrets table (8 active + 1 pending deletion); Lambda count 35→39
+- **INFRASTRUCTURE.md:** Header v3.1.3, Lambda count 35→39, Secrets table updated, alarm count ~47, EventBridge schedules for new Lambdas, Infrastructure section updated with 4 new Lambdas
+- **PROJECT_PLAN.md:** Version header v3.0.0→v3.1.3; Current State block updated (39 Lambdas, 8 secrets, ~47 alarms); OBS-1/DATA-2/AI-3 statuses → ⚠️ Partial; summary table updated (20 ✅, 4 ⚠️ partial, 11 🔴)
+- **INCIDENT_LOG.md:** Resolved gaps section added (v3.1.x — DLQ consumer, canary, item_size_guard)
+
+### Item 7: Cleanup script
+- `deploy/item7_clean_zip_files.sh` created — moves 6 stale .zips from `lambdas/` to `deploy/zips/`
+- `deploy/zips/` directory created
+
+---
+
 ## v3.1.4 — 2026-03-08: Architecture Review #2 + handover
 
 ### Review #2 conducted (v3.1.3 post-hardening)

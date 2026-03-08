@@ -494,14 +494,31 @@ def lambda_handler(event, context):
         print("[WARN] item_size_guard not available — falling back to direct put_item")
         _use_safe_put = False
 
+    # DATA-2: import validator once for the batch
+    try:
+        from ingestion_validator import validate_item as _validate_item
+        _use_validator = True
+    except ImportError:
+        _use_validator = False
+
     written = 0
     for date_str_key, item in day_items.items():
-        # ── REL-3: safe_put_item handles 400KB limit, CW metrics, and truncation ──
         source_label = item.get("source", csv_type)
+        _mf_item = floats_to_decimal(item)
+        # ── DATA-2: Validate before write ──
+        if _use_validator:
+            _vr = _validate_item(source_label, _mf_item, date_str_key)
+            if _vr.should_skip_ddb:
+                print(f"[DATA-2] CRITICAL: Skipping {source_label} DDB write for {date_str_key}: {_vr.errors}")
+                _vr.archive_to_s3(s3_client, bucket=bucket, item=_mf_item)
+                continue
+            if _vr.warnings:
+                print(f"[DATA-2] Validation warnings for {source_label}/{date_str_key}: {_vr.warnings}")
+        # ── REL-3: safe_put_item handles 400KB limit, CW metrics, and truncation ──
         if _use_safe_put:
-            _safe_put(table, floats_to_decimal(item), source=source_label, date_str=date_str_key)
+            _safe_put(table, _mf_item, source=source_label, date_str=date_str_key)
         else:
-            table.put_item(Item=floats_to_decimal(item))
+            table.put_item(Item=_mf_item)
         written += 1
 
     print(f"Written {written} DynamoDB items ({csv_type})")

@@ -383,7 +383,7 @@ def _is_truncated(text: str) -> bool:
         if stripped.endswith(ending):
             return True
     # No terminal punctuation at all for short outputs
-    if len(stripped) < 200 and not any(stripped.endswith(p) for p in ".!?\"'"]):
+    if len(stripped) < 200 and not any(stripped.endswith(p) for p in ".!?\"'"):
         return False  # not necessarily truncated for short coaching blurbs
     return False
 

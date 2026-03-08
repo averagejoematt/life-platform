@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-03-08 (v2.93.0)
+> Last updated: 2026-03-08 (v3.1.3 — 39 Lambdas, 8 secrets, ~47 alarms)
 
 ---
 
@@ -107,7 +107,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Field | Value |
 |-------|-------|
 | Alert topic | `life-platform-alerts` → email to `awsdev@mattsusername.com` |
-| CloudWatch alarms | 44 metric alarms (ALARM-only; 35 base + 8 invocation-count + 1 DDB item size) |
+| CloudWatch alarms | ~47 metric alarms (ALARM-only; base + invocation-count + DDB item size + canary + new Lambda alarms) |
 
 ---
 
@@ -132,25 +132,25 @@ All DNS-validated via Route 53 CNAME records.
 
 ---
 
-## Secrets Manager (8 secrets)
+## Secrets Manager (8 active secrets + 1 pending deletion)
 
 All under prefix `life-platform/`. No values stored in this doc — access via AWS console or CLI.
-Consolidated from 12 → 6 on 2026-03-05. P0 (2026-03-08) added `ai-keys` to isolate Anthropic key.
 
 | Secret | Type | Fields / Notes |
 |--------|------|----------------|
-| `api-keys` | JSON bundle | `anthropic_api_key`, `todoist_api_token`, `habitify_api_key`, `health_auto_export_api_key`, `notion_api_key`, `notion_database_id`, `dropbox_app_key`, `dropbox_app_secret`, `dropbox_refresh_token` |
 | `whoop` | OAuth | Auto-refreshed by Lambda |
 | `eightsleep` | OAuth | Auto-refreshed by Lambda |
 | `strava` | OAuth | Auto-refreshed by Lambda |
 | `withings` | OAuth | Auto-refreshed by Lambda |
 | `garmin` | Session | Auto-refreshed by Lambda |
-| `ai-keys` | JSON bundle | `anthropic_api_key` only — isolated from api-keys bundle (P0 hardening) |
-| `mcp-api-key` | Bearer token | Auto-rotates every 90 days (next: 2026-05-30) |
+| `ai-keys` | JSON bundle | `anthropic_api_key` + `mcp_api_key` (90-day auto-rotation) |
+| `todoist` | API key | Todoist API token |
+| `notion` | API key | Notion integration key + database ID |
+| ~~`api-keys`~~ | ~~Legacy bundle~~ | ~~**PENDING DELETION** (~2026-04-07). All Lambdas migrated to per-service secrets. Verify before deleting.~~ |
 
 ---
 
-## Lambdas (35)
+## Lambdas (39)
 
 ### Ingestion (13)
 `whoop-data-ingestion` · `eightsleep-data-ingestion` · `garmin-data-ingestion` · `strava-data-ingestion` · `withings-data-ingestion` · `habitify-data-ingestion` · `macrofactor-data-ingestion` · `notion-journal-ingestion` · `todoist-data-ingestion` · `weather-data-ingestion` · `health-auto-export-webhook` · `journal-enrichment` · `activity-enrichment`
@@ -161,8 +161,8 @@ Consolidated from 12 → 6 on 2026-03-05. P0 (2026-03-08) added `ai-keys` to iso
 ### Compute (5)
 `character-sheet-compute` · `adaptive-mode-compute` · `daily-metrics-compute` · `daily-insight-compute` · `hypothesis-engine`
 
-### Infrastructure (10)
-`life-platform-freshness-checker` · `dropbox-poll` · `insight-email-parser` · `life-platform-key-rotator` · `dashboard-refresh` · `life-platform-data-export` · `life-platform-qa-smoke` · `life-platform-mcp`
+### Infrastructure (14) — 4 new in v3.x hardening sprint
+`life-platform-freshness-checker` · `dropbox-poll` · `insight-email-parser` · `life-platform-key-rotator` · `dashboard-refresh` · `life-platform-data-export` · `life-platform-qa-smoke` · `life-platform-mcp` · `dlq-consumer` *(new)* · `life-platform-canary` *(new)* · `data-reconciliation` *(new)* · `pip-audit` *(new)*
 
 ### Lambda@Edge (us-east-1)
 `life-platform-cf-auth` (dashboard) · `life-platform-buddy-auth` (buddy page)
@@ -179,7 +179,7 @@ Migrated from EventBridge Rules → EventBridge Scheduler on 2026-03-08 (P1.6).
 | Timezone | `America/Los_Angeles` (DST-safe — no manual rule updates needed at DST transitions) |
 | IAM role | `life-platform-scheduler-role` |
 | Old rules | Disabled (not deleted) — rollback: `aws events enable-rule --name <rule>` |
-| Schedules | 27 total — see PROJECT_PLAN.md Ingestion Schedule for full timing |
+| Schedules | 27+ total — see PROJECT_PLAN.md Ingestion Schedule for full timing. New in v3.x: canary (every 30 min), dlq-consumer (every 15 min), data-reconciliation (daily 6 AM PT), pip-audit (weekly) |
 
 ---
 

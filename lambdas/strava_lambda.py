@@ -436,14 +436,27 @@ def save_to_dynamodb(date_str, activities):
         "total_zone2_seconds": sum(a.get("zone2_seconds") or 0 for a in activities),
     }
 
+    _strava_item = floats_to_decimal(item)
+    # ── DATA-2: Validate before write ──
+    try:
+        from ingestion_validator import validate_item as _validate_item
+        _vr = _validate_item("strava", _strava_item, date_str)
+        if _vr.should_skip_ddb:
+            print(f"[DATA-2] CRITICAL: Skipping strava DDB write for {date_str}: {_vr.errors}")
+            _vr.archive_to_s3(s3_client, bucket=S3_BUCKET, item=_strava_item)
+            return
+        if _vr.warnings:
+            print(f"[DATA-2] Validation warnings for strava/{date_str}: {_vr.warnings}")
+    except ImportError:
+        pass  # validator not bundled — proceed
+
     # ── REL-3: safe_put_item handles 400KB limit, CW metrics, and truncation ──
     try:
         from item_size_guard import safe_put_item
-        safe_put_item(table, floats_to_decimal(item), source="strava", date_str=date_str)
+        safe_put_item(table, _strava_item, source="strava", date_str=date_str)
     except ImportError:
-        # Fallback if item_size_guard not bundled (should not happen in production)
         print(f"[WARN] item_size_guard not available — falling back to direct put_item")
-        table.put_item(Item=floats_to_decimal(item))
+        table.put_item(Item=_strava_item)
     print(f"Saved {len(activities)} activities to DynamoDB for {date_str}")
 
 
