@@ -345,6 +345,7 @@ def ingest_day(date_str, access_token, s3_client, table, verbose=True, call_dela
             "pk": f"USER#{USER_ID}#SOURCE#whoop",
             "sk": f"DATE#{date_str}",
             "date": date_str,
+            "schema_version": 1,
             **normalized,
         })
         log(f"[INFO] DynamoDB daily item written ({len(normalized)} fields)")

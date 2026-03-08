@@ -86,7 +86,8 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
                readiness_score, readiness_colour, tldr_guidance, bod_insight,
                training_nutrition, journal_coach_text, mvp_streak, full_streak, vice_streaks=None,
                character_sheet=None, brief_mode="standard", engagement_score=None,
-               triggered_rewards=None, protocol_recs=None):
+               triggered_rewards=None, protocol_recs=None,
+               compute_stale=False, compute_age_msg=""):
     """Build the full daily brief HTML email.
 
     triggered_rewards and protocol_recs are pre-computed by lambda_handler
@@ -1102,6 +1103,11 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
     if data.get("journal"):
         active_sources.append("Notion")
     source_str = " &middot; ".join(active_sources) if active_sources else "No data sources"
+    if compute_stale:
+        html += '<div style="background:#fffbeb;padding:6px 24px;border-top:1px solid #fde68a;margin-top:8px;">'
+        html += '<p style="color:#92400e;font-size:9px;margin:0;text-align:center;">'
+        html += '&#9888;&#65039; Compute data ' + (compute_age_msg or 'unavailable') + ' &mdash; some metrics may be estimated or from a prior run.'
+        html += '</p></div>'
     html += '<div style="background:#f8f8fc;padding:10px 24px;border-top:1px solid #e8e8f0;margin-top:12px;">'
     html += '<p style="color:#9ca3af;font-size:9px;margin:0;text-align:center;">Life Platform v2.36 &middot; ' + date_str + ' &middot; ' + source_str + '</p>'
     html += '<p style="color:#b0b0b0;font-size:8px;margin:4px 0 0;text-align:center;">&#9874;&#65039; Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your diet, exercise, or supplement regimen.</p>'

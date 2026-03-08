@@ -1,5 +1,40 @@
 # Life Platform — Changelog
 
+## v2.97.0 — 2026-03-08: P1 Hardening Batch (SEC-2, SEC-3, MAINT-2, REL-1, DATA-1, AI-2)
+
+### SEC-2: Secret Split
+- `deploy/sec2_split_secrets.sh` — verifies `life-platform/ai-keys` exists, creates `life-platform/ingestion-keys` and `life-platform/webhook-key`, updates ingestion Lambda env vars, tightens IAM role policies to `ai-keys` only
+- `life-platform/api-keys` bundle frozen — delete after 2026-04-08
+
+### SEC-3: MCP Input Validation
+- Added `_validate_tool_args()` to `mcp_server.py` — validates required fields, type coercion, date format (YYYY-MM-DD), string length cap (500 chars), array length cap (100), enum validation
+- `handle_tools_call` now validates all arguments against `inputSchema` before dispatch; returns `{error: invalid_arguments}` on violation instead of crashing
+
+### MAINT-2: Lambda Layer Expanded
+- `deploy/p3_build_shared_utils_layer.sh` updated: 4 → 8 modules (`+character_engine`, `+output_writers`, `+ai_calls`, `+html_builder`)
+- `deploy/p3_attach_shared_utils_layer.sh` updated: 11 → 16 Lambdas (`+brittany-weekly-email`, `+daily-metrics-compute`, `+adaptive-mode-compute`, `+dashboard-refresh`)
+- **Run first:** `bash deploy/p3_build_shared_utils_layer.sh` then `bash deploy/p3_attach_shared_utils_layer.sh <ARN>`
+
+### REL-1: Compute Staleness Detection
+- `daily_brief_lambda.py`: checks `computed_at` on `computed_metrics` record; sets `_compute_stale=True` if >4 hours old or missing
+- `html_builder.py`: renders amber banner `⚠️ Compute data Xh ago — some metrics may be estimated` when stale flag is set
+- `build_html()` signature updated: `compute_stale=False, compute_age_msg=""` kwargs added
+
+### DATA-1: schema_version on DDB Items
+- `daily_brief_lambda.py`: `store_day_grade()` now writes `schema_version: 1`
+- `whoop_lambda.py`: daily item write now includes `schema_version: 1`
+- `deploy/data1_backfill_schema_version.sh` — scans all `USER#matthew` items, backfills `schema_version=1` on items that lack it (conditional update, safe to re-run)
+- Remaining 11 ingestion Lambdas: add `"schema_version": 1` to each `put_item` call following the whoop pattern
+
+### AI-2: Correlational Language in Tool Descriptions
+- `get_cross_source_correlation`: removed causation framing ("does X suppress Y?") → correlational framing ("does X correlate with Y?"); added explicit note "correlations do not imply causation"
+- `get_day_type_analysis`: removed "how does day type affect recovery?" → "how do my recovery metrics look by day type?"; added "Shows associations, not causation"
+
+### Deploy
+- `deploy/deploy_v2.97.0.sh` — deploys life-platform-mcp, daily-brief, whoop-data-ingestion
+
+---
+
 ## v2.96.0 — 2026-03-08: SEC-1 IAM Role Decomposition Complete
 
 ### SEC-1: lambda-weekly-digest-role Fully Deprecated

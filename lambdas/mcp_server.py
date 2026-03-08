@@ -13058,7 +13058,7 @@ TOOLS = {
         "fn": tool_get_cross_source_correlation,
         "schema": {
             "name": "get_cross_source_correlation",
-            "description": "Pearson correlation between any two numeric metrics, with optional day lag. The coaching superpower — reveals hidden relationships in your data. Examples: 'does HRV predict next-day training output?' (source_a=whoop, field_a=hrv, source_b=strava, field_b=total_distance_miles, lag_days=1), 'does work stress suppress recovery?' (source_a=todoist, field_a=tasks_completed, source_b=whoop, field_b=recovery_score), 'does weight track with training volume?' (source_a=withings, field_a=weight_lbs, source_b=strava, field_b=total_distance_miles). r > 0.4 is practically meaningful.",
+            "description": "Pearson correlation between any two numeric metrics, with optional day lag. Surfaces statistical associations — note correlations do not imply causation. Examples: 'is HRV associated with next-day training output?' (source_a=whoop, field_a=hrv, source_b=strava, field_b=total_distance_miles, lag_days=1), 'does task count correlate with recovery score?' (source_a=todoist, field_a=tasks_completed, source_b=whoop, field_b=recovery_score), 'how does weight track with training volume?' (source_a=withings, field_a=weight_lbs, source_b=strava, field_b=total_distance_miles). r > 0.4 is practically meaningful for n=1 data; interpret patterns as hypotheses to test, not conclusions.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -13969,7 +13969,7 @@ TOOLS = {
         "fn": tool_get_day_type_analysis,
         "schema": {
             "name": "get_day_type_analysis",
-            "description": "Segment health metrics by training day type (rest/light/moderate/hard/race). Cross-references Whoop strain, Strava, and training load to classify each day, then compares averages for sleep, recovery, and nutrition across day types. Use for: 'how does my sleep differ on hard training days?', 'do I eat more on rest days?', 'what\'s my HRV on hard vs easy days?', 'how does day type affect recovery?'",
+            "description": "Segment health metrics by training day type (rest/light/moderate/hard/race). Cross-references Whoop strain, Strava, and training load to classify each day, then compares averages for sleep, recovery, and nutrition across day types. Shows associations, not causation. Use for: 'how does my sleep differ on hard vs easy days?', 'do I eat more on rest days?', 'what\'s my HRV pattern on hard vs easy days?', 'how do my recovery metrics look by day type?'",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -14784,11 +14784,85 @@ def handle_tools_list(_params):
     return {"tools": [t["schema"] for t in TOOLS.values()]}
 
 
+# ── SEC-3: MCP input validation ───────────────────────────────────────────────
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_MAX_STR_LEN = 500   # cap free-text inputs to prevent oversized payloads
+_MAX_ARRAY_LEN = 100
+
+def _validate_tool_args(tool_name: str, arguments: dict, schema: dict) -> dict:
+    """Validate and sanitize tool arguments against the tool's inputSchema.
+    Returns a cleaned copy of arguments; raises ValueError on hard failures."""
+    if not isinstance(arguments, dict):
+        raise ValueError(f"Tool '{tool_name}': arguments must be an object, got {type(arguments).__name__}")
+
+    props    = schema.get("properties", {})
+    required = schema.get("required", [])
+    cleaned  = {}
+
+    # Check required fields
+    for field in required:
+        if field not in arguments:
+            raise ValueError(f"Tool '{tool_name}': missing required argument '{field}'")
+
+    # Validate and coerce each provided argument
+    for key, value in arguments.items():
+        # Drop unknown keys — don't error, just ignore (future-proof)
+        if key not in props:
+            logger.warning(f"[SEC-3] Tool '{tool_name}': unknown arg '{key}' — dropped")
+            continue
+
+        expected_type = props[key].get("type")
+        enum_vals     = props[key].get("enum")
+
+        # Enum validation
+        if enum_vals is not None and value not in enum_vals:
+            raise ValueError(f"Tool '{tool_name}': arg '{key}' must be one of {enum_vals}, got {value!r}")
+
+        # Type coercion / validation
+        if expected_type == "string":
+            if not isinstance(value, str):
+                value = str(value)
+            # Cap length
+            if len(value) > _MAX_STR_LEN:
+                logger.warning(f"[SEC-3] Tool '{tool_name}': arg '{key}' truncated {len(value)}→{_MAX_STR_LEN}")
+                value = value[:_MAX_STR_LEN]
+            # Date format check for date-named fields
+            if ("date" in key or key.endswith("_day")) and value and not _DATE_RE.match(value):
+                raise ValueError(f"Tool '{tool_name}': arg '{key}' must be YYYY-MM-DD, got {value!r}")
+        elif expected_type == "number" or expected_type == "integer":
+            if not isinstance(value, (int, float)):
+                try:
+                    value = float(value)
+                except (TypeError, ValueError):
+                    raise ValueError(f"Tool '{tool_name}': arg '{key}' must be numeric, got {value!r}")
+        elif expected_type == "boolean":
+            if not isinstance(value, bool):
+                value = bool(value)
+        elif expected_type == "array":
+            if not isinstance(value, list):
+                raise ValueError(f"Tool '{tool_name}': arg '{key}' must be an array, got {type(value).__name__}")
+            if len(value) > _MAX_ARRAY_LEN:
+                logger.warning(f"[SEC-3] Tool '{tool_name}': arg '{key}' array truncated to {_MAX_ARRAY_LEN}")
+                value = value[:_MAX_ARRAY_LEN]
+
+        cleaned[key] = value
+
+    return cleaned
+
+
 def handle_tools_call(params):
     name      = params.get("name")
     arguments = params.get("arguments", {})
     if name not in TOOLS:
         raise ValueError(f"Unknown tool: {name}")
+    # SEC-3: validate arguments against tool's inputSchema before dispatch
+    input_schema = TOOLS[name]["schema"].get("inputSchema", {})
+    try:
+        arguments = _validate_tool_args(name, arguments, input_schema)
+    except ValueError as ve:
+        logger.warning(f"[SEC-3] Validation error for '{name}': {ve}")
+        return {"content": [{"type": "text", "text": json.dumps(
+            {"error": "invalid_arguments", "detail": str(ve)}, default=str)}]}
     logger.info(f"Calling tool '{name}' with args: {arguments}")
     result = TOOLS[name]["fn"](arguments)
     return {"content": [{"type": "text", "text": json.dumps(result, default=str)}]}

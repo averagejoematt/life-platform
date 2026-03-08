@@ -31,6 +31,7 @@ echo "Attaching layer: $LAYER_ARN"
 echo ""
 
 LAMBDAS=(
+    # Email / digest Lambdas (use board_loader, retry_utils, insight_writer, html_builder, ai_calls)
     "daily-brief"
     "weekly-digest"
     "monthly-digest"
@@ -39,9 +40,15 @@ LAMBDAS=(
     "weekly-plate"
     "monday-compass"
     "anomaly-detector"
+    "brittany-weekly-email"
+    # Compute Lambdas (use scoring_engine, character_engine, output_writers)
     "character-sheet-compute"
+    "daily-metrics-compute"
     "daily-insight-compute"
+    "adaptive-mode-compute"
     "hypothesis-engine"
+    # Dashboard refresh (uses output_writers)
+    "dashboard-refresh"
 )
 
 ATTACHED=0

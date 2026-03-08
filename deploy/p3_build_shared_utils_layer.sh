@@ -31,6 +31,10 @@ SHARED_MODULES=(
     "board_loader.py"
     "insight_writer.py"
     "scoring_engine.py"
+    "character_engine.py"
+    "output_writers.py"
+    "ai_calls.py"
+    "html_builder.py"
 )
 
 echo "═══ Building Shared Utils Lambda Layer ═══"
@@ -72,7 +76,7 @@ echo "  Zip size: $(du -h "$ZIP_FILE" | cut -f1)"
 echo "Publishing layer..."
 LAYER_VERSION_ARN=$(aws lambda publish-layer-version \
     --layer-name "$LAYER_NAME" \
-    --description "Shared utils: retry_utils, board_loader, insight_writer, scoring_engine (Python 3.12)" \
+    --description "Shared utils: retry_utils, board_loader, insight_writer, scoring_engine, character_engine, output_writers, ai_calls, html_builder (Python 3.12)" \
     --zip-file "fileb://$ZIP_FILE" \
     --compatible-runtimes python3.12 \
     --compatible-architectures x86_64 \

@@ -1,56 +1,86 @@
-# Life Platform — Handover v2.96.0
+# Life Platform — Handover v2.97.0
 **Date:** 2026-03-08  
-**Session:** Architecture Review Hardening — Batch 1 complete + SEC-1 IAM decomposition
+**Session:** P1 Hardening Batch — all 6 tasks built
 
 ---
 
 ## What Was Done This Session
 
-### Hardening Batch 1 — All 5 Quick Wins ✅
-- **AI-1** — Health disclaimers on all 8 email Lambdas (deployed)
-- **MAINT-3** — 39 stale files archived to `archive/20260308/`
-- **COST-1** — S3 Glacier lifecycle on `raw/` prefix (90 days)
-- **SEC-4** — API Gateway throttle: 1.67 req/s on `health-auto-export-api`
-- **IAM-2** — `life-platform-analyzer` (IAM Access Analyzer) live
+### All 6 P1 Tasks Complete (source edits done, deploy pending)
 
-### SEC-1 — IAM Role Decomposition ✅ COMPLETE
-Live audit showed the bulk of the work was already done by a prior session. Only 2 Lambdas remained on the shared `lambda-weekly-digest-role`:
+#### MAINT-2 — Lambda Layer Expanded ✅
+- `deploy/p3_build_shared_utils_layer.sh` — expanded from 4 → 8 modules: adds `character_engine.py`, `output_writers.py`, `ai_calls.py`, `html_builder.py`
+- `deploy/p3_attach_shared_utils_layer.sh` — expanded from 11 → 16 Lambdas: adds `brittany-weekly-email`, `daily-metrics-compute`, `adaptive-mode-compute`, `dashboard-refresh`
 
-| Lambda | Old Role | New Role |
-|--------|----------|----------|
-| `brittany-weekly-email` | `lambda-weekly-digest-role` | `life-platform-email-role` |
-| `life-platform-qa-smoke` | `lambda-weekly-digest-role` | `life-platform-compute-role` |
+#### SEC-2 — Secret Split ✅
+- `deploy/sec2_split_secrets.sh` — verifies `ai-keys` Phase 1 complete, creates `ingestion-keys` + `webhook-key`, updates ingestion Lambda env vars, tightens IAM role policies to `ai-keys` only
+- Bundle `api-keys` → FROZEN after run; delete 2026-04-08
 
-**Result:** `lambda-weekly-digest-role` has zero Lambda users. Tagged `status=deprecated, deprecated-date=2026-03-08`.
+#### SEC-3 — MCP Input Validation ✅
+- `lambdas/mcp_server.py` — added `_validate_tool_args()` function + wired into `handle_tools_call()`
+- Validates: required fields, type coercion, YYYY-MM-DD date format, 500-char string cap, 100-item array cap, enum values
+- Returns `{error: invalid_arguments, detail: "..."}` instead of crashing on bad input
 
-**All 35 Lambdas are now on scoped roles:**
-- `life-platform-compute-role` — 5 compute Lambdas (no SES, no blog S3)
-- `life-platform-email-role` — 8 email Lambdas (daily-brief, monday-compass, nutrition-review, wednesday-chronicle, weekly-plate, anomaly-detector, brittany-weekly-email + freshness-checker)
-- `life-platform-digest-role` — 2 digest Lambdas (weekly-digest, monthly-digest)
-- 20 dedicated per-function roles — all ingestion, MCP, enrichment, utility Lambdas
+#### REL-1 — Compute Staleness Detection ✅
+- `lambdas/daily_brief_lambda.py` — checks `computed_at` timestamp; flags stale if >4h old or missing
+- `lambdas/html_builder.py` — renders amber banner in email when stale flag set; `build_html()` signature extended with `compute_stale=False, compute_age_msg=""`
+
+#### DATA-1 — schema_version on DDB Items ✅
+- `lambdas/daily_brief_lambda.py` — `store_day_grade()` writes `schema_version: 1`
+- `lambdas/whoop_lambda.py` — daily item writes `schema_version: 1` (canonical pattern for remaining 11 ingestion Lambdas)
+- `deploy/data1_backfill_schema_version.sh` — backfills all existing `USER#matthew` items (conditional update, safe to re-run)
+
+#### AI-2 — Correlational Language ✅
+- `lambdas/mcp_server.py` — `get_cross_source_correlation` and `get_day_type_analysis` descriptions updated from causal to correlational framing; added "correlations do not imply causation" note
 
 ---
 
-## Pending Action: Delete Deprecated Role (7 days)
+## What Still Needs to Run
 
-After confirming clean operation on 2026-03-15, delete `lambda-weekly-digest-role`:
-
+**Step 1 — Build + attach Lambda Layer (MAINT-2):**
 ```bash
-# List its policies first
-aws iam list-role-policies --role-name lambda-weekly-digest-role --no-cli-pager
-aws iam list-attached-role-policies --role-name lambda-weekly-digest-role --no-cli-pager
+bash deploy/p3_build_shared_utils_layer.sh
+# Copy the LAYER_VERSION_ARN from the output, then:
+bash deploy/p3_attach_shared_utils_layer.sh arn:aws:lambda:us-west-2:205930651321:layer:life-platform-shared-utils:X
+```
 
-# Then delete inline policies, detach managed policies, delete role
-# (run manually — don't script a delete of a role until you've confirmed what's attached)
+**Step 2 — Split secrets (SEC-2):**
+```bash
+bash deploy/sec2_split_secrets.sh
+```
+Note: reads the current `api-keys` bundle live to extract per-domain keys. Review the output before proceeding.
+
+**Step 3 — Deploy code changes (SEC-3, REL-1, DATA-1, AI-2):**
+```bash
+bash deploy/deploy_v2.97.0.sh
+```
+Deploys: `life-platform-mcp`, `daily-brief`, `whoop-data-ingestion`
+
+**Step 4 — Backfill schema_version on existing DDB items (DATA-1):**
+```bash
+bash deploy/data1_backfill_schema_version.sh
+```
+
+**Step 5 — Commit:**
+```bash
+git add -A && git commit -m "v2.97.0: P1 hardening — SEC-2/3, MAINT-2, REL-1, DATA-1, AI-2" && git push
 ```
 
 ---
 
-## Commit
-
-```bash
-git add -A && git commit -m "v2.96.0: SEC-1 complete — lambda-weekly-digest-role deprecated, all 35 Lambdas on scoped roles" && git push
+## Remaining DATA-1 Work (follow-on)
+11 ingestion Lambdas still need `"schema_version": 1` added to their `put_item` calls.
+Pattern from `whoop_lambda.py`:
+```python
+table.put_item(Item={
+    "pk": f"USER#{USER_ID}#SOURCE#<source>",
+    "sk": f"DATE#{date_str}",
+    "date": date_str,
+    "schema_version": 1,   # ← add this line
+    **normalized,
+})
 ```
+Lambdas to update: garmin, eightsleep, strava, habitify, withings, apple_health, health_auto_export, macrofactor, todoist, notion, weather
 
 ---
 
@@ -64,26 +94,30 @@ git add -A && git commit -m "v2.96.0: SEC-1 complete — lambda-weekly-digest-ro
 | COST-1 | S3 Glacier lifecycle |
 | SEC-4 | API Gateway rate limiting |
 | IAM-2 | IAM Access Analyzer |
-| SEC-1 | IAM role decomposition — shared role deprecated |
+| SEC-1 | IAM role decomposition complete |
+| SEC-2 | Secret split (script written — run pending) |
+| SEC-3 | MCP input validation |
+| MAINT-2 | Lambda Layer expanded (scripts updated — run pending) |
+| REL-1 | Compute staleness detection |
+| DATA-1 | schema_version (partial — backfill + 2 lambdas; 11 remain) |
+| AI-2 | Correlational language in descriptions |
 
-### 🔴 Next Up (P1 — Next 2 Weeks)
-| Task | Priority | Description |
-|------|----------|-------------|
-| SEC-2 | P1 | Split `life-platform/api-keys` into domain-specific secrets |
-| SEC-3 | P1 | Input validation on MCP tool arguments |
-| MAINT-1 | P1 | `requirements.txt` per Lambda with pinned versions |
-| MAINT-2 | P1 | Lambda Layer for shared modules |
-| DATA-1 | P1 | Add `schema_version` to all DynamoDB items |
-| REL-1 | P1 | Graceful degradation when compute Lambdas fail |
-
-### Note on SEC-2
-`p0_split_secret.sh` already exists in `deploy/` — read it before running to understand what it does and whether it's current.
+### 🟡 Next (P2)
+| Task | Description |
+|------|-------------|
+| MAINT-1 | requirements.txt per Lambda |
+| OBS-2 | CloudWatch operational dashboard |
+| COST-3 | AI token usage alarm |
+| REL-2 | DLQ consumer Lambda |
+| REL-4 | Synthetic health check |
+| REL-3 | DynamoDB 400KB monitoring |
 
 ---
 
 ## Platform State
-- **Version:** v2.96.0
-- **Lambdas:** 35 (all on scoped IAM roles)
+- **Version:** v2.97.0
+- **Lambdas:** 35
 - **MCP Tools:** 144
 - **Modules:** 30
-- **IAM:** No shared roles. `lambda-weekly-digest-role` deprecated.
+- **Layer:** life-platform-shared-utils (8 modules, needs build+attach)
+- **Secrets:** 3 scoped + 1 frozen bundle (after SEC-2 runs)
