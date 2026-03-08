@@ -462,9 +462,9 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | # | Task | Priority | Effort | Model | Status |
 |---|------|----------|--------|-------|--------|
-| SEC-1 | **Decompose shared IAM role into per-function roles.** `lambda-weekly-digest-role` shared by 10+ Lambdas violates least-privilege. Each Lambda gets dedicated role. No role accesses secrets it doesn't use. | P0 | M (3-4 hr) | Sonnet | 🔴 |
-| SEC-2 | **Split consolidated api-keys secret into domain-specific secrets.** `life-platform/api-keys` contains 9 credentials. Extend `ai-keys` pattern: separate secrets for anthropic, todoist, habitify, notion, dropbox, health-auto-export, mcp. +$2.40/mo. | P1 | M (2-3 hr) | Sonnet | 🔴 |
-| SEC-3 | **Add input validation to MCP tool arguments.** `handle_tools_call` passes raw arguments with no schema validation. Validate against TOOLS dict schemas before execution. | P1 | M (3-4 hr) | Sonnet | 🔴 |
+| SEC-1 | **Decompose shared IAM role into per-function roles.** `lambda-weekly-digest-role` shared by 10+ Lambdas violates least-privilege. Each Lambda gets dedicated role. No role accesses secrets it doesn't use. | P0 | M (3-4 hr) | Sonnet | ✅ |
+| SEC-2 | **Split consolidated api-keys secret into domain-specific secrets.** `life-platform/api-keys` contains 9 credentials. Extend `ai-keys` pattern: separate secrets for anthropic, todoist, habitify, notion, dropbox, health-auto-export, mcp. +$2.40/mo. | P1 | M (2-3 hr) | Sonnet | ✅ |
+| SEC-3 | **Add input validation to MCP tool arguments.** `handle_tools_call` passes raw arguments with no schema validation. Validate against TOOLS dict schemas before execution. | P1 | M (3-4 hr) | Sonnet | ✅ |
 | SEC-4 | **Add rate limiting to API Gateway webhook.** Health Auto Export API Gateway has no WAF/rate limiting. Add 100 req/min rate rule. | P2 | S (1 hr) | Sonnet | 🔴 |
 | SEC-5 | **Implement dependency vulnerability scanning.** No pip-audit or Snyk. Run `pip-audit` on all Lambda dependency sets monthly. | P2 | S (1-2 hr) | Sonnet | 🔴 |
 
@@ -472,14 +472,14 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | # | Task | Priority | Effort | Model | Status |
 |---|------|----------|--------|-------|--------|
-| IAM-1 | **Audit all Lambda IAM roles for excessive permissions.** Export actual policies, verify no `*` resources, confirm MCP lacks `Scan`/`DeleteItem`. | P1 | M (3-4 hr) | Sonnet | 🔴 |
+| IAM-1 | **Audit all Lambda IAM roles for excessive permissions.** Export actual policies, verify no `*` resources, confirm MCP lacks `Scan`/`DeleteItem`. | P1 | M (3-4 hr) | Sonnet | ✅ |
 | IAM-2 | **Enable IAM Access Analyzer.** Free. Identifies unused permissions and external access. | P2 | S (1 hr) | Sonnet | 🔴 |
 
 #### Epic: Reliability & Recovery
 
 | # | Task | Priority | Effort | Model | Status |
 |---|------|----------|--------|-------|--------|
-| REL-1 | **Add compute failure signals.** If `daily-metrics-compute` fails, Daily Brief silently uses stale data. Compute Lambdas write status record; Brief checks before proceeding and degrades gracefully. | P1 | M (3-4 hr) | Sonnet | 🔴 |
+| REL-1 | **Add compute failure signals.** If `daily-metrics-compute` fails, Daily Brief silently uses stale data. Compute Lambdas write status record; Brief checks before proceeding and degrades gracefully. | P1 | M (3-4 hr) | Sonnet | ✅ |
 | REL-2 | **Implement DLQ consumer Lambda.** Failed messages accumulate with no processing. Consumer classifies transient vs permanent, retries transient, alerts on permanent. | P2 | M (3-4 hr) | Sonnet | 🔴 |
 | REL-3 | **Add 400KB item size monitoring.** DDB 400KB limit risk for Strava/MacroFactor. CloudWatch alarm + ingestion pre-write size check with truncate/split at 350KB. | P2 | S (2 hr) | Sonnet | 🔴 |
 | REL-4 | **Add synthetic end-to-end health check.** Daily Lambda writes known test record, reads back, verifies integrity. Covers DDB, S3, MCP. | P2 | S (2 hr) | Sonnet | 🔴 |

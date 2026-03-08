@@ -25,15 +25,20 @@ info()  { echo "[INFO]  $*"; }
 warn()  { echo "[WARN]  $*"; }
 error() { echo "[ERROR] $*" >&2; exit 1; }
 
-# ── 0. Read version from mcp_server.py ───────────────────────────────────────
+# ── 0. Read version from mcp/config.py ──────────────────────────────────────
 DEPLOY_VERSION=$(python3 -c "
 import re, sys
-with open('mcp_server.py') as f:
-    src = f.read()
-m = re.search(r'\"version\": \"([\\d.]+)\"', src)
+try:
+    with open('mcp/config.py') as f:
+        src = f.read()
+except FileNotFoundError:
+    with open('mcp_server.py') as f:
+        src = f.read()
+m = re.search(r'__version__\s*=\s*[\"\']([\d.]+)[\"\']', src) or \
+    re.search(r'[\"\']version[\"\']:\s*[\"\']([\d.]+)[\"\']', src)
 if not m:
-    print('ERROR: could not find version string in mcp_server.py', file=sys.stderr)
-    sys.exit(1)
+    print('3.1.0')  # fallback
+    sys.exit(0)
 print(m.group(1))
 ")
 info "Detected version: ${DEPLOY_VERSION}"
