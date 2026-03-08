@@ -52,6 +52,10 @@ table    = dynamodb.Table(TABLE_NAME)
 s3       = boto3.client("s3", region_name=REGION)
 secrets  = boto3.client("secretsmanager", region_name=REGION)
 
+# AI model constants — read from env so model can be updated without redeployment
+AI_MODEL       = os.environ.get("AI_MODEL",       "claude-sonnet-4-6")
+AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+
 HYPOTHESES_PK = f"USER#{USER_ID}#SOURCE#hypotheses"
 MAX_NEW_HYPOTHESES = 5
 MAX_PENDING_HYPOTHESES = 20   # don't accumulate stale hypotheses
@@ -350,7 +354,7 @@ Return ONLY this JSON structure:
 }}"""
 
     payload = json.dumps({
-        "model": "claude-sonnet-4-6",
+        "model": AI_MODEL,
         "max_tokens": 2000,
         "system": HYPOTHESIS_SYSTEM_PROMPT,
         "messages": [{"role": "user", "content": user_message}],
@@ -444,7 +448,7 @@ Based on this data, is this hypothesis:
 Respond ONLY with JSON: {{"verdict": "confirming|refuted|insufficient", "evidence": "1-2 sentence explanation"}}"""
 
         payload = json.dumps({
-            "model": "claude-haiku-4-5",
+            "model": AI_MODEL_HAIKU,
             "max_tokens": 150,
             "messages": [{"role": "user", "content": check_prompt}],
         }).encode()

@@ -54,6 +54,9 @@ _api_key_cache = None
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table    = dynamodb.Table(TABLE_NAME)
 
+# AI model constant — read from env so model can be updated without redeployment
+AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+
 
 # ==============================================================================
 # HELPERS
@@ -491,7 +494,7 @@ Return ONLY a JSON array, no preamble:
 [{{"type": "sleep_timing", "text": "get to bed by 10", "executed": false, "evidence": "sleep start 23:30 -- 90 min late", "confidence": "high"}}]"""
 
     payload = json.dumps({
-        "model": "claude-haiku-4-5-20251001",
+        "model": AI_MODEL_HAIKU,
         "max_tokens": 600,
         "messages": [{"role": "user", "content": prompt}],
     }).encode()
