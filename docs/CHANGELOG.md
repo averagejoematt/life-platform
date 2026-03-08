@@ -1,5 +1,21 @@
 # Life Platform — Changelog
 
+## v3.1.4 — 2026-03-08: Architecture Review #2 + handover
+
+### Review #2 conducted (v3.1.3 post-hardening)
+- Re-graded all 9 dimensions against Review #1 baseline
+- Security C+ → **B+**, Reliability B- → **B+**, Operability C+ → **B-**, Data Quality B → **B+**, AI Rigor C+ → **B-**, Maintainability C → **B-**, Production Readiness D+ → **C**
+- Identified #1 remaining gap: 3 safety modules built but not wired (platform_logger, ingestion_validator, ai_output_validator)
+- Identified #2 gap: 4 stale docs (ARCHITECTURE, INFRASTRUCTURE, INCIDENT_LOG, PROJECT_PLAN)
+
+### Files updated
+- `docs/REVIEW_2026-03-08_v2.md` — Full Review #2 document
+- `handovers/2026-03-08_architecture_review_v2.md` — Detailed brief for next Sonnet session (7 items with exact instructions)
+- `docs/PROJECT_PLAN.md` — Tier 8 statuses updated: 20 ✅, 3 ⚠️ built, 1 ⚠️ partial, 11 🔴 open
+- `docs/CHANGELOG.md` — This entry
+
+---
+
 ## v3.1.3 — 2026-03-08: P3 Lambdas deployed
 
 - **data-reconciliation** (DATA-3): weekly gap report Lambda live. EventBridge Monday 07:30 UTC. First run: RED (17 gaps / 6 sources — all bootstrap noise or expected absence, zero real ingestion failures). Created `lambda-data-reconciliation-role` (DDB read + KMS + SES + S3 config).
