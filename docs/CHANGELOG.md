@@ -1,5 +1,22 @@
 # Life Platform — Changelog
 
+## v2.91.0 — 2026-03-08: Monday Compass — Weekly Planning Email
+
+### Monday Compass (`monday-compass` Lambda)
+- **New Lambda:** `lambdas/monday_compass_lambda.py` (v1.0.0)
+- **Schedule:** Monday 7:00 AM PT (EventBridge `cron(0 15 ? * MON *)`)
+- **Purpose:** Forward-looking weekly planning email bridging health state with task load — the demand-side intelligence layer missing from all other emails
+- **6 sections:** State of the Week, On Deck This Week (tasks by pillar), Prioritization Intelligence (AI cross-pillar reasoning), The Overdue Pile (commit/defer/delete), Board Pro Tips (3 context-selected members), This Week's Keystone (single highest-leverage action)
+- **Data sources:** Todoist live API (due-this-week + overdue filters), Character Sheet (DDB), Computed Metrics (DDB), Day Grades (7d, DDB), Whoop recovery (DDB), Habit scores (DDB), Profile (DDB), Insights ledger (IC-16)
+- **New config:** `config/project_pillar_map.json` → S3 — maps Todoist project names to platform pillars; falls back to hardcoded defaults if absent
+- **Board integration:** Dynamically selects 3 Board members based on weakest pillar + recovery + overdue backlog; always includes Rodriguez (decision fatigue / planning domain)
+- **AI:** `claude-sonnet-4-6`, temperature 0.4 (clarity > creativity), max_tokens 3500, ~$0.05/week
+- **IC-15 hook:** Persists planning insight to insights ledger after each send
+- **Deploy:** `deploy/deploy_monday_compass.sh` (creates Lambda, EventBridge rule, CloudWatch alarm, smoke test)
+- **Lambdas:** 34 → 35 | **Emails/digests:** 5 → 6
+
+---
+
 ## v2.90.0 — 2026-03-08: IC-8 Intent vs Execution Gap
 
 ### IC-8: Intent vs Execution Gap
