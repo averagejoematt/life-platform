@@ -791,32 +791,16 @@ Write in clean paragraphs. No bullet points. No numbered lists. No headers withi
 # ══════════════════════════════════════════════════════════════════════════════
 
 def call_anthropic(system_prompt, user_message, api_key):
-    payload = json.dumps({
-        "model": "claude-sonnet-4-5-20250929",
-        "max_tokens": 4096,
-        "temperature": 0.6,
-        "system": system_prompt,
-        "messages": [{"role": "user", "content": user_message}],
-    }).encode()
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages", data=payload,
-        headers={"Content-Type": "application/json", "x-api-key": api_key,
-                 "anthropic-version": "2023-06-01"}, method="POST",
+    # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
+    import retry_utils
+    return retry_utils.call_anthropic_api(
+        prompt=user_message,
+        api_key=api_key,
+        max_tokens=4096,
+        system=system_prompt,
+        temperature=0.6,
+        timeout=90,
     )
-    for attempt in range(1, 3):
-        try:
-            with urllib.request.urlopen(req, timeout=90) as r:
-                resp = json.loads(r.read())
-                return resp["content"][0]["text"].strip()
-        except urllib.error.HTTPError as e:
-            logger.warning(f"Anthropic HTTP {e.code} attempt {attempt}")
-            if attempt < 2 and e.code in (429, 529, 500, 502, 503, 504):
-                time.sleep(5)
-            else: raise
-        except urllib.error.URLError as e:
-            logger.warning(f"Anthropic network error attempt {attempt}: {e}")
-            if attempt < 2: time.sleep(5)
-            else: raise
 
 
 # ══════════════════════════════════════════════════════════════════════════════

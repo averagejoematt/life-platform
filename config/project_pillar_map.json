@@ -1,8 +1,20 @@
 {
-  "_comment": "Maps Todoist project names to Life Platform pillars. Edit to match your actual project structure.",
+  "_comment": "Maps Todoist project names to Life Platform pillars for Monday Compass.",
+  "_last_verified": "2026-03-08 — verified against DynamoDB completions_by_project keys",
+  "_actual_projects": ["To Do", "Inbox", "Long Term", "Re-Occuring", "Watch and Listen", "Growth & Relationships"],
   "_pillars": ["sleep", "movement", "nutrition", "mind", "metabolic", "consistency", "relationships"],
-  "_version": "1.0.0",
+  "_version": "2.0.0",
 
+  "_note": "Matthew's Todoist structure is intentionally flat — most tasks live in 'To Do'. Pillar context comes from task labels and names, not project hierarchy.",
+
+  "To Do":                 "consistency",
+  "Inbox":                 "consistency",
+  "Long Term":             "mind",
+  "Re-Occuring":           "consistency",
+  "Watch and Listen":      "mind",
+  "Growth & Relationships": "relationships",
+
+  "_fallbacks_comment": "Below are fallbacks in case new projects are added — keep in sync with actual Todoist structure",
   "Health & Body":         "movement",
   "Health":                "movement",
   "Fitness":               "movement",
@@ -23,7 +35,6 @@
   "Friends":               "relationships",
   "Finance":               "metabolic",
   "Money":                 "metabolic",
-  "Monarch":               "metabolic",
   "Health Metrics":        "metabolic",
   "Work":                  "consistency",
   "Career":                "consistency",
@@ -32,6 +43,5 @@
   "Life Admin":            "consistency",
   "Errands":               "consistency",
   "Personal":              "consistency",
-  "Projects":              "consistency",
-  "Inbox":                 "consistency"
+  "Projects":              "consistency"
 }

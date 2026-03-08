@@ -1,5 +1,75 @@
 # Life Platform — Changelog
 
+## v2.94.0 — 2026-03-08: Infrastructure Cleanup & Documentation
+
+### KMS Key ID Recorded
+- INFRASTRUCTURE.md: added KMS CMK key ID `444438d1-a5e0-43b8-9391-3cd2d70dde4d`, key ARN, rotation policy, CloudTrail note
+- Also updated: Secrets Manager count (6→8), CloudWatch alarm count (35→44), EventBridge section rewritten for Scheduler migration, version stamp updated to v2.93.0
+
+### P3 — Stale SECRET_NAME Audit
+- Audited all 35 Lambdas for `SECRET_NAME` env var pointing to nonexistent secrets
+- Finding: `habitify-data-ingestion` has `SECRET_NAME=life-platform/habitify` (secret doesn't exist)
+  - Harmless: Lambda uses `HABITIFY_SECRET_NAME` (different var), but misleading
+  - All other `SECRET_NAME` values verified against live Secrets Manager — all correct
+- `deploy/p3_secret_name_audit_fix.sh` removes the stale var from habitify Lambda
+
+### P3 — deploy_unified.sh v2.0
+- Rewrote `deploy/deploy_unified.sh` to cover all 35 current Lambdas (was missing ~15 added since v2.42)
+- Now delegates to `deploy_lambda.sh` (auto-reads handler config from AWS; no hardcoded zip names)
+- Garmin handled via `fix_garmin_deps.sh` special case (needs garminconnect/garth bundle)
+- Extra files (retry_utils, board_loader, etc.) listed per Lambda for correct packaging
+- `all` target deploys everything with 10s pauses
+
+### P3 — Lambda Layer Scripts
+- `deploy/p3_build_garmin_layer.sh`: builds `life-platform-garmin-deps` layer (garminconnect + garth, linux/x86_64, Python 3.12); removes need to bundle deps in every garmin deploy zip
+- `deploy/p3_build_shared_utils_layer.sh`: builds `life-platform-shared-utils` layer (retry_utils, board_loader, insight_writer, scoring_engine)
+- `deploy/p3_attach_shared_utils_layer.sh`: attaches shared utils layer to all 11 consumer Lambdas (AI + compute)
+- Layers are infrastructure scripts — run when ready to switch; no deploy required today
+
+### project_pillar_map.json — Verified & Corrected
+- Queried DynamoDB `completions_by_project` keys across 2025-present
+- Actual Todoist projects: `To Do`, `Inbox`, `Long Term`, `Re-Occuring`, `Watch and Listen`, `Growth & Relationships`
+- Rewrote `config/project_pillar_map.json` v2.0.0 with verified project names as primary entries, generic fallbacks preserved
+- Mappings: To Do→consistency, Long Term→mind, Re-Occuring→consistency, Watch and Listen→mind, Growth & Relationships→relationships
+- `deploy/p3_deploy_pillar_map.sh`: uploads to S3
+
+---
+
+## v2.93.0 — 2026-03-08: P1 Security & Reliability Hardening
+
+### P1.8 + P1.9 — Exponential Backoff + Token Metrics
+- **New:** `lambdas/retry_utils.py` — shared Anthropic API module: 4-attempt exponential backoff (5s/15s/45s), token usage to CloudWatch `LifePlatform/AI`, failure metric on exhaustion
+- All 7 AI Lambdas updated to delegate to `retry_utils` (ai_calls, weekly/monthly digest, nutrition-review, wednesday-chronicle, weekly-plate, monday-compass)
+- All hardcoded `claude-sonnet-4-5-20250929` model strings replaced with `os.environ.get("AI_MODEL", ...)`
+- IAM: `cloudwatch:PutMetricData` added to all 3 scoped roles (namespace-scoped `LifePlatform/AI`)
+
+### P1.7 — Invocation-Count Alarms (Silent Failure Detection)
+- 8 CloudWatch alarms: fire when 0 invocations in expected window (26h daily / 7d weekly)
+- `TreatMissingData=breaching` — silence triggers alarm
+- All route to `life-platform-alerts` SNS topic
+
+### P1.10 — DynamoDB Item Size Alerting
+- Strava + MacroFactor ingestion Lambdas emit `DynamoDBItemSizeKB` metric to `LifePlatform/Ingestion`
+- Alarm `life-platform-ddb-item-size-warning` fires at ≥300KB (DDB limit 400KB)
+
+### P1.4 — MCP Auth (No Action)
+- MCP URL called by Claude.ai (no AWS IAM creds) — HMAC Bearer with 90-day rotation is correct auth. Deferred as already adequate.
+
+### P1.5 — KMS CMK for DynamoDB
+- Created CMK `alias/life-platform-dynamodb` with annual auto-rotation
+- `life-platform` table SSE updated from AWS-owned key → CMK (zero downtime)
+- Every Decrypt call now logged in CloudTrail
+
+### P1.6 — EventBridge Rules → EventBridge Scheduler (DST-safe)
+- All 27 Lambda schedules migrated to EventBridge Scheduler with `America/Los_Angeles` timezone
+- DST transitions now automatic — `deploy_dst_spring/fall.sh` scripts no longer needed
+- New IAM role: `life-platform-scheduler-role`; new Scheduler group: `life-platform`
+- Old EventBridge rules disabled (not deleted) for rollback safety
+- `monthly_digest_lambda.py`: added Monday guard (fires 1st of month, skips if not Monday)
+- Migration script: `deploy/p1_migrate_eventbridge_scheduler.py` (Python, JSON-safe)
+
+---
+
 ## v2.92.0 — 2026-03-08: P0 Security Hardening
 
 ### IAM Role Decomposition

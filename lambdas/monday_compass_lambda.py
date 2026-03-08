@@ -492,32 +492,16 @@ def _fallback_board_context(week_state):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def call_anthropic(system_prompt, user_message, api_key, max_tokens=3000):
-    payload = json.dumps({
-        "model": "claude-sonnet-4-6",
-        "max_tokens": max_tokens,
-        "temperature": 0.4,
-        "system": system_prompt,
-        "messages": [{"role": "user", "content": user_message}],
-    }).encode()
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages", data=payload,
-        headers={"Content-Type": "application/json", "x-api-key": api_key,
-                 "anthropic-version": "2023-06-01"}, method="POST",
+    # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
+    import retry_utils
+    return retry_utils.call_anthropic_api(
+        prompt=user_message,
+        api_key=api_key,
+        max_tokens=max_tokens,
+        system=system_prompt,
+        temperature=0.4,
+        timeout=120,
     )
-    for attempt in range(1, 3):
-        try:
-            with urllib.request.urlopen(req, timeout=120) as r:
-                return json.loads(r.read())["content"][0]["text"].strip()
-        except urllib.error.HTTPError as e:
-            logger.warning(f"Anthropic HTTP {e.code} attempt {attempt}")
-            if attempt < 2 and e.code in (429, 529, 500, 502, 503, 504):
-                time.sleep(5)
-            else:
-                raise
-        except urllib.error.URLError as e:
-            logger.warning(f"Anthropic network error attempt {attempt}: {e}")
-            if attempt < 2: time.sleep(5)
-            else: raise
 
 
 SYSTEM_PROMPT = """You are the author of "The Monday Compass" — Matthew's weekly planning intelligence email. Your job is to connect his health state to his task load and help him start the week with clarity and intention rather than anxiety and noise.

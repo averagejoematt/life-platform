@@ -486,13 +486,26 @@ def lambda_handler(event, context):
 
     written = 0
     for date_str_key, item in day_items.items():
-        # ── Item size estimation (F2.2) ────────────────────────────────────────
+        # ── Item size estimation + CloudWatch metric (P1.10) ─────────────────────
         item_json = json.dumps(floats_to_decimal(item), default=str)
         item_size_kb = len(item_json.encode('utf-8')) / 1024
         if item_size_kb > 350:
             print(f"[SIZE-WARNING] ⚠️ MacroFactor item for {date_str_key} is {item_size_kb:.0f}KB — approaching 400KB DynamoDB limit!")
         elif item_size_kb > 250:
             print(f"[SIZE-INFO] MacroFactor item for {date_str_key} is {item_size_kb:.0f}KB")
+        try:
+            cw = boto3.client("cloudwatch", region_name=REGION)
+            cw.put_metric_data(
+                Namespace="LifePlatform/Ingestion",
+                MetricData=[{
+                    "MetricName": "DynamoDBItemSizeKB",
+                    "Dimensions": [{"Name": "Source", "Value": "macrofactor"}],
+                    "Value": item_size_kb,
+                    "Unit": "Kilobytes",
+                }],
+            )
+        except Exception as e:
+            print(f"[WARN] CloudWatch item size metric failed (non-fatal): {e}")
         table.put_item(Item=floats_to_decimal(item))
         written += 1
 

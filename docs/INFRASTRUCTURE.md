@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-03-08 (v2.91.0)
+> Last updated: 2026-03-08 (v2.93.0)
 
 ---
 
@@ -87,6 +87,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Table | `life-platform` |
 | Key schema | PK: `USER#matthew#SOURCE#<source>` · SK: `DATE#YYYY-MM-DD` |
 | Protection | Deletion protection ON · PITR enabled (35-day rolling) |
+| Encryption | KMS CMK `alias/life-platform-dynamodb` (key `444438d1-a5e0-43b8-9391-3cd2d70dde4d`) · annual auto-rotation ON |
 | Partitions (27) | whoop, eightsleep, garmin, strava, withings, habitify, macrofactor, apple_health, notion_journal, todoist, weather, supplements, cgm, labs, genome, dexa, day_grade, habit_scores, character_sheet, chronicle, coaching_insights, life_events, contacts, temptations, cold_heat_exposure, exercise_variety, adaptive_mode |
 
 ---
@@ -106,7 +107,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Field | Value |
 |-------|-------|
 | Alert topic | `life-platform-alerts` → email to `awsdev@mattsusername.com` |
-| CloudWatch alarms | 35 metric alarms (ALARM-only notifications, no OK notifications) — all 29 Lambdas covered |
+| CloudWatch alarms | 44 metric alarms (ALARM-only; 35 base + 8 invocation-count + 1 DDB item size) |
 
 ---
 
@@ -131,10 +132,10 @@ All DNS-validated via Route 53 CNAME records.
 
 ---
 
-## Secrets Manager (6 secrets)
+## Secrets Manager (8 secrets)
 
 All under prefix `life-platform/`. No values stored in this doc — access via AWS console or CLI.
-Consolidated from 12 → 6 on 2026-03-05 (saves $2.40/month). Static API keys merged into `api-keys`.
+Consolidated from 12 → 6 on 2026-03-05. P0 (2026-03-08) added `ai-keys` to isolate Anthropic key.
 
 | Secret | Type | Fields / Notes |
 |--------|------|----------------|
@@ -144,6 +145,7 @@ Consolidated from 12 → 6 on 2026-03-05 (saves $2.40/month). Static API keys me
 | `strava` | OAuth | Auto-refreshed by Lambda |
 | `withings` | OAuth | Auto-refreshed by Lambda |
 | `garmin` | Session | Auto-refreshed by Lambda |
+| `ai-keys` | JSON bundle | `anthropic_api_key` only — isolated from api-keys bundle (P0 hardening) |
 | `mcp-api-key` | Bearer token | Auto-rotates every 90 days (next: 2026-05-30) |
 
 ---
@@ -167,9 +169,33 @@ Consolidated from 12 → 6 on 2026-03-05 (saves $2.40/month). Static API keys me
 
 ---
 
-## EventBridge Schedule (29+ rules)
+## EventBridge Scheduler
 
-See PROJECT_PLAN.md "Ingestion Schedule" section for full timing.
+Migrated from EventBridge Rules → EventBridge Scheduler on 2026-03-08 (P1.6).
+
+| Field | Value |
+|-------|-------|
+| Scheduler group | `life-platform` |
+| Timezone | `America/Los_Angeles` (DST-safe — no manual rule updates needed at DST transitions) |
+| IAM role | `life-platform-scheduler-role` |
+| Old rules | Disabled (not deleted) — rollback: `aws events enable-rule --name <rule>` |
+| Schedules | 27 total — see PROJECT_PLAN.md Ingestion Schedule for full timing |
+
+---
+
+## KMS
+
+| Field | Value |
+|-------|-------|
+| Key alias | `alias/life-platform-dynamodb` |
+| Key ID | `444438d1-a5e0-43b8-9391-3cd2d70dde4d` |
+| Key ARN | `arn:aws:kms:us-west-2:205930651321:key/444438d1-a5e0-43b8-9391-3cd2d70dde4d` |
+| Purpose | DynamoDB table `life-platform` SSE (server-side encryption) |
+| Rotation | Annual auto-rotation ON |
+| Key policy | Root admin + all Lambda execution roles + DynamoDB service principal |
+| CloudTrail | Every Decrypt/GenerateDataKey call logged |
+
+See `deploy/p1_kms_dynamodb.sh` for creation script.
 
 ---
 

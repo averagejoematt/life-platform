@@ -900,20 +900,10 @@ One sentence. Concrete. Specific. Actionable in 7 days. Must reference actual nu
 Be honest. Be a coach, not a cheerleader."""
 
 
-def call_anthropic_with_retry(req, timeout=35, max_attempts=2, backoff_s=5):
-    for attempt in range(1, max_attempts + 1):
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return json.loads(r.read())
-        except urllib.error.HTTPError as e:
-            print(f"[WARN] Anthropic HTTP {e.code} attempt {attempt}")
-            if attempt < max_attempts and e.code in (429, 529, 500, 502, 503, 504):
-                time.sleep(backoff_s)
-            else: raise
-        except urllib.error.URLError as e:
-            print(f"[WARN] Anthropic network error attempt {attempt}: {e}")
-            if attempt < max_attempts: time.sleep(backoff_s)
-            else: raise
+def call_anthropic_with_retry(req, timeout=55, max_attempts=None, backoff_s=None):
+    # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
+    import retry_utils
+    return retry_utils.call_anthropic_raw(req, timeout=timeout)
 
 
 def call_haiku(data, profile, api_key):
@@ -943,7 +933,7 @@ def call_haiku(data, profile, api_key):
             print(f"[WARN] IC-16 progressive context failed: {e}")
 
     payload = json.dumps({
-        "model": "claude-sonnet-4-6", "max_tokens": 1500,
+        "model": os.environ.get("AI_MODEL", "claude-sonnet-4-6"), "max_tokens": 1500,
         "messages": [{"role": "user", "content": BOARD_PROMPT.format(
             data_json=json.dumps(pd, indent=2, default=str),
             grade_summary=grade_summary,
