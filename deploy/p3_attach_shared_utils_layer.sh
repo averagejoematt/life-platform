@@ -69,11 +69,16 @@ for fn in "${LAMBDAS[@]}"; do
     NEW_LAYERS=$(python3 -c "
 import json, sys
 
-existing = json.loads('$EXISTING') if '$EXISTING' != '[]' else []
+raw = '$EXISTING'
+try:
+    parsed = json.loads(raw)
+except Exception:
+    parsed = None
+existing = parsed if isinstance(parsed, list) else []
 new_arn = '$LAYER_ARN'
 layer_base = ':'.join(new_arn.split(':')[:-1])  # strip version number
 
-# Remove old version of same layer
+# Remove old version of same layer, append new
 filtered = [a for a in existing if not a.startswith(layer_base)]
 filtered.append(new_arn)
 print(' '.join(filtered))

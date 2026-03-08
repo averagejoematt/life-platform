@@ -12,7 +12,6 @@
 set -euo pipefail
 REGION="us-west-2"
 TABLE="life-platform"
-USER_PREFIX="USER#matthew"
 
 echo "=== DATA-1: Backfilling schema_version=1 on all DynamoDB items ==="
 echo "Table: $TABLE | Region: $REGION"
@@ -20,11 +19,10 @@ echo ""
 
 python3 << 'PYEOF'
 import boto3
-import sys
-from boto3.dynamodb.conditions import Attr
+from boto3.dynamodb.conditions import Key, Attr
 
-REGION    = "us-west-2"
-TABLE     = "life-platform"
+REGION      = "us-west-2"
+TABLE       = "life-platform"
 USER_PREFIX = "USER#matthew"
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
@@ -37,22 +35,21 @@ errors  = 0
 
 print("Scanning for items missing schema_version...")
 
-paginator = dynamodb.meta.client.get_paginator("scan")
-pages = paginator.paginate(
-    TableName=TABLE,
-    FilterExpression="begins_with(pk, :prefix) AND attribute_not_exists(schema_version)",
-    ExpressionAttributeValues={":prefix": {"S": USER_PREFIX}},
-    ProjectionExpression="pk, sk",
-)
+# Use resource-level scan with Attr conditions — avoids low-level DDB type issues
+scan_kwargs = {
+    "FilterExpression": Attr("pk").begins_with(USER_PREFIX) & Attr("schema_version").not_exists(),
+    "ProjectionExpression": "pk, sk",
+}
 
 items_to_update = []
-for page in pages:
-    for item in page.get("Items", []):
-        items_to_update.append({
-            "pk": item["pk"]["S"],
-            "sk": item["sk"]["S"],
-        })
-    scanned += page.get("Count", 0)
+while True:
+    resp = table.scan(**scan_kwargs)
+    items_to_update.extend(resp.get("Items", []))
+    scanned += resp.get("Count", 0)
+    last = resp.get("LastEvaluatedKey")
+    if not last:
+        break
+    scan_kwargs["ExclusiveStartKey"] = last
 
 print(f"  Found {len(items_to_update)} items to update (scanned {scanned} total)")
 print()
@@ -68,14 +65,14 @@ for i, key in enumerate(items_to_update, 1):
         updated += 1
         if updated % 100 == 0:
             print(f"  ... updated {updated}/{len(items_to_update)}")
-    except dynamodb.meta.client.exceptions.ConditionalCheckFailedException:
+    except table.meta.client.exceptions.ConditionalCheckFailedException:
         skipped += 1  # already has schema_version
     except Exception as e:
         errors += 1
         print(f"  ERROR on {key['pk']} / {key['sk']}: {e}")
 
 print()
-print(f"=== Done ===")
+print("=== Done ===")
 print(f"  Updated:  {updated}")
 print(f"  Skipped:  {skipped} (already had schema_version)")
 print(f"  Errors:   {errors}")

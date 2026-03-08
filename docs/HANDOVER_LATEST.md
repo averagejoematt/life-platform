@@ -35,7 +35,42 @@
 
 ---
 
-## What Still Needs to Run
+## Status: ALL DEPLOYED ✅
+
+All 6 P1 tasks complete and live. Git committed at `85cb969`.
+
+## Remaining Cleanup
+
+### DATA-1 follow-on
+11 ingestion Lambdas still need `"schema_version": 1` on their `put_item` calls. Backfill already ran (15,489 items updated). Pattern in `whoop_lambda.py`.
+
+Lambdas: garmin, eightsleep, strava, habitify, withings, apple_health, health_auto_export, macrofactor, todoist, notion, weather
+
+### Layer attach for dashboard-refresh Lambdas
+The two dashboard refresh Lambdas have different names than expected:
+```bash
+bash deploy/p3_attach_shared_utils_layer.sh arn:aws:lambda:us-west-2:205930651321:layer:life-platform-shared-utils:1
+# Already attached to 15 Lambdas. dashboard-refresh-afternoon and dashboard-refresh-evening
+# were missed — can manually attach or skip (they don't use all 8 shared modules).
+```
+
+### api-keys bundle
+Frozen. Delete on or after 2026-04-08:
+```bash
+aws secretsmanager delete-secret --secret-id life-platform/api-keys --region us-west-2
+```
+
+### lambda-weekly-digest-role
+Deprecated. Delete on or after 2026-03-15:
+```bash
+aws iam list-role-policies --role-name lambda-weekly-digest-role
+aws iam list-attached-role-policies --role-name lambda-weekly-digest-role
+aws iam delete-role --role-name lambda-weekly-digest-role
+```
+
+---
+
+## Archived: What Was Deployed
 
 **Step 1 — Build + attach Lambda Layer (MAINT-2):**
 ```bash
