@@ -1,5 +1,41 @@
 # Life Platform — Changelog
 
+## v3.1.0 — 2026-03-08: Security hardening complete
+
+### SEC-1: IAM Role Decomposition
+- Created 13 dedicated per-function IAM roles replacing shared `lambda-weekly-digest-role`
+- Each role scoped to exact permissions: DDB R/W vs R-only, specific S3 prefixes, only needed secrets
+- `deploy/setup_sec1_iam_roles.sh` — idempotent, creates roles + assigns to Lambdas
+- Most restrictive: adaptive-mode and daily-metrics-compute (DDB + KMS only, no S3/Secrets/SES)
+
+### SEC-2: Secret Split
+- Created `life-platform/todoist`, `life-platform/notion`, `life-platform/dropbox` secrets
+- Each Lambda now reads from its own domain-specific secret instead of consolidated bundle
+- Updated ANTHROPIC_SECRET env vars to point to `life-platform/ai-keys` for all AI Lambdas
+- `deploy/setup_sec2_secrets.sh` — reads api-keys bundle, distributes values, updates Lambda env vars
+- Cost: +$1.20/month for 3 new secrets
+
+### SEC-3: MCP Input Validation
+- Added `_validate_tool_args()` to `mcp/handler.py` before every tool call
+- Validates: required fields present, argument types match schema, strings under 2000 chars (injection guard)
+- Non-breaking: extra args allowed (backward compatible), unknown tools handled separately
+- Warnings logged as `[SEC-3]` for audit trail
+
+### IAM-1: Role Audit
+- `deploy/iam1_audit_roles.sh` — comprehensive audit script
+- Checks: wildcard actions/resources, dangerous DDB actions (Scan/DeleteItem), IAM privilege escalation risk, shared roles, orphaned roles
+- Deep audit of MCP server role (high-value target)
+- Human-readable report to `/tmp/iam_audit_<date>.txt`
+
+### REL-1: Compute Failure Signals
+- Added CloudWatch alarms for 4 compute Lambdas: daily-metrics-compute (errors + missed execution), daily-insight-compute, character-sheet-compute
+- All alarms → SNS `life-platform-alerts` → email notification within 5 min of failure
+- Email stale-compute banner already live in `html_builder.py` (line 1106) — proactive SNS alarm is new
+- `deploy/rel1_compute_alarm.sh`
+- Total CloudWatch alarms: ~39 (was 35)
+
+---
+
 ## v3.0.0 — 2026-03-08: P3 hardening complete
 
 ### OBS-1: Structured JSON Logging (`platform_logger.py`)

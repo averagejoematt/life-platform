@@ -63,9 +63,72 @@ def handle_tools_call(params):
     arguments = params.get("arguments", {})
     if name not in TOOLS:
         raise ValueError(f"Unknown tool: {name}")
+    # SEC-3: Validate arguments before execution
+    validation_error = _validate_tool_args(name, arguments)
+    if validation_error:
+        logger.warning(f"[SEC-3] Input validation failed for '{name}': {validation_error}")
+        raise ValueError(f"Invalid arguments for tool '{name}': {validation_error}")
     logger.info(f"Calling tool '{name}' with args: {arguments}")
     result = TOOLS[name]["fn"](arguments)
     return {"content": [{"type": "text", "text": json.dumps(result, default=str)}]}
+
+
+# ── SEC-3: MCP input validation ─────────────────────────────────────────────
+def _validate_tool_args(name: str, arguments: dict) -> str | None:
+    """Validate tool arguments against the tool's JSON schema inputSchema.
+
+    Returns an error message string if validation fails, None if valid.
+    Only validates required fields and basic type checking — not deep schema
+    validation (no jsonschema dep). Covers the main injection/crash vectors.
+    """
+    tool = TOOLS.get(name)
+    if not tool:
+        return None  # unknown tool handled separately
+
+    schema = tool.get("schema", {}).get("inputSchema", {})
+    properties = schema.get("properties", {})
+    required = schema.get("required", [])
+
+    # 1. Check required fields are present
+    for field in required:
+        if field not in arguments:
+            return f"Missing required argument: '{field}'"
+
+    # 2. Check types of provided arguments against schema
+    TYPE_MAP = {
+        "string":  str,
+        "integer": int,
+        "number":  (int, float),
+        "boolean": bool,
+        "array":   list,
+        "object":  dict,
+    }
+    for arg_name, arg_val in arguments.items():
+        if arg_name not in properties:
+            continue  # allow extra args — don't break existing callers
+        expected_type = properties[arg_name].get("type")
+        if not expected_type:
+            continue
+        py_type = TYPE_MAP.get(expected_type)
+        if py_type and not isinstance(arg_val, py_type):
+            # Allow int where float expected (JSON numbers)
+            if expected_type == "number" and isinstance(arg_val, int):
+                continue
+            return (
+                f"Argument '{arg_name}' has wrong type: "
+                f"expected {expected_type}, got {type(arg_val).__name__}"
+            )
+
+    # 3. Sanity check: reject suspiciously large string values (prompt injection guard)
+    MAX_STRING_LEN = 2000
+    for arg_name, arg_val in arguments.items():
+        if isinstance(arg_val, str) and len(arg_val) > MAX_STRING_LEN:
+            return (
+                f"Argument '{arg_name}' exceeds maximum length "
+                f"({len(arg_val)} > {MAX_STRING_LEN} chars)"
+            )
+
+    return None
 
 
 METHOD_HANDLERS = {
