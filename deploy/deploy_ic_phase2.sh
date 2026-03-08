@@ -8,7 +8,7 @@
 #   3. monthly-digest: IC-16 + insight_writer.py
 #   4. wednesday-chronicle: IC-16 + insight_writer.py
 #   5. nutrition-review: IC-16 + insight_writer.py
-#   6. weekly-plate-schedule: IC-16 + insight_writer.py
+#   6. weekly-plate: IC-16 + insight_writer.py
 #   7. life-platform-mcp: IC-19 (Decision Journal — 3 new tools, 139→142)
 #
 # Uses deploy_lambda.sh which auto-reads handler config from AWS.
@@ -62,8 +62,8 @@ sleep 10
 
 # ── 6. Weekly Plate (IC-16) ──
 echo ""
-echo "🍽️ 6/7: weekly-plate-schedule (IC-16 Progressive Context — meal planning)"
-bash deploy/deploy_lambda.sh weekly-plate-schedule lambdas/weekly_plate_lambda.py \
+echo "🍽️ 6/7: weekly-plate (IC-16 Progressive Context — meal planning)"
+bash deploy/deploy_lambda.sh weekly-plate lambdas/weekly_plate_lambda.py \
     --extra-files lambdas/board_loader.py lambdas/insight_writer.py
 
 sleep 10
