@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-Last updated: 2026-03-05 (v2.72.0 — 120 MCP tools, 25-module package, 28 Lambdas, 19 data sources)
+Last updated: 2026-03-08 (v2.91.0 — 144 MCP tools, 30-module package, 35 Lambdas, 19 data sources)
 
 ---
 
@@ -8,7 +8,7 @@ Last updated: 2026-03-05 (v2.72.0 — 120 MCP tools, 25-module package, 28 Lambd
 
 ### Scheduled ingestion times (Pacific Time)
 
-**⚠️ All EventBridge crons use fixed UTC. PT times shift by 1 hour when DST changes (next: March 8, 2026).**
+**⚠️ All EventBridge crons use fixed UTC. Times below reflect PDT (UTC-7, from March 8 2026). During PST (UTC-8, Nov–Mar) all times shift 1 hour earlier.**
 | Source | Schedule | Lambda |
 |--------|----------|--------|
 | Whoop | 06:00 AM | whoop-data-ingestion |
@@ -27,13 +27,14 @@ Last updated: 2026-03-05 (v2.72.0 — 120 MCP tools, 25-module package, 28 Lambd
 | Character Sheet Compute | 09:35 AM | character-sheet-compute (v1.0, reads yesterday's data, stores to DDB) |
 | Freshness Check | 09:45 AM | life-platform-freshness-checker |
 | Daily Brief | 10:00 AM | daily-brief (v2.62, 19 sections, 4 AI calls, reads character_sheet record, dedup, regrade mode, dynamic weight context, 7d training context) |
-| **DST note** | — | **All crons use fixed UTC.** Run `deploy_dst_spring_2026.sh` before March 8 and adjust crons each DST transition. |
+| **DST note** | — | All crons fixed UTC. Times above are PDT (UTC-7). Run `deploy/deploy_dst_spring_2026.sh` at each DST transition. |
 | Anomaly Detector | 08:05 AM | anomaly-detector |
 | Nutrition Review | 09:00 AM (Saturday only) | nutrition-review (v1.1, Sonnet, 3-expert panel) |
 | Weekly Digest | 08:00 AM (Sunday only) | weekly-digest (v4.3) |
 | Monthly Digest | 08:00 AM (1st Monday only) | monthly-digest (v1.1) |
 | Wednesday Chronicle | 07:00 AM (Wednesday only) | wednesday-chronicle (v1.1, Sonnet, Elena Voss) |
-| The Weekly Plate | 06:00 PM (Friday only) | weekly-plate (v1.0, Sonnet, food magazine email, ~63s) |
+| Monday Compass | 08:00 AM (Monday only) | monday-compass (v1.0, Sonnet, weekly planning email — tasks by pillar, Board Pro Tips, Keystone) |
+| The Weekly Plate | 07:00 PM (Friday only) | weekly-plate (v1.0, Sonnet, food magazine email, ~63s) |
 | Dashboard Refresh | 02:00 PM | dashboard-refresh (lightweight, no AI — updates weight/glucose/zone2/TSB/buddy) |
 | Dashboard Refresh | 06:00 PM | dashboard-refresh (same as above, second daily run) |
 | Dropbox Poll | Every 30 min | dropbox-poll |
