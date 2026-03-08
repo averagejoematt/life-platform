@@ -65,6 +65,15 @@ Deploys 7 Lambdas sequentially (10s delay between each):
 6. `weekly-plate-schedule` — IC-16
 7. `life-platform-mcp` — IC-19 (142 tools)
 
+**Deploy status (all 7 confirmed):**
+1. daily-brief ✅ (2026-03-08T03:19:50)
+2. weekly-digest ✅ (2026-03-08T03:20:02)
+3. monthly-digest ✅ (2026-03-08T03:20:14)
+4. wednesday-chronicle ✅ (2026-03-08T03:20:26)
+5. nutrition-review ✅ (2026-03-08T03:20:38)
+6. weekly-plate ✅ (2026-03-08T03:21:50) — deploy script had wrong name `weekly-plate-schedule`, fixed to `weekly-plate`
+7. life-platform-mcp ✅ — `deploy_mcp_split.sh` smoke test reported FAIL but CloudWatch confirms clean init (121 MB, tools/list succeeded). False alarm from stale smoke test format.
+
 **Post-deploy verification:**
 ```bash
 # MCP tool count (should be 142)
