@@ -1,5 +1,28 @@
 # Life Platform — Changelog
 
+## v2.94.1 — 2026-03-08: Architecture Review
+
+### Full Architecture Review Conducted
+- Comprehensive cross-functional review covering: architecture, security, reliability, observability, cost, code quality, data quality, AI rigor, maintainability, production readiness
+- Skeptical principal engineer pass: 15 harshest critiques, 10 hidden risks, 10 simplification opportunities, 5 most likely break points
+- Grades: Architecture B+, Security C+, Reliability B-, Operability C+, Cost A, Data Quality B, AI Rigor C+, Maintainability C, Production Readiness D+
+
+### New Files
+- `docs/REVIEW_2026-03-08.md` — Full review document (35 findings, 10 epics, 35 improvement tasks)
+- `docs/REVIEW_METHODOLOGY.md` — Repeatable review process with prompt template and cadence
+- `deploy/generate_review_bundle.sh` — Automated AWS state snapshot for future reviews
+
+### PROJECT_PLAN.md Updated
+- Added **Tier 8 — Architecture Review Hardening**: 35 tasks across 10 epics
+- Epics: Security Hardening, IAM Cleanup, Reliability & Recovery, Observability Uplift, Cost Optimization, Codebase Maintainability, Data Model & Quality, AI Trustworthiness & Validation, Platform Simplification, Productization Readiness
+- Each task annotated with priority (P0-P3), effort (S/M/L), preferred model (Sonnet/Opus), status
+- Model split: 28 Sonnet tasks, 7 Opus tasks
+
+### Key Decision
+- **No new features until P0/P1 hardening items complete.** Top priorities: IAM decomposition (SEC-1), health disclaimers (AI-1), shared Lambda Layer (MAINT-2), MCP input validation (SEC-3)
+
+---
+
 ## v2.94.0 — 2026-03-08: Infrastructure Cleanup & Documentation
 
 ### KMS Key ID Recorded

@@ -450,6 +450,109 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 ---
 
+### Tier 8 — Architecture Review Hardening (added 2026-03-08)
+
+> Full architecture review conducted 2026-03-08 at v2.91.0. Results: `docs/REVIEW_2026-03-08.md`. Methodology: `docs/REVIEW_METHODOLOGY.md`. Review bundle script: `deploy/generate_review_bundle.sh`.
+>
+> **Review grades:** Architecture B+, Security C+, Reliability B-, Operability C+, Cost A, Data Quality B, AI Rigor C+, Maintainability C, Production Readiness D+.
+>
+> **Principle:** No new features until P0/P1 hardening items complete. Fix the plumbing before installing the smart home system.
+
+#### Epic: Security Hardening
+
+| # | Task | Priority | Effort | Model | Status |
+|---|------|----------|--------|-------|--------|
+| SEC-1 | **Decompose shared IAM role into per-function roles.** `lambda-weekly-digest-role` shared by 10+ Lambdas violates least-privilege. Each Lambda gets dedicated role. No role accesses secrets it doesn't use. | P0 | M (3-4 hr) | Sonnet | 🔴 |
+| SEC-2 | **Split consolidated api-keys secret into domain-specific secrets.** `life-platform/api-keys` contains 9 credentials. Extend `ai-keys` pattern: separate secrets for anthropic, todoist, habitify, notion, dropbox, health-auto-export, mcp. +$2.40/mo. | P1 | M (2-3 hr) | Sonnet | 🔴 |
+| SEC-3 | **Add input validation to MCP tool arguments.** `handle_tools_call` passes raw arguments with no schema validation. Validate against TOOLS dict schemas before execution. | P1 | M (3-4 hr) | Sonnet | 🔴 |
+| SEC-4 | **Add rate limiting to API Gateway webhook.** Health Auto Export API Gateway has no WAF/rate limiting. Add 100 req/min rate rule. | P2 | S (1 hr) | Sonnet | 🔴 |
+| SEC-5 | **Implement dependency vulnerability scanning.** No pip-audit or Snyk. Run `pip-audit` on all Lambda dependency sets monthly. | P2 | S (1-2 hr) | Sonnet | 🔴 |
+
+#### Epic: IAM Cleanup
+
+| # | Task | Priority | Effort | Model | Status |
+|---|------|----------|--------|-------|--------|
+| IAM-1 | **Audit all Lambda IAM roles for excessive permissions.** Export actual policies, verify no `*` resources, confirm MCP lacks `Scan`/`DeleteItem`. | P1 | M (3-4 hr) | Sonnet | 🔴 |
+| IAM-2 | **Enable IAM Access Analyzer.** Free. Identifies unused permissions and external access. | P2 | S (1 hr) | Sonnet | 🔴 |
+
+#### Epic: Reliability & Recovery
+
+| # | Task | Priority | Effort | Model | Status |
+|---|------|----------|--------|-------|--------|
+| REL-1 | **Add compute failure signals.** If `daily-metrics-compute` fails, Daily Brief silently uses stale data. Compute Lambdas write status record; Brief checks before proceeding and degrades gracefully. | P1 | M (3-4 hr) | Sonnet | 🔴 |
+| REL-2 | **Implement DLQ consumer Lambda.** Failed messages accumulate with no processing. Consumer classifies transient vs permanent, retries transient, alerts on permanent. | P2 | M (3-4 hr) | Sonnet | 🔴 |
+| REL-3 | **Add 400KB item size monitoring.** DDB 400KB limit risk for Strava/MacroFactor. CloudWatch alarm + ingestion pre-write size check with truncate/split at 350KB. | P2 | S (2 hr) | Sonnet | 🔴 |
+| REL-4 | **Add synthetic end-to-end health check.** Daily Lambda writes known test record, reads back, verifies integrity. Covers DDB, S3, MCP. | P2 | S (2 hr) | Sonnet | 🔴 |
+
+#### Epic: Observability Uplift
+
+| # | Task | Priority | Effort | Model | Status |
+|---|------|----------|--------|-------|--------|
+| OBS-1 | **Standardize structured logging across all Lambdas.** Shared logging module: structured JSON, correlation ID (date + source), consistent fields. Migrate all Lambdas. | P1 | L (6-8 hr) | Sonnet | 🔴 |
+| OBS-2 | **Create operational health CloudWatch dashboard.** Single dashboard: alarm states, DLQ depth, error rates, last ingestion per source, AI tokens, cost MTD. | P2 | M (3-4 hr) | Sonnet | 🔴 |
+| OBS-3 | **Define SLOs for critical paths.** Daily Brief by 11 AM (99%), sources fresh within 24h (99%), MCP cold start <2s (95%), AI success 99%. | P3 | S (1-2 hr) | **Opus** | 🔴 |
+
+#### Epic: Cost Optimization
+
+| # | Task | Priority | Effort | Model | Status |
+|---|------|----------|--------|-------|--------|
+| COST-1 | **Archive unused S3 raw data to Glacier.** Lifecycle rule: `raw/` objects >90 days → Glacier. | P3 | S (30 min) | Sonnet | 🔴 |
+| COST-2 | **Audit MCP tool usage and archive low-use tools.** CloudWatch metric per tool invocation. After 30 days, archive 0-invocation tools. | P2 | M (2-3 hr) | Sonnet | 🔴 |
+| COST-3 | **Monitor AI token usage trends.** Alarm when daily Anthropic tokens >2x 7-day avg. Monthly AI cost in tracker. | P2 | S (1 hr) | Sonnet | 🔴 |
+
+#### Epic: Codebase Maintainability
+
+| # | Task | Priority | Effort | Model | Status |
+|---|------|----------|--------|-------|--------|
+| MAINT-1 | **Add dependency management (requirements.txt per Lambda).** Pinned versions. Deploy scripts install from requirements. Enables vulnerability scanning. | P1 | M (3-4 hr) | Sonnet | 🔴 |
+| MAINT-2 | **Create Lambda Layer for shared modules.** Layer contains board_loader, character_engine, ai_calls, insight_writer, html_builder, output_writers, scoring_engine. Single deploy updates all consumers. | P1 | M (3-4 hr) | Sonnet | 🔴 |
+| MAINT-3 | **Clean deploy/ and lambdas/ directories.** Archive version-specific and one-time scripts. Keep only deploy_lambda.sh, deploy_unified.sh, deploy_mcp.sh. Remove .backup/.broken/.zip from lambdas/. | P2 | S (1-2 hr) | Sonnet | 🔴 |
+| MAINT-4 | **Implement basic CI/CD with GitHub Actions.** On push to main: lint (flake8) → package zip → deploy → smoke test. Manual approval gate. | P2 | L (6-8 hr) | **Opus** | 🔴 |
+
+#### Epic: Data Model & Quality
+
+| # | Task | Priority | Effort | Model | Status |
+|---|------|----------|--------|-------|--------|
+| DATA-1 | **Add schema_version to all DDB items.** All ingestion Lambdas write `schema_version: 1` on every item. Enables versioned migrations. | P1 | S (2 hr) | Sonnet | 🔴 |
+| DATA-2 | **Add ingestion validation layer.** Shared validation module: required fields, type checks, range checks. Invalid records → DLQ, not DDB. | P1 | M (4-6 hr) | Sonnet | 🔴 |
+| DATA-3 | **Implement weekly reconciliation job.** Lambda checks all sources have records for each day of past week. Missing records flagged and reported. | P3 | M (3-4 hr) | Sonnet | 🔴 |
+
+#### Epic: AI Trustworthiness & Validation
+
+| # | Task | Priority | Effort | Model | Status |
+|---|------|----------|--------|-------|--------|
+| AI-1 | **Add health disclaimer to all AI-generated coaching.** Footer on every email: "AI-generated analysis, not medical advice." | P0 | S (1 hr) | Sonnet | 🔴 |
+| AI-2 | **Rename correlation tools / fix causal language in prompts.** All prompts referencing correlations include "correlation, not proven causal." IC hypotheses framed as "to investigate." | P2 | S (2 hr) | Sonnet | 🔴 |
+| AI-3 | **Add output validation for AI coaching.** Post-processing checks: dangerous exercise recs, supplement dosing outside safe ranges, contradictions with health conditions. | P1 | M (4-6 hr) | **Opus** | 🔴 |
+| AI-4 | **Validate IC hypothesis engine outputs.** Minimum effect size threshold, minimum sample days, confidence intervals, 30-day expiry on unconfirmed hypotheses. | P2 | M (3-4 hr) | **Opus** | 🔴 |
+
+#### Epic: Platform Simplification
+
+| # | Task | Priority | Effort | Model | Status |
+|---|------|----------|--------|-------|--------|
+| SIMP-1 | **Audit and archive low-usage MCP tools.** Usage metrics (30-day). Tools with 0 invocations flagged. Target: <100 active tools. | P2 | M (3-4 hr) | Sonnet | 🔴 |
+| SIMP-2 | **Consolidate ingestion Lambdas into shared framework.** Common config loading, DDB writing, S3 archival, gap detection. Source-specific handler functions. | P3 | L (8-12 hr) | **Opus** | 🔴 |
+
+#### Epic: Productization Readiness
+
+| # | Task | Priority | Effort | Model | Status |
+|---|------|----------|--------|-------|--------|
+| PROD-1 | **Implement Infrastructure as Code (CDK/Terraform).** All AWS resources defined in code. `cdk deploy` recreates full environment. Bash scripts retired. | P2 (P0 if productizing) | L (16-24 hr) | **Opus** | 🔴 |
+| PROD-2 | **Remove hardcoded single-user assumptions.** USER_ID parameterized end-to-end. Multi-user DDB access patterns. Per-user config loading. | P3 | L (12-16 hr) | **Opus** | 🔴 |
+
+#### Hardening Summary
+
+| Timeframe | Items | Total Effort |
+|-----------|-------|-------------|
+| **Next 2 days** (quick wins) | AI-1, MAINT-3, COST-1, SEC-4, IAM-2 | ~5 hr |
+| **Next 2 weeks** | SEC-1, SEC-2, SEC-3, MAINT-1, DATA-1, REL-1, OBS-2, AI-2, COST-3 | ~25 hr |
+| **Next 2 months** | MAINT-2, MAINT-4, OBS-1, DATA-2, AI-3, REL-2, REL-4, COST-2, SIMP-1, SEC-5, AI-4, OBS-3, DATA-3, REL-3, IAM-1 | ~55 hr |
+| **If productizing** | PROD-1, PROD-2, SIMP-2 | ~45 hr |
+
+**Model breakdown:** 28 Sonnet tasks, 7 Opus tasks. Opus reserved for: CI/CD pipeline design (MAINT-4), AI output validation design (AI-3, AI-4), SLO definition (OBS-3), and all productization architecture (PROD-1, PROD-2, SIMP-2).
+
+---
+
 ## Architecture Notes
 
 - Single DynamoDB table: PK `USER#matthew#SOURCE#<source>`, SK `DATE#YYYY-MM-DD` (+ suffixes for journal, day_grade)
