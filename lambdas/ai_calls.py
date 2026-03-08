@@ -763,6 +763,117 @@ def _compute_diminishing_returns(character_sheet, data, profile):
 
 
 # ==============================================================================
+# IC-7: CROSS-PILLAR TRADE-OFF REASONING
+# Identifies conflicting pillar signals and surfaces explicit trade-off reasoning.
+# Instead of coaching each pillar in isolation, finds where pillars are in tension
+# and identifies the limiting factor + optimization call.
+# ==============================================================================
+
+def _build_cross_pillar_tradeoffs(component_scores, data, profile):
+    """IC-7: Cross-pillar trade-off analysis.
+
+    Detects when pillars conflict and names the limiting factor + optimization call.
+    Enables coaching like: 'Sleep is the bottleneck \u2014 adding training load will compound
+    the deficit, not improve fitness' instead of independently coaching both pillars.
+
+    Returns a compact prompt block. Empty string if no meaningful trade-offs detected.
+    """
+    sleep_score       = component_scores.get("sleep")
+    movement_score    = component_scores.get("movement")
+    nutrition_score   = component_scores.get("nutrition")
+    mind_score        = component_scores.get("mind")  # noqa: F841
+    metabolic_score   = component_scores.get("metabolic_health")
+    consistency_score = component_scores.get("consistency")
+
+    mf      = data.get("macrofactor") or {}
+    whoop   = data.get("whoop") or {}
+    journal = data.get("journal") or {}
+
+    cal        = _safe_float(mf, "total_calories_kcal")
+    tsb        = data.get("tsb")
+    sleep_debt = data.get("sleep_debt_7d_hrs")
+    stress     = _safe_float(journal, "stress_avg")
+    recovery   = _safe_float(whoop, "recovery_score")
+    cal_target = profile.get("calorie_target", 1800)
+
+    tradeoffs = []
+
+    # 1. Sleep vs Movement: sleep is the limiting factor
+    if sleep_score is not None and movement_score is not None:
+        if sleep_score < 50 and movement_score > 60:
+            debt_str = f", 7d sleep debt: {sleep_debt:.1f}h" if sleep_debt else ""
+            tradeoffs.append(
+                f"  \U0001f6cc Sleep ({sleep_score}) \u2194 Movement ({movement_score}): "
+                f"Sleep is the LIMITING FACTOR{debt_str}. "
+                "Adding training load will compound sleep deficit, not build fitness. "
+                "\u2192 Optimization call: protect sleep infrastructure today; hold or reduce intensity."
+            )
+        elif sleep_score > 75 and movement_score < 45:
+            tradeoffs.append(
+                f"  \u26a1 Sleep ({sleep_score}) \u2194 Movement ({movement_score}): "
+                "Sleep is STRONG \u2014 physiological readiness is high but Movement is lagging. "
+                "\u2192 Optimization call: high-ROI training day. Substrate is recovered; adaptation window is open."
+            )
+
+    # 2. Nutrition deficit vs Training load (TSB)
+    if cal is not None and tsb is not None:
+        if cal < cal_target * 0.80 and tsb < -10:
+            tradeoffs.append(
+                f"  \u26a0\ufe0f Nutrition ({int(cal)} cal vs {cal_target} target) \u2194 Training fatigue (TSB {tsb:.0f}): "
+                "Aggressive deficit + accumulated fatigue = under-fueling risk. "
+                "\u2192 Optimization call: protein preservation takes priority over hitting calorie floor exactly today."
+            )
+
+    # 3. Mind/stress compounding physiological load
+    if stress is not None and recovery is not None:
+        if stress > 3.0 and recovery < 50:
+            tradeoffs.append(
+                f"  \U0001f9e0 Mind (journal stress {stress:.1f}/5) \u2194 Recovery ({recovery:.0f}%): "
+                "Psychological and physiological stress are COMPOUNDING. Both systems are taxed. "
+                "\u2192 Optimization call: this is a maintenance day. Reduce decision load; protect T0 habits only."
+            )
+    if stress is not None and stress > 3.5 and sleep_score is not None and sleep_score < 55:
+        if not any("COMPOUNDING" in t for t in tradeoffs):
+            tradeoffs.append(
+                f"  \U0001f9e0 Mind (stress {stress:.1f}/5) \u2194 Sleep ({sleep_score}): "
+                "Stress is likely suppressing sleep quality \u2014 the causation runs both ways. "
+                "\u2192 Optimization call: sleep protocol compliance tonight has double ROI."
+            )
+
+    # 4. Nutrition behaviour strong but metabolic adaptation lagging
+    if nutrition_score is not None and metabolic_score is not None:
+        if nutrition_score > 70 and metabolic_score < 50:
+            tradeoffs.append(
+                f"  \U0001f4c8 Nutrition behaviour ({nutrition_score}) \u2194 Metabolic health ({metabolic_score}): "
+                "Behavioural score is strong but metabolic adaptation LAGS by 1\u20133 weeks. "
+                "\u2192 Optimization call: trust the process. Consistency is the bridge."
+            )
+
+    # 5. Consistency lagging behind pillar strength
+    if consistency_score is not None and consistency_score < 45:
+        strong_pillars = [k for k, v in component_scores.items()
+                          if v is not None and v > 65 and k not in ("consistency", "relationships")]
+        if strong_pillars:
+            strong_str = ", ".join(k.replace("_", " ").title() for k in strong_pillars[:3])
+            tradeoffs.append(
+                f"  \U0001f517 Consistency ({consistency_score}) \u2194 Strong pillars ({strong_str}): "
+                "Pillar strength is real but consistency is the compounding mechanism \u2014 without it, gains don\u2019t accumulate. "
+                "\u2192 Optimization call: name one T0 habit to protect today regardless of everything else."
+            )
+
+    if not tradeoffs:
+        return ""
+
+    lines = ["CROSS-PILLAR TRADE-OFF ANALYSIS:"]
+    lines.extend(tradeoffs)
+    lines.append("")
+    lines.append("INSTRUCTION: Reason about these trade-offs explicitly in your coaching. Name the limiting factor.")
+    lines.append("Don't give equal coaching weight to all pillars \u2014 the constraint determines the ceiling.")
+    lines.append("When pillars conflict, state the optimization call: which pillar to PRIORITIZE vs which to hold.")
+    return "\n".join(lines)
+
+
+# ==============================================================================
 # DATA SUMMARY BUILDERS (used by AI prompt construction)
 # ==============================================================================
 
@@ -1225,6 +1336,9 @@ def call_board_of_directors(data, profile, day_grade, grade, component_scores, a
     # IC-25: Diminishing returns detector
     diminishing_ctx = _compute_diminishing_returns(character_sheet, data, profile)
 
+    # IC-7: Cross-pillar trade-off reasoning
+    tradeoff_ctx = _build_cross_pillar_tradeoffs(component_scores, data, profile)
+
     # Try config-driven intro, fall back to dynamic default
     bod_intro = _build_daily_bod_intro_from_config(data, profile)
     if not bod_intro:
@@ -1254,12 +1368,14 @@ DAY GRADE: {str(day_grade if day_grade is not None else "N/A")}/100 ({grade})
 {data_quality_block}
 {surprise_ctx}
 {diminishing_ctx}
+{tradeoff_ctx}
 
 Write 2-3 sentences. Reference specific numbers (at least two). Connect yesterday to today.
 Celebrate wins briefly, name gaps directly — if a Tier 0 habit was missed, NAME it.
 If a synergy stack is broken, note it. If there are LEVEL EVENTS, mention them.
 If there are ACTIVE EFFECTS like Sleep Drag, note the impact.
 CRITICAL: If habit gaps connect to metric outcomes (e.g. missed wind-down → low sleep efficiency), NAME THE CAUSAL CHAIN. Don't just list the gap.
+CROSS-PILLAR: If the trade-off analysis above identifies a limiting factor or optimization call, incorporate it — don't coach conflicting pillars independently.
 RED TEAM CHECK: If the analysis pass flagged a challenge (⚠️ above), consider it. If the correlation might be misleading or there's a confounding factor, adjust your coaching accordingly — don't give confident advice based on shaky signal. Intellectual honesty > false certainty.
 DO NOT start with "Matthew". Max 60 words."""
 
@@ -1345,6 +1461,9 @@ def call_tldr_and_guidance(data, profile, day_grade, grade, component_scores, co
     surprises = _compute_surprise_scores(data)
     surprise_ctx = _build_surprise_context(surprises)
 
+    # IC-7: Cross-pillar trade-off reasoning
+    tradeoff_ctx = _build_cross_pillar_tradeoffs(component_scores, data, profile)
+
     prompt = f"""You are the intelligence engine behind Matthew's Life Platform daily brief.
 Your job: synthesize ALL of yesterday's data into (1) one TL;DR sentence and (2) 3-4 smart, personalized guidance items for TODAY.
 
@@ -1375,10 +1494,12 @@ YESTERDAY'S SIGNALS:
 {analysis_block}
 {data_quality_block}
 {surprise_ctx}
+{tradeoff_ctx}
 
 RULES:
 - TL;DR: One sentence, max 20 words. The single most important takeaway from yesterday. Specific. Not generic.
 - Guidance: 3-4 items, each with an emoji prefix and 1 sentence. SMART — derived from the data above, not static advice. Each item should be something that could ONLY apply to TODAY given this specific data combination.
+- CROSS-PILLAR TRADE-OFFS: If the trade-off analysis above identifies a limiting factor or optimization call, let it shape guidance priority. When pillars conflict, guide toward the constraint, not all pillars simultaneously.
 - TDEE-aware nutrition guidance: use the TDEE context to reason about whether today's intake target should be maintained, increased (recovery day), or whether yesterday's intake looks like a logging gap vs genuine restriction.
 - Walk/movement coaching is STAGE-APPROPRIATE: at Week {jctx['week_num']}, if steps were high, that's a genuine training achievement — acknowledge it as such.
 - If habit gaps connect to metric outcomes, the guidance should NAME THE CAUSAL CHAIN (e.g. "Wind-down missed again last night — your sleep efficiency dropped to 71%. One habit change tonight would move that number.")
