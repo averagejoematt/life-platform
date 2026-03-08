@@ -1,5 +1,41 @@
 # Life Platform — Changelog
 
+## v2.86.0 — 2026-03-07: IC-2 Daily Insight Compute + IC-3 Chain-of-Thought + IC-6 Milestones
+
+### IC-2: Daily Insight Compute Lambda (new — 33rd Lambda)
+- **New file:** `lambdas/daily_insight_compute_lambda.py`
+- **Schedule:** 9:42 AM PT daily (EventBridge: `cron(42 17 * * ? *)`) — between daily-metrics-compute (9:40) and daily-brief (10:00)
+- **Reads (pre-computed):** `computed_metrics` (7-day), `habit_scores` (7-day), `day_grade` (14-day), `platform_memory` (coaching_calibration, what_worked, failure_pattern)
+- **Computes:** momentum signal (week-over-week grade trend), metric trend detection (3+ consecutive day runs as leading indicators), habit miss rates + weakest/strongest T0 habits, platform memory context
+- **Writes:** `SOURCE#computed_insights` DDB partition — includes `ai_context_block` string injected into all 4 Daily Brief AI calls
+- **Graceful degradation:** Daily Brief reads `data["computed_insights"]` via `_load_insights_context()` — empty string if Lambda hasn't run yet, no breakage
+
+### IC-3: Chain-of-Thought Two-Pass (BoD + TL;DR calls)
+- **New functions in `ai_calls.py`:** `_run_analysis_pass()`, `_format_analysis()`
+- **Pattern:** Pass 1 (max 150 tokens) identifies key patterns, causal chains, priority, and tone before Pass 2 writes coaching
+- **Applied to:** `call_board_of_directors` and `call_tldr_and_guidance` — both high-stakes calls that benefit most from pre-reasoning
+- **Cost:** +2 Haiku API calls per daily brief (~$0.0003 total, negligible)
+- **Effect:** Model identifies what's happening before writing — eliminates the pattern of listing gaps and metric scores independently without connecting them
+
+### IC-6: Milestone Architecture
+- **New in `ai_calls.py`:** `_WEIGHT_MILESTONES` list, `_build_milestone_context()` function
+- **6 milestones with biological significance:** Sleep Threshold (285 lbs), Walking Speed Unlock (270), Athletic Zone 2 (250), Athletic FFMI (225), Onederland (200), Goal Weight (185)
+- **Injection logic:** within 10 lbs approaching = `🎯 MILESTONE APPROACHING`; within 5 lbs past = `🏆 MILESTONE JUST ACHIEVED`
+- **Zero prompt bloat on normal days** — empty string if not near any milestone
+- **Injected into:** BoD and TL;DR+Guidance prompts (the two calls with broadest coaching scope)
+- **Override:** profile can define custom `weight_milestones` list to supersede hard-coded defaults
+
+### Files Changed
+- `lambdas/daily_insight_compute_lambda.py` — NEW
+- `lambdas/ai_calls.py` — IC-2 context reader, IC-3 analysis pass, IC-6 milestones (+~190 lines)
+- `lambdas/daily_brief_lambda.py` — fetch `computed_insights` in `gather_daily_data`, pass to data dict
+- `deploy/deploy_ic_features.sh` — NEW: creates Lambda, EventBridge rule, deploys daily-brief
+
+### Counts
+- **MCP tools:** 139 (unchanged) | **Lambdas:** 33 (+1: daily-insight-compute)
+
+---
+
 ## v2.85.0 — 2026-03-07: Prompt Intelligence Fixes (P1–P5) + IC-1 Platform Memory
 
 ### Prompt Intelligence

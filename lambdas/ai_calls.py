@@ -58,6 +58,162 @@ def _avg(vals):
 
 
 # ==============================================================================
+# IC-2: COMPUTED INSIGHTS READER
+# Reads the pre-computed platform intelligence block from daily-insight-compute Lambda.
+# ==============================================================================
+
+def _load_insights_context(data):
+    """Extract the AI context block from the computed_insights record.
+
+    Returns a compact string block for prompt injection, or empty string
+    if the insights Lambda hasn't run yet (graceful degradation).
+    """
+    insights = data.get("computed_insights")
+    if not insights:
+        return ""
+    block = insights.get("ai_context_block", "")
+    return block
+
+
+# ==============================================================================
+# IC-6: WEIGHT MILESTONE ARCHITECTURE
+# Biological waypoints with significance — injected when within 10 lbs.
+# ==============================================================================
+
+_WEIGHT_MILESTONES = [
+    {
+        "weight_lbs": 285,
+        "name": "Sleep Threshold",
+        "significance": "Sleep apnea risk drops substantially (genome flag). First major metabolic milestone on this journey.",
+        "domains": ["sleep", "metabolic"],
+    },
+    {
+        "weight_lbs": 270,
+        "name": "Walking Speed Unlock",
+        "significance": "Walking pace naturally improves ~0.3 mph from reduced load. Zone 2 walks feel meaningfully easier.",
+        "domains": ["movement", "metabolic"],
+    },
+    {
+        "weight_lbs": 250,
+        "name": "Athletic Zone 2",
+        "significance": "Zone 2 achievable at a pace that feels like a real workout — not just a stroll.",
+        "domains": ["movement", "cardiovascular"],
+    },
+    {
+        "weight_lbs": 225,
+        "name": "Athletic FFMI Range",
+        "significance": "FFMI crosses athletic range if muscle is preserved. Body composition makes the turn.",
+        "domains": ["body", "strength"],
+    },
+    {
+        "weight_lbs": 200,
+        "name": "Onederland",
+        "significance": "Under 200 lbs. Cardiovascular age improves dramatically. A threshold few expected.",
+        "domains": ["metabolic", "cardiovascular"],
+    },
+    {
+        "weight_lbs": 185,
+        "name": "Goal Weight — Transformation Complete",
+        "significance": "117 lbs lost from start. Athletic BMI. The person Matthew set out to become.",
+        "domains": ["all"],
+    },
+]
+
+
+def _build_milestone_context(profile, current_weight):
+    """Return milestone alert string if within 10 lbs of upcoming or just passed a milestone.
+
+    Empty string if no milestone is near — zero prompt bloat on normal days.
+    """
+    if current_weight is None:
+        return ""
+
+    milestones = profile.get("weight_milestones", _WEIGHT_MILESTONES)
+    lines = []
+
+    # Upcoming milestone (below current weight, approaching)
+    upcoming = [m for m in milestones if m["weight_lbs"] < current_weight]
+    if upcoming:
+        next_m = max(upcoming, key=lambda x: x["weight_lbs"])
+        lbs_away = round(current_weight - next_m["weight_lbs"], 1)
+        if lbs_away <= 10:
+            lines.append(f"🎯 MILESTONE APPROACHING: '{next_m['name']}' at {next_m['weight_lbs']} lbs ({lbs_away} lbs away)")
+            lines.append(f"   Biological significance: {next_m['significance']}")
+
+    # Most recently achieved milestone (current weight just passed it)
+    achieved = [m for m in milestones if m["weight_lbs"] >= current_weight]
+    if achieved:
+        recent_m = min(achieved, key=lambda x: x["weight_lbs"])
+        lbs_past = round(recent_m["weight_lbs"] - current_weight, 1)
+        if lbs_past <= 5:
+            lines.append(f"🏆 MILESTONE JUST ACHIEVED: '{recent_m['name']}' at {recent_m['weight_lbs']} lbs ({lbs_past} lbs below threshold)")
+            lines.append(f"   Significance: {recent_m['significance']}")
+            lines.append("   → Acknowledge this in your coaching. This is a real biological event, not just a number.")
+
+    return "\n".join(lines)
+
+
+# ==============================================================================
+# IC-3: CHAIN-OF-THOUGHT ANALYSIS PASS
+# Pass 1: structured pattern identification (100-150 tokens)
+# Pass 2: coaching output using Pass 1 analysis
+# Applied to BoD and TL;DR+Guidance calls.
+# ==============================================================================
+
+def _run_analysis_pass(component_scores, habit_miss_context, insights_ctx, api_key):
+    """IC-3 Pass 1: Identify patterns and causal chains BEFORE writing coaching.
+
+    Forces the model to reason about what's happening before it writes.
+    Returns analysis dict, or None if the call fails (graceful degradation).
+    """
+    comp_str = ", ".join(
+        f"{k.replace('_', ' ')}: {v}" for k, v in component_scores.items() if v is not None
+    )
+
+    prompt = f"""You are analyzing Matthew's health data. Output ONLY a JSON object, no preamble.
+
+COMPONENT SCORES (0-100): {comp_str}
+{insights_ctx or ''}
+{habit_miss_context}
+
+Identify the most important patterns. Output this exact JSON structure:
+{{"key_patterns": ["specific data observation 1", "specific data observation 2"], "causal_chain": "habit/metric X likely caused metric Y result because ...", "priority": "single most important coaching focus for today", "tone": "celebrate|challenge|support"}}"""
+
+    try:
+        raw = call_anthropic(prompt, api_key, max_tokens=150)
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+        if raw.endswith("```"):
+            raw = raw[:-3]
+        return json.loads(raw.strip())
+    except Exception as e:
+        print("[WARN] IC-3 analysis pass failed: " + str(e))
+        return None
+
+
+def _format_analysis(analysis):
+    """Format Pass 1 analysis for injection into Pass 2 prompt."""
+    if not analysis:
+        return ""
+    lines = ["PATTERN ANALYSIS (synthesize these into your coaching, don't just list them):"]
+    patterns = analysis.get("key_patterns", [])
+    if patterns:
+        for p in patterns:
+            lines.append(f"  • {p}")
+    chain = analysis.get("causal_chain", "")
+    if chain:
+        lines.append(f"  Causal chain: {chain}")
+    priority = analysis.get("priority", "")
+    if priority:
+        lines.append(f"  Today's priority: {priority}")
+    tone = analysis.get("tone", "")
+    if tone:
+        lines.append(f"  Tone: {tone}")
+    return "\n".join(lines)
+
+
+# ==============================================================================
 # P2: JOURNEY CONTEXT BLOCK
 # Injected into every AI call — week number, stage, stage-appropriate coaching.
 # ==============================================================================
@@ -697,6 +853,16 @@ def call_board_of_directors(data, profile, day_grade, grade, component_scores, a
     # P4: Habit → outcome patterns
     habit_outcome_ctx = _build_habit_outcome_context(data, profile)
 
+    # IC-2: Pre-computed platform intelligence
+    insights_ctx = _load_insights_context(data)
+
+    # IC-3: Chain-of-thought analysis pass (Pass 1 — patterns before coaching)
+    analysis = _run_analysis_pass(component_scores, habit_ctx + habit_outcome_ctx, insights_ctx, api_key)
+    analysis_block = _format_analysis(analysis)
+
+    # IC-6: Milestone architecture
+    milestone_ctx = _build_milestone_context(profile, data.get("latest_weight"))
+
     # Try config-driven intro, fall back to dynamic default
     bod_intro = _build_daily_bod_intro_from_config(data, profile)
     if not bod_intro:
@@ -710,6 +876,7 @@ def call_board_of_directors(data, profile, day_grade, grade, component_scores, a
 
 {journey_block}
 {health_ctx}
+{milestone_ctx}
 
 YESTERDAY'S DATA:
 {json.dumps(data_summary, indent=2, default=str)}
@@ -720,6 +887,8 @@ DAY GRADE: {str(day_grade if day_grade is not None else "N/A")}/100 ({grade})
 {habit_outcome_ctx}
 {character_ctx}
 {journal_ctx}
+{insights_ctx}
+{analysis_block}
 
 Write 2-3 sentences. Reference specific numbers (at least two). Connect yesterday to today.
 Celebrate wins briefly, name gaps directly — if a Tier 0 habit was missed, NAME it.
@@ -790,6 +959,19 @@ def call_tldr_and_guidance(data, profile, day_grade, grade, component_scores, co
     # P4: Habit → outcome patterns
     habit_outcome_ctx = _build_habit_outcome_context(data, profile)
 
+    # IC-2: Pre-computed intelligence
+    insights_ctx = _load_insights_context(data)
+
+    # IC-3: Analysis pass (Pass 1)
+    analysis = _run_analysis_pass(
+        component_scores,
+        ("MISSED HABITS: " + ", ".join(missed_mvp)) if missed_mvp else "",
+        insights_ctx, api_key)
+    analysis_block = _format_analysis(analysis)
+
+    # IC-6: Milestone
+    milestone_ctx = _build_milestone_context(profile, data_summary.get("current_weight"))
+
     prompt = f"""You are the intelligence engine behind Matthew's Life Platform daily brief.
 Your job: synthesize ALL of yesterday's data into (1) one TL;DR sentence and (2) 3-4 smart, personalized guidance items for TODAY.
 
@@ -815,6 +997,9 @@ YESTERDAY'S SIGNALS:
 - Journal mood: {data_summary.get("journal_mood")}/5, stress: {data_summary.get("journal_stress")}/5
 
 {habit_outcome_ctx}
+{insights_ctx}
+{milestone_ctx}
+{analysis_block}
 
 RULES:
 - TL;DR: One sentence, max 20 words. The single most important takeaway from yesterday. Specific. Not generic.
