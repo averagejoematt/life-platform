@@ -1,5 +1,22 @@
 # Life Platform — Changelog
 
+## v2.90.0 — 2026-03-08: IC-8 Intent vs Execution Gap
+
+### IC-8: Intent vs Execution Gap
+- **Modified:** `daily_insight_compute_lambda.py` (v1.0.0 → v1.1.0)
+- **New functions:** `analyze_intention_execution_gap()`, `_fetch_journal_for_date()`, `_extract_intention_texts()`, `_fetch_execution_metrics()`, `_evaluate_intentions_haiku()`, `_load_intention_history()`, `_compute_intention_patterns()`
+- **Data sources:** Morning `todays_intention` + prev-evening `tomorrow_focus` from Notion journal → Haiku evaluation against actual MacroFactor/Strava/Whoop/habit_scores
+- **Haiku model:** `claude-haiku-4-5-20251001`, ~$0.001/day
+- **Stores to:** `platform_memory` at `MEMORY#intention_tracking#<date>` (evaluations JSON + follow_through_rate)
+- **Compounds over time:** `_compute_intention_patterns()` detects recurring gap types (>=2 occurrences, >50% miss rate) from 14-day history
+- **Prompt block injected:** Into `ai_context_block` via `build_ai_context_block(intention_gap_ctx=...)` — surfaces today's gaps + recurring patterns + 7-day follow-through rate
+- **Non-fatal:** All IC-8 errors silently degrade to empty string; insight compute continues normally
+- **`build_ai_context_block` signature updated:** New optional `intention_gap_ctx=""` parameter (backward compatible)
+- **Handler returns:** `ic8_active: true/false` for CloudWatch monitoring
+- **Deploy:** `bash deploy/deploy_ic8.sh`
+
+---
+
 ## v2.89.0 — 2026-03-07: IC-7 Cross-Pillar Trade-offs + IC-18 Hypothesis Engine
 
 ### IC-7: Cross-Pillar Trade-off Reasoning

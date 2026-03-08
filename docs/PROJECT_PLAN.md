@@ -1,13 +1,13 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-07 (v2.89.0 — 144 MCP tools, 34 Lambdas, 30 modules, 19 data sources, 6 secrets, 35 alarms)
+> Last update: 2026-03-08 (v2.90.0 — 144 MCP tools, 34 Lambdas, 30 modules, 19 data sources, 6 secrets, 35 alarms)
 
 ---
 
 ## Current State
 
-- **Platform version:** v2.89.0
+- **Platform version:** v2.90.0
 - **MCP Server:** 144 tools across 30-module package (tools_decisions.py added), serving health data through Claude Desktop + claude.ai + Claude mobile (1024 MB, 12 tools pre-cached nightly)
 - **Remote MCP:** Function URL `c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` with OAuth auto-approve + HMAC Bearer token validation
 - **Data Sources:** 19 (12 scheduled + 1 webhook + 3 manual/periodic + 2 MCP-managed + 1 State of Mind via webhook)
@@ -301,7 +301,7 @@
 | IC-5 | **Momentum detection / early warning** | Leading-indicator signal computed 2–3 days before a struggling week develops. Triggers when 2+ early warning markers appear simultaneously (journal entry length declining, meal log gaps, habit completion 80→65%, HRV 3+ consecutive down days). Brief shifts tone and intervention proactively, not reactively. Highest-leverage behavioral intervention window is when slippage begins, not after it's established. | 3–4 hr | Month 2 |
 | ~~IC-6~~ | ~~**Milestone architecture**~~ | Computed once, stored in profile: weight/health milestones with specific biological/performance significance for Matthew. "At 285 lbs: sleep apnea risk drops substantially (genome flag). At 270 lbs: walking pace will naturally improve ~0.3 mph from reduced load. At 250 lbs: Zone 2 achievable at a pace that feels like a real workout. At 225 lbs: FFMI crosses athletic range if muscle preserved." Surfaced in coaching prompts when approaching each threshold. Converts abstract goal into a progression of meaningful waypoints. | 2–3 hr | Month 1 |
 | ~~IC-7~~ | ~~**Cross-pillar trade-off reasoning**~~ | Explicit optimization instruction added to BoD + Weekly Digest prompts. AI told to reason about trade-offs between pillars, not each in isolation. Enables: "Movement is strong but Sleep is degrading — at current TSB, adding training volume will compound sleep debt. Optimization call: hold training, invest in sleep." Currently the 7 pillars are analyzed independently. | 1–2 hr | Month 1 |
-| IC-8 | **Intent vs execution gap** | Dedicated journal analysis pass comparing stated intentions ("going to meal prep Sunday", "need to get to bed by 10") against next-day metrics. Builds personal intention-completion rate and identifies which intention types Matthew follows through on vs doesn't. Coaching AI told: "He said he'd do X. He didn't. This is the 4th time. Friction point is likely Y." The knowing-doing gap made quantifiable and specific. | 4–5 hr | Month 2 |
+| ~~IC-8~~ | ~~**Intent vs execution gap**~~ | Dedicated journal analysis pass comparing stated intentions ("going to meal prep Sunday", "need to get to bed by 10") against next-day metrics. Builds personal intention-completion rate and identifies which intention types Matthew follows through on vs doesn't. Coaching AI told: "He said he'd do X. He didn't. This is the 4th time. Friction point is likely Y." The knowing-doing gap made quantifiable and specific. | 4–5 hr | Month 2 |
 
 ### Medium-term (Month 3–5, requires sustained longitudinal data)
 
@@ -393,6 +393,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | Version | What | Date |
 |---------|------|------|
+| v2.90.0 | IC-8 Intent vs Execution Gap (daily-insight-compute v1.1.0, Haiku intention evaluator, platform_memory intention_tracking partition) | 2026-03-08 |
 | v2.89.0 | IC-7 Cross-Pillar Trade-offs (ai_calls.py) + IC-18 Hypothesis Engine (34th Lambda, Sunday 11 AM PT, 2 MCP tools, 144 total) | 2026-03-07 |
 | v2.88.0 | IC-23/24/25 (Surprise Scoring, Data Quality, Diminishing Returns) + IC-16 (Progressive Context all 6 digests) + IC-19 (Decision Journal, 3 MCP tools, 142 total) | 2026-03-07 |
 | v2.87.0 | IC-15 Insight Ledger (insight_writer.py shared module, DDB insights partition, Daily Brief integration) + IC-17 Red Team (contrarian challenge field in IC-3 analysis pass, RED TEAM CHECK in BoD + TL;DR prompts) + Roadmap IC-15–IC-22 | 2026-03-07 |
