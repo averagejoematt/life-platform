@@ -1,6 +1,6 @@
 # Life Platform — Features & Capabilities
 
-**Version:** v2.72.0 | **Last updated:** 2026-03-05
+**Version:** v2.91.0 | **Last updated:** 2026-03-08
 
 > This document describes everything the Life Platform can do, organized for two audiences:
 > **Part 1** is for anyone — what does this system do for you, organized by life domain.
@@ -397,16 +397,17 @@ Ask questions like: *"How's my HR recovery trend?"*, *"Am I getting fitter?"*, *
 
 ## 📧 Automated Emails
 
-| Email | When | What |
+| Email | When (PDT) | What |
 |-------|------|------|
-| Daily Brief v2.62 | Every day, 10:00 AM | 18-section morning intelligence with AI coaching, character sheet, dashboard + buddy JSON |
+| Monday Compass v1.0 | Monday, 8:00 AM | Weekly planning email: tasks by pillar (Todoist), health state, cross-pillar prioritization AI, overdue debt, Board Pro Tips, This Week's Keystone action |
+| Daily Brief v2.62 | Every day, 11:00 AM | 18-section morning intelligence with AI coaching, character sheet, dashboard + buddy JSON |
 | Anomaly Alert v2.1 | Daily (only if triggered) | Multi-source anomaly detection, travel-aware suppression |
 | Freshness Alert | Daily (only if triggered) | Data source staleness warnings |
-| Weekly Digest v4.3 | Sunday, 8:00 AM | 7-day summary with day grade trends, Board commentary + clinical JSON |
-| Monthly Coach's Letter | 1st Monday, 8:00 AM | 30-day review, annual goal progress, expert panel |
-| Nutrition Review v1.1 | Saturday, 9:00 AM | Sonnet-powered 3-expert panel weekly nutrition analysis |
-| Wednesday Chronicle v1.1 | Wednesday, 7:00 AM | Sonnet-powered narrative journalism by Elena Voss + blog post |
-| The Weekly Plate v1.0 | Friday, 6:00 PM | Sonnet-powered food magazine email with recipes and grocery lists |
+| Wednesday Chronicle v1.1 | Wednesday, 8:00 AM | Sonnet-powered narrative journalism by Elena Voss + blog post |
+| The Weekly Plate v1.0 | Friday, 7:00 PM | Sonnet-powered food magazine email with recipes and grocery lists |
+| Weekly Digest v4.3 | Sunday, 9:00 AM | 7-day summary with day grade trends, Board commentary + clinical JSON |
+| Monthly Coach's Letter | 1st Monday, 9:00 AM | 30-day review, annual goal progress, expert panel |
+| Nutrition Review v1.1 | Saturday, 10:00 AM | Sonnet-powered 3-expert panel weekly nutrition analysis |
 
 ---
 
@@ -477,7 +478,7 @@ MacroFactor doesn't have an API. The solution: export CSV from phone → save to
 
 | Component | Service | Count / Detail |
 |-----------|---------|---------------|
-| Lambdas | AWS Lambda (Python 3.12) | 27 total (13 ingestion, 1 webhook, 2 enrichment, 6 email/digest, 1 anomaly-detector, 1 freshness-checker, 1 character-sheet-compute, 1 dashboard-refresh, 1 MCP, 1 inbound-email, 1 key-rotator) |
+| Lambdas | AWS Lambda (Python 3.12) | 35 total (13 ingestion, 1 webhook, 2 enrichment, 7 email/digest, 5 compute, 1 anomaly-detector, 1 freshness-checker, 1 dashboard-refresh, 1 MCP, 1 inbound-email, 1 key-rotator, 1 data-export, 1 qa-smoke) |
 | Database | DynamoDB | 1 table, single-table design, on-demand billing, PITR enabled |
 | Object Storage | S3 | 1 bucket (~2.3 GB), raw archives + file triggers + static website |
 | Scheduling | EventBridge | 25 rules (13 ingestion, 12 operational) |
@@ -486,8 +487,8 @@ MacroFactor doesn't have an API. The solution: export CSV from phone → save to
 | Email (outbound) | SES | ~35 emails/month, DKIM verified domain |
 | Email (inbound) | SES Receipt Rules | `insight@aws.mattsusername.com` → S3 → Lambda |
 | Web Properties | CloudFront + S3 | 3 sites: `dash.averagejoematt.com` (dashboard + clinical), `blog.averagejoematt.com` (Chronicle), `buddy.averagejoematt.com` (accountability) |
-| Secrets | Secrets Manager | 12 secrets (OAuth tokens, API keys) |
-| Monitoring | CloudWatch | 22 alarms, 21 log groups (30-day retention) |
+| Secrets | Secrets Manager | 6 secrets (consolidated from 12 in v2.85.0) |
+| Monitoring | CloudWatch | 35 alarms, all Lambdas monitored, 30-day log retention |
 | Alerting | SNS | 1 topic → email subscription |
 | Audit | CloudTrail | Management event logging |
 | Cost Guard | AWS Budgets | $20 cap with 25/50/100% alerts |
@@ -631,12 +632,12 @@ These aren't just names — each expert's evidence-based frameworks are encoded 
 
 | Metric | Value |
 |--------|-------|
-| MCP tools | 120 |
+| MCP tools | 144 |
 | Data sources | 19 (12 scheduled + 1 webhook + 3 manual + 2 MCP-managed + 1 SoM via webhook) |
-| Lambdas | 28 |
-| EventBridge rules | 25 |
-| CloudWatch alarms | 22 |
-| Secrets | 12 |
+| Lambdas | 35 |
+| EventBridge rules | 30+ |
+| CloudWatch alarms | 35 |
+| Secrets | 6 (consolidated from 12 in v2.85.0) |
 | DynamoDB partitions | ~30 (sources + profile + cache + anomalies + day_grade + insights + experiments + travel + supplements + state_of_mind + habit_scores + character_sheet + life_events + interactions + temptations + exposures + food_responses + rewards) |
 | Daily Brief sections | 18 |
 | Haiku AI calls per brief | 4 |
@@ -646,7 +647,7 @@ These aren't just names — each expert's evidence-based frameworks are encoded 
 | Habits tracked | 65 across 9 groups |
 | Cached MCP tools | 12 (pre-computed nightly) |
 | SOT domains | 21 |
-| MCP modules | 25 (22 domain + config + utils + warmer) |
+| MCP modules | 30 |
 | Web dashboard views | 2 (daily + clinical) |
-| Monthly AWS cost | ~$6.50 |
+| Monthly AWS cost | ~$10 |
 | Development period | Feb 22-28, 2026 (7 days to v2.47.2) |

@@ -1,15 +1,15 @@
 # Life Platform — User Guide
 
 **Project:** Intelligent Life Platform (Project40 data backbone)  
-**Last updated:** 2026-03-05 (v2.75.0)
+**Last updated:** 2026-03-08 (v2.91.0)
 
 ---
 
 ## What This Is
 
-The Life Platform is a personal health intelligence system that aggregates data from nineteen sources (twelve scheduled + one webhook + three manual/periodic + two MCP-managed + one State of Mind via webhook), normalizes everything into a single DynamoDB table, and surfaces it to Claude via 121 MCP tools. A web dashboard at `https://dash.averagejoematt.com/` provides at-a-glance daily metrics and a clinical summary for doctor visits. It also sends automated daily briefs, weekly digests, and monthly reports. The result: Claude can answer questions about your health, fitness, sleep, nutrition, habits, productivity, body composition, labs, genome, glucose, gait, journal, and more using your actual data — not generics.
+The Life Platform is a personal health intelligence system that aggregates data from nineteen sources (twelve scheduled + one webhook + three manual/periodic + two MCP-managed + one State of Mind via webhook), normalizes everything into a single DynamoDB table, and surfaces it to Claude via 144 MCP tools. A web dashboard at `https://dash.averagejoematt.com/` provides at-a-glance daily metrics and a clinical summary for doctor visits. It also sends nine automated emails covering daily, weekly, and monthly cadences. The result: Claude can answer questions about your health, fitness, sleep, nutrition, habits, productivity, body composition, labs, genome, glucose, gait, journal, and more using your actual data — not generics.
 
-The platform also proactively reaches out each morning via a scheduled email layer — you don't have to ask. Anomalies are detected automatically, and a daily brief (with day grade, AI coaching, and 18 sections) is waiting in your inbox by 10:00 AM PT.
+The platform proactively reaches out on a schedule — you don't have to ask. Each Monday you get a planning email bridging your health state with your task load. Each morning brings a daily brief with day grade, AI coaching, and 18 sections. Anomalies are detected automatically.
 
 ---
 
@@ -43,11 +43,12 @@ The platform also proactively reaches out each morning via a scheduled email lay
 
 You receive automated emails without asking:
 
-| Email | Schedule | What it does |
+| Email | Schedule (PDT) | What it does |
 |-------|----------|--------------|
-| **Anomaly Alert v2.1** | Daily 8:05am PT (only if triggered) | Detects multi-source anomalies (15 metrics / 7 sources), travel-aware suppression, Haiku generates root cause hypothesis |
-| **Freshness Alert** | Daily 9:45am PT (only if triggered) | Checks all data sources for staleness, emails + SNS if any source is overdue |
-| **Daily Brief v2.6** | Daily 10:00am PT | 18-section brief: readiness, day grade + TL;DR, scorecard, weight phase, training, nutrition, **habits (tier-weighted intelligence)**, supplements, CGM spotlight, gait & mobility, weather context, travel banner, blood pressure, journal coach, Board of Directors insight, AI guidance. 4 Haiku AI calls. Writes dashboard JSON |
+| **Monday Compass v1.0** | Monday 8:00 AM | Forward-looking weekly planning email: Todoist tasks grouped by pillar, health state header, AI cross-pillar prioritization, overdue pile (commit/defer/delete), 3 Board Pro Tips, This Week's Keystone action. ~$0.05/week |
+| **Anomaly Alert v2.1** | Daily 9:05 AM (only if triggered) | Detects multi-source anomalies (15 metrics / 7 sources), travel-aware suppression, Haiku generates root cause hypothesis |
+| **Freshness Alert** | Daily 10:45 AM (only if triggered) | Checks all data sources for staleness, emails + SNS if any source is overdue |
+| **Daily Brief v2.62** | Daily 11:00 AM | 18-section brief: readiness, day grade + TL;DR, scorecard, weight phase, training, nutrition, **habits (tier-weighted intelligence)**, supplements, CGM spotlight, gait & mobility, weather context, travel banner, blood pressure, journal coach, Board of Directors insight, AI guidance. 4 Haiku AI calls. Writes dashboard JSON |
 | **Weekly Digest v4.2** | Sunday 8:30am PT | 7-day summary across all sources, day grade trends, Board of Advisors commentary (Haiku). Writes clinical.json for web dashboard |
 | **Monthly Coach's Letter** | 1st Monday 8:00am PT | 30-day vs prior-30-day deltas, annual goals progress bars, expert panel review |
 | **Nutrition Review** | Saturday 9:00am PT | Weekly food quality analysis: macro targets, micronutrients, meal timing, eating window, Norton/Patrick/Attia panel review (Sonnet) |

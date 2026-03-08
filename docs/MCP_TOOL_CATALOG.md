@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-**Version:** v2.72.0 | **Last updated:** 2026-03-05 | **Total tools:** 120
+**Version:** v2.91.0 | **Last updated:** 2026-03-08 | **Total tools:** 144
 
 > Complete reference for all MCP tools exposed to Claude Desktop.
 > For usage examples and natural language queries, see USER_GUIDE.md.
@@ -40,7 +40,12 @@
 | Social & Behavioral | 11 | 0 |
 | Longevity & Metabolic Intelligence | 4 | 0 |
 | Character Sheet Phase 4 | 3 | 0 |
-| | **Total** | **120** | **12** |
+| 25 | Todoist | 11 | 0 |
+| 26 | Platform Memory | 4 | 0 |
+| 27 | Decision Journal | 3 | 0 |
+| 28 | Adaptive Mode | 1 | 0 |
+| 29 | Hypothesis Engine | 2 | 0 |
+| | **Total** | **144** | **12** |
 
 > **Note:** 120 tools as of v2.72.0 (verified against TOOLS dict in `mcp/registry.py`).
 
@@ -406,6 +411,85 @@ Tools that require specific data sources to function:
 | `get_defense_patterns` | — | start_date, end_date | Defense mechanism patterns from journal enrichment. Frequency, mood/stress correlation, Conti assessment. |
 
 **Module:** `mcp/tools_longevity.py`
+
+---
+
+## 25. Todoist (11 tools) — v2.85.0
+
+### Read Tools
+
+| Tool | Required | Optional | Description |
+|------|----------|----------|-------------|
+| `get_task_completion_trend` | — | start_date, end_date, days | Daily completed task count + 7-day rolling average. Productivity trend signal. |
+| `get_task_load_summary` | — | date | Active count, overdue count, due-today snapshot, priority breakdown (P1-P4), cognitive load signal. |
+| `get_project_activity` | — | start_date, end_date, days | Completions by project with attention gap detection — which projects are being neglected. |
+| `get_decision_fatigue_signal` | — | start_date, end_date, days | Correlates task load × T0 habit compliance. Pearson r between cognitive load and non-negotiable habit completion. |
+| `get_todoist_day` | — | date | Full Todoist snapshot for a specific date (all fields). |
+
+### Write Tools
+
+| Tool | Required | Optional | Description |
+|------|----------|----------|-------------|
+| `list_todoist_tasks` | — | project_id, filter, limit | List active tasks. Supports Todoist filter syntax. |
+| `get_todoist_projects` | — | — | List all Todoist projects with IDs and names. |
+| `create_todoist_task` | **content** | project_id, due_string, priority, description, labels | Create a new task. Use `every! X days` syntax for completion-based recurrence. |
+| `update_todoist_task` | **task_id** | content, due_string, priority, description, labels | Update an existing task. |
+| `close_todoist_task` | **task_id** | — | Mark a task as complete. |
+| `delete_todoist_task` | **task_id** | — | Permanently delete a task. |
+
+**Note:** Use `every!` (not `every`) for recurring tasks — prevents pile-up when tasks slip.
+
+---
+
+## 26. Platform Memory (4 tools) — v2.86.0 (IC-1)
+
+| Tool | Required | Optional | Description |
+|------|----------|----------|-------------|
+| `write_platform_memory` | **category**, **content** | date, overwrite | Store a structured memory record. Categories: `failure_pattern`, `what_worked`, `coaching_calibration`, `personal_curves`, `journey_milestone`, `weekly_plate`, `insight`, `experiment_result`. |
+| `read_platform_memory` | **category** | days, limit | Retrieve recent memory records for a category. Defaults: 30 days, 10 records. |
+| `list_memory_categories` | — | days | List all categories with record counts and date ranges. |
+| `delete_platform_memory` | **category**, **date** | — | Delete a specific memory record. |
+
+**DDB partition:** `USER#matthew#SOURCE#platform_memory` / `MEMORY#<category>#<date>`
+**Module:** `mcp/tools_memory.py`
+
+---
+
+## 27. Decision Journal (3 tools) — v2.88.0 (IC-19)
+
+| Tool | Required | Optional | Description |
+|------|----------|----------|-------------|
+| `log_decision` | **decision** | source, followed, override_reason, pillars, date | Record a platform-guided decision and whether you followed it. `followed` = true/false/null. |
+| `get_decisions` | — | days, pillar, outcome_only | Retrieve decisions with trust calibration stats — follow vs override effectiveness comparison. |
+| `update_decision_outcome` | **sk** | outcome_metric, outcome_delta, outcome_notes, effectiveness | Record what happened 1-3 days after a decision. `effectiveness` 1-5 scale. |
+
+**DDB partition:** `USER#matthew#SOURCE#decisions` / `DECISION#<ISO-timestamp>`
+**Module:** `mcp/tools_decisions.py`
+
+---
+
+## 28. Adaptive Mode (1 tool) — v2.73.0 (IC-50)
+
+| Tool | Required | Optional | Description |
+|------|----------|----------|-------------|
+| `get_adaptive_mode` | — | days | Current and historical brief mode (flourishing / standard / struggling). Engagement score, contributing factors, mode distribution, current streak. Modes are pre-computed by `adaptive-mode-compute` Lambda. |
+
+**Modes:** Flourishing (score ≥70) / Standard (40-69) / Struggling (<40)
+**DDB partition:** `USER#matthew#SOURCE#adaptive_mode`
+**Module:** `mcp/tools_adaptive.py`
+
+---
+
+## 29. Hypothesis Engine (2 tools) — v2.89.0 (IC-18)
+
+| Tool | Required | Optional | Description |
+|------|----------|----------|-------------|
+| `get_hypotheses` | — | status, domain, days, include_archived | List cross-domain hypotheses generated weekly by `hypothesis-engine` Lambda. Status lifecycle: pending → confirming → confirmed (or refuted). Filter by status or domain. |
+| `update_hypothesis_outcome` | **sk**, **verdict** | evidence_note, effectiveness | Record a confirming or refuting observation. Verdicts: `confirming` / `confirmed` / `refuted` / `insufficient` / `archived`. Auto-promotes to `confirmed` after 3 confirming checks. |
+
+**Generated:** Weekly by `hypothesis-engine` Lambda (Sunday 11 AM PT)
+**DDB partition:** `USER#matthew#SOURCE#hypotheses` / `HYPOTHESIS#<timestamp>`
+**Module:** `mcp/tools_hypotheses.py`
 
 ---
 
