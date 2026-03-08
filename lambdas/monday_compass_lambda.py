@@ -321,7 +321,7 @@ def _group_tasks_by_pillar(tasks, pillar_map):
         proj = task.get("project_name", "Inbox")
         pillar = None
         # Try exact match first, then partial
-        for proj_key, p in pillar_map.items():\
+        for proj_key, p in pillar_map.items():
             if proj_key.startswith("_"):
                 continue
             if proj_key.lower() == proj.lower():

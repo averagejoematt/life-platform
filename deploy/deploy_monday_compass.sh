@@ -20,10 +20,15 @@ if aws lambda get-function --function-name "$FUNCTION_NAME" --region "$REGION" \
 else
     echo "   Lambda not found — creating..."
 
-    ROLE_ARN=$(aws lambda get-function-configuration \
-        --function-name "weekly-plate-schedule" \
+    # Get role ARN from any existing Lambda
+    ROLE_ARN=$(aws lambda list-functions \
         --region "$REGION" \
-        --query "Role" --output text --no-cli-pager)
+        --query "Functions[0].Role" --output text --no-cli-pager)
+    if [ -z "$ROLE_ARN" ] || [ "$ROLE_ARN" = "None" ]; then
+        echo "❌ Could not find an existing Lambda to copy role from"
+        echo "   Set ROLE_ARN manually and re-run, or create the Lambda manually first."
+        exit 1
+    fi
     echo "   Using role: $ROLE_ARN"
 
     echo "placeholder" > /tmp/placeholder.py
