@@ -87,7 +87,7 @@ def fetch_date(source, date_str):
         r = table.get_item(Key={"pk": USER_PREFIX + source, "sk": "DATE#" + date_str})
         return d2f(r.get("Item"))
     except Exception as e:
-        logger.warning("fetch_date(%s, %s): %s", source, date_str, e)
+        logger.warning(f"fetch_date({source}, {date_str}): {e}")
         return None
 
 
@@ -107,7 +107,7 @@ def fetch_range(source, start, end):
             kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
         return records
     except Exception as e:
-        logger.warning("fetch_range(%s): %s", source, e)
+        logger.warning(f"fetch_range({source}): {e}")
         return []
 
 
@@ -123,7 +123,7 @@ def fetch_journal_entries_for_date(date_str):
         )
         return [d2f(i) for i in resp.get("Items", [])]
     except Exception as e:
-        logger.warning("fetch_journal(%s): %s", date_str, e)
+        logger.warning(f"fetch_journal({date_str}): {e}")
         return []
 
 
@@ -313,7 +313,7 @@ Return ONLY a JSON array, no preamble or markdown."""
                 raw = raw[:-3]
             return json.loads(raw.strip())
     except Exception as e:
-        logger.warning("Haiku synthesis failed: %s", e)
+        logger.warning(f"Haiku synthesis failed: {e}")
         return []
 
 
@@ -353,7 +353,7 @@ def store_failure_patterns(run_date_str, patterns, failure_days_count, week_star
         item = {k: v for k, v in item.items() if v is not None and v != ""}
         table.put_item(Item=item)
         stored += 1
-        logger.info("Stored failure_pattern[%d]: %s — %s", i, component, pattern_text[:60])
+        logger.info(f"Stored failure_pattern[{i}]: {component} — {pattern_text[:60]}")
 
     return stored
 
@@ -376,7 +376,7 @@ def lambda_handler(event, context):
     run_date_str   = today.isoformat()
     week_start_str = week_start.isoformat()
 
-    logger.info("Analyzing failure patterns for %s -> %s", week_start_str, week_end.isoformat())
+    logger.info(f"Analyzing failure patterns for {week_start_str} -> {week_end.isoformat()}")
 
     # Idempotency: skip if already ran today (unless force=True)
     if not event.get("force"):
@@ -391,26 +391,25 @@ def lambda_handler(event, context):
                 Limit=1,
             )
             if existing.get("Items"):
-                logger.info("Already ran failure_pattern for %s — skipping (use force=true)", run_date_str)
+                logger.info(f"Already ran failure_pattern for {run_date_str} — skipping (use force=true)")
                 return {"statusCode": 200, "body": "Already ran today", "skipped": True}
         except Exception as e:
-            logger.warning("Idempotency check failed (non-fatal): %s", e)
+            logger.warning(f"Idempotency check failed (non-fatal): {e}")
 
     # 1. Load computed_metrics for the week
     computed_7d = fetch_range("computed_metrics", week_start_str, week_end.isoformat())
-    logger.info("Loaded %d computed_metrics records", len(computed_7d))
+    logger.info(f"Loaded {len(computed_7d)} computed_metrics records")
 
     if not computed_7d:
-        logger.info("No computed_metrics data for %s->%s — exiting", week_start_str, week_end.isoformat())
+        logger.info(f"No computed_metrics data for {week_start_str}->{week_end.isoformat()} — exiting")
         return {"statusCode": 200, "body": "No data", "failure_days": 0, "patterns_stored": 0}
 
     # 2. Extract failure days
     failure_days = extract_failure_days(computed_7d)
-    logger.info("Failure days (any component < %d): %d / %d",
-                FAILURE_THRESHOLD, len(failure_days), len(computed_7d))
+    logger.info(f"Failure days (any component < {FAILURE_THRESHOLD}): {len(failure_days)} / {len(computed_7d)}")
 
     if len(failure_days) < MIN_PATTERN_OCCURRENCES:
-        logger.info("Fewer than %d failure days — no patterns to identify", MIN_PATTERN_OCCURRENCES)
+        logger.info(f"Fewer than {MIN_PATTERN_OCCURRENCES} failure days — no patterns to identify")
         return {
             "statusCode": 200,
             "body": f"Only {len(failure_days)} failure day(s) — no patterns",
@@ -424,29 +423,26 @@ def lambda_handler(event, context):
         date_str = fd["date"]
         ctx = fetch_context_for_date(date_str)
         enriched.append({**fd, "context": ctx})
-        logger.info("Context for %s: %s", date_str,
-                    {k: v for k, v in ctx.items() if k != "date"})
+        logger.info(f"Context for {date_str}: { {k: v for k, v in ctx.items() if k != 'date'} }")
 
     # 4. Haiku synthesis
     try:
         api_key = _get_api_key()
     except Exception as e:
-        logger.error("Could not load API key: %s", e)
+        logger.error(f"Could not load API key: {e}")
         return {"statusCode": 500, "body": f"API key error: {e}"}
 
     patterns = synthesize_patterns_haiku(enriched, api_key)
-    logger.info("Haiku identified %d pattern(s)", len(patterns))
+    logger.info(f"Haiku identified {len(patterns)} pattern(s)")
     for p in patterns:
-        logger.info("  [%s] %s | %s | %s",
-                    p.get("severity", "?"), p.get("component", "?"),
-                    p.get("pattern", "")[:60], p.get("frequency", ""))
+        logger.info(f"  [{p.get('severity','?')}] {p.get('component','?')} | {p.get('pattern','')[:60]} | {p.get('frequency','')}")
 
     # 5. Store to platform_memory
     stored = 0
     if patterns:
         stored = store_failure_patterns(run_date_str, patterns, len(failure_days), week_start_str)
 
-    logger.info("Done: %d failure days -> %d patterns stored", len(failure_days), stored)
+    logger.info(f"Done: {len(failure_days)} failure days -> {stored} patterns stored")
 
     return {
         "statusCode":      200,

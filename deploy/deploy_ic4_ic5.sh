@@ -26,7 +26,7 @@ if aws lambda get-function --function-name failure-pattern-compute --region "$RE
     --region "$REGION"
 else
   echo "Creating failure-pattern-compute Lambda..."
-  ROLE_ARN="arn:aws:iam::${ACCOUNT}:role/life-platform-lambda-role"
+  ROLE_ARN="arn:aws:iam::${ACCOUNT}:role/life-platform-compute-role"
   aws lambda create-function \
     --function-name failure-pattern-compute \
     --runtime python3.12 \
@@ -75,7 +75,8 @@ echo ""
 echo "=== Deploying IC-5: daily-insight-compute v1.2.0 ==="
 sleep 10  # avoid ResourceConflictException if both are being updated
 
-bash deploy/deploy_lambda.sh daily-insight-compute
+bash deploy/deploy_lambda.sh daily-insight-compute lambdas/daily_insight_compute_lambda.py \
+  --extra-files lambdas/platform_logger.py
 
 echo ""
 echo "=== All done ==="
