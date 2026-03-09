@@ -63,6 +63,7 @@ def create_platform_lambda(
     s3_write: bool = True,
     needs_ses: bool = False,
     ses_domain: str = None,
+    existing_role_arn: str = None,
 ) -> _lambda.Function:
     """Create a Lambda function with standard Life Platform conventions.
 
@@ -80,60 +81,65 @@ def create_platform_lambda(
         env.update(environment)
 
     # ── IAM Role ──
-    role = iam.Role(
-        scope, f"{id}Role",
-        role_name=f"lambda-{function_name}-role",
-        assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-        managed_policies=[
-            iam.ManagedPolicy.from_aws_managed_policy_name(
-                "service-role/AWSLambdaBasicExecutionRole"
-            ),
-        ],
-    )
+    if existing_role_arn:
+        # Reference existing role by ARN — CDK treats it as immutable.
+        # No DefaultPolicy is generated, no DependsOn on Lambda, no import friction.
+        # IAM permissions remain managed outside CDK (as-is in AWS).
+        role = iam.Role.from_role_arn(scope, f"{id}Role", existing_role_arn)
+    else:
+        # Create new role (for new Lambdas not yet in AWS)
+        role = iam.Role(
+            scope, f"{id}Role",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name(
+                    "service-role/AWSLambdaBasicExecutionRole"
+                ),
+            ],
+        )
 
-    # DynamoDB permissions — attach to role directly to avoid cross-stack bucket policy
-    ddb_actions = [
-        "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem",
-        "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan",
-        "dynamodb:BatchGetItem", "dynamodb:BatchWriteItem",
-    ] if ddb_write else [
-        "dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:BatchGetItem",
-    ]
-    role.add_to_policy(iam.PolicyStatement(
-        actions=ddb_actions,
-        resources=[table.table_arn, f"{table.table_arn}/index/*"],
-    ))
-
-    # S3 permissions — attach to role directly to avoid cross-stack bucket policy
-    s3_actions = [
-        "s3:GetObject", "s3:PutObject", "s3:DeleteObject",
-        "s3:ListBucket",
-    ] if s3_write else [
-        "s3:GetObject", "s3:ListBucket",
-    ]
-    role.add_to_policy(iam.PolicyStatement(
-        actions=s3_actions,
-        resources=[bucket.bucket_arn, f"{bucket.bucket_arn}/*"],
-    ))
-
-    # Secrets Manager permissions (scoped to specific secrets)
-    if secrets:
-        for secret_id in secrets:
-            role.add_to_policy(iam.PolicyStatement(
-                actions=["secretsmanager:GetSecretValue", "secretsmanager:UpdateSecret"],
-                resources=[f"arn:aws:secretsmanager:*:*:secret:{secret_id}-*"],
-            ))
-
-    # SES permissions
-    if needs_ses and ses_domain:
+        # DynamoDB permissions
+        ddb_actions = [
+            "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem",
+            "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan",
+            "dynamodb:BatchGetItem", "dynamodb:BatchWriteItem",
+        ] if ddb_write else [
+            "dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:BatchGetItem",
+        ]
         role.add_to_policy(iam.PolicyStatement(
-            actions=["ses:SendEmail", "ses:SendRawEmail"],
-            resources=[f"arn:aws:ses:*:*:identity/{ses_domain}"],
+            actions=ddb_actions,
+            resources=[table.table_arn, f"{table.table_arn}/index/*"],
         ))
 
-    # DLQ send permission
-    if dlq:
-        dlq.grant_send_messages(role)
+        # S3 permissions
+        s3_actions = [
+            "s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket",
+        ] if s3_write else [
+            "s3:GetObject", "s3:ListBucket",
+        ]
+        role.add_to_policy(iam.PolicyStatement(
+            actions=s3_actions,
+            resources=[bucket.bucket_arn, f"{bucket.bucket_arn}/*"],
+        ))
+
+        # Secrets Manager permissions
+        if secrets:
+            for secret_id in secrets:
+                role.add_to_policy(iam.PolicyStatement(
+                    actions=["secretsmanager:GetSecretValue", "secretsmanager:UpdateSecret"],
+                    resources=[f"arn:aws:secretsmanager:*:*:secret:{secret_id}-*"],
+                ))
+
+        # SES permissions
+        if needs_ses and ses_domain:
+            role.add_to_policy(iam.PolicyStatement(
+                actions=["ses:SendEmail", "ses:SendRawEmail"],
+                resources=[f"arn:aws:ses:*:*:identity/{ses_domain}"],
+            ))
+
+        # DLQ send permission
+        if dlq:
+            dlq.grant_send_messages(role)
 
     # ── Lambda Function ──
     # Asset path is ".." (project root) because cdk synth runs from the cdk/ subdir.
@@ -156,6 +162,12 @@ def create_platform_lambda(
         ".git", ".git/**",
         "node_modules", "node_modules/**",
     ]
+    # When using an existing role (from_role_arn), we must NOT pass dead_letter_queue
+    # to the Function constructor — CDK automatically calls grant_send_messages on the
+    # queue when that param is set, which generates an AWS::IAM::Policy attached to the
+    # role. That policy creates a DependsOn on the Lambda, causing CloudFormation to
+    # reject the import changeset with "Unresolved resource dependencies".
+    # Instead, configure the DLQ via the L1 escape hatch (no grant triggered).
     fn = _lambda.Function(
         scope, id,
         function_name=function_name,
@@ -166,15 +178,22 @@ def create_platform_lambda(
         timeout=Duration.seconds(timeout_seconds),
         memory_size=memory_mb,
         environment=env,
-        dead_letter_queue=dlq,
+        dead_letter_queue=None if existing_role_arn else dlq,
         layers=[shared_layer] if shared_layer else [],
     )
 
+    # Set DLQ via L1 escape hatch when using existing role — avoids auto-grant.
+    if existing_role_arn and dlq:
+        cfn_fn = fn.node.default_child
+        cfn_fn.dead_letter_config = _lambda.CfnFunction.DeadLetterConfigProperty(
+            target_arn=dlq.queue_arn
+        )
+
     # ── EventBridge schedule ──
+    # No rule_name — import uses actual AWS name; CDK manages by logical ID after import.
     if schedule:
         rule = events.Rule(
             scope, f"{id}Schedule",
-            rule_name=f"{function_name}-schedule",
             schedule=events.Schedule.expression(schedule),
         )
         rule.add_target(targets.LambdaFunction(fn))

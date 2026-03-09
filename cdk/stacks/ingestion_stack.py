@@ -65,10 +65,42 @@ from constructs import Construct
 from stacks.lambda_helpers import create_platform_lambda
 
 # ── Shared utils Lambda Layer ARN ───────────────────────────────────────────
-# life-platform-shared-utils:4 — contains shared dependencies used across
-# multiple Lambdas. Garth (Garmin OAuth) is bundled in the Lambda zip directly
-# rather than as a separate layer.
 SHARED_LAYER_ARN = "arn:aws:lambda:us-west-2:205930651321:layer:life-platform-shared-utils:4"
+
+# ── Existing IAM Role ARNs ────────────────────────────────────────────────
+# Existing roles referenced by ARN (immutable) — CDK does not manage them.
+# No DefaultPolicy generated, no DependsOn on Lambda, no import friction.
+ACCT = "205930651321"
+REGION = "us-west-2"
+def _role(name): return f"arn:aws:iam::{ACCT}:role/{name}"
+
+# All core resources referenced by ARN/name to avoid cross-stack CloudFormation
+# export dependencies. CoreStack is not yet in CloudFormation, so its
+# Fn::ImportValue exports don't exist. Using from_* produces plain ARN strings.
+INGESTION_DLQ_ARN  = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
+LIFE_PLATFORM_TABLE = "life-platform"
+LIFE_PLATFORM_BUCKET = "matthew-life-platform"
+# Fill in ALERTS_TOPIC_ARN before importing — run:
+#   aws sns list-topics --query 'Topics[*].TopicArn' --output text | tr '\t' '\n' | grep life-platform
+ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"  # update if name differs
+
+ROLE_ARNS = {
+    "whoop":        _role("lambda-whoop-role"),
+    "garmin":       _role("lambda-garmin-ingestion-role"),
+    "notion":       _role("lambda-notion-ingestion-role"),
+    "withings":     _role("lambda-withings-role"),
+    "habitify":     _role("lambda-habitify-ingestion-role"),
+    "strava":       _role("lambda-strava-role"),
+    "journal":      _role("lambda-journal-enrichment-role"),
+    "todoist":      _role("lambda-todoist-role"),
+    "eightsleep":   _role("lambda-eightsleep-role"),
+    "activity":     _role("lambda-enrichment-role"),
+    "macrofactor":  _role("lambda-macrofactor-role"),
+    "weather":      _role("lambda-weather-role"),
+    "dropbox":      _role("lambda-dropbox-poll-role"),
+    "apple_health": _role("lambda-apple-health-role"),
+    "hae":          _role("lambda-health-auto-export-role"),
+}
 
 
 class IngestionStack(Stack):
@@ -90,12 +122,27 @@ class IngestionStack(Stack):
             self, "SharedUtilsLayer", SHARED_LAYER_ARN
         )
 
+        # Reference all core resources by ARN/name to avoid Fn::ImportValue.
+        # CoreStack exports don't exist until CoreStack is imported into CFn.
+        local_dlq = sqs.Queue.from_queue_arn(
+            self, "IngestionDLQ", INGESTION_DLQ_ARN
+        )
+        local_table = dynamodb.Table.from_table_name(
+            self, "LifePlatformTable", LIFE_PLATFORM_TABLE
+        )
+        local_bucket = s3.Bucket.from_bucket_name(
+            self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET
+        )
+        local_alerts_topic = sns.Topic.from_topic_arn(
+            self, "AlertsTopic", ALERTS_TOPIC_ARN
+        )
+
         # ── Shared kwargs passed to every ingestion Lambda ──
         shared = dict(
-            table=table,
-            bucket=bucket,
-            dlq=dlq,
-            alerts_topic=alerts_topic,
+            table=local_table,
+            bucket=local_bucket,
+            dlq=local_dlq,
+            alerts_topic=local_alerts_topic,
         )
 
         # ══════════════════════════════════════════════════════════════
@@ -108,15 +155,16 @@ class IngestionStack(Stack):
             source_file="lambdas/whoop_lambda.py",
             handler="whoop_lambda.lambda_handler",
             secrets=["life-platform/whoop"],
-            schedule="cron(0 14 * * ? *)",           # 07:00 AM PT
+            schedule="cron(0 14 * * ? *)",
             timeout_seconds=300,
+            existing_role_arn=ROLE_ARNS["whoop"],
             **shared,
         )
 
         # Second EventBridge rule: Whoop recovery refresh at 10:30 AM PT
         recovery_rule = events.Rule(
             self, "WhoopRecoveryRefreshRule",
-            rule_name="whoop-recovery-refresh",
+            # No rule_name — actual AWS name is whoop-recovery-refresh
             schedule=events.Schedule.expression("cron(30 17 * * ? *)"),
         )
         recovery_rule.add_target(targets.LambdaFunction(whoop))
@@ -131,10 +179,11 @@ class IngestionStack(Stack):
             source_file="lambdas/garmin_lambda.py",
             handler="garmin_lambda.lambda_handler",
             secrets=["life-platform/garmin"],
-            schedule="cron(0 14 * * ? *)",           # 07:00 AM PT
+            schedule="cron(0 14 * * ? *)",
             timeout_seconds=300,
-            memory_mb=512,                           # garth auth + multi-day backfill
+            memory_mb=512,
             shared_layer=shared_utils_layer,
+            existing_role_arn=ROLE_ARNS["garmin"],
             **shared,
         )
 
@@ -147,8 +196,9 @@ class IngestionStack(Stack):
             source_file="lambdas/notion_lambda.py",
             handler="notion_lambda.lambda_handler",
             secrets=["life-platform/notion"],
-            schedule="cron(0 14 * * ? *)",           # 07:00 AM PT
+            schedule="cron(0 14 * * ? *)",
             timeout_seconds=120,
+            existing_role_arn=ROLE_ARNS["notion"],
             **shared,
         )
 
@@ -162,8 +212,9 @@ class IngestionStack(Stack):
             source_file="lambdas/withings_lambda.py",
             handler="withings_lambda.lambda_handler",
             secrets=["life-platform/withings"],
-            schedule="cron(15 14 * * ? *)",          # 07:15 AM PT
+            schedule="cron(15 14 * * ? *)",
             timeout_seconds=120,
+            existing_role_arn=ROLE_ARNS["withings"],
             **shared,
         )
 
@@ -178,8 +229,9 @@ class IngestionStack(Stack):
             source_file="lambdas/habitify_lambda.py",
             handler="habitify_lambda.lambda_handler",
             secrets=["life-platform/api-keys"],
-            schedule="cron(15 14 * * ? *)",          # 07:15 AM PT
+            schedule="cron(15 14 * * ? *)",
             timeout_seconds=180,
+            existing_role_arn=ROLE_ARNS["habitify"],
             **shared,
         )
 
@@ -193,8 +245,9 @@ class IngestionStack(Stack):
             source_file="lambdas/strava_lambda.py",
             handler="strava_lambda.lambda_handler",
             secrets=["life-platform/strava"],
-            schedule="cron(30 14 * * ? *)",          # 07:30 AM PT
+            schedule="cron(30 14 * * ? *)",
             timeout_seconds=300,
+            existing_role_arn=ROLE_ARNS["strava"],
             **shared,
         )
 
@@ -209,8 +262,9 @@ class IngestionStack(Stack):
             source_file="lambdas/journal_enrichment_lambda.py",
             handler="journal_enrichment_lambda.lambda_handler",
             secrets=["life-platform/ai-keys"],
-            schedule="cron(30 14 * * ? *)",          # 07:30 AM PT
+            schedule="cron(30 14 * * ? *)",
             timeout_seconds=300,
+            existing_role_arn=ROLE_ARNS["journal"],
             **shared,
         )
 
@@ -224,8 +278,9 @@ class IngestionStack(Stack):
             source_file="lambdas/todoist_lambda.py",
             handler="todoist_lambda.lambda_handler",
             secrets=["life-platform/todoist"],
-            schedule="cron(45 14 * * ? *)",          # 07:45 AM PT
+            schedule="cron(45 14 * * ? *)",
             timeout_seconds=120,
+            existing_role_arn=ROLE_ARNS["todoist"],
             **shared,
         )
 
@@ -239,8 +294,9 @@ class IngestionStack(Stack):
             source_file="lambdas/eightsleep_lambda.py",
             handler="eightsleep_lambda.lambda_handler",
             secrets=["life-platform/eightsleep"],
-            schedule="cron(0 15 * * ? *)",           # 08:00 AM PT
+            schedule="cron(0 15 * * ? *)",
             timeout_seconds=120,
+            existing_role_arn=ROLE_ARNS["eightsleep"],
             **shared,
         )
 
@@ -255,8 +311,9 @@ class IngestionStack(Stack):
             source_file="lambdas/enrichment_lambda.py",
             handler="enrichment_lambda.lambda_handler",
             secrets=["life-platform/ai-keys"],
-            schedule="cron(30 15 * * ? *)",          # 08:30 AM PT
+            schedule="cron(30 15 * * ? *)",
             timeout_seconds=300,
+            existing_role_arn=ROLE_ARNS["activity"],
             **shared,
         )
 
@@ -270,8 +327,9 @@ class IngestionStack(Stack):
             function_name="macrofactor-data-ingestion",
             source_file="lambdas/macrofactor_lambda.py",
             handler="macrofactor_lambda.lambda_handler",
-            schedule="cron(0 16 * * ? *)",           # 09:00 AM PT
+            schedule="cron(0 16 * * ? *)",
             timeout_seconds=300,
+            existing_role_arn=ROLE_ARNS["macrofactor"],
             **shared,
         )
         # S3 trigger (uploads/macrofactor/*.csv) is managed outside CDK.
@@ -294,9 +352,10 @@ class IngestionStack(Stack):
             function_name="weather-data-ingestion",
             source_file="lambdas/weather_handler.py",
             handler="weather_handler.lambda_handler",
-            schedule="cron(45 13 * * ? *)",          # 06:45 AM PT
+            schedule="cron(45 13 * * ? *)",
             timeout_seconds=60,
-            s3_write=False,                          # weather writes to DDB only
+            s3_write=False,
+            existing_role_arn=ROLE_ARNS["weather"],
             **shared,
         )
 
@@ -313,6 +372,7 @@ class IngestionStack(Stack):
             secrets=["life-platform/dropbox"],
             schedule="rate(30 minutes)",
             timeout_seconds=120,
+            existing_role_arn=ROLE_ARNS["dropbox"],
             **shared,
         )
 
@@ -328,7 +388,8 @@ class IngestionStack(Stack):
             source_file="lambdas/apple_health_lambda.py",
             handler="apple_health_lambda.lambda_handler",
             timeout_seconds=300,
-            memory_mb=512,                           # XML parsing for large exports
+            memory_mb=512,
+            existing_role_arn=ROLE_ARNS["apple_health"],
             **shared,
         )
         # S3 trigger (imports/apple_health/) is managed outside CDK.
@@ -347,34 +408,10 @@ class IngestionStack(Stack):
         # It would require a dedicated RestStack or importing the API GW.
         # For now: Lambda is managed by CDK; API GW trigger is external reference.
         # ══════════════════════════════════════════════════════════════
-        hae_role = iam.Role(
-            self, "HaeWebhookRole",
-            role_name="lambda-health-auto-export-webhook-role",
-            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-            managed_policies=[
-                iam.ManagedPolicy.from_aws_managed_policy_name(
-                    "service-role/AWSLambdaBasicExecutionRole"
-                ),
-            ],
+        # HAE role referenced by ARN — same pattern as other ingestion roles.
+        hae_role = iam.Role.from_role_arn(
+            self, "HaeWebhookRole", ROLE_ARNS["hae"]
         )
-        hae_role.add_to_policy(iam.PolicyStatement(
-            actions=[
-                "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem",
-                "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan",
-                "dynamodb:BatchGetItem", "dynamodb:BatchWriteItem",
-            ],
-            resources=[table.table_arn, f"{table.table_arn}/index/*"],
-        ))
-        hae_role.add_to_policy(iam.PolicyStatement(
-            actions=["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"],
-            resources=[bucket.bucket_arn, f"{bucket.bucket_arn}/*"],
-        ))
-        hae_role.add_to_policy(iam.PolicyStatement(
-            actions=["secretsmanager:GetSecretValue"],
-            resources=[
-                f"arn:aws:secretsmanager:*:*:secret:life-platform/api-keys-*",
-            ],
-        ))
 
         _ASSET_EXCLUDES = [
             ".venv", ".venv/**", "cdk", "cdk/**", "cdk.out", "cdk.out/**",
@@ -394,8 +431,8 @@ class IngestionStack(Stack):
             timeout=Duration.seconds(30),            # API GW max timeout is 29s
             memory_size=256,
             environment={
-                "TABLE_NAME": table.table_name,
-                "S3_BUCKET": bucket.bucket_name,
+                "TABLE_NAME": local_table.table_name,
+                "S3_BUCKET": local_bucket.bucket_name,
                 "USER_ID": self.node.try_get_context("user_id") or "matthew",
             },
             # NO dead_letter_queue — request/response pattern
@@ -422,8 +459,8 @@ class IngestionStack(Stack):
             comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
         )
-        hae_alarm.add_alarm_action(cw_actions.SnsAction(alerts_topic))
-        hae_alarm.add_ok_action(cw_actions.SnsAction(alerts_topic))
+        hae_alarm.add_alarm_action(cw_actions.SnsAction(local_alerts_topic))
+        hae_alarm.add_ok_action(cw_actions.SnsAction(local_alerts_topic))
 
         # ══════════════════════════════════════════════════════════════
         # Outputs
