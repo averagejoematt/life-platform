@@ -1,10 +1,10 @@
 """
 hypothesis_engine_lambda.py — IC-18: Cross-Domain Hypothesis Engine
-v1.0.0
+v1.1.0 — AI-4: Output validation (effect size, confidence intervals, 30-day expiry)
 
 Scientific method applied to personal health data. Runs weekly (Sunday 11 AM PT)
 after the Weekly Digest, surfacing non-obvious cross-domain correlations that the
-existing 142 tools don't explicitly monitor.
+existing 144 tools don't explicitly monitor.
 
 Workflow:
   1. Pull 14 days of all-pillar data from DynamoDB
@@ -32,6 +32,7 @@ Cost: ~$0.05/week (one Sonnet call + DDB reads/writes)
 import json
 import os
 import logging
+import re
 import time
 import boto3
 import urllib.request
@@ -59,6 +60,21 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 HYPOTHESES_PK = f"USER#{USER_ID}#SOURCE#hypotheses"
 MAX_NEW_HYPOTHESES = 5
 MAX_PENDING_HYPOTHESES = 20   # don't accumulate stale hypotheses
+
+# AI-4: Validation thresholds
+MIN_DATA_DAYS = 10            # require >= 10 days with sufficient metrics before generating
+MIN_METRICS_PER_DAY = 5       # a day needs >= 5 non-null metrics to count as "complete"
+HARD_EXPIRY_DAYS = 30         # archive any hypothesis older than 30 days regardless of status
+MIN_SAMPLE_DAYS_FOR_CHECK = 7 # require >= 7 data days since creation before evaluating
+REQUIRED_HYPOTHESIS_FIELDS = {
+    "hypothesis_id", "hypothesis", "domains", "evidence",
+    "confirmation_criteria", "monitoring_window_days", "confidence",
+    "actionable_if_confirmed",
+}
+VALID_CONFIDENCE_LEVELS = {"low", "medium", "high"}
+# Pattern: confirmation criteria should contain at least one number (threshold/percentage)
+NUMERIC_PATTERN = re.compile(r'\d+\.?\d*\s*(%|days?|hours?|minutes?|ms|points?|g|kg|lbs?|cal|kcal|bpm|mg)')
+
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -281,6 +297,154 @@ def build_data_narrative(data):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# AI-4: DATA COMPLETENESS & HYPOTHESIS VALIDATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+def check_data_completeness(daily_rows):
+    """AI-4: Verify enough data exists to generate meaningful hypotheses.
+
+    Returns (is_sufficient, complete_days, total_days, message).
+    A "complete" day has >= MIN_METRICS_PER_DAY non-null fields (excluding 'date').
+    """
+    total_days = len(daily_rows)
+    complete_days = 0
+    for row in daily_rows:
+        non_null_metrics = sum(1 for k, v in row.items() if k != "date" and v is not None)
+        if non_null_metrics >= MIN_METRICS_PER_DAY:
+            complete_days += 1
+
+    is_sufficient = complete_days >= MIN_DATA_DAYS
+    if not is_sufficient:
+        msg = (f"Insufficient data: {complete_days}/{MIN_DATA_DAYS} complete days "
+               f"(total {total_days} days, requiring {MIN_METRICS_PER_DAY}+ metrics each)")
+    else:
+        msg = f"Data sufficient: {complete_days} complete days out of {total_days}"
+    return is_sufficient, complete_days, total_days, msg
+
+
+def validate_hypothesis(hyp, existing_texts=None):
+    """AI-4: Validate a single hypothesis before storing.
+
+    Returns (is_valid, issues_list). A hypothesis must:
+    1. Have all required fields present and non-empty
+    2. Have domains list with 2+ entries (cross-domain requirement)
+    3. Have confidence in valid set
+    4. Have confirmation_criteria containing at least one numeric threshold
+    5. Have monitoring_window_days between 7 and 30
+    6. Not duplicate existing hypotheses (simple substring check)
+    """
+    issues = []
+
+    # Required fields check
+    missing = REQUIRED_HYPOTHESIS_FIELDS - set(hyp.keys())
+    if missing:
+        issues.append(f"Missing fields: {missing}")
+
+    # Non-empty checks
+    for field in ("hypothesis", "evidence", "confirmation_criteria", "actionable_if_confirmed"):
+        val = hyp.get(field, "")
+        if not val or len(str(val).strip()) < 10:
+            issues.append(f"Field '{field}' too short or empty")
+
+    # Cross-domain: need 2+ domains
+    domains = hyp.get("domains", [])
+    if not isinstance(domains, list) or len(domains) < 2:
+        issues.append(f"Need 2+ domains for cross-domain hypothesis, got {len(domains) if isinstance(domains, list) else 0}")
+
+    # Confidence validation
+    confidence = hyp.get("confidence", "")
+    if confidence not in VALID_CONFIDENCE_LEVELS:
+        issues.append(f"Invalid confidence '{confidence}'; must be one of {VALID_CONFIDENCE_LEVELS}")
+
+    # Numeric threshold in confirmation criteria (AI-4: effect size requirement)
+    criteria = str(hyp.get("confirmation_criteria", ""))
+    if not NUMERIC_PATTERN.search(criteria):
+        issues.append("Confirmation criteria must contain specific numeric thresholds "
+                       "(e.g., '10% improvement', '5 points higher', '30 minutes more')")
+
+    # Monitoring window bounds
+    window = hyp.get("monitoring_window_days", 0)
+    try:
+        window = int(window)
+    except (ValueError, TypeError):
+        window = 0
+    if window < 7 or window > 30:
+        issues.append(f"monitoring_window_days must be 7-30, got {window}")
+
+    # Hypothesis ID format
+    hyp_id = hyp.get("hypothesis_id", "")
+    if not hyp_id or not hyp_id.startswith("hyp_"):
+        issues.append(f"hypothesis_id must start with 'hyp_', got '{hyp_id}'")
+
+    # Deduplication check (simple substring overlap with existing)
+    if existing_texts:
+        hyp_text = hyp.get("hypothesis", "").lower()
+        for existing in existing_texts:
+            # Check if more than 60% of words overlap
+            existing_words = set(existing.lower().split())
+            hyp_words = set(hyp_text.split())
+            if existing_words and hyp_words:
+                overlap = len(existing_words & hyp_words) / max(len(existing_words), len(hyp_words))
+                if overlap > 0.6:
+                    issues.append(f"Too similar to existing hypothesis: '{existing[:80]}...'")
+                    break
+
+    return len(issues) == 0, issues
+
+
+def enforce_hard_expiry(all_hypotheses):
+    """AI-4: Archive any hypothesis older than HARD_EXPIRY_DAYS regardless of status.
+
+    Returns list of (sk, "archived", reason) tuples for expired hypotheses.
+    """
+    now = datetime.now(timezone.utc).date()
+    expired = []
+
+    for hyp in all_hypotheses:
+        if hyp.get("status") in ("archived", "confirmed", "refuted"):
+            continue
+        created_at = hyp.get("created_at", "")
+        sk = hyp.get("sk", "")
+        if not created_at or not sk:
+            continue
+        try:
+            created_date = datetime.fromisoformat(created_at).date()
+            days_old = (now - created_date).days
+            if days_old > HARD_EXPIRY_DAYS:
+                expired.append((
+                    sk,
+                    "archived",
+                    f"Hard expiry: {days_old} days old (limit {HARD_EXPIRY_DAYS}d). "
+                    f"Status was '{hyp.get('status', 'unknown')}' with {hyp.get('check_count', 0)} checks."
+                ))
+        except Exception:
+            continue
+
+    return expired
+
+
+def validate_check_verdict(result):
+    """AI-4: Validate the Haiku hypothesis check response.
+
+    Returns (is_valid, verdict, evidence).
+    """
+    if not isinstance(result, dict):
+        return False, "insufficient", "Invalid response format"
+
+    verdict = result.get("verdict", "").strip().lower()
+    evidence = result.get("evidence", "").strip()
+
+    valid_verdicts = {"confirming", "refuted", "insufficient"}
+    if verdict not in valid_verdicts:
+        return False, "insufficient", f"Invalid verdict '{verdict}'"
+
+    if not evidence or len(evidence) < 10:
+        return False, verdict, "Evidence too short — treating as insufficient"
+
+    return True, verdict, evidence
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # HYPOTHESIS GENERATION — Claude Sonnet pass
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -304,10 +468,17 @@ WHAT YOU'RE LOOKING FOR — the interesting intersections:
 
 CRITERIA FOR GOOD HYPOTHESES:
 1. Cross-domain (involves at least 2 different pillars/sources)
-2. Specific and falsifiable (has clear confirmation criteria)
+2. Specific and falsifiable (has clear confirmation criteria WITH NUMERIC THRESHOLDS)
 3. Actionable if confirmed (Matthew could change something)
 4. Non-obvious (not something the Board would already coach)
-5. Grounded in the data (point to specific patterns you observed)
+5. Grounded in the data (point to specific patterns you observed, cite values)
+
+STRICT REQUIREMENTS (hypotheses that fail these are rejected):
+- confirmation_criteria MUST contain at least one specific number with units (e.g., "10% improvement in deep sleep", "HRV increases by 5+ points", "30 minutes more sleep")
+- domains MUST have 2+ entries (cross-domain is mandatory)
+- confidence must be "low", "medium", or "high" based on how many data points support it
+- monitoring_window_days must be 7-30 (not shorter, not longer)
+- evidence must cite specific dates or values from the data provided
 
 OUTPUT ONLY valid JSON. No preamble, no markdown, no backticks."""
 
@@ -344,10 +515,12 @@ Return ONLY this JSON structure:
       "hypothesis_id": "hyp_<short_slug>",
       "hypothesis": "One clear sentence stating the relationship",
       "domains": ["domain1", "domain2"],
-      "evidence": "What you saw in this data that suggested it (2-3 sentences, reference specific dates or values)",
-      "confirmation_criteria": "What would confirm this over the next 2-4 weeks (be specific)",
+      "evidence": "What you saw in this data that suggested it (2-3 sentences, CITE SPECIFIC DATES AND VALUES)",
+      "confirmation_criteria": "What would confirm this over 2-4 weeks — MUST include specific numeric thresholds (e.g., 'deep sleep % increases by 5+ points on days following protein >150g')",
+      "effect_size_observed": "The magnitude of the pattern you observed (e.g., '12% higher deep sleep on high-protein days')",
       "monitoring_window_days": 21,
-      "confidence": "low",
+      "confidence": "low|medium|high",
+      "confidence_reason": "Why this confidence level — how many data points support it",
       "actionable_if_confirmed": "What Matthew could change if this is confirmed (1 sentence)"
     }}
   ]
@@ -394,7 +567,11 @@ Return ONLY this JSON structure:
 def check_pending_hypotheses(pending_hypotheses, daily_rows, api_key):
     """For each pending hypothesis, check if recent data is confirming or refuting it.
 
-    Uses a lightweight Claude Haiku call per hypothesis (skips if < 3 days old).
+    AI-4 changes:
+    - Uses MIN_SAMPLE_DAYS_FOR_CHECK (7 days) instead of hardcoded 3
+    - Validates Haiku check response structure
+    - Hard expiry enforced separately (in handler)
+
     Returns list of (sk, new_status, evidence_note) tuples.
     """
     if not pending_hypotheses or not daily_rows:
@@ -414,23 +591,25 @@ def check_pending_hypotheses(pending_hypotheses, daily_rows, api_key):
         if not sk or not hypothesis_text:
             continue
 
-        # Skip if hypothesis is less than 3 days old
+        # AI-4: Skip if hypothesis is less than MIN_SAMPLE_DAYS_FOR_CHECK old
         try:
             created_date = datetime.fromisoformat(created_at).date()
             days_old = (now - created_date).days
         except Exception:
             days_old = 0
 
-        if days_old < 3:
+        if days_old < MIN_SAMPLE_DAYS_FOR_CHECK:
+            logger.info(f"[AI-4] Skipping check for {sk[:40]} — only {days_old}d old (need {MIN_SAMPLE_DAYS_FOR_CHECK})")
             continue
 
         # Archive if monitoring window expired and checked enough times
         if days_old > monitoring_window and check_count >= 3:
-            updates.append((sk, "archived", f"Monitoring window of {monitoring_window} days expired"))
+            updates.append((sk, "archived", f"Monitoring window of {monitoring_window} days expired after {check_count} checks"))
             continue
 
         relevant_data = [r for r in daily_rows if r.get("date", "") >= created_at[:10]]
-        if not relevant_data:
+        if len(relevant_data) < MIN_SAMPLE_DAYS_FOR_CHECK:
+            logger.info(f"[AI-4] Insufficient data for check: {len(relevant_data)} days (need {MIN_SAMPLE_DAYS_FOR_CHECK})")
             continue
 
         check_prompt = f"""Hypothesis: {hypothesis_text}
@@ -440,16 +619,18 @@ Confirmation criteria: {confirmation_criteria}
 Recent data ({len(relevant_data)} days since hypothesis was created):
 {json.dumps(relevant_data[-7:], indent=2)}
 
-Based on this data, is this hypothesis:
-- CONFIRMING: data is consistent with the hypothesis being true
-- REFUTED: data clearly contradicts the hypothesis
-- INSUFFICIENT: not enough relevant data yet to assess
+Based on this data, evaluate the hypothesis STRICTLY:
+- CONFIRMING: data shows a clear pattern consistent with the hypothesis, with observable effect sizes matching the criteria
+- REFUTED: data clearly contradicts the hypothesis or shows no pattern after sufficient observation
+- INSUFFICIENT: not enough relevant data points, or pattern is ambiguous
 
-Respond ONLY with JSON: {{"verdict": "confirming|refuted|insufficient", "evidence": "1-2 sentence explanation"}}"""
+Be conservative: default to INSUFFICIENT unless the evidence is clear. Cite specific values.
+
+Respond ONLY with JSON: {{"verdict": "confirming|refuted|insufficient", "evidence": "2-3 sentences citing specific data points and effect sizes"}}"""
 
         payload = json.dumps({
             "model": AI_MODEL_HAIKU,
-            "max_tokens": 150,
+            "max_tokens": 200,
             "messages": [{"role": "user", "content": check_prompt}],
         }).encode()
 
@@ -468,18 +649,23 @@ Respond ONLY with JSON: {{"verdict": "confirming|refuted|insufficient", "evidenc
                 if raw.endswith("```"):
                     raw = raw[:-3]
                 result = json.loads(raw.strip())
-                verdict = result.get("verdict", "insufficient")
-                evidence = result.get("evidence", "")
+
+                # AI-4: Validate check verdict
+                is_valid, verdict, evidence = validate_check_verdict(result)
+                if not is_valid:
+                    logger.warning(f"[AI-4] Invalid check verdict for {sk[:40]}: {result}")
+                    verdict = "insufficient"
 
                 if verdict == "refuted":
                     new_status = "refuted"
                 elif verdict == "confirming":
-                    new_status = "confirmed" if check_count >= 2 else "confirming"
+                    # AI-4: Require 3 confirming checks (was 2) for promotion to confirmed
+                    new_status = "confirmed" if check_count >= 3 else "confirming"
                 else:
                     new_status = hyp.get("status", "pending")
 
                 updates.append((sk, new_status, evidence))
-                logger.info(f"Hypothesis check: {verdict} -> {new_status}")
+                logger.info(f"[AI-4] Hypothesis check: {verdict} -> {new_status} (checks: {check_count + 1})")
                 time.sleep(0.5)
 
         except Exception as e:
@@ -540,7 +726,7 @@ def write_hypothesis_context_to_memory(active_hypotheses):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def lambda_handler(event, context):
-    logger.info("IC-18: Hypothesis Engine v1.0.0 starting...")
+    logger.info("IC-18: Hypothesis Engine v1.1.0 (AI-4) starting...")
 
     api_key = get_anthropic_key()
 
@@ -552,11 +738,28 @@ def lambda_handler(event, context):
     daily_rows = build_data_narrative(data)
     logger.info(f"Built data narrative: {len(daily_rows)} days")
 
+    # AI-4: Check data completeness before any hypothesis work
+    is_sufficient, complete_days, total_days, completeness_msg = check_data_completeness(daily_rows)
+    logger.info(f"[AI-4] Data completeness: {completeness_msg}")
+
     # 2. Load existing hypotheses
     all_hypotheses = load_existing_hypotheses()
     pending_hypotheses = [h for h in all_hypotheses if h.get("status") in ("pending", "confirming")]
     pending_count = len(pending_hypotheses)
     logger.info(f"Existing: {len(all_hypotheses)} total, {pending_count} pending/confirming")
+
+    # AI-4: Enforce hard expiry on all non-terminal hypotheses
+    expired_updates = enforce_hard_expiry(all_hypotheses)
+    expired_count = 0
+    for sk, status, reason in expired_updates:
+        update_hypothesis_status(sk, status, reason)
+        expired_count += 1
+    if expired_count:
+        logger.info(f"[AI-4] Hard expiry: archived {expired_count} hypotheses older than {HARD_EXPIRY_DAYS} days")
+        # Reload after expiry to get accurate pending count
+        all_hypotheses = load_existing_hypotheses()
+        pending_hypotheses = [h for h in all_hypotheses if h.get("status") in ("pending", "confirming")]
+        pending_count = len(pending_hypotheses)
 
     # 3. Check pending hypotheses against new data
     updates_made = 0
@@ -567,9 +770,12 @@ def lambda_handler(event, context):
             updates_made += 1
         logger.info(f"Hypothesis checks: {updates_made} updated")
 
-    # 4. Generate new hypotheses if room exists
+    # 4. Generate new hypotheses if room exists AND data is sufficient
     new_hypotheses_stored = 0
-    if pending_count < MAX_PENDING_HYPOTHESES:
+    validation_rejected = 0
+    if not is_sufficient:
+        logger.info(f"[AI-4] Skipping generation — {completeness_msg}")
+    elif pending_count < MAX_PENDING_HYPOTHESES:
         slots_available = MAX_PENDING_HYPOTHESES - pending_count
         n_to_generate = min(MAX_NEW_HYPOTHESES, slots_available)
         logger.info(f"Generating {n_to_generate} new hypotheses ({slots_available} slots)")
@@ -577,13 +783,28 @@ def lambda_handler(event, context):
         result = generate_hypotheses(daily_rows, all_hypotheses, api_key)
 
         if result and "hypotheses" in result:
+            existing_texts = [h.get("hypothesis", "")[:100] for h in all_hypotheses]
+
             for hyp in result["hypotheses"][:n_to_generate]:
-                if not hyp.get("hypothesis") or not hyp.get("domains"):
-                    logger.warning(f"Skipping malformed hypothesis: {hyp}")
+                # AI-4: Full validation before storing
+                is_valid, issues = validate_hypothesis(hyp, existing_texts)
+                if not is_valid:
+                    logger.warning(f"[AI-4] Rejected hypothesis '{hyp.get('hypothesis_id', '?')}': {issues}")
+                    validation_rejected += 1
                     continue
+
+                # Clamp monitoring_window_days to valid range
+                window = hyp.get("monitoring_window_days", 21)
+                try:
+                    window = max(7, min(30, int(window)))
+                except (ValueError, TypeError):
+                    window = 21
+                hyp["monitoring_window_days"] = window
+
                 store_hypothesis(hyp)
                 new_hypotheses_stored += 1
-            logger.info(f"Stored {new_hypotheses_stored} new hypotheses")
+
+            logger.info(f"Stored {new_hypotheses_stored} new hypotheses, rejected {validation_rejected}")
         else:
             logger.warning("Hypothesis generation returned no results")
     else:
@@ -597,9 +818,13 @@ def lambda_handler(event, context):
 
     summary = {
         "new_hypotheses": new_hypotheses_stored,
+        "validation_rejected": validation_rejected,
+        "expired_by_hard_limit": expired_count,
         "hypotheses_checked": len(pending_hypotheses),
         "hypotheses_updated": updates_made,
         "total_active": len(active),
+        "data_complete_days": complete_days,
+        "data_sufficient": is_sufficient,
     }
     logger.info(f"Complete: {summary}")
     return {"statusCode": 200, "body": json.dumps(summary)}

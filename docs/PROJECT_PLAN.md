@@ -1,7 +1,7 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-08 (v3.1.6 — 144 MCP tools, 39 Lambdas, 30 modules, 19 data sources, 8 secrets, ~47 alarms)
+> Last update: 2026-03-09 (v3.2.0 — 144 MCP tools, 39 Lambdas, 30 modules, 19 data sources, 8 secrets, ~47 alarms)
 
 ---
 
@@ -393,6 +393,8 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | Version | What | Date |
 |---------|------|------|
+| v3.2.0 | OBS-3 SLO definitions (4 alarms + freshness metrics + dashboard) + AI-4 hypothesis validation (v1.1.0: completeness, validation, hard expiry, stricter checks) + large opus scoping doc | 2026-03-09 |
+| v3.1.8 | SEC-4 API Gateway rate limiting + MAINT-3 stale zip cleanup (lambdas/ zip-free) | 2026-03-09 |
 | v2.91.0 | Monday Compass weekly planning email (35th Lambda, monday-compass, Monday 8 AM PDT, Todoist + health + Board + Keystone, deploy_monday_compass.sh) | 2026-03-08 |
 | v2.90.0 | IC-8 Intent vs Execution Gap (daily-insight-compute v1.1.0, Haiku intention evaluator, platform_memory intention_tracking partition) | 2026-03-08 |
 | v2.89.0 | IC-7 Cross-Pillar Trade-offs (ai_calls.py) + IC-18 Hypothesis Engine (34th Lambda, Sunday 11 AM PT, 2 MCP tools, 144 total) | 2026-03-07 |
@@ -490,7 +492,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 |---|------|----------|--------|-------|--------|
 | OBS-1 | **Standardize structured logging across all Lambdas.** `platform_logger.py` built and wired into `daily-brief`. Emits structured JSON with `correlation_id` field. Incremental rollout to other Lambdas ongoing. | P1 | L (6-8 hr) | Sonnet | ⚠️ Partial (daily-brief wired) |
 | OBS-2 | **Create operational health CloudWatch dashboard.** `life-platform-ops`: 23 widgets, 47 alarms, KPIs, error matrix, AI tokens. | P2 | M (3-4 hr) | Sonnet | ✅ v2.99.0 |
-| OBS-3 | **Define SLOs for critical paths.** Daily Brief by 11 AM (99%), sources fresh within 24h (99%), MCP cold start <2s (95%), AI success 99%. | P3 | S (1-2 hr) | **Opus** | 🔴 |
+| OBS-3 | **Define SLOs for critical paths.** 4 SLOs defined (Daily Brief 99%, Freshness 99%, MCP 99.5%, AI 99%). 4 CW alarms + freshness metrics + ops dashboard widgets. `docs/SLOs.md`. | P3 | S (1-2 hr) | **Opus** | ✅ v3.2.0 |
 
 #### Epic: Cost Optimization
 
@@ -524,7 +526,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 | AI-1 | **Add health disclaimer to all AI-generated coaching.** Footer on every email. | P0 | S (1 hr) | Sonnet | ✅ v2.95.0 |
 | AI-2 | **Rename correlation tools / fix causal language in prompts.** `ai_calls.py`: causal_chain → likely_connection, TRACE THE CAUSAL CHAIN → NAME THE LIKELY CORRELATIVE PATTERN, all BoD/guidance prompts use correlative framing throughout. | P2 | S (2 hr) | Sonnet | ✅ v3.1.6 |
 | AI-3 | **Add output validation for AI coaching.** `ai_output_validator.py` built with BLOCK/WARN/PASS tiers. Wired into `daily-brief` — all 4 AI outputs validated before HTML build; blocked outputs replaced with safe fallbacks; logs as `[AI-3]`. | P1 | M (4-6 hr) | **Opus** | ⚠️ Partial (daily-brief wired) |
-| AI-4 | **Validate IC hypothesis engine outputs.** Minimum effect size threshold, minimum sample days, confidence intervals, 30-day expiry on unconfirmed hypotheses. | P2 | M (3-4 hr) | **Opus** | 🔴 |
+| AI-4 | **Validate IC hypothesis engine outputs.** v1.1.0: data completeness check, hypothesis validation (fields+domains+numeric criteria+dedup), 30-day hard expiry, verdict validation, min 7d sample, 3 confirming checks for promotion. | P2 | M (3-4 hr) | **Opus** | ✅ v3.2.0 |
 
 #### Epic: Platform Simplification
 
@@ -544,12 +546,14 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ **Done** | 26 | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2; COST-1,3; MAINT-1,2,3; DATA-1,2,3; AI-1,2,3 |
-| 🔴 **Open** | 9 | OBS-3, COST-2, MAINT-4, AI-4, SIMP-1, SIMP-2, PROD-1, PROD-2 |
+| ✅ **Done** | 28 | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,3; MAINT-1,2,3; DATA-1,2,3; AI-1,2,3,4 |
+| 🔴 **Open** | 7 | COST-2, MAINT-4, SIMP-1, SIMP-2, PROD-1, PROD-2 |
 
-**Next hardening priorities:** OBS-3 (SLOs, Opus), COST-2 (MCP tool usage audit, Sonnet), AI-4 (hypothesis validation, Opus).
+**Next hardening priorities:** COST-2 + SIMP-1 (MCP tool usage audit, natural combo, Sonnet), then MAINT-4 (CI/CD, Opus).
 
-**Model breakdown for remaining open:** Sonnet: COST-2, SIMP-1. Opus: OBS-3, MAINT-4, AI-4, SIMP-2, PROD-1, PROD-2.
+**Model breakdown for remaining open:** Sonnet: COST-2, SIMP-1. Opus: MAINT-4, SIMP-2, PROD-1, PROD-2.
+
+**Large opus items scoped:** See `docs/SCOPING_LARGE_OPUS.md` for detailed design notes on MAINT-4, SIMP-2, PROD-1, PROD-2.
 
 ---
 

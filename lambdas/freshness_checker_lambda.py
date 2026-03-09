@@ -20,6 +20,7 @@ STALE_HOURS = int(os.environ.get("STALE_HOURS", "48"))
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 sns      = boto3.client("sns", region_name=REGION)
+cw       = boto3.client("cloudwatch", region_name=REGION)
 
 SOURCES = {
     "whoop":        "Whoop recovery/sleep",
@@ -102,6 +103,28 @@ def lambda_handler(event, context):
     else:
         status_list = "\n".join(source_status)
         logger.info("All sources fresh.\n%s", status_list)
+
+    # OBS-3: Emit SLO metrics to CloudWatch
+    try:
+        fresh_count = len(SOURCES) - len(stale_sources)
+        cw.put_metric_data(
+            Namespace="LifePlatform/Freshness",
+            MetricData=[
+                {
+                    "MetricName": "StaleSourceCount",
+                    "Value": len(stale_sources),
+                    "Unit": "Count",
+                },
+                {
+                    "MetricName": "FreshSourceCount",
+                    "Value": fresh_count,
+                    "Unit": "Count",
+                },
+            ],
+        )
+        logger.info("SLO metrics emitted: %d stale, %d fresh", len(stale_sources), fresh_count)
+    except Exception as e:
+        logger.error("CloudWatch SLO metric emit failed (non-fatal): %s", e)
 
     return {
         "statusCode": 200,
