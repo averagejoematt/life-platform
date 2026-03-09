@@ -67,11 +67,8 @@ from stacks.lambda_helpers import create_platform_lambda
 # ── Lambda Layer ARNs ────────────────────────────────────────────────────────
 SHARED_LAYER_ARN = "arn:aws:lambda:us-west-2:205930651321:layer:life-platform-shared-utils:4"
 
-# Garth OAuth library layer — required by garmin-data-ingestion only.
-# Retrieve the current ARN before importing:
-#   aws lambda list-layers --query 'Layers[?contains(LayerName, `garth`)].LatestMatchingVersion.LayerVersionArn' --output text
-# Then update this constant and run `cdk synth LifePlatformIngestion` to verify.
-GARTH_LAYER_ARN = "arn:aws:lambda:us-west-2:205930651321:layer:garth:1"  # UPDATE BEFORE IMPORT
+# NOTE: garth (OAuth library for Garmin) is NOT a Lambda Layer — it is bundled
+# directly in the garmin-data-ingestion zip. No layer ARN needed.
 
 # ── Existing IAM Role ARNs ────────────────────────────────────────────────
 # Existing roles referenced by ARN (immutable) — CDK does not manage them.
@@ -90,6 +87,9 @@ LIFE_PLATFORM_BUCKET = "matthew-life-platform"
 #   aws sns list-topics --query 'Topics[*].TopicArn' --output text | tr '\t' '\n' | grep life-platform
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"  # update if name differs
 
+# All 15 ingestion roles are dedicated SEC-1 per-function roles.
+# Verified 2026-03-09 via `aws lambda get-function-configuration --query Role`.
+# All have sqs:SendMessage — all use shared_with_dlq (no DLQ split needed).
 ROLE_ARNS = {
     "whoop":        _role("lambda-whoop-role"),
     "garmin":       _role("lambda-garmin-ingestion-role"),
@@ -159,10 +159,11 @@ class IngestionStack(Stack):
             self, "WhoopIngestion",
             function_name="whoop-data-ingestion",
             source_file="lambdas/whoop_lambda.py",
-            handler="whoop_lambda.lambda_handler",
+            handler="lambda_function.lambda_handler",  # AWS actual — zip has lambda_function.py
             secrets=["life-platform/whoop"],
-            schedule="cron(0 14 * * ? *)",
+            schedule="cron(0 13 * * ? *)",  # AWS actual rule: whoop-daily-ingestion
             timeout_seconds=300,
+            alarm_name="ingestion-error-whoop",  # AWS actual alarm name
             existing_role_arn=ROLE_ARNS["whoop"],
             **shared,
         )
@@ -170,32 +171,28 @@ class IngestionStack(Stack):
         # Second EventBridge rule: Whoop recovery refresh at 10:30 AM PT
         recovery_rule = events.Rule(
             self, "WhoopRecoveryRefreshRule",
-            # No rule_name — actual AWS name is whoop-recovery-refresh
-            schedule=events.Schedule.expression("cron(30 17 * * ? *)"),
+            # Actual AWS rule name: whoop-recovery-refresh
+            schedule=events.Schedule.expression("cron(30 16 * * ? *)"),  # AWS actual
         )
         recovery_rule.add_target(targets.LambdaFunction(whoop))
 
         # ══════════════════════════════════════════════════════════════
         # 2. Garmin
-        # Requires garth layer for OAuth token management
+        # garth OAuth library is bundled in the zip (not a Layer)
         # ══════════════════════════════════════════════════════════════
-        garth_layer = _lambda.LayerVersion.from_layer_version_arn(
-            self, "GarthLayer", GARTH_LAYER_ARN
-        )
-
         create_platform_lambda(
             self, "GarminIngestion",
             function_name="garmin-data-ingestion",
             source_file="lambdas/garmin_lambda.py",
             handler="garmin_lambda.lambda_handler",
             secrets=["life-platform/garmin"],
-            schedule="cron(0 14 * * ? *)",
+            schedule="cron(0 13 * * ? *)",  # AWS actual rule: garmin-daily-ingestion
             timeout_seconds=300,
             memory_mb=512,
             shared_layer=shared_utils_layer,
-            additional_layers=[garth_layer],
             existing_role_arn=ROLE_ARNS["garmin"],
-            **shared,
+            alerts_topic=None,  # no alarm exists in AWS for garmin
+            **{k: v for k, v in shared.items() if k != 'alerts_topic'},
         )
 
         # ══════════════════════════════════════════════════════════════
@@ -207,10 +204,11 @@ class IngestionStack(Stack):
             source_file="lambdas/notion_lambda.py",
             handler="notion_lambda.lambda_handler",
             secrets=["life-platform/notion"],
-            schedule="cron(0 14 * * ? *)",
+            schedule="cron(0 13 * * ? *)",  # AWS actual rule: notion-daily-ingest
             timeout_seconds=120,
             existing_role_arn=ROLE_ARNS["notion"],
-            **shared,
+            alerts_topic=None,  # no alarm exists in AWS for notion
+            **{k: v for k, v in shared.items() if k != 'alerts_topic'},
         )
 
         # ══════════════════════════════════════════════════════════════
@@ -221,10 +219,11 @@ class IngestionStack(Stack):
             self, "WithingsIngestion",
             function_name="withings-data-ingestion",
             source_file="lambdas/withings_lambda.py",
-            handler="withings_lambda.lambda_handler",
+            handler="lambda_function.lambda_handler",  # AWS actual — zip has lambda_function.py
             secrets=["life-platform/withings"],
-            schedule="cron(15 14 * * ? *)",
+            schedule="cron(15 13 * * ? *)",  # AWS actual rule: withings-daily-ingestion
             timeout_seconds=120,
+            alarm_name="ingestion-error-withings",  # AWS actual alarm name
             existing_role_arn=ROLE_ARNS["withings"],
             **shared,
         )
@@ -238,12 +237,13 @@ class IngestionStack(Stack):
             self, "HabitifyIngestion",
             function_name="habitify-data-ingestion",
             source_file="lambdas/habitify_lambda.py",
-            handler="habitify_lambda.lambda_handler",
+            handler="lambda_function.lambda_handler",  # AWS actual — zip has lambda_function.py
             secrets=["life-platform/api-keys"],
-            schedule="cron(15 14 * * ? *)",
+            schedule="cron(15 13 * * ? *)",  # AWS actual rule: habitify-daily-ingest
             timeout_seconds=180,
             existing_role_arn=ROLE_ARNS["habitify"],
-            **shared,
+            alerts_topic=None,  # no alarm exists in AWS for habitify
+            **{k: v for k, v in shared.items() if k != 'alerts_topic'},
         )
 
         # ══════════════════════════════════════════════════════════════
@@ -254,10 +254,11 @@ class IngestionStack(Stack):
             self, "StravaIngestion",
             function_name="strava-data-ingestion",
             source_file="lambdas/strava_lambda.py",
-            handler="strava_lambda.lambda_handler",
+            handler="lambda_function.lambda_handler",  # AWS actual — zip has lambda_function.py
             secrets=["life-platform/strava"],
-            schedule="cron(30 14 * * ? *)",
+            schedule="cron(30 13 * * ? *)",  # AWS actual rule: strava-daily-ingestion
             timeout_seconds=300,
+            alarm_name="ingestion-error-strava",  # AWS actual alarm name
             existing_role_arn=ROLE_ARNS["strava"],
             **shared,
         )
@@ -273,10 +274,11 @@ class IngestionStack(Stack):
             source_file="lambdas/journal_enrichment_lambda.py",
             handler="journal_enrichment_lambda.lambda_handler",
             secrets=["life-platform/ai-keys"],
-            schedule="cron(30 14 * * ? *)",
+            schedule="cron(30 13 * * ? *)",  # AWS actual rule: journal-enrichment-daily
             timeout_seconds=300,
             existing_role_arn=ROLE_ARNS["journal"],
-            **shared,
+            alerts_topic=None,  # no alarm exists in AWS for journal-enrichment
+            **{k: v for k, v in shared.items() if k != 'alerts_topic'},
         )
 
         # ══════════════════════════════════════════════════════════════
@@ -287,10 +289,11 @@ class IngestionStack(Stack):
             self, "TodoistIngestion",
             function_name="todoist-data-ingestion",
             source_file="lambdas/todoist_lambda.py",
-            handler="todoist_lambda.lambda_handler",
+            handler="lambda_function.lambda_handler",  # AWS actual — zip has lambda_function.py
             secrets=["life-platform/todoist"],
-            schedule="cron(45 14 * * ? *)",
+            schedule="cron(45 13 * * ? *)",  # AWS actual rule: todoist-daily-ingestion
             timeout_seconds=120,
+            alarm_name="ingestion-error-todoist",  # AWS actual alarm name
             existing_role_arn=ROLE_ARNS["todoist"],
             **shared,
         )
@@ -303,10 +306,11 @@ class IngestionStack(Stack):
             self, "EightsleepIngestion",
             function_name="eightsleep-data-ingestion",
             source_file="lambdas/eightsleep_lambda.py",
-            handler="eightsleep_lambda.lambda_handler",
+            handler="lambda_function.lambda_handler",  # AWS actual — zip has lambda_function.py
             secrets=["life-platform/eightsleep"],
-            schedule="cron(0 15 * * ? *)",
+            schedule="cron(0 14 * * ? *)",  # AWS actual rule: eightsleep-daily-ingestion
             timeout_seconds=120,
+            alarm_name="ingestion-error-eightsleep",  # AWS actual alarm name
             existing_role_arn=ROLE_ARNS["eightsleep"],
             **shared,
         )
@@ -322,8 +326,9 @@ class IngestionStack(Stack):
             source_file="lambdas/enrichment_lambda.py",
             handler="enrichment_lambda.lambda_handler",
             secrets=["life-platform/ai-keys"],
-            schedule="cron(30 15 * * ? *)",
+            schedule="cron(30 14 * * ? *)",  # AWS actual rule: activity-enrichment-nightly
             timeout_seconds=300,
+            alarm_name="ingestion-error-enrichment",  # AWS actual alarm name
             existing_role_arn=ROLE_ARNS["activity"],
             **shared,
         )
@@ -338,8 +343,9 @@ class IngestionStack(Stack):
             function_name="macrofactor-data-ingestion",
             source_file="lambdas/macrofactor_lambda.py",
             handler="macrofactor_lambda.lambda_handler",
-            schedule="cron(0 16 * * ? *)",
+            schedule="cron(0 15 * * ? *)",  # AWS actual rule: macrofactor-daily-ingestion
             timeout_seconds=300,
+            alarm_name="ingestion-error-macrofactor",  # AWS actual alarm name
             existing_role_arn=ROLE_ARNS["macrofactor"],
             **shared,
         )
@@ -363,11 +369,12 @@ class IngestionStack(Stack):
             function_name="weather-data-ingestion",
             source_file="lambdas/weather_handler.py",
             handler="weather_handler.lambda_handler",
-            schedule="cron(45 13 * * ? *)",
+            schedule="cron(45 12 * * ? *)",  # AWS actual rule: weather-daily-ingestion
             timeout_seconds=60,
             s3_write=False,
             existing_role_arn=ROLE_ARNS["weather"],
-            **shared,
+            alerts_topic=None,  # no alarm exists in AWS for weather
+            **{k: v for k, v in shared.items() if k != 'alerts_topic'},
         )
 
         # ══════════════════════════════════════════════════════════════
@@ -384,7 +391,8 @@ class IngestionStack(Stack):
             schedule="rate(30 minutes)",
             timeout_seconds=120,
             existing_role_arn=ROLE_ARNS["dropbox"],
-            **shared,
+            alerts_topic=None,  # no alarm exists in AWS for dropbox-poll
+            **{k: v for k, v in shared.items() if k != 'alerts_topic'},
         )
 
         # ══════════════════════════════════════════════════════════════
@@ -397,9 +405,10 @@ class IngestionStack(Stack):
             self, "AppleHealthIngestion",
             function_name="apple-health-ingestion",
             source_file="lambdas/apple_health_lambda.py",
-            handler="apple_health_lambda.lambda_handler",
+            handler="lambda_function.lambda_handler",  # AWS actual — zip has lambda_function.py
             timeout_seconds=300,
             memory_mb=512,
+            alarm_name="ingestion-error-apple-health",  # AWS actual alarm name
             existing_role_arn=ROLE_ARNS["apple_health"],
             **shared,
         )
@@ -456,22 +465,8 @@ class IngestionStack(Stack):
             source_arn=f"arn:aws:execute-api:{self.region}:{self.account}:a76xwxt2wa/*/*/ingest",
         )
 
-        # ══════════════════════════════════════════════════════════════
-        # CloudWatch error alarm for HAE webhook (not via helper)
-        # ══════════════════════════════════════════════════════════════
-        hae_alarm = hae.metric_errors(
-            period=Duration.hours(1),
-            statistic="Sum",
-        ).create_alarm(
-            self, "HaeWebhookErrorAlarm",
-            alarm_name="ingestion-error-health-auto-export-webhook",
-            evaluation_periods=1,
-            threshold=3,                             # tolerate 1-2 transient errors
-            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
-        )
-        hae_alarm.add_alarm_action(cw_actions.SnsAction(local_alerts_topic))
-        hae_alarm.add_ok_action(cw_actions.SnsAction(local_alerts_topic))
+        # NOTE: HAE webhook alarm omitted from import — does not exist in AWS.
+        # CDK will create ingestion-error-health-auto-export-webhook on first deploy.
 
         # ══════════════════════════════════════════════════════════════
         # Outputs

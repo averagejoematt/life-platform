@@ -19,7 +19,7 @@
 ### Stack status after this session
 - `LifePlatformCompute` ✅ deployed
 - `LifePlatformEmail` ✅ deployed
-- `LifePlatformIngestion` ⚠️ synth passing, import still pending
+- `LifePlatformIngestion` ✅ imported
 
 ---
 
