@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-08 (v3.1.3 — 144 tools, 30-module MCP package, 19 data sources, 39 Lambdas, 8 secrets, ~47 alarms, 7 email/digest Lambdas, IC features 1–8 live, Tier 8 hardening complete)
+Last updated: 2026-03-09 (v3.3.7 — 144 tools, 30-module MCP package, 19 data sources, 39 Lambdas, 8 secrets, ~47 alarms, 7 CDK stacks deployed, IC features 1–8 live, Tier 8 hardening complete)
 
 ---
 
@@ -77,7 +77,8 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | CloudFront (buddy) | CDN + auth | `ETTJ44FT0Z4GO` (`d1empeau04e0eg.cloudfront.net`) → S3 `/buddy`, Lambda@Edge auth (`life-platform-buddy-auth`), alias `buddy.averagejoematt.com`, PriceClass_100, HTTP/2+3 |
 | ACM Certificate | TLS | `arn:aws:acm:us-east-1:205930651321:certificate/8e560416-...` — `dash.averagejoematt.com` (DNS-validated) |
 | SES Receipt Rule Set | Inbound email routing | `life-platform-inbound` (active) — rule `insight-capture` routes `insight@aws.mattsusername.com` → S3 |
-| CloudWatch | Alarms + logs | **35 metric alarms**, all Lambdas monitored |
+| CloudWatch | Alarms + logs | **~47 metric alarms**, all Lambdas monitored |
+| CDK | Infrastructure as Code | `cdk/` — 7 stacks deployed (Ingestion, Compute, Email, Operational, Mcp, Monitoring, Web). Core stack deferred. `cdk/stacks/lambda_helpers.py` uses `Code.from_asset("../lambdas")`. |
 | CloudTrail | Audit logging | `life-platform-trail` → S3 |
 | AWS Budget | Cost guardrail | $20/mo cap, alerts at 25%/50%/100% |
 

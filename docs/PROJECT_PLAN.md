@@ -1,13 +1,13 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-09 (v3.2.2 — 144 MCP tools, 39 Lambdas, 30 modules, 19 data sources, 8 secrets, ~47 alarms)
+> Last update: 2026-03-09 (v3.3.7 — 144 MCP tools, 39 Lambdas, 30 modules, 19 data sources, 8 secrets, ~47 alarms, 7 CDK stacks)
 
 ---
 
 ## Current State
 
-- **Platform version:** v3.1.6
+- **Platform version:** v3.3.7
 - **MCP Server:** 144 tools across 30-module package (tools_decisions.py added), serving health data through Claude Desktop + claude.ai + Claude mobile (1024 MB, 12 tools pre-cached nightly)
 - **Remote MCP:** Function URL `c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` with OAuth auto-approve + HMAC Bearer token validation
 - **Data Sources:** 19 (12 scheduled + 1 webhook + 3 manual/periodic + 2 MCP-managed + 1 State of Mind via webhook)
@@ -393,7 +393,12 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | Version | What | Date |
 |---------|------|------|
-| v3.2.2 | SIMP-2 ingestion framework (design + code), PROD-1 CDK scaffolding (8-stack arch + core stack + lambda helper), PROD-2 multi-user audit (8 categories, 90% already parameterized) | 2026-03-09 |
+| v3.3.7 | CDK Code.from_asset path fix (../lambdas) — permanent fix for Lambda import errors on CDK deploy | 2026-03-09 |
+| v3.3.6 | Post-PROD-1 hotfixes: CDK packaging bug (23 Lambdas restored) + platform_logger set_date fix (13 ingestion Lambdas restored) | 2026-03-09 |
+| v3.3.5 | PROD-1 complete ✅ — all 7 CDK stacks deployed (Ingestion, Compute, Email, Operational, Mcp, Monitoring, Web) | 2026-03-09 |
+| v3.3.4 | PROD-1 CDK: LifePlatformMcp + LifePlatformMonitoring (21 alarms) + LifePlatformWeb (3 CloudFront distributions, us-east-1) | 2026-03-09 |
+| v3.3.3 | PROD-1 CDK: LifePlatformOperational (7 Lambdas + 8 alarms, freshness-checker excluded) + EventBridge import fix pattern | 2026-03-09 |
+| v3.3.2 | SIMP-2 ingestion framework (design + code), PROD-1 CDK scaffolding (8-stack arch + core stack + lambda helper), PROD-2 multi-user audit (8 categories, 90% already parameterized) | 2026-03-09 |
 | v3.2.1 | MAINT-4: GitHub Actions CI/CD pipeline (lint + plan + deploy + smoke test), OIDC auth, lambda_map.json, flake8 config | 2026-03-09 |
 | v3.2.0 | OBS-3 SLO definitions (4 alarms + freshness metrics + dashboard) + AI-4 hypothesis validation (v1.1.0: completeness, validation, hard expiry, stricter checks) + large opus scoping doc | 2026-03-09 |
 | v3.1.8 | SEC-4 API Gateway rate limiting + MAINT-3 stale zip cleanup (lambdas/ zip-free) | 2026-03-09 |
@@ -541,15 +546,15 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | # | Task | Priority | Effort | Model | Status |
 |---|------|----------|--------|-------|--------|
-| PROD-1 | **Implement Infrastructure as Code (CDK).** `cdk/` scaffolding: 8-stack arch, core stack (DDB+S3+SQS+SNS), `create_platform_lambda()` helper. Import strategy documented. | P2 (P0 if productizing) | L (16-24 hr) | **Opus** | ⚠️ Scaffolding done, 5 sessions remaining |
+| PROD-1 | **Implement Infrastructure as Code (CDK).** All 7 stacks deployed: Ingestion, Compute, Email, Operational, Mcp, Monitoring, Web. `create_platform_lambda()` helper with correct `Code.from_asset("../lambdas")` path. Core stack (DDB+S3+SQS+SNS) deferred — low priority. | P2 (P0 if productizing) | L (16-24 hr) | **Opus** | ✅ v3.3.7 |
 | PROD-2 | **Remove hardcoded single-user assumptions.** Audit complete (`AUDIT_PROD2_MULTI_USER.md`): 90% already parameterized. Remaining: remove defaults (30m), email to profile (2h), S3 path prefix (4-6h). | P3 | L (12-16 hr) | **Opus** | ⚠️ Audit done, 3 sessions implementation |
 
 #### Hardening Summary (updated post-Review #2, v3.1.3)
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ **Done** | 30 | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,2,3; MAINT-1,2,3,4; DATA-1,2,3; AI-1,2,3,4; SIMP-2 |
-| ⚠️ **In Progress** | 2 | PROD-1 (scaffolding done), PROD-2 (audit done) |
+| ✅ **Done** | 31 | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,2,3; MAINT-1,2,3,4; DATA-1,2,3; AI-1,2,3,4; SIMP-2; PROD-1 |
+| ⚠️ **In Progress** | 1 | PROD-2 (audit done, 3 sessions implementation remaining) |
 | 🔴 **Open** | 1 | SIMP-1 (revisit ~2026-04-08 after 30 days of EMF usage data) |
 
 **Next hardening priorities:** PROD-2 implementation (Sonnet), then PROD-1 CDK sessions.
