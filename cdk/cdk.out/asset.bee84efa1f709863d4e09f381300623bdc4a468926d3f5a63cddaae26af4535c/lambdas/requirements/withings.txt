@@ -1,2 +1,0 @@
-# withings-data-ingestion
-# No third-party dependencies — uses stdlib urllib + hmac only.
