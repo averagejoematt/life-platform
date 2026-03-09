@@ -30,9 +30,9 @@ from stacks.compute_stack import ComputeStack
 from stacks.email_stack import EmailStack
 # Future stacks — uncomment as implemented:
 from stacks.operational_stack import OperationalStack
-# from stacks.mcp_stack import McpStack
-# from stacks.web_stack import WebStack
-# from stacks.monitoring_stack import MonitoringStack
+from stacks.mcp_stack import McpStack
+from stacks.web_stack import WebStack
+from stacks.monitoring_stack import MonitoringStack
 
 app = cdk.App()
 
@@ -69,12 +69,16 @@ operational = OperationalStack(app, "LifePlatformOperational", env=env,
     alerts_topic=core.alerts_topic)
 # operational stack wired ✅
 #
-# mcp = McpStack(app, "LifePlatformMcp", env=env,
-#     table=core.table, bucket=core.bucket)
+mcp = McpStack(app, "LifePlatformMcp", env=env,
+    table=core.table, bucket=core.bucket)
+# mcp stack wired ✅
 #
-# web = WebStack(app, "LifePlatformWeb", env=env, bucket=core.bucket)
+web = WebStack(app, "LifePlatformWeb",
+    env=cdk.Environment(account=account, region="us-east-1"))  # CloudFront requires us-east-1
+# web stack wired ✅
 #
-# monitoring = MonitoringStack(app, "LifePlatformMonitoring", env=env,
-#     alerts_topic=core.alerts_topic)
+monitoring = MonitoringStack(app, "LifePlatformMonitoring", env=env,
+    alerts_topic=core.alerts_topic)
+# monitoring stack wired ✅
 
 app.synth()
