@@ -1,5 +1,30 @@
 # Life Platform — Changelog
 
+## v3.3.7 — 2026-03-09: IC-4 failure pattern compute + IC-5 early warning detection
+
+### IC-4: Failure Pattern Compute Lambda (new)
+- New Lambda `failure-pattern-compute` (weekly, Sunday 9:50 AM PT)
+- Scans 7 days of `computed_metrics`; identifies days where any component < 50
+- Fetches contextual data per failure day: Whoop recovery/HRV, Todoist task load, journal stress, MacroFactor calories
+- Haiku synthesis pass identifies recurring patterns (min 2 occurrences)
+- Stores `MEMORY#failure_pattern#<date>#<index>` to `platform_memory` DDB partition
+- Consumed by `daily_insight_compute` → `build_memory_context()` → injected into every Daily Brief AI call
+- Idempotent: skips if already ran today unless `force=true`
+
+### IC-5: Early Warning Detection (daily-insight-compute v1.2.0)
+- New function `detect_early_warning()` in `daily_insight_compute_lambda.py`
+- 4 markers checked: `journal_sparse`, `nutrition_gap`, `habit_declining`, `recovery_sliding`
+- Warning fires when 2+ markers active simultaneously
+- Injects `⚠️ EARLY WARNING` block into AI context before Daily Brief
+- Handler return dict includes `ic5_warning` and `ic5_markers` for CloudWatch visibility
+
+### PROD-2 audit
+- Confirmed all 39 Lambdas already use fail-fast `os.environ["USER_ID"]` (no `matthew` defaults remain)
+- All email Lambdas already use `os.environ["EMAIL_RECIPIENT"]` / `os.environ["EMAIL_SENDER"]`
+- Phase 3 (S3 path prefix) deferred — touches CloudFront, own session
+
+---
+
 ## v3.3.6 — 2026-03-09: Post-PROD-1 alarm triage + hotfixes
 
 ### CDK code packaging bug (all CDK-managed Lambdas broken)

@@ -1,5 +1,5 @@
 """
-Daily Insight Compute Lambda — IC-2 v1.0.0
+Daily Insight Compute Lambda — IC-2 v1.2.0
 Scheduled at 9:42 AM PT (17:42 UTC via EventBridge).
 
 Transforms raw pre-computed metrics into curated coaching intelligence
@@ -24,6 +24,7 @@ Schedule:
   9:42 AM PT  daily-insight-compute  ← this Lambda
   10:00 AM PT daily-brief            (reads computed_insights via data["computed_insights"])
 
+v1.2.0 — 2026-03-09 (IC-5: Early Warning Detection — multi-marker proactive alert)
 v1.1.0 — 2026-03-08 (IC-8: Intent vs Execution Gap)
 """
 
@@ -733,9 +734,94 @@ def analyze_intention_execution_gap(yesterday_str, profile):
 # AI CONTEXT BLOCK ASSEMBLY
 # ==============================================================================
 
+# ==============================================================================
+# IC-5: EARLY WARNING DETECTION
+# ==============================================================================
+
+def detect_early_warning(computed_records_7d, habit_7d, declining):
+    """IC-5: Detect early warning state from simultaneous multi-marker deterioration.
+
+    Fires when 2+ of the following markers are active at once:
+      1. journal_sparse   — journal component < 50 for 2 of last 3 days
+      2. nutrition_gap    — nutrition component < 40 for 2 of last 3 days
+      3. habit_declining  — T0 completion dropped >=15pp (last-3d avg vs prior-4d avg)
+      4. recovery_sliding — recovery or readiness_score already in declining list
+
+    Returns: (warning_active: bool, markers: list[str], warning_block: str)
+    """
+    markers = []
+
+    sorted_recs = sorted(computed_records_7d, key=lambda x: x.get("date", ""))
+    recent_3 = sorted_recs[-3:] if len(sorted_recs) >= 3 else sorted_recs
+
+    # Marker 1: journal sparse
+    journal_low = 0
+    for rec in recent_3:
+        comp = rec.get("component_scores", {})
+        score = safe_float(comp, "journal")
+        if score is not None and score < 50:
+            journal_low += 1
+    if journal_low >= 2:
+        markers.append("journal_sparse")
+
+    # Marker 2: nutrition gap
+    nutrition_low = 0
+    for rec in recent_3:
+        comp = rec.get("component_scores", {})
+        score = safe_float(comp, "nutrition")
+        if score is not None and score < 40:
+            nutrition_low += 1
+    if nutrition_low >= 2:
+        markers.append("nutrition_gap")
+
+    # Marker 3: habit completion dropping
+    sorted_habits = sorted(habit_7d, key=lambda x: x.get("date", ""))
+    if len(sorted_habits) >= 4:
+        recent_h = sorted_habits[-3:]
+        prior_h  = sorted_habits[-7:-3] if len(sorted_habits) >= 7 else sorted_habits[:-3]
+        def avg_completion(records):
+            vals = [safe_float(r, "t0_completion_rate") for r in records]
+            vals = [v for v in vals if v is not None]
+            return sum(vals) / len(vals) if vals else None
+        recent_comp = avg_completion(recent_h)
+        prior_comp  = avg_completion(prior_h)
+        if recent_comp is not None and prior_comp is not None:
+            drop_pp = prior_comp - recent_comp  # positive = drop
+            if drop_pp >= 0.15:  # 15 percentage point drop
+                markers.append("habit_declining")
+
+    # Marker 4: recovery / readiness sliding (reuse declining list from detect_metric_trends)
+    declining_metrics = {d["metric"] for d in declining}
+    if "recovery" in declining_metrics or "readiness_score" in declining_metrics:
+        markers.append("recovery_sliding")
+
+    warning_active = len(markers) >= 2
+
+    warning_block = ""
+    if warning_active:
+        marker_labels = {
+            "journal_sparse":   "journal tracking dropped off (2+ of last 3 days)",
+            "nutrition_gap":    "nutrition score critically low (2+ of last 3 days)",
+            "habit_declining":  "T0 habit completion dropped 15%+ this week",
+            "recovery_sliding": "recovery/readiness declining 3 consecutive days",
+        }
+        active_desc = [marker_labels[m] for m in markers if m in marker_labels]
+        warning_block = (
+            "\u26a0\ufe0f EARLY WARNING: Multiple deterioration markers active simultaneously:\n"
+            + "\n".join(f"  \u2022 {d}" for d in active_desc)
+            + "\nThis pattern often precedes broader health score decline. Address proactively."
+        )
+        logger.warning("IC-5 EARLY WARNING active: markers=%s", markers)
+    else:
+        logger.info("IC-5: No early warning (active markers: %s)", markers)
+
+    return warning_active, markers, warning_block
+
+
 def build_ai_context_block(momentum_signal, this_week_avg, prev_week_avg, trend_pct,
                             declining, improving, miss_rates, strongest, weakest,
-                            synergy_health, memory_ctx, intention_gap_ctx=""):
+                            synergy_health, memory_ctx, intention_gap_ctx="",
+                            early_warning_block=""):
     """Assemble the compact text block injected into all Daily Brief AI prompts."""
     lines = ["PLATFORM INTELLIGENCE (7-day context, pre-computed):"]
 
@@ -783,6 +869,11 @@ def build_ai_context_block(momentum_signal, this_week_avg, prev_week_avg, trend_
     if intention_gap_ctx:
         lines.append("")
         lines.append(intention_gap_ctx)
+
+    # IC-5: Early Warning
+    if early_warning_block:
+        lines.append("")
+        lines.append(early_warning_block)
 
     lines.append("INSTRUCTION: Reference this intelligence in coaching. Name the specific patterns, "
                  "causal chains, and leading indicators above \u2014 don't just list them, connect them.")
@@ -842,7 +933,7 @@ def store_computed_insights(yesterday_str, payload):
 # ==============================================================================
 
 def lambda_handler(event, context):
-    logger.info("Daily Insight Compute v1.1.0 starting...")
+    logger.info("Daily Insight Compute v1.2.0 starting...")
 
     today         = datetime.now(timezone.utc).date()
     yesterday_str = event.get("date") or (today - timedelta(days=1)).isoformat()
@@ -897,11 +988,19 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.warning("IC-8 failed (non-fatal): %s", e)
 
+    # ── 5c. IC-5: Early Warning Detection ──
+    ic5_warning, ic5_markers, early_warning_block = False, [], ""
+    try:
+        ic5_warning, ic5_markers, early_warning_block = detect_early_warning(
+            computed_7d, habit_7d, declining)
+    except Exception as e:
+        logger.warning("IC-5 failed (non-fatal): %s", e)
+
     # ── 6. Assemble AI context block ──
     ai_block = build_ai_context_block(
         momentum_signal, this_week_avg, prev_week_avg, trend_pct,
         declining, improving, miss_rates, strongest, weakest,
-        synergy_health, memory_ctx, intention_gap_ctx)
+        synergy_health, memory_ctx, intention_gap_ctx, early_warning_block)
     logger.info("AI context block: %d chars", len(ai_block))
 
     # ── 7. Store ──
@@ -929,4 +1028,6 @@ def lambda_handler(event, context):
         "improving_count": len(improving),
         "weakest_habits":  weakest[:3],
         "ic8_active":      bool(intention_gap_ctx),
+        "ic5_warning":     ic5_warning,
+        "ic5_markers":     ic5_markers,
     }
