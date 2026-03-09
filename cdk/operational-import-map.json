@@ -1,0 +1,33 @@
+{
+  "FreshnessChecker": "life-platform-freshness-checker",
+  "FreshnessCheckerSchedule": "life-platform-freshness-check",
+  "FreshnessCheckerErrorAlarm": "freshness-checker-errors",
+
+  "DlqConsumer": "life-platform-dlq-consumer",
+  "DlqConsumerSchedule": "dlq-consumer-schedule",
+
+  "Canary": "life-platform-canary",
+  "CanarySchedule": "canary-schedule",
+
+  "PipAudit": "life-platform-pip-audit",
+  "PipAuditSchedule": "life-platform-pip-audit-monthly",
+
+  "QaSmoke": "life-platform-qa-smoke",
+  "QaSmokeSchedule": "life-platform-qa-smoke",
+
+  "KeyRotator": "life-platform-key-rotator",
+  "KeyRotatorErrorAlarm": "key-rotator-errors",
+
+  "DataExport": "life-platform-data-export",
+  "DataExportErrorAlarm": "life-platform-data-export-errors",
+
+  "DataReconciliation": "life-platform-data-reconciliation",
+  "DataReconciliationSchedule": "life-platform-data-reconciliation-weekly",
+
+  "CanaryAnyFailureAlarm": "life-platform-canary-any-failure",
+  "CanaryDdbFailureAlarm": "life-platform-canary-ddb-failure",
+  "CanaryMcpFailureAlarm": "life-platform-canary-mcp-failure",
+  "CanaryS3FailureAlarm": "life-platform-canary-s3-failure",
+
+  "DlqDepthAlarm": "life-platform-dlq-depth-warning"
+}

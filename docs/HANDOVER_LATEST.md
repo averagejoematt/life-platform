@@ -1,38 +1,59 @@
-# Handover — v3.3.2 — 2026-03-09
+# Handover — v3.3.3 — 2026-03-09
 
 ## What was done this session
 
-### PROD-1 CDK — LifePlatformIngestion imported ✅
+### Option A — LifePlatformIngestion deploy script ✅
 
-After Compute + Email deployed (v3.3.1), ran `cdk import LifePlatformIngestion --force`.
+Wrote `deploy/deploy_ingestion_stack.sh`. Key finding: the 7 old-convention Lambdas
+(`lambda_function.lambda_handler`) were already corrected in `ingestion_stack.py` during
+the import session. **No handler drift will occur on deploy.** The deploy will:
+- Create 7 missing alarms (garmin, notion, habitify, journal-enrichment, weather, dropbox-poll, hae-webhook)
+- Add Lambda::Permission resources (S3/API Gateway invoke permissions)
 
-#### Problems hit and fixed during import
+**To run:**
+```bash
+bash deploy/deploy_ingestion_stack.sh
+```
 
-**1. Handler mismatches (7 Lambdas)**
-7 ingestion Lambdas have `lambda_function.lambda_handler` in AWS (old zip convention). Updated `ingestion_stack.py` to match AWS reality. These are marked with `# AWS actual` comments — on next `cdk deploy` nothing changes, but the zips should eventually be renamed to module-based handlers.
+---
 
-Lambdas with `lambda_function.lambda_handler` in AWS:
-- whoop-data-ingestion, withings-data-ingestion, habitify-data-ingestion, strava-data-ingestion, todoist-data-ingestion, eightsleep-data-ingestion, apple-health-ingestion
+### Option B — LifePlatformOperational stack built ✅
 
-**2. EventBridge schedule drift (all 15)**
-All ingestion rules fire 1 hour earlier than CDK had. All schedules corrected to match AWS.
+New file: `cdk/stacks/operational_stack.py`
+Import map: `cdk/operational-import-map.json`
+Deploy script: `deploy/deploy_operational_stack.sh`
+`cdk/app.py`: OperationalStack uncommented and wired
 
-**3. Garth layer doesn't exist**
-`garth` is bundled in the garmin Lambda zip, not a separate layer. Removed `GARTH_LAYER_ARN` and `additional_layers=[garth_layer]` from ingestion_stack.py.
+**8 Lambdas modeled** (all configs verified from AWS):
 
-**4. Alarm names use short form (not full function name)**
-AWS alarms use `ingestion-error-<short>` not `ingestion-error-<function-name>`. Added `alarm_name` override param to `lambda_helpers.py`. 8 alarms imported with correct short names.
+| Lambda | Function Name | Handler | Timeout | Memory | Schedule | DLQ | Alarm |
+|--------|-------------|---------|---------|--------|----------|-----|-------|
+| FreshnessChecker | life-platform-freshness-checker | `lambda_function.lambda_handler` | 30s | 128MB | cron(45 16 * * ? *) | ✅ | freshness-checker-errors |
+| DlqConsumer | life-platform-dlq-consumer | `dlq_consumer_lambda.lambda_handler` | 120s | 256MB | rate(6 hours) | ❌ | none |
+| Canary | life-platform-canary | `canary_lambda.lambda_handler` | 60s | 256MB | rate(4 hours) | ❌ | 4 custom (below) |
+| PipAudit | life-platform-pip-audit | `pip_audit_lambda.lambda_handler` | 300s | 512MB | cron(0 17 ? * MON *) | ❌ | none |
+| QaSmoke | life-platform-qa-smoke | `qa_smoke_lambda.lambda_handler` | 120s | 256MB | cron(30 18 ? * * *) | ❌ | none |
+| KeyRotator | life-platform-key-rotator | `lambda_function.lambda_handler` | 30s | 128MB | SM rotation only | ❌ | key-rotator-errors |
+| DataExport | life-platform-data-export | `data_export_lambda.lambda_handler` | 300s | 512MB | none (on-demand) | ❌ | life-platform-data-export-errors |
+| DataReconciliation | life-platform-data-reconciliation | `data_reconciliation_lambda.lambda_handler` | 120s | 256MB | cron(30 7 ? * MON *) | ❌ | none |
 
-**5. 7 alarms don't exist in AWS at all**
-garmin, notion, habitify, journal-enrichment, weather, dropbox-poll, hae-webhook alarms are absent. Set `alerts_topic=None` for those Lambdas — CDK will create alarms on first `cdk deploy`.
+**Special resources:**
+- 4 canary alarms in `LifePlatform/Canary` namespace (custom metrics: CanaryDDBFail, CanaryMCPFail, CanaryS3Fail)
+- DLQ depth alarm on SQS (`life-platform-dlq-depth-warning`) — AWS/SQS namespace, Maximum statistic
+- Secrets Manager invoke permission for key-rotator (will be CREATED on first deploy)
+- Note: `life-platform-canary-any-failure` and `-ddb-failure` both watch `CanaryDDBFail` — AWS actual, preserved as-is
 
-**6. HAE webhook alarm doesn't exist**
-Removed the inline HAE alarm block entirely for import. Will be created on first deploy.
+**Key findings during build:**
+- All Operational Lambdas use `life-platform-` prefix (not bare names like `freshness-checker`)
+- Only `freshness-checker` has a DLQ; all others dlq=None
+- `key-rotator` has no env vars in AWS; triggered by SM rotation, not EventBridge
+- `pip-audit` schedule is every Monday (not first-Monday-only as described in PROJECT_PLAN)
+- `brittany-weekly-email` Lambda already exists in AWS! (spotted in list-functions)
 
-#### Import result
-- 8 CloudWatch alarms imported ✅
-- All Lambda::Permission resources skipped (CDK recreates on deploy) ✅
-- All EventBridge rules skipped by --force (already exist, no change needed) ✅
+**To run:**
+```bash
+bash deploy/deploy_operational_stack.sh
+```
 
 ---
 
@@ -41,11 +62,11 @@ Removed the inline HAE alarm block entirely for import. Will be created on first
 | Stack | Status | Notes |
 |-------|--------|-------|
 | LifePlatformCore | Not in CFn | DDB + S3 + SQS + SNS — import deferred |
-| LifePlatformIngestion | ✅ Imported | Needs first `cdk deploy` to create missing alarms + Lambda permissions |
+| LifePlatformIngestion | ✅ Imported | **Run deploy_ingestion_stack.sh** |
 | LifePlatformCompute | ✅ Deployed | |
 | LifePlatformEmail | ✅ Deployed | |
-| LifePlatformOperational | 🔴 Not built | Next session |
-| LifePlatformMcp | 🔴 Not built | |
+| LifePlatformOperational | 🟡 Ready to import | **Run deploy_operational_stack.sh** |
+| LifePlatformMcp | 🔴 Not built | Next after Operational |
 | LifePlatformMonitoring | 🔴 Not built | |
 | LifePlatformWeb | 🔴 Not built | |
 
@@ -53,51 +74,55 @@ Removed the inline HAE alarm block entirely for import. Will be created on first
 
 ## Immediate next steps
 
-### Option A — First deploy of LifePlatformIngestion (quick win)
-Run deploy to bring the stack fully up-to-date — creates the 7 missing alarms, Lambda permissions, and locks in all the handler/schedule fixes:
+### Option A (5 min) — Deploy LifePlatformIngestion
 ```bash
-cd ~/Documents/Claude/life-platform/cdk && source .venv/bin/activate
-npx cdk deploy LifePlatformIngestion --require-approval never
-```
-⚠️ This will change handler strings on 7 Lambdas in AWS — confirm that's acceptable (the module names still exist in the zips, so it'll break those 7 unless the zips are updated too). Consider skipping for now and leaving as drift.
-
-### Option B — Build LifePlatformOperational stack (next PROD-1 stack)
-Lambdas to model:
-- freshness-checker, dlq-consumer, canary, pip-audit, qa-smoke, key-rotator, data-export, data-reconciliation
-
-Start by running:
-```bash
-for fn in freshness-checker dlq-consumer canary pip-audit qa-smoke \
-    life-platform-key-rotator data-export data-reconciliation; do
-  role=$(aws lambda get-function-configuration --function-name $fn \
-    --query Role --output text 2>/dev/null | awk -F'/' '{print $NF}')
-  echo "$fn → $role"
-done
+bash deploy/deploy_ingestion_stack.sh
 ```
 
-### Option C — Brittany weekly email (fully unblocked, separate from CDK work)
+### Option B (20 min) — Import + Deploy LifePlatformOperational
+```bash
+bash deploy/deploy_operational_stack.sh
+```
+Should be clean: all 8 Lambdas, 6 rules, 12 alarms already exist in AWS.
+Only new resource created: SM invoke permission on key-rotator.
+
+### Option C — Build LifePlatformMcp
+The MCP stack covers `life-platform-mcp` Lambda + Function URL.
+Before building, run role discovery:
+```bash
+aws lambda get-function-configuration --function-name life-platform-mcp \
+  --query "{handler:Handler,role:Role,timeout:Timeout,memory:MemorySize}" \
+  --region us-west-2
+```
+
+### Option D — Brittany weekly email (fully unblocked, separate from CDK)
 
 ---
 
 ## Key lessons learned this session
 
-**Alarm name convention drift:** Pre-SEC-1 alarms used short names (`ingestion-error-whoop`); newer alarms use full function names. When building operational/mcp stacks, check actual alarm names first.
+**Operational Lambdas use `life-platform-` prefix** — not bare names. `freshness-checker` in
+AWS is `life-platform-freshness-checker`. Verify with `list-functions` before building any stack.
 
-**Handler drift:** Older Lambdas deployed before the module-naming convention use `lambda_function.lambda_handler`. Changing the handler in CDK without updating the zip will break the Lambda. Leave as-is in CDK or update both simultaneously.
+**`brittany-weekly-email` already exists in Lambda** — visible in list-functions output.
+The Lambda was deployed previously (likely during a session not reflected in handover notes).
+Check what it does before the Brittany email feature session.
 
-**`alerts_topic=None` pattern for missing alarms:** When an alarm doesn't exist in AWS, set `alerts_topic=None` in the Lambda call and let CDK create it on first deploy. Don't try to import a non-existent alarm.
+**Canary alarms use custom CloudWatch namespace** — can't be modeled with `fn.metric_errors()`.
+Use `cloudwatch.Metric` + `cloudwatch.Alarm` directly with `LifePlatform/Canary` namespace.
 
-**`alarm_name` override param:** Added to `lambda_helpers.py` — use whenever AWS alarm name doesn't match the default `ingestion-error-{function_name}` pattern.
+**DLQ depth alarm is SQS-based** — belongs in OperationalStack (not MonitoringStack)
+because it monitors the same DLQ that DlqConsumer processes.
 
 ---
 
 ## Platform state
 
-**Version:** v3.3.2
+**Version:** v3.3.3
 
 | Epic | Status |
 |------|--------|
 | SEC-1,2,3,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,2,3; MAINT-1,2,3,4; DATA-1,2,3; AI-1,2,3,4 | ✅ |
-| PROD-1 | ⚠️ Compute ✅ Email ✅ Ingestion ✅; 4 stacks remaining |
+| PROD-1 | ⚠️ Compute ✅ Email ✅ Ingestion ✅; Operational 🟡 ready; 3 stacks remaining |
 | PROD-2 | ✅ |
 | SIMP-1 | 🔴 Revisit ~2026-04-08 |

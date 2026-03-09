@@ -1,5 +1,24 @@
 # Life Platform — Changelog
 
+## v3.3.3 — 2026-03-09: PROD-1 LifePlatformIngestion deploy script + LifePlatformOperational stack built
+
+### Option A — LifePlatformIngestion deploy script
+- `deploy/deploy_ingestion_stack.sh` written
+- Handler check: all 7 old-convention Lambdas already corrected in ingestion_stack.py — no drift on deploy
+- Deploy will create 7 missing alarms + Lambda::Permission resources
+
+### Option B — LifePlatformOperational stack
+- New: `cdk/stacks/operational_stack.py` — 8 Lambdas, 6 schedules, 12 alarms
+- New: `cdk/operational-import-map.json` — physical resource ID mapping
+- New: `deploy/deploy_operational_stack.sh` — import + deploy script
+- `cdk/app.py`: OperationalStack uncommented and wired
+- All configs verified from AWS: function names, handlers, roles, timeouts, memory, schedules
+- Canary alarms modeled with `cloudwatch.Metric` (LifePlatform/Canary custom namespace)
+- DLQ depth alarm modeled with AWS/SQS metric (Maximum statistic)
+- Key finding: `brittany-weekly-email` Lambda already exists in AWS
+
+---
+
 ## v3.3.1 — 2026-03-09: PROD-1 CDK LifePlatformCompute + LifePlatformEmail deploy ✅
 
 ### SQS permission fix — shared-role Lambdas cannot configure DLQ via CDK
