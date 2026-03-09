@@ -17,6 +17,15 @@ import re
 import boto3
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import logging
+
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("qa-smoke")
+except ImportError:
+    logger = logging.getLogger("qa-smoke")
+    logger.setLevel(logging.INFO)
 
 
 # ---------------------------------------------------------------------------

@@ -40,8 +40,13 @@ from decimal import Decimal
 
 import boto3
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("data-reconciliation")
+except ImportError:
+    logger = logging.getLogger("data-reconciliation")
+    logger.setLevel(logging.INFO)
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 REGION    = os.environ.get("AWS_REGION", "us-west-2")

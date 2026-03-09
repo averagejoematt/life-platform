@@ -38,8 +38,13 @@ import urllib.error
 
 import boto3
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("daily-insight-compute")
+except ImportError:
+    logger = logging.getLogger("daily-insight-compute")
+    logger.setLevel(logging.INFO)
 
 _REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME  = os.environ.get("TABLE_NAME", "life-platform")

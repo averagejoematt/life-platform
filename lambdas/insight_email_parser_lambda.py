@@ -32,8 +32,13 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from email import policy
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("insight-email-parser")
+except ImportError:
+    logger = logging.getLogger("insight-email-parser")
+    logger.setLevel(logging.INFO)
 
 
 # ── Config (env vars with backwards-compatible defaults) ──

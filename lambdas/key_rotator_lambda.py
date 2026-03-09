@@ -16,8 +16,13 @@ import secrets
 import base64
 import boto3
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("key-rotator")
+except ImportError:
+    logger = logging.getLogger("key-rotator")
+    logger.setLevel(logging.INFO)
 
 sm = boto3.client("secretsmanager")
 

@@ -1,5 +1,17 @@
 # Life Platform — Changelog
 
+## v3.2.5 — 2026-03-09: OBS-1 structured logging rollout complete
+
+### OBS-1: platform_logger wired into all live Lambdas
+- `deploy/patch_obs1_remaining.py` — patched 17 Lambda source files with OBS-1 try/except import block
+- `deploy/deploy_obs1_remaining.sh` — updated to reflect 14 live Lambdas (removed 3 not yet in AWS)
+- `deploy/deploy_obs1_resume.sh` — new resume script; deployed 9 Lambdas after discovering 3 not yet created
+- All 14 live compute/utility Lambdas now emit structured JSON logs with `source` + `date`/`correlation_id`
+- 3 Lambdas pre-patched but not yet deployed (data-export, data-reconciliation, pip-audit — Lambdas don't exist in AWS yet)
+- OBS-1 effectively complete for all existing infrastructure (~97% hardening overall)
+
+---
+
 ## v3.2.4 — 2026-03-09: PROD-2 Phase 1 — Remove hardcoded defaults
 
 ### PROD-2 Phase 1: Hardcoded default removal (96 replacements, 40 files)
