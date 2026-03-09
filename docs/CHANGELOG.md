@@ -1,5 +1,20 @@
 # Life Platform — Changelog
 
+## v3.3.6 — 2026-03-09: Post-PROD-1 alarm triage + hotfixes
+
+### CDK code packaging bug (all CDK-managed Lambdas broken)
+- Root cause: `Code.from_asset("..")` bundles files at `lambdas/X.py` in zip root, but Lambda needs `X.py` at zip root
+- Affected: all 7 Compute + 8 Email + 1 Mcp + 7 Operational Lambdas (23 total)
+- Fix: `deploy/redeploy_all_cdk_lambdas.sh` — redeployed all 23 via `deploy_lambda.sh`
+- Permanent fix (TODO): update `lambda_helpers.py` to use `Code.from_asset("../lambdas")` instead of `Code.from_asset("..")`
+
+### platform_logger `set_date` bug (all old-convention ingestion Lambdas broken)
+- Root cause: ingestion Lambdas had stale bundled logger missing `set_date()` method
+- Affected: whoop, eightsleep, withings, strava, todoist, macrofactor, garmin, habitify, notion, journal-enrichment, dropbox-poll, weather, activity-enrichment (13 total)
+- Fix: `deploy/redeploy_ingestion_with_logger.sh` — redeployed all 13 with `--extra-files lambdas/platform_logger.py`
+
+---
+
 ## v3.3.5 — 2026-03-09: PROD-1 complete ✅ — all 7 CDK stacks deployed
 
 ### Stacks shipped this session
