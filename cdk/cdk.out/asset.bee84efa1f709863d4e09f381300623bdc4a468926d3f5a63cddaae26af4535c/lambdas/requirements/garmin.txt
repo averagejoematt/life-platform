@@ -1,7 +1,0 @@
-# garmin-data-ingestion
-# Built via deploy/fix_garmin_deps.sh (platform linux/x86_64 wheels)
-# Do NOT use pip install -r for this file on macOS —
-# fix_garmin_deps.sh handles cross-platform build automatically.
-
-garminconnect==0.2.23
-garth==0.4.47

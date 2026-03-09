@@ -1,2 +1,0 @@
-# health-auto-export-webhook
-# No third-party dependencies — uses stdlib only.

@@ -31,6 +31,10 @@ venv/
 .venv/
 env/
 
+# CDK build artifacts
+cdk/cdk.out/
+cdk/.venv/
+
 # macOS
 .DS_Store
 
