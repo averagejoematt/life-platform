@@ -1,5 +1,15 @@
 # Life Platform — Changelog
 
+## v3.2.10 — 2026-03-09: PROD-1 CDK ComputeStack + EmailStack imported ✅
+
+### PROD-1 CDK: ComputeStack + EmailStack — cdk import complete
+- `cdk import LifePlatformCompute` ✅ — 7 Lambdas + 8 EventBridge rules under CDK
+- `cdk import LifePlatformEmail` ✅ — 8 Lambdas + 8 EventBridge rules under CDK
+- Import maps corrected: format must use CDK hashed logical IDs (e.g. `AnomalyDetectorA36086E5`) with flat `{FunctionName}` / `{Arn}` values — not nested resource type objects
+- Rule name inferences all correct on first attempt (no fixups needed)
+
+---
+
 ## v3.2.9 — 2026-03-09: PROD-1 CDK ComputeStack + EmailStack written
 
 ### PROD-1 CDK: ComputeStack (7 Lambdas)
