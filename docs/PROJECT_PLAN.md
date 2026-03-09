@@ -544,13 +544,12 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ **Done** | 22 | SEC-1, SEC-2, SEC-3, SEC-5, IAM-1, IAM-2, REL-1, REL-2, REL-3, REL-4, OBS-2, COST-1, COST-3, MAINT-1, MAINT-2, DATA-1, DATA-2, DATA-3, AI-1, AI-2 |
-| ⚠️ **Partial rollout** | 2 | OBS-1 (daily-brief wired), AI-3 (daily-brief wired) |
-| 🔴 **Open** | 11 | SEC-4, OBS-3, COST-2, MAINT-3, MAINT-4, AI-4, SIMP-1, SIMP-2, PROD-1, PROD-2 |
+| ✅ **Done** | 26 | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2; COST-1,3; MAINT-1,2,3; DATA-1,2,3; AI-1,2,3 |
+| 🔴 **Open** | 9 | OBS-3, COST-2, MAINT-4, AI-4, SIMP-1, SIMP-2, PROD-1, PROD-2 |
 
-**Next hardening priorities:** Complete OBS-1 rollout (platform_logger into remaining Lambdas). Complete AI-3 rollout (output validator into email Lambdas). Then SEC-4 (WAF), MAINT-3 (.zip cleanup), COST-2.
+**Next hardening priorities:** OBS-3 (SLOs, Opus), COST-2 (MCP tool usage audit, Sonnet), AI-4 (hypothesis validation, Opus).
 
-**Model breakdown for remaining open:** Sonnet: SEC-4, OBS-3, COST-2, AI-2, SIMP-1. Opus: MAINT-4, AI-4, SIMP-2, PROD-1, PROD-2.
+**Model breakdown for remaining open:** Sonnet: COST-2, SIMP-1. Opus: OBS-3, MAINT-4, AI-4, SIMP-2, PROD-1, PROD-2.
 
 ---
 
