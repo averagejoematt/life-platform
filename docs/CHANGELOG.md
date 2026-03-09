@@ -1,5 +1,23 @@
 # Life Platform — Changelog
 
+## v3.3.0 — 2026-03-09: PROD-1 CDK handler bug fix + garth layer + import prep
+
+### Critical handler fix — compute_stack.py + email_stack.py
+- All 15 Lambda definitions in ComputeStack + EmailStack had `handler="lambda_function.lambda_handler"` — a placeholder that would have broken 14 Lambdas on next `cdk deploy`
+- Fixed all handlers to `{module_name}.lambda_handler` convention across both stacks
+- Both stacks were already imported (v3.2.10) so `cdk deploy LifePlatformCompute LifePlatformEmail` is needed to reconcile
+
+### Garth layer support — ingestion_stack.py + lambda_helpers.py
+- Added `GARTH_LAYER_ARN` constant + `GarthLayer` construct to `ingestion_stack.py`
+- `create_platform_lambda()` now accepts `additional_layers: list` param; GarminIngestion uses it
+- `layers=` merges `shared_layer` + `additional_layers` cleanly
+
+### New: deploy/prepare_cdk_import.sh
+- Pre-flight script for `cdk import LifePlatformIngestion`
+- Auto-patches GARTH_LAYER_ARN from AWS, verifies all 30 Lambda handlers, spot-checks IAM roles, lists EventBridge rule names, runs `cdk synth`
+
+---
+
 ## v3.2.10 — 2026-03-09: PROD-1 CDK ComputeStack + EmailStack imported ✅
 
 ### PROD-1 CDK: ComputeStack + EmailStack — cdk import complete

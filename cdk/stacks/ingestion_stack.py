@@ -64,8 +64,14 @@ from constructs import Construct
 
 from stacks.lambda_helpers import create_platform_lambda
 
-# ── Shared utils Lambda Layer ARN ───────────────────────────────────────────
+# ── Lambda Layer ARNs ────────────────────────────────────────────────────────
 SHARED_LAYER_ARN = "arn:aws:lambda:us-west-2:205930651321:layer:life-platform-shared-utils:4"
+
+# Garth OAuth library layer — required by garmin-data-ingestion only.
+# Retrieve the current ARN before importing:
+#   aws lambda list-layers --query 'Layers[?contains(LayerName, `garth`)].LatestMatchingVersion.LayerVersionArn' --output text
+# Then update this constant and run `cdk synth LifePlatformIngestion` to verify.
+GARTH_LAYER_ARN = "arn:aws:lambda:us-west-2:205930651321:layer:garth:1"  # UPDATE BEFORE IMPORT
 
 # ── Existing IAM Role ARNs ────────────────────────────────────────────────
 # Existing roles referenced by ARN (immutable) — CDK does not manage them.
@@ -173,6 +179,10 @@ class IngestionStack(Stack):
         # 2. Garmin
         # Requires garth layer for OAuth token management
         # ══════════════════════════════════════════════════════════════
+        garth_layer = _lambda.LayerVersion.from_layer_version_arn(
+            self, "GarthLayer", GARTH_LAYER_ARN
+        )
+
         create_platform_lambda(
             self, "GarminIngestion",
             function_name="garmin-data-ingestion",
@@ -183,6 +193,7 @@ class IngestionStack(Stack):
             timeout_seconds=300,
             memory_mb=512,
             shared_layer=shared_utils_layer,
+            additional_layers=[garth_layer],
             existing_role_arn=ROLE_ARNS["garmin"],
             **shared,
         )

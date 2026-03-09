@@ -2,7 +2,7 @@
 EmailStack — email/digest Lambdas + EventBridge schedules.
 
 Lambdas (8):
-  daily-brief             cron(0 17 * * ? *)      — 10:00 AM PDT daily (8:15 AM → 10 AM after DST)
+  daily-brief             cron(0 17 * * ? *)      — 10:00 AM PDT daily (8:15 AM -> 10 AM after DST)
   weekly-digest           cron(0 16 ? * SUN *)    — Sunday 8:00 AM PT
   monthly-digest          cron(0 16 ? * 1#1 *)    — First Sunday of month 8:00 AM PT
   nutrition-review        cron(0 17 ? * SAT *)    — Saturday 9:00 AM PT
@@ -12,7 +12,12 @@ Lambdas (8):
   brittany-weekly-email   cron(30 17 ? * 1 *)     — Sunday 9:30 AM PT
 
 Special handler notes:
-  weekly-digest: handler = digest_handler.lambda_handler (not lambda_function.lambda_handler)
+  weekly-digest: handler = digest_handler.lambda_handler (not <module>.lambda_handler)
+  All others: <source_module>.lambda_handler convention.
+
+Handler naming convention: <source_module>.lambda_handler
+  All handlers verified against actual source file function signatures.
+  DO NOT change handlers to lambda_function.lambda_handler — that would break existing Lambdas.
 
 All use from_role_arn() to reference existing IAM roles — no DefaultPolicy generated.
 Cross-stack resources resolved locally — no Fn::ImportValue (CoreStack not yet in CFn).
@@ -93,7 +98,7 @@ class EmailStack(Stack):
         create_platform_lambda(
             self, "DailyBrief",
             function_name="daily-brief",
-            handler="lambda_function.lambda_handler",
+            handler="daily_brief_lambda.lambda_handler",
             source_file="lambdas/daily_brief_lambda.py",
             schedule="cron(0 17 * * ? *)",
             timeout_seconds=300,
@@ -104,7 +109,9 @@ class EmailStack(Stack):
 
         # ══════════════════════════════════════════════════════════════
         # 2. weekly-digest — Sunday 8:00 AM PT
-        # SPECIAL: handler is digest_handler.lambda_handler (not lambda_function)
+        # SPECIAL: handler is digest_handler.lambda_handler (not <module>.lambda_handler)
+        # This is an intentional deviation from the naming convention — the weekly-digest
+        # Lambda was deployed with digest_handler.py as the entry point.
         # ══════════════════════════════════════════════════════════════
         create_platform_lambda(
             self, "WeeklyDigest",
@@ -124,7 +131,7 @@ class EmailStack(Stack):
         create_platform_lambda(
             self, "MonthlyDigest",
             function_name="monthly-digest",
-            handler="lambda_function.lambda_handler",
+            handler="monthly_digest_lambda.lambda_handler",
             source_file="lambdas/monthly_digest_lambda.py",
             schedule="cron(0 16 ? * 1#1 *)",
             timeout_seconds=120,
@@ -139,7 +146,7 @@ class EmailStack(Stack):
         create_platform_lambda(
             self, "NutritionReview",
             function_name="nutrition-review",
-            handler="lambda_function.lambda_handler",
+            handler="nutrition_review_lambda.lambda_handler",
             source_file="lambdas/nutrition_review_lambda.py",
             schedule="cron(0 17 ? * SAT *)",
             timeout_seconds=120,
@@ -155,7 +162,7 @@ class EmailStack(Stack):
         create_platform_lambda(
             self, "WednesdayChronicle",
             function_name="wednesday-chronicle",
-            handler="lambda_function.lambda_handler",
+            handler="wednesday_chronicle_lambda.lambda_handler",
             source_file="lambdas/wednesday_chronicle_lambda.py",
             schedule="cron(0 15 ? * WED *)",
             timeout_seconds=120,
@@ -171,7 +178,7 @@ class EmailStack(Stack):
         create_platform_lambda(
             self, "WeeklyPlate",
             function_name="weekly-plate",
-            handler="lambda_function.lambda_handler",
+            handler="weekly_plate_lambda.lambda_handler",
             source_file="lambdas/weekly_plate_lambda.py",
             schedule="cron(0 2 ? * SAT *)",
             timeout_seconds=120,
@@ -187,7 +194,7 @@ class EmailStack(Stack):
         create_platform_lambda(
             self, "MondayCompass",
             function_name="monday-compass",
-            handler="lambda_function.lambda_handler",
+            handler="monday_compass_lambda.lambda_handler",
             source_file="lambdas/monday_compass_lambda.py",
             schedule="cron(0 15 ? * MON *)",
             timeout_seconds=120,
@@ -203,7 +210,7 @@ class EmailStack(Stack):
         create_platform_lambda(
             self, "BrittanyWeeklyEmail",
             function_name="brittany-weekly-email",
-            handler="lambda_function.lambda_handler",
+            handler="brittany_email_lambda.lambda_handler",
             source_file="lambdas/brittany_email_lambda.py",
             schedule="cron(30 17 ? * 1 *)",
             timeout_seconds=90,

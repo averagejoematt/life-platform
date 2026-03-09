@@ -59,6 +59,7 @@ def create_platform_lambda(
     memory_mb: int = 256,
     environment: dict = None,
     shared_layer: _lambda.ILayerVersion = None,
+    additional_layers: list = None,
     ddb_write: bool = True,
     s3_write: bool = True,
     needs_ses: bool = False,
@@ -179,7 +180,7 @@ def create_platform_lambda(
         memory_size=memory_mb,
         environment=env,
         dead_letter_queue=None if existing_role_arn else dlq,
-        layers=[shared_layer] if shared_layer else [],
+        layers=([shared_layer] if shared_layer else []) + (additional_layers or []),
     )
 
     # Set DLQ via L1 escape hatch when using existing role — avoids auto-grant.
