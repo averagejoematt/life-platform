@@ -485,7 +485,7 @@ def merge_day_to_dynamo(date_str, fields):
 
 def save_cgm_readings_to_s3(date_str, readings):
     """Save individual CGM readings to S3 for detailed analysis."""
-    s3_key = f"raw/cgm_readings/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
+    s3_key = f"raw/{USER_ID}/cgm_readings/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
 
     # Merge with existing readings for this day (idempotent)
     existing = []
@@ -515,7 +515,7 @@ def save_cgm_readings_to_s3(date_str, readings):
 
 def save_bp_readings_to_s3(date_str, readings):
     """Save individual BP readings to S3 for detailed analysis (v1.4.0)."""
-    s3_key = f"raw/blood_pressure/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
+    s3_key = f"raw/{USER_ID}/blood_pressure/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
 
     existing = []
     try:
@@ -543,7 +543,7 @@ def save_bp_readings_to_s3(date_str, readings):
 
 def save_state_of_mind_to_s3(date_str, entries):
     """Save individual State of Mind check-ins to S3 (v1.5.0)."""
-    s3_key = f"raw/state_of_mind/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
+    s3_key = f"raw/{USER_ID}/state_of_mind/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
 
     existing = []
     try:
@@ -890,7 +890,7 @@ def process_workouts(workouts):
 
 def save_workouts_to_s3(date_str, workouts_list):
     """Save individual workout records to S3, merging with existing (v1.6.0)."""
-    s3_key = f"raw/workouts/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
+    s3_key = f"raw/{USER_ID}/workouts/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
 
     existing = []
     try:
@@ -922,7 +922,7 @@ def save_raw_payload(payload):
     """Archive the raw webhook payload to S3."""
     now = datetime.now(timezone.utc)
     s3_key = (
-        f"raw/health_auto_export/"
+        f"raw/{USER_ID}/health_auto_export/"
         f"{now.strftime('%Y/%m/%d_%H%M%S')}.json"
     )
     s3_client.put_object(

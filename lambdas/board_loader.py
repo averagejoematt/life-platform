@@ -23,7 +23,7 @@ _board_cache = {"data": None, "ts": 0}
 _CACHE_TTL_S = 300  # 5 minutes
 
 
-def load_board(s3_client, bucket, force_refresh=False):
+def load_board(s3_client, bucket, force_refresh=False, user_id="matthew"):
     """Load board config from S3 with warm-container caching.
 
     Returns the full config dict, or None if S3 read fails.
@@ -34,7 +34,7 @@ def load_board(s3_client, bucket, force_refresh=False):
         return _board_cache["data"]
 
     try:
-        resp = s3_client.get_object(Bucket=bucket, Key="config/board_of_directors.json")
+        resp = s3_client.get_object(Bucket=bucket, Key=f"config/{user_id}/board_of_directors.json")
         config = json.loads(resp["Body"].read().decode("utf-8"))
         _board_cache["data"] = config
         _board_cache["ts"] = now

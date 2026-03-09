@@ -305,12 +305,12 @@ def ingest_day(date_str, access_token, s3_client, table, verbose=True, call_dela
     log(f"[INFO] workout records: {len(workout_records)}")
 
     # ── Raw → S3 ──────────────────────────────────────────────────────────────
-    _s3_put(s3_client, f"raw/whoop/recovery/{year}/{month}/{day}.json", recovery_data, log)
-    _s3_put(s3_client, f"raw/whoop/sleep/{year}/{month}/{day}.json", sleep_data, log)
-    _s3_put(s3_client, f"raw/whoop/cycle/{year}/{month}/{day}.json", cycle_data, log)
+    _s3_put(s3_client, f"raw/{USER_ID}/whoop/recovery/{year}/{month}/{day}.json", recovery_data, log)
+    _s3_put(s3_client, f"raw/{USER_ID}/whoop/sleep/{year}/{month}/{day}.json", sleep_data, log)
+    _s3_put(s3_client, f"raw/{USER_ID}/whoop/cycle/{year}/{month}/{day}.json", cycle_data, log)
     for workout in workout_records:
         wid = workout["id"]
-        _s3_put(s3_client, f"raw/whoop/workout/{year}/{month}/{day}/{wid}.json", workout, log)
+        _s3_put(s3_client, f"raw/{USER_ID}/whoop/workout/{year}/{month}/{day}/{wid}.json", workout, log)
 
     # ── Normalize ─────────────────────────────────────────────────────────────
     normalized = {}

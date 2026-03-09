@@ -35,7 +35,7 @@ def _load_cgm_readings(date_str):
     """
     try:
         y, m, d = date_str.split("-")
-        key = f"raw/cgm_readings/{y}/{m}/{d}.json"
+        key = f"raw/{USER_ID}/cgm_readings/{y}/{m}/{d}.json"
         resp = s3_client.get_object(Bucket=S3_BUCKET, Key=key)
         readings = json.loads(resp["Body"].read())
         result = []
@@ -630,10 +630,10 @@ def tool_get_fasting_glucose_validation(args):
     cgm_days = []  # list of "YYYY-MM-DD"
     for prefix_year in ["2024/", "2025/", "2026/"]:
         try:
-            for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=f"raw/cgm_readings/{prefix_year}"):
+            for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=f"raw/{USER_ID}/cgm_readings/{prefix_year}"):
                 for obj in page.get("Contents", []):
                     key = obj["Key"]  # raw/cgm_readings/2024/10/01.json
-                    parts = key.replace("raw/cgm_readings/", "").replace(".json", "").split("/")
+                    parts = key.replace(f"raw/{USER_ID}/cgm_readings/", "").replace(".json", "").split("/")
                     if len(parts) == 3:
                         y, m, d = parts
                         cgm_days.append(f"{y}-{m.zfill(2)}-{d.zfill(2)}")

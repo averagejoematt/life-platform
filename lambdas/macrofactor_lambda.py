@@ -447,7 +447,7 @@ def archive_raw(bucket, source_key, content_bytes, subfolder=""):
     import os
     fname   = os.path.basename(source_key)
     sub     = f"/{subfolder}" if subfolder else ""
-    dest    = f"raw/macrofactor{sub}/{now.strftime('%Y/%m')}/{fname}"
+    dest    = f"raw/{USER_ID}/macrofactor{sub}/{now.strftime('%Y/%m')}/{fname}"
     s3_client.put_object(Bucket=bucket, Key=dest, Body=content_bytes, ContentType="text/csv")
     print(f"Archived to s3://{bucket}/{dest}")
 

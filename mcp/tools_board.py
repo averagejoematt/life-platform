@@ -6,10 +6,10 @@ import json
 import logging
 from datetime import datetime
 
-from mcp.config import s3_client, S3_BUCKET, logger
+from mcp.config import s3_client, S3_BUCKET, USER_ID, logger
 
 # ── S3 key ──
-BOARD_S3_KEY = "config/board_of_directors.json"
+BOARD_S3_KEY = f"config/{USER_ID}/board_of_directors.json"
 
 
 def _load_board():

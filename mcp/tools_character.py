@@ -355,10 +355,12 @@ def _make_sparkline(values, width=14):
 
 import time
 import boto3
+import os as _os
 
-REWARDS_PK = USER_PREFIX + "rewards"
-S3_BUCKET = "matthew-life-platform"
-CS_CONFIG_KEY = "config/character_sheet.json"
+REWARDS_PK   = USER_PREFIX + "rewards"
+S3_BUCKET    = _os.environ.get("S3_BUCKET", "matthew-life-platform")  # PROD-2 Phase 2
+_CS_USER_ID  = _os.environ.get("USER_ID", "matthew")                  # PROD-2 Phase 2
+CS_CONFIG_KEY = f"config/{_CS_USER_ID}/character_sheet.json"          # PROD-2 Phase 2
 
 _s3_client = None
 def _get_s3():

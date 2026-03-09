@@ -588,7 +588,7 @@ def ingest_day(wake_date: str, secret: dict) -> dict:
     temp_data = fetch_temperature_data(user_id, token, wake_date, tz)
 
     # ── S3 backup ──────────────────────────────────────────────────────────────
-    s3_key = f"raw/eightsleep/{wake_date[:4]}/{wake_date[5:7]}/{wake_date[8:10]}.json"
+    s3_key = f"raw/{USER_ID}/eightsleep/{wake_date[:4]}/{wake_date[5:7]}/{wake_date[8:10]}.json"
     s3_client.put_object(
         Bucket=S3_BUCKET,
         Key=s3_key,
