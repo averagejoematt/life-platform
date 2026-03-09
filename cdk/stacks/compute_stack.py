@@ -15,6 +15,10 @@ All use from_role_arn() to reference existing IAM roles — no DefaultPolicy gen
 All DLQs set via L1 escape hatch — avoids grant_send_messages DependsOn.
 Cross-stack resources resolved locally — no Fn::ImportValue (CoreStack not yet in CFn).
 
+Handler naming convention: <source_module>.lambda_handler
+  All handlers verified against actual source file function signatures.
+  DO NOT change handlers to lambda_function.lambda_handler — that would break existing Lambdas.
+
 Import procedure (first time only):
   cdk import LifePlatformCompute --resource-mapping compute-import-map.json
 
@@ -49,11 +53,15 @@ ALERTS_TOPIC_ARN     = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
 def _role(name): return f"arn:aws:iam::{ACCT}:role/{name}"
 
 # ── IAM role ARNs ──
-# character-sheet-compute and daily-metrics-compute auto-detected from life-platform-mcp
-# at deploy time; they likely use the MCP Lambda's role. Verify with:
-#   aws lambda get-function-configuration --function-name <name> --query Role
-# daily-insight, adaptive-mode, hypothesis, anomaly: SEC-1 created per-function roles.
-# If drift is detected on any role, update the ARN and run `cdk deploy` to reconcile.
+# Verify actual roles before import with:
+#   for fn in anomaly-detector character-sheet-compute daily-metrics-compute \
+#       daily-insight-compute adaptive-mode-compute hypothesis-engine dashboard-refresh; do
+#     echo "$fn: $(aws lambda get-function-configuration --function-name $fn --query Role --output text)"
+#   done
+#
+# anomaly-detector, character-sheet-compute, dashboard-refresh were deployed pre-SEC-1
+# and may use a shared role. The weekly-digest-role entries below are best guesses —
+# update after running the verification query above.
 ROLE_ARNS = {
     "anomaly_detector":   _role("lambda-weekly-digest-role"),     # pre-SEC-1 deploy used this
     "character_sheet":    _role("lambda-weekly-digest-role"),     # auto-detected from mcp role
@@ -90,7 +98,7 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "AnomalyDetector",
             function_name="anomaly-detector",
-            handler="lambda_function.lambda_handler",
+            handler="anomaly_detector_lambda.lambda_handler",
             source_file="lambdas/anomaly_detector_lambda.py",
             schedule="cron(5 15 * * ? *)",
             timeout_seconds=90,
@@ -105,7 +113,7 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "CharacterSheetCompute",
             function_name="character-sheet-compute",
-            handler="lambda_function.lambda_handler",
+            handler="character_sheet_lambda.lambda_handler",
             source_file="lambdas/character_sheet_lambda.py",
             schedule="cron(35 17 * * ? *)",
             timeout_seconds=60,
@@ -120,7 +128,7 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "DailyMetricsCompute",
             function_name="daily-metrics-compute",
-            handler="lambda_function.lambda_handler",
+            handler="daily_metrics_compute_lambda.lambda_handler",
             source_file="lambdas/daily_metrics_compute_lambda.py",
             schedule="cron(40 17 * * ? *)",
             timeout_seconds=120,
@@ -135,7 +143,7 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "DailyInsightCompute",
             function_name="daily-insight-compute",
-            handler="lambda_function.lambda_handler",
+            handler="daily_insight_compute_lambda.lambda_handler",
             source_file="lambdas/daily_insight_compute_lambda.py",
             schedule="cron(45 17 * * ? *)",
             timeout_seconds=120,
@@ -150,7 +158,7 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "AdaptiveModeCompute",
             function_name="adaptive-mode-compute",
-            handler="lambda_function.lambda_handler",
+            handler="adaptive_mode_lambda.lambda_handler",
             source_file="lambdas/adaptive_mode_lambda.py",
             schedule="cron(50 17 * * ? *)",
             timeout_seconds=120,
@@ -165,7 +173,7 @@ class ComputeStack(Stack):
         create_platform_lambda(
             self, "HypothesisEngine",
             function_name="hypothesis-engine",
-            handler="lambda_function.lambda_handler",
+            handler="hypothesis_engine_lambda.lambda_handler",
             source_file="lambdas/hypothesis_engine_lambda.py",
             schedule="cron(0 19 ? * SUN *)",
             timeout_seconds=120,
@@ -183,7 +191,7 @@ class ComputeStack(Stack):
         dashboard = create_platform_lambda(
             self, "DashboardRefresh",
             function_name="dashboard-refresh",
-            handler="lambda_function.lambda_handler",
+            handler="dashboard_refresh_lambda.lambda_handler",
             source_file="lambdas/dashboard_refresh_lambda.py",
             schedule="cron(0 21 * * ? *)",    # afternoon rule — dashboard-refresh-afternoon
             timeout_seconds=60,
