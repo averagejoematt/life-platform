@@ -1,5 +1,22 @@
 # Life Platform — Changelog
 
+## v3.3.5 — 2026-03-09: PROD-1 complete ✅ — all 7 CDK stacks deployed
+
+### Stacks shipped this session
+- LifePlatformMcp: life-platform-mcp Lambda + 2 alarms (mcp-server-duration-high, slo-mcp-availability)
+- LifePlatformMonitoring: 21 alarms — SLO (3), daily-brief ops (4), AI token budgets (13), DDB item size (1)
+- LifePlatformWeb: 3 CloudFront distributions (dash, blog, buddy) in us-east-1; bootstrapped us-east-1
+
+### Patterns locked in
+- No `schedule=` on imported Lambdas — always `fn.add_permission()` with hardcoded rule ARNs
+- No `add_function_url()` on existing Lambdas — 409 conflict; leave as unmanaged drift
+- CloudFront always us-east-1; `--force` on `cdk import` for auto-resolution
+
+### Unmanaged drift (intentional)
+- All EventBridge rules, life-platform-mcp Function URL, life-platform-freshness-checker Lambda
+
+---
+
 ## v3.3.4 — 2026-03-09: LifePlatformIngestion + LifePlatformOperational deployed ✅
 
 ### LifePlatformIngestion deploy fix
