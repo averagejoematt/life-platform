@@ -41,8 +41,13 @@ from urllib.parse import urlencode
 
 import boto3
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("habitify")
+except ImportError:
+    logger = logging.getLogger("habitify")
+    logger.setLevel(logging.INFO)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
@@ -362,6 +367,7 @@ def lambda_handler(event, context):
       {"start": "...", "end": "..."}    → backfill date range
     """
     import time as _time
+    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
 
     api_key = get_api_key()
     area_map = fetch_areas(api_key)

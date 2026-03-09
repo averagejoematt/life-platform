@@ -37,8 +37,8 @@ from decimal import Decimal
 
 import boto3
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+_logger_std = logging.getLogger()
+_logger_std.setLevel(logging.INFO)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
@@ -73,6 +73,22 @@ try:
     _HAS_INSIGHT_WRITER = True
 except ImportError:
     _HAS_INSIGHT_WRITER = False
+
+# AI-3: Output validation
+try:
+    from ai_output_validator import validate_ai_output, AIOutputType
+    _HAS_AI_VALIDATOR = True
+except ImportError:
+    _HAS_AI_VALIDATOR = False
+
+# OBS-1: Structured logger
+try:
+    from platform_logger import get_logger
+    logger = get_logger("monday-compass")
+except ImportError:
+    import logging as _log
+    logger = _log.getLogger("monday-compass")
+    logger.setLevel(_log.INFO)
 
 # ── Default project→pillar mapping (overridden by S3 config if present) ──────
 _DEFAULT_PROJECT_PILLAR_MAP = {
@@ -793,6 +809,15 @@ def lambda_handler(event, context):
             '<div style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">'
             'Monday Compass AI unavailable this week. Check CloudWatch logs.</div>'
         )
+
+    # AI-3: Validate output before rendering
+    if _HAS_AI_VALIDATOR and ai_content and "unavailable" not in ai_content[:50]:
+        _val = validate_ai_output(ai_content, AIOutputType.GENERIC)
+        if _val.blocked:
+            logger.error(f"[AI-3] Monday Compass output BLOCKED: {_val.block_reason}")
+            ai_content = _val.safe_fallback or '<div style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">Monday Compass AI unavailable. Check CloudWatch logs.</div>'
+        elif _val.warnings:
+            logger.warning(f"[AI-3] Monday Compass warnings: {_val.warnings}")
 
     today_str = health_data.get("today_str", datetime.now(timezone.utc).date().isoformat())
     html      = build_email_html(ai_content, week_state, today_str)

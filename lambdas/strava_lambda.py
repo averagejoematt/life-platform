@@ -7,8 +7,13 @@ import os
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("strava")
+except ImportError:
+    logger = logging.getLogger("strava")
+    logger.setLevel(logging.INFO)
 
 
 def floats_to_decimal(obj):
@@ -461,6 +466,7 @@ def save_to_dynamodb(date_str, activities):
 
 
 def lambda_handler(event, context):
+    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
     if "start_date" in event and "end_date" in event:
         start_date = datetime.strptime(event["start_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
         end_date = datetime.strptime(event["end_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)

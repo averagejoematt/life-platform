@@ -38,8 +38,13 @@ from urllib.error import HTTPError
 import boto3
 from boto3.dynamodb.conditions import Key
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("journal-enrichment")
+except ImportError:
+    logger = logging.getLogger("journal-enrichment")
+    logger.setLevel(logging.INFO)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
@@ -427,6 +432,7 @@ def lambda_handler(event, context):
       {"full_sync": true}             → all entries
       {"force": true}                 → re-enrich already-enriched entries
     """
+    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
     force = event.get("force", False)
     full_sync = event.get("full_sync", False)
 

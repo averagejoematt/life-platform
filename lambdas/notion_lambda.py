@@ -36,8 +36,13 @@ from urllib.error import HTTPError
 
 import boto3
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("notion")
+except ImportError:
+    logger = logging.getLogger("notion")
+    logger.setLevel(logging.INFO)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
@@ -510,6 +515,7 @@ def lambda_handler(event, context):
       {"start": "...", "end": "..."}  → backfill date range
       {"full_sync": true}             → fetch ALL entries (initial load)
     """
+    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
     api_key, database_id = get_secrets()
 
     # Determine date range

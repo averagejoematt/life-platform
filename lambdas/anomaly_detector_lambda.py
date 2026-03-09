@@ -39,8 +39,24 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+_logger_std = logging.getLogger()
+_logger_std.setLevel(logging.INFO)
+
+# AI-3: Output validation
+try:
+    from ai_output_validator import validate_ai_output, AIOutputType
+    _HAS_AI_VALIDATOR = True
+except ImportError:
+    _HAS_AI_VALIDATOR = False
+
+# OBS-1: Structured logger
+try:
+    from platform_logger import get_logger
+    logger = get_logger("anomaly-detector")
+except ImportError:
+    import logging as _log
+    logger = _log.getLogger("anomaly-detector")
+    logger.setLevel(_log.INFO)
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 
@@ -538,6 +554,14 @@ def lambda_handler(event, context):
             context_data = build_context(yesterday)
             hypothesis = call_haiku_hypothesis(flagged, context_data, api_key)
             print(f"[INFO] Hypothesis: {hypothesis[:100]}...")
+            # AI-3: Validate hypothesis output
+            if _HAS_AI_VALIDATOR and hypothesis:
+                _val = validate_ai_output(hypothesis, AIOutputType.GENERIC)
+                if _val.blocked:
+                    logger.error(f"[AI-3] Anomaly hypothesis BLOCKED: {_val.block_reason}")
+                    hypothesis = "Multiple metrics flagged -- check your daily brief for details."
+                elif _val.warnings:
+                    logger.warning(f"[AI-3] Anomaly hypothesis warnings: {_val.warnings}")
         except Exception as e:
             print(f"[WARN] Haiku hypothesis failed: {e}")
             hypothesis = "Multiple metrics flagged -- check your daily brief for details."

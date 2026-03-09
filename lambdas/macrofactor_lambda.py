@@ -23,8 +23,13 @@ from collections import defaultdict, OrderedDict
 from datetime import datetime, timezone
 from decimal import Decimal
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("macrofactor")
+except ImportError:
+    logger = logging.getLogger("macrofactor")
+    logger.setLevel(logging.INFO)
 
 # ── Config (env vars with backwards-compatible defaults) ──
 REGION         = os.environ.get("AWS_REGION", "us-west-2")
@@ -448,6 +453,7 @@ def archive_raw(bucket, source_key, content_bytes, subfolder=""):
 
 
 def lambda_handler(event, context):
+    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
     print(f"Event: {json.dumps(event)}")
 
     if "Records" in event:
