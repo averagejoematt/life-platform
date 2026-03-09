@@ -28,8 +28,13 @@ from decimal import Decimal
 import boto3
 from boto3.dynamodb.conditions import Key
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("data-export")
+except ImportError:
+    logger = logging.getLogger("data-export")
+    logger.setLevel(logging.INFO)
 
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ["S3_BUCKET"]

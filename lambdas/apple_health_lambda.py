@@ -22,8 +22,13 @@ from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from collections import defaultdict
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("apple-health")
+except ImportError:
+    logger = logging.getLogger("apple-health")
+    logger.setLevel(logging.INFO)
 
 S3_BUCKET = os.environ["S3_BUCKET"]
 DYNAMODB_TABLE = os.environ.get("DYNAMODB_TABLE", "life-platform")

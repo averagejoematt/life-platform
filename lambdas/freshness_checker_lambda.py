@@ -8,8 +8,13 @@ import logging
 import boto3
 from datetime import datetime, timezone, timedelta
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("freshness-checker")
+except ImportError:
+    logger = logging.getLogger("freshness-checker")
+    logger.setLevel(logging.INFO)
 
 # ── Config (env vars with backwards-compatible defaults) ──
 REGION      = os.environ.get("AWS_REGION", "us-west-2")

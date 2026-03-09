@@ -23,8 +23,13 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from boto3.dynamodb.conditions import Key
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("adaptive-mode-compute")
+except ImportError:
+    logger = logging.getLogger("adaptive-mode-compute")
+    logger.setLevel(logging.INFO)
 
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ["USER_ID"]

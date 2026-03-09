@@ -40,8 +40,13 @@ import urllib.error
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("hypothesis-engine")
+except ImportError:
+    logger = logging.getLogger("hypothesis-engine")
+    logger.setLevel(logging.INFO)
 
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")

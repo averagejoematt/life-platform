@@ -34,8 +34,13 @@ from decimal import Decimal
 
 import character_engine
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("character-sheet-compute")
+except ImportError:
+    logger = logging.getLogger("character-sheet-compute")
+    logger.setLevel(logging.INFO)
 
 # ── Configuration from environment variables ──
 _REGION    = os.environ.get("AWS_REGION", "us-west-2")

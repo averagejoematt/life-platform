@@ -15,6 +15,15 @@ import os
 import boto3
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import logging
+
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("dashboard-refresh")
+except ImportError:
+    logger = logging.getLogger("dashboard-refresh")
+    logger.setLevel(logging.INFO)
 
 # -- Configuration --
 _REGION    = os.environ.get("AWS_REGION", "us-west-2")

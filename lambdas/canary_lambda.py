@@ -42,6 +42,15 @@ import urllib.error
 import boto3
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
+import logging
+
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("canary")
+except ImportError:
+    logger = logging.getLogger("canary")
+    logger.setLevel(logging.INFO)
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 REGION     = os.environ.get("AWS_REGION", "us-west-2")

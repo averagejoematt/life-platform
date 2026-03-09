@@ -28,8 +28,13 @@ from datetime import datetime, timezone
 
 import boto3
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("dropbox-poll")
+except ImportError:
+    logger = logging.getLogger("dropbox-poll")
+    logger.setLevel(logging.INFO)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
