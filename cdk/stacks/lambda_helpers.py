@@ -53,6 +53,7 @@ def create_platform_lambda(
     bucket: s3.IBucket,
     dlq: sqs.IQueue = None,
     alerts_topic: sns.ITopic = None,
+    alarm_name: str = None,          # override default "ingestion-error-{function_name}"
     secrets: list[str] = None,
     schedule: str = None,
     timeout_seconds: int = 120,
@@ -201,12 +202,13 @@ def create_platform_lambda(
 
     # ── CloudWatch error alarm ──
     if alerts_topic:
+        _alarm_name = alarm_name if alarm_name else f"ingestion-error-{function_name}"
         alarm = fn.metric_errors(
             period=Duration.hours(24),
             statistic="Sum",
         ).create_alarm(
             scope, f"{id}ErrorAlarm",
-            alarm_name=f"ingestion-error-{function_name}",
+            alarm_name=_alarm_name,
             evaluation_periods=1,
             threshold=1,
             comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
