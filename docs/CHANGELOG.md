@@ -1,5 +1,23 @@
 # Life Platform — Changelog
 
+## v3.3.9 — 2026-03-09: MAINT-3 complete + SEC-4 confirmed
+
+### MAINT-3: deploy/ directory cleanup
+- Archived ~247 stale one-off scripts from `deploy/` → `archive/YYYYMMDD/deploy/`
+- Archived 9 stale zips from `deploy/zips/` (kept `garmin_lambda.zip` — native deps)
+- 8 active files remain in `deploy/`: `deploy_lambda.sh`, `MANIFEST.md`, `SMOKE_TEST_TEMPLATE.sh`, `generate_review_bundle.sh`, `p3_build_shared_utils_layer.sh`, `p3_build_garmin_layer.sh`, `p3_attach_shared_utils_layer.sh`, `sec4_apigw_rate_limit.sh`
+- Script: `deploy/maint3_archive_deploy.sh`
+
+### SEC-4: API Gateway rate limiting — confirmed already live
+- Verified `health-auto-export-api` (HTTP API v2, `a76xwxt2wa`) already has throttling applied
+- Settings: `ThrottlingRateLimit: 1.67 req/s` (~100/min), `ThrottlingBurstLimit: 10`
+- Applied in a prior session; documented and closed
+
+### Hardening Epic: 34/35 items complete
+- All hardening items done except SIMP-1 (deferred to ~2026-04-08 for 30-day MCP usage data)
+
+---
+
 ## v3.3.8 — 2026-03-09: PROD-2 Phase 3 — S3 path prefixing + DLQ purge
 
 ### DLQ cleanup (Option B)

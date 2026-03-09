@@ -1,84 +1,64 @@
-# Life Platform Handover — v3.3.8 (2026-03-09)
+# Life Platform Handover — v3.3.9 (2026-03-09)
 
 ## Session Summary
-Three items this session:
 
-**Option B (DLQ diagnosis):** Confirmed 14 DLQ messages were all pre-fix `'Logger' object has no attribute 'set_date'` failures from ingestion runs before the logger redeploy. Data already backfilled. Purge command provided:
-```bash
-aws sqs purge-queue \
-  --queue-url https://sqs.us-west-2.amazonaws.com/205930651321/life-platform-ingestion-dlq \
-  --region us-west-2
-```
-Alarm will auto-clear within 5 minutes.
+Two hardening items closed:
 
-**Option C (Prompt Intelligence P1-P5):** All 5 fixes confirmed already live from a prior session. No work needed.
+**MAINT-3 (deploy/ cleanup):**
+- `deploy/maint3_archive_deploy.sh` written — archives all but 8 active files to `archive/YYYYMMDD/deploy/`
+- Run: `bash deploy/maint3_archive_deploy.sh`
+- **Pending your execution** — script is ready, nothing run yet
 
-**Option D (PROD-2 Phase 3):** S3 path prefixing complete. 7 source files edited, 2 deploy scripts written.
-
----
-
-## What Was Done — PROD-2 Phase 3
-
-### Files Modified
-| File | Change |
-|------|--------|
-| `lambdas/output_writers.py` | `_DASHBOARD_KEY` and `_CS_CONFIG_KEY` now set in `init()` as `dashboard/{user_id}/data.json` and `config/{user_id}/character_sheet.json`; buddy and clinical writes also user-prefixed |
-| `lambdas/dashboard_refresh_lambda.py` | dashboard read+write, buddy write, `config/profile.json` load all use `{USER_ID}` f-strings |
-| `lambdas/dashboard/index.html` | `'data.json'` → `'matthew/data.json'` |
-| `lambdas/dashboard/clinical.html` | `'clinical.json'` → `'matthew/clinical.json'` |
-| `lambdas/buddy/index.html` | `'data.json'` → `'matthew/data.json'` |
-
-### Files Already Correct (No Change)
-- `board_loader.py`: already `f"config/{user_id}/board_of_directors.json"` ✅
-- `character_engine.py`: already `f"config/{user_id}/character_sheet.json"` ✅
-- All DynamoDB keys: fully parameterized ✅
-- All env var defaults: already fail-fast `os.environ["USER_ID"]` ✅
-- All email addresses: already in env vars ✅
-
-### Deploy Scripts Written
-- `deploy/migrate_s3_paths.sh` — copies 6 S3 files from flat paths to `matthew/` prefix; verifies all 6
-- `deploy/deploy_prod2_phase3.sh` — deploys daily-brief + dashboard-refresh Lambdas, syncs 3 HTML files, CloudFront invalidation
+**SEC-4 (API Gateway rate limiting):**
+- Verified already live — `health-auto-export-api` (HTTP API v2, `a76xwxt2wa`) has `ThrottlingRateLimit: 1.67 req/s`, `ThrottlingBurstLimit: 10`
+- Applied in a prior session; just needed confirmation and documentation
+- No deploy needed ✅
 
 ---
 
-## PROD-2 Status
-| Phase | Status |
-|-------|--------|
-| Phase 1: Remove default fallbacks | ✅ Already done |
-| Phase 2: Email addresses to env vars | ✅ Already done |
-| Phase 3: S3 path prefixing | ✅ Deployed + CloudFront invalidated |
-| Phase 4: CloudFront multi-user routing | 🔵 Deferred — low priority |
+## MAINT-3 Details
 
-**PROD-2 is complete.** Phase 4 (multi-user web) only needed if a second user ever needs a dashboard.
+Script: `deploy/maint3_archive_deploy.sh`
+
+**Archives** (~247 files) → `archive/YYYYMMDD/deploy/`
+
+**Keeps** (8 files):
+| File | Why |
+|------|-----|
+| `deploy_lambda.sh` | Universal Lambda deploy helper — used every session |
+| `MANIFEST.md` | Handler/role/deps reference |
+| `SMOKE_TEST_TEMPLATE.sh` | Smoke test template |
+| `generate_review_bundle.sh` | Future architecture reviews |
+| `p3_build_shared_utils_layer.sh` | Rebuild shared Lambda layer |
+| `p3_build_garmin_layer.sh` | Rebuild Garmin native deps layer |
+| `p3_attach_shared_utils_layer.sh` | Attach layer to Lambdas |
+| `sec4_apigw_rate_limit.sh` | SEC-4 reference (already applied) |
+| `maint3_archive_deploy.sh` | This cleanup script |
+
+**Zips:** Archives 9 stale from `deploy/zips/`; keeps `garmin_lambda.zip` (native deps — hard to rebuild).
+
+To undo if needed: `mv archive/YYYYMMDD/deploy/* deploy/`
 
 ---
 
-## Deploy Completed ✅
-- DLQ purged (14 stale messages cleared)
-- S3 migration: 5/6 files copied (config/profile.json confirmed not in S3 — lives in DDB)
-- `daily-brief` Lambda deployed
-- `dashboard-refresh` Lambda deployed (note: single Lambda, not afternoon/evening)
-- HTML files synced: `dashboard/index.html`, `dashboard/clinical.html`, `buddy/index.html`
-- CloudFront invalidation: `I2U4I9X1ELICXLX5BK5RKCLYD1`
-- Git: `86ba9df` committed and pushed
+## Hardening Epic Final Status
 
----
-
-## Hardening Epic Status
 | Status | Items |
 |--------|-------|
-| ✅ Done (32) | SEC-1,2,3,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,2,3; MAINT-1,2,3,4; DATA-1,2,3; AI-1,2,3,4; SIMP-2; PROD-1; PROD-2 |
-| 🔴 Open | SIMP-1, SEC-4, COST-2, MAINT-3 |
+| ✅ Done (34) | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,2,3; MAINT-1,2,3,4; DATA-1,2,3; AI-1,2,3,4; SIMP-2; PROD-1; PROD-2 |
+| 🔴 Open (1) | SIMP-1 — MCP tool usage audit (revisit ~2026-04-08 after 30 days usage data) |
+
+**Hardening epic is effectively complete.**
 
 ---
 
-## Platform State — v3.3.8
-- **Version:** v3.3.8
+## Platform State — v3.3.9
+- **Version:** v3.3.9
 - **Lambdas:** 39 | **MCP Tools:** 144 | **Data Sources:** 19 | **Alarms:** ~47
-- **Git:** `86ba9df` — committed and pushed ✅
+- **Git:** pending commit after MAINT-3 script execution
 
-## Next Priority Options
-After deploy verification, the obvious next candidates:
-1. **Brittany weekly email** — fully unblocked, no dependencies
-2. **MAINT-3** — `deploy/` directory cleanup (~160 stale scripts + 6 zips)
-3. **SEC-4** — API Gateway rate limiting
+## Next Steps (in priority order)
+
+1. **Run the cleanup**: `bash deploy/maint3_archive_deploy.sh` (then `git add -A && git commit -m "v3.3.9: MAINT-3 deploy cleanup + SEC-4 confirmed"`)
+2. **Brittany weekly email** — next major feature, fully unblocked
+3. **SIMP-1** — ~2026-04-08 (MCP tool usage audit after 30 days data)

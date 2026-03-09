@@ -1,7 +1,7 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-09 (v3.3.8 — 144 MCP tools, 39 Lambdas, 30 modules, 19 data sources, 8 secrets, ~47 alarms, 7 CDK stacks)
+> Last update: 2026-03-09 (v3.3.9 — 144 MCP tools, 39 Lambdas, 30 modules, 19 data sources, 8 secrets, ~47 alarms, 7 CDK stacks)
 
 ---
 
@@ -474,7 +474,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 | SEC-1 | **Decompose shared IAM role into per-function roles.** 13 dedicated roles created and assigned. Most restrictive: DDB+KMS only. | P0 | M (3-4 hr) | Sonnet | ✅ v3.1.0 |
 | SEC-2 | **Split consolidated api-keys secret into domain-specific secrets.** todoist, notion, dropbox split. ai-keys isolated. api-keys pending deletion. | P1 | M (2-3 hr) | Sonnet | ✅ v3.1.0 |
 | SEC-3 | **Add input validation to MCP tool arguments.** `_validate_tool_args()` in handler.py — required fields, type coercion, string caps, date format, enum. | P1 | M (3-4 hr) | Sonnet | ✅ v3.1.0 |
-| SEC-4 | **Add rate limiting to API Gateway webhook.** Health Auto Export API Gateway has no WAF/rate limiting. Add 100 req/min rate rule. | P2 | S (1 hr) | Sonnet | 🔴 |
+| SEC-4 | **Add rate limiting to API Gateway webhook.** Health Auto Export API Gateway has no WAF/rate limiting. Add 100 req/min rate rule. | P2 | S (1 hr) | Sonnet | ✅ v3.3.9 |
 | SEC-5 | **Implement dependency vulnerability scanning.** pip-audit Lambda, monthly first-Monday schedule. 18 requirements files scanned. | P2 | S (1-2 hr) | Sonnet | ✅ v3.1.3 |
 
 #### Epic: IAM Cleanup
@@ -515,7 +515,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 |---|------|----------|--------|-------|--------|
 | MAINT-1 | **Add dependency management (requirements.txt per Lambda).** 18 files in `lambdas/requirements/`. Only garmin has third-party deps. | P1 | M (3-4 hr) | Sonnet | ✅ v2.99.0 |
 | MAINT-2 | **Create Lambda Layer for shared modules.** 8 modules, attached to 16 Lambdas. Fix-once-deploy-everywhere. | P1 | M (3-4 hr) | Sonnet | ✅ v2.97.0 |
-| MAINT-3 | **Clean deploy/ and lambdas/ directories.** lambdas/ backup files cleaned. **⚠️ deploy/ still ~160 scripts. 6 stale .zips in lambdas/.** | P2 | S (1-2 hr) | Sonnet | ⚠️ Partial |
+| MAINT-3 | **Clean deploy/ and lambdas/ directories.** lambdas/ zip-free. deploy/ archived ~247 one-off scripts → `archive/YYYYMMDD/deploy/`; 8 active files remain. | P2 | S (1-2 hr) | Sonnet | ✅ v3.3.9 |
 | MAINT-4 | **Implement basic CI/CD with GitHub Actions.** 4-job pipeline: lint (flake8) → plan (change detection via `ci/lambda_map.json`) → deploy (manual approval, shared layer rebuild, MCP handling) → smoke test (qa-smoke + canary). OIDC auth. | P2 | L (6-8 hr) | **Opus** | ✅ v3.2.1 |
 
 #### Epic: Data Model & Quality
@@ -553,7 +553,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ **Done** | 32 | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,2,3; MAINT-1,2,3,4; DATA-1,2,3; AI-1,2,3,4; SIMP-2; PROD-1; PROD-2 |
+| ✅ **Done** | 34 | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,2,3; MAINT-1,2,3,4; DATA-1,2,3; AI-1,2,3,4; SIMP-2; PROD-1; PROD-2 |
 | 🔴 **Open** | 1 | SIMP-1 (revisit ~2026-04-08 after 30 days of EMF usage data) |
 
 **Next hardening priorities:** PROD-2 implementation (Sonnet), then PROD-1 CDK sessions.
