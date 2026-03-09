@@ -1,5 +1,21 @@
 # Life Platform — Changelog
 
+## v3.1.8 — 2026-03-09: SEC-4 + MAINT-3
+
+### SEC-4: API Gateway rate limiting on health-auto-export-webhook ✅
+- Applied throttling to HTTP API v2 (`health-auto-export-api`) `$default` stage
+- `ThrottlingRateLimit`: 1.67 req/s (100/min) · `ThrottlingBurstLimit`: 10
+- Normal traffic is ~6 req/day — limits are very generous, purely protective
+- Script: `deploy/sec4_api_gateway_throttle.sh`
+
+### MAINT-3: Stale zip cleanup ✅
+- All `.backup`, `.broken`, stale `.zip`, and versioned deploy scripts were already archived in prior sessions
+- Final item: `lambdas/garmin_lambda.zip` moved to `archive/` (already present in `deploy/zips/`)
+- `lambdas/` is now zip-free
+- Script: `deploy/maint3_final.sh`
+
+---
+
 ## v3.1.7 — 2026-03-08: OBS-1 + AI-3 full rollout to all email Lambdas
 
 ### OBS-1: platform_logger wired into all 6 remaining email Lambdas
