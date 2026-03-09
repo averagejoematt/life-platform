@@ -1,5 +1,35 @@
 # Life Platform — Changelog
 
+## v3.3.8 — 2026-03-09: PROD-2 Phase 3 — S3 path prefixing + DLQ purge
+
+### DLQ cleanup (Option B)
+- Diagnosed 14 DLQ messages: all pre-fix `'Logger' object has no attribute 'set_date'` failures from March 9
+- All data already re-ingested by gap-aware backfill; purged DLQ safely via `aws sqs purge-queue`
+- `life-platform-dlq-depth-warning` alarm will auto-clear within 5 minutes
+
+### PROD-2 Phase 3: S3 path prefixing
+- `output_writers.py`: `_DASHBOARD_KEY` and `_CS_CONFIG_KEY` now set dynamically in `init()` as `dashboard/{user_id}/data.json` and `config/{user_id}/character_sheet.json`
+- `output_writers.py`: `buddy/data.json` and `dashboard/clinical.json` writes now use `f"buddy/{_USER_ID}/data.json"` and `f"dashboard/{_USER_ID}/clinical.json"` respectively
+- `dashboard_refresh_lambda.py`: all 3 S3 paths updated — dashboard read+write, buddy write, `config/profile.json` load
+- `lambdas/dashboard/index.html`: fetch URL updated to `matthew/data.json`
+- `lambdas/dashboard/clinical.html`: fetch URL updated to `matthew/clinical.json`
+- `lambdas/buddy/index.html`: fetch URL updated to `matthew/data.json`
+- `board_loader.py` and `character_engine.py` already used user-prefixed paths — no changes needed
+- `deploy/migrate_s3_paths.sh`: copies 6 files from flat paths to `matthew/` prefix, with verification
+- `deploy/deploy_prod2_phase3.sh`: deploys daily-brief, both dashboard-refresh Lambdas, syncs 3 HTML files, invalidates CloudFront
+
+### Bonus fix: dashboard-refresh profile loading
+- `dashboard_refresh_lambda.py`: `load_profile()` was reading from S3 `config/{user_id}/profile.json` (which never existed)
+- Fixed to read from DynamoDB `pk=USER#{USER_ID}, sk=PROFILE#v1` — same as all other Lambdas
+- Intraday dashboard refresh (2 PM + 6 PM) now has correct weight targets, phase data, and max_heart_rate for zone2/TSB/weight calculations
+
+### Confirmed already done (no changes needed)
+- Phase 1 (default fallback removal): all 39 Lambdas already use fail-fast `os.environ["USER_ID"]`
+- Phase 2 (email addresses): already in env vars across all 7 email Lambdas
+- DynamoDB keys: fully parameterized from day one
+
+---
+
 ## v3.3.7 — 2026-03-09: IC-4 failure pattern compute + IC-5 early warning detection
 
 ### IC-4: Failure Pattern Compute Lambda (new)

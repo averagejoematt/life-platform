@@ -245,12 +245,16 @@ def _build_avatar_data(character_sheet, profile, current_weight=None):
 
 
 def load_profile():
-    """Load profile from S3."""
+    """Load profile from DynamoDB (source of truth — not S3)."""
     try:
-        resp = s3.get_object(Bucket=S3_BUCKET, Key="config/profile.json")
-        return json.loads(resp["Body"].read().decode("utf-8"))
+        r = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
+        item = r.get("Item")
+        if not item:
+            print("[WARN] load_profile: no PROFILE#v1 record found")
+            return {}
+        return d2f(item)
     except Exception as e:
-        print(f"[WARN] Failed to load profile: {e}")
+        print(f"[WARN] load_profile: DynamoDB read failed: {e}")
         return {}
 
 
@@ -269,9 +273,9 @@ def read_existing_json(key):
 
 def refresh_dashboard(profile, yesterday, today):
     """Re-query intraday sources and merge into existing dashboard JSON."""
-    existing = read_existing_json("dashboard/data.json")
+    existing = read_existing_json(f"dashboard/{USER_ID}/data.json")
     if not existing:
-        print("[WARN] No existing dashboard/data.json — skipping dashboard refresh")
+        print(f"[WARN] No existing dashboard/{USER_ID}/data.json — skipping dashboard refresh")
         return
 
     # --- Re-query intraday-changing sources ---
@@ -413,7 +417,7 @@ def refresh_dashboard(profile, yesterday, today):
     # Write to S3
     s3.put_object(
         Bucket=S3_BUCKET,
-        Key="dashboard/data.json",
+        Key=f"dashboard/{USER_ID}/data.json",
         Body=json.dumps(existing, default=str),
         ContentType="application/json",
         CacheControl="max-age=300",
@@ -674,7 +678,7 @@ def refresh_buddy(profile, yesterday, today):
 
         s3.put_object(
             Bucket=S3_BUCKET,
-            Key="buddy/data.json",
+            Key=f"buddy/{USER_ID}/data.json",
             Body=json.dumps(buddy_data, default=str),
             ContentType="application/json",
             CacheControl="max-age=300",
