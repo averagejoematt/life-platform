@@ -1,5 +1,27 @@
 # Life Platform — Changelog
 
+## v3.2.8 — 2026-03-09: PROD-1 CDK IngestionStack — import complete ✅
+
+### PROD-1 CDK: IngestionStack imported into CloudFormation
+- `cdk import LifePlatformIngestion` succeeded — 15 Lambdas + 14 EventBridge rules now under CDK management
+- **Fixes applied during import debugging:**
+  - IAM roles switched from `iam.Role()` to `iam.Role.from_role_arn()` — eliminates DefaultPolicy/DependsOn that blocked import
+  - DLQ passed via L1 escape hatch (`cfn_fn.dead_letter_config`) when using existing role — avoids auto-`grant_send_messages` policy generation
+  - All cross-stack `Fn::ImportValue` references replaced with `from_*` lookups by ARN/name (DLQ, table, bucket, SNS topic) — CoreStack not yet in CloudFormation so its exports don't exist
+  - EventBridge rules require `Arn` (not `Name`) in import map
+  - CDK bootstrap required before first import (`npx cdk bootstrap aws://205930651321/us-west-2`)
+- `cdk/stacks/ingestion_stack.py` — hardcoded ARN constants for all core resources at module level
+- `cdk/stacks/lambda_helpers.py` — `existing_role_arn` param; L1 DLQ escape hatch pattern
+- `cdk/ingestion-import-map.json` — finalized with correct logical IDs and ARN-keyed EventBridge entries
+
+### Key learnings for remaining CDK stacks
+- All stacks that reference CoreStack resources must use `from_*` lookups until CoreStack itself is imported
+- IAM roles for existing Lambdas: always use `from_role_arn` — never create new roles
+- DLQ on existing roles: always use L1 escape hatch, never `dead_letter_queue=` param
+- EventBridge import map key: `Arn`, not `Name`
+
+---
+
 ## v3.2.7 — 2026-03-09: PROD-1 CDK IngestionStack — cdk synth clean
 
 ### PROD-1 CDK: IngestionStack written and synth validated

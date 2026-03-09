@@ -1,0 +1,89 @@
+{
+  "WhoopIngestionD6FDC5D6": {
+    "FunctionName": "whoop-data-ingestion"
+  },
+  "GarminIngestion126FC48B": {
+    "FunctionName": "garmin-data-ingestion"
+  },
+  "NotionIngestion8E43B738": {
+    "FunctionName": "notion-journal-ingestion"
+  },
+  "WithingsIngestion67318586": {
+    "FunctionName": "withings-data-ingestion"
+  },
+  "HabitifyIngestion02E883C1": {
+    "FunctionName": "habitify-data-ingestion"
+  },
+  "StravaIngestionE2403B98": {
+    "FunctionName": "strava-data-ingestion"
+  },
+  "JournalEnrichment5AE9BDF1": {
+    "FunctionName": "journal-enrichment"
+  },
+  "TodoistIngestion225C965F": {
+    "FunctionName": "todoist-data-ingestion"
+  },
+  "EightsleepIngestion9D34BD0C": {
+    "FunctionName": "eightsleep-data-ingestion"
+  },
+  "ActivityEnrichment0B596AF0": {
+    "FunctionName": "activity-enrichment"
+  },
+  "MacrofactorIngestionD890FA59": {
+    "FunctionName": "macrofactor-data-ingestion"
+  },
+  "WeatherIngestion96665D37": {
+    "FunctionName": "weather-data-ingestion"
+  },
+  "DropboxPollECC96D67": {
+    "FunctionName": "dropbox-poll"
+  },
+  "AppleHealthIngestionF6DB2080": {
+    "FunctionName": "apple-health-ingestion"
+  },
+  "HaeWebhookCCBE7326": {
+    "FunctionName": "health-auto-export-webhook"
+  },
+  "WhoopIngestionScheduleC6CE3A05": {
+    "Arn": "arn:aws:events:us-west-2:205930651321:rule/whoop-daily-ingestion"
+  },
+  "WhoopRecoveryRefreshRule281BB671": {
+    "Arn": "arn:aws:events:us-west-2:205930651321:rule/whoop-recovery-refresh"
+  },
+  "GarminIngestionSchedule2C1A9C2A": {
+    "Arn": "arn:aws:events:us-west-2:205930651321:rule/garmin-daily-ingestion"
+  },
+  "NotionIngestionSchedule9D1B07C8": {
+    "Arn": "arn:aws:events:us-west-2:205930651321:rule/notion-daily-ingest"
+  },
+  "WithingsIngestionSchedule74DB837E": {
+    "Arn": "arn:aws:events:us-west-2:205930651321:rule/withings-daily-ingestion"
+  },
+  "HabitifyIngestionSchedule8F584948": {
+    "Arn": "arn:aws:events:us-west-2:205930651321:rule/habitify-daily-ingest"
+  },
+  "StravaIngestionScheduleF947F9E3": {
+    "Arn": "arn:aws:events:us-west-2:205930651321:rule/strava-daily-ingestion"
+  },
+  "JournalEnrichmentSchedule841C3B7F": {
+    "Arn": "arn:aws:events:us-west-2:205930651321:rule/journal-enrichment-daily"
+  },
+  "TodoistIngestionSchedule03D61CE6": {
+    "Arn": "arn:aws:events:us-west-2:205930651321:rule/todoist-daily-ingestion"
+  },
+  "EightsleepIngestionSchedule649DFC98": {
+    "Arn": "arn:aws:events:us-west-2:205930651321:rule/eightsleep-daily-ingestion"
+  },
+  "ActivityEnrichmentScheduleF84A34C0": {
+    "Arn": "arn:aws:events:us-west-2:205930651321:rule/activity-enrichment-nightly"
+  },
+  "MacrofactorIngestionSchedule535CDEC4": {
+    "Arn": "arn:aws:events:us-west-2:205930651321:rule/macrofactor-daily-ingestion"
+  },
+  "WeatherIngestionScheduleC0A61643": {
+    "Arn": "arn:aws:events:us-west-2:205930651321:rule/weather-daily-ingestion"
+  },
+  "DropboxPollScheduleEF37156F": {
+    "Arn": "arn:aws:events:us-west-2:205930651321:rule/dropbox-poll-schedule"
+  }
+}
