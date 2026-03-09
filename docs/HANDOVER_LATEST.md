@@ -46,41 +46,21 @@ Alarm will auto-clear within 5 minutes.
 |-------|--------|
 | Phase 1: Remove default fallbacks | ✅ Already done |
 | Phase 2: Email addresses to env vars | ✅ Already done |
-| Phase 3: S3 path prefixing | ✅ Code complete — **needs deploy** |
+| Phase 3: S3 path prefixing | ✅ Deployed + CloudFront invalidated |
 | Phase 4: CloudFront multi-user routing | 🔵 Deferred — low priority |
 
-**PROD-2 is functionally complete** after the deploy scripts run. Phase 4 (multi-user web) is only needed if a second user ever actually needs a dashboard.
+**PROD-2 is complete.** Phase 4 (multi-user web) only needed if a second user ever needs a dashboard.
 
 ---
 
-## Pending Actions (run in order)
-
-### 1. Purge DLQ (if not already done)
-```bash
-aws sqs purge-queue \
-  --queue-url https://sqs.us-west-2.amazonaws.com/205930651321/life-platform-ingestion-dlq \
-  --region us-west-2
-```
-
-### 2. Migrate S3 files to new paths
-```bash
-bash deploy/migrate_s3_paths.sh
-```
-Expected output: 6 ✅ lines, possible ⚠️ on `config/profile.json` (may not exist in S3)
-
-### 3. Deploy and sync
-```bash
-bash deploy/deploy_prod2_phase3.sh
-```
-Deploys: `daily-brief`, `dashboard-refresh-afternoon`, `dashboard-refresh-evening`
-Syncs: `dashboard/index.html`, `dashboard/clinical.html`, `buddy/index.html`
-Invalidates: CloudFront dashboard distribution
-
-### 4. Verify
-- https://dash.averagejoematt.com/ — dashboard should load normally
-- https://dash.averagejoematt.com/clinical.html — clinical should load normally
-- https://buddy.averagejoematt.com/ — buddy page should load normally
-- Next Daily Brief (tomorrow 10 AM PT) — CloudWatch logs should show `dashboard/matthew/data.json`
+## Deploy Completed ✅
+- DLQ purged (14 stale messages cleared)
+- S3 migration: 5/6 files copied (config/profile.json confirmed not in S3 — lives in DDB)
+- `daily-brief` Lambda deployed
+- `dashboard-refresh` Lambda deployed (note: single Lambda, not afternoon/evening)
+- HTML files synced: `dashboard/index.html`, `dashboard/clinical.html`, `buddy/index.html`
+- CloudFront invalidation: `I2U4I9X1ELICXLX5BK5RKCLYD1`
+- Git: `86ba9df` committed and pushed
 
 ---
 
@@ -95,7 +75,7 @@ Invalidates: CloudFront dashboard distribution
 ## Platform State — v3.3.8
 - **Version:** v3.3.8
 - **Lambdas:** 39 | **MCP Tools:** 144 | **Data Sources:** 19 | **Alarms:** ~47
-- **Git:** needs commit after deploy confirmation
+- **Git:** `86ba9df` — committed and pushed ✅
 
 ## Next Priority Options
 After deploy verification, the obvious next candidates:
