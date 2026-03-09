@@ -1,41 +1,24 @@
 # Life Platform Handover — v3.1.8
 **Date:** 2026-03-09
-**Version:** v3.1.8 (ready to deploy)
-**Status:** All work complete and deployed. ✅
+**Version:** v3.1.8
+**Status:** All work complete, deployed, and committed. ✅
 
 ---
 
 ## What Was Done This Session
 
-### SEC-4: API Gateway rate limiting ✅ (script ready)
-- Script already existed from prior session: `deploy/sec4_api_gateway_throttle.sh`
-- Targets HTTP API v2 (`health-auto-export-api`), `$default` stage
-- Applies `ThrottlingRateLimit: 1.67 req/s` (100/min) and `ThrottlingBurstLimit: 10`
+### SEC-4: API Gateway rate limiting ✅
+- Applied throttling to HTTP API v2 (`health-auto-export-api`) `$default` stage
+- `ThrottlingRateLimit`: 1.67 req/s (100/min) · `ThrottlingBurstLimit`: 10
+- Per-route override on `POST /ingest` already existed (10 req/s, burst 20) — preserved
 - Normal traffic is ~6 req/day — purely protective, won't affect operation
+- Script: `deploy/sec4_api_gateway_throttle.sh`
 
-### MAINT-3: Stale zip cleanup ✅ (script ready)
-- All prior MAINT-3 targets already cleaned in previous sessions (`.backup`, `.broken`, versioned scripts)
-- Only remaining item: `lambdas/garmin_lambda.zip` (3.24 MB duplicate — already in `deploy/zips/`)
-- New script: `deploy/maint3_final.sh` — moves it to `archive/` and verifies `lambdas/` is zip-free
-
----
-
-## Deploy Steps
-
-**Step 1 — SEC-4:**
-```bash
-bash deploy/sec4_api_gateway_throttle.sh
-```
-
-**Step 2 — MAINT-3:**
-```bash
-bash deploy/maint3_final.sh
-```
-
-**Step 3 — Git:**
-```bash
-git add -A && git commit -m "v3.1.8: SEC-4 API Gateway rate limiting + MAINT-3 zip cleanup" && git push
-```
+### MAINT-3: Stale zip cleanup ✅
+- All prior MAINT-3 targets already cleaned in previous sessions
+- Final item: `lambdas/garmin_lambda.zip` (3.24 MB) archived — duplicate of `deploy/zips/garmin_lambda.zip`
+- `lambdas/` is now zip-free (verified)
+- Script: `deploy/maint3_final.sh`
 
 ---
 
