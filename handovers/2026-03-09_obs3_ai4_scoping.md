@@ -29,7 +29,11 @@
 - **deploy/ai4_hypothesis_validation.sh** — Deploy + smoke test script
 
 ### Large Opus Scoping ✅
-- **docs/SCOPING_LARGE_OPUS.md** — Design specs for MAINT-4, SIMP-2, PROD-1, PROD-2
+- **docs/SCOPING_LARGE_OPUS.md** — Design specs for:
+  - **MAINT-4** (CI/CD): GitHub Actions workflow design, OIDC auth, change detection, approval gates. 2 sessions.
+  - **SIMP-2** (Ingestion consolidation): Shared framework architecture, migration strategy, 3-phase approach. 3 sessions.
+  - **PROD-1** (IaC/CDK): 8-stack CDK design, import strategy for existing resources. 6 sessions.
+  - **PROD-2** (Multi-user): Hardcoding audit, parameterization plan, synthetic user test. 4 sessions.
 
 ---
 
@@ -40,6 +44,8 @@ The `hypothesis_engine_lambda.py` file on the local filesystem was accidentally 
 1. Download `hypothesis_engine_lambda.py` from Claude's output (presented in chat)
 2. Copy it to `lambdas/hypothesis_engine_lambda.py`
 3. Verify: `grep -c "AI-4" lambdas/hypothesis_engine_lambda.py` should return 15+
+
+The deploy script checks for AI-4 markers and will abort if the file is wrong.
 
 ---
 
@@ -65,22 +71,28 @@ bash deploy/ai4_hypothesis_validation.sh
 | ✅ Done | 28 | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,3; MAINT-1,2,3; DATA-1,2,3; AI-1,2,3,4 |
 | 🔴 Open | 7 | COST-2, MAINT-4, SIMP-1, SIMP-2, PROD-1, PROD-2 |
 
+OBS-3 and AI-4 move from 🔴 → ✅.
+
 ---
 
 ## Next Session Options
 
-| Priority | Item | Effort | Sessions |
-|----------|------|--------|----------|
-| Quick | COST-2 + SIMP-1 (MCP tool audit) | M | 1 |
-| Feature | Brittany weekly email | L | 2 |
-| Large | MAINT-4 (CI/CD) | L | 2 |
-| Large | SIMP-2 (ingestion consolidation) | L | 3 |
-| Large | PROD-1 (CDK) | XL | 6 |
-| Large | PROD-2 (multi-user) | L | 4 |
+### Quick Wins (Sonnet, 1 session)
+- **COST-2:** MCP tool usage audit — add CW metric per tool, archive 0-invocation tools after 30d
+- **SIMP-1:** Audit low-usage MCP tools — target <100 active tools (overlaps with COST-2)
+
+### Medium Efforts (Opus, 1-2 sessions)
+- **Brittany weekly email** — the long-queued major feature, fully unblocked
+
+### Large Efforts (Opus, multi-session — scoped in SCOPING_LARGE_OPUS.md)
+- **MAINT-4:** CI/CD with GitHub Actions (2 sessions)
+- **SIMP-2:** Consolidate ingestion Lambdas (3 sessions)
+- **PROD-1:** IaC with CDK (6 sessions)
+- **PROD-2:** Multi-user parameterization (4 sessions, ideally after PROD-1)
 
 ---
 
 ## Platform Stats (v3.2.0)
 - **Lambdas:** 39 | **MCP Tools:** 144 | **Modules:** 30
-- **Data Sources:** 19 | **Secrets:** 8 | **Alarms:** ~51
+- **Data Sources:** 19 | **Secrets:** 8 | **Alarms:** ~51 (4 new SLO alarms)
 - **Hardening:** 28/35 complete (80%)

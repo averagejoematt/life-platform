@@ -1,5 +1,45 @@
 # Life Platform — Changelog
 
+## v3.2.0 — 2026-03-09: OBS-3 (SLOs) + AI-4 (hypothesis validation) + large opus scoping
+
+### OBS-3: SLO Definitions ✅
+- Defined 4 formal SLOs with SLIs, targets, error budgets, and CloudWatch alarms
+  - SLO-1: Daily Brief Delivery — 99% (daily error alarm)
+  - SLO-2: Source Freshness — 99% (custom `LifePlatform/Freshness` metric)
+  - SLO-3: MCP Availability — 99.5% (hourly error rate)
+  - SLO-4: AI Coaching Success — 99% (daily failure count)
+- Updated `freshness_checker_lambda.py` to emit `StaleSourceCount` + `FreshSourceCount` CloudWatch metrics
+- Added `cloudwatch:PutMetricData` to freshness checker IAM role (scoped to namespace)
+- Updated ops dashboard with SLO Health section (4 widgets)
+- New doc: `docs/SLOs.md` with full SLO definitions, error budgets, and review cadence
+- Script: `deploy/obs3_slo_definitions.sh`
+
+### AI-4: Hypothesis Engine Output Validation ✅
+- `hypothesis_engine_lambda.py` v1.0.0 → v1.1.0
+- New validation functions:
+  - `check_data_completeness()` — requires 10+ days with 5+ metrics before generating
+  - `validate_hypothesis()` — validates all required fields, 2+ domains, numeric thresholds in criteria, confidence levels, monitoring window bounds, dedup check
+  - `enforce_hard_expiry()` — archives hypotheses >30 days old regardless of status
+  - `validate_check_verdict()` — validates Haiku check responses before acting on them
+- Raised minimum sample days for checking from 3 → 7
+- Raised confirming checks needed for promotion from 2 → 3
+- Updated generation prompt: requires effect sizes, specific numeric thresholds, confidence reasons
+- Handler now tracks `validation_rejected` and `expired_by_hard_limit` in response
+- Script: `deploy/ai4_hypothesis_validation.sh`
+
+### Large Opus Scoping
+- New doc: `docs/SCOPING_LARGE_OPUS.md` with design specs for:
+  - MAINT-4: GitHub Actions CI/CD (OIDC auth, change detection, approval gates) — 2 sessions
+  - SIMP-2: Ingestion Lambda consolidation (shared framework, 3-phase migration) — 3 sessions
+  - PROD-1: Infrastructure as Code with CDK (8-stack design, import strategy) — 6 sessions
+  - PROD-2: Multi-user parameterization (hardcoding audit, parameterization plan) — 4 sessions
+
+### Hardening update: 28/35 complete (80%)
+- OBS-3 and AI-4 move from 🔴 → ✅
+- Remaining open: COST-2, MAINT-4, SIMP-1, SIMP-2, PROD-1, PROD-2
+
+---
+
 ## v3.1.8 — 2026-03-09: SEC-4 + MAINT-3
 
 ### SEC-4: API Gateway rate limiting on health-auto-export-webhook ✅
