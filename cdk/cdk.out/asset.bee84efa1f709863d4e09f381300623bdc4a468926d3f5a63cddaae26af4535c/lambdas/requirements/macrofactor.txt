@@ -1,0 +1,2 @@
+# macrofactor-data-ingestion
+# No third-party dependencies — uses stdlib csv + urllib only.

@@ -49,7 +49,9 @@ class CoreStack(Stack):
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.RETAIN,
             deletion_protection=True,
-            point_in_time_recovery=True,
+            point_in_time_recovery_specification=dynamodb.CfnTable.PointInTimeRecoverySpecificationProperty(
+                point_in_time_recovery_enabled=True
+            ),
             time_to_live_attribute="ttl",
         )
 

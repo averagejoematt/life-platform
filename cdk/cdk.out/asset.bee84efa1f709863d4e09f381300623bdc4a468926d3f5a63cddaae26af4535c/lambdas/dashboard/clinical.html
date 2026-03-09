@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clinical Summary — Life Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#ffffff;--surface:#f8f9fa;--border:#e2e4e8;--border-lt:#f0f1f3;--text:#1a1a1e;--muted:#6b7280;--dim:#9ca3af;--accent:#2563eb;--green:#059669;--yellow:#d97706;--red:#dc2626;--font:'IBM Plex Sans',-apple-system,sans-serif;--mono:'IBM Plex Mono',monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.page{max-width:800px;margin:0 auto;padding:24px}
+.nav{display:flex;gap:16px;padding:12px 0;margin-bottom:24px;border-bottom:1px solid var(--border)}
+.nav a{font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);text-decoration:none;padding:4px 0;border-bottom:2px solid transparent;transition:all .15s}
+.nav a:hover{color:var(--text)}
+.nav a.active{color:var(--accent);border-bottom-color:var(--accent)}
+.rpt-hdr{margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid var(--text)}
+.rpt-title{font-size:22px;font-weight:700;letter-spacing:-.3px;margin-bottom:4px}
+.rpt-sub{font-size:13px;color:var(--muted);display:flex;gap:20px;flex-wrap:wrap}
+.rpt-sub span{display:flex;align-items:center;gap:4px}
+.btn-print{margin-left:auto;padding:5px 14px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;transition:all .15s}
+.btn-print:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.sec{margin-bottom:28px}
+.sec-hdr{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.sec-note{font-size:12px;color:var(--muted);font-style:italic;margin-top:8px}
+.v-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px}
+.v-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px 14px}
+.v-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:4px}
+.v-val{font-family:var(--mono);font-size:24px;font-weight:600;line-height:1.1;letter-spacing:-.5px}
+.v-unit{font-size:12px;font-weight:400;color:var(--muted);margin-left:2px}
+.v-delta{font-size:11px;margin-top:2px}
+.v-trend{font-size:10px;color:var(--dim);text-transform:capitalize}
+.v-na{font-size:13px;color:var(--dim);font-style:italic}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);padding:6px 10px;border-bottom:2px solid var(--border);white-space:nowrap}
+.tbl td{padding:7px 10px;border-bottom:1px solid var(--border-lt);vertical-align:top}
+.tbl tr:last-child td{border-bottom:none}
+.tbl .mono{font-family:var(--mono);font-weight:500;font-size:13px}
+.tbl .flag-h{color:var(--red);font-weight:600}
+.tbl .flag-l{color:var(--yellow);font-weight:600}
+.tbl .flag-ok{color:var(--green)}
+.tbl .flag-tag{font-size:9px;font-weight:700;letter-spacing:.3px;padding:1px 5px;border-radius:2px;margin-left:6px}
+.tbl .flag-tag.h{background:#fef2f2;color:var(--red)}
+.tbl .flag-tag.l{background:#fffbeb;color:var(--yellow)}
+.tbl .cat-row td{background:var(--surface);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--border)}
+.persist-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.persist-item{display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--surface);border:1px solid var(--border-lt);border-radius:4px;font-size:12px}
+.persist-badge{font-size:9px;font-weight:700;letter-spacing:.3px;padding:2px 6px;border-radius:2px;text-transform:uppercase;white-space:nowrap}
+.persist-badge.chronic{background:#fef2f2;color:var(--red)}
+.persist-badge.recurring{background:#fffbeb;color:var(--yellow)}
+.persist-badge.occasional{background:#f0fdf4;color:var(--green)}
+.supp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.supp-item{display:flex;align-items:baseline;gap:8px;padding:6px 10px;background:var(--surface);border-radius:4px;border:1px solid var(--border-lt)}
+.supp-name{font-weight:600;font-size:13px}
+.supp-dose{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.supp-time{font-size:11px;color:var(--dim);text-transform:capitalize}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:600px){.cols{grid-template-columns:1fr}}
+.sum-row{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border-lt)}
+.sum-row:last-child{border-bottom:none}
+.sum-label{font-size:13px;color:var(--muted)}
+.sum-val{font-family:var(--mono);font-size:14px;font-weight:500}
+.gene-list{display:flex;flex-direction:column;gap:8px}
+.gene-item{padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:4px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.gene-name{font-family:var(--mono);font-weight:600;font-size:13px;min-width:80px}
+.gene-var{font-family:var(--mono);font-size:12px;color:var(--muted);min-width:70px}
+.gene-note{font-size:12px;color:var(--text);flex:1;min-width:200px}
+.gene-risk{font-size:9px;font-weight:700;letter-spacing:.3px;padding:2px 6px;border-radius:2px;text-transform:uppercase;white-space:nowrap}
+.gene-risk.unfavorable{background:#fef2f2;color:var(--red)}
+.gene-risk.mixed{background:#fffbeb;color:var(--yellow)}
+.ftr{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font-size:11px;color:var(--dim);text-align:center;line-height:1.6}
+.ld{display:flex;align-items:center;justify-content:center;min-height:40vh;flex-direction:column;gap:12px}
+.sp{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ld-t{font-size:12px;color:var(--dim)}
+.err{font-size:13px;color:var(--red);text-align:center;padding:40px 20px}
+@media print{
+  @page{margin:0.6in 0.5in;size:letter}
+  body{font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .page{max-width:100%;padding:0}
+  .nav,.btn-print{display:none}
+  .rpt-hdr{margin-bottom:20px;padding-bottom:12px}
+  .rpt-title{font-size:18px}
+  .sec{page-break-inside:avoid;margin-bottom:18px}
+  .sec-hdr{color:var(--accent) !important}
+  .v-grid{grid-template-columns:repeat(4,1fr);gap:8px}
+  .v-card{padding:8px 10px}
+  .v-val{font-size:18px}
+  .cols{grid-template-columns:1fr 1fr;gap:12px}
+  .supp-grid{grid-template-columns:repeat(3,1fr)}
+  .gene-item{padding:5px 8px}
+  .ftr{margin-top:20px}
+  .tbl{font-size:11px}
+  .tbl td,.tbl th{padding:4px 8px}
+  a{color:inherit;text-decoration:none}
+}
+</style>
+</head>
+<body>
+<div class="page" id="app">
+  <div class="ld" id="loading">
+    <div class="sp"></div>
+    <div class="ld-t">Loading clinical data&hellip;</div>
+  </div>
+</div>
+<script>
+(function(){
+'use strict';
+var U='clinical.json';
+function $(i){return document.getElementById(i)}
+function f(v,d){return v==null?'\u2014':d!=null?Number(v).toFixed(d):Math.round(Number(v)).toString()}
+function fc(v){return v==null?'var(--dim)':v>=80?'var(--green)':v>=60?'var(--yellow)':'var(--red)'}
+function fd(s){if(!s)return'\u2014';try{var p=s.split('-');return['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+p[1]-1]+' '+parseInt(p[2])+', '+p[0]}catch(e){return s}}
+
+function render(d){
+var a=$('app'),o='';
+
+// Nav
+o+='<nav class="nav"><a href="index.html">Daily Dashboard</a><a href="clinical.html" class="active">Clinical Summary</a></nav>';
+
+// Header
+o+='<div class="rpt-hdr"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">';
+o+='<div><div class="rpt-title">Clinical Health Summary</div><div class="rpt-sub">';
+o+='<span><strong>Patient:</strong> '+(d.patient_name||'Matthew Walker')+'</span>';
+o+='<span><strong>Report Date:</strong> '+fd(d.report_date)+'</span>';
+o+='<span><strong>Period:</strong> '+(d.report_period||d.period||'30 days')+'</span>';
+o+='<span><strong>Sources:</strong> '+(d.sources_active||0)+' active</span>';
+o+='</div></div>';
+o+='<button class="btn-print" onclick="window.print()">Print / PDF</button>';
+o+='</div></div>';
+
+// ── VITALS ──
+var v=d.vitals_summary||{};
+o+='<div class="sec"><div class="sec-hdr">Vitals Overview</div><div class="v-grid">';
+
+// Weight
+o+='<div class="v-card"><div class="v-label">Weight</div>';
+if(v.weight_current_lbs!=null){
+  o+='<div class="v-val">'+f(v.weight_current_lbs,1)+'<span class="v-unit">lb</span></div>';
+  if(v.weight_30d_delta_lbs!=null){var wc=v.weight_30d_delta_lbs<0?'var(--green)':v.weight_30d_delta_lbs>0?'var(--red)':'var(--dim)';
+  o+='<div class="v-delta" style="color:'+wc+'">'+(v.weight_30d_delta_lbs>0?'+':'')+f(v.weight_30d_delta_lbs,1)+' lb (30d)</div>'}
+}else{o+='<div class="v-na">No data</div>'}
+o+='</div>';
+
+// RHR
+o+='<div class="v-card"><div class="v-label">Resting Heart Rate</div>';
+if(v.rhr_avg!=null){o+='<div class="v-val">'+f(v.rhr_avg)+'<span class="v-unit">bpm</span></div>';
+  if(v.rhr_trend)o+='<div class="v-trend">Trend: '+v.rhr_trend+'</div>';
+  else o+='<div class="v-trend">30-day avg</div>';
+}else{o+='<div class="v-na">No data</div>'}
+o+='</div>';
+
+// HRV
+o+='<div class="v-card"><div class="v-label">Heart Rate Variability</div>';
+if(v.hrv_avg_ms!=null){o+='<div class="v-val">'+f(v.hrv_avg_ms)+'<span class="v-unit">ms</span></div>';
+  if(v.hrv_trend)o+='<div class="v-trend">Trend: '+v.hrv_trend+'</div>';
+  else o+='<div class="v-trend">30-day avg (RMSSD)</div>';
+}else{o+='<div class="v-na">No data</div>'}
+o+='</div>';
+
+// Steps
+o+='<div class="v-card"><div class="v-label">Daily Steps</div>';
+if(v.avg_daily_steps!=null){o+='<div class="v-val">'+f(v.avg_daily_steps).replace(/\B(?=(\d{3})+(?!\d))/g,',')+'</div>';
+  o+='<div class="v-trend">30-day avg</div>';
+}else{o+='<div class="v-na">No data</div>'}
+o+='</div>';
+
+// BP (not yet tracked)
+o+='<div class="v-card"><div class="v-label">Blood Pressure</div><div class="v-na">Not tracked</div></div>';
+
+o+='</div></div>';
+
+// ── BODY COMP ──
+var bc=d.body_composition||{};
+o+='<div class="sec"><div class="sec-hdr">Body Composition (DEXA)</div>';
+if(bc.scan_date){
+  o+='<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Scan date: '+fd(bc.scan_date)+'</div><div class="v-grid">';
+  o+='<div class="v-card"><div class="v-label">Body Fat</div><div class="v-val">'+f(bc.body_fat_pct,1)+'<span class="v-unit">%</span></div></div>';
+  o+='<div class="v-card"><div class="v-label">FFMI</div><div class="v-val">'+f(bc.ffmi,1)+'</div></div>';
+  o+='<div class="v-card"><div class="v-label">Lean Mass</div><div class="v-val">'+f(bc.lean_mass_lbs,1)+'<span class="v-unit">lb</span></div></div>';
+  if(bc.visceral_fat_area_cm2!=null)o+='<div class="v-card"><div class="v-label">Visceral Fat</div><div class="v-val">'+f(bc.visceral_fat_area_cm2)+'<span class="v-unit">cm\u00b2</span></div></div>';
+  if(bc.bmd_t_score!=null)o+='<div class="v-card"><div class="v-label">Bone Density T-Score</div><div class="v-val">'+f(bc.bmd_t_score,1)+'</div></div>';
+  o+='</div>';
+}else{o+='<div class="sec-note">No DEXA scan data available.</div>'}
+o+='</div>';
+
+// ── LABS ──
+var labs=d.labs||{};
+o+='<div class="sec"><div class="sec-hdr">Laboratory Results</div>';
+if(labs.latest_draw_date){
+  o+='<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Latest draw: '+fd(labs.latest_draw_date);
+  if(labs.total_draws)o+=' ('+labs.total_draws+' historical draws on file)';
+  if(labs.provider)o+=' \u00b7 '+labs.provider;
+  o+='</div>';
+
+  var bm=labs.markers||[];
+  if(bm.length>0){
+    o+='<table class="tbl"><thead><tr><th>Biomarker</th><th>Value</th><th>Reference Range</th><th>Status</th></tr></thead><tbody>';
+    var cur_cat='';
+    for(var i=0;i<bm.length;i++){var b=bm[i];
+      if(b.category&&b.category!==cur_cat){cur_cat=b.category;
+        o+='<tr class="cat-row"><td colspan="4">'+cur_cat.charAt(0).toUpperCase()+cur_cat.slice(1)+'</td></tr>'}
+      var cls=b.flag==='H'?'flag-h':b.flag==='L'?'flag-l':'flag-ok';
+      var ft=b.flag==='H'?'<span class="flag-tag h">HIGH</span>':b.flag==='L'?'<span class="flag-tag l">LOW</span>':'';
+      var dec=(b.value!=null&&b.value%1!==0)?1:0;
+      o+='<tr><td>'+b.name+'</td><td class="mono '+cls+'">'+f(b.value,dec)+'<span style="color:var(--muted);font-weight:400"> '+(b.unit||'')+'</span></td><td style="color:var(--muted);">'+(b.range||'\u2014')+'</td><td>'+ft+'</td></tr>'}
+    o+='</tbody></table>';
+  }
+  if(labs.flagged_count!=null)o+='<div class="sec-note">'+labs.flagged_count+' of '+bm.length+' biomarkers outside reference range.</div>';
+}else{o+='<div class="sec-note">No lab data available.</div>'}
+o+='</div>';
+
+// ── PERSISTENT FLAGS ──
+var pflags=d.labs_flagged||[];
+if(pflags.length>0){
+  o+='<div class="sec"><div class="sec-hdr">Persistent Out-of-Range Biomarkers</div>';
+  o+='<div class="persist-list">';
+  for(var i=0;i<pflags.length;i++){var pf=pflags[i];
+    o+='<div class="persist-item">';
+    o+='<span class="persist-badge '+pf.persistence+'">'+pf.persistence+'</span>';
+    o+='<strong>'+pf.name+'</strong>';
+    o+='<span style="color:var(--muted)">Flagged in '+pf.draws_flagged+' of '+pf.total_draws+' draws</span>';
+    if(pf.latest_value!=null)o+='<span class="mono" style="margin-left:auto">Latest: '+f(pf.latest_value,pf.latest_value%1!==0?1:0)+'</span>';
+    o+='</div>';}
+  o+='</div>';
+  o+='<div class="sec-note">Persistence: chronic (\u226560% of draws), recurring (30\u201360%), occasional (&lt;30%).</div>';
+  o+='</div>';
+}
+
+// ── SUPPLEMENTS ──
+var supps=d.supplements||[];
+o+='<div class="sec"><div class="sec-hdr">Current Supplements &amp; Medications</div>';
+if(supps.length>0){
+  o+='<div class="supp-grid">';
+  for(var i=0;i<supps.length;i++){var s=supps[i];
+    o+='<div class="supp-item"><span class="supp-name">'+s.name+'</span>';
+    var dose_str='';
+    if(s.dose!=null){dose_str+=s.dose;if(s.unit)dose_str+=' '+s.unit}
+    if(dose_str)o+='<span class="supp-dose">'+dose_str+'</span>';
+    if(s.timing)o+='<span class="supp-time">'+s.timing.replace(/_/g,' ')+'</span>';
+    o+='</div>'}
+  o+='</div>';
+}else{o+='<div class="sec-note">No supplements currently logged.</div>'}
+o+='</div>';
+
+// ── SLEEP + ACTIVITY side-by-side ──
+o+='<div class="cols">';
+
+var sl=d.sleep_summary||{};
+o+='<div class="sec"><div class="sec-hdr">Sleep (30-Day Averages)</div>';
+o+='<div class="sum-row"><span class="sum-label">Score</span><span class="sum-val" style="color:'+fc(sl.avg_score)+'">'+f(sl.avg_score)+'/100</span></div>';
+o+='<div class="sum-row"><span class="sum-label">Duration</span><span class="sum-val">'+f(sl.avg_duration_hrs,1)+' hr</span></div>';
+o+='<div class="sum-row"><span class="sum-label">Efficiency</span><span class="sum-val">'+f(sl.avg_efficiency_pct)+'%</span></div>';
+o+='<div class="sum-row"><span class="sum-label">Deep Sleep</span><span class="sum-val">'+f(sl.avg_deep_pct)+'%</span></div>';
+o+='<div class="sum-row"><span class="sum-label">REM Sleep</span><span class="sum-val">'+f(sl.avg_rem_pct)+'%</span></div>';
+if(sl.days_with_data)o+='<div class="sec-note">Based on '+sl.days_with_data+' nights of data.</div>';
+o+='</div>';
+
+var act=d.activity_summary||{};
+o+='<div class="sec"><div class="sec-hdr">Physical Activity (30-Day)</div>';
+o+='<div class="sum-row"><span class="sum-label">Total Sessions</span><span class="sum-val">'+f(act.total_sessions_30d)+'</span></div>';
+var z2c=(act.zone2_weekly_avg_min!=null&&act.zone2_weekly_avg_min>=150)?'var(--green)':'var(--yellow)';
+o+='<div class="sum-row"><span class="sum-label">Zone 2 (weekly avg)</span><span class="sum-val" style="color:'+z2c+'">'+f(act.zone2_weekly_avg_min)+'/150 min</span></div>';
+if(act.avg_strain!=null)o+='<div class="sum-row"><span class="sum-label">Avg Strain (Whoop)</span><span class="sum-val">'+f(act.avg_strain,1)+'</span></div>';
+var types=act.types||{};
+var typeArr=Object.keys(types).sort(function(a,b){return types[b]-types[a]});
+if(typeArr.length)o+='<div class="sum-row"><span class="sum-label">Activity Types</span><span class="sum-val" style="font-family:var(--font);font-weight:500;font-size:13px">'+typeArr.slice(0,4).join(', ')+'</span></div>';
+o+='</div></div>';
+
+// ── GLUCOSE ──
+var gl=d.glucose_summary||{};
+o+='<div class="sec"><div class="sec-hdr">Glucose &amp; Metabolic Health (CGM)</div>';
+if(gl.avg_mg_dl!=null){
+  o+='<div class="v-grid">';
+  var mc=gl.avg_mg_dl<100?'var(--green)':gl.avg_mg_dl<120?'var(--yellow)':'var(--red)';
+  o+='<div class="v-card"><div class="v-label">Mean Glucose</div><div class="v-val" style="color:'+mc+'">'+f(gl.avg_mg_dl)+'<span class="v-unit">mg/dL</span></div></div>';
+  var tc=gl.time_in_range_pct!=null&&gl.time_in_range_pct>=90?'var(--green)':'var(--yellow)';
+  o+='<div class="v-card"><div class="v-label">Time in Range</div><div class="v-val" style="color:'+tc+'">'+f(gl.time_in_range_pct)+'<span class="v-unit">%</span></div></div>';
+  var vc=gl.variability_sd!=null&&gl.variability_sd<20?'var(--green)':'var(--yellow)';
+  o+='<div class="v-card"><div class="v-label">Variability (SD)</div><div class="v-val" style="color:'+vc+'">'+f(gl.variability_sd,1)+'</div></div>';
+  o+='<div class="v-card"><div class="v-label">Fasting Proxy</div><div class="v-val">'+f(gl.fasting_proxy_mg_dl)+'<span class="v-unit">mg/dL</span></div></div>';
+  o+='</div>';
+  o+='<div class="sec-note">CGM data from Dexcom Stelo via Apple Health. Time in range: 70\u2013140 mg/dL. Fasting proxy = overnight nadir (midnight\u20136 AM).';
+  if(gl.days_with_data)o+=' Based on '+gl.days_with_data+' days of data.';
+  o+='</div>';
+}else{o+='<div class="sec-note">No CGM data available for this period.</div>'}
+o+='</div>';
+
+// ── GENOME ──
+var genes=d.genome_flags||[];
+o+='<div class="sec"><div class="sec-hdr">Genetic Considerations</div>';
+if(genes.length>0){
+  o+='<div class="gene-list">';
+  for(var i=0;i<genes.length;i++){var g=genes[i];
+    o+='<div class="gene-item">';
+    o+='<span class="gene-name">'+g.gene+'</span>';
+    o+='<span class="gene-var">'+(g.variant||g.rsid||'')+'</span>';
+    o+='<span class="gene-risk '+(g.risk||'')+'">'+(g.risk||'')+'</span>';
+    o+='<span class="gene-note">'+g.note+'</span>';
+    o+='</div>'}
+  o+='</div>';
+  o+='<div class="sec-note">Genome analysis from 110 SNPs. Showing clinically relevant unfavorable and mixed-risk variants.</div>';
+}else{o+='<div class="sec-note">No genome data available.</div>'}
+o+='</div>';
+
+// Footer
+o+='<div class="ftr">Generated by Life Platform \u00b7 '+fd(d.report_date)+' \u00b7 '+(d.sources_active||0)+' data sources<br>';
+o+='This report is for informational purposes and does not constitute medical advice.<br>';
+o+='Data aggregated from: Whoop, Eight Sleep, Withings, Strava, MacroFactor, Apple Health, Dexcom Stelo, Garmin</div>';
+
+a.innerHTML=o;
+}
+
+function load(){
+var x=new XMLHttpRequest();
+x.open('GET',U+'?t='+Date.now(),true);
+x.onreadystatechange=function(){
+if(x.readyState!==4)return;
+if(x.status===200){try{render(JSON.parse(x.responseText))}catch(e){$('app').innerHTML='<div class="err">Parse error: '+e.message+'</div>'}}
+else if(x.status===0||x.status===404){$('app').innerHTML='<div class="err">No clinical data yet. Clinical data is generated weekly by the Sunday Digest.</div>'}
+else{$('app').innerHTML='<div class="err">Error loading data (HTTP '+x.status+')</div>'}
+};
+x.send();
+}
+load();
+})();
+</script>
+</body>
+</html>

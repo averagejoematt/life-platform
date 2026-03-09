@@ -91,17 +91,30 @@ def create_platform_lambda(
         ],
     )
 
-    # DynamoDB permissions
-    if ddb_write:
-        table.grant_read_write_data(role)
-    else:
-        table.grant_read_data(role)
+    # DynamoDB permissions — attach to role directly to avoid cross-stack bucket policy
+    ddb_actions = [
+        "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan",
+        "dynamodb:BatchGetItem", "dynamodb:BatchWriteItem",
+    ] if ddb_write else [
+        "dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:BatchGetItem",
+    ]
+    role.add_to_policy(iam.PolicyStatement(
+        actions=ddb_actions,
+        resources=[table.table_arn, f"{table.table_arn}/index/*"],
+    ))
 
-    # S3 permissions
-    if s3_write:
-        bucket.grant_read_write(role)
-    else:
-        bucket.grant_read(role)
+    # S3 permissions — attach to role directly to avoid cross-stack bucket policy
+    s3_actions = [
+        "s3:GetObject", "s3:PutObject", "s3:DeleteObject",
+        "s3:ListBucket",
+    ] if s3_write else [
+        "s3:GetObject", "s3:ListBucket",
+    ]
+    role.add_to_policy(iam.PolicyStatement(
+        actions=s3_actions,
+        resources=[bucket.bucket_arn, f"{bucket.bucket_arn}/*"],
+    ))
 
     # Secrets Manager permissions (scoped to specific secrets)
     if secrets:
@@ -123,12 +136,32 @@ def create_platform_lambda(
         dlq.grant_send_messages(role)
 
     # ── Lambda Function ──
+    # Asset path is ".." (project root) because cdk synth runs from the cdk/ subdir.
+    # Excludes prevent bundling venv, cdk artifacts, docs, and deploy scripts.
+    _ASSET_EXCLUDES = [
+        ".venv", ".venv/**",
+        "cdk", "cdk/**",
+        "cdk.out", "cdk.out/**",
+        "docs", "docs/**",
+        "deploy", "deploy/**",
+        "handovers", "handovers/**",
+        "backfill", "backfill/**",
+        "patches", "patches/**",
+        "seeds", "seeds/**",
+        "setup", "setup/**",
+        "datadrops", "datadrops/**",
+        "__pycache__", "**/__pycache__/**",
+        "*.pyc", "**/*.pyc",
+        "*.md",
+        ".git", ".git/**",
+        "node_modules", "node_modules/**",
+    ]
     fn = _lambda.Function(
         scope, id,
         function_name=function_name,
         runtime=_lambda.Runtime.PYTHON_3_12,
         handler=handler,
-        code=_lambda.Code.from_asset(".", exclude=["cdk/", "docs/", "deploy/", "*.md"]),
+        code=_lambda.Code.from_asset("..", exclude=_ASSET_EXCLUDES),
         role=role,
         timeout=Duration.seconds(timeout_seconds),
         memory_size=memory_mb,

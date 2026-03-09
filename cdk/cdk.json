@@ -1,0 +1,16 @@
+{
+  "app": "python3 app.py",
+  "context": {
+    "account": "205930651321",
+    "region": "us-west-2",
+    "user_id": "matthew",
+    "ddb_table_name": "life-platform",
+    "s3_bucket_name": "matthew-life-platform",
+    "sqs_dlq_name": "life-platform-ingestion-dlq",
+    "sns_topic_name": "life-platform-alerts",
+    "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
+    "@aws-cdk/core:checkSecretUsage": true,
+    "@aws-cdk/aws-iam:minimizePolicies": true,
+    "@aws-cdk/aws-s3:serverAccessLogsUseBucketPolicy": true
+  }
+}
