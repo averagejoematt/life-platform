@@ -1,5 +1,28 @@
 # Life Platform — Changelog
 
+## v3.1.7 — 2026-03-08: OBS-1 + AI-3 full rollout to all email Lambdas
+
+### OBS-1: platform_logger wired into all 6 remaining email Lambdas
+- **wednesday-chronicle:** OBS-1 added (AI-3 was already complete from prior session)
+- **nutrition-review:** OBS-1 added (AI-3 import was present, validation call now added)
+- **monday-compass:** OBS-1 + AI-3 both added
+- **monthly-digest:** OBS-1 + AI-3 both added
+- **weekly-plate:** OBS-1 + AI-3 both added
+- **anomaly-detector:** OBS-1 + AI-3 both added
+- **OBS-1 status:** ✅ Complete (daily-brief + weekly-digest from prior session + 6 email Lambdas = all email Lambdas covered)
+
+### AI-3: ai_output_validator wired into all email Lambdas
+- **Output types used:** NUTRITION_COACH (nutrition-review), MONTHLY_DIGEST (monthly-digest), WEEKLY_DIGEST (weekly-digest), GENERIC (monday-compass, weekly-plate, anomaly-detector)
+- **Validation call placement:** immediately after try/except AI call block, before HTML build / send
+- **Fallback pattern:** BLOCKED outputs replaced with safe HTML fallback; WARN outputs logged but passed through
+- **AI-3 status:** ✅ Complete (partial → full rollout across all 8 email Lambdas)
+
+### Deploy
+- Script: `bash deploy/deploy_obs1_ai3_rollout.sh`
+- 6 Lambdas: wednesday-chronicle, nutrition-review, monday-compass, monthly-digest, weekly-plate, anomaly-detector
+
+---
+
 ## v3.1.6 — 2026-03-08: DATA-2 full rollout + AI-2 causal language fixes
 
 ### DATA-2: Ingestion validator wired into all 13 ingestion Lambdas (complete)

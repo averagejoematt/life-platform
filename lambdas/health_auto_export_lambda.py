@@ -87,8 +87,13 @@ from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from collections import defaultdict
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("health-auto-export")
+except ImportError:
+    logger = logging.getLogger("health-auto-export")
+    logger.setLevel(logging.INFO)
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 S3_BUCKET      = os.environ.get("S3_BUCKET", "matthew-life-platform")
@@ -940,6 +945,7 @@ def lambda_handler(event, context):
       - Authorization: Bearer <api_key> header
     """
     _request_start = datetime.now(timezone.utc)
+    logger.set_date(_request_start.strftime("%Y-%m-%d"))  # OBS-1
     print(f"Health Auto Export webhook received")
 
     # ── Auth ──

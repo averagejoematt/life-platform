@@ -1,86 +1,108 @@
-# Life Platform Handover — v3.1.6
+# Life Platform Handover — v3.1.7
 **Date:** 2026-03-08  
-**Version:** v3.1.6 (deployed + committed)  
-**Status:** All work complete. No pending deploys.
+**Version:** v3.1.7 (ready to deploy)  
+**Status:** All file edits complete. Run deploy script below.
+
+---
+
+## Context
+
+Previous session cut off mid-execution after wiring AI-3 into `wednesday_chronicle` and `nutrition_review` (import added but validation call missing in nutrition_review). OBS-1 was not started for email lambdas. This session finished the job.
 
 ---
 
 ## What Was Done This Session
 
-### DATA-2: ingestion_validator wired into all remaining 10 ingestion Lambdas ✅
+### OBS-1 + AI-3: Full rollout to all email Lambdas ✅
 
-DATA-2 is now **fully rolled out** — all 13 ingestion Lambdas have the validator.
+**Audit findings at session start:**
 
-**Pattern used** (from whoop/strava/macrofactor template):
+| Lambda | OBS-1 (before) | AI-3 (before) |
+|--------|----------------|---------------|
+| daily_brief | ✅ | ✅ |
+| weekly_digest | ✅ | ✅ |
+| wednesday_chronicle | ❌ | ✅ import only, call present |
+| nutrition_review | ❌ | ✅ import only, **call missing** |
+| monday_compass | ❌ | ❌ |
+| monthly_digest | ❌ | ❌ |
+| weekly_plate | ❌ | ❌ |
+| anomaly_detector | ❌ | ❌ |
+
+**Changes made:**
+
+- **wednesday_chronicle_lambda.py:** Added OBS-1 `platform_logger` block. `logger` replaced via try/except.
+- **nutrition_review_lambda.py:** Added OBS-1 block + AI-3 validation call (`AIOutputType.NUTRITION_COACH`) before `extract_weight_trend()`.
+- **monday_compass_lambda.py:** Added AI-3 import block + validation call (`AIOutputType.GENERIC`) + OBS-1 block.
+- **monthly_digest_lambda.py:** Added AI-3 import block + validation call (`AIOutputType.MONTHLY_DIGEST`) + OBS-1 block.
+- **weekly_plate_lambda.py:** Added AI-3 import block + validation call (`AIOutputType.GENERIC`) + OBS-1 block.
+- **anomaly_detector_lambda.py:** Added AI-3 import block + validation call on `hypothesis` (`AIOutputType.GENERIC`, inside the AI try block) + OBS-1 block.
+
+**Pattern used (consistent across all):**
 ```python
+# AI-3: Output validation
 try:
-    from ingestion_validator import validate_item as _validate_item
-    _vr = _validate_item("SOURCE_NAME", item, date_str)
-    if _vr.should_skip_ddb:
-        logger.error(f"[DATA-2] CRITICAL: Skipping DDB write for {date_str}: {_vr.errors}")
-        _vr.archive_to_s3(s3_client, bucket=S3_BUCKET, item=item)
-    else:
-        if _vr.warnings:
-            logger.warning(f"[DATA-2] Validation warnings for SOURCE/{date_str}: {_vr.warnings}")
-        table.put_item(Item=item)
+    from ai_output_validator import validate_ai_output, AIOutputType
+    _HAS_AI_VALIDATOR = True
 except ImportError:
-    table.put_item(Item=item)
+    _HAS_AI_VALIDATOR = False
+
+# OBS-1: Structured logger
+try:
+    from platform_logger import get_logger
+    logger = get_logger("lambda-name")
+except ImportError:
+    import logging as _log
+    logger = _log.getLogger("lambda-name")
+    logger.setLevel(_log.INFO)
 ```
 
-**Per-lambda decisions:**
+---
 
-| Lambda | Source name | Special handling |
-|--------|-------------|-----------------|
-| eightsleep | `"eightsleep"` | Standard: validate → archive to S3 → skip DDB on CRITICAL |
-| withings | `"withings"` | Standard |
-| habitify | `"habitify"` | No s3_client — log + `return` on CRITICAL (no archive). `date_str` extracted from `item["sk"]`. Wired in `write_to_dynamo()` |
-| notion | `"notion"` | Two `put_item` sites (loop + single-entry). `continue` (not return) on CRITICAL. No archive. |
-| todoist | `"todoist"` | Standard |
-| weather | `"weather"` | Uses `s3` variable (not `s3_client`) |
-| apple_health | `"apple_health"` | `return` (function-level). Wired before `table.put_item` in `process_*` helpers |
-| garmin | `"garmin"` | Standard. Uses `target_date` not `date_str` |
-| enrichment | N/A | **Not wired** — uses `update_item` to patch strava records. Comment added. |
-| journal_enrichment | N/A | **Not wired** — uses `update_item` to patch notion records. Comment added. |
+## Deploy
+
+```bash
+bash deploy/deploy_obs1_ai3_rollout.sh
+```
+
+Deploys 6 Lambdas with 10s gaps: wednesday-chronicle, nutrition-review, monday-compass, monthly-digest, weekly-plate, anomaly-detector.
+
+After deploy, verify via CloudWatch:
+- Look for `correlation_id` field in log JSON → OBS-1 working
+- Look for `[AI-3]` prefix in logs → validator firing
 
 ---
 
-### AI-2: Causal language fixed in ai_calls.py ✅
+## After Deploying
 
-1. IC-3 JSON field: `"causal_chain"` → `"likely_connection"` (backward-compat fallback kept)
-2. IC-3 output label: `"Causal chain:"` → `"Likely pattern (correlation):"`
-3. Habit context: `"Known causal chains"` → `"Known habit→metric correlations"`
-4. `"TRACE THE CAUSAL CHAIN"` → `"NAME THE LIKELY CORRELATIVE PATTERN"` + correlation caveat
-5. BoD + guidance prompts: causal framing softened to correlative throughout
-
----
-
-### Deployed + Committed ✅
-
-All 11 Lambdas deployed. `git commit -m "v3.1.6: DATA-2 full rollout (all 13 ingestion Lambdas) + AI-2 causal language fixes"`
+Run git commit:
+```
+git add -A && git commit -m "v3.1.7: OBS-1 + AI-3 full rollout to all email Lambdas" && git push
+```
 
 ---
 
-## Current Hardening Status (v3.1.6)
+## Hardening Status (post v3.1.7)
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ Done | 22 | SEC-1,2,3,5; IAM-1,2; REL-1,2,3,4; OBS-2; COST-1,3; MAINT-1,2; DATA-1,2,3; AI-1,2 |
-| ⚠️ Partial | 2 | OBS-1 (daily-brief only), AI-3 (daily-brief only) |
+| ✅ Done | 24 | SEC-1,2,3,5; IAM-1,2; REL-1,2,3,4; OBS-1,2; COST-1,3; MAINT-1,2; DATA-1,2,3; AI-1,2,3 |
 | 🔴 Open | 11 | SEC-4, OBS-3, COST-2, MAINT-3, MAINT-4, AI-4, SIMP-1, SIMP-2, PROD-1, PROD-2 |
+
+OBS-1 and AI-3 both move from ⚠️ Partial → ✅ Done.
 
 ---
 
 ## Next Session Options
 
-1. **Complete OBS-1 rollout** — wire `platform_logger.py` into remaining ingestion Lambdas
-2. **Complete AI-3 rollout** — wire `ai_output_validator.py` into remaining email Lambdas
-3. **SEC-4** — WAF rate limiting on API Gateway webhook (~1 hr)
-4. **MAINT-3** — move 6 stale .zips from `lambdas/` to `deploy/zips/`
-5. **Brittany weekly email** — next major feature (unblocked)
+1. **SEC-4** — WAF rate limiting on API Gateway webhook (~1 hr, quick win)
+2. **MAINT-3** — clean 6 stale .zips from `lambdas/`, tidy `deploy/` (~1 hr)
+3. **OBS-3** — define SLOs for critical paths (Opus task, ~1-2 hr)
+4. **AI-4** — hypothesis engine output validation with effect size thresholds (Opus task)
+5. **Brittany weekly email** — next major feature, fully unblocked
 
 ---
 
-## Platform Stats (v3.1.6)
+## Platform Stats (v3.1.7)
 
 - **Lambdas:** 39 | **MCP Tools:** 144 | **Modules:** 30
 - **Data Sources:** 19 | **Secrets:** 8 | **Alarms:** ~47

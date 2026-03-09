@@ -7,8 +7,13 @@ import urllib.parse
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("todoist")
+except ImportError:
+    logger = logging.getLogger("todoist")
+    logger.setLevel(logging.INFO)
 
 SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/api-keys")
 # ── Config (env vars with backwards-compatible defaults) ──
@@ -133,6 +138,7 @@ def normalize_completed_task(task, project_map):
 
 
 def lambda_handler(event, context):
+    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
     # Date range handling
     if "start_date" in event and "end_date" in event:
         start_date = datetime.strptime(event["start_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)

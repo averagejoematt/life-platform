@@ -17,8 +17,13 @@ import boto3
 from decimal import Decimal
 from datetime import datetime, timezone, timedelta
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("withings")
+except ImportError:
+    logger = logging.getLogger("withings")
+    logger.setLevel(logging.INFO)
 
 # ── Config (env vars with backwards-compatible defaults) ──
 REGION        = os.environ.get("AWS_REGION", "us-west-2")
@@ -427,6 +432,7 @@ def _ingest_single_day(date_str, secret):
 # ── Lambda handler ─────────────────────────────────────────────────────────────
 def lambda_handler(event, context):
     import time as _time
+    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
 
     # ── Mode 1: Explicit date (manual invoke / backfill) ──
     if "date" in event:

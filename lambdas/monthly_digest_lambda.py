@@ -23,8 +23,8 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+_logger_std = logging.getLogger()
+_logger_std.setLevel(logging.INFO)
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 
@@ -53,6 +53,22 @@ try:
     _HAS_INSIGHT_WRITER = True
 except ImportError:
     _HAS_INSIGHT_WRITER = False
+
+# AI-3: Output validation
+try:
+    from ai_output_validator import validate_ai_output, AIOutputType
+    _HAS_AI_VALIDATOR = True
+except ImportError:
+    _HAS_AI_VALIDATOR = False
+
+# OBS-1: Structured logger
+try:
+    from platform_logger import get_logger
+    logger = get_logger("monthly-digest")
+except ImportError:
+    import logging as _log
+    logger = _log.getLogger("monthly-digest")
+    logger.setLevel(_log.INFO)
 
 RECIPIENT         = "awsdev@mattsusername.com"
 SENDER            = "awsdev@mattsusername.com"
@@ -910,6 +926,16 @@ def lambda_handler(event, context):
         print(f"[WARN] Haiku failed: {e}")
         commentary = ("🎯 THE CHAIR — MONTHLY OVERVIEW\nCommentary unavailable this month.\n"
                       "💡 INSIGHT OF THE MONTH\nReview your data sections below.")
+
+    # AI-3: Validate output before rendering
+    if _HAS_AI_VALIDATOR and commentary and "unavailable" not in commentary[:50]:
+        _val = validate_ai_output(commentary, AIOutputType.MONTHLY_DIGEST)
+        if _val.blocked:
+            print(f"[AI-3] Monthly digest commentary BLOCKED: {_val.block_reason}")
+            commentary = _val.safe_fallback or ("\U0001f3af THE CHAIR \u2014 MONTHLY OVERVIEW\nCommentary unavailable this month.\n"
+                                                "\U0001f4a1 INSIGHT OF THE MONTH\nReview your data sections below.")
+        elif _val.warnings:
+            print(f"[AI-3] Monthly digest warnings: {_val.warnings}")
 
     html = build_html(data, goals, commentary, windows)
 

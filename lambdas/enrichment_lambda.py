@@ -31,8 +31,13 @@ from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from boto3.dynamodb.conditions import Key
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("enrichment")
+except ImportError:
+    logger = logging.getLogger("enrichment")
+    logger.setLevel(logging.INFO)
 
 REGION         = os.environ.get("AWS_REGION", "us-west-2")
 DYNAMODB_TABLE = os.environ.get("TABLE_NAME", "life-platform")
@@ -281,6 +286,7 @@ def enrich_date_range(start_date: str, end_date: str):
 
 def lambda_handler(event, context):
     today     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    logger.set_date(today)  # OBS-1
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
     if event.get("backfill"):

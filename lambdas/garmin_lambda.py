@@ -69,8 +69,13 @@ import boto3
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("garmin")
+except ImportError:
+    logger = logging.getLogger("garmin")
+    logger.setLevel(logging.INFO)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 SECRET_NAME    = "life-platform/garmin"
@@ -777,6 +782,7 @@ def ingest_day(target_date: str, secret: dict, api=None) -> dict:
 # ── Lambda handler ─────────────────────────────────────────────────────────────
 def lambda_handler(event, context):
     import time as _time
+    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
 
     secret = get_secret()
 

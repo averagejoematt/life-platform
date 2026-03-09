@@ -11,8 +11,13 @@ import boto3
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("weather")
+except ImportError:
+    logger = logging.getLogger("weather")
+    logger.setLevel(logging.INFO)
 
 # ── Config (env vars with backwards-compatible defaults) ──
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
@@ -57,6 +62,7 @@ def fetch_weather(start_date, end_date):
 def lambda_handler(event, context):
     # Default: fetch yesterday + today (today may have partial data)
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    logger.set_date(today)  # OBS-1
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
     
     # Allow override via event

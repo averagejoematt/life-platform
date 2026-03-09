@@ -33,8 +33,9 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from collections import defaultdict
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger (wired below after optional imports)
+_logger_std = logging.getLogger()
+_logger_std.setLevel(logging.INFO)
 
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
@@ -64,6 +65,22 @@ try:
     _HAS_INSIGHT_WRITER = True
 except ImportError:
     _HAS_INSIGHT_WRITER = False
+
+# AI-3: Output validation
+try:
+    from ai_output_validator import validate_ai_output, AIOutputType
+    _HAS_AI_VALIDATOR = True
+except ImportError:
+    _HAS_AI_VALIDATOR = False
+
+# OBS-1: Structured logger
+try:
+    from platform_logger import get_logger
+    logger = get_logger("wednesday-chronicle")
+except ImportError:
+    import logging as _log
+    logger = _log.getLogger("wednesday-chronicle")
+    logger.setLevel(_log.INFO)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1406,6 +1423,15 @@ def lambda_handler(event, context):
         return {"statusCode": 500, "body": f"AI generation failed: {e}"}
 
     logger.info(f"Installment received: {len(raw_installment)} chars, ~{len(raw_installment.split())} words")
+
+    # AI-3: Validate output before rendering
+    if _HAS_AI_VALIDATOR and raw_installment:
+        _val = validate_ai_output(raw_installment, AIOutputType.CHRONICLE, min_length=200)
+        if _val.blocked:
+            logger.error(f"[AI-3] Chronicle BLOCKED: {_val.block_reason}")
+            return {"statusCode": 500, "body": f"[AI-3] Chronicle blocked: {_val.block_reason}"}
+        elif _val.warnings:
+            logger.warning(f"[AI-3] Chronicle warnings: {_val.warnings}")
 
     # Parse the installment
     title, stats_line, body_md = parse_installment(raw_installment)

@@ -63,6 +63,22 @@ try:
 except ImportError:
     _HAS_INSIGHT_WRITER = False
 
+# AI-3: Output validation
+try:
+    from ai_output_validator import validate_ai_output, AIOutputType
+    _HAS_AI_VALIDATOR = True
+except ImportError:
+    _HAS_AI_VALIDATOR = False
+
+# OBS-1: Structured logger
+try:
+    from platform_logger import get_logger
+    logger = get_logger("weekly-digest")
+except ImportError:
+    import logging as _log
+    logger = _log.getLogger("weekly-digest")
+    logger.setLevel(_log.INFO)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
@@ -1481,6 +1497,7 @@ def lambda_handler(event, context):
     data["_raw_grades"] = raw_grades
 
     api_key = get_anthropic_key()
+    logger.set_date(dates.get("this_end", ""))  # OBS-1
     print("[INFO] Calling Haiku for Board commentary...")
     try:
         commentary = call_haiku(data, profile, api_key)
@@ -1488,6 +1505,15 @@ def lambda_handler(event, context):
         print(f"[WARN] Haiku failed: {e}")
         commentary = ("🎯 THE CHAIR — OVERVIEW\nCommentary unavailable.\n"
                       "💡 INSIGHT OF THE WEEK\nReview data sections below.")
+
+    # AI-3: Validate output before rendering
+    if _HAS_AI_VALIDATOR and commentary:
+        _val = validate_ai_output(commentary, AIOutputType.WEEKLY_DIGEST)
+        if _val.blocked:
+            print(f"[AI-3] Weekly digest commentary BLOCKED: {_val.block_reason}")
+            commentary = _val.safe_fallback
+        elif _val.warnings:
+            print(f"[AI-3] Weekly digest warnings: {_val.warnings}")
 
     html = build_html(data, commentary, profile)
 

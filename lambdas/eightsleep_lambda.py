@@ -85,8 +85,13 @@ import boto3
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("eightsleep")
+except ImportError:
+    logger = logging.getLogger("eightsleep")
+    logger.setLevel(logging.INFO)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 SECRET_NAME    = "life-platform/eightsleep"
@@ -679,6 +684,7 @@ def _ingest_with_retry(wake_date, secret):
 
 def lambda_handler(event, context):
     import time as _time
+    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
 
     # ── Mode 1: Explicit date (manual invoke / backfill) ──
     if event.get("date"):
