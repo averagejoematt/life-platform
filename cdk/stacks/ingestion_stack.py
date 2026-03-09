@@ -414,19 +414,17 @@ class IngestionStack(Stack):
         hae_role = iam.Role.from_role_arn(self, "HaeWebhookRole", ROLE_ARNS["hae"])
 
         _ASSET_EXCLUDES = [
-            ".venv", ".venv/**", "cdk", "cdk/**", "cdk.out", "cdk.out/**",
-            "docs", "docs/**", "deploy", "deploy/**", "handovers", "handovers/**",
-            "backfill", "backfill/**", "patches", "patches/**", "seeds", "seeds/**",
-            "setup", "setup/**", "datadrops", "datadrops/**",
             "__pycache__", "**/__pycache__/**", "*.pyc", "**/*.pyc",
-            "*.md", ".git", ".git/**", "node_modules", "node_modules/**",
+            "*.md", ".DS_Store",
+            "dashboard", "dashboard/**", "buddy", "buddy/**",
+            "cf-auth", "cf-auth/**", "requirements", "requirements/**",
         ]
         hae = _lambda.Function(
             self, "HaeWebhook",
             function_name="health-auto-export-webhook",
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler="health_auto_export_lambda.lambda_handler",
-            code=_lambda.Code.from_asset("..", exclude=_ASSET_EXCLUDES),
+            code=_lambda.Code.from_asset("../lambdas", exclude=_ASSET_EXCLUDES),
             role=hae_role,
             timeout=Duration.seconds(30),
             memory_size=256,
