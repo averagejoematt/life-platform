@@ -2,7 +2,7 @@
 
 **Table:** `life-platform` (us-west-2)  
 **Design:** Single-table with composite keys  
-**Last updated:** 2026-03-05 (v2.72.0 — 120 MCP tools, 19 data sources, 28 Lambdas, 12 cached tools)
+**Last updated:** 2026-03-09 (v3.3.9 — 144 MCP tools, 19 data sources, 39 Lambdas, 12 cached tools)
 
 ---
 
@@ -32,9 +32,9 @@
 
 ## Sources
 
-Valid source identifiers: `whoop`, `withings`, `strava`, `todoist`, `apple_health`, `hevy`, `eightsleep`, `chronicling`, `macrofactor`, `macrofactor_workouts`, `garmin`, `habitify`, `notion`, `labs`, `dexa`, `genome`, `supplements`, `weather`, `travel`, `state_of_mind`, `habit_scores`
+Valid source identifiers: `whoop`, `withings`, `strava`, `todoist`, `apple_health`, `hevy`, `eightsleep`, `chronicling`, `macrofactor`, `macrofactor_workouts`, `garmin`, `habitify`, `notion`, `labs`, `dexa`, `genome`, `supplements`, `weather`, `travel`, `state_of_mind`, `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `hypotheses`, `chronicle`
 
-Note: `hevy` and `chronicling` are historical/archived sources — not actively ingesting. `habit_scores` is derived data written by the Daily Brief, not raw ingested data.
+Note: `hevy` and `chronicling` are historical/archived sources — not actively ingesting. `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, and `hypotheses` are derived/computed partitions, not raw ingested data.
 
 Ingestion methods: API polling (scheduled Lambda), S3 file triggers (manual export), **webhook** (Health Auto Export push — also handles BP and State of Mind), **MCP tool write** (supplements), **on-demand fetch + scheduled Lambda** (weather)
 
@@ -1050,6 +1050,160 @@ One item per day. Computed by the backfill script initially, then by the Daily B
 
 Config: `s3://matthew-life-platform/config/character_sheet.json`  
 Queried by MCP tools: `get_character_sheet`, `get_pillar_detail`, `get_level_history`.
+
+---
+
+## Computed Metrics Partition (v2.82.0 / IC MAINT)
+
+**pk:** `USER#matthew#SOURCE#computed_metrics`  
+**sk:** `DATE#YYYY-MM-DD`
+
+Pre-computed daily metrics written by `daily-metrics-compute` Lambda at 9:40 AM PT (before Daily Brief). The Daily Brief reads this partition first with inline fallback to raw source computation if absent.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `date` | string | YYYY-MM-DD |
+| `day_grade_total` | number | Weighted composite day grade (0-100) |
+| `day_grade_letter` | string | A+ through F |
+| `readiness_score` | number | 0-100 composite readiness |
+| `readiness_level` | string | GREEN / YELLOW / RED |
+| `hrv_7d_avg` | number | 7-day HRV rolling average (ms) |
+| `hrv_trend` | string | improving / stable / declining |
+| `weight_7d_avg` | number | 7-day weight rolling average (lbs) |
+| `tsb` | number | Training Stress Balance (ATL-CTL) |
+| `atl` | number | Acute Training Load (7-day) |
+| `ctl` | number | Chronic Training Load (42-day) |
+| `zone2_minutes_7d` | number | Zone 2 minutes in rolling 7 days |
+| `consecutive_logging_days` | number | Streak of days with nutrition logged |
+| `habit_streak_t0` | number | Consecutive days all Tier 0 habits completed |
+| `computed_at` | string | ISO timestamp of computation |
+
+---
+
+## Platform Memory Partition (IC-1, v2.86.0)
+
+**pk:** `USER#matthew#SOURCE#platform_memory`  
+**sk:** `MEMORY#<category>#<date>` (e.g. `MEMORY#failure_patterns#2026-03-09`)
+
+Structured key-value memory store for computed intelligence. Written by insight compute Lambda and digest Lambdas. Read by all AI calls as compounding context.
+
+**Memory categories:**
+
+| SK prefix | Written by | Purpose |
+|-----------|-----------|----------|
+| `MEMORY#failure_patterns` | Weekly attribution pass | Conditions preceding low day grades |
+| `MEMORY#what_worked` | IC-9 (Month 3) | Episodic library of above-baseline outcomes |
+| `MEMORY#coaching_calibration` | IC-11 (Month 3) | Matthew-specific response patterns |
+| `MEMORY#personal_curves` | IC-10 (Month 4) | Personal response curves (weight loss rate vs. intake, etc.) |
+| `MEMORY#temporal_patterns` | IC-26 (Month 2-3) | Cyclical patterns by DOW / week-of-month |
+| `MEMORY#milestone_architecture` | IC-6 (Month 1) | Weight/health milestones with biological significance |
+| `MEMORY#permanent_learnings` | IC-28 (quarterly) | Stable truths confirmed by repeated observation |
+| `MEMORY#intention_tracking` | IC-8 (daily-insight) | Stated intentions vs actual outcomes |
+
+**Core fields (all memory records):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `category` | string | Memory category label |
+| `date` | string | YYYY-MM-DD date written |
+| `content` | object | Category-specific structured content |
+| `written_by` | string | Lambda name that wrote this record |
+| `written_at` | string | ISO timestamp |
+| `version` | string | Schema version |
+
+---
+
+## Insight Ledger Partition (IC-15, v2.87.0)
+
+**pk:** `USER#matthew#SOURCE#insights`  
+**sk:** `INSIGHT#<ISO-timestamp>` (e.g. `INSIGHT#2026-03-09T10:15:00`)
+
+Universal write-on-generate: every email/digest Lambda appends a structured insight record after generation. Accumulates the raw material for all downstream IC compounding features.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `insight_id` | string | ISO timestamp (SK suffix) |
+| `text` | string | Full insight text |
+| `date_saved` | string | YYYY-MM-DD |
+| `source` | string | `chat` / `email` / `daily_brief` / `weekly_digest` / `chronicle` / etc. |
+| `digest_type` | string | Lambda that generated this insight |
+| `pillars` | list | Affected pillars e.g. `["sleep", "movement"]` |
+| `data_sources` | list | DDB sources referenced |
+| `confidence` | string | `high` / `medium` / `low` |
+| `actionable` | boolean | Whether the insight has an action item |
+| `semantic_tags` | list | e.g. `["hrv", "recovery", "caffeine"]` |
+| `generated_text_hash` | string | SHA256 hash for deduplication |
+| `status` | string | `open` / `acted` / `resolved` |
+| `outcome_notes` | string | What happened when acted on |
+
+---
+
+## Decisions Partition (IC-19, v2.88.0)
+
+**pk:** `USER#matthew#SOURCE#decisions`  
+**sk:** `DECISION#<ISO-timestamp>`
+
+Tracks platform-guided decisions and their outcomes. Builds trust-calibration dataset for knowing when to follow the system vs. override it.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `decision_id` | string | ISO timestamp (SK suffix) |
+| `date` | string | YYYY-MM-DD |
+| `decision` | string | What the platform recommended |
+| `context` | string | Why it was recommended |
+| `followed` | boolean | Whether Matthew followed the advice |
+| `outcome_metric` | string | Metric observed as outcome |
+| `outcome_delta` | number | Change in outcome metric |
+| `notes` | string | Free text notes |
+| `logged_at` | string | ISO timestamp |
+
+Access via `log_decision`, `get_decision_journal`, `get_decision_effectiveness` MCP tools.
+
+---
+
+## Hypotheses Partition (IC-18, v2.89.0)
+
+**pk:** `USER#matthew#SOURCE#hypotheses`  
+**sk:** `HYPOTHESIS#<ISO-timestamp>`
+
+Generated weekly by `hypothesis-engine` Lambda (Sunday 11 AM PT). Cross-domain hypotheses that the other 144 tools don't explicitly monitor. Confirmed hypotheses graduate to permanent checks; refuted ones archive.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `hypothesis_id` | string | ISO timestamp (SK suffix) |
+| `date_generated` | string | YYYY-MM-DD |
+| `hypothesis` | string | Hypothesis statement |
+| `domains` | list | Pillars involved e.g. `["sleep", "nutrition"]` |
+| `numeric_criteria` | object | Measurable confirmation criteria |
+| `confirmation_checks` | number | Times confirmed so far (need 3 to promote) |
+| `status` | string | `active` / `confirmed` / `refuted` / `expired` |
+| `verdict` | string | AI-generated verdict on current evidence |
+| `expiry_date` | string | Hard expiry (30 days from generation) |
+| `promoted_to` | string | `permanent_check` if promoted (null otherwise) |
+| `generated_at` | string | ISO timestamp |
+
+Access via `get_active_hypotheses`, `evaluate_hypothesis` MCP tools.
+
+---
+
+## Chronicle Partition (v2.52.0)
+
+**pk:** `USER#matthew#SOURCE#chronicle`  
+**sk:** `DATE#YYYY-MM-DD` (Wednesday of each installment)
+
+Stores Wednesday Chronicle installments by Elena Voss. Also published to S3 blog and `blog.averagejoematt.com`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `date` | string | YYYY-MM-DD (Wednesday) |
+| `title` | string | Installment title |
+| `thesis` | string | The central argument/idea of this installment |
+| `body` | string | Full article text (HTML) |
+| `word_count` | number | Approximate word count |
+| `s3_key` | string | S3 path of published blog post |
+| `installment_number` | number | Sequential installment number |
+| `board_interview` | boolean | Whether this installment includes a BoD interview |
+| `generated_at` | string | ISO timestamp |
 
 ---
 

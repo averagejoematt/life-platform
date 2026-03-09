@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-Last updated: 2026-03-08 (v2.91.0 — 144 MCP tools, 30-module package, 35 Lambdas, 19 data sources)
+Last updated: 2026-03-09 (v3.3.9 — 144 MCP tools, 30-module package, 39 Lambdas, 19 data sources)
 
 ---
 
@@ -25,6 +25,8 @@ Last updated: 2026-03-08 (v2.91.0 — 144 MCP tools, 30-module package, 35 Lambd
 | MCP Cache Warmer | 09:00 AM | life-platform-mcp (EventBridge payload) |
 | Whoop Recovery Refresh | 09:30 AM | whoop-data-ingestion (date_override: today) |
 | Character Sheet Compute | 09:35 AM | character-sheet-compute (v1.0, reads yesterday's data, stores to DDB) |
+| Daily Metrics Compute | 09:40 AM | daily-metrics-compute (day grade, readiness, streaks, TSB, HRV, weight → `computed_metrics` partition) |
+| Daily Insight Compute | 09:42 AM | daily-insight-compute (IC-2: 7-day habit×outcome correlations, leading indicators, platform_memory pull, structured JSON for Daily Brief AI calls) |
 | Freshness Check | 09:45 AM | life-platform-freshness-checker |
 | Daily Brief | 10:00 AM | daily-brief (v2.62, 19 sections, 4 AI calls, reads character_sheet record, dedup, regrade mode, dynamic weight context, 7d training context) |
 | **DST note** | — | All crons fixed UTC. Times above are PDT (UTC-7). Run `deploy/deploy_dst_spring_2026.sh` at each DST transition. |

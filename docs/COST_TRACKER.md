@@ -1,6 +1,6 @@
 # Life Platform — Cost Tracker
 
-Last updated: 2026-03-08 (v2.91.0)
+Last updated: 2026-03-09 (v3.3.9)
 
 > Budget target: **$25/month**. Design constraint: every feature must justify its cost.
 
@@ -10,7 +10,7 @@ Last updated: 2026-03-08 (v2.91.0)
 
 | Service | Cost/Month | Notes |
 |---------|-----------|-------|
-| **Secrets Manager** | $2.40 | 6 secrets × $0.40/secret/month (consolidated from 12 — saves $2.40/mo) |
+| **Secrets Manager** | $3.20 | 8 secrets × $0.40/secret/month (6 active + api-keys pending deletion ~2026-04-07; saves ~$1.60/mo vs original 12) |
 | **Lambda** | ~$0.50 | ~2,500 invocations/month (13 ingestion + 35 Lambda schedule runs + MCP on-demand + Dropbox poll) |
 | **DynamoDB** | ~$0.30 | On-demand pay-per-request, ~5,000 WCU + ~15,000 RCU/month |
 | **S3** | ~$0.05 | ~2.5 GB stored (raw archives + dashboard + blog + buddy + avatar), minimal GET/PUT |
@@ -53,11 +53,6 @@ Decisions where cost was a factor in the design:
 | 2026-02-25 | DynamoDB on-demand (not provisioned) | Saves ~$10-15/mo vs provisioned | Workload is spiky (morning ingestion burst, sparse MCP queries) |
 | 2026-02-25 | Single DynamoDB table, no GSI | $0 extra | All access patterns served by PK+SK queries |
 | 2026-03-05 | Secrets Manager consolidation: 12 → 6 secrets | Saves $2.40/month | Merged anthropic, todoist, habitify, health-auto-export, notion, dropbox into `life-platform/api-keys`. OAuth secrets (whoop, withings, strava, eightsleep, garmin) + mcp-api-key stay separate. Backwards-compatible `.get()` fallback pattern used in all 13 affected Lambdas |
-| 2026-02-28 | Reserved concurrency (10) on MCP Lambda instead of WAF | Saved $5/month | 80% of WAF protection for $0 (expert review recommendation) |
-| 2026-02-28 | CloudFront for web dashboard | +$0.01/month | HTTPS + CDN for `dash.averagejoematt.com` — negligible cost |
-| 2026-02-26 | Rejected provisioned concurrency for MCP Lambda | Saved $10.80/month | Solved latency with memory bump ($1/mo) + caching instead |
-| 2026-02-26 | Lambda memory 512→1024 MB | +~$1/month | 2x CPU allocation, halved heavy query execution time |
-| 2026-02-25 | DynamoDB on-demand (not provisioned) | Saves ~$10-15/mo vs provisioned | Workload is spiky (morning ingestion burst, sparse MCP queries) |
 | 2026-02-25 | Single DynamoDB table, no GSI | $0 extra | All access patterns served by PK+SK queries |
 | 2026-02-24 | 12 Secrets Manager secrets | $4.80/month → consolidated to $2.40/month | Isolation was right tradeoff initially; consolidated once pattern was proven |
 | 2026-02-24 | CloudWatch 30-day log retention | Saves vs default infinite | Sufficient for debugging; older data in S3 raw archives |

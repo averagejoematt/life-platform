@@ -1,5 +1,20 @@
 # Life Platform — Changelog
 
+## v3.3.10 — 2026-03-09: Documentation sweep + Tech Board established
+
+### Documentation
+- Full doc sweep with Technical Board of Directors (12 seats) engagement
+- **SCHEMA.md**: Updated from v2.72.0 to v3.3.9. Added 6 missing IC-era DDB partitions: `computed_metrics`, `platform_memory`, `insights`, `decisions`, `hypotheses`, `chronicle`. Source identifier list updated (19→27).
+- **RUNBOOK.md**: Updated Lambda count 35→39. Added `daily-metrics-compute` (9:40 AM) and `daily-insight-compute` (9:42 AM) to schedule.
+- **COST_TRACKER.md**: Fixed duplicate rows (5 duplicates removed). Corrected secrets count (6→8 active including api-keys pending deletion).
+- **REVIEW_METHODOLOGY.md**: Added Technical Board of Directors reference.
+- **DECISIONS.md** (NEW): Architecture Decision Record log. 20 ADRs from Feb 23–Mar 9 covering all major design decisions.
+- **INTELLIGENCE_LAYER.md** (NEW): First comprehensive IC feature documentation. All 13 live IC features (IC-1 through IC-25), prompt anatomy standards, chain-of-thought structure, data maturity roadmap, ADR-016/017 "what NOT to build" section.
+- Structural cleanup: 7 completed design docs moved to `docs/archive/`, 2 reviews moved to `docs/reviews/`, 1 PIR moved to `docs/rca/`, IAM audit moved to new `docs/audits/` directory.
+- Memory: Doc update trigger matrix expanded to 12 docs with typed triggers and directory routing rules.
+
+---
+
 ## v3.3.9 — 2026-03-09: MAINT-3 complete + SEC-4 confirmed
 
 ### MAINT-3: deploy/ directory cleanup
