@@ -1,5 +1,22 @@
 # Life Platform — Changelog
 
+## v3.3.4 — 2026-03-09: LifePlatformIngestion + LifePlatformOperational deployed ✅
+
+### LifePlatformIngestion deploy fix
+- Root cause: CDK calling `PutRule` on imported EventBridge rules → AWS "Internal Failure"
+- Fix: removed `schedule=` from all 15 Lambda definitions; replaced with `fn.add_permission()` using hardcoded rule ARNs
+- Pattern: EventBridge rules = unmanaged drift; CDK owns Lambda + permissions only
+- Deploy succeeded: all Lambda::Permission resources created
+
+### LifePlatformOperational import + deploy
+- 7 Lambdas imported: dlq-consumer, canary, pip-audit, qa-smoke, key-rotator, data-export, data-reconciliation
+- 8 alarms imported: freshness-checker-errors, key-rotator-errors, data-export-errors, 4x canary, dlq-depth
+- freshness-checker Lambda excluded — pre-CDK individual stack conflict
+- Same no-schedule pattern applied as Ingestion
+- Lambda::Permissions created on deploy
+
+---
+
 ## v3.3.3 — 2026-03-09: PROD-1 LifePlatformIngestion deploy script + LifePlatformOperational stack built
 
 ### Option A — LifePlatformIngestion deploy script
