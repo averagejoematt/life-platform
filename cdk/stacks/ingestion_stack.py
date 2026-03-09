@@ -64,11 +64,11 @@ from constructs import Construct
 
 from stacks.lambda_helpers import create_platform_lambda
 
-# ── Garth Lambda Layer ARN ──────────────────────────────────────────────────
-# The garmin Lambda uses `garth` (OAuth token management). This library is
-# pre-installed in a Lambda Layer. Update this ARN from AWS console:
-#   aws lambda list-layers --query 'Layers[?contains(LayerName, `garth`)].LatestMatchingVersion.LayerVersionArn'
-GARTH_LAYER_ARN = "arn:aws:lambda:us-west-2:205930651321:layer:garth:1"  # UPDATE ME
+# ── Shared utils Lambda Layer ARN ───────────────────────────────────────────
+# life-platform-shared-utils:4 — contains shared dependencies used across
+# multiple Lambdas. Garth (Garmin OAuth) is bundled in the Lambda zip directly
+# rather than as a separate layer.
+SHARED_LAYER_ARN = "arn:aws:lambda:us-west-2:205930651321:layer:life-platform-shared-utils:4"
 
 
 class IngestionStack(Stack):
@@ -85,9 +85,9 @@ class IngestionStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # ── Garth layer reference (existing layer, not created here) ──
-        garth_layer = _lambda.LayerVersion.from_layer_version_arn(
-            self, "GarthLayer", GARTH_LAYER_ARN
+        # ── Shared utils layer reference (existing layer, not created here) ──
+        shared_utils_layer = _lambda.LayerVersion.from_layer_version_arn(
+            self, "SharedUtilsLayer", SHARED_LAYER_ARN
         )
 
         # ── Shared kwargs passed to every ingestion Lambda ──
@@ -134,7 +134,7 @@ class IngestionStack(Stack):
             schedule="cron(0 14 * * ? *)",           # 07:00 AM PT
             timeout_seconds=300,
             memory_mb=512,                           # garth auth + multi-day backfill
-            shared_layer=garth_layer,
+            shared_layer=shared_utils_layer,
             **shared,
         )
 
