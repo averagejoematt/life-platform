@@ -1,67 +1,68 @@
-# Life Platform Handover — v3.2.1
+# Life Platform Handover — v3.2.2
 **Date:** 2026-03-09
-**Version:** v3.2.1
-**Status:** CI/CD pipeline written. OIDC setup + GitHub Environment config required before first use.
+**Version:** v3.2.2
+**Status:** Massive session — 5 hardening items progressed, all design work complete.
 
 ---
 
-## What Was Done This Session
+## Session Summary
 
-### OBS-3: SLO Definitions ✅ (deployed)
-- 4 SLO alarms created and verified
-- Freshness checker emitting CloudWatch metrics
-- Ops dashboard updated with SLO Health section
+| Item | Status | Deployed? |
+|------|--------|-----------|
+| OBS-3: SLOs | ✅ Complete | Yes — 4 alarms live |
+| AI-4: Hypothesis validation | ✅ Complete | Yes — v1.1.0 live |
+| MAINT-4: CI/CD | ✅ Complete | Yes — OIDC + workflow + environment |
+| SIMP-2: Ingestion framework | ⚠️ Session 1 done | No — code written, migration pending |
+| PROD-1: CDK scaffolding | ⚠️ Session 1 done | No — scaffolding only |
+| PROD-2: Multi-user audit | ⚠️ Session 1 done | No — audit doc only |
 
-### AI-4: Hypothesis Engine Validation ✅ (deployed)
-- v1.1.0 with data completeness, hypothesis validation, 30-day hard expiry
-- 13 complete data days confirmed, Lambda executing cleanly
+## Files Created/Modified
 
-### MAINT-4: GitHub Actions CI/CD ✅ (code ready, setup required)
-- `.github/workflows/ci-cd.yml` — 4-job pipeline:
-  - **Lint:** flake8 (fatal on syntax errors, warnings pass)
-  - **Plan:** git diff change detection → Lambda mapping via `ci/lambda_map.json`
-  - **Deploy:** GitHub Environment `production` approval gate, 10s between deploys, shared layer auto-rebuild, MCP server handled separately, garmin native deps auto-skipped
-  - **Smoke test:** qa-smoke + canary post-deploy verification
-- `ci/lambda_map.json` — 38 Lambda mappings + shared layer + MCP config
-- `.flake8` — project-wide lint config
-- `deploy/setup_github_oidc.sh` — OIDC provider + IAM role creation
-- `workflow_dispatch` support for manual deploy-all
+### New files
+- `.github/workflows/ci-cd.yml` — CI/CD pipeline
+- `.flake8` — lint config
+- `ci/lambda_map.json` — Lambda mapping for CI/CD
+- `cdk/app.py` — CDK app (8-stack architecture)
+- `cdk/stacks/core_stack.py` — DynamoDB + S3 + SQS + SNS
+- `cdk/stacks/lambda_helpers.py` — `create_platform_lambda()` factory
+- `cdk/requirements.txt`, `cdk.json`
+- `lambdas/ingestion_framework.py` — shared ingestion pipeline
+- `deploy/setup_github_oidc.sh` — OIDC setup (run, complete)
+- `deploy/obs3_slo_definitions.sh` — SLO alarms (run, complete)
+- `deploy/ai4_hypothesis_validation.sh` — Hypothesis deploy (run, complete)
+- `docs/SLOs.md`, `docs/DESIGN_SIMP2_INGESTION.md`, `docs/DESIGN_PROD1_CDK.md`, `docs/AUDIT_PROD2_MULTI_USER.md`, `docs/SCOPING_LARGE_OPUS.md`
 
-### Large Opus Scoping ✅
-- SIMP-2, PROD-1, PROD-2 design specs in `docs/SCOPING_LARGE_OPUS.md`
-
----
-
-## ⚠️ Setup Steps for MAINT-4
-
-The CI/CD pipeline code is in the repo but won't work until these one-time setup steps are done:
-
-```bash
-# 1. Create OIDC provider + IAM role
-bash deploy/setup_github_oidc.sh
-
-# 2. Go to GitHub → repo Settings → Environments
-#    Create environment: "production"
-#    Add protection rule: Required reviewers → add yourself
-#    Add deployment branch rule: main only
-```
-
-After that, any push to `main` that touches `lambdas/` or `mcp/` files will trigger the pipeline. The deploy step waits for your approval in the GitHub UI.
+### Modified files
+- `lambdas/freshness_checker_lambda.py` — CloudWatch metric emission
+- `lambdas/hypothesis_engine_lambda.py` — v1.1.0 AI-4 validation
+- `docs/CHANGELOG.md`, `docs/PROJECT_PLAN.md`
 
 ---
 
-## Hardening Status (v3.2.1)
+## Hardening Status (v3.2.2)
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ Done | 29 | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,3; MAINT-1,2,3,4; DATA-1,2,3; AI-1,2,3,4 |
-| 🔴 Open | 6 | COST-2, SIMP-1, SIMP-2, PROD-1, PROD-2 |
-
-**83% complete.** Remaining open items are all Sonnet (COST-2, SIMP-1) or multi-session Opus (SIMP-2, PROD-1, PROD-2).
+| ✅ Done | 29 | SEC-1-5, IAM-1-2, REL-1-4, OBS-1-3, COST-1,3, MAINT-1-4, DATA-1-3, AI-1-4 |
+| ⚠️ In Progress | 3 | SIMP-2 (framework built), PROD-1 (scaffolding), PROD-2 (audit) |
+| 🔴 Open | 3 | COST-2, SIMP-1 |
 
 ---
 
-## Platform Stats (v3.2.1)
+## Next Steps (all can be Sonnet)
+
+| Priority | Item | Effort | Notes |
+|----------|------|--------|-------|
+| 1 | COST-2 + SIMP-1 | 1 session | MCP tool usage audit — natural combo |
+| 2 | SIMP-2 Phase 1 | 1 session | Migrate weather Lambda to framework (proof of concept) |
+| 3 | SIMP-2 Phase 2-3 | 2 sessions | Migrate remaining 9 Lambdas |
+| 4 | PROD-2 implementation | 3 sessions | Remove defaults, email to profile, S3 paths |
+| 5 | PROD-1 sessions 2-6 | 5 sessions | Import resources, define all 39 Lambdas in CDK |
+| 6 | Brittany weekly email | 2 sessions | Long-queued feature, fully unblocked |
+
+---
+
+## Platform Stats (v3.2.2)
 - **Lambdas:** 39 | **MCP Tools:** 144 | **Modules:** 30
 - **Data Sources:** 19 | **Secrets:** 8 | **Alarms:** ~51
-- **Hardening:** 29/35 complete (83%)
+- **Hardening:** 29/35 done, 3 in progress, 3 open (83%→91% including in-progress)

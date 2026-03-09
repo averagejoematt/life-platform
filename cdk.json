@@ -1,0 +1,16 @@
+{
+  "app": "python3 cdk/app.py",
+  "context": {
+    "account": "205930651321",
+    "region": "us-west-2",
+    "user_id": "matthew",
+    "s3_bucket_name": "matthew-life-platform",
+    "ddb_table_name": "life-platform",
+    "sns_topic_name": "life-platform-alerts",
+    "sqs_dlq_name": "life-platform-ingestion-dlq",
+    "domain_dash": "dash.averagejoematt.com",
+    "domain_buddy": "buddy.averagejoematt.com",
+    "domain_blog": "blog.averagejoematt.com",
+    "ses_domain": "mattsusername.com"
+  }
+}
