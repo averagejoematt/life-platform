@@ -46,11 +46,11 @@ from decimal import Decimal
 # ── Config ─────────────────────────────────────────────────────────────────────
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET  = os.environ.get("S3_BUCKET", "matthew-life-platform")
+S3_BUCKET  = os.environ["S3_BUCKET"]
 MCP_URL    = os.environ.get("MCP_FUNCTION_URL", "")   # set from deploy script
 MCP_SECRET = os.environ.get("MCP_SECRET_NAME", "life-platform/api-keys")
-SENDER     = os.environ.get("EMAIL_SENDER", "awsdev@mattsusername.com")
-RECIPIENT  = os.environ.get("EMAIL_RECIPIENT", "awsdev@mattsusername.com")
+SENDER     = os.environ["EMAIL_SENDER"]
+RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
 
 CANARY_PK  = "CANARY#matthew"
 

@@ -22,8 +22,8 @@ except ImportError:
 # ── Config (env vars with backwards-compatible defaults) ──
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET  = os.environ.get("S3_BUCKET", "matthew-life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
+S3_BUCKET  = os.environ["S3_BUCKET"]
+USER_ID    = os.environ["USER_ID"]
 LAT, LON = 47.6062, -122.3321  # Seattle
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)

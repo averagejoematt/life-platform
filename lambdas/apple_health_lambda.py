@@ -25,10 +25,10 @@ from collections import defaultdict
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+S3_BUCKET = os.environ["S3_BUCKET"]
 DYNAMODB_TABLE = os.environ.get("DYNAMODB_TABLE", "life-platform")
 REGION = os.environ.get("AWS_DEFAULT_REGION", "us-west-2")
-USER_ID        = os.environ.get("USER_ID", "matthew")
+USER_ID        = os.environ["USER_ID"]
 OVERLAP_DAYS = 14  # Reprocess last N days to catch late-arriving records
 
 s3_client = boto3.client("s3", region_name=REGION)

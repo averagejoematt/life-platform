@@ -18,9 +18,9 @@ except ImportError:
 SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/api-keys")
 # ── Config (env vars with backwards-compatible defaults) ──
 REGION         = os.environ.get("AWS_REGION", "us-west-2")
-S3_BUCKET      = os.environ.get("S3_BUCKET", "matthew-life-platform")
+S3_BUCKET      = os.environ["S3_BUCKET"]
 DYNAMODB_TABLE = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID        = os.environ.get("USER_ID", "matthew")
+USER_ID        = os.environ["USER_ID"]
 
 secrets_client = boto3.client("secretsmanager", region_name=REGION)
 s3_client = boto3.client("s3", region_name=REGION)

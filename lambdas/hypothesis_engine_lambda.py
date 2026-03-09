@@ -45,8 +45,8 @@ logger.setLevel(logging.INFO)
 
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
-S3_BUCKET  = os.environ.get("S3_BUCKET", "matthew-life-platform")
+USER_ID    = os.environ["USER_ID"]
+S3_BUCKET  = os.environ["S3_BUCKET"]
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table    = dynamodb.Table(TABLE_NAME)

@@ -81,9 +81,9 @@ except ImportError:
 SECRET_NAME    = "life-platform/garmin"
 # ── Config (env vars with backwards-compatible defaults) ──
 REGION         = os.environ.get("AWS_REGION", "us-west-2")
-S3_BUCKET      = os.environ.get("S3_BUCKET", "matthew-life-platform")
+S3_BUCKET      = os.environ["S3_BUCKET"]
 DYNAMODB_TABLE = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID        = os.environ.get("USER_ID", "matthew")
+USER_ID        = os.environ["USER_ID"]
 LOOKBACK_DAYS  = int(os.environ.get("LOOKBACK_DAYS", "7"))
 
 # ── AWS clients ────────────────────────────────────────────────────────────────

@@ -40,8 +40,8 @@ logger.setLevel(logging.INFO)
 # ── Configuration from environment variables ──
 _REGION    = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET  = os.environ.get("S3_BUCKET", "matthew-life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
+S3_BUCKET  = os.environ["S3_BUCKET"]
+USER_ID    = os.environ["USER_ID"]
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 PILLAR_ORDER = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]

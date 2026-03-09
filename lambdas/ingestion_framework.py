@@ -97,8 +97,8 @@ class IngestionConfig:
         # Environment
         self.region = os.environ.get("AWS_REGION", "us-west-2")
         self.table_name = os.environ.get("TABLE_NAME", "life-platform")
-        self.s3_bucket = os.environ.get("S3_BUCKET", "matthew-life-platform")
-        self.user_id = os.environ.get("USER_ID", "matthew")
+        self.s3_bucket = os.environ["S3_BUCKET"]
+        self.user_id = os.environ["USER_ID"]
 
 
 # ══════════════════════════════════════════════════════════════════════════════

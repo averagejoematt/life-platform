@@ -39,10 +39,10 @@ _logger_std.setLevel(logging.INFO)
 
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET  = os.environ.get("S3_BUCKET", "matthew-life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
-RECIPIENT  = os.environ.get("EMAIL_RECIPIENT", "awsdev@mattsusername.com")
-SENDER     = os.environ.get("EMAIL_SENDER", "awsdev@mattsusername.com")
+S3_BUCKET  = os.environ["S3_BUCKET"]
+USER_ID    = os.environ["USER_ID"]
+RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
+SENDER     = os.environ["EMAIL_SENDER"]
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
@@ -61,7 +61,7 @@ except ImportError:
 
 try:
     import insight_writer
-    insight_writer.init(table, "matthew")
+    insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True
 except ImportError:
     _HAS_INSIGHT_WRITER = False

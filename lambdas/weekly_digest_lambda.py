@@ -47,8 +47,9 @@ import os
 # ── AWS clients ───────────────────────────────────────────────────────────────
 _REGION    = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-RECIPIENT  = os.environ.get("EMAIL_RECIPIENT", "awsdev@mattsusername.com")
-SENDER     = os.environ.get("EMAIL_SENDER", "awsdev@mattsusername.com")
+RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
+SENDER     = os.environ["EMAIL_SENDER"]
+USER_ID    = os.environ["USER_ID"]
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table    = dynamodb.Table(TABLE_NAME)
@@ -58,7 +59,7 @@ secrets  = boto3.client("secretsmanager", region_name=_REGION)
 # IC-15/16: Insight Ledger — progressive context + insight persistence
 try:
     import insight_writer
-    insight_writer.init(table, "matthew")
+    insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True
 except ImportError:
     _HAS_INSIGHT_WRITER = False
@@ -113,7 +114,7 @@ def fmt_num(val):
 
 def fetch_profile():
     try:
-        r = table.get_item(Key={"pk": "USER#matthew", "sk": "PROFILE#v1"})
+        r = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
         return d2f(r.get("Item", {}))
     except Exception as e:
         print(f"[ERROR] fetch_profile: {e}")
@@ -121,7 +122,7 @@ def fetch_profile():
 
 def query_range(source, start_date, end_date):
     """Batch query all records for a source in a date range."""
-    pk = f"USER#matthew#SOURCE#{source}"
+    pk = f"USER#{USER_ID}#SOURCE#{source}"
     records = {}
     kwargs = {
         "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
@@ -145,7 +146,7 @@ def query_journal_range(start_date, end_date):
     kwargs = {
         "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
         "ExpressionAttributeValues": {
-            ":pk": "USER#matthew#SOURCE#notion",
+            ":pk": f"USER#{USER_ID}#SOURCE#notion",
             ":s": f"DATE#{start_date}#journal#",
             ":e": f"DATE#{end_date}#journal#zzz",
         },
@@ -698,7 +699,7 @@ def fetch_stale_insights(days_threshold=7):
         r = table.query(
             KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
             ExpressionAttributeValues={
-                ":pk": "USER#matthew#SOURCE#insights",
+                ":pk": f"USER#{USER_ID}#SOURCE#insights",
                 ":s": "INSIGHT#0", ":e": "INSIGHT#z"})
         items = r.get("Items", [])
     except Exception as e:

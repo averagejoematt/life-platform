@@ -45,10 +45,10 @@ logger.setLevel(logging.INFO)
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 REGION    = os.environ.get("AWS_REGION", "us-west-2")
-BUCKET    = os.environ.get("S3_BUCKET", "matthew-life-platform")
-USER_ID   = os.environ.get("USER_ID", "matthew")
-RECIPIENT = os.environ.get("EMAIL_RECIPIENT", "awsdev@mattsusername.com")
-SENDER    = os.environ.get("EMAIL_SENDER", "awsdev@mattsusername.com")
+BUCKET    = os.environ["S3_BUCKET"]
+USER_ID   = os.environ["USER_ID"]
+RECIPIENT = os.environ["EMAIL_RECIPIENT"]
+SENDER    = os.environ["EMAIL_SENDER"]
 REQ_S3_PREFIX = os.environ.get("REQ_S3_PREFIX", "config/requirements/")
 
 s3  = boto3.client("s3",    region_name=REGION)

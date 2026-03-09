@@ -27,7 +27,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID = os.environ.get("USER_ID", "matthew")
+USER_ID = os.environ["USER_ID"]
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 ALGO_VERSION = "1.0"
 
