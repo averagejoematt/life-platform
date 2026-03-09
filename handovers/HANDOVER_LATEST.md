@@ -1,88 +1,118 @@
-# Handover — 2026-03-06 — Show & Tell PDF + Pipeline
+# Life Platform — Handover v3.3.7
+**Date:** 2026-03-09  
+**Session:** IC-4 + IC-5 + PROD-2 audit  
+**Version bump:** v3.3.6 → v3.3.7
 
-## Current Version
-v2.80.1 (no code changes this session — PDF/pipeline work only)
+---
 
 ## What Was Done This Session
 
-### 1. Show & Tell PDF (v5 — iterative build)
-Built a full multi-section PDF presentation for an internal show-and-tell with boss/peers/delegates. The PDF is at:
-`show_and_tell/output/LifePlatform_ShowAndTell_LATEST.pdf`
+### IC-4: Failure Pattern Compute Lambda ✅ (written + on disk, NOT YET DEPLOYED)
+**File:** `lambdas/failure_pattern_compute_lambda.py`
 
-**Content changes from previous versions:**
-- Cover hook rewritten: removed "felt terrible each morning" framing → "19 apps, none talking to each other"
-- The Story page: removed 120lb personal weight loss narrative → reframed as data aggregation problem
-- Stats strip: removed "120 lbs lost" → replaced with neutral platform stats
-- Elena Voss section: removed blog URL → added voice section mention
-- Met Market → "local supermarket" everywhere
-- Accountability section: expanded with friends dashboard (green/yellow/red signals)
-- Reward examples added: weekend away, spa day, new gear, dinner out, concert tickets
-- Roadmap: added LLM Failover Router (Anthropic down → OpenAI fallback)
-- New Section 12 — Documentation System (changelog, handovers, incident log, RCA)
-- Source-of-truth callout added to Data Model section
-- Board of Directors box rebuilt from canvas drawString → Paragraph Table (wraps properly)
-- Tier progression diagram regenerated with consistent pixel art avatars (brown hair, dark suit)
-- Removed "As the person responsible for rolling out Claude..." personal paragraph
+New Lambda — weekly Sunday 9:50 AM PT (EventBridge cron `50 17 ? * SUN *`).
 
-**Privacy redactions applied to screenshots:**
-- shot02_daily_brief: habit streaks line (No marijuana, No alcohol) → "✓ Habit streaks tracked"
-- shot05_habits: No alcohol, No marijuana, No porn rows; body skincare weight mention; walk 5k weight subtext
-- shot06_cgm_board: Weight Phase Tracker tile (290.3 lbs, 302 start, 185 goal, target 250)
-- shot16_dashboard + shot18_dashboard_character: weight tile numbers
-- shot07_brittany1: Coach Rodriguez "What's driving it" paragraph (emotionally vulnerable content)
+Logic:
+1. Loads 7 days of `computed_metrics`
+2. Identifies "failure days" (any component score < 50)
+3. Enriches each failure day with contextual data: Whoop recovery/HRV, Todoist task count, journal stress, MacroFactor calories
+4. Haiku synthesis pass → identifies recurring patterns (min 2 occurrences)
+5. Stores to `platform_memory` as `MEMORY#failure_pattern#<date>#<index>`
+6. Idempotent — skips if already ran today unless `force=true`
 
-### 2. Show & Tell Pipeline (`show_and_tell/`)
-Built a full automated pipeline so future PDFs take ~20 min instead of a full day.
+Consumed by: `daily_insight_compute` → `build_memory_context()` → injected into Daily Brief AI calls.
 
-**Files created:**
-```
-show_and_tell/
-├── README.md               ← full documentation
-├── setup.sh                ← one-time venv setup (handles macOS/Homebrew correctly)
-├── run.sh                  ← main pipeline: ./run.sh --open
-├── manifest.json           ← all version-specific stats (edit before each run)
-├── update_manifest.py      ← auto-reads version/incidents/handovers from live docs
-├── capture_screenshots.py  ← Playwright automation for dashboard + buddy page
-├── redact_screenshots.py   ← documented redaction rules (fractional coords, resolution-independent)
-├── build_pdf.py            ← patches manifest values into build script, runs build
-├── build_v4.py             ← core ReportLab PDF engine (copy here from root)
-├── tier_progression.png    ← generated tier diagram (keep here)
-├── arch_diagram.png        ← generated architecture diagram (keep here)
-├── screenshots/            ← raw unredacted screenshots go here
-├── processed/              ← redacted screenshots (used by build)
-└── output/                 ← final PDFs land here
+### IC-5: Early Warning Detection ✅ (written + on disk, NOT YET DEPLOYED)
+**File:** `lambdas/daily_insight_compute_lambda.py` (v1.0.0 → v1.2.0)
+
+New function `detect_early_warning(computed_records_7d, habit_7d, declining)`:
+- 4 markers: `journal_sparse`, `nutrition_gap`, `habit_declining`, `recovery_sliding`
+- Warning fires when **2+ markers** active simultaneously
+- Injects `⚠️ EARLY WARNING` block into AI context before final INSTRUCTION
+
+Handler return includes `ic5_warning` (bool) and `ic5_markers` (list) for CloudWatch visibility.
+
+### PROD-2 Audit ✅
+- **Phase 1 (env var defaults):** Already complete since v3.2.1. All 39 Lambdas use `os.environ["USER_ID"]` fail-fast. No `"matthew"` defaults remain.
+- **Phase 2 (email → profile):** Already done. All email Lambdas use `os.environ["EMAIL_RECIPIENT"]` / `os.environ["EMAIL_SENDER"]`. No profile migration needed to unblock multi-user.
+- **Phase 3 (S3 path prefix):** Deferred — touches CloudFront/web infra. Own session.
+
+---
+
+## Deploy Needed
+
+**Single script covers everything:**
+```bash
+bash deploy/deploy_ic4_ic5.sh
 ```
 
-**Pipeline flags:**
-- `./run.sh --open`                              — full pipeline
-- `./run.sh --skip-shots --open`                 — skip screenshot capture, still redact
-- `./run.sh --skip-shots --skip-redact --open`   — use existing processed/ screenshots directly
+This script:
+1. Creates/updates `failure-pattern-compute` Lambda with correct env vars
+2. Creates EventBridge rule `failure-pattern-compute-weekly` (cron `50 17 ? * SUN *`) — only on first deploy
+3. Deploys `daily-insight-compute` v1.2.0 via `deploy_lambda.sh`
 
-**What auto-updates each run (update_manifest.py reads live docs):**
-- Version (from HANDOVER_LATEST.md)
-- Incident count (from INCIDENT_LOG.md row count)
-- Handover count (from handovers/ directory)
-- Changelog entry count (from CHANGELOG.md)
-- MCP tool count (from MCP_TOOL_CATALOG.md)
-- Git object count (from `git count-objects`)
+**Verify after deploy:**
+```bash
+# IC-4 test (force=true bypasses idempotency check)
+aws lambda invoke --function-name failure-pattern-compute \
+  --payload '{"force":true}' /tmp/ic4_out.json --region us-west-2
+cat /tmp/ic4_out.json
 
-**What needs manual update in manifest.json before each run:**
-- roadmap_near_term array (items will have shipped)
-- Lambda count if changed
-- Cost per month if changed
+# IC-5: already fires as part of daily-insight-compute — check CloudWatch logs
+aws logs describe-log-streams \
+  --log-group-name /aws/lambda/daily-insight-compute \
+  --order-by LastEventTime --descending --limit 1 --region us-west-2
+```
 
-## Next Major Features (unchanged from last session)
-1. Reward seeding (prerequisite for Brittany email fixes)
-2. Brittany weekly email debugging (deployed but Board sections not rendering)
-3. Google Calendar integration
-4. Character Sheet Phase 4
+---
 
-## Open Items
-- BRITTANY_EMAIL env var: not yet set on brittany-weekly-email Lambda
-- Brittany email Board sections not rendering — CloudWatch logs needed to diagnose
+## File State
 
-## Key Files
-- Build script: `show_and_tell/build_v4.py`
-- Pipeline entry: `show_and_tell/run.sh`
-- Manifest: `show_and_tell/manifest.json`
-- Latest PDF: `show_and_tell/output/LifePlatform_ShowAndTell_LATEST.pdf`
+| File | Status |
+|------|--------|
+| `lambdas/failure_pattern_compute_lambda.py` | ✅ New — IC-4 v1.0.0 |
+| `lambdas/daily_insight_compute_lambda.py` | ✅ Updated — IC-2 v1.2.0 with IC-5 |
+| `deploy/deploy_ic4_ic5.sh` | ✅ Ready to run |
+| `docs/CHANGELOG.md` | ✅ v3.3.7 entry added |
+
+---
+
+## Architecture Notes (IC-4/5)
+
+**DDB keys:**
+- IC-4 writes: `pk=USER#matthew#SOURCE#platform_memory`, `sk=MEMORY#failure_pattern#<YYYY-MM-DD>#<i>`
+- IC-5 reads: `declining` list from `detect_metric_trends()` (already computed in step 3 of insight compute)
+
+**Schedule ordering on Sundays:**
+```
+9:40 AM  daily-metrics-compute
+9:42 AM  daily-insight-compute  (IC-5 fires here)
+9:50 AM  failure-pattern-compute  (IC-4 — new)
+10:00 AM daily-brief  (reads everything)
+```
+
+**IC-5 marker thresholds:**
+- `journal_sparse`: journal component < 50 for 2+ of last 3 days
+- `nutrition_gap`: nutrition component < 40 for 2+ of last 3 days
+- `habit_declining`: T0 completion rate dropped ≥15pp (last 3d avg vs prior 4d avg)
+- `recovery_sliding`: recovery or readiness_score in `declining` list from `detect_metric_trends`
+
+---
+
+## Open Items (Carried Forward)
+
+| Item | Priority | Status |
+|------|----------|--------|
+| **Deploy IC-4 + IC-5** | 🔴 High | Written, script ready → `bash deploy/deploy_ic4_ic5.sh` |
+| Brittany email | 🔴 High | Env var `BRITTANY_EMAIL` not set; Board sections not rendering |
+| Character Sheet Phase 4 (rewards) | 🟡 Medium | Deferred post Brittany |
+| PROD-2 Phase 3 (S3 path prefix) | 🟡 Medium | Deferred — CloudFront impact |
+| SEC-4 (API GW rate limiting) | 🟡 Medium | WAF rule on health-auto-export webhook |
+| Google Calendar integration | 🟢 Tier 1 | North Star gap #2 |
+| Monarch Money integration | 🟢 Tier 1 | `setup/setup_monarch_auth.py` exists |
+| DLQ depth monitoring | 🟡 Medium | EventBridge trigger or dashboard widget |
+
+---
+
+## Session Start Protocol
+Read `handovers/HANDOVER_LATEST.md` + `docs/PROJECT_PLAN.md` → brief state + suggest next steps.
