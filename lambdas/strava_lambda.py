@@ -404,7 +404,7 @@ def dedup_activities(activities):
 
 
 def save_to_s3(date_str, activities, raw_activities):
-    key = f"raw/strava/activities/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
+    key = f"raw/{USER_ID}/strava/activities/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
     payload = {
         "date": date_str,
         "ingested_at": datetime.now(timezone.utc).isoformat(),

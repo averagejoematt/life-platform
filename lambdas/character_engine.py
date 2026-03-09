@@ -43,14 +43,14 @@ _DEFAULT_TIERS = [
 # CONFIG LOADER
 # ==============================================================================
 
-def load_character_config(s3_client, bucket, force_refresh=False):
+def load_character_config(s3_client, bucket, force_refresh=False, user_id="matthew"):
     """Load character_sheet.json from S3 with warm-container caching."""
     now = time.time()
     if (not force_refresh and _config_cache["data"]
             and (now - _config_cache["ts"]) < _CONFIG_TTL_S):
         return _config_cache["data"]
     try:
-        resp = s3_client.get_object(Bucket=bucket, Key="config/character_sheet.json")
+        resp = s3_client.get_object(Bucket=bucket, Key=f"config/{user_id}/character_sheet.json")
         config = json.loads(resp["Body"].read().decode("utf-8"))
         _config_cache["data"] = config
         _config_cache["ts"] = now

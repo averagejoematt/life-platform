@@ -289,7 +289,7 @@ def build_day_record(date_str, day_sums, day_avg_acc, bg_readings, day_workouts,
 def save_day(date_str, day):
     """Write one day to S3 (gzipped) and DynamoDB."""
     year, month, day_num = date_str[:4], date_str[5:7], date_str[8:10]
-    s3_key = f"raw/apple_health/{year}/{month}/{day_num}.json.gz"
+    s3_key = f"raw/{USER_ID}/apple_health/{year}/{month}/{day_num}.json.gz"
 
     compressed = gzip.compress(json.dumps(day, default=str).encode())
     s3_client.put_object(

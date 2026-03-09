@@ -1,33 +1,30 @@
-# Life Platform — Handover v3.2.5
+# Life Platform — Handover v3.2.6
 Date: 2026-03-09
-Session: OBS-1 structured logging rollout — all live Lambdas complete
+Session: PROD-2 Phase 2 — S3 path prefixing (raw/ + config/)
 
 ---
 
 ## What Was Done This Session
 
-### OBS-1: platform_logger rollout complete (14/17 live Lambdas)
+### OBS-1 Resume (carried over from previous session)
+- `bash deploy/deploy_obs1_resume.sh` — 9/9 remaining live Lambdas deployed ✅
+- OBS-1 complete for all existing infrastructure (3 un-deployed Lambdas pre-patched)
 
-Resumed from previous session where patch script had been written but not run.
+### PROD-2 Phase 2: S3 path prefixing
+**Scope:** raw/ and config/ paths only. dashboard/buddy excluded (no CloudFront risk, zero multi-user value now).
 
-**Patch step:**
-- `deploy/patch_obs1_remaining.py` — patched 17 Lambda source files with OBS-1 import block
-- Two patterns handled: Pattern A (replace `logging.getLogger + setLevel`), Pattern B (add after imports for print-only files)
-- `set_date()` used for date-based Lambdas, `set_correlation_id()` for event-driven ones
+**What changed:**
+- `deploy/patch_prod2_phase2.py` — patched 13 files (8 ingestion Lambdas + tools_cgm + board_loader + character_engine + tools_board + tools_character)
+- `deploy/migrate_s3_prod2_phase2.sh` — copied 16,022 raw/ objects → raw/matthew/, 3 config files → config/matthew/
+- `deploy/deploy_prod2_phase2.sh` — deployed 10 Lambdas (8 ingestion + character-sheet-compute + life-platform-mcp)
 
-**Deploy steps:**
-1. `bash deploy/deploy_obs1_remaining.sh` — ran items 1–5 before hitting `data-export` (ResourceNotFoundException)
-2. Discovered 3 Lambdas not yet created in AWS: `data-export`, `data-reconciliation`, `pip-audit`
-3. `bash deploy/deploy_obs1_resume.sh` — deployed remaining 9 live Lambdas cleanly
+**All raw/ writes now:** `raw/{USER_ID}/source/...`
+**All config/ reads now:** `config/{USER_ID}/file.json`
+**Old paths preserved** — safe to delete after 7+ days of verified operation
 
-**All 14 deployed Lambdas:** apple-health-ingestion, character-sheet-compute, daily-insight-compute, daily-metrics-compute, dashboard-refresh, life-platform-dlq-consumer, dropbox-poll, life-platform-freshness-checker, hypothesis-engine, life-platform-canary, adaptive-mode-compute, insight-email-parser, life-platform-key-rotator, life-platform-qa-smoke
-
-**3 skipped (source files patched, Lambdas not yet created in AWS):**
-- `data-export` — source file has OBS-1, will deploy when Lambda is created
-- `data-reconciliation` — same
-- `pip-audit` — same
-
-OBS-1 is effectively ✅ complete for all existing infrastructure.
+**⚠️ Manual follow-up still pending (2 items):**
+1. SES receipt rule: update S3 prefix from `raw/inbound_email/` → `raw/matthew/inbound_email/`
+2. Apple Health S3 event notification: update trigger prefix from `imports/apple_health/` (unchanged) — actually the apple-health Lambda trigger hasn't changed; but `insight-email-parser` S3 trigger needs updating from `raw/inbound_email/` → `raw/matthew/inbound_email/`
 
 ---
 
@@ -38,36 +35,55 @@ OBS-1 is effectively ✅ complete for all existing infrastructure.
 | SEC-1,2,3,5 | ✅ |
 | IAM-1,2 | ✅ |
 | REL-1,2,3,4 | ✅ |
-| OBS-1 | ✅ All live Lambdas (3 un-deployed Lambdas pre-patched) |
+| OBS-1 | ✅ All live Lambdas |
 | OBS-2,3 | ✅ |
 | COST-1,2,3 | ✅ |
 | MAINT-1,2,3,4 | ✅ |
 | DATA-1,2,3 | ✅ |
 | AI-1,2,3,4 | ✅ |
-| PROD-1 | ⚠️ Scaffolding done, CDK import sessions 2-6 remain |
-| PROD-2 | ⚠️ Phase 1 done ✅, Phase 2 (S3 paths) pending |
+| PROD-1 | ⚠️ Scaffolding done, CDK sessions 2-6 remain |
+| PROD-2 | ✅ Phase 1 (env var defaults) + Phase 2 (S3 paths) done. dashboard/buddy deferred. |
 | SIMP-1 | 🔴 Revisit ~2026-04-08 |
 
-Overall: ~32/33 complete (~97%)
+Overall: ~97-98% hardening complete. PROD-1 CDK is the only substantial open item.
 
 ---
 
 ## Next Steps (Priority Order)
 
-| Priority | Item | Effort |
-|----------|------|--------|
-| 1 | Brittany weekly email | 2 sessions — fully unblocked |
-| 2 | PROD-2 Phase 2: S3 path prefixing | 4-6 hr — needs migration decision |
-| 3 | Prompt Intelligence fixes (P1-P5) | 2-3 sessions |
-| 4 | Google Calendar integration | 2 sessions |
-| 5 | PROD-1 CDK sessions 2-6 | 5 sessions |
-| 6 | SIMP-1 | ~2026-04-08 |
+| Priority | Item | Notes |
+|----------|------|-------|
+| 1 | **PROD-1 CDK IngestionStack** | Write IngestionStack + run cdk synth. Import later. |
+| 2 | **Brittany weekly email** | Fully unblocked |
+| 3 | **PROD-2 manual follow-up** | SES + insight-email-parser S3 trigger prefix update |
+| 4 | **Old S3 path cleanup** | After ~2026-03-16: delete raw/ (non-prefixed) + old config/*.json |
+| 5 | **Prompt Intelligence fixes (P1-P5)** | 2-3 sessions |
+| 6 | **Google Calendar integration** | 2 sessions |
 
 ---
 
+## PROD-1 CDK — Where We Left Off
+
+- `cdk/app.py` — 8-stack architecture defined, CoreStack wired, others commented out
+- `cdk/stacks/core_stack.py` — DynamoDB, S3, SQS DLQ, SNS (ready to `cdk import`)
+- `cdk/stacks/lambda_helpers.py` — `create_platform_lambda()` helper written
+- **Next session:** write `cdk/stacks/ingestion_stack.py` (13 Lambdas + IAM + EventBridge + alarms), run `cdk synth`, review CloudFormation diff. Do NOT run `cdk import` in the same session.
+
 ## Key Files Changed This Session
 
-- `deploy/patch_obs1_remaining.py` — patched 17 Lambda source files
-- `deploy/deploy_obs1_remaining.sh` — updated (removed 3 non-existent Lambdas)
-- `deploy/deploy_obs1_resume.sh` — resume script for items 6–17 (9 live Lambdas)
-- 17 Lambda source files in `lambdas/` — all have OBS-1 platform_logger block
+- `deploy/patch_prod2_phase2.py`
+- `deploy/migrate_s3_prod2_phase2.sh`
+- `deploy/deploy_prod2_phase2.sh`
+- `lambdas/health_auto_export_lambda.py` — 5 raw/ paths prefixed
+- `lambdas/whoop_lambda.py` — 4 raw/ paths prefixed
+- `lambdas/strava_lambda.py` — 1 raw/ path prefixed
+- `lambdas/garmin_lambda.py` — 1 raw/ path prefixed
+- `lambdas/macrofactor_lambda.py` — 1 raw/ path prefixed
+- `lambdas/apple_health_lambda.py` — 1 raw/ path prefixed
+- `lambdas/withings_lambda.py` — 1 raw/ path prefixed
+- `lambdas/eightsleep_lambda.py` — 1 raw/ path prefixed
+- `lambdas/board_loader.py` — user_id param added to load_board()
+- `lambdas/character_engine.py` — user_id param added to load_character_config()
+- `mcp/tools_cgm.py` — 3 raw/ read paths prefixed
+- `mcp/tools_board.py` — BOARD_S3_KEY dynamic
+- `mcp/tools_character.py` — S3_BUCKET + CS_CONFIG_KEY dynamic

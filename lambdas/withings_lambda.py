@@ -223,7 +223,7 @@ def parse_measurements(raw_body: dict) -> dict:
 
 # ── S3 storage ─────────────────────────────────────────────────────────────
 def save_to_s3(date_str: str, raw_body: dict):
-    key = f"raw/withings/measurements/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
+    key = f"raw/{USER_ID}/withings/measurements/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
     s3_client.put_object(
         Bucket=S3_BUCKET,
         Key=key,

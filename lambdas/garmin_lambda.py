@@ -738,7 +738,7 @@ def ingest_day(target_date: str, secret: dict, api=None) -> dict:
 
     print(f"Total fields collected: {len(record)}")
 
-    s3_key = f"raw/garmin/{target_date[:4]}/{target_date[5:7]}/{target_date[8:10]}.json"
+    s3_key = f"raw/{USER_ID}/garmin/{target_date[:4]}/{target_date[5:7]}/{target_date[8:10]}.json"
     s3_client.put_object(
         Bucket=S3_BUCKET,
         Key=s3_key,

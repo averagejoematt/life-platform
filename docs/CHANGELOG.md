@@ -1,5 +1,31 @@
 # Life Platform — Changelog
 
+## v3.2.6 — 2026-03-09: PROD-2 Phase 2 — S3 path prefixing (raw/ + config/)
+
+### PROD-2 Phase 2: S3 path prefixing
+- `deploy/patch_prod2_phase2.py` — automated patch script, 13 files changed
+- `deploy/migrate_s3_prod2_phase2.sh` — non-destructive S3 migration (16,022 raw/ objects + 3 config files copied to `raw/matthew/` and `config/matthew/`)
+- `deploy/deploy_prod2_phase2.sh` — 10-Lambda deploy script
+- **8 ingestion Lambdas** updated: health-auto-export-webhook, whoop, strava, garmin, macrofactor, apple-health, withings, eightsleep — all raw/ write paths now `raw/{USER_ID}/...`
+- **`mcp/tools_cgm.py`** — raw/cgm_readings/ read key, paginator prefix, key parser all prefixed
+- **`lambdas/board_loader.py`** — `load_board()` gains optional `user_id` param (default `"matthew"`), config key → `config/{user_id}/board_of_directors.json`
+- **`lambdas/character_engine.py`** — `load_character_config()` gains optional `user_id` param, config key → `config/{user_id}/character_sheet.json`
+- **`mcp/tools_board.py`** — imports `USER_ID`, `BOARD_S3_KEY` is now dynamic
+- **`mcp/tools_character.py`** — Phase 4 section: hardcoded `S3_BUCKET` → `os.environ.get()`, `CS_CONFIG_KEY` → dynamic
+- **Scope:** raw/ and config/ paths only. dashboard/ and buddy/ paths excluded (no CloudFront risk, no multi-user value yet)
+- **Old paths preserved** — delete after 7+ days of verified operation
+- **Manual follow-up:** Update SES receipt rule + S3 event notification for insight-email-parser and apple-health-ingestion to use `raw/matthew/` prefixes
+
+### PROD-2 Status after Phase 2
+- ✅ Category 1 (USER_ID default): Done (v3.2.4)
+- ✅ Category 3 (SES email defaults): Done (v3.2.4)
+- ✅ Category 4 (S3 path prefixing): Done — raw/ + config/ prefixed
+- ✅ Category 5 (DDB keys): Already parameterized
+- 🔴 Category 4 partial: dashboard/ + buddy/ paths deferred (no CloudFront risk, single-user only)
+- 🔴 Category 7 (CloudFront/web): Deferred
+
+---
+
 ## v3.2.5 — 2026-03-09: OBS-1 structured logging rollout complete
 
 ### OBS-1: platform_logger wired into all live Lambdas
