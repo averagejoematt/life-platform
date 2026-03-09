@@ -146,23 +146,19 @@ def create_platform_lambda(
     # ── Lambda Function ──
     # Asset path is ".." (project root) because cdk synth runs from the cdk/ subdir.
     # Excludes prevent bundling venv, cdk artifacts, docs, and deploy scripts.
+    # Asset path is "../lambdas" so the zip root = lambdas/ directory.
+    # Handler files (e.g. whoop_lambda.py) land at the zip root, which is where
+    # Lambda resolves module names from. Using ".." caused files to land at
+    # lambdas/whoop_lambda.py inside the zip, breaking all imports (fixed v3.3.6).
     _ASSET_EXCLUDES = [
-        ".venv", ".venv/**",
-        "cdk", "cdk/**",
-        "cdk.out", "cdk.out/**",
-        "docs", "docs/**",
-        "deploy", "deploy/**",
-        "handovers", "handovers/**",
-        "backfill", "backfill/**",
-        "patches", "patches/**",
-        "seeds", "seeds/**",
-        "setup", "setup/**",
-        "datadrops", "datadrops/**",
         "__pycache__", "**/__pycache__/**",
         "*.pyc", "**/*.pyc",
         "*.md",
-        ".git", ".git/**",
-        "node_modules", "node_modules/**",
+        "dashboard", "dashboard/**",   # static HTML assets — not Lambda code
+        "buddy", "buddy/**",            # static HTML assets — not Lambda code
+        "cf-auth", "cf-auth/**",        # CloudFront auth assets
+        "requirements", "requirements/**",
+        ".DS_Store",
     ]
     # When using an existing role (from_role_arn), we must NOT pass dead_letter_queue
     # to the Function constructor — CDK automatically calls grant_send_messages on the
@@ -175,7 +171,7 @@ def create_platform_lambda(
         function_name=function_name,
         runtime=_lambda.Runtime.PYTHON_3_12,
         handler=handler,
-        code=_lambda.Code.from_asset("..", exclude=_ASSET_EXCLUDES),
+        code=_lambda.Code.from_asset("../lambdas", exclude=_ASSET_EXCLUDES),
         role=role,
         timeout=Duration.seconds(timeout_seconds),
         memory_size=memory_mb,
