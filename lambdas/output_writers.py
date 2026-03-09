@@ -35,9 +35,9 @@ _fetch_date = None
 _normalize_whoop_sleep = None
 
 # Derived constants (set by init)
-_DASHBOARD_KEY = "dashboard/data.json"
+_DASHBOARD_KEY = None  # set in init() as dashboard/{user_id}/data.json
 _REWARDS_PK = None
-_CS_CONFIG_KEY = "config/character_sheet.json"
+_CS_CONFIG_KEY = None  # set in init() as config/{user_id}/character_sheet.json
 _PILLAR_ORDER = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
 
 
@@ -46,6 +46,7 @@ def init(s3_client, table_client, bucket, user_id, user_prefix,
     """Inject shared dependencies. Call once at Lambda startup."""
     global _s3, _table, _S3_BUCKET, _USER_ID, _USER_PREFIX
     global _fetch_range, _fetch_date, _normalize_whoop_sleep, _REWARDS_PK
+    global _DASHBOARD_KEY, _CS_CONFIG_KEY
     _s3 = s3_client
     _table = table_client
     _S3_BUCKET = bucket
@@ -55,6 +56,8 @@ def init(s3_client, table_client, bucket, user_id, user_prefix,
     _fetch_date = fetch_date_fn
     _normalize_whoop_sleep = normalize_whoop_fn
     _REWARDS_PK = f"USER#{user_id}#SOURCE#rewards"
+    _DASHBOARD_KEY = f"dashboard/{user_id}/data.json"
+    _CS_CONFIG_KEY = f"config/{user_id}/character_sheet.json"
 
 
 # ==============================================================================
@@ -820,12 +823,12 @@ def write_clinical_json(data, profile, yesterday):
 
         _s3.put_object(
             Bucket=_S3_BUCKET,
-            Key="dashboard/clinical.json",
+            Key=f"dashboard/{_USER_ID}/clinical.json",
             Body=json.dumps(clinical, default=str),
             ContentType="application/json",
             CacheControl="max-age=300",
         )
-        print("[INFO] Clinical JSON written to s3://" + _S3_BUCKET + "/dashboard/clinical.json")
+        print("[INFO] Clinical JSON written to s3://" + _S3_BUCKET + f"/dashboard/{_USER_ID}/clinical.json")
 
     except Exception as e:
         print("[WARN] Clinical JSON write failed: " + str(e))
@@ -1179,12 +1182,12 @@ def write_buddy_json(data, profile, yesterday, character_sheet=None):
 
         _s3.put_object(
             Bucket=_S3_BUCKET,
-            Key="buddy/data.json",
+            Key=f"buddy/{_USER_ID}/data.json",
             Body=json.dumps(buddy_data, default=str),
             ContentType="application/json",
             CacheControl="max-age=300",
         )
-        print("[INFO] Buddy JSON written to s3://" + _S3_BUCKET + "/buddy/data.json")
+        print("[INFO] Buddy JSON written to s3://" + _S3_BUCKET + f"/buddy/{_USER_ID}/data.json")
 
     except Exception as e:
         print("[WARN] Buddy JSON write failed: " + str(e))
