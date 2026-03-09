@@ -1,22 +1,19 @@
 {
-  "_comment": "CDK import map for LifePlatformEmail stack. Run: cdk synth LifePlatformEmail 2>&1 | grep 'importing' to verify logical IDs match after synth.",
-  "_verify_rules": "aws events list-rules --query 'Rules[*].Name' --output text | tr '\\t' '\\n' | sort",
+  "DailyBrief22B24B58":              { "FunctionName": "daily-brief" },
+  "WeeklyDigest16F74207":            { "FunctionName": "weekly-digest" },
+  "MonthlyDigest1498D0DA":           { "FunctionName": "monthly-digest" },
+  "NutritionReview454F0E72":         { "FunctionName": "nutrition-review" },
+  "WednesdayChronicle06572E73":      { "FunctionName": "wednesday-chronicle" },
+  "WeeklyPlate72587CF1":             { "FunctionName": "weekly-plate" },
+  "MondayCompass37779F0F":           { "FunctionName": "monday-compass" },
+  "BrittanyWeeklyEmailFFB976C5":     { "FunctionName": "brittany-weekly-email" },
 
-  "DailyBrief":               { "AWS::Lambda::Function": { "FunctionName": "daily-brief" } },
-  "WeeklyDigest":             { "AWS::Lambda::Function": { "FunctionName": "weekly-digest" } },
-  "MonthlyDigest":            { "AWS::Lambda::Function": { "FunctionName": "monthly-digest" } },
-  "NutritionReview":          { "AWS::Lambda::Function": { "FunctionName": "nutrition-review" } },
-  "WednesdayChronicle":       { "AWS::Lambda::Function": { "FunctionName": "wednesday-chronicle" } },
-  "WeeklyPlate":              { "AWS::Lambda::Function": { "FunctionName": "weekly-plate" } },
-  "MondayCompass":            { "AWS::Lambda::Function": { "FunctionName": "monday-compass" } },
-  "BrittanyWeeklyEmail":      { "AWS::Lambda::Function": { "FunctionName": "brittany-weekly-email" } },
-
-  "DailyBriefSchedule":          { "AWS::Events::Rule": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/daily-brief-schedule" } },
-  "WeeklyDigestSchedule":        { "AWS::Events::Rule": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/weekly-digest-sunday" } },
-  "MonthlyDigestSchedule":       { "AWS::Events::Rule": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/monthly-digest-schedule" } },
-  "NutritionReviewSchedule":     { "AWS::Events::Rule": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/nutrition-review-saturday" } },
-  "WednesdayChronicleSchedule":  { "AWS::Events::Rule": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/wednesday-chronicle-schedule" } },
-  "WeeklyPlateSchedule":         { "AWS::Events::Rule": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/weekly-plate" } },
-  "MondayCompassSchedule":       { "AWS::Events::Rule": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/monday-compass" } },
-  "BrittanyWeeklyEmailSchedule": { "AWS::Events::Rule": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/brittany-weekly-email-schedule" } }
+  "DailyBriefSchedule99515B48":          { "Arn": "arn:aws:events:us-west-2:205930651321:rule/daily-brief-schedule" },
+  "WeeklyDigestScheduleF14466BB":        { "Arn": "arn:aws:events:us-west-2:205930651321:rule/weekly-digest-sunday" },
+  "MonthlyDigestSchedule4F7106EE":       { "Arn": "arn:aws:events:us-west-2:205930651321:rule/monthly-digest-schedule" },
+  "NutritionReviewScheduleAD05C9CC":     { "Arn": "arn:aws:events:us-west-2:205930651321:rule/nutrition-review-saturday" },
+  "WednesdayChronicleSchedule73F96ECC":  { "Arn": "arn:aws:events:us-west-2:205930651321:rule/wednesday-chronicle-schedule" },
+  "WeeklyPlateSchedule00BB38FF":         { "Arn": "arn:aws:events:us-west-2:205930651321:rule/weekly-plate" },
+  "MondayCompassScheduleAD38164E":       { "Arn": "arn:aws:events:us-west-2:205930651321:rule/monday-compass" },
+  "BrittanyWeeklyEmailScheduleAE7E2228": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/brittany-weekly-email-schedule" }
 }
