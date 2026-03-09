@@ -40,7 +40,7 @@ logger.setLevel(logging.INFO)
 # ── Config ─────────────────────────────────────────────────────────────────────
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET  = os.environ.get("S3_BUCKET", "matthew-life-platform")
+S3_BUCKET  = os.environ["S3_BUCKET"]
 DLQ_URL    = os.environ.get("DLQ_URL", "")
 RECIPIENT  = "awsdev@mattsusername.com"
 SENDER     = "awsdev@mattsusername.com"

@@ -47,7 +47,7 @@ logger.setLevel(logging.INFO)
 # ── Configuration ──
 _REGION      = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME   = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID      = os.environ.get("USER_ID", "matthew")
+USER_ID      = os.environ["USER_ID"]
 ALGO_VERSION = "1.1"
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"

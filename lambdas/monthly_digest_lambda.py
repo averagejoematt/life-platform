@@ -31,14 +31,14 @@ _logger_std.setLevel(logging.INFO)
 # ── Config (env vars with backwards-compatible defaults) ──
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
+USER_ID    = os.environ["USER_ID"]
 
 dynamodb  = boto3.resource("dynamodb", region_name=REGION)
 table     = dynamodb.Table(TABLE_NAME)
 ses       = boto3.client("sesv2", region_name=REGION)
 secrets   = boto3.client("secretsmanager", region_name=REGION)
 s3_client = boto3.client("s3", region_name=REGION)
-S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+S3_BUCKET = os.environ["S3_BUCKET"]
 
 # Board of Directors config loader
 try:
@@ -49,7 +49,7 @@ except ImportError:
 
 try:
     import insight_writer
-    insight_writer.init(table, "matthew")
+    insight_writer.init(table, USER_ID)
     _HAS_INSIGHT_WRITER = True
 except ImportError:
     _HAS_INSIGHT_WRITER = False
@@ -70,8 +70,8 @@ except ImportError:
     logger = _log.getLogger("monthly-digest")
     logger.setLevel(_log.INFO)
 
-RECIPIENT         = "awsdev@mattsusername.com"
-SENDER            = "awsdev@mattsusername.com"
+RECIPIENT         = os.environ["EMAIL_RECIPIENT"]
+SENDER            = os.environ["EMAIL_SENDER"]
 PROTEIN_TARGET_G  = 180
 CALORIE_TARGET    = 1800
 GOAL_WEIGHT_LBS   = 220.0

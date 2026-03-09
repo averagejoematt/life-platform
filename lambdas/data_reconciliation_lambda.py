@@ -46,10 +46,10 @@ logger.setLevel(logging.INFO)
 # ── Config ─────────────────────────────────────────────────────────────────────
 REGION    = os.environ.get("AWS_REGION", "us-west-2")
 TABLE     = os.environ.get("TABLE_NAME", "life-platform")
-BUCKET    = os.environ.get("S3_BUCKET", "matthew-life-platform")
-USER_ID   = os.environ.get("USER_ID", "matthew")
-RECIPIENT = os.environ.get("EMAIL_RECIPIENT", "awsdev@mattsusername.com")
-SENDER    = os.environ.get("EMAIL_SENDER", "awsdev@mattsusername.com")
+BUCKET    = os.environ["S3_BUCKET"]
+USER_ID   = os.environ["USER_ID"]
+RECIPIENT = os.environ["EMAIL_RECIPIENT"]
+SENDER    = os.environ["EMAIL_SENDER"]
 ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/api-keys")
 LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "7"))
 

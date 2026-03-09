@@ -41,7 +41,7 @@ except ImportError:
 
 REGION         = os.environ.get("AWS_REGION", "us-west-2")
 DYNAMODB_TABLE = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID        = os.environ.get("USER_ID", "matthew")
+USER_ID        = os.environ["USER_ID"]
 USER_PREFIX    = f"USER#{USER_ID}#SOURCE#"
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)

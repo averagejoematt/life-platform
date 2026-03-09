@@ -1,5 +1,29 @@
 # Life Platform — Changelog
 
+## v3.2.4 — 2026-03-09: PROD-2 Phase 1 — Remove hardcoded defaults
+
+### PROD-2 Phase 1: Hardcoded default removal (96 replacements, 40 files)
+- `deploy/prod2_phase1_fix.py` — automated fix script (reusable for future audits)
+- All 39 Lambdas + `mcp/config.py`: `os.environ.get("USER_ID", "matthew")` → `os.environ["USER_ID"]`
+- All Lambdas with S3: `os.environ.get("S3_BUCKET", "matthew-life-platform")` → `os.environ["S3_BUCKET"]`
+- All email Lambdas: `os.environ.get("EMAIL_RECIPIENT/SENDER", "awsdev@...")` → `os.environ[...]`
+- `monthly_digest_lambda.py`: bare `RECIPIENT/SENDER = "awsdev@..."` → `os.environ[...]`
+- `weekly_digest_lambda.py`: injected `USER_ID = os.environ["USER_ID"]` (was missing entirely); fixed 4 hardcoded `"USER#matthew"` DDB key patterns → `f"USER#{USER_ID}"`
+- All 4 Lambdas with `insight_writer.init(table, "matthew")` → `insight_writer.init(table, USER_ID)`
+- All 40 Lambdas redeployed via `deploy/prod2_phase1_deploy_all.sh`
+
+### PROD-2 Status after Phase 1
+- ✅ Category 1 (USER_ID default): Done
+- ✅ Category 2 (S3 bucket name): Closed (cosmetic, no action)
+- ✅ Category 3 (SES email defaults): Done
+- ✅ Category 5 (DDB keys): Already parameterized
+- ✅ Category 6 (Board config): Closed (shared is correct)
+- 🔴 Category 4 (S3 path prefixing): Pending — biggest change, needs migration decision
+- 🔴 Category 7 (CloudFront/web): Deferred
+- 🔴 Category 8 (Comments): Low priority
+
+---
+
 ## v3.2.3 — 2026-03-09: COST-2 MCP metrics + SIMP-2 Phase 1 weather migration + SIMP-2 closed
 
 ### COST-2: MCP Tool Usage Metrics (live)

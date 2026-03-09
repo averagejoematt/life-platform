@@ -39,14 +39,14 @@ logger.setLevel(logging.INFO)
 # ── Config (env vars with backwards-compatible defaults) ──
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
+USER_ID    = os.environ["USER_ID"]
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table    = dynamodb.Table(TABLE_NAME)
 s3       = boto3.client("s3", region_name=REGION)
 ses      = boto3.client("sesv2", region_name=REGION)
 
-S3_BUCKET  = os.environ.get("S3_BUCKET", "matthew-life-platform")
+S3_BUCKET  = os.environ["S3_BUCKET"]
 
 # Confirmation emails send FROM this address (root domain DKIM already verified)
 SENDER = "awsdev@mattsusername.com"

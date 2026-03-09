@@ -33,7 +33,7 @@ logger.setLevel(logging.INFO)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+S3_BUCKET = os.environ["S3_BUCKET"]
 SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/api-keys")
 
 TOKEN_URL = "https://api.dropboxapi.com/oauth2/token"
@@ -43,7 +43,7 @@ DELETE_URL = "https://api.dropboxapi.com/2/files/delete_v2"
 
 # ── Config (env vars with backwards-compatible defaults) ──
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
-USER_ID    = os.environ.get("USER_ID", "matthew")
+USER_ID    = os.environ["USER_ID"]
 
 PK_TRACKER = f"USER#{USER_ID}#SOURCE#dropbox_tracker"
 
