@@ -1,7 +1,8 @@
 # Life Platform — Architecture Review Methodology
 
 > Repeatable process for conducting comprehensive architecture reviews.
-> First review: 2026-03-08 (v2.91.0). Results: docs/REVIEW_2026-03-08.md
+> First review: 2026-03-08 (v2.91.0). Reviews stored in docs/reviews/.  
+> Tech Board: invoke as "tech board" or by name. 12 seats across Architecture, Security, Data, AI, Operations, Product, and FinOps.
 
 ---
 
