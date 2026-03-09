@@ -1,0 +1,21 @@
+{
+  "_comment": "CDK import map for LifePlatformCompute stack. Run: cdk synth LifePlatformCompute 2>&1 | grep 'importing' to verify logical IDs match after synth.",
+  "_verify_rules": "aws events list-rules --query 'Rules[*].Name' --output text | tr '\\t' '\\n' | sort",
+
+  "AnomalyDetector":              { "AWS::Lambda::Function": { "FunctionName": "anomaly-detector" } },
+  "CharacterSheetCompute":        { "AWS::Lambda::Function": { "FunctionName": "character-sheet-compute" } },
+  "DailyMetricsCompute":          { "AWS::Lambda::Function": { "FunctionName": "daily-metrics-compute" } },
+  "DailyInsightCompute":          { "AWS::Lambda::Function": { "FunctionName": "daily-insight-compute" } },
+  "AdaptiveModeCompute":          { "AWS::Lambda::Function": { "FunctionName": "adaptive-mode-compute" } },
+  "HypothesisEngine":             { "AWS::Lambda::Function": { "FunctionName": "hypothesis-engine" } },
+  "DashboardRefresh":             { "AWS::Lambda::Function": { "FunctionName": "dashboard-refresh" } },
+
+  "AnomalyDetectorSchedule":             { "AWS::Events::Rule": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/anomaly-detector-daily" } },
+  "CharacterSheetComputeSchedule":       { "AWS::Events::Rule": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/character-sheet-compute" } },
+  "DailyMetricsComputeSchedule":         { "AWS::Events::Rule": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/daily-metrics-compute" } },
+  "DailyInsightComputeSchedule":         { "AWS::Events::Rule": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/daily-insight-compute" } },
+  "AdaptiveModeComputeSchedule":         { "AWS::Events::Rule": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/adaptive-mode-compute" } },
+  "HypothesisEngineSchedule":            { "AWS::Events::Rule": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/hypothesis-engine-weekly" } },
+  "DashboardRefreshSchedule":            { "AWS::Events::Rule": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/dashboard-refresh-afternoon" } },
+  "DashboardRefreshEveningRule":         { "AWS::Events::Rule": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/dashboard-refresh-evening" } }
+}

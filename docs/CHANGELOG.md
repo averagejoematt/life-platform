@@ -1,5 +1,34 @@
 # Life Platform — Changelog
 
+## v3.2.9 — 2026-03-09: PROD-1 CDK ComputeStack + EmailStack written
+
+### PROD-1 CDK: ComputeStack (7 Lambdas)
+- `cdk/stacks/compute_stack.py` — 7 compute Lambdas:
+  - `anomaly-detector` (8:05 AM PT), `character-sheet-compute` (9:35), `daily-metrics-compute` (9:40)
+  - `daily-insight-compute` (9:45), `adaptive-mode-compute` (9:50), `hypothesis-engine` (Sun 11 AM)
+  - `dashboard-refresh` (2 PM + 6 PM PDT — 2 EventBridge rules)
+- `cdk/compute-import-map.json` — 7 Lambda + 8 EventBridge rule entries
+- Applies all IngestionStack patterns: `from_role_arn`, L1 DLQ escape hatch, local core resource refs
+
+### PROD-1 CDK: EmailStack (8 Lambdas)
+- `cdk/stacks/email_stack.py` — 8 email/digest Lambdas:
+  - `daily-brief` (10 AM), `weekly-digest` (Sun 8 AM), `monthly-digest` (1st Sun 8 AM)
+  - `nutrition-review` (Sat 9 AM), `wednesday-chronicle` (Wed 7 AM), `weekly-plate` (Fri 6 PM)
+  - `monday-compass` (Mon 7 AM), `brittany-weekly-email` (Sun 9:30 AM)
+- `cdk/email-import-map.json` — 8 Lambda + 8 EventBridge rule entries
+- NOTE: `weekly-digest` uses `digest_handler.lambda_handler` (not `lambda_function`) — marked in stack
+
+### app.py updated
+- Both stacks wired in; remaining 4 stacks still commented out
+
+### Role ARN notes (verify post-import with drift detection)
+- Some compute Lambdas (character-sheet, dashboard-refresh) used MCP role at deploy time
+- `anomaly-detector` used `lambda-weekly-digest-role` (pre-SEC-1 deploy)
+- SEC-1 created per-function roles for all email Lambdas — ARNs hardcoded in ROLE_ARNS dicts
+- `brittany-weekly-email` used `lambda-weekly-digest-role` at create time
+
+---
+
 ## v3.2.8 — 2026-03-09: PROD-1 CDK IngestionStack — import complete ✅
 
 ### PROD-1 CDK: IngestionStack imported into CloudFormation

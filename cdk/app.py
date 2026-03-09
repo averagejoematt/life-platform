@@ -26,9 +26,9 @@ import aws_cdk as cdk
 
 from stacks.core_stack import CoreStack
 from stacks.ingestion_stack import IngestionStack
+from stacks.compute_stack import ComputeStack
+from stacks.email_stack import EmailStack
 # Future stacks — uncomment as implemented:
-# from stacks.compute_stack import ComputeStack
-# from stacks.email_stack import EmailStack
 # from stacks.operational_stack import OperationalStack
 # from stacks.mcp_stack import McpStack
 # from stacks.web_stack import WebStack
@@ -54,11 +54,15 @@ ingestion = IngestionStack(app, "LifePlatformIngestion", env=env,
     alerts_topic=core.alerts_topic)
 # ingestion stack wired ✅
 #
-# compute = ComputeStack(app, "LifePlatformCompute", env=env,
-#     table=core.table, bucket=core.bucket)
+compute = ComputeStack(app, "LifePlatformCompute", env=env,
+    table=core.table, bucket=core.bucket, dlq=core.dlq,
+    alerts_topic=core.alerts_topic)
+# compute stack wired ✅
 #
-# email = EmailStack(app, "LifePlatformEmail", env=env,
-#     table=core.table, bucket=core.bucket, alerts_topic=core.alerts_topic)
+email = EmailStack(app, "LifePlatformEmail", env=env,
+    table=core.table, bucket=core.bucket, dlq=core.dlq,
+    alerts_topic=core.alerts_topic)
+# email stack wired ✅
 #
 # operational = OperationalStack(app, "LifePlatformOperational", env=env,
 #     table=core.table, bucket=core.bucket, dlq=core.dlq,
