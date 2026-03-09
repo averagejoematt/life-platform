@@ -1,6 +1,6 @@
 {
   "_comment": "Lambda source file → AWS function name mapping for CI/CD. Used by .github/workflows/ci-cd.yml",
-  "_updated": "2026-03-09 v3.2.0",
+  "_updated": "2026-03-09 v3.2.3",
 
   "lambdas": {
     "lambdas/strava_lambda.py":              { "function": "strava-data-ingestion" },
@@ -15,7 +15,7 @@
     "lambdas/apple_health_lambda.py":        { "function": "apple-health-ingestion" },
     "lambdas/health_auto_export_lambda.py":  { "function": "health-auto-export-webhook" },
     "lambdas/dropbox_poll_lambda.py":        { "function": "dropbox-poll" },
-    "lambdas/weather_lambda.py":             { "function": "weather-data-ingestion" },
+    "lambdas/weather_handler.py":             { "function": "weather-data-ingestion" },
     "lambdas/enrichment_lambda.py":          { "function": "activity-enrichment" },
     "lambdas/journal_enrichment_lambda.py":  { "function": "journal-enrichment" },
     "lambdas/daily_brief_lambda.py":         { "function": "daily-brief" },
@@ -65,7 +65,10 @@
       "lambdas/insight_writer.py",
       "lambdas/retry_utils.py",
       "lambdas/ai_output_validator.py",
-      "lambdas/platform_logger.py"
+      "lambdas/platform_logger.py",
+      "lambdas/ingestion_framework.py",
+      "lambdas/ingestion_validator.py",
+      "lambdas/item_size_guard.py"
     ],
     "consumers": [
       "daily-brief", "weekly-digest", "monthly-digest",

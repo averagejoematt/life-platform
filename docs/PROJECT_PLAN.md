@@ -535,7 +535,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 | # | Task | Priority | Effort | Model | Status |
 |---|------|----------|--------|-------|--------|
 | SIMP-1 | **Audit and archive low-usage MCP tools.** Usage metrics (30-day). Tools with 0 invocations flagged. Target: <100 active tools. | P2 | M (3-4 hr) | Sonnet | 🔴 |
-| SIMP-2 | **Consolidate ingestion Lambdas into shared framework.** `ingestion_framework.py` written. Design doc + example migrations. 10 of 13 Lambdas targeted. | P3 | L (8-12 hr) | **Opus** | ⚠️ Framework built, migration pending (3 sessions) |
+| SIMP-2 | **Consolidate ingestion Lambdas into shared framework.** `ingestion_framework.py` written. Weather Lambda migrated (POC validated). Migration stopped after technical review: 2 of 3 Phase 2 Lambdas (strava, garmin) architecturally incompatible with per-day callback pattern. Full migration ROI doesn't justify regression risk at current scale. **Decision: framework stays in Layer for future new Lambdas; existing Lambdas stay as-is.** | P3 | — | — | ✅ Closed (deliberate) |
 
 #### Epic: Productization Readiness
 
@@ -548,15 +548,15 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ **Done** | 29 | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,3; MAINT-1,2,3,4; DATA-1,2,3; AI-1,2,3,4 |
-| ⚠️ **In Progress** | 3 | SIMP-2 (framework built), PROD-1 (scaffolding done), PROD-2 (audit done) |
-| 🔴 **Open** | 3 | COST-2, SIMP-1 |
+| ✅ **Done** | 30 | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,2,3; MAINT-1,2,3,4; DATA-1,2,3; AI-1,2,3,4; SIMP-2 |
+| ⚠️ **In Progress** | 2 | PROD-1 (scaffolding done), PROD-2 (audit done) |
+| 🔴 **Open** | 1 | SIMP-1 (revisit ~2026-04-08 after 30 days of EMF usage data) |
 
-**Next hardening priorities:** COST-2 + SIMP-1 (MCP tool usage audit, natural combo, Sonnet).
+**Next hardening priorities:** PROD-2 implementation (Sonnet), then PROD-1 CDK sessions.
 
-**Model breakdown for remaining open:** Sonnet: COST-2, SIMP-1. Opus: SIMP-2, PROD-1, PROD-2.
+**SIMP-2 lessons learned:** Architectural recommendations were made without validating per-source API shapes upfront. Strava (range-based API) and Garmin (native deps) are incompatible with the per-day callback pattern. Future framework adoption: new Lambdas fitting the per-day poll pattern should use it; existing Lambdas stay as-is.
 
-**Large opus items scoped:** See `docs/SCOPING_LARGE_OPUS.md` for detailed design notes on MAINT-4, SIMP-2, PROD-1, PROD-2.
+**Large opus items remaining:** PROD-1 (CDK import sessions 2-6), PROD-2 (S3 path prefix refactor).
 
 ---
 
