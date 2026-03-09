@@ -36,7 +36,7 @@ _REGION    = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 SENDER     = os.environ["EMAIL_SENDER"]
 RECIPIENT  = os.environ.get("BRITTANY_EMAIL", "awsdev@mattsusername.com")
-ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/api-keys")
+ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table    = dynamodb.Table(TABLE_NAME)
