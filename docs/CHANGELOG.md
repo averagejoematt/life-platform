@@ -1,5 +1,25 @@
 # Life Platform — Changelog
 
+## v3.2.1 — 2026-03-09: MAINT-4 CI/CD pipeline
+
+### MAINT-4: GitHub Actions CI/CD ✅
+- `.github/workflows/ci-cd.yml` — full 4-job pipeline:
+  - **Lint:** flake8 on all Python in lambdas/ and mcp/ (fatal on syntax errors only)
+  - **Plan:** auto-detects changed files via `git diff`, maps to Lambda functions using `ci/lambda_map.json`
+  - **Deploy:** manual approval gate (GitHub Environment `production`), deploys changed Lambdas with 10s spacing, auto-rebuilds shared layer if shared modules changed, handles MCP server separately
+  - **Smoke test:** invokes qa-smoke + canary Lambdas post-deploy
+- `ci/lambda_map.json` — 38 Lambda source → function name mappings + shared layer config + MCP config
+- `.flake8` — project-wide lint config (max 140 chars, ignore E501/W503/E402 for Lambda/MCP files)
+- `deploy/setup_github_oidc.sh` — creates OIDC identity provider + `github-actions-deploy-role` IAM role (scoped to Lambda deploy + S3 read + CloudWatch read)
+- Native deps (garmin) auto-skipped with warning in CI
+
+### Manual steps required
+1. Run `bash deploy/setup_github_oidc.sh` to create IAM provider + role
+2. GitHub → Settings → Environments → create `production` with required reviewer
+3. First push to `main` with Lambda changes will trigger the pipeline
+
+---
+
 ## v3.2.0 — 2026-03-09: OBS-3 (SLOs) + AI-4 (hypothesis validation) + large opus scoping
 
 ### OBS-3: SLO Definitions ✅
