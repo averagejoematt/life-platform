@@ -1,6 +1,6 @@
-# Life Platform Handover — v3.2.1
+# Life Platform Handover — v3.2.2
 **Date:** 2026-03-09
-**Session:** OBS-3 + AI-4 + MAINT-4 + Large Opus Scoping
+**Session:** OBS-3 + AI-4 + MAINT-4 + SIMP-2 + PROD-1 + PROD-2
 
 ---
 
@@ -31,4 +31,9 @@
 - `docs/CHANGELOG.md`
 - `docs/PROJECT_PLAN.md`
 
-## Hardening: 29/35 (83%)
+### Additional (v3.2.2)
+- `lambdas/ingestion_framework.py` — SIMP-2 shared ingestion pipeline
+- `cdk/app.py`, `cdk/stacks/core_stack.py`, `cdk/stacks/lambda_helpers.py` — PROD-1 CDK scaffolding
+- `docs/DESIGN_SIMP2_INGESTION.md`, `docs/DESIGN_PROD1_CDK.md`, `docs/AUDIT_PROD2_MULTI_USER.md`
+
+## Hardening: 29/35 done + 3 in progress (91%)

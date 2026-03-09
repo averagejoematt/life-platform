@@ -1,5 +1,32 @@
 # Life Platform — Changelog
 
+## v3.2.2 — 2026-03-09: SIMP-2 framework + PROD-1 CDK scaffolding + PROD-2 audit
+
+### SIMP-2: Ingestion Framework (Session 1 — design + code)
+- `lambdas/ingestion_framework.py` — reusable ingestion pipeline:
+  - `IngestionConfig` class: source-specific config (auth, gap detection, S3 prefix, item size guard)
+  - `run_ingestion()`: full pipeline (secret load → auth → gap detect → fetch → transform → validate → store → archive)
+  - Handles DATA-2 validation, REL-3 size guard, OBS-1 logging, gap detection, OAuth writeback
+  - Source Lambdas become ~40-200 line handler files with 3 callbacks (authenticate, fetch, transform)
+- `docs/DESIGN_SIMP2_INGESTION.md` — full design doc with example migrations (weather, whoop, habitify), migration plan (4 phases), risk mitigation
+
+### PROD-1: CDK Infrastructure as Code (Session 1 — scaffolding)
+- `cdk/app.py` — 8-stack architecture (core, ingestion, compute, email, operational, mcp, web, monitoring)
+- `cdk/stacks/core_stack.py` — DynamoDB + S3 + SQS + SNS with import support for existing resources
+- `cdk/stacks/lambda_helpers.py` — `create_platform_lambda()` factory (IAM, DLQ, EventBridge, alarms in one call)
+- `cdk.json` — context config with all resource names and domains
+- `cdk/requirements.txt` — CDK Python deps
+- `docs/DESIGN_PROD1_CDK.md` — design doc with import strategy, risk mitigation, session breakdown
+
+### PROD-2: Multi-User Audit (Session 1 — audit complete)
+- `docs/AUDIT_PROD2_MULTI_USER.md` — comprehensive audit of all hardcoded single-user assumptions:
+  - 8 categories: env var defaults, S3 bucket name, SES email, S3 paths, DDB keys, Board config, CloudFront, docstrings
+  - Key finding: codebase is ~90% parameterized (USER_ID env var pattern is consistent)
+  - Remaining work: remove default fallbacks (30 min), move email to profile (2 hr), prefix S3 paths (4-6 hr)
+  - Priority-ordered migration plan
+
+---
+
 ## v3.2.1 — 2026-03-09: MAINT-4 CI/CD pipeline
 
 ### MAINT-4: GitHub Actions CI/CD ✅

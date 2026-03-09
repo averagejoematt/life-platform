@@ -1,7 +1,7 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-09 (v3.2.1 — 144 MCP tools, 39 Lambdas, 30 modules, 19 data sources, 8 secrets, ~47 alarms)
+> Last update: 2026-03-09 (v3.2.2 — 144 MCP tools, 39 Lambdas, 30 modules, 19 data sources, 8 secrets, ~47 alarms)
 
 ---
 
@@ -393,6 +393,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | Version | What | Date |
 |---------|------|------|
+| v3.2.2 | SIMP-2 ingestion framework (design + code), PROD-1 CDK scaffolding (8-stack arch + core stack + lambda helper), PROD-2 multi-user audit (8 categories, 90% already parameterized) | 2026-03-09 |
 | v3.2.1 | MAINT-4: GitHub Actions CI/CD pipeline (lint + plan + deploy + smoke test), OIDC auth, lambda_map.json, flake8 config | 2026-03-09 |
 | v3.2.0 | OBS-3 SLO definitions (4 alarms + freshness metrics + dashboard) + AI-4 hypothesis validation (v1.1.0: completeness, validation, hard expiry, stricter checks) + large opus scoping doc | 2026-03-09 |
 | v3.1.8 | SEC-4 API Gateway rate limiting + MAINT-3 stale zip cleanup (lambdas/ zip-free) | 2026-03-09 |
@@ -534,21 +535,22 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 | # | Task | Priority | Effort | Model | Status |
 |---|------|----------|--------|-------|--------|
 | SIMP-1 | **Audit and archive low-usage MCP tools.** Usage metrics (30-day). Tools with 0 invocations flagged. Target: <100 active tools. | P2 | M (3-4 hr) | Sonnet | 🔴 |
-| SIMP-2 | **Consolidate ingestion Lambdas into shared framework.** Common config loading, DDB writing, S3 archival, gap detection. Source-specific handler functions. | P3 | L (8-12 hr) | **Opus** | 🔴 |
+| SIMP-2 | **Consolidate ingestion Lambdas into shared framework.** `ingestion_framework.py` written. Design doc + example migrations. 10 of 13 Lambdas targeted. | P3 | L (8-12 hr) | **Opus** | ⚠️ Framework built, migration pending (3 sessions) |
 
 #### Epic: Productization Readiness
 
 | # | Task | Priority | Effort | Model | Status |
 |---|------|----------|--------|-------|--------|
-| PROD-1 | **Implement Infrastructure as Code (CDK/Terraform).** All AWS resources defined in code. `cdk deploy` recreates full environment. Bash scripts retired. | P2 (P0 if productizing) | L (16-24 hr) | **Opus** | 🔴 |
-| PROD-2 | **Remove hardcoded single-user assumptions.** USER_ID parameterized end-to-end. Multi-user DDB access patterns. Per-user config loading. | P3 | L (12-16 hr) | **Opus** | 🔴 |
+| PROD-1 | **Implement Infrastructure as Code (CDK).** `cdk/` scaffolding: 8-stack arch, core stack (DDB+S3+SQS+SNS), `create_platform_lambda()` helper. Import strategy documented. | P2 (P0 if productizing) | L (16-24 hr) | **Opus** | ⚠️ Scaffolding done, 5 sessions remaining |
+| PROD-2 | **Remove hardcoded single-user assumptions.** Audit complete (`AUDIT_PROD2_MULTI_USER.md`): 90% already parameterized. Remaining: remove defaults (30m), email to profile (2h), S3 path prefix (4-6h). | P3 | L (12-16 hr) | **Opus** | ⚠️ Audit done, 3 sessions implementation |
 
 #### Hardening Summary (updated post-Review #2, v3.1.3)
 
 | Status | Count | Items |
 |--------|-------|-------|
 | ✅ **Done** | 29 | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,3; MAINT-1,2,3,4; DATA-1,2,3; AI-1,2,3,4 |
-| 🔴 **Open** | 6 | COST-2, SIMP-1, SIMP-2, PROD-1, PROD-2 |
+| ⚠️ **In Progress** | 3 | SIMP-2 (framework built), PROD-1 (scaffolding done), PROD-2 (audit done) |
+| 🔴 **Open** | 3 | COST-2, SIMP-1 |
 
 **Next hardening priorities:** COST-2 + SIMP-1 (MCP tool usage audit, natural combo, Sonnet).
 
