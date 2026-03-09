@@ -1,89 +1,117 @@
-# Life Platform — Handover v3.2.6
-Date: 2026-03-09
-Session: PROD-2 Phase 2 — S3 path prefixing (raw/ + config/)
+# Handover — v3.2.7 — 2026-03-09
+
+## What was done this session
+
+### PROD-1 CDK IngestionStack — cdk synth PASSING ✅
+
+Written and validated `cdk/stacks/ingestion_stack.py` covering all 15 ingestion Lambdas:
+
+| # | Lambda | Trigger | Notes |
+|---|--------|---------|-------|
+| 1 | whoop-data-ingestion | cron(0 14) + cron(30 17) | 2 EventBridge rules |
+| 2 | garmin-data-ingestion | cron(0 14) | garth layer attached |
+| 3 | notion-journal-ingestion | cron(0 14) | |
+| 4 | withings-data-ingestion | cron(15 14) | OAuth token refresh |
+| 5 | habitify-data-ingestion | cron(15 14) | api-keys secret |
+| 6 | strava-data-ingestion | cron(30 14) | OAuth token refresh |
+| 7 | journal-enrichment | cron(30 14) | ai-keys secret |
+| 8 | todoist-data-ingestion | cron(45 14) | |
+| 9 | eightsleep-data-ingestion | cron(0 15) | |
+| 10 | activity-enrichment | cron(30 15) | ai-keys secret |
+| 11 | macrofactor-data-ingestion | cron(0 16) + S3* | S3 notification outside CDK |
+| 12 | weather-data-ingestion | cron(45 13) | no S3 write |
+| 13 | dropbox-poll | rate(30 minutes) | |
+| 14 | apple-health-ingestion | S3* | S3 notification outside CDK, 512MB |
+| 15 | health-auto-export-webhook | API GW* | no DLQ, 30s timeout, API GW outside CDK |
+
+*S3 notifications and API Gateway not imported into CDK — kept external to avoid cyclic deps.
+
+### Key bugs fixed during synth
+
+1. **ENAMETOOLONG** — `Code.from_asset(".")` from cdk/ dir bundled `.venv` recursively.
+   Fix: changed to `Code.from_asset("..")` (project root) with comprehensive excludes.
+
+2. **Cyclic dependency** — `bucket.grant_read_write(role)` / `table.grant_*` mutate CoreStack
+   resource policies with IngestionStack ARNs → `CoreStack → IngestionStack → CoreStack`.
+   Fix: replaced all `grant_*` with explicit `role.add_to_policy(PolicyStatement(...))`.
+
+3. **Deprecated API** — `pointInTimeRecovery=True` in core_stack.py.
+   Fix: replaced with `point_in_time_recovery_specification=CfnTable.PointInTimeRecoverySpecificationProperty(...)`.
+
+### New files
+- `cdk/stacks/ingestion_stack.py`
+- `cdk/cdk.json`
+
+### Modified files
+- `cdk/app.py` — IngestionStack wired in
+- `cdk/stacks/lambda_helpers.py` — asset path, excludes, grant→policy fix
+- `cdk/stacks/core_stack.py` — PITR deprecation fix
 
 ---
 
-## What Was Done This Session
+## Immediate next steps
 
-### OBS-1 Resume (carried over from previous session)
-- `bash deploy/deploy_obs1_resume.sh` — 9/9 remaining live Lambdas deployed ✅
-- OBS-1 complete for all existing infrastructure (3 un-deployed Lambdas pre-patched)
+### 1. cdk import LifePlatformIngestion (NEXT SESSION — don't rush)
+Run in a fresh session after reviewing the synth output carefully:
+```bash
+cd ~/Documents/Claude/life-platform/cdk
+source .venv/bin/activate
+npx cdk import LifePlatformIngestion
+```
+CDK will prompt for each Lambda's physical resource name. Get them with:
+```bash
+aws lambda list-functions --query 'Functions[?starts_with(FunctionName, `whoop`) || starts_with(FunctionName, `garmin`) || starts_with(FunctionName, `strava`)].FunctionName'
+# etc — or just type the names as prompted
+```
+Verify via CloudWatch after import — CDK import does NOT redeploy code.
 
-### PROD-2 Phase 2: S3 path prefixing
-**Scope:** raw/ and config/ paths only. dashboard/buddy excluded (no CloudFront risk, zero multi-user value now).
+⚠️ **Update GARTH_LAYER_ARN** in ingestion_stack.py before importing:
+```bash
+aws lambda list-layers --query 'Layers[?contains(LayerName, `garth`)].LatestMatchingVersion.LayerVersionArn'
+```
 
-**What changed:**
-- `deploy/patch_prod2_phase2.py` — patched 13 files (8 ingestion Lambdas + tools_cgm + board_loader + character_engine + tools_board + tools_character)
-- `deploy/migrate_s3_prod2_phase2.sh` — copied 16,022 raw/ objects → raw/matthew/, 3 config files → config/matthew/
-- `deploy/deploy_prod2_phase2.sh` — deployed 10 Lambdas (8 ingestion + character-sheet-compute + life-platform-mcp)
+### 2. Remaining PROD-1 CDK stacks (sessions 3–6)
+- compute_stack.py (5 Lambdas: character-sheet-compute, dashboard-refresh x2, etc.)
+- email_stack.py (7 Lambdas: daily-brief, weekly-digest, monthly-digest, etc.)
+- operational_stack.py (anomaly, freshness, canary, dlq-consumer, key-rotator, etc.)
+- mcp_stack.py (life-platform-mcp + Function URL)
+- monitoring_stack.py (35 alarms)
 
-**All raw/ writes now:** `raw/{USER_ID}/source/...`
-**All config/ reads now:** `config/{USER_ID}/file.json`
-**Old paths preserved** — safe to delete after 7+ days of verified operation
+### 3. Brittany weekly email (fully unblocked — no other dependencies)
 
-**⚠️ Manual follow-up still pending (2 items):**
-1. SES receipt rule: update S3 prefix from `raw/inbound_email/` → `raw/matthew/inbound_email/`
-2. Apple Health S3 event notification: update trigger prefix from `imports/apple_health/` (unchanged) — actually the apple-health Lambda trigger hasn't changed; but `insight-email-parser` S3 trigger needs updating from `raw/inbound_email/` → `raw/matthew/inbound_email/`
+### 4. PROD-2 manual follow-up (AWS console — not blocking)
+- SES receipt rule: update prefix → `raw/matthew/inbound_email/`
+- S3 event notification for insight-email-parser: update prefix → `raw/matthew/inbound_email/`
+
+### 5. Old S3 path cleanup (~2026-03-16 when safe)
+```bash
+aws s3 rm s3://matthew-life-platform/raw/ --recursive --exclude 'raw/matthew/*'
+# + delete config/board_of_directors.json, config/character_sheet.json, config/project_pillar_map.json
+```
 
 ---
 
-## Hardening Status
+## Platform state
+
+**Version:** v3.2.7
+**Hardening:** ~98% complete
 
 | Epic | Status |
 |------|--------|
 | SEC-1,2,3,5 | ✅ |
 | IAM-1,2 | ✅ |
 | REL-1,2,3,4 | ✅ |
-| OBS-1 | ✅ All live Lambdas |
-| OBS-2,3 | ✅ |
+| OBS-1,2,3 | ✅ |
 | COST-1,2,3 | ✅ |
 | MAINT-1,2,3,4 | ✅ |
 | DATA-1,2,3 | ✅ |
 | AI-1,2,3,4 | ✅ |
-| PROD-1 | ⚠️ Scaffolding done, CDK sessions 2-6 remain |
-| PROD-2 | ✅ Phase 1 (env var defaults) + Phase 2 (S3 paths) done. dashboard/buddy deferred. |
+| PROD-1 | ⚠️ IngestionStack synth ✅; import + 5 more stacks remain |
+| PROD-2 | ✅ Phase 1 + Phase 2 done |
 | SIMP-1 | 🔴 Revisit ~2026-04-08 |
 
-Overall: ~97-98% hardening complete. PROD-1 CDK is the only substantial open item.
-
----
-
-## Next Steps (Priority Order)
-
-| Priority | Item | Notes |
-|----------|------|-------|
-| 1 | **PROD-1 CDK IngestionStack** | Write IngestionStack + run cdk synth. Import later. |
-| 2 | **Brittany weekly email** | Fully unblocked |
-| 3 | **PROD-2 manual follow-up** | SES + insight-email-parser S3 trigger prefix update |
-| 4 | **Old S3 path cleanup** | After ~2026-03-16: delete raw/ (non-prefixed) + old config/*.json |
-| 5 | **Prompt Intelligence fixes (P1-P5)** | 2-3 sessions |
-| 6 | **Google Calendar integration** | 2 sessions |
-
----
-
-## PROD-1 CDK — Where We Left Off
-
-- `cdk/app.py` — 8-stack architecture defined, CoreStack wired, others commented out
-- `cdk/stacks/core_stack.py` — DynamoDB, S3, SQS DLQ, SNS (ready to `cdk import`)
-- `cdk/stacks/lambda_helpers.py` — `create_platform_lambda()` helper written
-- **Next session:** write `cdk/stacks/ingestion_stack.py` (13 Lambdas + IAM + EventBridge + alarms), run `cdk synth`, review CloudFormation diff. Do NOT run `cdk import` in the same session.
-
-## Key Files Changed This Session
-
-- `deploy/patch_prod2_phase2.py`
-- `deploy/migrate_s3_prod2_phase2.sh`
-- `deploy/deploy_prod2_phase2.sh`
-- `lambdas/health_auto_export_lambda.py` — 5 raw/ paths prefixed
-- `lambdas/whoop_lambda.py` — 4 raw/ paths prefixed
-- `lambdas/strava_lambda.py` — 1 raw/ path prefixed
-- `lambdas/garmin_lambda.py` — 1 raw/ path prefixed
-- `lambdas/macrofactor_lambda.py` — 1 raw/ path prefixed
-- `lambdas/apple_health_lambda.py` — 1 raw/ path prefixed
-- `lambdas/withings_lambda.py` — 1 raw/ path prefixed
-- `lambdas/eightsleep_lambda.py` — 1 raw/ path prefixed
-- `lambdas/board_loader.py` — user_id param added to load_board()
-- `lambdas/character_engine.py` — user_id param added to load_character_config()
-- `mcp/tools_cgm.py` — 3 raw/ read paths prefixed
-- `mcp/tools_board.py` — BOARD_S3_KEY dynamic
-- `mcp/tools_character.py` — S3_BUCKET + CS_CONFIG_KEY dynamic
+## CDK environment
+- Location: `~/Documents/Claude/life-platform/cdk/`
+- Activate venv: `source .venv/bin/activate`
+- Synth: `npx cdk synth LifePlatformIngestion`
+- Node v25 warning is harmless — CDK runs fine

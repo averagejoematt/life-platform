@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(aws dynamodb query \\\\\n  --table-name life-platform \\\\\n  --key-condition-expression \"pk = :pk AND sk BETWEEN :start AND :end\" \\\\\n  --expression-attribute-values '{\":pk\":{\"S\":\"USER#matthew#SOURCE#whoop\"},\":start\":{\"S\":\"DATE#2025\"},\":end\":{\"S\":\"DATE#2026-99\"}}' \\\\\n  --scan-index-forward false \\\\\n  --limit 1 \\\\\n  --region us-west-2 \\\\\n  --query \"Items[0].sk.S\" \\\\\n  --output text)",
+      "Bash(aws s3 ls s3://matthew-life-platform/raw/whoop/recovery/ --recursive --region us-west-2)"
+    ]
+  }
+}

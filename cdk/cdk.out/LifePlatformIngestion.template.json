@@ -1,0 +1,3826 @@
+{
+ "Resources": {
+  "WhoopIngestionRole9858872A": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "RoleName": "lambda-whoop-data-ingestion-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WhoopIngestionRole/Resource"
+   }
+  },
+  "WhoopIngestionRoleDefaultPolicy741BF725": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:PutObject"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:UpdateSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:secretsmanager:*:*:secret:life-platform/whoop-*"
+      },
+      {
+       "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:SendMessage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "WhoopIngestionRoleDefaultPolicy741BF725",
+    "Roles": [
+     {
+      "Ref": "WhoopIngestionRole9858872A"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WhoopIngestionRole/DefaultPolicy/Resource"
+   }
+  },
+  "WhoopIngestionD6FDC5D6": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-205930651321-us-west-2",
+     "S3Key": "bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c.zip"
+    },
+    "DeadLetterConfig": {
+     "TargetArn": {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+     }
+    },
+    "Environment": {
+     "Variables": {
+      "TABLE_NAME": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformTable553E6A63E3C3CA8C"
+      },
+      "S3_BUCKET": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformBucket2E39407C11B2C6AD"
+      },
+      "USER_ID": "matthew",
+      "AWS_REGION_OVERRIDE": "us-west-2"
+     }
+    },
+    "FunctionName": "whoop-data-ingestion",
+    "Handler": "whoop_lambda.lambda_handler",
+    "MemorySize": 256,
+    "Role": {
+     "Fn::GetAtt": [
+      "WhoopIngestionRole9858872A",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 300
+   },
+   "DependsOn": [
+    "WhoopIngestionRoleDefaultPolicy741BF725",
+    "WhoopIngestionRole9858872A"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WhoopIngestion/Resource",
+    "aws:asset:path": "asset.bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "WhoopIngestionScheduleC6CE3A05": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Name": "whoop-data-ingestion-schedule",
+    "ScheduleExpression": "cron(0 14 * * ? *)",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "WhoopIngestionD6FDC5D6",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WhoopIngestionSchedule/Resource"
+   }
+  },
+  "WhoopIngestionScheduleAllowEventRuleLifePlatformIngestionWhoopIngestion7F8CFEAF5906E008": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "WhoopIngestionD6FDC5D6",
+      "Arn"
+     ]
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "WhoopIngestionScheduleC6CE3A05",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WhoopIngestionSchedule/AllowEventRuleLifePlatformIngestionWhoopIngestion7F8CFEAF"
+   }
+  },
+  "WhoopIngestionErrorAlarm78651148": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "AlarmName": "ingestion-error-whoop-data-ingestion",
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "WhoopIngestionD6FDC5D6"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "OKActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "Period": 86400,
+    "Statistic": "Sum",
+    "Threshold": 1,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WhoopIngestionErrorAlarm/Resource"
+   }
+  },
+  "WhoopRecoveryRefreshRule281BB671": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Name": "whoop-recovery-refresh",
+    "ScheduleExpression": "cron(30 17 * * ? *)",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "WhoopIngestionD6FDC5D6",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WhoopRecoveryRefreshRule/Resource"
+   }
+  },
+  "WhoopRecoveryRefreshRuleAllowEventRuleLifePlatformIngestionWhoopIngestion7F8CFEAF5B90CA75": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "WhoopIngestionD6FDC5D6",
+      "Arn"
+     ]
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "WhoopRecoveryRefreshRule281BB671",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WhoopRecoveryRefreshRule/AllowEventRuleLifePlatformIngestionWhoopIngestion7F8CFEAF"
+   }
+  },
+  "GarminIngestionRole06EA51BF": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "RoleName": "lambda-garmin-data-ingestion-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/GarminIngestionRole/Resource"
+   }
+  },
+  "GarminIngestionRoleDefaultPolicyC5930449": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:PutObject"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:UpdateSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:secretsmanager:*:*:secret:life-platform/garmin-*"
+      },
+      {
+       "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:SendMessage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "GarminIngestionRoleDefaultPolicyC5930449",
+    "Roles": [
+     {
+      "Ref": "GarminIngestionRole06EA51BF"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/GarminIngestionRole/DefaultPolicy/Resource"
+   }
+  },
+  "GarminIngestion126FC48B": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-205930651321-us-west-2",
+     "S3Key": "bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c.zip"
+    },
+    "DeadLetterConfig": {
+     "TargetArn": {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+     }
+    },
+    "Environment": {
+     "Variables": {
+      "TABLE_NAME": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformTable553E6A63E3C3CA8C"
+      },
+      "S3_BUCKET": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformBucket2E39407C11B2C6AD"
+      },
+      "USER_ID": "matthew",
+      "AWS_REGION_OVERRIDE": "us-west-2"
+     }
+    },
+    "FunctionName": "garmin-data-ingestion",
+    "Handler": "garmin_lambda.lambda_handler",
+    "Layers": [
+     "arn:aws:lambda:us-west-2:205930651321:layer:garth:1"
+    ],
+    "MemorySize": 512,
+    "Role": {
+     "Fn::GetAtt": [
+      "GarminIngestionRole06EA51BF",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 300
+   },
+   "DependsOn": [
+    "GarminIngestionRoleDefaultPolicyC5930449",
+    "GarminIngestionRole06EA51BF"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/GarminIngestion/Resource",
+    "aws:asset:path": "asset.bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "GarminIngestionSchedule2C1A9C2A": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Name": "garmin-data-ingestion-schedule",
+    "ScheduleExpression": "cron(0 14 * * ? *)",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "GarminIngestion126FC48B",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/GarminIngestionSchedule/Resource"
+   }
+  },
+  "GarminIngestionScheduleAllowEventRuleLifePlatformIngestionGarminIngestion7AD0459ACAF85072": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "GarminIngestion126FC48B",
+      "Arn"
+     ]
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "GarminIngestionSchedule2C1A9C2A",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/GarminIngestionSchedule/AllowEventRuleLifePlatformIngestionGarminIngestion7AD0459A"
+   }
+  },
+  "GarminIngestionErrorAlarmC0C54E3E": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "AlarmName": "ingestion-error-garmin-data-ingestion",
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "GarminIngestion126FC48B"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "OKActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "Period": 86400,
+    "Statistic": "Sum",
+    "Threshold": 1,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/GarminIngestionErrorAlarm/Resource"
+   }
+  },
+  "NotionIngestionRoleEC80D4AB": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "RoleName": "lambda-notion-journal-ingestion-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/NotionIngestionRole/Resource"
+   }
+  },
+  "NotionIngestionRoleDefaultPolicyE48B15FC": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:PutObject"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:UpdateSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:secretsmanager:*:*:secret:life-platform/notion-*"
+      },
+      {
+       "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:SendMessage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "NotionIngestionRoleDefaultPolicyE48B15FC",
+    "Roles": [
+     {
+      "Ref": "NotionIngestionRoleEC80D4AB"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/NotionIngestionRole/DefaultPolicy/Resource"
+   }
+  },
+  "NotionIngestion8E43B738": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-205930651321-us-west-2",
+     "S3Key": "bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c.zip"
+    },
+    "DeadLetterConfig": {
+     "TargetArn": {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+     }
+    },
+    "Environment": {
+     "Variables": {
+      "TABLE_NAME": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformTable553E6A63E3C3CA8C"
+      },
+      "S3_BUCKET": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformBucket2E39407C11B2C6AD"
+      },
+      "USER_ID": "matthew",
+      "AWS_REGION_OVERRIDE": "us-west-2"
+     }
+    },
+    "FunctionName": "notion-journal-ingestion",
+    "Handler": "notion_lambda.lambda_handler",
+    "MemorySize": 256,
+    "Role": {
+     "Fn::GetAtt": [
+      "NotionIngestionRoleEC80D4AB",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 120
+   },
+   "DependsOn": [
+    "NotionIngestionRoleDefaultPolicyE48B15FC",
+    "NotionIngestionRoleEC80D4AB"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/NotionIngestion/Resource",
+    "aws:asset:path": "asset.bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "NotionIngestionSchedule9D1B07C8": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Name": "notion-journal-ingestion-schedule",
+    "ScheduleExpression": "cron(0 14 * * ? *)",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "NotionIngestion8E43B738",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/NotionIngestionSchedule/Resource"
+   }
+  },
+  "NotionIngestionScheduleAllowEventRuleLifePlatformIngestionNotionIngestion82FC078781575CC0": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "NotionIngestion8E43B738",
+      "Arn"
+     ]
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "NotionIngestionSchedule9D1B07C8",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/NotionIngestionSchedule/AllowEventRuleLifePlatformIngestionNotionIngestion82FC0787"
+   }
+  },
+  "NotionIngestionErrorAlarm16F2BC82": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "AlarmName": "ingestion-error-notion-journal-ingestion",
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "NotionIngestion8E43B738"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "OKActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "Period": 86400,
+    "Statistic": "Sum",
+    "Threshold": 1,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/NotionIngestionErrorAlarm/Resource"
+   }
+  },
+  "WithingsIngestionRoleB70CE60D": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "RoleName": "lambda-withings-data-ingestion-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WithingsIngestionRole/Resource"
+   }
+  },
+  "WithingsIngestionRoleDefaultPolicyEAEC05AD": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:PutObject"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:UpdateSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:secretsmanager:*:*:secret:life-platform/withings-*"
+      },
+      {
+       "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:SendMessage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "WithingsIngestionRoleDefaultPolicyEAEC05AD",
+    "Roles": [
+     {
+      "Ref": "WithingsIngestionRoleB70CE60D"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WithingsIngestionRole/DefaultPolicy/Resource"
+   }
+  },
+  "WithingsIngestion67318586": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-205930651321-us-west-2",
+     "S3Key": "bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c.zip"
+    },
+    "DeadLetterConfig": {
+     "TargetArn": {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+     }
+    },
+    "Environment": {
+     "Variables": {
+      "TABLE_NAME": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformTable553E6A63E3C3CA8C"
+      },
+      "S3_BUCKET": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformBucket2E39407C11B2C6AD"
+      },
+      "USER_ID": "matthew",
+      "AWS_REGION_OVERRIDE": "us-west-2"
+     }
+    },
+    "FunctionName": "withings-data-ingestion",
+    "Handler": "withings_lambda.lambda_handler",
+    "MemorySize": 256,
+    "Role": {
+     "Fn::GetAtt": [
+      "WithingsIngestionRoleB70CE60D",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 120
+   },
+   "DependsOn": [
+    "WithingsIngestionRoleDefaultPolicyEAEC05AD",
+    "WithingsIngestionRoleB70CE60D"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WithingsIngestion/Resource",
+    "aws:asset:path": "asset.bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "WithingsIngestionSchedule74DB837E": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Name": "withings-data-ingestion-schedule",
+    "ScheduleExpression": "cron(15 14 * * ? *)",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "WithingsIngestion67318586",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WithingsIngestionSchedule/Resource"
+   }
+  },
+  "WithingsIngestionScheduleAllowEventRuleLifePlatformIngestionWithingsIngestion4D0D0375719C01BE": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "WithingsIngestion67318586",
+      "Arn"
+     ]
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "WithingsIngestionSchedule74DB837E",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WithingsIngestionSchedule/AllowEventRuleLifePlatformIngestionWithingsIngestion4D0D0375"
+   }
+  },
+  "WithingsIngestionErrorAlarmA847AAA5": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "AlarmName": "ingestion-error-withings-data-ingestion",
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "WithingsIngestion67318586"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "OKActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "Period": 86400,
+    "Statistic": "Sum",
+    "Threshold": 1,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WithingsIngestionErrorAlarm/Resource"
+   }
+  },
+  "HabitifyIngestionRoleAE8D3697": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "RoleName": "lambda-habitify-data-ingestion-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/HabitifyIngestionRole/Resource"
+   }
+  },
+  "HabitifyIngestionRoleDefaultPolicy6D4214B1": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:PutObject"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:UpdateSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:secretsmanager:*:*:secret:life-platform/api-keys-*"
+      },
+      {
+       "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:SendMessage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "HabitifyIngestionRoleDefaultPolicy6D4214B1",
+    "Roles": [
+     {
+      "Ref": "HabitifyIngestionRoleAE8D3697"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/HabitifyIngestionRole/DefaultPolicy/Resource"
+   }
+  },
+  "HabitifyIngestion02E883C1": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-205930651321-us-west-2",
+     "S3Key": "bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c.zip"
+    },
+    "DeadLetterConfig": {
+     "TargetArn": {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+     }
+    },
+    "Environment": {
+     "Variables": {
+      "TABLE_NAME": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformTable553E6A63E3C3CA8C"
+      },
+      "S3_BUCKET": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformBucket2E39407C11B2C6AD"
+      },
+      "USER_ID": "matthew",
+      "AWS_REGION_OVERRIDE": "us-west-2"
+     }
+    },
+    "FunctionName": "habitify-data-ingestion",
+    "Handler": "habitify_lambda.lambda_handler",
+    "MemorySize": 256,
+    "Role": {
+     "Fn::GetAtt": [
+      "HabitifyIngestionRoleAE8D3697",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 180
+   },
+   "DependsOn": [
+    "HabitifyIngestionRoleDefaultPolicy6D4214B1",
+    "HabitifyIngestionRoleAE8D3697"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/HabitifyIngestion/Resource",
+    "aws:asset:path": "asset.bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "HabitifyIngestionSchedule8F584948": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Name": "habitify-data-ingestion-schedule",
+    "ScheduleExpression": "cron(15 14 * * ? *)",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "HabitifyIngestion02E883C1",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/HabitifyIngestionSchedule/Resource"
+   }
+  },
+  "HabitifyIngestionScheduleAllowEventRuleLifePlatformIngestionHabitifyIngestion23F33408A8EB9C7D": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "HabitifyIngestion02E883C1",
+      "Arn"
+     ]
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "HabitifyIngestionSchedule8F584948",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/HabitifyIngestionSchedule/AllowEventRuleLifePlatformIngestionHabitifyIngestion23F33408"
+   }
+  },
+  "HabitifyIngestionErrorAlarmF7823158": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "AlarmName": "ingestion-error-habitify-data-ingestion",
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "HabitifyIngestion02E883C1"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "OKActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "Period": 86400,
+    "Statistic": "Sum",
+    "Threshold": 1,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/HabitifyIngestionErrorAlarm/Resource"
+   }
+  },
+  "StravaIngestionRole12EAC95C": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "RoleName": "lambda-strava-data-ingestion-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/StravaIngestionRole/Resource"
+   }
+  },
+  "StravaIngestionRoleDefaultPolicyF81AABB5": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:PutObject"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:UpdateSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:secretsmanager:*:*:secret:life-platform/strava-*"
+      },
+      {
+       "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:SendMessage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "StravaIngestionRoleDefaultPolicyF81AABB5",
+    "Roles": [
+     {
+      "Ref": "StravaIngestionRole12EAC95C"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/StravaIngestionRole/DefaultPolicy/Resource"
+   }
+  },
+  "StravaIngestionE2403B98": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-205930651321-us-west-2",
+     "S3Key": "bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c.zip"
+    },
+    "DeadLetterConfig": {
+     "TargetArn": {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+     }
+    },
+    "Environment": {
+     "Variables": {
+      "TABLE_NAME": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformTable553E6A63E3C3CA8C"
+      },
+      "S3_BUCKET": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformBucket2E39407C11B2C6AD"
+      },
+      "USER_ID": "matthew",
+      "AWS_REGION_OVERRIDE": "us-west-2"
+     }
+    },
+    "FunctionName": "strava-data-ingestion",
+    "Handler": "strava_lambda.lambda_handler",
+    "MemorySize": 256,
+    "Role": {
+     "Fn::GetAtt": [
+      "StravaIngestionRole12EAC95C",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 300
+   },
+   "DependsOn": [
+    "StravaIngestionRoleDefaultPolicyF81AABB5",
+    "StravaIngestionRole12EAC95C"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/StravaIngestion/Resource",
+    "aws:asset:path": "asset.bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "StravaIngestionScheduleF947F9E3": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Name": "strava-data-ingestion-schedule",
+    "ScheduleExpression": "cron(30 14 * * ? *)",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "StravaIngestionE2403B98",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/StravaIngestionSchedule/Resource"
+   }
+  },
+  "StravaIngestionScheduleAllowEventRuleLifePlatformIngestionStravaIngestion56189259F58A546F": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "StravaIngestionE2403B98",
+      "Arn"
+     ]
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "StravaIngestionScheduleF947F9E3",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/StravaIngestionSchedule/AllowEventRuleLifePlatformIngestionStravaIngestion56189259"
+   }
+  },
+  "StravaIngestionErrorAlarmF92217A1": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "AlarmName": "ingestion-error-strava-data-ingestion",
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "StravaIngestionE2403B98"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "OKActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "Period": 86400,
+    "Statistic": "Sum",
+    "Threshold": 1,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/StravaIngestionErrorAlarm/Resource"
+   }
+  },
+  "JournalEnrichmentRoleDD3A1D34": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "RoleName": "lambda-journal-enrichment-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/JournalEnrichmentRole/Resource"
+   }
+  },
+  "JournalEnrichmentRoleDefaultPolicyDB5F614A": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:PutObject"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:UpdateSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:secretsmanager:*:*:secret:life-platform/ai-keys-*"
+      },
+      {
+       "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:SendMessage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "JournalEnrichmentRoleDefaultPolicyDB5F614A",
+    "Roles": [
+     {
+      "Ref": "JournalEnrichmentRoleDD3A1D34"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/JournalEnrichmentRole/DefaultPolicy/Resource"
+   }
+  },
+  "JournalEnrichment5AE9BDF1": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-205930651321-us-west-2",
+     "S3Key": "bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c.zip"
+    },
+    "DeadLetterConfig": {
+     "TargetArn": {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+     }
+    },
+    "Environment": {
+     "Variables": {
+      "TABLE_NAME": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformTable553E6A63E3C3CA8C"
+      },
+      "S3_BUCKET": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformBucket2E39407C11B2C6AD"
+      },
+      "USER_ID": "matthew",
+      "AWS_REGION_OVERRIDE": "us-west-2"
+     }
+    },
+    "FunctionName": "journal-enrichment",
+    "Handler": "journal_enrichment_lambda.lambda_handler",
+    "MemorySize": 256,
+    "Role": {
+     "Fn::GetAtt": [
+      "JournalEnrichmentRoleDD3A1D34",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 300
+   },
+   "DependsOn": [
+    "JournalEnrichmentRoleDefaultPolicyDB5F614A",
+    "JournalEnrichmentRoleDD3A1D34"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/JournalEnrichment/Resource",
+    "aws:asset:path": "asset.bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "JournalEnrichmentSchedule841C3B7F": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Name": "journal-enrichment-schedule",
+    "ScheduleExpression": "cron(30 14 * * ? *)",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "JournalEnrichment5AE9BDF1",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/JournalEnrichmentSchedule/Resource"
+   }
+  },
+  "JournalEnrichmentScheduleAllowEventRuleLifePlatformIngestionJournalEnrichmentD3156D948E757A82": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "JournalEnrichment5AE9BDF1",
+      "Arn"
+     ]
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "JournalEnrichmentSchedule841C3B7F",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/JournalEnrichmentSchedule/AllowEventRuleLifePlatformIngestionJournalEnrichmentD3156D94"
+   }
+  },
+  "JournalEnrichmentErrorAlarm71004908": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "AlarmName": "ingestion-error-journal-enrichment",
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "JournalEnrichment5AE9BDF1"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "OKActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "Period": 86400,
+    "Statistic": "Sum",
+    "Threshold": 1,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/JournalEnrichmentErrorAlarm/Resource"
+   }
+  },
+  "TodoistIngestionRole542F9A6C": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "RoleName": "lambda-todoist-data-ingestion-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/TodoistIngestionRole/Resource"
+   }
+  },
+  "TodoistIngestionRoleDefaultPolicy343C162F": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:PutObject"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:UpdateSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:secretsmanager:*:*:secret:life-platform/todoist-*"
+      },
+      {
+       "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:SendMessage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "TodoistIngestionRoleDefaultPolicy343C162F",
+    "Roles": [
+     {
+      "Ref": "TodoistIngestionRole542F9A6C"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/TodoistIngestionRole/DefaultPolicy/Resource"
+   }
+  },
+  "TodoistIngestion225C965F": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-205930651321-us-west-2",
+     "S3Key": "bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c.zip"
+    },
+    "DeadLetterConfig": {
+     "TargetArn": {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+     }
+    },
+    "Environment": {
+     "Variables": {
+      "TABLE_NAME": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformTable553E6A63E3C3CA8C"
+      },
+      "S3_BUCKET": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformBucket2E39407C11B2C6AD"
+      },
+      "USER_ID": "matthew",
+      "AWS_REGION_OVERRIDE": "us-west-2"
+     }
+    },
+    "FunctionName": "todoist-data-ingestion",
+    "Handler": "todoist_lambda.lambda_handler",
+    "MemorySize": 256,
+    "Role": {
+     "Fn::GetAtt": [
+      "TodoistIngestionRole542F9A6C",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 120
+   },
+   "DependsOn": [
+    "TodoistIngestionRoleDefaultPolicy343C162F",
+    "TodoistIngestionRole542F9A6C"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/TodoistIngestion/Resource",
+    "aws:asset:path": "asset.bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "TodoistIngestionSchedule03D61CE6": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Name": "todoist-data-ingestion-schedule",
+    "ScheduleExpression": "cron(45 14 * * ? *)",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "TodoistIngestion225C965F",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/TodoistIngestionSchedule/Resource"
+   }
+  },
+  "TodoistIngestionScheduleAllowEventRuleLifePlatformIngestionTodoistIngestionB86B450010F85E3F": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "TodoistIngestion225C965F",
+      "Arn"
+     ]
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "TodoistIngestionSchedule03D61CE6",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/TodoistIngestionSchedule/AllowEventRuleLifePlatformIngestionTodoistIngestionB86B4500"
+   }
+  },
+  "TodoistIngestionErrorAlarmFDE34DB7": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "AlarmName": "ingestion-error-todoist-data-ingestion",
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "TodoistIngestion225C965F"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "OKActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "Period": 86400,
+    "Statistic": "Sum",
+    "Threshold": 1,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/TodoistIngestionErrorAlarm/Resource"
+   }
+  },
+  "EightsleepIngestionRole7BEC0EA2": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "RoleName": "lambda-eightsleep-data-ingestion-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/EightsleepIngestionRole/Resource"
+   }
+  },
+  "EightsleepIngestionRoleDefaultPolicy51E8A427": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:PutObject"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:UpdateSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:secretsmanager:*:*:secret:life-platform/eightsleep-*"
+      },
+      {
+       "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:SendMessage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "EightsleepIngestionRoleDefaultPolicy51E8A427",
+    "Roles": [
+     {
+      "Ref": "EightsleepIngestionRole7BEC0EA2"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/EightsleepIngestionRole/DefaultPolicy/Resource"
+   }
+  },
+  "EightsleepIngestion9D34BD0C": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-205930651321-us-west-2",
+     "S3Key": "bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c.zip"
+    },
+    "DeadLetterConfig": {
+     "TargetArn": {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+     }
+    },
+    "Environment": {
+     "Variables": {
+      "TABLE_NAME": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformTable553E6A63E3C3CA8C"
+      },
+      "S3_BUCKET": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformBucket2E39407C11B2C6AD"
+      },
+      "USER_ID": "matthew",
+      "AWS_REGION_OVERRIDE": "us-west-2"
+     }
+    },
+    "FunctionName": "eightsleep-data-ingestion",
+    "Handler": "eightsleep_lambda.lambda_handler",
+    "MemorySize": 256,
+    "Role": {
+     "Fn::GetAtt": [
+      "EightsleepIngestionRole7BEC0EA2",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 120
+   },
+   "DependsOn": [
+    "EightsleepIngestionRoleDefaultPolicy51E8A427",
+    "EightsleepIngestionRole7BEC0EA2"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/EightsleepIngestion/Resource",
+    "aws:asset:path": "asset.bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "EightsleepIngestionSchedule649DFC98": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Name": "eightsleep-data-ingestion-schedule",
+    "ScheduleExpression": "cron(0 15 * * ? *)",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "EightsleepIngestion9D34BD0C",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/EightsleepIngestionSchedule/Resource"
+   }
+  },
+  "EightsleepIngestionScheduleAllowEventRuleLifePlatformIngestionEightsleepIngestion77C04747F00813BE": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "EightsleepIngestion9D34BD0C",
+      "Arn"
+     ]
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "EightsleepIngestionSchedule649DFC98",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/EightsleepIngestionSchedule/AllowEventRuleLifePlatformIngestionEightsleepIngestion77C04747"
+   }
+  },
+  "EightsleepIngestionErrorAlarm3BD58B6F": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "AlarmName": "ingestion-error-eightsleep-data-ingestion",
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "EightsleepIngestion9D34BD0C"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "OKActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "Period": 86400,
+    "Statistic": "Sum",
+    "Threshold": 1,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/EightsleepIngestionErrorAlarm/Resource"
+   }
+  },
+  "ActivityEnrichmentRole1FC74F68": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "RoleName": "lambda-activity-enrichment-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/ActivityEnrichmentRole/Resource"
+   }
+  },
+  "ActivityEnrichmentRoleDefaultPolicy606253B2": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:PutObject"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:UpdateSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:secretsmanager:*:*:secret:life-platform/ai-keys-*"
+      },
+      {
+       "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:SendMessage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "ActivityEnrichmentRoleDefaultPolicy606253B2",
+    "Roles": [
+     {
+      "Ref": "ActivityEnrichmentRole1FC74F68"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/ActivityEnrichmentRole/DefaultPolicy/Resource"
+   }
+  },
+  "ActivityEnrichment0B596AF0": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-205930651321-us-west-2",
+     "S3Key": "bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c.zip"
+    },
+    "DeadLetterConfig": {
+     "TargetArn": {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+     }
+    },
+    "Environment": {
+     "Variables": {
+      "TABLE_NAME": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformTable553E6A63E3C3CA8C"
+      },
+      "S3_BUCKET": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformBucket2E39407C11B2C6AD"
+      },
+      "USER_ID": "matthew",
+      "AWS_REGION_OVERRIDE": "us-west-2"
+     }
+    },
+    "FunctionName": "activity-enrichment",
+    "Handler": "enrichment_lambda.lambda_handler",
+    "MemorySize": 256,
+    "Role": {
+     "Fn::GetAtt": [
+      "ActivityEnrichmentRole1FC74F68",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 300
+   },
+   "DependsOn": [
+    "ActivityEnrichmentRoleDefaultPolicy606253B2",
+    "ActivityEnrichmentRole1FC74F68"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/ActivityEnrichment/Resource",
+    "aws:asset:path": "asset.bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "ActivityEnrichmentScheduleF84A34C0": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Name": "activity-enrichment-schedule",
+    "ScheduleExpression": "cron(30 15 * * ? *)",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "ActivityEnrichment0B596AF0",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/ActivityEnrichmentSchedule/Resource"
+   }
+  },
+  "ActivityEnrichmentScheduleAllowEventRuleLifePlatformIngestionActivityEnrichment89E3A5F04C45DDD5": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "ActivityEnrichment0B596AF0",
+      "Arn"
+     ]
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "ActivityEnrichmentScheduleF84A34C0",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/ActivityEnrichmentSchedule/AllowEventRuleLifePlatformIngestionActivityEnrichment89E3A5F0"
+   }
+  },
+  "ActivityEnrichmentErrorAlarmB074BBCE": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "AlarmName": "ingestion-error-activity-enrichment",
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "ActivityEnrichment0B596AF0"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "OKActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "Period": 86400,
+    "Statistic": "Sum",
+    "Threshold": 1,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/ActivityEnrichmentErrorAlarm/Resource"
+   }
+  },
+  "MacrofactorIngestionRoleDEB93CE6": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "RoleName": "lambda-macrofactor-data-ingestion-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/MacrofactorIngestionRole/Resource"
+   }
+  },
+  "MacrofactorIngestionRoleDefaultPolicy1BCBEBD6": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:PutObject"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:SendMessage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "MacrofactorIngestionRoleDefaultPolicy1BCBEBD6",
+    "Roles": [
+     {
+      "Ref": "MacrofactorIngestionRoleDEB93CE6"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/MacrofactorIngestionRole/DefaultPolicy/Resource"
+   }
+  },
+  "MacrofactorIngestionD890FA59": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-205930651321-us-west-2",
+     "S3Key": "bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c.zip"
+    },
+    "DeadLetterConfig": {
+     "TargetArn": {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+     }
+    },
+    "Environment": {
+     "Variables": {
+      "TABLE_NAME": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformTable553E6A63E3C3CA8C"
+      },
+      "S3_BUCKET": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformBucket2E39407C11B2C6AD"
+      },
+      "USER_ID": "matthew",
+      "AWS_REGION_OVERRIDE": "us-west-2"
+     }
+    },
+    "FunctionName": "macrofactor-data-ingestion",
+    "Handler": "macrofactor_lambda.lambda_handler",
+    "MemorySize": 256,
+    "Role": {
+     "Fn::GetAtt": [
+      "MacrofactorIngestionRoleDEB93CE6",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 300
+   },
+   "DependsOn": [
+    "MacrofactorIngestionRoleDefaultPolicy1BCBEBD6",
+    "MacrofactorIngestionRoleDEB93CE6"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/MacrofactorIngestion/Resource",
+    "aws:asset:path": "asset.bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "MacrofactorIngestionS3InvokeMacrofactor3110E118": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "MacrofactorIngestionD890FA59",
+      "Arn"
+     ]
+    },
+    "Principal": "s3.amazonaws.com",
+    "SourceArn": "arn:aws:s3:::matthew-life-platform"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/MacrofactorIngestion/S3InvokeMacrofactor"
+   }
+  },
+  "MacrofactorIngestionSchedule535CDEC4": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Name": "macrofactor-data-ingestion-schedule",
+    "ScheduleExpression": "cron(0 16 * * ? *)",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "MacrofactorIngestionD890FA59",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/MacrofactorIngestionSchedule/Resource"
+   }
+  },
+  "MacrofactorIngestionScheduleAllowEventRuleLifePlatformIngestionMacrofactorIngestion44B29708802B5D1B": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "MacrofactorIngestionD890FA59",
+      "Arn"
+     ]
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "MacrofactorIngestionSchedule535CDEC4",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/MacrofactorIngestionSchedule/AllowEventRuleLifePlatformIngestionMacrofactorIngestion44B29708"
+   }
+  },
+  "MacrofactorIngestionErrorAlarm55570E34": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "AlarmName": "ingestion-error-macrofactor-data-ingestion",
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "MacrofactorIngestionD890FA59"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "OKActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "Period": 86400,
+    "Statistic": "Sum",
+    "Threshold": 1,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/MacrofactorIngestionErrorAlarm/Resource"
+   }
+  },
+  "WeatherIngestionRoleFAC156F8": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "RoleName": "lambda-weather-data-ingestion-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WeatherIngestionRole/Resource"
+   }
+  },
+  "WeatherIngestionRoleDefaultPolicy7669C798": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:GetObject",
+        "s3:ListBucket"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:SendMessage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "WeatherIngestionRoleDefaultPolicy7669C798",
+    "Roles": [
+     {
+      "Ref": "WeatherIngestionRoleFAC156F8"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WeatherIngestionRole/DefaultPolicy/Resource"
+   }
+  },
+  "WeatherIngestion96665D37": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-205930651321-us-west-2",
+     "S3Key": "bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c.zip"
+    },
+    "DeadLetterConfig": {
+     "TargetArn": {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+     }
+    },
+    "Environment": {
+     "Variables": {
+      "TABLE_NAME": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformTable553E6A63E3C3CA8C"
+      },
+      "S3_BUCKET": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformBucket2E39407C11B2C6AD"
+      },
+      "USER_ID": "matthew",
+      "AWS_REGION_OVERRIDE": "us-west-2"
+     }
+    },
+    "FunctionName": "weather-data-ingestion",
+    "Handler": "weather_handler.lambda_handler",
+    "MemorySize": 256,
+    "Role": {
+     "Fn::GetAtt": [
+      "WeatherIngestionRoleFAC156F8",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 60
+   },
+   "DependsOn": [
+    "WeatherIngestionRoleDefaultPolicy7669C798",
+    "WeatherIngestionRoleFAC156F8"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WeatherIngestion/Resource",
+    "aws:asset:path": "asset.bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "WeatherIngestionScheduleC0A61643": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Name": "weather-data-ingestion-schedule",
+    "ScheduleExpression": "cron(45 13 * * ? *)",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "WeatherIngestion96665D37",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WeatherIngestionSchedule/Resource"
+   }
+  },
+  "WeatherIngestionScheduleAllowEventRuleLifePlatformIngestionWeatherIngestion88C4E89B7A749CBB": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "WeatherIngestion96665D37",
+      "Arn"
+     ]
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "WeatherIngestionScheduleC0A61643",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WeatherIngestionSchedule/AllowEventRuleLifePlatformIngestionWeatherIngestion88C4E89B"
+   }
+  },
+  "WeatherIngestionErrorAlarm6064F77E": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "AlarmName": "ingestion-error-weather-data-ingestion",
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "WeatherIngestion96665D37"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "OKActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "Period": 86400,
+    "Statistic": "Sum",
+    "Threshold": 1,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/WeatherIngestionErrorAlarm/Resource"
+   }
+  },
+  "DropboxPollRole4EB89EB0": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "RoleName": "lambda-dropbox-poll-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/DropboxPollRole/Resource"
+   }
+  },
+  "DropboxPollRoleDefaultPolicy72D60302": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:PutObject"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:UpdateSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:secretsmanager:*:*:secret:life-platform/dropbox-*"
+      },
+      {
+       "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:SendMessage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "DropboxPollRoleDefaultPolicy72D60302",
+    "Roles": [
+     {
+      "Ref": "DropboxPollRole4EB89EB0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/DropboxPollRole/DefaultPolicy/Resource"
+   }
+  },
+  "DropboxPollECC96D67": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-205930651321-us-west-2",
+     "S3Key": "bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c.zip"
+    },
+    "DeadLetterConfig": {
+     "TargetArn": {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+     }
+    },
+    "Environment": {
+     "Variables": {
+      "TABLE_NAME": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformTable553E6A63E3C3CA8C"
+      },
+      "S3_BUCKET": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformBucket2E39407C11B2C6AD"
+      },
+      "USER_ID": "matthew",
+      "AWS_REGION_OVERRIDE": "us-west-2"
+     }
+    },
+    "FunctionName": "dropbox-poll",
+    "Handler": "dropbox_poll_lambda.lambda_handler",
+    "MemorySize": 256,
+    "Role": {
+     "Fn::GetAtt": [
+      "DropboxPollRole4EB89EB0",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 120
+   },
+   "DependsOn": [
+    "DropboxPollRoleDefaultPolicy72D60302",
+    "DropboxPollRole4EB89EB0"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/DropboxPoll/Resource",
+    "aws:asset:path": "asset.bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "DropboxPollScheduleEF37156F": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Name": "dropbox-poll-schedule",
+    "ScheduleExpression": "rate(30 minutes)",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "DropboxPollECC96D67",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/DropboxPollSchedule/Resource"
+   }
+  },
+  "DropboxPollScheduleAllowEventRuleLifePlatformIngestionDropboxPoll4DCFD0BD25C1116D": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DropboxPollECC96D67",
+      "Arn"
+     ]
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "DropboxPollScheduleEF37156F",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/DropboxPollSchedule/AllowEventRuleLifePlatformIngestionDropboxPoll4DCFD0BD"
+   }
+  },
+  "DropboxPollErrorAlarmDCF51780": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "AlarmName": "ingestion-error-dropbox-poll",
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "DropboxPollECC96D67"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "OKActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "Period": 86400,
+    "Statistic": "Sum",
+    "Threshold": 1,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/DropboxPollErrorAlarm/Resource"
+   }
+  },
+  "AppleHealthIngestionRoleDADD8295": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "RoleName": "lambda-apple-health-ingestion-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/AppleHealthIngestionRole/Resource"
+   }
+  },
+  "AppleHealthIngestionRoleDefaultPolicy2193A765": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:PutObject"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:SendMessage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "AppleHealthIngestionRoleDefaultPolicy2193A765",
+    "Roles": [
+     {
+      "Ref": "AppleHealthIngestionRoleDADD8295"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/AppleHealthIngestionRole/DefaultPolicy/Resource"
+   }
+  },
+  "AppleHealthIngestionF6DB2080": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-205930651321-us-west-2",
+     "S3Key": "bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c.zip"
+    },
+    "DeadLetterConfig": {
+     "TargetArn": {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttIngestionDLQF0F102AEArn2B17A628"
+     }
+    },
+    "Environment": {
+     "Variables": {
+      "TABLE_NAME": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformTable553E6A63E3C3CA8C"
+      },
+      "S3_BUCKET": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformBucket2E39407C11B2C6AD"
+      },
+      "USER_ID": "matthew",
+      "AWS_REGION_OVERRIDE": "us-west-2"
+     }
+    },
+    "FunctionName": "apple-health-ingestion",
+    "Handler": "apple_health_lambda.lambda_handler",
+    "MemorySize": 512,
+    "Role": {
+     "Fn::GetAtt": [
+      "AppleHealthIngestionRoleDADD8295",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 300
+   },
+   "DependsOn": [
+    "AppleHealthIngestionRoleDefaultPolicy2193A765",
+    "AppleHealthIngestionRoleDADD8295"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/AppleHealthIngestion/Resource",
+    "aws:asset:path": "asset.bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "AppleHealthIngestionS3InvokeAppleHealthD486DE16": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "AppleHealthIngestionF6DB2080",
+      "Arn"
+     ]
+    },
+    "Principal": "s3.amazonaws.com",
+    "SourceArn": "arn:aws:s3:::matthew-life-platform"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/AppleHealthIngestion/S3InvokeAppleHealth"
+   }
+  },
+  "AppleHealthIngestionErrorAlarm2E393F29": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "AlarmName": "ingestion-error-apple-health-ingestion",
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "AppleHealthIngestionF6DB2080"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "OKActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "Period": 86400,
+    "Statistic": "Sum",
+    "Threshold": 1,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/AppleHealthIngestionErrorAlarm/Resource"
+   }
+  },
+  "HaeWebhookRoleEACEDB40": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "RoleName": "lambda-health-auto-export-webhook-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/HaeWebhookRole/Resource"
+   }
+  },
+  "HaeWebhookRoleDefaultPolicy990C5E80": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformTable553E6A63Arn3D4A5AC2"
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:PutObject"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LifePlatformCore:ExportsOutputFnGetAttLifePlatformBucket2E39407CArnABF36F7C"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "secretsmanager:GetSecretValue",
+       "Effect": "Allow",
+       "Resource": "arn:aws:secretsmanager:*:*:secret:life-platform/api-keys-*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "HaeWebhookRoleDefaultPolicy990C5E80",
+    "Roles": [
+     {
+      "Ref": "HaeWebhookRoleEACEDB40"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/HaeWebhookRole/DefaultPolicy/Resource"
+   }
+  },
+  "HaeWebhookCCBE7326": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-205930651321-us-west-2",
+     "S3Key": "bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c.zip"
+    },
+    "Environment": {
+     "Variables": {
+      "TABLE_NAME": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformTable553E6A63E3C3CA8C"
+      },
+      "S3_BUCKET": {
+       "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefLifePlatformBucket2E39407C11B2C6AD"
+      },
+      "USER_ID": "matthew"
+     }
+    },
+    "FunctionName": "health-auto-export-webhook",
+    "Handler": "health_auto_export_lambda.lambda_handler",
+    "MemorySize": 256,
+    "Role": {
+     "Fn::GetAtt": [
+      "HaeWebhookRoleEACEDB40",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 30
+   },
+   "DependsOn": [
+    "HaeWebhookRoleDefaultPolicy990C5E80",
+    "HaeWebhookRoleEACEDB40"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/HaeWebhook/Resource",
+    "aws:asset:path": "asset.bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "HaeWebhookApiGatewayInvoke17C30874": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "HaeWebhookCCBE7326",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": "arn:aws:execute-api:us-west-2:205930651321:a76xwxt2wa/*/*/ingest"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/HaeWebhook/ApiGatewayInvoke"
+   }
+  },
+  "HaeWebhookErrorAlarm17E0315F": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "AlarmName": "ingestion-error-health-auto-export-webhook",
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "HaeWebhookCCBE7326"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "OKActions": [
+     {
+      "Fn::ImportValue": "LifePlatformCore:ExportsOutputRefAlertsTopic3414BE910C2DFF03"
+     }
+    ],
+    "Period": 3600,
+    "Statistic": "Sum",
+    "Threshold": 3,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/HaeWebhookErrorAlarm/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/02OTW7CQAxGz8LecQvhAlCp20bpAZCZuDDN/KDYU4RGc/fOhC66et/nJ9ne4W6/xdcN3aUz09w5e8b8qWRmGFliWgxDdadsyWMeo2N4+worh+isebT6TAUc+fNEmN9TMGpjaO5/HnjxVqS2AtKfSIRV8NBQOx6TmVmPJAz8w6GqPKa/g5UFjItpupOaK+aDo8U3tYZSYF1TP7/YcGnzj6S3pAWGh15jeOlxu8d+8y3WdksKaj3j+OQv3EnWsgQBAAA="
+   },
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformIngestion/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "WhoopFnArn": {
+   "Description": "Whoop ingestion Lambda ARN",
+   "Value": {
+    "Fn::GetAtt": [
+     "WhoopIngestionD6FDC5D6",
+     "Arn"
+    ]
+   }
+  },
+  "HaeWebhookFnArn": {
+   "Description": "Health Auto Export webhook Lambda ARN",
+   "Value": {
+    "Fn::GetAtt": [
+     "HaeWebhookCCBE7326",
+     "Arn"
+    ]
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

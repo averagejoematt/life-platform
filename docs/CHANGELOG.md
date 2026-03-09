@@ -1,5 +1,23 @@
 # Life Platform — Changelog
 
+## v3.2.7 — 2026-03-09: PROD-1 CDK IngestionStack — cdk synth clean
+
+### PROD-1 CDK: IngestionStack written and synth validated
+- `cdk/stacks/ingestion_stack.py` — 15-Lambda IngestionStack (13 scheduled + HAE webhook + apple-health)
+- `cdk/cdk.json` — CDK app entry point config with all context values
+- `cdk/stacks/lambda_helpers.py` — Fixed asset path (`..` = project root), explicit IAM policy statements (no `grant_*` to avoid cross-stack cyclic deps), comprehensive excludes (.venv, cdk.out, etc.)
+- `cdk/stacks/core_stack.py` — Fixed deprecated `pointInTimeRecovery` → `point_in_time_recovery_specification`
+- `cdk/app.py` — IngestionStack wired in
+- `npx cdk synth LifePlatformIngestion` — **passes clean** ✅
+- **Key design decisions:**
+  - `grant_*` replaced with explicit `add_to_policy` statements — `grant_*` mutates the CoreStack bucket/table resource policies, creating cyclic cross-stack dependencies
+  - S3 event notifications (macrofactor, apple-health) kept outside CDK — existing notifications preserved in AWS, Lambda resource policies added via `add_permission` instead
+  - HAE webhook: API Gateway trigger modeled as `add_permission` only; API GW itself not imported (deferred to RestStack)
+  - `.venv` placed inside `cdk/` dir — excluded from Lambda asset bundle via path `..` + explicit excludes list
+- **Next step:** `npx cdk import LifePlatformIngestion` — run in a separate session after reviewing synth output
+
+---
+
 ## v3.2.6 — 2026-03-09: PROD-2 Phase 2 — S3 path prefixing (raw/ + config/)
 
 ### PROD-2 Phase 2: S3 path prefixing

@@ -25,8 +25,8 @@ To import existing resources (first time only):
 import aws_cdk as cdk
 
 from stacks.core_stack import CoreStack
+from stacks.ingestion_stack import IngestionStack
 # Future stacks — uncomment as implemented:
-# from stacks.ingestion_stack import IngestionStack
 # from stacks.compute_stack import ComputeStack
 # from stacks.email_stack import EmailStack
 # from stacks.operational_stack import OperationalStack
@@ -49,8 +49,10 @@ core = CoreStack(app, "LifePlatformCore", env=env)
 # Each stack receives core.table, core.bucket, core.dlq, core.alerts_topic
 # as cross-stack references.
 #
-# ingestion = IngestionStack(app, "LifePlatformIngestion", env=env,
-#     table=core.table, bucket=core.bucket, dlq=core.dlq)
+ingestion = IngestionStack(app, "LifePlatformIngestion", env=env,
+    table=core.table, bucket=core.bucket, dlq=core.dlq,
+    alerts_topic=core.alerts_topic)
+# ingestion stack wired ✅
 #
 # compute = ComputeStack(app, "LifePlatformCompute", env=env,
 #     table=core.table, bucket=core.bucket)

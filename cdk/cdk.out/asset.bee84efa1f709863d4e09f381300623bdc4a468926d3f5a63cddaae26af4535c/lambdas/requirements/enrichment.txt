@@ -1,0 +1,2 @@
+# activity-enrichment + journal-enrichment
+# No third-party dependencies — uses stdlib + boto3 only.

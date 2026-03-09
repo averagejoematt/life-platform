@@ -1,0 +1,6 @@
+# Shared requirements for infrastructure Lambdas:
+#   life-platform-freshness-checker, life-platform-key-rotator,
+#   life-platform-data-export, life-platform-qa-smoke,
+#   life-platform-dlq-consumer, insight-email-parser, dropbox-poll
+#
+# No third-party dependencies — boto3 provided by Lambda runtime.

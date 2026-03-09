@@ -1,0 +1,90 @@
+{
+  "_comment": "Lambda source file → AWS function name mapping for CI/CD. Used by .github/workflows/ci-cd.yml",
+  "_updated": "2026-03-09 v3.2.3",
+
+  "lambdas": {
+    "lambdas/strava_lambda.py":              { "function": "strava-data-ingestion" },
+    "lambdas/whoop_lambda.py":               { "function": "whoop-data-ingestion" },
+    "lambdas/garmin_lambda.py":              { "function": "garmin-data-ingestion", "native_deps": true },
+    "lambdas/eightsleep_lambda.py":          { "function": "eightsleep-data-ingestion" },
+    "lambdas/habitify_lambda.py":            { "function": "habitify-data-ingestion" },
+    "lambdas/withings_lambda.py":            { "function": "withings-data-ingestion" },
+    "lambdas/todoist_lambda.py":             { "function": "todoist-data-ingestion" },
+    "lambdas/notion_lambda.py":              { "function": "notion-journal-ingestion" },
+    "lambdas/macrofactor_lambda.py":         { "function": "macrofactor-data-ingestion" },
+    "lambdas/apple_health_lambda.py":        { "function": "apple-health-ingestion" },
+    "lambdas/health_auto_export_lambda.py":  { "function": "health-auto-export-webhook" },
+    "lambdas/dropbox_poll_lambda.py":        { "function": "dropbox-poll" },
+    "lambdas/weather_handler.py":             { "function": "weather-data-ingestion" },
+    "lambdas/enrichment_lambda.py":          { "function": "activity-enrichment" },
+    "lambdas/journal_enrichment_lambda.py":  { "function": "journal-enrichment" },
+    "lambdas/daily_brief_lambda.py":         { "function": "daily-brief" },
+    "lambdas/weekly_digest_lambda.py":       { "function": "weekly-digest" },
+    "lambdas/monthly_digest_lambda.py":      { "function": "monthly-digest" },
+    "lambdas/nutrition_review_lambda.py":    { "function": "nutrition-review" },
+    "lambdas/wednesday_chronicle_lambda.py": { "function": "wednesday-chronicle" },
+    "lambdas/weekly_plate_lambda.py":        { "function": "weekly-plate" },
+    "lambdas/monday_compass_lambda.py":      { "function": "monday-compass" },
+    "lambdas/anomaly_detector_lambda.py":    { "function": "anomaly-detector" },
+    "lambdas/freshness_checker_lambda.py":   { "function": "life-platform-freshness-checker" },
+    "lambdas/insight_email_parser_lambda.py": { "function": "insight-email-parser" },
+    "lambdas/character_sheet_lambda.py":     { "function": "character-sheet-compute" },
+    "lambdas/adaptive_mode_lambda.py":       { "function": "adaptive-mode-compute" },
+    "lambdas/daily_metrics_compute_lambda.py": { "function": "daily-metrics-compute" },
+    "lambdas/daily_insight_compute_lambda.py": { "function": "daily-insight-compute" },
+    "lambdas/hypothesis_engine_lambda.py":   { "function": "hypothesis-engine" },
+    "lambdas/dashboard_refresh_lambda.py":   { "function": "dashboard-refresh" },
+    "lambdas/data_export_lambda.py":         { "function": "data-export" },
+    "lambdas/data_reconciliation_lambda.py": { "function": "data-reconciliation" },
+    "lambdas/dlq_consumer_lambda.py":        { "function": "dlq-consumer" },
+    "lambdas/canary_lambda.py":              { "function": "life-platform-canary" },
+    "lambdas/qa_smoke_lambda.py":            { "function": "qa-smoke" },
+    "lambdas/key_rotator_lambda.py":         { "function": "mcp-key-rotator" },
+    "lambdas/pip_audit_lambda.py":           { "function": "pip-audit" },
+    "lambdas/brittany_email_lambda.py":      { "function": "brittany-weekly-email" }
+  },
+
+  "mcp": {
+    "_comment": "MCP server is special — requires full mcp/ package",
+    "source": "lambdas/mcp_server.py",
+    "function": "life-platform-mcp",
+    "package_dir": "mcp/",
+    "triggers": ["mcp_server.py", "mcp/"]
+  },
+
+  "shared_layer": {
+    "_comment": "Changes to these files require layer rebuild + consumer redeploy",
+    "layer_name": "life-platform-shared-utils",
+    "modules": [
+      "lambdas/board_loader.py",
+      "lambdas/ai_calls.py",
+      "lambdas/html_builder.py",
+      "lambdas/output_writers.py",
+      "lambdas/scoring_engine.py",
+      "lambdas/character_engine.py",
+      "lambdas/insight_writer.py",
+      "lambdas/retry_utils.py",
+      "lambdas/ai_output_validator.py",
+      "lambdas/platform_logger.py",
+      "lambdas/ingestion_framework.py",
+      "lambdas/ingestion_validator.py",
+      "lambdas/item_size_guard.py"
+    ],
+    "consumers": [
+      "daily-brief", "weekly-digest", "monthly-digest",
+      "nutrition-review", "wednesday-chronicle", "weekly-plate",
+      "monday-compass", "anomaly-detector", "character-sheet-compute",
+      "daily-metrics-compute", "daily-insight-compute",
+      "adaptive-mode-compute", "hypothesis-engine", "dashboard-refresh"
+    ]
+  },
+
+  "skip_deploy": {
+    "_comment": "Files that are part of the repo but not directly deployable Lambdas",
+    "files": [
+      "lambdas/ingestion_validator.py",
+      "lambdas/item_size_guard.py",
+      "lambdas/freshness_checker.py"
+    ]
+  }
+}

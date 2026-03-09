@@ -1,0 +1,36 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c": {
+      "displayName": "WhoopIngestion/Code",
+      "source": {
+        "path": "asset.bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "205930651321-us-west-2-63840e0f": {
+          "bucketName": "cdk-hnb659fds-assets-205930651321-us-west-2",
+          "objectKey": "bee84efa1f709863d4e09f381300623bdc4a468926d3f5a63cddaae26af4535c.zip",
+          "region": "us-west-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::205930651321:role/cdk-hnb659fds-file-publishing-role-205930651321-us-west-2"
+        }
+      }
+    },
+    "87d6f03161185c4dc3cba36708d417f202609a7e1e7867fe225ec24ca3f6b4b7": {
+      "displayName": "LifePlatformIngestion Template",
+      "source": {
+        "path": "LifePlatformIngestion.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "205930651321-us-west-2-aadea2b8": {
+          "bucketName": "cdk-hnb659fds-assets-205930651321-us-west-2",
+          "objectKey": "87d6f03161185c4dc3cba36708d417f202609a7e1e7867fe225ec24ca3f6b4b7.json",
+          "region": "us-west-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::205930651321:role/cdk-hnb659fds-file-publishing-role-205930651321-us-west-2"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}
