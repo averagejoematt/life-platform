@@ -1,7 +1,7 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-09 (v3.2.0 — 144 MCP tools, 39 Lambdas, 30 modules, 19 data sources, 8 secrets, ~47 alarms)
+> Last update: 2026-03-09 (v3.2.1 — 144 MCP tools, 39 Lambdas, 30 modules, 19 data sources, 8 secrets, ~47 alarms)
 
 ---
 
@@ -393,6 +393,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | Version | What | Date |
 |---------|------|------|
+| v3.2.1 | MAINT-4: GitHub Actions CI/CD pipeline (lint + plan + deploy + smoke test), OIDC auth, lambda_map.json, flake8 config | 2026-03-09 |
 | v3.2.0 | OBS-3 SLO definitions (4 alarms + freshness metrics + dashboard) + AI-4 hypothesis validation (v1.1.0: completeness, validation, hard expiry, stricter checks) + large opus scoping doc | 2026-03-09 |
 | v3.1.8 | SEC-4 API Gateway rate limiting + MAINT-3 stale zip cleanup (lambdas/ zip-free) | 2026-03-09 |
 | v2.91.0 | Monday Compass weekly planning email (35th Lambda, monday-compass, Monday 8 AM PDT, Todoist + health + Board + Keystone, deploy_monday_compass.sh) | 2026-03-08 |
@@ -509,7 +510,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 | MAINT-1 | **Add dependency management (requirements.txt per Lambda).** 18 files in `lambdas/requirements/`. Only garmin has third-party deps. | P1 | M (3-4 hr) | Sonnet | ✅ v2.99.0 |
 | MAINT-2 | **Create Lambda Layer for shared modules.** 8 modules, attached to 16 Lambdas. Fix-once-deploy-everywhere. | P1 | M (3-4 hr) | Sonnet | ✅ v2.97.0 |
 | MAINT-3 | **Clean deploy/ and lambdas/ directories.** lambdas/ backup files cleaned. **⚠️ deploy/ still ~160 scripts. 6 stale .zips in lambdas/.** | P2 | S (1-2 hr) | Sonnet | ⚠️ Partial |
-| MAINT-4 | **Implement basic CI/CD with GitHub Actions.** On push to main: lint (flake8) → package zip → deploy → smoke test. Manual approval gate. | P2 | L (6-8 hr) | **Opus** | 🔴 |
+| MAINT-4 | **Implement basic CI/CD with GitHub Actions.** 4-job pipeline: lint (flake8) → plan (change detection via `ci/lambda_map.json`) → deploy (manual approval, shared layer rebuild, MCP handling) → smoke test (qa-smoke + canary). OIDC auth. | P2 | L (6-8 hr) | **Opus** | ✅ v3.2.1 |
 
 #### Epic: Data Model & Quality
 
@@ -546,12 +547,12 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ **Done** | 28 | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,3; MAINT-1,2,3; DATA-1,2,3; AI-1,2,3,4 |
-| 🔴 **Open** | 7 | COST-2, MAINT-4, SIMP-1, SIMP-2, PROD-1, PROD-2 |
+| ✅ **Done** | 29 | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,3; MAINT-1,2,3,4; DATA-1,2,3; AI-1,2,3,4 |
+| 🔴 **Open** | 6 | COST-2, SIMP-1, SIMP-2, PROD-1, PROD-2 |
 
-**Next hardening priorities:** COST-2 + SIMP-1 (MCP tool usage audit, natural combo, Sonnet), then MAINT-4 (CI/CD, Opus).
+**Next hardening priorities:** COST-2 + SIMP-1 (MCP tool usage audit, natural combo, Sonnet).
 
-**Model breakdown for remaining open:** Sonnet: COST-2, SIMP-1. Opus: MAINT-4, SIMP-2, PROD-1, PROD-2.
+**Model breakdown for remaining open:** Sonnet: COST-2, SIMP-1. Opus: SIMP-2, PROD-1, PROD-2.
 
 **Large opus items scoped:** See `docs/SCOPING_LARGE_OPUS.md` for detailed design notes on MAINT-4, SIMP-2, PROD-1, PROD-2.
 

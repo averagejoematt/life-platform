@@ -1,86 +1,67 @@
-# Life Platform Handover — v3.2.0
+# Life Platform Handover — v3.2.1
 **Date:** 2026-03-09
-**Version:** v3.2.0
-**Status:** Code ready, deploy scripts written. ⚠️ hypothesis_engine_lambda.py needs manual copy (see below).
+**Version:** v3.2.1
+**Status:** CI/CD pipeline written. OIDC setup + GitHub Environment config required before first use.
 
 ---
 
 ## What Was Done This Session
 
-### OBS-3: SLO Definitions ✅ (ready to deploy)
-- **docs/SLOs.md** — Formal SLO definitions for 4 critical paths:
-  - SLO-1: Daily Brief Delivery (99%, 24h error alarm)
-  - SLO-2: Source Freshness (99%, custom CloudWatch metric from freshness checker)
-  - SLO-3: MCP Availability (99.5%, hourly error rate alarm)
-  - SLO-4: AI Coaching Success (99%, daily failure count alarm)
-- **freshness_checker_lambda.py** — Updated to emit `StaleSourceCount` + `FreshSourceCount` to CloudWatch `LifePlatform/Freshness` namespace
-- **deploy/obs3_slo_definitions.sh** — Creates 4 SLO alarms, adds IAM for freshness checker CloudWatch, deploys Lambda, updates ops dashboard with SLO section
-- Error budgets defined (30-day and yearly windows)
+### OBS-3: SLO Definitions ✅ (deployed)
+- 4 SLO alarms created and verified
+- Freshness checker emitting CloudWatch metrics
+- Ops dashboard updated with SLO Health section
 
-### AI-4: Hypothesis Engine Output Validation ✅ (ready to deploy)
-- **hypothesis_engine_lambda.py** v1.1.0 — Major validation upgrade:
-  - `check_data_completeness()`: Requires 10+ days with 5+ metrics each before generating
-  - `validate_hypothesis()`: Validates required fields, 2+ domains, numeric thresholds in criteria, 7-30d window, confidence level, dedup check
-  - `enforce_hard_expiry()`: Archives any hypothesis >30 days old regardless of status
-  - `validate_check_verdict()`: Validates Haiku check responses before acting
-  - Min sample days for checking raised from 3 → 7
-  - Confirming checks needed for promotion raised from 2 → 3
-  - Updated prompt requires effect sizes, specific numeric thresholds, confidence reasons
-- **deploy/ai4_hypothesis_validation.sh** — Deploy + smoke test script
+### AI-4: Hypothesis Engine Validation ✅ (deployed)
+- v1.1.0 with data completeness, hypothesis validation, 30-day hard expiry
+- 13 complete data days confirmed, Lambda executing cleanly
+
+### MAINT-4: GitHub Actions CI/CD ✅ (code ready, setup required)
+- `.github/workflows/ci-cd.yml` — 4-job pipeline:
+  - **Lint:** flake8 (fatal on syntax errors, warnings pass)
+  - **Plan:** git diff change detection → Lambda mapping via `ci/lambda_map.json`
+  - **Deploy:** GitHub Environment `production` approval gate, 10s between deploys, shared layer auto-rebuild, MCP server handled separately, garmin native deps auto-skipped
+  - **Smoke test:** qa-smoke + canary post-deploy verification
+- `ci/lambda_map.json` — 38 Lambda mappings + shared layer + MCP config
+- `.flake8` — project-wide lint config
+- `deploy/setup_github_oidc.sh` — OIDC provider + IAM role creation
+- `workflow_dispatch` support for manual deploy-all
 
 ### Large Opus Scoping ✅
-- **docs/SCOPING_LARGE_OPUS.md** — Design specs for MAINT-4, SIMP-2, PROD-1, PROD-2
+- SIMP-2, PROD-1, PROD-2 design specs in `docs/SCOPING_LARGE_OPUS.md`
 
 ---
 
-## ⚠️ IMPORTANT: Manual Step Required
+## ⚠️ Setup Steps for MAINT-4
 
-The `hypothesis_engine_lambda.py` file on the local filesystem was accidentally emptied during the edit process. **Before running the AI-4 deploy script:**
-
-1. Download `hypothesis_engine_lambda.py` from Claude's output (presented in chat)
-2. Copy it to `lambdas/hypothesis_engine_lambda.py`
-3. Verify: `grep -c "AI-4" lambdas/hypothesis_engine_lambda.py` should return 15+
-
----
-
-## Deploy Order
+The CI/CD pipeline code is in the repo but won't work until these one-time setup steps are done:
 
 ```bash
-# 1. Fix the hypothesis engine file first (manual copy from Claude output)
-cp ~/Downloads/hypothesis_engine_lambda.py lambdas/hypothesis_engine_lambda.py
+# 1. Create OIDC provider + IAM role
+bash deploy/setup_github_oidc.sh
 
-# 2. OBS-3: SLO definitions
-bash deploy/obs3_slo_definitions.sh
-
-# 3. AI-4: Hypothesis validation (wait 10s between deploys)
-bash deploy/ai4_hypothesis_validation.sh
+# 2. Go to GitHub → repo Settings → Environments
+#    Create environment: "production"
+#    Add protection rule: Required reviewers → add yourself
+#    Add deployment branch rule: main only
 ```
+
+After that, any push to `main` that touches `lambdas/` or `mcp/` files will trigger the pipeline. The deploy step waits for your approval in the GitHub UI.
 
 ---
 
-## Hardening Status (post v3.2.0)
+## Hardening Status (v3.2.1)
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ Done | 28 | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,3; MAINT-1,2,3; DATA-1,2,3; AI-1,2,3,4 |
-| 🔴 Open | 7 | COST-2, MAINT-4, SIMP-1, SIMP-2, PROD-1, PROD-2 |
+| ✅ Done | 29 | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,3; MAINT-1,2,3,4; DATA-1,2,3; AI-1,2,3,4 |
+| 🔴 Open | 6 | COST-2, SIMP-1, SIMP-2, PROD-1, PROD-2 |
+
+**83% complete.** Remaining open items are all Sonnet (COST-2, SIMP-1) or multi-session Opus (SIMP-2, PROD-1, PROD-2).
 
 ---
 
-## Next Session Options
-
-| Priority | Item | Effort | Sessions |
-|----------|------|--------|----------|
-| Quick | COST-2 + SIMP-1 (MCP tool audit) | M | 1 |
-| Feature | Brittany weekly email | L | 2 |
-| Large | MAINT-4 (CI/CD) | L | 2 |
-| Large | SIMP-2 (ingestion consolidation) | L | 3 |
-| Large | PROD-1 (CDK) | XL | 6 |
-| Large | PROD-2 (multi-user) | L | 4 |
-
----
-
-## Platform Stats (v3.2.0)
+## Platform Stats (v3.2.1)
 - **Lambdas:** 39 | **MCP Tools:** 144 | **Modules:** 30
 - **Data Sources:** 19 | **Secrets:** 8 | **Alarms:** ~51
-- **Hardening:** 28/35 complete (80%)
+- **Hardening:** 29/35 complete (83%)
