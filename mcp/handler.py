@@ -69,8 +69,14 @@ def handle_tools_call(params):
         logger.warning(f"[SEC-3] Input validation failed for '{name}': {validation_error}")
         raise ValueError(f"Invalid arguments for tool '{name}': {validation_error}")
     logger.info(f"Calling tool '{name}' with args: {arguments}")
-    result = TOOLS[name]["fn"](arguments)
-    return {"content": [{"type": "text", "text": json.dumps(result, default=str)}]}
+    _t0 = time.time()
+    try:
+        result = TOOLS[name]["fn"](arguments)
+        _emit_tool_metric(name, (time.time() - _t0) * 1000, success=True)
+        return {"content": [{"type": "text", "text": json.dumps(result, default=str)}]}
+    except Exception:
+        _emit_tool_metric(name, (time.time() - _t0) * 1000, success=False)
+        raise
 
 
 # ── SEC-3: MCP input validation ─────────────────────────────────────────────
@@ -129,6 +135,38 @@ def _validate_tool_args(name: str, arguments: dict) -> str | None:
             )
 
     return None
+
+
+# ── COST-2: EMF tool usage metrics ───────────────────────────────────────────
+# Emits per-tool CloudWatch metrics via Embedded Metrics Format (EMF).
+# EMF is printed to stdout — Lambda auto-ingests it with zero IAM changes.
+# Namespace: LifePlatform/MCP  |  Dimensions: ToolName
+# After 30 days of data: use SIMP-1 audit to identify 0-invocation tools.
+def _emit_tool_metric(tool_name: str, duration_ms: float, success: bool) -> None:
+    """Emit EMF metric for a single tool invocation."""
+    try:
+        ts = int(time.time() * 1000)
+        emf = {
+            "_aws": {
+                "Timestamp": ts,
+                "CloudWatchMetrics": [{
+                    "Namespace": "LifePlatform/MCP",
+                    "Dimensions": [["ToolName"]],
+                    "Metrics": [
+                        {"Name": "ToolInvocations", "Unit": "Count"},
+                        {"Name": "ToolDuration",    "Unit": "Milliseconds"},
+                        {"Name": "ToolErrors",      "Unit": "Count"},
+                    ],
+                }],
+            },
+            "ToolName":        tool_name,
+            "ToolInvocations": 1,
+            "ToolDuration":    round(duration_ms, 1),
+            "ToolErrors":      0 if success else 1,
+        }
+        print(json.dumps(emf))
+    except Exception as e:
+        logger.warning(f"[COST-2] Failed to emit EMF metric for '{tool_name}': {e}")
 
 
 METHOD_HANDLERS = {

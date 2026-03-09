@@ -288,16 +288,18 @@ _SCHEMAS: dict[str, dict] = {
     "weather": {
         "required_fields": ["pk", "sk", "date"],
         "typed_fields": {
-            "temperature_max_f": (int, float),
-            "temperature_min_f": (int, float),
+            "temp_high_f": (int, float),
+            "temp_low_f":  (int, float),
+            "temp_avg_f":  (int, float),
         },
         "range_checks": {
-            "temperature_max_f": (-100, 150),
-            "temperature_min_f": (-100, 150),
-            "precipitation_mm": (0, 2_000),
-            "uv_index_max": (0, 20),
+            "temp_high_f":        (-100, 150),
+            "temp_low_f":         (-100, 150),
+            "temp_avg_f":         (-100, 150),
+            "precipitation_mm":   (0, 2_000),
+            "uv_index_max":       (0, 20),
         },
-        "at_least_one_of": ["temperature_max_f", "temperature_avg_f"],
+        "at_least_one_of": ["temp_high_f", "temp_avg_f"],
     },
 
     "supplements": {

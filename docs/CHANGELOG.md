@@ -1,5 +1,30 @@
 # Life Platform — Changelog
 
+## v3.2.3 — 2026-03-09: COST-2 MCP metrics + SIMP-2 Phase 1 weather migration + SIMP-2 closed
+
+### COST-2: MCP Tool Usage Metrics (live)
+- `mcp/handler.py` — `_emit_tool_metric()` added: EMF stdout emission per tool invocation
+- Tracks `ToolInvocations` (Count), `ToolDuration` (Milliseconds), `ToolErrors` (Count) per `ToolName` dimension
+- Namespace: `LifePlatform/MCP` | Zero IAM changes | Zero latency impact (stdout print)
+- SIMP-1 archiving gated on 30 days of data (~2026-04-08)
+
+### SIMP-2 Phase 1: Weather Lambda migrated (POC validated)
+- `lambdas/weather_handler.py` — new 96-line handler using `ingestion_framework.py` (replaces 143-line `weather_lambda.py`)
+- `lambdas/weather_lambda.py` — archived to `weather_lambda.py.archived`
+- `lambdas/ingestion_validator.py` — weather schema corrected: `temperature_max_f` → `temp_high_f`, added `temp_low_f`, `temp_avg_f`
+- Lambda Layer rebuilt: `life-platform-shared-utils:4` — adds `ingestion_framework.py`, `ingestion_validator.py`, `item_size_guard.py`; fixed zip structure (`-r` not `-j`, preserves `python/` prefix)
+- `ci/lambda_map.json` updated: weather source → `weather_handler.py`; ingestion framework files added to `shared_layer.modules`
+- `deploy/p3_build_shared_utils_layer.sh` — updated: adds 3 framework modules; fixed `zip -j` → `zip -r` bug
+
+### SIMP-2: Closed (deliberate)
+- Further migration stopped after technical review of Phase 2 candidates
+- Strava: range-based API incompatible with per-day callback pattern (1 call → 7 calls = worse)
+- Garmin: native deps (`garminconnect`/`garth`) require separate zip; framework is Layer-only
+- **Decision:** framework available in Layer for future per-day poll Lambdas; existing Lambdas stay as-is
+- Lessons learned documented in PROJECT_PLAN.md (SIMP-2 row + lessons section)
+
+---
+
 ## v3.2.2 — 2026-03-09: SIMP-2 framework + PROD-1 CDK scaffolding + PROD-2 audit
 
 ### SIMP-2: Ingestion Framework (Session 1 — design + code)
