@@ -63,13 +63,13 @@ def _role(name): return f"arn:aws:iam::{ACCT}:role/{name}"
 # and may use a shared role. The weekly-digest-role entries below are best guesses —
 # update after running the verification query above.
 ROLE_ARNS = {
-    "anomaly_detector":   _role("lambda-weekly-digest-role"),     # pre-SEC-1 deploy used this
-    "character_sheet":    _role("lambda-weekly-digest-role"),     # auto-detected from mcp role
-    "daily_metrics":      _role("lambda-daily-metrics-role"),
-    "daily_insight":      _role("lambda-daily-insight-role"),
-    "adaptive_mode":      _role("lambda-adaptive-mode-role"),
-    "hypothesis":         _role("lambda-hypothesis-engine-role"),
-    "dashboard_refresh":  _role("lambda-weekly-digest-role"),     # auto-detected from mcp role
+    "anomaly_detector":   _role("life-platform-email-role"),      # verified 2026-03-09
+    "character_sheet":    _role("life-platform-compute-role"),    # verified 2026-03-09
+    "daily_metrics":      _role("lambda-daily-metrics-role"),     # verified 2026-03-09
+    "daily_insight":      _role("lambda-daily-insight-role"),     # verified 2026-03-09
+    "adaptive_mode":      _role("lambda-adaptive-mode-role"),     # verified 2026-03-09
+    "hypothesis":         _role("lambda-hypothesis-engine-role"), # verified 2026-03-09
+    "dashboard_refresh":  _role("lambda-mcp-server-role"),        # verified 2026-03-09
 }
 
 
@@ -85,15 +85,29 @@ class ComputeStack(Stack):
         local_bucket       = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
 
-        shared = dict(
+        # ── Two shared dicts: with DLQ (dedicated-role Lambdas) and without (shared-role Lambdas)
+        # Shared-role Lambdas (anomaly, character-sheet, dashboard-refresh) use pre-SEC-1 roles
+        # that lack SQS SendMessage — CDK's DLQ escape hatch triggers a permission check and fails.
+        # Solution: skip DLQ management for those 3 Lambdas in CDK; their DLQ state is unmanaged drift.
+        # The 4 dedicated-role Lambdas (daily-metrics, daily-insight, adaptive-mode, hypothesis)
+        # have SQS perms from SEC-1 and get DLQ managed normally.
+        shared_with_dlq = dict(
             table=local_table,
             bucket=local_bucket,
             dlq=local_dlq,
             alerts_topic=local_alerts_topic,
         )
+        shared_no_dlq = dict(
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
+            alerts_topic=local_alerts_topic,
+        )
 
         # ══════════════════════════════════════════════════════════════
         # 1. anomaly-detector — 8:05 AM PT daily
+        # Role: life-platform-email-role (shared, no SQS perm) → dlq=None
+        # DLQ exists in AWS but is unmanaged drift — acceptable for now.
         # ══════════════════════════════════════════════════════════════
         create_platform_lambda(
             self, "AnomalyDetector",
@@ -104,11 +118,13 @@ class ComputeStack(Stack):
             timeout_seconds=90,
             memory_mb=256,
             existing_role_arn=ROLE_ARNS["anomaly_detector"],
-            **shared,
+            **shared_no_dlq,
         )
 
         # ══════════════════════════════════════════════════════════════
         # 2. character-sheet-compute — 9:35 AM PT daily
+        # Role: life-platform-compute-role (shared, no SQS perm) → dlq=None
+        # No DLQ in AWS either — consistent.
         # ══════════════════════════════════════════════════════════════
         create_platform_lambda(
             self, "CharacterSheetCompute",
@@ -119,11 +135,12 @@ class ComputeStack(Stack):
             timeout_seconds=60,
             memory_mb=512,
             existing_role_arn=ROLE_ARNS["character_sheet"],
-            **shared,
+            **shared_no_dlq,
         )
 
         # ══════════════════════════════════════════════════════════════
         # 3. daily-metrics-compute — 9:40 AM PT daily
+        # Role: lambda-daily-metrics-role (dedicated, has SQS perm) → dlq managed
         # ══════════════════════════════════════════════════════════════
         create_platform_lambda(
             self, "DailyMetricsCompute",
@@ -134,11 +151,12 @@ class ComputeStack(Stack):
             timeout_seconds=120,
             memory_mb=512,
             existing_role_arn=ROLE_ARNS["daily_metrics"],
-            **shared,
+            **shared_with_dlq,
         )
 
         # ══════════════════════════════════════════════════════════════
         # 4. daily-insight-compute — 9:45 AM PT daily
+        # Role: lambda-daily-insight-role (dedicated, has SQS perm) → dlq managed
         # ══════════════════════════════════════════════════════════════
         create_platform_lambda(
             self, "DailyInsightCompute",
@@ -149,11 +167,12 @@ class ComputeStack(Stack):
             timeout_seconds=120,
             memory_mb=512,
             existing_role_arn=ROLE_ARNS["daily_insight"],
-            **shared,
+            **shared_with_dlq,
         )
 
         # ══════════════════════════════════════════════════════════════
         # 5. adaptive-mode-compute — 9:50 AM PT daily
+        # Role: lambda-adaptive-mode-role (dedicated, has SQS perm) → dlq managed
         # ══════════════════════════════════════════════════════════════
         create_platform_lambda(
             self, "AdaptiveModeCompute",
@@ -164,11 +183,12 @@ class ComputeStack(Stack):
             timeout_seconds=120,
             memory_mb=256,
             existing_role_arn=ROLE_ARNS["adaptive_mode"],
-            **shared,
+            **shared_with_dlq,
         )
 
         # ══════════════════════════════════════════════════════════════
         # 6. hypothesis-engine — Sunday 11:00 AM PT
+        # Role: lambda-hypothesis-engine-role (dedicated, has SQS perm) → dlq managed
         # ══════════════════════════════════════════════════════════════
         create_platform_lambda(
             self, "HypothesisEngine",
@@ -179,7 +199,7 @@ class ComputeStack(Stack):
             timeout_seconds=120,
             memory_mb=256,
             existing_role_arn=ROLE_ARNS["hypothesis"],
-            **shared,
+            **shared_with_dlq,
         )
 
         # ══════════════════════════════════════════════════════════════
@@ -187,6 +207,8 @@ class ComputeStack(Stack):
         # Afternoon: 2:00 PM PDT = 21:00 UTC  cron(0 21 * * ? *)
         # Evening:   6:00 PM PDT = 01:00 UTC  cron(0 1  * * ? *)
         # DST note: updated from PST (22:00/02:00) to PDT (21:00/01:00) on 2026-03-08
+        # Role: lambda-mcp-server-role (shared, no SQS perm) → dlq=None
+        # No DLQ in AWS either — consistent.
         # ══════════════════════════════════════════════════════════════
         dashboard = create_platform_lambda(
             self, "DashboardRefresh",
@@ -197,7 +219,7 @@ class ComputeStack(Stack):
             timeout_seconds=60,
             memory_mb=256,
             existing_role_arn=ROLE_ARNS["dashboard_refresh"],
-            **shared,
+            **shared_no_dlq,
         )
 
         # Second EventBridge rule: evening refresh at 6 PM PDT

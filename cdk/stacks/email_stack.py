@@ -68,7 +68,7 @@ ROLE_ARNS = {
     "chronicle":       _role("lambda-wednesday-chronicle-role"),
     "weekly_plate":    _role("lambda-weekly-plate-role"),
     "monday_compass":  _role("lambda-monday-compass-role"),
-    "brittany":        _role("lambda-weekly-digest-role"),    # original deploy used shared role
+    "brittany":        _role("life-platform-email-role"),     # verified 2026-03-09
 }
 
 
@@ -84,10 +84,19 @@ class EmailStack(Stack):
         local_bucket       = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
 
-        shared = dict(
+        # ── Two shared dicts ──────────────────────────────────────────────────────────────
+        # brittany-weekly-email uses life-platform-email-role (shared, pre-SEC-1, no SQS perm).
+        # All other email Lambdas use dedicated SEC-1 roles with SQS perms — get DLQ managed.
+        shared_with_dlq = dict(
             table=local_table,
             bucket=local_bucket,
             dlq=local_dlq,
+            alerts_topic=local_alerts_topic,
+        )
+        shared_no_dlq = dict(
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
             alerts_topic=local_alerts_topic,
         )
 
@@ -104,7 +113,7 @@ class EmailStack(Stack):
             timeout_seconds=300,
             memory_mb=512,
             existing_role_arn=ROLE_ARNS["daily_brief"],
-            **shared,
+            **shared_with_dlq,
         )
 
         # ══════════════════════════════════════════════════════════════
@@ -122,7 +131,7 @@ class EmailStack(Stack):
             timeout_seconds=120,
             memory_mb=256,
             existing_role_arn=ROLE_ARNS["weekly_digest"],
-            **shared,
+            **shared_with_dlq,
         )
 
         # ══════════════════════════════════════════════════════════════
@@ -137,7 +146,7 @@ class EmailStack(Stack):
             timeout_seconds=120,
             memory_mb=256,
             existing_role_arn=ROLE_ARNS["monthly_digest"],
-            **shared,
+            **shared_with_dlq,
         )
 
         # ══════════════════════════════════════════════════════════════
@@ -152,7 +161,7 @@ class EmailStack(Stack):
             timeout_seconds=120,
             memory_mb=256,
             existing_role_arn=ROLE_ARNS["nutrition"],
-            **shared,
+            **shared_with_dlq,
         )
 
         # ══════════════════════════════════════════════════════════════
@@ -168,7 +177,7 @@ class EmailStack(Stack):
             timeout_seconds=120,
             memory_mb=256,
             existing_role_arn=ROLE_ARNS["chronicle"],
-            **shared,
+            **shared_with_dlq,
         )
 
         # ══════════════════════════════════════════════════════════════
@@ -184,7 +193,7 @@ class EmailStack(Stack):
             timeout_seconds=120,
             memory_mb=512,
             existing_role_arn=ROLE_ARNS["weekly_plate"],
-            **shared,
+            **shared_with_dlq,
         )
 
         # ══════════════════════════════════════════════════════════════
@@ -200,7 +209,7 @@ class EmailStack(Stack):
             timeout_seconds=120,
             memory_mb=512,
             existing_role_arn=ROLE_ARNS["monday_compass"],
-            **shared,
+            **shared_with_dlq,
         )
 
         # ══════════════════════════════════════════════════════════════
@@ -216,5 +225,5 @@ class EmailStack(Stack):
             timeout_seconds=90,
             memory_mb=256,
             existing_role_arn=ROLE_ARNS["brittany"],
-            **shared,
+            **shared_no_dlq,  # life-platform-email-role has no SQS perm
         )

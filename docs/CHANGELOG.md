@@ -1,5 +1,28 @@
 # Life Platform — Changelog
 
+## v3.3.1 — 2026-03-09: PROD-1 CDK LifePlatformCompute + LifePlatformEmail deploy ✅
+
+### SQS permission fix — shared-role Lambdas cannot configure DLQ via CDK
+- 4 Lambdas across both stacks use pre-SEC-1 shared roles (`life-platform-email-role`, `life-platform-compute-role`, `lambda-mcp-server-role`) that lack SQS SendMessage
+- CDK's L1 escape hatch for DLQ config triggers a permission check at deploy time — fatal for shared-role Lambdas
+- Fix: split `shared` dict into `shared_with_dlq` + `shared_no_dlq` in both stacks
+- `shared_no_dlq` used for: `anomaly-detector`, `character-sheet-compute`, `dashboard-refresh`, `brittany-weekly-email`
+- `shared_with_dlq` used for all dedicated SEC-1-role Lambdas
+- DLQ state on the 3 compute Lambdas that have it in AWS is unmanaged drift — acceptable
+
+### Role ARN corrections — compute_stack.py
+- `anomaly-detector` → `life-platform-email-role` (was: `lambda-weekly-digest-role`)
+- `character-sheet-compute` → `life-platform-compute-role` (was: `lambda-weekly-digest-role`)
+- `dashboard-refresh` → `lambda-mcp-server-role` (was: `lambda-weekly-digest-role`)
+- All 7 verified from `aws lambda get-function-configuration` output
+
+### Stack status after this session
+- `LifePlatformCompute` ✅ deployed
+- `LifePlatformEmail` ✅ deployed
+- `LifePlatformIngestion` ⚠️ synth passing, import still pending
+
+---
+
 ## v3.3.0 — 2026-03-09: PROD-1 CDK handler bug fix + garth layer + import prep
 
 ### Critical handler fix — compute_stack.py + email_stack.py
