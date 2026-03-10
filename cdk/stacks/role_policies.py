@@ -70,7 +70,7 @@ def _ingestion_base(
 
     # S3 write (raw data)
     if not no_s3:
-        prefix = s3_prefix or f"raw/{source}/*"
+        prefix = s3_prefix or f"raw/matthew/{source}/*"
         write_resources = _s3(prefix) + (_s3(*extra_s3_write) if extra_s3_write else [])
         stmts.append(iam.PolicyStatement(
             sid="S3Write",
@@ -131,7 +131,7 @@ def ingestion_notion() -> list[iam.PolicyStatement]:
     return _ingestion_base(
         "notion",
         secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
-        s3_prefix="raw/notion/*",
+        s3_prefix="raw/matthew/notion/*",
     )
 
 
@@ -146,7 +146,7 @@ def ingestion_habitify() -> list[iam.PolicyStatement]:
     return _ingestion_base(
         "habitify",
         secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
-        s3_prefix="raw/habitify/*",
+        s3_prefix="raw/matthew/habitify/*",
     )
 
 
@@ -154,6 +154,7 @@ def ingestion_strava() -> list[iam.PolicyStatement]:
     return _ingestion_base(
         "strava",
         secret_name="life-platform/strava",
+        extra_secret_actions=["secretsmanager:PutSecretValue"],  # OAuth token refresh writes back to secret
     )
 
 
@@ -256,8 +257,8 @@ def ingestion_dropbox() -> list[iam.PolicyStatement]:
     return _ingestion_base(
         "dropbox",
         secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
-        s3_prefix="imports/*",
-        extra_s3_read=["imports/*"],
+        s3_prefix="uploads/macrofactor/*",  # dropbox writes MacroFactor CSVs here
+        extra_s3_read=["uploads/macrofactor/*"],
     )
 
 
@@ -282,7 +283,7 @@ def ingestion_apple_health() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="S3Write",
             actions=["s3:PutObject"],
-            resources=_s3("raw/apple_health/*"),
+            resources=_s3("raw/matthew/apple_health/*"),
         ),
         iam.PolicyStatement(
             sid="DLQ",
@@ -308,7 +309,7 @@ def ingestion_hae() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="S3Write",
             actions=["s3:PutObject"],
-            resources=_s3("raw/apple_health/*"),
+            resources=_s3("raw/matthew/*"),  # HAE writes to multiple sub-paths: cgm_readings, blood_pressure, state_of_mind, workouts
         ),
         iam.PolicyStatement(
             sid="DLQ",

@@ -1,5 +1,25 @@
 # Life Platform — Changelog
 
+## v3.4.7 — 2026-03-10: IAM Health Check — S3 Paths + KMS + Strava OAuth
+
+### Bug Fixes (found during platform health check)
+- `role_policies.py` — `_ingestion_base()`: S3 write prefix corrected from `raw/{source}/*` → `raw/matthew/{source}/*` (all ingestion Lambdas write under user-prefixed paths — was silently failing on gap-fill attempts)
+- `role_policies.py` — `ingestion_hae()`: S3 write corrected to `raw/matthew/*` (HAE writes to multiple sub-paths: cgm_readings, blood_pressure, state_of_mind, workouts)
+- `role_policies.py` — `ingestion_apple_health()`: S3 write corrected to `raw/matthew/apple_health/*`
+- `role_policies.py` — `ingestion_strava()`: Added `secretsmanager:PutSecretValue` (OAuth token refresh writes back to secret on every API call)
+- `role_policies.py` — `ingestion_dropbox()`: S3 path corrected to `uploads/macrofactor/*` (actual write target, not `imports/*`)
+- `role_policies.py` — `ingestion_notion()` + `ingestion_habitify()`: S3 prefixes corrected to `raw/matthew/notion/*` and `raw/matthew/habitify/*`
+
+### Deployed
+- `LifePlatformIngestion` CDK stack
+
+### Smoke Tests (post-deploy)
+- `whoop-data-ingestion` ✅ 200
+- `strava-data-ingestion` ✅ 200
+- `journal-enrichment` ✅ 200
+
+---
+
 ## v3.4.6 — 2026-03-10: EMAIL_RECIPIENT + KMS Bug Fixes
 
 ### Bug Fixes
