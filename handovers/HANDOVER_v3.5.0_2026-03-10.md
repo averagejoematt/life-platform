@@ -63,9 +63,8 @@ Code is complete and CDK has it wired. Two steps remain:
 1. **Confirm Brittany's actual email** → update `_brittany_env["BRITTANY_EMAIL"]` in `cdk/stacks/email_stack.py`
 2. `npx cdk deploy LifePlatformEmail` (or `LifePlatformEmail LifePlatformCompute` to push api-keys fixes too)
 
-### Item 10 — Run cleanup_dead_files.sh
-Still pending: `bash deploy/cleanup_dead_files.sh`
-Removes: `lambdas/weather_lambda.py.archived`, `lambdas/freshness_checker.py`, then self-deletes.
+### ✅ Item 10 — cleanup_dead_files.sh
+Executed and self-removed. Deleted: `lambdas/weather_lambda.py.archived`, `lambdas/freshness_checker.py`.
 
 ### CDK Deploy Required Before April 7
 `cdk deploy LifePlatformEmail LifePlatformCompute` to push the api-keys env var fixes to Lambda function configurations in AWS. The Lambda code edits are local only until deployed.
