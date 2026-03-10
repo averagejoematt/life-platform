@@ -1,5 +1,26 @@
 # Life Platform — Changelog
 
+## v3.4.8 — 2026-03-10: COST-A + COST-B Completion
+
+### COST-B + Habitify Secret (combined)
+- `deploy/setup_ingestion_keys.sh`: merges todoist/notion/dropbox/habitify keys into `life-platform/ingestion-keys`
+- Supersedes CHANGELOG v3.4.4 warning — `life-platform/habitify` is NOT created separately; `habitify_api_key` goes into `ingestion-keys` (per role_policies.py COST-B update)
+- CDK env vars already deployed (v3.4.7): todoist→`SECRET_NAME`, notion→`NOTION_SECRET_NAME`, dropbox→`SECRET_NAME`, habitify→`HABITIFY_SECRET_NAME` all = `life-platform/ingestion-keys`
+- Schedules deletion of `life-platform/todoist`, `life-platform/notion`, `life-platform/dropbox` (~2026-04-10, saves $1.20/mo)
+- `life-platform/api-keys` still pending permanent deletion ~2026-04-07
+
+### COST-A Completion
+- `deploy/finish_cost_a.sh`: orchestrates orphan deletion + CDK Monitoring + CDK Operational deploys
+- Remaining stacks to deploy: `LifePlatformMonitoring`, `LifePlatformOperational` (Email already deployed v3.4.6)
+- `delete_orphan_alarms.sh` already populated (48 orphans identified in v3.4.5)
+- Expected result: ~87 → ~41 alarms, saves ~$4.60/mo
+
+### Scripts (run in order)
+1. `bash deploy/setup_ingestion_keys.sh` — merge keys + delete old secrets
+2. `bash deploy/finish_cost_a.sh` — orphan deletion + CDK deploy
+
+---
+
 ## v3.4.7 — 2026-03-10: IAM Health Check — S3 Paths + KMS + Strava OAuth
 
 ### Bug Fixes (found during platform health check)
