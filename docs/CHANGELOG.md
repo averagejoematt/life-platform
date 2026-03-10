@@ -1,5 +1,46 @@
 # Life Platform — Changelog
 
+## v3.4.1 — 2026-03-10: Sick Day System, PlatformLogger f-string fixes, EB rule recovery, KMS policy fix
+
+### Sick Day System (new feature)
+- New DynamoDB source: `pk=USER#matthew#SOURCE#sick_days`, `sk=DATE#YYYY-MM-DD`
+- 3 new MCP tools: `log_sick_day`, `get_sick_days`, `clear_sick_day` (MCP tools: 147 total)
+- Character Sheet: EMA frozen on sick days — copies prev record with `sick_day=True`, `frozen_from=<prev_date>`
+- Daily Metrics: `day_grade_letter="sick"`, streaks preserved from prev day, all pillar scores carried forward
+- Anomaly Detector: suppresses alert emails on sick days (`severity="sick_suppressed"`)
+- Freshness Checker: SNS alerts suppressed on sick days
+- Daily Brief: renders lightweight recovery HTML (sleep/recovery/HRV only), skips all AI calls
+- Buddy Page: `sick_day=True` flag propagated to buddy JSON
+- Retroactive flags applied for Mar 8 + Mar 9 2026 (reason: "sick - flu/illness")
+- Recompute confirmed: both days show `day_grade_letter="sick"`, character sheet frozen correctly
+
+### PlatformLogger f-string fixes
+- `PlatformLogger` does not support `%s` printf-style formatting (unlike stdlib logging)
+- Fixed 17 instances in `lambdas/character_sheet_lambda.py`
+- Fixed 18 instances in `lambdas/daily_metrics_compute_lambda.py`
+- Helper scripts: `deploy/fix_logger_calls.py`, `deploy/fix_dm_logger_final.py`, `deploy/fix_habit_scores_logger.py`
+
+### EventBridge rule recovery (UPDATE_ROLLBACK_COMPLETE fix)
+- Root cause: v3.4.0 cleanup script deleted console-created EB rules that CDK stacks referenced by clean physical name
+- Fix: Recreated all 16 rules via AWS CLI, then CDK stack update succeeded
+- Compute rules recovered: `anomaly-detector-daily`, `character-sheet-compute`, `daily-metrics-compute`, `daily-insight-compute`, `adaptive-mode-compute`, `hypothesis-engine-weekly`, `dashboard-refresh-afternoon`, `dashboard-refresh-evening`
+- Email rules recovered: `daily-brief-schedule`, `weekly-digest-sunday`, `monthly-digest-schedule`, `nutrition-review-saturday`, `wednesday-chronicle-schedule`, `weekly-plate`, `monday-compass`, `brittany-weekly-email-schedule`
+- Architecture lesson: CDK stacks should NOT use `rule_name=` with clean names — let CDK generate stack-prefixed physical names so cleanup scripts cannot inadvertently delete managed resources
+
+### character-sheet-compute KMS AccessDeniedException fix
+- Root cause: `compute_character_sheet()` in `cdk/stacks/role_policies.py` missing `needs_kms=True`
+- CDK fix applied to `role_policies.py`; runtime fix applied via `aws iam put-role-policy`
+- Follow-up: audit `needs_kms=True` for all Compute Lambdas writing to DDB (anomaly_detector, adaptive_mode, hypothesis_engine, dashboard_refresh)
+
+### daily_metrics_compute_lambda.py restoration
+- File corrupted to placeholder mid-session; restored via `git checkout HEAD -- lambdas/daily_metrics_compute_lambda.py`
+- Sick day patch re-applied and verified post-restoration
+
+### Lambda Layer update
+- All 7 Compute Lambdas updated to life-platform-shared-utils:6
+
+---
+
 ## v3.4.0 — 2026-03-10: Full IaC — CDK-manage IAM roles, EventBridge rules, Core resources
 
 ### Item 6: CDK-manage IAM roles (previously `existing_role_arn`)
