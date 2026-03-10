@@ -1,5 +1,5 @@
 """
-Anomaly Detector Lambda — v2.1.0 (Feature #18 + #23 Travel Awareness)
+Anomaly Detector Lambda — v2.2.0 (Feature #18 + #23 Travel Awareness)
 Fires at 8:05am PT daily (16:05 UTC via EventBridge) — after enrichment, before daily brief.
 
 v2.1.0 Changes:
@@ -393,7 +393,8 @@ def call_haiku_hypothesis(flagged, context, api_key):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def write_anomaly_record(date_str, flagged, alert_sent, hypothesis, severity,
-                         travel_mode=False, travel_dest=None):
+                         travel_mode=False, travel_dest=None,
+                         sick_mode=False, sick_reason=None):
     item = {
         "pk":               f"USER#{USER_ID}#SOURCE#anomalies",
         "sk":               f"DATE#{date_str}",
@@ -405,7 +406,9 @@ def write_anomaly_record(date_str, flagged, alert_sent, hypothesis, severity,
         "severity":         severity,
         "travel_mode":      travel_mode,
         "travel_destination": travel_dest,
-        "detector_version": "2.1.0",
+        "sick_mode":        sick_mode,
+        "sick_reason":      sick_reason,
+        "detector_version": "2.2.0",
         "updated_at":       datetime.now(timezone.utc).isoformat(),
     }
     item = json.loads(json.dumps(item), parse_float=Decimal)
@@ -532,6 +535,17 @@ def lambda_handler(event, context):
     if travel_mode:
         print(f"[INFO] TRAVEL MODE: {travel_dest} -- anomaly alerts will be suppressed")
 
+    # ── Sick day check (v2.2.0) ──
+    try:
+        from sick_day_checker import check_sick_day as _check_sick_anomaly
+        _sick_rec_anomaly = _check_sick_anomaly(table, USER_ID, yesterday)
+    except ImportError:
+        _sick_rec_anomaly = None
+    sick_mode   = _sick_rec_anomaly is not None
+    sick_reason = (_sick_rec_anomaly or {}).get("reason") or "sick day"
+    if sick_mode:
+        print(f"[INFO] SICK MODE: {sick_reason} -- anomaly alerts will be suppressed")
+
     flagged = check_anomalies(yesterday, today)
     print(f"[INFO] Flagged metrics: {len(flagged)}")
     for m in flagged:
@@ -581,11 +595,23 @@ def lambda_handler(event, context):
         print(f"[INFO] Travel mode -- {len(flagged)} metrics flagged across "
               f"{source_count} sources, alert SUPPRESSED")
 
+    elif multi and sick_mode:
+        source_count = len(set(f["source"] for f in flagged))
+        severity = "sick_suppressed"
+        hypothesis = (
+            f"[SICK DAY] {sick_reason}. Missing data and biometric drops are expected "
+            "during illness — recovery score, HRV, habits, and nutrition will all look "
+            "off. Anomaly alerts suppressed. Rest and recover."
+        )
+        print(f"[INFO] Sick mode -- {len(flagged)} metrics flagged across "
+              f"{source_count} sources, alert SUPPRESSED")
+
     else:
         print("[INFO] No multi-source anomaly -- no alert sent.")
 
     write_anomaly_record(yesterday, flagged, alert_sent, hypothesis, severity,
-                         travel_mode=travel_mode, travel_dest=travel_dest)
+                         travel_mode=travel_mode, travel_dest=travel_dest,
+                         sick_mode=sick_mode, sick_reason=sick_reason if sick_mode else None)
 
     return {
         "statusCode": 200,

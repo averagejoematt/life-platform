@@ -1,14 +1,14 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-10 (v3.4.0 — 144 MCP tools, 41 Lambdas, 30 modules, 19 data sources, 8 secrets, ~47 alarms, 8 CDK stacks)
+> Last update: 2026-03-10 (v3.4.1 — 147 MCP tools, 41 Lambdas, 31 modules, 19 data sources, 8 secrets, ~47 alarms, 8 CDK stacks)
 
 ---
 
 ## Current State
 
-- **Platform version:** v3.4.0
-- **MCP Server:** 144 tools across 30-module package (tools_decisions.py added), serving health data through Claude Desktop + claude.ai + Claude mobile (1024 MB, 12 tools pre-cached nightly)
+- **Platform version:** v3.4.1
+- **MCP Server:** 147 tools across 31-module package (tools_decisions.py added), serving health data through Claude Desktop + claude.ai + Claude mobile (1024 MB, 12 tools pre-cached nightly)
 - **Remote MCP:** Function URL `c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` with OAuth auto-approve + HMAC Bearer token validation
 - **Data Sources:** 19 (12 scheduled + 1 webhook + 3 manual/periodic + 2 MCP-managed + 1 State of Mind via webhook)
 - **Lambdas:** 41 (13 ingestion + 1 webhook + 2 enrichment + 7 email/digest [incl. monday-compass] + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 daily-metrics-compute + 1 daily-insight-compute + 1 hypothesis-engine + 1 dashboard-refresh + 1 data-export + 1 qa-smoke + 1 data-reconciliation + 1 pip-audit + **1 dlq-consumer + 1 canary**)

@@ -44,6 +44,23 @@ def lambda_handler(event, context):
     now = datetime.now(timezone.utc)
     stale_threshold = now - timedelta(hours=STALE_HOURS)
 
+    # ── Sick day check: suppress stale alerts if yesterday was a sick/rest day ──
+    # Stale data on a sick day is expected — user is not tracking anything.
+    yesterday_str = (now.date() - timedelta(days=1)).isoformat()
+    _sick_suppress = False
+    try:
+        from sick_day_checker import check_sick_day as _check_fresh_sick
+        _sick_fr = _check_fresh_sick(table, USER_ID, yesterday_str)
+        if _sick_fr:
+            _sick_suppress = True
+            _sick_r = _sick_fr.get("reason") or "sick day"
+            logger.info(
+                "Sick day flagged for %s (%s) — freshness alerts suppressed",
+                yesterday_str, _sick_r,
+            )
+    except ImportError:
+        pass
+
     stale_sources = []
     source_status = []
 
@@ -89,22 +106,30 @@ def lambda_handler(event, context):
     if stale_sources:
         stale_list = "\n".join([f"  - {name}: {detail}" for name, detail in stale_sources])
         status_list = "\n".join(source_status)
-        message = (
-            f"⚠️ Life Platform: Stale Data Detected\n\n"
-            f"The following sources have not updated in over {STALE_HOURS} hours:\n\n"
-            f"{stale_list}\n\n"
-            f"Full source status:\n{status_list}\n\n"
-            f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
-        )
-        try:
-            sns.publish(
-                TopicArn=SNS_ARN,
-                Subject=f"⚠️ Life Platform: {len(stale_sources)} stale source(s)",
-                Message=message,
+
+        if _sick_suppress:
+            # Sick day — expected data gap, no alert needed
+            logger.info(
+                "Stale sources detected (%d) but suppressed — sick day (%s)",
+                len(stale_sources), yesterday_str,
             )
-            logger.info("Alert sent for %d stale source(s)", len(stale_sources))
-        except Exception as e:
-            logger.error("SNS publish failed: %s", e)
+        else:
+            message = (
+                f"⚠️ Life Platform: Stale Data Detected\n\n"
+                f"The following sources have not updated in over {STALE_HOURS} hours:\n\n"
+                f"{stale_list}\n\n"
+                f"Full source status:\n{status_list}\n\n"
+                f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
+            )
+            try:
+                sns.publish(
+                    TopicArn=SNS_ARN,
+                    Subject=f"⚠️ Life Platform: {len(stale_sources)} stale source(s)",
+                    Message=message,
+                )
+                logger.info("Alert sent for %d stale source(s)", len(stale_sources))
+            except Exception as e:
+                logger.error("SNS publish failed: %s", e)
     else:
         status_list = "\n".join(source_status)
         logger.info("All sources fresh.\n%s", status_list)

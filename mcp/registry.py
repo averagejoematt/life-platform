@@ -23,6 +23,7 @@ from mcp.tools_todoist import *
 from mcp.tools_memory import *
 from mcp.tools_decisions import *
 from mcp.tools_hypotheses import *
+from mcp.tools_sick_days import *
 
 TOOLS = {
     "get_sources": {
@@ -3092,6 +3093,57 @@ TOOLS = {
                                       "description": "Optional 1-5 strength of evidence (5=very strong confirmation)."},
                 },
                 "required": ["sk", "verdict"],
+            },
+        },
+    },
+
+    "log_sick_day": {
+        "fn": tool_log_sick_day,
+        "schema": {
+            "name": "log_sick_day",
+            "description": (
+                "Flag one or more dates as sick or rest days. When flagged: Character Sheet EMA frozen, "
+                "day grade = 'sick', habit/streak timers preserved (not broken), anomaly alerts suppressed, "
+                "freshness alerts skipped, Daily Brief shows recovery banner."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "date":   {"type": "string", "description": "Single date YYYY-MM-DD."},
+                    "dates":  {"type": "array", "items": {"type": "string"},
+                               "description": "Multiple dates YYYY-MM-DD."},
+                    "reason": {"type": "string", "description": "Optional reason (flu, injury, etc)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "get_sick_days": {
+        "fn": tool_get_sick_days,
+        "schema": {
+            "name": "get_sick_days",
+            "description": "List sick/rest days within a date range. Shows date, reason, when logged.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "start_date": {"type": "string", "description": "Start YYYY-MM-DD (default 90d ago)."},
+                    "end_date":   {"type": "string", "description": "End YYYY-MM-DD (default today)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "clear_sick_day": {
+        "fn": tool_clear_sick_day,
+        "schema": {
+            "name": "clear_sick_day",
+            "description": "Remove a sick day flag (use if logged in error).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "date": {"type": "string", "description": "Date to un-flag YYYY-MM-DD."},
+                },
+                "required": ["date"],
             },
         },
     },
