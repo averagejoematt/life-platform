@@ -671,6 +671,7 @@ def analyze_intention_execution_gap(yesterday_str, profile):
             "total_intentions":    total,
             "intentions_executed": executed_count,
             "stored_at":           datetime.now(timezone.utc).isoformat(),
+            "ttl":                 int((datetime.now(timezone.utc) + timedelta(days=90)).timestamp()),
         }
         if follow_through_rate is not None:
             mem_item["follow_through_rate"] = Decimal(str(follow_through_rate))
