@@ -1,5 +1,83 @@
 # Life Platform — Changelog
 
+## v3.4.4 — 2026-03-10: Hygiene Sweep (Architecture Review #4 follow-up)
+
+### INCIDENT_LOG
+- Added 5 missing incidents from v3.4.0/v3.4.1 (retroactive, flagged for Matthew review)
+- P1: CDK IAM role gap during bulk migration
+- P2: CoreStack DLQ ARN change
+- P3: EB rule recreation gap (2 Lambdas)
+- P3: Orphan Lambda adoption — failure-pattern-compute EB rule missing
+- P4: Duplicate CloudWatch alarms after CDK adoption
+
+### DECISIONS.md
+- ADR-021: EventBridge rule naming convention (CDK)
+- ADR-022: CoreStack scoping — shared infra vs. per-stack resources
+- ADR-023: Sick day checker as shared utility module (not standalone Lambda)
+
+### role_policies.py (cdk/stacks)
+- `needs_kms=True` added to 6 compute functions: anomaly_detector, daily_insight, adaptive_mode, hypothesis_engine, dashboard_refresh, failure_pattern
+- `ingestion_habitify()` secret ref updated: `life-platform/api-keys` → `life-platform/habitify` (⚠️ secret needs creating before 2026-04-07)
+
+### failure_pattern_compute_lambda.py
+- `store_failure_patterns()` now sets `ttl` = `now + 90 days` on all platform_memory records
+- ⚠️ Deploy needed: `bash deploy/deploy_lambda.sh failure-pattern-compute`
+
+### ARCHITECTURE.md
+- Header updated to v3.4.2, 147 tools, 41 Lambdas, 8 CDK stacks
+- CDK resource table updated to list all 8 stacks (Core added)
+
+### deploy/ housekeeping
+- 19 one-time scripts archived to `deploy/archive/20260310/`
+- `deploy/cleanup_dead_files.sh` written — run once to delete `weather_lambda.py.archived` and `freshness_checker.py`
+- Session-end checklist updated: archive deploy/ scripts is now step (1)
+
+### PlatformLogger %s (item 7)
+- Already fixed in v1.0.1 — no action needed
+
+---
+
+## v3.4.3 — 2026-03-10: CDK IaC Bugfix Sprint
+
+### PlatformLogger `*args` fix
+- `platform_logger.py`: all log methods now accept `*args, **kwargs` + `%s` interpolation
+- Fixes `takes 2 positional arguments but 3 were given` across daily-metrics-compute, character-sheet-compute, anomaly-detector, and others
+- SharedUtilsLayer:7 deployed to all stacks
+
+### `role_policies.py` — 22 missing methods added
+- 5 compute methods: `compute_daily_insight`, `compute_adaptive_mode`, `compute_hypothesis_engine`, `compute_dashboard_refresh`, `compute_failure_pattern`
+- 9 email methods: `_email_base()` helper + `email_daily_brief`, `email_weekly_digest`, `email_monthly_digest`, `email_nutrition_review`, `email_wednesday_chronicle`, `email_weekly_plate`, `email_monday_compass`, `email_brittany`
+- 8 operational methods: `operational_freshness_checker`, `operational_dlq_consumer`, `operational_canary`, `operational_pip_audit`, `operational_qa_smoke`, `operational_key_rotator`, `operational_data_export`, `operational_data_reconciliation`, `operational_insight_email_parser`
+- 1 MCP method: `mcp_server`
+- KMS policy (`kms:Decrypt` + `kms:GenerateDataKey`) added unconditionally to `_ingestion_base()` — table uses CMK, all ingestion Lambdas need it
+
+### `ingestion_stack.py` — 7 handler strings corrected
+- whoop, withings, habitify, strava, todoist, eightsleep, apple-health had `lambda_function.lambda_handler` placeholder
+- Corrected to match actual filenames (e.g. `whoop_lambda.lambda_handler`)
+- Was masked pre-CDK because `deploy_lambda.sh` reads handler from AWS directly
+
+### Verification
+- `whoop-data-ingestion`: clean 200 ✅
+- `daily-metrics-compute`: clean 200 ✅
+- DLQ purged (11 dead messages cleared)
+- All 7 CDK stacks: `UPDATE_COMPLETE`
+- 26 alarms in ALARM — auto-resolving over next 24h
+
+---
+
+## v3.4.2 — 2026-03-10: Architecture Review #4 — Technical Board Assessment
+
+- Full 12-seat Technical Board review at v3.4.1
+- Deep artifact review: CDK role_policies.py, lambda_helpers.py v2.0, sick_day_checker.py, deploy/ state, INCIDENT_LOG gaps
+- Grades: Architecture A, Security A-, Reliability B+, Operability B+, Cost A, Data Quality A-, AI B, Maintainability B+, Production Readiness B
+- Overall: **A-/B+ platform** (up from B+ at Review #3, C+/B- at Review #1)
+- 10 remaining improvements identified (all S effort, all Sonnet)
+- Chair: "The platform is at A-/B+ and climbing. The remaining work is documentation and hygiene, not architecture."
+- `docs/reviews/REVIEW_2026-03-10.md`
+- Next review: ~2026-04-08 (30 days production operation)
+
+---
+
 ## v3.4.1 — 2026-03-10: Sick Day System, PlatformLogger f-string fixes, EB rule recovery, KMS policy fix
 
 ### Sick Day System (new feature)

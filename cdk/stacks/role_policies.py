@@ -61,6 +61,13 @@ def _ingestion_base(
         resources=[TABLE_ARN],
     ))
 
+    # KMS — required for all DDB operations (table is CMK-encrypted)
+    stmts.append(iam.PolicyStatement(
+        sid="KMS",
+        actions=["kms:Decrypt", "kms:GenerateDataKey"],
+        resources=[KMS_KEY_ARN],
+    ))
+
     # S3 write (raw data)
     if not no_s3:
         prefix = s3_prefix or f"raw/{source}/*"
@@ -136,9 +143,11 @@ def ingestion_withings() -> list[iam.PolicyStatement]:
 
 
 def ingestion_habitify() -> list[iam.PolicyStatement]:
+    # NOTE: Habitify key must be migrated from life-platform/api-keys (pending deletion ~2026-04-07)
+    # to life-platform/habitify before api-keys is deleted. Create secret + update ARCHITECTURE.md.
     return _ingestion_base(
         "habitify",
-        secret_name="life-platform/api-keys",
+        secret_name="life-platform/habitify",  # create this secret before 2026-04-07
         s3_prefix="raw/habitify/*",
     )
 
@@ -350,6 +359,7 @@ def _compute_base(
 def compute_anomaly_detector() -> list[iam.PolicyStatement]:
     """Anomaly detector reads DDB + S3 config, sends SES alerts, uses ai-keys."""
     return _compute_base(
+        needs_kms=True,  # reads CMK-encrypted DDB table
         needs_s3_config=True,
         needs_ai_keys=True,
         needs_ses=True,
@@ -368,3 +378,360 @@ def compute_character_sheet() -> list[iam.PolicyStatement]:
 def compute_daily_metrics() -> list[iam.PolicyStatement]:
     """Daily metrics: DDB read+write, KMS."""
     return _compute_base(needs_kms=True)
+
+
+def compute_daily_insight() -> list[iam.PolicyStatement]:
+    """Daily insight compute (IC-2): reads DDB metrics, writes insight records, uses ai-keys for Haiku."""
+    return _compute_base(
+        needs_kms=True,  # writes to platform_memory + insights DDB partitions
+        needs_ai_keys=True,
+        needs_s3_config=True,
+    )
+
+
+def compute_adaptive_mode() -> list[iam.PolicyStatement]:
+    """Adaptive mode compute: reads DDB + S3 config, uses ai-keys for mode inference."""
+    return _compute_base(
+        needs_kms=True,  # writes adaptive_mode record to DDB
+        needs_ai_keys=True,
+        needs_s3_config=True,
+    )
+
+
+def compute_hypothesis_engine() -> list[iam.PolicyStatement]:
+    """Hypothesis engine: reads DDB, uses ai-keys for Opus hypothesis generation, writes results to DDB."""
+    return _compute_base(
+        needs_kms=True,  # writes hypothesis records to DDB
+        needs_ai_keys=True,
+        needs_s3_config=True,
+    )
+
+
+def compute_dashboard_refresh() -> list[iam.PolicyStatement]:
+    """Dashboard refresh: reads DDB, writes dashboard/data.json + buddy/data.json to S3."""
+    return _compute_base(
+        needs_kms=True,  # reads CMK-encrypted DDB table
+        needs_s3_config=True,
+        needs_s3_write=["dashboard/*", "buddy/*"],
+    )
+
+
+def compute_failure_pattern() -> list[iam.PolicyStatement]:
+    """Failure pattern compute (IC-4): reads DDB metrics, uses ai-keys for pattern analysis, writes to DDB."""
+    return _compute_base(
+        needs_kms=True,  # writes failure_pattern records to platform_memory DDB partition
+        needs_ai_keys=True,
+        needs_s3_config=True,
+    )
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# EMAIL STACK — 8 Lambdas
+# Pattern: DDB read, S3 config (board_of_directors.json), ai-keys, SES send, DLQ
+# ═════════════════════════════════════════════════════════════════════════
+
+def _email_base(
+    needs_s3_write: list[str] = None,
+    extra_secrets: list[str] = None,
+    extra_statements: list[iam.PolicyStatement] = None,
+) -> list[iam.PolicyStatement]:
+    """Build standard email Lambda policies: DDB read, S3 config, ai-keys, SES, DLQ."""
+    stmts = [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem",
+                     "dynamodb:UpdateItem", "dynamodb:BatchGetItem"],
+            resources=[TABLE_ARN, f"{TABLE_ARN}/index/*"],
+        ),
+        iam.PolicyStatement(
+            sid="S3ConfigRead",
+            actions=["s3:GetObject"],
+            resources=_s3("config/*"),
+        ),
+        iam.PolicyStatement(
+            sid="Secrets",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn(s) for s in ["life-platform/ai-keys"] + (extra_secrets or [])],
+        ),
+        iam.PolicyStatement(
+            sid="SES",
+            actions=["ses:SendEmail", "sesv2:SendEmail"],
+            resources=[SES_IDENTITY],
+        ),
+        iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ),
+    ]
+    if needs_s3_write:
+        stmts.append(iam.PolicyStatement(
+            sid="S3Write",
+            actions=["s3:PutObject"],
+            resources=_s3(*needs_s3_write),
+        ))
+    if extra_statements:
+        stmts.extend(extra_statements)
+    return stmts
+
+
+def email_daily_brief() -> list[iam.PolicyStatement]:
+    """Daily brief: DDB read, S3 config, ai-keys, SES, writes dashboard/ + buddy/ to S3."""
+    return _email_base(needs_s3_write=["dashboard/*", "buddy/*"])
+
+
+def email_weekly_digest() -> list[iam.PolicyStatement]:
+    """Weekly digest: DDB read, S3 config, ai-keys, SES, writes clinical.json to S3."""
+    return _email_base(needs_s3_write=["dashboard/clinical.json"])
+
+
+def email_monthly_digest() -> list[iam.PolicyStatement]:
+    """Monthly digest: DDB read, S3 config, ai-keys, SES."""
+    return _email_base()
+
+
+def email_nutrition_review() -> list[iam.PolicyStatement]:
+    """Nutrition review: DDB read, S3 config, ai-keys, SES."""
+    return _email_base()
+
+
+def email_wednesday_chronicle() -> list[iam.PolicyStatement]:
+    """Wednesday chronicle: DDB read, S3 config, ai-keys, SES, writes blog post to S3."""
+    return _email_base(needs_s3_write=["blog/*"])
+
+
+def email_weekly_plate() -> list[iam.PolicyStatement]:
+    """Weekly Plate: DDB read, S3 config, ai-keys, SES."""
+    return _email_base()
+
+
+def email_monday_compass() -> list[iam.PolicyStatement]:
+    """Monday Compass: DDB read, S3 config, ai-keys, SES."""
+    return _email_base()
+
+
+def email_brittany() -> list[iam.PolicyStatement]:
+    """Brittany weekly email: DDB read, S3 config, ai-keys, SES."""
+    return _email_base()
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# OPERATIONAL STACK — 8 Lambdas
+# ═════════════════════════════════════════════════════════════════════════
+
+def operational_freshness_checker() -> list[iam.PolicyStatement]:
+    """Freshness checker: reads DDB + publishes CloudWatch custom metrics, sends SES alert."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="CloudWatchMetrics",
+            actions=["cloudwatch:PutMetricData"],
+            resources=["*"],
+        ),
+        iam.PolicyStatement(
+            sid="SES",
+            actions=["ses:SendEmail", "sesv2:SendEmail"],
+            resources=[SES_IDENTITY],
+        ),
+        iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ),
+    ]
+
+
+def operational_dlq_consumer() -> list[iam.PolicyStatement]:
+    """DLQ consumer: reads from DLQ, logs dead messages, sends SES summary."""
+    return [
+        iam.PolicyStatement(
+            sid="SQS",
+            actions=["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"],
+            resources=[DLQ_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="SES",
+            actions=["ses:SendEmail", "sesv2:SendEmail"],
+            resources=[SES_IDENTITY],
+        ),
+        iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ),
+    ]
+
+
+def operational_canary() -> list[iam.PolicyStatement]:
+    """Canary: reads DDB + S3 + invokes MCP Lambda function URL — no write access."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="S3Read",
+            actions=["s3:GetObject"],
+            resources=_s3("dashboard/*"),
+        ),
+        iam.PolicyStatement(
+            sid="CloudWatchMetrics",
+            actions=["cloudwatch:PutMetricData"],
+            resources=["*"],
+        ),
+        iam.PolicyStatement(
+            sid="Secrets",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/mcp-api-key")],
+        ),
+    ]
+
+
+def operational_pip_audit() -> list[iam.PolicyStatement]:
+    """Pip audit: no AWS resource access needed — just runs pip-audit and reports."""
+    return [
+        iam.PolicyStatement(
+            sid="SES",
+            actions=["ses:SendEmail", "sesv2:SendEmail"],
+            resources=[SES_IDENTITY],
+        ),
+    ]
+
+
+def operational_qa_smoke() -> list[iam.PolicyStatement]:
+    """QA smoke: reads DDB, S3, invokes other Lambdas for smoke tests."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="S3Read",
+            actions=["s3:GetObject"],
+            resources=_s3("dashboard/*", "config/*"),
+        ),
+        iam.PolicyStatement(
+            sid="SES",
+            actions=["ses:SendEmail", "sesv2:SendEmail"],
+            resources=[SES_IDENTITY],
+        ),
+    ]
+
+
+def operational_key_rotator() -> list[iam.PolicyStatement]:
+    """Key rotator: rotates MCP API key in Secrets Manager."""
+    return [
+        iam.PolicyStatement(
+            sid="Secrets",
+            actions=[
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:PutSecretValue",
+                "secretsmanager:UpdateSecret",
+                "secretsmanager:DescribeSecret",
+            ],
+            resources=[_secret_arn("life-platform/mcp-api-key")],
+        ),
+    ]
+
+
+def operational_data_export() -> list[iam.PolicyStatement]:
+    """Data export: reads all DDB items, writes JSON/CSV to S3 exports/."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="S3Write",
+            actions=["s3:PutObject"],
+            resources=_s3("exports/*"),
+        ),
+    ]
+
+
+def operational_data_reconciliation() -> list[iam.PolicyStatement]:
+    """Data reconciliation: reads DDB, sends SES report."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="S3Write",
+            actions=["s3:PutObject"],
+            resources=_s3("reports/*"),
+        ),
+        iam.PolicyStatement(
+            sid="SES",
+            actions=["ses:SendEmail", "sesv2:SendEmail"],
+            resources=[SES_IDENTITY],
+        ),
+    ]
+
+
+def operational_insight_email_parser() -> list[iam.PolicyStatement]:
+    """Insight email parser: reads from SES S3 drop, writes insight records to DDB."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="S3Read",
+            actions=["s3:GetObject"],
+            resources=_s3("inbound-email/*"),
+        ),
+        iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ),
+    ]
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# MCP STACK — 1 Lambda
+# ═════════════════════════════════════════════════════════════════════════
+
+def mcp_server() -> list[iam.PolicyStatement]:
+    """MCP server: full DDB read, S3 read (all prefixes), all secrets read, no write."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem",
+                     "dynamodb:UpdateItem", "dynamodb:BatchGetItem"],
+            resources=[TABLE_ARN, f"{TABLE_ARN}/index/*"],
+        ),
+        iam.PolicyStatement(
+            sid="S3Read",
+            actions=["s3:GetObject", "s3:ListBucket"],
+            resources=[BUCKET_ARN, f"{BUCKET_ARN}/*"],
+        ),
+        iam.PolicyStatement(
+            sid="S3Write",
+            actions=["s3:PutObject"],
+            resources=_s3("config/*"),
+        ),
+        iam.PolicyStatement(
+            sid="Secrets",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[
+                _secret_arn("life-platform/mcp-api-key"),
+                _secret_arn("life-platform/ai-keys"),
+            ],
+        ),
+        iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ),
+    ]

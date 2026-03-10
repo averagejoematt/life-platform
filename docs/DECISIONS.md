@@ -44,6 +44,9 @@ When a significant decision is made — a design pattern chosen, an approach rej
 | ADR-018 | CDK for IaC over Terraform | ✅ Active | 2026-03-09 |
 | ADR-019 | SIMP-2 ingestion framework: adopt for new Lambdas, skip migration of existing | ✅ Active | 2026-03-09 |
 | ADR-020 | MCP tool functions BEFORE TOOLS={} dict | ✅ Active | 2026-02-26 |
+| ADR-021 | EventBridge rule naming convention (CDK) | ✅ Active | 2026-03-10 |
+| ADR-022 | CoreStack scoping — shared infrastructure vs. per-stack resources | ✅ Active | 2026-03-10 |
+| ADR-023 | Sick day checker as shared utility, not standalone Lambda | ✅ Active | 2026-03-10 |
 
 ---
 
@@ -317,4 +320,61 @@ When a significant decision is made — a design pattern chosen, an approach rej
 
 ---
 
-*Last updated: 2026-03-09 (v3.3.9)*
+---
+
+## ADR-021 — EventBridge Rule Naming Convention (CDK)
+
+**Status:** Active  
+**Date:** 2026-03-10 (v3.4.0)  
+**Context:** v3.4.0 deleted 40 manually-created EventBridge rules and replaced them with CDK-managed equivalents. Naming convention needed to be consistent and discoverable.
+
+**Decision:** CDK-managed EB rules use lowercase-hyphenated names matching the Lambda function's logical purpose, e.g., `whoop-daily-ingestion`, `daily-brief-schedule`, `character-sheet-compute`. The rule name matches the CDK construct ID and, where applicable, the Lambda function name. CDK is the authoritative source for all EB rule names — manually-created rules are deleted after CDK adoption.
+
+**Alternatives considered:**
+- CDK auto-generated names (e.g., `IngestionStack-whoop-daily-ingestionXXXX`): Not human-readable; breaks RunBook references
+- Keep manual rules alongside CDK rules: Causes duplication, alarm thrashing, and double-invocation risk
+
+**Outcome:** 50 CDK-managed rules with consistent, human-readable names. Rule names are stable across CDK deploys (use `rule_name=` explicit naming, not auto-generated). ARCHITECTURE.md schedule tables reference these names.
+
+**Lesson learned (EB rule recreation gap incident):** When migrating from manual → CDK rules, use CDK import or blue/green rule swap. Never delete-then-create for time-sensitive schedules. Delete old rules only after verifying CDK rules are active and have fired at least once.
+
+---
+
+## ADR-022 — CoreStack Scoping: Shared Infrastructure vs. Per-Stack Resources
+
+**Status:** Active  
+**Date:** 2026-03-10 (v3.4.0)  
+**Context:** With 8 CDK stacks, deciding what lives in CoreStack vs. stack-specific resources.
+
+**Decision:** CoreStack owns exactly three shared infrastructure primitives: (1) SQS Dead Letter Queue (`life-platform-ingestion-dlq`), (2) SNS alert topic (`life-platform-alerts`), (3) shared Lambda Layer. All other stacks import CoreStack outputs via cross-stack references. CoreStack deploys first and is never destroyed.
+
+**What is NOT in CoreStack:**
+- DynamoDB table and S3 bucket: stateful data resources, managed manually with PITR/versioning enabled. CDK-managing stateful resources introduces destroy risk. These are referenced by ARN in all stacks.
+- CloudFront, ACM, API Gateway: managed in the Web stack or as standalone resources
+- Per-Lambda IAM roles: defined in each stack via `role_policies.py` to keep least-privilege scoping close to the resource
+
+**Rationale:** Shared infrastructure changes infrequently and affects all stacks. Per-resource policies belong with the resource. Stateful data must never be accidentally deleted by `cdk destroy`.
+
+**Lesson learned (DLQ ARN incident):** On first CDK deployment of CoreStack, the DLQ ARN changed because CDK couldn't import the manually-created resource. Future pattern: for resources that already exist, use `from_queue_arn()` CDK import rather than creating new — preserves ARN stability.
+
+---
+
+## ADR-023 — Sick Day Checker as Shared Utility, Not Standalone Lambda
+
+**Status:** Active  
+**Date:** 2026-03-10 (v3.4.0)  
+**Context:** Sick day detection logic (low step count, elevated resting HR, unusual sleep patterns, journal keywords) needed to be integrated into the compute pipeline.
+
+**Decision:** `sick_day_checker.py` is a shared utility module in the Lambda Layer, imported by `daily-metrics-compute` and `daily-brief`. It is not a standalone Lambda with its own EventBridge schedule.
+
+**Alternatives considered:**
+- Standalone Lambda on a schedule: adds a 42nd Lambda, introduces timing dependency (must run before `daily-metrics-compute`), provides no benefit over a synchronous call
+- Inline logic in `daily-brief`: couples sick-day logic to the presentation layer; `daily-metrics-compute` also needs the result for day grade computation
+
+**Outcome:** Sick day detection is synchronous with compute. The result is stored in `computed_metrics` and consumed by both the Daily Brief (tone adjustment, suppressed coaching pressure) and the Character Sheet (component score modifiers). No scheduling overhead.
+
+**Interface:** `from sick_day_checker import detect_sick_day` → returns `SickDayResult(is_sick: bool, confidence: float, signals: list[str])`. Consumed by `compute_anomaly_detector`, `daily_metrics_compute_lambda`, `daily_brief_lambda`.
+
+---
+
+*Last updated: 2026-03-10 (v3.4.2)*

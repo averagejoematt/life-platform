@@ -41,6 +41,7 @@ BACKWARD COMPATIBILITY:
   (positional only) continue to work unchanged. Migration can be incremental.
 
 v1.0.0 — 2026-03-08 (OBS-1)
+v1.0.1 — 2026-03-10 — *args %s compat for all log methods (Bug B fix)
 """
 
 import json
@@ -168,10 +169,21 @@ class PlatformLogger(logging.Logger):
 
     # ── Overridden log methods that accept keyword args ────────────────────────
 
-    def _log_with_extras(self, level: int, msg: str, kwargs: dict):
-        """Shared implementation — attach extra_fields to record."""
+    def _log_with_extras(self, level: int, msg: str, args: tuple, kwargs: dict):
+        """Shared implementation — attach extra_fields to record.
+
+        Supports both call styles:
+          logger.info("msg: %s", value)          # positional %s (stdlib compat)
+          logger.info("msg", key=value)           # keyword args → JSON fields
+        """
         if not self.isEnabledFor(level):
             return
+        # Interpolate %s args if provided (stdlib backward compat)
+        if args:
+            try:
+                msg = msg % args
+            except (TypeError, ValueError):
+                msg = f"{msg} {args}"  # fallback: append args if interpolation fails
         record = self.makeRecord(
             self.name,
             level,
@@ -186,23 +198,23 @@ class PlatformLogger(logging.Logger):
         record.extra_fields = kwargs  # all remaining kwargs become JSON fields
         self.handle(record)
 
-    def debug(self, msg: str, **kwargs):
-        self._log_with_extras(logging.DEBUG, msg, kwargs)
+    def debug(self, msg: str, *args, **kwargs):
+        self._log_with_extras(logging.DEBUG, msg, args, kwargs)
 
-    def info(self, msg: str, **kwargs):
-        self._log_with_extras(logging.INFO, msg, kwargs)
+    def info(self, msg: str, *args, **kwargs):
+        self._log_with_extras(logging.INFO, msg, args, kwargs)
 
-    def warning(self, msg: str, **kwargs):
-        self._log_with_extras(logging.WARNING, msg, kwargs)
+    def warning(self, msg: str, *args, **kwargs):
+        self._log_with_extras(logging.WARNING, msg, args, kwargs)
 
-    def warn(self, msg: str, **kwargs):
-        self._log_with_extras(logging.WARNING, msg, kwargs)
+    def warn(self, msg: str, *args, **kwargs):
+        self._log_with_extras(logging.WARNING, msg, args, kwargs)
 
-    def error(self, msg: str, **kwargs):
-        self._log_with_extras(logging.ERROR, msg, kwargs)
+    def error(self, msg: str, *args, **kwargs):
+        self._log_with_extras(logging.ERROR, msg, args, kwargs)
 
-    def critical(self, msg: str, **kwargs):
-        self._log_with_extras(logging.CRITICAL, msg, kwargs)
+    def critical(self, msg: str, *args, **kwargs):
+        self._log_with_extras(logging.CRITICAL, msg, args, kwargs)
 
     # ── Convenience helpers for common patterns ────────────────────────────────
 

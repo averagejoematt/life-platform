@@ -321,13 +321,19 @@ Return ONLY a JSON array, no preamble or markdown."""
 # PATTERN STORE
 # ==============================================================================
 
+# TTL for failure_pattern records: 90 days (patterns age out as behaviour evolves)
+_FAILURE_PATTERN_TTL_DAYS = 90
+
+
 def store_failure_patterns(run_date_str, patterns, failure_days_count, week_start_str):
     """Write failure pattern records to platform_memory.
 
     One record per pattern, keyed by run date + pattern index.
     Idempotent on rerun (same SK overwrites).
+    TTL: 90 days — DynamoDB auto-expires stale patterns as behaviour evolves.
     """
     stored = 0
+    ttl_ts = int((datetime.now(timezone.utc) + timedelta(days=_FAILURE_PATTERN_TTL_DAYS)).timestamp())
     for i, p in enumerate(patterns):
         component    = p.get("component", "unknown")
         pattern_text = p.get("pattern", "")
@@ -349,6 +355,7 @@ def store_failure_patterns(run_date_str, patterns, failure_days_count, week_star
             "suggestion":           p.get("suggestion", ""),
             "failure_days_scanned": failure_days_count,
             "stored_at":            datetime.now(timezone.utc).isoformat(),
+            "ttl":                  ttl_ts,  # 90-day auto-expiry
         }
         item = {k: v for k, v in item.items() if v is not None and v != ""}
         table.put_item(Item=item)
