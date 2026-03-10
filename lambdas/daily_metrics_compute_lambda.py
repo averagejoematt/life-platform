@@ -29,6 +29,7 @@ Pattern: follows character-sheet-compute Lambda architecture.
 
 v1.0.0 — 2026-03-07
 v1.1.0 — 2026-03-09: Sick day support — grade='sick', streaks preserved
+v1.1.0 — 2026-03-09: Sick day support — grade='sick', streaks preserved
 """
 
 import json
@@ -101,7 +102,7 @@ def fetch_date(source, date_str):
         r = table.get_item(Key={"pk": USER_PREFIX + source, "sk": "DATE#" + date_str})
         return d2f(r.get("Item"))
     except Exception as e:
-        logger.warning("fetch_date(%s, %s) failed: %s", source, date_str, e)
+        logger.warning(f"fetch_date({source}, {date_str}) failed: {e}")
         return None
 
 
@@ -124,7 +125,7 @@ def fetch_range(source, start, end):
             kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
         return records
     except Exception as e:
-        logger.warning("fetch_range(%s, %s→%s) failed: %s", source, start, end, e)
+        logger.warning(f"fetch_range({source}, {start}→{end}) failed: {e}")
         return []
 
 
@@ -133,7 +134,7 @@ def fetch_profile():
         r = table.get_item(Key={"pk": PROFILE_PK, "sk": "PROFILE#v1"})
         return d2f(r.get("Item", {}))
     except Exception as e:
-        logger.error("fetch_profile failed: %s", e)
+        logger.error(f"fetch_profile failed: {e}")
         return {}
 
 
@@ -147,7 +148,7 @@ def fetch_journal_entries(date_str):
             })
         return [d2f(i) for i in r.get("Items", [])]
     except Exception as e:
-        logger.warning("fetch_journal_entries(%s) failed: %s", date_str, e)
+        logger.warning(f"fetch_journal_entries({date_str}) failed: {e}")
         return []
 
 
@@ -472,9 +473,9 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights):
             if score is not None:
                 item["component_" + comp] = Decimal(str(score))
         table.put_item(Item=item)
-        logger.info("Stored day_grade: %s → %s (%s)", date_str, total_score, grade)
+        logger.info(f"Stored day_grade: {date_str} → {total_score} ({grade})")
     except Exception as e:
-        logger.warning("store_day_grade failed: %s", e)
+        logger.warning(f"store_day_grade failed: {e}")
 
 
 def store_habit_scores(date_str, component_details, component_scores, vice_streaks, profile):
@@ -537,11 +538,9 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
             item["synergy_groups"] = _deep_dec(sg_pcts)
         item = {k: v for k, v in item.items() if v is not None}
         table.put_item(Item=item)
-        logger.info("Stored habit_scores: %s T0=%s/%s T1=%s/%s",
-                    date_str, t0.get("done", 0), t0.get("total", 0),
-                    t1.get("done", 0), t1.get("total", 0))
+        logger.info(f"Stored habit_scores: {date_str} T0={t0.get('done', 0)}/{t0.get('total', 0)} T1={t1.get('done', 0)}/{t1.get('total', 0)}")
     except Exception as e:
-        logger.warning("store_habit_scores failed: %s", e)
+        logger.warning(f"store_habit_scores failed: {e}")
 
 
 # ==============================================================================
@@ -604,7 +603,7 @@ def assemble_data(yesterday_str, profile):
             strava["activity_count"] = deduped
             strava["total_moving_time_seconds"] = sum(
                 float(a.get("moving_time_seconds") or 0) for a in strava["activities"])
-            logger.info("Dedup: %d → %d Strava activities", orig, deduped)
+            logger.info(f"Dedup: {orig} → {deduped} Strava activities")
 
     # HRV averages
     hrv_7d_recs  = fetch_range("whoop", (today - timedelta(days=7)).isoformat(),  yesterday_str)
@@ -696,7 +695,7 @@ def lambda_handler(event, context):
     # Determine target date (default: yesterday; override via event for backfill/testing)
     if event.get("date"):
         yesterday_str = event["date"]
-        logger.info("Override date: %s", yesterday_str)
+        logger.info(f"Override date: {yesterday_str}")
     else:
         today         = datetime.now(timezone.utc).date()
         yesterday_str = (today - timedelta(days=1)).isoformat()
@@ -724,7 +723,7 @@ def lambda_handler(event, context):
                 changed = [s for s, ts in current_fps.items()
                            if ts > stored_fps.get(s, "")]
                 reason = f"newer data in: {', '.join(changed)}"
-            logger.info("Recomputing %s — %s", yesterday_str, reason)
+            logger.info(f"Recomputing {yesterday_str} — {reason}")
 
     # ── Sick day check ─────────────────────────────────────────────────────
     # If the target date is flagged as a sick/rest day, store a minimal record:
@@ -739,7 +738,58 @@ def lambda_handler(event, context):
 
     if _sick_rec:
         _sick_reason = _sick_rec.get("reason") or "sick day"
-        logger.info("Sick day flagged for %s (%s) — storing sick record", yesterday_str, _sick_reason)
+        logger.info(f"Sick day flagged for {yesterday_str} ({_sick_reason}) — storing sick record")
+
+        # Load previous day's computed_metrics to preserve streak values
+        _dt_y = datetime.strptime(yesterday_str, "%Y-%m-%d")
+        _prev_date = (_dt_y - timedelta(days=1)).strftime("%Y-%m-%d")
+        _prev_cm = fetch_date("computed_metrics", _prev_date)
+        _t0_streak  = int(float(_prev_cm.get("tier0_streak",  0))) if _prev_cm else 0
+        _t01_streak = int(float(_prev_cm.get("tier01_streak", 0))) if _prev_cm else 0
+        _vice_streaks = {k: int(float(v)) for k, v in _prev_cm.get("vice_streaks", {}).items()} if _prev_cm else {}
+
+        _sick_item = {
+            "pk":               USER_PREFIX + "computed_metrics",
+            "sk":               "DATE#" + yesterday_str,
+            "date":             yesterday_str,
+            "day_grade_letter": "sick",
+            "sick_day":         True,
+            "sick_day_reason":  _sick_reason,
+            "readiness_colour": "gray",
+            "tier0_streak":     Decimal(str(_t0_streak)),
+            "tier01_streak":    Decimal(str(_t01_streak)),
+            "sleep_debt_7d_hrs": Decimal("0"),
+            "computed_at":      datetime.now(timezone.utc).isoformat(),
+            "algo_version":     ALGO_VERSION,
+        }
+        if _vice_streaks:
+            _sick_item["vice_streaks"] = {k: Decimal(str(v)) for k, v in _vice_streaks.items()}
+
+        table.put_item(Item=_sick_item)
+        logger.info(f"Sick day record stored for {yesterday_str} — streaks preserved (T0={_t0_streak} T01={_t01_streak})")
+        return {
+            "statusCode":       200,
+            "body":             f"Sick day {yesterday_str}: computed_metrics stored with grade='sick'",
+            "day_grade_letter": "sick",
+            "sick_day":         True,
+            "tier0_streak":     _t0_streak,
+            "tier01_streak":    _t01_streak,
+        }
+
+    # ── Sick day check ─────────────────────────────────────────────────────
+    # If the target date is flagged as a sick/rest day, store a minimal record:
+    #   - day_grade_letter = "sick" (not scored, excluded from trend charts)
+    #   - Streak timers preserved from previous day (not broken, not advanced)
+    #   - Anomaly alerts will be suppressed separately by anomaly_detector
+    try:
+        from sick_day_checker import check_sick_day as _check_sick
+        _sick_rec = _check_sick(table, USER_ID, yesterday_str)
+    except ImportError:
+        _sick_rec = None
+
+    if _sick_rec:
+        _sick_reason = _sick_rec.get("reason") or "sick day"
+        logger.info(f"Sick day flagged for {yesterday_str} ({_sick_reason}) — storing sick record")
 
         # Load previous day's computed_metrics to preserve streak values
         _dt_y = datetime.strptime(yesterday_str, "%Y-%m-%d")
@@ -787,7 +837,7 @@ def lambda_handler(event, context):
 
     # ── Capture source fingerprints before assembling (same fetches, cached by DDB) ──
     source_fps = get_source_fingerprints(yesterday_str)
-    logger.info("Source fingerprints: %s", source_fps)
+    logger.info(f"Source fingerprints: {source_fps}")
 
     # ── Assemble raw data ──
     data, hrv_7d_avg, hrv_30d_avg = assemble_data(yesterday_str, profile)
@@ -795,14 +845,14 @@ def lambda_handler(event, context):
     # ── Day grade ──
     day_grade_score, grade, component_scores, component_details = \
         scoring_engine.compute_day_grade(data, profile)
-    logger.info("Day grade: %s (%s)", day_grade_score, grade)
+    logger.info(f"Day grade: {day_grade_score} ({grade})")
     for comp, score in component_scores.items():
         if score is not None:
-            logger.info("  %-20s %s", comp, score)
+            logger.info(f"  {comp:<20} {score}")
 
     # ── Readiness ──
     readiness_score, readiness_colour = compute_readiness(data)
-    logger.info("Readiness: %s (%s)", readiness_score, readiness_colour)
+    logger.info(f"Readiness: {readiness_score} ({readiness_colour})")
 
     # ── Habit streaks ──
     streak_data = compute_habit_streaks(profile, yesterday_str)
