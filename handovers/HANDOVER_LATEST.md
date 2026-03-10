@@ -1,4 +1,56 @@
-# Handover — v3.4.1: Sick Day System
+# Handover — v3.4.3: CDK IaC Bugfix Sprint
+**Date:** 2026-03-10  
+**Git:** pending — `git add -A && git commit -m "v3.4.3: CDK IaC bugfix sprint — role_policies, handlers, KMS, PlatformLogger" && git push`
+
+---
+
+## What Was Done This Session
+
+Multi-bug CDK infrastructure recovery sprint. Four distinct bugs fixed:
+
+**Bug 1: PlatformLogger `*args` (carried from prior session)**
+- All log methods updated: `*args, **kwargs` + `%s` interpolation support
+- SharedUtilsLayer:7 published, deployed to all 6 Lambda-bearing stacks
+
+**Bug 2: 22 missing `role_policies.py` methods**
+- CDK `app.py` synths all stacks simultaneously — `AttributeError` on any missing method blocks everything
+- Added: 5 compute, 9 email (new `_email_base()` helper), 8 operational, 1 MCP
+- Added KMS (`kms:Decrypt` + `kms:GenerateDataKey`) to `_ingestion_base()` — table is CMK-encrypted, all ingestion roles were missing this
+
+**Bug 3: 7 wrong handlers in `ingestion_stack.py`**
+- whoop, withings, habitify, strava, todoist, eightsleep, apple-health had `lambda_function.lambda_handler` scaffolding placeholder
+- Fixed to actual filenames (e.g. `whoop_lambda.lambda_handler`)
+- Root cause: `deploy_lambda.sh` reads handler from AWS directly, never validates CDK source — wrong values persisted undetected
+
+**Bug 4: KMS missing from all ingestion IAM roles**
+- CDK-created roles had no KMS access; `AccessDeniedException` on every DDB query
+- Fixed in `_ingestion_base()` — KMS statement now unconditional for all ingestion Lambdas
+
+### Verification
+- `whoop-data-ingestion` → 200, no FunctionError ✅
+- `daily-metrics-compute` → 200, no FunctionError ✅
+- DLQ purged (11 dead messages cleared)
+- All 7 CDK stacks: `UPDATE_COMPLETE`
+- 26 alarms in ALARM — auto-resolving within 24h as scheduled runs succeed
+
+---
+
+## Key Lesson
+`deploy_lambda.sh` reads handler config from AWS, bypassing CDK entirely. Wrong CDK values can persist indefinitely. Always verify CDK handler strings match actual filenames.
+
+---
+
+## Next Steps
+1. Monitor alarms — should clear within 24h
+2. **Partner email** — next major feature
+3. **COST-A** — CloudWatch alarm pruning (~87→35, saves ~$2/mo)
+4. **COST-B** — Secrets Manager consolidation review
+5. Architecture Review #5 — ~2026-04-08
+6. Run git commit above
+
+---
+
+# Previous Handover — v3.4.1: Sick Day System
 **Date:** 2026-03-10  
 **Git:** `fd4c5c0` — "v3.4.1: sick day system, fix PlatformLogger f-strings, fix EB rules, fix character-sheet KMS policy"  
 **Status:** ✅ Complete. All tasks done. No pending items.

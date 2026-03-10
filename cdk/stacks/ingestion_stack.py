@@ -43,7 +43,7 @@ class IngestionStack(Stack):
         whoop = create_platform_lambda(self, "WhoopIngestion",
             function_name="whoop-data-ingestion",
             source_file="lambdas/whoop_lambda.py",
-            handler="lambda_function.lambda_handler",
+            handler="whoop_lambda.lambda_handler",
             schedule="cron(0 14 * * ? *)",  # 6:00 AM PT daily
             timeout_seconds=300, alarm_name="ingestion-error-whoop",
             custom_policies=rp.ingestion_whoop(), **shared)
@@ -77,7 +77,7 @@ class IngestionStack(Stack):
         create_platform_lambda(self, "WithingsIngestion",
             function_name="withings-data-ingestion",
             source_file="lambdas/withings_lambda.py",
-            handler="lambda_function.lambda_handler",
+            handler="withings_lambda.lambda_handler",
             schedule="cron(15 14 * * ? *)",
             timeout_seconds=120, alarm_name="ingestion-error-withings",
             custom_policies=rp.ingestion_withings(), **shared)
@@ -86,7 +86,7 @@ class IngestionStack(Stack):
         create_platform_lambda(self, "HabitifyIngestion",
             function_name="habitify-data-ingestion",
             source_file="lambdas/habitify_lambda.py",
-            handler="lambda_function.lambda_handler",
+            handler="habitify_lambda.lambda_handler",
             schedule="cron(15 14 * * ? *)",
             timeout_seconds=180,
             custom_policies=rp.ingestion_habitify(),
@@ -96,7 +96,7 @@ class IngestionStack(Stack):
         create_platform_lambda(self, "StravaIngestion",
             function_name="strava-data-ingestion",
             source_file="lambdas/strava_lambda.py",
-            handler="lambda_function.lambda_handler",
+            handler="strava_lambda.lambda_handler",
             schedule="cron(30 14 * * ? *)",
             timeout_seconds=300, alarm_name="ingestion-error-strava",
             custom_policies=rp.ingestion_strava(), **shared)
@@ -115,7 +115,7 @@ class IngestionStack(Stack):
         create_platform_lambda(self, "TodoistIngestion",
             function_name="todoist-data-ingestion",
             source_file="lambdas/todoist_lambda.py",
-            handler="lambda_function.lambda_handler",
+            handler="todoist_lambda.lambda_handler",
             schedule="cron(45 14 * * ? *)",
             timeout_seconds=120, alarm_name="ingestion-error-todoist",
             custom_policies=rp.ingestion_todoist(), **shared)
@@ -124,7 +124,7 @@ class IngestionStack(Stack):
         create_platform_lambda(self, "EightsleepIngestion",
             function_name="eightsleep-data-ingestion",
             source_file="lambdas/eightsleep_lambda.py",
-            handler="lambda_function.lambda_handler",
+            handler="eightsleep_lambda.lambda_handler",
             schedule="cron(0 15 * * ? *)",
             timeout_seconds=120, alarm_name="ingestion-error-eightsleep",
             custom_policies=rp.ingestion_eightsleep(), **shared)
@@ -174,7 +174,7 @@ class IngestionStack(Stack):
         apple_health = create_platform_lambda(self, "AppleHealthIngestion",
             function_name="apple-health-ingestion",
             source_file="lambdas/apple_health_lambda.py",
-            handler="lambda_function.lambda_handler",
+            handler="apple_health_lambda.lambda_handler",
             timeout_seconds=300, memory_mb=512, alarm_name="ingestion-error-apple-health",
             custom_policies=rp.ingestion_apple_health(), **shared)
         apple_health.add_permission("S3InvokeAppleHealth",
