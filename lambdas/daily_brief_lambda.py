@@ -1180,6 +1180,103 @@ def lambda_handler(event, context):
     print("[INFO] Date: " + yesterday + " | sources: " +
           ", ".join(k for k in ["whoop", "sleep", "macrofactor", "habitify", "apple", "strava", "mf_workouts"] if data.get(k)))
 
+    # ── Sick day check ─────────────────────────────────────────────────────
+    # If today's subject date was a sick/rest day, send a brief recovery
+    # summary instead of the full brief. Skip scoring, habits, and coaching.
+    try:
+        from sick_day_checker import check_sick_day as _check_sick_brief
+        _sick_brief_rec = _check_sick_brief(table, USER_ID, yesterday)
+    except ImportError:
+        _sick_brief_rec = None
+
+    if _sick_brief_rec:
+        _sick_brief_reason = _sick_brief_rec.get("reason") or "sick day"
+        print(f"[INFO] Sick day flagged for {yesterday} ({_sick_brief_reason}) — sending recovery brief")
+
+        _sb_whoop      = fetch_date("whoop", yesterday)
+        _sb_sleep_hrs  = safe_float(_sb_whoop, "sleep_duration_hours")
+        _sb_recovery   = safe_float(_sb_whoop, "recovery_score")
+        _sb_hrv        = safe_float(_sb_whoop, "hrv")
+
+        _sb_sleep_line    = f"{_sb_sleep_hrs:.1f} hrs" if _sb_sleep_hrs else "—"
+        _sb_recovery_line = f"{int(_sb_recovery)}%" if _sb_recovery else "—"
+        _sb_hrv_line      = f"{int(_sb_hrv)} ms"   if _sb_hrv      else "—"
+
+        try:
+            _today_short = today.strftime("%a %b %-d")
+        except Exception:
+            _today_short = today.isoformat()
+
+        _sb_reason_display = _sick_brief_reason.title()
+        _sb_html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <div style="max-width:560px;margin:24px auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+    <div style="background:#1a1a2e;padding:20px 24px 16px;">
+      <p style="color:#8892b0;font-size:11px;margin:0 0 2px;text-transform:uppercase;letter-spacing:1px;">Daily Brief — Recovery Day</p>
+      <h1 style="color:#fff;font-size:17px;font-weight:700;margin:0;">{_today_short}</h1>
+    </div>
+    <div style="background:#7c3aed;padding:14px 24px;">
+      <p style="color:#fff;font-size:14px;font-weight:700;margin:0;">🤒 Rest &amp; Recovery — {_sb_reason_display}</p>
+      <p style="color:#e9d5ff;font-size:12px;margin:4px 0 0;">No grades, no scores, no coaching today. Just recover.</p>
+    </div>
+    <div style="padding:20px 24px 8px;">
+      <p style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 12px;">What Your Body Is Doing</p>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr>
+          <td style="padding:8px 0;font-size:13px;color:#6b7280;">Sleep last night</td>
+          <td style="padding:8px 0;font-size:14px;font-weight:600;color:#1a1a2e;text-align:right;">{_sb_sleep_line}</td>
+        </tr>
+        <tr style="border-top:1px solid #f3f4f6;">
+          <td style="padding:8px 0;font-size:13px;color:#6b7280;">Recovery score</td>
+          <td style="padding:8px 0;font-size:14px;font-weight:600;color:#1a1a2e;text-align:right;">{_sb_recovery_line}</td>
+        </tr>
+        <tr style="border-top:1px solid #f3f4f6;">
+          <td style="padding:8px 0;font-size:13px;color:#6b7280;">HRV</td>
+          <td style="padding:8px 0;font-size:14px;font-weight:600;color:#1a1a2e;text-align:right;">{_sb_hrv_line}</td>
+        </tr>
+      </table>
+    </div>
+    <div style="padding:4px 24px 20px;">
+      <div style="background:#f8f8fc;border-radius:8px;padding:14px 16px;border-left:3px solid #7c3aed;">
+        <p style="font-size:14px;color:#1a1a2e;line-height:1.65;margin:0;">
+          <strong>Today's only job:</strong> rest, hydrate, and let your immune system do its work.
+          Habits, calories, and streaks are frozen — no progress lost for being sick.
+          Your character sheet is paused. See you when you're back. 💜
+        </p>
+      </div>
+    </div>
+    <div style="background:#f8f8fc;padding:12px 24px;border-top:1px solid #e8e8f0;">
+      <p style="color:#9ca3af;font-size:10px;margin:0;text-align:center;">Life Platform — Recovery Day Brief | {_sick_brief_reason}</p>
+      <p style="color:#b0b0b0;font-size:8px;margin:4px 0 0;text-align:center;">&#9874;&#65039; Personal health tracking only &mdash; not medical advice.</p>
+    </div>
+  </div>
+</body>
+</html>"""
+
+        _sb_subject = f"Recovery Day | {_today_short} | 🤒 Rest up — no scores today"
+        ses.send_email(
+            FromEmailAddress=SENDER,
+            Destination={"ToAddresses": [RECIPIENT]},
+            Content={"Simple": {
+                "Subject": {"Data": _sb_subject, "Charset": "UTF-8"},
+                "Body":    {"Html": {"Data": _sb_html, "Charset": "UTF-8"}},
+            }},
+        )
+        print(f"[INFO] Recovery brief sent: {_sb_subject}")
+
+        try:
+            output_writers.write_buddy_json(
+                {"date": yesterday, "whoop": _sb_whoop, "sick_day": True,
+                 "sick_day_reason": _sick_brief_reason},
+                profile, yesterday, character_sheet=None,
+            )
+        except Exception as _sbe:
+            print(f"[WARN] write_buddy_json (sick) failed: {_sbe}")
+
+        return {"statusCode": 200, "body": f"Recovery brief sent for {yesterday}"}
+
     # Deduplicate multi-device Strava activities
     strava = data.get("strava")
     if strava and strava.get("activities"):

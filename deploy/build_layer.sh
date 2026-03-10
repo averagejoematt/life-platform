@@ -13,6 +13,7 @@ MODULES=(
     character_engine.py output_writers.py ai_calls.py html_builder.py
     ai_output_validator.py platform_logger.py ingestion_framework.py
     ingestion_validator.py item_size_guard.py digest_utils.py
+    sick_day_checker.py
 )
 
 rm -rf "$PROJ_ROOT/cdk/layer-build"

@@ -1,116 +1,136 @@
-# Life Platform — Handover v3.4.0
-**Date:** 2026-03-10
-**Session:** Full IaC — CDK-manage IAM roles, EventBridge rules, Core resources
+# Life Platform — Handover
+**Date:** 2026-03-09
+**Version:** v3.4.1 — Sick Day System
+**Session type:** Feature build (sick day flagging + full platform suppression)
 
 ---
 
-## Platform State
+## What Was Built
 
-| Dimension | Value |
+Matthew was sick March 8–9. The platform was penalizing him — Character Sheet EMA dragging down, anomaly alerts firing, freshness checker alerting, buddy page showing red beacons. This session built a complete sick day system.
+
+### New DDB partition
+`pk=USER#matthew#SOURCE#sick_days`, `sk=DATE#YYYY-MM-DD`
+Both March 8 and March 9 have already been written to DDB directly.
+
+### New files (already written to disk)
+- `lambdas/sick_day_checker.py` — shared Layer utility: `check_sick_day()`, `get_sick_days_range()`, `write_sick_day()`, `delete_sick_day()`. Safe import (returns None on ImportError).
+- `mcp/tools_sick_days.py` — 3 MCP tools: `tool_log_sick_day`, `tool_get_sick_days`, `tool_clear_sick_day`
+
+### Lambda patches (NOT yet deployed — apply_sick_day_patches.py applies them)
+| Lambda | Change |
 |---|---|
-| Version | v3.4.0 |
-| MCP Tools | 144 across 30 modules |
-| Lambdas | 41 |
-| Secrets | 8 |
-| Alarms | ~47 |
-| CDK Stacks | 8 |
-| Cost | ~$25/month |
-| AWS | Account 205930651321, us-west-2 |
+| `character_sheet_lambda.py` | v1.1.0: freeze EMA on sick day — copy prev record, `sick_day=True`, `frozen_from` |
+| `daily_metrics_compute_lambda.py` | v1.1.0: `day_grade_letter="sick"`, streaks preserved from prior day |
+| `anomaly_detector_lambda.py` | v2.2.0: `sick_suppressed` severity, alert email suppressed |
+| `freshness_checker_lambda.py` | suppresses SNS stale-source alerts on sick days |
+| `daily_brief_lambda.py` | sends recovery brief (sleep/recovery/HRV only, purple banner) |
+
+### Deploy artifacts (written to disk)
+- `deploy/apply_sick_day_patches.py` — programmatic patch script for all 5 Lambdas + registry.py
+- `deploy/sick_days_retroactive.sh` — Lambda re-invocation commands for Mar 8-9
+- `deploy/bump_version_341.py` — fixes CHANGELOG + PROJECT_PLAN version bump
+- `deploy/build_layer.sh` — already has `sick_day_checker.py` in MODULES array
 
 ---
 
-## What Was Done This Session
+## State of Key Files
 
-### Item 6: CDK-manage IAM roles — COMPLETE
-- Created `cdk/stacks/role_policies.py` — centralized least-privilege IAM policy definitions for all 41 Lambdas
-- Enhanced `lambda_helpers.py` with `custom_policies` parameter (deprecates `existing_role_arn`)
-- Updated all 5 Lambda stacks to use `custom_policies=rp.<function>()` instead of `existing_role_arn`
-- Deployed all 5 stacks sequentially: MCP → Operational → Compute → Ingestion → Email
-- All 41 Lambdas now use CDK-created roles (`LifePlatform*` prefix)
-- Deleted 39 orphaned console-created IAM roles
-
-### Item 7: CDK-manage EventBridge rules — COMPLETE
-- Switched Ingestion stack (14 rules) + Operational stack (6 rules) from `add_permission` workaround to `schedule=`
-- CDK now creates EB rules directly, wires Lambda permissions automatically
-- Deleted 40 old console-created EB rules
-- 2 rules intentionally kept outside CDK: `life-platform-nightly-warmer` (MCP custom payload), `life-platform-monthly-export`
-
-### 3 previously unmanaged Lambdas adopted
-- `failure-pattern-compute` → LifePlatformCompute (deleted orphan Lambda, CDK recreated)
-- `life-platform-freshness-checker` → LifePlatformOperational (deleted old CFn stack, CDK recreated)
-- `insight-email-parser` → LifePlatformOperational (deleted orphan Lambda, CDK recreated)
-
-### CoreStack (new) — COMPLETE
-- SQS DLQ imported into CDK management via `cdk import`
-- SNS topic imported into CDK management via `cdk import`
-- Lambda Layer v5 published via CDK (pre-built by `deploy/build_layer.sh`)
-- DDB table + S3 bucket referenced via `from_table_name`/`from_bucket_name` (deliberately unmanaged)
-
----
-
-## Deploy Status
-
-All deploys confirmed live as of 2026-03-10:
-- ✅ LifePlatformCore — SQS + SNS imported, Layer v5 published
-- ✅ LifePlatformMcp — CDK-owned IAM role
-- ✅ LifePlatformOperational — CDK-owned IAM roles + EB rules + freshness-checker + insight-parser
-- ✅ LifePlatformCompute — CDK-owned IAM roles + failure-pattern-compute
-- ✅ LifePlatformIngestion — CDK-owned IAM roles + EB rules
-- ✅ LifePlatformEmail — CDK-owned IAM roles
-- ✅ 39 old IAM roles deleted
-- ✅ 40 old EB rules deleted
-- ✅ Old `life-platform-freshness-checker` CFn stack deleted
-
----
-
-## CDK Coverage (8 stacks)
-
-| Stack | Resources |
+| File | State |
 |---|---|
-| LifePlatformCore | SQS DLQ, SNS topic, Lambda Layer |
-| LifePlatformIngestion | 15 Lambdas + 15 EB rules + 16 IAM roles |
-| LifePlatformCompute | 8 Lambdas + 9 EB rules + 8 IAM roles |
-| LifePlatformEmail | 8 Lambdas + 8 EB rules + 8 IAM roles |
-| LifePlatformOperational | 9 Lambdas + 6 EB rules + 9 IAM roles + 6 CW alarms |
-| LifePlatformMcp | 1 Lambda + 1 IAM role + 2 CW alarms |
-| LifePlatformWeb | 3 CloudFront distributions + ACM certs |
-| LifePlatformMonitoring | CW dashboard + 21 alarms |
-
-### Deliberately unmanaged (by design)
-- DynamoDB table `life-platform` (stateful — replacement = data loss)
-- S3 bucket `matthew-life-platform` (stateful — replacement = data loss)
-- MCP Function URL (stable, conflicting resource-based policies)
-- 2 EventBridge rules (`life-platform-nightly-warmer`, `life-platform-monthly-export`)
-- CloudFront Lambda@Edge auth functions (us-east-1 cross-region)
+| `lambdas/sick_day_checker.py` | ✅ Written, ready |
+| `mcp/tools_sick_days.py` | ✅ Written, ready |
+| `lambdas/character_sheet_lambda.py` | ✅ Written (v1.1.0 with sick day) |
+| `lambdas/daily_metrics_compute_lambda.py` | ⚠️ NEEDS PATCH — run apply_sick_day_patches.py |
+| `lambdas/anomaly_detector_lambda.py` | ⚠️ NEEDS PATCH — run apply_sick_day_patches.py |
+| `lambdas/freshness_checker_lambda.py` | ⚠️ NEEDS PATCH — run apply_sick_day_patches.py |
+| `lambdas/daily_brief_lambda.py` | ⚠️ NEEDS PATCH — run apply_sick_day_patches.py |
+| `mcp/registry.py` | ⚠️ NEEDS PATCH — run apply_sick_day_patches.py (restores from git + adds tools) |
+| `docs/CHANGELOG.md` | ⚠️ Overwritten with "placeholder" — fix with bump_version_341.py |
+| `docs/PROJECT_PLAN.md` | ⚠️ Still on v3.4.0 — fix with bump_version_341.py |
+| DDB sick_days records | ✅ 2026-03-08 + 2026-03-09 written |
 
 ---
 
-## Hardening Status
+## Deploy Sequence
 
-35/35 complete. All items from Architecture Review #3 resolved.
-- SIMP-1 (MCP tool usage audit) — revisit ~2026-04-08 after 30 days of EMF usage data
-- PROD-1 (CDK) — ✅ fully complete as of v3.4.0 (was "all 7 stacks", now 8 stacks with full IaC)
+Run these in order from `~/Documents/Claude/life-platform`:
+
+```bash
+# Step 1: Apply Lambda patches + fix registry.py
+python3 deploy/apply_sick_day_patches.py
+
+# Step 2: Fix CHANGELOG + PROJECT_PLAN version bump
+python3 deploy/bump_version_341.py
+
+# Step 3: Verify patches look right (spot check)
+head -10 lambdas/daily_metrics_compute_lambda.py
+grep -n "sick_day" lambdas/anomaly_detector_lambda.py | head -5
+grep -n "sick_day" mcp/registry.py | head -3
+
+# Step 4: Build Lambda Layer (sick_day_checker.py is already in MODULES)
+bash deploy/build_layer.sh
+
+# Step 5: Deploy all CDK stacks
+cd cdk
+cdk deploy LifePlatformCore --require-approval never
+cdk deploy LifePlatformIngestion LifePlatformCompute LifePlatformEmail LifePlatformOperational LifePlatformMcp --require-approval never
+cd ..
+
+# Step 6: Recompute Mar 8-9 records (now that sick day flags exist + code handles them)
+aws lambda invoke --function-name character-sheet-compute \
+    --payload '{"date": "2026-03-08", "force": true}' \
+    --cli-binary-format raw-in-base64-out /tmp/cs_08.json && cat /tmp/cs_08.json
+
+aws lambda invoke --function-name character-sheet-compute \
+    --payload '{"date": "2026-03-09", "force": true}' \
+    --cli-binary-format raw-in-base64-out /tmp/cs_09.json && cat /tmp/cs_09.json
+
+aws lambda invoke --function-name daily-metrics-compute \
+    --payload '{"date": "2026-03-08", "force": true}' \
+    --cli-binary-format raw-in-base64-out /tmp/dm_08.json && cat /tmp/dm_08.json
+
+aws lambda invoke --function-name daily-metrics-compute \
+    --payload '{"date": "2026-03-09", "force": true}' \
+    --cli-binary-format raw-in-base64-out /tmp/dm_09.json && cat /tmp/dm_09.json
+
+# Step 7: Git commit
+git add -A && git commit -m "v3.4.1: sick day system — freeze EMA, suppress anomalies/freshness, recovery brief" && git push
+```
 
 ---
 
-## Next Steps
+## Verification After Deploy
 
-1. **Architecture Review #4:** ~2026-04-08
-2. **Next feature: Brittany weekly email** (Lambda slot + source file exist)
-3. **SIMP-1:** MCP tool usage audit after 30 days of CloudWatch EMF data
-4. Monitor CloudWatch overnight for any permission errors from new CDK roles
+Expected results from re-invocations:
+- `character-sheet-compute` for Mar 8+9: `"sick_day": true`, `"frozen_from": "2026-03-07"` (or 08), no level change
+- `daily-metrics-compute` for Mar 8+9: `"day_grade_letter": "sick"`, streaks preserved
+
+Use MCP tool to verify:
+```
+get_sick_days(start_date="2026-03-07", end_date="2026-03-10")
+```
 
 ---
 
-## Key Paths
+## Next Session
 
-- `cdk/stacks/role_policies.py` — NEW: centralized IAM policies for all 41 Lambdas
-- `cdk/stacks/lambda_helpers.py` — UPDATED: `custom_policies` param
-- `cdk/stacks/core_stack.py` — NEW: SQS + SNS + Lambda Layer
-- `cdk/stacks/ingestion_stack.py` — UPDATED: CDK IAM + CDK EB rules
-- `cdk/stacks/compute_stack.py` — UPDATED: CDK IAM + failure-pattern-compute
-- `cdk/stacks/email_stack.py` — UPDATED: CDK IAM
-- `cdk/stacks/operational_stack.py` — UPDATED: CDK IAM + CDK EB rules + freshness + insight-parser
-- `cdk/stacks/mcp_stack.py` — UPDATED: CDK IAM
-- `deploy/build_layer.sh` — NEW: pre-builds Lambda Layer for CDK
-- `deploy/cleanup_old_roles.sh` — ran, 39 roles deleted
+1. **Brittany weekly email** — next major feature. Lambda slot + source file exist, no blockers.
+2. **Architecture Review #4** — scheduled ~2026-04-08
+3. **SIMP-1** — MCP tool usage audit after 30 days of CloudWatch EMF data (~2026-04-08)
+
+### Roadmap (unstarted, prioritized)
+- Monarch Money (#1) — financial stress pillar
+- Google Calendar (#2) — demand-side context (cognitive load)
+- Light exposure tracking (#31) — Habitify habit + correlation tool (~2-3 hr)
+- Grip strength (#16) — $15 dynamometer, ~2 hr build
+
+---
+
+## Platform State (v3.4.1)
+- MCP tools: 147 (added log_sick_day, get_sick_days, clear_sick_day)
+- Lambdas: 41 (unchanged)
+- CDK stacks: 8 (unchanged)
+- Modules: 31 (added tools_sick_days.py)
+- Cost: ~$25/month
+- DDB sick_days: 2026-03-08, 2026-03-09 ✅

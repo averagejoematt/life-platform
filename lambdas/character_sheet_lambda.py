@@ -1,5 +1,5 @@
 """
-Character Sheet Compute Lambda — v1.0.0
+Character Sheet Compute Lambda — v1.1.0
 Scheduled daily at 9:35 AM PT (17:35 UTC via EventBridge).
 
 Computes the character sheet for yesterday by:
@@ -22,6 +22,7 @@ Must run BEFORE:
   - Daily Brief (10:00 AM PT) — reads the stored record
 
 v1.0.0 — 2026-03-02
+v1.1.0 — 2026-03-09: Sick day freeze — EMA frozen, no penalty on sick days
 """
 
 import json
@@ -300,7 +301,7 @@ def load_raw_score_histories(yesterday_str, window=21):
 
 def lambda_handler(event, context):
     t0 = time.time()
-    logger.info("[character] Character Sheet Compute v1.0.0 starting...")
+    logger.info("[character] Character Sheet Compute v1.1.0 starting...")
 
     # ── Determine target date ──
     # Default: yesterday. Can override via event for backfill/testing.
@@ -324,6 +325,57 @@ def lambda_handler(event, context):
                 "body": f"Already computed for {yesterday_str}",
                 "character_level": existing.get("character_level"),
                 "character_tier": existing.get("character_tier"),
+            }
+
+    # ── Sick day check ─────────────────────────────────────────────────────
+    # If the target date is flagged as a sick/rest day, freeze the EMA:
+    # copy the previous day's character sheet record verbatim (no gain, no
+    # penalty), mark it sick_day=True, and return early.
+    try:
+        from sick_day_checker import check_sick_day as _check_sick
+        _sick_rec = _check_sick(table, USER_ID, yesterday_str)
+    except ImportError:
+        _sick_rec = None
+
+    if _sick_rec:
+        _sick_reason = _sick_rec.get("reason") or "sick day"
+        logger.info("[character] Sick day flagged for %s (%s) — freezing EMA", yesterday_str, _sick_reason)
+        _prev = load_previous_state(yesterday_str)
+        if _prev:
+            # Build a frozen record: copy previous EMA state, update date fields
+            _frozen = {k: v for k, v in _prev.items()}
+            _frozen["pk"]              = USER_PREFIX + "character_sheet"
+            _frozen["sk"]              = "DATE#" + yesterday_str
+            _frozen["date"]            = yesterday_str
+            _frozen["sick_day"]        = True
+            _frozen["sick_day_reason"] = _sick_reason
+            _frozen["frozen_from"]     = _prev.get("date", "")
+            _frozen["computed_at"]     = datetime.now(timezone.utc).isoformat()
+            # Convert floats → Decimal for DynamoDB
+            def _dec(obj):
+                if isinstance(obj, list):  return [_dec(i) for i in obj]
+                if isinstance(obj, dict):  return {k: _dec(v) for k, v in obj.items()}
+                if isinstance(obj, bool):  return obj
+                if isinstance(obj, float): return Decimal(str(obj))
+                if isinstance(obj, int):   return Decimal(str(obj))
+                return obj
+            table.put_item(Item={k: _dec(v) for k, v in _frozen.items() if v is not None})
+            logger.info("[character] Frozen record stored for %s (from %s)",
+                        yesterday_str, _frozen.get("frozen_from", "?"))
+            return {
+                "statusCode":   200,
+                "body":         f"Sick day {yesterday_str}: character sheet EMA frozen (no change)",
+                "sick_day":     True,
+                "frozen_from":  _frozen.get("frozen_from", ""),
+                "character_level": _prev.get("character_level"),
+                "character_tier":  _prev.get("character_tier"),
+            }
+        else:
+            logger.info("[character] Sick day but no previous state — skipping compute entirely")
+            return {
+                "statusCode": 200,
+                "body":       f"Sick day {yesterday_str}: no previous state to freeze from, skipped",
+                "sick_day":   True,
             }
 
     # ── Load config from S3 ──
