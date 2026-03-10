@@ -1,28 +1,24 @@
 """
-CoreStack — DynamoDB, S3, SQS DLQ, SNS alerts.
+CoreStack — Shared infrastructure: SQS DLQ, SNS alerts, Lambda Layer.
 
-These resources already exist in AWS. First deployment uses `cdk import` to
-bring them under CDK management without recreating them.
+DynamoDB and S3 are deliberately NOT CDK-managed (stateful resources).
+SQS DLQ and SNS topic are CDK-managed via `cdk import` (first time).
+Lambda Layer is CDK-managed — new versions published on each deploy.
 
-Import procedure (run once):
-  1. Deploy this stack with the import-friendly constructs
-  2. Run: cdk import LifePlatformCore
-  3. CDK will prompt for the physical resource IDs:
-     - DynamoDB table: life-platform
-     - S3 bucket: matthew-life-platform
-     - SQS queue: https://sqs.us-west-2.amazonaws.com/205930651321/life-platform-ingestion-dlq
-     - SNS topic: arn:aws:sns:us-west-2:205930651321:life-platform-alerts
+IMPORTANT: Run `bash deploy/build_layer.sh` before `cdk deploy` to
+build the layer directory at cdk/layer-build/python/*.
 """
 
 import aws_cdk as cdk
 from aws_cdk import (
     Stack,
     RemovalPolicy,
+    Duration,
     aws_dynamodb as dynamodb,
     aws_s3 as s3,
     aws_sqs as sqs,
     aws_sns as sns,
-    Duration,
+    aws_lambda as _lambda,
 )
 from constructs import Construct
 
@@ -34,81 +30,49 @@ class CoreStack(Stack):
 
         ctx = self.node.try_get_context
 
-        # ══════════════════════════════════════════════════════════════
-        # DynamoDB — single-table design
-        # ══════════════════════════════════════════════════════════════
-        self.table = dynamodb.Table(
+        # ── DynamoDB — lookup only (NOT CDK-managed) ──
+        self.table = dynamodb.Table.from_table_name(
             self, "LifePlatformTable",
             table_name=ctx("ddb_table_name") or "life-platform",
-            partition_key=dynamodb.Attribute(
-                name="pk", type=dynamodb.AttributeType.STRING
-            ),
-            sort_key=dynamodb.Attribute(
-                name="sk", type=dynamodb.AttributeType.STRING
-            ),
-            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
-            removal_policy=RemovalPolicy.RETAIN,
-            deletion_protection=True,
-            point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
-                point_in_time_recovery_enabled=True
-            ),
-            time_to_live_attribute="ttl",
         )
 
-        # ══════════════════════════════════════════════════════════════
-        # S3 — raw data + static website hosting
-        # ══════════════════════════════════════════════════════════════
-        self.bucket = s3.Bucket(
+        # ── S3 — lookup only (NOT CDK-managed) ──
+        self.bucket = s3.Bucket.from_bucket_name(
             self, "LifePlatformBucket",
             bucket_name=ctx("s3_bucket_name") or "matthew-life-platform",
-            removal_policy=RemovalPolicy.RETAIN,
-            auto_delete_objects=False,
-            versioned=False,
-            block_public_access=s3.BlockPublicAccess(
-                block_public_acls=True,
-                block_public_policy=True,
-                ignore_public_acls=True,
-                restrict_public_buckets=True,
-            ),
-            lifecycle_rules=[
-                s3.LifecycleRule(
-                    id="archive-raw-to-glacier",
-                    prefix="raw/",
-                    transitions=[
-                        s3.Transition(
-                            storage_class=s3.StorageClass.GLACIER,
-                            transition_after=Duration.days(90),
-                        )
-                    ],
-                ),
-            ],
         )
 
-        # ══════════════════════════════════════════════════════════════
-        # SQS — Dead Letter Queue for failed Lambda invocations
-        # ══════════════════════════════════════════════════════════════
+        # ── SQS DLQ (CDK-managed, imported first time) ──
         self.dlq = sqs.Queue(
             self, "IngestionDLQ",
-            queue_name=ctx("sqs_dlq_name") or "life-platform-ingestion-dlq",
+            queue_name="life-platform-ingestion-dlq",
             retention_period=Duration.days(14),
+            visibility_timeout=Duration.seconds(30),
             removal_policy=RemovalPolicy.RETAIN,
         )
 
-        # ══════════════════════════════════════════════════════════════
-        # SNS — Alert routing
-        # ══════════════════════════════════════════════════════════════
+        # ── SNS alerts (CDK-managed, imported first time) ──
         self.alerts_topic = sns.Topic(
             self, "AlertsTopic",
-            topic_name=ctx("sns_topic_name") or "life-platform-alerts",
+            topic_name="life-platform-alerts",
         )
 
-        # ══════════════════════════════════════════════════════════════
-        # Outputs (for cross-stack references)
-        # ══════════════════════════════════════════════════════════════
+        # ── Lambda Layer (CDK-managed) ──
+        # Pre-built by deploy/build_layer.sh → cdk/layer-build/python/
+        # No Docker needed. CDK zips the directory and publishes.
+        self.shared_layer = _lambda.LayerVersion(
+            self, "SharedUtilsLayer",
+            layer_version_name="life-platform-shared-utils",
+            code=_lambda.Code.from_asset("layer-build"),
+            compatible_runtimes=[_lambda.Runtime.PYTHON_3_12],
+            description="Shared utils for Life Platform Lambdas",
+            removal_policy=RemovalPolicy.RETAIN,
+        )
+
+        # ── Outputs ──
         cdk.CfnOutput(self, "TableName", value=self.table.table_name)
-        cdk.CfnOutput(self, "TableArn", value=self.table.table_arn)
         cdk.CfnOutput(self, "BucketName", value=self.bucket.bucket_name)
-        cdk.CfnOutput(self, "BucketArn", value=self.bucket.bucket_arn)
         cdk.CfnOutput(self, "DlqUrl", value=self.dlq.queue_url)
         cdk.CfnOutput(self, "DlqArn", value=self.dlq.queue_arn)
         cdk.CfnOutput(self, "AlertsTopicArn", value=self.alerts_topic.topic_arn)
+        cdk.CfnOutput(self, "SharedLayerArn", value=self.shared_layer.layer_version_arn)

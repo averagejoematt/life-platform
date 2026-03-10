@@ -1,17 +1,17 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-10 (v3.3.13 — 144 MCP tools, 39 Lambdas, 30 modules, 19 data sources, 8 secrets, ~47 alarms, 7 CDK stacks)
+> Last update: 2026-03-10 (v3.4.0 — 144 MCP tools, 41 Lambdas, 30 modules, 19 data sources, 8 secrets, ~47 alarms, 8 CDK stacks)
 
 ---
 
 ## Current State
 
-- **Platform version:** v3.3.13
+- **Platform version:** v3.4.0
 - **MCP Server:** 144 tools across 30-module package (tools_decisions.py added), serving health data through Claude Desktop + claude.ai + Claude mobile (1024 MB, 12 tools pre-cached nightly)
 - **Remote MCP:** Function URL `c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` with OAuth auto-approve + HMAC Bearer token validation
 - **Data Sources:** 19 (12 scheduled + 1 webhook + 3 manual/periodic + 2 MCP-managed + 1 State of Mind via webhook)
-- **Lambdas:** 39 (13 ingestion + 1 webhook + 2 enrichment + 7 email/digest [incl. monday-compass] + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 daily-metrics-compute + 1 daily-insight-compute + 1 hypothesis-engine + 1 dashboard-refresh + 1 data-export + 1 qa-smoke + 1 data-reconciliation + 1 pip-audit + **1 dlq-consumer + 1 canary**)
+- **Lambdas:** 41 (13 ingestion + 1 webhook + 2 enrichment + 7 email/digest [incl. monday-compass] + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 daily-metrics-compute + 1 daily-insight-compute + 1 hypothesis-engine + 1 dashboard-refresh + 1 data-export + 1 qa-smoke + 1 data-reconciliation + 1 pip-audit + **1 dlq-consumer + 1 canary**)
 - **Cost:** ~$25/month
 - **Secrets Manager:** 8 secrets (split from api-keys bundle — ai-keys, todoist, notion now separate; api-keys pending deletion ~2026-04-07)
 - **CloudWatch Alarms:** ~47 (all Lambdas + canary + item size + ops dashboard alarms)
@@ -393,6 +393,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | Version | What | Date |
 |---------|------|------|
+| v3.4.0 | Full IaC: CDK-manage IAM roles (41 Lambdas), EventBridge rules (~50), CoreStack (SQS+SNS+Layer), 3 orphan Lambdas adopted, 39 old roles + 40 old EB rules deleted | 2026-03-10 |
 | v3.3.7 | CDK Code.from_asset path fix (../lambdas) — permanent fix for Lambda import errors on CDK deploy | 2026-03-09 |
 | v3.3.6 | Post-PROD-1 hotfixes: CDK packaging bug (23 Lambdas restored) + platform_logger set_date fix (13 ingestion Lambdas restored) | 2026-03-09 |
 | v3.3.5 | PROD-1 complete ✅ — all 7 CDK stacks deployed (Ingestion, Compute, Email, Operational, Mcp, Monitoring, Web) | 2026-03-09 |
@@ -546,7 +547,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | # | Task | Priority | Effort | Model | Status |
 |---|------|----------|--------|-------|--------|
-| PROD-1 | **Implement Infrastructure as Code (CDK).** All 7 stacks deployed: Ingestion, Compute, Email, Operational, Mcp, Monitoring, Web. `create_platform_lambda()` helper with correct `Code.from_asset("../lambdas")` path. Core stack (DDB+S3+SQS+SNS) deferred — low priority. | P2 (P0 if productizing) | L (16-24 hr) | **Opus** | ✅ v3.3.7 |
+| PROD-1 | **Implement Infrastructure as Code (CDK).** All 8 stacks deployed: Core (SQS+SNS+Layer), Ingestion, Compute, Email, Operational, Mcp, Monitoring, Web. CDK owns all 41 Lambda IAM roles (`custom_policies`), all EventBridge rules (`schedule=`), SQS DLQ, SNS topic, Lambda Layer. DDB+S3 deliberately unmanaged (stateful). | P2 (P0 if productizing) | L (16-24 hr) | **Opus** | ✅ v3.4.0 |
 | PROD-2 | **Remove hardcoded single-user assumptions.** Complete. S3 paths user-prefixed, profile loading fixed (DDB not S3), HTML fetch paths updated, DLQ purged. | P3 | L (12-16 hr) | **Opus** | ✅ v3.3.8 |
 
 #### Hardening Summary (updated post-Review #2, v3.1.3)
@@ -560,7 +561,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 **SIMP-2 lessons learned:** Architectural recommendations were made without validating per-source API shapes upfront. Strava (range-based API) and Garmin (native deps) are incompatible with the per-day callback pattern. Future framework adoption: new Lambdas fitting the per-day poll pattern should use it; existing Lambdas stay as-is.
 
-**Large opus items remaining:** PROD-1 (CDK import sessions 2-6), PROD-2 (S3 path prefix refactor).
+**Large opus items remaining:** None. PROD-1 complete (v3.4.0), PROD-2 complete (v3.3.8).
 
 ---
 
