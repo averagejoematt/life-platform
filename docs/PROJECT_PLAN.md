@@ -1,20 +1,20 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-10 (v3.4.1 — 147 MCP tools, 41 Lambdas, 31 modules, 19 data sources, 8 secrets, ~47 alarms, 8 CDK stacks)
+> Last update: 2026-03-10 (v3.4.7 — 147 MCP tools, 41 Lambdas, 31 modules, 19 data sources, 8 secrets, 42 alarms, 8 CDK stacks)
 
 ---
 
 ## Current State
 
-- **Platform version:** v3.4.1
+- **Platform version:** v3.4.7
 - **MCP Server:** 147 tools across 31-module package (tools_decisions.py added), serving health data through Claude Desktop + claude.ai + Claude mobile (1024 MB, 12 tools pre-cached nightly)
 - **Remote MCP:** Function URL `c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` with OAuth auto-approve + HMAC Bearer token validation
 - **Data Sources:** 19 (12 scheduled + 1 webhook + 3 manual/periodic + 2 MCP-managed + 1 State of Mind via webhook)
 - **Lambdas:** 41 (13 ingestion + 1 webhook + 2 enrichment + 7 email/digest [incl. monday-compass] + 1 dropbox-poll + 1 inbound-email + 1 key-rotator + 1 character-sheet-compute + 1 adaptive-mode-compute + 1 daily-metrics-compute + 1 daily-insight-compute + 1 hypothesis-engine + 1 dashboard-refresh + 1 data-export + 1 qa-smoke + 1 data-reconciliation + 1 pip-audit + **1 dlq-consumer + 1 canary**)
 - **Cost:** ~$25/month
-- **Secrets Manager:** 8 secrets (split from api-keys bundle — ai-keys, todoist, notion now separate; api-keys pending deletion ~2026-04-07)
-- **CloudWatch Alarms:** ~47 (all Lambdas + canary + item size + ops dashboard alarms)
+- **Secrets Manager:** 8 secrets (`whoop, garmin, withings, strava, eightsleep, ai-keys, mcp-api-key, ingestion-keys`); `api-keys` pending deletion ~2026-04-07; `todoist`/`notion`/`dropbox` pending deletion ~2026-04-10 after `setup_ingestion_keys.sh` merges keys into `ingestion-keys`
+- **CloudWatch Alarms:** 42 (40 CDK-managed + 2 intentional orphans: `health-auto-export-no-invocations-24h`, `life-platform-recursive-loop`)
 - **Web Dashboard:** CloudFront — `https://dash.averagejoematt.com/` (Lambda@Edge auth)
 - **Blog:** CloudFront — `https://blog.averagejoematt.com/` (public, no auth) — "The Measured Life" by Elena Voss
 - **Buddy Page:** CloudFront — `https://buddy.averagejoematt.com/` (Lambda@Edge auth, separate password) — accountability partner interface for Tom
