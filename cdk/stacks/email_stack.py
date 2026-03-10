@@ -47,7 +47,11 @@ class EmailStack(Stack):
 
         shared = dict(table=local_table, bucket=local_bucket, dlq=local_dlq, alerts_topic=local_alerts_topic)
 
-        create_platform_lambda(self, "DailyBrief", function_name="daily-brief", handler="daily_brief_lambda.lambda_handler", source_file="lambdas/daily_brief_lambda.py", schedule="cron(0 17 * * ? *)", timeout_seconds=300, memory_mb=512, custom_policies=rp.email_daily_brief(), **shared)
+        # daily-brief: alerts_topic=None — MonitoringStack owns its alarms
+        # (slo-daily-brief-delivery, life-platform-daily-brief-errors,
+        #  daily-brief-no-invocations-24h, daily-brief-duration-high).
+        # Suppressed here to avoid ingestion-error-daily-brief duplicate. COST-A 2026-03-10.
+        create_platform_lambda(self, "DailyBrief", function_name="daily-brief", handler="daily_brief_lambda.lambda_handler", source_file="lambdas/daily_brief_lambda.py", schedule="cron(0 17 * * ? *)", timeout_seconds=300, memory_mb=512, custom_policies=rp.email_daily_brief(), **{**shared, "alerts_topic": None})
 
         create_platform_lambda(self, "WeeklyDigest", function_name="weekly-digest", handler="digest_handler.lambda_handler", source_file="lambdas/weekly_digest_lambda.py", schedule="cron(0 16 ? * SUN *)", timeout_seconds=120, memory_mb=256, custom_policies=rp.email_weekly_digest(), **shared)
 

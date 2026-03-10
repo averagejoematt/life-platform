@@ -92,6 +92,8 @@ def create_platform_lambda(
         "S3_BUCKET": bucket.bucket_name,
         "USER_ID": scope.node.try_get_context("user_id") or "matthew",
         "AWS_REGION_OVERRIDE": scope.node.try_get_context("region") or "us-west-2",
+        "EMAIL_RECIPIENT": scope.node.try_get_context("email_recipient") or "lifeplatform@mattsusername.com",
+        "EMAIL_SENDER": scope.node.try_get_context("email_sender") or "lifeplatform@mattsusername.com",
     }
     if environment:
         env.update(environment)

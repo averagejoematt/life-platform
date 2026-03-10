@@ -1,5 +1,43 @@
 # Life Platform — Changelog
 
+## v3.4.6 — 2026-03-10: EMAIL_RECIPIENT + KMS Bug Fixes
+
+### Bug Fixes
+- `lambda_helpers.py`: Added `EMAIL_RECIPIENT` + `EMAIL_SENDER` to base env vars for all Lambdas (was previously console-only orphan config — wiped by COST-A CDK deploy)
+- `cdk/cdk.json`: Added `email_recipient` + `email_sender` context keys (`lifeplatform@mattsusername.com`)
+- `role_policies.py` — `_email_base()`: Added missing `kms:Decrypt` + `kms:GenerateDataKey` for all 8 email Lambdas (CMK-encrypted DDB table requires KMS on every reader)
+- `role_policies.py` — Also added KMS to 5 inline policy functions that were missing it: `ingestion_journal_enrichment`, `ingestion_activity_enrichment`, `ingestion_apple_health`, `ingestion_hae`, `ingestion_weather`
+- `daily_brief_lambda.py`: Removed redundant `from datetime import timezone` inside `lambda_handler` (shadowed module-level import, causing `UnboundLocalError` at line 1171)
+
+### Deployed
+- `LifePlatformEmail` CDK stack (2x — first deploy fixed EMAIL vars, second fixed KMS)
+- `daily-brief` Lambda (timezone fix)
+
+### Result
+- Daily brief confirmed sending: `statusCode 200`, "Daily brief v2.77.0 sent"
+- Today's 9 AM brief was missed; next scheduled run tomorrow will succeed
+
+---
+
+## v3.4.5 — 2026-03-10: COST-A CloudWatch Alarm Consolidation
+
+### CloudWatch Alarms
+- Identified 87 alarms vs ~55 CDK-managed — ~32 pre-CDK orphans + 14 CDK duplicates
+- `monitoring_stack.py`: Removed `life-platform-daily-brief-invocations` (dup of `daily-brief-no-invocations-24h`)
+- `monitoring_stack.py`: Consolidated AI token alarms from 13 → 2 (keep `ai-tokens-daily-brief-daily` + `ai-tokens-platform-daily-total`)
+- `email_stack.py`: daily-brief passes `alerts_topic=None` (removes `ingestion-error-daily-brief` dup)
+- `operational_stack.py`: Removed `life-platform-canary-any-failure` (bug: watched same metric as `canary-ddb-failure`)
+- Scripts: `deploy/audit_alarms.sh` + `deploy/delete_orphan_alarms.sh`
+- **Savings: ~$4.60/mo** ($7.70 → ~$3.10 CloudWatch); 87 → ~41 alarms
+- ⚠️ CDK changes NOT YET DEPLOYED — run: `cdk deploy LifePlatformMonitoring LifePlatformEmail LifePlatformOperational`
+- ⚠️ Orphan deletion pending — run `audit_alarms.sh`, populate PRECDK_ORPHANS in delete script, then run delete
+
+### Docs
+- COST_TRACKER.md: corrected CloudWatch cost row, monthly actuals, decision log
+- HANDOVER_LATEST.md: updated
+
+---
+
 ## v3.4.4 — 2026-03-10: Hygiene Sweep (Architecture Review #4 follow-up)
 
 ### INCIDENT_LOG

@@ -171,7 +171,8 @@ class OperationalStack(Stack):
         def _canary_alarm(aid, aname, mname):
             a = cloudwatch.Alarm(self, aid, alarm_name=aname, metric=cloudwatch.Metric(namespace="LifePlatform/Canary", metric_name=mname, period=Duration.seconds(300), statistic="Sum"), evaluation_periods=1, threshold=1, comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD, treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
             a.add_alarm_action(cw_actions.SnsAction(local_alerts_topic)); a.add_ok_action(cw_actions.SnsAction(local_alerts_topic))
-        _canary_alarm("CanaryAnyFailureAlarm", "life-platform-canary-any-failure", "CanaryDDBFail")
+        # NOTE: CanaryAnyFailureAlarm removed 2026-03-10 — bug: watched CanaryDDBFail
+        # (identical to canary-ddb-failure). The 3 individual alarms below provide full coverage.
         _canary_alarm("CanaryDdbFailureAlarm", "life-platform-canary-ddb-failure", "CanaryDDBFail")
         _canary_alarm("CanaryMcpFailureAlarm", "life-platform-canary-mcp-failure", "CanaryMCPFail")
         _canary_alarm("CanaryS3FailureAlarm", "life-platform-canary-s3-failure", "CanaryS3Fail")

@@ -1302,7 +1302,6 @@ def lambda_handler(event, context):
             _computed_at_str = _computed.get("computed_at", "")
             if _computed_at_str:
                 try:
-                    from datetime import timezone
                     _computed_at = datetime.fromisoformat(_computed_at_str.replace("Z", "+00:00"))
                     _age_hours = (datetime.now(timezone.utc) - _computed_at).total_seconds() / 3600
                     if _age_hours > 4:
