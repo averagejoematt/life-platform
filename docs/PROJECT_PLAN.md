@@ -92,7 +92,7 @@
 | The Weekly Plate v1.0 | Friday 7:00 PM | ✅ Live |
 | Weekly Digest v4.3 | Sunday 9:00 AM | ✅ Live |
 | Nutrition Review v1.1 | Saturday 10:00 AM | ✅ Live |
-| Monthly Digest v1.1 | 1st Monday 9:00 AM | ✅ Live |
+| Monthly Digest v1.2 | 1st Monday 9:00 AM | ✅ Live |
 
 ### Ingestion Schedule (PT)
 ```
