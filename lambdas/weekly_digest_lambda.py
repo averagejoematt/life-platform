@@ -44,6 +44,13 @@ from collections import defaultdict
 
 import os
 
+# ── Shared digest utilities (digest_utils.py) ───────────────────────────────
+from digest_utils import (
+    d2f, avg, fmt, fmt_num, safe_float,
+    dedup_activities,
+    _normalize_whoop_sleep,
+)
+
 # ── AWS clients ───────────────────────────────────────────────────────────────
 _REGION    = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
@@ -89,28 +96,7 @@ def get_anthropic_key():
     secret = secrets.get_secret_value(SecretId=os.environ.get("ANTHROPIC_SECRET", "life-platform/api-keys"))
     return json.loads(secret["SecretString"])["anthropic_api_key"]
 
-def d2f(obj):
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
-    return obj
-
-def safe_float(rec, field, default=None):
-    if rec and field in rec:
-        try: return float(rec[field])
-        except Exception: return default
-    return default
-
-def avg(vals):
-    v = [x for x in vals if x is not None]
-    return round(sum(v)/len(v), 1) if v else None
-
-def fmt(val, unit="", dec=1):
-    return "—" if val is None else f"{round(val, dec)}{unit}"
-
-def fmt_num(val):
-    if val is None: return "—"
-    return "{:,}".format(round(val))
+# d2f, avg, fmt, fmt_num, safe_float imported from digest_utils
 
 def fetch_profile():
     try:
@@ -184,37 +170,7 @@ def hit_bar(pct, color="#27ae60"):
 # STRAVA DEDUP (from daily brief v2.2.3)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def dedup_activities(activities):
-    if not activities or len(activities) <= 1:
-        return activities
-    def parse_start(a):
-        s = a.get("start_date_local") or a.get("start_date") or ""
-        try: return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
-        except (ValueError, TypeError): return None
-    def richness(a):
-        score = 0
-        if float(a.get("distance_meters") or 0) > 0: score += 1000
-        score += float(a.get("moving_time_seconds") or 0)
-        if a.get("summary_polyline"): score += 500
-        return score
-    indexed = [(i, a, parse_start(a)) for i, a in enumerate(activities)]
-    indexed = [(i, a, t) for i, a, t in indexed if t is not None]
-    indexed.sort(key=lambda x: x[2])
-    remove = set()
-    for j in range(len(indexed)):
-        if j in remove: continue
-        _, a_j, t_j = indexed[j]
-        sport_j = (a_j.get("sport_type") or "").lower()
-        for k in range(j + 1, len(indexed)):
-            if k in remove: continue
-            _, a_k, t_k = indexed[k]
-            if (a_k.get("sport_type") or "").lower() != sport_j: continue
-            if abs((t_k - t_j).total_seconds()) / 60 > 15: break
-            if richness(a_j) >= richness(a_k): remove.add(k)
-            else: remove.add(j)
-    kept = [a for i, (_, a, _) in enumerate(indexed) if i not in remove]
-    no_time = [a for a in activities if parse_start(a) is None]
-    return kept + no_time
+# dedup_activities imported from digest_utils
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -266,35 +222,7 @@ def ex_whoop(recs_dict):
             "rhr_avg": avg(rhrs), "strain_avg": avg(strains), "days": len(recs)}
 
 
-def _normalize_whoop_sleep(item):
-    """Map Whoop DynamoDB fields to normalised sleep analysis fields (v2.55.0)."""
-    out = dict(item)
-    if "sleep_quality_score" in item and "sleep_score" not in item:
-        out["sleep_score"] = item["sleep_quality_score"]
-    if "sleep_efficiency_percentage" in item and "sleep_efficiency_pct" not in item:
-        out["sleep_efficiency_pct"] = item["sleep_efficiency_percentage"]
-    dur = None
-    try:
-        dur = float(item["sleep_duration_hours"]) if item.get("sleep_duration_hours") else None
-    except (ValueError, TypeError):
-        pass
-    if dur and dur > 0:
-        for src_field, pct_field in [
-            ("slow_wave_sleep_hours", "deep_pct"),
-            ("rem_sleep_hours",      "rem_pct"),
-            ("light_sleep_hours",    "light_pct"),
-        ]:
-            val = item.get(src_field)
-            if val is not None and pct_field not in item:
-                try:
-                    out[pct_field] = round(float(val) / dur * 100, 1)
-                except (ValueError, TypeError, ZeroDivisionError):
-                    pass
-    if "time_awake_hours" in item and "waso_hours" not in item:
-        out["waso_hours"] = item["time_awake_hours"]
-    if "disturbance_count" in item and "toss_and_turns" not in item:
-        out["toss_and_turns"] = item["disturbance_count"]
-    return out
+# _normalize_whoop_sleep imported from digest_utils
 
 
 def ex_whoop_sleep(recs_dict):

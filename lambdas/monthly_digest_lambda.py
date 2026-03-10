@@ -1,5 +1,5 @@
 """
-Monthly Coach's Letter Lambda — v1.1.0 (Board Centralization)
+Monthly Coach's Letter Lambda — v1.2.0 (digest_utils consolidation)
 Fires first Sunday of each month at 16:00 UTC (8am PT).
 EventBridge cron: cron(0 16 ? * 1#1 *)
 
@@ -70,13 +70,26 @@ except ImportError:
     logger = _log.getLogger("monthly-digest")
     logger.setLevel(_log.INFO)
 
+# ── Shared digest utilities ────────────────────────────────────────────
+from digest_utils import (
+    d2f, avg, fmt,
+    dedup_activities,
+    _normalize_whoop_sleep,
+    ex_whoop_from_list       as ex_whoop,
+    ex_whoop_sleep_from_list as ex_whoop_sleep,
+    ex_withings_from_list    as ex_withings,
+    compute_banister_from_list,
+)
+
 RECIPIENT         = os.environ["EMAIL_RECIPIENT"]
 SENDER            = os.environ["EMAIL_SENDER"]
-PROTEIN_TARGET_G  = 180
-CALORIE_TARGET    = 1800
 GOAL_WEIGHT_LBS   = 220.0
+# Zone 2 HR constants — used as fallback when profile has no max_heart_rate
 ZONE2_HR_LOW      = 110
 ZONE2_HR_HIGH     = 129
+# Nutrition constants — used as fallback when profile targets are absent
+PROTEIN_TARGET_G  = 180
+CALORIE_TARGET    = 1800
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -88,11 +101,7 @@ def get_anthropic_key():
     secret = secrets.get_secret_value(SecretId=secret_name)
     return json.loads(secret["SecretString"])["anthropic_api_key"]
 
-def d2f(obj):
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
-    return obj
+# d2f, avg, fmt imported from digest_utils
 
 def fetch_range(source, start, end):
     try:
@@ -100,15 +109,8 @@ def fetch_range(source, start, end):
             KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
             ExpressionAttributeValues={":pk": f"USER#{USER_ID}#SOURCE#{source}",
                                        ":s": f"DATE#{start}", ":e": f"DATE#{end}"})
-        return r.get("Items", [])
+        return [d2f(i) for i in r.get("Items", [])]
     except Exception: return []
-
-def avg(vals):
-    v = [x for x in vals if x is not None]
-    return round(sum(v)/len(v), 1) if v else None
-
-def fmt(val, unit="", dec=1):
-    return "—" if val is None else f"{round(val, dec)}{unit}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -141,88 +143,41 @@ def get_date_windows():
 # EXTRACTORS  (30-day versions, same logic as weekly)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def ex_whoop(recs):
+# ex_whoop, ex_whoop_sleep, ex_withings imported from digest_utils
+# _normalize_whoop_sleep imported from digest_utils
+
+def ex_strava(recs, profile=None):
+    """Extract Strava summary from a list of records.
+
+    Uses profile max_heart_rate for Zone 2 bounds when available;
+    falls back to module-level ZONE2_HR_LOW/HIGH constants.
+    Activities are deduped before processing.
+    """
     if not recs: return None
-    hrvs  = [float(r["hrv"])               for r in recs if "hrv"               in r]
-    recov = [float(r["recovery_score"])    for r in recs if "recovery_score"    in r]
-    rhrs  = [float(r["resting_heart_rate"])for r in recs if "resting_heart_rate"in r]
-    strs  = [float(r["strain"])            for r in recs if "strain"            in r]
-    return {"hrv_avg": avg(hrvs), "hrv_min": min(hrvs, default=None),
-            "hrv_max": max(hrvs, default=None),
-            "recovery_avg": avg(recov), "rhr_avg": avg(rhrs),
-            "strain_avg": avg(strs), "days": len(recs)}
-
-def ex_withings(recs):
-    if not recs: return None
-    weights  = [float(r["weight_lbs"])   for r in recs if "weight_lbs"   in r]
-    bodyfats = [float(r["body_fat_pct"]) for r in recs if "body_fat_pct" in r]
-    sr = sorted(recs, key=lambda r: r.get("sk",""), reverse=True)
-    return {"weight_latest": float(sr[0]["weight_lbs"]) if sr and "weight_lbs" in sr[0] else None,
-            "weight_avg": avg(weights), "weight_min": min(weights, default=None),
-            "weight_max": max(weights, default=None), "body_fat_avg": avg(bodyfats),
-            "measurements": len(recs)}
-
-def _normalize_whoop_sleep(item):
-    """Map Whoop DynamoDB fields to normalised sleep analysis fields (v2.55.0)."""
-    out = dict(item)
-    if "sleep_quality_score" in item and "sleep_score" not in item:
-        out["sleep_score"] = item["sleep_quality_score"]
-    if "sleep_efficiency_percentage" in item and "sleep_efficiency_pct" not in item:
-        out["sleep_efficiency_pct"] = item["sleep_efficiency_percentage"]
-    dur = None
-    try:
-        dur = float(item["sleep_duration_hours"]) if item.get("sleep_duration_hours") else None
-    except (ValueError, TypeError):
-        pass
-    if dur and dur > 0:
-        for src_field, pct_field in [
-            ("slow_wave_sleep_hours", "deep_pct"),
-            ("rem_sleep_hours",      "rem_pct"),
-        ]:
-            val = item.get(src_field)
-            if val is not None and pct_field not in item:
-                try:
-                    out[pct_field] = round(float(val) / dur * 100, 1)
-                except (ValueError, TypeError, ZeroDivisionError):
-                    pass
-    return out
-
-
-def ex_whoop_sleep(recs):
-    """Extract sleep metrics from Whoop records (SOT for sleep duration/staging v2.55.0)."""
-    if not recs: return None
-    normed = [_normalize_whoop_sleep(r) for r in recs]
-    scores = [float(r["sleep_score"]) for r in normed if "sleep_score" in r]
-    durs   = [float(r["sleep_duration_hours"]) for r in normed if "sleep_duration_hours" in r]
-    effs   = [float(r["sleep_efficiency_pct"]) for r in normed if "sleep_efficiency_pct" in r]
-    deep_pcts = [float(r["deep_pct"]) for r in normed if "deep_pct" in r]
-    rem_pcts  = [float(r["rem_pct"])  for r in normed if "rem_pct"  in r]
-    return {"score_avg": avg(scores), "duration_avg_hrs": avg(durs),
-            "efficiency_avg": avg(effs), "rem_pct": avg(rem_pcts),
-            "deep_pct": avg(deep_pcts), "nights": len(recs)}
-
-def ex_strava(recs):
-    if not recs: return None
+    max_hr = (profile or {}).get("max_heart_rate", None)
+    z2_low  = max_hr * 0.60 if max_hr else ZONE2_HR_LOW
+    z2_high = max_hr * 0.70 if max_hr else ZONE2_HR_HIGH
     acts = []
     zone2_mins = 0
     for r in recs:
-        for a in r.get("activities", []):
+        day_acts = dedup_activities(r.get("activities", []))
+        for a in day_acts:
             hr   = float(a.get("average_heartrate") or 0)
             secs = float(a.get("moving_time_seconds") or 0)
-            obj  = {"name": a.get("enriched_name") or a.get("name",""),
-                    "sport": a.get("sport_type",""),
+            obj  = {"name": a.get("enriched_name") or a.get("name", ""),
+                    "sport": a.get("sport_type", ""),
                     "miles": round(float(a.get("distance_miles") or 0), 1),
-                    "mins": round(secs/60), "hr": round(hr) if hr else None}
+                    "mins": round(secs / 60), "hr": round(hr) if hr else None}
             acts.append(obj)
-            if hr and ZONE2_HR_LOW <= hr <= ZONE2_HR_HIGH:
+            if hr and z2_low <= hr <= z2_high:
                 zone2_mins += obj["mins"]
-    total_miles = round(sum(float(r.get("total_distance_miles",0)) for r in recs), 1)
-    total_mins  = round(sum(float(r.get("total_moving_time_seconds",0)) for r in recs)/60)
-    z2_pct      = round(zone2_mins/total_mins*100) if total_mins else 0
+    total_miles = round(sum(float(r.get("total_distance_miles", 0)) for r in recs), 1)
+    total_mins  = round(sum(float(r.get("total_moving_time_seconds", 0)) for r in recs) / 60)
+    z2_pct      = round(zone2_mins / total_mins * 100) if total_mins else 0
     return {"total_miles": total_miles, "total_minutes": total_mins,
             "activity_count": len(acts), "zone2_minutes": round(zone2_mins),
-            "zone2_pct": z2_pct,
-            "total_elevation_feet": round(sum(float(r.get("total_elevation_gain_feet",0)) for r in recs))}
+            "zone2_pct": z2_pct, "zone2_hr_range": f"{round(z2_low)}-{round(z2_high)}",
+            "total_elevation_feet": round(sum(float(r.get("total_elevation_gain_feet", 0)) for r in recs))}
 
 def ex_hevy(recs):
     if not recs: return None
@@ -233,15 +188,24 @@ def ex_hevy(recs):
                        "volume_lbs": round(float(w.get("total_volume_lbs",0)))})
     return {"workout_count": len(wk)}
 
-def ex_macrofactor(recs):
+def ex_macrofactor(recs, profile=None):
+    """Extract MacroFactor nutrition summary.
+
+    Uses profile calorie_target / protein_target_g when available;
+    falls back to module-level CALORIE_TARGET / PROTEIN_TARGET_G constants.
+    Field names match the actual DynamoDB schema (total_calories_kcal, total_protein_g).
+    """
     if not recs: return None
-    cals  = [float(r["calories"])  for r in recs if "calories"  in r]
-    prots = [float(r["protein_g"]) for r in recs if "protein_g" in r]
+    prot_target = (profile or {}).get("protein_target_g", PROTEIN_TARGET_G)
+    cal_target  = (profile or {}).get("calorie_target",   CALORIE_TARGET)
+    cals  = [float(r["total_calories_kcal"]) for r in recs if "total_calories_kcal" in r]
+    prots = [float(r["total_protein_g"])     for r in recs if "total_protein_g"     in r]
     days  = len(recs)
     return {"calories_avg": avg(cals), "protein_avg_g": avg(prots),
+            "calorie_target": cal_target, "protein_target": prot_target,
             "days_logged": days,
-            "protein_hit_rate": round(sum(1 for p in prots if p>=PROTEIN_TARGET_G)/days*100) if days else None,
-            "calorie_hit_rate": round(sum(1 for c in cals  if c<=CALORIE_TARGET   )/days*100) if days else None}
+            "protein_hit_rate": round(sum(1 for p in prots if p >= prot_target) / days * 100) if days else None,
+            "calorie_hit_rate": round(sum(1 for c in cals  if c <= cal_target  ) / days * 100) if days else None}
 
 def ex_character_sheet(recs):
     """Extract character sheet metrics from pre-computed DynamoDB records."""
@@ -287,30 +251,20 @@ def ex_chronicling(recs):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# BANISTER (same as weekly)
+# BANISTER  — compute_banister_from_list imported from digest_utils
 # ══════════════════════════════════════════════════════════════════════════════
-
-def compute_banister(strava_60d, today):
-    kj = {}
-    for r in strava_60d:
-        d = str(r.get("date",""))
-        if d: kj[d] = sum(float(a.get("kilojoules") or 0) for a in r.get("activities",[]))
-    ctl = atl = 0.0
-    cd, ad = math.exp(-1/42), math.exp(-1/7)
-    for i in range(59,-1,-1):
-        day = (today - timedelta(days=i)).isoformat()
-        load = kj.get(day, 0)
-        ctl = ctl*cd + load*(1-cd)
-        atl = atl*ad + load*(1-ad)
-    return {"ctl": round(ctl,1), "atl": round(atl,1), "tsb": round(ctl-atl,1)}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ANNUAL GOALS TRACKING
 # ══════════════════════════════════════════════════════════════════════════════
 
-def compute_annual_goals(cur, windows):
-    """Compute progress against known 2026 annual goals."""
+def compute_annual_goals(cur, windows, profile=None):
+    """Compute progress against known 2026 annual goals.
+
+    Accepts the full profile dict (from PROFILE#v1) so we avoid a redundant
+    DynamoDB fetch. Falls back to module-level constants if profile is absent.
+    """
     today = datetime.now(timezone.utc).date()
     year_start = today.replace(month=1, day=1)
     days_elapsed = (today - year_start).days
@@ -322,15 +276,10 @@ def compute_annual_goals(cur, windows):
     # Weight goal
     w = cur.get("withings")
     if w and w.get("weight_latest"):
-        try:
-            p = table.get_item(Key={"pk":f"USER#{USER_ID}","sk":"PROFILE"}).get("Item",{})
-            journey_start_weight = float(p.get("journey_start_weight_lbs", 300))
-            goal_weight = float(p.get("goal_weight_lbs", GOAL_WEIGHT_LBS))
-            journey_start_date_str = str(p.get("journey_start_date",""))
-        except Exception:
-            journey_start_weight = 300
-            goal_weight = GOAL_WEIGHT_LBS
-            journey_start_date_str = ""
+        p = profile or {}
+        journey_start_weight = float(p.get("journey_start_weight_lbs", 300))
+        goal_weight          = float(p.get("goal_weight_lbs", GOAL_WEIGHT_LBS))
+        journey_start_date_str = str(p.get("journey_start_date", ""))
 
         current = w["weight_latest"]
         lost    = round(journey_start_weight - current, 1)
@@ -567,11 +516,25 @@ def gather_all():
         "chronicling": ex_chronicling,
     }
 
+    # ── Profile (needed for profile-driven targets) ──
+    try:
+        p_item = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"}).get("Item", {})
+        profile = d2f(p_item)
+    except Exception as e:
+        print(f"[WARN] gather_all: profile fetch failed: {e}")
+        profile = {}
+
     raw_cur   = {s: fetch_range(s, wins["cur_start"],   wins["cur_end"])   for s in sources}
     raw_prior = {s: fetch_range(s, wins["prior_start"], wins["prior_end"]) for s in sources}
 
     cur   = {s: extractors[s](raw_cur[s])   for s in extractors}
     prior = {s: extractors[s](raw_prior[s]) for s in extractors}
+
+    # Sources that need profile for target-aware extraction
+    cur["strava"]      = ex_strava(raw_cur["strava"],      profile)
+    prior["strava"]    = ex_strava(raw_prior["strava"],    profile)
+    cur["macrofactor"] = ex_macrofactor(raw_cur["macrofactor"],  profile)
+    prior["macrofactor"] = ex_macrofactor(raw_prior["macrofactor"], profile)
 
     # Sleep: extracted from Whoop (SOT for duration/staging v2.55.0)
     cur["sleep"]   = ex_whoop_sleep(raw_cur["whoop"])
@@ -600,28 +563,24 @@ def gather_all():
     cur["character_sheet"]   = ex_character_sheet(cs_recs_cur)
     prior["character_sheet"] = ex_character_sheet(cs_recs_prior)
 
-    # Banister (60d Strava)
+    # Banister (60d Strava) — uses shared compute_banister_from_list (includes dedup)
     strava_60d = fetch_range("strava",
         (today - timedelta(days=60)).isoformat(), (today - timedelta(days=1)).isoformat())
-    training_load = compute_banister(strava_60d, today)
+    training_load = compute_banister_from_list(strava_60d, today)
 
-    # Profile
-    try:
-        p = table.get_item(Key={"pk":f"USER#{USER_ID}","sk":"PROFILE"}).get("Item",{})
-        profile = {
-            "goal_weight_lbs": float(p.get("goal_weight_lbs", GOAL_WEIGHT_LBS)),
-            "journey_start_weight_lbs": float(p["journey_start_weight_lbs"]) if p.get("journey_start_weight_lbs") else None,
-            "journey_start_date": str(p.get("journey_start_date","")),
-        }
-    except Exception:
-        profile = {"goal_weight_lbs": GOAL_WEIGHT_LBS}
+    # Profile already fetched above; build legacy compat dict for build_html / compute_annual_goals
+    profile_compat = {
+        "goal_weight_lbs": float(profile.get("goal_weight_lbs", GOAL_WEIGHT_LBS)),
+        "journey_start_weight_lbs": float(profile["journey_start_weight_lbs"]) if profile.get("journey_start_weight_lbs") else None,
+        "journey_start_date": str(profile.get("journey_start_date", "")),
+    }
 
-    annual_goals = compute_annual_goals(cur, wins)
+    annual_goals = compute_annual_goals(cur, wins, profile)
 
     return {
         "cur": cur, "prior": prior,
         "training_load": training_load,
-        "profile": profile,
+        "profile": profile_compat,
         "windows": wins,
     }, annual_goals
 
@@ -761,9 +720,10 @@ def build_html(data, goals, commentary, windows):
         tr_rows += row("Total Miles", fmt(st_c.get("total_miles")," mi"), delta(st_c.get("total_miles"), st_p.get("total_miles")," mi"))
         tr_rows += row("Total Elevation", f'{st_c.get("total_elevation_feet",0):,} ft', delta(st_c.get("total_elevation_feet"), st_p.get("total_elevation_feet")," ft"))
         tr_rows += row("Activities", str(st_c.get("activity_count",0)), delta(st_c.get("activity_count"), st_p.get("activity_count")))
-        z2 = st_c.get("zone2_minutes",0); z2pct = st_c.get("zone2_pct",0)
-        z2col = "#27ae60" if z2>=500 else "#e67e22" if z2>=200 else "#e74c3c"
-        tr_rows += row(f'Zone 2 ({ZONE2_HR_LOW}–{ZONE2_HR_HIGH} bpm)', f'<span style="color:{z2col};font-weight:700;">{z2} min ({z2pct}% of cardio)</span>')
+        z2 = st_c.get("zone2_minutes", 0); z2pct = st_c.get("zone2_pct", 0)
+        z2_range = st_c.get("zone2_hr_range", f"{ZONE2_HR_LOW}–{ZONE2_HR_HIGH}")
+        z2col = "#27ae60" if z2 >= 500 else "#e67e22" if z2 >= 200 else "#e74c3c"
+        tr_rows += row(f'Zone 2 ({z2_range} bpm)', f'<span style="color:{z2col};font-weight:700;">{z2} min ({z2pct}% of cardio)</span>')
     tsb = tl.get("tsb",0)
     tcol = "#27ae60" if tsb>=0 else "#e67e22" if tsb>=-15 else "#e74c3c"
     tr_rows += row("CTL — 42-day Fitness", fmt(tl.get("ctl")), highlight=True)
