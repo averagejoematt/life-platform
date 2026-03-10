@@ -41,12 +41,9 @@ BUCKET = "matthew-life-platform"
 S3_WEBSITE_DOMAIN = f"{BUCKET}.s3-website-{REGION}.amazonaws.com"
 
 # Existing ACM certificate ARNs (us-east-1, required for CloudFront)
-# These were created before CDK and are referenced by ARN only.
-# To find: aws acm list-certificates --region us-east-1
-# (Managed externally — not created or deleted by this stack)
-CERT_ARN_DASH  = None  # Populated during import if needed — distribution already has cert
-CERT_ARN_BLOG  = None
-CERT_ARN_BUDDY = None
+CERT_ARN_DASH  = "arn:aws:acm:us-east-1:205930651321:certificate/8e560416-e5f6-4f87-82a6-17b5e7df25d0"
+CERT_ARN_BLOG  = "arn:aws:acm:us-east-1:205930651321:certificate/952ddf18-d073-4d04-a0b7-42c7f5150dc2"
+CERT_ARN_BUDDY = "arn:aws:acm:us-east-1:205930651321:certificate/cfaf8364-1353-48d3-8522-6892a5aef680"
 
 
 def _s3_origin(origin_path: str) -> dict:
@@ -78,6 +75,11 @@ class WebStack(Stack):
                 comment="Life Platform Dashboard — dash.averagejoematt.com",
                 aliases=["dash.averagejoematt.com"],
                 price_class="PriceClass_100",
+                viewer_certificate=cloudfront.CfnDistribution.ViewerCertificateProperty(
+                    acm_certificate_arn=CERT_ARN_DASH,
+                    ssl_support_method="sni-only",
+                    minimum_protocol_version="TLSv1.2_2021",
+                ),
                 origins=[cloudfront.CfnDistribution.OriginProperty(
                     domain_name=S3_WEBSITE_DOMAIN,
                     id="S3WebsiteOrigin",
@@ -108,6 +110,11 @@ class WebStack(Stack):
                 comment="The Measured Life Blog — blog.averagejoematt.com",
                 aliases=["blog.averagejoematt.com"],
                 price_class="PriceClass_100",
+                viewer_certificate=cloudfront.CfnDistribution.ViewerCertificateProperty(
+                    acm_certificate_arn=CERT_ARN_BLOG,
+                    ssl_support_method="sni-only",
+                    minimum_protocol_version="TLSv1.2_2021",
+                ),
                 origins=[cloudfront.CfnDistribution.OriginProperty(
                     domain_name=S3_WEBSITE_DOMAIN,
                     id="S3WebsiteOrigin",
@@ -138,6 +145,11 @@ class WebStack(Stack):
                 comment="Buddy Accountability Page — buddy.averagejoematt.com",
                 aliases=["buddy.averagejoematt.com"],
                 price_class="PriceClass_100",
+                viewer_certificate=cloudfront.CfnDistribution.ViewerCertificateProperty(
+                    acm_certificate_arn=CERT_ARN_BUDDY,
+                    ssl_support_method="sni-only",
+                    minimum_protocol_version="TLSv1.2_2021",
+                ),
                 origins=[cloudfront.CfnDistribution.OriginProperty(
                     domain_name=S3_WEBSITE_DOMAIN,
                     id="S3WebsiteOrigin",
