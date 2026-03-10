@@ -1,5 +1,19 @@
 # Life Platform — Changelog
 
+## v3.4.9 — 2026-03-10: CloudFront TLS Fix
+
+### Bug Fix
+- `cdk/stacks/web_stack.py`: Wired ACM certificate ARNs to all three CloudFront distributions
+- Root cause: `CERT_ARN_*` constants were `None` — CDK was deploying distributions without `viewer_certificate`, causing browsers to receive the default `*.cloudfront.net` cert
+- Fix: Added `ViewerCertificateProperty` with `ssl_support_method=sni-only`, `minimum_protocol_version=TLSv1.2_2021` to all three distributions
+- Certs (all `ISSUED`, us-east-1):
+  - `dash.averagejoematt.com` → `8e560416-e5f6-4f87-82a6-17b5e7df25d0`
+  - `blog.averagejoematt.com` → `952ddf18-d073-4d04-a0b7-42c7f5150dc2`
+  - `buddy.averagejoematt.com` → `cfaf8364-1353-48d3-8522-6892a5aef680`
+- Deploy: `npx cdk deploy LifePlatformWeb --require-approval never`
+
+---
+
 ## v3.4.8 — 2026-03-10: COST-A + COST-B Completion
 
 ### COST-B + Habitify Secret (combined)
