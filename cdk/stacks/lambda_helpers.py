@@ -3,15 +3,20 @@ lambda_helpers.py — Shared Lambda construction patterns for CDK stacks.
 
 Provides a helper function that creates a Lambda function with all the
 standard Life Platform conventions:
-  - Per-function IAM role (least privilege)
+  - Per-function IAM role with explicit least-privilege policies
   - DLQ configured
   - Environment variables (TABLE_NAME, S3_BUCKET, USER_ID)
   - CloudWatch error alarm
   - Handler auto-detection from source file
   - Shared Layer attachment (optional)
 
+v2.0 (v3.4.0): Added custom_policies parameter to replace existing_role_arn.
+  CDK now OWNS all IAM roles — no more from_role_arn references.
+  Migration: existing_role_arn is DEPRECATED and will be removed in a future version.
+
 Usage in a stack:
     from stacks.lambda_helpers import create_platform_lambda
+    from stacks.role_policies import ingestion_policies
 
     fn = create_platform_lambda(
         self, "WhoopIngestion",
@@ -21,7 +26,7 @@ Usage in a stack:
         table=core.table,
         bucket=core.bucket,
         dlq=core.dlq,
-        secrets=["life-platform/whoop"],
+        custom_policies=ingestion_policies("whoop"),
         schedule="cron(0 14 * * ? *)",
         timeout_seconds=120,
     )
@@ -53,7 +58,7 @@ def create_platform_lambda(
     bucket: s3.IBucket,
     dlq: sqs.IQueue = None,
     alerts_topic: sns.ITopic = None,
-    alarm_name: str = None,          # override default "ingestion-error-{function_name}"
+    alarm_name: str = None,
     secrets: list[str] = None,
     schedule: str = None,
     timeout_seconds: int = 120,
@@ -61,13 +66,22 @@ def create_platform_lambda(
     environment: dict = None,
     shared_layer: _lambda.ILayerVersion = None,
     additional_layers: list = None,
+    # ── Legacy parameter (DEPRECATED — use custom_policies instead) ──
+    existing_role_arn: str = None,
+    # ── Fine-grained IAM (v2.0) ──
+    custom_policies: list[iam.PolicyStatement] = None,
+    # ── Legacy broad-permission flags (used when neither existing_role_arn nor custom_policies) ──
     ddb_write: bool = True,
     s3_write: bool = True,
     needs_ses: bool = False,
     ses_domain: str = None,
-    existing_role_arn: str = None,
 ) -> _lambda.Function:
     """Create a Lambda function with standard Life Platform conventions.
+
+    IAM role resolution order:
+      1. custom_policies → CDK creates role with ONLY these statements + BasicExecution
+      2. existing_role_arn → from_role_arn (DEPRECATED, for backward compat only)
+      3. Neither → CDK creates role with broad default DDB/S3/Secrets/SES grants
 
     Returns the Lambda Function construct.
     """
@@ -83,13 +97,29 @@ def create_platform_lambda(
         env.update(environment)
 
     # ── IAM Role ──
-    if existing_role_arn:
-        # Reference existing role by ARN — CDK treats it as immutable.
-        # No DefaultPolicy is generated, no DependsOn on Lambda, no import friction.
-        # IAM permissions remain managed outside CDK (as-is in AWS).
+    if custom_policies is not None:
+        # v2.0: CDK-owned role with explicit least-privilege policies.
+        role = iam.Role(
+            scope, f"{id}Role",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name(
+                    "service-role/AWSLambdaBasicExecutionRole"
+                ),
+            ],
+        )
+        for stmt in custom_policies:
+            role.add_to_policy(stmt)
+        # DLQ send permission comes from role_policies.py statements AND
+        # the Lambda constructor's dead_letter_queue auto-grant. No explicit
+        # grant_send_messages needed here.
+
+    elif existing_role_arn:
+        # DEPRECATED: Reference existing role by ARN.
         role = iam.Role.from_role_arn(scope, f"{id}Role", existing_role_arn)
+
     else:
-        # Create new role (for new Lambdas not yet in AWS)
+        # Fallback: broad default grants (for new Lambdas not yet audited)
         role = iam.Role(
             scope, f"{id}Role",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
@@ -100,7 +130,6 @@ def create_platform_lambda(
             ],
         )
 
-        # DynamoDB permissions
         ddb_actions = [
             "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem",
             "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan",
@@ -113,7 +142,6 @@ def create_platform_lambda(
             resources=[table.table_arn, f"{table.table_arn}/index/*"],
         ))
 
-        # S3 permissions
         s3_actions = [
             "s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket",
         ] if s3_write else [
@@ -124,7 +152,6 @@ def create_platform_lambda(
             resources=[bucket.bucket_arn, f"{bucket.bucket_arn}/*"],
         ))
 
-        # Secrets Manager permissions
         if secrets:
             for secret_id in secrets:
                 role.add_to_policy(iam.PolicyStatement(
@@ -132,40 +159,33 @@ def create_platform_lambda(
                     resources=[f"arn:aws:secretsmanager:*:*:secret:{secret_id}-*"],
                 ))
 
-        # SES permissions
         if needs_ses and ses_domain:
             role.add_to_policy(iam.PolicyStatement(
                 actions=["ses:SendEmail", "ses:SendRawEmail"],
                 resources=[f"arn:aws:ses:*:*:identity/{ses_domain}"],
             ))
 
-        # DLQ send permission
         if dlq:
             dlq.grant_send_messages(role)
 
     # ── Lambda Function ──
-    # Asset path is ".." (project root) because cdk synth runs from the cdk/ subdir.
-    # Excludes prevent bundling venv, cdk artifacts, docs, and deploy scripts.
-    # Asset path is "../lambdas" so the zip root = lambdas/ directory.
-    # Handler files (e.g. whoop_lambda.py) land at the zip root, which is where
-    # Lambda resolves module names from. Using ".." caused files to land at
-    # lambdas/whoop_lambda.py inside the zip, breaking all imports (fixed v3.3.6).
     _ASSET_EXCLUDES = [
         "__pycache__", "**/__pycache__/**",
         "*.pyc", "**/*.pyc",
         "*.md",
-        "dashboard", "dashboard/**",   # static HTML assets — not Lambda code
-        "buddy", "buddy/**",            # static HTML assets — not Lambda code
-        "cf-auth", "cf-auth/**",        # CloudFront auth assets
+        "dashboard", "dashboard/**",
+        "buddy", "buddy/**",
+        "cf-auth", "cf-auth/**",
         "requirements", "requirements/**",
         ".DS_Store",
     ]
+
     # When using an existing role (from_role_arn), we must NOT pass dead_letter_queue
-    # to the Function constructor — CDK automatically calls grant_send_messages on the
-    # queue when that param is set, which generates an AWS::IAM::Policy attached to the
-    # role. That policy creates a DependsOn on the Lambda, causing CloudFormation to
-    # reject the import changeset with "Unresolved resource dependencies".
-    # Instead, configure the DLQ via the L1 escape hatch (no grant triggered).
+    # to the Function constructor — CDK automatically calls grant_send_messages which
+    # generates an AWS::IAM::Policy that causes import issues.
+    # For custom_policies, DLQ grant is handled above, so we CAN pass it normally.
+    use_dlq_constructor = (custom_policies is not None or existing_role_arn is None) and dlq is not None
+
     fn = _lambda.Function(
         scope, id,
         function_name=function_name,
@@ -176,7 +196,7 @@ def create_platform_lambda(
         timeout=Duration.seconds(timeout_seconds),
         memory_size=memory_mb,
         environment=env,
-        dead_letter_queue=None if existing_role_arn else dlq,
+        dead_letter_queue=dlq if use_dlq_constructor else None,
         layers=([shared_layer] if shared_layer else []) + (additional_layers or []),
     )
 
@@ -188,7 +208,6 @@ def create_platform_lambda(
         )
 
     # ── EventBridge schedule ──
-    # No rule_name — import uses actual AWS name; CDK manages by logical ID after import.
     if schedule:
         rule = events.Rule(
             scope, f"{id}Schedule",

@@ -1,0 +1,8 @@
+{
+    "IngestionDLQF0F102AE": {
+        "QueueUrl": "https://sqs.us-west-2.amazonaws.com/205930651321/life-platform-ingestion-dlq"
+    },
+    "AlertsTopic3414BE91": {
+        "TopicArn": "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+    }
+}

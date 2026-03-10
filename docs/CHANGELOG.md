@@ -1,5 +1,62 @@
 # Life Platform — Changelog
 
+## v3.4.0 — 2026-03-10: Full IaC — CDK-manage IAM roles, EventBridge rules, Core resources
+
+### Item 6: CDK-manage IAM roles (previously `existing_role_arn`)
+- **New file**: `cdk/stacks/role_policies.py` — centralized least-privilege IAM policy definitions for all 41 Lambdas
+- **Updated**: `lambda_helpers.py` — added `custom_policies` parameter; `existing_role_arn` deprecated
+- All 5 Lambda stacks (Ingestion, Compute, Email, Operational, MCP) switched from `existing_role_arn` to `custom_policies=rp.<function>()`
+- 41 Lambdas now use CDK-created per-function roles (`LifePlatform*` prefix)
+- 39 orphaned console-created IAM roles deleted via `cleanup_old_roles.sh`
+
+### Item 7: CDK-manage EventBridge rules (previously add_permission workaround)
+- Ingestion stack: 14 EB rules now CDK-owned via `schedule=` (was `add_permission` + hardcoded rule ARN)
+- Operational stack: 6 EB rules now CDK-owned via `schedule=`
+- Compute stack: already had CDK-managed EB rules; added failure-pattern-compute schedule
+- 40 old console-created EB rules deleted
+- 2 intentionally kept outside CDK: `life-platform-nightly-warmer` (custom MCP payload), `life-platform-monthly-export` (data-export monthly)
+
+### 3 previously unmanaged Lambdas adopted into CDK
+- `failure-pattern-compute` → LifePlatformCompute (was orphan Lambda, no CFn stack)
+- `life-platform-freshness-checker` → LifePlatformOperational (was in separate `life-platform-freshness-checker` CFn stack, deleted)
+- `insight-email-parser` → LifePlatformOperational (was orphan Lambda, no CFn stack)
+
+### CoreStack (new CDK stack)
+- SQS DLQ (`life-platform-ingestion-dlq`) imported into CDK management
+- SNS topic (`life-platform-alerts`) imported into CDK management
+- Lambda Layer v5 published via CDK (`build_layer.sh` pre-builds `cdk/layer-build/python/`)
+- DDB table + S3 bucket deliberately NOT CDK-managed (stateful resources — import risk too high)
+- MCP Function URL deliberately NOT CDK-managed (conflicting resource-based policies)
+
+### CDK coverage summary (8 stacks)
+- **LifePlatformCore**: SQS DLQ + SNS topic + Lambda Layer
+- **LifePlatformIngestion**: 15 Lambdas + 15 EB rules + 15 IAM roles
+- **LifePlatformCompute**: 8 Lambdas + 9 EB rules + 8 IAM roles
+- **LifePlatformEmail**: 8 Lambdas + 8 EB rules + 8 IAM roles
+- **LifePlatformOperational**: 9 Lambdas + 6 EB rules + 9 IAM roles
+- **LifePlatformMcp**: 1 Lambda + 1 IAM role + 2 alarms
+- **LifePlatformWeb**: 3 CloudFront distributions + ACM certs
+- **LifePlatformMonitoring**: CW dashboard + alarms
+
+### Deliberately unmanaged (by design)
+- DynamoDB table `life-platform` (stateful — replacement = data loss)
+- S3 bucket `matthew-life-platform` (stateful — replacement = data loss)
+- MCP Function URL (stable, conflicting permissions)
+- 2 EventBridge rules (`nightly-warmer`, `monthly-export`)
+- CloudFront Lambda@Edge auth functions
+
+### New files
+- `cdk/stacks/role_policies.py` — centralized IAM policies
+- `deploy/build_layer.sh` — pre-builds Lambda Layer for CDK
+- `deploy/deploy_cdk_iam_roles.sh` — Item 6 deploy script
+- `deploy/deploy_cdk_eb_and_lambdas.sh` — Item 7 deploy script
+- `deploy/deploy_cdk_core.sh` — CoreStack deploy script
+- `deploy/verify_iam_migration.sh` — verification script
+- `deploy/cleanup_old_roles.sh` — old role cleanup script
+- `cdk/.gitignore` — excludes cdk.out/ and layer-build/
+
+---
+
 ## v3.3.13 — 2026-03-10: Task 10 — digest_utils consolidation
 
 ### digest_utils.py (new shared module)
