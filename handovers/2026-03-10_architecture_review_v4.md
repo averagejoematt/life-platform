@@ -59,10 +59,25 @@ Architecture Review #4 conducted by Technical Board of Directors (12 seats). No 
 
 ---
 
+## New: Pre-Compiled Review Bundle System
+
+Context window exhaustion was killing Review #5 attempts in other sessions. Built `deploy/generate_review_bundle.py` — compresses all 10+ docs into a single ~3000-5000 line file.
+
+**To run future reviews:**
+```bash
+python3 deploy/generate_review_bundle.py
+# Then in a new Claude session:
+# "Read docs/reviews/REVIEW_BUNDLE_YYYY-MM-DD.md, then conduct Architecture Review #5 using the Technical Board."
+```
+
+Also updated `docs/REVIEW_METHODOLOGY.md` with the new process.
+
+---
+
 ## Next Steps
 
 1. **Save downloaded review** → `docs/reviews/REVIEW_2026-03-10.md`
-2. **Git commit:** `git add -A && git commit -m "v3.4.2: Architecture Review #4 — Tech Board, A-/B+ overall" && git push`
+2. **Git commit:** `git add -A && git commit -m "v3.4.2: Architecture Review #4 + review bundle generator" && git push`
 3. **Hygiene items 1-10** above (can be done alongside Brittany email, all Sonnet)
 4. **Brittany weekly email** — next major feature
-5. **Review #5:** ~2026-04-08 (30 days production data)
+5. **Review #5:** ~2026-04-08 — use `python3 deploy/generate_review_bundle.py` first!
