@@ -1,5 +1,17 @@
 # Life Platform — Changelog
 
+## v3.4.10 — 2026-03-10: Architecture Review #6
+
+### Architecture Review
+- Tech Board review #6 at v3.4.9. Grades: Arch A, Sec A, Rel A-, Ops A-, Cost A, Data A, AI B, Maint A-, Prod B+
+- Seven dimensions at A/A-. Three upgrades this cycle: Security A-→A, Data Quality A-→A, Maintainability B+→A-
+- AI/Analytics (B) remains the primary blocker — `ai_output_validator.py` wired into daily-brief only, 6 other email Lambdas unvalidated
+- Top items: wire ai_output_validator to all email Lambdas, OBS-1 logger rollout, ship Brittany email, unit tests for shared modules
+- Path to all-A: ~20–25 hours of work. Next review ~2026-04-08
+- Review: `docs/reviews/REVIEW_2026-03-10_v6.md`
+
+---
+
 ## v3.4.9 — 2026-03-10: CloudFront TLS Fix
 
 ### Bug Fix
