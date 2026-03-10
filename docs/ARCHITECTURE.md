@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-10 (v3.4.7 — 147 tools, 31-module MCP package, 19 data sources, 41 Lambdas, 8 secrets, 42 alarms, 8 CDK stacks deployed)
+Last updated: 2026-03-10 (v3.5.0 — 147 tools, 31-module MCP package, 19 data sources, 43 Lambdas, 8 secrets, 42 alarms, 8 CDK stacks deployed)
 
 ---
 
@@ -78,7 +78,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | ACM Certificate | TLS | `arn:aws:acm:us-east-1:205930651321:certificate/8e560416-...` — `dash.averagejoematt.com` (DNS-validated) |
 | SES Receipt Rule Set | Inbound email routing | `life-platform-inbound` (active) — rule `insight-capture` routes `insight@aws.mattsusername.com` → S3 |
 | CloudWatch | Alarms + logs | **~47 metric alarms**, all Lambdas monitored |
-| CDK | Infrastructure as Code | `cdk/` — 8 stacks deployed: **Core** (SQS DLQ + SNS + Layer), Ingestion, Compute, Email, Operational, Mcp, Monitoring, Web. CDK owns all 41 Lambda IAM roles + ~50 EventBridge rules. `cdk/stacks/lambda_helpers.py` uses `Code.from_asset("../lambdas")`. DDB + S3 deliberately unmanaged (stateful). |}
+| CDK | Infrastructure as Code | `cdk/` — 8 stacks deployed: **Core** (SQS DLQ + SNS + Layer), Ingestion, Compute, Email, Operational, Mcp, Monitoring, Web. CDK owns all 43 Lambda IAM roles + ~50 EventBridge rules. `cdk/stacks/lambda_helpers.py` uses `Code.from_asset("../lambdas")`. DDB + S3 deliberately unmanaged (stateful). |}
 | CloudTrail | Audit logging | `life-platform-trail` → S3 |
 | AWS Budget | Cost guardrail | $20/mo cap, alerts at 25%/50%/100% |
 
@@ -108,7 +108,7 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 | Weather | `weather-data-ingestion` | `weather-daily-ingestion` | `cron(45 13 * * ? *)` | 06:45 AM | `lambda-weather-role` |
 | Dropbox Poll | `dropbox-poll` | `dropbox-poll-schedule` | `rate(30 minutes)` | every 30m | `lambda-dropbox-poll-role` |
 
-**⚠️ DST note:** All crons use fixed UTC. Times above reflect PDT (UTC-7, from March 8 2026). Adjust ±1hr during PST (UTC-8, Nov–Mar). Run `deploy/deploy_dst_spring_2026.sh` at each DST transition.
+**DST note:** All EventBridge Rule crons use fixed UTC — times shift ±1hr at DST boundaries (PDT = UTC-7 Mar–Nov; PST = UTC-8 Nov–Mar). Tables above reflect PDT (UTC-7).
 
 ### Operational Lambdas (EventBridge → Lambda)
 
@@ -145,7 +145,7 @@ These are not data ingestion — they compute, alert, or deliver intelligence.
 | QA Smoke | `qa-smoke` | on-demand | — | — | `lambda-qa-smoke-role` |
 | Data Export | `data-export` | on-demand | — | — | `lambda-data-export-role` |
 
-**Note:** As of v3.1.3, all Lambdas have dedicated per-function IAM roles (39 total). The original shared `lambda-weekly-digest-role` was deleted and replaced by per-function roles. Three pre-SEC-1 Lambdas (`anomaly-detector`, `character-sheet-compute`, `dashboard-refresh`) use shared roles (`life-platform-email-role`, `life-platform-compute-role`, `lambda-mcp-server-role` respectively) — SEC-1 migration deferred. Each role is least-privilege scoped to the AWS resources that function needs.
+**Note:** As of v3.4.0 (PROD-1 CDK), all Lambdas have **CDK-owned** dedicated per-function IAM roles (43 roles, one per Lambda). All policies defined in `cdk/stacks/role_policies.py`. SEC-1 complete — no shared roles remain.
 
 ### File-triggered ingestion (S3 → Lambda)
 
@@ -357,7 +357,7 @@ Health Auto Export → API Gateway → Webhook → DynamoDB + S3
 
 ## IAM Security Model
 
-Each Lambda has a **dedicated, least-privilege IAM role** (39 roles total as of v3.1.3). No shared roles.
+Each Lambda has a **dedicated, least-privilege IAM role** (43 roles total as of v3.5.0, CDK-managed). No shared roles.
 
 - **Ingestion roles (13 dedicated):** DynamoDB write, S3 write, Secrets Manager read (scoped to own secret), SQS DLQ send
 - **MCP role:** DynamoDB `GetItem` + `Query` + `PutItem`; S3 `GetObject` on `raw/cgm_readings/*`
@@ -365,7 +365,7 @@ Each Lambda has a **dedicated, least-privilege IAM role** (39 roles total as of 
 - **Compute roles (5 dedicated):** DynamoDB read/write, `life-platform/ai-keys` (IC compute Lambdas that call Anthropic)
 - **Operational roles (14 dedicated):** scoped per function (e.g. canary: DDB write+read+delete only; dlq-consumer: SQS ReceiveMessage + DDB write)
 - No role has `dynamodb:Scan` or cross-account permissions
-- **Deleted:** `lambda-weekly-digest-role` (was shared by ~10 Lambdas — replaced by per-function roles; `lambda-weekly-digest-role-v2` is the weekly-digest Lambda's dedicated role)
+- All roles CDK-owned via `role_policies.py` — no manually-created or shared roles remain
 
 ---
 

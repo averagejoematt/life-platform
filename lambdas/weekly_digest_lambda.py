@@ -93,7 +93,7 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def get_anthropic_key():
-    secret = secrets.get_secret_value(SecretId=os.environ.get("ANTHROPIC_SECRET", "life-platform/api-keys"))
+    secret = secrets.get_secret_value(SecretId=os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys"))
     return json.loads(secret["SecretString"])["anthropic_api_key"]
 
 # d2f, avg, fmt, fmt_num, safe_float imported from digest_utils

@@ -97,7 +97,7 @@ CALORIE_TARGET    = 1800
 # ══════════════════════════════════════════════════════════════════════════════
 
 def get_anthropic_key():
-    secret_name = os.environ.get("ANTHROPIC_SECRET", "life-platform/api-keys")
+    secret_name = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
     secret = secrets.get_secret_value(SecretId=secret_name)
     return json.loads(secret["SecretString"])["anthropic_api_key"]
 
