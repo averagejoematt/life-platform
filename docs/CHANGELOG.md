@@ -1,5 +1,37 @@
 # Life Platform — Changelog
 
+## v3.5.0 — 2026-03-10: Sprint v3.5.0 — api-keys migration, unit tests, CloudFront smoke test
+
+### Critical: api-keys secret migration (deadline ~2026-04-07)
+- Fixed 9 Lambdas with hardcoded `life-platform/api-keys` default → updated to `life-platform/ai-keys`
+  - `daily_brief_lambda.py`, `monday_compass_lambda.py`, `wednesday_chronicle_lambda.py`, `weekly_plate_lambda.py`
+  - `nutrition_review_lambda.py`, `monthly_digest_lambda.py`, `anomaly_detector_lambda.py`, `weekly_digest_lambda.py`
+- Fixed `cdk/stacks/email_stack.py`: added `_email_env = {"ANTHROPIC_SECRET": "life-platform/ai-keys"}` to all 7 email Lambdas
+- Added `_partner_env` with `PARTNER_EMAIL` placeholder (⚠️ confirm real email before `cdk deploy LifePlatformEmail`)
+
+### Architecture
+- `docs/ARCHITECTURE.md`: Lambda count corrected 41→43 (+partner-weekly-email, +failure-pattern-compute)
+- Removed stale DST deploy script reference and SEC-1 pre-migration notes
+- Header bumped v3.4.7→v3.5.0
+
+### Testing
+- `tests/test_shared_modules.py`: 60 unit tests across 5 shared modules (all passing)
+  - `ai_output_validator`: 16 tests (blocked/warn/pass logic, all output types, JSON validation)
+  - `platform_logger`: 7 tests (singleton, JSON output, structured fields, helpers)
+  - `sick_day_checker`: 9 tests (DDB mocking, Decimal→float, error handling)
+  - `digest_utils`: 24 tests (d2f, avg, fmt, dedup, Whoop/Withings extractors, Banister)
+  - `ingestion_validator`: 4 tests (validate_item API, ValidationResult, supported sources)
+
+### Operations
+- `deploy/smoke_test_cloudfront.sh`: HTTPS smoke test for all 3 CloudFront distributions
+  - Tests: HTTPS connectivity, TLS cert validity, CloudFront header present, HTTP→HTTPS redirect
+  - Covers: `dash.averagejoematt.com`, `blog.averagejoematt.com`, `buddy.averagejoematt.com`
+  - Verified: 12/12 passed (2026-03-10)
+- `deploy/cleanup_dead_files.sh`: Executed and self-removed
+  - Deleted: `lambdas/weather_lambda.py.archived`, `lambdas/freshness_checker.py`
+
+---
+
 ## v3.4.10 — 2026-03-10: Architecture Review #6
 
 ### Architecture Review

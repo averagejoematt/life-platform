@@ -47,7 +47,7 @@ USER_ID    = os.environ["USER_ID"]
 RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
 SENDER     = os.environ["EMAIL_SENDER"]
 S3_BUCKET  = os.environ["S3_BUCKET"]
-SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/api-keys")
+SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/ai-keys")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
