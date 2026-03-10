@@ -1,5 +1,31 @@
 # Life Platform — Changelog
 
+## v3.3.13 — 2026-03-10: Task 10 — digest_utils consolidation
+
+### digest_utils.py (new shared module)
+- Created `lambdas/digest_utils.py` — single source of truth for utilities shared across digest Lambdas
+- Contains: `d2f`, `avg`, `fmt`, `fmt_num`, `safe_float`, `dedup_activities`, `_normalize_whoop_sleep`
+- Canonical extractors: `ex_whoop_from_list`, `ex_whoop_sleep_from_list`, `ex_withings_from_list`
+- Banister adapters: `compute_banister_from_list` (list input), `compute_banister_from_dict` (dict input), shared `_banister_core`
+
+### weekly_digest_lambda.py
+- Removed ~80 lines of local utility functions; now imports from `digest_utils`
+- No behaviour change — pure refactor
+
+### monthly_digest_lambda.py — v1.2.0 (5 bug fixes + refactor)
+- **Bug fix**: `ex_macrofactor` field names corrected: `calories` → `total_calories_kcal`, `protein_g` → `total_protein_g` (were returning `None` for all records)
+- **Bug fix**: `ex_macrofactor` now profile-driven (calorie_target / protein_target_g from PROFILE#v1)
+- **Bug fix**: Profile SK fixed: `PROFILE` → `PROFILE#v1` (was silently falling back to hardcoded defaults)
+- **Bug fix**: `ex_strava` now calls `dedup_activities()` (was counting Garmin→Strava duplicate activities)
+- **Bug fix**: Banister now uses `compute_banister_from_list` which includes dedup
+- Zone 2 HR range now profile-driven; `fetch_range` applies `d2f()` inline; `compute_annual_goals` accepts profile dict
+
+### Deploy
+- `deploy/deploy_task10_digest_utils.sh`
+- Use: `bash deploy/deploy_task10_digest_utils.sh`
+
+---
+
 ## v3.3.12 — 2026-03-09: Hardening tasks 1–5 complete
 
 ### Task 1: ingestion_validator audit — COMPLETE (no changes needed)
