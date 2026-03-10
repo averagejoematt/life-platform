@@ -80,7 +80,7 @@ def fetch_date(source, date_str):
         item = resp.get("Item")
         return d2f(item) if item else None
     except Exception as e:
-        logger.warning("[character] fetch_date(%s, %s) failed: %s", source, date_str, e)
+        logger.warning(f"[character] fetch_date({source}, {date_str}) failed: {e}")
         return None
 
 
@@ -105,7 +105,7 @@ def fetch_range(source, start_date, end_date):
             kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
         return records
     except Exception as e:
-        logger.warning("[character] fetch_range(%s, %s→%s) failed: %s", source, start_date, end_date, e)
+        logger.warning(f"[character] fetch_range({source}, {start_date}→{end_date}) failed: {e}")
         return []
 
 
@@ -131,7 +131,7 @@ def fetch_journal_entries(date_str):
             kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
         return entries
     except Exception as e:
-        logger.warning("[character] fetch_journal_entries(%s) failed: %s", date_str, e)
+        logger.warning(f"[character] fetch_journal_entries({date_str}) failed: {e}")
         return []
 
 
@@ -254,10 +254,7 @@ def assemble_data(yesterday_str):
     data["data_completeness_pct"] = round((present / expected_count) * 100, 1)
 
     elapsed = time.time() - t0
-    logger.info("[character] Data assembled for %s in %.1fs — sources: %s",
-                yesterday_str, elapsed,
-                ", ".join(k for k in ["whoop", "macrofactor", "apple", "habit_scores",
-                                       "state_of_mind", "journal_entries"] if data.get(k)))
+    logger.info(f"[character] Data assembled for {yesterday_str} in {elapsed:.1f}s — sources: " + ", ".join(k for k in ["whoop", "macrofactor", "apple", "habit_scores", "state_of_mind", "journal_entries"] if data.get(k)))
     return data
 
 
@@ -307,7 +304,7 @@ def lambda_handler(event, context):
     # Default: yesterday. Can override via event for backfill/testing.
     if event.get("date"):
         yesterday_str = event["date"]
-        logger.info("[character] Override date: %s", yesterday_str)
+        logger.info(f"[character] Override date: {yesterday_str}")
     else:
         today = datetime.now(timezone.utc).date()
         yesterday_str = (today - timedelta(days=1)).isoformat()
@@ -316,10 +313,7 @@ def lambda_handler(event, context):
     if not event.get("force"):
         existing = fetch_date("character_sheet", yesterday_str)
         if existing:
-            logger.info("[character] Already computed for %s (level %s, tier %s) — skipping",
-                        yesterday_str,
-                        existing.get("character_level", "?"),
-                        existing.get("character_tier", "?"))
+            logger.info(f"[character] Already computed for {yesterday_str} — skipping")
             return {
                 "statusCode": 200,
                 "body": f"Already computed for {yesterday_str}",
@@ -339,7 +333,7 @@ def lambda_handler(event, context):
 
     if _sick_rec:
         _sick_reason = _sick_rec.get("reason") or "sick day"
-        logger.info("[character] Sick day flagged for %s (%s) — freezing EMA", yesterday_str, _sick_reason)
+        logger.info(f"[character] Sick day flagged for {yesterday_str} ({_sick_reason}) — freezing EMA")
         _prev = load_previous_state(yesterday_str)
         if _prev:
             # Build a frozen record: copy previous EMA state, update date fields
@@ -360,8 +354,7 @@ def lambda_handler(event, context):
                 if isinstance(obj, int):   return Decimal(str(obj))
                 return obj
             table.put_item(Item={k: _dec(v) for k, v in _frozen.items() if v is not None})
-            logger.info("[character] Frozen record stored for %s (from %s)",
-                        yesterday_str, _frozen.get("frozen_from", "?"))
+            logger.info(f"[character] Frozen record stored for {yesterday_str} (from {_frozen.get('frozen_from', '?')})")
             return {
                 "statusCode":   200,
                 "body":         f"Sick day {yesterday_str}: character sheet EMA frozen (no change)",
@@ -384,7 +377,7 @@ def lambda_handler(event, context):
         logger.error("[character] Failed to load config from S3 — aborting")
         return {"statusCode": 500, "body": "Config load failed"}
 
-    logger.info("[character] Config loaded — %d pillars", len(config.get("pillars", {})))
+    logger.info(f"[character] Config loaded — {len(config.get('pillars', {}))} pillars")
 
     # ── Assemble data ──
     data = assemble_data(yesterday_str)
@@ -392,16 +385,13 @@ def lambda_handler(event, context):
     # ── Load continuity state ──
     previous_state = load_previous_state(yesterday_str)
     if previous_state:
-        logger.info("[character] Previous state loaded — Level %s (%s %s)",
-                    previous_state.get("character_level", "?"),
-                    previous_state.get("character_tier_emoji", ""),
-                    previous_state.get("character_tier", "?"))
+        logger.info(f"[character] Previous state loaded — Level {previous_state.get('character_level', '?')} ({previous_state.get('character_tier_emoji', '')} {previous_state.get('character_tier', '?')})")
     else:
         logger.info("[character] No previous state — starting from baseline")
 
     raw_score_histories = load_raw_score_histories(yesterday_str)
     history_depth = max(len(v) for v in raw_score_histories.values()) if raw_score_histories else 0
-    logger.info("[character] Raw score histories loaded — %d days of history", history_depth)
+    logger.info(f"[character] Raw score histories loaded — {history_depth} days of history")
 
     # ── Compute ──
     try:
@@ -409,7 +399,7 @@ def lambda_handler(event, context):
             data, previous_state, raw_score_histories, config
         )
     except Exception as e:
-        logger.error("[character] compute_character_sheet failed: %s", e, exc_info=True)
+        logger.error(f"[character] compute_character_sheet failed: {e}")
         return {"statusCode": 500, "body": f"Computation failed: {e}"}
 
     char_level = record.get("character_level", 1)
@@ -420,28 +410,25 @@ def lambda_handler(event, context):
     # Log pillar summary
     for p in PILLAR_ORDER:
         pd = record.get(f"pillar_{p}", {})
-        logger.info("[character]   %s: raw=%s level=%s tier=%s (%s)",
-                    p, pd.get("raw_score", "?"), pd.get("level", "?"),
-                    pd.get("tier", "?"), pd.get("tier_emoji", "?"))
+        logger.info(f"[character]   {p}: raw={pd.get('raw_score', '?')} level={pd.get('level', '?')} tier={pd.get('tier', '?')} ({pd.get('tier_emoji', '?')})")
 
     # Log events
     if events:
         for ev in events:
-            logger.info("[character]   EVENT: %s", json.dumps(ev, default=str))
+            logger.info(f"[character]   EVENT: {json.dumps(ev, default=str)}")
 
     # Log active effects
     effects = record.get("active_effects", [])
     if effects:
         for eff in effects:
-            logger.info("[character]   EFFECT: %s %s", eff.get("emoji", ""), eff.get("name", ""))
+            logger.info(f"[character]   EFFECT: {eff.get('emoji', '')} {eff.get('name', '')}")
 
     # ── Store ──
     try:
         character_engine.store_character_sheet(table, USER_PREFIX, record)
-        logger.info("[character] Stored: %s — Level %s (%s %s) — %d events",
-                    yesterday_str, char_level, char_emoji, char_tier, len(events))
+        logger.info(f"[character] Stored: {yesterday_str} — Level {char_level} ({char_emoji} {char_tier}) — {len(events)} events")
     except Exception as e:
-        logger.error("[character] store_character_sheet failed: %s", e, exc_info=True)
+        logger.error(f"[character] store_character_sheet failed: {e}")
         return {"statusCode": 500, "body": f"Store failed: {e}"}
 
     elapsed = time.time() - t0

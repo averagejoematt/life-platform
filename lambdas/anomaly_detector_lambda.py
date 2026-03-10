@@ -408,6 +408,8 @@ def write_anomaly_record(date_str, flagged, alert_sent, hypothesis, severity,
         "travel_destination": travel_dest,
         "sick_mode":        sick_mode,
         "sick_reason":      sick_reason,
+        "sick_mode":        sick_mode,
+        "sick_reason":      sick_reason,
         "detector_version": "2.2.0",
         "updated_at":       datetime.now(timezone.utc).isoformat(),
     }
@@ -546,6 +548,17 @@ def lambda_handler(event, context):
     if sick_mode:
         print(f"[INFO] SICK MODE: {sick_reason} -- anomaly alerts will be suppressed")
 
+    # ── Sick day check (v2.2.0) ──
+    try:
+        from sick_day_checker import check_sick_day as _check_sick_anomaly
+        _sick_rec_anomaly = _check_sick_anomaly(table, USER_ID, yesterday)
+    except ImportError:
+        _sick_rec_anomaly = None
+    sick_mode   = _sick_rec_anomaly is not None
+    sick_reason = (_sick_rec_anomaly or {}).get("reason") or "sick day"
+    if sick_mode:
+        print(f"[INFO] SICK MODE: {sick_reason} -- anomaly alerts will be suppressed")
+
     flagged = check_anomalies(yesterday, today)
     print(f"[INFO] Flagged metrics: {len(flagged)}")
     for m in flagged:
@@ -606,6 +619,17 @@ def lambda_handler(event, context):
         print(f"[INFO] Sick mode -- {len(flagged)} metrics flagged across "
               f"{source_count} sources, alert SUPPRESSED")
 
+    elif multi and sick_mode:
+        source_count = len(set(f["source"] for f in flagged))
+        severity = "sick_suppressed"
+        hypothesis = (
+            f"[SICK DAY] {sick_reason}. Missing data and biometric drops are expected "
+            "during illness — recovery score, HRV, habits, and nutrition will all look "
+            "off. Anomaly alerts suppressed. Rest and recover."
+        )
+        print(f"[INFO] Sick mode -- {len(flagged)} metrics flagged across "
+              f"{source_count} sources, alert SUPPRESSED")
+
     else:
         print("[INFO] No multi-source anomaly -- no alert sent.")
 
@@ -623,6 +647,6 @@ def lambda_handler(event, context):
             "alert_sent": alert_sent,
             "travel_mode": travel_mode,
             "travel_destination": travel_dest,
-            "detector_version": "2.1.0",
+            "detector_version": "2.2.0",
         })
     }
