@@ -1,5 +1,41 @@
 # Life Platform — Changelog
 
+## v3.3.12 — 2026-03-09: Hardening tasks 1–5 complete
+
+### Task 1: ingestion_validator audit — COMPLETE (no changes needed)
+- Audited all 13 ingestion Lambdas + 4 enrichment/delegate Lambdas
+- All primary `put_item` writers already have the validator. The 4 without it (`health_auto_export`, `dropbox_poll`, `enrichment`, `journal_enrichment`) use `update_item` or delegate writes — validator correctly applied at point of initial write.
+
+### Task 2: ARCHITECTURE.md IAM section corrected
+- Fixed 19 stale IAM role entries in the Compute and Operational/Email Lambda tables
+- Roles corrected using CDK stack source-of-truth (verified 2026-03-09 comments in stacks)
+- Key changes: `lambda-weekly-digest-role` references replaced with 10 per-function roles; `lambda-anomaly-detector-role` → `life-platform-email-role`; `lambda-character-sheet-role` → `life-platform-compute-role`; `lambda-dashboard-refresh-role` → `lambda-mcp-server-role`
+- Note added clarifying 3 pre-SEC-1 Lambdas still use shared roles (anomaly-detector, character-sheet-compute, dashboard-refresh)
+
+### Task 3: INCIDENT_LOG.md v3.3.6 incidents added
+- Added two P2 incidents from 2026-03-09 (v3.3.6):
+  - CDK packaging bug: all 23 CDK-managed Lambdas broken by `Code.from_asset("..")` path issue
+  - platform_logger `set_date` stale bundle: all 13 ingestion Lambdas failing, 14 DLQ messages
+- Updated patterns section: CDK packaging watch-out + stale lambda module caches
+- Updated last-updated date and most-common root-cause counts
+
+### Task 4: platform_memory TTL — `daily-insight-compute`
+- Added `"ttl": int((datetime.now(timezone.utc) + timedelta(days=90)).timestamp())` to the `MEMORY#intention_tracking#<date>` write in `daily_insight_compute_lambda.py`
+- Uses `timedelta(days=90)` with already-imported `datetime`/`timedelta` — no new imports
+- DynamoDB TTL configured on `ttl` attribute (per prior setup) — records will auto-expire after 90 days
+
+### Task 5: MCP auth-failure EMF metric — `handler.py`
+- Added `_emit_auth_failure_metric()` in `mcp/handler.py` (follows `_emit_tool_metric()` pattern)
+- Namespace: `LifePlatform/MCP` | Dimension: `EventType=AuthFailure` | Metric: `AuthFailures` (Count)
+- Called immediately after `_validate_bearer()` rejects an invalid token
+- Enables alarm: `AuthFailures >= 5 in 5 min` to detect credential probing
+
+### Deploy
+- `deploy/deploy_hardening_v3312.sh` — deploys `life-platform-mcp` + `daily-insight-compute`
+- Use: `bash deploy/deploy_hardening_v3312.sh`
+
+---
+
 ## v3.3.11 — 2026-03-09: Architecture Review #3 — Technical Board Assessment
 
 - Full 12-seat Technical Board of Directors review at v3.3.10

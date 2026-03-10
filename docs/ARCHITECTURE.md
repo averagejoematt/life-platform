@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-09 (v3.3.7 — 144 tools, 30-module MCP package, 19 data sources, 39 Lambdas, 8 secrets, ~47 alarms, 7 CDK stacks deployed, IC features 1–8 live, Tier 8 hardening complete)
+Last updated: 2026-03-09 (v3.3.12 — 144 tools, 30-module MCP package, 19 data sources, 39 Lambdas, 8 secrets, ~47 alarms, 7 CDK stacks deployed, IC features 1–8 live, all 5 hardening tasks complete)
 
 ---
 
@@ -118,34 +118,34 @@ These are not data ingestion — they compute, alert, or deliver intelligence.
 
 | Function | Lambda | EventBridge Rule | Cron (UTC) | PT (PDT) | IAM Role |
 |---|---|---|---|---|---|
-| Character Sheet Compute | `character-sheet-compute` | `character-sheet-compute` | `cron(35 17 * * ? *)` | 10:35 AM | `lambda-character-sheet-role` |
-| Adaptive Mode Compute | `adaptive-mode-compute` | `adaptive-mode-compute-daily` | `cron(30 17 * * ? *)` | 10:30 AM | `lambda-weekly-digest-role` |
-| Daily Metrics Compute | `daily-metrics-compute` | `daily-metrics-compute-daily` | `cron(25 17 * * ? *)` | 10:25 AM | `lambda-weekly-digest-role` |
-| Daily Insight Compute (IC-8) | `daily-insight-compute` | `daily-insight-compute-daily` | `cron(20 17 * * ? *)` | 10:20 AM | `lambda-weekly-digest-role` |
-| Hypothesis Engine (IC-18) | `hypothesis-engine` | `hypothesis-engine-weekly` | `cron(0 19 ? * SUN *)` | Sun 12:00 PM | `lambda-weekly-digest-role` |
+| Character Sheet Compute | `character-sheet-compute` | `character-sheet-compute` | `cron(35 17 * * ? *)` | 10:35 AM | `life-platform-compute-role` |
+| Adaptive Mode Compute | `adaptive-mode-compute` | `adaptive-mode-compute-daily` | `cron(30 17 * * ? *)` | 10:30 AM | `lambda-adaptive-mode-role` |
+| Daily Metrics Compute | `daily-metrics-compute` | `daily-metrics-compute-daily` | `cron(25 17 * * ? *)` | 10:25 AM | `lambda-daily-metrics-role` |
+| Daily Insight Compute (IC-8) | `daily-insight-compute` | `daily-insight-compute-daily` | `cron(20 17 * * ? *)` | 10:20 AM | `lambda-daily-insight-role` |
+| Hypothesis Engine (IC-18) | `hypothesis-engine` | `hypothesis-engine-weekly` | `cron(0 19 ? * SUN *)` | Sun 12:00 PM | `lambda-hypothesis-engine-role` |
 
 **Operational & Email Lambdas:**
 
 | Function | Lambda | EventBridge Rule | Cron (UTC) | PT (PDT) | IAM Role |
 |---|---|---|---|---|---|
-| Anomaly Detector v2.1 | `anomaly-detector` | `anomaly-detector-daily` | `cron(5 16 * * ? *)` | 09:05 AM | `lambda-anomaly-detector-role` |
+| Anomaly Detector v2.1 | `anomaly-detector` | `anomaly-detector-daily` | `cron(5 16 * * ? *)` | 09:05 AM | `life-platform-email-role` |
 | Cache Warmer | `life-platform-mcp` | `life-platform-nightly-warmer` | `cron(0 17 * * ? *)` | 10:00 AM | `lambda-mcp-server-role` |
 | Whoop Recovery Refresh | `whoop-data-ingestion` | `whoop-recovery-refresh` | `cron(30 17 * * ? *)` | 10:30 AM | `lambda-whoop-role` |
 | Freshness Checker | `life-platform-freshness-checker` | `life-platform-freshness-check` | `cron(45 17 * * ? *)` | 10:45 AM | `lambda-freshness-checker-role` |
-| Monday Compass | `monday-compass` | `monday-compass` | `cron(0 15 ? * MON *)` | Mon 08:00 AM | `lambda-weekly-digest-role` |
-| Daily Brief | `daily-brief` | `daily-brief-schedule` | `cron(0 18 * * ? *)` | 11:00 AM | `lambda-weekly-digest-role` |
-| Weekly Digest | `weekly-digest` | `weekly-digest-sunday` | `cron(0 16 ? * SUN *)` | Sun 09:00 AM | `lambda-weekly-digest-role` |
-| Monthly Digest | `monthly-digest` | `monthly-digest-schedule` | `cron(0 16 ? * 1#1 *)` | 1st Mon 9:00 AM | `lambda-weekly-digest-role` |
-| Nutrition Review | `nutrition-review` | `nutrition-review-schedule` | `cron(0 17 ? * SAT *)` | Sat 10:00 AM | `lambda-weekly-digest-role` |
-| Wednesday Chronicle | `wednesday-chronicle` | `wednesday-chronicle` | `cron(0 15 ? * WED *)` | Wed 08:00 AM | `lambda-weekly-digest-role` |
-| The Weekly Plate | `weekly-plate` | `weekly-plate-schedule` | `cron(0 2 ? * SAT *)` | Fri 07:00 PM | `lambda-weekly-digest-role` |
-| Dashboard Refresh (2 PM) | `dashboard-refresh` | `dashboard-refresh-afternoon` | `cron(0 22 * * ? *)` | 03:00 PM | `lambda-dashboard-refresh-role` |
-| Dashboard Refresh (6 PM) | `dashboard-refresh` | `dashboard-refresh-evening` | `cron(0 2 * * ? *)` | 07:00 PM | `lambda-dashboard-refresh-role` |
+| Monday Compass | `monday-compass` | `monday-compass` | `cron(0 15 ? * MON *)` | Mon 08:00 AM | `lambda-monday-compass-role` |
+| Daily Brief | `daily-brief` | `daily-brief-schedule` | `cron(0 18 * * ? *)` | 11:00 AM | `lambda-daily-brief-role` |
+| Weekly Digest | `weekly-digest` | `weekly-digest-sunday` | `cron(0 16 ? * SUN *)` | Sun 09:00 AM | `lambda-weekly-digest-role-v2` |
+| Monthly Digest | `monthly-digest` | `monthly-digest-schedule` | `cron(0 16 ? * 1#1 *)` | 1st Mon 9:00 AM | `lambda-monthly-digest-role` |
+| Nutrition Review | `nutrition-review` | `nutrition-review-schedule` | `cron(0 17 ? * SAT *)` | Sat 10:00 AM | `lambda-nutrition-review-role` |
+| Wednesday Chronicle | `wednesday-chronicle` | `wednesday-chronicle` | `cron(0 15 ? * WED *)` | Wed 08:00 AM | `lambda-wednesday-chronicle-role` |
+| The Weekly Plate | `weekly-plate` | `weekly-plate-schedule` | `cron(0 2 ? * SAT *)` | Fri 07:00 PM | `lambda-weekly-plate-role` |
+| Dashboard Refresh (2 PM) | `dashboard-refresh` | `dashboard-refresh-afternoon` | `cron(0 22 * * ? *)` | 03:00 PM | `lambda-mcp-server-role` |
+| Dashboard Refresh (6 PM) | `dashboard-refresh` | `dashboard-refresh-evening` | `cron(0 2 * * ? *)` | 07:00 PM | `lambda-mcp-server-role` |
 | MCP Key Rotator | `mcp-key-rotator` | Secrets Manager rotation | 90-day auto | — | `lambda-key-rotator-role` |
-| QA Smoke | `qa-smoke` | on-demand | — | — | `lambda-weekly-digest-role` |
-| Data Export | `data-export` | on-demand | — | — | `lambda-weekly-digest-role` |
+| QA Smoke | `qa-smoke` | on-demand | — | — | `lambda-qa-smoke-role` |
+| Data Export | `data-export` | on-demand | — | — | `lambda-data-export-role` |
 
-**Note:** As of v3.1.3, all Lambdas have **dedicated per-function IAM roles** (13 ingestion + 26 email/compute/operational = 39 total). The shared `lambda-weekly-digest-role` was deleted after migration. Each role is least-privilege scoped to only the AWS resources that function needs.
+**Note:** As of v3.1.3, all Lambdas have dedicated per-function IAM roles (39 total). The original shared `lambda-weekly-digest-role` was deleted and replaced by per-function roles. Three pre-SEC-1 Lambdas (`anomaly-detector`, `character-sheet-compute`, `dashboard-refresh`) use shared roles (`life-platform-email-role`, `life-platform-compute-role`, `lambda-mcp-server-role` respectively) — SEC-1 migration deferred. Each role is least-privilege scoped to the AWS resources that function needs.
 
 ### File-triggered ingestion (S3 → Lambda)
 
@@ -365,7 +365,7 @@ Each Lambda has a **dedicated, least-privilege IAM role** (39 roles total as of 
 - **Compute roles (5 dedicated):** DynamoDB read/write, `life-platform/ai-keys` (IC compute Lambdas that call Anthropic)
 - **Operational roles (14 dedicated):** scoped per function (e.g. canary: DDB write+read+delete only; dlq-consumer: SQS ReceiveMessage + DDB write)
 - No role has `dynamodb:Scan` or cross-account permissions
-- **Deleted:** `lambda-weekly-digest-role` (was shared by ~10 Lambdas — now replaced by per-function roles)
+- **Deleted:** `lambda-weekly-digest-role` (was shared by ~10 Lambdas — replaced by per-function roles; `lambda-weekly-digest-role-v2` is the weekly-digest Lambda's dedicated role)
 
 ---
 

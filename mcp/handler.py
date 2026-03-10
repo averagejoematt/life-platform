@@ -169,6 +169,33 @@ def _emit_tool_metric(tool_name: str, duration_ms: float, success: bool) -> None
         logger.warning(f"[COST-2] Failed to emit EMF metric for '{tool_name}': {e}")
 
 
+# ── SEC: Auth failure EMF metric ────────────────────────────────────────────
+# Emits a CloudWatch metric on every rejected Bearer token attempt.
+# Namespace: LifePlatform/MCP  |  Dimension: EventType=AuthFailure
+# Alarm on AuthFailures >= 5 in 5 min to detect credential probing.
+def _emit_auth_failure_metric() -> None:
+    """Emit EMF metric for a rejected Bearer token."""
+    try:
+        ts = int(time.time() * 1000)
+        emf = {
+            "_aws": {
+                "Timestamp": ts,
+                "CloudWatchMetrics": [{
+                    "Namespace": "LifePlatform/MCP",
+                    "Dimensions": [["EventType"]],
+                    "Metrics": [
+                        {"Name": "AuthFailures", "Unit": "Count"},
+                    ],
+                }],
+            },
+            "EventType":    "AuthFailure",
+            "AuthFailures": 1,
+        }
+        print(json.dumps(emf))
+    except Exception as e:
+        logger.warning(f"[SEC] Failed to emit auth failure metric: {e}")
+
+
 METHOD_HANDLERS = {
     "initialize":                handle_initialize,
     "tools/list":                handle_tools_list,
@@ -386,6 +413,7 @@ def handle_remote_mcp(event, method):
     # ── Bearer token validation for MCP endpoints ─────────────────────────
     if not _validate_bearer(event):
         logger.warning(f"[Remote] Rejected: invalid/missing Bearer token")
+        _emit_auth_failure_metric()
         return _remote_response(401, json.dumps({"error": "Unauthorized: invalid Bearer token"}),
                                 {"WWW-Authenticate": "Bearer"})
 
