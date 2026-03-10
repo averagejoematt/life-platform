@@ -130,7 +130,7 @@ def ingestion_garmin() -> list[iam.PolicyStatement]:
 def ingestion_notion() -> list[iam.PolicyStatement]:
     return _ingestion_base(
         "notion",
-        secret_name="life-platform/notion",
+        secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
         s3_prefix="raw/notion/*",
     )
 
@@ -143,11 +143,9 @@ def ingestion_withings() -> list[iam.PolicyStatement]:
 
 
 def ingestion_habitify() -> list[iam.PolicyStatement]:
-    # NOTE: Habitify key must be migrated from life-platform/api-keys (pending deletion ~2026-04-07)
-    # to life-platform/habitify before api-keys is deleted. Create secret + update ARCHITECTURE.md.
     return _ingestion_base(
         "habitify",
-        secret_name="life-platform/habitify",  # create this secret before 2026-04-07
+        secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
         s3_prefix="raw/habitify/*",
     )
 
@@ -168,6 +166,11 @@ def ingestion_journal_enrichment() -> list[iam.PolicyStatement]:
             resources=[TABLE_ARN],
         ),
         iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
             sid="Secrets",
             actions=["secretsmanager:GetSecretValue"],
             resources=[_secret_arn("life-platform/ai-keys")],
@@ -183,7 +186,7 @@ def ingestion_journal_enrichment() -> list[iam.PolicyStatement]:
 def ingestion_todoist() -> list[iam.PolicyStatement]:
     return _ingestion_base(
         "todoist",
-        secret_name="life-platform/todoist",
+        secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
     )
 
 
@@ -201,6 +204,11 @@ def ingestion_activity_enrichment() -> list[iam.PolicyStatement]:
             sid="DynamoDB",
             actions=["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:Query"],
             resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="Secrets",
@@ -232,6 +240,11 @@ def ingestion_weather() -> list[iam.PolicyStatement]:
             resources=[TABLE_ARN],
         ),
         iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
             sid="DLQ",
             actions=["sqs:SendMessage"],
             resources=[DLQ_ARN],
@@ -242,7 +255,7 @@ def ingestion_weather() -> list[iam.PolicyStatement]:
 def ingestion_dropbox() -> list[iam.PolicyStatement]:
     return _ingestion_base(
         "dropbox",
-        secret_name="life-platform/dropbox",
+        secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
         s3_prefix="imports/*",
         extra_s3_read=["imports/*"],
     )
@@ -255,6 +268,11 @@ def ingestion_apple_health() -> list[iam.PolicyStatement]:
             sid="DynamoDB",
             actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query"],
             resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="S3Read",
@@ -281,6 +299,11 @@ def ingestion_hae() -> list[iam.PolicyStatement]:
             sid="DynamoDB",
             actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query"],
             resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="S3Write",
@@ -442,6 +465,11 @@ def _email_base(
             actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem",
                      "dynamodb:UpdateItem", "dynamodb:BatchGetItem"],
             resources=[TABLE_ARN, f"{TABLE_ARN}/index/*"],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="S3ConfigRead",

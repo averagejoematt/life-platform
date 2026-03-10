@@ -70,6 +70,7 @@ class IngestionStack(Stack):
             handler="notion_lambda.lambda_handler",
             schedule="cron(0 14 * * ? *)",
             timeout_seconds=120,
+            environment={"NOTION_SECRET_NAME": "life-platform/ingestion-keys"},
             custom_policies=rp.ingestion_notion(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 
@@ -89,6 +90,7 @@ class IngestionStack(Stack):
             handler="habitify_lambda.lambda_handler",
             schedule="cron(15 14 * * ? *)",
             timeout_seconds=180,
+            environment={"HABITIFY_SECRET_NAME": "life-platform/ingestion-keys"},
             custom_policies=rp.ingestion_habitify(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 
@@ -118,6 +120,7 @@ class IngestionStack(Stack):
             handler="todoist_lambda.lambda_handler",
             schedule="cron(45 14 * * ? *)",
             timeout_seconds=120, alarm_name="ingestion-error-todoist",
+            environment={"SECRET_NAME": "life-platform/ingestion-keys"},
             custom_policies=rp.ingestion_todoist(), **shared)
 
         # ── 9. Eight Sleep — 7:00 AM PT daily
@@ -167,6 +170,7 @@ class IngestionStack(Stack):
             handler="dropbox_poll_lambda.lambda_handler",
             schedule="rate(30 minutes)",
             timeout_seconds=120,
+            environment={"SECRET_NAME": "life-platform/ingestion-keys"},
             custom_policies=rp.ingestion_dropbox(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 

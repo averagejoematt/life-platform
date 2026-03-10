@@ -1,6 +1,6 @@
 # Life Platform — Cost Tracker
 
-Last updated: 2026-03-09 (v3.3.9)
+Last updated: 2026-03-10 (v3.4.5 — COST-A alarm audit)
 
 > Budget target: **$25/month**. Design constraint: every feature must justify its cost.
 
@@ -14,7 +14,7 @@ Last updated: 2026-03-09 (v3.3.9)
 | **Lambda** | ~$0.50 | ~2,500 invocations/month (13 ingestion + 35 Lambda schedule runs + MCP on-demand + Dropbox poll) |
 | **DynamoDB** | ~$0.30 | On-demand pay-per-request, ~5,000 WCU + ~15,000 RCU/month |
 | **S3** | ~$0.05 | ~2.5 GB stored (raw archives + dashboard + blog + buddy + avatar), minimal GET/PUT |
-| **CloudWatch** | ~$0.20 | 35 alarms, 26 log groups (30-day retention) |
+| **CloudWatch** | ~$3.20 | 42 alarms (40 CDK-managed + 2 intentional orphans: health-auto-export-no-invocations-24h, life-platform-recursive-loop). Down from 90 before COST-A. |
 | **SES** | ~$0.01 | ~55 emails/month (daily brief + weekly + monthly + anomaly + freshness + nutrition review + chronicle + weekly plate + monday compass) |
 | **API Gateway** | ~$0.01 | ~180 webhook invocations/month (Health Auto Export, ~4h × 30 days) |
 | **SNS** | $0.00 | Free tier (alert topic, low volume) |
@@ -23,7 +23,7 @@ Last updated: 2026-03-09 (v3.3.9)
 | **PITR (DynamoDB)** | ~$0.10 | 35-day continuous backup on single table |
 | **CloudFront** | ~$0.01 | CDN for `dash.averagejoematt.com`, `blog.averagejoematt.com`, `buddy.averagejoematt.com` (free tier) |
 | **Route 53** | ~$0.50 | 1 hosted zone — flat monthly fee |
-| **Total** | **~$10/month** | Well under $25 target — higher than $3 estimate due to Anthropic API costs (~$3/mo) and additional CloudWatch alarms |
+| **Total** | **~$10/month** | Well under $25 target. CloudWatch is the dominant variable — drops from ~$7.70 to ~$3.10 after COST-A alarm cleanup. |
 
 ---
 
@@ -52,6 +52,7 @@ Decisions where cost was a factor in the design:
 | 2026-02-26 | Lambda memory 512→1024 MB | +~$1/month | 2x CPU allocation, halved heavy query execution time |
 | 2026-02-25 | DynamoDB on-demand (not provisioned) | Saves ~$10-15/mo vs provisioned | Workload is spiky (morning ingestion burst, sparse MCP queries) |
 | 2026-02-25 | Single DynamoDB table, no GSI | $0 extra | All access patterns served by PK+SK queries |
+| 2026-03-10 | CloudWatch alarm consolidation (COST-A): 87 → ~41 alarms. Removed: 14 CDK duplicates (ingestion-error-daily-brief, life-platform-daily-brief-invocations, canary-any-failure, 11 per-Lambda AI token alarms) + ~32 pre-CDK orphans via delete_orphan_alarms.sh. AI token coverage: platform total + daily-brief only (was per-Lambda). | Saves ~$4.60/month ($7.70 → $3.10) |
 | 2026-03-05 | Secrets Manager consolidation: 12 → 6 secrets | Saves $2.40/month | Merged anthropic, todoist, habitify, health-auto-export, notion, dropbox into `life-platform/api-keys`. OAuth secrets (whoop, withings, strava, eightsleep, garmin) + mcp-api-key stay separate. Backwards-compatible `.get()` fallback pattern used in all 13 affected Lambdas |
 | 2026-02-25 | Single DynamoDB table, no GSI | $0 extra | All access patterns served by PK+SK queries |
 | 2026-02-24 | 12 Secrets Manager secrets | $4.80/month → consolidated to $2.40/month | Isolation was right tradeoff initially; consolidated once pattern was proven |
@@ -66,7 +67,8 @@ Decisions where cost was a factor in the design:
 | Month | AWS Bill | Notes |
 |-------|---------|-------|
 | Feb 2026 | $1.92 | Platform built Feb 22, partial month. 22 Lambdas, 19 sources, CloudFront CDN |
-| Mar 2026 | ~$3.00 est | First full month. 29 Lambdas, 3 web properties, 6 secrets (consolidated), 35 alarms |
+| Mar 2026 | ~$13-14 est (pre-COST-A) | First full month. 41 Lambdas, 87 alarms (real run-rate). COST-A cleanup in progress — target ~$9-10/mo post-cleanup. |
+| Apr 2026+ | ~$9-10 est (post-COST-A) | 41 alarms, api-keys secret deleted (~2026-04-07 saves $0.40). CloudWatch $3.10 vs $7.70 before. |
 
 ---
 

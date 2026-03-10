@@ -96,35 +96,18 @@ class MonitoringStack(Stack):
                "AWS/Lambda", "Errors", 300, "Sum", 1, GTE,
                {"FunctionName": "daily-brief"})
 
-        _alarm("DailyBriefInvocations",   "life-platform-daily-brief-invocations",
-               "AWS/Lambda", "Invocations", 93600, "Sum", 1, LT,
-               {"FunctionName": "daily-brief"})
+        # NOTE: life-platform-daily-brief-invocations (93600s) removed 2026-03-10 —
+        # duplicate of daily-brief-no-invocations-24h above. COST-A cleanup.
 
         # ══════════════════════════════════════════════════════════════
-        # AI token budget alarms — LifePlatform/AI AnthropicOutputTokens
+        # AI token budget alarms — consolidated 2026-03-10 (COST-A)
+        # Removed 11 per-Lambda alarms ($1.10/mo). Kept: daily-brief
+        # (highest-cost Lambda) + platform total (catch-all).
         # ══════════════════════════════════════════════════════════════
-        token_alarms = [
-            # (alarm_id_suffix,       lambda_name,                 threshold)
-            ("AdaptiveModeCompute",   "adaptive-mode-compute",     1818),
-            ("AnomalyDetector",       "anomaly-detector",          1818),
-            ("CharacterSheetCompute", "character-sheet-compute",   1818),
-            ("DailyBrief",            "daily-brief",               13333),
-            ("DailyInsightCompute",   "daily-insight-compute",     1818),
-            ("HypothesisEngine",      "hypothesis-engine",         1818),
-            ("MondayCompass",         "monday-compass",            1818),
-            ("MonthlyDigest",         "monthly-digest",            1818),
-            ("NutritionReview",       "nutrition-review",          1818),
-            ("WednesdayChronicle",    "wednesday-chronicle",       1818),
-            ("WeeklyDigest",          "weekly-digest",             1818),
-            ("WeeklyPlate",           "weekly-plate",              1818),
-        ]
-        for aid, fn_name, thresh in token_alarms:
-            _alarm(
-                f"AiTokens{aid}Daily",
-                f"ai-tokens-{fn_name}-daily",
-                "LifePlatform/AI", "AnthropicOutputTokens", 86400, "Sum", thresh, GTE,
-                {"LambdaFunction": fn_name},
-            )
+        _alarm("AiTokensDailyBriefDaily",
+               "ai-tokens-daily-brief-daily",
+               "LifePlatform/AI", "AnthropicOutputTokens", 86400, "Sum", 13333, GTE,
+               {"LambdaFunction": "daily-brief"})
 
         # Platform-level total (no dims)
         _alarm("AiTokensPlatformTotal",   "ai-tokens-platform-daily-total",

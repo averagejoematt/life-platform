@@ -4,6 +4,8 @@
     "account": "205930651321",
     "region": "us-west-2",
     "user_id": "matthew",
+    "email_recipient": "lifeplatform@mattsusername.com",
+    "email_sender": "lifeplatform@mattsusername.com",
     "ddb_table_name": "life-platform",
     "s3_bucket_name": "matthew-life-platform",
     "sqs_dlq_name": "life-platform-ingestion-dlq",
