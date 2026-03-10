@@ -46,19 +46,13 @@
 
 ---
 
-## Pending Deploys
+## Deploy Status
 
-### Task 10 (this session):
-```bash
-bash deploy/deploy_task10_digest_utils.sh
-```
-Deploys: `weekly-digest` + `monthly-digest`
-
-### v3.3.12 hardening (prior session, still unconfirmed):
-```bash
-bash deploy/deploy_hardening_v3312.sh
-```
-Deploys: `life-platform-mcp` + `daily-insight-compute`
+All v3.3.12 + v3.3.13 deploys confirmed live as of 2026-03-10:
+- ✅ `life-platform-mcp` — auth-failure EMF metric (v3.3.12)
+- ✅ `daily-insight-compute` — platform_memory 90-day TTL (v3.3.12)
+- ✅ `weekly-digest` — digest_utils refactor (v3.3.13)
+- ✅ `monthly-digest` — digest_utils + 5 bug fixes (v3.3.13)
 
 ---
 
