@@ -51,7 +51,7 @@ except ImportError:
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-SECRET_NAME = os.environ.get("HABITIFY_SECRET_NAME", "life-platform/api-keys")
+SECRET_NAME = os.environ.get("HABITIFY_SECRET_NAME", "life-platform/habitify")
 BASE_URL = "https://api.habitify.me"
 # ── Config (env vars with backwards-compatible defaults) ──
 REGION     = os.environ.get("AWS_REGION", "us-west-2")

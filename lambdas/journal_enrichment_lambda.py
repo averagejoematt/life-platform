@@ -48,7 +48,7 @@ except ImportError:
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/api-keys")
+ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
 MODEL = os.environ.get("MODEL", "claude-haiku-4-5-20251001")
 ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 # ── Config (env vars with backwards-compatible defaults) ──

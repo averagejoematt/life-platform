@@ -90,7 +90,7 @@ class IngestionStack(Stack):
             handler="habitify_lambda.lambda_handler",
             schedule="cron(15 14 * * ? *)",
             timeout_seconds=180,
-            environment={"HABITIFY_SECRET_NAME": "life-platform/ingestion-keys"},
+            environment={"HABITIFY_SECRET_NAME": "life-platform/habitify"},
             custom_policies=rp.ingestion_habitify(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 
@@ -110,6 +110,7 @@ class IngestionStack(Stack):
             handler="journal_enrichment_lambda.lambda_handler",
             schedule="cron(30 14 * * ? *)",
             timeout_seconds=300,
+            environment={"ANTHROPIC_SECRET": "life-platform/ai-keys"},
             custom_policies=rp.ingestion_journal_enrichment(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 
