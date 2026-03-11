@@ -15,6 +15,7 @@ import aws_cdk as cdk
 from aws_cdk import (
     Stack,
     aws_iam as iam,
+    aws_lambda as _lambda,
     aws_sqs as sqs,
     aws_dynamodb as dynamodb,
     aws_s3 as s3,
@@ -28,6 +29,7 @@ from stacks import role_policies as rp
 REGION = "us-west-2"
 ACCT = "205930651321"
 
+SHARED_LAYER_ARN     = f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:4"
 INGESTION_DLQ_ARN    = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
 LIFE_PLATFORM_TABLE  = "life-platform"
 LIFE_PLATFORM_BUCKET = "matthew-life-platform"
@@ -45,7 +47,9 @@ class EmailStack(Stack):
         local_bucket       = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
 
-        shared = dict(table=local_table, bucket=local_bucket, dlq=local_dlq, alerts_topic=local_alerts_topic)
+        shared_utils_layer = _lambda.LayerVersion.from_layer_version_arn(self, "SharedUtilsLayer", SHARED_LAYER_ARN)
+        shared = dict(table=local_table, bucket=local_bucket, dlq=local_dlq, alerts_topic=local_alerts_topic,
+                      shared_layer=shared_utils_layer)
 
         # daily-brief: alerts_topic=None — MonitoringStack owns its alarms
         # (slo-daily-brief-delivery, life-platform-daily-brief-errors,
