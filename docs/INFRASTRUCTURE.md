@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-03-08 (v3.1.3 — 39 Lambdas, 8 secrets, ~47 alarms)
+> Last updated: 2026-03-11 (v3.6.0 — 42 Lambdas, 9 secrets, 150 MCP tools, ~42 alarms)
 
 ---
 
@@ -55,7 +55,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Function URL (remote) | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/` |
 | Auth (remote) | HMAC Bearer token via `life-platform/mcp-api-key` secret (auto-rotates every 90 days) |
 | Auth (local) | `mcp_bridge.py` → `.config.json` → Function URL |
-| Tools | 144 across 30 modules |
+| Tools | 150 across 31 modules |
 | Cache warmer | 12 tools pre-computed nightly at 9:00 AM PT |
 
 ---
@@ -88,7 +88,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Key schema | PK: `USER#matthew#SOURCE#<source>` · SK: `DATE#YYYY-MM-DD` |
 | Protection | Deletion protection ON · PITR enabled (35-day rolling) |
 | Encryption | KMS CMK `alias/life-platform-dynamodb` (key `444438d1-a5e0-43b8-9391-3cd2d70dde4d`) · annual auto-rotation ON |
-| Partitions (27) | whoop, eightsleep, garmin, strava, withings, habitify, macrofactor, apple_health, notion_journal, todoist, weather, supplements, cgm, labs, genome, dexa, day_grade, habit_scores, character_sheet, chronicle, coaching_insights, life_events, contacts, temptations, cold_heat_exposure, exercise_variety, adaptive_mode |
+| Partitions (30) | whoop, eightsleep, garmin, strava, withings, habitify, macrofactor, apple_health, notion_journal, todoist, weather, supplements, cgm, labs, genome, dexa, day_grade, habit_scores, character_sheet, chronicle, coaching_insights, life_events, contacts, temptations, cold_heat_exposure, exercise_variety, adaptive_mode, platform_memory, insights, hypotheses |
 
 ---
 
@@ -132,7 +132,7 @@ All DNS-validated via Route 53 CNAME records.
 
 ---
 
-## Secrets Manager (8 active secrets + 1 pending deletion)
+## Secrets Manager (9 active secrets + 1 pending deletion)
 
 All under prefix `life-platform/`. No values stored in this doc — access via AWS console or CLI.
 
@@ -146,40 +146,39 @@ All under prefix `life-platform/`. No values stored in this doc — access via A
 | `ai-keys` | JSON bundle | `anthropic_api_key` + `mcp_api_key` (90-day auto-rotation) |
 | `todoist` | API key | Todoist API token |
 | `notion` | API key | Notion integration key + database ID |
-| ~~`api-keys`~~ | ~~Legacy bundle~~ | ~~**PENDING DELETION** (~2026-04-07). All Lambdas migrated to per-service secrets. Verify before deleting.~~ |
+| `habitify` | API key | Habitify API token. Own dedicated secret — NOT bundled in api-keys (different Lambda consumer set). |
+| ~~`api-keys`~~ | ~~Legacy bundle~~ | ~~**PENDING PERMANENT DELETION 2026-03-17** (7-day recovery window). All Lambdas migrated to per-service secrets.~~ |
 
 ---
 
-## Lambdas (39)
+## Lambdas (42)
 
 ### Ingestion (13)
 `whoop-data-ingestion` · `eightsleep-data-ingestion` · `garmin-data-ingestion` · `strava-data-ingestion` · `withings-data-ingestion` · `habitify-data-ingestion` · `macrofactor-data-ingestion` · `notion-journal-ingestion` · `todoist-data-ingestion` · `weather-data-ingestion` · `health-auto-export-webhook` · `journal-enrichment` · `activity-enrichment`
 
-### Email / Digest (7)
+### Email / Digest (8)
 `daily-brief` · `weekly-digest` · `monthly-digest` · `nutrition-review` · `wednesday-chronicle` · `weekly-plate` · `monday-compass` · `anomaly-detector`
 
 ### Compute (5)
 `character-sheet-compute` · `adaptive-mode-compute` · `daily-metrics-compute` · `daily-insight-compute` · `hypothesis-engine`
 
-### Infrastructure (14) — 4 new in v3.x hardening sprint
-`life-platform-freshness-checker` · `dropbox-poll` · `insight-email-parser` · `life-platform-key-rotator` · `dashboard-refresh` · `life-platform-data-export` · `life-platform-qa-smoke` · `life-platform-mcp` · `dlq-consumer` *(new)* · `life-platform-canary` *(new)* · `data-reconciliation` *(new)* · `pip-audit` *(new)*
+### Infrastructure (14)
+`life-platform-freshness-checker` · `dropbox-poll` · `insight-email-parser` · `life-platform-key-rotator` · `dashboard-refresh` · `life-platform-data-export` · `life-platform-qa-smoke` · `life-platform-mcp` · `dlq-consumer` · `life-platform-canary` · `data-reconciliation` · `pip-audit` · `brittany-weekly-email` · `sick-day-checker`
 
 ### Lambda@Edge (us-east-1)
 `life-platform-cf-auth` (dashboard) · `life-platform-buddy-auth` (buddy page)
 
 ---
 
-## EventBridge Scheduler
+## EventBridge
 
-Migrated from EventBridge Rules → EventBridge Scheduler on 2026-03-08 (P1.6).
+All rules CDK-managed as of v3.4.0 (PROD-1). IAM role: `life-platform-scheduler-role`.
 
 | Field | Value |
 |-------|-------|
-| Scheduler group | `life-platform` |
-| Timezone | `America/Los_Angeles` (DST-safe — no manual rule updates needed at DST transitions) |
-| IAM role | `life-platform-scheduler-role` |
-| Old rules | Disabled (not deleted) — rollback: `aws events enable-rule --name <rule>` |
-| Schedules | 27+ total — see PROJECT_PLAN.md Ingestion Schedule for full timing. New in v3.x: canary (every 30 min), dlq-consumer (every 15 min), data-reconciliation (daily 6 AM PT), pip-audit (weekly) |
+| Timezone | `America/Los_Angeles` (DST-safe) |
+| Schedules | 50+ total (see PROJECT_PLAN.md Ingestion Schedule for timing) |
+| Old manual rules | Deleted in v3.4.0 migration |
 
 ---
 
