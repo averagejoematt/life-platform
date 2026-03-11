@@ -1,6 +1,16 @@
 """
-Anomaly Detector Lambda — v2.3.0 (IC-19 Deliverable 2: Sustained Anomaly Tracking)
+Anomaly Detector Lambda — v2.4.0 (Henning: HRV log-transform for lognormal Z-scoring)
 Fires at 8:05am PT daily (16:05 UTC via EventBridge) — after enrichment, before daily brief.
+
+v2.4.0 Changes:
+  - LOG_TRANSFORM_METRICS: HRV Z-score now computed on log(HRV) — reduces false high-HRV
+    flags and makes low-HRV detection more statistically precise (lognormal distribution)
+  - compute_baseline accepts log_transform param; mean/SD computed in log domain
+  - check_anomalies applies log() to yesterday_val for LOG_TRANSFORM_METRICS before Z calc
+  - Flagged dict gains log_transform (bool) and distribution_note fields for transparency
+  - display values (yesterday_val, baseline_mean, baseline_sd, pct_from_mean) remain in
+    original units — only the Z-score computation moves to log domain
+  - detector_version bumped to 2.4.0
 
 v2.3.0 Changes:
   - _check_sustained_streaks(): detects metrics flagged 3+ consecutive days (same direction)
@@ -109,6 +119,12 @@ MIN_ABSOLUTE_CHANGE = {
 
 DOW_NORMALIZED_METRICS = {"steps", "tasks_completed", "completion_pct"}
 
+# Metrics where Z-scoring should be performed on log(value) rather than raw value.
+# HRV is right-skewed / lognormal: raw Z-scores over-alert on high-HRV days and
+# under-calibrate on low-HRV days. Log-domain Z-scoring corrects this.
+# Add a metric here only if its distribution is verifiably right-skewed from your data.
+LOG_TRANSFORM_METRICS = {"hrv"}
+
 METRICS = [
     ("whoop",       "recovery_score",       "Recovery Score",      True),
     ("whoop",       "hrv",                  "HRV",                 True),
@@ -210,7 +226,17 @@ def compute_adaptive_threshold(cv):
             return z_threshold
     return 1.5
 
-def compute_baseline(source, field, end_date, lookback_days=30, dow_normalize=False, target_is_weekend=False):
+def compute_baseline(source, field, end_date, lookback_days=30, dow_normalize=False,
+                     target_is_weekend=False, log_transform=False):
+    """Compute rolling baseline mean, SD, CV, and adaptive Z-threshold.
+
+    Args:
+        log_transform: if True, compute mean/SD on log(values) rather than raw values.
+            Used for lognormal metrics (currently: HRV). The returned mean/SD are in log
+            domain — callers must apply the same transform to the observation before
+            computing a Z-score. Display values should always be back-converted to original
+            units by the caller.
+    """
     start = (end_date - timedelta(days=lookback_days)).isoformat()
     end   = (end_date - timedelta(days=1)).isoformat()
     records = fetch_range(source, start, end)
@@ -237,11 +263,26 @@ def compute_baseline(source, field, end_date, lookback_days=30, dow_normalize=Fa
     if len(vals) < MIN_BASELINE_DAYS:
         return None, None, None, None, len(vals), baseline_type
 
-    mean = statistics.mean(vals)
-    sd   = statistics.stdev(vals) if len(vals) > 1 else 0
-    cv   = (sd / mean) if mean != 0 else 0
-    z_threshold = compute_adaptive_threshold(cv)
+    # Log-domain computation for lognormal metrics (e.g. HRV).
+    # CV and z_threshold are derived from original-scale values so the adaptive
+    # threshold logic stays comparable across all metrics.
+    if log_transform:
+        safe_vals = [v for v in vals if v > 0]
+        if len(safe_vals) < MIN_BASELINE_DAYS:
+            return None, None, None, None, len(safe_vals), baseline_type
+        log_vals   = [math.log(v) for v in safe_vals]
+        mean       = statistics.mean(log_vals)       # log-domain mean
+        sd         = statistics.stdev(log_vals) if len(log_vals) > 1 else 0
+        # CV still computed in original domain for consistent adaptive-threshold logic
+        orig_mean  = statistics.mean(safe_vals)
+        orig_sd    = statistics.stdev(safe_vals) if len(safe_vals) > 1 else 0
+        cv         = (orig_sd / orig_mean) if orig_mean != 0 else 0
+    else:
+        mean = statistics.mean(vals)
+        sd   = statistics.stdev(vals) if len(vals) > 1 else 0
+        cv   = (sd / mean) if mean != 0 else 0
 
+    z_threshold = compute_adaptive_threshold(cv)
     return mean, sd, cv, z_threshold, len(vals), baseline_type
 
 
@@ -260,11 +301,14 @@ def check_anomalies(yesterday_str, today):
         if yesterday_val is None:
             continue
 
-        dow_normalize = field in DOW_NORMALIZED_METRICS
+        dow_normalize  = field in DOW_NORMALIZED_METRICS
+        log_transform  = field in LOG_TRANSFORM_METRICS
+
         mean, sd, cv, z_threshold, sample_size, baseline_type = compute_baseline(
             source, field, yesterday_date,
             dow_normalize=dow_normalize,
-            target_is_weekend=yesterday_is_weekend
+            target_is_weekend=yesterday_is_weekend,
+            log_transform=log_transform,
         )
 
         if mean is None or sd is None:
@@ -272,15 +316,22 @@ def check_anomalies(yesterday_str, today):
         if sd == 0:
             continue
 
-        z = (yesterday_val - mean) / sd
-        abs_change = abs(yesterday_val - mean)
+        # For log-transform metrics: Z is computed in log domain.
+        # Absolute-change filter and display values stay in original units.
+        if log_transform and yesterday_val > 0:
+            z_val = math.log(yesterday_val)  # log-domain observation
+        else:
+            z_val = yesterday_val
+
+        z          = (z_val - mean) / sd
+        abs_change = abs(yesterday_val - (math.exp(mean) if log_transform else mean))
 
         min_abs = MIN_ABSOLUTE_CHANGE.get(field, 0)
         if abs_change < min_abs:
             continue
 
         is_anomalous = False
-        direction = None
+        direction    = None
 
         if low_is_bad is True:
             if z <= -z_threshold:
@@ -296,20 +347,29 @@ def check_anomalies(yesterday_str, today):
                 direction = "low" if z < 0 else "high"
 
         if is_anomalous:
+            # Display mean/SD in original units for readability regardless of transform.
+            display_mean = round(math.exp(mean) if log_transform else mean, 1)
+            display_sd   = round(
+                # Approximate original-unit SD from log-domain SD via delta method: σ_orig ≈ μ_orig * σ_log
+                math.exp(mean) * sd if log_transform else sd, 1
+            )
             flagged.append({
-                "source":         source,
-                "field":          field,
-                "label":          label,
-                "yesterday_val":  round(yesterday_val, 1),
-                "baseline_mean":  round(mean, 1),
-                "baseline_sd":    round(sd, 1),
-                "z_score":        round(z, 2),
-                "direction":      direction,
-                "pct_from_mean":  round(((yesterday_val - mean) / mean) * 100, 1) if mean != 0 else 0,
-                "cv":             round(cv, 3) if cv is not None else None,
-                "z_threshold":    z_threshold,
-                "baseline_type":  baseline_type,
-                "sample_size":    sample_size,
+                "source":              source,
+                "field":               field,
+                "label":               label,
+                "yesterday_val":       round(yesterday_val, 1),
+                "baseline_mean":       display_mean,
+                "baseline_sd":         display_sd,
+                "z_score":             round(z, 2),
+                "direction":           direction,
+                "pct_from_mean":       round(((yesterday_val - display_mean) / display_mean) * 100, 1)
+                                       if display_mean != 0 else 0,
+                "cv":                  round(cv, 3) if cv is not None else None,
+                "z_threshold":         z_threshold,
+                "baseline_type":       baseline_type,
+                "sample_size":         sample_size,
+                "log_transform":       log_transform,
+                "distribution_note":   "lognormal_z" if log_transform else "gaussian_approx",
             })
 
     return flagged
@@ -680,7 +740,7 @@ def write_anomaly_record(date_str, flagged, alert_sent, hypothesis, severity,
         "travel_destination":    travel_dest,
         "sick_mode":             sick_mode,
         "sick_reason":           sick_reason,
-        "detector_version":      "2.3.0",
+        "detector_version":      "2.4.0",
         "updated_at":            datetime.now(timezone.utc).isoformat(),
     }
     # Sustained streak fields — additive, harmless if absent (IC-19 Deliverable 2)
