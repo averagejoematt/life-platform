@@ -87,7 +87,7 @@ NUMERIC_PATTERN = re.compile(r'\d+\.?\d*\s*(%|days?|hours?|minutes?|ms|points?|g
 # ══════════════════════════════════════════════════════════════════════════════
 
 def get_anthropic_key():
-    secret_name = os.environ.get("ANTHROPIC_SECRET", "life-platform/api-keys")
+    secret_name = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
     try:
         val = secrets.get_secret_value(SecretId=secret_name)
         data = json.loads(val["SecretString"])
