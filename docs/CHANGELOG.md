@@ -1,5 +1,23 @@
 # Life Platform — Changelog
 
+## v3.5.7 — 2026-03-11: Brittany email production cutover complete
+
+### Brittany Weekly Email — production cutover ✅
+- `BRITTANY_EMAIL` updated in `cdk/stacks/email_stack.py` to Brittany's real address
+- `npx cdk deploy LifePlatformEmail` run to apply
+- Fires Sunday 9:30 AM PT (`cron(30 17 ? * 1 *)`)
+- Feature fully complete end-to-end
+
+## v3.5.6 — 2026-03-11: OBS-1 confirmed complete (all 42 Lambdas)
+
+### OBS-1 — Closed ✅
+- Full audit of all 42 Lambdas across all tiers: ingestion (13), compute (4), email (8), operational/other (17)
+- All have `platform_logger` imported and `get_logger()` called
+- `apple_health` and `dropbox_poll` intentionally omit `set_date` (multi-date streaming / no single processing date)
+- AI-3 (`ai_output_validator.py`) also confirmed complete across all email Lambdas (v3.5.4)
+- PROJECT_PLAN updated: OBS-1 → ✅ v3.5.6, AI-3 → ✅ v3.5.4
+- No code changes required — audit confirmed work already done
+
 ## v3.5.5 — 2026-03-11: Brittany email live; email stack layer v4 fix
 
 ### Brittany Weekly Email — now live
