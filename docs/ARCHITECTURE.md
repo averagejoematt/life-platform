@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-10 (v3.5.0 — 147 tools, 31-module MCP package, 19 data sources, 43 Lambdas, 8 secrets, 42 alarms, 8 CDK stacks deployed)
+Last updated: 2026-03-10 (v3.5.1 — 150 tools, 31-module MCP package, 19 data sources, 42 Lambdas, 8 secrets, 42 alarms, 8 CDK stacks deployed)
 
 ---
 
@@ -70,7 +70,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | Lambda Function URL (MCP) | MCP HTTPS endpoint | `https://votqefkra435xwrccmapxxbj6y0jawgn.lambda-url.us-west-2.on.aws/` (AuthType NONE — auth handled in Lambda via API key header) |
 | Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` (OAuth 2.1 auto-approve + HMAC Bearer) |
 | API Gateway | HTTP endpoint | `health-auto-export-api` (a76xwxt2wa) — webhook ingest |
-| Secrets Manager | Credential store | 8 secrets: 4 OAuth (`whoop`, `withings`, `strava`, `garmin`) + `eightsleep` + `life-platform/ai-keys` (Anthropic) + `life-platform/todoist` + `life-platform/notion` + `life-platform/dropbox` — **`life-platform/api-keys` pending deletion** |
+| Secrets Manager | Credential store | 9 secrets: 4 OAuth (`whoop`, `withings`, `strava`, `garmin`) + `eightsleep` + `life-platform/ai-keys` (Anthropic) + `life-platform/todoist` + `life-platform/notion` + `life-platform/habitify` — **`life-platform/api-keys` pending deletion (~2026-04-07)** |
 | SNS topic | Alert routing | `life-platform-alerts` |
 | CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` (`d14jnhrgfrte42.cloudfront.net`) → S3 `/dashboard`, Lambda@Edge auth (`life-platform-cf-auth`), alias `dash.averagejoematt.com` |
 | CloudFront (blog) | CDN (public) | `E1JOC1V6E6DDYI` (`d1aufb59hb2r1q.cloudfront.net`) → S3 `/blog`, NO auth, alias `blog.averagejoematt.com` |
@@ -189,7 +189,7 @@ DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq` (SQS). Request
 
 ### OAuth token management
 
-Whoop, Withings, Strava, Garmin: OAuth2 with self-healing refresh tokens. Each Lambda reads secret → calls API → on expiry, refreshes → writes updated credentials back to Secrets Manager. Eight Sleep: username/password JWT, refreshed each invocation. Notion, Habitify, Todoist: static API keys (consolidated into `life-platform/api-keys`).
+Whoop, Withings, Strava, Garmin: OAuth2 with self-healing refresh tokens. Each Lambda reads secret → calls API → on expiry, refreshes → writes updated credentials back to Secrets Manager. Eight Sleep: username/password JWT, refreshed each invocation. Notion, Todoist, Habitify: static API keys — each has its own dedicated secret (`life-platform/notion`, `life-platform/todoist`, `life-platform/habitify`). See ADR-014 for the dedicated-vs-bundled governing principle.
 
 ---
 
@@ -371,7 +371,7 @@ Each Lambda has a **dedicated, least-privilege IAM role** (43 roles total as of 
 
 ## Secrets Manager
 
-**8 active secrets** at $0.40/month each = **~$3.20/month**
+**9 active secrets** at $0.40/month each = **~$3.60/month**
 
 | Secret | Used By | Contents |
 |---|---|---|
@@ -383,6 +383,7 @@ Each Lambda has a **dedicated, least-privilege IAM role** (43 roles total as of 
 | `life-platform/ai-keys` | All email/compute/MCP Lambdas | Anthropic API key + MCP API key (90-day auto-rotation) |
 | `life-platform/todoist` | Todoist Lambda | Todoist API key |
 | `life-platform/notion` | Notion Lambda | Notion integration key |
+| `life-platform/habitify` | Habitify Lambda | Habitify API key (dedicated secret — see ADR-014) |
 | ~~`life-platform/api-keys`~~ | ~~Legacy~~ | ~~**PENDING DELETION** (~2026-04-07). Verify all Lambdas migrated before deleting.~~ |
 
 ---
@@ -393,7 +394,7 @@ Target: under $25/month | Current: ~$10/month
 
 | Driver | Monthly Cost |
 |---|---|
-| Secrets Manager (6 secrets) | ~$2.40 |
+| Secrets Manager (9 secrets, api-keys pending deletion) | ~$3.60 |
 | Lambda invocations (~2,000/mo) | ~$0.50 |
 | DynamoDB (on-demand, low RCU/WCU) | ~$1.00 |
 | S3 (~2.5 GB stored + requests) | ~$0.50 |

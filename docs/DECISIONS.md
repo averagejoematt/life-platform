@@ -37,7 +37,7 @@ When a significant decision is made — a design pattern chosen, an approach rej
 | ADR-011 | Whoop as sleep SOT over Eight Sleep | ✅ Active | 2026-03-01 |
 | ADR-012 | Board of Directors as S3 config, not code | ✅ Active | 2026-03-01 |
 | ADR-013 | Shared Lambda Layer for common modules | ✅ Active | 2026-03-05 |
-| ADR-014 | Secrets Manager consolidation (12→8) | ✅ Active | 2026-03-05 |
+| ADR-014 | Secrets Manager consolidation — dedicated vs. bundled principle | ✅ Active | 2026-03-05 |
 | ADR-015 | Compute→Store→Read pattern for intelligence features | ✅ Active | 2026-03-06 |
 | ADR-016 | platform_memory DDB partition over vector store | ✅ Active | 2026-03-07 |
 | ADR-017 | No fine-tuning — prompt + context engineering instead | ✅ Active | 2026-03-07 |
@@ -242,6 +242,10 @@ When a significant decision is made — a design pattern chosen, an approach rej
 
 **Decision:** Consolidate to 8 secrets. Domain-specific bundles: `ai-keys`, `api-keys` (pending deletion), `todoist`, `notion` + OAuth secrets remain separate per service (whoop, withings, strava, eightsleep, garmin) + `mcp-api-key`.
 
+**Governing principle (clarified 2026-03-11):** Bundle secrets only when the same credentials are consumed by the exact same set of Lambdas. The one justified bundle is `life-platform/ai-keys` (Anthropic API key + MCP bearer token — shared by all email, compute, and MCP Lambdas). Everything else is dedicated. Habitify, Todoist, and Notion each have their own secret because each is consumed by exactly one Lambda — bundling them saves $0.40/month at the cost of blast radius and coupling. OAuth secrets (Whoop, Withings, Strava, Garmin) are always dedicated because they auto-rotate and write back to their own secret. The original `api-keys` bundle was an over-optimisation; migrating away from it was correct.
+
+**Current end state (v3.5.0):** 9 active secrets — `whoop`, `withings`, `strava`, `garmin`, `eightsleep`, `ai-keys`, `todoist`, `notion`, `habitify`. `api-keys` pending deletion (~2026-04-07).
+
 **Lesson learned (dropbox-poll incident):** Lambdas with hardcoded `SECRET_NAME` env vars are latent risks after consolidation. Audit remaining Lambdas for any stale overrides. Key name prefixes (`dropbox_app_key` vs `app_key`) must match new bundle structure.
 
 ---
@@ -377,4 +381,4 @@ When a significant decision is made — a design pattern chosen, an approach rej
 
 ---
 
-*Last updated: 2026-03-10 (v3.4.2)*
+*Last updated: 2026-03-11 (v3.5.0)*

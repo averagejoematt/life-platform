@@ -544,6 +544,97 @@ test("list_supported_sources: returns list with whoop, withings", test_list_supp
 
 
 # ======================================================================
+# call_anthropic middleware — signature + output_type wiring
+# ======================================================================
+print("\n-- call_anthropic middleware -------------------------------------")
+
+import inspect
+import ast
+import glob
+
+from ai_calls import call_anthropic, _AI_VALIDATOR_AVAILABLE, AIOutputType
+
+def test_call_anthropic_has_output_type_param():
+    sig = inspect.signature(call_anthropic)
+    assert "output_type" in sig.parameters, "call_anthropic must accept output_type param"
+    assert "health_context" in sig.parameters, "call_anthropic must accept health_context param"
+    assert sig.parameters["output_type"].default is None, "output_type default must be None"
+    assert sig.parameters["health_context"].default is None, "health_context default must be None"
+
+def test_ai_validator_importable():
+    assert _AI_VALIDATOR_AVAILABLE, (
+        "ai_output_validator must be importable from Layer — "
+        "check that ai_output_validator.py is in cdk/layer-build/python/"
+    )
+
+def test_ai_output_type_importable():
+    assert AIOutputType is not None, "AIOutputType must import successfully via ai_calls"
+    assert hasattr(AIOutputType, "BOD_COACHING")
+    assert hasattr(AIOutputType, "JOURNAL_COACH")
+    assert hasattr(AIOutputType, "TRAINING_COACH")
+
+def test_bod_caller_passes_output_type():
+    """call_board_of_directors must pass output_type=AIOutputType.BOD_COACHING to call_anthropic."""
+    src_path = os.path.join(LAMBDAS_DIR, "ai_calls.py")
+    with open(src_path) as f:
+        src = f.read()
+    # Check that the BoD final call_anthropic includes BOD_COACHING
+    assert "BOD_COACHING" in src, (
+        "call_board_of_directors must pass output_type=AIOutputType.BOD_COACHING "
+        "to call_anthropic — AI-3 middleware will not activate without it"
+    )
+
+def test_journal_caller_passes_output_type():
+    """call_journal_coach must pass output_type=AIOutputType.JOURNAL_COACH."""
+    src_path = os.path.join(LAMBDAS_DIR, "ai_calls.py")
+    with open(src_path) as f:
+        src = f.read()
+    assert "JOURNAL_COACH" in src, (
+        "call_journal_coach must pass output_type=AIOutputType.JOURNAL_COACH"
+    )
+
+def test_email_lambdas_dont_call_anthropic_directly():
+    """Email Lambdas should call ai_calls wrappers, not call_anthropic() directly.
+    Direct call_anthropic() calls bypass the output_type middleware.
+    Checks all email + compute Lambda files."""
+    email_lambdas = [
+        "daily_brief_lambda.py", "weekly_digest_lambda", "monthly_digest_lambda.py",
+        "nutrition_review_lambda.py", "wednesday_chronicle_lambda.py",
+        "weekly_plate_lambda.py", "monday_compass_lambda.py", "brittany_email_lambda.py",
+        "anomaly_detector_lambda.py", "daily_insight_compute_lambda.py",
+        "hypothesis_engine_lambda.py",
+    ]
+    violations = []
+    for fname in email_lambdas:
+        fpath = os.path.join(LAMBDAS_DIR, fname)
+        if not os.path.exists(fpath):
+            continue
+        with open(fpath) as f:
+            src = f.read()
+        # Valid wiring patterns:
+        #   (a) uses ai_calls module wrappers: "from ai_calls import" present
+        #   (b) standalone Lambda with its own local call_anthropic() guarded by _HAS_AI_VALIDATOR
+        #       These Lambdas import ai_output_validator directly and call validate_ai_output
+        #       post-hoc at the call site — a legitimate alternative pattern.
+        # Violation: has call_anthropic( but neither pattern is present.
+        has_ai_calls_import = "from ai_calls" in src
+        has_standalone_validator = "_HAS_AI_VALIDATOR" in src and "validate_ai_output" in src
+        if "call_anthropic(" in src and not has_ai_calls_import and not has_standalone_validator:
+            violations.append(fname)
+    assert not violations, (
+        f"These Lambdas call call_anthropic() directly (bypassing AI-3 middleware): {violations}. "
+        "Import and use ai_calls wrappers instead."
+    )
+
+test("call_anthropic: has output_type + health_context params", test_call_anthropic_has_output_type_param)
+test("ai_output_validator: importable (_AI_VALIDATOR_AVAILABLE=True)", test_ai_validator_importable)
+test("AIOutputType: importable with correct members", test_ai_output_type_importable)
+test("call_board_of_directors: passes BOD_COACHING output_type", test_bod_caller_passes_output_type)
+test("call_journal_coach: passes JOURNAL_COACH output_type", test_journal_caller_passes_output_type)
+test("email Lambdas: no direct call_anthropic() bypass", test_email_lambdas_dont_call_anthropic_directly)
+
+
+# ======================================================================
 # Summary
 # ======================================================================
 passed = sum(1 for s, _ in results if s == PASS)

@@ -67,5 +67,5 @@ class EmailStack(Stack):
 
         create_platform_lambda(self, "MondayCompass", function_name="monday-compass", handler="monday_compass_lambda.lambda_handler", source_file="lambdas/monday_compass_lambda.py", schedule="cron(0 15 ? * MON *)", timeout_seconds=120, memory_mb=512, environment=_email_env, custom_policies=rp.email_monday_compass(), **shared)
 
-        _brittany_env = {**_email_env, "BRITTANY_EMAIL": "brittany@mattsusername.com"}  # TODO: confirm real address
+        _brittany_env = {**_email_env, "BRITTANY_EMAIL": "awsdev@mattsusername.com"}
         create_platform_lambda(self, "BrittanyWeeklyEmail", function_name="brittany-weekly-email", handler="brittany_email_lambda.lambda_handler", source_file="lambdas/brittany_email_lambda.py", schedule="cron(30 17 ? * 1 *)", timeout_seconds=90, memory_mb=256, environment=_brittany_env, custom_policies=rp.email_brittany(), **shared)

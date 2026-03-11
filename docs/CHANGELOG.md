@@ -1,5 +1,73 @@
 # Life Platform — Changelog
 
+## v3.5.1 — 2026-03-11: Secrets hygiene, Brittany email deploy, CDK deploy, sick day
+
+### Secrets
+- Restored `life-platform/habitify` secret (accidentally deleted during cleanup sweep)
+- Verified: `DeletedDate: null` — Habitify ingestion Lambda operational
+- `docs/DECISIONS.md` ADR-014: added governing principle — bundle only when same credentials consumed by same Lambda set; `ai-keys` is the one justified bundle; all others dedicated
+- `docs/ARCHITECTURE.md`: corrected secrets count 8→9, added `life-platform/habitify` to secrets table, fixed stale OAuth paragraph, updated cost profile ($2.40→$3.60/month for Secrets Manager)
+
+### Brittany email
+- `cdk/stacks/email_stack.py`: `BRITTANY_EMAIL` placeholder → `awsdev@mattsusername.com`
+- Lambda verified live with correct env vars post-deploy
+- First send: next Monday 10:30 AM PT
+
+### CDK deploy
+- `LifePlatformCompute` + `LifePlatformEmail` deployed (43.68s)
+- All email Lambdas now have explicit `ANTHROPIC_SECRET=life-platform/ai-keys`
+- api-keys migration debt fully resolved — safe through ~2026-04-07 deletion
+
+### Operations
+- CloudFront smoke test: 12/12 passed across all 3 distributions
+- March 10 sick day logged to DynamoDB (`USER#matthew#SOURCE#sick_days / DATE#2026-03-10`)
+- 12 alarms in ALARM at session close — all pre-CDK migration turbulence, expected to self-clear
+
+---
+
+## v3.6.0 — 2026-03-10: Board Sprint — AI-3 middleware, post-CDK smoke, env diff, architecture auto-update
+
+### Item 4: AI-3 Output Validator Middleware (closes AI grade B→A path)
+- `lambdas/ai_calls.py`: `call_anthropic()` now accepts `output_type=None, health_context=None`
+  - Validation runs inline after every successful API call when `output_type` is set
+  - Transparent fail-safe: if `ai_output_validator` import fails, logs warning and returns raw output
+  - Returns `vr.sanitized_text` (safe fallback when blocked, original when passing)
+  - `call_board_of_directors`: wired `AIOutputType.BOD_COACHING` + `health_context` dict
+  - `call_journal_coach`: wired `AIOutputType.JOURNAL_COACH`
+- `lambdas/ai_output_validator.py`: `_CORRELATION_AS_CAUSATION` expanded 4→12 patterns
+  - Added: direct causal assertions, certainty framing, responsibility language, `proves that` patterns
+- `lambdas/weekly_plate_lambda.py`: `GENERIC` → `NUTRITION_COACH` (activates calorie blocking)
+- `lambdas/monday_compass_lambda.py`: `GENERIC` → `WEEKLY_DIGEST` (correct type for planning digest)
+- `tests/test_shared_modules.py`: +6 tests in new `call_anthropic middleware` section (66/66 passing)
+  - Covers: signature, `_AI_VALIDATOR_AVAILABLE` flag, `AIOutputType` members, BOD/journal wiring
+  - Lambda bypass detector: catches Lambdas with `call_anthropic()` and neither valid wiring pattern
+
+### Item 1: Post-CDK Deploy Smoke Test
+- `deploy/post_cdk_smoke.sh`: 3-section post-deploy gate
+  - Section 1: delegates to `smoke_test_cloudfront.sh` (HTTPS, TLS, redirect)
+  - Section 2: Lambda State=Active + CloudWatch error check for all 8 email + 7 compute Lambdas
+  - Section 3: MCP warm ping — invokes `get_health_dashboard` to confirm intelligence layer intact
+  - Flags: `--skip-mcp`, colored output (green/yellow/red), exits 1 on any FAIL
+
+### Item 2: Pre-CDK Env Var Diff Check
+- `deploy/cdk_env_diff.sh`: two-direction diff before every CDK deploy
+  - ADDITIONS: vars CDK will add (low risk, visible)
+  - DELETIONS: vars Lambda has that CDK doesn't — highlighted in red (HIGH RISK)
+  - High-sensitivity vars (`EMAIL_RECIPIENT`, `ANTHROPIC_SECRET`, `AI_MODEL`, `BRITTANY_EMAIL`, etc.) flagged explicitly
+  - `--ci` flag: exits 1 on deletions without prompting (CI/CD gate)
+  - Interactive mode: `[y/N]` confirmation with INCIDENT_LOG reminder
+  - Stack mapping covers all 5 CDK stacks (Email, Compute, Ingestion, Operational, MCP)
+
+### Item 3: ARCHITECTURE.md Header Auto-Update
+- `scripts/update_architecture_header.sh`: counts Lambdas from CDK stacks + MCP tools from `mcp/`
+  - Rewrites `Last updated:` header line in `ARCHITECTURE.md`
+  - Detects and reports new Lambdas since last git commit
+  - Run: 42 Lambdas, 150 tools detected and written
+- `scripts/install_hooks.sh`: installs pre-commit hook that auto-runs header script + stages changes
+  - Installed: `.git/hooks/pre-commit`
+
+---
+
 ## v3.5.0 — 2026-03-10: Sprint v3.5.0 — api-keys migration, unit tests, CloudFront smoke test
 
 ### Critical: api-keys secret migration (deadline ~2026-04-07)

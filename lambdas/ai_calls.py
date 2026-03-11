@@ -26,6 +26,15 @@ from datetime import date as _date_cls
 
 import boto3
 
+# AI-3 middleware: lazy import of output validator (transparent fail-safe)
+try:
+    from ai_output_validator import validate_ai_output as _validate_ai_output, AIOutputType
+    _AI_VALIDATOR_AVAILABLE = True
+except ImportError:
+    _validate_ai_output = None
+    AIOutputType = None
+    _AI_VALIDATOR_AVAILABLE = False
+
 # AI model constants — read from env so model can be updated without redeployment
 AI_MODEL       = os.environ.get("AI_MODEL",       "claude-sonnet-4-6")
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
@@ -1058,12 +1067,20 @@ def build_workout_summary(data):
 # ANTHROPIC API
 # ==============================================================================
 
-def call_anthropic(prompt, api_key, max_tokens=200, system=None):
+def call_anthropic(prompt, api_key, max_tokens=200, system=None,
+                   output_type=None, health_context=None):
     """Call Anthropic API with exponential backoff (4 attempts: 5s/15s/45s delays).
 
     P1.8: Exponential backoff replaces fixed 2-attempt/5s retry.
     P1.9: Token usage emitted to CloudWatch LifePlatform/AI namespace.
-    Returns text string (unchanged interface — callers require no updates).
+    AI-3 middleware: validates output when output_type is specified (transparent fail-safe).
+
+    Args:
+        output_type:    AIOutputType enum value — enables AI-3 output validation.
+                        Pass None (default) to skip — used for JSON callers and IC passes.
+        health_context: Dict of health metrics for context-aware validation checks
+                        (e.g. {"recovery_score": 45, "tsb": -12}).
+    Returns text string — safe fallback if output is blocked by validator.
     """
     body = {
         "model": AI_MODEL,
@@ -1097,7 +1114,19 @@ def call_anthropic(prompt, api_key, max_tokens=200, system=None):
                         usage.get("input_tokens", 0),
                         usage.get("output_tokens", 0),
                     )
-                return resp["content"][0]["text"].strip()
+                text = resp["content"][0]["text"].strip()
+                # AI-3 middleware: validate output when output_type is specified
+                if output_type is not None and _AI_VALIDATOR_AVAILABLE:
+                    try:
+                        vr = _validate_ai_output(text, output_type, health_context or {})
+                        if vr.blocked:
+                            print(f"[AI-3] BLOCKED {output_type}: {vr.block_reason}")
+                        elif vr.warnings:
+                            print(f"[AI-3] WARN {output_type}: {vr.warnings}")
+                        return vr.sanitized_text
+                    except Exception as _ve:
+                        print(f"[WARN] ai_output_validator non-fatal: {_ve}")
+                return text
         except urllib.error.HTTPError as e:
             retryable = e.code in (429, 529, 500, 502, 503, 504)
             print(f"[WARN] Anthropic HTTP {e.code} attempt {attempt}/{max_attempts}")
@@ -1266,7 +1295,8 @@ Format: [reflection] || [tactical thing]
 No labels, no formatting. Natural voice. Max 80 words total."""
 
     try:
-        return call_anthropic(prompt, api_key, max_tokens=250)
+        return call_anthropic(prompt, api_key, max_tokens=250,
+                              output_type=AIOutputType.JOURNAL_COACH if _AI_VALIDATOR_AVAILABLE else None)
     except Exception as e:
         print("[WARN] Journal coach failed: " + str(e))
         return ""
@@ -1472,7 +1502,14 @@ DO NOT start with "Matthew". Max 60 words."""
     elif brief_mode == "struggling":
         prompt += "\n\nTONE: He is in a ROUGH PATCH — engagement is low, habits slipping. Be warm, not clinical. Acknowledge the difficulty without piling on. Focus on the smallest possible next right action. No guilt."
 
-    return call_anthropic(prompt, api_key, max_tokens=200)
+    _hctx = {
+        "recovery_score": _safe_float(data.get("whoop"), "recovery_score") if data else None,
+        "tsb": data.get("tsb") if data else None,
+        "sleep_score": _safe_float((data.get("sleep") or {}), "sleep_score") if data else None,
+    }
+    return call_anthropic(prompt, api_key, max_tokens=200,
+                          output_type=AIOutputType.BOD_COACHING if _AI_VALIDATOR_AVAILABLE else None,
+                          health_context=_hctx)
 
 
 def call_tldr_and_guidance(data, profile, day_grade, grade, component_scores, component_details,
