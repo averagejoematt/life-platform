@@ -39,7 +39,7 @@ except ImportError:
 # ── Config ────────────────────────────────────────────────────────────────────
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ["S3_BUCKET"]
-SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/api-keys")
+SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/ingestion-keys")
 
 TOKEN_URL = "https://api.dropboxapi.com/oauth2/token"
 LIST_URL = "https://api.dropboxapi.com/2/files/list_folder"

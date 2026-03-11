@@ -19,7 +19,7 @@ from mcp.helpers import pearson_r
 # ── Todoist API client ────────────────────────────────────────────────────────
 
 _TODOIST_BASE = "https://api.todoist.com/api/v1"
-_SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/api-keys")
+_SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/todoist")
 _REGION = os.environ.get("AWS_REGION", "us-west-2")
 _todoist_token_cache = None
 

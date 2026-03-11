@@ -55,7 +55,7 @@ BUCKET    = os.environ["S3_BUCKET"]
 USER_ID   = os.environ["USER_ID"]
 RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 SENDER    = os.environ["EMAIL_SENDER"]
-ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/api-keys")
+ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
 LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "7"))
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"

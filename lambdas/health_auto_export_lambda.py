@@ -98,7 +98,7 @@ except ImportError:
 # ── Config ─────────────────────────────────────────────────────────────────────
 S3_BUCKET      = os.environ["S3_BUCKET"]
 DYNAMODB_TABLE = os.environ.get("DYNAMODB_TABLE", "life-platform")
-SECRET_NAME    = os.environ.get("SECRET_NAME", "life-platform/api-keys")
+SECRET_NAME    = os.environ.get("SECRET_NAME", "life-platform/ingestion-keys")
 REGION         = os.environ.get("AWS_DEFAULT_REGION", "us-west-2")
 USER_ID        = os.environ["USER_ID"]
 PK             = f"USER#{USER_ID}#SOURCE#apple_health"
