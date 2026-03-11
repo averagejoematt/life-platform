@@ -1,5 +1,32 @@
 # Life Platform — Changelog
 
+## v3.5.5 — 2026-03-11: Brittany email live; email stack layer v4 fix
+
+### Brittany Weekly Email — now live
+- First successful invocation confirmed: `Matthew's Week · 2026-03-10` sent to `awsdev@mattsusername.com`
+- Root cause of prior failures: (1) `deploy_obs1_ai3_apikeys.sh` used inline zip logic with path prefix — module landed at `lambdas/brittany_email_lambda.py` inside zip instead of root; (2) EmailStack had no layer reference — all 8 email Lambdas were on layer v2 (missing `set_date`)
+
+### EmailStack layer fix (email_stack.py)
+- Added `aws_lambda as _lambda` import
+- Added `SHARED_LAYER_ARN` constant pointing to `life-platform-shared-utils:4`
+- Added `shared_utils_layer` and passed via `shared` dict to all 8 email Lambdas
+- `npx cdk deploy LifePlatformEmail` — all 8 email Lambdas now on layer v4
+
+### Root cause documented
+- `deploy_obs1_ai3_apikeys.sh` had a bug: inline `deploy_lambda()` used `zip /tmp/fn.zip lambdas/file.py` (path prefix preserved) instead of delegating to `deploy/deploy_lambda.sh` (which strips path via temp dir). All future deploy scripts must use `deploy_lambda.sh`.
+
+## v3.5.4 — 2026-03-11: api-keys deleted; OBS-1 + AI-3 + secret fixes deployed
+
+### Deployed
+- `bash deploy/deploy_obs1_ai3_apikeys.sh` — all 5 Lambda code changes live (brittany-weekly-email, journal-enrichment, habitify-data-ingestion, notion-journal-ingestion, todoist-data-ingestion)
+- `cdk deploy LifePlatformIngestion` — confirmed no changes needed (CDK env vars already correct from v3.5.3)
+- **`life-platform/api-keys` deleted** from Secrets Manager (scheduled permanent deletion 2026-03-17; 7-day recovery window)
+
+### Secrets Manager state (post-deletion)
+- Active secrets (9): `life-platform/whoop`, `garmin`, `withings`, `strava`, `eightsleep`, `ai-keys`, `todoist`, `notion`, `habitify`
+- `life-platform/ingestion-keys` = notion+todoist+dropbox bundle (active)
+- `life-platform/api-keys` = **DELETED** (recovery window until 2026-03-17)
+
 ## v3.5.3 — 2026-03-11: OBS-1 + AI-3 rollout complete; api-keys pre-deletion fixes
 
 ### OBS-1 — platform_logger rollout status
