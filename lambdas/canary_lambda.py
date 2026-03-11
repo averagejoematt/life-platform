@@ -57,7 +57,7 @@ REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET  = os.environ["S3_BUCKET"]
 MCP_URL    = os.environ.get("MCP_FUNCTION_URL", "")   # set from deploy script
-MCP_SECRET = os.environ.get("MCP_SECRET_NAME", "life-platform/api-keys")
+MCP_SECRET = os.environ.get("MCP_SECRET_NAME", "life-platform/ai-keys")
 SENDER     = os.environ["EMAIL_SENDER"]
 RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
 
