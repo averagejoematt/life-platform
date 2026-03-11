@@ -126,6 +126,57 @@ jobs:
           python3 -m pytest tests/test_role_policies.py -v --tb=short
           echo "::endgroup::"
 
+      - name: Safety module wiring linter (test_wiring_coverage.py)
+        # Validates platform_logger / ingestion_validator / ai_output_validator are
+        # wired across all Lambdas. Catches 'built but not wired' gaps (highest hardening risk).
+        # Also scans prompt strings for causal language (AI-3 / causal framing principle).
+        run: |
+          echo "::group::Wiring coverage linter"
+          python3 -m pytest tests/test_wiring_coverage.py -v --tb=short
+          echo "::endgroup::"
+
+      - name: DynamoDB pattern linter (test_ddb_patterns.py)
+        # Validates DDB key format, reserved-word guards, schema_version, and
+        # validate_item usage before put_item in ingestion Lambdas.
+        run: |
+          echo "::group::DynamoDB pattern linter"
+          python3 -m pytest tests/test_ddb_patterns.py -v --tb=short
+          echo "::endgroup::"
+
+      - name: Deprecated secrets scan
+        # Fails if any Lambda or config file references a secret scheduled for deletion.
+        # Secret retirement schedule is maintained in ci/deprecated_secrets.txt.
+        run: |
+          echo "::group::Deprecated secrets scan"
+          FAILED=0
+
+          # Read deprecated secret names (skip blank lines and comments)
+          while IFS= read -r line; do
+            secret=$(echo "$line" | sed 's/#.*//' | xargs)
+            [ -z "$secret" ] && continue
+
+            echo "Scanning for deprecated secret: $secret"
+            MATCHES=$(grep -rn --include='*.py' --include='*.json' --include='*.yml' --include='*.yaml' --include='*.sh' "$secret" \
+              lambdas/ mcp/ cdk/ .github/ ci/ \
+              --exclude-dir='.venv' --exclude-dir='cdk.out' \
+              2>/dev/null | grep -v 'deprecated_secrets.txt' | grep -v '^Binary')
+
+            if [ -n "$MATCHES" ]; then
+              echo "::error::Deprecated secret '$secret' still referenced:"
+              echo "$MATCHES" | head -20
+              FAILED=$((FAILED + 1))
+            else
+              echo "  ✅ No references to '$secret'"
+            fi
+          done < ci/deprecated_secrets.txt
+
+          echo "::endgroup::"
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::error::$FAILED deprecated secret(s) still referenced. Update to current secret names before merging."
+            exit 1
+          fi
+          echo "✅ Deprecated secrets scan passed"
+
   # ════════════════════════════════════════════════════════════════
   # Job 3: Plan — validate map, detect changes, build deploy plan
   # ════════════════════════════════════════════════════════════════
@@ -221,6 +272,30 @@ jobs:
             echo "::warning::cdk diff exited $CDK_EXIT (non-zero is normal when changes detected)"
           fi
           echo "✅ CDK diff complete"
+
+      - name: Validate handler function names
+        # Checks that every Lambda source file in lambda_map.json defines
+        # a function named lambda_handler. Catches handler renames before deploy.
+        run: |
+          echo "::group::Handler consistency check"
+          FAILED=0
+
+          while IFS= read -r src; do
+            [ -f "$src" ] || continue
+            if ! grep -q '^def lambda_handler' "$src"; then
+              echo "::error::$src: missing 'def lambda_handler' — handler function not found"
+              FAILED=$((FAILED + 1))
+            else
+              echo "  ✅ $src"
+            fi
+          done < <(jq -r '.lambdas | keys[]' ci/lambda_map.json)
+
+          echo "::endgroup::"
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::error::$FAILED Lambda source file(s) missing def lambda_handler"
+            exit 1
+          fi
+          echo "✅ All Lambda source files define lambda_handler"
 
       - name: Detect changes and build deploy plan
         id: plan
