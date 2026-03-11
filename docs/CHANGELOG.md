@@ -1,5 +1,24 @@
 # Life Platform — Changelog
 
+## v3.5.3 — 2026-03-11: OBS-1 + AI-3 rollout complete; api-keys pre-deletion fixes
+
+### OBS-1 — platform_logger rollout status
+- **Confirmed wired** in all email Lambdas: daily-brief, weekly-digest, monthly-digest, nutrition-review, wednesday-chronicle, weekly-plate, monday-compass, anomaly-detector (prior sessions)
+- **NEW:** `brittany_email_lambda.py` — added `get_logger("brittany-weekly")` + `logger.set_date()` in handler (OBS-1 complete across all email Lambdas)
+
+### AI-3 — ai_output_validator rollout status
+- **Confirmed wired** in all email Lambdas (prior sessions)
+- **NEW:** `brittany_email_lambda.py` — added `validate_ai_output(commentary, AIOutputType.WEEKLY_DIGEST)` with `was_replaced` logging (AI-3 complete across all email Lambdas)
+
+### api-keys pre-deletion fixes (blocker removal before ~2026-04-07)
+- `journal_enrichment_lambda.py`: `ANTHROPIC_SECRET` default `api-keys` → `ai-keys` (was unguarded — no CDK env override existed; **real break risk on deletion**)
+- `ingestion_stack.py`: added `environment={"ANTHROPIC_SECRET": "life-platform/ai-keys"}` to JournalEnrichment CDK block
+- `ingestion_stack.py`: fixed `HABITIFY_SECRET_NAME` CDK env — was `life-platform/ingestion-keys`, now `life-platform/habitify` (bug: habitify has its own secret per ADR-014)
+- `habitify_lambda.py`: default fallback `api-keys` → `life-platform/habitify`
+- `notion_lambda.py`: default fallback `api-keys` → `ingestion-keys` (CDK was already correct)
+- `todoist_lambda.py`: default fallback `api-keys` → `ingestion-keys` (CDK was already correct)
+- **Remaining before deletion:** `cdk deploy IngestionStack` to push the two CDK env var changes live
+
 ## v3.5.2 — 2026-03-11: IC-19 complete — slow drift, sustained anomalies, hypothesis-experiment bridge
 
 ### IC-19 Deliverable 1 — Slow Drift Detector (`daily_insight_compute_lambda.py` IC-2 v1.2.0)

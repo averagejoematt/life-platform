@@ -23,6 +23,7 @@ by The Chair into plain English for a partner audience.
 """
 
 import json
+import logging
 import os
 import time
 import boto3
@@ -31,6 +32,14 @@ import urllib.request
 from datetime import datetime, timedelta, timezone, date
 from decimal import Decimal
 from collections import defaultdict
+
+# OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
+try:
+    from platform_logger import get_logger
+    logger = get_logger("brittany-weekly")
+except ImportError:
+    logger = logging.getLogger("brittany-weekly")
+    logger.setLevel(logging.INFO)
 
 _REGION    = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
@@ -730,15 +739,25 @@ def build_html(data, commentary_text):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def lambda_handler(event, context):
-    print("[INFO] Brittany Weekly Email v1.1.0 starting...")
+    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+    logger.info("Brittany Weekly Email v1.1.0 starting...")
     data = gather_all()
 
-    print("[INFO] Calling Sonnet 4.6 for Board commentary...")
+    logger.info("Calling Sonnet 4.6 for Board commentary...")
     try:
         commentary = build_commentary(data)
-        print("[INFO] Commentary length: " + str(len(commentary)) + " chars")
+        logger.info("Commentary length: %s chars", len(commentary))
+        # AI-3: validate output before rendering
+        try:
+            from ai_output_validator import validate_ai_output, AIOutputType
+            _val = validate_ai_output(commentary, AIOutputType.WEEKLY_DIGEST)
+            if _val.was_replaced:
+                logger.warning("[AI-3] Brittany commentary replaced with fallback: %s", _val.failure_reason)
+            commentary = _val.final_text
+        except ImportError:
+            pass
     except Exception as e:
-        print("[WARN] AI call failed: " + str(e))
+        logger.warning("AI call failed: %s", e)
         commentary = (
             "💚 HOW HE'S FEELING — COACH RODRIGUEZ\n"
             "Commentary unavailable this week.\n\n"

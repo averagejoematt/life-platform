@@ -15,7 +15,7 @@ except ImportError:
     logger = logging.getLogger("todoist")
     logger.setLevel(logging.INFO)
 
-SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/api-keys")
+SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/ingestion-keys")
 # ── Config (env vars with backwards-compatible defaults) ──
 REGION         = os.environ.get("AWS_REGION", "us-west-2")
 S3_BUCKET      = os.environ["S3_BUCKET"]
