@@ -1,5 +1,39 @@
 # Life Platform — Changelog
 
+## v3.6.2 — 2026-03-11: Remove one-time hygiene script from repo root
+
+### Changes
+- Removed `apply_hygiene_files.sh` from project root (one-time use script committed inadvertently during hygiene sprint)
+
+### Files changed
+- `apply_hygiene_files.sh` (deleted)
+
+---
+
+## v3.6.1 — 2026-03-11: Hygiene sprint — 7 documentation and CI/CD fixes
+
+### Changes
+- **INCIDENT_LOG.md** — updated to v3.6.0 (12 versions behind); added 2 new incidents: Brittany email zip-path-prefix bug (P2) + EmailStack missing layer v4 (P3); patterns section updated
+- **CHANGELOG.md** — resolved v3.6.0 version collision (two entries, different dates); 2026-03-10 "Board Sprint" entry renamed to `v3.5.0a`
+- **INFRASTRUCTURE.md** — updated from v3.1.3 → v3.6.0 (20+ versions stale); Lambda count 39→42, secrets 8→9 (added `habitify`), MCP tools 144→150, DDB partitions 27→30, EventBridge section rewritten to reflect CDK ownership, `api-keys` deletion date corrected to 2026-03-17
+- **ci-cd.yml** — added Job 2 `test` (pytest on `tests/test_shared_modules.py`) between lint and plan; plan now `needs: [lint, test]`; jobs renumbered 1→6
+- **cdk/app.py** — fixed docstring: `7 email/digest Lambdas` → `8`; expanded `Deployment:` to list all 8 stacks; removed stale `# Future stacks — uncomment as implemented:` comments
+- **deploy/** — 12 one-time scripts archived to `deploy/archive/20260311/`; 9 active scripts remain
+- **docs/CHANGELOG_v341.md** — orphan file moved to `docs/archive/CHANGELOG_v341.md`
+
+### Files changed
+- `docs/INCIDENT_LOG.md`
+- `docs/CHANGELOG.md`
+- `docs/INFRASTRUCTURE.md`
+- `.github/workflows/ci-cd.yml`
+- `cdk/app.py`
+- `deploy/archive_onetime_scripts.sh` (new)
+- `deploy/archive_changelog_v341.sh` (new)
+- 12 scripts → `deploy/archive/20260311/`
+- `docs/CHANGELOG_v341.md` → `docs/archive/CHANGELOG_v341.md`
+
+---
+
 ## v3.6.0 — 2026-03-11: CI/CD hardening
 
 ### Changes
