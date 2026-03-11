@@ -1,5 +1,5 @@
 """
-Daily Insight Compute Lambda — IC-2 v1.2.0
+Daily Insight Compute Lambda — IC-2 v1.3.0
 Scheduled at 9:42 AM PT (17:42 UTC via EventBridge).
 
 Transforms raw pre-computed metrics into curated coaching intelligence
@@ -24,12 +24,24 @@ Schedule:
   9:42 AM PT  daily-insight-compute  ← this Lambda
   10:00 AM PT daily-brief            (reads computed_insights via data["computed_insights"])
 
+v1.3.0 — 2026-03-11 (IC-19: Slow Drift + Experiment Context)
+  - _compute_slow_drift(): non-overlapping 7d vs 8-28d windows, min N=14 (Henning)
+  - Weight plateau: regression slope on >=8 measurements, not endpoint (Attia)
+  - Weight plateau: MacroFactor TDEE preferred over Apple Watch (Webb/Norton)
+  - Recomposition caveat + >=11 complete log day gate (Okafor/Henning)
+  - Circadian consistency note when HRV/recovery drift fires (Huberman)
+  - slow_drift_metrics stored on computed_insights with baseline_n (Omar)
+  - _build_experiment_context(): descriptive active experiment injection (Anika/Raj)
+  - _build_prioritized_context_block(): priority queue + 700-token budget (Priya)
+  - Social quality flag when multiple drift + sparse journal (Murthy)
 v1.2.0 — 2026-03-09 (IC-5: Early Warning Detection — multi-marker proactive alert)
 v1.1.0 — 2026-03-08 (IC-8: Intent vs Execution Gap)
 """
 
 import json
+import math
 import os
+import statistics
 import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -819,67 +831,524 @@ def detect_early_warning(computed_records_7d, habit_7d, declining):
     return warning_active, markers, warning_block
 
 
+# ==============================================================================
+# PRIORITY QUEUE CONTEXT ASSEMBLER  (IC-19 v1.3.0 — Priya/Anika/Elena)
+# ==============================================================================
+
+def _build_prioritized_context_block(signals, token_budget=700):
+    """Assemble AI context block from priority-ranked signals, filling to token budget.
+
+    Args:
+        signals: list of dicts with keys:
+            priority      (int, lower = higher urgency; 1 always included)
+            content       (str, the line or block to append)
+            token_estimate (int, approximate tokens for budget tracking)
+        token_budget: maximum tokens to spend on signal content.
+            NOTE: 700 is an initial estimate — revisit once coaching quality
+            feedback is available to calibrate against actual Daily Brief quality.
+
+    Pure function — no AWS/DynamoDB dependencies. (Elena)
+    """
+    header = "PLATFORM INTELLIGENCE (7-day context, pre-computed):"
+    footer = ("INSTRUCTION: Reference this intelligence in coaching. Name the specific patterns, "
+              "causal chains, and leading indicators above \u2014 don't just list them, connect them.")
+
+    lines = [header]
+    used  = len(header.split())  # rough word count as token proxy
+
+    for sig in sorted(signals, key=lambda s: s["priority"]):
+        est = sig.get("token_estimate", 20)
+        if sig["priority"] > 1 and used + est > token_budget:
+            break  # priority-1 signals always included regardless of budget
+        lines.append(sig["content"])
+        used += est
+
+    lines.append("")
+    lines.append(footer)
+    return "\n".join(lines)
+
+
+# ==============================================================================
+# SLOW DRIFT DETECTION  (IC-19 Deliverable 1 — Henning/Attia/Webb/Okafor/Huberman)
+# ==============================================================================
+
+def _linreg_slope(y_vals):
+    """Compute linear regression slope for equally-spaced observations.
+    Returns slope per step (e.g. lbs/day), or None if fewer than 2 points."""
+    n = len(y_vals)
+    if n < 2:
+        return None
+    xs = list(range(n))
+    x_mean = sum(xs) / n
+    y_mean = sum(y_vals) / n
+    num = sum((xs[i] - x_mean) * (y_vals[i] - y_mean) for i in range(n))
+    den = sum((xs[i] - x_mean) ** 2 for i in range(n))
+    return num / den if den != 0 else 0.0
+
+
+def _check_circadian_consistency(yesterday_str, window_days=21):
+    """Return SD of bedtime (sleep start hour) over the window, or None.
+
+    Huberman: if HRV/recovery drift fires AND bedtime consistency has degraded,
+    surface it as a potential upstream cause.
+    """
+    try:
+        today = datetime.now(timezone.utc).date()
+        start = (today - timedelta(days=window_days + 1)).isoformat()
+        recs  = fetch_range("eightsleep", start, yesterday_str)
+        bedtimes = []
+        for r in recs:
+            bt = r.get("bedtime_start") or r.get("sleep_start")
+            if not bt:
+                continue
+            try:
+                dt = datetime.fromisoformat(str(bt).replace("Z", "+00:00"))
+                # Convert to decimal hours (e.g. 23.5 = 11:30 PM)
+                bedtimes.append(dt.hour + dt.minute / 60.0)
+            except Exception:
+                pass
+        if len(bedtimes) < 7:
+            return None
+        return round(statistics.stdev(bedtimes), 2)
+    except Exception:
+        return None
+
+
+def _compute_slow_drift(yesterday_str, profile):
+    """Detect gradual metric drift using non-overlapping baseline windows.
+
+    Windows (Henning — MUST be non-overlapping):
+      Recent window:   days 1-7  before yesterday  (7 days)
+      Baseline window: days 8-28 before yesterday  (21 days, zero overlap)
+
+    Severity tiers:
+      mild:        0.5-1.0 SD drift  — stored but NOT injected into context block
+      significant: 1.0-1.5 SD        — injected into context block at priority 4
+      severe:      >1.5 SD           — injected at priority 2 (displaces lower signals)
+
+    Minimum data (Henning): N>=14 non-null points in baseline window, else insufficient_data.
+
+    Weight plateau uses separate regression logic (Attia):
+      - Requires >=8 weight measurements in 14-day window
+      - Requires >=11 complete nutrition log days (Henning)
+      - Uses regression slope, not endpoint comparison
+      - MacroFactor TDEE preferred over Apple Watch (Webb/Norton)
+      - Includes recomposition caveat in output (Okafor)
+
+    Returns list of drift dicts with keys:
+      metric, source, recent_mean, baseline_mean, drift_sd, severity,
+      baseline_n, note (optional context string)
+    """
+    today       = datetime.now(timezone.utc).date()
+    yest        = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
+
+    # Recent window: days 1-7 before yesterday (inclusive)
+    recent_end   = (yest - timedelta(days=1)).isoformat()
+    recent_start = (yest - timedelta(days=7)).isoformat()
+
+    # Baseline window: days 8-28 before yesterday (non-overlapping)
+    baseline_end   = (yest - timedelta(days=8)).isoformat()
+    baseline_start = (yest - timedelta(days=28)).isoformat()
+
+    drift_results = []
+
+    # ── Biometric drift metrics (HRV, RHR, sleep efficiency, recovery score) ──
+    DRIFT_METRICS = [
+        ("whoop",  "hrv",                         "HRV",              True),
+        ("whoop",  "resting_heart_rate",           "Resting HR",       False),
+        ("whoop",  "sleep_efficiency_percentage",  "Sleep Efficiency", True),
+        ("whoop",  "recovery_score",              "Recovery Score",   True),
+    ]
+
+    circadian_sd = None  # computed once if HRV or recovery drift detected
+
+    for source, field, label, higher_is_better in DRIFT_METRICS:
+        recent_recs   = fetch_range(source, recent_start, recent_end)
+        baseline_recs = fetch_range(source, baseline_start, baseline_end)
+
+        recent_vals   = [safe_float(r, field) for r in recent_recs
+                         if safe_float(r, field) is not None]
+        baseline_vals = [safe_float(r, field) for r in baseline_recs
+                         if safe_float(r, field) is not None]
+
+        # Henning: minimum N=14 in baseline window
+        if len(baseline_vals) < 14:
+            drift_results.append({
+                "metric":    label,
+                "source":    source,
+                "severity":  "insufficient_data",
+                "baseline_n": len(baseline_vals),
+            })
+            continue
+
+        if len(recent_vals) == 0:
+            continue
+
+        baseline_mean = sum(baseline_vals) / len(baseline_vals)
+        baseline_sd   = statistics.stdev(baseline_vals) if len(baseline_vals) > 1 else 0
+        recent_mean   = sum(recent_vals) / len(recent_vals)
+
+        if baseline_sd == 0:
+            continue
+
+        # Drift = recent_mean - baseline_mean, expressed in baseline SDs
+        # Henning: recent and baseline windows are non-overlapping
+        drift_sd_val = (recent_mean - baseline_mean) / baseline_sd
+
+        # Determine severity direction (worse or better?)
+        if higher_is_better:
+            is_worsening = drift_sd_val < 0
+            abs_drift    = abs(drift_sd_val)
+        else:
+            is_worsening = drift_sd_val > 0
+            abs_drift    = abs(drift_sd_val)
+
+        if abs_drift < 0.5:
+            continue  # noise, skip entirely
+        elif abs_drift < 1.0:
+            severity = "mild"
+        elif abs_drift < 1.5:
+            severity = "significant"
+        else:
+            severity = "severe"
+
+        note = None
+        # Huberman: circadian consistency note for HRV/recovery drift
+        if field in ("hrv", "recovery_score") and severity in ("significant", "severe") and is_worsening:
+            if circadian_sd is None:
+                circadian_sd = _check_circadian_consistency(yesterday_str)
+            if circadian_sd is not None and circadian_sd > 1.0:
+                note = (f"Note: bedtime consistency has also varied (SD {circadian_sd}h over the "
+                        f"window). Circadian timing may be an upstream contributor to this drift.")
+
+        drift_results.append({
+            "metric":        label,
+            "field":         field,
+            "source":        source,
+            "recent_mean":   round(recent_mean, 2),
+            "baseline_mean": round(baseline_mean, 2),
+            "drift_sd":      round(drift_sd_val, 2),
+            "severity":      severity,
+            "worsening":     is_worsening,
+            "baseline_n":    len(baseline_vals),   # Omar: include for downstream confidence
+            "note":          note,
+        })
+
+    # ── Weight plateau detection (Attia/Henning/Webb/Okafor) ──
+    try:
+        wt_recs = fetch_range("withings",
+                              (yest - timedelta(days=14)).isoformat(),
+                              yesterday_str)
+        wt_vals = [(r.get("date") or r.get("sk", "").replace("DATE#", ""),
+                    safe_float(r, "weight_lbs"))
+                   for r in wt_recs if safe_float(r, "weight_lbs") is not None]
+        wt_vals.sort(key=lambda x: x[0])  # chronological
+
+        if len(wt_vals) >= 8:  # Attia: need >=8 measurements for regression
+            # Check complete nutrition log days (Henning: >=11 of last 14 days)
+            cal_target  = profile.get("calorie_target", 1800)
+            mf_recs     = fetch_range("macrofactor",
+                                      (yest - timedelta(days=14)).isoformat(),
+                                      yesterday_str)
+            complete_days = sum(
+                1 for r in mf_recs
+                if safe_float(r, "total_calories_kcal", 0) >= cal_target * 0.65
+            )
+
+            if complete_days >= 11:
+                weights_only = [v for _, v in wt_vals]
+                slope_per_day = _linreg_slope(weights_only)   # lbs/day
+                slope_per_week = slope_per_day * 7 if slope_per_day is not None else None
+
+                # Attia: plateau = slope > -0.2 lbs/week (insufficient loss)
+                if slope_per_week is not None and slope_per_week > -0.2:
+                    # MacroFactor TDEE preferred; fallback to Apple Watch (Webb/Norton)
+                    mf_tdee = None
+                    aw_tdee = None
+                    for r in mf_recs:
+                        v = safe_float(r, "tdee_kcal") or safe_float(r, "maintenance_calories")
+                        if v:
+                            mf_tdee = v; break
+                    aw_recs = fetch_range("apple_health",
+                                         (yest - timedelta(days=14)).isoformat(),
+                                         yesterday_str)
+                    aw_cals = [safe_float(r, "active_energy_burned") for r in aw_recs
+                               if safe_float(r, "active_energy_burned") is not None]
+                    if aw_cals:
+                        aw_tdee = sum(aw_cals) / len(aw_cals)
+
+                    tdee_used = mf_tdee or aw_tdee
+                    tdee_source = "MacroFactor" if mf_tdee else ("Apple Watch" if aw_tdee else "unknown")
+
+                    # Okafor: always include recomposition caveat
+                    recomp_note = (
+                        "Note: a flat scale weight doesn't necessarily mean a stall — "
+                        "recomposition (muscle gain while losing fat) can produce a flat "
+                        "trend even during a genuine deficit. Interpret alongside body "
+                        "composition data, not scale weight alone."
+                    )
+
+                    drift_results.append({
+                        "metric":          "Weight Plateau",
+                        "source":          "withings",
+                        "slope_lbs_week":  round(slope_per_week, 2),
+                        "measurements_n":  len(wt_vals),
+                        "complete_log_days": complete_days,
+                        "tdee_source":     tdee_source,
+                        "severity":        "significant",
+                        "worsening":       True,
+                        "baseline_n":      len(wt_vals),
+                        "note":            recomp_note,
+                    })
+    except Exception as e:
+        logger.warning("Slow drift weight plateau check failed (non-fatal): %s", e)
+
+    return [r for r in drift_results if r.get("severity") not in ("insufficient_data", None)
+            and r.get("severity") != "mild"]
+
+
+# ==============================================================================
+# EXPERIMENT CONTEXT INJECTION  (IC-19 Deliverable 3A — Anika/Raj/Patrick/Conti)
+# ==============================================================================
+
+def _build_experiment_context(yesterday_str, profile):
+    """Build a purely descriptive active-experiment block for the AI context.
+
+    Rules (Board v2 spec):
+    - Early return if no active experiments (Raj/Viktor: no DDB latency on empty days)
+    - Purely descriptive: raw numbers only, no trajectory verdict (Anika)
+    - For supplement-type experiments: include dose adherence from supplement log (Patrick)
+    - Negative psychological variable hypotheses framed as opportunities, not baselines (Conti)
+    - Active experiment context is priority 7 in the queue (below sustained anomaly,
+      above declining metrics) since it is informational, not urgent
+    """
+    try:
+        exp_pk = USER_PREFIX + "experiments"
+        resp   = table.query(
+            KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
+            FilterExpression="#st = :active",
+            ExpressionAttributeNames={"#st": "status"},
+            ExpressionAttributeValues={
+                ":pk":     exp_pk,
+                ":prefix": "EXP#",
+                ":active": "active",
+            },
+        )
+        active_exps = [d2f(i) for i in resp.get("Items", [])]
+    except Exception as e:
+        logger.warning("_build_experiment_context: query failed (non-fatal): %s", e)
+        return ""
+
+    # Raj/Viktor: early return — zero DDB fetch cost on non-experiment days
+    if not active_exps:
+        return ""
+
+    today_dt   = datetime.now(timezone.utc).date()
+    yest_dt    = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
+    lines      = ["ACTIVE EXPERIMENTS (descriptive only — evaluate with get_experiment_results):"]
+
+    # Negative psychological variable keywords (Conti: use intervention framing)
+    _NEG_PSYCH_KEYWORDS = {
+        "stress", "anxiety", "mood", "loneliness", "isolation",
+        "depression", "grief", "fatigue", "avoidance", "rumination"
+    }
+
+    for exp in active_exps:
+        name        = exp.get("name", exp.get("experiment_id", "Unknown"))
+        start_str   = exp.get("start_date", "")
+        hypothesis  = exp.get("hypothesis", "")
+        category    = (exp.get("category") or "").lower()
+        metrics     = exp.get("primary_metrics") or []
+
+        # Compute day count
+        try:
+            start_dt = datetime.strptime(start_str, "%Y-%m-%d").date()
+            days_in  = (yest_dt - start_dt).days + 1
+        except Exception:
+            days_in  = "?"
+
+        lines.append(f"  {name} (Day {days_in}, started {start_str}):")
+
+        # Per-metric descriptive snapshot: baseline vs recent — NO verdict
+        for metric_def in metrics[:4]:  # cap at 4 metrics per experiment
+            source = metric_def.get("source", "")
+            field  = metric_def.get("field", "")
+            label  = metric_def.get("label", field)
+            if not source or not field:
+                continue
+            try:
+                # Baseline: same window before experiment started
+                if isinstance(days_in, int) and days_in >= 1:
+                    bl_start = (start_dt - timedelta(days=days_in)).isoformat()
+                    bl_end   = (start_dt - timedelta(days=1)).isoformat()
+                    bl_recs  = fetch_range(source, bl_start, bl_end)
+                    bl_vals  = [safe_float(r, field) for r in bl_recs
+                                if safe_float(r, field) is not None]
+                    # Recent 7d during experiment
+                    dur_start = max(start_str,
+                                    (yest_dt - timedelta(days=6)).isoformat())
+                    dur_recs  = fetch_range(source, dur_start, yesterday_str)
+                    dur_vals  = [safe_float(r, field) for r in dur_recs
+                                 if safe_float(r, field) is not None]
+                    if bl_vals and dur_vals:
+                        bl_mean   = round(sum(bl_vals) / len(bl_vals), 1)
+                        dur_mean  = round(sum(dur_vals) / len(dur_vals), 1)
+                        delta     = round(dur_mean - bl_mean, 1)
+                        delta_str = f"+{delta}" if delta > 0 else str(delta)
+                        lines.append(f"    {label}: baseline {bl_mean} | 7d avg {dur_mean} | delta {delta_str}")
+            except Exception:
+                pass
+
+        # Patrick: supplement adherence for supplement-type experiments
+        if "supplement" in category or "supplement" in name.lower():
+            try:
+                supp_name = exp.get("supplement_name") or name
+                supp_pk   = USER_PREFIX + "supplements"
+                if isinstance(days_in, int):
+                    supp_recs = fetch_range("supplements",
+                                            start_str, yesterday_str)
+                    doses_taken = sum(
+                        1 for r in supp_recs
+                        if supp_name.lower() in (r.get("supplement_name") or "").lower()
+                    )
+                    lines.append(f"    Adherence: {doses_taken}/{days_in} doses logged")
+            except Exception:
+                pass
+
+        # Conti: intervention framing for negative psychological variable hypotheses
+        if hypothesis:
+            hyp_lower = hypothesis.lower()
+            is_neg_psych = any(kw in hyp_lower for kw in _NEG_PSYCH_KEYWORDS)
+            if is_neg_psych:
+                lines.append(f"    Context: This experiment tests a potential intervention "
+                              f"opportunity — data is early; treat as exploratory, not diagnostic.")
+
+    return "\n".join(lines) if len(lines) > 1 else ""
+
+
+# ==============================================================================
+# AI CONTEXT BLOCK ASSEMBLER  (priority queue version — IC-19 v1.3.0)
+# ==============================================================================
+
 def build_ai_context_block(momentum_signal, this_week_avg, prev_week_avg, trend_pct,
                             declining, improving, miss_rates, strongest, weakest,
                             synergy_health, memory_ctx, intention_gap_ctx="",
-                            early_warning_block=""):
-    """Assemble the compact text block injected into all Daily Brief AI prompts."""
-    lines = ["PLATFORM INTELLIGENCE (7-day context, pre-computed):"]
+                            early_warning_block="",
+                            slow_drift_metrics=None,
+                            experiment_ctx="",
+                            social_flag=""):
+    """Assemble the compact text block injected into all Daily Brief AI prompts.
 
-    # Momentum
-    if this_week_avg is not None:
-        if momentum_signal == "improving" and trend_pct is not None:
-            lines.append(f"\U0001f4c8 Momentum: IMPROVING ({prev_week_avg}\u2192{this_week_avg} avg grade, +{trend_pct}% week-over-week)")
-        elif momentum_signal == "declining" and trend_pct is not None:
-            lines.append(f"\U0001f4c9 Momentum: DECLINING ({prev_week_avg}\u2192{this_week_avg} avg grade, {trend_pct}% week-over-week)")
-        else:
-            lines.append(f"\u27a1\ufe0f Momentum: STABLE (avg grade: {this_week_avg})")
+    Delegates to _build_prioritized_context_block() with priority-ranked signals.
+    Priority 1 signals always included; lower priorities filled to 700-token budget.
+    """
+    # Build signals list (Priya priority queue)
+    # Priority 1 = always included regardless of budget
+    # Higher number = lower priority, first to be dropped if budget exceeded
+    signals = []
 
-    # Leading indicators — declining first (more urgent)
+    # P1: IC-5 Early Warning (always surfaces)
+    if early_warning_block:
+        signals.append({"priority": 1, "content": early_warning_block, "token_estimate": 60})
+
+    # P2: Severe slow drift (displaces lower signals — Attia/Henning)
+    if slow_drift_metrics:
+        severe = [d for d in slow_drift_metrics if d.get("severity") == "severe" and d.get("worsening")]
+        for d in severe:
+            line = (f"\U0001F6A8 SLOW DRIFT — SEVERE: {d['metric']} has drifted "
+                    f"{abs(d.get('drift_sd', 0)):.1f} SD below baseline over 3 weeks "
+                    f"(recent avg: {d.get('recent_mean')} vs baseline: {d.get('baseline_mean')}, "
+                    f"N={d.get('baseline_n')} days).")
+            if d.get("note"):
+                line += f" {d['note']}"
+            signals.append({"priority": 2, "content": line, "token_estimate": 40})
+
+    # P3: Sustained anomaly context (informational only — full alert sent separately)
+    # (No content here — the anomaly detector sends its own email; we just note it)
+
+    # P4: Significant slow drift
+    if slow_drift_metrics:
+        significant = [d for d in slow_drift_metrics if d.get("severity") == "significant" and d.get("worsening")]
+        for d in significant:
+            line = (f"\u26a0\ufe0f SLOW DRIFT: {d['metric']} trending down "
+                    f"({abs(d.get('drift_sd', 0)):.1f} SD below 3-week baseline; "
+                    f"recent avg {d.get('recent_mean')} vs {d.get('baseline_mean')}, "
+                    f"N={d.get('baseline_n')}).")
+            if d.get("note"):
+                line += f" {d['note']}"
+            signals.append({"priority": 4, "content": line, "token_estimate": 35})
+        # Weight plateau
+        wt = next((d for d in slow_drift_metrics if d.get("metric") == "Weight Plateau"), None)
+        if wt:
+            line = (f"\U0001F6A8 WEIGHT PLATEAU: scale trend is flat "
+                    f"({wt.get('slope_lbs_week', 0):+.2f} lbs/wk over "
+                    f"{wt.get('measurements_n')} weigh-ins, {wt.get('complete_log_days')} complete log days, "
+                    f"TDEE from {wt.get('tdee_source', 'unknown')}). {wt.get('note', '')}")
+            signals.append({"priority": 4, "content": line, "token_estimate": 45})
+
+    # P5: IC-8 Intent vs Execution Gap
+    if intention_gap_ctx:
+        signals.append({"priority": 5, "content": intention_gap_ctx, "token_estimate": 50})
+
+    # P6: Declining metrics (3-day consecutive)
     for d in declining[:2]:
         m = d["metric"].replace("_", " ")
-        lines.append(f"\u26a0\ufe0f LEADING INDICATOR: {m} declining {d['consecutive_days']} days straight (now {d['current']} vs {d['baseline_7d_avg']} avg, {d['delta_pct']}%)")
+        line = (f"\u26a0\ufe0f LEADING INDICATOR: {m} declining {d['consecutive_days']} days "
+                f"(now {d['current']} vs {d['baseline_7d_avg']} avg, {d['delta_pct']}%)")
+        signals.append({"priority": 6, "content": line, "token_estimate": 25})
 
+    # P7: Momentum signal
+    if this_week_avg is not None:
+        if momentum_signal == "improving" and trend_pct is not None:
+            mom = f"\U0001f4c8 Momentum: IMPROVING ({prev_week_avg}\u2192{this_week_avg} avg grade, +{trend_pct}% WoW)"
+        elif momentum_signal == "declining" and trend_pct is not None:
+            mom = f"\U0001f4c9 Momentum: DECLINING ({prev_week_avg}\u2192{this_week_avg} avg grade, {trend_pct}% WoW)"
+        else:
+            mom = f"\u27a1\ufe0f Momentum: STABLE (avg grade: {this_week_avg})"
+        signals.append({"priority": 7, "content": mom, "token_estimate": 20})
+
+    # P7: Active experiments (descriptive)
+    if experiment_ctx:
+        signals.append({"priority": 7, "content": experiment_ctx, "token_estimate": 60})
+
+    # P8: Improving metrics
     for imp in improving[:2]:
         m = imp["metric"].replace("_", " ")
-        lines.append(f"\u2705 POSITIVE SIGNAL: {m} improving {imp['consecutive_days']} days straight (now {imp['current']} vs {imp['baseline_7d_avg']} avg, +{imp['delta_pct']}%)")
+        line = (f"\u2705 POSITIVE SIGNAL: {m} improving {imp['consecutive_days']} days "
+                f"(now {imp['current']} vs {imp['baseline_7d_avg']} avg, +{imp['delta_pct']}%)")
+        signals.append({"priority": 8, "content": line, "token_estimate": 25})
 
-    # Habit patterns
+    # P9: Habit patterns
     if weakest:
         habit_detail = []
         for h in weakest[:3]:
             miss_rate   = miss_rates.get(h)
             days_missed = round(miss_rate * 7) if miss_rate else "?"
             habit_detail.append(f"{h} (missed {days_missed}/7 days)")
-        lines.append(f"\U0001f534 Weakest T0 habits: {', '.join(habit_detail)}")
-
+        signals.append({"priority": 9,
+                         "content": f"\U0001f534 Weakest T0 habits: {', '.join(habit_detail)}",
+                         "token_estimate": 20})
     if strongest:
-        lines.append(f"\U0001f4aa Strongest habits: {', '.join(strongest[:3])}")
+        signals.append({"priority": 9,
+                         "content": f"\U0001f4aa Strongest habits: {', '.join(strongest[:3])}",
+                         "token_estimate": 15})
 
-    # Synergy group issues
+    # P9: Synergy group issues
     broken_synergies = [g for g, h in synergy_health.items() if h < 0.5]
     if broken_synergies:
-        lines.append(f"\u26a1 Broken synergy stacks: {', '.join(broken_synergies)}")
+        signals.append({"priority": 9,
+                         "content": f"\u26a1 Broken synergy stacks: {', '.join(broken_synergies)}",
+                         "token_estimate": 15})
 
-    # Platform memory (coaching calibration, what worked)
+    # P10: Platform memory (coaching calibration)
     if memory_ctx:
-        lines.append("")
-        lines.append(memory_ctx)
+        signals.append({"priority": 10, "content": memory_ctx, "token_estimate": 40})
 
-    # IC-8: Intent vs Execution Gap
-    if intention_gap_ctx:
-        lines.append("")
-        lines.append(intention_gap_ctx)
+    # P11: Murthy — social quality flag when multiple drift signals + sparse journal
+    if social_flag:
+        signals.append({"priority": 11, "content": social_flag, "token_estimate": 25})
 
-    # IC-5: Early Warning
-    if early_warning_block:
-        lines.append("")
-        lines.append(early_warning_block)
-
-    lines.append("INSTRUCTION: Reference this intelligence in coaching. Name the specific patterns, "
-                 "causal chains, and leading indicators above \u2014 don't just list them, connect them.")
-
-    return "\n".join(lines)
+    return _build_prioritized_context_block(signals)
 
 
 # ==============================================================================
@@ -920,6 +1389,8 @@ def store_computed_insights(yesterday_str, payload):
         item["weakest_habits"] = payload["weakest"]
     if payload.get("synergy_health"):
         item["synergy_health"] = json.dumps(payload["synergy_health"])
+    if payload.get("slow_drift_metrics"):
+        item["slow_drift_metrics"] = json.dumps(payload["slow_drift_metrics"])
 
     item = {k: v for k, v in item.items() if v is not None}
     table.put_item(Item=item)
@@ -997,11 +1468,44 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.warning("IC-5 failed (non-fatal): %s", e)
 
+    # ── 5d. IC-19: Slow Drift Detection (non-fatal) ──
+    slow_drift_metrics = []
+    try:
+        slow_drift_metrics = _compute_slow_drift(yesterday_str, profile)
+        logger.info("IC-19 slow drift: %d signals detected", len(slow_drift_metrics))
+    except Exception as e:
+        logger.warning("IC-19 slow drift failed (non-fatal): %s", e)
+
+    # ── 5e. IC-19: Active Experiment Context (non-fatal) ──
+    experiment_ctx = ""
+    try:
+        experiment_ctx = _build_experiment_context(yesterday_str, profile)
+        if experiment_ctx:
+            logger.info("IC-19 experiment context: %d chars", len(experiment_ctx))
+    except Exception as e:
+        logger.warning("IC-19 experiment context failed (non-fatal): %s", e)
+
+    # ── 5f. Murthy: social quality flag when multiple drift signals + sparse journal ──
+    social_flag = ""
+    try:
+        if len(slow_drift_metrics) >= 2 and ic5_markers and "journal_sparse" in ic5_markers:
+            social_flag = (
+                "\U0001f91d SOCIAL NOTE: Multiple drift signals are active alongside sparse "
+                "journalling this week. Research (Murthy) associates withdrawal from "
+                "self-reflection with reduced social connection. Consider reaching out "
+                "to someone in your network today."
+            )
+    except Exception:
+        pass
+
     # ── 6. Assemble AI context block ──
     ai_block = build_ai_context_block(
         momentum_signal, this_week_avg, prev_week_avg, trend_pct,
         declining, improving, miss_rates, strongest, weakest,
-        synergy_health, memory_ctx, intention_gap_ctx, early_warning_block)
+        synergy_health, memory_ctx, intention_gap_ctx, early_warning_block,
+        slow_drift_metrics=slow_drift_metrics,
+        experiment_ctx=experiment_ctx,
+        social_flag=social_flag)
     logger.info("AI context block: %d chars", len(ai_block))
 
     # ── 7. Store ──
@@ -1018,6 +1522,7 @@ def lambda_handler(event, context):
         "synergy_health":      synergy_health,
         "memory_context":      memory_ctx,
         "ai_context_block":    ai_block,
+        "slow_drift_metrics":  slow_drift_metrics,
     }
     store_computed_insights(yesterday_str, payload)
 

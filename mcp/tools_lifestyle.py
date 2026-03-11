@@ -1369,7 +1369,7 @@ def tool_get_travel_log(args):
         entry = {
             "trip_id": t.get("sk"),
             "destination": f"{t.get('destination_city', '')}, {t.get('destination_country', '')}".strip(", "),
-            "dates": f"{t.get('start_date', '?')} → {t.get('end_date', 'ongoing')}",
+            "dates": f"{t.get('start_date', '?')} \u2192 {t.get('end_date', 'ongoing')}",
             "status": t.get("status"),
             "tz_offset_hours": t.get("tz_offset_hours"),
             "direction": t.get("direction"),
@@ -1504,11 +1504,11 @@ def tool_get_jet_lag_recovery(args):
     return {
         "trip": {
             "destination": trip.get("destination_city"),
-            "dates": f"{start_date} → {end_date}",
+            "dates": f"{start_date} \u2192 {end_date}",
             "tz_offset_hours": tz_diff,
             "direction": trip.get("direction"),
         },
-        "analysis_window": {"pre_trip": f"{pre_start} → {pre_end}", "post_return": f"{post_start} → {post_end}"},
+        "analysis_window": {"pre_trip": f"{pre_start} \u2192 {pre_end}", "post_return": f"{post_start} \u2192 {post_end}"},
         "metrics": results,
         "summary": {
             "metrics_tracked": len(results),
@@ -1571,7 +1571,7 @@ def tool_get_state_of_mind_trend(args):
                 "   - Headers: same Authorization Bearer token\n"
                 "   - Export Format: JSON, Version 2\n"
                 "   - Date Range: 'Since Last Sync'\n"
-                "3. Check-ins will flow: How We Feel → HealthKit → HAE → Lambda → DynamoDB + S3"
+                "3. Check-ins will flow: How We Feel \u2192 HealthKit \u2192 HAE \u2192 Lambda \u2192 DynamoDB + S3"
             ),
             "period": {"start": start, "end": end},
         }
@@ -2255,7 +2255,7 @@ def tool_get_energy_balance(args):
         "target_deficit_kcal": target_deficit,
         "summary": summary,
         "daily": daily,
-        "note": "TDEE from Apple Watch (active + basal) is more accurate than formula-based BMR. 500 kcal/day deficit ≈ 1 lb/week loss.",
+        "note": "TDEE from Apple Watch (active + basal) is more accurate than formula-based BMR. 500 kcal/day deficit \u2248 1 lb/week loss.",
     }
 
 
@@ -2432,7 +2432,7 @@ def tool_create_experiment(args):
         "tags":          tags,
         "board_of_directors": {
             "Huberman": "One variable at a time. Track for at least 2 weeks before drawing conclusions. Control for confounders: sleep timing, stress, travel.",
-            "Attia":    "Define your primary endpoint now. What number would convince you this worked? Statistical noise requires ≥14 days of data.",
+            "Attia":    "Define your primary endpoint now. What number would convince you this worked? Statistical noise requires \u226514 days of data.",
             "Ferriss":  "What does the minimum effective dose look like? Start with the smallest intervention that could produce a measurable change.",
         },
     }
@@ -2490,6 +2490,32 @@ def tool_list_experiments(args):
         "filter":    status_filter or "all",
         "experiments": results,
     }
+
+
+# \u2500\u2500 Cohen's d effect size helper (IC-19 Deliverable 3C \u2014 Henning/Yael/Norton) \u2500\u2500
+def _cohens_d(before_vals, during_vals):
+    """Compute Cohen's d effect size using pooled SD.
+
+    Formula (Board spec):
+        pooled_sd = sqrt((sd_before\u00b2 + sd_during\u00b2) / 2)
+        cohens_d  = (mean_during - mean_before) / pooled_sd
+
+    Returns None if pooled_sd == 0 or either list has fewer than 2 values.
+    Never binned into small/medium/large labels (Henning: N=1 binning is misleading).
+    Yael: None propagates cleanly \u2014 verify JSON serialisation handles it (returns None).
+
+    Pure function, _ prefix convention. (Elena)
+    """
+    if len(before_vals) < 2 or len(during_vals) < 2:
+        return None
+    mean_b = sum(before_vals) / len(before_vals)
+    mean_d = sum(during_vals) / len(during_vals)
+    var_b  = sum((x - mean_b) ** 2 for x in before_vals) / (len(before_vals) - 1)
+    var_d  = sum((x - mean_d) ** 2 for x in during_vals) / (len(during_vals) - 1)
+    pooled_sd = math.sqrt((var_b + var_d) / 2)
+    if pooled_sd == 0:
+        return None  # Yael: None propagates through JSON as null, not an error
+    return (mean_d - mean_b) / pooled_sd
 
 
 def tool_get_experiment_results(args):
@@ -2587,16 +2613,37 @@ def tool_get_experiment_results(args):
         else:
             direction = "increased" if delta > 0 else ("decreased" if delta < 0 else "unchanged")
 
+        # Effect size: Cohen's d with honest uncertainty label (Henning/Norton \u2014 never binned)
+        d_val = _cohens_d(before_vals, during_vals)
+        if d_val is not None:
+            effect_size = {
+                "cohens_d": round(d_val, 3),
+                "interpretation": (
+                    f"d={d_val:.2f} \u2014 treat as directional only at N={len(during_vals)}; "
+                    f"95% CI approximately \u00b1{round(1.96 / math.sqrt(len(during_vals) / 2), 2)}"
+                ),
+            }
+        else:
+            effect_size = None  # Yael: None \u2192 JSON null, not an error
+
+        # Consistency score: % of during-period days above before-period mean (Henning: non-parametric)
+        consistency_score = (
+            round(sum(1 for v in during_vals if v > before_mean) / len(during_vals) * 100, 1)
+            if during_vals else None
+        )
+
         comparisons.append({
-            "metric":        display_name,
-            "source":        source,
-            "before_mean":   round(before_mean, 2),
-            "during_mean":   round(during_mean, 2),
-            "delta":         round(delta, 2),
-            "pct_change":    round(pct_change, 1) if pct_change is not None else None,
-            "direction":     direction,
-            "before_n":      len(before_vals),
-            "during_n":      len(during_vals),
+            "metric":             display_name,
+            "source":             source,
+            "before_mean":        round(before_mean, 2),
+            "during_mean":        round(during_mean, 2),
+            "delta":              round(delta, 2),
+            "pct_change":         round(pct_change, 1) if pct_change is not None else None,
+            "direction":          direction,
+            "before_n":           len(before_vals),
+            "during_n":           len(during_vals),
+            "effect_size":        effect_size,
+            "consistency_score":  consistency_score,
         })
 
     # Sort: improved first, then worsened, then unchanged
@@ -2606,14 +2653,23 @@ def tool_get_experiment_results(args):
     improved = [c for c in comparisons if c["direction"] == "improved"]
     worsened = [c for c in comparisons if c["direction"] == "worsened"]
 
-    # Minimum duration warning
+    # Minimum duration warning + domain-specific guidance (Norton: nutrition/supplement
+    # experiments have ~5-7 days of adaptation noise before signal emerges in days 8-14+)
+    category = (item.get("category") or "").lower()
     min_duration_met = during_days >= 14
     duration_warning = None
     if not min_duration_met:
-        duration_warning = (
-            f"Only {during_days} days of data. Board recommends minimum 14 days "
-            f"for reliable signal. Results may be noise."
-        )
+        if "supplement" in category or "nutrition" in category or "macro" in category:
+            duration_warning = (
+                f"Only {during_days} days of data. For nutrition/supplement experiments, "
+                f"the first 5-7 days are often adaptation noise \u2014 the signal typically "
+                f"emerges in days 8-14+. Minimum 14 days recommended before drawing conclusions."
+            )
+        else:
+            duration_warning = (
+                f"Only {during_days} days of data. Board recommends minimum 14 days "
+                f"for reliable signal. Results may be noise."
+            )
 
     return {
         "experiment": {
@@ -2625,8 +2681,8 @@ def tool_get_experiment_results(args):
             "end_date":   end_date if status != "active" else f"{end_date} (ongoing)",
         },
         "comparison_period": {
-            "before": f"{before_start} → {before_end} ({during_days} days)",
-            "during": f"{during_start} → {during_end} ({during_days} days)",
+            "before": f"{before_start} \u2192 {before_end} ({during_days} days)",
+            "during": f"{during_start} \u2192 {during_end} ({during_days} days)",
         },
         "duration_warning":  duration_warning,
         "metrics_compared":  len(comparisons),
@@ -2636,17 +2692,27 @@ def tool_get_experiment_results(args):
         "board_of_directors": {
             "Attia": (
                 f"{'✅ Minimum 14-day threshold met.' if min_duration_met else '⚠️ Under 14 days — treat as preliminary.'} "
-                f"{'Strong signal: ' + str(len(improved)) + ' metrics improved.' if len(improved) > len(worsened) else ''} "
-                f"Look at effect sizes, not just direction. A 1% change is noise; 5%+ over 14+ days is signal."
+                "Rate of change matters less than trajectory. Look at effect sizes (Cohen's d), not just direction. "
+                "d < 0.2 is noise at these sample sizes; d > 0.5 with a consistency score >65% warrants attention."
             ),
-            "Huberman": (
-                "Check for confounders: did sleep timing, stress, travel, or other habits change during this period? "
-                "The strongest signal is when multiple related metrics move in the same direction."
+            "Okafor": (
+                "Trajectory matters more than any single datapoint. Check: is this experiment isolating one "
+                "variable, or did other habits change during the same window? Confounders are the primary "
+                "threat to N=1 validity. Cross-reference against travel, training load, and sleep quality."
             ),
-            "Ferriss": (
-                f"Hypothesis: '{hypothesis}'. "
-                f"{'The data supports this hypothesis.' if len(improved) > len(worsened) else 'The data does not clearly support this hypothesis.'} "
-                "Consider: is the juice worth the squeeze? Even a positive result needs to be sustainable."
+            "Norton": (
+                "Consistency score tells you how often each during-day beat your before average \u2014 "
+                "it's the non-parametric signal that Cohen's d can miss at small N. A consistency score "
+                "of 70%+ with a positive delta is more meaningful than a larger delta with 50% consistency. "
+                + ("Note: for nutrition/supplement experiments, treat week 1 as adaptation noise. "
+                   "The clean signal is in the second week and beyond. "
+                   if ("supplement" in category or "nutrition" in category) else "")
+                + "Build from what's working. Don't overhaul \u2014 optimize."
+            ),
+            "Chen": (
+                "Cross-check HRV and recovery score trends against your training load (ATL/CTL/TSB) during "
+                "the experiment window. If ATL was elevated, improvements in sleep or recovery metrics may "
+                "be training-driven, not intervention-driven. Isolate the variable."
             ),
         },
     }
@@ -2689,7 +2755,7 @@ def tool_end_experiment(args):
             ":ea": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"),
         },
     )
-    logger.info(f"end_experiment: {exp_id} → {status}")
+    logger.info(f"end_experiment: {exp_id} \u2192 {status}")
 
     start_date = existing.get("start_date", "")
     try:
@@ -2710,7 +2776,7 @@ def tool_end_experiment(args):
     }
 
 
-# ── Ruck Logging (v2.49.0) ──────────────────────────────────────────────────
+# \u2500\u2500 Ruck Logging (v2.49.0) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 def tool_log_ruck(args):
     """
@@ -2731,7 +2797,7 @@ def tool_log_ruck(args):
     notes = args.get("notes", "")
     strava_id = args.get("strava_id")  # Optional direct match
 
-    # ── Find matching Walk activity from Strava ──
+    # \u2500\u2500 Find matching Walk activity from Strava \u2500\u2500
     strava_item = query_source("strava", date)
     if not strava_item:
         return {"error": f"No Strava data found for {date}. Was the activity recorded?"}
@@ -2784,13 +2850,13 @@ def tool_log_ruck(args):
             local = w.get("start_date_local", "")
             dist = w.get("distance_miles") or round(float(w.get("distance_meters", 0)) / 1609.34, 1)
             dur = round(float(w.get("moving_time_seconds", 0)) / 60)
-            options.append(f"strava_id={w.get('strava_id')}: {local[11:16]} — {dist} mi, {dur} min")
+            options.append(f"strava_id={w.get('strava_id')}: {local[11:16]} \u2014 {dist} mi, {dur} min")
         return {
             "error": f"Multiple walks on {date}. Specify time_hint or strava_id:",
             "walks": options,
         }
 
-    # ── Build ruck entry ──
+    # \u2500\u2500 Build ruck entry \u2500\u2500
     sid = str(matched.get("strava_id", ""))
     dist_mi = matched.get("distance_miles") or round(float(matched.get("distance_meters", 0)) / 1609.34, 2)
     dur_min = round(float(matched.get("moving_time_seconds", 0)) / 60, 1)
@@ -2830,7 +2896,7 @@ def tool_log_ruck(args):
     }
     entry = {k: v for k, v in entry.items() if v is not None and v != ""}
 
-    # ── Write to DynamoDB ──
+    # \u2500\u2500 Write to DynamoDB \u2500\u2500
     try:
         table.update_item(
             Key={"pk": RUCK_PK, "sk": f"DATE#{date}"},

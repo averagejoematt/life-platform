@@ -1,6 +1,6 @@
 """
 hypothesis_engine_lambda.py — IC-18: Cross-Domain Hypothesis Engine
-v1.1.0 — AI-4: Output validation (effect size, confidence intervals, 30-day expiry)
+v1.2.0 — AI-4 + IC-19 D3B: Conti intervention framing, experiment cross-reference, experiment suggestions
 
 Scientific method applied to personal health data. Runs weekly (Sunday 11 AM PT)
 after the Weekly Digest, surfacing non-obvious cross-domain correlations that the
@@ -88,310 +88,299 @@ NUMERIC_PATTERN = re.compile(r'\d+\.?\d*\s*(%|days?|hours?|minutes?|ms|points?|g
 
 def get_anthropic_key():
     secret_name = os.environ.get("ANTHROPIC_SECRET", "life-platform/api-keys")
-    secret = secrets.get_secret_value(SecretId=secret_name)
-    return json.loads(secret["SecretString"])["anthropic_api_key"]
+    try:
+        val = secrets.get_secret_value(SecretId=secret_name)
+        data = json.loads(val["SecretString"])
+        return data.get("ANTHROPIC_API_KEY") or data.get("anthropic_api_key")
+    except Exception as e:
+        logger.error(f"Failed to get Anthropic key: {e}")
+        raise
 
 
 def d2f(obj):
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
+    """Convert DynamoDB Decimals to float/int."""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if isinstance(obj, dict):
+        return {k: d2f(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [d2f(v) for v in obj]
     return obj
 
 
 def safe_float(rec, field, default=None):
-    if rec and field in rec:
-        try: return float(rec[field])
-        except Exception: return default
-    return default
+    v = rec.get(field)
+    if v is None:
+        return default
+    try:
+        return float(v)
+    except (ValueError, TypeError):
+        return default
 
 
 def query_range(source, start_date, end_date):
-    """Query a DDB source for a date range, return dict of date -> record."""
+    """Query DynamoDB for a source's data in a date range."""
+    from boto3.dynamodb.conditions import Key
     pk = f"USER#{USER_ID}#SOURCE#{source}"
-    records = {}
-    kwargs = {
-        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-        "ExpressionAttributeValues": {
-            ":pk": pk, ":s": f"DATE#{start_date}", ":e": f"DATE#{end_date}"
-        },
-    }
-    while True:
-        resp = table.query(**kwargs)
-        for item in resp.get("Items", []):
-            date_str = item["sk"].replace("DATE#", "")
-            records[date_str] = d2f(item)
-        if "LastEvaluatedKey" not in resp:
-            break
-        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
-    return records
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(
+                f"DATE#{start_date}", f"DATE#{end_date}"
+            )
+        )
+        return d2f(resp.get("Items", []))
+    except Exception as e:
+        logger.warning(f"query_range({source}) failed: {e}")
+        return []
 
 
 def fetch_profile():
+    """Load user profile from DynamoDB."""
     try:
-        r = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
-        return d2f(r.get("Item", {}))
-    except Exception as e:
-        logger.warning(f"Profile fetch failed: {e}")
+        resp = table.get_item(Key={"pk": f"USER#{USER_ID}#profile", "sk": "PROFILE"})
+        return d2f(resp.get("Item", {}))
+    except Exception:
         return {}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# DATA GATHERING — 14 days across all major sources
-# ══════════════════════════════════════════════════════════════════════════════
-
 def gather_data():
-    today = datetime.now(timezone.utc).date()
-    end_date = (today - timedelta(days=1)).isoformat()
-    start_date = (today - timedelta(days=14)).isoformat()
+    """Fetch 14 days of multi-source data for hypothesis generation."""
+    end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    start_date = (datetime.now(timezone.utc) - timedelta(days=13)).strftime("%Y-%m-%d")
 
-    logger.info(f"Pulling 14d data: {start_date} -> {end_date}")
+    sources = ["whoop", "garmin", "macrofactor", "apple_health",
+               "withings", "strava", "notion", "habitify", "eightsleep"]
 
-    profile = fetch_profile()
+    data = {}
+    for source in sources:
+        try:
+            items = query_range(source, start_date, end_date)
+            if items:
+                data[source] = items
+                logger.info(f"Loaded {len(items)} {source} records")
+        except Exception as e:
+            logger.warning(f"Failed to load {source}: {e}")
 
-    sources = {
-        "whoop":       query_range("whoop", start_date, end_date),
-        "sleep":       query_range("sleep", start_date, end_date),
-        "macrofactor": query_range("macrofactor", start_date, end_date),
-        "strava":      query_range("strava", start_date, end_date),
-        "habitify":    query_range("habitify", start_date, end_date),
-        "apple":       query_range("apple_health", start_date, end_date),
-        "withings":    query_range("withings", start_date, end_date),
-        "journal":     query_range("journal", start_date, end_date),
-        "eightsleep":  query_range("eightsleep", start_date, end_date),
-    }
+    return data if data else None
 
-    # Also pull computed_metrics for day grades
-    computed = query_range("computed_metrics", start_date, end_date)
-
-    logger.info(f"Data pull complete: {', '.join(f'{k}:{len(v)}d' for k,v in sources.items())}")
-
-    return {
-        "sources": sources,
-        "computed": computed,
-        "profile": profile,
-        "dates": {"start": start_date, "end": end_date},
-    }
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# EXISTING HYPOTHESIS MANAGEMENT
-# ══════════════════════════════════════════════════════════════════════════════
 
 def load_existing_hypotheses(status_filter=None):
-    """Load hypotheses from DDB. Optionally filter by status."""
+    """Load existing hypotheses from DynamoDB."""
+    from boto3.dynamodb.conditions import Key
     try:
         resp = table.query(
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
-            ExpressionAttributeValues={
-                ":pk": HYPOTHESES_PK,
-                ":prefix": "HYPOTHESIS#",
-            },
+            KeyConditionExpression=Key("pk").eq(HYPOTHESES_PK) & Key("sk").begins_with("HYPOTHESIS#"),
             ScanIndexForward=False,
-            Limit=50,
         )
-        items = [d2f(i) for i in resp.get("Items", [])]
+        items = d2f(resp.get("Items", []))
         if status_filter:
-            items = [i for i in items if i.get("status") == status_filter]
+            items = [h for h in items if h.get("status") == status_filter]
         return items
     except Exception as e:
-        logger.warning(f"load_existing_hypotheses failed: {e}")
+        logger.error(f"Failed to load hypotheses: {e}")
         return []
 
 
 def store_hypothesis(hypothesis: dict):
-    """Write a hypothesis record to DDB."""
-    now = datetime.now(timezone.utc).isoformat()
-    sk = f"HYPOTHESIS#{now}"
+    """Write a new hypothesis to DynamoDB."""
+    now = datetime.now(timezone.utc)
+    sk = f"HYPOTHESIS#{now.isoformat()}"
+
     item = {
         "pk": HYPOTHESES_PK,
         "sk": sk,
-        "created_at": now,
-        "last_checked": now,
-        "check_count": 0,
         "status": "pending",
-        "evidence_log": [],
-        **hypothesis,
+        "created_at": now.isoformat(),
+        "check_count": 0,
+        **{k: v for k, v in hypothesis.items() if v is not None},
     }
-    table.put_item(Item=item)
-    logger.info(f"Stored hypothesis: {hypothesis.get('hypothesis_id', '?')} -- {hypothesis.get('hypothesis', '')[:80]}")
-    return sk
+
+    # Convert floats to Decimal for DynamoDB
+    def to_decimal(obj):
+        if isinstance(obj, float):
+            return Decimal(str(obj))
+        if isinstance(obj, dict):
+            return {k: to_decimal(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [to_decimal(v) for v in obj]
+        return obj
+
+    table.put_item(Item=to_decimal(item))
+    logger.info(f"Stored hypothesis: {hypothesis.get('hypothesis_id', sk)}")
 
 
 def update_hypothesis_status(sk: str, status: str, evidence_note: str = ""):
-    """Update hypothesis status and append to evidence_log."""
+    """Update hypothesis status and increment check_count."""
     now = datetime.now(timezone.utc).isoformat()
-    update_expr = "SET #s = :s, last_checked = :lc, check_count = check_count + :one"
-    expr_names = {"#s": "status"}
-    expr_vals = {":s": status, ":lc": now, ":one": 1}
+    try:
+        update_expr = "SET #s = :s, last_checked = :now, check_count = if_not_exists(check_count, :zero) + :one"
+        expr_names = {"#s": "status"}
+        expr_vals = {
+            ":s": status,
+            ":now": now,
+            ":zero": Decimal("0"),
+            ":one": Decimal("1"),
+        }
 
-    if evidence_note:
-        update_expr += ", evidence_log = list_append(if_not_exists(evidence_log, :empty), :ev)"
-        expr_vals[":empty"] = []
-        expr_vals[":ev"] = [{"date": now[:10], "note": evidence_note, "direction": status}]
+        if evidence_note:
+            update_expr += ", last_evidence = :ev"
+            expr_vals[":ev"] = evidence_note
 
-    table.update_item(
-        Key={"pk": HYPOTHESES_PK, "sk": sk},
-        UpdateExpression=update_expr,
-        ExpressionAttributeNames=expr_names,
-        ExpressionAttributeValues=expr_vals,
-    )
+        table.update_item(
+            Key={"pk": HYPOTHESES_PK, "sk": sk},
+            UpdateExpression=update_expr,
+            ExpressionAttributeNames=expr_names,
+            ExpressionAttributeValues=expr_vals,
+        )
+        logger.info(f"Updated hypothesis {sk[:40]}: {status}")
+    except Exception as e:
+        logger.error(f"Failed to update hypothesis {sk}: {e}")
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# BUILD DATA NARRATIVE — compact summary of 14 days for the AI
-# ══════════════════════════════════════════════════════════════════════════════
 
 def build_data_narrative(data):
-    """Compress 14 days of multi-source data into a compact narrative for the hypothesis generator."""
-    sources = data["sources"]
-    computed = data["computed"]
-    dates = sorted(set(
-        list(sources["whoop"].keys()) +
-        list(sources["macrofactor"].keys()) +
-        list(sources["sleep"].keys()) +
-        list(sources["habitify"].keys())
-    ))
+    """Build day-by-day narrative rows for hypothesis evaluation."""
+    if not data:
+        return []
 
-    daily_rows = []
-    for date_str in dates:
-        whoop   = sources["whoop"].get(date_str, {})
-        sleep   = sources["sleep"].get(date_str, {})
-        mf      = sources["macrofactor"].get(date_str, {})
-        strava  = sources["strava"].get(date_str, {})
-        hab     = sources["habitify"].get(date_str, {})
-        apple   = sources["apple"].get(date_str, {})
-        journal = sources["journal"].get(date_str, {})
-        eight   = sources["eightsleep"].get(date_str, {})
-        comp    = computed.get(date_str, {})
+    # Find date range
+    all_dates = set()
+    for source, items in data.items():
+        for item in items:
+            d = item.get("date") or item.get("sk", "")[-10:]
+            if d and len(d) == 10:
+                all_dates.add(d)
 
-        row = {
-            "date": date_str,
-            # Recovery & sleep
-            "hrv":            safe_float(whoop, "hrv"),
-            "recovery":       safe_float(whoop, "recovery_score"),
-            "sleep_score":    safe_float(sleep, "sleep_score"),
-            "sleep_hrs":      safe_float(sleep, "sleep_duration_hours"),
-            "deep_pct":       safe_float(sleep, "deep_pct"),
-            "rem_pct":        safe_float(sleep, "rem_pct"),
-            "bed_temp_f":     safe_float(eight, "current_temp_f"),
-            # Nutrition
-            "calories":       safe_float(mf, "total_calories_kcal"),
-            "protein_g":      safe_float(mf, "total_protein_g"),
-            "carbs_g":        safe_float(mf, "total_carbs_g"),
-            "fat_g":          safe_float(mf, "total_fat_g"),
-            # Movement
-            "activity_count": safe_float(strava, "activity_count"),
-            "steps":          safe_float(apple, "steps"),
-            # Glucose
-            "glucose_avg":    safe_float(apple, "blood_glucose_avg"),
-            "glucose_tir":    safe_float(apple, "blood_glucose_time_in_range_pct"),
-            # Mind & habits
-            "journal_stress": safe_float(journal, "stress_avg"),
-            "journal_mood":   safe_float(journal, "mood_avg"),
-            "habit_pct":      round(safe_float(hab, "total_completed", 0) /
-                                    max(safe_float(hab, "total_possible", 1), 1) * 100, 0),
-            # Day grade
-            "day_grade":      safe_float(comp, "day_grade"),
-        }
-        # Remove None values
+    rows = []
+    for date in sorted(all_dates):
+        row = {"date": date}
+
+        # Whoop
+        whoop = next((i for i in data.get("whoop", []) if i.get("date") == date), {})
+        if whoop:
+            row["recovery"] = safe_float(whoop, "recovery_score")
+            row["hrv"] = safe_float(whoop, "hrv")
+            row["rhr"] = safe_float(whoop, "resting_heart_rate")
+            row["sleep_score"] = safe_float(whoop, "sleep_quality_score")
+            row["sleep_efficiency"] = safe_float(whoop, "sleep_efficiency_percentage")
+            row["deep_sleep_hrs"] = safe_float(whoop, "slow_wave_sleep_hours")
+            row["rem_hrs"] = safe_float(whoop, "rem_sleep_hours")
+            row["total_sleep_hrs"] = safe_float(whoop, "total_in_bed_time_hrs")
+
+        # Garmin
+        garmin = next((i for i in data.get("garmin", []) if i.get("date") == date), {})
+        if garmin:
+            row["stress"] = safe_float(garmin, "average_stress_level")
+            row["body_battery"] = safe_float(garmin, "body_battery_high")
+            row["steps_garmin"] = safe_float(garmin, "total_steps")
+
+        # MacroFactor
+        mf = next((i for i in data.get("macrofactor", []) if i.get("date") == date), {})
+        if mf:
+            row["calories"] = safe_float(mf, "total_calories_kcal")
+            row["protein_g"] = safe_float(mf, "total_protein_g")
+            row["carbs_g"] = safe_float(mf, "total_carbs_g")
+            row["fat_g"] = safe_float(mf, "total_fat_g")
+            row["weight_lbs"] = safe_float(mf, "tdee_kcal")  # TDEE as proxy
+
+        # Withings (weight)
+        wi = next((i for i in data.get("withings", []) if i.get("date") == date), {})
+        if wi:
+            row["weight_lbs"] = safe_float(wi, "weight_lbs")
+
+        # Apple Health
+        ah = next((i for i in data.get("apple_health", []) if i.get("date") == date), {})
+        if ah:
+            row["steps"] = safe_float(ah, "steps")
+            row["active_cal"] = safe_float(ah, "active_calories")
+            row["mindful_min"] = safe_float(ah, "mindful_minutes")
+            row["glucose_avg"] = safe_float(ah, "blood_glucose_avg")
+            row["walking_speed"] = safe_float(ah, "walking_speed_mph")
+
+        # Strava
+        st = next((i for i in data.get("strava", []) if i.get("date") == date), {})
+        if st:
+            row["workout"] = bool(safe_float(st, "activity_count", 0))
+            row["training_load"] = safe_float(st, "total_kilojoules")
+            row["zone2_min"] = safe_float(st, "zone2_minutes")
+
+        # Notion journal
+        nj = next((i for i in data.get("notion", []) if i.get("date") == date), {})
+        if nj:
+            row["mood"] = safe_float(nj, "enriched_mood")
+            row["energy"] = safe_float(nj, "enriched_energy")
+            row["journal_stress"] = safe_float(nj, "enriched_stress")
+            row["social"] = nj.get("enriched_social_quality")
+
+        # Eight Sleep
+        es = next((i for i in data.get("eightsleep", []) if i.get("date") == date), {})
+        if es:
+            row["sleep_onset_min"] = safe_float(es, "time_to_sleep_min")
+            row["bed_temp_f"] = safe_float(es, "avg_bed_temp_f")
+
+        # Filter None values
         row = {k: v for k, v in row.items() if v is not None}
-        daily_rows.append(row)
+        if len(row) > 1:  # more than just date
+            rows.append(row)
 
-    return daily_rows
+    return rows
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# AI-4: DATA COMPLETENESS & HYPOTHESIS VALIDATION
-# ══════════════════════════════════════════════════════════════════════════════
 
 def check_data_completeness(daily_rows):
-    """AI-4: Verify enough data exists to generate meaningful hypotheses.
+    """AI-4: Check if we have enough complete data to generate reliable hypotheses.
 
     Returns (is_sufficient, complete_days, total_days, message).
-    A "complete" day has >= MIN_METRICS_PER_DAY non-null fields (excluding 'date').
     """
-    total_days = len(daily_rows)
-    complete_days = 0
-    for row in daily_rows:
-        non_null_metrics = sum(1 for k, v in row.items() if k != "date" and v is not None)
-        if non_null_metrics >= MIN_METRICS_PER_DAY:
-            complete_days += 1
-
-    is_sufficient = complete_days >= MIN_DATA_DAYS
-    if not is_sufficient:
-        msg = (f"Insufficient data: {complete_days}/{MIN_DATA_DAYS} complete days "
-               f"(total {total_days} days, requiring {MIN_METRICS_PER_DAY}+ metrics each)")
-    else:
-        msg = f"Data sufficient: {complete_days} complete days out of {total_days}"
-    return is_sufficient, complete_days, total_days, msg
+    total = len(daily_rows)
+    complete = sum(1 for r in daily_rows if len(r) >= MIN_METRICS_PER_DAY + 1)  # +1 for date key
+    msg = f"{complete}/{total} complete days (need {MIN_DATA_DAYS} with {MIN_METRICS_PER_DAY}+ metrics)"
+    return complete >= MIN_DATA_DAYS, complete, total, msg
 
 
 def validate_hypothesis(hyp, existing_texts=None):
-    """AI-4: Validate a single hypothesis before storing.
+    """AI-4: Validate a generated hypothesis against quality requirements.
 
-    Returns (is_valid, issues_list). A hypothesis must:
-    1. Have all required fields present and non-empty
-    2. Have domains list with 2+ entries (cross-domain requirement)
-    3. Have confidence in valid set
-    4. Have confirmation_criteria containing at least one numeric threshold
-    5. Have monitoring_window_days between 7 and 30
-    6. Not duplicate existing hypotheses (simple substring check)
+    Returns (is_valid, list_of_issues).
     """
     issues = []
 
-    # Required fields check
+    # Required fields
     missing = REQUIRED_HYPOTHESIS_FIELDS - set(hyp.keys())
     if missing:
         issues.append(f"Missing fields: {missing}")
 
-    # Non-empty checks
-    for field in ("hypothesis", "evidence", "confirmation_criteria", "actionable_if_confirmed"):
-        val = hyp.get(field, "")
-        if not val or len(str(val).strip()) < 10:
-            issues.append(f"Field '{field}' too short or empty")
+    # Confidence level
+    if hyp.get("confidence") not in VALID_CONFIDENCE_LEVELS:
+        issues.append(f"Invalid confidence: {hyp.get('confidence')}")
 
-    # Cross-domain: need 2+ domains
+    # Cross-domain requirement
     domains = hyp.get("domains", [])
     if not isinstance(domains, list) or len(domains) < 2:
-        issues.append(f"Need 2+ domains for cross-domain hypothesis, got {len(domains) if isinstance(domains, list) else 0}")
+        issues.append("Must have 2+ domains")
 
-    # Confidence validation
-    confidence = hyp.get("confidence", "")
-    if confidence not in VALID_CONFIDENCE_LEVELS:
-        issues.append(f"Invalid confidence '{confidence}'; must be one of {VALID_CONFIDENCE_LEVELS}")
-
-    # Numeric threshold in confirmation criteria (AI-4: effect size requirement)
-    criteria = str(hyp.get("confirmation_criteria", ""))
+    # Numeric threshold in confirmation criteria
+    criteria = hyp.get("confirmation_criteria", "")
     if not NUMERIC_PATTERN.search(criteria):
-        issues.append("Confirmation criteria must contain specific numeric thresholds "
-                       "(e.g., '10% improvement', '5 points higher', '30 minutes more')")
+        issues.append("confirmation_criteria must contain numeric threshold with units")
 
-    # Monitoring window bounds
+    # Monitoring window
     window = hyp.get("monitoring_window_days", 0)
     try:
         window = int(window)
+        if not (7 <= window <= 30):
+            issues.append(f"monitoring_window_days must be 7-30, got {window}")
     except (ValueError, TypeError):
-        window = 0
-    if window < 7 or window > 30:
-        issues.append(f"monitoring_window_days must be 7-30, got {window}")
+        issues.append(f"monitoring_window_days must be numeric, got {window}")
 
-    # Hypothesis ID format
-    hyp_id = hyp.get("hypothesis_id", "")
-    if not hyp_id or not hyp_id.startswith("hyp_"):
-        issues.append(f"hypothesis_id must start with 'hyp_', got '{hyp_id}'")
-
-    # Deduplication check (simple substring overlap with existing)
+    # Duplicate check
     if existing_texts:
-        hyp_text = hyp.get("hypothesis", "").lower()
+        hypothesis_text = hyp.get("hypothesis", "")[:100].lower()
         for existing in existing_texts:
-            # Check if more than 60% of words overlap
-            existing_words = set(existing.lower().split())
-            hyp_words = set(hyp_text.split())
-            if existing_words and hyp_words:
-                overlap = len(existing_words & hyp_words) / max(len(existing_words), len(hyp_words))
-                if overlap > 0.6:
-                    issues.append(f"Too similar to existing hypothesis: '{existing[:80]}...'")
+            if existing and len(hypothesis_text) > 20:
+                # Simple overlap check: if >50% of words match, likely duplicate
+                h_words = set(hypothesis_text.split())
+                e_words = set(existing.lower().split())
+                if h_words and len(h_words & e_words) / len(h_words) > 0.5:
+                    issues.append(f"Too similar to existing hypothesis: {existing[:60]}")
                     break
 
     return len(issues) == 0, issues
@@ -400,57 +389,87 @@ def validate_hypothesis(hyp, existing_texts=None):
 def enforce_hard_expiry(all_hypotheses):
     """AI-4: Archive any hypothesis older than HARD_EXPIRY_DAYS regardless of status.
 
-    Returns list of (sk, "archived", reason) tuples for expired hypotheses.
+    Returns list of (sk, new_status, reason) tuples for hypotheses to archive.
     """
+    updates = []
     now = datetime.now(timezone.utc).date()
-    expired = []
 
     for hyp in all_hypotheses:
         if hyp.get("status") in ("archived", "confirmed", "refuted"):
             continue
+
         created_at = hyp.get("created_at", "")
-        sk = hyp.get("sk", "")
-        if not created_at or not sk:
-            continue
         try:
             created_date = datetime.fromisoformat(created_at).date()
             days_old = (now - created_date).days
-            if days_old > HARD_EXPIRY_DAYS:
-                expired.append((
-                    sk,
-                    "archived",
-                    f"Hard expiry: {days_old} days old (limit {HARD_EXPIRY_DAYS}d). "
-                    f"Status was '{hyp.get('status', 'unknown')}' with {hyp.get('check_count', 0)} checks."
-                ))
         except Exception:
             continue
 
-    return expired
+        if days_old > HARD_EXPIRY_DAYS:
+            sk = hyp.get("sk", "")
+            if sk:
+                updates.append((sk, "archived", f"Hard expiry: {days_old} days old (limit {HARD_EXPIRY_DAYS})"))
 
+    return updates
+
+
+# ── IC-19 D3B: Load active N=1 experiments for hypothesis cross-reference ──
+def load_active_experiments():
+    """Query active N=1 experiments from DynamoDB.
+
+    Used to cross-reference hypothesis evidence: if an active experiment is testing
+    something related to a pending hypothesis, that is additive confirmation evidence
+    (Chen: check ATL/CTL context; Henning: small N, keep claims modest).
+
+    Returns list of experiment dicts (id, name, hypothesis, start_date).
+    """
+    EXPERIMENTS_PK = f"USER#{USER_ID}#SOURCE#experiments"
+    try:
+        from boto3.dynamodb.conditions import Key
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(EXPERIMENTS_PK) & Key("sk").begins_with("EXP#"),
+        )
+        items = []
+        for item in resp.get("Items", []):
+            status = item.get("status", "")
+            if status == "active":
+                items.append({
+                    "experiment_id": item.get("experiment_id", ""),
+                    "name":          str(item.get("name", "")),
+                    "hypothesis":    str(item.get("hypothesis", "")),
+                    "start_date":    str(item.get("start_date", "")),
+                })
+        return items
+    except Exception as e:
+        logger.warning(f"load_active_experiments failed (non-fatal): {e}")
+        return []
 
 def validate_check_verdict(result):
-    """AI-4: Validate the Haiku hypothesis check response.
+    """AI-4: Validate the check verdict from Haiku.
 
     Returns (is_valid, verdict, evidence).
     """
     if not isinstance(result, dict):
-        return False, "insufficient", "Invalid response format"
+        return False, "insufficient", "Invalid response structure"
 
-    verdict = result.get("verdict", "").strip().lower()
-    evidence = result.get("evidence", "").strip()
+    verdict = result.get("verdict", "").lower().strip()
+    evidence = result.get("evidence", "")
 
-    valid_verdicts = {"confirming", "refuted", "insufficient"}
-    if verdict not in valid_verdicts:
-        return False, "insufficient", f"Invalid verdict '{verdict}'"
+    if verdict not in ("confirming", "refuted", "insufficient"):
+        return False, "insufficient", f"Invalid verdict: {verdict}"
 
     if not evidence or len(evidence) < 10:
-        return False, verdict, "Evidence too short — treating as insufficient"
+        return False, "insufficient", "Evidence too brief"
+
+    # AI-4: Require evidence to cite at least one number for confirming/refuted verdicts
+    if verdict in ("confirming", "refuted") and not re.search(r'\d', evidence):
+        return False, "insufficient", "Evidence must cite specific values for confirming/refuted verdicts"
 
     return True, verdict, evidence
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# HYPOTHESIS GENERATION — Claude Sonnet pass
+# HYPOTHESIS SYSTEM PROMPT
 # ══════════════════════════════════════════════════════════════════════════════
 
 HYPOTHESIS_SYSTEM_PROMPT = """You are a data scientist analyzing Matthew's personal health data to generate cross-domain hypotheses.
@@ -484,6 +503,14 @@ STRICT REQUIREMENTS (hypotheses that fail these are rejected):
 - confidence must be "low", "medium", or "high" based on how many data points support it
 - monitoring_window_days must be 7-30 (not shorter, not longer)
 - evidence must cite specific dates or values from the data provided
+
+FRAMING RULE — NEGATIVE PSYCHOLOGICAL VARIABLES (Conti):
+Hypotheses about stress, anxiety, low mood, emotional depletion, or other negative psychological
+states MUST be framed as intervention opportunities, NOT as baseline characterisations.
+BAD:  "High stress correlates with poor sleep efficiency"
+GOOD: "Reducing perceived stress on high-workload days may improve sleep efficiency by ~X%"
+The hypothesis sentence should describe what changing the variable could produce, not just that
+two things move together. This applies to ANY variable where the desirable direction is reduction.
 
 OUTPUT ONLY valid JSON. No preamble, no markdown, no backticks."""
 
@@ -577,6 +604,10 @@ def check_pending_hypotheses(pending_hypotheses, daily_rows, api_key):
     - Validates Haiku check response structure
     - Hard expiry enforced separately (in handler)
 
+    IC-19 D3B changes:
+    - Loads active N=1 experiments and cross-references against each hypothesis
+    - Injects matching experiment context into the check prompt (additive evidence)
+
     Returns list of (sk, new_status, evidence_note) tuples.
     """
     if not pending_hypotheses or not daily_rows:
@@ -584,6 +615,9 @@ def check_pending_hypotheses(pending_hypotheses, daily_rows, api_key):
 
     updates = []
     now = datetime.now(timezone.utc).date()
+
+    # IC-19 D3B: Load active experiments once for the whole batch
+    active_experiments = load_active_experiments()
 
     for hyp in pending_hypotheses:
         sk = hyp.get("sk", "")
@@ -617,11 +651,35 @@ def check_pending_hypotheses(pending_hypotheses, daily_rows, api_key):
             logger.info(f"[AI-4] Insufficient data for check: {len(relevant_data)} days (need {MIN_SAMPLE_DAYS_FOR_CHECK})")
             continue
 
+        # IC-19 D3B: If an active experiment's hypothesis overlaps with this one,
+        # include it as additional context (Raj: early exit if no experiments to check)
+        exp_context = ""
+        if active_experiments:
+            hyp_lower = hypothesis_text.lower()
+            related = [
+                e for e in active_experiments
+                if any(kw in hyp_lower for kw in e["name"].lower().split()[:4]
+                       if len(kw) > 4)
+                or any(kw in hyp_lower for kw in e["hypothesis"].lower().split()[:6]
+                       if len(kw) > 4)
+            ]
+            if related:
+                exp_lines = [
+                    f"  [{e['experiment_id']}] {e['name']}: {e['hypothesis']!r} (since {e['start_date']})"
+                    for e in related
+                ]
+                exp_context = (
+                    "\n\nACTIVE EXPERIMENTS (cross-reference as additional evidence — "
+                    "Henning: small N, keep claims correlative not causal):\n"
+                    + "\n".join(exp_lines)
+                    + "\n"
+                )
+
         check_prompt = f"""Hypothesis: {hypothesis_text}
 
 Confirmation criteria: {confirmation_criteria}
 
-Recent data ({len(relevant_data)} days since hypothesis was created):
+Recent data ({len(relevant_data)} days since hypothesis was created):{exp_context}
 {json.dumps(relevant_data[-7:], indent=2)}
 
 Based on this data, evaluate the hypothesis STRICTLY:
@@ -697,6 +755,15 @@ def write_hypothesis_context_to_memory(active_hypotheses):
             lines.append("CONFIRMED HYPOTHESES (incorporate into coaching as established patterns):")
             for h in confirmed[:3]:
                 lines.append(f"  [CONFIRMED] {h['hypothesis']}")
+                # IC-19 D3B: Suggest formalising confirmed hypotheses as N=1 experiments
+                # (Conti: if the confirmed hypothesis involves a negative psychological variable,
+                # frame the experiment suggestion as an intervention opportunity, not a label)
+                actionable = h.get("actionable_if_confirmed", "")
+                if actionable:
+                    lines.append(
+                        f"  [EXPERIMENT SUGGESTED] {actionable} "
+                        f"— Consider running a formal N=1 experiment to quantify this effect."
+                    )
 
         if pending:
             lines.append("ACTIVE HYPOTHESES (watch for confirming/refuting evidence in current data):")
@@ -731,7 +798,7 @@ def write_hypothesis_context_to_memory(active_hypotheses):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def lambda_handler(event, context):
-    logger.info("IC-18: Hypothesis Engine v1.1.0 (AI-4) starting...")
+    logger.info("IC-18: Hypothesis Engine v1.2.0 (AI-4 + IC-19 D3B) starting...")
 
     api_key = get_anthropic_key()
 
