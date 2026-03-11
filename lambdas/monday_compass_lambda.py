@@ -812,7 +812,7 @@ def lambda_handler(event, context):
 
     # AI-3: Validate output before rendering
     if _HAS_AI_VALIDATOR and ai_content and "unavailable" not in ai_content[:50]:
-        _val = validate_ai_output(ai_content, AIOutputType.GENERIC)
+        _val = validate_ai_output(ai_content, AIOutputType.WEEKLY_DIGEST)
         if _val.blocked:
             logger.error(f"[AI-3] Monday Compass output BLOCKED: {_val.block_reason}")
             ai_content = _val.safe_fallback or '<div style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">Monday Compass AI unavailable. Check CloudWatch logs.</div>'

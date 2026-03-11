@@ -141,10 +141,20 @@ _GENERIC_USELESS_PHRASES = [
 ]
 
 _CORRELATION_AS_CAUSATION = [
+    # Original patterns
     r"\bcauses?\b.*\bproves?\b",
     r"\bclearly\s+causing\b",
     r"\bdefinitely\s+caused\b",
     r"\bproven\s+(?:to\s+)?(?:cause|link)\b",
+    # Direct causal assertions without hedging (AI-2 requirement: must use correlative framing)
+    r"\b(?:this|that|it)\s+(?:is\s+)?causing\s+your\b",
+    r"\bcaused?\s+(?:directly\s+)?your\s+(?:poor|low|high|bad|great)\b",
+    r"\bthe\s+(?:reason|cause)\s+(?:is|was)\s+(?:that|your)\b",
+    r"\bdirectly\s+(?:caused?|responsible\s+for)\b",
+    r"\bresponsible\s+for\s+your\b",
+    r"\bwe\s+(?:know|can\s+see)\s+(?:this|that)\s+(?:causes?|affects?)\b",
+    r"\bthis\s+(?:definitely|certainly|clearly|is\s+clearly)\s+(?:affects?|impacts?|causes?)\b",
+    r"\b(?:proves?|proof)\s+that\s+(?:your|the)\b",
 ]
 
 
