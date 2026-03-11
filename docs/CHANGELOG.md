@@ -1,5 +1,22 @@
 # Life Platform — Changelog
 
+## v3.6.0 — 2026-03-11: CI/CD hardening
+
+### Changes
+- **Syntax check step** added to Lint job — `python3 -m py_compile` on all `.py` files in `lambdas/` and `mcp/`. Catches broken syntax that flake8 misses (truncated files, invalid f-strings).
+- **`lambda_map.json` validation step** added to Plan job — fails fast if any source file or layer module in the map doesn't exist in the repo. Prevents silent drift.
+- **`aws lambda wait function-updated`** replaces `sleep 10` for MCP deploy and all individual Lambda deploys. Polls until Lambda state is `Active` rather than racing a fixed delay.
+- **Layer version verification** added after shared layer rebuild — checks every consumer Lambda is on the new version after `p3_attach_shared_utils_layer.sh` runs. Would have caught the v3.5.5 EmailStack incident.
+- **Structured smoke test + canary** — both now parse JSON response and check the `status` field rather than grepping the raw output for the string "error". Eliminated false positives (e.g. `{"errors": 0}`).
+- **`notify-failure` job** (Job 5) — `if: failure()` condition posts to SNS `life-platform-alerts` with commit SHA + GitHub Actions run URL on any upstream job failure.
+- **`ci/lambda_map.json`** — replaced stale `lambdas/freshness_checker.py` with `lambdas/sick_day_checker.py` in `skip_deploy`; bumped `_updated` to v3.6.0.
+
+### Files changed
+- `.github/workflows/ci-cd.yml`
+- `ci/lambda_map.json`
+
+---
+
 ## v3.5.8 — 2026-03-11: Prompt Intelligence Fixes (P1–P5) — audit + gap closure
 
 ### Audit: P1–P5 confirmed code-complete
