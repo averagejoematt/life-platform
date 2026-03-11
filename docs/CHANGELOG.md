@@ -1,5 +1,27 @@
 # Life Platform — Changelog
 
+## v3.6.4 — 2026-03-12: anomaly_detector v2.4.0 — HRV log-transform + doc corrections
+
+### Changes
+- **`lambdas/anomaly_detector_lambda.py`** — bumped to v2.4.0. Added `LOG_TRANSFORM_METRICS = {"hrv"}` constant. `compute_baseline()` now accepts `log_transform` param: when True, mean/SD computed on log(values); CV still computed in original domain for consistent adaptive-threshold logic. `check_anomalies()` applies log() to the observation before Z computation for log-transform metrics. Display values (`yesterday_val`, `baseline_mean`, `baseline_sd`, `pct_from_mean`) remain in original ms units via back-conversion. Flagged dict gains two new fields: `log_transform` (bool) and `distribution_note` ("lognormal_z" or "gaussian_approx") for transparency. `detector_version` bumped to 2.4.0.
+- **`docs/INTELLIGENCE_LAYER.md`** — corrected inaccurate claim that DoW σ was computed on mixed weekday/weekend values (it was already correctly filtered). Updated HRV bullet to note v2.4.0 fix. Updated last-updated timestamp.
+
+### Files changed
+- `lambdas/anomaly_detector_lambda.py`
+- `docs/INTELLIGENCE_LAYER.md`
+
+---
+
+## v3.6.3 — 2026-03-12: INTELLIGENCE_LAYER.md — Known Statistical Limitations section
+
+### Changes
+- **docs/INTELLIGENCE_LAYER.md** — added "Known Statistical Limitations" section (Dr. Henning Brandt consultation). Documents: EMA λ and τ parameters for ATL/CTL Banister model (λ≈0.867/τ=7d and λ≈0.976/τ=42d), Z-score normality assumption with per-threshold FP rates, multiple comparisons analysis (13 metrics × 2-source gate), non-overlapping window validity conditions (N=14 gate rationale), 3-day consecutive trend FP rate under random walk, IC-23 surprise scoring as heuristic not statistical test, validity precondition summary table, and 5 hard rules for new engineers. Last updated timestamp bumped to v3.6.3.
+
+### Files changed
+- `docs/INTELLIGENCE_LAYER.md`
+
+---
+
 ## v3.6.2 — 2026-03-11: Remove one-time hygiene script from repo root
 
 ### Changes
