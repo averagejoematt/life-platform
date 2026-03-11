@@ -605,6 +605,12 @@ def operational_canary() -> list[iam.PolicyStatement]:
             resources=[TABLE_ARN],
         ),
         iam.PolicyStatement(
+            sid="KMS",
+            # DDB table uses CMK — canary needs decrypt + generate for PutItem/GetItem
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
             sid="S3Canary",
             # Canary writes to canary/ prefix, reads back, then deletes
             actions=["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
@@ -617,7 +623,8 @@ def operational_canary() -> list[iam.PolicyStatement]:
         ),
         iam.PolicyStatement(
             sid="Secrets",
-            # MCP check needs ai-keys to get the Bearer token
+            # MCP check tries to fetch Bearer token — ai-keys is closest match
+            # Note: canary skips MCP gracefully if key unavailable (non-fatal)
             actions=["secretsmanager:GetSecretValue"],
             resources=[_secret_arn("life-platform/ai-keys")],
         ),

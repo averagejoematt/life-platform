@@ -1,0 +1,47 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DynamoDB",
+      "Effect": "Allow",
+      "Action": ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:DeleteItem"],
+      "Resource": "arn:aws:dynamodb:us-west-2:205930651321:table/life-platform"
+    },
+    {
+      "Sid": "KMS",
+      "Effect": "Allow",
+      "Action": ["kms:Decrypt", "kms:GenerateDataKey"],
+      "Resource": "arn:aws:kms:us-west-2:205930651321:key/444438d1-a5e0-43b8-9391-3cd2d70dde4d"
+    },
+    {
+      "Sid": "S3Canary",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::matthew-life-platform/canary/*"
+    },
+    {
+      "Sid": "CloudWatchMetrics",
+      "Effect": "Allow",
+      "Action": ["cloudwatch:PutMetricData"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Secrets",
+      "Effect": "Allow",
+      "Action": ["secretsmanager:GetSecretValue"],
+      "Resource": "arn:aws:secretsmanager:us-west-2:205930651321:secret:life-platform/ai-keys-*"
+    },
+    {
+      "Sid": "SESAlert",
+      "Effect": "Allow",
+      "Action": ["ses:SendEmail"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "LogsBasic",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": "arn:aws:logs:us-west-2:205930651321:log-group:/aws/lambda/life-platform-canary:*"
+    }
+  ]
+}
