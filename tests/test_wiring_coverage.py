@@ -115,9 +115,7 @@ W2_KNOWN_GAPS: set[str] = {
 }
 
 # W3 ai_output_validator gaps:
-W3_KNOWN_GAPS: set[str] = {
-    "hypothesis_engine_lambda.py",  # AI-3: not yet wired — fix with api-keys migration
-}
+W3_KNOWN_GAPS: set[str] = set()  # All AI-output Lambdas wired as of v3.6.9
 
 
 # ══════════════════════════════════════════════════════════════════════════════

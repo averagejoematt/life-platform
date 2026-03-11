@@ -48,6 +48,13 @@ except ImportError:
     logger = logging.getLogger("hypothesis-engine")
     logger.setLevel(logging.INFO)
 
+# AI-3: Output validator — validates AI text before storage/delivery
+try:
+    from ai_output_validator import validate_ai_output, AIOutputType
+    _HAS_AI_VALIDATOR = True
+except ImportError:
+    _HAS_AI_VALIDATOR = False
+
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID    = os.environ["USER_ID"]
@@ -580,6 +587,14 @@ Return ONLY this JSON structure:
                     raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
                 if raw.endswith("```"):
                     raw = raw[:-3]
+                # AI-3: Validate raw JSON text before parsing
+                if _HAS_AI_VALIDATOR:
+                    val_result = validate_ai_output(raw, AIOutputType.GENERIC)
+                    if val_result.blocked:
+                        logger.error("[AI-3] generate_hypotheses blocked: %s", val_result.block_reason)
+                        return None
+                    if val_result.warnings:
+                        logger.warning("[AI-3] generate_hypotheses warnings: %s", val_result.warnings)
                 return json.loads(raw.strip())
         except urllib.error.HTTPError as e:
             logger.warning(f"Anthropic HTTP {e.code} attempt {attempt}")
@@ -718,6 +733,15 @@ Respond ONLY with JSON: {{"verdict": "confirming|refuted|insufficient", "evidenc
                 if not is_valid:
                     logger.warning(f"[AI-4] Invalid check verdict for {sk[:40]}: {result}")
                     verdict = "insufficient"
+
+                # AI-3: Validate evidence text before storing
+                if _HAS_AI_VALIDATOR and evidence:
+                    ev_result = validate_ai_output(evidence, AIOutputType.GENERIC)
+                    if ev_result.blocked:
+                        logger.warning("[AI-3] check evidence blocked for %s: %s", sk[:40], ev_result.block_reason)
+                        evidence = ev_result.safe_fallback or "Evidence unavailable — output blocked by validator."
+                    elif ev_result.warnings:
+                        logger.warning("[AI-3] check evidence warnings for %s: %s", sk[:40], ev_result.warnings)
 
                 if verdict == "refuted":
                     new_status = "refuted"

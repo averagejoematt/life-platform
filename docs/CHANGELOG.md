@@ -1,5 +1,84 @@
 # Life Platform — Changelog
 
+## v3.6.9 — 2026-03-11: hypothesis_engine W3 wiring complete — CI linter now fully green
+
+### Summary
+Wired `ai_output_validator` into `hypothesis_engine_lambda.py` to close the last W3 known gap. W3_KNOWN_GAPS is now empty; all 12 AI-output Lambdas are compliant. CI test suite fully green.
+
+### Changes
+- **`lambdas/hypothesis_engine_lambda.py`** — Added `_HAS_AI_VALIDATOR` try/except import block (AI-3). Validates raw JSON text in `generate_hypotheses()` before `json.loads()` (blocks empty/truncated output). Validates `evidence` text in `check_pending_hypotheses()` after AI-4 verdict extraction (warns/replaces unsafe evidence strings).
+- **`tests/test_wiring_coverage.py`** — Removed `hypothesis_engine_lambda.py` from `W3_KNOWN_GAPS`. Set to `set()` with comment `All AI-output Lambdas wired as of v3.6.9`.
+
+### Files changed
+- `lambdas/hypothesis_engine_lambda.py`
+- `tests/test_wiring_coverage.py`
+
+---
+
+## v3.6.8 — 2026-03-11: 5 CI linters + KMS gap sweep + hypothesis_engine api-keys fix
+
+### Summary
+Full CI linter suite built following KMS gap incidents (canary v3.6.5, qa-smoke v3.6.7). Board of Directors review surfaced 5 priority linter categories. All 5 built and wired into CI in one session. Also fixed `hypothesis_engine_lambda.py` defaulting to the deprecated `life-platform/api-keys` secret (deadline 2026-03-17).
+
+### Linters added
+- **`tests/test_role_policies.py`** (built earlier in session, v3.6.7) — IAM policy linter: R1–R7 covering KMS requirements, wildcard resources, scoped secrets, duplicate SIDs. Found 6 missing KMS policies total (3 in v3.6.7 commit, 3 more in v3.6.8: `freshness_checker`, `insight_email_parser`, `mcp_server`).
+- **`tests/test_wiring_coverage.py`** — Safety module wiring: W1 platform_logger (all Lambdas), W2 ingestion_validator (ingestion Lambdas), W3 ai_output_validator (email + AI-compute Lambdas), W4 causal language scan in prompt strings. Known gap documented: `hypothesis_engine` W3.
+- **`tests/test_ddb_patterns.py`** — DynamoDB patterns: D1 pk/sk format, D2 `date` reserved word guard, D3 schema_version present, D4 put_item preceded by validator.
+- **`ci/deprecated_secrets.txt`** — Secret retirement registry. CI lint job scans all source for entries. First entry: `life-platform/api-keys` (deadline 2026-03-17).
+- **Handler consistency check** — Plan job step; validates every Lambda source file in `lambda_map.json` defines `def lambda_handler`.
+
+### KMS gap sweep (role_policies.py)
+Fixed KMS missing from 6 policies total this session:
+  `operational_qa_smoke`, `operational_data_export`, `operational_data_reconciliation` (v3.6.7)
+  `operational_freshness_checker`, `operational_insight_email_parser`, `mcp_server` (v3.6.8, caught by linter)
+
+### Bug fix
+- **`lambdas/hypothesis_engine_lambda.py`** — `get_anthropic_key()` default `life-platform/api-keys` → `life-platform/ai-keys`. Would have broken silently on 2026-03-17.
+
+### Files changed
+- `tests/test_role_policies.py` (new)
+- `tests/test_wiring_coverage.py` (new)
+- `tests/test_ddb_patterns.py` (new)
+- `ci/deprecated_secrets.txt` (new)
+- `.github/workflows/ci-cd.yml`
+- `cdk/stacks/role_policies.py`
+- `lambdas/hypothesis_engine_lambda.py`
+
+---
+
+## v3.6.6 — 2026-03-11: Fix missing shared_layer on 13 ingestion Lambdas
+
+### Problem
+All ingestion Lambdas except Garmin were missing the `life-platform-shared-utils:4` layer. This caused `from platform_logger import get_logger` to silently fall back to stdlib `logging.Logger`, which has no `set_date()` method. Every ingestion Lambda that calls `logger.set_date()` was crashing and routing to the DLQ — producing 10 DLQ messages overnight (all Todoist) and a `dlq-depth-warning` alarm.
+
+### Changes
+- **`cdk/stacks/ingestion_stack.py`** — added `shared_layer=shared_utils_layer` to all 13 ingestion Lambdas (Whoop, Notion, Withings, Habitify, Strava, JournalEnrichment, Todoist, EightSleep, ActivityEnrichment, MacroFactor, Weather, DropboxPoll, AppleHealth). Garmin already had it.
+- **Live fix applied** — layer attached to all 13 Lambdas immediately via `aws lambda update-function-configuration` (no CDK deploy needed).
+- **DLQ purged** — 10 stale Todoist failure messages cleared.
+
+### Files changed
+- `cdk/stacks/ingestion_stack.py`
+
+---
+
+## v3.6.5 — 2026-03-11: Fix canary IAM policy (AccessDeniedException on every run)
+
+### Problem
+`operational_canary()` IAM policy was read-only but the canary is a write-read-delete round-trip test. Every canary run since deployment was failing with `AccessDeniedException` on DynamoDB PutItem, S3 PutObject, and Secrets GetSecretValue. The canary was also referencing a nonexistent secret (`life-platform/mcp-api-key`). This caused the `canary-ddb-failure` and `canary-s3-failure` alarms to fire every 4 hours (ALARM + OK pairs = inbox flood).
+
+### Changes
+- **`cdk/stacks/role_policies.py`** — rewrote `operational_canary()`: DynamoDB `GetItem+Query` → `PutItem+GetItem+DeleteItem`; S3 `GetObject on dashboard/*` → `PutObject+GetObject+DeleteObject on canary/*`; Secrets `life-platform/mcp-api-key` (nonexistent) → `life-platform/ai-keys`; added `ses:SendEmail` for alert sending; added `kms:Decrypt+GenerateDataKey` for CMK-encrypted DDB table.
+- **`lambdas/canary_lambda.py`** — fixed `MCP_SECRET` default from `life-platform/api-keys` (being deleted 2026-03-17) → `life-platform/ai-keys`.
+- **`deploy/canary_policy.json`** — policy document for direct `aws iam put-role-policy` application (bypasses CDK for immediate fix).
+- **Live fix applied** — policy applied directly to `CanaryRole` via AWS CLI. Canary confirmed `ALL PASS ✅` within same session.
+
+### Files changed
+- `cdk/stacks/role_policies.py`
+- `lambdas/canary_lambda.py`
+- `deploy/canary_policy.json` (new)
+
+---
+
 ## v3.6.4 — 2026-03-12: anomaly_detector v2.4.0 — HRV log-transform + doc corrections
 
 ### Changes
