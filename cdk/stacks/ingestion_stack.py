@@ -46,6 +46,7 @@ class IngestionStack(Stack):
             handler="whoop_lambda.lambda_handler",
             schedule="cron(0 14 * * ? *)",  # 6:00 AM PT daily
             timeout_seconds=300, alarm_name="ingestion-error-whoop",
+            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_whoop(), **shared)
         # Second schedule: recovery refresh at 9:30 AM PT
         whoop_recovery = events.Rule(self, "WhoopRecoverySchedule",
@@ -71,6 +72,7 @@ class IngestionStack(Stack):
             schedule="cron(0 14 * * ? *)",
             timeout_seconds=120,
             environment={"NOTION_SECRET_NAME": "life-platform/ingestion-keys"},
+            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_notion(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 
@@ -81,6 +83,7 @@ class IngestionStack(Stack):
             handler="withings_lambda.lambda_handler",
             schedule="cron(15 14 * * ? *)",
             timeout_seconds=120, alarm_name="ingestion-error-withings",
+            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_withings(), **shared)
 
         # ── 5. Habitify — 6:15 AM PT daily
@@ -91,6 +94,7 @@ class IngestionStack(Stack):
             schedule="cron(15 14 * * ? *)",
             timeout_seconds=180,
             environment={"HABITIFY_SECRET_NAME": "life-platform/habitify"},
+            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_habitify(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 
@@ -101,6 +105,7 @@ class IngestionStack(Stack):
             handler="strava_lambda.lambda_handler",
             schedule="cron(30 14 * * ? *)",
             timeout_seconds=300, alarm_name="ingestion-error-strava",
+            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_strava(), **shared)
 
         # ── 7. Journal Enrichment — 6:30 AM PT daily
@@ -111,6 +116,7 @@ class IngestionStack(Stack):
             schedule="cron(30 14 * * ? *)",
             timeout_seconds=300,
             environment={"ANTHROPIC_SECRET": "life-platform/ai-keys"},
+            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_journal_enrichment(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 
@@ -122,6 +128,7 @@ class IngestionStack(Stack):
             schedule="cron(45 14 * * ? *)",
             timeout_seconds=120, alarm_name="ingestion-error-todoist",
             environment={"SECRET_NAME": "life-platform/ingestion-keys"},
+            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_todoist(), **shared)
 
         # ── 9. Eight Sleep — 7:00 AM PT daily
@@ -131,6 +138,7 @@ class IngestionStack(Stack):
             handler="eightsleep_lambda.lambda_handler",
             schedule="cron(0 15 * * ? *)",
             timeout_seconds=120, alarm_name="ingestion-error-eightsleep",
+            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_eightsleep(), **shared)
 
         # ── 10. Activity Enrichment — 7:30 AM PT daily
@@ -140,6 +148,7 @@ class IngestionStack(Stack):
             handler="enrichment_lambda.lambda_handler",
             schedule="cron(30 15 * * ? *)",
             timeout_seconds=300, alarm_name="ingestion-error-enrichment",
+            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_activity_enrichment(), **shared)
 
         # ── 11. MacroFactor — 8:00 AM PT daily + S3 trigger
@@ -149,6 +158,7 @@ class IngestionStack(Stack):
             handler="macrofactor_lambda.lambda_handler",
             schedule="cron(0 16 * * ? *)",
             timeout_seconds=300, alarm_name="ingestion-error-macrofactor",
+            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_macrofactor(), **shared)
         macrofactor.add_permission("S3InvokeMacrofactor",
             principal=iam.ServicePrincipal("s3.amazonaws.com"),
@@ -161,6 +171,7 @@ class IngestionStack(Stack):
             handler="weather_handler.lambda_handler",
             schedule="cron(45 13 * * ? *)",
             timeout_seconds=60,
+            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_weather(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 
@@ -172,6 +183,7 @@ class IngestionStack(Stack):
             schedule="rate(30 minutes)",
             timeout_seconds=120,
             environment={"SECRET_NAME": "life-platform/ingestion-keys"},
+            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_dropbox(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 
@@ -181,6 +193,7 @@ class IngestionStack(Stack):
             source_file="lambdas/apple_health_lambda.py",
             handler="apple_health_lambda.lambda_handler",
             timeout_seconds=300, memory_mb=512, alarm_name="ingestion-error-apple-health",
+            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_apple_health(), **shared)
         apple_health.add_permission("S3InvokeAppleHealth",
             principal=iam.ServicePrincipal("s3.amazonaws.com"),
