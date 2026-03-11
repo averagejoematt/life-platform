@@ -657,6 +657,12 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
             resources=[TABLE_ARN],
         ),
         iam.PolicyStatement(
+            sid="KMS",
+            # DDB table uses CMK — required for all GetItem/Query calls
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
             sid="S3Read",
             actions=["s3:GetObject"],
             resources=_s3("dashboard/*", "config/*"),
@@ -694,6 +700,11 @@ def operational_data_export() -> list[iam.PolicyStatement]:
             resources=[TABLE_ARN],
         ),
         iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
             sid="S3Write",
             actions=["s3:PutObject"],
             resources=_s3("exports/*"),
@@ -708,6 +719,11 @@ def operational_data_reconciliation() -> list[iam.PolicyStatement]:
             sid="DynamoDB",
             actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"],
             resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="S3Write",
