@@ -53,7 +53,7 @@ ALL_LAMBDAS = [
     "eightsleep_lambda.py", "habitify_lambda.py", "withings_lambda.py",
     "todoist_lambda.py", "notion_lambda.py", "macrofactor_lambda.py",
     "apple_health_lambda.py", "health_auto_export_lambda.py",
-    "dropbox_poll_lambda.py", "weather_lambda.py",
+    "dropbox_poll_lambda.py", "weather_handler.py",
     "enrichment_lambda.py", "journal_enrichment_lambda.py",
     # Email
     "daily_brief_lambda.py", "weekly_digest_lambda.py", "monthly_digest_lambda.py",
@@ -77,7 +77,7 @@ INGESTION_LAMBDAS = [
     "eightsleep_lambda.py", "habitify_lambda.py", "withings_lambda.py",
     "todoist_lambda.py", "notion_lambda.py", "macrofactor_lambda.py",
     "apple_health_lambda.py", "health_auto_export_lambda.py",
-    "dropbox_poll_lambda.py", "weather_lambda.py",
+    "dropbox_poll_lambda.py", "weather_handler.py",
     "enrichment_lambda.py", "journal_enrichment_lambda.py",
 ]
 

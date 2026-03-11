@@ -41,6 +41,7 @@
     "lambdas/qa_smoke_lambda.py":            { "function": "qa-smoke" },
     "lambdas/key_rotator_lambda.py":         { "function": "mcp-key-rotator" },
     "lambdas/pip_audit_lambda.py":           { "function": "pip-audit" },
+    "lambdas/failure_pattern_compute_lambda.py": { "function": "failure-pattern-compute" },
     "lambdas/brittany_email_lambda.py":      { "function": "brittany-weekly-email" }
   },
 

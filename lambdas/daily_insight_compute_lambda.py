@@ -361,7 +361,7 @@ def _get_api_key():
     if _api_key_cache:
         return _api_key_cache
     secrets_client = boto3.client("secretsmanager", region_name=_REGION)
-    secret_name = os.environ.get("ANTHROPIC_SECRET", "life-platform/api-keys")
+    secret_name = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
     resp = secrets_client.get_secret_value(SecretId=secret_name)
     _api_key_cache = json.loads(resp["SecretString"])["anthropic_api_key"]
     return _api_key_cache

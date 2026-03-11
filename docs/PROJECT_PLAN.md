@@ -571,6 +571,68 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 ---
 
+### Tier 9 — Technical Board Review #7 Action Items (added 2026-03-11)
+
+> Full 12-seat Technical Board review at v3.6.9. Platform grade: A-/B+. CI fully green. 34/35 hardening complete.
+> Review identified 30 action items across immediate hygiene, short-session improvements, medium features, larger efforts, and data-gated items.
+
+#### Immediate (< 30 min each)
+
+| # | Task | Source | Effort | Status |
+|---|------|--------|--------|--------|
+| TB7-1 | **Verify GitHub `production` Environment exists in repo settings.** If missing, CI deploys without human approval. | Yael | 2 min | 🔴 |
+| TB7-2 | **Brittany email — verify real address is set** (was cutover in v3.5.7 per changelog; handover still says pending). | Sarah | 2 min | 🔴 |
+| TB7-3 | **CDK reconcile — `cdk deploy LifePlatformIngestion LifePlatformOperational`.** Drift accumulating since March 10. | Priya | 10 min | 🔴 |
+| TB7-4 | **Final `api-keys` grep sweep before March 17 permanent deletion.** Check Python code defaults, not just string refs. | Yael | 15 min | 🔴 |
+| TB7-5 | **Verify/clean EventBridge Scheduler orphans.** `aws scheduler list-schedules --group-name life-platform`. CDK Rules are now authoritative — delete any active Scheduler schedules to prevent double-firing. | Marcus | 15 min | 🔴 |
+| TB7-6 | **Fix `weather_lambda.py` → `weather_handler.py` in `test_wiring_coverage.py`.** W1 test was silently skipping. | Elena | 5 min | ✅ v3.7.0 |
+| TB7-7 | **Add `failure_pattern_compute_lambda.py` to `lambda_map.json`.** CI never deploys it, no handler validation. | Elena | 5 min | ✅ v3.7.0 |
+| TB7-8 | **Fix CHANGELOG v3.6.3/v3.6.4 date typos** (`2026-03-12` → `2026-03-11`). | Omar | 2 min | ✅ v3.7.0 |
+
+#### Short Session (30 min – 2 hours)
+
+| # | Task | Source | Effort | Status |
+|---|------|--------|--------|--------|
+| TB7-9 | **Triage all alarms currently in ALARM state.** Suppress resolved, fix real ones. Alert fatigue risk. | Jin | 1 hr | 🔴 |
+| TB7-10 | **Set reserved concurrency=1 on all 13 ingestion Lambdas.** Prevents OAuth token race conditions during gap-fill retries. Free. | Marcus | 30 min | 🔴 |
+| TB7-11 | **Add layer version consistency CI check.** All 14 consumers must be on same layer version pre-deploy. Prevents v3.5.5 EmailStack incident recurrence. | Marcus | 1 hr | 🔴 |
+| TB7-12 | **Add stateful resource assertion to CI Plan job.** DDB table exists + PITR on + KMS key matches. Catches manual console drift. | Priya | 30 min | 🔴 |
+| TB7-13 | **Add `digest_utils.py` to `shared_layer.modules` in `lambda_map.json`.** Not getting fix-once-deploy-everywhere coverage. | Elena | 30 min | 🔴 |
+| TB7-14 | **Document TTL policy per DDB partition in SCHEMA.md.** 90d memory, 180d insights, 30d hypotheses — inconsistent, undocumented. | Omar | 30 min | 🔴 |
+| TB7-15 | **Set $5/month soft alarm on `LifePlatform/AI` CloudWatch namespace.** AI cost inflection goes unnoticed until monthly bill. | Dana | 15 min | 🔴 |
+| TB7-16 | **Add fingerprint update comment in `daily_metrics_compute_lambda.py`.** New data sources (e.g., Google Calendar) won't trigger recompute without fingerprint list update. | Omar | 5 min | 🔴 |
+| TB7-17 | **Verify DLQ `dlq-depth-warning` alarm period is ≤1 hour.** If 6-hour period, ingestion failures have 6-hour detection gap. | Jin | 10 min | 🔴 |
+
+#### Medium Session (2–6 hours)
+
+| # | Task | Source | Effort | Status |
+|---|------|--------|--------|--------|
+| TB7-18 | **Google Calendar integration.** Board rank #2, biggest remaining data gap. Demand-side intelligence (meeting load, deep work, cognitive load). | Sarah / Raj | 6-8 hr | 🔴 |
+| TB7-19 | **AI output validator: hallucinated data reference detection.** Cross-ref mentioned numbers against `health_context` dict. Most dangerous class of AI coaching error. | Anika | 3-4 hr | 🔴 |
+| TB7-20 | **Add relevance filter to `build_insights_context()` (IC-16).** Prevent progressive context token bloat as corpus grows past month 3-4. | Anika | 2-3 hr | 🔴 |
+| TB7-21 | **Raise anomaly single-day alert threshold to Z=2.0** (keep sustained tracker at current) or add Bonferroni-lite correction. ~42% daily FP rate at Z=1.75 with 13 metrics. | Henning | 2-3 hr | 🔴 |
+| TB7-22 | **Consider equalizing IC-19 slow drift detector windows** (14 vs 14 instead of 7 vs 21) or document the asymmetric choice in INTELLIGENCE_LAYER.md. | Henning | 1 hr | 🔴 |
+| TB7-23 | **Upgrade IC-3 analysis pass from Haiku to Sonnet** (or document intentional quality asymmetry between analysis and output passes). | Anika | 1 hr | 🔴 |
+
+#### Larger Effort (4+ hours, future sessions)
+
+| # | Task | Source | Effort | Status |
+|---|------|--------|--------|--------|
+| TB7-24 | **Lambda handler integration tests.** Even 1 per critical Lambda with mocked DDB/S3/SES. Catches NameErrors, missing imports, wrong field names. | Elena | 8-12 hr | 🔴 |
+| TB7-25 | **CI/CD rollback mechanism.** Publish Lambda versions, alias-based atomic deploys, rollback on smoke test failure. | Jin | 4 hr | 🔴 |
+| TB7-26 | **CloudFront + WAF rate rule on MCP Function URL.** Compromised HMAC token = unbounded DDB reads. | Yael | 1 hr + $5/mo | 🔴 |
+| TB7-27 | **MCP tool tiering system design.** Tier 1 (~30 always-registered) vs Tier 2 (on-demand). Design before SIMP-1 data arrives. | Sarah | 2-3 hr | 🔴 |
+
+#### Parked / Data-Gated
+
+| # | Task | Trigger | Status |
+|---|------|---------|--------|
+| TB7-28 | **SIMP-1 + COST-2: MCP tool usage audit and archive.** | ~2026-04-08 (30 days EMF data) | 🔴 |
+| TB7-29 | **Architecture Review #8.** Run `python3 deploy/generate_review_bundle.py` first. | ~2026-04-08 | 🔴 |
+| TB7-30 | **IC-20 Titan embeddings cost modeling.** Check if $5/mo AI alarm triggers before building. | Month 3-4 | 🔴 |
+
+---
+
 ## Architecture Notes
 
 - Single DynamoDB table: PK `USER#matthew#SOURCE#<source>`, SK `DATE#YYYY-MM-DD` (+ suffixes for journal, day_grade)
