@@ -162,7 +162,7 @@ bash deploy/deploy_lambda.sh nutrition-review
 
 ---
 
-## v3.6.0 — 2026-03-10: Board Sprint — AI-3 middleware, post-CDK smoke, env diff, architecture auto-update
+## v3.5.0a — 2026-03-10: Board Sprint — AI-3 middleware, post-CDK smoke, env diff, architecture auto-update
 
 ### Item 4: AI-3 Output Validator Middleware (closes AI grade B→A path)
 - `lambdas/ai_calls.py`: `call_anthropic()` now accepts `output_type=None, health_context=None`

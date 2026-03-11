@@ -6,7 +6,7 @@ Stack architecture:
   core        → DynamoDB, S3, SQS DLQ, SNS alerts (imported existing resources)
   ingestion   → 13 ingestion Lambdas + EventBridge rules + IAM roles
   compute     → 5 compute Lambdas + EventBridge rules
-  email       → 7 email/digest Lambdas + EventBridge rules
+  email       → 8 email/digest Lambdas + EventBridge rules
   operational → Operational Lambdas (anomaly, freshness, canary, dlq-consumer, etc.)
   mcp         → MCP Lambda + Function URLs (local + remote)
   web         → CloudFront (3 distributions) + ACM certificates
@@ -16,7 +16,12 @@ Deployment:
   cdk bootstrap aws://205930651321/us-west-2
   cdk deploy LifePlatformCore
   cdk deploy LifePlatformIngestion
-  ... etc
+  cdk deploy LifePlatformCompute
+  cdk deploy LifePlatformEmail
+  cdk deploy LifePlatformOperational
+  cdk deploy LifePlatformMcp
+  cdk deploy LifePlatformWeb         # requires us-east-1 cert ARNs
+  cdk deploy LifePlatformMonitoring
 
 To import existing resources (first time only):
   cdk import LifePlatformCore
@@ -28,7 +33,6 @@ from stacks.core_stack import CoreStack
 from stacks.ingestion_stack import IngestionStack
 from stacks.compute_stack import ComputeStack
 from stacks.email_stack import EmailStack
-# Future stacks — uncomment as implemented:
 from stacks.operational_stack import OperationalStack
 from stacks.mcp_stack import McpStack
 from stacks.web_stack import WebStack
@@ -45,7 +49,7 @@ env = cdk.Environment(account=account, region=region)
 # ── Core infrastructure (DynamoDB, S3, SQS, SNS) ──
 core = CoreStack(app, "LifePlatformCore", env=env)
 
-# ── Future stacks ──
+# ── All 8 stacks wired ──
 # Each stack receives core.table, core.bucket, core.dlq, core.alerts_topic
 # as cross-stack references.
 #
