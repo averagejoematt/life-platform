@@ -738,6 +738,35 @@ def lambda_handler(event, context):
             protein_target_g=pro_target,
         )
 
+    # P2: Dynamic journey context — panel must know stage for appropriate coaching
+    try:
+        _start = datetime.strptime(profile.get("journey_start_date", "2026-02-22"), "%Y-%m-%d").date()
+        _days_in = max(1, (datetime.now(timezone.utc).date() - _start).days + 1)
+        _week_num = max(1, (_days_in + 6) // 7)
+        _start_w = profile.get("journey_start_weight_lbs", 302)
+        _goal_w = profile.get("goal_weight_lbs", 185)
+        if _week_num <= 4:
+            _stage = "Foundation Stage"
+            _note = (f"Week {_week_num}: At {_start_w}+ lbs, caloric deficit sustainability and protein consistency "
+                     "matter more than macro fine-tuning. Do NOT apply intermediate-athlete nutrition benchmarks. "
+                     "Acknowledge adherence wins warmly — this is still the hardest phase.")
+        elif _week_num <= 12:
+            _stage = "Momentum Stage"
+            _note = f"Week {_week_num}: habit foundation established. Progressive nutrition optimization is appropriate."
+        elif _week_num <= 26:
+            _stage = "Building Stage"
+            _note = f"Week {_week_num}: protocol refinement and deficit sustainability are primary levers."
+        else:
+            _stage = "Advanced Stage"
+            _note = f"Week {_week_num}: performance nutrition coaching fully applicable."
+        journey_block = (
+            f"JOURNEY CONTEXT: Week {_week_num} ({_days_in} days in) | {_start_w}→{_goal_w} lbs | {_stage}\n"
+            f"{_note}\n"
+        )
+        user_message = journey_block + "\n" + user_message
+    except Exception as e:
+        print(f"[WARN] P2 journey context failed: {e}")
+
     # IC-16: Progressive context for nutrition insights
     if _HAS_INSIGHT_WRITER:
         try:

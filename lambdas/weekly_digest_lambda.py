@@ -800,8 +800,9 @@ BOARD_PROMPT = """You are the coordinating intelligence for Matthew's Weekly Hea
 
 CONTEXT:
 Matthew Walker, 36, Seattle. Senior Director at a SaaS company. Goal: lose ~117 lbs (302→185),
-build muscle, improve sleep and stress management. Current phase: Phase 1 Ignition (1800 cal/day,
-190g protein, 3 lbs/week target). He tracks obsessively but struggles with consistency.
+build muscle, improve sleep and stress management. He tracks obsessively but struggles with consistency.
+
+{journey_context}
 
 DAY GRADES THIS WEEK (0-100 composite of sleep, recovery, nutrition, movement, habits, hydration, journal, glucose):
 {grade_summary}
@@ -877,12 +878,43 @@ def call_haiku(data, profile, api_key):
         except Exception as e:
             print(f"[WARN] IC-16 progressive context failed: {e}")
 
+    # P2: Dynamic journey context (replaces hardcoded 'Phase 1 Ignition')
+    try:
+        _start = datetime.strptime(profile.get("journey_start_date", "2026-02-22"), "%Y-%m-%d").date()
+        _days_in = max(1, (datetime.now(timezone.utc).date() - _start).days + 1)
+        _week_num = max(1, (_days_in + 6) // 7)
+        _start_w = profile.get("journey_start_weight_lbs", 302)
+        _goal_w = profile.get("goal_weight_lbs", 185)
+        _cal = profile.get("calorie_target", 1800)
+        _pro = profile.get("protein_target_g", 190)
+        if _week_num <= 4:
+            _stage = "Foundation Stage — habit formation + consistency over intensity"
+            _coaching_note = (f"At Week {_week_num}, walks at {_start_w}+ lbs carry real cardiovascular load. "
+                              "Evaluate movement volume generously. Don't apply intermediate-athlete benchmarks.")
+        elif _week_num <= 12:
+            _stage = "Momentum Stage — progressive overload appropriate, recovery-guided intensity"
+            _coaching_note = f"Week {_week_num}: bodyweight-adjusted benchmarks apply, not absolute standards."
+        elif _week_num <= 26:
+            _stage = "Building Stage — periodization and performance metrics actionable"
+            _coaching_note = f"Week {_week_num}: protocol optimization and deficit sustainability are primary levers."
+        else:
+            _stage = "Advanced Stage — data-driven protocol refinement"
+            _coaching_note = f"Week {_week_num}: performance coaching fully applicable."
+        journey_context = (
+            f"JOURNEY STAGE: Week {_week_num} ({_days_in} days in) | {_start_w}→{_goal_w} lbs | {_stage}\n"
+            f"Current targets: {_cal} kcal/day, {_pro}g protein\n"
+            f"Week {_week_num} coaching principle: {_coaching_note}"
+        )
+    except Exception:
+        journey_context = "JOURNEY STAGE: Week 1 of transformation | 302→185 lbs"
+
     payload = json.dumps({
         "model": os.environ.get("AI_MODEL", "claude-sonnet-4-6"), "max_tokens": 1500,
         "messages": [{"role": "user", "content": BOARD_PROMPT.format(
             data_json=json.dumps(pd, indent=2, default=str),
             grade_summary=grade_summary,
-            previous_insights=previous_insights)}]
+            previous_insights=previous_insights,
+            journey_context=journey_context)}]
     }).encode()
     req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=payload,
         headers={"Content-Type": "application/json", "x-api-key": api_key,

@@ -1,5 +1,25 @@
 # Life Platform — Changelog
 
+## v3.5.8 — 2026-03-11: Prompt Intelligence Fixes (P1–P5) — audit + gap closure
+
+### Audit: P1–P5 confirmed code-complete
+- Full audit of all 5 Prompt Intelligence Fixes — all implemented in prior sessions across `ai_calls.py` and `weekly_plate_lambda.py`
+- P1 (plate memory), P2 (journey context), P3 (walk coaching rewrite), P4 (habit→outcome), P5 (TDEE context) all wired into Daily Brief AI calls
+- PROJECT_PLAN section marked ✅ Complete
+
+### Gap closure: P2 journey context extended to Weekly Digest + Nutrition Review
+- **`weekly_digest_lambda.py`**: replaced hardcoded `Phase 1 Ignition` in `BOARD_PROMPT` with dynamic `{journey_context}` placeholder; `call_haiku()` now computes week_num + stage from profile and injects it — Board advisors now know what week of the journey they're coaching
+- **`nutrition_review_lambda.py`**: dynamic journey context block prepended to user message before AI call — Norton/Patrick/Attia panel now knows Foundation Stage coaching principles apply
+- Both files: SYNTAX VERIFIED
+
+### Deploy
+```
+bash deploy/deploy_lambda.sh weekly-digest
+bash deploy/deploy_lambda.sh nutrition-review
+```
+
+---
+
 ## v3.5.7 — 2026-03-11: Brittany email production cutover complete
 
 ### Brittany Weekly Email — production cutover ✅
