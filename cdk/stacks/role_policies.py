@@ -596,17 +596,19 @@ def operational_dlq_consumer() -> list[iam.PolicyStatement]:
 
 
 def operational_canary() -> list[iam.PolicyStatement]:
-    """Canary: reads DDB + S3 + invokes MCP Lambda function URL — no write access."""
+    """Canary: write-read-delete round-trip test on DDB + S3, optional MCP check, SES alert."""
     return [
         iam.PolicyStatement(
             sid="DynamoDB",
-            actions=["dynamodb:GetItem", "dynamodb:Query"],
+            # Canary writes a synthetic record, reads it back, then deletes it
+            actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:DeleteItem"],
             resources=[TABLE_ARN],
         ),
         iam.PolicyStatement(
-            sid="S3Read",
-            actions=["s3:GetObject"],
-            resources=_s3("dashboard/*"),
+            sid="S3Canary",
+            # Canary writes to canary/ prefix, reads back, then deletes
+            actions=["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+            resources=_s3("canary/*"),
         ),
         iam.PolicyStatement(
             sid="CloudWatchMetrics",
@@ -615,8 +617,15 @@ def operational_canary() -> list[iam.PolicyStatement]:
         ),
         iam.PolicyStatement(
             sid="Secrets",
+            # MCP check needs ai-keys to get the Bearer token
             actions=["secretsmanager:GetSecretValue"],
-            resources=[_secret_arn("life-platform/mcp-api-key")],
+            resources=[_secret_arn("life-platform/ai-keys")],
+        ),
+        iam.PolicyStatement(
+            sid="SESAlert",
+            # Canary sends an SES alert email when checks fail
+            actions=["ses:SendEmail"],
+            resources=["*"],
         ),
     ]
 
