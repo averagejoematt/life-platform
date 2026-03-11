@@ -118,6 +118,14 @@ jobs:
           python3 -m pytest tests/test_shared_modules.py -v --tb=short
           echo "::endgroup::"
 
+      - name: IAM policy linter (test_role_policies.py)
+        # Validates every policy function in role_policies.py without AWS credentials.
+        # Catches missing KMS, wildcard resources, unscoped secrets, duplicate SIDs.
+        run: |
+          echo "::group::IAM policy linter"
+          python3 -m pytest tests/test_role_policies.py -v --tb=short
+          echo "::endgroup::"
+
   # ════════════════════════════════════════════════════════════════
   # Job 3: Plan — validate map, detect changes, build deploy plan
   # ════════════════════════════════════════════════════════════════
@@ -162,6 +170,57 @@ jobs:
             exit 1
           fi
           echo "✅ lambda_map.json valid — all source files present"
+
+      - name: Configure AWS credentials (OIDC) — plan
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::205930651321:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: CDK diff — detect IAM/infra drift
+        # Surfaces any gap between CDK state and what's live in AWS.
+        # Fails the build if CDK would destroy resources; warns on additions/modifications.
+        # Requires Node + CDK CLI + Python CDK venv.
+        run: |
+          echo "::group::CDK diff"
+          node --version
+          npm install -g aws-cdk --quiet
+
+          cd cdk
+          python3 -m venv .venv --quiet
+          source .venv/bin/activate
+          pip install -r requirements.txt --quiet
+
+          # Run diff across all stacks; capture output
+          set +e
+          npx cdk diff --all 2>&1 | tee /tmp/cdk_diff.txt
+          CDK_EXIT=$?
+          set -e
+
+          echo "::endgroup::"
+
+          # Flag any detected destroys as a hard failure
+          if grep -q '\[-\]\|destroy\|Destroy' /tmp/cdk_diff.txt; then
+            echo "::error::CDK diff detected resource DESTRUCTIONS — review before deploying:"
+            grep '\[-\]\|destroy\|Destroy' /tmp/cdk_diff.txt | head -20
+            exit 1
+          fi
+
+          # Surface IAM changes as a warning (not a hard block — additions are expected)
+          if grep -qi 'iam\|policy\|role\|permission' /tmp/cdk_diff.txt; then
+            echo "::warning::CDK diff detected IAM/policy changes — verify role_policies.py is up to date:"
+            grep -i 'iam\|policy\|role\|permission' /tmp/cdk_diff.txt | head -20
+          fi
+
+          # Surface inline policy drift specifically (the pattern that burned us today)
+          if grep -qi 'InlinePolicy\|inline_policy\|QaSmokeKmsAccess\|CanaryKmsAccess' /tmp/cdk_diff.txt; then
+            echo "::warning::CDK diff detected inline policy drift — a manual console fix may not be in CDK yet"
+          fi
+
+          if [ "$CDK_EXIT" -ne 0 ]; then
+            echo "::warning::cdk diff exited $CDK_EXIT (non-zero is normal when changes detected)"
+          fi
+          echo "✅ CDK diff complete"
 
       - name: Detect changes and build deploy plan
         id: plan

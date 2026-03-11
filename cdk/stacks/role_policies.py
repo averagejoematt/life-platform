@@ -557,6 +557,11 @@ def operational_freshness_checker() -> list[iam.PolicyStatement]:
             resources=[TABLE_ARN],
         ),
         iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
             sid="CloudWatchMetrics",
             actions=["cloudwatch:PutMetricData"],
             resources=["*"],
@@ -747,6 +752,11 @@ def operational_insight_email_parser() -> list[iam.PolicyStatement]:
             resources=[TABLE_ARN],
         ),
         iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
             sid="S3Read",
             actions=["s3:GetObject"],
             resources=_s3("inbound-email/*"),
@@ -771,6 +781,11 @@ def mcp_server() -> list[iam.PolicyStatement]:
             actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem",
                      "dynamodb:UpdateItem", "dynamodb:BatchGetItem"],
             resources=[TABLE_ARN, f"{TABLE_ARN}/index/*"],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
             sid="S3Read",
