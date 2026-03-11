@@ -2,13 +2,22 @@
 # MAINT-4: Automated lint → deploy → smoke test on push to main
 #
 # Architecture:
-#   1. Lint (flake8) — runs on every push, no AWS access needed
-#   2. Plan — detects changed files, maps to Lambda functions
+#   1. Lint (flake8 + py_compile syntax check) — runs on every push, no AWS access needed
+#   2. Plan — validates lambda_map.json, detects changed files, maps to Lambda functions
 #   3. Deploy — requires manual approval (GitHub Environment: production)
-#   4. Smoke test — invokes qa-smoke Lambda to verify
+#   4. Smoke test — invokes qa-smoke + canary, checks structured output
+#   5. Notify — posts to SNS on any failure
 #
 # AWS auth: OIDC federation (no long-lived keys)
 # See deploy/setup_github_oidc.sh to create the IAM provider + role
+#
+# Changes from original (v3.5.8 → v3.6.0):
+#   - Added py_compile syntax check step in Lint job
+#   - Added lambda_map.json structural validation in Plan job
+#   - Replaced sleep 10 with aws lambda wait function-updated (MCP + Lambda deploys)
+#   - Added layer version verification after shared layer rebuild
+#   - Fixed smoke test and canary to parse JSON output, not grep for "error"
+#   - Added notify-failure job that posts to SNS life-platform-alerts on any failure
 
 name: CI/CD
 
@@ -30,17 +39,18 @@ on:
 env:
   AWS_REGION: us-west-2
   LAMBDA_MAP: ci/lambda_map.json
+  SNS_TOPIC_ARN: arn:aws:sns:us-west-2:205930651321:life-platform-alerts
 
 permissions:
   id-token: write   # OIDC token for AWS
-  contents: read     # Checkout code
+  contents: read    # Checkout code
 
 jobs:
   # ════════════════════════════════════════════════════════════════
-  # Job 1: Lint
+  # Job 1: Lint + Syntax Check
   # ════════════════════════════════════════════════════════════════
   lint:
-    name: Lint (flake8)
+    name: Lint + Syntax Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -57,16 +67,36 @@ jobs:
           echo "::group::Linting lambdas/"
           flake8 lambdas/ --count --show-source --statistics || true
           echo "::endgroup::"
-          
+
           echo "::group::Linting mcp/"
           flake8 mcp/ --count --show-source --statistics || true
           echo "::endgroup::"
-          
-          # Fail on errors (E), pass on warnings (W)
+
+          # Fail on syntax errors and undefined names; pass on style warnings
           flake8 lambdas/ mcp/ --count --select=E9,F63,F7,F82 --show-source --statistics
 
+      - name: Syntax check (py_compile)
+        # Catches broken syntax that flake8 misses (e.g. invalid f-strings, truncated files)
+        run: |
+          echo "::group::Syntax checking lambdas/ and mcp/"
+          FAILED=0
+          while IFS= read -r -d '' f; do
+            if python3 -m py_compile "$f" 2>&1; then
+              echo "  ✅ $f"
+            else
+              echo "  ❌ SYNTAX ERROR: $f"
+              FAILED=$((FAILED + 1))
+            fi
+          done < <(find lambdas/ mcp/ -name '*.py' -print0)
+          echo "::endgroup::"
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::error::$FAILED file(s) failed syntax check"
+            exit 1
+          fi
+          echo "✅ All files pass syntax check"
+
   # ════════════════════════════════════════════════════════════════
-  # Job 2: Plan — detect changes, map to Lambdas
+  # Job 2: Plan — validate map, detect changes, build deploy plan
   # ════════════════════════════════════════════════════════════════
   plan:
     name: Plan deployments
@@ -82,11 +112,39 @@ jobs:
         with:
           fetch-depth: 2  # Need HEAD~1 for diff
 
+      - name: Validate lambda_map.json
+        # Catches drift where map references source files that no longer exist in the repo
+        run: |
+          echo "Validating ci/lambda_map.json..."
+          MISSING=0
+
+          echo "Checking Lambda source files..."
+          while IFS= read -r src; do
+            if [ ! -f "$src" ]; then
+              echo "  ❌ MISSING source: $src (in .lambdas — file not found in repo)"
+              MISSING=$((MISSING + 1))
+            fi
+          done < <(jq -r '.lambdas | keys[]' ci/lambda_map.json)
+
+          echo "Checking shared layer modules..."
+          while IFS= read -r mod; do
+            if [ ! -f "$mod" ]; then
+              echo "  ❌ MISSING layer module: $mod (in .shared_layer.modules — file not found)"
+              MISSING=$((MISSING + 1))
+            fi
+          done < <(jq -r '.shared_layer.modules[]' ci/lambda_map.json)
+
+          if [ "$MISSING" -gt 0 ]; then
+            echo "::error::lambda_map.json references $MISSING missing file(s). Update ci/lambda_map.json to match current repo state."
+            exit 1
+          fi
+          echo "✅ lambda_map.json valid — all source files present"
+
       - name: Detect changes and build deploy plan
         id: plan
         run: |
           set -e
-          
+
           # Get changed files
           if [ "${{ github.event.inputs.deploy_all }}" = "true" ]; then
             echo "Manual deploy-all triggered — deploying everything"
@@ -95,13 +153,12 @@ jobs:
             CHANGED=$(git diff --name-only HEAD~1 HEAD -- lambdas/ mcp/ mcp_server.py 2>/dev/null || \
                       find lambdas/ mcp/ -name '*.py' -type f)
           fi
-          
+
           echo "Changed files:"
           echo "$CHANGED" | head -50
-          
-          # Load lambda map
+
           LAMBDA_MAP_FILE="${{ env.LAMBDA_MAP }}"
-          
+
           # Check for shared layer changes
           LAYER_CHANGED="false"
           LAYER_MODULES=$(jq -r '.shared_layer.modules[]' "$LAMBDA_MAP_FILE")
@@ -113,7 +170,7 @@ jobs:
             fi
           done
           echo "layer_changed=$LAYER_CHANGED" >> "$GITHUB_OUTPUT"
-          
+
           # Check for MCP changes
           MCP_CHANGED="false"
           if echo "$CHANGED" | grep -q "^mcp/" || echo "$CHANGED" | grep -q "mcp_server.py"; then
@@ -121,10 +178,10 @@ jobs:
             echo "⚡ MCP server changed"
           fi
           echo "mcp_changed=$MCP_CHANGED" >> "$GITHUB_OUTPUT"
-          
+
           # Build deploy matrix: list of {function, source} pairs
           DEPLOYS="[]"
-          
+
           # Direct Lambda source file changes
           for file in $CHANGED; do
             FUNC=$(jq -r --arg f "$file" '.lambdas[$f].function // empty' "$LAMBDA_MAP_FILE")
@@ -132,15 +189,13 @@ jobs:
               DEPLOYS=$(echo "$DEPLOYS" | jq --arg fn "$FUNC" --arg src "$file" '. + [{"function": $fn, "source": $src}]')
             fi
           done
-          
-          # If shared layer changed, add all consumer Lambdas
+
+          # If shared layer changed, cascade to all consumer Lambdas
           if [ "$LAYER_CHANGED" = "true" ]; then
             CONSUMERS=$(jq -r '.shared_layer.consumers[]' "$LAMBDA_MAP_FILE")
             for consumer in $CONSUMERS; do
-              # Find source file for this consumer
               SRC=$(jq -r --arg fn "$consumer" '[.lambdas | to_entries[] | select(.value.function == $fn) | .key] | first // empty' "$LAMBDA_MAP_FILE")
               if [ -n "$SRC" ]; then
-                # Avoid duplicates
                 EXISTS=$(echo "$DEPLOYS" | jq --arg fn "$consumer" '[.[] | select(.function == $fn)] | length')
                 if [ "$EXISTS" = "0" ]; then
                   DEPLOYS=$(echo "$DEPLOYS" | jq --arg fn "$consumer" --arg src "$SRC" '. + [{"function": $fn, "source": $src}]')
@@ -148,19 +203,19 @@ jobs:
               fi
             done
           fi
-          
+
           # Deduplicate
           DEPLOYS=$(echo "$DEPLOYS" | jq 'unique_by(.function)')
-          
+
           COUNT=$(echo "$DEPLOYS" | jq 'length')
           echo "📋 Deploy plan: $COUNT Lambda(s)"
           echo "$DEPLOYS" | jq -r '.[] | "  → \(.function) (\(.source))"'
-          
+
           HAS_DEPLOYS="false"
           if [ "$COUNT" -gt 0 ] || [ "$MCP_CHANGED" = "true" ]; then
             HAS_DEPLOYS="true"
           fi
-          
+
           echo "has_deploys=$HAS_DEPLOYS" >> "$GITHUB_OUTPUT"
           echo "matrix=$(echo "$DEPLOYS" | jq -c '.')" >> "$GITHUB_OUTPUT"
 
@@ -172,7 +227,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: plan
     if: needs.plan.outputs.has_deploys == 'true'
-    environment: production   # ← Manual approval gate
+    environment: production   # ← Manual approval gate — verify this Environment exists in GitHub repo settings
     steps:
       - uses: actions/checkout@v4
 
@@ -188,92 +243,126 @@ jobs:
         run: |
           echo "═══ Rebuilding shared utils layer ═══"
           bash deploy/p3_build_shared_utils_layer.sh
-          
-          # Capture the new layer ARN from the script output
+
           LAYER_ARN=$(aws lambda list-layer-versions \
             --layer-name life-platform-shared-utils \
             --region ${{ env.AWS_REGION }} \
             --query 'LayerVersions[0].LayerVersionArn' \
             --output text)
-          echo "New layer: $LAYER_ARN"
-          
+          echo "New layer ARN: $LAYER_ARN"
+
           echo "Attaching to consumers..."
           bash deploy/p3_attach_shared_utils_layer.sh "$LAYER_ARN"
+
+          # Verify all consumers are now on the new layer version
+          echo ""
+          echo "Verifying layer attachment..."
+          LATEST_VER=$(aws lambda list-layer-versions \
+            --layer-name life-platform-shared-utils \
+            --region ${{ env.AWS_REGION }} \
+            --query 'LayerVersions[0].Version' --output text)
+
+          MISMATCH=0
+          while IFS= read -r consumer; do
+            # Extract version number from the LayerArn suffix (e.g. :5 → 5)
+            ATTACHED_ARN=$(aws lambda get-function-configuration \
+              --function-name "$consumer" \
+              --region ${{ env.AWS_REGION }} \
+              --query 'Layers[?contains(LayerArn, `life-platform-shared-utils`)].LayerArn | [0]' \
+              --output text 2>/dev/null)
+            ATTACHED_VER=$(echo "$ATTACHED_ARN" | awk -F: '{print $NF}')
+            if [ "$ATTACHED_VER" != "$LATEST_VER" ]; then
+              echo "  ⚠️  $consumer is on layer v${ATTACHED_VER:-unknown}, expected v$LATEST_VER"
+              MISMATCH=$((MISMATCH + 1))
+            else
+              echo "  ✅ $consumer → layer v$LATEST_VER"
+            fi
+          done < <(jq -r '.shared_layer.consumers[]' "${{ env.LAMBDA_MAP }}")
+
+          if [ "$MISMATCH" -gt 0 ]; then
+            echo "::error::$MISMATCH consumer(s) not on latest layer. Check p3_attach_shared_utils_layer.sh."
+            exit 1
+          fi
+          echo "✅ All consumers verified on layer v$LATEST_VER"
 
       # ── Deploy MCP server if needed ──
       - name: Deploy MCP server
         if: needs.plan.outputs.mcp_changed == 'true'
         run: |
           echo "═══ Deploying MCP server ═══"
-          
+
           WORK_DIR=$(mktemp -d)
-          
-          # Get handler config
+
           HANDLER=$(aws lambda get-function-configuration \
             --function-name life-platform-mcp \
             --region ${{ env.AWS_REGION }} \
             --query "Handler" --output text)
           MODULE_NAME=$(echo "$HANDLER" | cut -d'.' -f1)
-          
-          # Package: mcp_server.py + full mcp/ directory
+
+          # Package: entry point + full mcp/ directory (cd into temp dir to strip path prefix)
           cp mcp_server.py "$WORK_DIR/${MODULE_NAME}.py"
           cp -r mcp/ "$WORK_DIR/mcp/"
-          
           (cd "$WORK_DIR" && zip -r deploy.zip "${MODULE_NAME}.py" mcp/ -q)
-          
+
           aws lambda update-function-code \
             --function-name life-platform-mcp \
             --zip-file "fileb://$WORK_DIR/deploy.zip" \
             --region ${{ env.AWS_REGION }} > /dev/null
-          
+
+          # Wait for update to complete before proceeding (replaces sleep 10)
+          aws lambda wait function-updated \
+            --function-name life-platform-mcp \
+            --region ${{ env.AWS_REGION }}
+
           echo "✅ life-platform-mcp deployed"
           rm -rf "$WORK_DIR"
-          sleep 10
 
       # ── Deploy individual Lambdas ──
       - name: Deploy Lambdas
         run: |
           MATRIX='${{ needs.plan.outputs.deploy_matrix }}'
           COUNT=$(echo "$MATRIX" | jq 'length')
-          
+
           if [ "$COUNT" = "0" ]; then
             echo "No individual Lambdas to deploy"
             exit 0
           fi
-          
+
           echo "═══ Deploying $COUNT Lambda(s) ═══"
-          
+
           DEPLOYED=0
           FAILED=0
-          
+
           for row in $(echo "$MATRIX" | jq -r '.[] | @base64'); do
             FUNC=$(echo "$row" | base64 -d | jq -r '.function')
             SRC=$(echo "$row" | base64 -d | jq -r '.source')
-            
+
             echo ""
             echo "→ Deploying $FUNC from $SRC..."
-            
-            # Skip garmin (native deps — must be built separately)
+
+            # Skip Lambdas with native deps — must be built in the correct environment
             NATIVE=$(jq -r --arg f "$SRC" '.lambdas[$f].native_deps // false' "${{ env.LAMBDA_MAP }}")
             if [ "$NATIVE" = "true" ]; then
-              echo "  ⚠️ SKIPPED: $FUNC has native deps (deploy manually)"
+              echo "  ⚠️ SKIPPED: $FUNC has native deps (deploy manually with correct build env)"
               continue
             fi
-            
+
             if bash deploy/deploy_lambda.sh "$FUNC" "$SRC"; then
-              echo "  ✅ $FUNC deployed"
+              # Wait for update to complete before deploying next Lambda
+              aws lambda wait function-updated \
+                --function-name "$FUNC" \
+                --region ${{ env.AWS_REGION }}
+              echo "  ✅ $FUNC deployed and active"
               DEPLOYED=$((DEPLOYED + 1))
             else
               echo "  ❌ FAILED: $FUNC"
               FAILED=$((FAILED + 1))
             fi
-            
-            sleep 10  # Avoid ResourceConflictException
           done
-          
+
           echo ""
           echo "═══ Deploy complete: $DEPLOYED succeeded, $FAILED failed ═══"
-          
+
           if [ "$FAILED" -gt 0 ]; then
             echo "::error::$FAILED Lambda(s) failed to deploy"
             exit 1
@@ -301,18 +390,35 @@ jobs:
             --payload '{}' \
             --region ${{ env.AWS_REGION }} \
             --cli-binary-format raw-in-base64-out \
-            /tmp/smoke.json > /dev/null 2>&1
-          
+            /tmp/smoke.json
+
           echo "Smoke test result:"
-          cat /tmp/smoke.json | python3 -m json.tool 2>/dev/null || cat /tmp/smoke.json
-          
-          # Check for errors
-          if grep -qi "error" /tmp/smoke.json 2>/dev/null; then
-            echo "::warning::Smoke test returned errors — check CloudWatch"
+          python3 -m json.tool /tmp/smoke.json 2>/dev/null || cat /tmp/smoke.json
+
+          # Parse structured output — check status field, not raw string grep
+          STATUS=$(python3 -c "
+          import json, sys
+          try:
+              result = json.load(open('/tmp/smoke.json'))
+              status = result.get('status', result.get('statusCode', ''))
+              # Accept: 'ok', 'pass', 200, or absence of 'error'/'fail' in status
+              s = str(status).lower()
+              if s in ('ok', 'pass', '200') or (s and 'error' not in s and 'fail' not in s):
+                  print('PASS')
+              else:
+                  print(f'FAIL:{status}')
+          except Exception as e:
+              print(f'PARSE_ERROR:{e}')
+          ")
+
+          if [[ "$STATUS" == PASS ]]; then
+            echo "✅ Smoke test passed"
+          elif [[ "$STATUS" == PARSE_ERROR* ]]; then
+            echo "::warning::Could not parse smoke test output as JSON — check qa-smoke Lambda response format"
+          else
+            echo "::error::Smoke test reported failure: $STATUS"
+            exit 1
           fi
-          
-          echo ""
-          echo "✅ Smoke test complete"
 
       - name: Verify canary
         run: |
@@ -322,12 +428,68 @@ jobs:
             --payload '{}' \
             --region ${{ env.AWS_REGION }} \
             --cli-binary-format raw-in-base64-out \
-            /tmp/canary.json > /dev/null 2>&1
-          
-          cat /tmp/canary.json | python3 -m json.tool 2>/dev/null || cat /tmp/canary.json
-          
-          if grep -qi "error" /tmp/canary.json 2>/dev/null; then
-            echo "::error::Canary failed after deploy"
+            /tmp/canary.json
+
+          echo "Canary result:"
+          python3 -m json.tool /tmp/canary.json 2>/dev/null || cat /tmp/canary.json
+
+          # Parse structured output
+          STATUS=$(python3 -c "
+          import json, sys
+          try:
+              result = json.load(open('/tmp/canary.json'))
+              status = result.get('status', result.get('statusCode', ''))
+              s = str(status).lower()
+              if s in ('ok', 'pass', '200', 'healthy') or (s and 'error' not in s and 'fail' not in s):
+                  print('PASS')
+              else:
+                  print(f'FAIL:{status}')
+          except Exception as e:
+              print(f'PARSE_ERROR:{e}')
+          ")
+
+          if [[ "$STATUS" == PASS ]]; then
+            echo "✅ Canary healthy"
+          elif [[ "$STATUS" == PARSE_ERROR* ]]; then
+            echo "::warning::Could not parse canary output — check life-platform-canary response format"
+          else
+            echo "::error::Canary unhealthy after deploy: $STATUS — check CloudWatch logs"
             exit 1
           fi
-          echo "✅ Canary healthy"
+
+  # ════════════════════════════════════════════════════════════════
+  # Job 5: Notify on failure
+  # Runs if any upstream job fails. Posts to SNS life-platform-alerts.
+  # ════════════════════════════════════════════════════════════════
+  notify-failure:
+    name: Notify failure
+    runs-on: ubuntu-latest
+    needs: [lint, plan, deploy, smoke-test]
+    if: failure()
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::205930651321:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Post failure to SNS
+        run: |
+          COMMIT="${{ github.sha }}"
+          SHORT_COMMIT="${COMMIT:0:7}"
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          MESSAGE="CI/CD FAILURE
+          Commit: $SHORT_COMMIT (${{ github.ref_name }})
+          Run: $RUN_URL
+          Triggered by: ${{ github.actor }}
+
+          Check GitHub Actions for details."
+
+          aws sns publish \
+            --topic-arn "${{ env.SNS_TOPIC_ARN }}" \
+            --subject "Life Platform CI/CD Failed [$SHORT_COMMIT]" \
+            --message "$MESSAGE" \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✅ Failure notification sent to SNS"
