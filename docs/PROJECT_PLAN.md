@@ -269,17 +269,17 @@
 
 ---
 
-## Prompt Intelligence Fixes — Identified 2026-03-07
+## Prompt Intelligence Fixes — Identified 2026-03-07 ✅ Complete
 
-> Audit of all AI-facing prompts across the ecosystem revealed 5 concrete gaps where coaching output is canned/generic rather than compounding and personalized. These are the immediate fixes before Tier 7 intelligence compounding work begins.
+> All 5 fixes confirmed code-complete (2026-03-11 audit). P1–P5 were implemented across prior sessions. Gap audit (2026-03-11) found two additional lambdas missing P2 context — patched in v3.5.8.
 
-| # | Fix | Problem | Effort |
-|---|-----|---------|--------|
-| P1 | **Weekly Plate memory** | No stored history — AI rediscovers the same foods every week (cottage cheese problem). Fix: store each plate output to DDB, load last 4 plate summaries as context, add explicit anti-repeat instruction for Wildcard and recipes. | 2–3 hr |
-| P2 | **Journey context block** | All prompts know start/goal weight but not week number, fitness baseline, or early-stage coaching principles. A 2-week-in walker at 302 lbs being coached the same as an intermediate athlete. Fix: centralized `_build_journey_context()` function injected into all AI calls with week number, stage label, and stage-appropriate coaching principles. | 2–3 hr |
-| P3 | **Training coach — walk/early fitness rewrite** | Current prompt instructs coach to give walks "a brief NEAT acknowledgment" — written for an intermediate athlete. At Week 2 of a 117 lb journey, a 45-min walk IS the workout. Fix: week-aware, bodyweight-relative benchmarking; walking pace/distance evaluated relative to current weight and week, not absolute standards. | 1–2 hr |
-| P4 | **Habit → outcome connector** | Coach sees missed habits and metric scores in the same prompt but isn't instructed to trace the causal chain. Fix: pre-process habit completion × metric correlation before AI calls (which nights did sleep efficiency degrade when wind-down habit was missed?), inject as structured context + explicit prompt instruction to connect cause and effect. | 3–4 hr |
-| P5 | **TDEE / deficit context in nutrition** | Prompts state targets (1800 cal) but AI doesn't know estimated maintenance TDEE, so it can't reason about deficit size or intelligently flag days significantly below target as either disciplined or a logging gap. Fix: surface MacroFactor estimated TDEE in nutrition prompts, add deficit-aware protein prioritization rules for aggressive deficit days. | 1–2 hr |
+| # | Fix | Status |
+|---|-----|--------|
+| ~~P1~~ | ~~**Weekly Plate memory**~~ — `load_plate_history` + `store_plate_summary` + anti-repeat context in `weekly_plate_lambda.py` | ✅ v3.5.x |
+| ~~P2~~ | ~~**Journey context block**~~ — `_build_journey_context()` in `ai_calls.py`, wired into all 4 Daily Brief AI calls; dynamic week/stage also added to `weekly_digest_lambda.py` + `nutrition_review_lambda.py` (v3.5.8) | ✅ v3.5.8 |
+| ~~P3~~ | ~~**Training coach walk rewrite**~~ — explicit walk coaching rules in `call_training_nutrition_coach`; walks evaluated as primary sessions at Stage weight | ✅ v3.5.x |
+| ~~P4~~ | ~~**Habit → outcome connector**~~ — `_build_habit_outcome_context()` wired into BoD + TL;DR with explicit causal-chain instruction | ✅ v3.5.x |
+| ~~P5~~ | ~~**TDEE / deficit context**~~ — `_build_tdee_context()` wired into training/nutrition coach + TL;DR; flags logging gaps vs genuine restriction | ✅ v3.5.x |
 
 ---
 
