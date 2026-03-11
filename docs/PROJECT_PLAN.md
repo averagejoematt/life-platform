@@ -502,7 +502,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | # | Task | Priority | Effort | Model | Status |
 |---|------|----------|--------|-------|--------|
-| OBS-1 | **Standardize structured logging across all Lambdas.** `platform_logger.py` built and wired into `daily-brief`. Emits structured JSON with `correlation_id` field. Incremental rollout to other Lambdas ongoing. | P1 | L (6-8 hr) | Sonnet | ⚠️ Partial (daily-brief wired) |
+| OBS-1 | **Standardize structured logging across all Lambdas.** `platform_logger.py` built and wired into all 42 Lambdas across all tiers (ingestion, compute, email, operational). Emits structured JSON with `correlation_id` field. `apple_health` + `dropbox_poll` omit `set_date` by design (multi-date streaming / no date context). | P1 | L (6-8 hr) | Sonnet | ✅ v3.5.6 |
 | OBS-2 | **Create operational health CloudWatch dashboard.** `life-platform-ops`: 23 widgets, 47 alarms, KPIs, error matrix, AI tokens. | P2 | M (3-4 hr) | Sonnet | ✅ v2.99.0 |
 | OBS-3 | **Define SLOs for critical paths.** 4 SLOs defined (Daily Brief 99%, Freshness 99%, MCP 99.5%, AI 99%). 4 CW alarms + freshness metrics + ops dashboard widgets. `docs/SLOs.md`. | P3 | S (1-2 hr) | **Opus** | ✅ v3.2.0 |
 
@@ -537,7 +537,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 |---|------|----------|--------|-------|--------|
 | AI-1 | **Add health disclaimer to all AI-generated coaching.** Footer on every email. | P0 | S (1 hr) | Sonnet | ✅ v2.95.0 |
 | AI-2 | **Rename correlation tools / fix causal language in prompts.** `ai_calls.py`: causal_chain → likely_connection, TRACE THE CAUSAL CHAIN → NAME THE LIKELY CORRELATIVE PATTERN, all BoD/guidance prompts use correlative framing throughout. | P2 | S (2 hr) | Sonnet | ✅ v3.1.6 |
-| AI-3 | **Add output validation for AI coaching.** `ai_output_validator.py` built with BLOCK/WARN/PASS tiers. Wired into `daily-brief` — all 4 AI outputs validated before HTML build; blocked outputs replaced with safe fallbacks; logs as `[AI-3]`. | P1 | M (4-6 hr) | **Opus** | ⚠️ Partial (daily-brief wired) |
+| AI-3 | **Add output validation for AI coaching.** `ai_output_validator.py` built with BLOCK/WARN/PASS tiers. Wired into `daily-brief` — all 4 AI outputs validated before HTML build; blocked outputs replaced with safe fallbacks; logs as `[AI-3]`. Wired into all 8 email Lambdas (v3.5.4). | P1 | M (4-6 hr) | **Opus** | ✅ v3.5.4 |
 | AI-4 | **Validate IC hypothesis engine outputs.** v1.1.0: data completeness check, hypothesis validation (fields+domains+numeric criteria+dedup), 30-day hard expiry, verdict validation, min 7d sample, 3 confirming checks for promotion. | P2 | M (3-4 hr) | **Opus** | ✅ v3.2.0 |
 
 #### Epic: Platform Simplification
@@ -560,6 +560,8 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 |--------|-------|-------|
 | ✅ **Done** | 34 | SEC-1,2,3,4,5; IAM-1,2; REL-1,2,3,4; OBS-1,2,3; COST-1,2,3; MAINT-1,2,3,4; DATA-1,2,3; AI-1,2,3,4; SIMP-2; PROD-1; PROD-2 |
 | 🔴 **Open** | 1 | SIMP-1 (revisit ~2026-04-08 after 30 days of EMF usage data) |
+
+> OBS-1 confirmed complete 2026-03-11: full audit of all 42 Lambdas — ingestion (13), compute (4), email (8), operational (all) — all wired. AI-3 also confirmed complete across all email Lambdas (v3.5.4).
 
 **Next hardening priorities:** PROD-2 implementation (Sonnet), then PROD-1 CDK sessions.
 
