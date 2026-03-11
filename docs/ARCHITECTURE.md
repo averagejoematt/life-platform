@@ -37,7 +37,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 │  COMPUTE LAYER (IC intelligence features)                   │
 │  character-sheet-compute · adaptive-mode-compute            │
 │  daily-metrics-compute · daily-insight-compute (IC-8)       │
-│  hypothesis-engine (IC-18, Sunday 11 AM PT)                 │
+│  hypothesis-engine v1.2.0 (IC-18+IC-19 D3B, Sunday 12 PM PT)                 │
 │  compute → store → read pattern: runs before Daily Brief    │
 │                                                             │
 │  EMAIL LAYER                                                │
@@ -313,7 +313,7 @@ Cached tools: `get_aggregated_summary` (5yr + 2yr views), `get_personal_records`
 
 The IC (Intelligence Capability) system implements a compute → store → read pattern. Standalone Lambdas run before the Daily Brief, store pre-computed results to DynamoDB, and downstream consumers (Daily Brief, MCP tools) read without recomputing.
 
-**Live features:** IC-1 (anomaly detection), IC-2 (training load), IC-3 (nutrition tracking), IC-6 (CGM correlation), IC-7 (cross-pillar trade-offs, `ai_calls.py`), IC-8 (intent vs execution gap — `daily-insight-compute`, writes to `platform_memory` partition), IC-15 (insights persistence), IC-16 (progressive context), IC-17 (readiness synthesis), IC-18 (hypothesis engine), IC-19 (N=1 experiments), IC-23 (Character Sheet scoring), IC-24 (adaptive mode), IC-25 (decisions module).
+**Live features:** IC-1 (anomaly detection), IC-2 (training load), IC-3 (nutrition tracking), IC-6 (CGM correlation), IC-7 (cross-pillar trade-offs, `ai_calls.py`), IC-8 (intent vs execution gap — `daily-insight-compute`, writes to `platform_memory` partition), IC-15 (insights persistence), IC-16 (progressive context), IC-17 (readiness synthesis), IC-18 (hypothesis engine), IC-19 (N=1 experiments + IC-19 Board spec: slow drift detector, sustained anomaly tracking v2.3.0, hypothesis-experiment bridge), IC-23 (Character Sheet scoring), IC-24 (adaptive mode), IC-25 (decisions module).
 
 **Data-gated next:** IC-4 (failure patterns, ~Apr 18), IC-5 (momentum warning, ~Apr 18), IC-26 (temporal mining, ~May), IC-27 (multi-resolution handoff, ~May).
 
