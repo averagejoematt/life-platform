@@ -1,6 +1,19 @@
 """
-Anomaly Detector Lambda — v2.2.0 (Feature #18 + #23 Travel Awareness)
+Anomaly Detector Lambda — v2.3.0 (IC-19 Deliverable 2: Sustained Anomaly Tracking)
 Fires at 8:05am PT daily (16:05 UTC via EventBridge) — after enrichment, before daily brief.
+
+v2.3.0 Changes:
+  - _check_sustained_streaks(): detects metrics flagged 3+ consecutive days (same direction)
+  - Sick/travel days = streak BREAK (not just suppression)
+  - Training load covariate for HRV/RHR streaks (ATL vs CTL + recovery score joint condition)
+  - Sleep metric deduplication (keep most clinically meaningful when multiple streak together)
+  - Sustained alert email: yellow accent, softer language, behavioral interpretation frame
+  - write_anomaly_record: additive sustained_metrics + sustained_alert_sent fields
+  - Fixed duplicate sick_mode block in lambda_handler
+  - detector_version bumped to 2.3.0
+
+v2.2.0 Changes:
+  - Sick day suppression (sick_day_checker integration)
 
 v2.1.0 Changes:
   - Travel awareness: checks travel partition before alerting
@@ -22,9 +35,11 @@ Logic:
   4. Compute coefficient of variation (CV) → adaptive Z threshold
   5. Day-of-week normalization for lifestyle-variable metrics
   6. Minimum absolute change filter prevents noise on stable metrics
-  7. If 2+ flagged metrics span 2+ sources AND not traveling → multi-source anomaly
-  8. Write anomaly record to DynamoDB (always — even if no anomaly)
-  9. If multi-source anomaly and NOT traveling: Haiku hypothesis + alert email
+  7. Check sustained streaks (3+ consecutive days same metric + direction)
+  8. If 2+ flagged metrics span 2+ sources AND not traveling → multi-source anomaly
+  9. Write anomaly record to DynamoDB (always — even if no anomaly)
+  10. If multi-source anomaly and NOT traveling: Haiku hypothesis + alert email
+  11. If sustained streaks detected: separate trend alert email
 """
 
 import json
@@ -389,34 +404,295 @@ def call_haiku_hypothesis(flagged, context, api_key):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# SUSTAINED ANOMALY TRACKING  (IC-19 Deliverable 2 — Board v2 spec)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _check_sustained_streaks(yesterday_str, today_flagged):
+    """Detect metrics that have been flagged in the same direction for 3+ consecutive days.
+
+    Design rules (Board v2):
+    - Reads last 6 days of SOURCE#anomalies records.
+    - Sick OR travel days = streak BREAK (resets counter to zero). (Jin)
+    - 3+ consecutive days same metric + same direction → sustained_single_source label.
+    - HRV/RHR escalation: check yesterday's computed_metrics ATL vs CTL (Henning/Chen).
+      Use yesterday's record — timing safe (anomaly detector runs 9:05 AM, computed
+      metrics written 9:40 AM yesterday; yesterday's record is always available).
+    - If streak-read DDB query fails, Lambda must still proceed. (Jin: non-fatal wrapping)
+    - Sleep metrics: deduplicate to most clinically meaningful metric when multiple
+      sleep metrics streak simultaneously. (Park)
+
+    Args:
+        yesterday_str: YYYY-MM-DD
+        today_flagged:  list of flagged dicts from check_anomalies (today's single-day flags)
+
+    Returns:
+        list of sustained dicts:
+            {metric, label, source, direction, streak_days, severity, training_context}
+    """
+    # ── 1. Read last 6 days of anomaly records (non-fatal) ──
+    try:
+        yest_dt   = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
+        start_6d  = (yest_dt - timedelta(days=6)).isoformat()
+
+        pk = f"USER#{USER_ID}#SOURCE#anomalies"
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
+            ExpressionAttributeValues={
+                ":pk": pk,
+                ":s":  f"DATE#{start_6d}",
+                ":e":  f"DATE#{yesterday_str}",
+            },
+        )
+        history = {item["date"]: item for item in resp.get("Items", [])}
+    except Exception as e:
+        print(f"[WARN] _check_sustained_streaks: DDB read failed (non-fatal, falling back to single-day): {e}")
+        return []  # Jin: never silences primary anomaly alert
+
+    if not history:
+        return []
+
+    # ── 2. Build per-metric streak counters ──
+    # Index today's flagged by (field, direction) for lookup
+    today_by_key = {(f["field"], f["direction"]): f for f in today_flagged}
+
+    # Collect all unique (field, direction) combos seen across history + today
+    all_metric_keys = set(today_by_key.keys())
+    for day_rec in history.values():
+        for m in (day_rec.get("anomalous_metrics") or []):
+            all_metric_keys.add((m.get("field", ""), m.get("direction", "")))
+
+    sustained = []
+
+    for (field, direction) in all_metric_keys:
+        if not field or not direction:
+            continue
+
+        # Walk backwards from yesterday, counting consecutive days this (field, direction) appeared
+        streak = 0
+        candidate_label  = None
+        candidate_source = None
+
+        for i in range(7):  # up to 7 days back
+            check_date = (yest_dt - timedelta(days=i)).isoformat()
+
+            if check_date == yesterday_str:
+                # Use today's freshly-computed flagged list
+                if (field, direction) in today_by_key:
+                    streak += 1
+                    candidate_label  = today_by_key[(field, direction)]["label"]
+                    candidate_source = today_by_key[(field, direction)]["source"]
+                else:
+                    break  # not flagged today → streak ends
+                continue
+
+            day_rec = history.get(check_date)
+            if day_rec is None:
+                break  # missing record = streak break
+
+            # Sick or travel day = streak BREAK (Chen/spec)
+            if day_rec.get("sick_mode") or day_rec.get("travel_mode"):
+                break
+
+            day_flags = day_rec.get("anomalous_metrics") or []
+            match = next((f for f in day_flags
+                          if f.get("field") == field and f.get("direction") == direction), None)
+            if match:
+                streak += 1
+                if not candidate_label:
+                    candidate_label  = match.get("label", field)
+                    candidate_source = match.get("source", "")
+            else:
+                break  # streak ends
+
+        if streak < 3:
+            continue  # not sustained yet
+
+        # ── 3. Training load covariate for HRV / RHR streaks (Chen/Henning) ──
+        training_context = None
+        if field in ("hrv", "resting_heart_rate") and direction in ("low", "high"):
+            try:
+                yesterday_computed = table.get_item(
+                    Key={
+                        "pk": f"USER#{USER_ID}#SOURCE#computed_metrics",
+                        "sk": f"DATE#{yesterday_str}",
+                    }
+                ).get("Item", {})
+                atl = float(yesterday_computed.get("atl") or 0)
+                ctl = float(yesterday_computed.get("ctl") or 0)
+                recovery = float(yesterday_computed.get("recovery_score") or 0)
+
+                if atl > ctl and recovery < 60:
+                    # Overreaching signature — flag but still send alert (Chen)
+                    training_context = (
+                        f"Training load context: ATL ({atl:.0f}) > CTL ({ctl:.0f}) "
+                        f"with low recovery ({recovery:.0f}). This pattern may reflect "
+                        f"acute overreaching rather than an independent health signal — "
+                        f"monitor and consider reducing load if it persists."
+                    )
+                elif atl > ctl and recovery >= 65:
+                    # Adapting under load — soften alert framing (Chen)
+                    training_context = (
+                        f"Training load context: ATL ({atl:.0f}) > CTL ({ctl:.0f}) "
+                        f"but recovery is holding ({recovery:.0f}). This may reflect "
+                        f"normal adaptation under current training load rather than "
+                        f"an independent health concern."
+                    )
+            except Exception as e:
+                print(f"[WARN] Training covariate check failed (non-fatal): {e}")
+
+        sustained.append({
+            "metric":           field,
+            "label":            candidate_label or field,
+            "source":           candidate_source or "",
+            "direction":        direction,
+            "streak_days":      streak,
+            "severity":         "sustained_single_source",
+            "training_context": training_context,
+        })
+
+    # ── 4. Park: deduplicate sleep metrics — keep most clinically meaningful ──
+    sleep_fields = {"sleep_efficiency_percentage", "sleep_score", "sleep_performance"}
+    sleep_hits = [s for s in sustained if s["metric"] in sleep_fields]
+    if len(sleep_hits) > 1:
+        # sleep_efficiency_percentage is most clinically meaningful; keep it, drop others
+        priority_field = "sleep_efficiency_percentage"
+        keep = next((s for s in sleep_hits if s["metric"] == priority_field), sleep_hits[0])
+        sustained = [s for s in sustained if s["metric"] not in sleep_fields or s is keep]
+
+    return sustained
+
+
+def build_sustained_alert_html(sustained_list, date_str):
+    """Build HTML email for sustained anomaly alerts.
+
+    Design: yellow accent, softer language. No 'WARNING'. (Board v2)
+    Rodriguez: alert copy must include a behavioral interpretation frame.
+    """
+    try:
+        dt        = datetime.strptime(date_str, "%Y-%m-%d")
+        day_label = dt.strftime("%A, %b %-d")
+    except Exception:
+        day_label = date_str
+
+    rows = []
+    for s in sustained_list:
+        direction_word = "below" if s["direction"] == "low" else "above"
+        tc_html = ""
+        if s.get("training_context"):
+            tc_html = (f'<p style="color:#92400e;font-size:13px;margin:6px 0 0 0;">'
+                       f'<em>{s["training_context"]}</em></p>')
+        rows.append(f"""
+        <tr>
+          <td style="padding:12px 16px;border-bottom:1px solid #fef3c7;">
+            <strong style="color:#1f2937;">{s["label"]}</strong><br>
+            <span style="color:#6b7280;font-size:13px;">
+              Flagged {s["direction"]} for <strong>{s["streak_days"]} consecutive days</strong>
+              ({direction_word} baseline)
+            </span>
+            {tc_html}
+          </td>
+        </tr>""")
+
+    return f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family:system-ui,sans-serif;background:#fffbeb;margin:0;padding:24px;">
+  <div style="max-width:600px;margin:0 auto;background:white;border-radius:12px;
+              border:2px solid #f59e0b;overflow:hidden;">
+
+    <!-- Header -->
+    <div style="background:#f59e0b;padding:20px 24px;">
+      <h2 style="margin:0;color:white;font-size:18px;">
+        📊 Trend Alert — {day_label}
+      </h2>
+      <p style="margin:6px 0 0;color:#fffbeb;font-size:14px;">
+        {len(sustained_list)} metric{"s" if len(sustained_list) > 1 else ""} flagged
+        across multiple consecutive days
+      </p>
+    </div>
+
+    <!-- Metrics table -->
+    <table style="width:100%;border-collapse:collapse;">
+      {"".join(rows)}
+    </table>
+
+    <!-- Behavioral frame (Rodriguez: mandatory) -->
+    <div style="padding:16px 24px;background:#fef9f0;border-top:1px solid #fef3c7;">
+      <p style="margin:0;color:#78350f;font-size:14px;line-height:1.5;">
+        <strong>Before adjusting anything:</strong> check whether your training load,
+        recent sleep window, or any life stressors account for this pattern. A streak
+        doesn't always mean something is wrong — it means a pattern is worth noticing.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:12px 24px;background:#f9fafb;border-top:1px solid #f3f4f6;">
+      <p style="margin:0;color:#9ca3af;font-size:12px;">
+        Sustained anomaly detection · Life Platform · {date_str}
+      </p>
+    </div>
+  </div>
+</body>
+</html>"""
+
+
+def send_sustained_alert_email(sustained_list, date_str):
+    """Send sustained anomaly trend alert email."""
+    metrics_summary = ", ".join(s["label"] for s in sustained_list[:3])
+    if len(sustained_list) > 3:
+        metrics_summary += f" +{len(sustained_list) - 3} more"
+
+    subject = f"Trend Alert — {metrics_summary} elevated {sustained_list[0]['streak_days']} consecutive days"
+    html    = build_sustained_alert_html(sustained_list, date_str)
+
+    ses.send_email(
+        FromEmailAddress=SENDER,
+        Destination={"ToAddresses": [RECIPIENT]},
+        Content={
+            "Simple": {
+                "Subject": {"Data": subject, "Charset": "UTF-8"},
+                "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
+            }
+        },
+    )
+    print(f"[INFO] Sustained alert email sent: {subject}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # DYNAMODB WRITE
 # ══════════════════════════════════════════════════════════════════════════════
 
 def write_anomaly_record(date_str, flagged, alert_sent, hypothesis, severity,
                          travel_mode=False, travel_dest=None,
-                         sick_mode=False, sick_reason=None):
+                         sick_mode=False, sick_reason=None,
+                         sustained_metrics=None, sustained_alert_sent=False):
+    """Write anomaly record. Additive sustained_metrics field — no schema breakage. (Jin/Omar)"""
     item = {
-        "pk":               f"USER#{USER_ID}#SOURCE#anomalies",
-        "sk":               f"DATE#{date_str}",
-        "date":             date_str,
-        "anomalous_metrics": flagged,
-        "source_count":     len(set(f["source"] for f in flagged)),
-        "alert_sent":       alert_sent,
-        "hypothesis":       hypothesis,
-        "severity":         severity,
-        "travel_mode":      travel_mode,
-        "travel_destination": travel_dest,
-        "sick_mode":        sick_mode,
-        "sick_reason":      sick_reason,
-        "sick_mode":        sick_mode,
-        "sick_reason":      sick_reason,
-        "detector_version": "2.2.0",
-        "updated_at":       datetime.now(timezone.utc).isoformat(),
+        "pk":                    f"USER#{USER_ID}#SOURCE#anomalies",
+        "sk":                    f"DATE#{date_str}",
+        "date":                  date_str,
+        "anomalous_metrics":     flagged,
+        "source_count":          len(set(f["source"] for f in flagged)),
+        "alert_sent":            alert_sent,
+        "hypothesis":            hypothesis,
+        "severity":              severity,
+        "travel_mode":           travel_mode,
+        "travel_destination":    travel_dest,
+        "sick_mode":             sick_mode,
+        "sick_reason":           sick_reason,
+        "detector_version":      "2.3.0",
+        "updated_at":            datetime.now(timezone.utc).isoformat(),
     }
+    # Sustained streak fields — additive, harmless if absent (IC-19 Deliverable 2)
+    if sustained_metrics:
+        item["sustained_metrics"] = sustained_metrics
+    if sustained_alert_sent:
+        item["sustained_alert_sent"] = True
     item = json.loads(json.dumps(item), parse_float=Decimal)
     table.put_item(Item=item)
     print(f"[INFO] Anomaly record written: date={date_str} severity={severity} "
-          f"metrics={len(flagged)} sources={item['source_count']}")
+          f"metrics={len(flagged)} sources={item['source_count']} "
+          f"sustained={len(sustained_metrics or [])} sustained_alerted={sustained_alert_sent}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -488,7 +764,7 @@ def build_alert_html(flagged, hypothesis, date_str):
     </div>
     <div style="background:#f8f8fc;padding:12px 24px;border-top:1px solid #e8e8f0;">
       <p style="color:#9ca3af;font-size:10px;margin:0;text-align:center;">
-        Life Platform - Anomaly Detector v2.1.0 - Adaptive thresholds (CV-based) - 2+ source rule - Travel aware
+        Life Platform - Anomaly Detector v2.3.0 - Adaptive thresholds (CV-based) - 2+ source rule - Travel aware - Sustained tracking
       </p>
       <p style="color:#b0b0b0;font-size:8px;margin:4px 0 0;text-align:center;">&#9874;&#65039; Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your health regimen.</p>
     </div>
@@ -524,7 +800,7 @@ def send_alert_email(flagged, hypothesis, date_str):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def lambda_handler(event, context):
-    print("[INFO] Anomaly Detector v2.1.0 starting (adaptive thresholds + travel awareness)...")
+    print("[INFO] Anomaly Detector v2.3.0 starting (adaptive thresholds + travel + sustained tracking)...")
 
     today     = datetime.now(timezone.utc).date()
     yesterday = (today - timedelta(days=1)).isoformat()
@@ -548,17 +824,6 @@ def lambda_handler(event, context):
     if sick_mode:
         print(f"[INFO] SICK MODE: {sick_reason} -- anomaly alerts will be suppressed")
 
-    # ── Sick day check (v2.2.0) ──
-    try:
-        from sick_day_checker import check_sick_day as _check_sick_anomaly
-        _sick_rec_anomaly = _check_sick_anomaly(table, USER_ID, yesterday)
-    except ImportError:
-        _sick_rec_anomaly = None
-    sick_mode   = _sick_rec_anomaly is not None
-    sick_reason = (_sick_rec_anomaly or {}).get("reason") or "sick day"
-    if sick_mode:
-        print(f"[INFO] SICK MODE: {sick_reason} -- anomaly alerts will be suppressed")
-
     flagged = check_anomalies(yesterday, today)
     print(f"[INFO] Flagged metrics: {len(flagged)}")
     for m in flagged:
@@ -566,12 +831,24 @@ def lambda_handler(event, context):
               f"(Z={m['z_score']}, threshold={m.get('z_threshold')}, "
               f"CV={m.get('cv')}, baseline={m.get('baseline_type')}, {m['direction']})")
 
+    # ── Sustained streak detection (IC-19 Deliverable 2 — non-fatal) ──
+    sustained_metrics    = []
+    sustained_alert_sent = False
+    if not travel_mode and not sick_mode:
+        try:
+            sustained_metrics = _check_sustained_streaks(yesterday, flagged)
+            if sustained_metrics:
+                print(f"[INFO] Sustained streaks: {len(sustained_metrics)} metric(s): "
+                      f"{[s['label'] for s in sustained_metrics]}")
+        except Exception as e:
+            print(f"[WARN] _check_sustained_streaks failed (non-fatal): {e}")
+
     multi = is_multi_source(flagged)
     alert_sent  = False
     hypothesis  = ""
     severity    = "none"
 
-    if multi and not travel_mode:
+    if multi and not travel_mode and not sick_mode:
         source_count = len(set(f["source"] for f in flagged))
         severity = "high" if len(flagged) >= 4 else "moderate"
         print(f"[INFO] Multi-source anomaly -- {len(flagged)} metrics across {source_count} sources. Severity: {severity}")
@@ -619,34 +896,35 @@ def lambda_handler(event, context):
         print(f"[INFO] Sick mode -- {len(flagged)} metrics flagged across "
               f"{source_count} sources, alert SUPPRESSED")
 
-    elif multi and sick_mode:
-        source_count = len(set(f["source"] for f in flagged))
-        severity = "sick_suppressed"
-        hypothesis = (
-            f"[SICK DAY] {sick_reason}. Missing data and biometric drops are expected "
-            "during illness — recovery score, HRV, habits, and nutrition will all look "
-            "off. Anomaly alerts suppressed. Rest and recover."
-        )
-        print(f"[INFO] Sick mode -- {len(flagged)} metrics flagged across "
-              f"{source_count} sources, alert SUPPRESSED")
-
     else:
         print("[INFO] No multi-source anomaly -- no alert sent.")
 
+    # ── Send sustained alert if streaks detected (separate from primary alert) ──
+    if sustained_metrics and not travel_mode and not sick_mode:
+        try:
+            send_sustained_alert_email(sustained_metrics, yesterday)
+            sustained_alert_sent = True
+        except Exception as e:
+            print(f"[ERROR] Sustained alert email failed (non-fatal): {e}")
+
     write_anomaly_record(yesterday, flagged, alert_sent, hypothesis, severity,
                          travel_mode=travel_mode, travel_dest=travel_dest,
-                         sick_mode=sick_mode, sick_reason=sick_reason if sick_mode else None)
+                         sick_mode=sick_mode, sick_reason=sick_reason if sick_mode else None,
+                         sustained_metrics=sustained_metrics,
+                         sustained_alert_sent=sustained_alert_sent)
 
     return {
         "statusCode": 200,
         "body": json.dumps({
-            "date": yesterday,
-            "flagged_count": len(flagged),
-            "multi_source": multi,
-            "severity": severity,
-            "alert_sent": alert_sent,
-            "travel_mode": travel_mode,
-            "travel_destination": travel_dest,
-            "detector_version": "2.2.0",
+            "date":                yesterday,
+            "flagged_count":       len(flagged),
+            "multi_source":        multi,
+            "severity":            severity,
+            "alert_sent":          alert_sent,
+            "travel_mode":         travel_mode,
+            "travel_destination":  travel_dest,
+            "sustained_count":     len(sustained_metrics),
+            "sustained_alert_sent": sustained_alert_sent,
+            "detector_version":    "2.3.0",
         })
     }

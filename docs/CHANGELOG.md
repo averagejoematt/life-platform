@@ -1,5 +1,41 @@
 # Life Platform — Changelog
 
+## v3.5.2 — 2026-03-11: IC-19 complete — slow drift, sustained anomalies, hypothesis-experiment bridge
+
+### IC-19 Deliverable 1 — Slow Drift Detector (`daily_insight_compute_lambda.py` IC-2 v1.2.0)
+- `_compute_slow_drift()`: non-overlapping windows (recent=days 1–7, baseline=days 8–28), N≥14 gate (Henning)
+- Weight plateau: regression slope on ≥8 measurements, slope>-0.2 lbs/week (Attia)
+- MacroFactor TDEE primary, Apple Watch fallback, surfaces which source used (Webb/Norton)
+- `_build_prioritized_context_block()`: pure function, 700-token budget, P1–P11 priority queue (Sarah/Elena/Priya)
+- Social quality flag when multiple drift + sparse journal (Murthy)
+- Fixed unicode syntax error: `\u{...}` → `\U000...` (two occurrences)
+
+### IC-19 Deliverable 2 — Sustained Anomaly Tracking (`anomaly_detector_lambda.py` v2.3.0)
+- `_check_sustained_streaks()`: reads 6 days of `SOURCE#anomalies`, counts consecutive days same metric+direction
+- Sick/travel days = streak BREAK (Jin); 3+ consecutive days → `sustained_single_source` severity
+- Training load covariate: ATL>CTL + recovery<60 → overreaching note; ATL>CTL + recovery≥65 → soften framing (Chen/Henning)
+- Sleep metric deduplication: keeps `sleep_efficiency_percentage` (Park)
+- `build_sustained_alert_html()`: yellow accent, softer language, behavioral interpretation frame (Rodriguez)
+- `send_sustained_alert_email()`: subject `"Trend Alert — [Metric] elevated [N] consecutive days"`
+- `write_anomaly_record()`: additive `sustained_metrics` + `sustained_alert_sent` fields (Jin/Omar)
+
+### IC-19 Deliverable 3 — Hypothesis-Experiment Bridge
+- `mcp/tools_lifestyle.py`: `_cohens_d()` helper (pooled SD, None propagation, no size labels — Henning/Yael)
+- `tool_get_experiment_results()`: adds `effect_size` (Cohen's d + CI label) and `consistency_score` (% during-days above before-mean)
+- Board coaching replaced Ferriss/Huberman with Attia/Okafor/Norton/Chen; domain-specific duration warning (Norton adaptation noise)
+- `_build_experiment_context()` in `daily_insight_compute_lambda.py`: early return if no experiments (Raj), supplement adherence (Patrick), intervention framing for negative psych variables (Conti)
+- `hypothesis_engine_lambda.py` v1.2.0 (IC-19 D3B):
+  - `HYPOTHESIS_SYSTEM_PROMPT`: Conti framing rule — negative psychological variable hypotheses must use intervention framing, not baseline labelling
+  - `load_active_experiments()`: queries active N=1 experiments for cross-reference
+  - `check_pending_hypotheses()`: injects matching experiment context into each hypothesis check prompt (Henning: small N, correlative framing)
+  - `write_hypothesis_context_to_memory()`: confirmed hypotheses now emit `[EXPERIMENT SUGGESTED]` line with actionable next step
+- All 19 IC-19 board conditions fulfilled
+
+### Deploy script
+- `deploy/deploy_ic19.sh`: deploys anomaly-detector, daily-insight-compute, hypothesis-engine sequentially
+
+---
+
 ## v3.5.1 — 2026-03-11: Secrets hygiene, Brittany email deploy, CDK deploy, sick day
 
 ### Secrets
