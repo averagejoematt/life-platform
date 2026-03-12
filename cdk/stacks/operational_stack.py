@@ -49,7 +49,7 @@ class OperationalStack(Stack):
         freshness = create_platform_lambda(self, "FreshnessChecker",
             function_name="life-platform-freshness-checker",
             source_file="lambdas/freshness_checker_lambda.py",
-            handler="lambda_function.lambda_handler",
+            handler="freshness_checker_lambda.lambda_handler",
             schedule="cron(45 16 * * ? *)",
             timeout_seconds=30, memory_mb=128,
             environment={
@@ -116,7 +116,7 @@ class OperationalStack(Stack):
         key_rotator = create_platform_lambda(self, "KeyRotator",
             function_name="life-platform-key-rotator",
             source_file="lambdas/key_rotator_lambda.py",
-            handler="lambda_function.lambda_handler",
+            handler="key_rotator_lambda.lambda_handler",
             timeout_seconds=30, memory_mb=128,
             alarm_name="key-rotator-errors",
             custom_policies=rp.operational_key_rotator(),
@@ -154,7 +154,7 @@ class OperationalStack(Stack):
         insight_parser = create_platform_lambda(self, "InsightEmailParser",
             function_name="insight-email-parser",
             source_file="lambdas/insight_email_parser_lambda.py",
-            handler="lambda_function.lambda_handler",
+            handler="insight_email_parser_lambda.lambda_handler",
             timeout_seconds=30, memory_mb=128,
             environment={
                 "ALLOWED_SENDERS": "awsdev@mattsusername.com,mattsthrowaway@protonmail.com",

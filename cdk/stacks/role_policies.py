@@ -188,6 +188,7 @@ def ingestion_todoist() -> list[iam.PolicyStatement]:
     return _ingestion_base(
         "todoist",
         secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
+        s3_prefix="raw/todoist/*",  # NOTE: no matthew/ prefix — Lambda writes to raw/todoist/ directly
     )
 
 

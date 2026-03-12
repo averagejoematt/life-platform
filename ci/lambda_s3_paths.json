@@ -1,0 +1,29 @@
+{
+  "_comment": "S3 write path manifest — cross-checks CDK IAM policies against actual Lambda writes.",
+  "_convention": "Default pattern is raw/matthew/{source}/* — only non-convention paths need entries here.",
+  "_how_to_use": "Run tests/test_cdk_s3_paths.py. Add an entry when a Lambda deviates from convention.",
+  "_last_updated": "2026-03-12 (added todoist + dropbox exceptions)",
+
+  "exceptions": {
+    "todoist": {
+      "expected_prefix": "raw/todoist/",
+      "iam_prefix": "raw/todoist/*",
+      "reason": "Todoist Lambda was built before the raw/{USER_ID}/ convention — writes to raw/todoist/ directly",
+      "lambda_file": "lambdas/todoist_lambda.py",
+      "evidence": "lambdas/todoist_lambda.py: key = f\"raw/todoist/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json\""
+    },
+    "dropbox": {
+      "expected_prefix": "uploads/macrofactor/",
+      "iam_prefix": "uploads/macrofactor/*",
+      "reason": "Dropbox poll Lambda reads MacroFactor CSV uploads from S3 uploads/ prefix — it's a trigger path, not a raw ingest path",
+      "lambda_file": "lambdas/dropbox_poll_lambda.py",
+      "evidence": "lambdas/dropbox_poll_lambda.py: s3_key = f\"uploads/macrofactor/{filename}\""
+    }
+  },
+
+  "convention": {
+    "default_prefix_template": "raw/matthew/{source}/",
+    "default_iam_template": "raw/matthew/{source}/*",
+    "user_id": "matthew"
+  }
+}

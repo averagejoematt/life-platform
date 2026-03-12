@@ -126,6 +126,27 @@ jobs:
           python3 -m pytest tests/test_role_policies.py -v --tb=short
           echo "::endgroup::"
 
+      - name: CDK handler consistency linter (test_cdk_handler_consistency.py)
+        # Validates every handler= in CDK stacks matches its source_file= basename.
+        # Catches the 2026-03-12 P0 bug class: handler='lambda_function.lambda_handler'
+        # when the actual file is 'freshness_checker_lambda.py'.
+        # Also hard-fails if any handler='lambda_function.lambda_handler' is found.
+        run: |
+          echo "::group::CDK handler consistency linter"
+          python3 -m pytest tests/test_cdk_handler_consistency.py -v --tb=short
+          echo "::endgroup::"
+
+      - name: CDK S3 path linter (test_cdk_s3_paths.py)
+        # Validates IAM S3 write paths in role_policies.py match actual Lambda write paths.
+        # Exceptions (deviations from raw/matthew/{source}/* convention) must be
+        # documented in ci/lambda_s3_paths.json with evidence from the Lambda source.
+        # Catches the 2026-03-12 P0 bug: todoist IAM used raw/matthew/todoist/* but
+        # Lambda writes to raw/todoist/* (no matthew/ prefix).
+        run: |
+          echo "::group::CDK S3 path linter"
+          python3 -m pytest tests/test_cdk_s3_paths.py -v --tb=short
+          echo "::endgroup::"
+
       - name: Safety module wiring linter (test_wiring_coverage.py)
         # Validates platform_logger / ingestion_validator / ai_output_validator are
         # wired across all Lambdas. Catches 'built but not wired' gaps (highest hardening risk).
