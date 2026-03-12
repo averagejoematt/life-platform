@@ -273,6 +273,100 @@ jobs:
           fi
           echo "✅ CDK diff complete"
 
+      - name: Assert stateful resources exist
+        # TB7-12: Verify key stateful AWS resources are present before any deploy.
+        # Guards against wrong-account or wrong-region deploys silently targeting nothing.
+        run: |
+          FAILED=0
+
+          echo "Checking DynamoDB table: life-platform"
+          if aws dynamodb describe-table --table-name life-platform \
+               --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+            echo "  ✅ DynamoDB: life-platform"
+          else
+            echo "  ❌ DynamoDB table 'life-platform' not found — wrong account or region?"
+            FAILED=$((FAILED + 1))
+          fi
+
+          echo "Checking S3 bucket: matthew-life-platform"
+          if aws s3api head-bucket --bucket matthew-life-platform 2>/dev/null; then
+            echo "  ✅ S3: matthew-life-platform"
+          else
+            echo "  ❌ S3 bucket 'matthew-life-platform' not found"
+            FAILED=$((FAILED + 1))
+          fi
+
+          echo "Checking SNS topic: life-platform-alerts"
+          if aws sns get-topic-attributes \
+               --topic-arn "arn:aws:sns:us-west-2:205930651321:life-platform-alerts" \
+               --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+            echo "  ✅ SNS: life-platform-alerts"
+          else
+            echo "  ❌ SNS topic 'life-platform-alerts' not found"
+            FAILED=$((FAILED + 1))
+          fi
+
+          echo "Checking KMS key: alias/life-platform-dynamodb"
+          if aws kms describe-key --key-id alias/life-platform-dynamodb \
+               --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+            echo "  ✅ KMS: alias/life-platform-dynamodb"
+          else
+            echo "  ❌ KMS key 'alias/life-platform-dynamodb' not found"
+            FAILED=$((FAILED + 1))
+          fi
+
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::error::$FAILED stateful resource(s) missing — wrong account or region? (account=205930651321 region=us-west-2)"
+            exit 1
+          fi
+          echo "✅ All stateful resources verified"
+
+      - name: Verify layer version consistency
+        # TB7-11: Confirm every shared-layer consumer is on the current layer version.
+        # Catches the 'stale consumer' state that occurs after a layer rebuild that
+        # wasn't fully propagated — before that state reaches production.
+        run: |
+          LAYER_NAME="life-platform-shared-utils"
+
+          LATEST_VER=$(aws lambda list-layer-versions \
+            --layer-name "$LAYER_NAME" \
+            --region ${{ env.AWS_REGION }} \
+            --query 'LayerVersions[0].Version' --output text 2>/dev/null)
+
+          if [ -z "$LATEST_VER" ] || [ "$LATEST_VER" = "None" ]; then
+            echo "::warning::Layer '$LAYER_NAME' not found in AWS — skipping consistency check (first deploy?)"
+            exit 0
+          fi
+          echo "Latest layer version: v$LATEST_VER"
+
+          MISMATCH=0
+          while IFS= read -r consumer; do
+            ATTACHED_ARN=$(aws lambda get-function-configuration \
+              --function-name "$consumer" \
+              --region ${{ env.AWS_REGION }} \
+              --query "Layers[?contains(LayerArn, '$LAYER_NAME')].LayerArn | [0]" \
+              --output text 2>/dev/null || echo "")
+
+            if [ -z "$ATTACHED_ARN" ] || [ "$ATTACHED_ARN" = "None" ]; then
+              echo "  ⚠️  $consumer: no $LAYER_NAME layer attached"
+              MISMATCH=$((MISMATCH + 1))
+            else
+              ATTACHED_VER=$(echo "$ATTACHED_ARN" | awk -F: '{print $NF}')
+              if [ "$ATTACHED_VER" != "$LATEST_VER" ]; then
+                echo "  ❌ $consumer: layer v$ATTACHED_VER (latest is v$LATEST_VER)"
+                MISMATCH=$((MISMATCH + 1))
+              else
+                echo "  ✅ $consumer: layer v$LATEST_VER"
+              fi
+            fi
+          done < <(jq -r '.shared_layer.consumers[]' "${{ env.LAMBDA_MAP }}")
+
+          if [ "$MISMATCH" -gt 0 ]; then
+            echo "::error::$MISMATCH consumer(s) not on layer v$LATEST_VER — run deploy/build_layer.sh + attach to fix"
+            exit 1
+          fi
+          echo "✅ All shared-layer consumers on v$LATEST_VER"
+
       - name: Validate handler function names
         # Checks that every Lambda source file in lambda_map.json defines
         # a function named lambda_handler. Catches handler renames before deploy.

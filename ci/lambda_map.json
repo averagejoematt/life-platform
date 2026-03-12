@@ -1,6 +1,6 @@
 {
   "_comment": "Lambda source file → AWS function name mapping for CI/CD. Used by .github/workflows/ci-cd.yml",
-  "_updated": "2026-03-11 v3.6.0",
+  "_updated": "2026-03-11 v3.7.3",
 
   "lambdas": {
     "lambdas/strava_lambda.py":              { "function": "strava-data-ingestion" },
@@ -69,7 +69,8 @@
       "lambdas/platform_logger.py",
       "lambdas/ingestion_framework.py",
       "lambdas/ingestion_validator.py",
-      "lambdas/item_size_guard.py"
+      "lambdas/item_size_guard.py",
+      "lambdas/digest_utils.py"
     ],
     "consumers": [
       "daily-brief", "weekly-digest", "monthly-digest",
@@ -85,7 +86,8 @@
     "files": [
       "lambdas/ingestion_validator.py",
       "lambdas/item_size_guard.py",
-      "lambdas/sick_day_checker.py"
+      "lambdas/sick_day_checker.py",
+      "lambdas/digest_utils.py"
     ]
   }
 }

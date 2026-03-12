@@ -1276,6 +1276,21 @@ Claude tools
 
 ---
 
+## TTL Policy
+
+DynamoDB TTL is enabled on the `life-platform` table using the `ttl` attribute. Only one partition uses TTL; all others retain data indefinitely.
+
+| Partition | TTL? | TTL field | Retention | Notes |
+|-----------|------|-----------|-----------|-------|
+| `CACHE#matthew` | ✅ Yes | `ttl` | 26 hours | Written by MCP warmer at 03:00 UTC nightly. Items auto-expire ~26h after write. Avoids stale cache items surviving past the next warm cycle. |
+| All other partitions | ❌ No | — | Indefinite | Raw ingestion data, day grades, character sheet, computed metrics, insights, decisions, hypotheses, travel, anomalies, platform memory, supplements, journal — all retained permanently for trend analysis. |
+
+**How TTL is set:** The `store_cache` function in `mcp_server.py` sets `ttl = int(time.time()) + 93600` (26 hours in seconds). DynamoDB background deletion occurs within ~48 hours of expiry — expired items may still be returned briefly before deletion, so MCP tools should check `ttl` against `time.time()` if freshness is critical.
+
+**Adding TTL to new partitions:** Set `ttl` to a Unix epoch integer on any item you want auto-expired. No schema migration required — DynamoDB TTL operates on a per-item basis.
+
+---
+
 ## Aggregation Behavior
 
 The MCP server automatically switches from raw daily records to monthly aggregates when a requested date window exceeds 90 days (`RAW_DAY_LIMIT = 90`). This keeps response payloads manageable and costs low.
