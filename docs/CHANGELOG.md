@@ -1,5 +1,34 @@
 # Life Platform — Changelog
 
+## v3.7.2 — 2026-03-11: TB7-5 Scheduler orphan cleanup + TB7-9 alarm triage
+
+### Summary
+Eliminated 8 pre-CDK EventBridge Scheduler orphans that were double-firing alongside
+CDK-managed EventBridge Rules. Cleared 5 stale alarms from March 8-10 deploy sessions.
+Platform now has zero alarms in ALARM state and no duplicate scheduling.
+
+### Changes
+- **TB7-5** — Deleted 8 Scheduler orphans from `life-platform` group:
+  `whoop-ingestion`, `character-sheet-compute`, `journal-enrichment`, `monday-compass`,
+  `dropbox-poll`, `eightsleep-ingestion`, `freshness-checker`, `nutrition-review`.
+  CDK EventBridge Rules (39) are now sole scheduling authority.
+- **TB7-9** — Reset 5 stale alarms to OK:
+  `ingestion-error-daily-insight-compute` (2026-03-10),
+  `ingestion-error-monday-compass` (2026-03-08),
+  `ingestion-error-todoist` (2026-03-08),
+  `freshness-checker-errors` (2026-03-09),
+  `slo-source-freshness` (2026-03-08).
+  All from CDK deployment sessions, underlying issues resolved.
+- **deploy/check_eb_scheduler_orphans.sh** — reusable utility, kept in deploy/
+- **deploy/triage_alarms.sh** — reusable utility, kept in deploy/
+
+### Files Changed
+- `deploy/check_eb_scheduler_orphans.sh` — new
+- `deploy/triage_alarms.sh` — new
+- `docs/PROJECT_PLAN.md` — TB7-5, TB7-9 marked complete
+
+---
+
 ## v3.7.1 — 2026-03-11: CDK reconcile (TB7-3) + TB7-10 N/A finding
 
 ### Summary

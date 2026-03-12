@@ -584,7 +584,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 | TB7-2 | **Brittany email — verify real address is set** (was cutover in v3.5.7 per changelog; handover still says pending). | Sarah | 2 min | 🔴 |
 | TB7-3 | **CDK reconcile — `cdk deploy LifePlatformIngestion LifePlatformOperational`.** Drift accumulating since March 10. | Priya | 10 min | ✅ v3.7.1 |
 | TB7-4 | **Final `api-keys` grep sweep before March 17 permanent deletion.** Check Python code defaults, not just string refs. | Yael | 15 min | 🔴 |
-| TB7-5 | **Verify/clean EventBridge Scheduler orphans.** `aws scheduler list-schedules --group-name life-platform`. CDK Rules are now authoritative — delete any active Scheduler schedules to prevent double-firing. | Marcus | 15 min | 🔴 |
+| TB7-5 | **Verify/clean EventBridge Scheduler orphans.** `aws scheduler list-schedules --group-name life-platform`. CDK Rules are now authoritative — delete any active Scheduler schedules to prevent double-firing. | Marcus | 15 min | ✅ v3.7.2 — 8 orphans deleted (whoop-ingestion, character-sheet-compute, journal-enrichment, monday-compass, dropbox-poll, eightsleep-ingestion, freshness-checker, nutrition-review) |
 | TB7-6 | **Fix `weather_lambda.py` → `weather_handler.py` in `test_wiring_coverage.py`.** W1 test was silently skipping. | Elena | 5 min | ✅ v3.7.0 |
 | TB7-7 | **Add `failure_pattern_compute_lambda.py` to `lambda_map.json`.** CI never deploys it, no handler validation. | Elena | 5 min | ✅ v3.7.0 |
 | TB7-8 | **Fix CHANGELOG v3.6.3/v3.6.4 date typos** (`2026-03-12` → `2026-03-11`). | Omar | 2 min | ✅ v3.7.0 |
@@ -593,7 +593,7 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 
 | # | Task | Source | Effort | Status |
 |---|------|--------|--------|--------|
-| TB7-9 | **Triage all alarms currently in ALARM state.** Suppress resolved, fix real ones. Alert fatigue risk. | Jin | 1 hr | 🔴 |
+| TB7-9 | **Triage all alarms currently in ALARM state.** Suppress resolved, fix real ones. Alert fatigue risk. | Jin | 1 hr | ✅ v3.7.2 — 5 stale alarms reset to OK (ingestion-error-daily-insight-compute, ingestion-error-monday-compass, ingestion-error-todoist, freshness-checker-errors, slo-source-freshness). All from 2026-03-08/10 deploy sessions. |
 | TB7-10 | **Set reserved concurrency=1 on all 13 ingestion Lambdas.** Prevents OAuth token race conditions during gap-fill retries. Free. | Marcus | 30 min | ✅ N/A — account `ConcurrentExecutions` limit is 10 (floor); any reservation violates AWS minimum unreserved floor of 10. EventBridge single-invocation scheduling is equivalent protection. |
 | TB7-11 | **Add layer version consistency CI check.** All 14 consumers must be on same layer version pre-deploy. Prevents v3.5.5 EmailStack incident recurrence. | Marcus | 1 hr | 🔴 |
 | TB7-12 | **Add stateful resource assertion to CI Plan job.** DDB table exists + PITR on + KMS key matches. Catches manual console drift. | Priya | 30 min | 🔴 |
