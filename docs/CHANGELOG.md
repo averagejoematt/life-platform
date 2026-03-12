@@ -1,5 +1,36 @@
 # Life Platform — Changelog
 
+## v3.7.4 — 2026-03-12: P0 alarm flood fix (CDK reconcile regression)
+
+### Summary
+Four bugs causing overnight alarm flood, all introduced by CDK reconcile (v3.7.2).
+Fixed: Todoist IAM S3 path, freshness-checker handler config, daily-insight-compute
+PlatformLogger multi-arg TypeError, monday-compass stale alarm reset. All 6 alarms
+cleared to OK. Platform alarm count back to 0.
+
+### Root Cause
+CDK reconcile on 2026-03-11 overwrote two live configs to CDK's desired state:
+- Todoist IAM S3 resource: `raw/matthew/todoist/*` (CDK) vs `raw/todoist/*` (actual write path)
+- Freshness checker handler: `lambda_function.lambda_handler` (CDK) vs `freshness_checker_lambda.lambda_handler` (actual file)
+
+### Changes
+- **BUG FIX** — `todoist-data-ingestion` IAM: corrected S3 resource ARN from
+  `raw/matthew/todoist/*` to `raw/todoist/*` (`fix_p0_alarm_bugs.sh`)
+- **BUG FIX** — `life-platform-freshness-checker` handler: corrected from
+  `lambda_function.lambda_handler` to `freshness_checker_lambda.lambda_handler`
+- **BUG FIX** — `daily-insight-compute`: converted all `logger.info/warning("%s", arg)`
+  calls to f-strings — PlatformLogger only accepts a single message argument
+- **ALARM RESET** — `monday-compass`: stale alarm from api-keys deletion; code already
+  uses `ai-keys` (live), will self-heal on next Monday run (2026-03-16)
+- **ALARM RESET** — `failure-pattern-compute`: single error 2026-03-09, no recurrence
+- Added `deploy/fix_p0_alarm_bugs.sh` and `deploy/fix_p0_daily_insight_deploy.sh`
+
+### Lesson Learned
+CDK reconcile must be followed immediately by a smoke-test of every reconciled Lambda.
+Added to RUNBOOK: post-reconcile verification checklist.
+
+---
+
 ## v3.7.3 — 2026-03-11: TB7-11 through TB7-17 CI hardening + bug fix
 
 ### Summary

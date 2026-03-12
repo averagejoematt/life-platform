@@ -99,7 +99,7 @@ def fetch_date(source, date_str):
         r = table.get_item(Key={"pk": USER_PREFIX + source, "sk": "DATE#" + date_str})
         return d2f(r.get("Item"))
     except Exception as e:
-        logger.warning("fetch_date(%s, %s): %s", source, date_str, e)
+        logger.warning(f"fetch_date({source}, {date_str}): {e}")
         return None
 
 
@@ -119,7 +119,7 @@ def fetch_range(source, start, end):
             kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
         return records
     except Exception as e:
-        logger.warning("fetch_range(%s): %s", source, e)
+        logger.warning(f"fetch_range({source}): {e}")
         return []
 
 
@@ -128,7 +128,7 @@ def fetch_profile():
         r = table.get_item(Key={"pk": PROFILE_PK, "sk": "PROFILE#v1"})
         return d2f(r.get("Item", {}))
     except Exception as e:
-        logger.error("fetch_profile: %s", e)
+        logger.error(f"fetch_profile: {e}")
         return {}
 
 
@@ -148,7 +148,7 @@ def fetch_memory_records(category, days=30):
         )
         return [d2f(i) for i in resp.get("Items", [])]
     except Exception as e:
-        logger.warning("fetch_memory(%s): %s", category, e)
+        logger.warning(f"fetch_memory({category}): {e}")
         return []
 
 
@@ -381,7 +381,7 @@ def _fetch_journal_for_date(date_str):
         )
         return [d2f(i) for i in resp.get("Items", [])]
     except Exception as e:
-        logger.warning("_fetch_journal_for_date(%s): %s", date_str, e)
+        logger.warning(f"_fetch_journal_for_date({date_str}): {e}")
         return []
 
 
@@ -531,7 +531,7 @@ Return ONLY a JSON array, no preamble:
                 raw = raw[:-3]
             return json.loads(raw.strip())
     except Exception as e:
-        logger.warning("IC-8 Haiku evaluation failed: %s", e)
+        logger.warning(f"IC-8 Haiku evaluation failed: {e}")
         return []
 
 
@@ -564,7 +564,7 @@ def _load_intention_history(yesterday_str):
             records.append(rec)
         return records
     except Exception as e:
-        logger.warning("_load_intention_history: %s", e)
+        logger.warning(f"_load_intention_history: {e}")
         return []
 
 
@@ -633,7 +633,7 @@ def analyze_intention_execution_gap(yesterday_str, profile):
     try:
         api_key = _get_api_key()
     except Exception as e:
-        logger.warning("IC-8: Could not load API key: %s", e)
+        logger.warning(f"IC-8: Could not load API key: {e}")
         return ""
 
     # Intentions to check for yesterday:
@@ -654,7 +654,7 @@ def analyze_intention_execution_gap(yesterday_str, profile):
     }
 
     if not any(combined.values()):
-        logger.info("IC-8: No intention data for %s -- skipping", yesterday_str)
+        logger.info(f"IC-8: No intention data for {yesterday_str} -- skipping")
         return ""
 
     # Execution metrics for yesterday
@@ -663,7 +663,7 @@ def analyze_intention_execution_gap(yesterday_str, profile):
     # Haiku evaluation
     evaluations = _evaluate_intentions_haiku(combined, execution_metrics, api_key)
     if not evaluations:
-        logger.info("IC-8: No evaluations produced for %s", yesterday_str)
+        logger.info(f"IC-8: No evaluations produced for {yesterday_str}")
         return ""
 
     total          = len(evaluations)
@@ -688,12 +688,9 @@ def analyze_intention_execution_gap(yesterday_str, profile):
         if follow_through_rate is not None:
             mem_item["follow_through_rate"] = Decimal(str(follow_through_rate))
         table.put_item(Item=mem_item)
-        logger.info(
-            "IC-8: Stored intention tracking %s (rate=%.2f, %d/%d)",
-            yesterday_str, follow_through_rate or 0, executed_count, total,
-        )
+        logger.info(f"IC-8: Stored intention tracking {yesterday_str} (rate={follow_through_rate or 0:.2f}, {executed_count}/{total})")
     except Exception as e:
-        logger.warning("IC-8: Failed to store to platform_memory: %s", e)
+        logger.warning(f"IC-8: Failed to store to platform_memory: {e}")
 
     # Recurring patterns from history
     history  = _load_intention_history(yesterday_str)
@@ -824,9 +821,9 @@ def detect_early_warning(computed_records_7d, habit_7d, declining):
             + "\n".join(f"  \u2022 {d}" for d in active_desc)
             + "\nThis pattern often precedes broader health score decline. Address proactively."
         )
-        logger.warning("IC-5 EARLY WARNING active: markers=%s", markers)
+        logger.warning(f"IC-5 EARLY WARNING active: markers={markers}")
     else:
-        logger.info("IC-5: No early warning (active markers: %s)", markers)
+        logger.info(f"IC-5: No early warning (active markers: {markers})")
 
     return warning_active, markers, warning_block
 
@@ -1101,7 +1098,7 @@ def _compute_slow_drift(yesterday_str, profile):
                         "note":            recomp_note,
                     })
     except Exception as e:
-        logger.warning("Slow drift weight plateau check failed (non-fatal): %s", e)
+        logger.warning(f"Slow drift weight plateau check failed (non-fatal): {e}")
 
     return [r for r in drift_results if r.get("severity") not in ("insufficient_data", None)
             and r.get("severity") != "mild"]
@@ -1136,7 +1133,7 @@ def _build_experiment_context(yesterday_str, profile):
         )
         active_exps = [d2f(i) for i in resp.get("Items", [])]
     except Exception as e:
-        logger.warning("_build_experiment_context: query failed (non-fatal): %s", e)
+        logger.warning(f"_build_experiment_context: query failed (non-fatal): {e}")
         return ""
 
     # Raj/Viktor: early return — zero DDB fetch cost on non-experiment days
@@ -1394,10 +1391,7 @@ def store_computed_insights(yesterday_str, payload):
 
     item = {k: v for k, v in item.items() if v is not None}
     table.put_item(Item=item)
-    logger.info("Stored computed_insights for %s (momentum=%s, declining=%d, improving=%d)",
-                yesterday_str, payload.get("momentum_signal"),
-                len(payload.get("declining_metrics", [])),
-                len(payload.get("improving_metrics", [])))
+    logger.info(f"Stored computed_insights for {yesterday_str} (momentum={payload.get('momentum_signal')}, declining={len(payload.get('declining_metrics', []))}, improving={len(payload.get('improving_metrics', []))})")
 
 
 # ==============================================================================
@@ -1414,7 +1408,7 @@ def lambda_handler(event, context):
     if not event.get("force"):
         existing = fetch_date("computed_insights", yesterday_str)
         if existing:
-            logger.info("Already computed insights for %s — skipping (use force=true to override)", yesterday_str)
+            logger.info(f"Already computed insights for {yesterday_str} — skipping (use force=true to override)")
             return {"statusCode": 200, "body": f"Already computed for {yesterday_str}", "skipped": True}
 
     profile = fetch_profile()
@@ -1430,24 +1424,21 @@ def lambda_handler(event, context):
                               (today - timedelta(days=14)).isoformat(),
                               yesterday_str)
 
-    logger.info("Loaded: %d computed_metrics, %d habit_scores, %d day_grade records",
-                len(computed_7d), len(habit_7d), len(grade_14d))
+    logger.info(f"Loaded: {len(computed_7d)} computed_metrics, {len(habit_7d)} habit_scores, {len(grade_14d)} day_grade records")
 
     # ── 2. Momentum ──
     momentum_signal, this_week_avg, prev_week_avg, trend_pct = compute_momentum(
         grade_14d, yesterday_str)
-    logger.info("Momentum: %s (this_week=%.1f, prev_week=%s, trend=%s%%)",
-                momentum_signal, this_week_avg or 0, prev_week_avg, trend_pct)
+    logger.info(f"Momentum: {momentum_signal} (this_week={this_week_avg or 0:.1f}, prev_week={prev_week_avg}, trend={trend_pct}%)")
 
     # ── 3. Metric trends ──
     declining, improving = detect_metric_trends(computed_7d)
-    logger.info("Declining metrics: %s | Improving: %s",
-                [d["metric"] for d in declining], [i["metric"] for i in improving])
+    logger.info(f"Declining metrics: {[d['metric'] for d in declining]} | Improving: {[i['metric'] for i in improving]}")
 
     # ── 4. Habit patterns ──
     miss_rates, strongest, weakest, synergy_health = compute_habit_patterns(
         habit_7d, profile)
-    logger.info("Weakest T0 habits: %s | Strongest: %s", weakest[:3], strongest[:3])
+    logger.info(f"Weakest T0 habits: {weakest[:3]} | Strongest: {strongest[:3]}")
 
     # ── 5. Platform memory context ──
     memory_ctx = build_memory_context()
@@ -1456,9 +1447,9 @@ def lambda_handler(event, context):
     intention_gap_ctx = ""
     try:
         intention_gap_ctx = analyze_intention_execution_gap(yesterday_str, profile)
-        logger.info("IC-8: Intention gap context: %d chars", len(intention_gap_ctx))
+        logger.info(f"IC-8: Intention gap context: {len(intention_gap_ctx)} chars")
     except Exception as e:
-        logger.warning("IC-8 failed (non-fatal): %s", e)
+        logger.warning(f"IC-8 failed (non-fatal): {e}")
 
     # ── 5c. IC-5: Early Warning Detection ──
     ic5_warning, ic5_markers, early_warning_block = False, [], ""
@@ -1466,24 +1457,24 @@ def lambda_handler(event, context):
         ic5_warning, ic5_markers, early_warning_block = detect_early_warning(
             computed_7d, habit_7d, declining)
     except Exception as e:
-        logger.warning("IC-5 failed (non-fatal): %s", e)
+        logger.warning(f"IC-5 failed (non-fatal): {e}")
 
     # ── 5d. IC-19: Slow Drift Detection (non-fatal) ──
     slow_drift_metrics = []
     try:
         slow_drift_metrics = _compute_slow_drift(yesterday_str, profile)
-        logger.info("IC-19 slow drift: %d signals detected", len(slow_drift_metrics))
+        logger.info(f"IC-19 slow drift: {len(slow_drift_metrics)} signals detected")
     except Exception as e:
-        logger.warning("IC-19 slow drift failed (non-fatal): %s", e)
+        logger.warning(f"IC-19 slow drift failed (non-fatal): {e}")
 
     # ── 5e. IC-19: Active Experiment Context (non-fatal) ──
     experiment_ctx = ""
     try:
         experiment_ctx = _build_experiment_context(yesterday_str, profile)
         if experiment_ctx:
-            logger.info("IC-19 experiment context: %d chars", len(experiment_ctx))
+            logger.info(f"IC-19 experiment context: {len(experiment_ctx)} chars")
     except Exception as e:
-        logger.warning("IC-19 experiment context failed (non-fatal): %s", e)
+        logger.warning(f"IC-19 experiment context failed (non-fatal): {e}")
 
     # ── 5f. Murthy: social quality flag when multiple drift signals + sparse journal ──
     social_flag = ""
@@ -1506,7 +1497,7 @@ def lambda_handler(event, context):
         slow_drift_metrics=slow_drift_metrics,
         experiment_ctx=experiment_ctx,
         social_flag=social_flag)
-    logger.info("AI context block: %d chars", len(ai_block))
+    logger.info(f"AI context block: {len(ai_block)} chars")
 
     # ── 7. Store ──
     payload = {
