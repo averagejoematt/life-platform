@@ -17,7 +17,6 @@ from mcp.tools_lifestyle import *
 from mcp.tools_board import *
 from mcp.tools_character import *
 from mcp.tools_social import *
-from mcp.tools_longevity import *
 from mcp.tools_adaptive import *
 from mcp.tools_todoist import *
 from mcp.tools_memory import *
@@ -318,20 +317,6 @@ TOOLS = {
             },
         },
     },
-    "get_non_scale_victories": {
-        "fn": tool_get_non_scale_victories,
-        "schema": {
-            "name": "get_non_scale_victories",
-            "description": "Surfaces fitness and health improvements since journey start that are independent of the scale — critical for motivation during plateaus. Compares: resting HR, HRV, recovery score, sleep, activity count, monthly mileage, and moving speed between the first 30 days of the journey and the most recent 30 days. Use for: 'what non-scale victories have I had?', 'how has my fitness improved?', 'I am in a plateau — am I still making progress?', 'has my heart rate improved since I started?'. Requires journey_start_date in profile.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
-                },
-                "required": [],
-            },
-        },
-    },
     "get_exercise_history": {
         "fn": tool_get_exercise_history,
         "schema": {
@@ -503,30 +488,6 @@ TOOLS = {
             },
         },
     },
-    "get_nutrition_biometrics_correlation": {
-        "fn": tool_get_nutrition_biometrics_correlation,
-        "schema": {
-            "name": "get_nutrition_biometrics_correlation",
-            "description": (
-                "Pearson correlations between 10 daily nutrition metrics and 9 biometric outcomes across "
-                "Whoop, Withings, and Eight Sleep — with optional day lag to test next-day effects. "
-                "Reveals YOUR personal diet-health relationships: does protein predict recovery? Does caffeine "
-                "suppress sleep efficiency? Does calorie deficit lower HRV next day? "
-                "Use for: 'does my diet affect my recovery?', 'does protein improve HRV?', "
-                "'what nutrition patterns hurt my sleep?', 'does caffeine affect my sleep score?', "
-                "'what does my diet predict about my performance?'. Requires ≥14 days of MacroFactor data."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "lag_days":   {"type": "number", "description": "Shift biometrics forward N days. 1 = does today\'s nutrition predict tomorrow\'s outcomes? Default 1."},
-                },
-                "required": [],
-            },
-        },
-    },
     # ── MacroFactor / Nutrition tools ─────────────────────────────────────────
     "get_nutrition_summary": {
         "fn": tool_get_nutrition_summary,
@@ -591,62 +552,6 @@ TOOLS = {
             },
         },
     },
-    "get_caffeine_sleep_correlation": {
-        "fn": tool_get_caffeine_sleep_correlation,
-        "schema": {
-            "name": "get_caffeine_sleep_correlation",
-            "description": (
-                "Personal caffeine cutoff finder. Scans MacroFactor food_log for caffeine-containing items, "
-                "finds the last caffeine intake time per day, then correlates with same-night Eight Sleep "
-                "data (efficiency, deep sleep %, REM %, sleep score, onset latency). "
-                "Splits days into time buckets (no caffeine / before noon / noon-2pm / 2pm-4pm / after 4pm) "
-                "and compares average sleep quality across buckets. Also runs Pearson correlations for "
-                "both timing and dose effects. Generates a personal cutoff recommendation. "
-                "Based on Huberman and Attia guidance that caffeine timing is one of the highest-leverage sleep interventions. "
-                "Use for: 'what is my caffeine cutoff?', 'does caffeine affect my sleep?', "
-                "'when should I stop drinking coffee?', 'how does caffeine timing affect my deep sleep?', "
-                "'caffeine and sleep correlation'. Requires MacroFactor food log data + Eight Sleep data."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_exercise_sleep_correlation": {
-        "fn": tool_get_exercise_sleep_correlation,
-        "schema": {
-            "name": "get_exercise_sleep_correlation",
-            "description": (
-                "Personal exercise timing cutoff finder. Extracts the last exercise end time per day from "
-                "Strava (start_date_local + elapsed_time_seconds), then correlates with same-night Eight Sleep "
-                "data (efficiency, deep sleep %, REM %, sleep score, onset latency, HRV). "
-                "Splits days into time-of-day buckets (rest day / before noon / noon-3pm / 3-6pm / 6-8pm / after 8pm) "
-                "and compares average sleep quality across buckets. Also analyzes exercise intensity via average HR "
-                "and the interaction of intensity x timing (does a hard evening workout hurt more than an easy one?). "
-                "Includes rest-day vs exercise-day comparison, Pearson correlations for timing and intensity effects, "
-                "and a personal recommendation on exercise cutoff time. "
-                "Based on Huberman, Galpin, and Attia guidance that exercise timing is a modifiable sleep lever. "
-                "Use for: 'do late workouts hurt my sleep?', 'exercise timing and sleep quality', "
-                "'when should I stop exercising before bed?', 'does evening exercise affect my deep sleep?', "
-                "'exercise vs rest day sleep comparison'. Requires Strava + Eight Sleep data."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date":            {"type": "string", "description": "Start date YYYY-MM-DD (default: 180 days ago)."},
-                    "end_date":              {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "min_duration_minutes":  {"type": "integer", "description": "Minimum activity duration in minutes to include (default: 15). Filters out very short activities."},
-                    "exclude_sport_types":   {"type": "string", "description": "Comma-separated sport types to exclude (e.g. 'Walk,Yoga'). Case-insensitive."},
-                },
-                "required": [],
-            },
-        },
-    },
     "get_zone2_breakdown": {
         "fn": tool_get_zone2_breakdown,
         "schema": {
@@ -670,34 +575,6 @@ TOOLS = {
                     "end_date":               {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
                     "weekly_target_minutes":   {"type": "integer", "description": "Weekly Zone 2 target in minutes (default: 150, per Attia/WHO guidelines)."},
                     "min_duration_minutes":    {"type": "integer", "description": "Minimum activity duration in minutes to include (default: 10)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_alcohol_sleep_correlation": {
-        "fn": tool_get_alcohol_sleep_correlation,
-        "schema": {
-            "name": "get_alcohol_sleep_correlation",
-            "description": (
-                "Personal alcohol impact analyzer. Correlates MacroFactor alcohol intake (grams, standard drinks) "
-                "with same-night Eight Sleep data (efficiency, deep %, REM %, sleep score, onset latency, HRV) "
-                "AND next-day Whoop recovery (recovery score, HRV, resting HR). "
-                "Splits days into dose buckets (none / light ≤1 drink / moderate 1-2.5 drinks / heavy 3+ drinks) "
-                "and compares sleep + recovery quality across buckets. Also runs Pearson correlations for "
-                "dose effects, timing effects (last drink time), and drinking-vs-sober comparison. "
-                "Generates a personal impact severity assessment. One standard drink = 14g pure alcohol. "
-                "Based on Huberman, Attia, and Walker: alcohol suppresses REM, raises resting HR, and impairs HRV recovery. "
-                "Use for: 'is alcohol affecting my sleep?', 'how does drinking affect my recovery?', "
-                "'alcohol and sleep correlation', 'should I drink less?', 'drinking vs sober sleep comparison', "
-                "'how does alcohol affect my HRV?'. Requires MacroFactor food log + Eight Sleep data. "
-                "Whoop data enhances next-day recovery analysis but is not required."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
                 },
                 "required": [],
             },
@@ -763,30 +640,6 @@ TOOLS = {
                     "top_n":      {"type": "number",  "description": "Number of top habits to return (default: 15)."},
                 },
                 "required": [],
-            },
-        },
-    },
-    "get_habit_health_correlations": {
-        "fn": tool_get_habit_health_correlations,
-        "schema": {
-            "name": "get_habit_health_correlations",
-            "description": (
-                "Correlate a P40 habit or group score with a biometric outcome (HRV, recovery, weight, sleep). "
-                "Supports lag_days to test predictive effects (e.g., does cold shower today predict HRV tomorrow?). "
-                "Use for: 'does my Nutrition score predict recovery?', 'does meditation improve HRV?'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "habit_name":    {"type": "string", "description": "Exact habit name (provide this OR group_name)."},
-                    "group_name":    {"type": "string", "description": f"P40 group name (provide this OR habit_name). Valid: {P40_GROUPS}"},
-                    "health_source": {"type": "string", "description": "Biometric source (e.g. 'whoop', 'withings', 'eightsleep')."},
-                    "health_field":  {"type": "string", "description": "Biometric field (e.g. 'hrv', 'recovery_score', 'weight_lbs', 'total_score')."},
-                    "start_date":    {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date":      {"type": "string", "description": "End date YYYY-MM-DD."},
-                    "lag_days":      {"type": "number",  "description": "Shift health metric N days forward (default: 0). Use 1 to test 'does A today predict B tomorrow?'."},
-                },
-                "required": ["health_source", "health_field"],
             },
         },
     },
@@ -869,54 +722,6 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_garmin_summary": {
-        "fn": tool_get_garmin_summary,
-        "schema": {
-            "name": "get_garmin_summary",
-            "description": (
-                "Garmin Epix daily biometrics over a date range. Returns Body Battery (energy reserve 0-100), "
-                "physiological stress score (HRV-derived, objective), overnight HRV (cross-check with Whoop), "
-                "resting heart rate, and respiration rate. "
-                "Body Battery is Garmin's flagship metric — it shows how much energy reserve you have "
-                "throughout the day and how well you recovered. Avg stress is objective physiological stress "
-                "(not self-reported) derived from continuous HRV monitoring. "
-                "Use for: 'what is my Body Battery?', 'how stressed am I physiologically?', "
-                "'show my Garmin data', 'what was my energy reserve this week?', "
-                "'compare my Garmin HRV to Whoop'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 7 days ago)."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_device_agreement": {
-        "fn": tool_get_device_agreement,
-        "schema": {
-            "name": "get_device_agreement",
-            "description": (
-                "Cross-device validation: Whoop vs Garmin agreement on HRV and resting heart rate. "
-                "Surfaces days where the two devices significantly disagree (>20ms HRV or >6bpm RHR delta), "
-                "which indicates lower confidence in readiness scores for those days. "
-                "Agreement rates and a composite device confidence rating are returned. "
-                "Use for: 'do Whoop and Garmin agree?', 'how reliable is my readiness score?', "
-                "'are there days where devices disagreed?', 'cross-device HRV validation', "
-                "'device confidence check'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 30 days ago)."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
                 },
                 "required": [],
             },
@@ -1105,23 +910,6 @@ TOOLS = {
             },
         },
     },
-    "get_body_composition_snapshot": {
-        "fn": tool_get_body_composition_snapshot,
-        "schema": {
-            "name": "get_body_composition_snapshot",
-            "description": (
-                "DEXA scan: FFMI, visceral fat, BMD, A/G ratio, posture analysis, Withings delta. "
-                "Use for: 'DEXA results', 'body composition', 'FFMI', 'posture', 'weight change since DEXA'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "date": {"type": "string", "description": "Scan date YYYY-MM-DD. Omit for latest."},
-                },
-                "required": [],
-            },
-        },
-    },
     "get_health_risk_profile": {
         "fn": tool_get_health_risk_profile,
         "schema": {
@@ -1138,72 +926,6 @@ TOOLS = {
                 },
                 "required": [],
             },
-        },
-    },
-    "get_day_type_analysis": {
-        "fn": tool_get_day_type_analysis,
-        "schema": {
-            "name": "get_day_type_analysis",
-            "description": "Segment health metrics by training day type (rest/light/moderate/hard/race). Cross-references Whoop strain, Strava, and training load to classify each day, then compares averages for sleep, recovery, and nutrition across day types. Use for: 'how does my sleep differ on hard training days?', 'do I eat more on rest days?', 'what\'s my HRV on hard vs easy days?', 'how does day type affect recovery?'",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD. Defaults to 90 days ago."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
-                    "days":       {"type": "number", "description": "Lookback window in days. Default 90. Ignored if start_date provided."},
-                    "metrics":    {"type": "array", "items": {"type": "string"}, "description": "Metric groups to analyze: 'sleep', 'recovery', 'nutrition'. Default: all three."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_next_lab_priorities": {
-        "fn": tool_get_next_lab_priorities,
-        "schema": {
-            "name": "get_next_lab_priorities",
-            "description": (
-                "Genome-informed next blood panel recommendations. Tests to add based on genetic risk, "
-                "persistent flags, and gaps. Priority levels + rationale. "
-                "Use for: 'what to test next', 'plan next blood draw', 'missing tests'."
-            ),
-            "inputSchema": {"type": "object", "properties": {}, "required": []},
-        },
-    },
-
-    # ── v2.15.0 — Gait, Energy Balance, Movement, CGM tools ─────────────────
-    "get_gait_analysis": {
-        "fn": tool_get_gait_analysis,
-        "schema": {
-            "name": "get_gait_analysis",
-            "description": (
-                "Gait & mobility tracker from Apple Watch. Tracks walking speed (strongest all-cause mortality "
-                "predictor), step length (earliest aging marker), asymmetry (injury indicator), double support "
-                "(fall risk). Composite score 0-100, clinical flags, trend analysis. <2.24 mph = clinical flag. "
-                "Use for: 'gait analysis', 'walking speed trend', 'mobility health', 'injury detection'. "
-                "Requires Apple Health webhook v1.1.0+."
-            ),
-            "inputSchema": {"type": "object", "properties": {
-                "start_date": {"type": "string", "description": "Start YYYY-MM-DD (default: 90d ago)."},
-                "end_date":   {"type": "string", "description": "End YYYY-MM-DD (default: today)."},
-            }, "required": []},
-        },
-    },
-    "get_energy_balance": {
-        "fn": tool_get_energy_balance,
-        "schema": {
-            "name": "get_energy_balance",
-            "description": (
-                "Daily energy balance: Apple Watch TDEE (active + basal cal) vs MacroFactor intake. "
-                "Daily surplus/deficit, rolling averages, implied weight change. Uses real wearable data "
-                "not formula BMR. Tracks deficit target hit rate. "
-                "Use for: 'am I in a deficit?', 'calorie balance', 'TDEE vs intake', 'surplus or deficit?'. "
-                "Requires Apple Health webhook + MacroFactor."
-            ),
-            "inputSchema": {"type": "object", "properties": {
-                "start_date":          {"type": "string", "description": "Start YYYY-MM-DD (default: 30d ago)."},
-                "end_date":            {"type": "string", "description": "End YYYY-MM-DD (default: today)."},
-                "target_deficit_kcal": {"type": "integer", "description": "Target daily deficit kcal (default: 500)."},
-            }, "required": []},
         },
     },
     "get_movement_score": {
@@ -1236,23 +958,6 @@ TOOLS = {
             ),
             "inputSchema": {"type": "object", "properties": {
                 "start_date": {"type": "string", "description": "Start YYYY-MM-DD (default: 30d ago)."},
-                "end_date":   {"type": "string", "description": "End YYYY-MM-DD (default: today)."},
-            }, "required": []},
-        },
-    },
-    "get_glucose_sleep_correlation": {
-        "fn": tool_get_glucose_sleep_correlation,
-        "schema": {
-            "name": "get_glucose_sleep_correlation",
-            "description": (
-                "Correlate glucose with same-night sleep. Buckets by glucose level, compares Eight Sleep "
-                "outcomes. Pearson correlations for variability/spikes vs sleep quality. Elevated evening "
-                "glucose raises core temp, opposing deep sleep (Huberman, Walker). "
-                "Use for: 'does blood sugar affect sleep?', 'glucose sleep correlation', "
-                "'do spikes hurt sleep?'. Requires Apple Health CGM + Eight Sleep."
-            ),
-            "inputSchema": {"type": "object", "properties": {
-                "start_date": {"type": "string", "description": "Start YYYY-MM-DD (default: 90d ago)."},
                 "end_date":   {"type": "string", "description": "End YYYY-MM-DD (default: today)."},
             }, "required": []},
         },
@@ -1300,24 +1005,6 @@ TOOLS = {
             },
         },
     },
-    "get_glucose_exercise_correlation": {
-        "fn": tool_get_glucose_exercise_correlation,
-        "schema": {
-            "name": "get_glucose_exercise_correlation",
-            "description": (
-                "Exercise vs rest day glucose comparison. Intensity analysis (easy vs hard). Duration "
-                "correlations. Zone 2 improves glucose disposal — trending this is a longevity biomarker "
-                "(Attia). Exercise increases GLUT4 uptake for 24-48h. "
-                "Use for: 'does exercise help blood sugar?', 'workout vs rest day glucose', "
-                "'Zone 2 glucose benefit'. Requires Apple Health CGM + Strava."
-            ),
-            "inputSchema": {"type": "object", "properties": {
-                "start_date": {"type": "string", "description": "Start YYYY-MM-DD (default: 90d ago)."},
-                "end_date":   {"type": "string", "description": "End YYYY-MM-DD (default: today)."},
-            }, "required": []},
-        },
-    },
-
     # ── Journal tools (v2.16.0) ────────────────────────────────────────────────
     "get_journal_entries": {
         "fn": tool_get_journal_entries,
@@ -1404,30 +1091,6 @@ TOOLS = {
                 "properties": {
                     "start_date": {"type": "string", "description": "Start YYYY-MM-DD (default: 30 days ago)."},
                     "end_date":   {"type": "string", "description": "End YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_journal_correlations": {
-        "fn": tool_get_journal_correlations,
-        "schema": {
-            "name": "get_journal_correlations",
-            "description": (
-                "Correlate journal signals (mood, energy, stress, subjective sleep quality) "
-                "with wearable data (Whoop recovery/HRV/strain, Eight Sleep score/efficiency, "
-                "Garmin stress/Body Battery/readiness). Finds Pearson correlations and notable "
-                "divergences where subjective experience doesn't match objective data "
-                "(e.g. 'felt terrible but Eight Sleep scored 85' = possible sleep state misperception). "
-                "Use for: 'does my mood correlate with HRV?', 'subjective vs objective sleep', "
-                "'do high-stress days affect my recovery?', 'journal-wearable correlations'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start YYYY-MM-DD (default: 60 days ago)."},
-                    "end_date":   {"type": "string", "description": "End YYYY-MM-DD (default: today)."},
-                    "signal":     {"type": "string", "description": "stress, mood, energy, sleep_quality, or all (default: all)."},
                 },
                 "required": [],
             },
@@ -1575,31 +1238,6 @@ TOOLS = {
             },
         },
     },
-    "get_sleep_environment_analysis": {
-        "fn": tool_get_sleep_environment_analysis,
-        "schema": {
-            "name": "get_sleep_environment_analysis",
-            "description": (
-                "Sleep environment optimization. Correlates Eight Sleep bed temperature settings "
-                "(heating/cooling level, bed temp F/C) with sleep outcomes (efficiency, deep %, "
-                "REM %, score, onset latency, HRV). Splits nights into temperature buckets, "
-                "computes Pearson correlations, and identifies your optimal thermal sleep profile. "
-                "Huberman: core body temperature is the #1 physiological sleep trigger. "
-                "Walker: sleeping too warm is the most common modifiable sleep disruptor. "
-                "Use for: 'optimal bed temperature', 'does temperature affect my sleep?', "
-                "'Eight Sleep temperature correlation', 'sleep environment', 'bed cooling analysis', "
-                "'what temperature should I set my Eight Sleep?'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 180 days ago)."},
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
     "log_supplement": {
         "fn": tool_log_supplement,
         "schema": {
@@ -1642,52 +1280,6 @@ TOOLS = {
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 30 days ago)."},
                     "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
                     "name": {"type": "string", "description": "Filter by supplement name (partial match, case-insensitive)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_supplement_correlation": {
-        "fn": tool_get_supplement_correlation,
-        "schema": {
-            "name": "get_supplement_correlation",
-            "description": (
-                "Cross-reference a specific supplement with health outcomes. Compares days taking the supplement "
-                "vs days without across recovery, sleep, HRV, glucose, stress. Enhances N=1 experiments. "
-                "Use for: 'is magnesium helping my sleep?', 'creatine impact on recovery', "
-                "'does vitamin D affect my HRV?', 'supplement effectiveness', 'is this supplement working?'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string", "description": "Supplement name to analyze (required). Partial match, case-insensitive."},
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": ["name"],
-            },
-        },
-    },
-    "get_weather_correlation": {
-        "fn": tool_get_weather_correlation,
-        "schema": {
-            "name": "get_weather_correlation",
-            "description": (
-                "Weather & seasonal correlation analysis. Fetches Seattle weather from Open-Meteo "
-                "(free API), caches in DynamoDB, and correlates temperature, humidity, precipitation, "
-                "daylight hours, sunshine, barometric pressure, and UV index with health metrics "
-                "(recovery, HRV, sleep, stress, Body Battery) and journal signals (mood, energy, stress). "
-                "Huberman: daylight is the master circadian lever. Walker: seasonal light drives sleep. "
-                "Attia: barometric pressure affects inflammation and autonomic function. "
-                "Use for: 'does weather affect my sleep?', 'daylight and mood correlation', "
-                "'seasonal patterns in my health', 'weather impact on recovery', "
-                "'does rain affect my energy?', 'sunshine and sleep quality'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
                 },
                 "required": [],
             },
@@ -1749,47 +1341,6 @@ TOOLS = {
                 "wellbeing model context. Correlates social quality with recovery, HRV, sleep, stress. "
                 "Seligman: Relationships are the #1 predictor of sustained wellbeing. "
                 "Use for: 'social connection trend', 'meaningful connections', 'PERMA score'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_social_isolation_risk": {
-        "fn": tool_get_social_isolation_risk,
-        "schema": {
-            "name": "get_social_isolation_risk",
-            "description": (
-                "Social isolation risk detector. Flags periods of 3+ consecutive days without meaningful "
-                "social connection. Correlates isolation episodes with health metric declines. "
-                "Use for: 'am I socially isolated?', 'isolation risk', 'loneliness health impact'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "consecutive_days": {"type": "integer", "description": "Consecutive days threshold (default: 3)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_meditation_correlation": {
-        "fn": tool_get_meditation_correlation,
-        "schema": {
-            "name": "get_meditation_correlation",
-            "description": (
-                "Meditation and breathwork analysis. Tracks mindful_minutes from Apple Health, "
-                "correlates with HRV, stress, sleep, recovery, Body Battery. Shows meditation vs "
-                "non-meditation day comparisons, dose-response, next-day effects, streaks. "
-                "Huberman: NSDR is highest-ROI. Attia: consistency > duration. "
-                "Use for: 'meditation impact', 'does meditation help HRV?', 'breathwork effects'."
             ),
             "inputSchema": {
                 "type": "object",
@@ -1893,29 +1444,6 @@ TOOLS = {
             },
         },
     },
-    "get_blood_pressure_correlation": {
-        "fn": tool_get_blood_pressure_correlation,
-        "schema": {
-            "name": "get_blood_pressure_correlation",
-            "description": (
-                "Correlate blood pressure with lifestyle factors: sodium intake, training load, stress, "
-                "sleep quality, caffeine, weight. Pearson r for systolic and diastolic vs 11 factors. "
-                "Exercise vs rest day comparison. Sodium dose-response buckets (low/mid/high). "
-                "Attia: sodium is strongest modifiable lever. Huberman: Zone 2 is most evidence-backed BP intervention. "
-                "Use for: 'does sodium affect my BP?', 'exercise and blood pressure', "
-                "'what affects my blood pressure?', 'BP correlations', 'salt sensitivity'. "
-                "Requires BP cuff syncing to Apple Health + 5+ days of data."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
     # ── Habit Registry tools (v2.47.0) ──────────────────────────────────────────
     "get_habit_registry": {
         "fn": tool_get_habit_registry,
@@ -2013,52 +1541,6 @@ TOOLS = {
             },
         },
     },
-    "log_ruck": {
-        "fn": tool_log_ruck,
-        "schema": {
-            "name": "log_ruck",
-            "description": (
-                "Tag a Strava Walk/Hike as a rucking session with weight. Finds the matching activity on the "
-                "given date, writes a ruck overlay with load weight, adjusted calorie estimate (Pandolf equation), "
-                "and load multiplier. If multiple walks on the same day, use time_hint ('morning', 'afternoon') "
-                "or strava_id to disambiguate. Ruck data is stored separately and does not modify the Strava record. "
-                "Use for: 'I rucked this morning with 35lbs', 'log my ruck 40 pounds', 'tag today's walk as a ruck', "
-                "'rucked yesterday afternoon 30lb'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "weight_lbs": {"type": "number", "description": "Ruck weight in pounds (required). E.g. 35."},
-                    "date": {"type": "string", "description": "Date YYYY-MM-DD (default: today)."},
-                    "time_hint": {"type": "string", "description": "When the ruck was: 'morning', 'afternoon', 'evening', or HH:MM. Helps match if multiple walks."},
-                    "strava_id": {"type": "string", "description": "Direct Strava activity ID to tag (optional)."},
-                    "notes": {"type": "string", "description": "Optional notes (e.g. 'hilly route', 'GORUCK plate')."},
-                },
-                "required": ["weight_lbs"],
-            },
-        },
-    },
-    "get_ruck_log": {
-        "fn": tool_get_ruck_log,
-        "schema": {
-            "name": "get_ruck_log",
-            "description": (
-                "Retrieve rucking history with session details, total miles, load trends, weekly frequency, "
-                "and estimated calorie totals. Each session shows distance, duration, elevation, ruck weight, "
-                "and adjusted calorie estimate vs normal walking. "
-                "Use for: 'show my ruck log', 'rucking history', 'how much have I rucked?', "
-                "'ruck frequency', 'ruck mileage', 'heaviest ruck'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
     # ── Board of Directors Management ──
     "get_board_of_directors": {
         "fn": tool_get_board_of_directors,
@@ -2081,45 +1563,6 @@ TOOLS = {
                     "active_only": {"type": "boolean", "description": "Only show active members. Default: true."},
                 },
                 "required": [],
-            },
-        },
-    },
-    "update_board_member": {
-        "fn": tool_update_board_member,
-        "schema": {
-            "name": "update_board_member",
-            "description": (
-                "Add a new board member or update an existing one. Supports partial updates — only "
-                "fields in 'updates' are changed. For new members, name/title/type are required. "
-                "Use for: 'add a new expert', 'change Chen's focus areas', 'update Norton's voice', "
-                "'add chronicle role to Patrick'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "member_id": {"type": "string", "description": "Member ID (snake_case, e.g. 'sarah_chen')."},
-                    "updates": {"type": "object", "description": "Dict of fields to set/update. Nested dicts are merged."},
-                },
-                "required": ["member_id", "updates"],
-            },
-        },
-    },
-    "remove_board_member": {
-        "fn": tool_remove_board_member,
-        "schema": {
-            "name": "remove_board_member",
-            "description": (
-                "Remove or deactivate a board member. Default is soft-delete (sets active=false). "
-                "Use hard_delete=true only for permanent removal. "
-                "Use for: 'retire Dr. Chen', 'remove Norton from the board', 'deactivate Walker'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "member_id": {"type": "string", "description": "Member ID to remove/deactivate."},
-                    "hard_delete": {"type": "boolean", "description": "If true, permanently removes. Default: false (deactivate)."},
-                },
-                "required": ["member_id"],
             },
         },
     },
@@ -2404,168 +1847,6 @@ TOOLS = {
             },
         },
     },
-    # ── Cold/Heat Exposure Logging (#36) ──
-    "log_exposure": {
-        "fn": tool_log_exposure,
-        "schema": {
-            "name": "log_exposure",
-            "description": (
-                "Log a cold or heat exposure session (cold shower, cold plunge, ice bath, sauna, "
-                "hot bath, contrast therapy). Huberman: deliberate cold exposure increases dopamine 2.5x. "
-                "Use for: 'I did a cold shower today', 'log 3 min cold plunge at 50F', "
-                "'sauna session 20 minutes', 'cold exposure this morning'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "type": {"type": "string", "description": "Exposure type: cold_shower, cold_plunge, ice_bath, sauna, hot_bath, contrast, other."},
-                    "date": {"type": "string", "description": "Date YYYY-MM-DD (default: today)."},
-                    "duration_min": {"type": "number", "description": "Duration in minutes."},
-                    "temperature_f": {"type": "number", "description": "Water/air temperature in Fahrenheit."},
-                    "time_of_day": {"type": "string", "description": "When: morning, afternoon, evening."},
-                    "notes": {"type": "string", "description": "Optional notes."},
-                },
-                "required": ["type"],
-            },
-        },
-    },
-    "get_exposure_log": {
-        "fn": tool_get_exposure_log,
-        "schema": {
-            "name": "get_exposure_log",
-            "description": (
-                "Retrieve cold/heat exposure history: sessions, frequency, type breakdown, duration stats. "
-                "Use for: 'show my cold exposure log', 'how often do I sauna', "
-                "'exposure history', 'cold plunge frequency'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_exposure_correlation": {
-        "fn": tool_get_exposure_correlation,
-        "schema": {
-            "name": "get_exposure_correlation",
-            "description": (
-                "Correlate cold/heat exposure with HRV, sleep quality, recovery, mood. Compares "
-                "exposure days vs rest days AND next-day effects. Huberman: cold exposure increases "
-                "dopamine 2.5x; sauna improves cardiovascular markers and growth hormone. "
-                "Use for: 'does cold exposure help my HRV?', 'sauna and sleep quality', "
-                "'cold plunge recovery correlation', 'do cold showers improve my mood?'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    # ── Exercise Variety Scoring (#28) ──
-    "get_exercise_variety": {
-        "fn": tool_get_exercise_variety,
-        "schema": {
-            "name": "get_exercise_variety",
-            "description": (
-                "Movement pattern diversity index. Analyzes activity type variety using Shannon diversity, "
-                "flags staleness when same patterns repeat, identifies missing movement categories, "
-                "and provides recommendations. Chen: adaptation is the enemy of progress. "
-                "Use for: 'am I doing enough variety?', 'exercise variety score', "
-                "'movement diversity', 'am I in a rut?', 'what activities am I missing?', "
-                "'staleness check', 'exercise pattern analysis'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "window_weeks": {"type": "integer", "description": "Rolling window for staleness check (default: 4 weeks)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    # ── Longevity & Metabolic Intelligence (v2.72.0) ──
-    "get_biological_age": {
-        "fn": tool_get_biological_age,
-        "schema": {
-            "name": "get_biological_age",
-            "description": (
-                "Compute biological age from blood draws using Levine PhenoAge algorithm. "
-                "Uses 9 biomarkers (albumin, creatinine, glucose, CRP, ALP, lymphocyte %, MCV, RDW, WBC) "
-                "to estimate how fast you're aging vs chronological age. Shows trajectory across all draws. "
-                "Okafor: this is the single most meaningful longevity number. "
-                "Attia: the delta between biological and chronological age is what matters. "
-                "Use for: 'what is my biological age', 'am I aging well', 'PhenoAge', "
-                "'biological vs chronological age', 'longevity assessment', 'aging trajectory'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "draw_date": {"type": "string", "description": "Specific draw date YYYY-MM-DD. Omit for all draws."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_metabolic_health_score": {
-        "fn": tool_get_metabolic_health_score,
-        "schema": {
-            "name": "get_metabolic_health_score",
-            "description": (
-                "Composite metabolic health score (0-100) from daily + quarterly data. "
-                "Components: CGM glucose/TIR/variability (30%), lab biomarkers — glucose/HbA1c/TG/HDL (35%), "
-                "weight/BMI (20%), blood pressure (15%). Includes metabolic syndrome criteria check. "
-                "Attia: stop looking at 15 metrics — give me one number for metabolic trajectory. "
-                "Use for: 'metabolic health score', 'am I metabolically healthy', "
-                "'metabolic syndrome check', 'composite metabolic assessment', "
-                "'one number for metabolic health'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 30 days ago)."},
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_food_response_database": {
-        "fn": tool_get_food_response_database,
-        "schema": {
-            "name": "get_food_response_database",
-            "description": (
-                "Personal food glycemic response database. Ranks YOUR foods by glucose impact using "
-                "MacroFactor food logs + CGM data. Shows best and worst foods, macro correlations "
-                "(carbs/fiber/protein vs glucose impact), and confidence levels per food. "
-                "Builds on get_glucose_meal_response with persistent per-food scoring. "
-                "Webb: your personal food response is more meaningful than any GI table. "
-                "Attia: focus on the fiber-to-carb ratio — strongest dietary predictor of glucose response. "
-                "Use for: 'which foods spike my glucose most', 'best foods for blood sugar', "
-                "'food response database', 'personal glycemic index', 'food leaderboard', "
-                "'worst foods for glucose', 'food scoring'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "min_observations": {"type": "integer", "description": "Minimum times a food must appear to be ranked (default: 2)."},
-                    "sort_by": {"type": "string", "description": "Sort leaderboard by: avg_spike (default), count. Lower impact = better."},
-                },
-                "required": [],
-            },
-        },
-    },
     "get_adaptive_mode": {
         "fn": get_adaptive_mode,
         "schema": {
@@ -2588,30 +1869,7 @@ TOOLS = {
             },
         },
     },
-    "get_defense_patterns": {
-        "fn": tool_get_defense_patterns,
-        "schema": {
-            "name": "get_defense_patterns",
-            "description": (
-                "Retrieve defense mechanism patterns from enriched journal entries. "
-                "Shows frequency of each psychological defense (intellectualization, avoidance, "
-                "displacement, rationalization, isolation of affect, minimization, projection, denial, "
-                "sublimation, humor as deflection). Includes mood/stress correlation per pattern, "
-                "trend over time, and Conti-informed assessment. "
-                "Conti: the platform itself can be a defense mechanism — understanding that is the next level. "
-                "Use for: 'defense mechanism patterns', 'psychological defenses', 'am I avoiding anything', "
-                "'defense patterns in journal', 'emotional depth trend', 'Conti analysis'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
+    # get_defense_patterns removed — function never implemented (v3.7.0)
     # ── Lactate Threshold Estimation (#27) ──
     "get_lactate_threshold_estimate": {
         "fn": tool_get_lactate_threshold_estimate,

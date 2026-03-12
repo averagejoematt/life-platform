@@ -8,8 +8,10 @@ tools_hypotheses.py — IC-18: Cross-Domain Hypothesis Engine MCP Tools
 
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
-from mcp.db import get_table
-from mcp.config import USER_ID
+from mcp.config import table, USER_ID
+
+def get_table():
+    return table
 
 HYPOTHESES_PK = f"USER#{USER_ID}#SOURCE#hypotheses"
 

@@ -24,7 +24,14 @@ Categories seeded now:
 
 import json
 from datetime import datetime, timedelta, timezone
-from .tools_data import _get_table, _get_user_id, _d2f
+from mcp.config import table as _table_ref, USER_ID as _user_id_ref
+from mcp.core import decimal_to_float as _d2f
+
+def _get_table():
+    return _table_ref
+
+def _get_user_id():
+    return _user_id_ref
 
 MEMORY_SOURCE = "platform_memory"
 
