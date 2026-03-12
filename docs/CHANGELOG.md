@@ -1,5 +1,44 @@
 # Life Platform — Changelog
 
+## v3.7.3 — 2026-03-11: TB7-11 through TB7-17 CI hardening + bug fix
+
+### Summary
+Seven CI/CD hardening tasks completed: layer version consistency check, stateful resource
+assertion, lambda_map.json digest_utils fix, TTL policy documentation, AI cost alarm,
+fingerprint idempotency docstrings, and DLQ alarm period verifier. Also fixed a silent
+duplicate sick-day check block in daily_metrics_compute_lambda.py.
+
+### Changes
+- **TB7-11** — Added "Verify layer version consistency" step to CI Plan job. Fetches
+  latest `life-platform-shared-utils` version, iterates all consumers in `lambda_map.json`,
+  fails CI if any Lambda is on a stale layer version.
+- **TB7-12** — Added "Assert stateful resources exist" step to CI Plan job. Verifies
+  DynamoDB table, S3 bucket, SNS topic, and KMS key all exist before any CDK deploy proceeds.
+- **TB7-13** — Added `lambdas/digest_utils.py` to `shared_layer.modules` and `skip_deploy.files`
+  in `ci/lambda_map.json` (it's a shared layer module, not a standalone Lambda).
+- **TB7-14** — Added "## TTL Policy" section to `docs/SCHEMA.md` documenting that only
+  `CACHE#matthew` has TTL (26h, field: `ttl`); all other partitions retain indefinitely.
+- **TB7-15** — Created `deploy/create_ai_cost_alarm.sh`: CloudWatch `EstimatedCharges` alarm
+  in us-east-1 at $5/month threshold, SNS to `life-platform-alerts`.
+- **TB7-16** — Added detailed docstrings to `get_source_fingerprints()` and `fingerprints_changed()`
+  in `daily_metrics_compute_lambda.py` explaining the data-aware idempotency pattern.
+- **TB7-17** — Created `deploy/verify_dlq_alarm_periods.sh`: scans all DLQ-related CloudWatch
+  alarms, fails if any has Period > 3600s (1 hour).
+- **Bug fix** — Removed duplicate sick-day check block in `daily_metrics_compute_lambda.py`.
+  The handler had the entire try/except/if block duplicated verbatim (f-string vs % format).
+  File reduced from ~900+ lines to 863 lines. Syntax verified clean.
+
+### Files Changed
+- `.github/workflows/ci-cd.yml` — TB7-11 layer check + TB7-12 resource assertion added
+- `ci/lambda_map.json` — TB7-13: digest_utils.py added to shared layer
+- `docs/SCHEMA.md` — TB7-14: TTL policy section added
+- `deploy/create_ai_cost_alarm.sh` — new (TB7-15)
+- `deploy/verify_dlq_alarm_periods.sh` — new (TB7-17)
+- `lambdas/daily_metrics_compute_lambda.py` — TB7-16 docstrings + duplicate block removed
+- `docs/PROJECT_PLAN.md` — TB7-11 through TB7-17 marked complete
+
+---
+
 ## v3.7.2 — 2026-03-11: TB7-5 Scheduler orphan cleanup + TB7-9 alarm triage
 
 ### Summary

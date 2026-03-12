@@ -29,7 +29,6 @@ Pattern: follows character-sheet-compute Lambda architecture.
 
 v1.0.0 — 2026-03-07
 v1.1.0 — 2026-03-09: Sick day support — grade='sick', streaks preserved
-v1.1.0 — 2026-03-09: Sick day support — grade='sick', streaks preserved
 """
 
 import json
@@ -548,10 +547,23 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
 # ==============================================================================
 
 def get_source_fingerprints(yesterday_str, sources=None):
-    """Return dict of source → webhook_ingested_at for the key daily sources.
+    """Return dict of source → ingested_at timestamp for the key daily sources.
 
-    Used for data-aware idempotency: if any source has a newer ingested_at
-    than the stored fingerprint, the compute record is stale and needs a rerun.
+    Data-aware idempotency pattern
+    ──────────────────────────────
+    Rather than using a simple 'skip if computed today' guard (which would
+    silently miss late-arriving data), this Lambda records a per-source
+    ingestion timestamp fingerprint when it first runs.
+
+    On the *next* invocation for the same date, fingerprints_changed() compares
+    the stored timestamps against the current DDB records. If any source has a
+    newer ingested_at (e.g. a delayed Whoop sync arriving after the 9:40 AM run),
+    the Lambda recomputes from scratch — ensuring the Daily Brief always reflects
+    the freshest available data without manual reruns.
+
+    Fingerprint fields checked (in priority order):
+      webhook_ingested_at  — Health Auto Export webhook writes
+      ingested_at          — Scheduled Lambda writes (Strava, Habitify, etc.)
     """
     if sources is None:
         sources = ["whoop", "apple_health", "macrofactor", "strava", "habitify", "withings"]
@@ -565,7 +577,12 @@ def get_source_fingerprints(yesterday_str, sources=None):
 
 
 def fingerprints_changed(stored_fps, current_fps):
-    """Return True if any source in current_fps is newer than stored_fps."""
+    """Return True if any source in current_fps is newer than stored_fps.
+
+    ISO string comparison is safe for UTC timestamps (lexicographic order matches
+    chronological order when the format is consistent). A missing stored timestamp
+    for a source that now has data also triggers recompute (new source appeared).
+    """
     for src, current_ts in current_fps.items():
         stored_ts = stored_fps.get(src)
         if not stored_ts:
@@ -767,60 +784,6 @@ def lambda_handler(event, context):
 
         table.put_item(Item=_sick_item)
         logger.info(f"Sick day record stored for {yesterday_str} — streaks preserved (T0={_t0_streak} T01={_t01_streak})")
-        return {
-            "statusCode":       200,
-            "body":             f"Sick day {yesterday_str}: computed_metrics stored with grade='sick'",
-            "day_grade_letter": "sick",
-            "sick_day":         True,
-            "tier0_streak":     _t0_streak,
-            "tier01_streak":    _t01_streak,
-        }
-
-    # ── Sick day check ─────────────────────────────────────────────────────
-    # If the target date is flagged as a sick/rest day, store a minimal record:
-    #   - day_grade_letter = "sick" (not scored, excluded from trend charts)
-    #   - Streak timers preserved from previous day (not broken, not advanced)
-    #   - Anomaly alerts will be suppressed separately by anomaly_detector
-    try:
-        from sick_day_checker import check_sick_day as _check_sick
-        _sick_rec = _check_sick(table, USER_ID, yesterday_str)
-    except ImportError:
-        _sick_rec = None
-
-    if _sick_rec:
-        _sick_reason = _sick_rec.get("reason") or "sick day"
-        logger.info(f"Sick day flagged for {yesterday_str} ({_sick_reason}) — storing sick record")
-
-        # Load previous day's computed_metrics to preserve streak values
-        _dt_y = datetime.strptime(yesterday_str, "%Y-%m-%d")
-        _prev_date = (_dt_y - timedelta(days=1)).strftime("%Y-%m-%d")
-        _prev_cm = fetch_date("computed_metrics", _prev_date)
-        _t0_streak  = int(float(_prev_cm.get("tier0_streak",  0))) if _prev_cm else 0
-        _t01_streak = int(float(_prev_cm.get("tier01_streak", 0))) if _prev_cm else 0
-        _vice_streaks = {k: int(float(v)) for k, v in _prev_cm.get("vice_streaks", {}).items()} if _prev_cm else {}
-
-        _sick_item = {
-            "pk":               USER_PREFIX + "computed_metrics",
-            "sk":               "DATE#" + yesterday_str,
-            "date":             yesterday_str,
-            "day_grade_letter": "sick",
-            "sick_day":         True,
-            "sick_day_reason":  _sick_reason,
-            "readiness_colour": "gray",
-            "tier0_streak":     Decimal(str(_t0_streak)),
-            "tier01_streak":    Decimal(str(_t01_streak)),
-            "sleep_debt_7d_hrs": Decimal("0"),
-            "computed_at":      datetime.now(timezone.utc).isoformat(),
-            "algo_version":     ALGO_VERSION,
-        }
-        if _vice_streaks:
-            _sick_item["vice_streaks"] = {k: Decimal(str(v)) for k, v in _vice_streaks.items()}
-
-        table.put_item(Item=_sick_item)
-        logger.info(
-            "Sick day record stored for %s — streaks preserved (T0=%s T01=%s)",
-            yesterday_str, _t0_streak, _t01_streak,
-        )
         return {
             "statusCode":       200,
             "body":             f"Sick day {yesterday_str}: computed_metrics stored with grade='sick'",
