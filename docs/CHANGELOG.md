@@ -1,5 +1,59 @@
 # Life Platform — Changelog
 
+## v3.7.0 — 2026-03-11: MCP crash fix + tool consolidation (148 → 115)
+
+### Summary
+MCP Lambda was in a crash loop caused by 4 stacked "registered but never implemented" bugs.
+Fixed all 4, consolidated tool surface from 148 → 115, and built a registry integrity test
+(R1-R7) that prevents this class of failure permanently.
+
+### Crash Fixes
+- **tools_longevity.py** — imported in registry.py but file never created → `ImportModuleError`
+- **tools_memory.py** — imported `_get_table`/`_get_user_id` from `tools_data` (don't exist there) → shimmed to `mcp.config`
+- **tools_decisions.py** — same broken import pattern → shimmed to `mcp.config`
+- **tools_hypotheses.py** — imported from `mcp.db` (file doesn't exist) → shimmed to `mcp.config`
+- **tool_get_defense_patterns** — registered in TOOLS dict, function never written → removed
+
+### Tool Consolidation (148 → 115, −33 tools)
+- **−3** longevity tools (never implemented): `get_biological_age`, `get_metabolic_health_score`, `get_food_response_database`
+- **−1** defense patterns tool (never implemented): `get_defense_patterns`
+- **−13** domain-specific correlation tools (replaced by `get_cross_source_correlation`):
+  `get_caffeine_sleep_correlation`, `get_exercise_sleep_correlation`, `get_alcohol_sleep_correlation`,
+  `get_nutrition_biometrics_correlation`, `get_glucose_sleep_correlation`, `get_glucose_exercise_correlation`,
+  `get_blood_pressure_correlation`, `get_supplement_correlation`, `get_habit_health_correlations`,
+  `get_journal_correlations`, `get_weather_correlation`, `get_meditation_correlation`, `get_exposure_correlation`
+- **−8** Claude-derivable tools: `get_non_scale_victories`, `get_day_type_analysis`, `get_device_agreement`,
+  `get_energy_balance`, `get_garmin_summary`, `get_social_isolation_risk`, `get_sleep_environment_analysis`,
+  `get_exercise_variety`
+- **−6** low-usage/aspirational: `log_exposure`, `get_exposure_log`, `log_ruck`, `get_ruck_log`,
+  `get_gait_analysis`, `get_body_composition_snapshot`
+- **−1** labs tool: `get_next_lab_priorities` (Claude derives from lab data)
+- **−2** BoD admin tools: `update_board_member`, `remove_board_member` (→ admin scripts)
+
+### Defensive Measures Added
+- **`tests/test_mcp_registry.py`** — 7-check integrity linter (R1-R7), all offline, 0.33s:
+  R1 imports resolve, R2 functions exist, R3 schema valid, R4 no duplicates,
+  R5 count in range, R6 syntax valid, R7 all modules parseable
+- **Deploy script integration** — `deploy_mcp_consolidation.sh` runs registry lint before zip/deploy
+- **Session rule** — never register a tool without the implementing function in the same commit
+
+### Files Changed
+- `mcp/registry.py` — consolidated from 3150 → ~2400 lines, removed `tools_longevity` import
+- `mcp/tools_memory.py` — fixed import (`_get_table` → `mcp.config.table` shim)
+- `mcp/tools_decisions.py` — fixed import (same pattern)
+- `mcp/tools_hypotheses.py` — fixed import (`mcp.db` → `mcp.config.table` shim)
+- `tests/test_mcp_registry.py` — NEW (R1-R7 registry linter)
+- `deploy/deploy_mcp_consolidation.sh` — NEW (deploy with lint gate)
+
+### Technical Board Review
+- Full 12-seat board review conducted. Unanimous on crash fix + consolidation.
+- Board recommends Phase 1: pre-compute composite scores to DDB (next session)
+- Board recommends Phase 1b: pre-compute weekly correlation matrix (session after)
+- 115 tools is correct resting point until pre-computation layer is built.
+- See `docs/reviews/mcp_architecture_review_2026-03-11.md` for full review.
+
+---
+
 ## v3.6.9 — 2026-03-11: hypothesis_engine W3 wiring complete — CI linter now fully green
 
 ### Summary
