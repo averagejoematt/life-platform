@@ -1,5 +1,38 @@
 # Life Platform — Changelog
 
+## v3.7.5 — 2026-03-12: CDK source hardening + CI linters (H/S test suite)
+
+### Summary
+Fixed CDK source to match live reality (preventing re-regression on every future deploy),
+then added two offline linter test files + a manifest + a post-reconcile smoke script
+to permanently prevent the CDK handler/S3-path class of bug.
+
+### Changes
+- **CDK FIX** — `operational_stack.py`: corrected handler for `freshness-checker`, `key-rotator`,
+  and `insight-email-parser` from `lambda_function.lambda_handler` to actual module names.
+  Without this, every future `cdk deploy OperationalStack` would re-break all three.
+- **CDK FIX** — `role_policies.py` `ingestion_todoist()`: added explicit `s3_prefix="raw/todoist/*"`.
+  Without this, every future `cdk deploy IngestionStack` would re-break Todoist AccessDenied.
+- **CDK FIX** — `ingestion_stack.py`: annotated HAE webhook handler with `# noqa: CDK_HANDLER_ORPHAN`
+  (uses `from_asset` not `source_file=`; linter needs to know this is intentional).
+- **NEW TEST** — `tests/test_cdk_handler_consistency.py` (H1–H5): offline linter that
+  validates every `handler=` in CDK stacks matches its `source_file=` basename, and
+  hard-fails if any `handler='lambda_function.lambda_handler'` is found.
+- **NEW TEST** — `tests/test_cdk_s3_paths.py` (S1–S4): offline linter that validates
+  every IAM S3 prefix in `role_policies.py` follows convention or is documented in manifest.
+- **NEW FILE** — `ci/lambda_s3_paths.json`: living manifest of known S3 path exceptions
+  (currently: todoist + dropbox) with evidence linking to Lambda source code.
+- **NEW SCRIPT** — `deploy/post_cdk_reconcile_smoke.sh`: run immediately after any
+  `cdk deploy` to verify handlers, IAM paths, and Lambda invocability before sleeping.
+- Both new tests wired into CI `test` job (run on every push, no AWS credentials needed).
+
+### Lesson Encoded
+CDK is the source of truth. When live config diverges from CDK desired state,
+manual post-incident patches are not enough — the CDK source must also be correct
+or the next reconcile re-breaks things. The H/S linter suite enforces this.
+
+---
+
 ## v3.7.4 — 2026-03-12: P0 alarm flood fix (CDK reconcile regression)
 
 ### Summary
