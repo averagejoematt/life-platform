@@ -1,5 +1,33 @@
 # Life Platform — Changelog
 
+## v3.7.1 — 2026-03-11: CDK reconcile (TB7-3) + TB7-10 N/A finding
+
+### Summary
+CDK drift reconcile for LifePlatformIngestion + LifePlatformOperational. TB7-10
+(reserved concurrency on ingestion Lambdas) investigated and closed as not applicable:
+account concurrency limit is 10 (floor), making reserved concurrency architecturally
+impossible. EventBridge single-invocation scheduling is equivalent protection.
+
+### Changes
+- **LifePlatformIngestion deployed** — 15 Lambdas updated to current code zip (drift from
+  ingestion_stack.py changes in v3.6.9 session). No functional Lambda changes.
+- **LifePlatformOperational** — no differences, confirmed in sync.
+- **TB7-10 closed as N/A** — `ConcurrentExecutions: 10` account limit means any
+  `reserved_concurrent_executions` setting violates AWS minimum unreserved floor of 10.
+  EventBridge fires exactly one invocation per schedule; concurrent OAuth token races
+  are not a real risk at this scale. Added to PROJECT_PLAN as documented decision.
+- **deploy/deploy_tb7_reconcile.sh** — one-shot reconcile script, archived post-session.
+  Fixed venv bootstrap (auto-creates if missing) and `--yes` flag for npx prompts.
+
+### Files Changed
+- `cdk/stacks/ingestion_stack.py` — no net change (reserved concurrency added then reverted)
+- `cdk/stacks/lambda_helpers.py` — no net change (parameter added then reverted)
+- `deploy/deploy_tb7_reconcile.sh` — new (one-shot, archived to deploy/archive/20260311/)
+- `deploy/check_eb_scheduler_orphans.sh` — new (reusable utility, keep in deploy/)
+- `deploy/triage_alarms.sh` — new (reusable utility, keep in deploy/)
+
+---
+
 ## v3.7.0 — 2026-03-11: MCP crash fix + tool consolidation (148 → 115)
 
 ### Summary
