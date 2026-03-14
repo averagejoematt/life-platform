@@ -359,6 +359,21 @@ _SCHEMAS: dict[str, dict] = {
         },
         "at_least_one_of": ["tier0_done", "composite_score"],
     },
+
+    "google_calendar": {  # R8-ST1 — added v3.7.22
+        "required_fields": ["pk", "sk", "date"],
+        "typed_fields": {
+            "event_count":     (int, float),
+            "meeting_minutes": (int, float),
+        },
+        "range_checks": {
+            "event_count":       (0, 100),
+            "meeting_minutes":   (0, 1440),  # max 24h of meetings
+            "focus_block_count": (0, 20),    # null is valid (not computable) — skip range check if absent
+        },
+        "critical_range_checks": {},
+        "at_least_one_of": ["event_count", "events"],
+    },
 }
 
 # Default schema for any source not explicitly listed — minimal checks only

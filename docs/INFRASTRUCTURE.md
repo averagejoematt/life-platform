@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-03-14 (v3.7.21 — 44 Lambdas, 10 active secrets, 88 MCP tools, ~47 alarms)
+> Last updated: 2026-03-14 (v3.7.22 — 45 Lambdas, 11 active secrets, 88 MCP tools, ~49 alarms)
 
 ---
 
@@ -107,7 +107,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Field | Value |
 |-------|-------|
 | Alert topic | `life-platform-alerts` → email to `awsdev@mattsusername.com` |
-| CloudWatch alarms | ~47 metric alarms (ALARM-only; base + invocation-count + DDB item size + canary + new Lambda alarms) |
+| CloudWatch alarms | ~49 metric alarms (ALARM-only; base + invocation-count + DDB item size + canary + new Lambda alarms) |
 
 ---
 
@@ -132,7 +132,7 @@ All DNS-validated via Route 53 CNAME records.
 
 ---
 
-## Secrets Manager (10 active secrets)
+## Secrets Manager (11 active secrets)
 
 All under prefix `life-platform/`. No values stored in this doc — access via AWS console or CLI.
 

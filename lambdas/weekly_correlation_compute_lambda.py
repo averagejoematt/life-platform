@@ -131,18 +131,46 @@ def pearson_r(xs, ys):
     return round(max(-1.0, min(1.0, r)), 4), n
 
 
-def interpret_r(r):
-    """Classify correlation strength."""
+# Minimum sample sizes for each interpretation label (Henning, R9).
+# Pearson r on small n is extremely noisy — a r=0.7 on n=12 must not be called 'strong'.
+_INTERP_N_REQUIRED = {
+    "strong":   50,  # |r| >= 0.6 AND n >= 50
+    "moderate": 30,  # |r| >= 0.4 AND n >= 30
+    "weak":     10,  # |r| >= 0.2 AND n >= 10
+}
+
+
+def interpret_r(r, n=None):
+    """Classify correlation strength, gated on sample size.
+
+    With small n, downgrade interpretation to avoid spurious 'strong' labels.
+    Requires n >= 30 for 'moderate', n >= 50 for 'strong'.
+    """
     if r is None:
         return "insufficient_data"
     abs_r = abs(r)
+    # Determine raw label from r magnitude
     if abs_r >= 0.6:
-        return "strong"
-    if abs_r >= 0.4:
-        return "moderate"
-    if abs_r >= 0.2:
-        return "weak"
-    return "negligible"
+        raw = "strong"
+    elif abs_r >= 0.4:
+        raw = "moderate"
+    elif abs_r >= 0.2:
+        raw = "weak"
+    else:
+        return "negligible"
+
+    # Downgrade if n is too small for the label
+    if n is not None:
+        required = _INTERP_N_REQUIRED.get(raw, 0)
+        if n < required:
+            # Downgrade one level
+            if raw == "strong":
+                raw = "moderate" if n >= _INTERP_N_REQUIRED["moderate"] else "weak"
+            elif raw == "moderate":
+                raw = "weak" if n >= _INTERP_N_REQUIRED["weak"] else "insufficient_data"
+            elif raw == "weak":
+                raw = "insufficient_data"
+    return raw
 
 
 # ==============================================================================
@@ -289,13 +317,13 @@ def compute_correlations(series):
         ys = [series[d].get(metric_b) for d in dates]
         r, n = pearson_r(xs, ys)
         results[label] = {
-            "metric_a":      metric_a,
-            "metric_b":      metric_b,
-            "pearson_r":     r,
-            "r_squared":     round(r ** 2, 4) if r is not None else None,
-            "n_days":        n,
-            "interpretation": interpret_r(r),
-            "direction":     ("positive" if r > 0 else "negative") if r is not None else None,
+            "metric_a":       metric_a,
+            "metric_b":       metric_b,
+            "pearson_r":      r,
+            "r_squared":      round(r ** 2, 4) if r is not None else None,
+            "n_days":         n,
+            "interpretation": interpret_r(r, n),  # n-gated: moderate≥30, strong≥50
+            "direction":      ("positive" if r > 0 else "negative") if r is not None else None,
         }
         if r is not None:
             logger.info("  %-40s r=%.3f (n=%d, %s)", label, r, n, interpret_r(r))
