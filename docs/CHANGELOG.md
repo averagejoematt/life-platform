@@ -1,5 +1,25 @@
 # Life Platform — Changelog
 
+## v3.7.13 — 2026-03-14: R8-6/7/8 housekeeping
+
+### Summary
+Post-Review #8 housekeeping. Updated archive_onetime_scripts.sh with Batch 2 (12 new one-time scripts since v3.6.0). Reconciled MCP tool count to 116 across all docs (was 144/150/116 across three files). Updated ARCHITECTURE.md to v3.7.12 + fixed stale auth secret reference.
+
+### Changes
+- **deploy/archive_onetime_scripts.sh**: added Batch 2 (12 scripts from TB7 + P0 sessions)
+- **docs/ARCHITECTURE.md**: header updated to v3.7.12/2026-03-14, tool count 116, modules 31, secrets 9, alarms 47; serve layer section updated (144→116, 30→31 modules); fixed stale `life-platform/api-keys` auth reference
+- **docs/INFRASTRUCTURE.md**: tool count 150→116
+- **docs/MCP_TOOL_CATALOG.md**: version v2.91.0→v3.7.12, date updated, total 144→116
+- **docs/CHANGELOG.md**: this entry
+
+### Files Changed
+- `deploy/archive_onetime_scripts.sh`
+- `docs/ARCHITECTURE.md`
+- `docs/INFRASTRUCTURE.md`
+- `docs/MCP_TOOL_CATALOG.md`
+
+---
+
 ## v3.7.12 — 2026-03-14: Architecture Review #8 + R8 housekeeping
 
 ### Summary

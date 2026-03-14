@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-13 (v3.7.12 — 116 tools, 31-module MCP package, 19 data sources, 42 Lambdas, 8 secrets, 42 alarms, 8 CDK stacks deployed)
+Last updated: 2026-03-13 (v3.7.13 — 116 tools, 31-module MCP package, 19 data sources, 42 Lambdas, 8 secrets, 42 alarms, 8 CDK stacks deployed)
 
 ---
 
@@ -256,10 +256,10 @@ No GSI by design — all access patterns served by PK+SK queries.
 
 ### MCP Server
 
-**Lambda:** `life-platform-mcp` | **Tools:** 144 | **Memory:** 1024 MB | **Modules:** 30
+**Lambda:** `life-platform-mcp` | **Tools:** 116 | **Memory:** 1024 MB | **Modules:** 31
 **Local endpoint:** `https://votqefkra435xwrccmapxxbj6y0jawgn.lambda-url.us-west-2.on.aws/`
 **Remote MCP:** `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` — OAuth 2.1 auto-approve + HMAC Bearer (enables claude.ai + mobile)
-**Auth:** `x-api-key` header check; key in `life-platform/api-keys`
+**Auth:** `x-api-key` header check; key in `life-platform/ai-keys`
 **Protocol:** JSON-RPC 2.0 / MCP spec 2025-06-18
 
 30-module package structure:

@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-**Version:** v2.91.0 | **Last updated:** 2026-03-08 | **Total tools:** 144
+**Version:** v3.7.12 | **Last updated:** 2026-03-14 | **Total tools:** 116
 
 > Complete reference for all MCP tools exposed to Claude Desktop.
 > For usage examples and natural language queries, see USER_GUIDE.md.
