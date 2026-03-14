@@ -1,5 +1,35 @@
 # Life Platform — Changelog
 
+## v3.7.6 — 2026-03-13: TB7 sprint complete + MCP KMS fix
+
+### Summary
+Completed all 5 outstanding TB7 hardening items. Discovered and fixed MCP KMS
+permission regression. Brittany weekly email unblocked and confirmed sending.
+
+### Changes
+- **TB7-4 CLOSED** — `life-platform/api-keys` permanently deleted (4 days ahead of
+  2026-03-17 deadline). Grep sweep confirmed zero live Lambda code references remaining.
+- **TB7-1 CLOSED** — GitHub `production` environment confirmed with 1 protection rule.
+- **TB7-2 CLOSED** — Brittany weekly email fully unblocked: set `BRITTANY_EMAIL=brittany@mattsusername.com`
+  and `EMAIL_SENDER=awsdev@mattsusername.com` on live Lambda + CDK source updated in
+  `email_stack.py`. Smoke test confirmed 200 + email sent.
+- **TB7-15 CLOSED** — Created `life-platform-billing-alerts` SNS topic in us-east-1
+  (billing alarms require same-region SNS). Created `life-platform-ai-cost-soft-alarm`
+  in us-east-1 at $5 threshold. Fixed `create_ai_cost_alarm.sh` (cross-region SNS bug).
+- **TB7-17 CLOSED** — DLQ alarm period verified at 300s (5 min), well within 1-hour limit.
+  Fixed `verify_dlq_alarm_periods.sh` (JMESPath `lower()` bug + heredoc Python parse bug).
+- **BUG FIX** — MCP Lambda had lost `kms:Decrypt` on platform KMS key (AccessDeniedException
+  on all DDB operations). Applied `McpKmsDecrypt` inline policy to MCP role. CDK
+  `role_policies.mcp_server()` already has KMS — regression was from stale role state.
+- **SICK DAYS** — Logged 2026-03-12 and 2026-03-13 as sick days.
+
+### Notes
+- DLQ alarm currently in ALARM state — worth investigating for queued messages.
+- Billing SNS subscription pending email confirmation to `awsdev@mattsusername.com`.
+- Brittany email next scheduled run: Sunday 2026-03-15 at 09:30 PT.
+
+---
+
 ## v3.7.5 — 2026-03-12: CDK source hardening + CI linters (H/S test suite)
 
 ### Summary

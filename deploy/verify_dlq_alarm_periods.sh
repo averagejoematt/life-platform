@@ -20,7 +20,7 @@ echo ""
 # or have "dlq" / "dead" in their name.
 ALARM_JSON=$(aws cloudwatch describe-alarms \
   --region "$AWS_REGION" \
-  --query "MetricAlarms[?contains(MetricName, 'ApproximateNumberOfMessages') || contains(lower(AlarmName), 'dlq') || contains(lower(AlarmName), 'dead')]" \
+  --query "MetricAlarms[?contains(MetricName, 'ApproximateNumberOfMessages') || contains(AlarmName, 'dlq') || contains(AlarmName, 'dead') || contains(AlarmName, 'DLQ') || contains(AlarmName, 'Dead')]" \
   --output json)
 
 COUNT=$(echo "$ALARM_JSON" | python3 -c "import json,sys; print(len(json.load(sys.stdin)))")
@@ -36,33 +36,28 @@ echo "Found $COUNT DLQ-related alarm(s):"
 echo ""
 
 FAILED=0
-echo "$ALARM_JSON" | python3 << 'PYEOF'
+echo "$ALARM_JSON" | python3 -c "
 import json, sys
-
 alarms = json.load(sys.stdin)
 max_period = 3600
-
 for a in alarms:
-    name    = a.get("AlarmName", "?")
-    period  = a.get("Period", 0)
-    evals   = a.get("EvaluationPeriods", 1)
-    state   = a.get("StateValue", "?")
-    total   = period * evals
-
-    ok = period <= max_period
-    status = "✅" if ok else "❌"
-    print(f"  {status} {name}")
-    print(f"     Period: {period}s ({period // 60} min)  x {evals} eval(s) = {total}s total window")
-    print(f"     State:  {state}")
+    name   = a.get('AlarmName', '?')
+    period = a.get('Period', 0)
+    evals  = a.get('EvaluationPeriods', 1)
+    state  = a.get('StateValue', '?')
+    total  = period * evals
+    ok     = period <= max_period
+    status = 'OK' if ok else 'FAIL'
+    print(f'  [{status}] {name}')
+    print(f'     Period: {period}s ({period // 60} min) x {evals} eval(s) = {total}s total window')
+    print(f'     State:  {state}')
     if not ok:
-        print(f"     ⚠️  VIOLATION: period {period}s exceeds limit of {max_period}s (1 hour)")
+        print(f'     VIOLATION: period {period}s exceeds limit of {max_period}s (1 hour)')
     print()
-
-violations = [a for a in alarms if a.get("Period", 0) > max_period]
+violations = [a for a in alarms if a.get('Period', 0) > max_period]
 if violations:
-    print(f"❌ {len(violations)} alarm(s) exceed the 1-hour period limit.")
-    print("   Fix: reduce Period in the CloudWatch alarm or CDK construct.")
+    print(f'FAIL: {len(violations)} alarm(s) exceed the 1-hour period limit.')
     sys.exit(1)
 else:
-    print(f"✅ All {len(alarms)} DLQ alarm(s) have period ≤ {max_period}s (1 hour).")
-PYEOF
+    print(f'PASS: All {len(alarms)} DLQ alarm(s) have period <= {max_period}s (1 hour).')
+"
