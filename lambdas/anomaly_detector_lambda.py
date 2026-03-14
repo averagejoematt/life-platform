@@ -113,9 +113,9 @@ MIN_BASELINE_DAYS = 7
 # At 13 metrics, Z=1.5 floor yields ~42% daily FP rate. Z=2.0 floor drops it to ~2.3% per metric.
 # Sustained streak tracker (DDB history) is unaffected by this change.
 CV_THRESHOLDS = [
-    (0.30, 2.5),   # high variability → Z=2.0
-    (0.15, 2.0),   # medium variability → Z=1.75
-    (0.0,  2.0),   # low variability → Z=1.5
+    (0.30, 2.5),   # high variability → Z=2.5
+    (0.15, 2.0),   # medium variability → Z=2.0
+    (0.0,  2.0),   # low variability → Z=2.0
 ]
 
 MIN_ABSOLUTE_CHANGE = {

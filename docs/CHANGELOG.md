@@ -1,5 +1,40 @@
 # Life Platform — Changelog
 
+## v3.7.15 — 2026-03-13: Architecture Review #8 execution
+
+### Summary
+Full Architecture Review #8 conducted. Grade: A-. Executed immediate fixes: stale CV_THRESHOLDS comments in anomaly detector, new IAM/secrets consistency CI lint (`test_iam_secrets_consistency.py`), SCHEMA.md added to `sync_doc_metadata.py`, P0 verification script for webhook auth + secret reconciliation. Review document produced at `docs/reviews/architecture_review_8_full.md`.
+
+### Key Review Findings (see full report)
+- **FINDING-1 (HIGH):** COST-B created `ingestion-keys` references in 4 IAM policies that don’t match documented 9-secret list. Needs runtime verification.
+- **FINDING-2 (HIGH):** Webhook Lambda IAM has no Secrets Manager access but code calls `get_secret_value()`. Auth may be broken. Needs runtime verification.
+- **FINDING-3 (HIGH):** Complexity approaching single-operator sustainability limits. SIMP-1 is the strategic priority.
+- **FINDING-4 (MEDIUM):** No integration/E2E test in CI.
+- 12 total findings documented. 4 SLOs validated. 23 ADRs reviewed.
+
+### Changes
+- **lambdas/anomaly_detector_lambda.py**: Fixed stale CV_THRESHOLDS inline comments (said Z=2.0/1.75/1.5 but actual values are Z=2.5/2.0/2.0)
+- **tests/test_iam_secrets_consistency.py** (new): R8-8 CI lint — cross-references IAM secret ARN patterns against known-secrets list. Rules S1–S4.
+- **.github/workflows/ci-cd.yml**: Added `test_iam_secrets_consistency.py` to Job 2 (Unit Tests)
+- **deploy/sync_doc_metadata.py**: Added SCHEMA.md to sync rules; bumped PLATFORM_FACTS to v3.7.15
+- **deploy/r8_p0_verify.sh** (new): P0 verification script — checks secrets inventory, Lambda env vars, webhook auth, MCP concurrency, runs IAM lint
+
+### Files Changed
+- `lambdas/anomaly_detector_lambda.py`
+- `tests/test_iam_secrets_consistency.py` (new)
+- `.github/workflows/ci-cd.yml`
+- `deploy/sync_doc_metadata.py`
+- `deploy/r8_p0_verify.sh` (new)
+- `docs/CHANGELOG.md`
+
+### Next Steps (from R8 roadmap)
+1. Run `bash deploy/r8_p0_verify.sh` to verify webhook auth + secret state
+2. Fix `role_policies.py` based on verification results
+3. Run `python3 deploy/sync_doc_metadata.py --apply` to fix SCHEMA.md header
+4. SIMP-1 tool consolidation (60-day target)
+
+---
+
 ## v3.7.14 — 2026-03-14: doc sync automation
 
 ### Summary
