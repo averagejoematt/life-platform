@@ -153,6 +153,19 @@ jobs:
           python3 -m pytest tests/test_ddb_patterns.py -v --tb=short
           echo "::endgroup::"
 
+      - name: MCP registry integrity linter (test_mcp_registry.py)
+        run: |
+          echo "::group::MCP registry integrity linter"
+          python3 -m pytest tests/test_mcp_registry.py -v --tb=short
+          echo "::endgroup::"
+
+      - name: Lambda handler integration linter (test_lambda_handlers.py)
+        # TB7-24: I1-I6 — file existence, syntax, handler signature, try/except, orphans, MCP entry point
+        run: |
+          echo "::group::Lambda handler integration linter"
+          python3 -m pytest tests/test_lambda_handlers.py -v --tb=short
+          echo "::endgroup::"
+
       - name: Deprecated secrets scan
         run: |
           echo "::group::Deprecated secrets scan"

@@ -1,5 +1,45 @@
 # Life Platform — Changelog
 
+## v3.7.12 — 2026-03-14: Architecture Review #8 + R8 housekeeping
+
+### Summary
+Architecture Review #8 (v3.7.11 baseline). Platform grades to A- overall for the first time. Five R8 items resolved in-session: SNS confirmed active, weather_lambda.py orphan deleted, bundle generator handover path fixed, test_lambda_handlers.py + test_mcp_registry.py wired into CI/CD Job 2.
+
+### Changes
+- **docs/reviews/REVIEW_BUNDLE_2026-03-14.md** (new): pre-compiled review bundle
+- **lambdas/weather_lambda.py** deleted (orphan — Review #4 debt, fails I5)
+- **deploy/generate_review_bundle.py**: fix handover path (`handovers/HANDOVER_LATEST.md` not `docs/`)
+- **.github/workflows/ci-cd.yml**: added `test_mcp_registry.py` + `test_lambda_handlers.py` to Job 2 (R8-5)
+- **docs/CHANGELOG.md**: this entry
+
+### Review #8 Grades
+| Dimension | #7 | **#8** | Δ |
+|-----------|-----|--------|---|
+| Architecture | A | **A** | → |
+| Security | A- | **A-** | → |
+| Reliability | B+ | **A-** | ↑ |
+| Operability | B+ | **A-** | ↑ |
+| Cost | A | **A** | → |
+| Data Quality | A- | **A-** | → |
+| AI/Analytics | B | **B+** | ↑ |
+| Maintainability | B+ | **A-** | ↑ |
+| Production Readiness | B | **B** | → |
+
+### Outstanding R8 items
+- R8-1 🔴 TB7-4: grep sweep + delete `life-platform/api-keys` before 2026-03-17
+- R8-6 🟡 Run `bash deploy/archive_onetime_scripts.sh`
+- R8-7 🟡 Reconcile MCP tool count across ARCHITECTURE.md / INFRASTRUCTURE.md / MCP_TOOL_CATALOG.md
+- R8-8 🟢 Update ARCHITECTURE.md header
+
+### Files Changed
+- `docs/reviews/REVIEW_BUNDLE_2026-03-14.md` (new)
+- `deploy/generate_review_bundle.py` (handover path fix)
+- `.github/workflows/ci-cd.yml` (R8-5: 2 new CI test steps)
+- `lambdas/weather_lambda.py` (deleted → deploy/archive/)
+- `docs/CHANGELOG.md`
+
+---
+
 ## v3.7.11 — 2026-03-13: TB7-24 Lambda handler integration linter
 
 ### Summary

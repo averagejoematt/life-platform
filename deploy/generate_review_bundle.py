@@ -130,7 +130,7 @@ def build_bundle():
     sections.append("## 1. PLATFORM STATE SNAPSHOT\n")
 
     # Handover (latest state)
-    handover = read_file(DOCS_DIR / "HANDOVER_LATEST.md")
+    handover = read_file(PROJECT_ROOT / "handovers" / "HANDOVER_LATEST.md")
     sections.append("### Latest Handover\n")
     sections.append(handover)
     sections.append("\n---\n")
