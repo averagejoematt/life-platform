@@ -24,6 +24,9 @@ Schedule:
   9:42 AM PT  daily-insight-compute  ← this Lambda
   10:00 AM PT daily-brief            (reads computed_insights via data["computed_insights"])
 
+v1.4.0 — 2026-03-13 (TB7-22: equalize slow drift windows)
+  - _compute_slow_drift(): windows changed from 7d recent/8-28d baseline
+    to 14d recent/15-28d baseline (equal 14d windows, same SE of mean)
 v1.3.0 — 2026-03-11 (IC-19: Slow Drift + Experiment Context)
   - _compute_slow_drift(): non-overlapping 7d vs 8-28d windows, min N=14 (Henning)
   - Weight plateau: regression slope on >=8 measurements, not endpoint (Attia)
@@ -914,9 +917,14 @@ def _check_circadian_consistency(yesterday_str, window_days=21):
 def _compute_slow_drift(yesterday_str, profile):
     """Detect gradual metric drift using non-overlapping baseline windows.
 
-    Windows (Henning — MUST be non-overlapping):
-      Recent window:   days 1-7  before yesterday  (7 days)
-      Baseline window: days 8-28 before yesterday  (21 days, zero overlap)
+    Windows (TB7-22, 2026-03-13 — equalized per Henning recommendation):
+      Recent window:   days 1-14 before yesterday  (14 days)
+      Baseline window: days 15-28 before yesterday (14 days, zero overlap)
+
+    Rationale: original 7d recent / 21d baseline was asymmetric. The shorter recent
+    window was more volatile and the asymmetric comparison inflated apparent drift
+    severity. Equal 14d/14d windows are more statistically comparable (same N, same
+    SE of mean). Min N=14 gate now applies identically to both windows.
 
     Severity tiers:
       mild:        0.5-1.0 SD drift  — stored but NOT injected into context block
@@ -939,12 +947,12 @@ def _compute_slow_drift(yesterday_str, profile):
     today       = datetime.now(timezone.utc).date()
     yest        = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
 
-    # Recent window: days 1-7 before yesterday (inclusive)
+    # Recent window: days 1-14 before yesterday (inclusive) — TB7-22
     recent_end   = (yest - timedelta(days=1)).isoformat()
-    recent_start = (yest - timedelta(days=7)).isoformat()
+    recent_start = (yest - timedelta(days=14)).isoformat()
 
-    # Baseline window: days 8-28 before yesterday (non-overlapping)
-    baseline_end   = (yest - timedelta(days=8)).isoformat()
+    # Baseline window: days 15-28 before yesterday (non-overlapping) — TB7-22
+    baseline_end   = (yest - timedelta(days=15)).isoformat()
     baseline_start = (yest - timedelta(days=28)).isoformat()
 
     drift_results = []

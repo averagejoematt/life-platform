@@ -116,7 +116,6 @@ invoke_check() {
     --function-name "$fn" \
     --payload "$payload" \
     --region "$REGION" \
-    --cli-binary-format raw-in-base64-out \
     "$tmp" \
     --query "StatusCode" --output text 2>/dev/null || echo "0")
 
@@ -145,9 +144,9 @@ invoke_check() {
 # Freshness checker (the one that broke)
 invoke_check "life-platform-freshness-checker"
 
-# Todoist — can't actually ingest without credentials, but check it boots cleanly
-# Pass a no-op payload that won't trigger real ingestion
-invoke_check "todoist-data-ingestion" '{"dry_run": true}'
+# Todoist — just check it boots cleanly (imports resolve, handler exists)
+# Empty payload: the Lambda will attempt ingestion but will exit cleanly on no-new-data
+invoke_check "todoist-data-ingestion" '{}'
 
 # Canary — full health check
 invoke_check "life-platform-canary"

@@ -91,6 +91,8 @@ The architecture decision (ADR-016) is explicit: no vector store, no embeddings,
 **Status:** Live (v2.86.0)  
 **What it does:** Board of Directors + TL;DR AI calls use two-pass reasoning. Pass 1 generates structured JSON identifying patterns and causal chains. Pass 2 writes coaching output using Pass 1 analysis. ~2× token cost but material quality improvement — model reasons before writing.
 
+**Model routing (TB7-23, confirmed 2026-03-13):** Both Pass 1 (analysis) and Pass 2 (output) use `AI_MODEL` = `claude-sonnet-4-6` via `call_anthropic()` in `ai_calls.py`. There is **no quality asymmetry** between the two passes — both run on Sonnet. The Haiku reference at line 515 of `daily_insight_compute_lambda.py` is the IC-8 intent evaluator, which correctly uses Haiku (classification task, not coaching). IC-3 itself has no Haiku dependency.
+
 ### IC-6: Milestone Architecture
 **Status:** Live (v2.86.0)  
 **What it does:** 6 weight/health milestones with biological significance for Matthew stored in `platform_memory`. Surfaced in coaching when approaching each threshold. Example: "At 285 lbs: sleep apnea risk drops substantially (genome flag)." Converts abstract goal into biological waypoints.
@@ -276,9 +278,11 @@ IC features are gated by how much data exists. Don't build IC features before th
 
 | CV (σ/μ) | Z threshold | One-tailed FP rate (normality assumed) |
 |----------|-------------|----------------------------------------|
-| ≥ 0.30 (high variability) | 2.0 | 2.28% per metric per day |
-| 0.15–0.30 (medium) | 1.75 | 4.01% per metric per day |
-| < 0.15 (low variability) | 1.5 | 6.68% per metric per day |
+| ≥ 0.30 (high variability) | 2.5 | 0.62% per metric per day |
+| 0.15–0.30 (medium) | 2.0 | 2.28% per metric per day |
+| < 0.15 (low variability) | 2.0 | 2.28% per metric per day |
+
+> **TB7-21 (2026-03-13):** Floor raised from Z=1.5/1.75 to Z=2.0 (`anomaly_detector_lambda.py` v2.5.0). At 13 metrics with Z=1.5 floor, expected daily FP count under independence was ~0.87 (single-metric) before the 2-source gate. Z=2.0 floor reduces this to ~0.30. Sustained streak tracker is unaffected (reads DDB anomaly history, not single-day Z-scores).
 
 **Normality assumption:** Z-scores are only interpretable as probabilities under a Gaussian distribution. Most health metrics are *not* normally distributed:
 - **HRV**: right-skewed and often lognormal. **Fixed in v2.4.0:** Z-scores for HRV are now computed on log(HRV) rather than raw HRV (see `LOG_TRANSFORM_METRICS` in `anomaly_detector_lambda.py`). Display values (ms) remain in original units; only the Z computation moves to log domain. This reduces false high-HRV flags and makes low-HRV detection more precise.
@@ -297,7 +301,9 @@ IC features are gated by how much data exists. Don't build IC features before th
 ### 3. Non-Overlapping Window Drift Detection
 
 **Where used:** `daily_insight_compute_lambda.py` → `_compute_slow_drift()`  
-**Method:** Compare recent-window mean (days 1–7 before yesterday) against baseline-window mean (days 8–28 before yesterday). Express drift as (recent_mean − baseline_mean) / baseline_SD. Windows are explicitly non-overlapping by design (Henning gate).
+**Method:** Compare recent-window mean (days 1–14 before yesterday) against baseline-window mean (days 15–28 before yesterday). Express drift as (recent_mean − baseline_mean) / baseline_SD. Windows are explicitly non-overlapping by design (Henning gate).
+
+> **TB7-22 (2026-03-13):** Windows equalized from 7d recent/8-28d baseline to 14d recent/15-28d baseline (`daily_insight_compute_lambda.py` v1.4.0). Rationale: asymmetric windows produced a volatile recent mean (N=7) vs stable baseline mean (N=21), inflating apparent drift severity. Equal 14d windows have the same standard error of the mean, making comparisons statistically equivalent.
 
 **Why non-overlapping matters:** Overlapping windows share data points, creating artificial correlation between the two means and inflating the apparent precision of the drift estimate. The 1-day gap between windows (day 7 vs day 8) is the minimum necessary separation.
 
@@ -376,4 +382,4 @@ These decisions are documented to prevent revisiting:
 
 ---
 
-*Last updated: 2026-03-12 (v3.6.3)*
+*Last updated: 2026-03-13 (v3.7.7 — TB7-21/22/23)*

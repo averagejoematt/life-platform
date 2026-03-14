@@ -126,17 +126,36 @@ def _avg(vals):
 # Reads the pre-computed platform intelligence block from daily-insight-compute Lambda.
 # ==============================================================================
 
+# TB7-20: Hard cap on insights context injected into prompts.
+# The upstream _build_prioritized_context_block() already applies a 700-token budget,
+# but as the corpus grows this is a safety valve for the ai_calls layer.
+# 1500 chars ≈ ~375 tokens. Truncates at a signal boundary with a note.
+_MAX_INSIGHTS_CONTEXT_CHARS = 1500
+
+
 def _load_insights_context(data):
     """Extract the AI context block from the computed_insights record.
 
     Returns a compact string block for prompt injection, or empty string
     if the insights Lambda hasn't run yet (graceful degradation).
+
+    TB7-20: Applies a 1500-char hard cap as a second safety valve beyond the
+    700-token budget enforced upstream in _build_prioritized_context_block().
+    Truncates at a newline boundary and appends a truncation note.
     """
     insights = data.get("computed_insights")
     if not insights:
         return ""
     block = insights.get("ai_context_block", "")
-    return block
+    if not block:
+        return ""
+    if len(block) <= _MAX_INSIGHTS_CONTEXT_CHARS:
+        return block
+    # Truncate at the last newline before the cap so we don't cut mid-sentence
+    cutoff = block.rfind("\n", 0, _MAX_INSIGHTS_CONTEXT_CHARS)
+    if cutoff < 0:
+        cutoff = _MAX_INSIGHTS_CONTEXT_CHARS
+    return block[:cutoff] + "\n[...context truncated at 1500-char limit]"
 
 
 # ==============================================================================
