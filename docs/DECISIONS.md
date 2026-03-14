@@ -381,7 +381,7 @@ When a significant decision is made — a design pattern chosen, an approach rej
 
 ---
 
-*Last updated: 2026-03-13 (v3.7.15)*
+*Last updated: 2026-03-14 (v3.7.20)*
 
 ---
 

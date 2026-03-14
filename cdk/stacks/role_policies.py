@@ -449,6 +449,11 @@ def compute_hypothesis_engine() -> list[iam.PolicyStatement]:
     )
 
 
+def compute_weekly_correlations() -> list[iam.PolicyStatement]:
+    """Weekly correlation compute (R8-LT9): reads 8 source partitions, writes SOURCE#weekly_correlations."""
+    return _compute_base(needs_kms=True)
+
+
 def compute_dashboard_refresh() -> list[iam.PolicyStatement]:
     """Dashboard refresh: reads DDB, writes dashboard/data.json + buddy/data.json to S3."""
     return _compute_base(

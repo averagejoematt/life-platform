@@ -48,9 +48,9 @@ DOCS = ROOT / "docs"
 
 PLATFORM_FACTS = {
     # Core counts
-    "version":          "v3.7.19",
+    "version":          "v3.7.20",
     "date":             "2026-03-14",
-    "lambda_count":     42,
+    "lambda_count":     43,
     "tool_count":       86,
     "module_count":     31,       # mcp/ modules
     "secret_count":     10,       # active secrets (verified by r8_p0_verify.sh)

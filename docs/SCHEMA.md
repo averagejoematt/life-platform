@@ -2,7 +2,7 @@
 
 **Table:** `life-platform` (us-west-2)  
 **Design:** Single-table with composite keys  
-**Last updated:** 2026-03-13 (v3.7.15 — 116 MCP tools, 19 data sources, 42 Lambdas, 12 cached tools)
+**Last updated:** 2026-03-14 (v3.7.20 — 86 MCP tools, 19 data sources, 43 Lambdas, 12 cached tools)
 
 ---
 
@@ -1077,6 +1077,69 @@ Pre-computed daily metrics written by `daily-metrics-compute` Lambda at 9:40 AM 
 | `consecutive_logging_days` | number | Streak of days with nutrition logged |
 | `habit_streak_t0` | number | Consecutive days all Tier 0 habits completed |
 | `computed_at` | string | ISO timestamp of computation |
+
+---
+
+## Weekly Correlations Partition (R8-LT9, v3.7.20)
+
+**pk:** `USER#matthew#SOURCE#weekly_correlations`  
+**sk:** `WEEK#<iso_week>` (e.g. `WEEK#2026-W11`)
+
+Pearson correlations between 20 key metric pairs computed weekly over a 90-day rolling window. Written by `weekly-correlation-compute` Lambda every Sunday at 11:30 AM PT. MCP tools can read this for instant correlation lookups without recomputing from raw sources.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `week` | string | ISO week key (e.g. `2026-W11`) |
+| `start_date` | string | Window start YYYY-MM-DD |
+| `end_date` | string | Window end YYYY-MM-DD |
+| `lookback_days` | number | Lookback window (default: 90) |
+| `n_pairs` | number | Number of correlation pairs computed |
+| `correlations` | map | Per-pair results (see below) |
+| `computed_at` | string | ISO timestamp |
+
+**`correlations` sub-fields** (per pair, e.g. `correlations.hrv_vs_recovery`):
+
+| Sub-field | Type | Description |
+|-----------|------|-------------|
+| `metric_a` | string | First metric name |
+| `metric_b` | string | Second metric name |
+| `pearson_r` | number | Pearson r (−1 to 1), null if <10 paired days |
+| `r_squared` | number | r² (explained variance) |
+| `n_days` | number | Paired data points used |
+| `interpretation` | string | strong/moderate/weak/negligible/insufficient_data |
+| `direction` | string | positive/negative/null |
+
+**Pairs computed:** hrv↔recovery, sleep_duration↔recovery, sleep_score↔recovery, hrv↔sleep_score, rhr↔recovery, tsb↔recovery, strain↔hrv, training_load↔hrv, training_mins↔recovery, protein↔recovery, calories↔hrv, carbs↔hrv, steps↔recovery, steps↔hrv, steps↔sleep, habit_pct↔day_grade, habit_pct↔recovery, tier0_streak↔day_grade, calories↔day_grade, readiness↔day_grade.
+
+**Durability:** Retained indefinitely. One record per ISO week.
+
+---
+
+## Composite Scores Partition (R8-ST5, v3.7.20)
+
+**pk:** `USER#matthew#SOURCE#composite_scores`  
+**sk:** `DATE#YYYY-MM-DD`
+
+Denormalised daily snapshot of all key composite metrics. Written by `daily-metrics-compute` Lambda at 9:40 AM PT alongside `computed_metrics`. Enables MCP tools to do a single DDB read for common composite lookups instead of recomputing from raw sources. Also supports trend queries across dates.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `date` | string | YYYY-MM-DD |
+| `day_grade_score` | number | Weighted day grade 0-100 |
+| `day_grade_letter` | string | A+ through F |
+| `readiness_score` | number | 0-100 composite (recovery+sleep+hrv+tsb) |
+| `readiness_colour` | string | green / yellow / red / gray |
+| `tier0_streak` | number | Consecutive Tier-0 perfect days |
+| `tier01_streak` | number | Consecutive Tier-0+1 perfect days |
+| `tsb` | number | Training Stress Balance (CTL−ATL) |
+| `hrv_7d` | number | 7-day HRV average (ms) |
+| `hrv_30d` | number | 30-day HRV baseline (ms) |
+| `latest_weight` | number | Most recent Withings weight (lbs) |
+| `component_scores` | map | Per-component scores from scoring engine |
+| `computed_at` | string | ISO timestamp |
+| `algo_version` | string | Scoring algorithm version |
+
+**Durability:** Retained indefinitely. Non-critical path — write failures are logged but do not block Daily Brief delivery.
 
 ---
 
