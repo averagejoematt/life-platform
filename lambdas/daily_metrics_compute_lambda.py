@@ -566,6 +566,11 @@ def get_source_fingerprints(yesterday_str, sources=None):
       ingested_at          — Scheduled Lambda writes (Strava, Habitify, etc.)
     """
     if sources is None:
+        # TB7-16: When adding a new data source (e.g. google_calendar, monarch_money),
+        # add it to this list. If a source is omitted, late-arriving data for that
+        # source will NOT trigger a recompute — the Daily Brief may silently reflect
+        # stale values. Sources should be included only if they materially affect
+        # day grade scoring or the AI coaching context.
         sources = ["whoop", "apple_health", "macrofactor", "strava", "habitify", "withings"]
     fps = {}
     for src in sources:

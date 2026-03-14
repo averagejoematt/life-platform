@@ -1278,14 +1278,24 @@ Claude tools
 
 ## TTL Policy
 
-DynamoDB TTL is enabled on the `life-platform` table using the `ttl` attribute. Only one partition uses TTL; all others retain data indefinitely.
+> **TB7-14 (2026-03-13):** Per-partition retention policies documented. DynamoDB TTL is currently only enforced on `CACHE#matthew`. All other partitions use **application-level expiry** (enforced by query logic or Lambda code) or retain indefinitely. This table is the canonical reference.
 
-| Partition | TTL? | TTL field | Retention | Notes |
-|-----------|------|-----------|-----------|-------|
-| `CACHE#matthew` | ✅ Yes | `ttl` | 26 hours | Written by MCP warmer at 03:00 UTC nightly. Items auto-expire ~26h after write. Avoids stale cache items surviving past the next warm cycle. |
-| All other partitions | ❌ No | — | Indefinite | Raw ingestion data, day grades, character sheet, computed metrics, insights, decisions, hypotheses, travel, anomalies, platform memory, supplements, journal — all retained permanently for trend analysis. |
+DynamoDB TTL is enabled on the `life-platform` table using the `ttl` attribute.
 
-**How TTL is set:** The `store_cache` function in `mcp_server.py` sets `ttl = int(time.time()) + 93600` (26 hours in seconds). DynamoDB background deletion occurs within ~48 hours of expiry — expired items may still be returned briefly before deletion, so MCP tools should check `ttl` against `time.time()` if freshness is critical.
+| Partition | DDB TTL? | App-level expiry? | Policy | Enforcement | Notes |
+|-----------|----------|-------------------|--------|-------------|-------|
+| `CACHE#matthew` | ✅ Yes | — | 26 hours | `ttl` field set by `store_cache()` in `mcp_server.py` | Auto-expired by DDB background deletion. Avoids stale cache surviving past nightly warm cycle. |
+| `SOURCE#hypotheses` | ❌ No | ✅ Yes | 30 days | `expiry_date` field checked by `hypothesis-engine` Lambda + MCP tools | 30-day hard expiry enforced at application layer (v1.1.0). Expired hypotheses are never promoted regardless of evidence count. Status set to `expired`. |
+| `SOURCE#platform_memory` | ❌ No | ❌ No | ~90 days (policy, not enforced) | Query window limits (fetch_memory_records lookback) | Categories accumulate indefinitely in DDB; lookback windows (30–90 days) mean old records are never read. No cleanup needed until corpus exceeds 1,000 items. |
+| `SOURCE#insights` | ❌ No | ❌ No | ~180 days (policy, not enforced) | IC-16 lookback windows (30d for weekly, 90d for monthly) | Grows ~7 records/week (one per digest). At 180-day retention target: ~180 records. Low volume — no urgent cleanup need. Revisit when insight count exceeds 500 (trigger for Insights GSI, roadmap item #17). |
+| `SOURCE#decisions` | ❌ No | ❌ No | Indefinite | — | Low volume (manual or inferred). Retained permanently for trust-calibration dataset. |
+| `SOURCE#anomalies` | ❌ No | ❌ No | Indefinite | — | One record per day. Grows at ~365 records/year. Lightweight — no cleanup needed. |
+| All raw ingestion partitions | ❌ No | ❌ No | Indefinite | — | `whoop`, `strava`, `garmin`, `macrofactor`, etc. Retained permanently for longitudinal trend analysis. This is the core data asset. |
+| All other derived partitions | ❌ No | ❌ No | Indefinite | — | `day_grade`, `character_sheet`, `computed_metrics`, `habit_scores`, `travel`, `supplements`, `journal`, `chronicle` — all retained permanently. |
+
+**Why most partitions have no DDB TTL:** The platform's value is in longitudinal data. Deleting raw data or computed history would break trend tools, retrocompute, and the character sheet baseline. Only ephemeral/high-churn partitions (cache, expiring hypotheses) warrant TTL.
+
+**How DDB TTL is set:** The `store_cache` function in `mcp_server.py` sets `ttl = int(time.time()) + 93600` (26 hours in seconds). DynamoDB background deletion occurs within ~48 hours of expiry — expired items may still be returned briefly before deletion, so MCP tools should check `ttl` against `time.time()` if freshness is critical.
 
 **Adding TTL to new partitions:** Set `ttl` to a Unix epoch integer on any item you want auto-expired. No schema migration required — DynamoDB TTL operates on a per-item basis.
 
