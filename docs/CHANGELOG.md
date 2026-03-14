@@ -1,5 +1,40 @@
 # Life Platform — Changelog
 
+## v3.7.18 — 2026-03-14: SIMP-1 Phase 1b — Data, Health, Nutrition clusters
+
+### Summary
+SIMP-1 Phase 1b consolidated 11 tools into 4 dispatchers: `get_daily_snapshot`, `get_longitudinal_summary`, `get_health`, `get_nutrition`. Tool count 109 → 101 (−8 net: 11 removed, 4 added). Board vote 11-0: also added `get_health_risk_profile` and `get_health_trajectory` to nightly warmer in the same commit — these were the only two expensive on-demand tools not previously cached; now warm nightly alongside health_dashboard.
+
+### Changes
+- **mcp/tools_data.py**: Added `tool_get_daily_snapshot` (view: summary|latest) and `tool_get_longitudinal_summary` (view: aggregate|seasonal|records) dispatchers at end of file.
+- **mcp/tools_health.py**: Added `tool_get_health` (view: dashboard|risk_profile|trajectory) dispatcher at end of file.
+- **mcp/tools_nutrition.py**: Added `tool_get_nutrition` (view: summary|macros|meal_timing|micronutrients) dispatcher at end of file.
+- **mcp/warmer.py**: Added steps 7 + 8 — nightly warm of `health_risk_profile` and `health_trajectory`. Import line updated. These were previously compute-on-demand only.
+- **mcp/registry.py**: Removed 11 tools: get_latest, get_daily_summary, get_aggregated_summary, get_personal_records, get_seasonal_patterns, get_health_dashboard, get_health_risk_profile, get_health_trajectory, get_micronutrient_report, get_meal_timing, get_nutrition_summary, get_macro_targets. Added 4 dispatchers: get_daily_snapshot, get_longitudinal_summary, get_health, get_nutrition. Net: 109 → 101.
+
+### Tool count history
+| Version | Tools | Delta | Phase |
+|---------|-------|-------|-------|
+| v3.7.14 | 116 | baseline | pre-SIMP-1 |
+| v3.7.17 | 109 | −7 | Phase 1a: Habits |
+| v3.7.18 | 101 | −8 | Phase 1b: Data/Health/Nutrition |
+| Target | ≤80 | −21 more | Phases 1c-2 |
+
+### Deployed
+- `life-platform-mcp` Lambda (registry + dispatcher functions + warmer)
+- Post-reconcile smoke: 10/10 ✅
+- CI: 7/7 (registry test) ✅
+
+### Files Changed
+- `mcp/tools_data.py`
+- `mcp/tools_health.py`
+- `mcp/tools_nutrition.py`
+- `mcp/warmer.py`
+- `mcp/registry.py`
+- `docs/CHANGELOG.md`
+
+---
+
 ## v3.7.17 — 2026-03-14: R8 gap closure sprint — 8 findings resolved
 
 ### Summary

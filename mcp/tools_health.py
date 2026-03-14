@@ -2018,3 +2018,25 @@ def tool_get_hydration_score(args):
         "recommendations": recs,
         "daily_breakdown": daily_rows,
     }
+
+
+def tool_get_health(args):
+    """
+    Unified health intelligence dispatcher. Routes to the appropriate underlying
+    function based on the 'view' parameter.
+    Board recommendation (11-0): health_risk_profile and health_trajectory are
+    also warmed nightly so view= dispatch hits cache on warm invocations.
+    """
+    VALID_VIEWS = {
+        "dashboard":    tool_get_health_dashboard,
+        "risk_profile": tool_get_health_risk_profile,
+        "trajectory":   tool_get_health_trajectory,
+    }
+    view = (args.get("view") or "dashboard").lower().strip()
+    if view not in VALID_VIEWS:
+        return {
+            "error": f"Unknown view '{view}'.",
+            "valid_views": list(VALID_VIEWS.keys()),
+            "hint": "Default is 'dashboard'. Use 'risk_profile' for CV/metabolic/longevity risk, 'trajectory' for forward-looking projections.",
+        }
+    return VALID_VIEWS[view](args)
