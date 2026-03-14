@@ -459,3 +459,17 @@ def tool_get_strength_standards(args):
         "lifts": results,
         "note": "Standards based on bodyweight multipliers (male norms). Female lifters typically achieve 70–80% of these values.",
     }
+
+
+def tool_get_strength(args):
+    """Unified strength intelligence dispatcher."""
+    VALID_VIEWS = {
+        "progress":  tool_get_strength_progress,
+        "prs":       tool_get_strength_prs,
+        "standards": tool_get_strength_standards,
+    }
+    view = (args.get("view") or "progress").lower().strip()
+    if view not in VALID_VIEWS:
+        return {"error": f"Unknown view '{view}'.", "valid_views": list(VALID_VIEWS.keys()),
+                "hint": "'progress' for volume/load trends, 'prs' for all-time personal records by lift, 'standards' for bodyweight-relative strength levels."}
+    return VALID_VIEWS[view](args)

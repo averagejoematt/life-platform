@@ -544,3 +544,19 @@ def tool_get_journal_correlations(args):
         "correlations": correlations,
         "notable_divergences": divergences[:10],
     }
+
+
+def tool_get_mood(args):
+    """Unified mood/state-of-mind dispatcher.
+    mood_trend = subjective journal-derived mood; state_of_mind = Apple Health HWF valence.
+    """
+    from mcp.tools_lifestyle import tool_get_state_of_mind_trend
+    VALID_VIEWS = {
+        "trend":         tool_get_mood_trend,
+        "state_of_mind": tool_get_state_of_mind_trend,
+    }
+    view = (args.get("view") or "trend").lower().strip()
+    if view not in VALID_VIEWS:
+        return {"error": f"Unknown view '{view}'.", "valid_views": list(VALID_VIEWS.keys()),
+                "hint": "'trend' for journal-derived mood/energy/stress scores, 'state_of_mind' for Apple Health How We Feel valence data."}
+    return VALID_VIEWS[view](args)

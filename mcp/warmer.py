@@ -13,7 +13,9 @@ from mcp.core import ddb_cache_set, mem_cache_set
 from mcp.tools_data import tool_get_sources, tool_get_field_stats
 from mcp.tools_health import tool_get_health_dashboard, tool_get_health_risk_profile, tool_get_health_trajectory
 from mcp.tools_habits import tool_get_habit_dashboard
-from mcp.tools_training import tool_get_training_load, tool_get_seasonal_patterns, tool_get_personal_records
+from mcp.tools_training import tool_get_training_load, tool_get_seasonal_patterns, tool_get_personal_records, tool_get_training_periodization, tool_get_training_recommendation
+from mcp.tools_character import tool_get_character_sheet
+from mcp.tools_cgm import tool_get_cgm_dashboard
 
 WARMER_CORE_SOURCES = [s for s in SOURCES if s not in ("apple_health", "hevy")]
 
@@ -141,6 +143,66 @@ def nightly_cache_warmer():
     except Exception as e:
         logger.error(f"[warmer] health_trajectory failed: {e}")
         results["health_trajectory"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
+
+    # 9. get_training_load (fix: imported but never cached before SIMP-1 Phase 1c)
+    _t = time.time()
+    try:
+        logger.info("[warmer] computing training_load")
+        data = tool_get_training_load({})
+        ddb_cache_set("training_load_today", data)
+        mem_cache_set("training_load_today", data)
+        results["training_load"] = {"status": "ok", "ms": int((time.time()-_t)*1000)}
+    except Exception as e:
+        logger.error(f"[warmer] training_load failed: {e}")
+        results["training_load"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
+
+    # 10. get_training_periodization (board vote 11-0: warm with Phase 1c consolidation)
+    _t = time.time()
+    try:
+        logger.info("[warmer] computing training_periodization")
+        data = tool_get_training_periodization({})
+        ddb_cache_set("training_periodization_today", data)
+        mem_cache_set("training_periodization_today", data)
+        results["training_periodization"] = {"status": "ok", "ms": int((time.time()-_t)*1000)}
+    except Exception as e:
+        logger.error(f"[warmer] training_periodization failed: {e}")
+        results["training_periodization"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
+
+    # 11. get_training_recommendation (board vote 11-0: warm with Phase 1c consolidation)
+    _t = time.time()
+    try:
+        logger.info("[warmer] computing training_recommendation")
+        data = tool_get_training_recommendation({})
+        ddb_cache_set("training_recommendation_today", data)
+        mem_cache_set("training_recommendation_today", data)
+        results["training_recommendation"] = {"status": "ok", "ms": int((time.time()-_t)*1000)}
+    except Exception as e:
+        logger.error(f"[warmer] training_recommendation failed: {e}")
+        results["training_recommendation"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
+
+    # 12. get_character_sheet (board vote 11-0: reads pre-computed DDB partition, fast)
+    _t = time.time()
+    try:
+        logger.info("[warmer] computing character_sheet")
+        data = tool_get_character_sheet({})
+        ddb_cache_set("character_sheet_today", data)
+        mem_cache_set("character_sheet_today", data)
+        results["character_sheet"] = {"status": "ok", "ms": int((time.time()-_t)*1000)}
+    except Exception as e:
+        logger.error(f"[warmer] character_sheet failed: {e}")
+        results["character_sheet"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
+
+    # 13. get_cgm_dashboard (board vote 11-0: apple_health query, warm for latency)
+    _t = time.time()
+    try:
+        logger.info("[warmer] computing cgm_dashboard")
+        data = tool_get_cgm_dashboard({})
+        ddb_cache_set("cgm_dashboard_today", data)
+        mem_cache_set("cgm_dashboard_today", data)
+        results["cgm_dashboard"] = {"status": "ok", "ms": int((time.time()-_t)*1000)}
+    except Exception as e:
+        logger.error(f"[warmer] cgm_dashboard failed: {e}")
+        results["cgm_dashboard"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
 
     total_ms = int((time.time() - warmer_start) * 1000)
     errors   = [k for k, v in results.items() if not v.get("status", "").startswith("ok")]

@@ -1706,3 +1706,20 @@ def tool_get_exercise_efficiency_trend(args):
             "Compare same activity types only — mixing sports confounds the trend."
         ),
     }
+
+
+def tool_get_training(args):
+    """Unified training intelligence dispatcher.
+    Board vote 11-0: training_load, training_recommendation, training_periodization
+    added to nightly warmer in same commit (all multi-source, expensive on-demand).
+    """
+    VALID_VIEWS = {
+        "load":            tool_get_training_load,
+        "periodization":   tool_get_training_periodization,
+        "recommendation":  tool_get_training_recommendation,
+    }
+    view = (args.get("view") or "load").lower().strip()
+    if view not in VALID_VIEWS:
+        return {"error": f"Unknown view '{view}'.", "valid_views": list(VALID_VIEWS.keys()),
+                "hint": "'load' for CTL/ATL/TSB fitness-fatigue model, 'periodization' for mesocycle analysis, 'recommendation' for today's workout suggestion."}
+    return VALID_VIEWS[view](args)

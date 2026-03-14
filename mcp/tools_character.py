@@ -708,3 +708,20 @@ def get_protocol_recommendations(character_sheet, config):
                         "protocols": tier_recs[:2],
                     })
     return recs
+
+
+def tool_get_character(args):
+    """Unified character sheet dispatcher.
+    Reads pre-computed data from SOURCE#character_sheet partition (written nightly
+    by character-sheet-compute Lambda) — all views are fast DDB reads.
+    """
+    VALID_VIEWS = {
+        "sheet":  tool_get_character_sheet,
+        "pillar": tool_get_pillar_detail,
+        "history": tool_get_level_history,
+    }
+    view = (args.get("view") or "sheet").lower().strip()
+    if view not in VALID_VIEWS:
+        return {"error": f"Unknown view '{view}'.", "valid_views": list(VALID_VIEWS.keys()),
+                "hint": "'sheet' for overall Character Level + all 7 pillars, 'pillar' for deep dive into one pillar (requires pillar=), 'history' for level-up timeline."}
+    return VALID_VIEWS[view](args)
