@@ -29,24 +29,11 @@ R8 items resolved in-session:
 
 ---
 
-## 🔴 CRITICAL — Due 2026-03-17 (3 days)
+## ✅ TB7-4 / R8-1 COMPLETE
 
-**R8-1 / TB7-4: `life-platform/api-keys` permanent deletion**
-
-Run the grep sweep to confirm no Lambda still references this secret, then delete:
-
-```bash
-# Step 1: grep sweep (copy files to Claude container first if using Claude)
-grep -r "api-keys" lambdas/ cdk/ --include="*.py" --include="*.yml" | grep -v "ai-keys" | grep -v ".pyc"
-
-# Step 2: If clean, delete
-aws secretsmanager delete-secret \
-  --secret-id life-platform/api-keys \
-  --force-delete-without-recovery \
-  --region us-west-2
-```
-
-The health-auto-export webhook still uses `life-platform/api-keys` as its Bearer token — this is the **webhook auth key**, not the same secret being deleted. Verify the Lambda reads from `life-platform/ai-keys` (Anthropic key), not `life-platform/api-keys`.
+**`life-platform/api-keys` permanently deleted 2026-03-14.**
+Grep sweep confirmed zero references in lambdas/, cdk/, ci/, scripts before deletion.
+Force-deleted without recovery window.
 
 ---
 

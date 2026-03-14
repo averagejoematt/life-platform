@@ -147,7 +147,7 @@ All under prefix `life-platform/`. No values stored in this doc — access via A
 | `todoist` | API key | Todoist API token |
 | `notion` | API key | Notion integration key + database ID |
 | `habitify` | API key | Habitify API token. Own dedicated secret — NOT bundled in api-keys (different Lambda consumer set). |
-| ~~`api-keys`~~ | ~~Legacy bundle~~ | ~~**PENDING PERMANENT DELETION 2026-03-17** (7-day recovery window). All Lambdas migrated to per-service secrets.~~ |
+| ~~`api-keys`~~ | ~~Legacy bundle~~ | ~~**PERMANENTLY DELETED 2026-03-14.** All Lambdas migrated to per-service secrets.~~ |
 
 ---
 
