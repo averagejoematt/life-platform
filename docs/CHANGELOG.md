@@ -1,58 +1,55 @@
 # Life Platform — Changelog
 
-## v3.7.9 — 2026-03-13: TB7-25/26/27 — Rollback + WAF + tool tiering design
+## v3.7.9 — 2026-03-13: TB7-25/26/27 — Rollback + WAF (N/A) + tool tiering design
 
 ### Summary
-TB7-25: Alias-based CI/CD rollback implemented using S3 artifact strategy.
-`deploy_lambda.sh` now maintains `latest.zip`/`previous.zip` per function in
-S3. New `rollback_lambda.sh` enables one-command rollback. CI/CD gets
-`rollback-on-smoke-failure` job that auto-fires when smoke test fails after
-a successful deploy. TB7-26: WAF WebACL (REGIONAL, rate-limit 1000 req/5min
-per IP) added to McpStack CDK with `CfnWebACLAssociation` targeting MCP Lambda
-ARN. CloudWatch alarm on blocked requests. TB7-27: MCP tool tiering design doc
-created — 4-tier taxonomy, criteria, preliminary assignments for all 144 tools,
-SIMP-1 instrumentation requirements.
+TB7-25: S3 artifact rollback strategy. `deploy_lambda.sh` maintains
+`latest.zip`/`previous.zip` per function. New `rollback_lambda.sh` one-command
+rollback. CI/CD `rollback-on-smoke-failure` job auto-fires when smoke fails after
+a successful deploy. TB7-26: N/A — AWS WAFv2 `associate-web-acl` does not support
+Lambda Function URLs as a resource type (supported: ALB, API GW, AppSync, Cognito,
+App Runner, Verified Access). Attempted CfnWebACLAssociation and CLI association
+both returned InvalidRequest. WebACL created and rolled back cleanly. MCP endpoint
+is adequately protected by HMAC Bearer auth + existing slo-mcp-availability alarm.
+TB7-27: MCP tool tiering design doc — 4-tier taxonomy, criteria, preliminary
+assignments for all 144 tools, SIMP-1 instrumentation plan.
 
 ### Changes
-- **TB7-25** — `deploy/deploy_lambda.sh`: adds S3 artifact management step —
-  shifts `deploys/{func}/latest.zip` → `previous.zip` before each deploy,
-  uploads new zip as `latest.zip`. Works for all 40 Lambdas.
-- **TB7-25** — `deploy/rollback_lambda.sh` (new): downloads `previous.zip`
-  from S3, redeploys, waits for active. Accepts one or more function names.
-- **TB7-25** — `.github/workflows/ci-cd.yml`: added `rollback-on-smoke-failure`
-  job (Job 6). Fires when `smoke-test` fails AND `deploy` succeeded. Rolls back
-  all deployed Lambdas and MCP server. Notes layer rollback is manual.
-  Notify-failure job renumbered to Job 7.
-- **TB7-25** — `ci-cd.yml` Deploy job: MCP deploy step now also maintains
-  `deploys/life-platform-mcp/latest.zip` and `previous.zip` on S3.
-- **TB7-26** — `cdk/stacks/mcp_stack.py`: added WAF WebACL
-  `life-platform-mcp-rate-limit` (REGIONAL, 1000 req/5min per IP, returns 429
-  on block). `CfnWebACLAssociation` targets MCP Lambda function ARN.
-  CloudWatch alarm `mcp-waf-rate-limit-blocks` (threshold 10 blocks/hour) → SNS.
-  Cost: ~$5/month.
+- **TB7-25** — `deploy/deploy_lambda.sh`: S3 artifact management — shifts
+  `deploys/{func}/latest.zip` → `previous.zip` before each deploy, uploads new
+  zip as `latest.zip`.
+- **TB7-25** — `deploy/rollback_lambda.sh` (new): downloads `previous.zip` from
+  S3, redeploys, waits for active. Accepts multiple function names.
+- **TB7-25** — `.github/workflows/ci-cd.yml`: `rollback-on-smoke-failure` job
+  (Job 6). Fires when smoke-test fails AND deploy succeeded. Rolls back all
+  deployed Lambdas + MCP. Layer rollback noted as manual.
+- **TB7-25** — `ci-cd.yml` MCP deploy step: now maintains S3 rollback artifacts
+  for `life-platform-mcp`.
+- **TB7-26 N/A** — `cdk/stacks/mcp_stack.py`: WAF attempt reverted. Stack
+  returned to v2.0 baseline with documented rationale in module docstring.
+  `deploy/attach_mcp_waf.sh` created (documents the failed approach) then
+  superseded. No net change to stack from v3.7.8.
 - **TB7-27** — `docs/MCP_TOOL_TIERING_DESIGN.md` (new): 4-tier taxonomy,
   tiering criteria, preliminary assignments for all 144 tools, Option A
-  implementation (tier field in TOOLS dict), SIMP-1 data collection plan,
-  6-week instrumentation requirements, SIMP-1 session plan.
+  implementation (tier field in TOOLS dict), 6-week SIMP-1 instrumentation
+  requirements, decision rules, session plan.
 
 ### Files Changed
 - `deploy/deploy_lambda.sh` (S3 artifact management)
 - `deploy/rollback_lambda.sh` (new)
 - `.github/workflows/ci-cd.yml` (rollback job + MCP S3 artifact)
-- `cdk/stacks/mcp_stack.py` (WAF WebACL + alarm)
+- `cdk/stacks/mcp_stack.py` (WAF reverted; docstring updated with N/A rationale)
 - `docs/MCP_TOOL_TIERING_DESIGN.md` (new)
 - `docs/CHANGELOG.md` (this file)
 - `handovers/HANDOVER_v3.7.9.md` (new)
 
-### Deploy required
-- `bash deploy/rollback_lambda.sh` — no deploy, script is local only
-- `cdk deploy LifePlatformMcp` — deploys WAF WebACL + association + new alarm
-  Run from `cdk/`: `source .venv/bin/activate && npx cdk deploy LifePlatformMcp --require-approval never`
-- `bash deploy/post_cdk_reconcile_smoke.sh` after CDK deploy
+### Deploy status
+- LifePlatformMcp: ✅ deployed + smoke 10/10
+- TB7-26 WAF: N/A — not supported for Lambda Function URLs
 
 ### AWS cost delta
-- WAF: ~$5/month (1 WebACL + 1 rule + request processing)
-- S3: ~$0 (rollback zips are small; lifecycle rule recommended: expire after 30 days)
+- S3 rollback artifacts: ~$0 (small zips; add lifecycle rule to expire after 30d)
+- WAF: $0 (not deployed)
 
 ---
 
