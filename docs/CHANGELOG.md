@@ -27,11 +27,15 @@ Full Architecture Review #8 conducted. Grade: A-. Executed immediate fixes: stal
 - `deploy/r8_p0_verify.sh` (new)
 - `docs/CHANGELOG.md`
 
-### Next Steps (from R8 roadmap)
-1. Run `bash deploy/r8_p0_verify.sh` to verify webhook auth + secret state
-2. Fix `role_policies.py` based on verification results
-3. Run `python3 deploy/sync_doc_metadata.py --apply` to fix SCHEMA.md header
-4. SIMP-1 tool consolidation (60-day target)
+### Post-P0 Fixes (same session, after verification)
+- **docs/ARCHITECTURE.md**: Secrets table rewritten to match actual 10-secret state (was 9 with 2 nonexistent). Fixed webhook auth reference (`api-keys` → `ingestion-keys`). Fixed OAuth management section (dedicated → bundled reality). Updated AWS resources summary.
+- **docs/PROJECT_PLAN.md**: Rebuilt from scratch with all R8 action items extracted, prioritized into 4 tiers (Tier 1 30d / Tier 2 60d / Tier 3 90d / Tier 4 deferred), with effort estimates and dependencies. 25 items total.
+- **docs/SIMP1_PLAN.md** (new): Full SIMP-1 consolidation plan. Analyzed 116 tools by domain (20 domains). Identified 14 merge groups in Phase 1 (−28 tools, 116→88). Phase 2 EMF-driven cuts (−5-10, →78-83). Phase 3 pre-compute unlocks. Execution: ~5 sessions.
+
+### Next Steps
+1. R8-QS2: Integration test for qa-smoke (Tier 1, high ROI)
+2. SIMP-1 Phase 1: read-only merges can begin immediately
+3. Google Calendar integration (~6-8h)
 
 ---
 
