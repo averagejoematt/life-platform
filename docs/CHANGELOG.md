@@ -1,5 +1,19 @@
 # Life Platform — Changelog
 
+## v3.7.11 — 2026-03-13: TB7-24 Lambda handler integration linter
+
+### Summary
+Added `tests/test_lambda_handlers.py` — static Lambda handler integration linter using `ci/lambda_map.json` as authoritative registry. Six rules (I1–I6) covering file existence, syntax validity, handler signature, error resilience, orphan detection, and MCP server entry point. Complements the existing CDK handler consistency linter (H1–H5).
+
+### Changes
+- **tests/test_lambda_handlers.py** (new): TB7-24. I1 all registered sources exist; I2 syntax valid; I3 `lambda_handler(event, context)` arity; I4 top-level try/except present; I5 no orphaned Lambda files; I6 MCP server entry point valid.
+
+### Files Changed
+- `tests/test_lambda_handlers.py` (new)
+- `docs/CHANGELOG.md`
+
+---
+
 ## v3.7.10 — 2026-03-13: Housekeeping + Incident RCA (Todoist IAM drift)
 
 ### Summary
