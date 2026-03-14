@@ -701,6 +701,30 @@ def tool_get_habit_dashboard(args):
     }
 
 
+def tool_get_habits(args):
+    """
+    Unified habit intelligence dispatcher. Routes to the appropriate underlying
+    function based on the 'view' parameter. All underlying functions are preserved
+    for direct use (e.g. warmer.py).
+    """
+    VALID_VIEWS = {
+        "dashboard":  tool_get_habit_dashboard,
+        "adherence":  tool_get_habit_adherence,
+        "streaks":    tool_get_habit_streaks,
+        "tiers":      tool_get_habit_tier_report,
+        "stacks":     tool_get_habit_stacks,
+        "keystones":  tool_get_keystone_habits,
+    }
+    view = (args.get("view") or "dashboard").lower().strip()
+    if view not in VALID_VIEWS:
+        return {
+            "error": f"Unknown view '{view}'.",
+            "valid_views": list(VALID_VIEWS.keys()),
+            "hint": "Default view is 'dashboard'. Use 'adherence', 'streaks', 'tiers', 'stacks', or 'keystones' for other analyses.",
+        }
+    return VALID_VIEWS[view](args)
+
+
 def tool_get_garmin_summary(args):
     """
     Garmin daily biometrics over a date range.

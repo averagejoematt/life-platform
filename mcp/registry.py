@@ -581,89 +581,42 @@ TOOLS = {
         },
     },
     # ── Habits / P40 tools ────────────────────────────────────────────────────
-    "get_habit_adherence": {
-        "fn": tool_get_habit_adherence,
+    "get_habits": {
+        "fn": tool_get_habits,
         "schema": {
-            "name": "get_habit_adherence",
+            "name": "get_habits",
             "description": (
-                "Per-habit and per-group P40 completion rates over any date range. "
-                "Returns habits ranked worst-to-best by adherence. "
-                "Use for: 'how consistent am I with cold showers?', 'which P40 group is weakest?', "
-                "'show my habit adherence this month'."
+                "Unified P40 habit intelligence. Use the 'view' parameter to select the analysis: "
+                "'dashboard' (default) = current-state briefing: latest day, 7d rolling vs 30d baseline, best/worst groups, top streaks, alerts. "
+                "'adherence' = per-habit and per-group completion rates ranked worst-to-best. Supports group= filter. "
+                "'streaks' = current streak, longest streak, days since last completion per habit. Supports habit_name= filter. "
+                "'tiers' = Tier 0 perfect-day rate, T1 adherence, vice adherence, most-missed T0 habits, synergy groups. "
+                "'stacks' = co-occurrence analysis: which habits cluster together (lift metric), natural morning routines. "
+                "'keystones' = Pearson correlation of each habit vs overall P40 score — the behavioral levers. "
+                "Use for: 'how are my habits?', 'P40 check-in', 'habit adherence this month', 'active streaks', "
+                "'are my non-negotiables consistent?', 'which habits do I always do together?', 'keystone habits', "
+                "'which P40 group is weakest?', 'habit tier report', 'natural routines'."
             ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 2020-01-01)."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "group":      {"type": "string", "description": f"Optional P40 group filter. Valid: {P40_GROUPS}"},
+                    "view": {
+                        "type": "string",
+                        "description": "Which analysis to run. One of: dashboard (default), adherence, streaks, tiers, stacks, keystones.",
+                        "enum": ["dashboard", "adherence", "streaks", "tiers", "stacks", "keystones"],
+                    },
+                    "start_date":      {"type": "string",  "description": "Start date YYYY-MM-DD."},
+                    "end_date":        {"type": "string",  "description": "End date YYYY-MM-DD (default: today)."},
+                    "group":           {"type": "string",  "description": f"[adherence] Filter by P40 group. Valid: {P40_GROUPS}"},
+                    "habit_name":      {"type": "string",  "description": "[streaks] Optional habit name filter (fuzzy match)."},
+                    "top_n":           {"type": "number",  "description": "[keystones/stacks] Number of top results to return (default: 15/20)."},
+                    "min_pct":         {"type": "number",  "description": "[stacks] Minimum base rate to include a habit (default: 0.1)."},
                 },
                 "required": [],
             },
         },
     },
-    "get_habit_streaks": {
-        "fn": tool_get_habit_streaks,
-        "schema": {
-            "name": "get_habit_streaks",
-            "description": (
-                "Current streak, longest streak, and days since last completion for each P40 habit. "
-                "Use for: 'what is my longest meditation streak?', 'which habits have I been consistent with?', "
-                "'show my active streaks'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date":  {"type": "string", "description": "Start date YYYY-MM-DD (default: 2020-01-01)."},
-                    "end_date":    {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "habit_name":  {"type": "string", "description": "Optional habit name filter (fuzzy match)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_keystone_habits": {
-        "fn": tool_get_keystone_habits,
-        "schema": {
-            "name": "get_keystone_habits",
-            "description": (
-                "Identifies which individual habits have the highest Pearson correlation with overall daily "
-                "P40 completion score — the behavioral levers that lift everything else when done. "
-                "r >= 0.5 = strong lever, r >= 0.3 = moderate. "
-                "Use for: 'what are my keystone habits?', 'which habits have the most impact?'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD."},
-                    "top_n":      {"type": "number",  "description": "Number of top habits to return (default: 15)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_group_trends": {
-        "fn": tool_get_group_trends,
-        "schema": {
-            "name": "get_group_trends",
-            "description": (
-                "Weekly P40 group scores over time with trend direction (improving / stable / declining). "
-                "Use for: 'how have my habits trended this year?', 'which P40 pillars are improving?', "
-                "'show weekly habit scores'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD."},
-                    "groups":     {"type": "array", "items": {"type": "string"},
-                                   "description": f"Optional list of P40 groups to include. Valid: {P40_GROUPS}"},
-                },
-                "required": [],
-            },
-        },
-    },
+    # compare_habit_periods retained as standalone — requires 4 required params, not suited to view= dispatch
     "compare_habit_periods": {
         "fn": tool_compare_habit_periods,
         "schema": {
@@ -684,46 +637,6 @@ TOOLS = {
                     "period_b_label": {"type": "string", "description": "Label for period B (e.g. 'This month')."},
                 },
                 "required": ["period_a_start", "period_a_end", "period_b_start", "period_b_end"],
-            },
-        },
-    },
-    "get_habit_stacks": {
-        "fn": tool_get_habit_stacks,
-        "schema": {
-            "name": "get_habit_stacks",
-            "description": (
-                "Co-occurrence analysis: which P40 habits cluster together beyond chance. "
-                "Uses lift = P(A and B) / (P(A) × P(B)). Lift > 1.5 = genuine clustering. "
-                "Also identifies natural 'stacks' — 3+ habits co-occurring ≥60% of days. "
-                "Use for: 'which habits do I always do together?', 'what are my natural morning routines?'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD."},
-                    "top_n":      {"type": "number",  "description": "Number of top pairs to return (default: 20)."},
-                    "min_pct":    {"type": "number",  "description": "Minimum base rate to include a habit (default: 0.1 = 10%)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_habit_dashboard": {
-        "fn": tool_get_habit_dashboard,
-        "schema": {
-            "name": "get_habit_dashboard",
-            "description": (
-                "Current-state P40 briefing. Shows: latest day status, 7-day rolling scores vs 30-day baseline, "
-                "best/worst groups, top active streaks, and alerts for declining areas. "
-                "Use for: 'how are my habits?', 'P40 morning check-in', 'what habits need attention?'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
             },
         },
     },
@@ -1464,28 +1377,6 @@ TOOLS = {
                     "category": {"type": "string", "description": "Filter by category (e.g. 'sleep', 'nutrition', 'recovery', 'mindset')."},
                     "vice_only": {"type": "boolean", "description": "If true, only show vice habits (default: false)."},
                     "synergy_group": {"type": "string", "description": "Filter by synergy group (e.g. 'morning_stack', 'recovery_stack')."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_habit_tier_report": {
-        "fn": tool_get_habit_tier_report,
-        "schema": {
-            "name": "get_habit_tier_report",
-            "description": (
-                "Tier-level adherence trends from daily habit_scores snapshots. Shows Tier 0 perfect-day rate "
-                "(the most important habit metric), T1 adherence trend, vice adherence, composite trend, "
-                "most frequently missed T0 habits, and synergy group completion rates. "
-                "The key question: 'Are my non-negotiables actually non-negotiable?' "
-                "Use for: 'how is my Tier 0 adherence?', 'habit tier report', 'are my non-negotiables consistent?', "
-                "'which T0 habits do I miss most?', 'synergy group adherence', 'tier-level habit trends'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 30 days ago)."},
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
                 },
                 "required": [],
             },
@@ -2309,6 +2200,8 @@ TOOLS = {
                 "IC-18: List cross-domain health hypotheses generated by the weekly Hypothesis Engine. "
                 "Shows non-obvious correlations between pillars being monitored for confirmation or refutation. "
                 "Lifecycle: pending -> confirming -> confirmed (incorporated into AI coaching) or refuted. "
+                "IMPORTANT: Active hypotheses are unconfirmed — they require 3 confirming observations before promotion. "
+                "Treat pending/confirming hypotheses as working theories only, not established patterns. "
                 "Use for: 'what hypotheses is the platform watching?', 'confirmed patterns', "
                 "'what cross-domain correlations have been found?', 'scientific method on my data'."
             ),

@@ -58,7 +58,7 @@ Decisions where cost was a factor in the design:
 | 2026-02-24 | 12 Secrets Manager secrets | $4.80/month → consolidated to $2.40/month | Isolation was right tradeoff initially; consolidated once pattern was proven |
 | 2026-02-24 | CloudWatch 30-day log retention | Saves vs default infinite | Sufficient for debugging; older data in S3 raw archives |
 | 2026-02-23 | MCP via Lambda Function URL (not API Gateway) | $0 vs ~$3.50/mo for REST API | AuthType NONE + in-Lambda API key check = free |
-| 2026-02-23 | Haiku (not Sonnet/Opus) for AI calls in briefs/digests | ~$0.10/mo vs ~$2-5/mo | Haiku quality sufficient for coaching commentary |
+| 2026-02-23 | Haiku (not Sonnet/Opus) for AI calls in briefs/digests — **STALE: actual routing is Sonnet (see ai_calls.py)** | ~$3/mo actual (Sonnet) vs ~$0.10/mo if Haiku | Sonnet used for quality; Haiku entry was aspirational, never reflected production routing. Not a cost problem — still within budget. |
 
 ---
 

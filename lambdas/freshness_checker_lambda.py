@@ -156,6 +156,68 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.error("CloudWatch SLO metric emit failed (non-fatal): %s", e)
 
+    # R8-ST4: OAuth token health check — alert if any OAuth refresh token not updated >60 days.
+    # Prevents silent cascade failure if tokens expire during extended absence.
+    OAUTH_SECRETS = [
+        "life-platform/whoop",
+        "life-platform/withings",
+        "life-platform/strava",
+        "life-platform/garmin",
+    ]
+    OAUTH_STALE_DAYS = int(os.environ.get("OAUTH_STALE_DAYS", "60"))
+    try:
+        sm = boto3.client("secretsmanager", region_name=REGION)
+        oauth_stale = []
+        for secret_name in OAUTH_SECRETS:
+            try:
+                meta = sm.describe_secret(SecretId=secret_name)
+                last_changed = meta.get("LastChangedDate")
+                if last_changed:
+                    age_days = (now - last_changed.replace(tzinfo=timezone.utc)).days
+                    if age_days > OAUTH_STALE_DAYS:
+                        oauth_stale.append((secret_name, age_days))
+                        logger.warning(
+                            "OAuth token stale: %s last updated %d days ago",
+                            secret_name, age_days,
+                        )
+            except Exception as _se:
+                logger.warning("Could not check OAuth secret %s: %s", secret_name, _se)
+
+        if oauth_stale:
+            stale_list = "\n".join(
+                [f"  - {name}: {days} days since last update" for name, days in oauth_stale]
+            )
+            try:
+                sns.publish(
+                    TopicArn=SNS_ARN,
+                    Subject=f"⚠️ Life Platform: {len(oauth_stale)} OAuth token(s) may be expiring",
+                    Message=(
+                        f"⚠️ Life Platform: OAuth Token Health Warning\n\n"
+                        f"The following OAuth secrets have not been updated in over {OAUTH_STALE_DAYS} days.\n"
+                        f"Tokens may be at risk of expiring during extended absence:\n\n"
+                        f"{stale_list}\n\n"
+                        f"Action: trigger a manual data pull for each source to force a token refresh,\n"
+                        f"or verify tokens are still valid in AWS Secrets Manager.\n\n"
+                        f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
+                    ),
+                )
+                logger.info("OAuth token health alert sent for %d secret(s)", len(oauth_stale))
+            except Exception as _sns_e:
+                logger.error("OAuth alert SNS publish failed: %s", _sns_e)
+
+        # Emit CloudWatch metric for OAuth token staleness
+        cw.put_metric_data(
+            Namespace="LifePlatform/Freshness",
+            MetricData=[{
+                "MetricName": "OAuthTokenStaleCount",
+                "Value": float(len(oauth_stale)),
+                "Unit": "Count",
+            }],
+        )
+
+    except Exception as _oauth_e:
+        logger.error("OAuth token health check failed (non-fatal): %s", _oauth_e)
+
     return {
         "statusCode": 200,
         "stale_count": len(stale_sources),
