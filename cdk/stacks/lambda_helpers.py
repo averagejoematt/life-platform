@@ -22,7 +22,7 @@ Usage in a stack:
         self, "WhoopIngestion",
         function_name="whoop-data-ingestion",
         source_file="lambdas/whoop_lambda.py",
-        handler="lambda_function.lambda_handler",
+        handler="whoop_lambda.lambda_handler",
         table=core.table,
         bucket=core.bucket,
         dlq=core.dlq,
