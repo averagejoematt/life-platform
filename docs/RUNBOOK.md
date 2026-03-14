@@ -382,17 +382,50 @@ aws lambda invoke --function-name withings-data-ingestion --payload '{}' /tmp/te
 
 ## Session Close Checklist
 
-At the end of every working session:
+At the end of every working session — in this order:
 
-1. Write handover to `handovers/YYYY-MM-DD_<topic>.md`
-2. Update `docs/HANDOVER_LATEST.md` pointer
-3. Update `docs/CHANGELOG.md`
-4. Update `docs/PROJECT_PLAN.md` (completed items, next steps)
-5. Update additional docs as needed (ARCHITECTURE, SCHEMA, RUNBOOK, FEATURES, MCP_TOOL_CATALOG)
-6. Commit and push to GitHub:
-   ```bash
-   git add -A && git commit -m "vX.XX.X: <what changed>" && git push
-   ```
+```bash
+# Step 1: Sync all doc metadata (tool counts, secrets, alarms, version, date)
+python3 deploy/sync_doc_metadata.py          # dry run — review changes
+python3 deploy/sync_doc_metadata.py --apply  # apply if changes look right
+
+# Step 2: Commit and push
+git add -A && git commit -m "vX.XX.X: <what changed>" && git push
+```
+
+**That's it for standard sessions.** The sync script handles all counter/header drift automatically.
+
+For sessions where more than counters changed, use the trigger matrix below.
+
+---
+
+## Doc Update Trigger Matrix
+
+Consult this when deciding which docs need human edits beyond what sync_doc_metadata.py handles.
+
+| What changed | Docs to update manually |
+|---|---|
+| **New Lambda added** | ARCHITECTURE (ingest/email/compute/operational table), INFRASTRUCTURE (Lambda list), lambda_map.json, RUNBOOK (schedule table if scheduled), CHANGELOG |
+| **Lambda deleted** | Same as above — remove the row |
+| **Schedule time changed** | ARCHITECTURE (EventBridge table), RUNBOOK (schedule table) — times must match |
+| **New secret added** | ARCHITECTURE (Secrets table + cost profile), INFRASTRUCTURE (Secrets table), DECISIONS ADR-014, COST_TRACKER — then update PLATFORM_FACTS in sync_doc_metadata.py |
+| **Secret deleted** | Same docs — then update PLATFORM_FACTS |
+| **New MCP tools added** | MCP_TOOL_CATALOG (new rows), ARCHITECTURE (serve layer description) — then update PLATFORM_FACTS |
+| **MCP tools removed** | MCP_TOOL_CATALOG (remove rows) — then update PLATFORM_FACTS |
+| **New CDK stack** | ARCHITECTURE (CDK section), INFRASTRUCTURE, cdk/app.py |
+| **DynamoDB schema change** | SCHEMA.md, DATA_DICTIONARY.md |
+| **New data source** | ARCHITECTURE (ingest layer), DATA_DICTIONARY (SOT table), SCHEMA.md, RUNBOOK (schedule table), FEATURES.md |
+| **IAM role changed** | ARCHITECTURE (IAM section), RUNBOOK (IAM table), role_policies.py |
+| **New IC feature** | ARCHITECTURE (IC features list), INTELLIGENCE_LAYER.md, CHANGELOG |
+| **Cost change** | COST_TRACKER (breakdown + decisions log) — then update PLATFORM_FACTS |
+| **New ADR** | DECISIONS.md (ADR Index + full entry) |
+| **Incident** | INCIDENT_LOG.md |
+| **New CI rule / test** | ARCHITECTURE (CI section if applicable), CHANGELOG |
+| **Any of the above** | CHANGELOG always |
+
+**Key principle:** `sync_doc_metadata.py` owns the numbers. Humans own the prose. Never manually update tool counts, Lambda counts, version headers, or date stamps — just update PLATFORM_FACTS in the script and run it.
+
+---
 
 **GitHub repo:** `git@github.com:averagejoematt/life-platform.git` (SSH, private)
 **Never commit:** `datadrops/`, `lambdas/dashboard/data.json`, `lambdas/dashboard/clinical.json`, `*.env`, `.config.json`

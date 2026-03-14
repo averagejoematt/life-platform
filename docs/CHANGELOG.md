@@ -1,5 +1,21 @@
 # Life Platform — Changelog
 
+## v3.7.14 — 2026-03-14: doc sync automation
+
+### Summary
+Added `deploy/sync_doc_metadata.py` — single source of truth for all platform counters (tool count, Lambda count, secrets, alarms, version, date). Replaces manual hunt-and-update across 6+ docs. Also rewrote the RUNBOOK session close checklist with a proper trigger matrix.
+
+### Changes
+- **deploy/sync_doc_metadata.py** (new): owns PLATFORM_FACTS dict, applies regex replacements across all docs. Dry-run by default, `--apply` to write.
+- **docs/RUNBOOK.md**: session close checklist rewritten — 2-command process (`sync_doc_metadata.py` + git), plus explicit trigger matrix for structural changes.
+
+### Files Changed
+- `deploy/sync_doc_metadata.py` (new)
+- `docs/RUNBOOK.md`
+- `docs/CHANGELOG.md`
+
+---
+
 ## v3.7.13 — 2026-03-14: R8-6/7/8 housekeeping
 
 ### Summary
