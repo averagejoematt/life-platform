@@ -123,6 +123,7 @@ These are not data ingestion — they compute, alert, or deliver intelligence.
 | Daily Metrics Compute | `daily-metrics-compute` | `daily-metrics-compute-daily` | `cron(25 17 * * ? *)` | 10:25 AM | `lambda-daily-metrics-role` |
 | Daily Insight Compute (IC-8) | `daily-insight-compute` | `daily-insight-compute-daily` | `cron(20 17 * * ? *)` | 10:20 AM | `lambda-daily-insight-role` |
 | Hypothesis Engine (IC-18) | `hypothesis-engine` | `hypothesis-engine-weekly` | `cron(0 19 ? * SUN *)` | Sun 12:00 PM | `lambda-hypothesis-engine-role` |
+| Weekly Correlation Compute (R8-LT9) | `weekly-correlation-compute` | `WeeklyCorrelationComputeRule` | `cron(30 18 ? * SUN *)` | Sun 11:30 AM | CDK-generated role |
 
 **Operational & Email Lambdas:**
 
@@ -256,7 +257,7 @@ No GSI by design — all access patterns served by PK+SK queries.
 
 ### MCP Server
 
-**Lambda:** `life-platform-mcp` | **Tools:** 116 | **Memory:** 1024 MB | **Modules:** 31
+**Lambda:** `life-platform-mcp` | **Tools:** 86 | **Memory:** 1024 MB | **Modules:** 31
 **Local endpoint:** `https://votqefkra435xwrccmapxxbj6y0jawgn.lambda-url.us-west-2.on.aws/`
 **Remote MCP:** `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` — OAuth 2.1 auto-approve + HMAC Bearer (enables claude.ai + mobile)
 **Auth:** `x-api-key` header check; key in `life-platform/ai-keys`
@@ -280,9 +281,9 @@ Cold start: ~700–800ms. Warm: 23–30ms. Cached tools: <100ms.
 
 ### Cache warmer
 
-EventBridge triggers MCP Lambda at 10:00 AM PDT daily (`source: aws.events`). Pre-computes 12 tools → `CACHE#matthew` partition, 26-hour TTL. Runtime: ~7s.
+EventBridge triggers MCP Lambda at 10:00 AM PDT daily (`source: aws.events`). Pre-computes 13 tools → `CACHE#matthew` partition, 26-hour TTL. Runtime: ~90s (13 steps).
 
-Cached tools: `get_aggregated_summary` (5yr + 2yr views), `get_personal_records`, `get_seasonal_patterns`, `get_health_dashboard`, `get_habit_dashboard`, `get_readiness_score`, `get_health_risk_profile`, `get_body_composition_snapshot`, `get_energy_balance`, `get_day_type_analysis`, `get_movement_score`.
+Cached tools (SIMP-1 updated, v3.7.18–19): `get_longitudinal_summary` (aggregate year + month), `get_longitudinal_summary` (records), `get_longitudinal_summary` (seasonal), `get_health` (dashboard), `get_health` (risk_profile), `get_health` (trajectory), `get_habits` (dashboard), `get_training` (load), `get_training` (periodization), `get_training` (recommendation), `get_character` (sheet), `get_cgm` (dashboard). Steps 9-13 added v3.7.19.
 
 ### Email / Intelligence cadence
 
