@@ -1,5 +1,38 @@
 # Life Platform — Changelog
 
+## v3.7.21 — 2026-03-14: Google Calendar integration (R8-ST1)
+
+### Summary
+Google Calendar is now a live data source. 2 new MCP tools (`get_calendar_events`, `get_schedule_load`). Daily ingestion Lambda runs at 6:30 AM PT. OAuth2 with token refresh stored in Secrets Manager `life-platform/google-calendar`. Requires one-time auth setup via `setup/setup_google_calendar_auth.py`.
+
+### Components
+- **`lambdas/google_calendar_lambda.py`** — daily ingestion Lambda. OAuth2 refresh_token pattern (same as Strava/Whoop). Fetches 7-day lookback (gap fill) + 14-day lookahead. Stores per-day records + `DATE#lookahead` summary.
+- **`mcp/tools_calendar.py`** — `tool_get_calendar_events` (view: day/range/lookahead) + `tool_get_schedule_load` (meeting load analysis, DOW patterns, week assessment)
+- **`mcp/registry.py`** — 2 new tools registered (88 total)
+- **`cdk/stacks/role_policies.py`** — `ingestion_google_calendar()` IAM (DDB, S3, secret read/write, DLQ)
+- **`cdk/stacks/ingestion_stack.py`** — Lambda #16 wired, schedule `cron(30 13 * * ? *)` (6:30 AM PT)
+- **`setup/setup_google_calendar_auth.py`** — one-time OAuth setup script
+
+### Data model
+- `SOURCE#google_calendar | DATE#<date>` — per-day: event list, event_count, meeting_minutes, focus_block_count, earliest/latest event
+- `SOURCE#google_calendar | DATE#lookahead` — 14-day forward summary, updated daily
+
+### Activation required
+Google Calendar data will NOT flow until OAuth is authorized:
+```bash
+pip install google-auth-oauthlib google-api-python-client
+python3 setup/setup_google_calendar_auth.py
+```
+Requires: Google Cloud project, Calendar API enabled, OAuth 2.0 Desktop credentials.
+
+### Deployed
+- CDK: `LifePlatformIngestion` (google-calendar-ingestion Lambda + IAM)
+- `google-calendar-ingestion` Lambda code deployed
+- `life-platform-mcp` Lambda (88 tools)
+- Post-reconcile smoke: 10/10 ✅, CI: 7/7 ✅
+
+---
+
 ## v3.7.20 — 2026-03-14: R8-ST5 + R8-LT3 + R8-LT9
 
 ### Summary

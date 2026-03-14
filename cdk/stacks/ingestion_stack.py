@@ -209,5 +209,15 @@ class IngestionStack(Stack):
         hae = _lambda.Function(self, "HaeWebhook", function_name="health-auto-export-webhook", runtime=_lambda.Runtime.PYTHON_3_12, handler="health_auto_export_lambda.lambda_handler", code=_lambda.Code.from_asset("../lambdas", exclude=_ASSET_EXCLUDES), role=hae_role, timeout=Duration.seconds(30), memory_size=256, environment={"TABLE_NAME": local_table.table_name, "S3_BUCKET": local_bucket.bucket_name, "USER_ID": self.node.try_get_context("user_id") or "matthew"})
         hae.add_permission("ApiGatewayInvoke", principal=iam.ServicePrincipal("apigateway.amazonaws.com"), source_arn=f"arn:aws:execute-api:{self.region}:{self.account}:a76xwxt2wa/*/*/ingest")
 
+        # ── 16. Google Calendar — daily ingestion (R8-ST1)
+        create_platform_lambda(self, "GoogleCalendarIngestion",
+            function_name="google-calendar-ingestion",
+            source_file="lambdas/google_calendar_lambda.py",
+            handler="google_calendar_lambda.lambda_handler",
+            schedule="cron(30 13 * * ? *)",  # 6:30 AM PT daily
+            timeout_seconds=120, alarm_name="ingestion-error-google-calendar",
+            shared_layer=shared_utils_layer,
+            custom_policies=rp.ingestion_google_calendar(), **shared)
+
         cdk.CfnOutput(self, "WhoopFnArn", value=whoop.function_arn, description="Whoop ingestion Lambda ARN")
         cdk.CfnOutput(self, "HaeWebhookFnArn", value=hae.function_arn, description="Health Auto Export webhook Lambda ARN")
