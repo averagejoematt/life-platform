@@ -449,6 +449,16 @@ def compute_hypothesis_engine() -> list[iam.PolicyStatement]:
     )
 
 
+def ingestion_google_calendar() -> list[iam.PolicyStatement]:
+    """Google Calendar ingestion (R8-ST1): reads/writes DDB, reads secret, writes S3 raw backup, writes refreshed token."""
+    return _ingestion_base(
+        "google_calendar",
+        secret_name="life-platform/google-calendar",
+        s3_prefix="raw/google_calendar/*",
+        extra_secret_actions=["secretsmanager:PutSecretValue"],  # OAuth token refresh writes back
+    )
+
+
 def compute_weekly_correlations() -> list[iam.PolicyStatement]:
     """Weekly correlation compute (R8-LT9): reads 8 source partitions, writes SOURCE#weekly_correlations."""
     return _compute_base(needs_kms=True)
