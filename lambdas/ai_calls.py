@@ -1657,8 +1657,17 @@ Examples of BAD guidance (too generic): "Stay hydrated", "Get 7.5 hours of sleep
 Respond in EXACTLY this JSON format, no other text:
 {{"tldr": "One sentence TL;DR", "guidance": ["emoji + sentence 1", "emoji + sentence 2", "emoji + sentence 3"]}}"""
 
+    # health_context passed so AI-3 validator can run hallucination detection
+    # on the guidance items (checks claimed metric values against actual data).
+    _hctx = {
+        "recovery_score": data_summary.get("recovery_score"),
+        "tsb":            data_summary.get("tsb"),
+        "sleep_score":    data_summary.get("sleep_score"),
+    }
     try:
-        raw = call_anthropic(prompt, api_key, max_tokens=450)
+        raw = call_anthropic(prompt, api_key, max_tokens=450,
+                             output_type=AIOutputType.GUIDANCE if _AI_VALIDATOR_AVAILABLE else None,
+                             health_context=_hctx)
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]

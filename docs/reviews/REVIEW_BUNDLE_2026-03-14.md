@@ -9,7 +9,7 @@
 
 ### Latest Handover
 
-→ See handovers/HANDOVER_v3.7.21.md
+→ See handovers/HANDOVER_v3.7.22.md
 
 
 ---
@@ -17,6 +17,50 @@
 ## 2. RECENT CHANGELOG
 
 # Life Platform — Changelog
+
+## v3.7.22 — 2026-03-14: R9 A/A+ hardening sprint
+
+### Summary
+All 21 R9 board action items completed. Platform grade target: A (from A-). Key fixes: tools_calendar.py lazy DDB init, real focus_block_count algorithm, n-gated correlation interpretation, google_calendar registered in all platform systems, dedicated warmer Lambda, 9 dispatcher unit tests, 2 ADRs.
+
+### Changes
+
+**Data Quality (Omar + Anika)**
+- `mcp/config.py`: `google_calendar` added to SOURCES list — enables cross-source tools to include calendar data
+- `lambdas/freshness_checker_lambda.py`: `google_calendar` added to monitored SOURCES (10 → 11 sources)
+- `lambdas/ingestion_validator.py`: `google_calendar` schema added (required_fields, range_checks for event_count + meeting_minutes)
+- `lambdas/google_calendar_lambda.py` v1.0.1: `compute_day_stats()` rewritten — real 90-min gap detection from actual HH:MM event times; returns `None` when uncomputable (never fabricates). Partial-progress gap fill: one date stored at a time so partial runs persist.
+- `lambdas/weekly_correlation_compute_lambda.py`: `interpret_r()` now n-gated — moderate requires n≥30, strong requires n≥50. Prevents spurious 'strong' labels on small samples during first 3 months.
+
+**Architecture + Reliability (Priya + Viktor + Jin)**
+- `cdk/stacks/mcp_stack.py` v2.2: dedicated `life-platform-mcp-warmer` Lambda. Same source as MCP server, separate EventBridge rule at 10:00 AM PT, 300s timeout. MCP request-serving Lambda freed from 90s warmer concurrency hold.
+- `lambdas/mcp_server.py`: warmer EventBridge permission retained on MCP Lambda for legacy rule during transition (no-op cost).
+- SLO-5: `slo-warmer-completeness` alarm added — fires if warmer Lambda errors on daily run.
+
+**Security (Yael)**
+- `setup/setup_google_calendar_auth.py`: `KmsKeyId` added to `create_secret` — Google Calendar secret now uses platform CMK, not AWS-managed key.
+- ADR-026 documents local MCP endpoint `AuthType NONE` as explicitly accepted design.
+
+**Maintainability (Elena)**
+- `mcp/tools_calendar.py` v1.1.0: module-level boto3 replaced with lazy `table` from `mcp.config` — same pattern as all other tool modules. Cold-start failure risk eliminated.
+- `mcp/tools_calendar.py`: `get_schedule_load` now reads `weekly_correlations` partition and surfaces data-driven schedule→health patterns in coaching_note.
+- `tests/test_business_logic.py`: 9 dispatcher routing tests added (TestDispatcherRouting). Total: 74+9 = 83 tests.
+- `lambdas/qa_smoke_lambda.py`: `get_task_load_summary` replaced with `get_todoist_snapshot(view=load)` dispatcher call — verifies SIMP-1 dispatcher routing is live on every daily smoke run.
+
+**Documentation**
+- `docs/DECISIONS.md`: ADR-025 (composite_scores consolidation decision), ADR-026 (local MCP auth accepted)
+- `docs/ARCHITECTURE.md`: secret count 10→11, dedicated warmer Lambda in schedule table, google-calendar secret row added, cost profile updated
+- `deploy/sync_doc_metadata.py`: v3.7.22, 45 Lambdas, 11 secrets, 49 alarms, 20 data sources
+
+### Deployed
+- `life-platform-mcp` Lambda (tools_calendar.py fix)
+- `google-calendar-ingestion` Lambda (v1.0.1: real focus_block detection, partial-progress)
+- `life-platform-freshness-checker` Lambda (google_calendar added)
+- `weekly-correlation-compute` Lambda (n-gated interpret_r)
+- CDK: `LifePlatformMcp` (dedicated warmer Lambda + SLO-5 alarm)
+- CI: 7/7 (registry), 83/83 (business logic + dispatchers)
+
+---
 
 ## v3.7.21 — 2026-03-14: Google Calendar integration (R8-ST1)
 
@@ -122,52 +166,8 @@ SIMP-1 Phase 1c+1d consolidated 24 tools into 9 dispatchers. Tool count 101 → 
 
 ## v3.7.18 — 2026-03-14: SIMP-1 Phase 1b — Data, Health, Nutrition clusters
 
-### Summary
-SIMP-1 Phase 1b consolidated 11 tools into 4 dispatchers: `get_daily_snapshot`, `get_longitudinal_summary`, `get_health`, `get_nutrition`. Tool count 109 → 101 (−8 net: 11 removed, 4 added). Board vote 11-0: also added `get_health_risk_profile` and `get_health_trajectory` to nightly warmer in the same commit — these were the only two expensive on-demand tools not previously cached; now warm nightly alongside health_dashboard.
 
-### Changes
-- **mcp/tools_data.py**: Added `tool_get_daily_snapshot` (view: summary|latest) and `tool_get_longitudinal_summary` (view: aggregate|seasonal|records) dispatchers at end of file.
-- **mcp/tools_health.py**: Added `tool_get_health` (view: dashboard|risk_profile|trajectory) dispatcher at end of file.
-- **mcp/tools_nutrition.py**: Added `tool_get_nutrition` (view: summary|macros|meal_timing|micronutrients) dispatcher at end of file.
-- **mcp/warmer.py**: Added steps 7 + 8 — nightly warm of `health_risk_profile` and `health_trajectory`. Import line updated. These were previously compute-on-demand only.
-- **mcp/registry.py**: Removed 11 tools: get_latest, get_daily_summary, get_aggregated_summary, get_personal_records, get_seasonal_patterns, get_health_dashboard, get_health_risk_profile, get_health_trajectory, get_micronutrient_report, get_meal_timing, get_nutrition_summary, get_macro_targets. Added 4 dispatchers: get_daily_snapshot, get_longitudinal_summary, get_health, get_nutrition. Net: 109 → 101.
-
-### Tool count history
-| Version | Tools | Delta | Phase |
-|---------|-------|-------|-------|
-| v3.7.14 | 116 | baseline | pre-SIMP-1 |
-| v3.7.17 | 109 | −7 | Phase 1a: Habits |
-| v3.7.18 | 101 | −8 | Phase 1b: Data/Health/Nutrition |
-| Target | ≤80 | −21 more | Phases 1c-2 |
-
-### Deployed
-- `life-platform-mcp` Lambda (registry + dispatcher functions + warmer)
-- Post-reconcile smoke: 10/10 ✅
-- CI: 7/7 (registry test) ✅
-
-### Files Changed
-- `mcp/tools_data.py`
-- `mcp/tools_health.py`
-- `mcp/tools_nutrition.py`
-- `mcp/warmer.py`
-- `mcp/registry.py`
-- `docs/CHANGELOG.md`
-
----
-
-## v3.7.17 — 2026-03-14: R8 gap closure sprint — 8 findings resolved
-
-### Summary
-Closed all remaining actionable R8 findings from the Architecture Review #8 PDF. SIMP-1 Phase 1a (habits cluster) reduced MCP tools 116→109. Resolved 8 open items: compute pipeline staleness observability (Risk-7), HAE S3 scope tightening (R8-ST7), CDK IAM blocking gate (R8-ST6), maintenance mode script (R8-ST3), OAuth token health monitoring (R8-ST4), DynamoDB PITR restore runbook (R8-ST2), hypothesis disclaimer (R8-LT7), and COST_TRACKER model routing entry (R8-QS3). PROJECT_PLAN TB7-1 and TB7-2 statuses corrected to Done (were previously completed but not marked).
-
-### Changes
-- **mcp/tools_habits.py**: Added `tool_get_habits(view=...)` dispatcher — routes to dashboard/adherence/streaks/tiers/stacks/keystones.
-- **mcp/registry.py**: Removed 7 habit tools (get_habit_adherence, get_habit_streaks, get_keystone_habits, get_group_trends, get_habit_stacks, get_habit_dashboard, get_habit_tier_report). Added `get_habits`. Retained `compare_habit_periods` standalone. Net: 116→109 tools. Added unconfirmed-hypothesis disclaimer to `get_hypotheses` description.
-- **lambdas/daily_brief_lambda.py**: Risk-7 — emits `LifePlatform/ComputePipelineStaleness` CloudWatch metric when computed_metrics is missing or >4h stale.
-- **lambdas/freshness_checker_lambda.py**: R8-ST4 — OAuth token health check on all 4 OAuth secrets via DescribeSecret. Alerts via SNS if any token not updated >60 days. Emits `OAuthTokenStaleCount` metric.
-- **cdk/stacks/role_policies.py**: `email_daily_brief()` — added CloudWatchMetrics statement (PutMetricData). `operational_freshness_checker()` — added OAuthSecretDescribe statement for 4 OAuth secrets. `ingestion_hae()` — S3Write tightened from `raw/matthew/*` to 5 explicit paths.
-
-... [TRUNCATED — 324 lines omitted, 474 total]
+... [TRUNCATED — 368 lines omitted, 518 total]
 
 
 ---
@@ -176,7 +176,7 @@ Closed all remaining actionable R8 findings from the Architecture Review #8 PDF.
 
 # Life Platform — Architecture
 
-Last updated: 2026-03-14 (v3.7.21 — 89 tools, 31-module MCP package, 19 data sources, 44 Lambdas, 8 secrets, 42 alarms, 8 CDK stacks deployed)
+Last updated: 2026-03-14 (v3.7.22 — 89 tools, 31-module MCP package, 20 data sources, 45 Lambdas, 8 secrets, 42 alarms, 8 CDK stacks deployed)
 
 ---
 
@@ -246,14 +246,14 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | Lambda Function URL (MCP) | MCP HTTPS endpoint | `https://votqefkra435xwrccmapxxbj6y0jawgn.lambda-url.us-west-2.on.aws/` (AuthType NONE — auth handled in Lambda via API key header) |
 | Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` (OAuth 2.1 auto-approve + HMAC Bearer) |
 | API Gateway | HTTP endpoint | `health-auto-export-api` (a76xwxt2wa) — webhook ingest |
-| Secrets Manager | Credential store | 10 secrets: 4 OAuth (`whoop`, `withings`, `strava`, `garmin`) + `eightsleep` + `ai-keys` (Anthropic + MCP) + `ingestion-keys` (Notion/Todoist/Habitify/Dropbox/webhook keys bundle) + `habitify` (dedicated) + `webhook-key` + `mcp-api-key` — **`api-keys` permanently deleted 2026-03-14** |
+| Secrets Manager | Credential store | 11 secrets: 4 OAuth (`whoop`, `withings`, `strava`, `garmin`) + `eightsleep` + `ai-keys` (Anthropic + MCP) + `ingestion-keys` (Notion/Todoist/Habitify/Dropbox/webhook keys bundle) + `habitify` (dedicated) + `webhook-key` + `mcp-api-key` — **`api-keys` permanently deleted 2026-03-14** |
 | SNS topic | Alert routing | `life-platform-alerts` |
 | CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` (`d14jnhrgfrte42.cloudfront.net`) → S3 `/dashboard`, Lambda@Edge auth (`life-platform-cf-auth`), alias `dash.averagejoematt.com`. **Note (R8-LT6):** Lambda@Edge auth functions are manually managed outside CDK — `web_stack.py` has zero Lambda@Edge references. Intentionally left unmanaged: Lambda@Edge requires us-east-1 deployment which complicates CDK stack boundaries. Document-only; no CDK migration planned. |
 | CloudFront (blog) | CDN (public) | `E1JOC1V6E6DDYI` (`d1aufb59hb2r1q.cloudfront.net`) → S3 `/blog`, NO auth, alias `blog.averagejoematt.com` |
 | CloudFront (buddy) | CDN + auth | `ETTJ44FT0Z4GO` (`d1empeau04e0eg.cloudfront.net`) → S3 `/buddy`, Lambda@Edge auth (`life-platform-buddy-auth`), alias `buddy.averagejoematt.com`, PriceClass_100, HTTP/2+3 |
 | ACM Certificate | TLS | `arn:aws:acm:us-east-1:205930651321:certificate/8e560416-...` — `dash.averagejoematt.com` (DNS-validated) |
 | SES Receipt Rule Set | Inbound email routing | `life-platform-inbound` (active) — rule `insight-capture` routes `insight@aws.mattsusername.com` → S3 |
-| CloudWatch | Alarms + logs | **~47 metric alarms**, all Lambdas monitored |
+| CloudWatch | Alarms + logs | **~49 metric alarms**, all Lambdas monitored |
 | CDK | Infrastructure as Code | `cdk/` — 8 stacks deployed: **Core** (SQS DLQ + SNS + Layer), Ingestion, Compute, Email, Operational, Mcp, Monitoring, Web. CDK owns all 43 Lambda IAM roles + ~50 EventBridge rules. `cdk/stacks/lambda_helpers.py` uses `Code.from_asset("../lambdas")`. DDB + S3 deliberately unmanaged (stateful). |}
 | CloudTrail | Audit logging | `life-platform-trail` → S3 |
 | AWS Budget | Cost guardrail | $20/mo cap, alerts at 25%/50%/100% |
@@ -306,7 +306,7 @@ These are not data ingestion — they compute, alert, or deliver intelligence.
 | Function | Lambda | EventBridge Rule | Cron (UTC) | PT (PDT) | IAM Role |
 |---|---|---|---|---|---|
 | Anomaly Detector v2.1 | `anomaly-detector` | `anomaly-detector-daily` | `cron(5 16 * * ? *)` | 09:05 AM | `life-platform-email-role` |
-| Cache Warmer | `life-platform-mcp` | `life-platform-nightly-warmer` | `cron(0 17 * * ? *)` | 10:00 AM | `lambda-mcp-server-role` |
+| Cache Warmer (dedicated) | `life-platform-mcp-warmer` | CDK-managed warmer rule | `cron(0 17 * * ? *)` | 10:00 AM | CDK-generated role |
 | Whoop Recovery Refresh | `whoop-data-ingestion` | `whoop-recovery-refresh` | `cron(30 17 * * ? *)` | 10:30 AM | `lambda-whoop-role` |
 | Freshness Checker | `life-platform-freshness-checker` | `life-platform-freshness-check` | `cron(45 17 * * ? *)` | 10:45 AM | `lambda-freshness-checker-role` |
 | Monday Compass | `monday-compass` | `monday-compass` | `cron(0 15 ? * MON *)` | Mon 08:00 AM | `lambda-monday-compass-role` |
@@ -357,7 +357,7 @@ These are not data ingestion — they compute, alert, or deliver intelligence.
 
 ### Failure handling
 
-DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq` (SQS). Request/response pattern Lambdas (`life-platform-mcp`, `health-auto-export-webhook`) excluded. CloudWatch metric alarms: **~47 total**, all Lambdas monitored. Alarm actions → SNS `life-platform-alerts`. 24-hour evaluation period, `TreatMissingData: notBreaching`.
+DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq` (SQS). Request/response pattern Lambdas (`life-platform-mcp`, `health-auto-export-webhook`) excluded. CloudWatch metric alarms: **~49 total**, all Lambdas monitored. Alarm actions → SNS `life-platform-alerts`. 24-hour evaluation period, `TreatMissingData: notBreaching`.
 
 **Additional failure safeguards (v3.1.3):**
 - **DLQ Consumer Lambda** (`dlq-consumer`): Drains `life-platform-ingestion-dlq` on a schedule, logs failed message details to CloudWatch with structured context for triage.
@@ -475,7 +475,7 @@ Cached tools (SIMP-1 updated, v3.7.18–19): `get_longitudinal_summary` (aggrega
 | `monday-compass` v1.0 | Mon 8:00 AM | Forward-looking planning email. Todoist tasks by pillar, cross-pillar prioritization AI, overdue debt, Board Pro Tips, Keystone action. |
 | `wednesday-chronicle` v1.1 | Wed 8:00 AM | "The Measured Life" — Elena Voss narrative journalism. Thesis-driven synthesis, Board interviews, S3 blog post. |
 
-... [TRUNCATED — 171 lines omitted, 471 total]
+... [TRUNCATED — 172 lines omitted, 472 total]
 
 
 ---
@@ -485,7 +485,7 @@ Cached tools (SIMP-1 updated, v3.7.18–19): `get_longitudinal_summary` (aggrega
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-03-14 (v3.7.21 — 44 Lambdas, 10 active secrets, 88 MCP tools, ~47 alarms)
+> Last updated: 2026-03-14 (v3.7.22 — 45 Lambdas, 11 active secrets, 88 MCP tools, ~49 alarms)
 
 ---
 
@@ -591,7 +591,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Field | Value |
 |-------|-------|
 | Alert topic | `life-platform-alerts` → email to `awsdev@mattsusername.com` |
-| CloudWatch alarms | ~47 metric alarms (ALARM-only; base + invocation-count + DDB item size + canary + new Lambda alarms) |
+| CloudWatch alarms | ~49 metric alarms (ALARM-only; base + invocation-count + DDB item size + canary + new Lambda alarms) |
 
 ---
 
@@ -616,7 +616,7 @@ All DNS-validated via Route 53 CNAME records.
 
 ---
 
-## Secrets Manager (10 active secrets)
+## Secrets Manager (11 active secrets)
 
 All under prefix `life-platform/`. No values stored in this doc — access via AWS console or CLI.
 
@@ -690,35 +690,36 @@ See `deploy/p1_kms_dynamodb.sh` for creation script.
 
 ## 5. ARCHITECTURE DECISIONS (ADRs)
 
-## ADR Index
+# will be overwritten immediately below
+---
 
-| # | Title | Status | Date |
-|---|-------|--------|------|
-| ADR-001 | Single-table DynamoDB design | ✅ Active | 2026-02-23 |
-| ADR-002 | Lambda Function URL over API Gateway for MCP | ✅ Active | 2026-02-23 |
-| ADR-003 | MCP over REST API for Claude integration | ✅ Active | 2026-02-24 |
-| ADR-004 | Source-of-truth domain ownership model | ✅ Active | 2026-02-25 |
-| ADR-005 | No GSI on DynamoDB table | ✅ Active | 2026-02-25 |
-| ADR-006 | DynamoDB on-demand billing over provisioned | ✅ Active | 2026-02-25 |
-| ADR-007 | Lambda memory 1024 MB over provisioned concurrency | ✅ Active | 2026-02-26 |
-| ADR-008 | No VPC — public Lambda endpoints with auth | ✅ Active | 2026-02-27 |
-| ADR-009 | CloudFront + S3 static site over server-rendered dashboard | ✅ Active | 2026-02-27 |
-| ADR-010 | Reserved concurrency over WAF | ✅ Active | 2026-02-28 |
-| ADR-011 | Whoop as sleep SOT over Eight Sleep | ✅ Active | 2026-03-01 |
-| ADR-012 | Board of Directors as S3 config, not code | ✅ Active | 2026-03-01 |
-| ADR-013 | Shared Lambda Layer for common modules | ✅ Active | 2026-03-05 |
-| ADR-014 | Secrets Manager consolidation — dedicated vs. bundled principle | ✅ Active | 2026-03-05 |
-| ADR-015 | Compute→Store→Read pattern for intelligence features | ✅ Active | 2026-03-06 |
-| ADR-016 | platform_memory DDB partition over vector store | ✅ Active | 2026-03-07 |
-| ADR-017 | No fine-tuning — prompt + context engineering instead | ✅ Active | 2026-03-07 |
-| ADR-018 | CDK for IaC over Terraform | ✅ Active | 2026-03-09 |
-| ADR-019 | SIMP-2 ingestion framework: adopt for new Lambdas, skip migration of existing | ✅ Active | 2026-03-09 |
-| ADR-020 | MCP tool functions BEFORE TOOLS={} dict | ✅ Active | 2026-02-26 |
-| ADR-021 | EventBridge rule naming convention (CDK) | ✅ Active | 2026-03-10 |
-| ADR-022 | CoreStack scoping — shared infrastructure vs. per-stack resources | ✅ Active | 2026-03-10 |
-| ADR-023 | Sick day checker as shared utility, not standalone Lambda | ✅ Active | 2026-03-10 |
+## ADR-025 — composite_scores vs computed_metrics: Consolidate into computed_metrics
+
+**Status:** Active  
+**Date:** 2026-03-14 (v3.7.22, R9 hardening)  
+**Context:** Viktor Sorokin (R9) raised whether SOURCE#composite_scores (v3.7.20) duplicates SOURCE#computed_metrics. ~80% field overlap.
+
+**Decision:** Consolidate into computed_metrics. Remove composite_scores. Execute before SIMP-1 Phase 2.
+
+**Reasoning:** (1) No distinct access pattern — computed_metrics already serves this purpose. (2) Field overlap is a coherence liability with no tie-breaker rule. (3) Two writes for the same data risk temporal divergence. (4) computed_metrics is the established SOT since IC-8.
+
+**Migration:** Remove write_composite_scores() from daily_metrics_compute_lambda.py. Redirect weekly_correlation_compute_lambda.py's composite fetch to computed_metrics. Update SCHEMA.md.
+
+**Outcome:** Consolidate before Apr 13.
 
 ---
+
+## ADR-026 — Local MCP Endpoint: AuthType NONE + In-Lambda Key Check (Accepted)
+
+**Status:** Active  
+**Date:** 2026-03-14 (v3.7.22, R9 hardening)  
+**Context:** Local MCP Function URL uses AuthType NONE + x-api-key in-Lambda. Remote uses HMAC Bearer. Yael (R9) asked for explicit documentation.
+
+**Decision:** Retain current model. Document as accepted design.
+
+**Reasoning:** (1) Both endpoints require auth — local validates x-api-key before any processing. (2) IAM AuthType breaks Claude Desktop bridge (would need SigV4 signing). (3) Unguessable URL (~160-bit entropy) + in-Lambda auth is strong for a personal project. (4) HMAC Bearer consistency is cosmetic — no meaningful security gain.
+
+**Outcome:** Document and accept. No migration planned.
 
 
 ---
@@ -728,7 +729,7 @@ See `deploy/p1_kms_dynamodb.sh` for creation script.
 # Life Platform — Service Level Objectives (SLOs)
 
 > OBS-3: Formal SLO definitions for critical platform paths.
-> Last updated: 2026-03-14 (v3.7.21)
+> Last updated: 2026-03-14 (v3.7.22)
 
 ---
 
@@ -1747,7 +1748,7 @@ class ValidationResult:
                 "archived_at": datetime.now(timezone.utc).isoformat(),
                 "errors": self.errors,
 
-... [TRUNCATED — 446 lines omitted, 526 total]
+... [TRUNCATED — 461 lines omitted, 541 total]
 
 ```
 

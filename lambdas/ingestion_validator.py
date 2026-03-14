@@ -32,11 +32,11 @@ VALIDATION RULES:
       CRITICAL — skip DDB write, archive to S3, log error
       WARNING  — write proceeds, issue logged and archived
 
-SOURCES COVERED (19):
+SOURCES COVERED (20):
   whoop, garmin, apple_health, macrofactor, macrofactor_workouts, strava,
   eightsleep, withings, habitify, notion, todoist, weather, supplements,
   computed_metrics, character_sheet, adaptive_mode, day_grade, habit_scores,
-  computed_insights
+  computed_insights, google_calendar
 
 v1.0.0 — 2026-03-08 (DATA-2)
 """

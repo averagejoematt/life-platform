@@ -41,7 +41,7 @@ All SLO alarms publish to `life-platform-alerts` SNS topic. The operational dash
 | **Metric** | `LifePlatform/Freshness::StaleSourceCount`, custom metric emitted by `freshness_checker_lambda.py` |
 | **Recovery** | Identify stale source → check ingestion Lambda logs → fix auth/API issue → manually invoke |
 
-**Monitored sources (9):** Whoop, Withings, Strava, Todoist, Apple Health, Eight Sleep, MacroFactor, Garmin, Habitify.
+**Monitored sources (10):** Whoop, Withings, Strava, Todoist, Apple Health, Eight Sleep, MacroFactor, Garmin, Habitify, Google Calendar.
 
 **Why 48h threshold:** Many sources only sync once daily. A 24h threshold would false-alarm on normal timezone drift. 48h catches genuine failures while tolerating expected gaps (e.g., no MacroFactor data on a day Matthew doesn't log food).
 

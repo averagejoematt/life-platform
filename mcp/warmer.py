@@ -1,5 +1,9 @@
 """
 Nightly cache warmer — pre-computes expensive tools.
+
+v1.1.0 — 2026-03-14 (R10 A+ hardening): Steps 5-13 now call SIMP-1 dispatchers
+instead of underlying tool functions directly. Prevents silent bypass of any
+pre/post-processing logic added to dispatchers in future phases.
 """
 import json
 import time
@@ -9,13 +13,18 @@ from datetime import datetime, timedelta
 from mcp.config import logger, SOURCES
 from mcp.core import ddb_cache_set, mem_cache_set
 
-# Tool functions imported individually for the warmer
+# Steps 1-4: aggregate/record tools not yet consolidated — call directly
 from mcp.tools_data import tool_get_sources, tool_get_field_stats
-from mcp.tools_health import tool_get_health_dashboard, tool_get_health_risk_profile, tool_get_health_trajectory
-from mcp.tools_habits import tool_get_habit_dashboard
-from mcp.tools_training import tool_get_training_load, tool_get_seasonal_patterns, tool_get_personal_records, tool_get_training_periodization, tool_get_training_recommendation
-from mcp.tools_character import tool_get_character_sheet
-from mcp.tools_cgm import tool_get_cgm_dashboard
+from mcp.tools_training import tool_get_seasonal_patterns, tool_get_personal_records
+
+# Steps 5-13: call SIMP-1 dispatchers (not underlying functions).
+# If a dispatcher adds pre/post-processing in a future phase, the warmer
+# will benefit automatically rather than silently bypassing it.
+from mcp.tools_health import tool_get_health
+from mcp.tools_habits import tool_get_habits
+from mcp.tools_training import tool_get_training
+from mcp.tools_character import tool_get_character
+from mcp.tools_cgm import tool_get_cgm
 
 WARMER_CORE_SOURCES = [s for s in SOURCES if s not in ("apple_health", "hevy")]
 
@@ -96,11 +105,11 @@ def nightly_cache_warmer():
         logger.error(f"[warmer] seasonal_patterns failed: {e}")
         results["seasonal_patterns"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
 
-    # 5. get_health_dashboard
+    # 5. get_health → dashboard (via dispatcher — was: tool_get_health_dashboard)
     _t = time.time()
     try:
-        logger.info("[warmer] computing health_dashboard")
-        data = tool_get_health_dashboard({})
+        logger.info("[warmer] computing health dashboard (via dispatcher)")
+        data = tool_get_health({"view": "dashboard"})
         ddb_cache_set("health_dashboard_today", data)
         mem_cache_set("health_dashboard_today", data)
         results["health_dashboard"] = {"status": "ok", "ms": int((time.time()-_t)*1000)}
@@ -108,11 +117,11 @@ def nightly_cache_warmer():
         logger.error(f"[warmer] health_dashboard failed: {e}")
         results["health_dashboard"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
 
-    # 6. get_habit_dashboard
+    # 6. get_habits → dashboard (via dispatcher — was: tool_get_habit_dashboard)
     _t = time.time()
     try:
-        logger.info("[warmer] computing habit_dashboard")
-        data = tool_get_habit_dashboard({})
+        logger.info("[warmer] computing habits dashboard (via dispatcher)")
+        data = tool_get_habits({"view": "dashboard"})
         ddb_cache_set("habit_dashboard_today", data)
         mem_cache_set("habit_dashboard_today", data)
         results["habit_dashboard"] = {"status": "ok", "ms": int((time.time()-_t)*1000)}
@@ -120,11 +129,11 @@ def nightly_cache_warmer():
         logger.error(f"[warmer] habit_dashboard failed: {e}")
         results["habit_dashboard"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
 
-    # 7. get_health_risk_profile (board vote 11-0: warm before get_health consolidation)
+    # 7. get_health → risk_profile (via dispatcher — was: tool_get_health_risk_profile)
     _t = time.time()
     try:
-        logger.info("[warmer] computing health_risk_profile")
-        data = tool_get_health_risk_profile({})
+        logger.info("[warmer] computing health risk_profile (via dispatcher)")
+        data = tool_get_health({"view": "risk_profile"})
         ddb_cache_set("health_risk_profile_today", data)
         mem_cache_set("health_risk_profile_today", data)
         results["health_risk_profile"] = {"status": "ok", "ms": int((time.time()-_t)*1000)}
@@ -132,11 +141,11 @@ def nightly_cache_warmer():
         logger.error(f"[warmer] health_risk_profile failed: {e}")
         results["health_risk_profile"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
 
-    # 8. get_health_trajectory (board vote 11-0: warm before get_health consolidation)
+    # 8. get_health → trajectory (via dispatcher — was: tool_get_health_trajectory)
     _t = time.time()
     try:
-        logger.info("[warmer] computing health_trajectory")
-        data = tool_get_health_trajectory({"domain": "all"})
+        logger.info("[warmer] computing health trajectory (via dispatcher)")
+        data = tool_get_health({"view": "trajectory"})
         ddb_cache_set("health_trajectory_today", data)
         mem_cache_set("health_trajectory_today", data)
         results["health_trajectory"] = {"status": "ok", "ms": int((time.time()-_t)*1000)}
@@ -144,11 +153,11 @@ def nightly_cache_warmer():
         logger.error(f"[warmer] health_trajectory failed: {e}")
         results["health_trajectory"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
 
-    # 9. get_training_load (fix: imported but never cached before SIMP-1 Phase 1c)
+    # 9. get_training → load (via dispatcher — was: tool_get_training_load)
     _t = time.time()
     try:
-        logger.info("[warmer] computing training_load")
-        data = tool_get_training_load({})
+        logger.info("[warmer] computing training load (via dispatcher)")
+        data = tool_get_training({"view": "load"})
         ddb_cache_set("training_load_today", data)
         mem_cache_set("training_load_today", data)
         results["training_load"] = {"status": "ok", "ms": int((time.time()-_t)*1000)}
@@ -156,11 +165,11 @@ def nightly_cache_warmer():
         logger.error(f"[warmer] training_load failed: {e}")
         results["training_load"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
 
-    # 10. get_training_periodization (board vote 11-0: warm with Phase 1c consolidation)
+    # 10. get_training → periodization (via dispatcher — was: tool_get_training_periodization)
     _t = time.time()
     try:
-        logger.info("[warmer] computing training_periodization")
-        data = tool_get_training_periodization({})
+        logger.info("[warmer] computing training periodization (via dispatcher)")
+        data = tool_get_training({"view": "periodization"})
         ddb_cache_set("training_periodization_today", data)
         mem_cache_set("training_periodization_today", data)
         results["training_periodization"] = {"status": "ok", "ms": int((time.time()-_t)*1000)}
@@ -168,11 +177,11 @@ def nightly_cache_warmer():
         logger.error(f"[warmer] training_periodization failed: {e}")
         results["training_periodization"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
 
-    # 11. get_training_recommendation (board vote 11-0: warm with Phase 1c consolidation)
+    # 11. get_training → recommendation (via dispatcher — was: tool_get_training_recommendation)
     _t = time.time()
     try:
-        logger.info("[warmer] computing training_recommendation")
-        data = tool_get_training_recommendation({})
+        logger.info("[warmer] computing training recommendation (via dispatcher)")
+        data = tool_get_training({"view": "recommendation"})
         ddb_cache_set("training_recommendation_today", data)
         mem_cache_set("training_recommendation_today", data)
         results["training_recommendation"] = {"status": "ok", "ms": int((time.time()-_t)*1000)}
@@ -180,11 +189,11 @@ def nightly_cache_warmer():
         logger.error(f"[warmer] training_recommendation failed: {e}")
         results["training_recommendation"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
 
-    # 12. get_character_sheet (board vote 11-0: reads pre-computed DDB partition, fast)
+    # 12. get_character → sheet (via dispatcher — was: tool_get_character_sheet)
     _t = time.time()
     try:
-        logger.info("[warmer] computing character_sheet")
-        data = tool_get_character_sheet({})
+        logger.info("[warmer] computing character sheet (via dispatcher)")
+        data = tool_get_character({"view": "sheet"})
         ddb_cache_set("character_sheet_today", data)
         mem_cache_set("character_sheet_today", data)
         results["character_sheet"] = {"status": "ok", "ms": int((time.time()-_t)*1000)}
@@ -192,11 +201,11 @@ def nightly_cache_warmer():
         logger.error(f"[warmer] character_sheet failed: {e}")
         results["character_sheet"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
 
-    # 13. get_cgm_dashboard (board vote 11-0: apple_health query, warm for latency)
+    # 13. get_cgm → dashboard (via dispatcher — was: tool_get_cgm_dashboard)
     _t = time.time()
     try:
-        logger.info("[warmer] computing cgm_dashboard")
-        data = tool_get_cgm_dashboard({})
+        logger.info("[warmer] computing cgm dashboard (via dispatcher)")
+        data = tool_get_cgm({"view": "dashboard"})
         ddb_cache_set("cgm_dashboard_today", data)
         mem_cache_set("cgm_dashboard_today", data)
         results["cgm_dashboard"] = {"status": "ok", "ms": int((time.time()-_t)*1000)}
