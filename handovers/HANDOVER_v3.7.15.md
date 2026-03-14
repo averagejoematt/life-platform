@@ -1,6 +1,6 @@
 # Life Platform Handover — v3.7.15
 **Date:** 2026-03-13
-**Session type:** Architecture Review #8 + P0 execution
+**Session type:** Architecture Review #8 + P0 execution + roadmap build
 
 ---
 
@@ -9,82 +9,55 @@
 ### Architecture Review #8 — Full System Review
 Grade: A-. Full report at `docs/reviews/architecture_review_8_full.md`. 12 findings (3 HIGH).
 
-### P0 Verification Results (r8_p0_verify.sh)
-Ran the P0 verification script. Key discoveries:
+### P0 Verification + Fixes
+- Webhook auth: was returning 500 (broken IAM). Fixed in role_policies.py → CDK deployed → now returns 403 (auth working) ✅
+- Secret state: 10 actual secrets in AWS (not 9). Three were undocumented: `ingestion-keys`, `webhook-key`, `mcp-api-key`. Two documented ones didn't exist: `todoist`, `notion` (use `ingestion-keys` bundle). All references reconciled. ✅
+- MCP reserved concurrency: account limit is 10 total — can't reserve (same as TB7-10). ✅ N/A
 
-**Actual secrets in AWS = 10 (not 9):**
-- 7 documented correctly: whoop, withings, strava, garmin, eightsleep, ai-keys, habitify
-- 3 undocumented: `ingestion-keys` (COST-B bundle), `webhook-key`, `mcp-api-key`
-- 2 documented but DON'T EXIST: `todoist`, `notion` — these use `ingestion-keys` bundle
+### ARCHITECTURE.md Secrets Table
+Rewrote all 4 stale sections: AWS resources summary, webhook auth reference, OAuth management section, and the full 10-secret table with correct names, consumers, and contents.
 
-**Webhook auth (FINDING-2 resolved):** Returns 500 "Auth error" — failing closed (safe but broken). Lambda tries to read `ingestion-keys` secret but IAM has no Secrets Manager access. Fixed in `role_policies.py` — added `secretsmanager:GetSecretValue` for `ingestion-keys`. Needs CDK deploy.
+### PROJECT_PLAN.md Rebuilt
+Extracted every action item from R8 review. Prioritized into 4 tiers:
+- **Tier 1 (30d):** SIMP-1, integration test, doc hygiene, script archiving
+- **Tier 2 (60d):** Google Calendar, DDB restore test, maintenance mode, OAuth monitoring, composite pre-compute, CDK IAM gate, HAE scope tightening
+- **Tier 3 (90d):** R9 review, IC-4/IC-5, unit tests, DDB export, SLO review, Lambda@Edge, hypothesis disclaimer, DLQ event-driven
+- **Tier 4 (deferred):** IC features gated on data maturity (IC-4/5/9/10/11/20/26/28)
 
-**MCP reserved concurrency:** Not set. ADR-010 says 10.
-
-### Fixes Applied
-1. **role_policies.py:** Added Secrets Manager access to `ingestion_hae()` for `life-platform/ingestion-keys` (restores webhook auth after CDK deploy)
-2. **test_iam_secrets_consistency.py:** Updated KNOWN_SECRETS to 10 actual secrets (removed nonexistent todoist/notion, added ingestion-keys/webhook-key/mcp-api-key)
-3. **sync_doc_metadata.py:** Secret count 9→10, cost $3.60→$4.00
-4. **anomaly_detector_lambda.py:** Fixed stale CV_THRESHOLDS comments
-5. **ci-cd.yml:** Added IAM lint to Job 2
-6. **CHANGELOG.md:** v3.7.15 entry
+### SIMP-1 Consolidation Plan
+Created `docs/SIMP1_PLAN.md` — full analysis of 116 tools by domain. Identified consolidation map:
+- **Phase 1 (read-only merges):** 14 merge groups → -28 tools (116→88). No EMF data needed.
+- **Phase 2 (EMF-driven cuts):** -5 to -10 tools (88→~80). Needs 30-day data (~April 13).
+- **Phase 3 (pre-compute unlocks):** Doesn't reduce count but simplifies compute.
+- Execution: ~5 sessions, one merge cluster per commit.
 
 ---
 
 ## Platform Status
 - Version: v3.7.15
-- ⚠️ Webhook auth BROKEN until CDK deploy (failing closed — safe but no data flowing)
-- MCP reserved concurrency: NOT SET (ADR-010 says 10)
-- SIMP-1 data window: accumulating
+- All alarms: OK
+- Webhook auth: RESTORED ✅ (403 on bad token)
+- Active secrets: 10 (reconciled)
+- DLQ: 0
+- SIMP-1 data window: accumulating (EMF started 2026-03-13)
 
-## Next Session — Critical Path
-
-### 1. Sync docs
-```bash
-python3 deploy/sync_doc_metadata.py --apply
-```
-
-### 2. Commit current fixes
-```bash
-git add -A && git commit -m "v3.7.15: Architecture Review #8 — P0 fixes" && git push
-```
-
-### 3. Deploy CDK to restore webhook auth
-```bash
-cd cdk
-source .venv/bin/activate
-npx cdk deploy LifePlatformIngestion --require-approval never
-```
-Then verify:
-```bash
-curl -X POST -H "Authorization: Bearer INVALID_TOKEN" https://a76xwxt2wa.execute-api.us-west-2.amazonaws.com/ingest -d '{"data":{"metrics":[]}}'
-# Should return 401 (not 500)
-```
-
-### 4. Set MCP reserved concurrency (ADR-010)
-```bash
-aws lambda put-function-concurrency \
-  --function-name life-platform-mcp \
-  --reserved-concurrent-executions 10 \
-  --region us-west-2
-```
-
-### 5. Update ARCHITECTURE.md secrets table (manual — sync script handles counts only)
-Replace the 9-secret table with the actual 10-secret list.
-
-### 6. Future
-- SIMP-1 tool consolidation (60-day target, ≤80 tools)
-- Google Calendar integration
-- DDB restore test
+## Next Session
+1. **R8-QS2: Integration test for qa-smoke** (Tier 1, M effort, high ROI)
+2. **R8-QS4: Archive deploy scripts** — `bash deploy/archive_onetime_scripts.sh`
+3. **R8-ST1: Google Calendar integration** (~6-8h, highest-priority new feature)
+4. **SIMP-1 Phase 1** can begin anytime — no EMF dependency for read-only merges
 
 ---
 
-## Files Changed
-- `cdk/stacks/role_policies.py` — webhook IAM fix
-- `tests/test_iam_secrets_consistency.py` — updated KNOWN_SECRETS to reality
-- `deploy/sync_doc_metadata.py` — secret count 10, SCHEMA.md rule
-- `lambdas/anomaly_detector_lambda.py` — CV_THRESHOLDS comments
-- `.github/workflows/ci-cd.yml` — IAM lint
-- `deploy/r8_p0_verify.sh` — NEW
-- `docs/CHANGELOG.md` — v3.7.15
+## Files Changed This Session
+- `lambdas/anomaly_detector_lambda.py` — CV_THRESHOLDS comment fix
+- `cdk/stacks/role_policies.py` — webhook IAM fix (Secrets Manager access)
+- `tests/test_iam_secrets_consistency.py` — NEW (S1-S4 CI lint)
+- `.github/workflows/ci-cd.yml` — IAM lint added to Job 2
+- `deploy/sync_doc_metadata.py` — SCHEMA.md rule, secret count 10, version bump
+- `deploy/r8_p0_verify.sh` — NEW (P0 verification script)
+- `docs/ARCHITECTURE.md` — Secrets table + 3 other sections rewritten
+- `docs/PROJECT_PLAN.md` — Rebuilt with all R8 action items, 4 tiers
+- `docs/SIMP1_PLAN.md` — NEW (consolidation plan: 116→≤80 tools)
+- `docs/CHANGELOG.md` — v3.7.15 entry
 - `handovers/HANDOVER_v3.7.15.md` — this file

@@ -70,7 +70,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | Lambda Function URL (MCP) | MCP HTTPS endpoint | `https://votqefkra435xwrccmapxxbj6y0jawgn.lambda-url.us-west-2.on.aws/` (AuthType NONE — auth handled in Lambda via API key header) |
 | Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` (OAuth 2.1 auto-approve + HMAC Bearer) |
 | API Gateway | HTTP endpoint | `health-auto-export-api` (a76xwxt2wa) — webhook ingest |
-| Secrets Manager | Credential store | 9 secrets: 4 OAuth (`whoop`, `withings`, `strava`, `garmin`) + `eightsleep` + `life-platform/ai-keys` (Anthropic) + `life-platform/todoist` + `life-platform/notion` + `life-platform/habitify` — **`life-platform/api-keys` permanently deleted 2026-03-14** |
+| Secrets Manager | Credential store | 10 secrets: 4 OAuth (`whoop`, `withings`, `strava`, `garmin`) + `eightsleep` + `ai-keys` (Anthropic + MCP) + `ingestion-keys` (Notion/Todoist/Habitify/Dropbox/webhook keys bundle) + `habitify` (dedicated) + `webhook-key` + `mcp-api-key` — **`api-keys` permanently deleted 2026-03-14** |
 | SNS topic | Alert routing | `life-platform-alerts` |
 | CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` (`d14jnhrgfrte42.cloudfront.net`) → S3 `/dashboard`, Lambda@Edge auth (`life-platform-cf-auth`), alias `dash.averagejoematt.com` |
 | CloudFront (blog) | CDN (public) | `E1JOC1V6E6DDYI` (`d1aufb59hb2r1q.cloudfront.net`) → S3 `/blog`, NO auth, alias `blog.averagejoematt.com` |
@@ -166,7 +166,7 @@ These are not data ingestion — they compute, alert, or deliver intelligence.
 
 | Source | Lambda | Endpoint | Auth |
 |---|---|---|---|
-| Health Auto Export | `health-auto-export-webhook` | `https://a76xwxt2wa.execute-api.us-west-2.amazonaws.com/ingest` | Bearer token (`life-platform/api-keys`) |
+| Health Auto Export | `health-auto-export-webhook` | `https://a76xwxt2wa.execute-api.us-west-2.amazonaws.com/ingest` | Bearer token (`life-platform/ingestion-keys` → `health_auto_export_api_key`) |
 
 **Three-tier source filtering (v1.1.0):**
 - Tier 1 (Apple-exclusive): steps, active/basal energy, gait metrics, flights, distance, headphone audio, water intake, caffeine
@@ -189,7 +189,7 @@ DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq` (SQS). Request
 
 ### OAuth token management
 
-Whoop, Withings, Strava, Garmin: OAuth2 with self-healing refresh tokens. Each Lambda reads secret → calls API → on expiry, refreshes → writes updated credentials back to Secrets Manager. Eight Sleep: username/password JWT, refreshed each invocation. Notion, Todoist, Habitify: static API keys — each has its own dedicated secret (`life-platform/notion`, `life-platform/todoist`, `life-platform/habitify`). See ADR-014 for the dedicated-vs-bundled governing principle.
+Whoop, Withings, Strava, Garmin: OAuth2 with self-healing refresh tokens. Each Lambda reads secret → calls API → on expiry, refreshes → writes updated credentials back to Secrets Manager. Eight Sleep: username/password JWT, refreshed each invocation. Notion, Todoist, Habitify: static API keys bundled in `life-platform/ingestion-keys` (COST-B pattern — single secret with per-service key fields). Habitify also has a dedicated secret (`life-platform/habitify`) per ADR-014. Dropbox poll and Health Auto Export webhook also read from `ingestion-keys`. See ADR-014 for the dedicated-vs-bundled governing principle.
 
 ---
 
@@ -380,11 +380,12 @@ Each Lambda has a **dedicated, least-privilege IAM role** (43 roles total as of 
 | `life-platform/strava` | Strava Lambda | OAuth2 tokens (auto-updated) |
 | `life-platform/garmin` | Garmin Lambda | garth OAuth tokens (auto-updated) |
 | `life-platform/eightsleep` | Eight Sleep Lambda | Username + password (JWT refreshed each run) |
-| `life-platform/ai-keys` | All email/compute/MCP Lambdas | Anthropic API key + MCP API key (90-day auto-rotation) |
-| `life-platform/todoist` | Todoist Lambda | Todoist API key |
-| `life-platform/notion` | Notion Lambda | Notion integration key |
-| `life-platform/habitify` | Habitify Lambda | Habitify API key (dedicated secret — see ADR-014) |
-| ~~`life-platform/api-keys`~~ | ~~Legacy~~ | ~~**PERMANENTLY DELETED 2026-03-14.** All Lambdas migrated to per-service secrets.~~ |
+| `life-platform/ai-keys` | All email/compute/MCP Lambdas | Anthropic API key + MCP bearer token (90-day auto-rotation via `mcp-key-rotator`) |
+| `life-platform/ingestion-keys` | Notion, Todoist, Habitify, Dropbox, HAE webhook | COST-B bundle: per-service key fields (`notion_api_key`, `todoist_api_key`, `habitify_api_key`, `dropbox_app_key`, `health_auto_export_api_key`) |
+| `life-platform/habitify` | Habitify Lambda | Dedicated Habitify API key (also in `ingestion-keys` — see ADR-014) |
+| `life-platform/webhook-key` | *(reserved)* | Dedicated HAE webhook auth key (exists but not yet primary — Lambda reads `ingestion-keys`) |
+| `life-platform/mcp-api-key` | MCP Key Rotator Lambda | MCP server bearer token (90-day auto-rotation, consumed by `ai-keys`) |
+| ~~`life-platform/api-keys`~~ | ~~Legacy~~ | ~~**PERMANENTLY DELETED 2026-03-14.**~~ |
 
 ---
 
