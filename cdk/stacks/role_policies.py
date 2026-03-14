@@ -295,7 +295,12 @@ def ingestion_apple_health() -> list[iam.PolicyStatement]:
 
 
 def ingestion_hae() -> list[iam.PolicyStatement]:
-    """Health Auto Export webhook: API Gateway trigger, DDB + S3 write."""
+    """Health Auto Export webhook: API Gateway trigger, DDB + S3 write.
+
+    R8 Finding-2 fix: Added Secrets Manager access for Bearer token auth.
+    Code default reads life-platform/ingestion-keys (health_auto_export_api_key).
+    Dedicated life-platform/webhook-key also exists — migration deferred.
+    """
     return [
         iam.PolicyStatement(
             sid="DynamoDB",
@@ -311,6 +316,11 @@ def ingestion_hae() -> list[iam.PolicyStatement]:
             sid="S3Write",
             actions=["s3:PutObject"],
             resources=_s3("raw/matthew/*"),  # HAE writes to multiple sub-paths: cgm_readings, blood_pressure, state_of_mind, workouts
+        ),
+        iam.PolicyStatement(
+            sid="Secrets",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/ingestion-keys")],
         ),
         iam.PolicyStatement(
             sid="DLQ",

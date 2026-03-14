@@ -197,6 +197,13 @@ jobs:
           fi
           echo "✅ Deprecated secrets scan passed"
 
+      - name: IAM/secrets consistency linter (test_iam_secrets_consistency.py)
+        # R8-8: Cross-refs IAM secret ARN patterns against known-secrets list
+        run: |
+          echo "::group::IAM/secrets consistency linter"
+          python3 -m pytest tests/test_iam_secrets_consistency.py -v --tb=short
+          echo "::endgroup::"
+
   # ════════════════════════════════════════════════════════════════
   # Job 3: Plan — validate map, detect changes, build deploy plan
   # ════════════════════════════════════════════════════════════════

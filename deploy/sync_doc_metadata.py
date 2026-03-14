@@ -48,12 +48,12 @@ DOCS = ROOT / "docs"
 
 PLATFORM_FACTS = {
     # Core counts
-    "version":          "v3.7.13",
-    "date":             "2026-03-14",
+    "version":          "v3.7.15",
+    "date":             "2026-03-13",
     "lambda_count":     42,
     "tool_count":       116,
     "module_count":     31,       # mcp/ modules
-    "secret_count":     9,        # active secrets
+    "secret_count":     10,       # active secrets (verified by r8_p0_verify.sh)
     "alarm_count":      47,       # CloudWatch alarms
     "data_sources":     19,
     "cdk_stacks":       8,
@@ -63,8 +63,8 @@ PLATFORM_FACTS = {
     "api_keys_status":  "PERMANENTLY DELETED 2026-03-14",
 
     # Cost
-    "secrets_cost":     "$3.60",  # secret_count × $0.40
-    "secrets_cost_note": "9 active secrets × $0.40/secret/month. `api-keys` permanently deleted 2026-03-14.",
+    "secrets_cost":     "$4.00",  # secret_count × $0.40
+    "secrets_cost_note": "10 active secrets × $0.40/secret/month. `api-keys` permanently deleted 2026-03-14.",
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -199,6 +199,13 @@ RULES = [
         "docs/DECISIONS.md",
         r"\*Last updated: \d{4}-\d{2}-\d{2} \([^\)]+\)\*",
         "*Last updated: {date} ({version})*",
+    ),
+
+    # ── SCHEMA.md ────────────────────────────────────────────────────────────
+    (
+        "docs/SCHEMA.md",
+        r"\*\*Last updated:\*\* \d{4}-\d{2}-\d{2} \([^\)]+\)",
+        "**Last updated:** {date} ({version} — {tool_count} MCP tools, {data_sources} data sources, {lambda_count} Lambdas, 12 cached tools)",
     ),
 ]
 

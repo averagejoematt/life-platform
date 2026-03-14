@@ -1,6 +1,6 @@
 # Life Platform — Cost Tracker
 
-Last updated: 2026-03-14 (v3.7.13 — api-keys deleted, 9 active secrets)
+Last updated: 2026-03-13 (v3.7.15)
 
 > Budget target: **$25/month**. Design constraint: every feature must justify its cost.
 
@@ -10,7 +10,7 @@ Last updated: 2026-03-14 (v3.7.13 — api-keys deleted, 9 active secrets)
 
 | Service | Cost/Month | Notes |
 |---------|-----------|-------|
-| **Secrets Manager** | $3.60 | 9 active secrets × $0.40/secret/month. `api-keys` permanently deleted 2026-03-14. |
+| **Secrets Manager** | $4.00 | 10 active secrets × $0.40/secret/month. `api-keys` permanently deleted 2026-03-14. |
 | **Lambda** | ~$0.50 | ~2,500 invocations/month (13 ingestion + 35 Lambda schedule runs + MCP on-demand + Dropbox poll) |
 | **DynamoDB** | ~$0.30 | On-demand pay-per-request, ~5,000 WCU + ~15,000 RCU/month |
 | **S3** | ~$0.05 | ~2.5 GB stored (raw archives + dashboard + blog + buddy + avatar), minimal GET/PUT |
