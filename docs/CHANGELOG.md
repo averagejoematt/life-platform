@@ -1,5 +1,42 @@
 # Life Platform — Changelog
 
+## v3.7.8 — 2026-03-13: TB7 fully closed + DLQ cleared + smoke test fix
+
+### Summary
+TB7-11/12/13 confirmed already done. TB7-14 and TB7-16 completed (SCHEMA TTL
+documentation + fingerprint comment). DLQ investigated and cleared (5 stale
+Habitify retry messages from pre-layer-v9 deploy). Smoke test fixed
+(--cli-binary-format regression + handler regressions for key-rotator and
+insight-email-parser). All TB7 items now closed.
+
+### Changes
+- **TB7-14 CLOSED** — `SCHEMA.md` TTL section replaced with full per-partition
+  table: DDB TTL vs app-level expiry vs indefinite, with rationale for each.
+  Documents hypotheses (30d app-level), platform_memory (~90d policy),
+  insights (~180d policy), decisions/anomalies/ingestion (indefinite).
+- **TB7-16 CLOSED** — Comment added to `get_source_fingerprints()` in
+  `daily_metrics_compute_lambda.py` warning that new data sources must be
+  added to the fingerprint list to trigger recomputes.
+- **TB7-11/12/13 CLOSED** — Confirmed already implemented: layer version
+  consistency CI check, stateful resource assertions, and digest_utils.py in
+  shared_layer.modules all present in existing `ci-cd.yml` and `lambda_map.json`.
+- **DLQ CLEARED** — 5 stale Habitify retry messages from 2026-03-13 14:15 UTC
+  (pre-layer-v9 deploy). All identical EventBridge events. Purged + alarm reset
+  to OK. Habitify confirmed healthy.
+- **SMOKE TEST FIXED** — Removed `--cli-binary-format raw-in-base64-out` from
+  `post_cdk_reconcile_smoke.sh` (AWS CLI v2 regression). Fixed dry_run payload
+  for todoist invocation check.
+- **HANDLER FIXES** — `life-platform-key-rotator` and `insight-email-parser`
+  restored to correct handlers (CDK reconcile regression).
+
+### Files Changed
+- `lambdas/daily_metrics_compute_lambda.py` (TB7-16 fingerprint comment)
+- `docs/SCHEMA.md` (TB7-14 TTL per-partition table)
+- `docs/PROJECT_PLAN.md` (TB7-11–17 all marked complete)
+- `deploy/post_cdk_reconcile_smoke.sh` (CLI flag fix + dry_run fix)
+
+---
+
 ## v3.7.7 — 2026-03-13: TB7-19/20/21/22/23 — AI validator + anomaly + drift hardening
 
 ### Summary
