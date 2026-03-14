@@ -48,10 +48,10 @@ DOCS = ROOT / "docs"
 
 PLATFORM_FACTS = {
     # Core counts
-    "version":          "v3.7.15",
-    "date":             "2026-03-13",
+    "version":          "v3.7.19",
+    "date":             "2026-03-14",
     "lambda_count":     42,
-    "tool_count":       116,
+    "tool_count":       86,
     "module_count":     31,       # mcp/ modules
     "secret_count":     10,       # active secrets (verified by r8_p0_verify.sh)
     "alarm_count":      47,       # CloudWatch alarms
