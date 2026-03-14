@@ -11,7 +11,7 @@ from mcp.core import ddb_cache_set, mem_cache_set
 
 # Tool functions imported individually for the warmer
 from mcp.tools_data import tool_get_sources, tool_get_field_stats
-from mcp.tools_health import tool_get_health_dashboard
+from mcp.tools_health import tool_get_health_dashboard, tool_get_health_risk_profile, tool_get_health_trajectory
 from mcp.tools_habits import tool_get_habit_dashboard
 from mcp.tools_training import tool_get_training_load, tool_get_seasonal_patterns, tool_get_personal_records
 
@@ -117,6 +117,30 @@ def nightly_cache_warmer():
     except Exception as e:
         logger.error(f"[warmer] habit_dashboard failed: {e}")
         results["habit_dashboard"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
+
+    # 7. get_health_risk_profile (board vote 11-0: warm before get_health consolidation)
+    _t = time.time()
+    try:
+        logger.info("[warmer] computing health_risk_profile")
+        data = tool_get_health_risk_profile({})
+        ddb_cache_set("health_risk_profile_today", data)
+        mem_cache_set("health_risk_profile_today", data)
+        results["health_risk_profile"] = {"status": "ok", "ms": int((time.time()-_t)*1000)}
+    except Exception as e:
+        logger.error(f"[warmer] health_risk_profile failed: {e}")
+        results["health_risk_profile"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
+
+    # 8. get_health_trajectory (board vote 11-0: warm before get_health consolidation)
+    _t = time.time()
+    try:
+        logger.info("[warmer] computing health_trajectory")
+        data = tool_get_health_trajectory({"domain": "all"})
+        ddb_cache_set("health_trajectory_today", data)
+        mem_cache_set("health_trajectory_today", data)
+        results["health_trajectory"] = {"status": "ok", "ms": int((time.time()-_t)*1000)}
+    except Exception as e:
+        logger.error(f"[warmer] health_trajectory failed: {e}")
+        results["health_trajectory"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
 
     total_ms = int((time.time() - warmer_start) * 1000)
     errors   = [k for k, v in results.items() if not v.get("status", "").startswith("ok")]

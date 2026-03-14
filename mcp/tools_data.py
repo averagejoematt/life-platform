@@ -441,3 +441,42 @@ def tool_get_weekly_summary(args):
         "sorted_by":             sort_by,
         "weeks":                 rows[:limit],
     }
+
+
+def tool_get_daily_snapshot(args):
+    """
+    Unified daily data dispatcher. Routes to get_daily_summary (specific date)
+    or get_latest (most recent records across sources) based on view parameter.
+    """
+    VALID_VIEWS = {
+        "summary": tool_get_daily_summary,
+        "latest":  tool_get_latest,
+    }
+    view = (args.get("view") or "summary").lower().strip()
+    if view not in VALID_VIEWS:
+        return {
+            "error": f"Unknown view '{view}'.",
+            "valid_views": list(VALID_VIEWS.keys()),
+            "hint": "Use 'summary' for all data on a specific date, 'latest' for the most recent record per source.",
+        }
+    return VALID_VIEWS[view](args)
+
+
+def tool_get_longitudinal_summary(args):
+    """
+    Unified longitudinal data dispatcher. Routes to aggregated_summary,
+    seasonal_patterns, or personal_records based on view parameter.
+    """
+    VALID_VIEWS = {
+        "aggregate":  tool_get_aggregated_summary,
+        "seasonal":   tool_get_seasonal_patterns,
+        "records":    tool_get_personal_records,
+    }
+    view = (args.get("view") or "aggregate").lower().strip()
+    if view not in VALID_VIEWS:
+        return {
+            "error": f"Unknown view '{view}'.",
+            "valid_views": list(VALID_VIEWS.keys()),
+            "hint": "Use 'aggregate' for monthly/yearly averages, 'seasonal' for month-by-month patterns across all years, 'records' for all-time PRs.",
+        }
+    return VALID_VIEWS[view](args)

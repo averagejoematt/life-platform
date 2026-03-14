@@ -33,30 +33,29 @@ TOOLS = {
             "inputSchema": {"type": "object", "properties": {}, "required": []},
         },
     },
-    "get_latest": {
-        "fn": tool_get_latest,
+    "get_daily_snapshot": {
+        "fn": tool_get_daily_snapshot,
         "schema": {
-            "name": "get_latest",
-            "description": "Get the most recent record(s) for one or more sources. Useful for current status checks.",
+            "name": "get_daily_snapshot",
+            "description": (
+                "Unified daily data access. "
+                "'summary' (default) = all available data across every source for a specific date. Best for 'how was my day/yesterday?' questions. Requires date=. "
+                "'latest' = most recent record for each source — useful for current status checks. "
+                "Use for: 'how was yesterday?', 'what\'s my latest data?', 'show me today\'s readings', 'all data for 2026-03-10'."
+            ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
+                    "view": {
+                        "type": "string",
+                        "description": "'summary' (default) for a specific date, 'latest' for most recent per source.",
+                        "enum": ["summary", "latest"],
+                    },
+                    "date":    {"type": "string", "description": "[summary] Date YYYY-MM-DD (required for summary view)."},
                     "sources": {"type": "array", "items": {"type": "string"},
-                                "description": f"List of sources to fetch. Defaults to all. Valid: {SOURCES}"}
+                                "description": f"[latest] List of sources to fetch. Defaults to all. Valid: {SOURCES}"},
                 },
                 "required": [],
-            },
-        },
-    },
-    "get_daily_summary": {
-        "fn": tool_get_daily_summary,
-        "schema": {
-            "name": "get_daily_summary",
-            "description": "Get all available data across every source for a single date. Best starting point for 'how was my day/yesterday?' questions.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {"date": {"type": "string", "description": "Date in YYYY-MM-DD format."}},
-                "required": ["date"],
             },
         },
     },
@@ -105,19 +104,30 @@ TOOLS = {
             },
         },
     },
-    "get_aggregated_summary": {
-        "fn": tool_get_aggregated_summary,
+    "get_longitudinal_summary": {
+        "fn": tool_get_longitudinal_summary,
         "schema": {
-            "name": "get_aggregated_summary",
-            "description": "Get monthly or yearly averages across any date range. Use this for long-horizon questions like 'summarize my health history' or 'how has my weight trended over the years'. Returns avg/min/max per period per source.",
+            "name": "get_longitudinal_summary",
+            "description": (
+                "Unified long-horizon data intelligence. Use 'view' to select the analysis: "
+                "'aggregate' (default) = monthly or yearly averages across any date range. For 'how has my weight trended over the years?', 'summarize my health history'. Supports source=, period=month|year. "
+                "'seasonal' = month-by-month averages aggregated across ALL years, revealing annual cycles. For 'do I always gain weight in winter?', 'when is my HRV historically highest?'. "
+                "'records' = all-time personal records across every measurable dimension. For 'what are my PRs?', 'when was I fittest?', 'have I ever run further than X miles?'. "
+                "Use for: 'summarize my history', 'seasonal patterns', 'all-time bests', 'yearly trends', 'my PRs', 'when should I plan my peak event?'."
+            ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "source":     {"type": "string", "description": f"Optional. If omitted all sources included. Valid: {SOURCES}"},
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD. Defaults to 2010-01-01."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
+                    "view": {
+                        "type": "string",
+                        "description": "Which analysis: aggregate (default), seasonal, records.",
+                        "enum": ["aggregate", "seasonal", "records"],
+                    },
+                    "source":     {"type": "string", "description": f"[aggregate/seasonal] Optional source filter. Valid: {SOURCES}"},
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
+                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
                     "period":     {"type": "string", "enum": ["month", "year"],
-                                   "description": "Use 'year' for multi-year history, 'month' for 1-3 year windows."},
+                                   "description": "[aggregate] Use 'year' for multi-year history, 'month' for 1-3 year windows."},
                 },
                 "required": [],
             },
@@ -214,20 +224,6 @@ TOOLS = {
             },
         },
     },
-    "get_personal_records": {
-        "fn": tool_get_personal_records,
-        "schema": {
-            "name": "get_personal_records",
-            "description": "All-time personal records (PRs) across every measurable dimension — the athlete's trophy case. Includes: longest activity, most elevation, biggest week, best HRV, lowest resting HR, best recovery score, heaviest/lightest weight, lowest body fat, and more. Each record includes the date it was set and age at the time (requires profile DOB). Use for: 'what are my all-time best performances?', 'when was I fittest?', 'what are my PRs?', 'have I ever run further than X miles?'",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "end_date": {"type": "string", "description": "Only consider records up to this date. Defaults to today."},
-                },
-                "required": [],
-            },
-        },
-    },
     "get_cross_source_correlation": {
         "fn": tool_get_cross_source_correlation,
         "schema": {
@@ -248,28 +244,32 @@ TOOLS = {
             },
         },
     },
-    "get_seasonal_patterns": {
-        "fn": tool_get_seasonal_patterns,
+    "get_health": {
+        "fn": tool_get_health,
         "schema": {
-            "name": "get_seasonal_patterns",
-            "description": "Month-by-month averages aggregated across ALL years, revealing annual cycles. Use for: 'do I always gain weight in winter?', 'what month do I train most?', 'when is my HRV historically highest?', 'what are my seasonal training patterns?', 'when should I plan my peak event?'. Essential for periodisation and setting realistic seasonal targets. Each month shows how many years of data contribute.",
+            "name": "get_health",
+            "description": (
+                "Unified health intelligence. Use 'view' to select the analysis: "
+                "'dashboard' (default) = current-state morning briefing: readiness (recovery, HRV, RHR, sleep), training load (CTL/ATL/TSB/ACWR), 7d/30d summaries, biomarker trends, alerts. "
+                "'risk_profile' = health risk synthesis: cardiovascular, metabolic, longevity. Combines 7 lab draws, 110 genome SNPs, DEXA, wearable HRV. Supports domain= filter. Warmed nightly. "
+                "'trajectory' = forward-looking projections: weight goal date, biomarker trend slopes, Zone 2 trend, HRV trend, glucose trend, Board of Directors longevity assessment. Supports domain= filter. Warmed nightly. "
+                "Use for: 'how am I doing?', 'morning check-in', 'health briefing', 'am I overtrained?', "
+                "'health risk profile', 'CV risk', 'metabolic health', 'longevity assessment', "
+                "'where am I headed?', 'health trajectory', 'projected goal date', 'am I on track?'."
+            ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "source":     {"type": "string", "description": f"Optional. Limit to one source. Valid: {SOURCES}. Omit for all sources."},
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD. Defaults to 2010-01-01."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
+                    "view": {
+                        "type": "string",
+                        "description": "dashboard (default), risk_profile, or trajectory.",
+                        "enum": ["dashboard", "risk_profile", "trajectory"],
+                    },
+                    "domain": {"type": "string",
+                               "description": "[risk_profile] 'cardiovascular', 'metabolic', 'longevity'. Omit for all. [trajectory] 'all', 'weight', 'biomarkers', 'fitness', 'recovery', 'metabolic'."},
                 },
                 "required": [],
             },
-        },
-    },
-    "get_health_dashboard": {
-        "fn": tool_get_health_dashboard,
-        "schema": {
-            "name": "get_health_dashboard",
-            "description": "Current-state morning briefing in a single call. Returns: today's readiness (recovery score, HRV, RHR, sleep), training load status (CTL/ATL/TSB/ACWR), 7-day and 30-day training summaries, 30-day biomarker trends (HRV, RHR, weight), and automated alerts for anything outside healthy ranges. Use for: 'how am I doing?', 'morning check-in', 'give me a health briefing', 'am I overtrained?', 'should I train hard today?'",
-            "inputSchema": {"type": "object", "properties": {}, "required": []},
         },
     },
     "get_weight_loss_progress": {
@@ -444,91 +444,33 @@ TOOLS = {
         },
     },
     # ── MacroFactor longevity nutrition tools ─────────────────────────────────
-    "get_micronutrient_report": {
-        "fn": tool_get_micronutrient_report,
-        "schema": {
-            "name": "get_micronutrient_report",
-            "description": (
-                "Score ~25 micronutrients against RDA and longevity-optimal targets (Attia, Rhonda Patrick, "
-                "Bryan Johnson Blueprint). Flags chronic deficiencies (avg < 60% RDA), near-miss gaps (60-90%), "
-                "upper-limit exceedances, omega-6:omega-3 ratio, and Pacific Northwest vitamin D risk. "
-                "Results grouped by category: Fatty Acids, Minerals, Vitamins, B Vitamins. "
-                "Use for: 'am I micronutrient deficient?', 'is my omega-3 intake good?', 'what vitamins am I low in?', "
-                "'is my vitamin D ok?', 'give me a nutrient sufficiency report'. Requires MacroFactor data."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 30 days ago)."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_meal_timing": {
-        "fn": tool_get_meal_timing,
-        "schema": {
-            "name": "get_meal_timing",
-            "description": (
-                "Eating window analysis based on Satchin Panda / Salk Institute TRF research. "
-                "Returns: first and last bite times, eating window duration, caloric distribution across "
-                "morning/midday/evening/late, circadian consistency (SD of meal times), and gap between "
-                "last bite and sleep onset (from Eight Sleep data). Flags TRF violations and late eating. "
-                "Use for: 'what is my eating window?', 'am I eating too late?', 'is my meal timing circadian-aligned?', "
-                "'how close to sleep am I eating?', 'do I practice time-restricted eating?'. Requires MacroFactor data."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 30 days ago)."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
     # ── MacroFactor / Nutrition tools ─────────────────────────────────────────
-    "get_nutrition_summary": {
-        "fn": tool_get_nutrition_summary,
+    "get_nutrition": {
+        "fn": tool_get_nutrition,
         "schema": {
-            "name": "get_nutrition_summary",
+            "name": "get_nutrition",
             "description": (
-                "Daily macro breakdown and rolling averages from MacroFactor. Returns per-day rows and period "
-                "averages for calories, protein, carbs, fat, fiber, sodium, caffeine, omega-3, potassium, "
-                "magnesium, and vitamin D. Also shows gap vs reference targets. "
-                "Use for: 'how is my nutrition?', 'what are my average macros?', 'am I getting enough fiber?', "
-                "'show me this week\\'s nutrition', 'how\\'s my omega-3 intake?'. Requires MacroFactor data."
+                "Unified nutrition intelligence from MacroFactor. Use 'view' to select the analysis: "
+                "'summary' (default) = daily macro breakdown and rolling averages: calories, protein, carbs, fat, fiber, sodium, omega-3, vitamin D, gap vs targets. "
+                "'macros' = calorie and protein adherence vs TDEE estimate. Day-by-day hit rates. Supports calorie_target= and protein_target= overrides. "
+                "'meal_timing' = eating window analysis (TRF/Satchin Panda): first/last bite, window duration, circadian consistency, gap to sleep onset. "
+                "'micronutrients' = score ~25 micronutrients against RDA + longevity targets (Attia, Patrick, Blueprint). Flags deficiencies, omega-6:3 ratio, vitamin D risk. "
+                "Use for: 'how is my nutrition?', 'average macros', 'am I hitting protein?', 'am I in a deficit?', "
+                "'eating window', 'am I eating too late?', 'TRF', 'micronutrient deficiencies', 'omega-3 intake', 'vitamin D'. Requires MacroFactor data."
             ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 30 days ago)."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_macro_targets": {
-        "fn": tool_get_macro_targets,
-        "schema": {
-            "name": "get_macro_targets",
-            "description": (
-                "Compare actual daily nutrition vs calorie and protein targets. Estimates TDEE from current "
-                "Withings weight using Mifflin-St Jeor formula. Shows day-by-day adherence and hit rates. "
-                "Calorie and protein targets can be overridden. "
-                "Use for: 'am I hitting my protein goal?', 'how often am I in a deficit?', "
-                "'am I eating enough?', 'show my calorie adherence this month'. Requires MacroFactor data."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date":      {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date":        {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "days":            {"type": "number", "description": "Rolling window in days (default: 30). Ignored if start_date provided."},
-                    "calorie_target":  {"type": "number", "description": "Override daily calorie target (kcal). Defaults to TDEE estimate."},
-                    "protein_target":  {"type": "number", "description": "Override daily protein target (g). Default: 180g."},
+                    "view": {
+                        "type": "string",
+                        "description": "summary (default), macros, meal_timing, or micronutrients.",
+                        "enum": ["summary", "macros", "meal_timing", "micronutrients"],
+                    },
+                    "start_date":     {"type": "string", "description": "Start date YYYY-MM-DD (default: 30 days ago)."},
+                    "end_date":       {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "days":           {"type": "number", "description": "[macros] Rolling window in days (default: 30). Ignored if start_date provided."},
+                    "calorie_target": {"type": "number", "description": "[macros] Override daily calorie target (kcal). Defaults to TDEE estimate."},
+                    "protein_target": {"type": "number", "description": "[macros] Override daily protein target (g). Default: 180g."},
                 },
                 "required": [],
             },
@@ -823,24 +765,6 @@ TOOLS = {
             },
         },
     },
-    "get_health_risk_profile": {
-        "fn": tool_get_health_risk_profile,
-        "schema": {
-            "name": "get_health_risk_profile",
-            "description": (
-                "Health risk synthesis: cardiovascular, metabolic, longevity. Combines 7 lab draws, "
-                "110 genome SNPs, DEXA, wearable HRV into unified assessment. "
-                "Use for: 'health risk profile', 'CV risk', 'metabolic health', 'longevity assessment'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "domain": {"type": "string", "description": "'cardiovascular', 'metabolic', 'longevity'. Omit for all."},
-                },
-                "required": [],
-            },
-        },
-    },
     "get_movement_score": {
         "fn": tool_get_movement_score,
         "schema": {
@@ -1101,31 +1025,6 @@ TOOLS = {
         },
     },
 
-    "get_health_trajectory": {
-        "fn": tool_get_health_trajectory,
-        "schema": {
-            "name": "get_health_trajectory",
-            "description": (
-                "Forward-looking health intelligence — where are you headed? "
-                "Computes trajectories and projections across 5 domains: weight (rate of loss, "
-                "goal date, phase milestones), biomarkers (lab trend slopes, projected values, "
-                "threshold warnings), fitness (Zone 2 trend, training consistency), recovery "
-                "(HRV trend, sleep efficiency), and metabolic (glucose trends, time in range). "
-                "Board of Directors provides a longevity-focused assessment of overall trajectory. "
-                "Use for: 'where am I headed?', 'health trajectory', 'projected goal date', "
-                "'biomarker trends', 'am I on track?', 'forward-looking health assessment', "
-                "'when will I reach my goal weight?', 'longevity projection'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "domain": {"type": "string",
-                               "description": "Focus area: 'all' (default), 'weight', 'biomarkers', 'fitness', 'recovery', 'metabolic'."},
-                },
-                "required": [],
-            },
-        },
-    },
     "get_hr_recovery_trend": {
         "fn": tool_get_hr_recovery_trend,
         "schema": {

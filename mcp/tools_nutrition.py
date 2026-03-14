@@ -622,3 +622,24 @@ def tool_get_food_log(args):
         "daily_totals":  totals,
         "food_log":      clean_log,
     }
+
+
+def tool_get_nutrition(args):
+    """
+    Unified nutrition intelligence dispatcher. Routes to the appropriate
+    underlying function based on the 'view' parameter.
+    """
+    VALID_VIEWS = {
+        "summary":       tool_get_nutrition_summary,
+        "macros":        tool_get_macro_targets,
+        "meal_timing":   tool_get_meal_timing,
+        "micronutrients": tool_get_micronutrient_report,
+    }
+    view = (args.get("view") or "summary").lower().strip()
+    if view not in VALID_VIEWS:
+        return {
+            "error": f"Unknown view '{view}'.",
+            "valid_views": list(VALID_VIEWS.keys()),
+            "hint": "Default is 'summary'. Use 'macros' for calorie/protein adherence, 'meal_timing' for eating window analysis, 'micronutrients' for RDA scoring.",
+        }
+    return VALID_VIEWS[view](args)
