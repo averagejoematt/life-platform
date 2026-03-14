@@ -26,7 +26,7 @@ Architecture Review #8 (v3.7.11 baseline). Platform grades to A- overall for the
 | Production Readiness | B | **B** | → |
 
 ### Outstanding R8 items
-- R8-1 🔴 TB7-4: grep sweep + delete `life-platform/api-keys` before 2026-03-17
+- R8-1 ✅ TB7-4: `life-platform/api-keys` permanently deleted 2026-03-14
 - R8-6 🟡 Run `bash deploy/archive_onetime_scripts.sh`
 - R8-7 🟡 Reconcile MCP tool count across ARCHITECTURE.md / INFRASTRUCTURE.md / MCP_TOOL_CATALOG.md
 - R8-8 🟢 Update ARCHITECTURE.md header
