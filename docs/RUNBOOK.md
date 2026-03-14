@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-Last updated: 2026-03-09 (v3.3.9 — 144 MCP tools, 30-module package, 39 Lambdas, 19 data sources)
+Last updated: 2026-03-14 (v3.7.13 — 116 MCP tools, 31-module package, 42 Lambdas, 19 data sources)
 
 ---
 
@@ -11,26 +11,26 @@ Last updated: 2026-03-09 (v3.3.9 — 144 MCP tools, 30-module package, 39 Lambda
 **⚠️ All EventBridge crons use fixed UTC. Times below reflect PDT (UTC-7, from March 8 2026). During PST (UTC-8, Nov–Mar) all times shift 1 hour earlier.**
 | Source | Schedule | Lambda |
 |--------|----------|--------|
-| Whoop | 06:00 AM | whoop-data-ingestion |
-| Garmin | 06:00 AM | garmin-data-ingestion |
-| Notion Journal | 06:00 AM | notion-journal-ingestion |
-| Withings | 06:15 AM | withings-data-ingestion |
-| Habitify | 06:15 AM | habitify-data-ingestion |
-| Strava | 06:30 AM | strava-data-ingestion |
-| Journal Enrichment | 06:30 AM | journal-enrichment |
-| Todoist | 06:45 AM | todoist-data-ingestion |
-| Eight Sleep | 07:00 AM | eightsleep-data-ingestion |
-| Activity Enrichment | 07:30 AM | activity-enrichment |
-| MacroFactor | 08:00 AM | macrofactor-data-ingestion (EventBridge + S3 trigger) |
-| MCP Cache Warmer | 09:00 AM | life-platform-mcp (EventBridge payload) |
-| Whoop Recovery Refresh | 09:30 AM | whoop-data-ingestion (date_override: today) |
-| Character Sheet Compute | 09:35 AM | character-sheet-compute (v1.0, reads yesterday's data, stores to DDB) |
-| Daily Metrics Compute | 09:40 AM | daily-metrics-compute (day grade, readiness, streaks, TSB, HRV, weight → `computed_metrics` partition) |
-| Daily Insight Compute | 09:42 AM | daily-insight-compute (IC-2: 7-day habit×outcome correlations, leading indicators, platform_memory pull, structured JSON for Daily Brief AI calls) |
-| Freshness Check | 09:45 AM | life-platform-freshness-checker |
-| Daily Brief | 10:00 AM | daily-brief (v2.62, 19 sections, 4 AI calls, reads character_sheet record, dedup, regrade mode, dynamic weight context, 7d training context) |
-| **DST note** | — | All crons fixed UTC. Times above are PDT (UTC-7). Run `deploy/deploy_dst_spring_2026.sh` at each DST transition. |
-| Anomaly Detector | 08:05 AM | anomaly-detector |
+| Whoop | 07:00 AM | whoop-data-ingestion |
+| Garmin | 07:00 AM | garmin-data-ingestion |
+| Notion Journal | 07:00 AM | notion-journal-ingestion |
+| Withings | 07:15 AM | withings-data-ingestion |
+| Habitify | 07:15 AM | habitify-data-ingestion |
+| Strava | 07:30 AM | strava-data-ingestion |
+| Journal Enrichment | 07:30 AM | journal-enrichment |
+| Todoist | 07:45 AM | todoist-data-ingestion |
+| Eight Sleep | 08:00 AM | eightsleep-data-ingestion |
+| Activity Enrichment | 08:30 AM | activity-enrichment |
+| MacroFactor | 09:00 AM | macrofactor-data-ingestion (EventBridge + S3 trigger) |
+| MCP Cache Warmer | 10:00 AM | life-platform-mcp (EventBridge payload) |
+| Whoop Recovery Refresh | 10:30 AM | whoop-data-ingestion (date_override: today) |
+| Character Sheet Compute | 10:35 AM | character-sheet-compute (v1.0, reads yesterday's data, stores to DDB) |
+| Daily Metrics Compute | 10:25 AM | daily-metrics-compute (day grade, readiness, streaks, TSB, HRV, weight → `computed_metrics` partition) |
+| Daily Insight Compute | 10:20 AM | daily-insight-compute (IC-8: 7-day habit×outcome correlations, leading indicators, platform_memory pull, structured JSON for Daily Brief AI calls) |
+| Freshness Check | 10:45 AM | life-platform-freshness-checker |
+| Daily Brief | 11:00 AM | daily-brief (v2.62, 18 sections, 4 AI calls, reads character_sheet record, dedup, regrade mode, dynamic weight context, 7d training context) |
+| **DST note** | — | All crons fixed UTC. Times above are PDT (UTC-7). DST is now active (PDT = UTC-7). |
+| Anomaly Detector | 09:05 AM | anomaly-detector |
 | Nutrition Review | 09:00 AM (Saturday only) | nutrition-review (v1.1, Sonnet, 3-expert panel) |
 | Weekly Digest | 08:00 AM (Sunday only) | weekly-digest (v4.3) |
 | Monthly Digest | 08:00 AM (1st Monday only) | monthly-digest (v1.1) |
@@ -116,18 +116,15 @@ All secrets are stored in AWS Secrets Manager under `life-platform/` prefix:
 
 | Secret | Function | Notes |
 |--------|----------|-------|
-| `life-platform/whoop` | whoop-data-ingestion | Includes refresh token; auto-updated on each run |
-| `life-platform/withings` | withings-data-ingestion | Includes refresh token; auto-updated |
-| `life-platform/strava` | strava-data-ingestion | Includes refresh token; auto-updated |
-| `life-platform/todoist` | todoist-data-ingestion | Static API key; rarely needs updating |
-| `life-platform/eightsleep` | eightsleep-data-ingestion | JWT; auto-refreshed on each run |
+| `life-platform/whoop` | whoop-data-ingestion | OAuth2 access + refresh tokens; auto-updated on each run |
+| `life-platform/withings` | withings-data-ingestion | OAuth2 tokens; auto-updated |
+| `life-platform/strava` | strava-data-ingestion | OAuth2 tokens; auto-updated |
 | `life-platform/garmin` | garmin-data-ingestion | garth OAuth tokens; auto-refreshed; falls back to password re-login |
+| `life-platform/eightsleep` | eightsleep-data-ingestion | Username + password (JWT); auto-refreshed on each run |
+| `life-platform/ai-keys` | All email/compute/MCP Lambdas | Anthropic API key + MCP API key (90-day auto-rotation) |
+| `life-platform/todoist` | todoist-data-ingestion | Static API key; get from Todoist Settings → Integrations |
+| `life-platform/notion` | notion-journal-ingestion | Notion integration key + database ID |
 | `life-platform/habitify` | habitify-data-ingestion | Static API key; get from Habitify Settings → Account → API |
-| `life-platform/notion` | notion-journal-ingestion | Notion API key + database ID |
-| `life-platform/anthropic` | daily-brief, journal-enrichment | Anthropic API key for Haiku calls |
-| `life-platform/dropbox` | dropbox-poll | OAuth2 refresh token; auto-updated |
-| `life-platform/health-auto-export` | health-auto-export-webhook | Bearer token for webhook auth |
-| `life-platform/mcp-api-key` | life-platform-mcp | API Gateway auth; used by mcp_bridge.py |
 
 To view a secret value (for debugging):
 ```bash
@@ -158,7 +155,14 @@ Each Lambda has its own dedicated IAM role scoped to exactly what it needs:
 | lambda-dropbox-poll-role | dropbox-poll | life-platform/dropbox only |
 | lambda-health-auto-export-role | health-auto-export-webhook | life-platform/health-auto-export only |
 | lambda-freshness-checker-role | life-platform-freshness-checker | None |
-| lambda-weekly-digest-role | daily-brief, weekly-digest, monthly-digest, nutrition-review, wednesday-chronicle, weekly-plate | life-platform/anthropic. All 6 bundle `board_loader.py` for config-driven Board of Directors prompts (v2.57.0). |
+| lambda-daily-brief-role | daily-brief | life-platform/ai-keys |
+| lambda-weekly-digest-role-v2 | weekly-digest | life-platform/ai-keys |
+| lambda-monthly-digest-role | monthly-digest | life-platform/ai-keys |
+| lambda-nutrition-review-role | nutrition-review | life-platform/ai-keys |
+| lambda-wednesday-chronicle-role | wednesday-chronicle | life-platform/ai-keys |
+| lambda-weekly-plate-role | weekly-plate | life-platform/ai-keys |
+
+*Note: As of SEC-1 (PROD-1, v3.4.0), all Lambdas have dedicated IAM roles. No shared roles remain. All roles CDK-managed via `role_policies.py`.*
 
 ---
 

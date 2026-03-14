@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-03-11 (v3.6.0 — 42 Lambdas, 9 secrets, 150 MCP tools, ~42 alarms)
+> Last updated: 2026-03-14 (v3.7.13 — 42 Lambdas, 9 active secrets, 116 MCP tools, ~47 alarms)
 
 ---
 
@@ -132,7 +132,7 @@ All DNS-validated via Route 53 CNAME records.
 
 ---
 
-## Secrets Manager (9 active secrets + 1 pending deletion)
+## Secrets Manager (9 active secrets)
 
 All under prefix `life-platform/`. No values stored in this doc — access via AWS console or CLI.
 
