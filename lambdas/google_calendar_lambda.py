@@ -1,5 +1,5 @@
 """
-google_calendar_lambda.py — Daily Google Calendar ingestion (v1.0.0)
+google_calendar_lambda.py — Daily Google Calendar ingestion (v1.0.2)
 
 Fetches calendar events and stores structured data to DynamoDB.
 Runs daily at 6:30 AM PT (13:30 UTC) — before all compute and brief Lambdas.
@@ -27,6 +27,8 @@ Gap detection: 7-day lookback, backfills missing DATE records (partial-progress:
 OAuth: refresh_token pattern, writes updated credentials back to Secrets Manager.
 Auth: life-platform/google-calendar secret.
 
+v1.0.2 — 2026-03-14 (R10 A+ hardening: graceful OAuth-not-configured handler — returns 200 not 500
+         when secret doesn't exist yet, preventing daily alarm noise before OAuth is set up)
 v1.0.1 — 2026-03-14 (R9 hardening: real focus_block_count algorithm, partial-progress gap fill)
 v1.0.0 — 2026-03-14 (R8-ST1)
 """
@@ -414,15 +416,29 @@ def ingest_date_range(calendars, start_date, end_date, secret):
 def lambda_handler(event, context):
     import time
     t0 = time.time()
-    logger.info("Google Calendar ingestion v1.0.1 starting...")
+    logger.info("Google Calendar ingestion v1.0.2 starting...")
 
     today       = datetime.now(timezone.utc).date()
     ingested_at = datetime.now(timezone.utc).isoformat()
 
-    # ── Auth ──────────────────────────────────────────────────────────────────
+    # ── Auth — graceful degradation when OAuth not yet configured ──────────────
+    # The google-calendar secret only exists after setup_google_calendar_auth.py is run.
+    # Return 200 (not an error) so the Lambda alarm does not fire daily until OAuth is set up.
     try:
         secret = get_secret()
     except Exception as e:
+        err_str = str(e)
+        if "ResourceNotFoundException" in err_str or "SecretId" in err_str:
+            logger.info(
+                "Google Calendar OAuth not yet configured (%s) — skipping run. "
+                "Run setup/setup_google_calendar_auth.py to activate.",
+                SECRET_NAME,
+            )
+            return {
+                "statusCode": 200,
+                "body": "OAuth not yet configured — run setup/setup_google_calendar_auth.py to activate",
+                "oauth_pending": True,
+            }
         logger.error("Failed to load secret %s: %s", SECRET_NAME, e)
         return {"statusCode": 500, "body": f"Secret load failed: {e}"}
 
