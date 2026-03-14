@@ -13,10 +13,15 @@
 #   ./deploy/deploy_lambda.sh health-auto-export-webhook lambdas/health_auto_export_lambda.py
 #   ./deploy/deploy_lambda.sh daily-brief lambdas/daily_brief_lambda.py \
 #       --extra-files lambdas/ai_calls.py lambdas/html_builder.py lambdas/output_writers.py lambdas/board_loader.py
+#
+# Rollback:
+#   Each deploy shifts the previous zip to s3://.../deploys/<func>/previous.zip.
+#   Run: bash deploy/rollback_lambda.sh <function-name>
 
 set -euo pipefail
 
 REGION="us-west-2"
+BUCKET="matthew-life-platform"
 
 if [ $# -lt 2 ]; then
     echo "Usage: $0 <function-name> <source-file> [--extra-files file1.py ...]"
@@ -92,6 +97,21 @@ else
     (cd "$WORK_DIR" && zip -q deploy.zip "$EXPECTED_FILENAME")
     echo "📦 Packaged $(basename "$SOURCE_FILE") → $EXPECTED_FILENAME in zip"
 fi
+
+# ── Step 2.5: S3 rollback artifact management ──
+# Shift latest → previous before overwriting. Enables rollback_lambda.sh.
+S3_LATEST="deploys/${FUNCTION_NAME}/latest.zip"
+S3_PREVIOUS="deploys/${FUNCTION_NAME}/previous.zip"
+
+if aws s3 ls "s3://$BUCKET/$S3_LATEST" --region "$REGION" > /dev/null 2>&1; then
+    aws s3 cp "s3://$BUCKET/$S3_LATEST" "s3://$BUCKET/$S3_PREVIOUS" \
+        --region "$REGION" --no-cli-pager > /dev/null
+    echo "💾 Rollback artifact saved → s3://$BUCKET/$S3_PREVIOUS"
+fi
+
+aws s3 cp "$WORK_DIR/deploy.zip" "s3://$BUCKET/$S3_LATEST" \
+    --region "$REGION" --no-cli-pager > /dev/null
+echo "💾 Deploy artifact stored  → s3://$BUCKET/$S3_LATEST"
 
 # ── Step 3: Verify main handler is in the zip ──
 # unzip -l columns: Length Date Time Name — use $NF (last field) for filename

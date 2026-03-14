@@ -6,7 +6,8 @@
 #   2. Plan — validates lambda_map.json, detects changed files, maps to Lambda functions
 #   3. Deploy — requires manual approval (GitHub Environment: production)
 #   4. Smoke test — invokes qa-smoke + canary, checks structured output
-#   5. Notify — posts to SNS on any failure
+#   5. Auto-rollback — fires if smoke-test fails after a successful deploy (TB7-25)
+#   6. Notify — posts to SNS on any failure
 #
 # AWS auth: OIDC federation (no long-lived keys)
 # See deploy/setup_github_oidc.sh to create the IAM provider + role
@@ -18,6 +19,10 @@
 #   - Added layer version verification after shared layer rebuild
 #   - Fixed smoke test and canary to parse JSON output, not grep for "error"
 #   - Added notify-failure job that posts to SNS life-platform-alerts on any failure
+# Changes (v3.7.9):
+#   - Added rollback-on-smoke-failure job (TB7-25): auto-rollback when smoke test fails
+#     after a successful deploy. Calls deploy/rollback_lambda.sh for each deployed function.
+#     Requires deploy_lambda.sh to have stored artifacts to s3://matthew-life-platform/deploys/
 
 name: CI/CD
 
@@ -119,59 +124,40 @@ jobs:
           echo "::endgroup::"
 
       - name: IAM policy linter (test_role_policies.py)
-        # Validates every policy function in role_policies.py without AWS credentials.
-        # Catches missing KMS, wildcard resources, unscoped secrets, duplicate SIDs.
         run: |
           echo "::group::IAM policy linter"
           python3 -m pytest tests/test_role_policies.py -v --tb=short
           echo "::endgroup::"
 
       - name: CDK handler consistency linter (test_cdk_handler_consistency.py)
-        # Validates every handler= in CDK stacks matches its source_file= basename.
-        # Catches the 2026-03-12 P0 bug class: handler='lambda_function.lambda_handler'
-        # when the actual file is 'freshness_checker_lambda.py'.
-        # Also hard-fails if any handler='lambda_function.lambda_handler' is found.
         run: |
           echo "::group::CDK handler consistency linter"
           python3 -m pytest tests/test_cdk_handler_consistency.py -v --tb=short
           echo "::endgroup::"
 
       - name: CDK S3 path linter (test_cdk_s3_paths.py)
-        # Validates IAM S3 write paths in role_policies.py match actual Lambda write paths.
-        # Exceptions (deviations from raw/matthew/{source}/* convention) must be
-        # documented in ci/lambda_s3_paths.json with evidence from the Lambda source.
-        # Catches the 2026-03-12 P0 bug: todoist IAM used raw/matthew/todoist/* but
-        # Lambda writes to raw/todoist/* (no matthew/ prefix).
         run: |
           echo "::group::CDK S3 path linter"
           python3 -m pytest tests/test_cdk_s3_paths.py -v --tb=short
           echo "::endgroup::"
 
       - name: Safety module wiring linter (test_wiring_coverage.py)
-        # Validates platform_logger / ingestion_validator / ai_output_validator are
-        # wired across all Lambdas. Catches 'built but not wired' gaps (highest hardening risk).
-        # Also scans prompt strings for causal language (AI-3 / causal framing principle).
         run: |
           echo "::group::Wiring coverage linter"
           python3 -m pytest tests/test_wiring_coverage.py -v --tb=short
           echo "::endgroup::"
 
       - name: DynamoDB pattern linter (test_ddb_patterns.py)
-        # Validates DDB key format, reserved-word guards, schema_version, and
-        # validate_item usage before put_item in ingestion Lambdas.
         run: |
           echo "::group::DynamoDB pattern linter"
           python3 -m pytest tests/test_ddb_patterns.py -v --tb=short
           echo "::endgroup::"
 
       - name: Deprecated secrets scan
-        # Fails if any Lambda or config file references a secret scheduled for deletion.
-        # Secret retirement schedule is maintained in ci/deprecated_secrets.txt.
         run: |
           echo "::group::Deprecated secrets scan"
           FAILED=0
 
-          # Read deprecated secret names (skip blank lines and comments)
           while IFS= read -r line; do
             secret=$(echo "$line" | sed 's/#.*//' | xargs)
             [ -z "$secret" ] && continue
@@ -216,7 +202,6 @@ jobs:
           fetch-depth: 2  # Need HEAD~1 for diff
 
       - name: Validate lambda_map.json
-        # Catches drift where map references source files that no longer exist in the repo
         run: |
           echo "Validating ci/lambda_map.json..."
           MISSING=0
@@ -250,9 +235,6 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: CDK diff — detect IAM/infra drift
-        # Surfaces any gap between CDK state and what's live in AWS.
-        # Fails the build if CDK would destroy resources; warns on additions/modifications.
-        # Requires Node + CDK CLI + Python CDK venv.
         run: |
           echo "::group::CDK diff"
           node --version
@@ -263,7 +245,6 @@ jobs:
           source .venv/bin/activate
           pip install -r requirements.txt --quiet
 
-          # Run diff across all stacks; capture output
           set +e
           npx cdk diff --all 2>&1 | tee /tmp/cdk_diff.txt
           CDK_EXIT=$?
@@ -271,20 +252,17 @@ jobs:
 
           echo "::endgroup::"
 
-          # Flag any detected destroys as a hard failure
           if grep -q '\[-\]\|destroy\|Destroy' /tmp/cdk_diff.txt; then
             echo "::error::CDK diff detected resource DESTRUCTIONS — review before deploying:"
             grep '\[-\]\|destroy\|Destroy' /tmp/cdk_diff.txt | head -20
             exit 1
           fi
 
-          # Surface IAM changes as a warning (not a hard block — additions are expected)
           if grep -qi 'iam\|policy\|role\|permission' /tmp/cdk_diff.txt; then
             echo "::warning::CDK diff detected IAM/policy changes — verify role_policies.py is up to date:"
             grep -i 'iam\|policy\|role\|permission' /tmp/cdk_diff.txt | head -20
           fi
 
-          # Surface inline policy drift specifically (the pattern that burned us today)
           if grep -qi 'InlinePolicy\|inline_policy\|QaSmokeKmsAccess\|CanaryKmsAccess' /tmp/cdk_diff.txt; then
             echo "::warning::CDK diff detected inline policy drift — a manual console fix may not be in CDK yet"
           fi
@@ -295,8 +273,6 @@ jobs:
           echo "✅ CDK diff complete"
 
       - name: Assert stateful resources exist
-        # TB7-12: Verify key stateful AWS resources are present before any deploy.
-        # Guards against wrong-account or wrong-region deploys silently targeting nothing.
         run: |
           FAILED=0
 
@@ -343,9 +319,6 @@ jobs:
           echo "✅ All stateful resources verified"
 
       - name: Verify layer version consistency
-        # TB7-11: Confirm every shared-layer consumer is on the current layer version.
-        # Catches the 'stale consumer' state that occurs after a layer rebuild that
-        # wasn't fully propagated — before that state reaches production.
         run: |
           LAYER_NAME="life-platform-shared-utils"
 
@@ -389,8 +362,6 @@ jobs:
           echo "✅ All shared-layer consumers on v$LATEST_VER"
 
       - name: Validate handler function names
-        # Checks that every Lambda source file in lambda_map.json defines
-        # a function named lambda_handler. Catches handler renames before deploy.
         run: |
           echo "::group::Handler consistency check"
           FAILED=0
@@ -417,7 +388,6 @@ jobs:
         run: |
           set -e
 
-          # Get changed files
           if [ "${{ github.event.inputs.deploy_all }}" = "true" ]; then
             echo "Manual deploy-all triggered — deploying everything"
             CHANGED=$(find lambdas/ mcp/ -name '*.py' -type f)
@@ -431,7 +401,6 @@ jobs:
 
           LAMBDA_MAP_FILE="${{ env.LAMBDA_MAP }}"
 
-          # Check for shared layer changes
           LAYER_CHANGED="false"
           LAYER_MODULES=$(jq -r '.shared_layer.modules[]' "$LAMBDA_MAP_FILE")
           for mod in $LAYER_MODULES; do
@@ -443,7 +412,6 @@ jobs:
           done
           echo "layer_changed=$LAYER_CHANGED" >> "$GITHUB_OUTPUT"
 
-          # Check for MCP changes
           MCP_CHANGED="false"
           if echo "$CHANGED" | grep -q "^mcp/" || echo "$CHANGED" | grep -q "mcp_server.py"; then
             MCP_CHANGED="true"
@@ -451,10 +419,8 @@ jobs:
           fi
           echo "mcp_changed=$MCP_CHANGED" >> "$GITHUB_OUTPUT"
 
-          # Build deploy matrix: list of {function, source} pairs
           DEPLOYS="[]"
 
-          # Direct Lambda source file changes
           for file in $CHANGED; do
             FUNC=$(jq -r --arg f "$file" '.lambdas[$f].function // empty' "$LAMBDA_MAP_FILE")
             if [ -n "$FUNC" ]; then
@@ -462,7 +428,6 @@ jobs:
             fi
           done
 
-          # If shared layer changed, cascade to all consumer Lambdas
           if [ "$LAYER_CHANGED" = "true" ]; then
             CONSUMERS=$(jq -r '.shared_layer.consumers[]' "$LAMBDA_MAP_FILE")
             for consumer in $CONSUMERS; do
@@ -476,7 +441,6 @@ jobs:
             done
           fi
 
-          # Deduplicate
           DEPLOYS=$(echo "$DEPLOYS" | jq 'unique_by(.function)')
 
           COUNT=$(echo "$DEPLOYS" | jq 'length')
@@ -499,7 +463,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: plan
     if: needs.plan.outputs.has_deploys == 'true'
-    environment: production   # ← Manual approval gate — verify this Environment exists in GitHub repo settings
+    environment: production   # ← Manual approval gate
     steps:
       - uses: actions/checkout@v4
 
@@ -509,7 +473,6 @@ jobs:
           role-to-assume: arn:aws:iam::205930651321:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
-      # ── Rebuild shared layer if needed ──
       - name: Rebuild shared layer
         if: needs.plan.outputs.layer_changed == 'true'
         run: |
@@ -526,7 +489,6 @@ jobs:
           echo "Attaching to consumers..."
           bash deploy/p3_attach_shared_utils_layer.sh "$LAYER_ARN"
 
-          # Verify all consumers are now on the new layer version
           echo ""
           echo "Verifying layer attachment..."
           LATEST_VER=$(aws lambda list-layer-versions \
@@ -536,7 +498,6 @@ jobs:
 
           MISMATCH=0
           while IFS= read -r consumer; do
-            # Extract version number from the LayerArn suffix (e.g. :5 → 5)
             ATTACHED_ARN=$(aws lambda get-function-configuration \
               --function-name "$consumer" \
               --region ${{ env.AWS_REGION }} \
@@ -557,7 +518,6 @@ jobs:
           fi
           echo "✅ All consumers verified on layer v$LATEST_VER"
 
-      # ── Deploy MCP server if needed ──
       - name: Deploy MCP server
         if: needs.plan.outputs.mcp_changed == 'true'
         run: |
@@ -571,17 +531,28 @@ jobs:
             --query "Handler" --output text)
           MODULE_NAME=$(echo "$HANDLER" | cut -d'.' -f1)
 
-          # Package: entry point + full mcp/ directory (cd into temp dir to strip path prefix)
           cp mcp_server.py "$WORK_DIR/${MODULE_NAME}.py"
           cp -r mcp/ "$WORK_DIR/mcp/"
           (cd "$WORK_DIR" && zip -r deploy.zip "${MODULE_NAME}.py" mcp/ -q)
+
+          # S3 rollback artifact for MCP
+          BUCKET="matthew-life-platform"
+          if aws s3 ls "s3://$BUCKET/deploys/life-platform-mcp/latest.zip" \
+               --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+            aws s3 cp "s3://$BUCKET/deploys/life-platform-mcp/latest.zip" \
+              "s3://$BUCKET/deploys/life-platform-mcp/previous.zip" \
+              --region ${{ env.AWS_REGION }} > /dev/null
+          fi
+          aws s3 cp "$WORK_DIR/deploy.zip" \
+            "s3://$BUCKET/deploys/life-platform-mcp/latest.zip" \
+            --region ${{ env.AWS_REGION }} > /dev/null
+          echo "💾 MCP rollback artifact stored"
 
           aws lambda update-function-code \
             --function-name life-platform-mcp \
             --zip-file "fileb://$WORK_DIR/deploy.zip" \
             --region ${{ env.AWS_REGION }} > /dev/null
 
-          # Wait for update to complete before proceeding (replaces sleep 10)
           aws lambda wait function-updated \
             --function-name life-platform-mcp \
             --region ${{ env.AWS_REGION }}
@@ -589,7 +560,6 @@ jobs:
           echo "✅ life-platform-mcp deployed"
           rm -rf "$WORK_DIR"
 
-      # ── Deploy individual Lambdas ──
       - name: Deploy Lambdas
         run: |
           MATRIX='${{ needs.plan.outputs.deploy_matrix }}'
@@ -612,7 +582,6 @@ jobs:
             echo ""
             echo "→ Deploying $FUNC from $SRC..."
 
-            # Skip Lambdas with native deps — must be built in the correct environment
             NATIVE=$(jq -r --arg f "$SRC" '.lambdas[$f].native_deps // false' "${{ env.LAMBDA_MAP }}")
             if [ "$NATIVE" = "true" ]; then
               echo "  ⚠️ SKIPPED: $FUNC has native deps (deploy manually with correct build env)"
@@ -620,7 +589,6 @@ jobs:
             fi
 
             if bash deploy/deploy_lambda.sh "$FUNC" "$SRC"; then
-              # Wait for update to complete before deploying next Lambda
               aws lambda wait function-updated \
                 --function-name "$FUNC" \
                 --region ${{ env.AWS_REGION }}
@@ -667,13 +635,11 @@ jobs:
           echo "Smoke test result:"
           python3 -m json.tool /tmp/smoke.json 2>/dev/null || cat /tmp/smoke.json
 
-          # Parse structured output — check status field, not raw string grep
           STATUS=$(python3 -c "
           import json, sys
           try:
               result = json.load(open('/tmp/smoke.json'))
               status = result.get('status', result.get('statusCode', ''))
-              # Accept: 'ok', 'pass', 200, or absence of 'error'/'fail' in status
               s = str(status).lower()
               if s in ('ok', 'pass', '200') or (s and 'error' not in s and 'fail' not in s):
                   print('PASS')
@@ -705,7 +671,6 @@ jobs:
           echo "Canary result:"
           python3 -m json.tool /tmp/canary.json 2>/dev/null || cat /tmp/canary.json
 
-          # Parse structured output
           STATUS=$(python3 -c "
           import json, sys
           try:
@@ -730,7 +695,75 @@ jobs:
           fi
 
   # ════════════════════════════════════════════════════════════════
-  # Job 6: Notify on failure
+  # Job 6: Auto-rollback on smoke failure (TB7-25)
+  # Fires when smoke-test fails AFTER a successful deploy.
+  # Rolls back each deployed function to its previous S3 artifact.
+  # Note: Does NOT roll back shared layer rebuilds (manual step).
+  # ════════════════════════════════════════════════════════════════
+  rollback-on-smoke-failure:
+    name: Auto-rollback (smoke failure)
+    runs-on: ubuntu-latest
+    needs: [plan, deploy, smoke-test]
+    if: needs.smoke-test.result == 'failure' && needs.deploy.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::205930651321:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Rollback deployed Lambdas
+        run: |
+          MATRIX='${{ needs.plan.outputs.deploy_matrix }}'
+          MCP_CHANGED='${{ needs.plan.outputs.mcp_changed }}'
+          COUNT=$(echo "$MATRIX" | jq 'length')
+
+          echo "⚠️  Smoke test failed after successful deploy — initiating auto-rollback"
+          echo ""
+
+          ROLLED_BACK=0
+          FAILED=0
+
+          # Roll back individual Lambdas
+          for row in $(echo "$MATRIX" | jq -r '.[] | @base64'); do
+            FUNC=$(echo "$row" | base64 -d | jq -r '.function')
+            echo "→ Rolling back $FUNC..."
+            if bash deploy/rollback_lambda.sh "$FUNC"; then
+              ROLLED_BACK=$((ROLLED_BACK + 1))
+            else
+              echo "  ❌ Rollback failed for $FUNC — manual intervention required"
+              FAILED=$((FAILED + 1))
+            fi
+          done
+
+          # Roll back MCP if it was deployed
+          if [ "$MCP_CHANGED" = "true" ]; then
+            echo "→ Rolling back life-platform-mcp..."
+            if bash deploy/rollback_lambda.sh "life-platform-mcp"; then
+              ROLLED_BACK=$((ROLLED_BACK + 1))
+            else
+              echo "  ❌ MCP rollback failed — manual intervention required"
+              FAILED=$((FAILED + 1))
+            fi
+          fi
+
+          echo ""
+          echo "═══ Rollback complete: $ROLLED_BACK succeeded, $FAILED failed ═══"
+
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::error::$FAILED Lambda(s) could not be rolled back — manual redeploy required"
+            exit 1
+          fi
+
+          echo "✅ All Lambdas rolled back. Investigate smoke test failure before re-deploying."
+          echo ""
+          echo "Note: If shared layer was also rebuilt, layer rollback is MANUAL."
+          echo "  Run: bash deploy/build_layer.sh (from previous commit) + attach"
+
+  # ════════════════════════════════════════════════════════════════
+  # Job 7: Notify on failure
   # Runs if any upstream job fails. Posts to SNS life-platform-alerts.
   # ════════════════════════════════════════════════════════════════
   notify-failure:
