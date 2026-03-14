@@ -12,6 +12,7 @@ Lambdas (7):
   daily-insight-compute     cron(45 17 * * ? *)   — 9:45 AM PT daily
   adaptive-mode-compute     cron(50 17 * * ? *)   — 9:50 AM PT daily
   hypothesis-engine         cron(0 19 ? * SUN *)  — Sunday 11:00 AM PT
+  weekly-correlation-compute cron(30 18 ? * SUN *) — Sunday 11:30 AM PT
   dashboard-refresh         cron(0 21 * * ? *)    — 2:00 PM PDT + 6:00 PM PDT
 """
 
@@ -121,6 +122,17 @@ class ComputeStack(Stack):
             schedule="cron(0 19 ? * SUN *)",
             timeout_seconds=120, memory_mb=256,
             custom_policies=rp.compute_hypothesis_engine(),
+            **shared,
+        )
+
+        create_platform_lambda(
+            self, "WeeklyCorrelationCompute",
+            function_name="weekly-correlation-compute",
+            handler="weekly_correlation_compute_lambda.lambda_handler",
+            source_file="lambdas/weekly_correlation_compute_lambda.py",
+            schedule="cron(30 18 ? * SUN *)",  # Sunday 11:30 AM PT (30 min before hypothesis engine)
+            timeout_seconds=120, memory_mb=256,
+            custom_policies=rp.compute_weekly_correlations(),
             **shared,
         )
 

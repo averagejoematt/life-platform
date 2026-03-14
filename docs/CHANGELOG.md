@@ -1,5 +1,39 @@
 # Life Platform — Changelog
 
+## v3.7.20 — 2026-03-14: R8-ST5 + R8-LT3 + R8-LT9
+
+### Summary
+Three R8 findings closed: composite scores pre-compute (R8-ST5), unit test suite (R8-LT3, 74/74), and weekly correlation compute Lambda (R8-LT9). All remaining actionable R8 findings are now resolved. Only gated items remain (SIMP-1 Phase 2 ~Apr 13, R9 review, Google Calendar).
+
+### R8-ST5 — Composite Scores Pre-compute
+- Added `write_composite_scores()` to `daily_metrics_compute_lambda.py` — called at end of every daily compute run
+- Writes `SOURCE#composite_scores | DATE#<date>` with: day_grade_score, day_grade_letter, readiness_score, readiness_colour, tier0_streak, tier01_streak, tsb, hrv_7d, hrv_30d, latest_weight, component_scores, computed_at, algo_version
+- Non-fatal: write failures logged but don’t block Daily Brief
+- Schema documented in `docs/SCHEMA.md`
+
+### R8-LT3 — Unit Tests for Business Logic
+- Created `tests/test_business_logic.py` — 74 tests, all passing (0.17s)
+- Covers: `scoring_engine` (helpers, letter_grade, score_sleep, score_recovery, score_nutrition, compute_day_grade), `character_engine` (helpers, _clamp, _pct_of_target, _deviation_score, _in_range_score, _trend_score, get_tier), `daily_metrics_compute_lambda` (compute_tsb, compute_readiness)
+- Fully offline — no AWS credentials needed
+
+### R8-LT9 — Weekly Correlation Compute
+- New Lambda `lambdas/weekly_correlation_compute_lambda.py`
+- Runs Sunday 11:30 AM PT (`cron(30 18 ? * SUN *)`) — 30 min before hypothesis engine
+- Computes 20 Pearson correlation pairs over 90-day rolling window
+- Writes to `SOURCE#weekly_correlations | WEEK#<iso_week>`
+- Idempotent: skips if already computed (pass `force=true` to override)
+- CDK wired: `LifePlatformCompute` stack, `compute_weekly_correlations()` IAM policy
+- Schema documented in `docs/SCHEMA.md`
+
+### Deployed
+- CDK: `LifePlatformCompute` (new weekly-correlation-compute Lambda + IAM)
+- `daily-metrics-compute` Lambda (composite scores writer)
+- `weekly-correlation-compute` Lambda (new)
+- Post-reconcile smoke: 10/10 ✅
+- CI: 7/7 ✅, business logic: 74/74 ✅
+
+---
+
 ## v3.7.19 — 2026-03-14: SIMP-1 Phase 1c+1d — Labs/Training/Strength/Character/CGM/Mood/Metrics/Todoist/SickDays
 
 ### Summary
