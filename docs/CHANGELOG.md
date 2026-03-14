@@ -1,5 +1,49 @@
 # Life Platform — Changelog
 
+## v3.7.22 — 2026-03-14: R9 A/A+ hardening sprint
+
+### Summary
+All 21 R9 board action items completed. Platform grade target: A (from A-). Key fixes: tools_calendar.py lazy DDB init, real focus_block_count algorithm, n-gated correlation interpretation, google_calendar registered in all platform systems, dedicated warmer Lambda, 9 dispatcher unit tests, 2 ADRs.
+
+### Changes
+
+**Data Quality (Omar + Anika)**
+- `mcp/config.py`: `google_calendar` added to SOURCES list — enables cross-source tools to include calendar data
+- `lambdas/freshness_checker_lambda.py`: `google_calendar` added to monitored SOURCES (10 → 11 sources)
+- `lambdas/ingestion_validator.py`: `google_calendar` schema added (required_fields, range_checks for event_count + meeting_minutes)
+- `lambdas/google_calendar_lambda.py` v1.0.1: `compute_day_stats()` rewritten — real 90-min gap detection from actual HH:MM event times; returns `None` when uncomputable (never fabricates). Partial-progress gap fill: one date stored at a time so partial runs persist.
+- `lambdas/weekly_correlation_compute_lambda.py`: `interpret_r()` now n-gated — moderate requires n≥30, strong requires n≥50. Prevents spurious 'strong' labels on small samples during first 3 months.
+
+**Architecture + Reliability (Priya + Viktor + Jin)**
+- `cdk/stacks/mcp_stack.py` v2.2: dedicated `life-platform-mcp-warmer` Lambda. Same source as MCP server, separate EventBridge rule at 10:00 AM PT, 300s timeout. MCP request-serving Lambda freed from 90s warmer concurrency hold.
+- `lambdas/mcp_server.py`: warmer EventBridge permission retained on MCP Lambda for legacy rule during transition (no-op cost).
+- SLO-5: `slo-warmer-completeness` alarm added — fires if warmer Lambda errors on daily run.
+
+**Security (Yael)**
+- `setup/setup_google_calendar_auth.py`: `KmsKeyId` added to `create_secret` — Google Calendar secret now uses platform CMK, not AWS-managed key.
+- ADR-026 documents local MCP endpoint `AuthType NONE` as explicitly accepted design.
+
+**Maintainability (Elena)**
+- `mcp/tools_calendar.py` v1.1.0: module-level boto3 replaced with lazy `table` from `mcp.config` — same pattern as all other tool modules. Cold-start failure risk eliminated.
+- `mcp/tools_calendar.py`: `get_schedule_load` now reads `weekly_correlations` partition and surfaces data-driven schedule→health patterns in coaching_note.
+- `tests/test_business_logic.py`: 9 dispatcher routing tests added (TestDispatcherRouting). Total: 74+9 = 83 tests.
+- `lambdas/qa_smoke_lambda.py`: `get_task_load_summary` replaced with `get_todoist_snapshot(view=load)` dispatcher call — verifies SIMP-1 dispatcher routing is live on every daily smoke run.
+
+**Documentation**
+- `docs/DECISIONS.md`: ADR-025 (composite_scores consolidation decision), ADR-026 (local MCP auth accepted)
+- `docs/ARCHITECTURE.md`: secret count 10→11, dedicated warmer Lambda in schedule table, google-calendar secret row added, cost profile updated
+- `deploy/sync_doc_metadata.py`: v3.7.22, 45 Lambdas, 11 secrets, 49 alarms, 20 data sources
+
+### Deployed
+- `life-platform-mcp` Lambda (tools_calendar.py fix)
+- `google-calendar-ingestion` Lambda (v1.0.1: real focus_block detection, partial-progress)
+- `life-platform-freshness-checker` Lambda (google_calendar added)
+- `weekly-correlation-compute` Lambda (n-gated interpret_r)
+- CDK: `LifePlatformMcp` (dedicated warmer Lambda + SLO-5 alarm)
+- CI: 7/7 (registry), 83/83 (business logic + dispatchers)
+
+---
+
 ## v3.7.21 — 2026-03-14: Google Calendar integration (R8-ST1)
 
 ### Summary

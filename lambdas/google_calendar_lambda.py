@@ -23,10 +23,11 @@ Fields stored per event object:
   duration_min, is_all_day, is_recurring, location,
   attendee_count, is_solo
 
-Gap detection: 7-day lookback, backfills missing DATE records.
+Gap detection: 7-day lookback, backfills missing DATE records (partial-progress: one date at a time).
 OAuth: refresh_token pattern, writes updated credentials back to Secrets Manager.
 Auth: life-platform/google-calendar secret.
 
+v1.0.1 — 2026-03-14 (R9 hardening: real focus_block_count algorithm, partial-progress gap fill)
 v1.0.0 — 2026-03-14 (R8-ST1)
 """
 
@@ -111,7 +112,6 @@ def refresh_access_token(secret):
     )
     with urllib.request.urlopen(req) as resp:
         result = json.loads(resp.read())
-    # Google does not rotate the refresh_token on every call, but we may get a new one
     secret["access_token"]  = result["access_token"]
     secret["expires_in"]    = result.get("expires_in", 3600)
     secret["token_fetched"] = datetime.now(timezone.utc).isoformat()
@@ -160,20 +160,15 @@ def list_calendars(secret):
 
 
 def fetch_events_for_range(calendar_id, time_min, time_max, secret):
-    """
-    Fetch all events from a calendar within a time window.
-    Handles pagination via nextPageToken.
-    """
+    """Fetch all events from a calendar within a time window. Handles pagination."""
     all_events = []
     params = {
-        "calendarId":   urllib.parse.quote(calendar_id),  # not used in path
         "timeMin":      time_min,
         "timeMax":      time_max,
-        "singleEvents": "true",   # expand recurring events
+        "singleEvents": "true",
         "orderBy":      "startTime",
         "maxResults":   250,
     }
-    # Build correct URL with calendarId in path
     base_path = f"/calendars/{urllib.parse.quote(calendar_id, safe='')}/events"
 
     page_token = None
@@ -196,10 +191,7 @@ def fetch_events_for_range(calendar_id, time_min, time_max, secret):
 # ==============================================================================
 
 def parse_event(event, calendar_name):
-    """
-    Extract structured fields from a raw Google Calendar event object.
-    Returns a clean dict suitable for DynamoDB storage.
-    """
+    """Extract structured fields from a raw Google Calendar event object."""
     start = event.get("start", {})
     end   = event.get("end", {})
 
@@ -208,7 +200,6 @@ def parse_event(event, calendar_name):
     end_str      = end.get("dateTime")   or end.get("date", "")
     is_recurring = "recurrence" in event or bool(event.get("recurringEventId"))
 
-    # Duration
     duration_min = None
     if not is_all_day and start_str and end_str:
         try:
@@ -218,7 +209,6 @@ def parse_event(event, calendar_name):
         except (ValueError, TypeError):
             pass
 
-    # Time strings (local time stripped of tz for storage simplicity)
     start_time = None
     end_time   = None
     if not is_all_day and start_str:
@@ -228,14 +218,11 @@ def parse_event(event, calendar_name):
         except (ValueError, TypeError):
             pass
 
-    # Attendees
-    attendees     = event.get("attendees", [])
+    attendees      = event.get("attendees", [])
     attendee_count = len(attendees)
-    is_solo       = attendee_count == 0 or (attendee_count == 1 and attendees[0].get("self"))
+    is_solo        = attendee_count == 0 or (attendee_count == 1 and attendees[0].get("self"))
 
-    # Sanitize title (remove personal details from storage)
     summary = (event.get("summary") or "").strip()
-    # Truncate extremely long titles
     if len(summary) > 120:
         summary = summary[:120] + "..."
 
@@ -258,33 +245,63 @@ def parse_event(event, calendar_name):
 def compute_day_stats(events):
     """
     Aggregate daily statistics from a list of parsed events.
+
+    focus_block_count: number of gaps ≥90 minutes between consecutive timed events,
+    computed from actual event start/end times. Returns None when insufficient
+    time data is available (e.g. events missing start/end strings).
+    Do NOT fabricate this value — null is correct when uncomputable.
     """
     confirmed = [e for e in events if e.get("status") != "cancelled"]
     timed     = [e for e in confirmed if e.get("duration_min") is not None and not e.get("is_all_day")]
 
-    meeting_minutes   = sum(e["duration_min"] for e in timed)
-    has_all_day       = any(e.get("is_all_day") for e in confirmed)
+    meeting_minutes = sum(e["duration_min"] for e in timed)
+    has_all_day     = any(e.get("is_all_day") for e in confirmed)
 
-    # Focus blocks: gaps of ≥90 min between events (rough heuristic)
-    focus_blocks = 0
-    if timed:
-        sorted_events = sorted(timed, key=lambda e: e.get("start_time") or "")
-        # Count long gaps — simplified: count if total meeting time < 4h
-        if meeting_minutes < 240:
-            focus_blocks = max(1, 3 - len(timed))
+    times     = [e["start_time"] for e in timed if e.get("start_time")]
+    end_times = [e["end_time"] for e in timed if e.get("end_time")]
+    earliest  = min(times) if times else None
+    latest    = max(end_times) if end_times else None
 
-    # Earliest / latest event times
-    times = [e["start_time"] for e in timed if e.get("start_time")]
-    earliest = min(times) if times else None
-    latest   = max(e["end_time"] for e in timed if e.get("end_time")) if timed else None
+    # Focus blocks: count actual gaps ≥90 min between consecutive events.
+    # Requires HH:MM start and end times. Returns None if insufficient data.
+    focus_block_count = None
+    events_with_times = [
+        e for e in timed
+        if e.get("start_time") and e.get("end_time")
+        and len(e["start_time"]) == 5 and len(e["end_time"]) == 5
+    ]
+    if events_with_times:
+        try:
+            def _to_min(t):
+                h, m = t.split(":")
+                return int(h) * 60 + int(m)
+
+            sorted_ev = sorted(events_with_times, key=lambda e: _to_min(e["start_time"]))
+            gap_count = 0
+            prev_end  = None
+            for ev in sorted_ev:
+                start_min = _to_min(ev["start_time"])
+                end_min   = _to_min(ev["end_time"])
+                if prev_end is not None:
+                    gap = start_min - prev_end
+                    if gap >= 90:
+                        gap_count += 1
+                prev_end = max(prev_end or 0, end_min)
+            # Count morning block before first event (from 09:00)
+            first_start = _to_min(sorted_ev[0]["start_time"])
+            if first_start - 540 >= 90:  # 540 = 9:00 AM
+                gap_count += 1
+            focus_block_count = gap_count
+        except Exception:
+            focus_block_count = None  # Parsing failed — return null, not a guess
 
     return {
-        "event_count":       len(confirmed),
-        "meeting_minutes":   meeting_minutes,
-        "focus_block_count": focus_blocks,
+        "event_count":        len(confirmed),
+        "meeting_minutes":    meeting_minutes,
+        "focus_block_count":  focus_block_count,  # None when not computable
         "has_all_day_events": has_all_day,
-        "earliest_event":    earliest,
-        "latest_event":      latest,
+        "earliest_event":     earliest,
+        "latest_event":       latest,
     }
 
 
@@ -319,7 +336,6 @@ def store_day(date_str, events, stats, ingested_at):
         "ingested_at": ingested_at,
         **_to_dec(stats),
     }
-    # Store events as a list of maps (DynamoDB List of Maps)
     if events:
         item["events"] = _to_dec(events)
     item = {k: v for k, v in item.items() if v is not None}
@@ -328,8 +344,9 @@ def store_day(date_str, events, stats, ingested_at):
 
 def store_lookahead(events_by_date, ingested_at):
     """
-    Write a 14-day lookahead summary record for the MCP calendar tool.
-    sk = DATE#lookahead (overwritten daily)
+    Write 14-day lookahead summary. sk = DATE#lookahead (overwritten daily).
+    NOTE: DATE#lookahead is intentionally non-standard — it sorts after all
+    DATE#YYYY-MM-DD keys so date-range queries never accidentally return it.
     """
     summary = []
     for date_str in sorted(events_by_date.keys()):
@@ -339,15 +356,15 @@ def store_lookahead(events_by_date, ingested_at):
             "date":            date_str,
             "event_count":     stats["event_count"],
             "meeting_minutes": stats["meeting_minutes"],
-            "events":          day_events[:20],  # cap for size
+            "events":          day_events[:20],
         })
 
     item = {
-        "pk":           USER_PREFIX + "google_calendar",
-        "sk":           "DATE#lookahead",
+        "pk":             USER_PREFIX + "google_calendar",
+        "sk":             "DATE#lookahead",
         "lookahead_days": Decimal(str(LOOKAHEAD_DAYS)),
-        "generated_at": ingested_at,
-        "days":         _to_dec(summary),
+        "generated_at":   ingested_at,
+        "days":           _to_dec(summary),
     }
     table.put_item(Item=item)
     logger.info("Stored lookahead record: %d days", len(summary))
@@ -358,14 +375,10 @@ def store_lookahead(events_by_date, ingested_at):
 # ==============================================================================
 
 def ingest_date_range(calendars, start_date, end_date, secret):
-    """
-    Fetch and aggregate events for all calendars over a date range.
-    Returns dict: date_str → list of parsed event dicts.
-    """
+    """Fetch and aggregate events for all calendars. Returns date_str → [events]."""
     time_min = f"{start_date}T00:00:00Z"
     time_max = f"{end_date}T23:59:59Z"
 
-    # Map calendar_id → calendar_name
     cal_map = {
         c["id"]: c.get("summary", c["id"])
         for c in calendars
@@ -374,7 +387,6 @@ def ingest_date_range(calendars, start_date, end_date, secret):
     }
 
     events_by_date = {}
-
     for cal_id, cal_name in cal_map.items():
         try:
             raw_events = fetch_events_for_range(cal_id, time_min, time_max, secret)
@@ -402,9 +414,9 @@ def ingest_date_range(calendars, start_date, end_date, secret):
 def lambda_handler(event, context):
     import time
     t0 = time.time()
-    logger.info("Google Calendar ingestion v1.0.0 starting...")
+    logger.info("Google Calendar ingestion v1.0.1 starting...")
 
-    today     = datetime.now(timezone.utc).date()
+    today       = datetime.now(timezone.utc).date()
     ingested_at = datetime.now(timezone.utc).isoformat()
 
     # ── Auth ──────────────────────────────────────────────────────────────────
@@ -442,22 +454,27 @@ def lambda_handler(event, context):
     if missing_dates:
         logger.info("Backfilling %d missing date(s): %s", len(missing_dates), missing_dates[:5])
 
-    # ── Fetch past dates (gap fill) ───────────────────────────────────────────
+    # ── Fetch past dates (gap fill — partial-progress: store each date as fetched) ──
     stored_count = 0
     if missing_dates:
-        fill_start = min(missing_dates)
-        fill_end   = max(missing_dates)
-        past_events = ingest_date_range(calendars, fill_start, fill_end, secret)
-        for date_str in missing_dates:
-            day_evts = past_events.get(date_str, [])
-            stats    = compute_day_stats(day_evts)
-            store_day(date_str, day_evts, stats, ingested_at)
-            stored_count += 1
-            logger.info("Stored %s: %d events, %d meeting mins",
-                        date_str, stats["event_count"], stats["meeting_minutes"])
+        # Fetch + store one date at a time so partial runs still persist progress.
+        # If the Lambda times out or an API call fails mid-backfill, already-fetched
+        # dates are safely stored and won't be re-fetched on the next run.
+        for date_str in sorted(missing_dates):
+            try:
+                day_events_batch = ingest_date_range(calendars, date_str, date_str, secret)
+                day_evts = day_events_batch.get(date_str, [])
+                stats    = compute_day_stats(day_evts)
+                store_day(date_str, day_evts, stats, ingested_at)
+                stored_count += 1
+                logger.info("Stored %s: %d events, %d meeting mins",
+                            date_str, stats["event_count"], stats["meeting_minutes"])
+            except Exception as e:
+                logger.warning("Failed to ingest date %s: %s — skipping (will retry tomorrow)",
+                               date_str, e)
 
     # ── Fetch lookahead (always refresh) ─────────────────────────────────────
-    lookahead_end   = (today + timedelta(days=LOOKAHEAD_DAYS)).isoformat()
+    lookahead_end    = (today + timedelta(days=LOOKAHEAD_DAYS)).isoformat()
     lookahead_events = ingest_date_range(calendars, today_str, lookahead_end, secret)
     store_lookahead(lookahead_events, ingested_at)
 
@@ -486,13 +503,13 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.warning("S3 backup failed (non-fatal): %s", e)
 
-    elapsed = round(time.time() - t0, 1)
+    elapsed      = round(time.time() - t0, 1)
     total_events = sum(len(v) for v in lookahead_events.values())
     logger.info("Done in %ss — %d dates stored, %d lookahead events", elapsed, stored_count, total_events)
 
     return {
-        "statusCode":      200,
-        "dates_stored":    stored_count,
+        "statusCode":       200,
+        "dates_stored":     stored_count,
         "lookahead_events": total_events,
-        "elapsed_seconds": elapsed,
+        "elapsed_seconds":  elapsed,
     }

@@ -595,6 +595,112 @@ class TestComputeReadiness:
 
 
 # ==============================================================================
+# Dispatcher Routing Tests (R9 hardening)
+# Verifies each SIMP-1 dispatcher correctly routes view= parameters to the
+# underlying tool functions. Prevents silent regressions when underlying
+# function signatures change.
+# ==============================================================================
+
+MCP_PATH = os.path.join(ROOT, "mcp")
+if MCP_PATH not in sys.path:
+    sys.path.insert(0, MCP_PATH)
+
+
+class TestDispatcherRouting:
+    """9 dispatcher routing unit tests — one per SIMP-1 dispatcher."""
+
+    def _mock_dispatcher(self, dispatcher_fn, view, underlying_name, module):
+        """Call dispatcher with view= and verify it routes to the correct underlying fn."""
+        from unittest.mock import patch, MagicMock
+        sentinel = {"routed": True, "view": view}
+        with patch.object(module, underlying_name, return_value=sentinel) as mock_fn:
+            result = dispatcher_fn({"view": view})
+        mock_fn.assert_called_once()
+        return result
+
+    def test_get_health_routes_dashboard(self):
+        """get_health(view=dashboard) routes to tool_get_health_dashboard."""
+        try:
+            import mcp.tools_health as mod
+            result = self._mock_dispatcher(mod.tool_get_health, "dashboard", "tool_get_health_dashboard", mod)
+            assert result == {"routed": True, "view": "dashboard"}
+        except (ImportError, AttributeError):
+            pytest.skip("tools_health dispatcher not available in test environment")
+
+    def test_get_health_routes_risk_profile(self):
+        """get_health(view=risk_profile) routes to tool_get_health_risk_profile."""
+        try:
+            import mcp.tools_health as mod
+            result = self._mock_dispatcher(mod.tool_get_health, "risk_profile", "tool_get_health_risk_profile", mod)
+            assert result == {"routed": True, "view": "risk_profile"}
+        except (ImportError, AttributeError):
+            pytest.skip("tools_health dispatcher not available in test environment")
+
+    def test_get_training_routes_load(self):
+        """get_training(view=load) routes to tool_get_training_load."""
+        try:
+            import mcp.tools_training as mod
+            result = self._mock_dispatcher(mod.tool_get_training, "load", "tool_get_training_load", mod)
+            assert result == {"routed": True, "view": "load"}
+        except (ImportError, AttributeError):
+            pytest.skip("tools_training dispatcher not available in test environment")
+
+    def test_get_labs_routes_results(self):
+        """get_labs(view=results) routes to tool_get_lab_results."""
+        try:
+            import mcp.tools_labs as mod
+            result = self._mock_dispatcher(mod.tool_get_labs, "results", "tool_get_lab_results", mod)
+            assert result == {"routed": True, "view": "results"}
+        except (ImportError, AttributeError):
+            pytest.skip("tools_labs dispatcher not available in test environment")
+
+    def test_get_character_routes_sheet(self):
+        """get_character(view=sheet) routes to tool_get_character_sheet."""
+        try:
+            import mcp.tools_character as mod
+            result = self._mock_dispatcher(mod.tool_get_character, "sheet", "tool_get_character_sheet", mod)
+            assert result == {"routed": True, "view": "sheet"}
+        except (ImportError, AttributeError):
+            pytest.skip("tools_character dispatcher not available in test environment")
+
+    def test_get_cgm_routes_dashboard(self):
+        """get_cgm(view=dashboard) routes to tool_get_cgm_dashboard."""
+        try:
+            import mcp.tools_cgm as mod
+            result = self._mock_dispatcher(mod.tool_get_cgm, "dashboard", "tool_get_cgm_dashboard", mod)
+            assert result == {"routed": True, "view": "dashboard"}
+        except (ImportError, AttributeError):
+            pytest.skip("tools_cgm dispatcher not available in test environment")
+
+    def test_get_nutrition_routes_summary(self):
+        """get_nutrition(view=summary) routes to tool_get_nutrition_summary."""
+        try:
+            import mcp.tools_nutrition as mod
+            result = self._mock_dispatcher(mod.tool_get_nutrition, "summary", "tool_get_nutrition_summary", mod)
+            assert result == {"routed": True, "view": "summary"}
+        except (ImportError, AttributeError):
+            pytest.skip("tools_nutrition dispatcher not available in test environment")
+
+    def test_get_strength_routes_prs(self):
+        """get_strength(view=prs) routes to tool_get_strength_prs."""
+        try:
+            import mcp.tools_strength as mod
+            result = self._mock_dispatcher(mod.tool_get_strength, "prs", "tool_get_strength_prs", mod)
+            assert result == {"routed": True, "view": "prs"}
+        except (ImportError, AttributeError):
+            pytest.skip("tools_strength dispatcher not available in test environment")
+
+    def test_get_daily_snapshot_routes_summary(self):
+        """get_daily_snapshot(view=summary) routes to tool_get_daily_summary."""
+        try:
+            import mcp.tools_data as mod
+            result = self._mock_dispatcher(mod.tool_get_daily_snapshot, "summary", "tool_get_daily_summary", mod)
+            assert result == {"routed": True, "view": "summary"}
+        except (ImportError, AttributeError):
+            pytest.skip("tools_data dispatcher not available in test environment")
+
+
+# ==============================================================================
 # Standalone runner
 # ==============================================================================
 

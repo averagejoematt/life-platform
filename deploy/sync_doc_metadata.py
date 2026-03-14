@@ -48,14 +48,14 @@ DOCS = ROOT / "docs"
 
 PLATFORM_FACTS = {
     # Core counts
-    "version":          "v3.7.21",
+    "version":          "v3.7.22",
     "date":             "2026-03-14",
-    "lambda_count":     44,
+    "lambda_count":     45,
     "tool_count":       88,
     "module_count":     31,       # mcp/ modules
-    "secret_count":     10,       # active secrets (verified by r8_p0_verify.sh)
-    "alarm_count":      47,       # CloudWatch alarms
-    "data_sources":     19,
+    "secret_count":     11,       # active secrets (10 original + google-calendar added v3.7.21)
+    "alarm_count":      49,       # +2 R9: mcp-warmer-error + slo-warmer-completeness
+    "data_sources":     20,       # google_calendar live (pending OAuth setup)
     "cdk_stacks":       8,
     "iam_roles":        43,
 
@@ -63,8 +63,8 @@ PLATFORM_FACTS = {
     "api_keys_status":  "PERMANENTLY DELETED 2026-03-14",
 
     # Cost
-    "secrets_cost":     "$4.00",  # secret_count × $0.40
-    "secrets_cost_note": "10 active secrets × $0.40/secret/month. `api-keys` permanently deleted 2026-03-14.",
+    "secrets_cost":     "$4.40",  # secret_count × $0.40
+    "secrets_cost_note": "11 active secrets × $0.40/secret/month. `api-keys` permanently deleted 2026-03-14. `google-calendar` added v3.7.21.",
 }
 
 # ══════════════════════════════════════════════════════════════════════════════

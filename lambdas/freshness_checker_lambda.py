@@ -28,15 +28,16 @@ sns      = boto3.client("sns", region_name=REGION)
 cw       = boto3.client("cloudwatch", region_name=REGION)
 
 SOURCES = {
-    "whoop":        "Whoop recovery/sleep",
-    "withings":     "Withings weight/body comp",
-    "strava":       "Strava activities",
-    "todoist":      "Todoist tasks",
-    "apple_health": "Apple Health",
-    "eightsleep":   "Eight Sleep",
-    "macrofactor":  "MacroFactor nutrition",
-    "garmin":       "Garmin biometrics",
-    "habitify":     "Habitify habits",
+    "whoop":           "Whoop recovery/sleep",
+    "withings":        "Withings weight/body comp",
+    "strava":          "Strava activities",
+    "todoist":         "Todoist tasks",
+    "apple_health":    "Apple Health",
+    "eightsleep":      "Eight Sleep",
+    "macrofactor":     "MacroFactor nutrition",
+    "garmin":          "Garmin biometrics",
+    "habitify":        "Habitify habits",
+    "google_calendar": "Google Calendar events",  # R8-ST1 — added v3.7.21
 }
 
 def lambda_handler(event, context):

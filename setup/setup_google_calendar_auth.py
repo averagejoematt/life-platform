@@ -48,6 +48,7 @@ except ImportError:
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 SECRET_NAME = "life-platform/google-calendar"
 REGION = "us-west-2"
+KMS_KEY_ID = "arn:aws:kms:us-west-2:205930651321:key/444438d1-a5e0-43b8-9391-3cd2d70dde4d"  # platform CMK
 
 
 def main():
@@ -88,6 +89,7 @@ def main():
             Name=SECRET_NAME,
             Description="Google Calendar OAuth tokens for life-platform ingestion Lambda",
             SecretString=json.dumps(secret_data),
+            KmsKeyId=KMS_KEY_ID,  # Use platform CMK, not AWS-managed key
         )
         print(f"✅ Created new secret: {SECRET_NAME}")
     except sm.exceptions.ResourceExistsException:

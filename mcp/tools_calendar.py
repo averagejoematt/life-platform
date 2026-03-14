@@ -9,31 +9,27 @@ Data source: USER#matthew#SOURCE#google_calendar
   DATE#YYYY-MM-DD  — one record per day (past + today + tomorrow)
   DATE#lookahead   — 14-day forward summary (updated daily by ingestion Lambda)
 
+NOTE on schema: DATE#lookahead is intentionally non-standard (not a date string).
+It sorts lexicographically after all date strings, so date-range queries on
+DATE#YYYY-MM-DD will never accidentally return it. Documented as known anomaly.
+
+v1.1.0 — 2026-03-14 (R9 hardening: lazy DDB init, weekly_correlations integration)
 v1.0.0 — 2026-03-14 (R8-ST1)
 """
 
-import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from mcp.config import USER_PREFIX, logger
+from mcp.config import USER_PREFIX, logger, table
 from mcp.core import query_source, decimal_to_float
 
-try:
-    import boto3
-    import os
-    _REGION = os.environ.get("AWS_REGION", "us-west-2")
-    _TABLE  = os.environ.get("TABLE_NAME", "life-platform")
-    _ddb    = boto3.resource("dynamodb", region_name=_REGION)
-    _table  = _ddb.Table(_TABLE)
-except Exception:
-    _table = None
 
+# ── Lazy single-item DDB helpers (no module-level boto3) ─────────────────────
 
 def _fetch_day(date_str):
     """Fetch a single day's calendar record from DynamoDB."""
     try:
-        resp = _table.get_item(
+        resp = table.get_item(
             Key={
                 "pk": USER_PREFIX + "google_calendar",
                 "sk": "DATE#" + date_str,
@@ -47,9 +43,9 @@ def _fetch_day(date_str):
 
 
 def _fetch_lookahead():
-    """Fetch the 14-day lookahead summary record."""
+    """Fetch the 14-day lookahead summary record (sk=DATE#lookahead)."""
     try:
-        resp = _table.get_item(
+        resp = table.get_item(
             Key={
                 "pk": USER_PREFIX + "google_calendar",
                 "sk": "DATE#lookahead",
@@ -63,8 +59,27 @@ def _fetch_lookahead():
 
 
 def _fetch_range(start_date, end_date):
-    """Fetch calendar records for a date range."""
+    """Fetch calendar records for a date range via shared query_source."""
     return query_source("google_calendar", start_date, end_date)
+
+
+def _fetch_latest_weekly_correlations():
+    """Fetch the most recent weekly_correlations record for schedule coaching context."""
+    try:
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND sk BEGINS_WITH :s",
+            ExpressionAttributeValues={
+                ":pk": USER_PREFIX + "weekly_correlations",
+                ":s":  "WEEK#",
+            },
+            ScanIndexForward=False,
+            Limit=1,
+        )
+        items = resp.get("Items", [])
+        return decimal_to_float(items[0]) if items else None
+    except Exception as e:
+        logger.warning("_fetch_latest_weekly_correlations() failed: %s", e)
+        return None
 
 
 # ==============================================================================
@@ -81,7 +96,7 @@ def tool_get_calendar_events(args):
     Date range:
       Returns day-by-day summary with event counts and meeting minutes.
 
-    Lookahead (default view):
+    Lookahead:
       Returns the 14-day forward summary (pre-computed nightly).
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -100,11 +115,11 @@ def tool_get_calendar_events(args):
             }
         days = lookahead.get("days", [])
         return {
-            "view":           "lookahead",
-            "generated_at":   lookahead.get("generated_at"),
-            "lookahead_days": lookahead.get("lookahead_days", 14),
-            "days":           days,
-            "total_events":   sum(d.get("event_count", 0) for d in days),
+            "view":                  "lookahead",
+            "generated_at":          lookahead.get("generated_at"),
+            "lookahead_days":        lookahead.get("lookahead_days", 14),
+            "days":                  days,
+            "total_events":          sum(d.get("event_count", 0) for d in days),
             "total_meeting_minutes": sum(d.get("meeting_minutes", 0) for d in days),
         }
 
@@ -118,12 +133,12 @@ def tool_get_calendar_events(args):
         summary = []
         for r in sorted(records, key=lambda x: x.get("date", "")):
             summary.append({
-                "date":              r.get("date"),
-                "event_count":       r.get("event_count", 0),
-                "meeting_minutes":   r.get("meeting_minutes", 0),
-                "focus_block_count": r.get("focus_block_count", 0),
-                "earliest_event":    r.get("earliest_event"),
-                "latest_event":      r.get("latest_event"),
+                "date":            r.get("date"),
+                "event_count":     r.get("event_count", 0),
+                "meeting_minutes": r.get("meeting_minutes", 0),
+                "focus_block_count": r.get("focus_block_count"),  # may be null pre-fix
+                "earliest_event":  r.get("earliest_event"),
+                "latest_event":    r.get("latest_event"),
             })
         total_meeting = sum(d["meeting_minutes"] for d in summary)
         avg_daily     = round(total_meeting / len(summary)) if summary else 0
@@ -164,7 +179,7 @@ def tool_get_calendar_events(args):
         "date":              date_str,
         "event_count":       rec.get("event_count", 0),
         "meeting_minutes":   rec.get("meeting_minutes", 0),
-        "focus_block_count": rec.get("focus_block_count", 0),
+        "focus_block_count": rec.get("focus_block_count"),  # null = not yet computed
         "earliest_event":    rec.get("earliest_event"),
         "latest_event":      rec.get("latest_event"),
         "has_all_day_events": rec.get("has_all_day_events", False),
@@ -180,10 +195,10 @@ def tool_get_calendar_events(args):
 def tool_get_schedule_load(args):
     """
     Scheduling intelligence: meeting load analysis, focus block availability,
-    and planning patterns. Correlates schedule density with health/habit outcomes.
+    day-of-week patterns, week-ahead assessment, and health correlations.
 
-    Helps answer: 'Do I have a heavy week?', 'When are my best focus blocks?',
-    'How does my meeting load affect my recovery?', 'Is tomorrow manageable?'
+    Pulls weekly_correlations to surface data-driven schedule→health insights
+    (e.g. "heavy meeting days correlate with lower next-day recovery").
     """
     today    = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     days     = int(args.get("days", 14))
@@ -192,13 +207,13 @@ def tool_get_schedule_load(args):
     ).strftime("%Y-%m-%d")
     start_date = args.get("start_date") or today
 
-    # Fetch historical data for pattern analysis
     hist_days  = int(args.get("history_days", 30))
     hist_start = (datetime.now(timezone.utc) - timedelta(days=hist_days)).strftime("%Y-%m-%d")
     yesterday  = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
     historical = _fetch_range(hist_start, yesterday) if hist_days > 0 else []
     upcoming   = _fetch_lookahead()
+    correlations_rec = _fetch_latest_weekly_correlations()
 
     # ── Historical patterns ────────────────────────────────────────────────────
     patterns = {}
@@ -207,11 +222,10 @@ def tool_get_schedule_load(args):
         event_counts         = [r.get("event_count", 0) for r in historical]
         avg_meeting_min = round(sum(meeting_mins_per_day) / len(meeting_mins_per_day)) if meeting_mins_per_day else 0
         avg_events      = round(sum(event_counts) / len(event_counts), 1) if event_counts else 0
-        heavy_days      = sum(1 for m in meeting_mins_per_day if m >= 240)  # ≥4h meetings
-        focus_days      = sum(1 for m in meeting_mins_per_day if m <= 60)   # light schedule
+        heavy_days      = sum(1 for m in meeting_mins_per_day if m >= 240)
+        focus_days      = sum(1 for m in meeting_mins_per_day if m <= 60)
 
-        # Day-of-week breakdown
-        dow_load = {str(i): [] for i in range(7)}  # 0=Mon...6=Sun
+        dow_load = {str(i): [] for i in range(7)}
         for r in historical:
             d = r.get("date", "")
             try:
@@ -225,29 +239,27 @@ def tool_get_schedule_load(args):
             vals = dow_load.get(str(i), [])
             dow_avg[name] = round(sum(vals) / len(vals)) if vals else 0
 
-        busiest_dow   = max(dow_avg, key=dow_avg.get)
-        lightest_dow  = min((k for k, v in dow_avg.items() if v is not None), key=dow_avg.get)
+        busiest_dow  = max(dow_avg, key=dow_avg.get)
+        lightest_dow = min((k for k, v in dow_avg.items() if v is not None), key=dow_avg.get)
 
         patterns = {
-            "history_days":       len(historical),
+            "history_days":            len(historical),
             "avg_meeting_min_per_day": avg_meeting_min,
-            "avg_events_per_day": avg_events,
-            "heavy_days_pct":     round(heavy_days / len(historical) * 100) if historical else 0,
-            "focus_days_pct":     round(focus_days / len(historical) * 100) if historical else 0,
-            "by_day_of_week":     dow_avg,
-            "busiest_day":        busiest_dow,
-            "lightest_day":       lightest_dow,
+            "avg_events_per_day":      avg_events,
+            "heavy_days_pct":          round(heavy_days / len(historical) * 100) if historical else 0,
+            "focus_days_pct":          round(focus_days / len(historical) * 100) if historical else 0,
+            "by_day_of_week":          dow_avg,
+            "busiest_day":             busiest_dow,
+            "lightest_day":            lightest_dow,
         }
 
-    # ── Upcoming week summary ─────────────────────────────────────────────────
+    # ── Upcoming week summary ──────────────────────────────────────────────────
     upcoming_summary = []
     if upcoming:
         for day in upcoming.get("days", [])[:days]:
-            d_str   = day.get("date", "")
             m_mins  = day.get("meeting_minutes", 0)
             e_count = day.get("event_count", 0)
 
-            # Load classification
             if m_mins >= 300:   load = "very_heavy"
             elif m_mins >= 180: load = "heavy"
             elif m_mins >= 60:  load = "moderate"
@@ -255,17 +267,69 @@ def tool_get_schedule_load(args):
             else:               load = "clear"
 
             upcoming_summary.append({
-                "date":            d_str,
+                "date":            day.get("date", ""),
                 "event_count":     e_count,
                 "meeting_minutes": m_mins,
                 "load":            load,
                 "focus_available": load in ("clear", "light"),
             })
 
-    # ── This week at a glance ──────────────────────────────────────────────────
+    # ── Week ahead summary ─────────────────────────────────────────────────────
     week_total_min  = sum(d["meeting_minutes"] for d in upcoming_summary[:7])
     week_heavy_days = sum(1 for d in upcoming_summary[:7] if d["load"] in ("heavy", "very_heavy"))
     week_clear_days = sum(1 for d in upcoming_summary[:7] if d["load"] == "clear")
+
+    # ── Weekly correlations: schedule→health insights ──────────────────────────
+    # Pulls pre-computed correlations from weekly_correlations partition to surface
+    # data-driven schedule→health patterns (not fabricated coaching notes).
+    health_correlations = []
+    if correlations_rec:
+        corr_map = correlations_rec.get("correlations", {})
+        n_days = correlations_rec.get("n_days", 0)
+
+        # Pairs relevant to schedule load
+        schedule_relevant_pairs = [
+            ("steps_vs_recovery",       "steps",  "recovery_score",  "Steps → Recovery"),
+            ("steps_vs_hrv",            "steps",  "hrv",             "Steps → HRV"),
+            ("training_mins_vs_recovery", "training_mins", "recovery_score", "Training duration → Recovery"),
+            ("habit_pct_vs_recovery",   "habit_pct", "recovery_score", "Habit adherence → Recovery"),
+        ]
+        for corr_key, _m_a, _m_b, label in schedule_relevant_pairs:
+            c = corr_map.get(corr_key)
+            if not c:
+                continue
+            r = c.get("pearson_r")
+            interp = c.get("interpretation", "")
+            n = c.get("n_days", 0)
+            direction = c.get("direction", "")
+            if r is not None and interp not in ("insufficient_data", "negligible"):
+                health_correlations.append({
+                    "label":          label,
+                    "r":              r,
+                    "interpretation": interp,
+                    "direction":      direction,
+                    "n_days":         n,
+                    "note":           f"r={r:+.2f} ({interp}, n={n})",
+                })
+
+    # ── Coaching note ──────────────────────────────────────────────────────────
+    if patterns:
+        coaching_parts = [
+            f"Your average meeting load is {patterns.get('avg_meeting_min_per_day', 0)} min/day. "
+            f"{patterns.get('lightest_day', 'the lightest day')} is typically your lightest day — "
+            "consider protecting it for deep work."
+        ]
+        # Add data-driven correlation insight if available
+        if health_correlations:
+            top = sorted(health_correlations, key=lambda x: abs(x["r"]), reverse=True)[0]
+            dir_word = "positively" if top["direction"] == "positive" else "negatively"
+            coaching_parts.append(
+                f"Data pattern ({top['n_days']} days): {top['label']} is {dir_word} correlated "
+                f"with health outcomes ({top['note']}) — this is a correlational pattern, not proven causal."
+            )
+        coaching_note = " ".join(coaching_parts)
+    else:
+        coaching_note = "No historical data yet — patterns will emerge after a few weeks of data."
 
     return {
         "generated_at":       today,
@@ -281,12 +345,8 @@ def tool_get_schedule_load(args):
                 else "light_week"
             ),
         },
-        "historical_patterns": patterns,
-        "coaching_note": (
-            f"Your average meeting load is {patterns.get('avg_meeting_min_per_day', 0)} min/day. "
-            f"{patterns.get('lightest_day', 'Wednesday')} is typically your lightest day — "
-            "consider protecting it for deep work."
-            if patterns else
-            "No historical data yet — patterns will emerge after a few weeks of data."
-        ),
+        "historical_patterns":    patterns,
+        "health_correlations":    health_correlations,  # data-driven, from weekly_correlations
+        "correlations_week":      correlations_rec.get("week") if correlations_rec else None,
+        "coaching_note":          coaching_note,
     }

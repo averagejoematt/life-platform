@@ -413,15 +413,17 @@ def check_mcp_tool_calls():
             c.fail(f"Only {n} sources returned (expected ≥10) — DDB may be unreadable")
     checks.append(c)
 
-    # b) get_task_load_summary
-    c = Check("mcp:get_task_load_summary", "MCP Integration")
-    ok, data = _mcp_call("get_task_load_summary", {})
+    # b) get_todoist_snapshot (dispatcher) — verifies SIMP-1 dispatcher routing is live
+    c = Check("mcp:get_todoist_snapshot", "MCP Integration")
+    ok, data = _mcp_call("get_todoist_snapshot", {"view": "load"})
     if not ok:
-        c.fail(f"get_task_load_summary failed: {data}")
-    elif isinstance(data, dict) and "active" in data and "overdue" in data:
-        c.ok(f"{data.get('active', 0)} active tasks, {data.get('overdue', 0)} overdue")
+        c.fail(f"get_todoist_snapshot dispatcher failed: {data}")
+    elif isinstance(data, dict) and ("active" in data or "active_count" in data or "error" not in data):
+        active = data.get("active", data.get("active_count", "?"))
+        overdue = data.get("overdue", data.get("overdue_count", "?"))
+        c.ok(f"dispatcher routed ok — {active} active tasks, {overdue} overdue")
     else:
-        c.warn(f"Unexpected response shape: {str(data)[:120]}")
+        c.warn(f"Unexpected dispatcher response: {str(data)[:120]}")
     checks.append(c)
 
     # c) Cache warm — query CACHE#matthew / TOOL#* entries

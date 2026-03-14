@@ -9,7 +9,7 @@
 
 ### Latest Handover
 
-**[HANDOVER_20260311_v372.md](../handovers/HANDOVER_20260311_v372.md)**
+→ See handovers/HANDOVER_v3.7.21.md
 
 
 ---
@@ -18,139 +18,156 @@
 
 # Life Platform — Changelog
 
-## v3.7.11 — 2026-03-13: TB7-24 Lambda handler integration linter
+## v3.7.21 — 2026-03-14: Google Calendar integration (R8-ST1)
 
 ### Summary
-Added `tests/test_lambda_handlers.py` — static Lambda handler integration linter using `ci/lambda_map.json` as authoritative registry. Six rules (I1–I6) covering file existence, syntax validity, handler signature, error resilience, orphan detection, and MCP server entry point. Complements the existing CDK handler consistency linter (H1–H5).
+Google Calendar is now a live data source. 2 new MCP tools (`get_calendar_events`, `get_schedule_load`). Daily ingestion Lambda runs at 6:30 AM PT. OAuth2 with token refresh stored in Secrets Manager `life-platform/google-calendar`. Requires one-time auth setup via `setup/setup_google_calendar_auth.py`.
+
+### Components
+- **`lambdas/google_calendar_lambda.py`** — daily ingestion Lambda. OAuth2 refresh_token pattern (same as Strava/Whoop). Fetches 7-day lookback (gap fill) + 14-day lookahead. Stores per-day records + `DATE#lookahead` summary.
+- **`mcp/tools_calendar.py`** — `tool_get_calendar_events` (view: day/range/lookahead) + `tool_get_schedule_load` (meeting load analysis, DOW patterns, week assessment)
+- **`mcp/registry.py`** — 2 new tools registered (88 total)
+- **`cdk/stacks/role_policies.py`** — `ingestion_google_calendar()` IAM (DDB, S3, secret read/write, DLQ)
+- **`cdk/stacks/ingestion_stack.py`** — Lambda #16 wired, schedule `cron(30 13 * * ? *)` (6:30 AM PT)
+- **`setup/setup_google_calendar_auth.py`** — one-time OAuth setup script
+
+### Data model
+- `SOURCE#google_calendar | DATE#<date>` — per-day: event list, event_count, meeting_minutes, focus_block_count, earliest/latest event
+- `SOURCE#google_calendar | DATE#lookahead` — 14-day forward summary, updated daily
+
+### Activation required
+Google Calendar data will NOT flow until OAuth is authorized:
+```bash
+pip install google-auth-oauthlib google-api-python-client
+python3 setup/setup_google_calendar_auth.py
+```
+Requires: Google Cloud project, Calendar API enabled, OAuth 2.0 Desktop credentials.
+
+### Deployed
+- CDK: `LifePlatformIngestion` (google-calendar-ingestion Lambda + IAM)
+- `google-calendar-ingestion` Lambda code deployed
+- `life-platform-mcp` Lambda (88 tools)
+- Post-reconcile smoke: 10/10 ✅, CI: 7/7 ✅
+
+---
+
+## v3.7.20 — 2026-03-14: R8-ST5 + R8-LT3 + R8-LT9
+
+### Summary
+Three R8 findings closed: composite scores pre-compute (R8-ST5), unit test suite (R8-LT3, 74/74), and weekly correlation compute Lambda (R8-LT9). All remaining actionable R8 findings are now resolved. Only gated items remain (SIMP-1 Phase 2 ~Apr 13, R9 review, Google Calendar).
+
+### R8-ST5 — Composite Scores Pre-compute
+- Added `write_composite_scores()` to `daily_metrics_compute_lambda.py` — called at end of every daily compute run
+- Writes `SOURCE#composite_scores | DATE#<date>` with: day_grade_score, day_grade_letter, readiness_score, readiness_colour, tier0_streak, tier01_streak, tsb, hrv_7d, hrv_30d, latest_weight, component_scores, computed_at, algo_version
+- Non-fatal: write failures logged but don’t block Daily Brief
+- Schema documented in `docs/SCHEMA.md`
+
+### R8-LT3 — Unit Tests for Business Logic
+- Created `tests/test_business_logic.py` — 74 tests, all passing (0.17s)
+- Covers: `scoring_engine` (helpers, letter_grade, score_sleep, score_recovery, score_nutrition, compute_day_grade), `character_engine` (helpers, _clamp, _pct_of_target, _deviation_score, _in_range_score, _trend_score, get_tier), `daily_metrics_compute_lambda` (compute_tsb, compute_readiness)
+- Fully offline — no AWS credentials needed
+
+### R8-LT9 — Weekly Correlation Compute
+- New Lambda `lambdas/weekly_correlation_compute_lambda.py`
+- Runs Sunday 11:30 AM PT (`cron(30 18 ? * SUN *)`) — 30 min before hypothesis engine
+- Computes 20 Pearson correlation pairs over 90-day rolling window
+- Writes to `SOURCE#weekly_correlations | WEEK#<iso_week>`
+- Idempotent: skips if already computed (pass `force=true` to override)
+- CDK wired: `LifePlatformCompute` stack, `compute_weekly_correlations()` IAM policy
+- Schema documented in `docs/SCHEMA.md`
+
+### Deployed
+- CDK: `LifePlatformCompute` (new weekly-correlation-compute Lambda + IAM)
+- `daily-metrics-compute` Lambda (composite scores writer)
+- `weekly-correlation-compute` Lambda (new)
+- Post-reconcile smoke: 10/10 ✅
+- CI: 7/7 ✅, business logic: 74/74 ✅
+
+---
+
+## v3.7.19 — 2026-03-14: SIMP-1 Phase 1c+1d — Labs/Training/Strength/Character/CGM/Mood/Metrics/Todoist/SickDays
+
+### Summary
+SIMP-1 Phase 1c+1d consolidated 24 tools into 9 dispatchers. Tool count 101 → 86 (−15 net: 24 removed, 9 added). Warmer extended with 5 new warm steps (training_load fix + periodization + recommendation + character_sheet + cgm_dashboard). Board vote 11-0 applied: all expensive on-demand tools in Phase 1c clusters (training, cgm) now warmed nightly. Registry R5 test range updated to 75-105.
 
 ### Changes
-- **tests/test_lambda_handlers.py** (new): TB7-24. I1 all registered sources exist; I2 syntax valid; I3 `lambda_handler(event, context)` arity; I4 top-level try/except present; I5 no orphaned Lambda files; I6 MCP server entry point valid.
+- **mcp/tools_labs.py**: Added `tool_get_labs(view: results|trends|out_of_range)`
+- **mcp/tools_training.py**: Added `tool_get_training(view: load|periodization|recommendation)`
+- **mcp/tools_strength.py**: Added `tool_get_strength(view: progress|prs|standards)`
+- **mcp/tools_character.py**: Added `tool_get_character(view: sheet|pillar|history)`
+- **mcp/tools_cgm.py**: Added `tool_get_cgm(view: dashboard|fasting)`
+- **mcp/tools_journal.py**: Added `tool_get_mood(view: trend|state_of_mind)` with lazy import of tool_get_state_of_mind_trend from tools_lifestyle
+- **mcp/tools_health.py**: Added `tool_get_daily_metrics(view: movement|energy|hydration)` with lazy import of tool_get_movement_score from tools_lifestyle
+- **mcp/tools_todoist.py**: Added `tool_get_todoist_snapshot(view: load|today)` with args-dict adapter for positional-arg underlying functions
+- **mcp/tools_sick_days.py**: Added `tool_manage_sick_days(action: list|log|clear)`
+- **mcp/warmer.py**: Added steps 9-13 — training_load (fix: imported but never cached), training_periodization, training_recommendation, character_sheet, cgm_dashboard
+- **mcp/registry.py**: Removed 24 tools, added 9 dispatchers, net 101→86
+- **tests/test_mcp_registry.py**: Updated R5 range 100-130 → 75-105
+
+### Tool count history
+| Version | Tools | Delta | Phase |
+|---------|-------|-------|-------|
+| v3.7.14 | 116 | baseline | pre-SIMP-1 |
+| v3.7.17 | 109 | −7 | Phase 1a: Habits |
+| v3.7.18 | 101 | −8 | Phase 1b: Data/Health/Nutrition |
+| v3.7.19 | 86 | −15 | Phase 1c+1d: Labs/Training/Strength/Character/CGM/Mood/Metrics/Todoist/SickDays |
+| Target | ≤80 | −6 more | Phase 2: EMF-driven (~2026-04-13) |
+
+### Deployed
+- `life-platform-mcp` Lambda
+- Post-reconcile smoke: 10/10 ✅
+- CI: 7/7 ✅
+
+---
+
+## v3.7.18 — 2026-03-14: SIMP-1 Phase 1b — Data, Health, Nutrition clusters
+
+### Summary
+SIMP-1 Phase 1b consolidated 11 tools into 4 dispatchers: `get_daily_snapshot`, `get_longitudinal_summary`, `get_health`, `get_nutrition`. Tool count 109 → 101 (−8 net: 11 removed, 4 added). Board vote 11-0: also added `get_health_risk_profile` and `get_health_trajectory` to nightly warmer in the same commit — these were the only two expensive on-demand tools not previously cached; now warm nightly alongside health_dashboard.
+
+### Changes
+- **mcp/tools_data.py**: Added `tool_get_daily_snapshot` (view: summary|latest) and `tool_get_longitudinal_summary` (view: aggregate|seasonal|records) dispatchers at end of file.
+- **mcp/tools_health.py**: Added `tool_get_health` (view: dashboard|risk_profile|trajectory) dispatcher at end of file.
+- **mcp/tools_nutrition.py**: Added `tool_get_nutrition` (view: summary|macros|meal_timing|micronutrients) dispatcher at end of file.
+- **mcp/warmer.py**: Added steps 7 + 8 — nightly warm of `health_risk_profile` and `health_trajectory`. Import line updated. These were previously compute-on-demand only.
+- **mcp/registry.py**: Removed 11 tools: get_latest, get_daily_summary, get_aggregated_summary, get_personal_records, get_seasonal_patterns, get_health_dashboard, get_health_risk_profile, get_health_trajectory, get_micronutrient_report, get_meal_timing, get_nutrition_summary, get_macro_targets. Added 4 dispatchers: get_daily_snapshot, get_longitudinal_summary, get_health, get_nutrition. Net: 109 → 101.
+
+### Tool count history
+| Version | Tools | Delta | Phase |
+|---------|-------|-------|-------|
+| v3.7.14 | 116 | baseline | pre-SIMP-1 |
+| v3.7.17 | 109 | −7 | Phase 1a: Habits |
+| v3.7.18 | 101 | −8 | Phase 1b: Data/Health/Nutrition |
+| Target | ≤80 | −21 more | Phases 1c-2 |
+
+### Deployed
+- `life-platform-mcp` Lambda (registry + dispatcher functions + warmer)
+- Post-reconcile smoke: 10/10 ✅
+- CI: 7/7 (registry test) ✅
 
 ### Files Changed
-- `tests/test_lambda_handlers.py` (new)
+- `mcp/tools_data.py`
+- `mcp/tools_health.py`
+- `mcp/tools_nutrition.py`
+- `mcp/warmer.py`
+- `mcp/registry.py`
 - `docs/CHANGELOG.md`
 
 ---
 
-## v3.7.10 — 2026-03-13: Housekeeping + Incident RCA (Todoist IAM drift)
+## v3.7.17 — 2026-03-14: R8 gap closure sprint — 8 findings resolved
 
 ### Summary
-Housekeeping sprint: confirmed SIMP-1 EMF instrumentation already live, added
-S3 lifecycle script for deploy artifacts, confirmed Brittany email address already
-correct (SES sandbox verification pending). Investigated Mar 12 alarm storm —
-root cause was CDK drift on TodoistIngestionRole missing `s3:PutObject`. Fixed
-via `cdk deploy LifePlatformIngestion`. Also fixed duplicate sick-day suppression
-block in freshness_checker_lambda.py (silent bug).
+Closed all remaining actionable R8 findings from the Architecture Review #8 PDF. SIMP-1 Phase 1a (habits cluster) reduced MCP tools 116→109. Resolved 8 open items: compute pipeline staleness observability (Risk-7), HAE S3 scope tightening (R8-ST7), CDK IAM blocking gate (R8-ST6), maintenance mode script (R8-ST3), OAuth token health monitoring (R8-ST4), DynamoDB PITR restore runbook (R8-ST2), hypothesis disclaimer (R8-LT7), and COST_TRACKER model routing entry (R8-QS3). PROJECT_PLAN TB7-1 and TB7-2 statuses corrected to Done (were previously completed but not marked).
 
 ### Changes
-- **deploy/apply_s3_lifecycle.sh** (new): expires `deploys/*` S3 objects after 30 days. Pending run.
-- **lambdas/freshness_checker_lambda.py**: removed duplicate sick-day suppression block — second block silently reset `_sick_suppress = False`. Needs deploy.
-- **LifePlatformIngestion CDK deploy**: synced TodoistIngestionRole — added missing `s3:PutObject` on `raw/todoist/*`. Resolved Mar 12 alarm storm.
+- **mcp/tools_habits.py**: Added `tool_get_habits(view=...)` dispatcher — routes to dashboard/adherence/streaks/tiers/stacks/keystones.
+- **mcp/registry.py**: Removed 7 habit tools (get_habit_adherence, get_habit_streaks, get_keystone_habits, get_group_trends, get_habit_stacks, get_habit_dashboard, get_habit_tier_report). Added `get_habits`. Retained `compare_habit_periods` standalone. Net: 116→109 tools. Added unconfirmed-hypothesis disclaimer to `get_hypotheses` description.
+- **lambdas/daily_brief_lambda.py**: Risk-7 — emits `LifePlatform/ComputePipelineStaleness` CloudWatch metric when computed_metrics is missing or >4h stale.
+- **lambdas/freshness_checker_lambda.py**: R8-ST4 — OAuth token health check on all 4 OAuth secrets via DescribeSecret. Alerts via SNS if any token not updated >60 days. Emits `OAuthTokenStaleCount` metric.
+- **cdk/stacks/role_policies.py**: `email_daily_brief()` — added CloudWatchMetrics statement (PutMetricData). `operational_freshness_checker()` — added OAuthSecretDescribe statement for 4 OAuth secrets. `ingestion_hae()` — S3Write tightened from `raw/matthew/*` to 5 explicit paths.
 
-### Incident: Mar 12 Alarm Storm (P3)
-- **Root cause:** CDK drift — TodoistIngestionRole missing `s3:PutObject`
-- **Cascade:** Todoist failure → freshness checker → slo-source-freshness → daily-insight-compute, failure-pattern-compute, monday-compass, DLQ depth
-- **Fix:** `cdk deploy LifePlatformIngestion` (54s). Smoke verified clean.
-- **Full RCA:** docs/INCIDENT_LOG.md
-
-### Pending deploy actions
-- `bash deploy/apply_s3_lifecycle.sh`
-- `bash deploy/deploy_lambda.sh freshness-checker lambdas/freshness_checker_lambda.py`
-- `aws sesv2 create-email-identity --email-identity brittany@mattsusername.com --region us-west-2`
-- SNS subscription confirmation in `awsdev@mattsusername.com`
-
-
-## v3.7.9 — 2026-03-13: TB7-25/26/27 — Rollback + WAF (N/A) + tool tiering design
-
-### Summary
-TB7-25: S3 artifact rollback strategy. `deploy_lambda.sh` maintains
-`latest.zip`/`previous.zip` per function. New `rollback_lambda.sh` one-command
-rollback. CI/CD `rollback-on-smoke-failure` job auto-fires when smoke fails after
-a successful deploy. TB7-26: N/A — AWS WAFv2 `associate-web-acl` does not support
-Lambda Function URLs as a resource type (supported: ALB, API GW, AppSync, Cognito,
-App Runner, Verified Access). Attempted CfnWebACLAssociation and CLI association
-both returned InvalidRequest. WebACL created and rolled back cleanly. MCP endpoint
-is adequately protected by HMAC Bearer auth + existing slo-mcp-availability alarm.
-TB7-27: MCP tool tiering design doc — 4-tier taxonomy, criteria, preliminary
-assignments for all 144 tools, SIMP-1 instrumentation plan.
-
-### Changes
-- **TB7-25** — `deploy/deploy_lambda.sh`: S3 artifact management — shifts
-  `deploys/{func}/latest.zip` → `previous.zip` before each deploy, uploads new
-  zip as `latest.zip`.
-- **TB7-25** — `deploy/rollback_lambda.sh` (new): downloads `previous.zip` from
-  S3, redeploys, waits for active. Accepts multiple function names.
-- **TB7-25** — `.github/workflows/ci-cd.yml`: `rollback-on-smoke-failure` job
-  (Job 6). Fires when smoke-test fails AND deploy succeeded. Rolls back all
-  deployed Lambdas + MCP. Layer rollback noted as manual.
-- **TB7-25** — `ci-cd.yml` MCP deploy step: now maintains S3 rollback artifacts
-  for `life-platform-mcp`.
-- **TB7-26 N/A** — `cdk/stacks/mcp_stack.py`: WAF attempt reverted. Stack
-  returned to v2.0 baseline with documented rationale in module docstring.
-  `deploy/attach_mcp_waf.sh` created (documents the failed approach) then
-  superseded. No net change to stack from v3.7.8.
-- **TB7-27** — `docs/MCP_TOOL_TIERING_DESIGN.md` (new): 4-tier taxonomy,
-  tiering criteria, preliminary assignments for all 144 tools, Option A
-  implementation (tier field in TOOLS dict), 6-week SIMP-1 instrumentation
-  requirements, decision rules, session plan.
-
-### Files Changed
-- `deploy/deploy_lambda.sh` (S3 artifact management)
-- `deploy/rollback_lambda.sh` (new)
-- `.github/workflows/ci-cd.yml` (rollback job + MCP S3 artifact)
-- `cdk/stacks/mcp_stack.py` (WAF reverted; docstring updated with N/A rationale)
-- `docs/MCP_TOOL_TIERING_DESIGN.md` (new)
-- `docs/CHANGELOG.md` (this file)
-- `handovers/HANDOVER_v3.7.9.md` (new)
-
-### Deploy status
-- LifePlatformMcp: ✅ deployed + smoke 10/10
-- TB7-26 WAF: N/A — not supported for Lambda Function URLs
-
-### AWS cost delta
-- S3 rollback artifacts: ~$0 (small zips; add lifecycle rule to expire after 30d)
-- WAF: $0 (not deployed)
-
----
-
-## v3.7.8 — 2026-03-13: TB7 fully closed + DLQ cleared + smoke test fix
-
-### Summary
-TB7-11/12/13 confirmed already done. TB7-14 and TB7-16 completed (SCHEMA TTL
-documentation + fingerprint comment). DLQ investigated and cleared (5 stale
-Habitify retry messages from pre-layer-v9 deploy). Smoke test fixed
-(--cli-binary-format regression + handler regressions for key-rotator and
-insight-email-parser). All TB7 items now closed.
-
-### Changes
-- **TB7-14 CLOSED** — `SCHEMA.md` TTL section replaced with full per-partition
-  table: DDB TTL vs app-level expiry vs indefinite, with rationale for each.
-  Documents hypotheses (30d app-level), platform_memory (~90d policy),
-  insights (~180d policy), decisions/anomalies/ingestion (indefinite).
-- **TB7-16 CLOSED** — Comment added to `get_source_fingerprints()` in
-  `daily_metrics_compute_lambda.py` warning that new data sources must be
-  added to the fingerprint list to trigger recomputes.
-- **TB7-11/12/13 CLOSED** — Confirmed already implemented: layer version
-  consistency CI check, stateful resource assertions, and digest_utils.py in
-  shared_layer.modules all present in existing `ci-cd.yml` and `lambda_map.json`.
-- **DLQ CLEARED** — 5 stale Habitify retry messages from 2026-03-13 14:15 UTC
-  (pre-layer-v9 deploy). All identical EventBridge events. Purged + alarm reset
-  to OK. Habitify confirmed healthy.
-- **SMOKE TEST FIXED** — Removed `--cli-binary-format raw-in-base64-out` from
-  `post_cdk_reconcile_smoke.sh` (AWS CLI v2 regression). Fixed dry_run payload
-  for todoist invocation check.
-- **HANDLER FIXES** — `life-platform-key-rotator` and `insight-email-parser`
-  restored to correct handlers (CDK reconcile regression).
-
-### Files Changed
-- `lambdas/daily_metrics_compute_lambda.py` (TB7-16 fingerprint comment)
-- `docs/SCHEMA.md` (TB7-14 TTL per-partition table)
-- `docs/PROJECT_PLAN.md` (TB7-11–17 all marked complete)
-- `deploy/post_cdk_reconcile_smoke.sh` (CLI flag fix + dry_run fix)
-
----
-
-## v3.7.7 — 2026-03-13: TB7-19/20/21/22/23 — AI validator + anomaly + drift hardening
+... [TRUNCATED — 324 lines omitted, 474 total]
 
 
 ---
@@ -159,7 +176,7 @@ insight-email-parser). All TB7 items now closed.
 
 # Life Platform — Architecture
 
-Last updated: 2026-03-13 (v3.7.11 — 116 tools, 31-module MCP package, 19 data sources, 42 Lambdas, 8 secrets, 42 alarms, 8 CDK stacks deployed)
+Last updated: 2026-03-14 (v3.7.21 — 89 tools, 31-module MCP package, 19 data sources, 44 Lambdas, 8 secrets, 42 alarms, 8 CDK stacks deployed)
 
 ---
 
@@ -190,7 +207,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
                          │ DynamoDB queries
 ┌────────────────────────▼────────────────────────────────────┐
 │  SERVE LAYER                                                │
-│  MCP Server Lambda (144 tools, 1024 MB) + Lambda Function URL│
+│  MCP Server Lambda (88 tools, 1024 MB) + Lambda Function URL│
 │  ← Claude Desktop + claude.ai + Claude mobile via remote MCP│
 │                                                             │
 │  COMPUTE LAYER (IC intelligence features)                   │
@@ -229,9 +246,9 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | Lambda Function URL (MCP) | MCP HTTPS endpoint | `https://votqefkra435xwrccmapxxbj6y0jawgn.lambda-url.us-west-2.on.aws/` (AuthType NONE — auth handled in Lambda via API key header) |
 | Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` (OAuth 2.1 auto-approve + HMAC Bearer) |
 | API Gateway | HTTP endpoint | `health-auto-export-api` (a76xwxt2wa) — webhook ingest |
-| Secrets Manager | Credential store | 9 secrets: 4 OAuth (`whoop`, `withings`, `strava`, `garmin`) + `eightsleep` + `life-platform/ai-keys` (Anthropic) + `life-platform/todoist` + `life-platform/notion` + `life-platform/habitify` — **`life-platform/api-keys` pending deletion (~2026-04-07)** |
+| Secrets Manager | Credential store | 10 secrets: 4 OAuth (`whoop`, `withings`, `strava`, `garmin`) + `eightsleep` + `ai-keys` (Anthropic + MCP) + `ingestion-keys` (Notion/Todoist/Habitify/Dropbox/webhook keys bundle) + `habitify` (dedicated) + `webhook-key` + `mcp-api-key` — **`api-keys` permanently deleted 2026-03-14** |
 | SNS topic | Alert routing | `life-platform-alerts` |
-| CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` (`d14jnhrgfrte42.cloudfront.net`) → S3 `/dashboard`, Lambda@Edge auth (`life-platform-cf-auth`), alias `dash.averagejoematt.com` |
+| CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` (`d14jnhrgfrte42.cloudfront.net`) → S3 `/dashboard`, Lambda@Edge auth (`life-platform-cf-auth`), alias `dash.averagejoematt.com`. **Note (R8-LT6):** Lambda@Edge auth functions are manually managed outside CDK — `web_stack.py` has zero Lambda@Edge references. Intentionally left unmanaged: Lambda@Edge requires us-east-1 deployment which complicates CDK stack boundaries. Document-only; no CDK migration planned. |
 | CloudFront (blog) | CDN (public) | `E1JOC1V6E6DDYI` (`d1aufb59hb2r1q.cloudfront.net`) → S3 `/blog`, NO auth, alias `blog.averagejoematt.com` |
 | CloudFront (buddy) | CDN + auth | `ETTJ44FT0Z4GO` (`d1empeau04e0eg.cloudfront.net`) → S3 `/buddy`, Lambda@Edge auth (`life-platform-buddy-auth`), alias `buddy.averagejoematt.com`, PriceClass_100, HTTP/2+3 |
 | ACM Certificate | TLS | `arn:aws:acm:us-east-1:205930651321:certificate/8e560416-...` — `dash.averagejoematt.com` (DNS-validated) |
@@ -282,6 +299,7 @@ These are not data ingestion — they compute, alert, or deliver intelligence.
 | Daily Metrics Compute | `daily-metrics-compute` | `daily-metrics-compute-daily` | `cron(25 17 * * ? *)` | 10:25 AM | `lambda-daily-metrics-role` |
 | Daily Insight Compute (IC-8) | `daily-insight-compute` | `daily-insight-compute-daily` | `cron(20 17 * * ? *)` | 10:20 AM | `lambda-daily-insight-role` |
 | Hypothesis Engine (IC-18) | `hypothesis-engine` | `hypothesis-engine-weekly` | `cron(0 19 ? * SUN *)` | Sun 12:00 PM | `lambda-hypothesis-engine-role` |
+| Weekly Correlation Compute (R8-LT9) | `weekly-correlation-compute` | `WeeklyCorrelationComputeRule` | `cron(30 18 ? * SUN *)` | Sun 11:30 AM | CDK-generated role |
 
 **Operational & Email Lambdas:**
 
@@ -325,7 +343,7 @@ These are not data ingestion — they compute, alert, or deliver intelligence.
 
 | Source | Lambda | Endpoint | Auth |
 |---|---|---|---|
-| Health Auto Export | `health-auto-export-webhook` | `https://a76xwxt2wa.execute-api.us-west-2.amazonaws.com/ingest` | Bearer token (`life-platform/api-keys`) |
+| Health Auto Export | `health-auto-export-webhook` | `https://a76xwxt2wa.execute-api.us-west-2.amazonaws.com/ingest` | Bearer token (`life-platform/ingestion-keys` → `health_auto_export_api_key`) |
 
 **Three-tier source filtering (v1.1.0):**
 - Tier 1 (Apple-exclusive): steps, active/basal energy, gait metrics, flights, distance, headphone audio, water intake, caffeine
@@ -348,7 +366,7 @@ DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq` (SQS). Request
 
 ### OAuth token management
 
-Whoop, Withings, Strava, Garmin: OAuth2 with self-healing refresh tokens. Each Lambda reads secret → calls API → on expiry, refreshes → writes updated credentials back to Secrets Manager. Eight Sleep: username/password JWT, refreshed each invocation. Notion, Todoist, Habitify: static API keys — each has its own dedicated secret (`life-platform/notion`, `life-platform/todoist`, `life-platform/habitify`). See ADR-014 for the dedicated-vs-bundled governing principle.
+Whoop, Withings, Strava, Garmin: OAuth2 with self-healing refresh tokens. Each Lambda reads secret → calls API → on expiry, refreshes → writes updated credentials back to Secrets Manager. Eight Sleep: username/password JWT, refreshed each invocation. Notion, Todoist, Habitify: static API keys bundled in `life-platform/ingestion-keys` (COST-B pattern — single secret with per-service key fields). Habitify also has a dedicated secret (`life-platform/habitify`) per ADR-014. Dropbox poll and Health Auto Export webhook also read from `ingestion-keys`. See ADR-014 for the dedicated-vs-bundled governing principle.
 
 ---
 
@@ -415,13 +433,13 @@ No GSI by design — all access patterns served by PK+SK queries.
 
 ### MCP Server
 
-**Lambda:** `life-platform-mcp` | **Tools:** 144 | **Memory:** 1024 MB | **Modules:** 30
+**Lambda:** `life-platform-mcp` | **Tools:** 86 | **Memory:** 1024 MB | **Modules:** 31
 **Local endpoint:** `https://votqefkra435xwrccmapxxbj6y0jawgn.lambda-url.us-west-2.on.aws/`
 **Remote MCP:** `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` — OAuth 2.1 auto-approve + HMAC Bearer (enables claude.ai + mobile)
-**Auth:** `x-api-key` header check; key in `life-platform/api-keys`
+**Auth:** `x-api-key` header check; key in `life-platform/ai-keys`
 **Protocol:** JSON-RPC 2.0 / MCP spec 2025-06-18
 
-30-module package structure:
+31-module package structure:
 ```
 mcp/
   handler.py, config.py, utils.py, core.py, helpers.py
@@ -439,9 +457,9 @@ Cold start: ~700–800ms. Warm: 23–30ms. Cached tools: <100ms.
 
 ### Cache warmer
 
-EventBridge triggers MCP Lambda at 10:00 AM PDT daily (`source: aws.events`). Pre-computes 12 tools → `CACHE#matthew` partition, 26-hour TTL. Runtime: ~7s.
+EventBridge triggers MCP Lambda at 10:00 AM PDT daily (`source: aws.events`). Pre-computes 13 tools → `CACHE#matthew` partition, 26-hour TTL. Runtime: ~90s (13 steps).
 
-Cached tools: `get_aggregated_summary` (5yr + 2yr views), `get_personal_records`, `get_seasonal_patterns`, `get_health_dashboard`, `get_habit_dashboard`, `get_readiness_score`, `get_health_risk_profile`, `get_body_composition_snapshot`, `get_energy_balance`, `get_day_type_analysis`, `get_movement_score`.
+Cached tools (SIMP-1 updated, v3.7.18–19): `get_longitudinal_summary` (aggregate year + month), `get_longitudinal_summary` (records), `get_longitudinal_summary` (seasonal), `get_health` (dashboard), `get_health` (risk_profile), `get_health` (trajectory), `get_habits` (dashboard), `get_training` (load), `get_training` (periodization), `get_training` (recommendation), `get_character` (sheet), `get_cgm` (dashboard). Steps 9-13 added v3.7.19.
 
 ### Email / Intelligence cadence
 
@@ -456,9 +474,8 @@ Cached tools: `get_aggregated_summary` (5yr + 2yr views), `get_personal_records`
 |---|---|---|
 | `monday-compass` v1.0 | Mon 8:00 AM | Forward-looking planning email. Todoist tasks by pillar, cross-pillar prioritization AI, overdue debt, Board Pro Tips, Keystone action. |
 | `wednesday-chronicle` v1.1 | Wed 8:00 AM | "The Measured Life" — Elena Voss narrative journalism. Thesis-driven synthesis, Board interviews, S3 blog post. |
-| `weekly-plate` v1.0 | Fri 7:00 PM | Food-focused magazine column with grocery list for Met Market. ~$0.04/week. |
 
-... [TRUNCATED — 169 lines omitted, 469 total]
+... [TRUNCATED — 171 lines omitted, 471 total]
 
 
 ---
@@ -468,7 +485,7 @@ Cached tools: `get_aggregated_summary` (5yr + 2yr views), `get_personal_records`
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-03-11 (v3.6.0 — 42 Lambdas, 9 secrets, 150 MCP tools, ~42 alarms)
+> Last updated: 2026-03-14 (v3.7.21 — 44 Lambdas, 10 active secrets, 88 MCP tools, ~47 alarms)
 
 ---
 
@@ -522,7 +539,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Function URL (remote) | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/` |
 | Auth (remote) | HMAC Bearer token via `life-platform/mcp-api-key` secret (auto-rotates every 90 days) |
 | Auth (local) | `mcp_bridge.py` → `.config.json` → Function URL |
-| Tools | 150 across 31 modules |
+| Tools | 88 across 31 modules |
 | Cache warmer | 12 tools pre-computed nightly at 9:00 AM PT |
 
 ---
@@ -599,7 +616,7 @@ All DNS-validated via Route 53 CNAME records.
 
 ---
 
-## Secrets Manager (9 active secrets + 1 pending deletion)
+## Secrets Manager (10 active secrets)
 
 All under prefix `life-platform/`. No values stored in this doc — access via AWS console or CLI.
 
@@ -614,7 +631,7 @@ All under prefix `life-platform/`. No values stored in this doc — access via A
 | `todoist` | API key | Todoist API token |
 | `notion` | API key | Notion integration key + database ID |
 | `habitify` | API key | Habitify API token. Own dedicated secret — NOT bundled in api-keys (different Lambda consumer set). |
-| ~~`api-keys`~~ | ~~Legacy bundle~~ | ~~**PENDING PERMANENT DELETION 2026-03-17** (7-day recovery window). All Lambdas migrated to per-service secrets.~~ |
+| ~~`api-keys`~~ | ~~Legacy bundle~~ | ~~**PERMANENTLY DELETED 2026-03-14.** All Lambdas migrated to per-service secrets.~~ |
 
 ---
 
@@ -711,7 +728,7 @@ See `deploy/p1_kms_dynamodb.sh` for creation script.
 # Life Platform — Service Level Objectives (SLOs)
 
 > OBS-3: Formal SLO definitions for critical platform paths.
-> Last updated: 2026-03-09 (v3.2.0)
+> Last updated: 2026-03-14 (v3.7.21)
 
 ---
 
@@ -1199,7 +1216,7 @@ Usage in a stack:
         self, "WhoopIngestion",
         function_name="whoop-data-ingestion",
         source_file="lambdas/whoop_lambda.py",
-        handler="lambda_function.lambda_handler",
+        handler="whoop_lambda.lambda_handler",
         table=core.table,
         bucket=core.bucket,
         dlq=core.dlq,
@@ -1345,7 +1362,7 @@ def _ingestion_base(
         ))
 
 
-... [TRUNCATED — 734 lines omitted, 814 total]
+... [TRUNCATED — 815 lines omitted, 895 total]
 
 ```
 
@@ -1357,22 +1374,22 @@ def _ingestion_base(
 
 ## 11. SOURCE CODE INVENTORY
 
-### lambdas/ (57 .py files, 0 other files)
+### lambdas/ (58 .py files, 0 other files)
 
-**Python files:** adaptive_mode_lambda.py, ai_calls.py, ai_output_validator.py, anomaly_detector_lambda.py, apple_health_lambda.py, board_loader.py, brittany_email_lambda.py, canary_lambda.py, character_engine.py, character_sheet_lambda.py, daily_brief_lambda.py, daily_insight_compute_lambda.py, daily_metrics_compute_lambda.py, dashboard_refresh_lambda.py, data_export_lambda.py, data_reconciliation_lambda.py, digest_utils.py, dlq_consumer_lambda.py, dropbox_poll_lambda.py, eightsleep_lambda.py, enrichment_lambda.py, failure_pattern_compute_lambda.py, freshness_checker_lambda.py, garmin_lambda.py, habitify_lambda.py, health_auto_export_lambda.py, html_builder.py, hypothesis_engine_lambda.py, ingestion_framework.py, ingestion_validator.py, insight_email_parser_lambda.py, insight_writer.py, item_size_guard.py, journal_enrichment_lambda.py, key_rotator_lambda.py, macrofactor_lambda.py, mcp_server.py, monday_compass_lambda.py, monthly_digest_lambda.py, notion_lambda.py, nutrition_review_lambda.py, output_writers.py, pip_audit_lambda.py, platform_logger.py, qa_smoke_lambda.py, retry_utils.py, scoring_engine.py, sick_day_checker.py, strava_lambda.py, todoist_lambda.py, weather_handler.py, weather_lambda.py, wednesday_chronicle_lambda.py, weekly_digest_lambda.py, weekly_plate_lambda.py, whoop_lambda.py, withings_lambda.py
+**Python files:** adaptive_mode_lambda.py, ai_calls.py, ai_output_validator.py, anomaly_detector_lambda.py, apple_health_lambda.py, board_loader.py, brittany_email_lambda.py, canary_lambda.py, character_engine.py, character_sheet_lambda.py, daily_brief_lambda.py, daily_insight_compute_lambda.py, daily_metrics_compute_lambda.py, dashboard_refresh_lambda.py, data_export_lambda.py, data_reconciliation_lambda.py, digest_utils.py, dlq_consumer_lambda.py, dropbox_poll_lambda.py, eightsleep_lambda.py, enrichment_lambda.py, failure_pattern_compute_lambda.py, freshness_checker_lambda.py, garmin_lambda.py, google_calendar_lambda.py, habitify_lambda.py, health_auto_export_lambda.py, html_builder.py, hypothesis_engine_lambda.py, ingestion_framework.py, ingestion_validator.py, insight_email_parser_lambda.py, insight_writer.py, item_size_guard.py, journal_enrichment_lambda.py, key_rotator_lambda.py, macrofactor_lambda.py, mcp_server.py, monday_compass_lambda.py, monthly_digest_lambda.py, notion_lambda.py, nutrition_review_lambda.py, output_writers.py, pip_audit_lambda.py, platform_logger.py, qa_smoke_lambda.py, retry_utils.py, scoring_engine.py, sick_day_checker.py, strava_lambda.py, todoist_lambda.py, weather_handler.py, wednesday_chronicle_lambda.py, weekly_correlation_compute_lambda.py, weekly_digest_lambda.py, weekly_plate_lambda.py, whoop_lambda.py, withings_lambda.py
 
 
 **Subdirectories:** __pycache__, buddy, cf-auth, dashboard, requirements
 
 
-### deploy/ (26 files)
+### deploy/ (17 files)
 
-**Files:** MANIFEST.md, SMOKE_TEST_TEMPLATE.sh, apply_s3_lifecycle.sh, archive_changelog_v341.sh, archive_onetime_scripts.sh, attach_mcp_waf.sh, audit_alarms.sh, build_layer.sh, canary_policy.json, cdk_env_diff.sh, check_eb_scheduler_orphans.sh, create_ai_cost_alarm.sh, deploy_lambda.sh, deploy_mcp_consolidation.sh, deploy_tb7_apikeys_fixes.sh, deploy_tb7_reconcile.sh, fix_p0_alarm_bugs.sh, fix_p0_daily_insight_deploy.sh, generate_review_bundle.py, generate_review_bundle.sh, post_cdk_reconcile_smoke.sh, post_cdk_smoke.sh, rollback_lambda.sh, smoke_test_cloudfront.sh, triage_alarms.sh, verify_dlq_alarm_periods.sh
+**Files:** MANIFEST.md, SMOKE_TEST_TEMPLATE.sh, apply_s3_lifecycle.sh, archive_onetime_scripts.sh, build_layer.sh, canary_policy.json, create_compute_staleness_alarm.sh, deploy_lambda.sh, deploy_mcp_consolidation.sh, generate_review_bundle.py, maintenance_mode.sh, post_cdk_reconcile_smoke.sh, post_cdk_smoke.sh, r8_p0_verify.sh, rollback_lambda.sh, smoke_test_cloudfront.sh, sync_doc_metadata.py
 
 
-### mcp/ (30 modules)
+### mcp/ (31 modules)
 
-**Modules:** __init__.py, config.py, core.py, handler.py, helpers.py, labs_helpers.py, registry.py, strength_helpers.py, tools_adaptive.py, tools_board.py, tools_cgm.py, tools_character.py, tools_correlation.py, tools_data.py, tools_decisions.py, tools_habits.py, tools_health.py, tools_hypotheses.py, tools_journal.py, tools_labs.py, tools_lifestyle.py, tools_memory.py, tools_nutrition.py, tools_sick_days.py, tools_sleep.py, tools_social.py, tools_strength.py, tools_todoist.py, tools_training.py, warmer.py
+**Modules:** __init__.py, config.py, core.py, handler.py, helpers.py, labs_helpers.py, registry.py, strength_helpers.py, tools_adaptive.py, tools_board.py, tools_calendar.py, tools_cgm.py, tools_character.py, tools_correlation.py, tools_data.py, tools_decisions.py, tools_habits.py, tools_health.py, tools_hypotheses.py, tools_journal.py, tools_labs.py, tools_lifestyle.py, tools_memory.py, tools_nutrition.py, tools_sick_days.py, tools_sleep.py, tools_social.py, tools_strength.py, tools_todoist.py, tools_training.py, warmer.py
 
 
 ---
@@ -1463,7 +1480,7 @@ try:
 except ImportError:
     _HAS_BOARD_LOADER = False
 
-... [TRUNCATED — 1488 lines omitted, 1568 total]
+... [TRUNCATED — 1505 lines omitted, 1585 total]
 
 ```
 
@@ -2040,7 +2057,7 @@ Ingestion methods: API polling (scheduled Lambda), S3 file triggers (manual expo
 
 ## 15. DOCUMENTATION INVENTORY
 
-**Root docs (21 files):** ARCHITECTURE.md, CHANGELOG.md, CHANGELOG_ARCHIVE.md, COST_TRACKER.md, DATA_DICTIONARY.md, DECISIONS.md, FEATURES.md, HANDOVER_LATEST.md, INCIDENT_LOG.md, INFRASTRUCTURE.md, INTELLIGENCE_LAYER.md, MCP_TOOL_CATALOG.md, MCP_TOOL_TIERING_DESIGN.md, PROJECT_PLAN.md, PROJECT_PLAN_ARCHIVE.md, REVIEW_METHODOLOGY.md, REVIEW_RUNBOOK.md, RUNBOOK.md, SCHEMA.md, SLOs.md, USER_GUIDE.md
+**Root docs (22 files):** ARCHITECTURE.md, CHANGELOG.md, CHANGELOG_ARCHIVE.md, COST_TRACKER.md, DATA_DICTIONARY.md, DECISIONS.md, FEATURES.md, HANDOVER_LATEST.md, INCIDENT_LOG.md, INFRASTRUCTURE.md, INTELLIGENCE_LAYER.md, MCP_TOOL_CATALOG.md, MCP_TOOL_TIERING_DESIGN.md, PROJECT_PLAN.md, PROJECT_PLAN_ARCHIVE.md, REVIEW_METHODOLOGY.md, REVIEW_RUNBOOK.md, RUNBOOK.md, SCHEMA.md, SIMP1_PLAN.md, SLOs.md, USER_GUIDE.md
 
 
 **docs/archive/ (15 files):** AUDIT_PROD2_MULTI_USER.md, AVATAR_DESIGN_STRATEGY.md, BOARD_DERIVED_METRICS_PLAN.md, CHANGELOG_v341.md, DERIVED_METRICS_PLAN.md, DESIGN_PROD1_CDK.md, DESIGN_SIMP2_INGESTION.md, NOTION_ENRICHMENT_SPEC.md, NOTION_JOURNAL_SPEC.md, SCHEMA_LABS_ADDITION.md, SCOPING_LARGE_OPUS.md, SPEC_CHARACTER_SHEET.md, avatar-design-strategy.md, data-source-audit-2026-02-24.md, wednesday-chronicle-design.md
@@ -2055,7 +2072,7 @@ Ingestion methods: API polling (scheduled Lambda), S3 file triggers (manual expo
 **docs/rca/ (2 files):** PIR-2026-02-28-ingestion-outage.md, RCA_2026-02-24_apple_health_pipeline.md
 
 
-**docs/reviews/ (11 files):** REVIEW_2026-03-08.md, REVIEW_2026-03-08_v2.md, REVIEW_2026-03-09.md, REVIEW_2026-03-09_full.md, REVIEW_2026-03-10.md, REVIEW_2026-03-10_full.md, REVIEW_2026-03-10_v6.md, REVIEW_2026-03-11_v7.md, REVIEW_BUNDLE_2026-03-10.md, mcp_architecture_review_2026-03-11.md, platform-review-2026-03-05.md
+**docs/reviews/ (12 files):** REVIEW_2026-03-08.md, REVIEW_2026-03-08_v2.md, REVIEW_2026-03-09.md, REVIEW_2026-03-09_full.md, REVIEW_2026-03-10.md, REVIEW_2026-03-10_full.md, REVIEW_2026-03-10_v6.md, REVIEW_2026-03-11_v7.md, REVIEW_BUNDLE_2026-03-10.md, REVIEW_BUNDLE_2026-03-14.md, mcp_architecture_review_2026-03-11.md, platform-review-2026-03-05.md
 
 
 
