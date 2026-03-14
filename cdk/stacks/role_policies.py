@@ -665,7 +665,7 @@ def operational_pip_audit() -> list[iam.PolicyStatement]:
 
 
 def operational_qa_smoke() -> list[iam.PolicyStatement]:
-    """QA smoke: reads DDB, S3, invokes other Lambdas for smoke tests."""
+    """QA smoke: reads DDB + cache, S3, MCP API key, Lambda/Secrets inventory, sends SES report."""
     return [
         iam.PolicyStatement(
             sid="DynamoDB",
@@ -681,7 +681,32 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="S3Read",
             actions=["s3:GetObject"],
-            resources=_s3("dashboard/*", "config/*"),
+            # dashboard/* + config/* + blog/* (check_blog_links reads blog/index.html)
+            resources=_s3("dashboard/*", "config/*", "blog/*"),
+        ),
+        iam.PolicyStatement(
+            sid="S3ListBlog",
+            actions=["s3:ListBucket"],
+            resources=[BUCKET_ARN],
+            conditions={"StringLike": {"s3:prefix": "blog/*"}},
+        ),
+        iam.PolicyStatement(
+            sid="SecretsGetMCP",
+            # check_mcp_tool_calls: fetch MCP API key
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/mcp-api-key")],
+        ),
+        iam.PolicyStatement(
+            sid="SecretsInventory",
+            # check_lambda_secrets: list all secrets to validate Lambda SECRET_NAME refs
+            actions=["secretsmanager:ListSecrets"],
+            resources=["*"],
+        ),
+        iam.PolicyStatement(
+            sid="LambdaList",
+            # check_lambda_secrets: enumerate Lambda env vars to find stale SECRET_NAME values
+            actions=["lambda:ListFunctions"],
+            resources=["*"],
         ),
         iam.PolicyStatement(
             sid="SES",

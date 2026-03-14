@@ -14,7 +14,10 @@ Env vars: TABLE_NAME, S3_BUCKET, EMAIL_RECIPIENT, EMAIL_SENDER
 import json
 import os
 import re
+import urllib.request
+import urllib.error
 import boto3
+from boto3.dynamodb.conditions import Key
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import logging
@@ -42,6 +45,8 @@ dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table    = dynamodb.Table(TABLE_NAME)
 s3       = boto3.client("s3", region_name=REGION)
 ses      = boto3.client("sesv2", region_name=REGION)
+MCP_FUNCTION_URL = os.environ.get("MCP_FUNCTION_URL", "")
+MCP_SECRET_NAME  = os.environ.get("MCP_SECRET_NAME", "life-platform/mcp-api-key")
 
 
 # ---------------------------------------------------------------------------
@@ -344,6 +349,103 @@ def check_avatar_assets():
 
 
 # ---------------------------------------------------------------------------
+# CHECK 7 — MCP integration: 2 tool calls + cache warm verification
+# ---------------------------------------------------------------------------
+
+def check_mcp_tool_calls():
+    """
+    Three sub-checks:
+    a) get_sources        → ≥10 sources listed  (auth + DDB read path)
+    b) get_task_load_summary → has active/overdue keys  (compute path)
+    c) DDB cache warm     → CACHE#matthew has ≥10 TOOL# entries  (nightly warmer ran)
+    """
+    checks = []
+
+    if not MCP_FUNCTION_URL:
+        return [Check("mcp:config", "MCP Integration").warn("MCP_FUNCTION_URL not configured — skipping")]
+
+    # Fetch MCP API key
+    sm = boto3.client("secretsmanager", region_name=REGION)
+    try:
+        api_key = sm.get_secret_value(SecretId=MCP_SECRET_NAME)["SecretString"]
+    except Exception as e:
+        return [Check("mcp:auth", "MCP Integration").fail(f"Cannot fetch MCP API key: {e}")]
+
+    def _mcp_call(tool_name, arguments):
+        """Single MCP tools/call. Returns (ok: bool, data_or_error_str)."""
+        payload = json.dumps({
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "id": f"qa-{tool_name}",
+            "params": {"name": tool_name, "arguments": arguments},
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            MCP_FUNCTION_URL,
+            data=payload,
+            headers={"Content-Type": "application/json", "x-api-key": api_key},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                body = json.loads(r.read().decode("utf-8"))
+            if "error" in body:
+                return False, f"RPC error: {body['error']}"
+            content = body.get("result", {}).get("content", [])
+            if not content:
+                return False, "Empty result content"
+            return True, json.loads(content[0].get("text", "{}"))
+        except urllib.error.HTTPError as e:
+            return False, f"HTTP {e.code}: {e.reason}"
+        except Exception as e:
+            return False, str(e)
+
+    # a) get_sources
+    c = Check("mcp:get_sources", "MCP Integration")
+    ok, data = _mcp_call("get_sources", {})
+    if not ok:
+        c.fail(f"get_sources failed: {data}")
+    else:
+        sources = data.get("sources", data) if isinstance(data, dict) else data
+        n = len(sources) if isinstance(sources, (list, dict)) else 0
+        if n >= 10:
+            c.ok(f"{n} sources available")
+        else:
+            c.fail(f"Only {n} sources returned (expected ≥10) — DDB may be unreadable")
+    checks.append(c)
+
+    # b) get_task_load_summary
+    c = Check("mcp:get_task_load_summary", "MCP Integration")
+    ok, data = _mcp_call("get_task_load_summary", {})
+    if not ok:
+        c.fail(f"get_task_load_summary failed: {data}")
+    elif isinstance(data, dict) and "active" in data and "overdue" in data:
+        c.ok(f"{data.get('active', 0)} active tasks, {data.get('overdue', 0)} overdue")
+    else:
+        c.warn(f"Unexpected response shape: {str(data)[:120]}")
+    checks.append(c)
+
+    # c) Cache warm — query CACHE#matthew / TOOL#* entries
+    c = Check("mcp:cache_warm", "MCP Integration")
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq("CACHE#matthew") & Key("sk").begins_with("TOOL#"),
+            Select="COUNT",
+        )
+        n = resp.get("Count", 0)
+        if n >= 10:
+            c.ok(f"Cache has {n} warm entries")
+        elif n >= 1:
+            c.warn(f"Cache has only {n} entries — warmer may have partially failed")
+        else:
+            c.fail("Cache empty — nightly warmer has not run or failed entirely")
+    except Exception as e:
+        c.fail(f"Cache query error: {e}")
+    checks.append(c)
+
+    return checks
+
+
+# ---------------------------------------------------------------------------
 # Report builder
 # ---------------------------------------------------------------------------
 
@@ -409,6 +511,7 @@ def lambda_handler(event, context):
     all_checks += check_blog_links()
     all_checks += check_lambda_secrets()
     all_checks += check_avatar_assets()
+    all_checks += check_mcp_tool_calls()
 
     html = build_report_html(all_checks, run_time_str)
 

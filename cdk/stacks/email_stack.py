@@ -8,7 +8,6 @@ Lambdas (8):
   daily-brief, weekly-digest, monthly-digest, nutrition-review,
   wednesday-chronicle, weekly-plate, monday-compass, brittany-weekly-email
 
-Special handler: weekly-digest uses digest_handler.lambda_handler
 """
 
 import aws_cdk as cdk
@@ -59,7 +58,7 @@ class EmailStack(Stack):
 
         create_platform_lambda(self, "DailyBrief", function_name="daily-brief", handler="daily_brief_lambda.lambda_handler", source_file="lambdas/daily_brief_lambda.py", schedule="cron(0 17 * * ? *)", timeout_seconds=300, memory_mb=512, environment=_email_env, custom_policies=rp.email_daily_brief(), **{**shared, "alerts_topic": None})
 
-        create_platform_lambda(self, "WeeklyDigest", function_name="weekly-digest", handler="digest_handler.lambda_handler", source_file="lambdas/weekly_digest_lambda.py", schedule="cron(0 16 ? * SUN *)", timeout_seconds=120, memory_mb=256, environment=_email_env, custom_policies=rp.email_weekly_digest(), **shared)
+        create_platform_lambda(self, "WeeklyDigest", function_name="weekly-digest", handler="weekly_digest_lambda.lambda_handler", source_file="lambdas/weekly_digest_lambda.py", schedule="cron(0 16 ? * SUN *)", timeout_seconds=120, memory_mb=256, environment=_email_env, custom_policies=rp.email_weekly_digest(), **shared)
 
         create_platform_lambda(self, "MonthlyDigest", function_name="monthly-digest", handler="monthly_digest_lambda.lambda_handler", source_file="lambdas/monthly_digest_lambda.py", schedule="cron(0 16 ? * 1#1 *)", timeout_seconds=120, memory_mb=256, environment=_email_env, custom_policies=rp.email_monthly_digest(), **shared)
 

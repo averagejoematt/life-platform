@@ -107,7 +107,12 @@ class OperationalStack(Stack):
             handler="qa_smoke_lambda.lambda_handler",
             schedule="cron(30 18 ? * * *)",
             timeout_seconds=120, memory_mb=256,
-            environment={"EMAIL_RECIPIENT": "awsdev@mattsusername.com", "EMAIL_SENDER": "awsdev@mattsusername.com"},
+            environment={
+                "EMAIL_RECIPIENT": "awsdev@mattsusername.com",
+                "EMAIL_SENDER": "awsdev@mattsusername.com",
+                "MCP_FUNCTION_URL": "https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/",
+                "MCP_SECRET_NAME": "life-platform/mcp-api-key",
+            },
             custom_policies=rp.operational_qa_smoke(),
             table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None,
         )

@@ -1,5 +1,47 @@
 # Life Platform — Changelog
 
+## v3.7.16 — 2026-03-14: R8-QS2 integration test + CDK handler bug fixes
+
+### Summary
+Added MCP integration test to qa-smoke Lambda (R8-QS2). Fixed pre-existing IAM bug where qa-smoke had zero Secrets Manager/Lambda permissions, silently breaking `check_lambda_secrets()` on every run. Caught and fixed 2 additional pre-existing CDK bugs: `weekly-digest` had wrong handler (`digest_handler` instead of `weekly_digest_lambda`), and `lambda_helpers.py` docstring contained the `lambda_function.lambda_handler` placeholder that H5 linter now catches. Deployed LifePlatformOperational + LifePlatformEmail. R8-QS4 (archive scripts) confirmed already done.
+
+### Changes
+- **lambdas/qa_smoke_lambda.py**: Added `check_mcp_tool_calls()` — 3 sub-checks: (a) `get_sources` ≥10 sources, (b) `get_task_load_summary` shape validation, (c) DDB cache warm ≥10 `TOOL#` entries. Wired into handler. Added `urllib.request`, `Key` imports. Added `MCP_FUNCTION_URL` / `MCP_SECRET_NAME` env var config.
+- **cdk/stacks/role_policies.py**: `operational_qa_smoke()` expanded from 4 → 8 policy statements. Added: `S3ListBlog` (blog/* list), `SecretsGetMCP` (mcp-api-key GetSecretValue), `SecretsInventory` (ListSecrets *), `LambdaList` (ListFunctions *). Fixed `S3Read` to include `blog/*`.
+- **cdk/stacks/operational_stack.py**: Added `MCP_FUNCTION_URL` and `MCP_SECRET_NAME` env vars to QaSmoke Lambda.
+- **cdk/stacks/email_stack.py**: Fixed `weekly-digest` handler `digest_handler.lambda_handler` → `weekly_digest_lambda.lambda_handler`. Removed stale "Special handler" comment.
+- **cdk/stacks/lambda_helpers.py**: Fixed docstring example using `lambda_function.lambda_handler` placeholder → `whoop_lambda.lambda_handler`.
+
+### Bugs Found and Fixed
+- **qa-smoke IAM gap** (silent pre-existing): `check_lambda_secrets()` called `secretsmanager:ListSecrets` + `lambda:ListFunctions` but role had neither permission → AccessDenied on every run, silently reported as a failure in QA email.
+- **weekly-digest wrong handler** (latent CDK bug): Handler was `digest_handler.lambda_handler` — no such module exists. CDK deploy would overwrite live handler to a broken value on next reconcile. Fixed to `weekly_digest_lambda.lambda_handler`.
+- **lambda_helpers docstring** (linter false-positive risk): Docstring example used `lambda_function.lambda_handler` which H5 linter correctly flags as the P0 bug pattern.
+
+### CI Results
+- 20/20 tests passing (test_cdk_handler_consistency H1–H5, test_cdk_s3_paths S1–S4, test_iam_secrets_consistency S1–S4, test_mcp_registry R1–R7)
+
+### Deployed
+- `life-platform-qa-smoke` Lambda (code)
+- `LifePlatformOperational` CDK stack (IAM + env vars)
+- `LifePlatformEmail` CDK stack (weekly-digest handler fix)
+- Post-reconcile smoke: 10/10 ✅
+
+### Files Changed
+- `lambdas/qa_smoke_lambda.py`
+- `cdk/stacks/role_policies.py`
+- `cdk/stacks/operational_stack.py`
+- `cdk/stacks/email_stack.py`
+- `cdk/stacks/lambda_helpers.py`
+- `docs/CHANGELOG.md`
+- `handovers/HANDOVER_v3.7.16.md` (new)
+
+### Next Steps
+1. SIMP-1 Phase 1a: Habits cluster merge (6 tools → 1, −5 net)
+2. Google Calendar integration (~6-8h)
+3. R8-ST2: DynamoDB restore procedure runbook + test
+
+---
+
 ## v3.7.15 — 2026-03-13: Architecture Review #8 execution
 
 ### Summary
