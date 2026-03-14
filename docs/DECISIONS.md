@@ -382,3 +382,25 @@ When a significant decision is made — a design pattern chosen, an approach rej
 ---
 
 *Last updated: 2026-03-13 (v3.7.15)*
+
+---
+
+## ADR-024 — DLQ Consumer: Schedule-Triggered vs SQS Event Source Mapping
+
+**Status:** Active  
+**Date:** 2026-03-14 (v3.7.19)  
+**Context:** R8-LT8 asked whether the DLQ consumer should switch from its current scheduled model (EventBridge every 6 hours, Lambda polls SQS) to SQS event source mapping (Lambda triggered immediately on message arrival).
+
+**Decision:** Retain the schedule-triggered model. No migration to event source mapping.
+
+**Reasoning:**
+1. **DLQ messages are not time-critical.** A DLQ message represents a failed async Lambda invocation. The underlying failure already happened. Knowing about it in 6 hours vs 30 seconds has no operational difference for a personal project with no SLA.
+2. **Schedule model is simpler.** The consumer uses `sqs.receive_message` with long polling. It works correctly today with zero configuration risk.
+3. **Event source mapping adds complexity for marginal gain.** ESM requires: a new `SQS` trigger on the Lambda, `sqs:ReceiveMessage` / `sqs:DeleteMessage` / `sqs:GetQueueAttributes` IAM on the Lambda role (currently on the function itself), batch size and window configuration, and a visibility timeout that exceeds Lambda timeout. None of this is complicated, but it adds CDK config and an execution model change to a non-critical path.
+4. **Personal project context.** Viktor (Adversarial board member) correctly flagged this as a marginal improvement. The 6-hour polling interval is fine for a system where the operator checks email daily.
+
+**Alternatives considered:**
+- SQS event source mapping: triggers immediately on message arrival, auto-deletes on success, no polling needed. Saves ~$0 (SQS free tier). Adds CDK config complexity.
+- Reduce schedule to 1 hour: trivial change, still polling model, marginally faster notification.
+
+**Outcome:** No change. Documented explicitly so future reviewers don’t re-open this question.

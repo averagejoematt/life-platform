@@ -549,3 +549,18 @@ def delete_todoist_task(task_id: str):
     except Exception as e:
         logger.error(f"delete_todoist_task error: {e}")
         return {"error": str(e)}
+
+
+def tool_get_todoist_snapshot(args):
+    """Unified Todoist snapshot dispatcher.
+    Adapts args dict to underlying positional-arg signatures.
+    """
+    VALID_VIEWS = {
+        "today": lambda a: get_todoist_day(a.get("date")),
+        "load":  lambda a: get_task_load_summary(int(a.get("days", 7))),
+    }
+    view = (args.get("view") or "load").lower().strip()
+    if view not in VALID_VIEWS:
+        return {"error": f"Unknown view '{view}'.", "valid_views": list(VALID_VIEWS.keys()),
+                "hint": "'load' for current task load snapshot + cognitive load signal, 'today' for full Todoist day summary."}
+    return VALID_VIEWS[view](args)

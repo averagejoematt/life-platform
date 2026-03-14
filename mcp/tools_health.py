@@ -2020,6 +2020,23 @@ def tool_get_hydration_score(args):
     }
 
 
+def tool_get_daily_metrics(args):
+    """Unified daily metrics dispatcher.
+    movement_score lives in tools_lifestyle; energy_expenditure and hydration_score are local.
+    """
+    from mcp.tools_lifestyle import tool_get_movement_score
+    VALID_VIEWS = {
+        "movement":   tool_get_movement_score,
+        "energy":     tool_get_energy_expenditure,
+        "hydration":  tool_get_hydration_score,
+    }
+    view = (args.get("view") or "movement").lower().strip()
+    if view not in VALID_VIEWS:
+        return {"error": f"Unknown view '{view}'.", "valid_views": list(VALID_VIEWS.keys()),
+                "hint": "'movement' for NEAT/step score, 'energy' for calorie expenditure vs intake, 'hydration' for daily water intake adequacy."}
+    return VALID_VIEWS[view](args)
+
+
 def tool_get_health(args):
     """
     Unified health intelligence dispatcher. Routes to the appropriate underlying

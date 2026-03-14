@@ -330,3 +330,17 @@ def tool_get_genome_insights(args):
         result["available_categories"] = sorted(cats.keys())
 
     return result
+
+
+def tool_get_labs(args):
+    """Unified lab intelligence dispatcher."""
+    VALID_VIEWS = {
+        "results":      tool_get_lab_results,
+        "trends":       tool_get_lab_trends,
+        "out_of_range": tool_get_out_of_range_history,
+    }
+    view = (args.get("view") or "results").lower().strip()
+    if view not in VALID_VIEWS:
+        return {"error": f"Unknown view '{view}'.", "valid_views": list(VALID_VIEWS.keys()),
+                "hint": "'results' for latest draws, 'trends' for trajectory, 'out_of_range' for persistent flags."}
+    return VALID_VIEWS[view](args)

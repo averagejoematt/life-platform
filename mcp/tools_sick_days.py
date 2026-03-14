@@ -149,3 +149,17 @@ def tool_clear_sick_day(args):
             "force=true to recompute affected records."
         ),
     }
+
+
+def tool_manage_sick_days(args):
+    """Unified sick day management dispatcher."""
+    VALID_ACTIONS = {
+        "list":  tool_get_sick_days,
+        "log":   tool_log_sick_day,
+        "clear": tool_clear_sick_day,
+    }
+    action = (args.get("action") or "list").lower().strip()
+    if action not in VALID_ACTIONS:
+        return {"error": f"Unknown action '{action}'.", "valid_actions": list(VALID_ACTIONS.keys()),
+                "hint": "'list' to view sick days, 'log' to flag a date (requires date=), 'clear' to remove flag (requires date=)."}
+    return VALID_ACTIONS[action](args)

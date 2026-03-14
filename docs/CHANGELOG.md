@@ -1,5 +1,40 @@
 # Life Platform — Changelog
 
+## v3.7.19 — 2026-03-14: SIMP-1 Phase 1c+1d — Labs/Training/Strength/Character/CGM/Mood/Metrics/Todoist/SickDays
+
+### Summary
+SIMP-1 Phase 1c+1d consolidated 24 tools into 9 dispatchers. Tool count 101 → 86 (−15 net: 24 removed, 9 added). Warmer extended with 5 new warm steps (training_load fix + periodization + recommendation + character_sheet + cgm_dashboard). Board vote 11-0 applied: all expensive on-demand tools in Phase 1c clusters (training, cgm) now warmed nightly. Registry R5 test range updated to 75-105.
+
+### Changes
+- **mcp/tools_labs.py**: Added `tool_get_labs(view: results|trends|out_of_range)`
+- **mcp/tools_training.py**: Added `tool_get_training(view: load|periodization|recommendation)`
+- **mcp/tools_strength.py**: Added `tool_get_strength(view: progress|prs|standards)`
+- **mcp/tools_character.py**: Added `tool_get_character(view: sheet|pillar|history)`
+- **mcp/tools_cgm.py**: Added `tool_get_cgm(view: dashboard|fasting)`
+- **mcp/tools_journal.py**: Added `tool_get_mood(view: trend|state_of_mind)` with lazy import of tool_get_state_of_mind_trend from tools_lifestyle
+- **mcp/tools_health.py**: Added `tool_get_daily_metrics(view: movement|energy|hydration)` with lazy import of tool_get_movement_score from tools_lifestyle
+- **mcp/tools_todoist.py**: Added `tool_get_todoist_snapshot(view: load|today)` with args-dict adapter for positional-arg underlying functions
+- **mcp/tools_sick_days.py**: Added `tool_manage_sick_days(action: list|log|clear)`
+- **mcp/warmer.py**: Added steps 9-13 — training_load (fix: imported but never cached), training_periodization, training_recommendation, character_sheet, cgm_dashboard
+- **mcp/registry.py**: Removed 24 tools, added 9 dispatchers, net 101→86
+- **tests/test_mcp_registry.py**: Updated R5 range 100-130 → 75-105
+
+### Tool count history
+| Version | Tools | Delta | Phase |
+|---------|-------|-------|-------|
+| v3.7.14 | 116 | baseline | pre-SIMP-1 |
+| v3.7.17 | 109 | −7 | Phase 1a: Habits |
+| v3.7.18 | 101 | −8 | Phase 1b: Data/Health/Nutrition |
+| v3.7.19 | 86 | −15 | Phase 1c+1d: Labs/Training/Strength/Character/CGM/Mood/Metrics/Todoist/SickDays |
+| Target | ≤80 | −6 more | Phase 2: EMF-driven (~2026-04-13) |
+
+### Deployed
+- `life-platform-mcp` Lambda
+- Post-reconcile smoke: 10/10 ✅
+- CI: 7/7 ✅
+
+---
+
 ## v3.7.18 — 2026-03-14: SIMP-1 Phase 1b — Data, Health, Nutrition clusters
 
 ### Summary

@@ -191,6 +191,35 @@ TOOLS = {
             },
         },
     },
+    "get_training": {
+        "fn": tool_get_training,
+        "schema": {
+            "name": "get_training",
+            "description": (
+                "Unified training intelligence. Use 'view' to select the analysis: "
+                "'load' (default) = Banister CTL/ATL/TSB fitness-fatigue model + ACWR injury risk. Warmed nightly. "
+                "'periodization' = mesocycle detection (Base/Build/Peak/Deload), 80/20 polarization analysis, progressive overload tracking. Warmed nightly. "
+                "'recommendation' = readiness-based workout suggestion synthesising Whoop, Eight Sleep, Garmin, training load. Board of Directors rationale. Warmed nightly. "
+                "Use for: 'how fit am I?', 'am I overtraining?', 'training load', 'CTL', 'TSB', 'form', "
+                "'am I in a deload?', 'periodization', 'what should I do today?', 'training recommendation', 'ready to train?'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "view": {
+                        "type": "string",
+                        "description": "load (default), periodization, or recommendation.",
+                        "enum": ["load", "periodization", "recommendation"],
+                    },
+                    "start_date": {"type": "string", "description": "[load/periodization] Start date YYYY-MM-DD."},
+                    "end_date":   {"type": "string", "description": "[load/periodization] End date YYYY-MM-DD (default: today)."},
+                    "date":       {"type": "string", "description": "[recommendation] Target date YYYY-MM-DD (default: today)."},
+                    "weeks":      {"type": "number", "description": "[periodization] Number of weeks to analyse (default: 12)."},
+                },
+                "required": [],
+            },
+        },
+    },
     "get_weekly_summary": {
         "fn": tool_get_weekly_summary,
         "schema": {
@@ -204,21 +233,6 @@ TOOLS = {
                     "sort_by":        {"type": "string", "description": "Field to sort weeks by. Options: 'total_distance_miles' (default), 'total_elevation_gain_feet', 'total_moving_time_seconds', 'activity_count'."},
                     "limit":          {"type": "number", "description": "Max weeks to return. Default 52."},
                     "sort_ascending": {"type": "boolean", "description": "Set true for chronological order (trend view). Default false (best weeks first)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_training_load": {
-        "fn": tool_get_training_load,
-        "schema": {
-            "name": "get_training_load",
-            "description": "Compute the Banister fitness-fatigue model: CTL (42-day fitness), ATL (7-day fatigue), TSB (form = CTL-ATL), and ACWR (injury risk ratio). Use for: 'how fit am I right now?', 'am I overtraining?', 'am I ready for a race?', 'when was my peak fitness?', 'what is my injury risk?'. ACWR > 1.3 = caution, > 1.5 = danger. TSB positive = fresh, negative = fatigued. Returns a full time series plus current state summary.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD. Defaults to 6 months ago."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
                 },
                 "required": [],
             },
@@ -241,6 +255,34 @@ TOOLS = {
                     "end_date":   {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
                 },
                 "required": ["source_a", "field_a", "source_b", "field_b"],
+            },
+        },
+    },
+    "get_daily_metrics": {
+        "fn": tool_get_daily_metrics,
+        "schema": {
+            "name": "get_daily_metrics",
+            "description": (
+                "Unified daily activity metrics. "
+                "'movement' (default) = NEAT analysis, movement score 0-100, step target tracking, sedentary day flags. "
+                "'energy' = calorie expenditure vs intake balance — TDEE breakdown, activity energy, deficit/surplus trend. "
+                "'hydration' = daily water intake adequacy scored against bodyweight-adjusted target (35ml/kg). "
+                "Use for: 'am I moving enough?', 'NEAT', 'steps', 'sedentary days', "
+                "'energy balance', 'calorie burn', 'am I in a deficit?', 'hydration score', 'water intake'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "view": {
+                        "type": "string",
+                        "description": "movement (default), energy, or hydration.",
+                        "enum": ["movement", "energy", "hydration"],
+                    },
+                    "start_date":  {"type": "string", "description": "Start date YYYY-MM-DD (default: 30d ago)."},
+                    "end_date":    {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "step_target": {"type": "integer", "description": "[movement] Daily step target (default: 8000)."},
+                },
+                "required": [],
             },
         },
     },
@@ -302,21 +344,6 @@ TOOLS = {
             },
         },
     },
-    "get_energy_expenditure": {
-        "fn": tool_get_energy_expenditure,
-        "schema": {
-            "name": "get_energy_expenditure",
-            "description": "Estimates Total Daily Energy Expenditure (TDEE) = BMR + exercise calories. BMR computed via Mifflin-St Jeor (most validated for people with obesity). Exercise calories from Strava kilojoules or TRIMP estimate. Returns implied daily calorie target at a given deficit, and shows how BMR has changed since start weight (metabolic adaptation). Use for: 'how many calories should I eat?', 'what is my TDEE?', 'how much am I burning?', 'how has my metabolism changed as I lose weight?'. Requires height_inches, date_of_birth, biological_sex in profile.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "target_deficit_kcal": {"type": "number", "description": "Daily calorie deficit target. Default 500 (≈1 lb/week). Use 750 for 1.5 lbs/week, 1000 for 2 lbs/week."},
-                    "end_date":            {"type": "string",  "description": "End date YYYY-MM-DD. Defaults to today."},
-                },
-                "required": [],
-            },
-        },
-    },
     "get_exercise_history": {
         "fn": tool_get_exercise_history,
         "schema": {
@@ -331,23 +358,6 @@ TOOLS = {
                     "include_warmups": {"type": "boolean", "description": "Include warmup sets. Default false."},
                 },
                 "required": ["exercise_name"],
-            },
-        },
-    },
-    "get_strength_prs": {
-        "fn": tool_get_strength_prs,
-        "schema": {
-            "name": "get_strength_prs",
-            "description": "All-exercise PR leaderboard ranked by estimated 1RM (Epley formula). Shows best weight, best reps, and estimated 1-rep max for every exercise with sufficient data. Use for: 'what are my strength PRs?', 'what's my best bench press?', 'show me my top lifts by muscle group'.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date":           {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date":             {"type": "string", "description": "End date YYYY-MM-DD."},
-                    "muscle_group_filter":  {"type": "string", "description": "Optional filter by muscle group. E.g. 'chest', 'back', 'legs'."},
-                    "min_sessions":         {"type": "number", "description": "Minimum sessions required for exercise to appear. Default 3."},
-                },
-                "required": [],
             },
         },
     },
@@ -367,20 +377,32 @@ TOOLS = {
             },
         },
     },
-    "get_strength_progress": {
-        "fn": tool_get_strength_progress,
+    "get_strength": {
+        "fn": tool_get_strength,
         "schema": {
-            "name": "get_strength_progress",
-            "description": "Longitudinal 1RM trend, rate of gain, and plateau detection for a single exercise. Splits history into thirds for periodization analysis. Use for: 'am I still getting stronger at bench?', 'how fast is my squat progressing?', 'am I in a plateau?'",
+            "name": "get_strength",
+            "description": (
+                "Unified strength intelligence. Use 'view' to select the analysis: "
+                "'progress' (default) = volume load trends, progressive overload tracking, weekly volume by muscle group. "
+                "'prs' = all-time personal records per lift (1RM estimates, max weight, max reps). "
+                "'standards' = bodyweight-relative strength levels vs Wilks/Reps standards (Beginner/Intermediate/Advanced/Elite). "
+                "Use for: 'strength progress', 'am I getting stronger?', 'my PRs', 'bench press record', "
+                "'how strong am I vs standards?', 'strength levels', 'Wilks score'."
+            ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "exercise_name":          {"type": "string", "description": "Exercise name (fuzzy match)."},
-                    "start_date":             {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date":               {"type": "string", "description": "End date YYYY-MM-DD."},
-                    "plateau_threshold_days": {"type": "number", "description": "Days without PR to flag plateau. Default 90."},
+                    "view": {
+                        "type": "string",
+                        "description": "progress (default), prs, or standards.",
+                        "enum": ["progress", "prs", "standards"],
+                    },
+                    "start_date":  {"type": "string", "description": "[progress] Start date YYYY-MM-DD."},
+                    "end_date":    {"type": "string", "description": "[progress/prs] End date YYYY-MM-DD (default: today)."},
+                    "exercise":    {"type": "string", "description": "[prs] Filter by exercise name (partial match)."},
+                    "muscle_group":{"type": "string", "description": "[progress] Filter by muscle group."},
                 },
-                "required": ["exercise_name"],
+                "required": [],
             },
         },
     },
@@ -394,22 +416,6 @@ TOOLS = {
                 "properties": {
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
                     "end_date":   {"type": "string", "description": "End date YYYY-MM-DD."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_strength_standards": {
-        "fn": tool_get_strength_standards,
-        "schema": {
-            "name": "get_strength_standards",
-            "description": "Bodyweight-relative strength vs Untrained/Novice/Intermediate/Advanced/Elite norms for bench press, squat, deadlift, and overhead press. Uses current bodyweight from Withings. Use for: 'how strong am I?', 'what level is my bench press?', 'how far am I from an advanced deadlift?', 'what are my strength standards?'",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "end_date":           {"type": "string", "description": "Only use data up to this date. Defaults to today."},
-                    "bodyweight_source":  {"type": "string", "description": "'withings' (default) or 'profile'."},
-                    "bodyweight_lbs":     {"type": "number", "description": "Override bodyweight in lbs if no Withings data."},
                 },
                 "required": [],
             },
@@ -675,55 +681,33 @@ TOOLS = {
             },
         },
     },
-    "get_lab_results": {
-        "fn": tool_get_lab_results,
+    "get_labs": {
+        "fn": tool_get_labs,
         "schema": {
-            "name": "get_lab_results",
+            "name": "get_labs",
             "description": (
-                "Get blood work results. Without a date, returns summary of all 7 draws (2019-2025). "
-                "With a date, returns full biomarkers with genome cross-reference annotations. "
-                "Filter by category: lipids, cbc, metabolic, thyroid, liver, kidney, etc. "
-                "Use for: 'show my latest blood work', 'lipids in 2024', 'all lab draws'."
+                "Unified lab intelligence. Use 'view' to select the analysis: "
+                "'results' (default) = latest blood work values across all 7 draws with reference ranges and trend direction. "
+                "'trends' = biomarker trajectory over time — slope, direction, clinical threshold crossings. "
+                "'out_of_range' = all historically out-of-range biomarkers with persistence classification (chronic/recurring/occasional). "
+                "Use for: 'show my blood work', 'lab results', 'biomarker trends', 'what\'s out of range?', "
+                "'cholesterol history', 'which labs are chronic issues?'."
             ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "draw_date": {"type": "string", "description": "Draw date YYYY-MM-DD. Omit to list all."},
-                    "category":  {"type": "string", "description": "Filter: lipids, cbc, metabolic, thyroid, liver, kidney, electrolytes, minerals, diabetes, hormones, etc."},
+                    "view": {
+                        "type": "string",
+                        "description": "results (default), trends, or out_of_range.",
+                        "enum": ["results", "trends", "out_of_range"],
+                    },
+                    "biomarker": {"type": "string", "description": "[results/trends] Filter by biomarker name (partial match)."},
+                    "category":  {"type": "string", "description": "[results] Filter by category (e.g. 'lipids', 'metabolic', 'hormones')."},
+                    "start_date": {"type": "string", "description": "[trends] Start date YYYY-MM-DD."},
+                    "end_date":   {"type": "string", "description": "[trends] End date YYYY-MM-DD (default: today)."},
                 },
                 "required": [],
             },
-        },
-    },
-    "get_lab_trends": {
-        "fn": tool_get_lab_trends,
-        "schema": {
-            "name": "get_lab_trends",
-            "description": (
-                "Track biomarker trajectory across all 7 draws (2019-2025). Slope per year, 1-year projection, "
-                "derived ratios (TG/HDL, non-HDL, TC/HDL). Genome flags for genetic drivers. "
-                "Use for: 'LDL trend', 'cholesterol trajectory', 'is glucose rising', 'TG/HDL ratio over time'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "biomarker":  {"type": "string", "description": "Single key: 'ldl_c', 'hba1c', 'glucose'. Use search_biomarker to find names."},
-                    "biomarkers": {"type": "array", "items": {"type": "string"}, "description": "Multiple keys."},
-                    "include_derived_ratios": {"type": "boolean", "description": "Include TG/HDL, non-HDL, TC/HDL. Default true."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_out_of_range_history": {
-        "fn": tool_get_out_of_range_history,
-        "schema": {
-            "name": "get_out_of_range_history",
-            "description": (
-                "All out-of-range biomarkers across draws with persistence (chronic/recurring/occasional) "
-                "and genome-driven explanations. Use for: 'flagged biomarkers', 'persistent issues', 'genetic vs lifestyle flags'."
-            ),
-            "inputSchema": {"type": "object", "properties": {}, "required": []},
         },
     },
     "search_biomarker": {
@@ -765,38 +749,31 @@ TOOLS = {
             },
         },
     },
-    "get_movement_score": {
-        "fn": tool_get_movement_score,
+    "get_cgm": {
+        "fn": tool_get_cgm,
         "schema": {
-            "name": "get_movement_score",
+            "name": "get_cgm",
             "description": (
-                "Daily movement & NEAT analysis. NEAT = energy burned outside exercise (larger than workouts "
-                "for most people). Movement score 0-100, step target tracking, sedentary day flags. "
-                "Use for: 'am I moving enough?', 'NEAT analysis', 'sedentary days', 'step trend', "
-                "'non-exercise activity'. Requires Apple Health webhook. Strava enhances NEAT calc."
+                "Unified CGM (continuous glucose monitor) intelligence. "
+                "'dashboard' (default) = time-in-range (target >90%), variability (SD target <20), mean glucose, time above 140, fasting proxy, clinical flags, trend. Warmed nightly. "
+                "'fasting' = overnight nadir-based fasting glucose validation — avoids dawn phenomenon by using 2-5 AM nadir. Cross-validates CGM accuracy. "
+                "Use for: 'glucose overview', 'blood sugar', 'time in range', 'CGM dashboard', "
+                "'am I pre-diabetic?', 'fasting glucose', 'glucose variability', 'metabolic health'."
             ),
-            "inputSchema": {"type": "object", "properties": {
-                "start_date":  {"type": "string", "description": "Start YYYY-MM-DD (default: 30d ago)."},
-                "end_date":    {"type": "string", "description": "End YYYY-MM-DD (default: today)."},
-                "step_target": {"type": "integer", "description": "Daily step target (default: 8000)."},
-            }, "required": []},
-        },
-    },
-    "get_cgm_dashboard": {
-        "fn": tool_get_cgm_dashboard,
-        "schema": {
-            "name": "get_cgm_dashboard",
-            "description": (
-                "CGM blood glucose dashboard. Time in range (target >90%), variability (SD target <20), "
-                "mean glucose (target <100), time above 140, fasting proxy. Clinical flags, trend analysis. "
-                "Glucose management is a top-3 longevity lever (Attia, Huberman). "
-                "Use for: 'glucose overview', 'CGM dashboard', 'blood sugar', 'time in range', "
-                "'metabolic health', 'am I pre-diabetic?'. Requires Apple Health CGM webhook."
-            ),
-            "inputSchema": {"type": "object", "properties": {
-                "start_date": {"type": "string", "description": "Start YYYY-MM-DD (default: 30d ago)."},
-                "end_date":   {"type": "string", "description": "End YYYY-MM-DD (default: today)."},
-            }, "required": []},
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "view": {
+                        "type": "string",
+                        "description": "dashboard (default) or fasting.",
+                        "enum": ["dashboard", "fasting"],
+                    },
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
+                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "days":       {"type": "number", "description": "[dashboard] Days to analyse (default: 30)."},
+                },
+                "required": [],
+            },
         },
     },
     "get_glucose_meal_response": {
@@ -819,24 +796,6 @@ TOOLS = {
                     "start_date":        {"type": "string", "description": "Start date YYYY-MM-DD (default: 30 days ago)."},
                     "end_date":          {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
                     "meal_gap_minutes":  {"type": "integer", "description": "Minutes gap to consider separate meals (default: 30)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_fasting_glucose_validation": {
-        "fn": tool_get_fasting_glucose_validation,
-        "schema": {
-            "name": "get_fasting_glucose_validation",
-            "description": "Validate CGM fasting glucose accuracy against venous lab draws. Computes proper overnight nadir (midnight-6AM) from raw CGM readings, builds distribution, and compares against 6 historical blood draws. Two modes: direct same-day validation when overlap exists, and statistical validation (z-scores, percentiles) when not. Shows bias analysis, confidence level, and Board of Directors interpretation. Use for: 'how accurate is my CGM fasting glucose?', 'validate CGM against labs', 'compare overnight nadir to blood work', 'is my fasting proxy trustworthy?'",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "nadir_start_hour": {"type": "number", "description": "Start of overnight window (decimal hours). Default 0 (midnight)."},
-                    "nadir_end_hour": {"type": "number", "description": "End of overnight window (decimal hours). Default 6 (6 AM)."},
-                    "deep_nadir_start_hour": {"type": "number", "description": "Start of deep nadir window. Default 2 (2 AM). Avoids late digestion."},
-                    "deep_nadir_end_hour": {"type": "number", "description": "End of deep nadir window. Default 5 (5 AM). Avoids dawn phenomenon."},
-                    "min_overnight_readings": {"type": "number", "description": "Minimum CGM readings in overnight window. Default 6 (~30 min coverage)."},
                 },
                 "required": [],
             },
@@ -887,23 +846,28 @@ TOOLS = {
             },
         },
     },
-    "get_mood_trend": {
-        "fn": tool_get_mood_trend,
+    "get_mood": {
+        "fn": tool_get_mood,
         "schema": {
-            "name": "get_mood_trend",
+            "name": "get_mood",
             "description": (
-                "Mood, energy, and stress scores over time with 7-day rolling averages, "
-                "trend direction, and recurring themes at peaks/valleys. Combines structured "
-                "Notion scores with Haiku-enriched signals for the most accurate longitudinal view. "
-                "Use for: 'how has my mood been this month?', 'stress trend over 30 days', "
-                "'am I getting better?', 'energy trend', 'mood and stress together'."
+                "Unified mood and state-of-mind intelligence. "
+                "'trend' (default) = journal-derived mood, energy, and stress scores with 7-day rolling averages, trend direction. "
+                "'state_of_mind' = Apple Health How We Feel (HWF) valence data — objective emotional state tracking. "
+                "Use for: 'how has my mood been?', 'mood trend', 'energy levels', 'stress trend', "
+                "'state of mind', 'emotional wellbeing', 'How We Feel data', 'mood vs training'."
             ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "start_date": {"type": "string", "description": "Start YYYY-MM-DD (default: 30 days ago)."},
-                    "end_date":   {"type": "string", "description": "End YYYY-MM-DD (default: today)."},
-                    "metric":     {"type": "string", "description": "mood, energy, stress, or all (default: all)."},
+                    "view": {
+                        "type": "string",
+                        "description": "trend (default) or state_of_mind.",
+                        "enum": ["trend", "state_of_mind"],
+                    },
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 30 days ago)."},
+                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "days":       {"type": "number", "description": "[trend] Rolling window in days (default: 30)."},
                 },
                 "required": [],
             },
@@ -1097,52 +1061,6 @@ TOOLS = {
             },
         },
     },
-    "get_training_periodization": {
-        "fn": tool_get_training_periodization,
-        "schema": {
-            "name": "get_training_periodization",
-            "description": (
-                "Training periodization planner. Analyzes weekly training patterns to detect mesocycle phases "
-                "(base/build/peak/deload), deload needs (Galpin 3:1 or 4:1 ratio), progressive overload "
-                "tracking (strength volume trends), training polarization (Seiler 80/20 model), Zone 2 "
-                "target adherence (Attia 150 min/week), and training consistency. "
-                "Use for: 'do I need a deload?', 'training periodization', 'am I overtraining?', "
-                "'progressive overload trend', 'training polarization check', 'weekly training summary', "
-                "'mesocycle analysis', 'should I take a rest week?'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 12 weeks ago)."},
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "weeks": {"type": "integer", "description": "Number of weeks to analyze (default: 12). Ignored if start_date provided."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_training_recommendation": {
-        "fn": tool_get_training_recommendation,
-        "schema": {
-            "name": "get_training_recommendation",
-            "description": (
-                "Readiness-based training recommendation. Synthesizes Whoop recovery, Eight Sleep quality, "
-                "Garmin Body Battery, training load (CTL/ATL/TSB), recent activity history, and muscle group "
-                "recency into a specific workout suggestion: type (Zone 2, intervals, strength upper/lower, "
-                "active recovery, rest), intensity, duration, HR targets, and muscle groups to target. "
-                "Board of Directors provides rationale. Warns about injury risk (ACWR), consecutive training days, "
-                "and sleep debt. Use for: 'what should I do today?', 'workout recommendation', 'should I train today?', "
-                "'am I recovered enough for a hard workout?', 'readiness-based training', 'what workout today?'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "date": {"type": "string", "description": "Date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
     "get_social_connection_trend": {
         "fn": tool_get_social_connection_trend,
         "schema": {
@@ -1303,34 +1221,6 @@ TOOLS = {
             },
         },
     },
-    "get_state_of_mind_trend": {
-        "fn": tool_get_state_of_mind_trend,
-        "schema": {
-            "name": "get_state_of_mind_trend",
-            "description": (
-                "State of Mind valence trend from How We Feel / Apple Health. Tracks mood check-ins "
-                "(momentary emotions + daily moods) with valence (-1 to +1), emotion labels (Happy, Stressed, "
-                "Calm, Anxious, etc.), and life area associations (Work, Family, Health, Fitness, Money, etc.). "
-                "Shows overall valence trend, 7-day rolling average, time-of-day patterns, best/worst days, "
-                "top emotion labels, valence by life area (which domains drive best/worst mood), and "
-                "valence classification distribution. Huberman: mood is circadian — cortisol, dopamine, serotonin "
-                "fluctuate throughout day. Walker: evening mood valence predicts sleep onset latency. "
-                "Seligman: momentary mood sampling is clinically validated experience sampling method (ESM). "
-                "Use for: 'how has my mood been?', 'state of mind trend', 'valence trend', 'mood check-ins', "
-                "'what makes me feel best?', 'mood by time of day', 'How We Feel data', "
-                "'emotional patterns', 'which life areas affect my mood?'. "
-                "Requires How We Feel (or Apple State of Mind) + Health Auto Export State of Mind automation."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
     # ── Board of Directors Management ──
     "get_board_of_directors": {
         "fn": tool_get_board_of_directors,
@@ -1357,69 +1247,6 @@ TOOLS = {
         },
     },
     # ── Character Sheet tools (v2.58.0) ──
-    "get_character_sheet": {
-        "fn": tool_get_character_sheet,
-        "schema": {
-            "name": "get_character_sheet",
-            "description": (
-                "Get the current character sheet — overall Character Level (1-100), all 7 pillar levels "
-                "and tiers, active cross-pillar effects, XP totals, and recent level events. "
-                "Includes 14-day sparklines per pillar. "
-                "Use for: 'show my character sheet', 'what level am I', 'how am I doing overall', "
-                "'character status', 'my game stats'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "date": {"type": "string", "description": "Date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_pillar_detail": {
-        "fn": tool_get_pillar_detail,
-        "schema": {
-            "name": "get_pillar_detail",
-            "description": (
-                "Deep dive into a single pillar: component breakdown with individual scores, "
-                "daily raw_scores over time, level history, XP curve, and contributing metrics. "
-                "Valid pillars: sleep, movement, nutrition, metabolic, mind, relationships, consistency. "
-                "Use for: 'how is my sleep pillar', 'break down my nutrition score', "
-                "'movement pillar detail', 'why is my mind score low'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "pillar": {"type": "string", "description": "Pillar name: sleep, movement, nutrition, metabolic, mind, relationships, consistency."},
-                    "days": {"type": "integer", "description": "Days of history to analyze (default: 30, max: 180)."},
-                    "date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": ["pillar"],
-            },
-        },
-    },
-    "get_level_history": {
-        "fn": tool_get_level_history,
-        "schema": {
-            "name": "get_level_history",
-            "description": (
-                "Timeline of all level and tier change events across all pillars or a specific one. "
-                "Shows level ups, level downs, tier transitions, and milestone achievements. "
-                "Use for: 'show my level history', 'when did I level up', 'tier transitions', "
-                "'character progress timeline', 'have I hit any milestones'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "days": {"type": "integer", "description": "Days of history (default: 90, max: 365)."},
-                    "pillar": {"type": "string", "description": "Optional: filter to specific pillar."},
-                    "date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
     # ── Character Sheet Phase 4 tools (v2.71.0) ──
     "set_reward": {
         "fn": tool_set_reward,
@@ -1461,6 +1288,34 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "status": {"type": "string", "description": "Filter by status: active, triggered, claimed. Leave empty for all."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "get_character": {
+        "fn": tool_get_character,
+        "schema": {
+            "name": "get_character",
+            "description": (
+                "Unified Character Sheet intelligence. All views read pre-computed data from SOURCE#character_sheet DDB partition (fast). "
+                "'sheet' (default) = overall Character Level (1-100), all 7 pillar scores, daily streak, current tier, component breakdown. "
+                "'pillar' = deep dive into a single pillar with component scores, trend, 14-day history. Requires pillar=. "
+                "'history' = timeline of all level-up and tier-change events. "
+                "Use for: 'character sheet', 'what level am I?', 'pillar scores', 'how is my Sleep pillar?', "
+                "'level history', 'when did I level up?', 'tier status'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "view": {
+                        "type": "string",
+                        "description": "sheet (default), pillar, or history.",
+                        "enum": ["sheet", "pillar", "history"],
+                    },
+                    "pillar":      {"type": "string", "description": "[pillar] Pillar name e.g. 'Sleep', 'Training', 'Nutrition', 'Mind', 'Recovery', 'Metabolic', 'Social'."},
+                    "days":        {"type": "number", "description": "[pillar] Days of history to include (default: 14)."},
+                    "pillar_filter":{"type": "string", "description": "[history] Filter level history by pillar name."},
                 },
                 "required": [],
             },
@@ -1515,6 +1370,35 @@ TOOLS = {
                     "recurring": {"type": "string", "description": "If recurring: 'annual', 'monthly', etc."},
                 },
                 "required": ["title"],
+            },
+        },
+    },
+    "manage_sick_days": {
+        "fn": tool_manage_sick_days,
+        "schema": {
+            "name": "manage_sick_days",
+            "description": (
+                "Manage sick and rest day flags. Sick day flags suppress streak breaks, habit alerts, and anomaly noise. "
+                "'list' (default) = show all logged sick/rest days in a date range. "
+                "'log' = flag a date as sick/rest day (requires date=). Accepts dates= list for multiple days. "
+                "'clear' = remove a sick day flag logged in error (requires date=). "
+                "Use for: 'log a sick day', 'I\'m sick today', 'show my sick days', 'remove sick day flag', 'rest day'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "description": "list (default), log, or clear.",
+                        "enum": ["list", "log", "clear"],
+                    },
+                    "date":       {"type": "string", "description": "[log/clear] Date YYYY-MM-DD."},
+                    "dates":      {"type": "array", "items": {"type": "string"}, "description": "[log] List of dates to flag at once."},
+                    "reason":     {"type": "string", "description": "[log] Optional reason (e.g. 'flu', 'rest day', 'travel')."},
+                    "start_date": {"type": "string", "description": "[list] Start of range (default: 30 days ago)."},
+                    "end_date":   {"type": "string", "description": "[list] End of range (default: today)."},
+                },
+                "required": [],
             },
         },
     },
@@ -1717,29 +1601,6 @@ TOOLS = {
         },
     },
     # ── Hydration Tracking Enhancement (#30) ──
-    "get_hydration_score": {
-        "fn": tool_get_hydration_score,
-        "schema": {
-            "name": "get_hydration_score",
-            "description": (
-                "Hydration adequacy scoring with bodyweight-adjusted daily target (35ml/kg per Webb). "
-                "Shows daily water intake vs target, adequacy rate, deficit days, current streak, "
-                "and correlation with exercise intensity. Source: Apple Health water_intake_ml. "
-                "Webb: hydration adequacy is correlated with energy, headaches, and exercise performance. "
-                "Use for: 'am I drinking enough water?', 'hydration score', 'water intake trend', "
-                "'hydration target', 'deficit days', 'water and exercise', 'daily water', 'hydration adequacy'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 30 days ago)."},
-                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "target_ml":  {"type": "number", "description": "Override daily target in ml (default: 35ml/kg bodyweight)."},
-                },
-                "required": [],
-            },
-        },
-    },
     # ── Todoist Integration ──
     "get_task_completion_trend": {
         "fn": get_task_completion_trend,
@@ -1760,21 +1621,27 @@ TOOLS = {
             },
         },
     },
-    "get_task_load_summary": {
-        "fn": get_task_load_summary,
+    "get_todoist_snapshot": {
+        "fn": tool_get_todoist_snapshot,
         "schema": {
-            "name": "get_task_load_summary",
+            "name": "get_todoist_snapshot",
             "description": (
-                "Current task load snapshot: active count, overdue count, due-today count, priority breakdown. "
-                "Includes cognitive load signal (LOW/MODERATE/ELEVATED/HIGH) based on overdue backlog. "
-                "The decision fatigue indicator — high active + high overdue = cognitive overhead that suppresses habits. "
-                "Use for: 'how many tasks do I have?', 'task load', 'overdue tasks', 'due today', "
-                "'how overwhelmed am I?', 'decision fatigue', 'task backlog', 'Todoist load'."
+                "Unified Todoist snapshot. "
+                "'load' (default) = current task load: active count, overdue, due-today, priority breakdown, cognitive load signal (LOW/MODERATE/ELEVATED/HIGH). "
+                "'today' = full Todoist day summary for a specific date — completed tasks, project breakdown, counts. "
+                "Use for: 'how many tasks do I have?', 'task load', 'am I overloaded?', 'decision fatigue', "
+                "'overdue tasks', 'Todoist summary', 'what tasks did I complete yesterday?', 'task backlog'."
             ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "days": {"type": "integer", "description": "Days of recent completion history to include (default: 7)."},
+                    "view": {
+                        "type": "string",
+                        "description": "load (default) or today.",
+                        "enum": ["load", "today"],
+                    },
+                    "date": {"type": "string", "description": "[today] Date YYYY-MM-DD (default: yesterday)."},
+                    "days": {"type": "integer", "description": "[load] Days of completion history to include (default: 7)."},
                 },
                 "required": [],
             },
@@ -1816,26 +1683,6 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "days": {"type": "integer", "description": "Days to analyze (default: 30, min: 14, max: 60)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_todoist_day": {
-        "fn": get_todoist_day,
-        "schema": {
-            "name": "get_todoist_day",
-            "description": (
-                "Full Todoist snapshot for a specific date (default: yesterday). "
-                "Returns completed tasks list with project names, overdue/active/due-today counts, "
-                "priority breakdown, and completions by project. "
-                "Use for: 'what tasks did I complete yesterday?', 'Todoist day summary', "
-                "'what was my task load on [date]?', 'show me my completed tasks'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "date": {"type": "string", "description": "Date YYYY-MM-DD (default: yesterday)."},
                 },
                 "required": [],
             },
@@ -2147,54 +1994,4 @@ TOOLS = {
         },
     },
 
-    "log_sick_day": {
-        "fn": tool_log_sick_day,
-        "schema": {
-            "name": "log_sick_day",
-            "description": (
-                "Flag one or more dates as sick or rest days. When flagged: Character Sheet EMA frozen, "
-                "day grade = 'sick', habit/streak timers preserved (not broken), anomaly alerts suppressed, "
-                "freshness alerts skipped, Daily Brief shows recovery banner."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "date":   {"type": "string", "description": "Single date YYYY-MM-DD."},
-                    "dates":  {"type": "array", "items": {"type": "string"},
-                               "description": "Multiple dates YYYY-MM-DD."},
-                    "reason": {"type": "string", "description": "Optional reason (flu, injury, etc)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_sick_days": {
-        "fn": tool_get_sick_days,
-        "schema": {
-            "name": "get_sick_days",
-            "description": "List sick/rest days within a date range. Shows date, reason, when logged.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start YYYY-MM-DD (default 90d ago)."},
-                    "end_date":   {"type": "string", "description": "End YYYY-MM-DD (default today)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "clear_sick_day": {
-        "fn": tool_clear_sick_day,
-        "schema": {
-            "name": "clear_sick_day",
-            "description": "Remove a sick day flag (use if logged in error).",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "date": {"type": "string", "description": "Date to un-flag YYYY-MM-DD."},
-                },
-                "required": ["date"],
-            },
-        },
-    },
 }

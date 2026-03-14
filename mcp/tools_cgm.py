@@ -899,3 +899,16 @@ def tool_get_fasting_glucose_validation(args):
             "Huberman": "Glucose regulation is a proxy for metabolic flexibility. Low overnight variability + clean nadirs indicate good insulin sensitivity and hepatic glucose control.",
         },
     }
+
+
+def tool_get_cgm(args):
+    """Unified CGM intelligence dispatcher."""
+    VALID_VIEWS = {
+        "dashboard": tool_get_cgm_dashboard,
+        "fasting":   tool_get_fasting_glucose_validation,
+    }
+    view = (args.get("view") or "dashboard").lower().strip()
+    if view not in VALID_VIEWS:
+        return {"error": f"Unknown view '{view}'.", "valid_views": list(VALID_VIEWS.keys()),
+                "hint": "'dashboard' for time-in-range, variability, mean glucose, clinical flags. 'fasting' for overnight nadir-based fasting glucose validation."}
+    return VALID_VIEWS[view](args)
