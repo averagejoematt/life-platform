@@ -31,7 +31,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
                          │ DynamoDB queries
 ┌────────────────────────▼────────────────────────────────────┐
 │  SERVE LAYER                                                │
-│  MCP Server Lambda (144 tools, 1024 MB) + Lambda Function URL│
+│  MCP Server Lambda (116 tools, 1024 MB) + Lambda Function URL│
 │  ← Claude Desktop + claude.ai + Claude mobile via remote MCP│
 │                                                             │
 │  COMPUTE LAYER (IC intelligence features)                   │
@@ -262,7 +262,7 @@ No GSI by design — all access patterns served by PK+SK queries.
 **Auth:** `x-api-key` header check; key in `life-platform/ai-keys`
 **Protocol:** JSON-RPC 2.0 / MCP spec 2025-06-18
 
-30-module package structure:
+31-module package structure:
 ```
 mcp/
   handler.py, config.py, utils.py, core.py, helpers.py
@@ -346,7 +346,7 @@ Health Auto Export → API Gateway → Webhook → DynamoDB + S3
                               daily-metrics · daily-insight
                               hypothesis-engine
                                                     │
-                               MCP Lambda (144 tools)
+                               MCP Lambda (116 tools)
                                                     │
                       Lambda Function URL (local) / Remote MCP URL
                                                     │
@@ -384,7 +384,7 @@ Each Lambda has a **dedicated, least-privilege IAM role** (43 roles total as of 
 | `life-platform/todoist` | Todoist Lambda | Todoist API key |
 | `life-platform/notion` | Notion Lambda | Notion integration key |
 | `life-platform/habitify` | Habitify Lambda | Habitify API key (dedicated secret — see ADR-014) |
-| ~~`life-platform/api-keys`~~ | ~~Legacy~~ | ~~**PENDING DELETION** (~2026-04-07). Verify all Lambdas migrated before deleting.~~ |
+| ~~`life-platform/api-keys`~~ | ~~Legacy~~ | ~~**PERMANENTLY DELETED 2026-03-14.** All Lambdas migrated to per-service secrets.~~ |
 
 ---
 
@@ -394,7 +394,7 @@ Target: under $25/month | Current: ~$10/month
 
 | Driver | Monthly Cost |
 |---|---|
-| Secrets Manager (9 secrets, api-keys pending deletion) | ~$3.60 |
+| Secrets Manager (9 active secrets) | ~$3.60 |
 | Lambda invocations (~2,000/mo) | ~$0.50 |
 | DynamoDB (on-demand, low RCU/WCU) | ~$1.00 |
 | S3 (~2.5 GB stored + requests) | ~$0.50 |
@@ -413,7 +413,7 @@ AWS Budget alerts at $5 (25%), $10 (50%), $20 (100%) → `awsdev@mattsusername.c
 ~/Documents/Claude/life-platform/
   mcp_server.py                   ← MCP Lambda entry point
   mcp_bridge.py                   ← Local MCP adapter (Claude Desktop stdio → Lambda HTTPS)
-  mcp/                            ← MCP server package (30 modules)
+  mcp/                            ← MCP server package (31 modules)
     handler.py, config.py, utils.py, core.py, helpers.py, warmer.py
     labs_helpers.py, strength_helpers.py, registry.py
     tools_sleep, tools_health, tools_training, tools_nutrition, tools_habits
@@ -430,7 +430,7 @@ AWS Budget alerts at $5 (25%), $10 (50%), $20 (100%) → `awsdev@mattsusername.c
     PROJECT_PLAN.md               ← Roadmap and backlog
     USER_GUIDE.md                 ← How to use MCP tools
     FEATURES.md                   ← Feature showcase
-    MCP_TOOL_CATALOG.md           ← All 144 tools with params, cache, deps
+    MCP_TOOL_CATALOG.md           ← All 116 tools with params, cache, deps
     DATA_DICTIONARY.md            ← Every metric → SOT source
     COST_TRACKER.md               ← Budget tracking
     INCIDENT_LOG.md               ← Operational incident history

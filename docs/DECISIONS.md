@@ -244,7 +244,7 @@ When a significant decision is made — a design pattern chosen, an approach rej
 
 **Governing principle (clarified 2026-03-11):** Bundle secrets only when the same credentials are consumed by the exact same set of Lambdas. The one justified bundle is `life-platform/ai-keys` (Anthropic API key + MCP bearer token — shared by all email, compute, and MCP Lambdas). Everything else is dedicated. Habitify, Todoist, and Notion each have their own secret because each is consumed by exactly one Lambda — bundling them saves $0.40/month at the cost of blast radius and coupling. OAuth secrets (Whoop, Withings, Strava, Garmin) are always dedicated because they auto-rotate and write back to their own secret. The original `api-keys` bundle was an over-optimisation; migrating away from it was correct.
 
-**Current end state (v3.5.0):** 9 active secrets — `whoop`, `withings`, `strava`, `garmin`, `eightsleep`, `ai-keys`, `todoist`, `notion`, `habitify`. `api-keys` pending deletion (~2026-04-07).
+**Current end state (v3.7.13):** 9 active secrets — `whoop`, `withings`, `strava`, `garmin`, `eightsleep`, `ai-keys`, `todoist`, `notion`, `habitify`. `api-keys` **permanently deleted 2026-03-14**.
 
 **Lesson learned (dropbox-poll incident):** Lambdas with hardcoded `SECRET_NAME` env vars are latent risks after consolidation. Audit remaining Lambdas for any stale overrides. Key name prefixes (`dropbox_app_key` vs `app_key`) must match new bundle structure.
 
@@ -381,4 +381,4 @@ When a significant decision is made — a design pattern chosen, an approach rej
 
 ---
 
-*Last updated: 2026-03-11 (v3.5.0)*
+*Last updated: 2026-03-14 (v3.7.13)*
