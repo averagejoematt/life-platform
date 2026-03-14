@@ -61,23 +61,6 @@ def lambda_handler(event, context):
     except ImportError:
         pass
 
-    # ── Sick day check: suppress stale alerts if yesterday was a sick/rest day ──
-    # Stale data on a sick day is expected — user is not tracking anything.
-    yesterday_str = (now.date() - timedelta(days=1)).isoformat()
-    _sick_suppress = False
-    try:
-        from sick_day_checker import check_sick_day as _check_fresh_sick
-        _sick_fr = _check_fresh_sick(table, USER_ID, yesterday_str)
-        if _sick_fr:
-            _sick_suppress = True
-            _sick_r = _sick_fr.get("reason") or "sick day"
-            logger.info(
-                "Sick day flagged for %s (%s) — freshness alerts suppressed",
-                yesterday_str, _sick_r,
-            )
-    except ImportError:
-        pass
-
     stale_sources = []
     source_status = []
 

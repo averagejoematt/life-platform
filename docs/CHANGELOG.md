@@ -1,5 +1,33 @@
 # Life Platform — Changelog
 
+## v3.7.10 — 2026-03-13: Housekeeping + Incident RCA (Todoist IAM drift)
+
+### Summary
+Housekeeping sprint: confirmed SIMP-1 EMF instrumentation already live, added
+S3 lifecycle script for deploy artifacts, confirmed Brittany email address already
+correct (SES sandbox verification pending). Investigated Mar 12 alarm storm —
+root cause was CDK drift on TodoistIngestionRole missing `s3:PutObject`. Fixed
+via `cdk deploy LifePlatformIngestion`. Also fixed duplicate sick-day suppression
+block in freshness_checker_lambda.py (silent bug).
+
+### Changes
+- **deploy/apply_s3_lifecycle.sh** (new): expires `deploys/*` S3 objects after 30 days. Pending run.
+- **lambdas/freshness_checker_lambda.py**: removed duplicate sick-day suppression block — second block silently reset `_sick_suppress = False`. Needs deploy.
+- **LifePlatformIngestion CDK deploy**: synced TodoistIngestionRole — added missing `s3:PutObject` on `raw/todoist/*`. Resolved Mar 12 alarm storm.
+
+### Incident: Mar 12 Alarm Storm (P3)
+- **Root cause:** CDK drift — TodoistIngestionRole missing `s3:PutObject`
+- **Cascade:** Todoist failure → freshness checker → slo-source-freshness → daily-insight-compute, failure-pattern-compute, monday-compass, DLQ depth
+- **Fix:** `cdk deploy LifePlatformIngestion` (54s). Smoke verified clean.
+- **Full RCA:** docs/INCIDENT_LOG.md
+
+### Pending deploy actions
+- `bash deploy/apply_s3_lifecycle.sh`
+- `bash deploy/deploy_lambda.sh freshness-checker lambdas/freshness_checker_lambda.py`
+- `aws sesv2 create-email-identity --email-identity brittany@mattsusername.com --region us-west-2`
+- SNS subscription confirmation in `awsdev@mattsusername.com`
+
+
 ## v3.7.9 — 2026-03-13: TB7-25/26/27 — Rollback + WAF (N/A) + tool tiering design
 
 ### Summary
