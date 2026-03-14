@@ -279,8 +279,12 @@ jobs:
           fi
 
           if grep -qi 'iam\|policy\|role\|permission' /tmp/cdk_diff.txt; then
-            echo "::warning::CDK diff detected IAM/policy changes — verify role_policies.py is up to date:"
+            echo "::error::CDK diff detected IAM/policy changes — R8-ST6 gate: review and approve manually before deploying."
+            echo "Changes detected:"
             grep -i 'iam\|policy\|role\|permission' /tmp/cdk_diff.txt | head -20
+            echo ""
+            echo "If these changes are intentional, run 'cdk deploy' locally and verify with post_cdk_reconcile_smoke.sh before re-pushing."
+            exit 1
           fi
 
           if grep -qi 'InlinePolicy\|inline_policy\|QaSmokeKmsAccess\|CanaryKmsAccess' /tmp/cdk_diff.txt; then

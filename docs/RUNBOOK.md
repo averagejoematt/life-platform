@@ -190,6 +190,95 @@ aws dynamodb query \
 
 ---
 
+## DynamoDB PITR Restore (R8-ST2)
+
+PITR (Point-In-Time Recovery) is enabled on `life-platform`. This gives a 35-day continuous backup window. PITR restores to a **new table** — the original table is never overwritten.
+
+### Verify PITR is enabled
+```bash
+aws dynamodb describe-continuous-backups \
+  --table-name life-platform \
+  --region us-west-2 \
+  --query 'ContinuousBackupsDescription.PointInTimeRecoveryDescription'
+```
+Expected: `PointInTimeRecoveryStatus: ENABLED` with `EarliestRestorableDateTime` and `LatestRestorableDateTime`.
+
+### Restore to a test table (drill procedure)
+Use this to verify integrity without touching production:
+```bash
+# Restore to a timestamped test table (use ISO 8601 UTC)
+RESTORE_TIME="2026-03-14T10:00:00Z"   # adjust to desired point-in-time
+
+aws dynamodb restore-table-to-point-in-time \
+  --source-table-name life-platform \
+  --target-table-name life-platform-restore-test \
+  --restore-date-time "$RESTORE_TIME" \
+  --region us-west-2
+```
+
+Monitor restore status (takes 5–20 minutes depending on table size):
+```bash
+aws dynamodb describe-table \
+  --table-name life-platform-restore-test \
+  --region us-west-2 \
+  --query 'Table.TableStatus'
+# ACTIVE = restore complete
+```
+
+Verify data integrity after restore:
+```bash
+# Check item count
+aws dynamodb describe-table \
+  --table-name life-platform-restore-test \
+  --query 'Table.ItemCount' \
+  --region us-west-2
+
+# Spot-check a known record (e.g. yesterday's whoop data)
+YESTERDAY=$(date -u -v-1d +%Y-%m-%d)
+aws dynamodb get-item \
+  --table-name life-platform-restore-test \
+  --key "{\"pk\":{\"S\":\"USER#matthew#SOURCE#whoop\"},\"sk\":{\"S\":\"DATE#${YESTERDAY}\"}}" \
+  --region us-west-2
+```
+
+Delete the test table when done:
+```bash
+aws dynamodb delete-table \
+  --table-name life-platform-restore-test \
+  --region us-west-2
+```
+
+### Emergency: restore to production (data loss recovery)
+Only if the production table is corrupted or accidentally deleted:
+```bash
+# 1. Restore to a temporary table first
+aws dynamodb restore-table-to-point-in-time \
+  --source-table-name life-platform \
+  --target-table-name life-platform-recovered \
+  --restore-date-time "<last-known-good-timestamp>" \
+  --region us-west-2
+
+# 2. Verify integrity (see drill procedure above, substitute table name)
+
+# 3. Update all Lambda env vars to point to life-platform-recovered:
+#    TABLE_NAME env var on all 42 Lambdas — easiest via CDK redeploy
+#    cdk deploy --all (will set TABLE_NAME across all stacks)
+
+# 4. Enable PITR on the recovered table:
+aws dynamodb update-continuous-backups \
+  --table-name life-platform-recovered \
+  --point-in-time-recovery-specification PointInTimeRecoveryEnabled=true \
+  --region us-west-2
+```
+
+### Notes
+- PITR has no additional restore cost beyond storage (~$0.10/mo for this table size).
+- Restore is to a new table — original is never touched, so there's no risk in initiating a restore.
+- KMS: the restored table uses the same CMK. No key rotation needed.
+- Deletion protection is enabled on `life-platform` — accidental deletes require a 2-step process.
+
+---
+
 ## Common Issues
 
 ### Whoop/Withings/Strava: "Token expired" error

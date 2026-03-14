@@ -315,7 +315,14 @@ def ingestion_hae() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="S3Write",
             actions=["s3:PutObject"],
-            resources=_s3("raw/matthew/*"),  # HAE writes to multiple sub-paths: cgm_readings, blood_pressure, state_of_mind, workouts
+            # R8-ST7: tightened from raw/matthew/* to explicit HAE sub-paths (2026-03-14)
+            resources=_s3(
+                "raw/matthew/cgm_readings/*",
+                "raw/matthew/blood_pressure/*",
+                "raw/matthew/state_of_mind/*",
+                "raw/matthew/workouts/*",
+                "raw/matthew/health_auto_export/*",
+            ),
         ),
         iam.PolicyStatement(
             sid="Secrets",
@@ -516,8 +523,19 @@ def _email_base(
 
 
 def email_daily_brief() -> list[iam.PolicyStatement]:
-    """Daily brief: DDB read, S3 config, ai-keys, SES, writes dashboard/ + buddy/ to S3."""
-    return _email_base(needs_s3_write=["dashboard/*", "buddy/*"])
+    """Daily brief: DDB read, S3 config, ai-keys, SES, writes dashboard/ + buddy/ to S3.
+    Risk-7: also emits ComputePipelineStaleness metric to CloudWatch.
+    """
+    return _email_base(
+        needs_s3_write=["dashboard/*", "buddy/*"],
+        extra_statements=[
+            iam.PolicyStatement(
+                sid="CloudWatchMetrics",
+                actions=["cloudwatch:PutMetricData"],
+                resources=["*"],
+            ),
+        ],
+    )
 
 
 def email_weekly_digest() -> list[iam.PolicyStatement]:
@@ -560,7 +578,9 @@ def email_brittany() -> list[iam.PolicyStatement]:
 # ═════════════════════════════════════════════════════════════════════════
 
 def operational_freshness_checker() -> list[iam.PolicyStatement]:
-    """Freshness checker: reads DDB + publishes CloudWatch custom metrics, sends SES alert."""
+    """Freshness checker: reads DDB + publishes CloudWatch custom metrics, sends SES alert.
+    R8-ST4: also calls DescribeSecret on OAuth secrets to check token freshness.
+    """
     return [
         iam.PolicyStatement(
             sid="DynamoDB",
@@ -586,6 +606,17 @@ def operational_freshness_checker() -> list[iam.PolicyStatement]:
             sid="DLQ",
             actions=["sqs:SendMessage"],
             resources=[DLQ_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="OAuthSecretDescribe",
+            # R8-ST4: DescribeSecret to read LastChangedDate for OAuth token health monitoring
+            actions=["secretsmanager:DescribeSecret"],
+            resources=[
+                _secret_arn("life-platform/whoop"),
+                _secret_arn("life-platform/withings"),
+                _secret_arn("life-platform/strava"),
+                _secret_arn("life-platform/garmin"),
+            ],
         ),
     ]
 

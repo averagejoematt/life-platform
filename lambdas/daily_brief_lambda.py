@@ -1292,6 +1292,8 @@ def lambda_handler(event, context):
     # Try to read pre-computed metrics from daily-metrics-compute Lambda (9:40 AM PT).
     # If the record exists, we skip all inline scoring and stores — they already happened.
     # Fallback to inline computation if record is missing (Lambda not yet deployed, backfill, etc.).
+    # Risk-7: emit CloudWatch metric when compute pipeline is stale/missing so alarm can fire.
+    _cloudwatch = boto3.client("cloudwatch", region_name=_REGION)
     _computed = None
     _compute_stale = False   # REL-1: flag stale/missing compute for email banner
     _compute_age_msg = ""
@@ -1322,6 +1324,21 @@ def lambda_handler(event, context):
         _compute_stale = True
         _compute_age_msg = "fetch error"
         print("[WARN] Could not fetch computed_metrics: " + str(_e))
+
+    # Risk-7: emit CloudWatch metric for compute pipeline staleness monitoring.
+    # Alarm: LifePlatformComputeStaleness >= 1 for 1 datapoint within 1 day → alert.
+    try:
+        _cloudwatch.put_metric_data(
+            Namespace="LifePlatform",
+            MetricData=[{
+                "MetricName": "ComputePipelineStaleness",
+                "Value": 1.0 if _compute_stale else 0.0,
+                "Unit": "Count",
+                "Dimensions": [{"Name": "Source", "Value": "computed_metrics"}],
+            }]
+        )
+    except Exception as _cw_e:
+        print("[WARN] Risk-7: failed to emit compute staleness metric: " + str(_cw_e))
 
     if _computed:
         # Read pre-computed values — daily-metrics-compute already stored day_grade + habit_scores

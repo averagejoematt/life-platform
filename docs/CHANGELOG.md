@@ -1,5 +1,50 @@
 # Life Platform — Changelog
 
+## v3.7.17 — 2026-03-14: R8 gap closure sprint — 8 findings resolved
+
+### Summary
+Closed all remaining actionable R8 findings from the Architecture Review #8 PDF. SIMP-1 Phase 1a (habits cluster) reduced MCP tools 116→109. Resolved 8 open items: compute pipeline staleness observability (Risk-7), HAE S3 scope tightening (R8-ST7), CDK IAM blocking gate (R8-ST6), maintenance mode script (R8-ST3), OAuth token health monitoring (R8-ST4), DynamoDB PITR restore runbook (R8-ST2), hypothesis disclaimer (R8-LT7), and COST_TRACKER model routing entry (R8-QS3). PROJECT_PLAN TB7-1 and TB7-2 statuses corrected to Done (were previously completed but not marked).
+
+### Changes
+- **mcp/tools_habits.py**: Added `tool_get_habits(view=...)` dispatcher — routes to dashboard/adherence/streaks/tiers/stacks/keystones.
+- **mcp/registry.py**: Removed 7 habit tools (get_habit_adherence, get_habit_streaks, get_keystone_habits, get_group_trends, get_habit_stacks, get_habit_dashboard, get_habit_tier_report). Added `get_habits`. Retained `compare_habit_periods` standalone. Net: 116→109 tools. Added unconfirmed-hypothesis disclaimer to `get_hypotheses` description.
+- **lambdas/daily_brief_lambda.py**: Risk-7 — emits `LifePlatform/ComputePipelineStaleness` CloudWatch metric when computed_metrics is missing or >4h stale.
+- **lambdas/freshness_checker_lambda.py**: R8-ST4 — OAuth token health check on all 4 OAuth secrets via DescribeSecret. Alerts via SNS if any token not updated >60 days. Emits `OAuthTokenStaleCount` metric.
+- **cdk/stacks/role_policies.py**: `email_daily_brief()` — added CloudWatchMetrics statement (PutMetricData). `operational_freshness_checker()` — added OAuthSecretDescribe statement for 4 OAuth secrets. `ingestion_hae()` — S3Write tightened from `raw/matthew/*` to 5 explicit paths.
+- **.github/workflows/ci-cd.yml**: R8-ST6 — CDK diff IAM detection upgraded from `::warning` to `::error` + `exit 1` (blocking gate).
+- **deploy/maintenance_mode.sh** (new): R8-ST3 — enable/disable/status for 7 non-essential EventBridge rules. Core ingestion + compute always kept running.
+- **deploy/create_compute_staleness_alarm.sh** (new): Risk-7 — creates `life-platform-compute-pipeline-stale` CloudWatch alarm.
+- **docs/RUNBOOK.md**: R8-ST2 — added DynamoDB PITR Restore section with drill procedure, integrity checks, and emergency restore steps.
+- **docs/COST_TRACKER.md**: R8-QS3 — marked Haiku model routing entry as stale (actual: Sonnet).
+- **docs/PROJECT_PLAN.md**: Marked R8-QS2/QS3/QS4, TB7-1/TB7-2, R8-ST2/ST3/ST4/ST6/ST7, R8-LT7 as Done. Added Risk-7 as tracked item.
+
+### Deployed
+- `daily-brief` Lambda (compute staleness metric)
+- `life-platform-mcp` Lambda (registry: 116→109 tools, hypothesis disclaimer)
+- `life-platform-freshness-checker` Lambda (OAuth token health check)
+- `LifePlatformIngestion` CDK (HAE S3 scope tightened)
+- `LifePlatformEmail` CDK (daily_brief CloudWatch IAM)
+- `LifePlatformOperational` CDK (freshness_checker OAuthSecretDescribe IAM)
+- CloudWatch alarm: `life-platform-compute-pipeline-stale` ✅
+- Post-reconcile smoke: 10/10 ✅
+- CI: 20/20 ✅
+
+### Files Changed
+- `mcp/tools_habits.py`
+- `mcp/registry.py`
+- `lambdas/daily_brief_lambda.py`
+- `lambdas/freshness_checker_lambda.py`
+- `cdk/stacks/role_policies.py`
+- `.github/workflows/ci-cd.yml`
+- `deploy/maintenance_mode.sh` (new)
+- `deploy/create_compute_staleness_alarm.sh` (new)
+- `docs/RUNBOOK.md`
+- `docs/COST_TRACKER.md`
+- `docs/PROJECT_PLAN.md`
+- `docs/CHANGELOG.md`
+
+---
+
 ## v3.7.16 — 2026-03-14: R8-QS2 integration test + CDK handler bug fixes
 
 ### Summary

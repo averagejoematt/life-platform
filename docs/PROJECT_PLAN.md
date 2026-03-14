@@ -27,23 +27,23 @@ Items are grouped by priority tier. Within each tier, items are ordered by ROI (
 | ID | Item | Source | Effort | Impact | Status |
 |----|------|--------|--------|--------|--------|
 | R8-QS1 | **SIMP-1: MCP tool consolidation** — reduce from 116 to ≤80 tools using 30-day EMF invocation data. Pre-compute composite scores → `SOURCE#composite_scores` partition. Group related tools behind composite entry points. | R8 Finding-5, R8 Top-10 #5 | L | HIGH — biggest product quality + context window improvement | ⏳ EMF data accumulating (started 2026-03-13, ready ~2026-04-13) |
-| R8-QS2 | **Add integration test to qa-smoke Lambda** — write test record to `SOURCE#test`, invoke 2-3 MCP tools + validate response schema, verify cache ≥10 items, verify freshness of ≥1 source. | R8 Finding-4, R8 Top-10 #3 | M (2-3h) | HIGH — catches 80% of deployment-induced failures | Not started |
-| R8-QS3 | **Update COST_TRACKER model routing entry** — decision log says "Haiku ~$0.10/mo" but `ai_calls.py` uses Sonnet for coaching calls (~$3/mo actual). Entry is stale, not a cost problem. | R8 §8 stale docs | S (10min) | LOW — documentation hygiene | Not started |
-| R8-QS4 | **Archive completed deploy scripts** — reduce 120+ scripts in `deploy/` to active-only. Run `bash deploy/archive_onetime_scripts.sh`. | R8 Finding-3, R8-6 (pending from v3.7.14) | S (15min) | LOW — DevEx / cognitive load | Pending run |
-| TB7-1 | **GitHub `production` Environment gate** — verify exists in repo settings for CI/CD manual approval. | TB7 (pre-R8) | S (5min) | LOW — CI/CD hygiene | Not started |
-| TB7-2 | **Update `BRITTANY_EMAIL` env var** to real address for accountability email. | TB7 (pre-R8) | S (5min) | LOW — feature enablement | Not started |
+| R8-QS2 | **Add integration test to qa-smoke Lambda** — write test record to `SOURCE#test`, invoke 2-3 MCP tools + validate response schema, verify cache ≥10 items, verify freshness of ≥1 source. | R8 Finding-4, R8 Top-10 #3 | M (2-3h) | HIGH — catches 80% of deployment-induced failures | ✅ Done (v3.7.16) |
+| R8-QS3 | **Update COST_TRACKER model routing entry** — decision log says "Haiku ~$0.10/mo" but `ai_calls.py` uses Sonnet for coaching calls (~$3/mo actual). Entry is stale, not a cost problem. | R8 §8 stale docs | S (10min) | LOW — documentation hygiene | ✅ Done (v3.7.17) |
+| R8-QS4 | **Archive completed deploy scripts** — reduce 120+ scripts in `deploy/` to active-only. Run `bash deploy/archive_onetime_scripts.sh`. | R8 Finding-3, R8-6 (pending from v3.7.14) | S (15min) | LOW — DevEx / cognitive load | ✅ Done (v3.7.16) |
+| TB7-1 | **GitHub `production` Environment gate** — verify exists in repo settings for CI/CD manual approval. | TB7 (pre-R8) | S (5min) | LOW — CI/CD hygiene | ✅ Done |
+| TB7-2 | **Update `BRITTANY_EMAIL` env var** to real address for accountability email. | TB7 (pre-R8) | S (5min) | LOW — feature enablement | ✅ Done |
 
 ### Tier 2 — Near-Term (60 days)
 
 | ID | Item | Source | Effort | Impact | Status |
 |----|------|--------|--------|--------|--------|
 | R8-ST1 | **Google Calendar integration** — highest-priority unbuilt data source. OAuth token rotation pattern, ~6-8h. | Pre-R8, TB7-18 | L (6-8h) | MEDIUM — new data source for scheduling/planning intelligence | Not started |
-| R8-ST2 | **Document and test DynamoDB restore procedure** — write runbook section, execute PITR restore to test table, verify data integrity across partitions. | R8 Finding-6, R8 Top-10 #6 | S (1h) | MEDIUM — critical insurance for core data asset | Not started |
-| R8-ST3 | **Create "maintenance mode" Lambda profile** — config to disable non-essential Lambdas (Wednesday Chronicle, Monday Compass, Weekly Plate, Nutrition Review) while keeping core ingestion + Daily Brief. For vacation/extended absence. | R8 §6 R-5, R8 Top-10 #9 | S (30min) | MEDIUM — operational resilience during absence | Not started |
-| R8-ST4 | **Add OAuth token health monitoring** — CloudWatch alarm if any OAuth refresh token hasn't been updated in >60 days. Prevents cascade failure during absence. | R8 §6 R-2, R8 Top-10 | M (2h) | MEDIUM — prevents multi-source auth cascade failure | Not started |
+| R8-ST2 | **Document and test DynamoDB restore procedure** — write runbook section, execute PITR restore to test table, verify data integrity across partitions. | R8 Finding-6, R8 Top-10 #6 | S (1h) | MEDIUM — critical insurance for core data asset | ✅ Done (v3.7.17) — runbook written. Drill (actual restore) still recommended. |
+| R8-ST3 | **Create "maintenance mode" Lambda profile** — config to disable non-essential Lambdas during vacation/absence. | R8 §6 R-5, R8 Top-10 #9 | S (30min) | MEDIUM — operational resilience during absence | ✅ Done (v3.7.17) — `deploy/maintenance_mode.sh enable\|disable\|status` |
+| R8-ST4 | **Add OAuth token health monitoring** — alert if any OAuth refresh token hasn't been updated in >60 days. | R8 §6 R-2, R8 Top-10 | M (2h) | MEDIUM — prevents multi-source auth cascade failure | ✅ Done (v3.7.17) — freshness_checker extended, OAuthSecretDescribe IAM added |
 | R8-ST5 | **Pre-compute composite scores** — `SOURCE#composite_scores` DynamoDB partition written nightly. Enables MCP tool count reduction (SIMP-1 dependency). | Pre-R8, SIMP-1 prereq | M (3-4h) | HIGH (via SIMP-1) — reduces tool count, enables ≤75 target | Not started |
-| R8-ST6 | **CDK diff IAM change → blocking gate** — make CI pipeline block (not just warn) when CDK diff detects IAM/policy changes. Prevents COST-B-class drift from accumulating silently. | R8 §10 CD-4 | S (30min) | MEDIUM — prevents future IAM drift | Not started |
-| R8-ST7 | **Tighten HAE webhook S3 write scope** — `ingestion_hae()` currently allows `raw/matthew/*`. Tighten to explicit paths: `raw/cgm_readings/*`, `raw/blood_pressure/*`, `raw/state_of_mind/*`, `raw/workouts/*`, `raw/health_auto_export/*`. | R8 §5 IAM | S (15min) | LOW — least-privilege refinement | Not started |
+| R8-ST6 | **CDK diff IAM change → blocking gate** — make CI pipeline block (not just warn) when CDK diff detects IAM/policy changes. | R8 §10 CD-4 | S (30min) | MEDIUM — prevents future IAM drift | ✅ Done (v3.7.17) — ci-cd.yml warning → error + exit 1 |
+| R8-ST7 | **Tighten HAE webhook S3 write scope** — tightened from `raw/matthew/*` to 5 explicit paths. | R8 §5 IAM | S (15min) | LOW — least-privilege refinement | ✅ Done (v3.7.17) — role_policies.py updated, CDK deploy pending |
 
 ### Tier 3 — Strategic (90 days)
 
@@ -55,7 +55,8 @@ Items are grouped by priority tier. Within each tier, items are ordered by ROI (
 | R8-LT4 | **DynamoDB export to S3 for analytics isolation** — separate analytical workload from transactional. Export to Parquet via DDB export, query with Athena. | R8 §17 roadmap | L | LOW — premature until data volume warrants | Not started |
 | R8-LT5 | **Review SLO targets** — evaluate whether 99%/99.5% targets are appropriate based on 90 days of operational data. | R8 §17 roadmap | S (assessment) | LOW — operational maturity | Gated on 90 days data |
 | R8-LT6 | **Lambda@Edge auth — verify CDK management** — `life-platform-cf-auth` and `life-platform-buddy-auth` may be manually managed outside CDK. Verify and document or bring into WebStack. | R8 Finding-6, R8 §4 S | S (15min) | LOW — infrastructure hygiene | Not started |
-| R8-LT7 | **Add disclaimer to `get_active_hypotheses` MCP tool** — "Active hypotheses are unconfirmed — require 3 confirming observations before promotion." Already internal logic, should be surfaced to user. | R8 §12 AI-2 | S (5min) | LOW — analytical transparency | Not started |
+| R8-LT7 | **Add disclaimer to `get_hypotheses` MCP tool** — unconfirmed hypotheses require 3 observations before promotion. | R8 §12 AI-2 | S (5min) | LOW — analytical transparency | ✅ Done (v3.7.17) — registry description updated |
+| Risk-7 | **Compute pipeline timing: staleness observability** — Daily Brief now emits `ComputePipelineStaleness` CloudWatch metric when `computed_metrics` is missing or >4h stale. Alarm `life-platform-compute-pipeline-stale` to be created via `deploy/create_compute_staleness_alarm.sh`. | R8 Top-10 Risk 7 | S (30min) | MEDIUM — makes silent timing failure visible | ✅ Code done (v3.7.17). Run alarm script to complete. |
 | R8-LT8 | **DLQ consumer: event-driven vs scheduled** — currently schedule-triggered. Consider SQS event source mapping for faster triage. | R8 §6 R-3 | S (30min) | LOW — marginal improvement for personal project | Not started |
 | R8-LT9 | **Pre-compute weekly correlation matrix** — `SOURCE#weekly_correlations` partition. Reduces MCP tool compute time. | Pre-R8 | M (3h) | LOW — performance optimization | Not started |
 
