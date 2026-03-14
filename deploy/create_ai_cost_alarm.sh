@@ -21,22 +21,32 @@ AWS_ACCOUNT="205930651321"
 AWS_BILLING_REGION="us-east-1"     # AWS billing metrics only exist in us-east-1
 AWS_HOME_REGION="us-west-2"
 
-SNS_TOPIC_ARN="arn:aws:sns:${AWS_HOME_REGION}:${AWS_ACCOUNT}:life-platform-alerts"
+BILLING_SNS_TOPIC_NAME="life-platform-billing-alerts"
+NOTIFY_EMAIL="awsdev@mattsusername.com"
 
-# ── Step 1: Enable billing alerts (idempotent) ──────────────────────────────
-echo "Enabling billing alerts on account..."
-aws ce put-anomaly-monitor \
-  --anomaly-monitor '{"MonitorName":"life-platform-cost-monitor","MonitorType":"DIMENSIONAL","MonitorDimension":"SERVICE"}' \
-  --region us-east-1 2>/dev/null || true
+# ── Step 1: Create us-east-1 SNS topic for billing alerts ──────────────────
+# CloudWatch billing alarms require SNS topic in us-east-1 (cross-region not supported)
+echo "Creating billing SNS topic in us-east-1..."
+BILLING_TOPIC_ARN=$(aws sns create-topic \
+  --name "$BILLING_SNS_TOPIC_NAME" \
+  --region us-east-1 \
+  --query 'TopicArn' --output text)
+echo "Topic ARN: $BILLING_TOPIC_ARN"
 
-# Enable billing metric in CloudWatch (one-time setup per account)
-aws cloudwatch enable-alarm-actions 2>/dev/null || true
+# Subscribe email (idempotent — re-subscribing existing address is a no-op)
+aws sns subscribe \
+  --topic-arn "$BILLING_TOPIC_ARN" \
+  --protocol email \
+  --notification-endpoint "$NOTIFY_EMAIL" \
+  --region us-east-1
+echo "Email subscription requested for $NOTIFY_EMAIL (confirm via email if first time)"
 
 # ── Step 2: Create total estimated charges alarm ────────────────────────────
+echo ""
 echo "Creating EstimatedCharges alarm in us-east-1..."
 aws cloudwatch put-metric-alarm \
   --alarm-name "life-platform-ai-cost-soft-alarm" \
-  --alarm-description "Soft alarm: AWS estimated charges exceeded \$5 this month. Review AI/Lambda spending. life-platform-alerts." \
+  --alarm-description "Soft alarm: AWS estimated charges exceeded \$5 this month. Review AI/Lambda spending." \
   --namespace "AWS/Billing" \
   --metric-name "EstimatedCharges" \
   --dimensions Name=Currency,Value=USD \
@@ -46,8 +56,8 @@ aws cloudwatch put-metric-alarm \
   --threshold 5 \
   --comparison-operator GreaterThanOrEqualToThreshold \
   --treat-missing-data notBreaching \
-  --alarm-actions "$SNS_TOPIC_ARN" \
-  --ok-actions "$SNS_TOPIC_ARN" \
+  --alarm-actions "$BILLING_TOPIC_ARN" \
+  --ok-actions "$BILLING_TOPIC_ARN" \
   --region "$AWS_BILLING_REGION"
 
 echo "✅ Alarm 'life-platform-ai-cost-soft-alarm' created in us-east-1"

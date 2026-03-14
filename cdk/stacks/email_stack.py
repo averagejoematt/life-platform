@@ -71,5 +71,5 @@ class EmailStack(Stack):
 
         create_platform_lambda(self, "MondayCompass", function_name="monday-compass", handler="monday_compass_lambda.lambda_handler", source_file="lambdas/monday_compass_lambda.py", schedule="cron(0 15 ? * MON *)", timeout_seconds=120, memory_mb=512, environment=_email_env, custom_policies=rp.email_monday_compass(), **shared)
 
-        _partner_env = {**_email_env, "PARTNER_EMAIL": "awsdev@mattsusername.com"}
+        _partner_env = {**_email_env, "PARTNER_EMAIL": "[partner-address-redacted]", "EMAIL_SENDER": "awsdev@mattsusername.com"}
         create_platform_lambda(self, "PartnerWeeklyEmail", function_name="partner-weekly-email", handler="partner_email_lambda.lambda_handler", source_file="lambdas/partner_email_lambda.py", schedule="cron(30 17 ? * 1 *)", timeout_seconds=90, memory_mb=256, environment=_partner_env, custom_policies=rp.email_partner(), **shared)
