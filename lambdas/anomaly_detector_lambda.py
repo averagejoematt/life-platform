@@ -1,6 +1,12 @@
 """
-Anomaly Detector Lambda — v2.4.0 (Henning: HRV log-transform for lognormal Z-scoring)
+Anomaly Detector Lambda — v2.5.0 (TB7-21: raise Z-floor to 2.0, reduce single-day FP rate)
 Fires at 8:05am PT daily (16:05 UTC via EventBridge) — after enrichment, before daily brief.
+
+v2.5.0 Changes:
+  - CV_THRESHOLDS: floor raised from Z=1.5/1.75 to Z=2.0 across all buckets
+    (TB7-21 / Henning: at 13 metrics, Z=1.5 floor produced ~42% daily FP rate)
+    New table: high variability CV>=0.30 → Z=2.5, medium CV>=0.15 → Z=2.0, low → Z=2.0
+  - detector_version bumped to 2.5.0
 
 v2.4.0 Changes:
   - LOG_TRANSFORM_METRICS: HRV Z-score now computed on log(HRV) — reduces false high-HRV
@@ -103,10 +109,13 @@ SENDER    = "awsdev@mattsusername.com"
 MIN_BASELINE_DAYS = 7
 
 # ── Adaptive threshold configuration ─────────────────────────────────────────
+# TB7-21 (2026-03-13): Raised floor from 1.5/1.75 to Z=2.0 across all CV buckets.
+# At 13 metrics, Z=1.5 floor yields ~42% daily FP rate. Z=2.0 floor drops it to ~2.3% per metric.
+# Sustained streak tracker (DDB history) is unaffected by this change.
 CV_THRESHOLDS = [
-    (0.30, 2.0),   # high variability → Z=2.0
-    (0.15, 1.75),  # medium variability → Z=1.75
-    (0.0,  1.5),   # low variability → Z=1.5
+    (0.30, 2.5),   # high variability → Z=2.0
+    (0.15, 2.0),   # medium variability → Z=1.75
+    (0.0,  2.0),   # low variability → Z=1.5
 ]
 
 MIN_ABSOLUTE_CHANGE = {
@@ -740,7 +749,7 @@ def write_anomaly_record(date_str, flagged, alert_sent, hypothesis, severity,
         "travel_destination":    travel_dest,
         "sick_mode":             sick_mode,
         "sick_reason":           sick_reason,
-        "detector_version":      "2.4.0",
+        "detector_version":      "2.5.0",
         "updated_at":            datetime.now(timezone.utc).isoformat(),
     }
     # Sustained streak fields — additive, harmless if absent (IC-19 Deliverable 2)
@@ -824,7 +833,7 @@ def build_alert_html(flagged, hypothesis, date_str):
     </div>
     <div style="background:#f8f8fc;padding:12px 24px;border-top:1px solid #e8e8f0;">
       <p style="color:#9ca3af;font-size:10px;margin:0;text-align:center;">
-        Life Platform - Anomaly Detector v2.3.0 - Adaptive thresholds (CV-based) - 2+ source rule - Travel aware - Sustained tracking
+        Life Platform - Anomaly Detector v2.5.0 - Adaptive thresholds (CV-based, Z-floor=2.0) - 2+ source rule - Travel aware - Sustained tracking
       </p>
       <p style="color:#b0b0b0;font-size:8px;margin:4px 0 0;text-align:center;">&#9874;&#65039; Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your health regimen.</p>
     </div>

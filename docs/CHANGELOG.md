@@ -1,5 +1,46 @@
 # Life Platform — Changelog
 
+## v3.7.7 — 2026-03-13: TB7-19/20/21/22/23 — AI validator + anomaly + drift hardening
+
+### Summary
+Completed the final 5 TB7 items deferred from earlier sessions. Three code changes
+(hallucination detection, insights cap, anomaly thresholds, drift windows) and one
+doc-only resolution (TB7-23: IC-3 already on Sonnet, no code change needed).
+
+### Changes
+- **TB7-19 CLOSED** — `ai_output_validator.py` v1.1.0: added `_METRIC_PATTERNS` (7 metrics)
+  and `_check_hallucinated_metrics()`. Check 12 in `validate_ai_output()` scans AI text for
+  numeric health claims (recovery, HRV, resting HR, sleep score, weight, TSB) and WARNs
+  when mentioned value deviates >25% from actual `health_context` value. WARN tier only
+  (not BLOCK — rounding/wording differences are common).
+- **TB7-20 CLOSED** — `ai_calls.py`: `_load_insights_context()` now applies a 1500-char
+  hard cap (second safety valve behind the 700-token upstream budget). Truncates at
+  newline boundary with `[...context truncated at 1500-char limit]` note.
+- **TB7-21 CLOSED** — `anomaly_detector_lambda.py` v2.5.0: `CV_THRESHOLDS` floor raised
+  from Z=1.5/1.75 to Z=2.0 across all CV buckets. At 13 metrics, Z=1.5 floor produced
+  ~42% daily FP rate; Z=2.0 floor reduces expected pre-gate FP rate to ~2.3%/metric/day.
+  Sustained streak tracker unaffected (reads DDB history). `INTELLIGENCE_LAYER.md` table
+  updated.
+- **TB7-22 CLOSED** — `daily_insight_compute_lambda.py` v1.4.0: slow drift windows
+  equalized to 14d recent / 15-28d baseline (was 7d / 8-28d). Equal N windows reduce
+  volatile recent-mean false drift signals. `INTELLIGENCE_LAYER.md` validity conditions
+  updated.
+- **TB7-23 CLOSED** — Doc-only. IC-3 analysis pass (`_run_analysis_pass()`) calls
+  `call_anthropic()` which uses `AI_MODEL` = Sonnet. No quality asymmetry exists. Haiku
+  at line 515 of `daily_insight_compute_lambda.py` is IC-8 intent evaluator (correct by
+  design). Documented in `INTELLIGENCE_LAYER.md` IC-3 section.
+
+### Files Changed
+- `lambdas/ai_output_validator.py` (v1.1.0)
+- `lambdas/ai_calls.py` (`_load_insights_context` cap)
+- `lambdas/anomaly_detector_lambda.py` (v2.5.0)
+- `lambdas/daily_insight_compute_lambda.py` (v1.4.0)
+- `docs/INTELLIGENCE_LAYER.md` (TB7-21/22/23 updates)
+- `docs/PROJECT_PLAN.md` (TB7-19–23 marked complete)
+- `deploy/deploy_tb7_19_23.sh` (new)
+
+---
+
 ## v3.7.6 — 2026-03-13: TB7 sprint complete + MCP KMS fix
 
 ### Summary

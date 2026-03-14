@@ -608,11 +608,11 @@ Last 5 versions shown. Full history in CHANGELOG.md / CHANGELOG_ARCHIVE.md.
 | # | Task | Source | Effort | Status |
 |---|------|--------|--------|--------|
 | TB7-18 | **Google Calendar integration.** Board rank #2, biggest remaining data gap. Demand-side intelligence (meeting load, deep work, cognitive load). | Sarah / Raj | 6-8 hr | 🔴 |
-| TB7-19 | **AI output validator: hallucinated data reference detection.** Cross-ref mentioned numbers against `health_context` dict. Most dangerous class of AI coaching error. | Anika | 3-4 hr | 🔴 |
-| TB7-20 | **Add relevance filter to `build_insights_context()` (IC-16).** Prevent progressive context token bloat as corpus grows past month 3-4. | Anika | 2-3 hr | 🔴 |
-| TB7-21 | **Raise anomaly single-day alert threshold to Z=2.0** (keep sustained tracker at current) or add Bonferroni-lite correction. ~42% daily FP rate at Z=1.75 with 13 metrics. | Henning | 2-3 hr | 🔴 |
-| TB7-22 | **Consider equalizing IC-19 slow drift detector windows** (14 vs 14 instead of 7 vs 21) or document the asymmetric choice in INTELLIGENCE_LAYER.md. | Henning | 1 hr | 🔴 |
-| TB7-23 | **Upgrade IC-3 analysis pass from Haiku to Sonnet** (or document intentional quality asymmetry between analysis and output passes). | Anika | 1 hr | 🔴 |
+| TB7-19 | **AI output validator: hallucinated data reference detection.** Cross-ref mentioned numbers against `health_context` dict. Most dangerous class of AI coaching error. | Anika | 3-4 hr | ✅ v3.7.7 |
+| TB7-20 | **Add relevance filter to `build_insights_context()` (IC-16).** Prevent progressive context token bloat as corpus grows past month 3-4. | Anika | 2-3 hr | ✅ v3.7.7 |
+| TB7-21 | **Raise anomaly single-day alert threshold to Z=2.0** (keep sustained tracker at current) or add Bonferroni-lite correction. ~42% daily FP rate at Z=1.75 with 13 metrics. | Henning | 2-3 hr | ✅ v3.7.7 |
+| TB7-22 | **Consider equalizing IC-19 slow drift detector windows** (14 vs 14 instead of 7 vs 21) or document the asymmetric choice in INTELLIGENCE_LAYER.md. | Henning | 1 hr | ✅ v3.7.7 |
+| TB7-23 | **Upgrade IC-3 analysis pass from Haiku to Sonnet** (or document intentional quality asymmetry between analysis and output passes). | Anika | 1 hr | ✅ v3.7.7 — doc only; IC-3 already on Sonnet |
 
 #### Larger Effort (4+ hours, future sessions)
 

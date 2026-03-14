@@ -45,6 +45,10 @@ DISCLAIMER:
     "AI-generated analysis, not medical advice." (AI-1 requirement)
     This module validates logical safety, not medical accuracy.
 
+v1.1.0 — 2026-03-13 (TB7-19: hallucinated data reference detection)
+  - _METRIC_PATTERNS: 7 metric patterns (recovery, HRV, resting HR, sleep score, weight, TSB)
+  - _check_hallucinated_metrics(): cross-refs text numbers against health_context ±25%
+  - Check 12 in validate_ai_output(): WARN when claimed metrics deviate >25% from actual
 v1.0.0 — 2026-03-08 (AI-3)
 """
 
@@ -139,6 +143,23 @@ _GENERIC_USELESS_PHRASES = [
     r"\btake\s+care\s+of\s+yourself\b",
     r"\blisten\s+to\s+your\s+body\b",
 ]
+
+# ── TB7-19: Metric claim patterns for hallucination detection ─────────────────
+# Each tuple: (health_context_key, regex_extracting_the_number, display_label)
+# Tolerance: 25% deviation between number mentioned in text and actual context value.
+# WARN tier only — hallucinated claims are suspicious but not always wrong (rounding, etc.).
+_METRIC_PATTERNS = [
+    ("recovery_score",     r"recovery\s+(?:score\s+)?(?:is|was|of|at|:)?\s*(\d+(?:\.\d+)?)\s*%?",       "recovery score"),
+    ("hrv",                r"HRV\s+(?:of\s+|was\s+|is\s+|at\s+)?(\d+(?:\.\d+)?)\s*ms",                 "HRV (ms)"),
+    ("hrv",                r"(\d+(?:\.\d+)?)\s*ms\s+HRV",                                               "HRV (ms)"),
+    ("resting_heart_rate", r"resting\s+(?:heart\s+rate|HR)\s+(?:of\s+|was\s+|is\s+|at\s+)?(\d+(?:\.\d+)?)\s*(?:bpm)?", "resting HR"),
+    ("sleep_quality_score",r"sleep\s+(?:score|quality)\s+(?:of\s+|was\s+|is\s+|at\s+)?(\d+(?:\.\d+)?)\s*%?", "sleep score"),
+    ("latest_weight",      r"weight\s+(?:of\s+|was\s+|is\s+|at\s+)?(\d{2,3}(?:\.\d+)?)\s*(?:lbs?|pounds?)", "weight"),
+    ("tsb",                r"\bTSB\s+(?:of\s+|was\s+|is\s+|at\s+)?(-?\d+(?:\.\d+)?)",                  "TSB"),
+]
+
+_HALLUCINATION_TOLERANCE = 0.25  # flag if text number differs >25% from actual context value
+
 
 _CORRELATION_AS_CAUSATION = [
     # Original patterns
@@ -297,6 +318,13 @@ def validate_ai_output(
     if stripped.startswith("Matthew"):
         result.warnings.append("Output starts with 'Matthew' — prompt instruction may have been ignored")
 
+    # ── Check 12: Hallucinated metric claims (TB7-19, WARN) ───────────────────
+    # Scan for specific numeric health claims and cross-ref against health_context.
+    # Only runs when health_context is populated (requires caller to pass it).
+    if ctx:
+        hallucination_warnings = _check_hallucinated_metrics(stripped, ctx)
+        result.warnings.extend(hallucination_warnings)
+
     if result.blocked:
         logger.error("[ai_validator] Output blocked: %s | %s", output_type, result.block_reason)
     elif result.warnings:
@@ -380,6 +408,64 @@ def _find_patterns(text: str, patterns: list[str]) -> list[str]:
         if re.search(pattern, text, re.IGNORECASE):
             found.append(pattern.replace(r"\b", "").replace("\\", "").strip(".+*?()[]{}^$|"))
     return found
+
+
+def _check_hallucinated_metrics(text: str, health_context: dict) -> list[str]:
+    """TB7-19: Scan output for numeric health claims and cross-ref against health_context.
+
+    For each recognized metric pattern, extract the number mentioned in text and compare
+    against the actual value in health_context. Flag if deviation exceeds
+    _HALLUCINATION_TOLERANCE (25%).
+
+    Returns list of warning strings for any suspicious claims found.
+    Skips metrics absent from health_context (can't validate what we don't have).
+    TSB can be negative — use absolute comparison with an absolute floor of 5.
+    """
+    if not health_context:
+        return []
+
+    warnings = []
+    already_warned = set()  # deduplicate by context_key (multiple patterns can match same metric)
+
+    for ctx_key, pattern, label in _METRIC_PATTERNS:
+        actual = health_context.get(ctx_key)
+        if actual is None:
+            continue  # can't validate without ground truth
+
+        try:
+            actual_f = float(actual)
+        except (TypeError, ValueError):
+            continue
+
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        for match_str in matches:
+            try:
+                mentioned = float(match_str)
+            except ValueError:
+                continue
+
+            # Skip zero-division and near-zero TSB (absolute comparison instead)
+            if abs(actual_f) < 1e-3:
+                if abs(mentioned - actual_f) > 5:
+                    key = (ctx_key, round(mentioned))
+                    if key not in already_warned:
+                        warnings.append(
+                            f"Hallucinated {label}: text says {mentioned}, actual is {actual_f}"
+                        )
+                        already_warned.add(key)
+                continue
+
+            deviation = abs(mentioned - actual_f) / abs(actual_f)
+            if deviation > _HALLUCINATION_TOLERANCE:
+                key = (ctx_key, round(mentioned))
+                if key not in already_warned:
+                    warnings.append(
+                        f"Hallucinated {label}: text says {mentioned}, actual is {actual_f:.1f} "
+                        f"({deviation * 100:.0f}% deviation)"
+                    )
+                    already_warned.add(key)
+
+    return warnings
 
 
 def _is_truncated(text: str) -> bool:
