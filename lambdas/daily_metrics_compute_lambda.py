@@ -747,75 +747,6 @@ def assemble_data(yesterday_str, profile):
 
 
 # ==============================================================================
-# R8-ST5: COMPOSITE SCORES PARTITION
-# ==============================================================================
-
-def write_composite_scores(
-    date_str, day_grade_score, grade, component_scores,
-    readiness_score, readiness_colour, streak_data,
-    tsb, hrv_7d, hrv_30d, latest_weight,
-):
-    """Write SOURCE#composite_scores partition (R8-ST5).
-
-    A denormalised daily snapshot of all key composite metrics.
-    Enables MCP tools to do a single DDB read instead of recomputing from
-    raw sources on every call. Also enables trend queries across dates.
-
-    Partition key:  USER#<uid>#SOURCE#composite_scores
-    Sort key:       DATE#<yyyy-mm-dd>
-
-    Fields stored (all optional — only written if available):
-      day_grade_score     int     0-100
-      day_grade_letter    str     A+/A/A-/.../F
-      readiness_score     int     0-100 (weighted recovery+sleep+hrv+tsb)
-      readiness_colour    str     green/yellow/red/gray
-      tier0_streak        int     consecutive Tier-0 perfect days
-      tier01_streak       int     consecutive Tier-0+1 perfect days
-      tsb                 float   Training Stress Balance (CTL-ATL)
-      hrv_7d              float   7-day HRV average (ms)
-      hrv_30d             float   30-day HRV baseline (ms)
-      latest_weight       float   most recent Withings weight (lbs)
-      component_scores    map     per-component scores from scoring engine
-      computed_at         str     ISO timestamp
-    """
-    try:
-        item = {
-            "pk":               USER_PREFIX + "composite_scores",
-            "sk":               "DATE#" + date_str,
-            "date":             date_str,
-            "readiness_colour": readiness_colour or "gray",
-            "tier0_streak":     Decimal(str(streak_data.get("tier0_streak", 0))),
-            "tier01_streak":    Decimal(str(streak_data.get("tier01_streak", 0))),
-            "computed_at":      datetime.now(timezone.utc).isoformat(),
-            "algo_version":     ALGO_VERSION,
-        }
-        if grade:
-            item["day_grade_letter"] = grade
-        for field, val in [
-            ("day_grade_score", day_grade_score),
-            ("readiness_score", readiness_score),
-            ("tsb", tsb),
-            ("hrv_7d", hrv_7d),
-            ("hrv_30d", hrv_30d),
-            ("latest_weight", latest_weight),
-        ]:
-            if val is not None:
-                item[field] = _to_dec(val)
-        # Component scores (flattened for easy per-component querying)
-        if component_scores:
-            item["component_scores"] = {
-                k: Decimal(str(v)) for k, v in component_scores.items()
-                if v is not None
-            }
-        item = {k: v for k, v in item.items() if v is not None}
-        table.put_item(Item=item)
-        logger.info("R8-ST5: composite_scores written for %s", date_str)
-    except Exception as e:
-        # Non-fatal — composite_scores is a convenience partition, not critical path
-        logger.warning("R8-ST5: write_composite_scores failed (non-fatal): %s", e)
-
-
-# ==============================================================================
 # LAMBDA HANDLER
 # ==============================================================================
 
@@ -960,11 +891,9 @@ def lambda_handler(event, context):
         streak_data.get("vice_streaks", {}), profile,
     )
 
-    # R8-ST5: composite_scores partition DEPRECATED per ADR-025.
-    # All fields now live in computed_metrics. write_composite_scores() retained
-    # for manual backfill only. Do NOT call from lambda_handler.
-    # TODO: remove write_composite_scores() entirely after computed_metrics has
-    # 30+ days of history (target: v3.8.x, post-SIMP-1 Phase 2).
+    # CLEANUP-1 complete (v3.7.28): write_composite_scores() removed per ADR-025.
+    # All composite fields live in computed_metrics. composite_scores partition
+    # retained in DynamoDB for historical records but no longer written to.
 
     elapsed = time.time() - t0
     logger.info("Done in %.1fs", elapsed)
