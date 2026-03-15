@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Background -->
+  <rect width="256" height="256" rx="56" fill="#085041"/>
+
+  <!-- Outer constellation nodes -->
+  <circle cx="128" cy="58"  r="10" fill="#5DCAA5"/>
+  <circle cx="192" cy="98"  r="9"  fill="#5DCAA5"/>
+  <circle cx="168" cy="178" r="9"  fill="#5DCAA5"/>
+  <circle cx="88"  cy="178" r="9"  fill="#5DCAA5"/>
+  <circle cx="64"  cy="98"  r="9"  fill="#5DCAA5"/>
+
+  <!-- Outer ring edges -->
+  <line x1="128" y1="58"  x2="192" y2="98"  stroke="#5DCAA5" stroke-width="2.5" opacity="0.55"/>
+  <line x1="192" y1="98"  x2="168" y2="178" stroke="#5DCAA5" stroke-width="2.5" opacity="0.55"/>
+  <line x1="168" y1="178" x2="88"  y2="178" stroke="#5DCAA5" stroke-width="2.5" opacity="0.55"/>
+  <line x1="88"  y1="178" x2="64"  y2="98"  stroke="#5DCAA5" stroke-width="2.5" opacity="0.55"/>
+  <line x1="64"  y1="98"  x2="128" y2="58"  stroke="#5DCAA5" stroke-width="2.5" opacity="0.55"/>
+
+  <!-- Hub centre -->
+  <circle cx="128" cy="124" r="14" fill="#1D9E75"/>
+
+  <!-- Spokes from hub to outer nodes -->
+  <line x1="128" y1="124" x2="128" y2="58"  stroke="#1D9E75" stroke-width="2.5" opacity="0.85"/>
+  <line x1="128" y1="124" x2="192" y2="98"  stroke="#1D9E75" stroke-width="2.5" opacity="0.85"/>
+  <line x1="128" y1="124" x2="168" y2="178" stroke="#1D9E75" stroke-width="2.5" opacity="0.85"/>
+  <line x1="128" y1="124" x2="88"  y2="178" stroke="#1D9E75" stroke-width="2.5" opacity="0.85"/>
+  <line x1="128" y1="124" x2="64"  y2="98"  stroke="#1D9E75" stroke-width="2.5" opacity="0.85"/>
+</svg>
