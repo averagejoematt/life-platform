@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-14 (v3.7.22 — 89 tools, 31-module MCP package, 20 data sources, 45 Lambdas, 8 secrets, 42 alarms, 8 CDK stacks deployed)
+Last updated: 2026-03-15 (v3.7.22 — 87 tools, 22-module MCP package, 20 data sources, 42 Lambdas, 11 secrets, 49 alarms, 8 CDK stacks deployed)
 
 ---
 
@@ -31,7 +31,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
                          │ DynamoDB queries
 ┌────────────────────────▼────────────────────────────────────┐
 │  SERVE LAYER                                                │
-│  MCP Server Lambda (88 tools, 1024 MB) + Lambda Function URL│
+│  MCP Server Lambda (87 tools, 1024 MB) + Lambda Function URL│
 │  ← Claude Desktop + claude.ai + Claude mobile via remote MCP│
 │                                                             │
 │  COMPUTE LAYER (IC intelligence features)                   │
@@ -263,7 +263,7 @@ No GSI by design — all access patterns served by PK+SK queries.
 **Auth:** `x-api-key` header check; key in `life-platform/ai-keys`
 **Protocol:** JSON-RPC 2.0 / MCP spec 2025-06-18
 
-31-module package structure:
+22-module package structure:
 ```
 mcp/
   handler.py, config.py, utils.py, core.py, helpers.py
@@ -347,7 +347,7 @@ Health Auto Export → API Gateway → Webhook → DynamoDB + S3
                               daily-metrics · daily-insight
                               hypothesis-engine
                                                     │
-                               MCP Lambda (88 tools)
+                               MCP Lambda (87 tools)
                                                     │
                       Lambda Function URL (local) / Remote MCP URL
                                                     │
@@ -416,7 +416,7 @@ AWS Budget alerts at $5 (25%), $10 (50%), $20 (100%) → `awsdev@mattsusername.c
 ~/Documents/Claude/life-platform/
   mcp_server.py                   ← MCP Lambda entry point
   mcp_bridge.py                   ← Local MCP adapter (Claude Desktop stdio → Lambda HTTPS)
-  mcp/                            ← MCP server package (31 modules)
+  mcp/                            ← MCP server package (22 modules)
     handler.py, config.py, utils.py, core.py, helpers.py, warmer.py
     labs_helpers.py, strength_helpers.py, registry.py
     tools_sleep, tools_health, tools_training, tools_nutrition, tools_habits
@@ -433,7 +433,7 @@ AWS Budget alerts at $5 (25%), $10 (50%), $20 (100%) → `awsdev@mattsusername.c
     PROJECT_PLAN.md               ← Roadmap and backlog
     USER_GUIDE.md                 ← How to use MCP tools
     FEATURES.md                   ← Feature showcase
-    MCP_TOOL_CATALOG.md           ← All 88 tools with params, cache, deps
+    MCP_TOOL_CATALOG.md           ← All 87 tools with params, cache, deps
     DATA_DICTIONARY.md            ← Every metric → SOT source
     COST_TRACKER.md               ← Budget tracking
     INCIDENT_LOG.md               ← Operational incident history

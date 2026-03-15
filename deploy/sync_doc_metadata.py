@@ -41,6 +41,106 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# AUTO-DISCOVERY — derive counts from source files (no AWS calls needed)
+# Always runs before PLATFORM_FACTS is used. Overrides any stale manual values.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _auto_discover_tool_count() -> int | None:
+    """Count top-level keys in TOOLS dict in mcp/registry.py via AST."""
+    registry_path = ROOT / "mcp" / "registry.py"
+    if not registry_path.exists():
+        return None
+    try:
+        src = registry_path.read_text(encoding="utf-8")
+        tools_start = src.find("TOOLS = {")
+        if tools_start == -1:
+            return None
+        tools_section = src[tools_start:]
+        # Match 4-space-indented string keys at the top level of TOOLS dict
+        tool_names = re.findall(r'^    "([a-z_]+)"\s*:\s*\{', tools_section, re.MULTILINE)
+        return len(tool_names) if tool_names else None
+    except Exception:
+        return None
+
+
+def _auto_discover_lambda_count() -> int | None:
+    """Count unique function_name= entries across all CDK stack files."""
+    cdk_stacks_dir = ROOT / "cdk" / "stacks"
+    if not cdk_stacks_dir.exists():
+        return None
+    try:
+        names = set()
+        for stack_file in cdk_stacks_dir.glob("*.py"):
+            src = stack_file.read_text(encoding="utf-8")
+            # Match function_name="some-name" and function_name='some-name'
+            found = re.findall(r'function_name=["\']([a-z0-9_-]+)["\']', src)
+            names.update(found)
+        return len(names) if names else None
+    except Exception:
+        return None
+
+
+def _auto_discover_module_count() -> int | None:
+    """Count mcp/tools_*.py modules."""
+    mcp_dir = ROOT / "mcp"
+    if not mcp_dir.exists():
+        return None
+    try:
+        return len(list(mcp_dir.glob("tools_*.py")))
+    except Exception:
+        return None
+
+
+def _auto_discover_version() -> str | None:
+    """Read version from CHANGELOG.md first entry."""
+    changelog = ROOT / "docs" / "CHANGELOG.md"
+    if not changelog.exists():
+        return None
+    try:
+        src = changelog.read_text(encoding="utf-8")
+        m = re.search(r'^## (v[\d.]+)', src, re.MULTILINE)
+        return m.group(1) if m else None
+    except Exception:
+        return None
+
+
+def _apply_auto_discovered(facts: dict) -> dict:
+    """Override PLATFORM_FACTS values with auto-discovered counts where available.
+
+    Only overrides if the auto-discovered value is non-None and differs from
+    the stored value, so the manual dict still acts as fallback.
+    """
+    tool_count = _auto_discover_tool_count()
+    if tool_count is not None:
+        if facts.get("tool_count") != tool_count:
+            print(f"  [auto] tool_count: {facts.get('tool_count')} → {tool_count} (from mcp/registry.py)")
+        facts["tool_count"] = tool_count
+
+    lambda_count = _auto_discover_lambda_count()
+    if lambda_count is not None:
+        if facts.get("lambda_count") != lambda_count:
+            print(f"  [auto] lambda_count: {facts.get('lambda_count')} → {lambda_count} (from CDK stacks)")
+        facts["lambda_count"] = lambda_count
+
+    module_count = _auto_discover_module_count()
+    if module_count is not None:
+        facts["module_count"] = module_count
+
+    version = _auto_discover_version()
+    if version is not None:
+        facts["version"] = version
+        facts["date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # Recompute derived facts
+    facts["secrets_cost"] = f"${facts['secret_count'] * 0.40:.2f}"
+    facts["secrets_cost_note"] = (
+        f"{facts['secret_count']} active secrets × $0.40/secret/month. "
+        f"`api-keys` permanently deleted 2026-03-14. `google-calendar` added v3.7.21."
+    )
+    return facts
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PLATFORM FACTS — update this dict when platform state changes
 # This is the ONLY place these numbers should live.
@@ -250,7 +350,14 @@ def process_doc(rel_path: str, dry_run: bool) -> list[str]:
 
 def main():
     dry_run = "--apply" not in sys.argv
+    quiet = "--quiet" in sys.argv
     mode = "DRY RUN (pass --apply to write changes)" if dry_run else "APPLYING CHANGES"
+
+    # Auto-discover counts from source files before applying rules
+    facts_copy = dict(PLATFORM_FACTS)
+    _apply_auto_discovered(facts_copy)
+    # Update global PLATFORM_FACTS with auto-discovered values
+    PLATFORM_FACTS.update(facts_copy)
 
     print(f"\n{'='*60}")
     print(f"  sync_doc_metadata.py — {mode}")
