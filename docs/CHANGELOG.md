@@ -1,5 +1,27 @@
 # Life Platform — Changelog
 
+## v3.7.49 — 2026-03-15: Board-recommended bug fixes + health coaching features
+
+### Summary
+Both boards (Technical + Health) convened on live data and identified 3 production bugs and 2 missing coaching features. All 5 implemented and verified live.
+
+### Bugs Fixed
+- `mcp/tools_character.py`: `{level:3d}` → `{int(level):3d}` — DDB Decimal→float causes `ValueError: Unknown format code 'd'` crashing `get_character` on every call
+- `mcp/labs_helpers.py`: Added `from boto3.dynamodb.conditions import Key` — `Key` used in genome + labs queries but never imported, causing `NameError` in `get_health(trajectory)` biomarkers partition
+- `mcp/tools_health.py`: Moved `normalize_whoop_sleep` to module-level import (was only local inside `tool_get_readiness_score`, not in scope for `tool_get_health_trajectory`) — fixed recovery partition `NameError`
+
+### Features Added
+- **Weight loss rate safety warning (Attia gate):** `tool_get_health_trajectory` now computes 1% body weight/week threshold and emits `rate_warning` when exceeded. At current 287.7 lbs, threshold = 2.88 lbs/week; current 5.23 lbs/week fires the flag. Warning wired into Board of Directors concerns.
+- **Strength frequency check (Attia/Huberman):** Trajectory fitness section now checks average strength sessions/week over last 4 weeks. Warns when <3 sessions/week during weight loss phase. Wired into Board concerns.
+
+### Test Results
+- All 5 fixes verified live via MCP tool calls after deploy ✅
+
+### Deployed
+- MCP Lambda redeployed (v3.7.49) ✅
+
+---
+
 ## v3.7.48 — 2026-03-15: R16 findings sweep (doc fixes + canary + CI/CD trigger)
 
 ### Summary
