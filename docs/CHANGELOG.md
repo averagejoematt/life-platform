@@ -1,5 +1,20 @@
 # Life Platform — Changelog
 
+## v3.7.28 — 2026-03-15: SEC-3 fix + CLEANUP-1
+
+### Summary
+SEC-3 HIGH finding resolved: `_load_cgm_readings` now validates `date_str` format and calendar validity before constructing the S3 key, closing the path traversal risk. CLEANUP-1 complete: `write_composite_scores()` dead code (69 lines) removed from `daily_metrics_compute_lambda.py` per ADR-025 — function was never called since v3.7.25.
+
+### Changes
+- `mcp/tools_cgm.py`: `_DATE_RE` compiled at module load. `_load_cgm_readings` rejects malformed date_str before S3 key construction (SEC-3 HIGH)
+- `lambdas/daily_metrics_compute_lambda.py`: `write_composite_scores()` function and R8-ST5 section header removed (CLEANUP-1). TODO comment replaced with done note.
+
+### Deployed
+- `life-platform-mcp` ✅
+- `daily-metrics-compute` ✅
+
+---
+
 ## v3.7.27 — 2026-03-15: 10-item unblocked sweep
 
 ### Summary
