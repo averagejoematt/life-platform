@@ -1398,6 +1398,19 @@ def store_computed_insights(yesterday_str, payload):
         item["slow_drift_metrics"] = json.dumps(payload["slow_drift_metrics"])
 
     item = {k: v for k, v in item.items() if v is not None}
+    # DATA-2: validate_item for computed_insights (Item 3, R12)
+    try:
+        from ingestion_validator import validate_item as _vi
+        _vr = _vi("computed_insights", item, yesterday_str)
+        if _vr.should_skip_ddb:
+            logger.error("[DATA-2] Skipping computed_insights write for %s: %s", yesterday_str, _vr.errors)
+            return
+        if _vr.warnings:
+            logger.warning("[DATA-2] computed_insights warnings for %s: %s", yesterday_str, _vr.warnings)
+    except ImportError:
+        pass
+    except Exception as ve:
+        logger.warning("[DATA-2] computed_insights validate_item failed (proceeding): %s", ve)
     table.put_item(Item=item)
     logger.info(f"Stored computed_insights for {yesterday_str} (momentum={payload.get('momentum_signal')}, declining={len(payload.get('declining_metrics', []))}, improving={len(payload.get('improving_metrics', []))})")
 

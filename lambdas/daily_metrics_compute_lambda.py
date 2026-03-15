@@ -445,15 +445,21 @@ def store_computed_metrics(
         item["source_fingerprints"] = source_fingerprints
 
     item = {k: v for k, v in item.items() if v is not None}
-    # DATA-2: Validate before write
+    # DATA-2: Use validate_item directly (no S3 client — compute partitions don't archive
+    # to S3 on failure; they log and skip. validate_and_write requires s3_client != None.)
     try:
-        from ingestion_validator import validate_and_write as _vaw
-        _vaw(table, None, None, "computed_metrics", item, date_str, use_safe_put=False)
+        from ingestion_validator import validate_item as _vi
+        _vr = _vi("computed_metrics", item, date_str)
+        if _vr.should_skip_ddb:
+            logger.error("[DATA-2] Skipping computed_metrics write for %s: %s", date_str, _vr.errors)
+            return  # critical validation failure — don't write corrupt data
+        if _vr.warnings:
+            logger.warning("[DATA-2] computed_metrics warnings for %s: %s", date_str, _vr.warnings)
     except ImportError:
-        table.put_item(Item=item)  # validator not in Lambda env — write directly
+        pass  # validator not bundled — proceed without check
     except Exception as ve:
-        logger.warning("Validation wrapper failed (falling back to direct write): %s", ve)
-        table.put_item(Item=item)
+        logger.warning("[DATA-2] validate_item failed (proceeding with write): %s", ve)
+    table.put_item(Item=item)
     logger.info(
         "Stored computed_metrics: %s — grade=%s (%s) readiness=%s (%s) "
         "T0_streak=%s TSB=%s",
@@ -479,14 +485,20 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights):
         for comp, score in component_scores.items():
             if score is not None:
                 item["component_" + comp] = Decimal(str(score))
-        # DATA-2: Validate before write
+        # DATA-2: validate_item directly (no S3 client for compute partitions)
         try:
-            from ingestion_validator import validate_and_write as _vaw
-            _vaw(table, None, None, "day_grade", item, date_str, use_safe_put=False)
+            from ingestion_validator import validate_item as _vi
+            _vr = _vi("day_grade", item, date_str)
+            if _vr.should_skip_ddb:
+                logger.error("[DATA-2] Skipping day_grade write for %s: %s", date_str, _vr.errors)
+                return
+            if _vr.warnings:
+                logger.warning("[DATA-2] day_grade warnings for %s: %s", date_str, _vr.warnings)
         except ImportError:
-            table.put_item(Item=item)
-        except Exception:
-            table.put_item(Item=item)
+            pass
+        except Exception as ve:
+            logger.warning("[DATA-2] day_grade validate_item failed (proceeding): %s", ve)
+        table.put_item(Item=item)
         logger.info(f"Stored day_grade: {date_str} → {total_score} ({grade})")
     except Exception as e:
         logger.warning(f"store_day_grade failed: {e}")
@@ -551,6 +563,19 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
         if sg_pcts:
             item["synergy_groups"] = _deep_dec(sg_pcts)
         item = {k: v for k, v in item.items() if v is not None}
+        # DATA-2: validate_item for habit_scores (Item 3, R12)
+        try:
+            from ingestion_validator import validate_item as _vi
+            _vr = _vi("habit_scores", item, date_str)
+            if _vr.should_skip_ddb:
+                logger.error("[DATA-2] Skipping habit_scores write for %s: %s", date_str, _vr.errors)
+                return
+            if _vr.warnings:
+                logger.warning("[DATA-2] habit_scores warnings for %s: %s", date_str, _vr.warnings)
+        except ImportError:
+            pass
+        except Exception as ve:
+            logger.warning("[DATA-2] habit_scores validate_item failed (proceeding): %s", ve)
         table.put_item(Item=item)
         logger.info(f"Stored habit_scores: {date_str} T0={t0.get('done', 0)}/{t0.get('total', 0)} T1={t1.get('done', 0)}/{t1.get('total', 0)}")
     except Exception as e:
@@ -935,13 +960,11 @@ def lambda_handler(event, context):
         streak_data.get("vice_streaks", {}), profile,
     )
 
-    # R8-ST5: Write composite scores partition for fast MCP tool reads
-    write_composite_scores(
-        yesterday_str, day_grade_score, grade, component_scores,
-        readiness_score, readiness_colour, streak_data,
-        data.get("tsb"), hrv_7d_avg, hrv_30d_avg,
-        data.get("latest_weight"),
-    )
+    # R8-ST5: composite_scores partition DEPRECATED per ADR-025.
+    # All fields now live in computed_metrics. write_composite_scores() retained
+    # for manual backfill only. Do NOT call from lambda_handler.
+    # TODO: remove write_composite_scores() entirely after computed_metrics has
+    # 30+ days of history (target: v3.8.x, post-SIMP-1 Phase 2).
 
     elapsed = time.time() - t0
     logger.info("Done in %.1fs", elapsed)

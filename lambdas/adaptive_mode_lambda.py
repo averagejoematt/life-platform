@@ -84,6 +84,19 @@ def store_adaptive_mode(date_str, result):
         "computed_at": datetime.now(timezone.utc).isoformat(),
         "algo_version": ALGO_VERSION,
     }
+    # DATA-2: validate_item for adaptive_mode (Item 3, R12)
+    try:
+        from ingestion_validator import validate_item as _vi
+        _vr = _vi("adaptive_mode", item, date_str)
+        if _vr.should_skip_ddb:
+            logger.error("[DATA-2] Skipping adaptive_mode write for %s: %s", date_str, _vr.errors)
+            return
+        if _vr.warnings:
+            logger.warning("[DATA-2] adaptive_mode warnings for %s: %s", date_str, _vr.warnings)
+    except ImportError:
+        pass
+    except Exception as ve:
+        logger.warning("[DATA-2] adaptive_mode validate_item failed (proceeding): %s", ve)
     table.put_item(Item=item)
     logger.info(f"Stored adaptive_mode for {date_str}: {result['brief_mode']} (score={result['engagement_score']})")
 
