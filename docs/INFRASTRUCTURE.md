@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-03-15 (v3.7.47 — 42 Lambdas, 10 active secrets, 87 MCP tools, ~49 alarms)
+> Last updated: 2026-03-15 (v3.7.48 — 42 Lambdas, 9 active secrets, 87 MCP tools, ~49 alarms)
 > Note: `webhook-key` scheduled for deletion 2026-03-15 (7-day recovery window). Count reflects post-deletion state.
 
 ---
@@ -133,7 +133,7 @@ All DNS-validated via Route 53 CNAME records.
 
 ---
 
-## Secrets Manager (10 active secrets)
+## Secrets Manager (9 active secrets)
 
 All under prefix `life-platform/`. No values stored in this doc — access via AWS console or CLI.
 

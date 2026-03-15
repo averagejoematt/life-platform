@@ -154,7 +154,8 @@ def _apply_auto_discovered(facts: dict) -> dict:
     facts["secrets_cost"] = f"${facts['secret_count'] * 0.40:.2f}"
     facts["secrets_cost_note"] = (
         f"{facts['secret_count']} active secrets × $0.40/secret/month. "
-        f"`api-keys` deleted 2026-03-14. `webhook-key` scheduled deletion 2026-03-22."
+        f"`api-keys` deleted 2026-03-14. `webhook-key` deleted 2026-03-14. "
+        f"`google-calendar` deleted 2026-03-15 (ADR-030)."
     )
     return facts
 
@@ -170,7 +171,7 @@ PLATFORM_FACTS = {
     "lambda_count":     45,       # fallback: auto-discovery may under-count Lambda@Edge
     "tool_count":       88,       # fallback: auto-discovery requires registry.py parseable
     "module_count":     31,       # fallback: all mcp/*.py except __init__.py
-    "secret_count":     10,       # active secrets (webhook-key scheduled deletion 2026-03-22)
+    "secret_count":     9,        # active secrets (webhook-key deleted 2026-03-14, google-calendar deleted 2026-03-15)
     "alarm_count":      49,
     "data_sources":     19,       # google_calendar retired (ADR-030, v3.7.46)
     "cdk_stacks":       8,
@@ -180,8 +181,8 @@ PLATFORM_FACTS = {
     "api_keys_status":  "PERMANENTLY DELETED 2026-03-14",
 
     # Cost
-    "secrets_cost":     "$4.00",  # secret_count × $0.40
-    "secrets_cost_note": "10 active secrets × $0.40/secret/month. `api-keys` deleted 2026-03-14. `webhook-key` scheduled deletion 2026-03-22.",
+    "secrets_cost":     "$3.60",  # secret_count × $0.40
+    "secrets_cost_note": "9 active secrets × $0.40/secret/month. `api-keys` deleted 2026-03-14. `webhook-key` deleted 2026-03-14. `google-calendar` deleted 2026-03-15 (ADR-030).",
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
