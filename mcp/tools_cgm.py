@@ -28,11 +28,31 @@ from mcp.helpers import (
 
 # ── CGM helpers ──
 
+# SEC-3 (HIGH): Compiled once at module load — avoids recompiling on every CGM call.
+# Used by _load_cgm_readings to prevent S3 path traversal via malformed date_str.
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
 def _load_cgm_readings(date_str):
     """
     Load 5-minute CGM readings from S3 for a given date.
     Returns list of (hour_decimal, value_mg_dl) tuples sorted by time.
+
+    SEC-3 (HIGH): date_str is validated before S3 key construction to prevent
+    path traversal (e.g. '../../config/board_of_directors' -> wrong S3 object).
+    A malformed date_str would split("-") into unexpected segments and produce
+    a key like raw/matthew/cgm_readings/../../config/..., reading an unintended
+    object. The regex + strptime checks eliminate this class of input entirely.
     """
+    # Validate format and calendar validity before constructing S3 key
+    if not _DATE_RE.match(str(date_str)):
+        logger.warning("_load_cgm_readings: invalid date_str format: %r -- rejecting", date_str)
+        return []
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        logger.warning("_load_cgm_readings: non-calendar date: %r -- rejecting", date_str)
+        return []
     try:
         y, m, d = date_str.split("-")
         key = f"raw/{USER_ID}/cgm_readings/{y}/{m}/{d}.json"
@@ -202,7 +222,7 @@ def tool_get_glucose_sleep_correlation(args):
         "bucket_analysis": bucket_summary, "correlations": correlations,
         "notable_correlations": strong if strong else None, "daily": paired[-14:],
         "interpretation": "Negative r between glucose and sleep quality means higher glucose = worse sleep. "
-                          "Time above 140 is most actionable — spikes raise core temperature, opposing deep sleep.",
+                          "Time above 140 is most actionable -- spikes raise core temperature, opposing deep sleep.",
     }
 
 
@@ -566,7 +586,7 @@ def tool_get_glucose_meal_response(args):
     elif avg_spike > 30:
         rec.append("Average spike is ELEVATED (30-40 mg/dL). Good opportunity to optimize meal composition.")
     elif avg_spike > 15:
-        rec.append("Average spike is MODERATE (15-30 mg/dL). Solid metabolic health — fine-tune worst offenders.")
+        rec.append("Average spike is MODERATE (15-30 mg/dL). Solid metabolic health -- fine-tune worst offenders.")
     else:
         rec.append("Average spike is EXCELLENT (<15 mg/dL). Outstanding glucose control.")
 
@@ -726,7 +746,6 @@ def tool_get_fasting_glucose_validation(args):
     }
 
     # ── Load lab fasting glucose ─────────────────────────────────────────
-    table = get_table()
     from boto3.dynamodb.conditions import Key
     lab_resp = table.query(
         KeyConditionExpression=Key("pk").eq(USER_PREFIX + "labs") & Key("sk").begins_with("DATE#")
@@ -769,7 +788,6 @@ def tool_get_fasting_glucose_validation(args):
 
     for draw in lab_draws:
         lab_val = draw["fasting_glucose_mg_dl"]
-        # Z-score vs overnight nadir distribution
         z_overnight = None
         if on_stats and on_stats["std_dev"] > 0:
             z_overnight = round((lab_val - on_stats["mean"]) / on_stats["std_dev"], 2)
@@ -777,7 +795,6 @@ def tool_get_fasting_glucose_validation(args):
         if deep_stats and deep_stats["std_dev"] > 0:
             z_deep = round((lab_val - deep_stats["mean"]) / deep_stats["std_dev"], 2)
 
-        # Percentile estimate
         pct = None
         if on_nadirs:
             below = sum(1 for v in on_nadirs if v <= lab_val)
@@ -813,27 +830,25 @@ def tool_get_fasting_glucose_validation(args):
             bias["cgm_deep_nadir_mean"] = deep_stats["mean"]
             bias["lab_minus_cgm_deep"] = round(lab_mean - deep_stats["mean"], 1)
 
-        # Interpretation
         diff = bias["lab_minus_cgm_overnight"]
         if abs(diff) <= 5:
-            bias["interpretation"] = "Excellent agreement — CGM overnight nadir closely matches lab fasting glucose."
+            bias["interpretation"] = "Excellent agreement -- CGM overnight nadir closely matches lab fasting glucose."
             bias["confidence"] = "high"
         elif abs(diff) <= 10:
             direction = "higher" if diff > 0 else "lower"
-            bias["interpretation"] = f"Good agreement — lab reads ~{abs(diff)} mg/dL {direction} than CGM nadir. Within expected CGM accuracy range (±10-15 mg/dL for Stelo)."
+            bias["interpretation"] = f"Good agreement -- lab reads ~{abs(diff)} mg/dL {direction} than CGM nadir. Within expected CGM accuracy range (+-10-15 mg/dL for Stelo)."
             bias["confidence"] = "moderate"
         elif abs(diff) <= 20:
             direction = "higher" if diff > 0 else "lower"
-            bias["interpretation"] = f"Moderate discrepancy — lab reads ~{abs(diff)} mg/dL {direction}. Dexcom Stelo has MARD ~9% which can produce this gap. Consider a same-day validation."
+            bias["interpretation"] = f"Moderate discrepancy -- lab reads ~{abs(diff)} mg/dL {direction}. Dexcom Stelo has MARD ~9% which can produce this gap. Consider a same-day validation."
             bias["confidence"] = "low"
         else:
-            bias["interpretation"] = f"Significant discrepancy ({abs(diff)} mg/dL). CGM interstitial glucose lags venous by design, but this gap warrants investigation. Could indicate sensor placement, calibration, or timing issues."
+            bias["interpretation"] = f"Significant discrepancy ({abs(diff)} mg/dL). CGM interstitial glucose lags venous by design, but this gap warrants investigation."
             bias["confidence"] = "very_low"
 
     # ── Insights ─────────────────────────────────────────────────────────
     insights = []
 
-    # Daily min vs overnight nadir comparison
     if distributions["daily_minimum"] and on_stats:
         dm = distributions["daily_minimum"]["mean"]
         on = on_stats["mean"]
@@ -841,12 +856,11 @@ def tool_get_fasting_glucose_validation(args):
         if abs(diff) > 3:
             insights.append(
                 f"Daily minimum averages {dm} vs overnight nadir {on} ({diff:+.1f} mg/dL). "
-                f"{'Daily min occurs outside overnight window — current proxy slightly underestimates true fasting.' if diff < 0 else 'Daily min typically IS the overnight nadir — current proxy is reasonable.'}"
+                f"{'Daily min occurs outside overnight window -- current proxy slightly underestimates true fasting.' if diff < 0 else 'Daily min typically IS the overnight nadir -- current proxy is reasonable.'}"
             )
         else:
-            insights.append(f"Daily minimum ({dm}) and overnight nadir ({on}) are very close — current fasting proxy is a good approximation.")
+            insights.append(f"Daily minimum ({dm}) and overnight nadir ({on}) are very close -- current fasting proxy is a good approximation.")
 
-    # Deep nadir vs standard nadir
     if deep_stats and on_stats:
         diff = round(deep_stats["mean"] - on_stats["mean"], 1)
         if abs(diff) > 2:
@@ -855,20 +869,18 @@ def tool_get_fasting_glucose_validation(args):
                 f"Dawn phenomenon may be raising late-night readings."
             )
 
-    # Variability
     if on_stats and on_stats["std_dev"] > 8:
         insights.append(f"High overnight nadir variability (SD {on_stats['std_dev']} mg/dL). Factors: meal timing, alcohol, sleep quality, stress.")
     elif on_stats and on_stats["std_dev"] < 4:
-        insights.append(f"Very stable overnight nadirs (SD {on_stats['std_dev']} mg/dL) — strong metabolic consistency.")
+        insights.append(f"Very stable overnight nadirs (SD {on_stats['std_dev']} mg/dL) -- strong metabolic consistency.")
 
-    # Lab trend
     if len(lab_draws) >= 3:
         recent = lab_draws[-1]["fasting_glucose_mg_dl"]
         oldest = lab_draws[0]["fasting_glucose_mg_dl"]
         if recent > oldest + 5:
-            insights.append(f"Lab fasting glucose trending up: {oldest} → {recent} mg/dL over {len(lab_draws)} draws. Monitor with CGM confirmation.")
+            insights.append(f"Lab fasting glucose trending up: {oldest} -> {recent} mg/dL over {len(lab_draws)} draws. Monitor with CGM confirmation.")
         elif recent < oldest - 5:
-            insights.append(f"Lab fasting glucose trending down: {oldest} → {recent} mg/dL — positive trajectory.")
+            insights.append(f"Lab fasting glucose trending down: {oldest} -> {recent} mg/dL -- positive trajectory.")
 
     if not direct_validations:
         insights.append("No same-day CGM + lab data available. Schedule your next blood draw while wearing the Stelo for gold-standard validation.")
@@ -891,10 +903,10 @@ def tool_get_fasting_glucose_validation(args):
             "deep_nadir_window": f"{int(deep_start):02d}:00 - {int(deep_end):02d}:00",
             "min_readings_required": min_readings,
             "cgm_device": "Dexcom Stelo (MARD ~9%)",
-            "note": "Interstitial glucose (CGM) lags venous blood by 5-15 min and can differ by ±10-15 mg/dL. Lab draws are single-point; CGM captures continuous overnight minimum.",
+            "note": "Interstitial glucose (CGM) lags venous blood by 5-15 min and can differ by +-10-15 mg/dL. Lab draws are single-point; CGM captures continuous overnight minimum.",
         },
         "board_of_directors": {
-            "Attia": "Fasting glucose <90 mg/dL is optimal. Overnight CGM nadir is more informative than a single lab draw — it captures the true metabolic baseline every night.",
+            "Attia": "Fasting glucose <90 mg/dL is optimal. Overnight CGM nadir is more informative than a single lab draw -- it captures the true metabolic baseline every night.",
             "Patrick": "Dawn phenomenon (4-7 AM cortisol rise) elevates glucose. The 2-5 AM deep nadir avoids this confounder and gives the cleanest fasting signal.",
             "Huberman": "Glucose regulation is a proxy for metabolic flexibility. Low overnight variability + clean nadirs indicate good insulin sensitivity and hepatic glucose control.",
         },
