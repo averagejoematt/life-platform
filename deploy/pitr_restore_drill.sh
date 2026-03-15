@@ -141,11 +141,12 @@ WHOOP_ITEM=$(aws dynamodb get-item \
     --projection-expression "pk, sk, recovery_score, hrv" \
     --output json 2>/dev/null)
 
+RECOVERY="N/A"
 if echo "$WHOOP_ITEM" | grep -q '"recovery_score"'; then
     RECOVERY=$(echo "$WHOOP_ITEM" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('Item',{}).get('recovery_score',{}).get('N','?'))" 2>/dev/null || echo "?")
     echo "   ✅ Whoop record found (recovery_score: ${RECOVERY})"
 else
-    echo "   ⚠️  Whoop record not found for ${YESTERDAY} (may be missing in source too)"
+    echo "   ⚠️  Whoop record not found for ${YESTERDAY} (may be missing in source or sick day)"
 fi
 
 # 4d: Spot-check computed_metrics partition
@@ -158,6 +159,7 @@ CM_ITEM=$(aws dynamodb get-item \
     --projection-expression "pk, sk, day_grade_score, readiness_score" \
     --output json 2>/dev/null)
 
+GRADE="N/A"
 if echo "$CM_ITEM" | grep -q '"day_grade_score"'; then
     GRADE=$(echo "$CM_ITEM" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('Item',{}).get('day_grade_score',{}).get('N','?'))" 2>/dev/null || echo "?")
     echo "   ✅ Computed metrics found (day_grade_score: ${GRADE})"

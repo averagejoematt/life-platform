@@ -30,7 +30,11 @@ set -euo pipefail
 
 REGION_EDGE="us-east-1"
 REGION_MAIN="us-west-2"
-SNS_ARN="arn:aws:sns:${REGION_MAIN}:205930651321:life-platform-alerts"
+# NOTE: CloudWatch alarms in us-east-1 require SNS topics in us-east-1.
+# The main life-platform-alerts topic is in us-west-2 and cannot be used here.
+# This alarm uses no SNS action — check it via the CloudWatch console or
+# create a dedicated us-east-1 SNS topic if email alerting is needed.
+# SNS_ARN="arn:aws:sns:${REGION_MAIN}:205930651321:life-platform-alerts"  # us-west-2 — WRONG for us-east-1 alarm
 
 echo "══════════════════════════════════════════════════════"
 echo "  Lambda@Edge Alarm Setup"
@@ -81,7 +85,7 @@ echo "🔔 Creating CloudWatch alarm: life-platform-cf-auth-errors..."
 
 aws cloudwatch put-metric-alarm \
     --alarm-name "life-platform-cf-auth-errors" \
-    --alarm-description "Lambda@Edge cf-auth invocation errors — dashboard/blog may be inaccessible" \
+    --alarm-description "Lambda@Edge cf-auth invocation errors — dashboard/blog may be inaccessible. Check: aws logs tail /aws/lambda/us-east-1.${CF_AUTH_FUNCTION} --region us-east-1" \
     --namespace "AWS/Lambda" \
     --metric-name "Errors" \
     --dimensions Name=FunctionName,Value="${CF_AUTH_FUNCTION}" \
@@ -91,9 +95,9 @@ aws cloudwatch put-metric-alarm \
     --threshold 5 \
     --comparison-operator GreaterThanOrEqualToThreshold \
     --treat-missing-data notBreaching \
-    --alarm-actions "${SNS_ARN}" \
-    --ok-actions "${SNS_ARN}" \
     --region "${REGION_EDGE}"
+# Note: no --alarm-actions — would need a us-east-1 SNS topic.
+# Monitor via: aws cloudwatch describe-alarms --alarm-names life-platform-cf-auth-errors --region us-east-1
 
 echo "   ✅ Alarm created: life-platform-cf-auth-errors (us-east-1)"
 echo ""
@@ -106,7 +110,7 @@ echo "  Function:   ${CF_AUTH_FUNCTION} (us-east-1)"
 echo "  Secret:     life-platform/cf-auth (us-east-1)"
 echo "  Alarm:      life-platform-cf-auth-errors"
 echo "  Threshold:  ≥5 errors in 2 consecutive 5-min windows"
-echo "  Alert to:   life-platform-alerts SNS"
+echo "  Alert:      Console only (no SNS -- us-east-1 SNS topic needed for email alerts)"
 echo ""
 echo "  NOTE: The buddy page (buddy.averagejoematt.com) is intentionally"
 echo "  PUBLIC — no auth Lambda@Edge is needed. It shows non-sensitive"
