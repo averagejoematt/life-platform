@@ -1,7 +1,7 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-15 (v3.7.26 — R9-R12 complete, brief quality improved, all actionable items resolved)
+> Last update: 2026-03-15 (v3.7.29 — SEC-3 MEDIUM closed, CLEANUP-4 Decimal import fix, ADR-027 utils.py created)
 
 ---
 
@@ -66,10 +66,12 @@ These are not architecture decisions — they're deferred deletions and one-time
 
 | ID | Item | Source | Effort | Status |
 |----|------|--------|--------|--------|
-| CLEANUP-1 | **Remove `write_composite_scores()` dead code** — function body still exists in `daily_metrics_compute_lambda.py` but has no caller since v3.7.25. Remove entirely once `computed_metrics` has 30+ days of history. | ADR-025 + R12 Viktor | S (5min) | Not started |
-| CLEANUP-2 | **Lambda@Edge in `ci/lambda_map.json`** — `cf-auth` function exists in `lambdas/cf-auth/index.mjs`, deployed to us-east-1, manually associated with CloudFront distributions. Add to `lambda_map.json` with `region: us-east-1` note so it's not invisible to tooling. | R12 Yael | S (15min) | Not started |
-| CLEANUP-3 | **Google Calendar OAuth activation** — run `python3 setup/setup_google_calendar_auth.py`. Not an engineering task. Has been deferred since v3.7.21. | R9-R12 every review | S (20min) | Not started |
-| CLEANUP-4 | **Validator docstring cleanup** — `ingestion_validator.py` docstring says "adaptive_mode, computed_insights" twice. Fix the human-readable list. Also fix the `from datetime import` inside lagged correlation loop in `weekly_correlation_compute_lambda.py`. | R12 Elena + Marcus | S (5min) | Not started |
+| CLEANUP-1 | **Remove `write_composite_scores()` dead code** | ADR-025 + R12 Viktor | S | ✅ Done (v3.7.28) |
+| CLEANUP-2 | **Lambda@Edge in `ci/lambda_map.json`** | R12 Yael | S | ✅ Done (v3.7.27) — `lambda_edge` section with cf-auth, region, CloudFront ID |
+| CLEANUP-3 | **Google Calendar OAuth activation** — run `python3 setup/setup_google_calendar_auth.py`. Not an engineering task. Deferred since v3.7.21. | R9-R13 every review | S (20min) | ⏳ Still pending — carry to Apr 13 |
+| CLEANUP-4 | **`ingestion_validator.py` Decimal import fix** — `_Decimal` was used in typed_fields loop with no import anywhere in the file (live NameError risk). `from decimal import Decimal as _Decimal` moved to module level. `weekly_correlation_compute_lambda.py` was already clean. | R12 Elena + Marcus | S | ✅ Done (v3.7.29) |
+| SEC-3 MEDIUM | **`validate_date_range` in `mcp/utils.py`** — new stable module. Prevents unbounded DDB range scans from MCP tool date inputs. Auto-applied in `handler._validate_tool_args` step 4 to all tools with `start_date`/`end_date` or `date` args. `validate_single_date` also included. | R13 Yael / board | S | ✅ Done (v3.7.29) |
+| ADR-027 EXEC | **Stable MCP core → Layer** — `mcp/utils.py` now exists as stable module. `build_mcp_stable_layer.sh` lists all 6 stable modules including `utils.py`. Full Layer rebuild deferred to Apr 13 with SIMP-1 Phase 2. | ADR-027 | M (15min) | ⏳ Script ready, execution deferred Apr 13 |
 
 ---
 
