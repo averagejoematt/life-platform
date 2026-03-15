@@ -1,7 +1,7 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-15 (v3.7.47 — R16 review conducted, R15 findings closed, ADR-030/031, Google Calendar retired)
+> Last update: 2026-03-15 (v3.7.48 — All R16 findings closed, CI/CD first run triggered (TB7-1), secrets 9 active)
 
 ---
 
@@ -94,13 +94,14 @@ These are not architecture decisions — they're deferred deletions and one-time
 
 | ID | Item | Source | Effort | Impact | Status |
 |----|------|--------|--------|--------|--------|
-| R16-F01 | **ARCHITECTURE inline tool count 89→87** — Serve Layer MCP Server table still says 89 after Google Calendar retirement. | R16 Omar | XS | LOW | ⏳ Pending |
-| R16-F02 | **INFRASTRUCTURE `google-calendar` secret still listed** — delete secret + update table. | R16 Yael | XS | LOW | ⏳ Pending |
-| R16-F03 | **INFRASTRUCTURE Lambda list still has `google-calendar-ingestion`** — execute CDK deploy + update doc. | R16 Marcus | S | LOW | ⏳ Pending (CDK deploy needed) |
-| R16-F04 | **CI/CD pipeline activation** — run `setup_github_oidc.sh`, create GitHub `production` Environment, trigger first pipeline run. Closes TB7-1. | R16 Elena | M | MEDIUM | ⏳ Pending — highest-leverage item |
-| R16-F05 | **Canary tool count threshold <50→<80** — tighten to match 87-tool reality. | R16 Jin | XS | LOW | ⏳ Pending |
-| R16-F06 | **`webhook-key` deletion status** — verify via `describe-secret`, update INFRASTRUCTURE. | R16 Yael | XS | LOW | ⏳ Pending |
-| R14-F02 | **INTELLIGENCE_LAYER.md staleness** — persisting across R14/R15/R16. Add IC-4/IC-5 descriptions. | R14 Sarah (carry) | S | LOW | ⏳ Persisting |
+| R16-F01 | **ARCHITECTURE inline tool count 89→87** | R16 Omar | XS | LOW | ✅ Done (v3.7.48) |
+| R16-F02 | **`google-calendar` secret deletion** | R16 Yael | XS | LOW | ✅ Done — already deleted in v3.7.46 |
+| R16-F03 | **CDK deploy removes `google-calendar-ingestion`** | R16 Marcus | S | LOW | ✅ Done (v3.7.48) — 10/10 smoke passed |
+| R16-F04 | **CI/CD pipeline activation** — OIDC role provisioned, `production` Environment confirmed, first pipeline run triggered. | R16 Elena | M | MEDIUM | ✅ Done (v3.7.48) — closes TB7-1 |
+| R16-F05 | **Canary tool count threshold <50→<80** | R16 Jin | XS | LOW | ✅ Done (v3.7.48) |
+| R16-F06 | **`webhook-key` deletion verified** — `DeletedDate: 2026-03-14` confirmed. Secrets count updated to 9. | R16 Yael | XS | LOW | ✅ Done (v3.7.48) |
+| R14-F02 | **INTELLIGENCE_LAYER.md IC-4/IC-5 descriptions** | R14 Sarah (carry) | S | LOW | ✅ Done (v3.7.48) |
+| R14-F04 | **MCP_TOOL_CATALOG.md ADR-030 retirement note** | R14 Sarah (carry) | XS | LOW | ✅ Done (v3.7.48) |
 
 ---
 
@@ -170,15 +171,15 @@ These are not architecture decisions — they're deferred deletions and one-time
 
 | Metric | Current | Target | Notes |
 |--------|---------|--------|-------|
-| MCP tools | 89 | ≤80 (SIMP-1 Phase 2) | Phase 1 complete (116→89). Phase 2 gated ~Apr 13 |
+| MCP tools | 87 | ≤80 (SIMP-1 Phase 2) | Phase 1 complete (116→87 via ADR-030). Phase 2 gated ~Apr 13 |
 | Lambdas | 43 (CDK) + 1 Lambda@Edge | — | Lambda@Edge (`cf-auth`) in us-east-1, manually managed |
 | CloudWatch alarms | 49 | — | +SLO-5 warmer alarm (v3.7.22) |
 | Monthly cost | ~$10 | <$25 | Well under budget |
-| Active secrets | 11 | — | +google-calendar (v3.7.21) |
+| Active secrets | 9 | — | webhook-key deleted 2026-03-14; google-calendar deleted 2026-03-15 (ADR-030) |
 | CI linters | 9 | — | H1-H5, S1-S4, IAM, registry, handler, wiring, DDB patterns |
 | SLOs defined | 5 | — | SLO-1 through SLO-5 (warmer added v3.7.22) |
 | IC features live | 14 of 30 | — | Next: IC-4/IC-5 (~May 2026) |
-| Data sources | 20 | — | google_calendar deployed; OAuth pending (CLEANUP-3) |
-| Architecture review grade | B+/A- | A | R13 comprehensive review. R15 doc findings fixed. R13 F01-F02-F08 now closed. |
-| R13 open findings | 2 of 15 | 0 | F01 done (v3.7.45), F02 done (v3.7.45), F07 done (v3.7.43), F08 done (v3.7.38), F10 done (v3.7.43), F15 done (v3.7.37). Remaining: F03 (monolith split, deferred ADR-029). |
+| Data sources | 19 | — | google_calendar retired (ADR-030, v3.7.46) |
+| Architecture review grade | A | A | R16 grade A. All R16 findings closed. Platform in steady state. |
+| R13 open findings | 0 of 15 | 0 | All closed. F03 (monolith split) deferred via ADR-029. |
 | CI integration tests wired | I1/I2/I4-I9 | all | I3/I10-I14 manual-only (Lambda invocation side effects or special auth) |
