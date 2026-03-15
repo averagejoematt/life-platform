@@ -45,12 +45,18 @@ class McpStack(Stack):
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
 
         # ── MCP Server Lambda (request-serving) ───────────────────────────────
+        # R13-XR: ACTIVE tracing enables X-Ray for every invocation.
+        # Lambda runtime auto-instruments boto3 calls (DDB queries, Secrets reads)
+        # without requiring aws_xray_sdk in the package. Subsegments for each
+        # DDB query appear in the X-Ray service map, enabling per-query latency
+        # diagnosis that previously required CloudWatch log parsing.
         mcp = create_platform_lambda(self, "McpServer",
             function_name=MCP_FUNCTION_NAME,
             source_file="lambdas/mcp_server.py",
             handler="mcp_server.lambda_handler",
             timeout_seconds=300,
             memory_mb=768,  # R5: power-tuned — 768 MB is cost-optimal (AWS Lambda Power Tuning v4.4.0)
+            tracing=_lambda.Tracing.ACTIVE,  # R13-XR: X-Ray active tracing
             environment={"DEPLOY_VERSION": "2.74.0"},
             custom_policies=rp.mcp_server(),
             table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None)

@@ -61,9 +61,9 @@ Items are grouped by priority tier. Within each tier, items are ordered by ROI (
 
 | ID | Item | Source | Effort | Impact | Status |
 |----|------|--------|--------|--------|--------|
-| R13-F14 | **MCP endpoint canary** — synthetic probe of remote MCP Function URL every 15 min. Existing canary tests DDB+S3+MCP but may not exercise the remote Function URL path. | R13 Finding-14 | S (2h) | MEDIUM — catches remote MCP downtime | Not started |
+| R13-F14 | **MCP endpoint canary** — synthetic probe of remote MCP Function URL every 15 min. Existing canary tests DDB+S3+MCP but may not exercise the remote Function URL path. | R13 Finding-14 | S (2h) | MEDIUM — catches remote MCP downtime | ✅ Done (v3.7.40) |
 | R13-F03 | **MCP monolith split assessment** — if MCP usage increases 5-10x, split into read-light (cached, metadata) and read-heavy (correlation, longitudinal, search) Lambdas. | R13 Finding-03 | L | MEDIUM — scaling readiness | Not needed now. Revisit at productization or >100 MCP calls/day. |
-| R13-XR | **X-Ray tracing on MCP Lambda** — enables per-DDB-query latency diagnosis. Currently diagnosis requires log parsing. | R13 §Observability | S (2h) | LOW — operational maturity | Not started |
+| R13-XR | **X-Ray tracing on MCP Lambda** — enables per-DDB-query latency diagnosis. Currently diagnosis requires log parsing. | R13 §Observability | S (2h) | LOW — operational maturity | ✅ Done (v3.7.40) |
 | R8-LT1 | **Architecture Review #14** — post-R13 validation. Targeting ~2026-05-15 (after R13 30-day items resolved). | R13 30-60-90 roadmap | L (1 session) | HIGH — validates R13 improvements | Gated on R13-F01 through F09 |
 | R8-LT2 | **Evaluate IC-4/IC-5 readiness** — failure pattern recognition + momentum/early warning. Data maturity gate ~6-8 weeks behavioral data. | INTELLIGENCE_LAYER.md | S (assessment) | MEDIUM — next IC features | Gated on data (~May 2026) |
 | R8-LT3 | **Unit tests for business logic** — pytest unit tests for scoring_engine, character_engine, day grade computation. | R8 §9 testability | M-L | MEDIUM | ✅ Done (v3.7.20) — 74/74 tests in `tests/test_business_logic.py` |

@@ -181,6 +181,16 @@ def ingestion_journal_enrichment() -> list[iam.PolicyStatement]:
             actions=["sqs:SendMessage"],
             resources=[DLQ_ARN],
         ),
+        iam.PolicyStatement(
+            sid="XRay",  # R13-XR: X-Ray active tracing
+            actions=[
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+                "xray:GetSamplingRules",
+                "xray:GetSamplingTargets",
+            ],
+            resources=["*"],  # X-Ray does not support resource-level restrictions
+        ),
     ]
 
 
@@ -221,6 +231,16 @@ def ingestion_activity_enrichment() -> list[iam.PolicyStatement]:
             sid="DLQ",
             actions=["sqs:SendMessage"],
             resources=[DLQ_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="XRay",  # R13-XR: X-Ray active tracing
+            actions=[
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+                "xray:GetSamplingRules",
+                "xray:GetSamplingTargets",
+            ],
+            resources=["*"],  # X-Ray does not support resource-level restrictions
         ),
     ]
 

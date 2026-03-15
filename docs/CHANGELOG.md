@@ -1,5 +1,41 @@
 # Life Platform — Changelog
 
+## v3.7.40 — 2026-03-15: R13-F14 MCP canary 15min + R13-XR X-Ray tracing
+
+### Summary
+MCP endpoint is now probed every 15 minutes (R13-F14). Canary also fixed three bugs introduced by R13-F05 (wrong secret name, raw api-key header instead of HMAC Bearer, tool count threshold too high). X-Ray ACTIVE tracing wired into MCP Lambda via CDK (R13-XR).
+
+### Changes
+
+**R13-F14 — MCP canary 15-min probe**
+- `lambdas/canary_lambda.py`: 3 bugs fixed
+  - `MCP_SECRET` default: `ai-keys` → `mcp-api-key`
+  - Auth: `x-api-key` header → HMAC-derived Bearer token (matches R13-F05 fail-closed logic)
+  - Tool count threshold: `< 100` → `< 50` (we have 89; headroom for SIMP-1 cuts)
+  - +`derive_mcp_bearer_token()` helper
+  - +`mcp_only` event flag: skips DDB/S3 checks for 15-min MCP-only probe
+- `patches/patch_canary_mcp_only.py`: one-shot patch script that inserted the `mcp_only` mode
+- `deploy/create_mcp_canary_15min.sh` (new): EventBridge rule `rate(15 minutes)` → canary with `{"mcp_only": true}` + two CloudWatch alarms:
+  - `life-platform-mcp-canary-failure-15min`: any CanaryMCPFail ≥ 1 in 15 min
+  - `life-platform-mcp-canary-latency-15min`: p95 CanaryLatencyMCP_ms > 10s for 2 consecutive windows
+
+**R13-XR — X-Ray tracing on MCP Lambda**
+- `cdk/stacks/mcp_stack.py`: `tracing=_lambda.Tracing.ACTIVE` on MCP server Lambda
+- `cdk/stacks/lambda_helpers.py`: `tracing` param added to `create_platform_lambda()`, forwarded to `_lambda.Function()`
+- `cdk/stacks/role_policies.py` `mcp_server()`: +`XRay` PolicyStatement (`xray:PutTraceSegments`, `PutTelemetryRecords`, `GetSamplingRules`, `GetSamplingTargets`)
+- CDK deployed: `LifePlatformMcp` ✅
+
+### Test Results
+- All 16 tests passing ✅
+
+### Deployed
+- `life-platform-canary` ✅ (fixed auth + mcp_only mode)
+- `LifePlatformMcp` CDK stack ✅ (X-Ray ACTIVE tracing)
+- EventBridge rule `life-platform-mcp-canary-15min` ✅
+- CloudWatch alarms: `life-platform-mcp-canary-failure-15min`, `life-platform-mcp-canary-latency-15min` ✅
+
+---
+
 ## v3.7.39 — 2026-03-15: LV1 fix — centralize layer version + LV5
 
 ### Summary

@@ -57,7 +57,7 @@ REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET  = os.environ["S3_BUCKET"]
 MCP_URL    = os.environ.get("MCP_FUNCTION_URL", "")   # set from deploy script
-MCP_SECRET = os.environ.get("MCP_SECRET_NAME", "life-platform/ai-keys")
+MCP_SECRET = os.environ.get("MCP_SECRET_NAME", "life-platform/mcp-api-key")
 SENDER     = os.environ["EMAIL_SENDER"]
 RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
 
@@ -178,17 +178,40 @@ def check_s3(canary_ts: str, payload: dict) -> tuple[bool, str, float]:
 # ── Check 3: MCP Lambda reachability ─────────────────────────────────────────
 
 def get_mcp_api_key() -> str | None:
-    """Fetch MCP API key from Secrets Manager."""
+    """Fetch MCP API key from Secrets Manager.
+
+    The MCP API key is stored as a raw string (not JSON) in
+    life-platform/mcp-api-key. It is used to derive the HMAC Bearer token.
+    """
     try:
         resp = secrets.get_secret_value(SecretId=MCP_SECRET)
-        secret_dict = json.loads(resp["SecretString"])
-        # Try both possible key names
-        return (secret_dict.get("mcp_api_key")
-                or secret_dict.get("MCP_API_KEY")
-                or secret_dict.get("api_key"))
+        raw = resp["SecretString"]
+        # Secret is stored as a raw string (the key itself), not JSON
+        # Try JSON parse as fallback for legacy format
+        try:
+            secret_dict = json.loads(raw)
+            return (secret_dict.get("mcp_api_key")
+                    or secret_dict.get("MCP_API_KEY")
+                    or secret_dict.get("api_key"))
+        except (json.JSONDecodeError, AttributeError):
+            return raw.strip()
     except Exception as e:
         print(f"[WARN] Could not fetch MCP API key: {e}")
         return None
+
+
+def derive_mcp_bearer_token(api_key: str) -> str:
+    """Derive the HMAC Bearer token from the MCP API key.
+
+    R13-F14 + R13-F05: The MCP handler derives its expected Bearer token via:
+      sig = hmac.new(api_key.encode(), b'life-platform-bearer-v1', sha256).hexdigest()
+      token = f'lp_{sig}'
+    The canary must use the same derivation — sending the raw api_key
+    as an x-api-key header was the old bridge pattern and is no longer valid
+    after R13-F05 made auth fail-closed.
+    """
+    sig = hmac.new(api_key.encode(), b"life-platform-bearer-v1", hashlib.sha256).hexdigest()
+    return f"lp_{sig}"
 
 
 def check_mcp(canary_ts: str) -> tuple[bool, str, float]:
@@ -211,6 +234,9 @@ def check_mcp(canary_ts: str) -> tuple[bool, str, float]:
         "params": {},
     }).encode("utf-8")
 
+    # Derive Bearer token (R13-F05: fail-closed auth requires HMAC Bearer, not raw x-api-key)
+    bearer = derive_mcp_bearer_token(api_key)
+
     t0 = time.monotonic()
     try:
         req = urllib.request.Request(
@@ -218,7 +244,7 @@ def check_mcp(canary_ts: str) -> tuple[bool, str, float]:
             data=payload,
             headers={
                 "Content-Type": "application/json",
-                "x-api-key": api_key,
+                "Authorization": f"Bearer {bearer}",
             },
             method="POST",
         )
@@ -236,11 +262,12 @@ def check_mcp(canary_ts: str) -> tuple[bool, str, float]:
             data = json.loads(body)
             tools = data.get("result", {}).get("tools", [])
             tool_count = len(tools)
-            if tool_count < 100:  # sanity check — should have 100+ tools
-                return False, f"MCP tools/list returned only {tool_count} tools (expected 100+)", latency
+            # R13-F14: threshold 50 — we have 89 tools; headroom for SIMP-1 cuts
+            if tool_count < 50:
+                return False, f"MCP tools/list returned only {tool_count} tools (expected ≥50)", latency
             return True, f"MCP reachable OK — {tool_count} tools listed ({latency:.0f}ms)", latency
         except (json.JSONDecodeError, AttributeError):
-            # Response came back but wasn't parseable — Lambda is alive but something's wrong
+            # Response came back but wasn't parseable — Lambda alive but something wrong
             return False, f"MCP response unparseable: {body[:100]}", latency
 
     except urllib.error.HTTPError as e:
@@ -309,28 +336,32 @@ def lambda_handler(event, context):
     payload_hash = hashlib.sha256(f"canary-{canary_ts}".encode()).hexdigest()[:16]
     payload = {"hash": payload_hash, "ts": canary_ts}
 
-    print(f"Canary run: {canary_ts} | hash={payload_hash}")
+    # R13-F14: mcp_only=true skips DDB/S3 for the 15-min MCP probe
+    mcp_only = event.get("mcp_only", False)
+    mode = "mcp-only" if mcp_only else "full"
+    print(f"Canary run ({mode}): {canary_ts} | hash={payload_hash}")
 
     results = {}
     failures = []
 
-    # ── DynamoDB check ──────────────────────────────────────────────────────
-    ddb_ok, ddb_msg, ddb_ms = check_dynamodb(canary_ts, payload)
-    results["dynamodb"] = {"ok": ddb_ok, "message": ddb_msg, "latency_ms": round(ddb_ms)}
-    print(f"  DDB:  {'✅' if ddb_ok else '❌'} {ddb_msg}")
-    emit("CanaryDDBPass" if ddb_ok else "CanaryDDBFail", 1)
-    emit("CanaryLatencyDDB_ms", ddb_ms, "Milliseconds")
-    if not ddb_ok:
-        failures.append({"check": "DynamoDB", "message": ddb_msg})
+    if not mcp_only:
+        # ── DynamoDB check ──────────────────────────────────────────────────────
+        ddb_ok, ddb_msg, ddb_ms = check_dynamodb(canary_ts, payload)
+        results["dynamodb"] = {"ok": ddb_ok, "message": ddb_msg, "latency_ms": round(ddb_ms)}
+        print(f"  DDB:  {'✅' if ddb_ok else '❌'} {ddb_msg}")
+        emit("CanaryDDBPass" if ddb_ok else "CanaryDDBFail", 1)
+        emit("CanaryLatencyDDB_ms", ddb_ms, "Milliseconds")
+        if not ddb_ok:
+            failures.append({"check": "DynamoDB", "message": ddb_msg})
 
-    # ── S3 check ────────────────────────────────────────────────────────────
-    s3_ok, s3_msg, s3_ms = check_s3(canary_ts, payload)
-    results["s3"] = {"ok": s3_ok, "message": s3_msg, "latency_ms": round(s3_ms)}
-    print(f"  S3:   {'✅' if s3_ok else '❌'} {s3_msg}")
-    emit("CanaryS3Pass" if s3_ok else "CanaryS3Fail", 1)
-    emit("CanaryLatencyS3_ms", s3_ms, "Milliseconds")
-    if not s3_ok:
-        failures.append({"check": "S3", "message": s3_msg})
+        # ── S3 check ────────────────────────────────────────────────────────────
+        s3_ok, s3_msg, s3_ms = check_s3(canary_ts, payload)
+        results["s3"] = {"ok": s3_ok, "message": s3_msg, "latency_ms": round(s3_ms)}
+        print(f"  S3:   {'✅' if s3_ok else '❌'} {s3_msg}")
+        emit("CanaryS3Pass" if s3_ok else "CanaryS3Fail", 1)
+        emit("CanaryLatencyS3_ms", s3_ms, "Milliseconds")
+        if not s3_ok:
+            failures.append({"check": "S3", "message": s3_msg})
 
     # ── MCP check ───────────────────────────────────────────────────────────
     mcp_ok, mcp_msg, mcp_ms = check_mcp(canary_ts)
