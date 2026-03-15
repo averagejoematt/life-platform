@@ -157,6 +157,8 @@ ITEM_COUNT=$(aws dynamodb describe-table \
     --output text)
 echo "   Item count (DDB estimate): ${ITEM_COUNT}"
 
+ITEM_COUNT=$(echo "${ITEM_COUNT}" | tr -d '[:space:]')
+ITEM_COUNT=${ITEM_COUNT:-0}
 if [ "${ITEM_COUNT}" -lt 100 ]; then
     echo "   ⚠️  Very low item count — restore may be incomplete or table is newly populated"
 else
@@ -177,7 +179,8 @@ for source in "${REQUIRED_PARTITIONS[@]}"; do
         --expression-attribute-values "{\":pk\": {\"S\": \"${PK}\"}}" \
         --select COUNT \
         --query "Count" \
-        --output text 2>/dev/null || echo "0")
+        --output text 2>/dev/null | tr -d '[:space:]' || echo "0")
+    RESULT=${RESULT:-0}
 
     if [ "${RESULT}" -gt 0 ]; then
         echo "   ✅ ${source}: ${RESULT} records"
