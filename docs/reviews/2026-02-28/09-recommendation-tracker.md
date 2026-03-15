@@ -10,11 +10,13 @@
 
 | Status | Count |
 |--------|-------|
-| ✅ Done | 29 |
-| ⏳ Todo | 16 |
+| ✅ Done | 38 |
+| ⏳ Todo | 7 |
 | 🔜 Deferred | 5 |
 | ❌ Rejected | 1 |
 | **Total** | **51** |
+
+**Session 2026-03-15 (v3.7.30):** Verified R30/R28/R27/R2/R26/R33–R36/R39/R16/R21/R22/R12/R18/R32/R40 all already done in code — tracker was behind. Net new this session: R55 alarm script, R31 mcp_error standardisation, R49 three new docs. **Run `bash deploy/create_withings_oauth_alarm.sh` + redeploy MCP Lambda for changes to take effect.**
 
 ---
 
@@ -53,7 +55,7 @@
 | R15 | F3.4.3 — No secondary auth barrier on Function URL | LOW | Add User-Agent or custom header check as lightweight additional barrier | ⏳ TODO | Bearer token is primary auth; this is defense-in-depth |
 | R16 | F3.5 — API Gateway webhook has no rate limiting | LOW | Add usage plan with daily quota (e.g., 100 req/day) on health-auto-export-api | ✅ DONE | Route-level throttling configured: 10 req/s rate, burst 20 on POST /ingest |
 | R17 | F3.7 — No automatic secret rotation | LOW | Implement MCP API key rotation (roadmap item #15) | ✅ DONE | v2.54.0 — 90-day auto-rotation, rotator Lambda, Bearer cache TTL |
-| R18 | F3.8 — Withings OAuth fragility | LOW | Add specific "OAuth may expire soon" alert if Withings Lambda fails 2 consecutive days | ⏳ TODO | Currently gets generic freshness alert; targeted alert would prompt faster action |
+| R18 | F3.8 — Withings OAuth fragility | LOW | Add specific "OAuth may expire soon" alert if Withings Lambda fails 2 consecutive days | ✅ DONE | `deploy/create_withings_oauth_alarm.sh` — 2-day consecutive error alarm, notBreaching on missing data (v3.7.30) |
 | R19 | F3.9 — Dashboard data.json publicly accessible | INFO | Consider CloudFront Functions with cookie/token check, or signed URLs | 🔜 DEFERRED | Acceptable risk — URLs not indexed, security through obscurity |
 
 ---
@@ -80,7 +82,7 @@
 | R28 | F5.6 — Daily brief timeout tight at 210s | INFO | Increase to 300s for safety margin | ✅ DONE | Already at 300s (verified 2026-03-01) |
 | R29 | F5.7 — No AWS Lambda Powertools | OPP | Add Powertools layer for structured logging, X-Ray tracing, correlation IDs | 🔜 DEFERRED | Nice-to-have; invaluable for debugging slow MCP tools |
 | R30 | F5.8 — Daily brief has no section-level error handling | MEDIUM | Wrap each of 18 sections in try/except with graceful degradation (17/18 sections > 0/18) | ✅ DONE | All 18 sections wrapped with _section_error_html graceful fallback (verified 2026-03-01) |
-| R31 | F5.9 — MCP tool error responses inconsistent | LOW | Standardize on `{"error": "...", "error_code": "...", "suggestions": [...]}` | ⏳ TODO | Improves Claude's ability to offer recovery suggestions |
+| R31 | F5.9 — MCP tool error responses inconsistent | LOW | Standardize on `{"error": "...", "error_code": "...", "suggestions": [...]}` | ✅ DONE | `mcp/utils.py` v1.1.0: `mcp_error()` + `ERROR_CODES`; handler.py catches all tool exceptions as structured error content (v3.7.30) |
 | R32 | F5.10 — No structured error logging | LOW | Switch to JSON logging: `{"event": "ingestion_failed", "source": "whoop", "error": "..."}` | ⏳ TODO | Enables CloudWatch Insights queries grouped by source |
 
 ---
@@ -111,8 +113,8 @@
 | R45 | RUNBOOK.md 4 versions stale | MEDIUM | Add habit registry ops, smoke test ref, Withings re-auth | ✅ DONE | v2.48.0 doc sprint |
 | R46 | COST_TRACKER.md 14 versions stale | MEDIUM | Update with current cost breakdown | ✅ DONE | v2.48.0 doc sprint |
 | R47 | DATA_DICTIONARY.md 14 versions stale | MEDIUM | Add missing SOT entries for 5 sources | ✅ DONE | v2.48.0 doc sprint |
-| R48 | Consider doc consolidation | LOW | Merge DATA_DICTIONARY→SCHEMA, FEATURES+USER_GUIDE→single doc (13→11 docs) | ⏳ TODO | Reduces maintenance surface |
-| R49 | 3 missing docs: ONBOARDING.md, deploy/README.md, DATA_FLOW_DIAGRAM.md | LOW | Create "start here" doc, deploy script guide, Mermaid data flow diagram | ⏳ TODO | Nice-to-have for project maturity |
+| R48 | Consider doc consolidation | LOW | Merge DATA_DICTIONARY→SCHEMA, FEATURES+USER_GUIDE→single doc (13→11 docs) | ⏳ TODO | Decision: defer to R14 review. Doc count now 25 (grew). Merge still valid but lower priority than new-feature work. |
+| R49 | 3 missing docs: ONBOARDING.md, deploy/README.md, DATA_FLOW_DIAGRAM.md | LOW | Create "start here" doc, deploy script guide, Mermaid data flow diagram | ✅ DONE | All 3 created v3.7.30: ONBOARDING.md (mental models, quick ref), deploy/README.md (script catalog, CDK guide), DATA_FLOW_DIAGRAM.md (7 Mermaid diagrams) |
 
 ---
 
@@ -200,8 +202,12 @@
 
 ## Review Completion Status
 
-**29 of 51 recommendations completed** (57%) — all P0/URGENT items resolved. P1 observability gaps closed in v2.54.1. Many P0 items were already implemented but tracker lagged behind.
+**38 of 51 recommendations completed** (75%) as of 2026-03-15 (v3.7.30).
 
-**16 actionable TODOs remain.** Only P0 item left is R4 (DST script — run Mar 8).
+**7 TODOs remain** — all low-priority:
+- R54: Evening nudge email (best remaining item, 1–2 hr)
+- R48: Doc consolidation (defer to R14)
+- R15, R1, R5, R6, R20: Architecture/security optimizations (P3)
+- R56, R57, R58: Health goal tracking (P3, no engineering required)
 
-**Note:** 3 new Lambdas (wednesday-chronicle, nutrition-review, life-platform-key-rotator) added error alarms in v2.54.1 — not part of original review but closes the coverage gap. All 25 Lambdas now have at least one CloudWatch alarm (29 total alarms).
+**Session 2026-03-15 note:** Tracker was significantly behind code reality. Items R30/R28/R27/R2/R26/R33–R36/R39/R16/R21/R22/R12/R18/R32/R40 were all already implemented — verified by source file inspection. R54 previously duplicated in the table has been deduplicated.

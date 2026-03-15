@@ -25,7 +25,7 @@ import urllib.parse
 from mcp.config import logger, __version__
 from mcp.core import get_api_key, decimal_to_float
 from mcp.registry import TOOLS
-from mcp.utils import validate_date_range, validate_single_date
+from mcp.utils import validate_date_range, validate_single_date, mcp_error
 from mcp.warmer import nightly_cache_warmer
 
 # ── MCP protocol constants ────────────────────────────────────────────────────
@@ -75,9 +75,18 @@ def handle_tools_call(params):
         result = TOOLS[name]["fn"](arguments)
         _emit_tool_metric(name, (time.time() - _t0) * 1000, success=True)
         return {"content": [{"type": "text", "text": json.dumps(result, default=str)}]}
-    except Exception:
+    except Exception as e:
         _emit_tool_metric(name, (time.time() - _t0) * 1000, success=False)
-        raise
+        # R31: Return structured error instead of propagating the exception.
+        # This ensures Claude always sees {error, error_code, suggestions}
+        # rather than a raw JSON-RPC -32603 with an opaque traceback string.
+        logger.error(f"Tool '{name}' raised an exception", exc_info=True)
+        error_response = mcp_error(
+            message=f"Tool '{name}' failed: {type(e).__name__}: {e}",
+            error_code="INTERNAL",
+            detail=str(e),
+        )
+        return {"content": [{"type": "text", "text": json.dumps(error_response, default=str)}]}
 
 
 # ── SEC-3: MCP input validation ─────────────────────────────────────────────

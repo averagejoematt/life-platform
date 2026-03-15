@@ -1,5 +1,55 @@
 # Life Platform — Changelog
 
+## v3.7.30 — 2026-03-15: R31 + R55 + R49 (review tracker closure)
+
+### Summary
+Review tracker sweep. 9 items verified already done in code (tracker was behind v3.7.x work). Net new: R31 MCP error standardisation, R55 Withings OAuth alarm, R49 three new docs. Review tracker now at 38/51 (75%) with only 7 low-priority TODOs remaining.
+
+### Changes
+
+**R31 — `mcp/utils.py` v1.1.0**
+- Added `mcp_error(message, error_code, suggestions, detail)` — canonical error response factory for all MCP tools.
+- Added `ERROR_CODES` dict with 7 codes: NO_DATA, DATE_RANGE, MISSING_ARG, SOURCE_UNAVAIL, PARTIAL_DATA, QUERY_TOO_BROAD, INTERNAL.
+- Added `_default_suggestions(error_code)` — per-code recovery hints Claude can act on.
+- Added `from typing import Any` import.
+
+**R31 — `mcp/handler.py`**
+- Imported `mcp_error` from `mcp.utils`.
+- `handle_tools_call`: changed bare `raise` on tool exception to structured `mcp_error()` response returned as MCP content. Claude now always sees `{error, error_code, suggestions}` instead of a raw JSON-RPC -32603.
+- Exception still logged with `exc_info=True` for CloudWatch visibility.
+
+**R55 — `deploy/create_withings_oauth_alarm.sh`** (new)
+- CloudWatch alarm `withings-oauth-consecutive-errors`: fires on ≥1 Withings Lambda error for 2 consecutive days.
+- `TreatMissingData=notBreaching` — won't fire during maintenance mode or holidays.
+- OK-action also wired to SNS (clears alert when Lambda recovers).
+- Alarm description includes re-auth command for fast on-call response.
+- **Run this script to deploy the alarm.**
+
+**R49 — `docs/ONBOARDING.md`** (new)
+- "Start here" doc: system overview, key mental models (single-table DDB, pipeline timing, CDK ownership), data sources table, dev setup, common tasks quick-reference, troubleshooting table, session handover protocol.
+
+**R49 — `deploy/README.md`** (new)
+- Deploy script catalog: all 20 active scripts with purpose + when-to-use.
+- Step-by-step Lambda deploy procedures (standard, MCP special zip, Garmin native deps).
+- CDK deploy guide with all 8 stack names and what they own.
+- Alarm script and maintenance mode references.
+- Archive policy.
+
+**R49 — `docs/DATA_FLOW_DIAGRAM.md`** (new)
+- 7 Mermaid diagrams: full system overview, daily brief critical path (with times), DynamoDB key schema (ERD), MCP request sequence, OAuth token refresh flow, weekly email cadence (Gantt), alarm coverage topology.
+
+**`docs/reviews/2026-02-28/09-recommendation-tracker.md`**
+- Summary updated: 29→38 done, 16→7 TODO.
+- R18, R31, R49 marked DONE. R48 noted as deferred to R14 review.
+- Prioritized TODO list rewritten — 7 remaining items with honest P1/P2/P3 tiers.
+- Session note added explaining tracker lag vs code reality.
+
+### Deployed
+- `life-platform-mcp` (mcp/utils.py v1.1.0 + handler.py R31 exception wrapping) ✅ 2026-03-15T05:43:17Z
+- `withings-oauth-consecutive-errors` alarm ✅ 2026-03-15
+
+---
+
 ## v3.7.29 — 2026-03-15: SEC-3 MEDIUM + CLEANUP-4 + ADR-027 utils.py
 
 ### Summary

@@ -1,15 +1,22 @@
 """
 mcp/utils.py — SEC-3 MEDIUM: MCP input validation utilities.
+                R31: Standardised error response builder.
 
 Shared validation helpers for MCP tool arguments. Prevents invalid or
 dangerous inputs from reaching DynamoDB queries.
 
+Also provides mcp_error() — the canonical error response factory for all
+MCP tool functions. Ensures every error Claude receives has the same shape:
+  {"error": str, "error_code": str, "suggestions": list[str]}
+
 Stable module — part of the Layer (ADR-027 stable core tier).
 
 v1.0.0 — 2026-03-14 (SEC-3 MEDIUM)
+v1.1.0 — 2026-03-15 (R31: mcp_error() + ERROR_CODES)
 """
 import re
 from datetime import datetime
+from typing import Any
 
 # ── Date validation ────────────────────────────────────────────────────────────
 
@@ -87,6 +94,99 @@ def validate_date_range(
         )
 
     return None  # valid
+
+
+# ── R31: Standardised MCP error responses ─────────────────────────────────────
+
+# Canonical error codes used across all MCP tools.
+# Claude reads these to decide how to recover — keep them stable.
+ERROR_CODES = {
+    "NO_DATA":          "No data found for the requested period.",
+    "DATE_RANGE":       "Invalid or out-of-bound date range.",
+    "MISSING_ARG":      "A required argument was not provided.",
+    "SOURCE_UNAVAIL":   "Data source is unavailable or not yet ingested.",
+    "PARTIAL_DATA":     "Data returned but one or more fields are incomplete.",
+    "QUERY_TOO_BROAD":  "Query spans too many days — use a narrower date range.",
+    "INTERNAL":         "Internal processing error.",
+}
+
+
+def mcp_error(
+    message: str,
+    error_code: str = "INTERNAL",
+    suggestions: list[str] = None,
+    detail: Any = None,
+) -> dict:
+    """Build a standardised MCP tool error response.
+
+    All MCP tool functions should return this instead of raising exceptions
+    or returning ad-hoc dicts. Claude uses the error_code and suggestions
+    fields to decide how to recover without re-prompting the user.
+
+    Args:
+        message:     Human-readable error description.
+        error_code:  One of ERROR_CODES keys (default: "INTERNAL").
+        suggestions: List of recovery actions for Claude to try.
+                     If None, a default suggestion is generated from error_code.
+        detail:      Optional extra context (e.g. caught exception str).
+                     Included only in the response, not logged here.
+
+    Returns:
+        dict with keys: error, error_code, suggestions
+        (and optionally: detail)
+
+    Examples:
+        return mcp_error("No Whoop data found", "NO_DATA",
+                         ["Try a shorter date range", "Check get_data_freshness"])
+
+        return mcp_error("DynamoDB query failed", "INTERNAL", detail=str(e))
+    """
+    if suggestions is None:
+        suggestions = _default_suggestions(error_code)
+
+    response: dict[str, Any] = {
+        "error":      message,
+        "error_code": error_code,
+        "suggestions": suggestions,
+    }
+    if detail is not None:
+        response["detail"] = str(detail)
+    return response
+
+
+def _default_suggestions(error_code: str) -> list[str]:
+    """Return sensible default recovery suggestions for each error code."""
+    _DEFAULTS = {
+        "NO_DATA": [
+            "Try a shorter or different date range.",
+            "Call get_data_freshness to check when this source last updated.",
+        ],
+        "DATE_RANGE": [
+            "Use YYYY-MM-DD format for both start_date and end_date.",
+            "Ensure start_date is on or before end_date.",
+            "Limit the range to 365 days or fewer.",
+        ],
+        "MISSING_ARG": [
+            "Check the tool's required arguments and retry.",
+        ],
+        "SOURCE_UNAVAIL": [
+            "Call get_data_freshness to see which sources are current.",
+            "This source may not have data for the requested date.",
+        ],
+        "PARTIAL_DATA": [
+            "Some fields may be missing — interpret available data with caution.",
+            "Call get_data_freshness to see if the source is fully ingested.",
+        ],
+        "QUERY_TOO_BROAD": [
+            "Split the request into smaller date windows (e.g. 90-day chunks).",
+            "Use get_longitudinal_summary for multi-year overviews instead.",
+        ],
+        "INTERNAL": [
+            "Retry the request — this may be a transient error.",
+            "If the error persists, check CloudWatch logs for the MCP Lambda.",
+        ],
+    }
+    return _DEFAULTS.get(error_code, ["Retry or check system status."])
 
 
 def validate_single_date(date_str: str, label: str = "date") -> str | None:
