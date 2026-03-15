@@ -20,6 +20,7 @@ Why this exists:
     This script compresses them into a single file with the most review-relevant content.
 
 v1.0.0 — 2026-03-10
+v1.1.0 — 2026-03-14 — Updated grade table with R13 results
 """
 
 import os
@@ -291,29 +292,29 @@ def build_bundle():
     # ══════════════════════════════════════════════════════════════
     sections.append("## 13. PREVIOUS REVIEW GRADES\n")
     sections.append("""
-| Dimension | #1 (v2.91) | #2 (v3.1.3) | #3 (v3.3.10) | #4 (v3.4.1) |
-|-----------|-----------|-----------|-------------|-------------|
-| Architecture | B+ | B+ | A- | A |
-| Security | C+ | B+ | B+ | A- |
-| Reliability | B- | B+ | B+ | B+ |
-| Operability | C+ | B- | B+ | B+ |
-| Cost | A | A | A | A |
-| Data Quality | B | B+ | B+ | A- |
-| AI/Analytics | C+ | B- | B | B |
-| Maintainability | C | B- | B | B+ |
-| Production Readiness | D+ | C | B- | B |
+| Dimension | #1 (v2.91) | #2 (v3.1.3) | #3 (v3.3.10) | #4 (v3.4.1) | #13 (v3.7.29) |
+|-----------|-----------|-----------|-------------|-------------|---------------|
+| Architecture | B+ | B+ | A- | A | A |
+| Security | C+ | B+ | B+ | A- | A- |
+| Reliability | B- | B+ | B+ | B+ | A- |
+| Operability | C+ | B- | B+ | B+ | B+ |
+| Cost | A | A | A | A | A+ |
+| Data Quality | B | B+ | B+ | A- | A |
+| AI/Analytics | C+ | B- | B | B | B+ |
+| Maintainability | C | B- | B | B+ | B+ |
+| Production Readiness | D+ | C | B- | B | B+ |
 
-**Review #4 top 10 remaining items:**
-1. Update INCIDENT_LOG with v3.4.0/v3.4.1 incidents (5 entries)
-2. Archive 19 one-time deploy/ scripts
-3. Delete dead files (weather_lambda.py.archived, freshness_checker.py)
-4. Add 3 ADRs (EB rule naming, CoreStack scoping, sick day design)
-5. Audit needs_kms=True across role_policies.py
-6. Add TTL to failure_pattern_compute records
-7. Fix PlatformLogger %s formatting support
-8. Update ARCHITECTURE.md header + CDK section
-9. Check ingestion_habitify() api-keys secret reference
-10. Add "archive deploy/" to session-end checklist
+**Review #13 top findings (15 total — full report: `docs/reviews/REVIEW_2026-03-14_v13.md`):**
+1. No CI/CD pipeline — manual deploys are primary operational risk (HIGH)
+2. No integration tests for critical path (HIGH)
+3. OAuth auto-approve fail-open default (MEDIUM)
+4. On-demand correlation tool missing n-gating (MEDIUM)
+5. No backup restore drill (MEDIUM)
+6. Lambda layer version management is manual (MEDIUM)
+7. No medical disclaimers in MCP tool responses (MEDIUM)
+8. No rate limiting on MCP write tools (MEDIUM)
+9. No canary for remote MCP endpoint (MEDIUM)
+10. Weekly correlation compute lacks multiple comparison correction (MEDIUM)
 """)
     sections.append("\n---\n")
 
