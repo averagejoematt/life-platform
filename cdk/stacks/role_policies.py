@@ -856,7 +856,13 @@ def operational_insight_email_parser() -> list[iam.PolicyStatement]:
 # ═════════════════════════════════════════════════════════════════════════
 
 def mcp_server() -> list[iam.PolicyStatement]:
-    """MCP server: full DDB read, S3 read (all prefixes), all secrets read, no write."""
+    """MCP server: DDB read/write (cache), S3 read (config + CGM only), secrets, no full-bucket access.
+
+    S3 tightened from BUCKET_ARN/* → explicit prefixes only (Yael, item 5, v3.7.27):
+      - config/*                      board personas, character config, profile
+      - raw/matthew/cgm_readings/*    5-min glucose readings for CGM tools
+    ListBucket scoped to cgm_readings prefix only.
+    """
     return [
         iam.PolicyStatement(
             sid="DynamoDB",
@@ -871,8 +877,15 @@ def mcp_server() -> list[iam.PolicyStatement]:
         ),
         iam.PolicyStatement(
             sid="S3Read",
-            actions=["s3:GetObject", "s3:ListBucket"],
-            resources=[BUCKET_ARN, f"{BUCKET_ARN}/*"],
+            actions=["s3:GetObject"],
+            resources=_s3("config/*", "raw/matthew/cgm_readings/*"),
+        ),
+        iam.PolicyStatement(
+            sid="S3ListCGM",
+            # Scoped list for fasting_glucose_validation tool (paginates raw/matthew/cgm_readings/)
+            actions=["s3:ListBucket"],
+            resources=[BUCKET_ARN],
+            conditions={"StringLike": {"s3:prefix": ["raw/matthew/cgm_readings/*"]}},
         ),
         iam.PolicyStatement(
             sid="S3Write",

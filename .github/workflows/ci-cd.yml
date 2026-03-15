@@ -719,6 +719,64 @@ jobs:
           fi
 
   # ════════════════════════════════════════════════════════════════
+  # Job 5b: Post-deploy integration checks (I1 / I2 / I5)
+  # Runs after deploy succeeds, parallel to smoke-test.
+  # I1: handler names in live AWS match expected module names
+  # I2: shared layer version is current on all consumers
+  # I5: required secrets exist (needs secretsmanager:DescribeSecret on OIDC role)
+  #
+  # ⚠️  I5 requires the github-actions-deploy-role to have:
+  #     secretsmanager:DescribeSecret on life-platform/* secrets.
+  #     If the role lacks this, I5 will be skipped (continue-on-error: true).
+  #     To enable: add secretsmanager:DescribeSecret to role_policies for the
+  #     github-actions-deploy-role CDK construct.
+  # ════════════════════════════════════════════════════════════════
+  post-deploy-checks:
+    name: Post-deploy integration checks (I1/I2/I5)
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: needs.deploy.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install boto3 + pytest
+        run: pip install boto3 pytest --quiet
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::205930651321:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: I1 — Lambda handler names match expected module names
+        # Catches CDK reconcile regression: CDK overwrites handler to lambda_function.lambda_handler
+        # Root cause of 2026-03-12 P0 alarm flood.
+        run: |
+          python3 -m pytest tests/test_integration_aws.py::test_i1_lambda_handlers_match_expected \
+            -v --tb=short -m integration 2>&1
+          echo "I1 complete"
+
+      - name: I2 — Shared layer version current on all consumers
+        # Catches stale layer (2026-03-09 P2: 13 Lambdas failed after logger update).
+        run: |
+          python3 -m pytest tests/test_integration_aws.py::test_i2_lambda_layer_version_current \
+            -v --tb=short -m integration 2>&1
+          echo "I2 complete"
+
+      - name: I5 — Required secrets exist in Secrets Manager
+        # Catches stale SECRET_NAME env vars pointing at deleted secrets.
+        # continue-on-error: true until github-actions-deploy-role gets secretsmanager:DescribeSecret.
+        continue-on-error: true
+        run: |
+          python3 -m pytest tests/test_integration_aws.py::test_i5_required_secrets_exist \
+            -v --tb=short -m integration 2>&1
+          echo "I5 complete"
+
+  # ════════════════════════════════════════════════════════════════
   # Job 6: Auto-rollback on smoke failure (TB7-25)
   # Fires when smoke-test fails AFTER a successful deploy.
   # Rolls back each deployed function to its previous S3 artifact.

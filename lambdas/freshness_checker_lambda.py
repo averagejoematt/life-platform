@@ -40,6 +40,23 @@ SOURCES = {
     "google_calendar": "Google Calendar events",  # R8-ST1 — added v3.7.21
 }
 
+# Field-level completeness checks — key fields that should be non-null in a healthy record.
+# A source can be "fresh" (recent date) but have partial data (missing key metrics).
+# Missing fields here emit a PartialCompletenessCount metric and include source in alert.
+# Added v3.7.27 (item 11 — Omar / Jin board recommendation).
+FIELD_COMPLETENESS_CHECKS: dict[str, list[str]] = {
+    "whoop":           ["hrv", "recovery_score", "sleep_duration_hours"],
+    "garmin":          ["steps", "resting_heart_rate", "body_battery_highest"],
+    "apple_health":    ["steps", "active_energy_kcal"],
+    "macrofactor":     ["total_calories_kcal", "total_protein_g"],
+    "strava":          ["activity_count"],
+    "eightsleep":      ["sleep_efficiency_pct", "sleep_duration_hours"],
+    "withings":        ["weight_lbs"],
+    "habitify":        ["total_completed"],
+    "todoist":         ["tasks_completed"],
+    "google_calendar": ["event_count"],
+}
+
 def lambda_handler(event, context):
     table = dynamodb.Table(TABLE_NAME)
     now = datetime.now(timezone.utc)
@@ -63,6 +80,7 @@ def lambda_handler(event, context):
         pass
 
     stale_sources = []
+    partial_sources = []   # fresh but missing expected fields
     source_status = []
 
     for source_key, source_name in SOURCES.items():
@@ -99,7 +117,24 @@ def lambda_handler(event, context):
                 stale_sources.append((source_name, f"Last update: {date_str} ({age_hours:.0f}h ago)"))
                 source_status.append(f"  ⚠️  {source_name}: {date_str} ({age_hours:.0f}h ago)")
             else:
-                source_status.append(f"  ✅ {source_name}: {date_str} ({age_hours:.0f}h ago)")
+                # Source is fresh — now spot-check field completeness
+                completeness_flag = ""
+                expected_fields = FIELD_COMPLETENESS_CHECKS.get(source_key, [])
+                if expected_fields:
+                    try:
+                        item_resp = table.get_item(
+                            Key={"pk": pk, "sk": sk},
+                            ProjectionExpression=", ".join(expected_fields),
+                        )
+                        item = item_resp.get("Item", {})
+                        missing = [f for f in expected_fields if item.get(f) is None]
+                        if missing:
+                            partial_sources.append((source_name, missing))
+                            completeness_flag = f" ⚠️ PARTIAL: {missing}"
+                    except Exception as _ce:
+                        logger.warning("Field completeness check failed for %s: %s", source_key, _ce)
+
+                source_status.append(f"  ✅ {source_name}: {date_str} ({age_hours:.0f}h ago){completeness_flag}")
         except ValueError:
             stale_sources.append((source_name, f"Invalid date format: {date_str}"))
             source_status.append(f"  ❌ {source_name}: Invalid date {date_str}")
@@ -135,6 +170,26 @@ def lambda_handler(event, context):
         status_list = "\n".join(source_status)
         logger.info("All sources fresh.\n%s", status_list)
 
+    # Partial completeness alert (separate from staleness alert)
+    if partial_sources and not _sick_suppress:
+        partial_list = "\n".join(
+            [f"  - {name}: missing {', '.join(fields)}" for name, fields in partial_sources]
+        )
+        try:
+            sns.publish(
+                TopicArn=SNS_ARN,
+                Subject=f"⚠️ Life Platform: {len(partial_sources)} partial record(s)",
+                Message=(
+                    f"⚠️ Life Platform: Partial Data Detected\n\n"
+                    f"The following sources have fresh records but are missing expected fields:\n\n"
+                    f"{partial_list}\n\n"
+                    f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
+                ),
+            )
+            logger.info("Partial completeness alert sent for %d source(s)", len(partial_sources))
+        except Exception as e:
+            logger.error("Partial completeness SNS publish failed: %s", e)
+
     # OBS-3: Emit SLO metrics to CloudWatch
     try:
         fresh_count = len(SOURCES) - len(stale_sources)
@@ -151,9 +206,15 @@ def lambda_handler(event, context):
                     "Value": fresh_count,
                     "Unit": "Count",
                 },
+                {
+                    "MetricName": "PartialCompletenessCount",
+                    "Value": float(len(partial_sources)),
+                    "Unit": "Count",
+                },
             ],
         )
-        logger.info("SLO metrics emitted: %d stale, %d fresh", len(stale_sources), fresh_count)
+        logger.info("SLO metrics emitted: %d stale, %d fresh, %d partial",
+                    len(stale_sources), fresh_count, len(partial_sources))
     except Exception as e:
         logger.error("CloudWatch SLO metric emit failed (non-fatal): %s", e)
 
@@ -223,5 +284,7 @@ def lambda_handler(event, context):
         "statusCode": 200,
         "stale_count": len(stale_sources),
         "stale_sources": [s[0] for s in stale_sources],
+        "partial_count": len(partial_sources),
+        "partial_sources": [s[0] for s in partial_sources],
         "checked_at": now.isoformat(),
     }

@@ -81,6 +81,19 @@
     ]
   },
 
+  "lambda_edge": {
+    "_comment": "Lambda@Edge functions — deployed in us-east-1, manually managed outside CDK. NOT auto-deployed via CI/CD pipeline. Metrics aggregated to us-east-1 per AWS requirement.",
+    "functions": {
+      "lambdas/cf-auth/index.mjs": {
+        "function": "life-platform-cf-auth",
+        "region": "us-east-1",
+        "cloudfront_distribution": "EM5NPX6NJN095",
+        "protects": "dash.averagejoematt.com",
+        "note": "Manually deployed — NOT CDK-managed. Lambda@Edge requires us-east-1 and cannot be deployed from us-west-2 CDK stacks. Secret: life-platform/cf-auth (must exist in us-east-1). Alarm: life-platform-cf-auth-errors (us-east-1 CloudWatch)."
+      }
+    }
+  },
+
   "skip_deploy": {
     "_comment": "Files that are part of the repo but not directly deployable Lambdas (Layer modules or utilities)",
     "files": [
