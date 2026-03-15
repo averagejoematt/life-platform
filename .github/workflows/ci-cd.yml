@@ -212,6 +212,14 @@ jobs:
           python3 -m pytest tests/test_secret_references.py -v --tb=short
           echo "::endgroup::"
 
+      - name: Layer version consistency linter (test_layer_version_consistency.py)
+        # R13-F08: Offline check — verifies layer module files exist, no hardcoded ARNs,
+        # and all consumers are wired in CDK. Complements the live AWS check in the Plan job.
+        run: |
+          echo "::group::Layer version consistency linter"
+          python3 -m pytest tests/test_layer_version_consistency.py -v --tb=short
+          echo "::endgroup::"
+
   # ════════════════════════════════════════════════════════════════
   # Job 3: Plan — validate map, detect changes, build deploy plan
   # ════════════════════════════════════════════════════════════════
