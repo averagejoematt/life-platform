@@ -1,5 +1,30 @@
 # Life Platform — Changelog
 
+## v3.7.34 — 2026-03-15: R5 power-tuning + inbox hygiene (OK alarm removal)
+
+### Summary
+Two improvements from the same session. R5: AWS Lambda Power Tuning identified 768 MB as cost-optimal for `life-platform-mcp` (25% cheaper than the live 1024 MB setting). Inbox hygiene: removed OK recovery notifications from all Lambda alarms — inbox now only receives actionable alerts.
+
+### Changes
+- `cdk/stacks/mcp_stack.py`: MCP server + warmer both updated from 512 MB (CDK) / 1024 MB (live drift) → 768 MB. Comment notes power-tuning result.
+- `cdk/stacks/lambda_helpers.py`: removed `alarm.add_ok_action()` — all CDK-managed Lambda alarms now ALARM-only
+- `deploy/create_withings_oauth_alarm.sh`: removed `--ok-actions` flag
+- `deploy/sync_doc_metadata.py`: `secret_count` updated 11→10, `DATA_DICTIONARY.md` rule removed (archived), `secrets_cost_note` updated
+- Live Withings alarm updated directly in AWS (OK action removed)
+- `npx cdk deploy LifePlatformMcp` ✅ — deployed in 30s
+
+### Power Tuning Results
+| Memory | Cost/invocation | Duration |
+|--------|----------------|----------|
+| 512 MB | higher | slower |
+| **768 MB** | **$0.00000029 ✅ cheapest** | **21.8ms** |
+| 1024 MB | ~25% more expensive | faster |
+| 1536 MB | most expensive | fastest |
+
+Visualization: https://lambda-power-tuning.show/#AAIAAwAEAAY=;yf+RQ65HrkHXo7NBA93VQw==;GCslNs+VmzRpcs80CGA1Nw==
+
+---
+
 ## v3.7.33 — 2026-03-15: R48 doc consolidation (25 → 22 docs)
 
 ### Summary

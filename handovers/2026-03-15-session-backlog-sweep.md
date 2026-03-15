@@ -1,7 +1,7 @@
-# Session Handover — 2026-03-15 — Backlog Sweep (v3.7.31)
+# Session Handover — 2026-03-15 — Backlog Sweep + Power Tuning + Doc Consolidation (v3.7.34)
 
-**Platform version:** v3.7.31
-**Session type:** Large backlog sprint — 9 items from buildable list
+**Platform version:** v3.7.34
+**Session type:** Large multi-part session — backlog sprint + R5 power tuning + R48 doc consolidation + inbox hygiene
 
 ---
 
@@ -47,32 +47,57 @@
 - `python3 deploy/sync_doc_metadata.py --apply` ✅ — auto-updated tool count 88→89, lambda count 45→43.
 - `git commit + push` ✅ — edaac50
 
+### R5 — Lambda Power Tuning
+- Deployed AWS Lambda Power Tuning SAR (serverlessrepo-lambda-power-tuning)
+- Ran against `life-platform-mcp` at 512/768/1024/1536 MB, 10 invocations each
+- **Result: 768 MB is cost-optimal** — $0.00000029/invocation, 21.8ms avg
+- CDK had drift (512 MB in code, 1024 MB live) — both fixed to 768 MB
+- MCP server + warmer both updated in `cdk/stacks/mcp_stack.py`
+- `npx cdk deploy LifePlatformMcp` ✅
+
+### R48 — Doc consolidation
+- `DATA_DICTIONARY.md` merged into `SCHEMA.md` (SOT domains, overlap map, data gaps as header sections)
+- `FEATURES.md` + `USER_GUIDE.md` (both at stale v2.91.0) replaced with fresh `PLATFORM_GUIDE.md`
+- 3 docs archived, 1 new doc, net 25→22 active docs
+- `docs/ARCHITECTURE.md` doc index updated
+
+### Inbox hygiene (bonus)
+- Removed `add_ok_action` from `cdk/stacks/lambda_helpers.py` — all CDK Lambda alarms now ALARM-only
+- `deploy/create_withings_oauth_alarm.sh` — removed `--ok-actions` flag
+- Live Withings alarm updated directly in AWS
+- Rule: email in inbox = something broken, action required
+
+### sync_doc_metadata.py fixes
+- `secret_count` 11→10, cost note updated
+- `DATA_DICTIONARY.md` rule removed (file archived)
+- `secrets_cost` recompute formula updated
+
+### Deploys
+- `npx cdk deploy LifePlatformMcp` ✅ (768MB memory + OK action removal)
+- `npx cdk deploy LifePlatformEmail` ✅ (evening nudge + Layer v10)
+- `npx cdk deploy LifePlatformIngestion` ✅ (Layer v10)
+
 ---
 
 ## Current State
 
-**Platform:** v3.7.31 | **MCP tools:** 89 | **Lambdas:** 43 | **Layer:** v10
+**Platform:** v3.7.34 | **MCP tools:** 89 | **Lambdas:** 43 | **Secrets:** 10 | **Layer:** v10 | **MCP memory:** 768 MB
 
 ---
 
 ## Pending / Next Steps
 
-1. **R20: Delete `webhook-key`** — run:
-   ```bash
-   aws secretsmanager delete-secret \
-     --secret-id life-platform/webhook-key \
-     --recovery-window-in-days 7 \
-     --region us-west-2
-   ```
-   Then update `docs/ARCHITECTURE.md` and `docs/INFRASTRUCTURE.md` secrets count 11→10.
+1. **CLEANUP-3: Google Calendar OAuth** — `python3 setup/setup_google_calendar_auth.py` (20 min, non-engineering)
 
-2. **CLEANUP-3: Google Calendar OAuth** — `python3 setup/setup_google_calendar_auth.py` (20 min, not engineering)
+2. **Architecture Review #13** — `python3 deploy/generate_review_bundle.py` first. Targeting Apr 13.
 
-3. **Architecture Review #13** — `python3 deploy/generate_review_bundle.py` first. Targeting Apr 13.
+3. **SIMP-1 Phase 2** — ≤80 tools, gated on 30 days EMF data (~Apr 13).
 
-4. **SIMP-1 Phase 2** — ≤80 tools, gated on 30 days EMF data (~Apr 13).
+4. **MacroFactor CSV import** — top blocked item. All nutrition tools on mock data.
 
 5. **IC-4/IC-5** — failure patterns + momentum. Data gate ~May 2026.
+
+6. **webhook-key permanent deletion** — auto-deletes 2026-03-22 (already scheduled, no action needed).
 
 ---
 
