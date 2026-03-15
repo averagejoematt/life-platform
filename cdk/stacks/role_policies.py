@@ -469,14 +469,7 @@ def compute_hypothesis_engine() -> list[iam.PolicyStatement]:
     )
 
 
-def ingestion_google_calendar() -> list[iam.PolicyStatement]:
-    """Google Calendar ingestion (R8-ST1): reads/writes DDB, reads secret, writes S3 raw backup, writes refreshed token."""
-    return _ingestion_base(
-        "google_calendar",
-        secret_name="life-platform/google-calendar",
-        s3_prefix="raw/google_calendar/*",
-        extra_secret_actions=["secretsmanager:PutSecretValue"],  # OAuth token refresh writes back
-    )
+# ingestion_google_calendar() removed v3.7.46 — ADR-030 (integration retired)
 
 
 def compute_weekly_correlations() -> list[iam.PolicyStatement]:
