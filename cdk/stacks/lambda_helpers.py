@@ -232,6 +232,6 @@ def create_platform_lambda(
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
         )
         alarm.add_alarm_action(cw_actions.SnsAction(alerts_topic))
-        alarm.add_ok_action(cw_actions.SnsAction(alerts_topic))
+        # OK actions intentionally omitted — inbox should only receive actionable alerts
 
     return fn

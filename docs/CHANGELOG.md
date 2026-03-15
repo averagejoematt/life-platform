@@ -1,5 +1,23 @@
 # Life Platform — Changelog
 
+## v3.7.33 — 2026-03-15: R48 doc consolidation (25 → 22 docs)
+
+### Summary
+Doc consolidation sprint. DATA_DICTIONARY merged into SCHEMA (SOT domains, metric overlap map, three-tier filtering, known data gaps added as header sections). FEATURES + USER_GUIDE replaced with fresh PLATFORM_GUIDE.md (accurate at v3.7.32, organized by domain, includes query guide and troubleshooting). ARCHITECTURE.md doc index updated.
+
+### Changes
+- `docs/SCHEMA.md` renamed to `Schema & Data Dictionary` — prepended SOT domains table, metric overlap map, three-tier filtering, and known data gaps sections from DATA_DICTIONARY.md
+- `docs/PLATFORM_GUIDE.md` (new) — combines feature guide (organized by domain), natural language query guide (query → tool mappings for all domains), data update procedures, and troubleshooting. Replaces FEATURES.md (v2.91.0, stale) and USER_GUIDE.md (v2.91.0, stale).
+- `docs/DATA_DICTIONARY.md` → archived to `docs/archive/DATA_DICTIONARY_archived_v3.7.32.md`
+- `docs/FEATURES.md` → archived to `docs/archive/FEATURES_archived_v3.7.32.md`
+- `docs/USER_GUIDE.md` → archived to `docs/archive/USER_GUIDE_archived_v3.7.32.md`
+- `docs/ARCHITECTURE.md` doc index updated to reflect new structure
+
+### Doc count
+25 → 22 active docs (3 archived, 1 new)
+
+---
+
 ## v3.7.32 — 2026-03-15: R20 webhook-key deletion + doc audit fixes
 
 ### Summary

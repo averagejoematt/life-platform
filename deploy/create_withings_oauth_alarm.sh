@@ -49,8 +49,7 @@ aws cloudwatch put-metric-alarm \
   --threshold 1 \
   --comparison-operator "GreaterThanOrEqualToThreshold" \
   --treat-missing-data "notBreaching" \
-  --alarm-actions "${SNS_ARN}" \
-  --ok-actions "${SNS_ARN}"
+  --alarm-actions "${SNS_ARN}"
 
 echo ""
 echo "✅  Alarm '${ALARM_NAME}' created successfully."
