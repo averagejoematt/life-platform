@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-03-15 (v3.7.32 — 43 Lambdas, 11 active secrets, 89 MCP tools, ~49 alarms)
+> Last updated: 2026-03-15 (v3.7.33 — 43 Lambdas, 11 active secrets, 89 MCP tools, ~49 alarms)
 > Note: `webhook-key` scheduled for deletion 2026-03-15 (7-day recovery window). Count reflects post-deletion state.
 
 ---

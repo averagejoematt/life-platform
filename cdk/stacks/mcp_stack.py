@@ -50,7 +50,7 @@ class McpStack(Stack):
             source_file="lambdas/mcp_server.py",
             handler="mcp_server.lambda_handler",
             timeout_seconds=300,
-            memory_mb=512,
+            memory_mb=768,  # R5: power-tuned — 768 MB is cost-optimal (AWS Lambda Power Tuning v4.4.0)
             environment={"DEPLOY_VERSION": "2.74.0"},
             custom_policies=rp.mcp_server(),
             table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None)
@@ -78,7 +78,7 @@ class McpStack(Stack):
             handler="mcp_server.lambda_handler",
             schedule="cron(0 17 * * ? *)",  # 10:00 AM PT daily
             timeout_seconds=300,
-            memory_mb=512,
+            memory_mb=768,  # R5: matched to MCP server power-tuned value
             alarm_name="mcp-warmer-error",
             environment={"DEPLOY_VERSION": "2.74.0"},
             custom_policies=rp.mcp_server(),

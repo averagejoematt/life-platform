@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-**Version:** v3.7.32 | **Last updated:** 2026-03-15 | **Total tools:** 89
+**Version:** v3.7.33 | **Last updated:** 2026-03-15 | **Total tools:** 89
 
 > SIMP-1 Phase 1 complete (v3.7.17–19): 116 → 86 tools via 13 view-dispatchers.
 > Many previously standalone tools are now `view=` parameters of a parent dispatcher.
