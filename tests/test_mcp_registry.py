@@ -133,7 +133,8 @@ def _get_tool_names(src):
     if tools_start == -1:
         return []
     tools_section = src[tools_start:]
-    return re.findall(r'^\s{4}"([a-z_]+)"\s*:\s*\{', tools_section, re.MULTILINE)
+    # [a-z0-9_]+ to handle names like get_zone2_breakdown
+    return re.findall(r'^\s{4}"([a-z0-9_]+)"\s*:\s*\{', tools_section, re.MULTILINE)
 
 
 def test_r3_schema_structure():
