@@ -30,6 +30,7 @@ from mcp.labs_helpers import (
 )
 from mcp.strength_helpers import classify_exercise
 from mcp.tools_training import tool_get_training_load
+from mcp.helpers import normalize_whoop_sleep
 def tool_get_health_dashboard(args):
     today     = datetime.utcnow().strftime("%Y-%m-%d")
     d30_start = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
@@ -187,7 +188,6 @@ def tool_get_readiness_score(args):
         }
 
     # ── 2. Sleep quality score (25%) ─ Whoop SOT v2.55.0 ────────────────────────
-    from mcp.helpers import normalize_whoop_sleep
     sleep_raw    = query_source("whoop", d7_start, end_date)
     sleep_recent = [normalize_whoop_sleep(i) for i in sleep_raw]
     sleep_sorted = sorted(sleep_recent, key=lambda x: x.get("date", ""), reverse=True)
@@ -1490,6 +1490,24 @@ def tool_get_health_trajectory(args):
                 lost_so_far = start_weight - current_weight
                 pct_complete = round(lost_so_far / total_to_lose * 100, 1) if total_to_lose > 0 else 0
 
+                # Attia lean-mass-preservation gate: flag if loss rate > 1% body weight/week
+                safe_rate_threshold = round(current_weight * 0.01, 2)
+                rate_warning = None
+                if abs(weekly_rate) > safe_rate_threshold:
+                    rate_warning = {
+                        "flag": True,
+                        "current_rate_lbs_per_week": round(abs(weekly_rate), 2),
+                        "safe_threshold_lbs_per_week": safe_rate_threshold,
+                        "excess_lbs_per_week": round(abs(weekly_rate) - safe_rate_threshold, 2),
+                        "message": (
+                            f"⚠️ Losing {abs(round(weekly_rate, 2))} lbs/week — "
+                            f"exceeds the 1% body weight threshold ({safe_rate_threshold} lbs/week). "
+                            "Sustained rates above this threshold risk lean mass catabolism. "
+                            "Prioritise 3×/week resistance training and ≥0.7g protein per lb body weight."
+                        ),
+                        "attia_target": "0.5–1.0% body weight/week for optimal lean mass preservation",
+                    }
+
                 result["weight"] = {
                     "current_weight":       round(current_weight, 1),
                     "goal_weight":          goal_weight,
@@ -1504,6 +1522,7 @@ def tool_get_health_trajectory(args):
                     "phase_milestones":     phase_projections,
                     "projections":          projections,
                     "trend_direction":      "losing" if weekly_rate < -0.3 else ("gaining" if weekly_rate > 0.3 else "stable"),
+                    "rate_warning":         rate_warning,
                 }
             else:
                 result["weight"] = {"message": "Need more recent data (< 4 data points in last 28 days)."}
@@ -1649,6 +1668,36 @@ def tool_get_health_trajectory(args):
                     active_weeks = sum(1 for w in weeks_sorted if weekly_hours[w] > 0.5)
                     consistency = round(active_weeks / total_weeks * 100, 0) if total_weeks > 0 else 0
 
+                    # Strength frequency check (Attia/Huberman: 3+x/week during weight loss)
+                    weekly_strength = {}
+                    for item in strava_data:
+                        d = item.get("date", "")
+                        try:
+                            dt = datetime.strptime(d, "%Y-%m-%d")
+                            wk = dt.strftime("%Y-W%U")
+                        except ValueError:
+                            continue
+                        for act in (item.get("activities") or []):
+                            sport = (act.get("sport_type") or act.get("type", "")).lower()
+                            if any(k in sport for k in ["weight", "strength", "gym", "lift"]):
+                                weekly_strength[wk] = weekly_strength.get(wk, 0) + 1
+
+                    strength_warning = None
+                    if weekly_strength:
+                        recent_strength_weeks = [weekly_strength.get(w, 0) for w in weeks_sorted[-4:]]
+                        avg_strength_per_week = sum(recent_strength_weeks) / len(recent_strength_weeks)
+                        if avg_strength_per_week < 3:
+                            strength_warning = {
+                                "flag": True,
+                                "avg_strength_sessions_per_week": round(avg_strength_per_week, 1),
+                                "target": 3,
+                                "message": (
+                                    f"⚠️ Only {round(avg_strength_per_week, 1)} strength sessions/week (target ≥3). "
+                                    "During a caloric deficit, resistance training frequency is the primary "
+                                    "lever for lean mass preservation."
+                                ),
+                            }
+
                     result["fitness"] = {
                         "avg_weekly_hours":     round(avg_weekly_hours, 1),
                         "avg_weekly_zone2_min": round(avg_weekly_z2, 0),
@@ -1658,6 +1707,7 @@ def tool_get_health_trajectory(args):
                         "training_consistency_pct": consistency,
                         "weeks_analyzed":       total_weeks,
                         "active_weeks":         active_weeks,
+                        "strength_warning":     strength_warning,
                         "attia_assessment":     (
                             "Meeting Zone 2 target" if z2_pct >= 90
                             else f"Zone 2 at {z2_pct}% of target — increase easy cardio"
@@ -1787,6 +1837,8 @@ def tool_get_health_trajectory(args):
             positives.append(f"Weight loss on track at {abs(w['weekly_rate_lbs'])} lbs/week")
         elif w["trend_direction"] == "gaining":
             concerns.append(f"Weight trending up ({w['weekly_rate_lbs']} lbs/week)")
+        if w.get("rate_warning"):
+            concerns.append(w["rate_warning"]["message"])
 
     if "biomarkers" in result and isinstance(result["biomarkers"], dict) and "concerns" in result["biomarkers"]:
         n_concerns = result["biomarkers"]["concerns"]
@@ -1801,6 +1853,8 @@ def tool_get_health_trajectory(args):
             positives.append(f"Zone 2 target met ({z2}%)")
         else:
             concerns.append(f"Zone 2 at {z2}% of target — increase easy cardio")
+        if result["fitness"].get("strength_warning"):
+            concerns.append(result["fitness"]["strength_warning"]["message"])
 
     if "recovery" in result and isinstance(result["recovery"], dict):
         hrv_info = result["recovery"].get("hrv", {})

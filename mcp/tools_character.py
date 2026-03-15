@@ -81,7 +81,7 @@ def _format_pillar_line(name, pillar_data):
     raw = pillar_data.get("raw_score")
     bars = _TIER_BARS.get(tier, "░░░░░░░░░░")
     raw_str = f" (raw: {raw})" if raw is not None else ""
-    return f"{emoji} {name.capitalize():15s} {bars} {level:3d} {tier_emoji} {tier}{raw_str}"
+    return f"{emoji} {name.capitalize():15s} {bars} {int(level):3d} {tier_emoji} {tier}{raw_str}"
 
 
 # ── Tool: get_character_sheet ──
