@@ -20,6 +20,7 @@ import uuid
 import hmac
 import hashlib
 import time
+import concurrent.futures
 import urllib.parse
 
 from mcp.config import logger, __version__
@@ -71,15 +72,31 @@ def handle_tools_call(params):
         raise ValueError(f"Invalid arguments for tool '{name}': {validation_error}")
     logger.info(f"Calling tool '{name}' with args: {arguments}")
     _t0 = time.time()
+    # R6: per-tool soft timeout — returns a structured error instead of hanging
+    # the Lambda until the 300s hard limit. 30s is the default; query-too-broad
+    # errors guide Claude to try a narrower date range or use a summary tool.
+    _TOOL_TIMEOUT_SECS = 30
     try:
-        result = TOOLS[name]["fn"](arguments)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _pool:
+            _future = _pool.submit(TOOLS[name]["fn"], arguments)
+            try:
+                result = _future.result(timeout=_TOOL_TIMEOUT_SECS)
+            except concurrent.futures.TimeoutError:
+                _emit_tool_metric(name, _TOOL_TIMEOUT_SECS * 1000, success=False)
+                logger.warning(f"Tool '{name}' exceeded {_TOOL_TIMEOUT_SECS}s soft timeout")
+                return {"content": [{"type": "text", "text": json.dumps(
+                    mcp_error(
+                        message=(
+                            f"Tool '{name}' timed out after {_TOOL_TIMEOUT_SECS}s. "
+                            "The query is likely scanning too much data."
+                        ),
+                        error_code="QUERY_TOO_BROAD",
+                    ), default=str)}]}
         _emit_tool_metric(name, (time.time() - _t0) * 1000, success=True)
         return {"content": [{"type": "text", "text": json.dumps(result, default=str)}]}
     except Exception as e:
         _emit_tool_metric(name, (time.time() - _t0) * 1000, success=False)
         # R31: Return structured error instead of propagating the exception.
-        # This ensures Claude always sees {error, error_code, suggestions}
-        # rather than a raw JSON-RPC -32603 with an opaque traceback string.
         logger.error(f"Tool '{name}' raised an exception", exc_info=True)
         error_response = mcp_error(
             message=f"Tool '{name}' failed: {type(e).__name__}: {e}",

@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-03-15 (v3.7.30 — 42 Lambdas, 11 active secrets, 88 MCP tools, ~49 alarms)
+> Last updated: 2026-03-15 (v3.7.31 — 43 Lambdas, 11 active secrets, 89 MCP tools, ~49 alarms)
 
 ---
 
@@ -55,7 +55,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Function URL (remote) | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/` |
 | Auth (remote) | HMAC Bearer token via `life-platform/mcp-api-key` secret (auto-rotates every 90 days) |
 | Auth (local) | `mcp_bridge.py` → `.config.json` → Function URL |
-| Tools | 88 across 31 modules |
+| Tools | 89 across 31 modules |
 | Cache warmer | 12 tools pre-computed nightly at 9:00 AM PT |
 
 ---

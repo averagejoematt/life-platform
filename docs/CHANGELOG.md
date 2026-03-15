@@ -1,5 +1,88 @@
 # Life Platform — Changelog
 
+## v3.7.31 — 2026-03-15: R57 centenarian benchmarks + R6 timeout + R54 evening nudge + R6
+
+### Summary
+Four features from the buildable backlog. R57: Attia centenarian decathlon tool benchmarks compound lifts against longevity targets. R6: 30s per-tool soft timeout prevents Lambda hard-timeout on broad scans. R54: Evening nudge Lambda checks supplement/journal/How We Feel completeness at 8 PM and sends reminder if anything’s missing. R1 confirmed already done (daily_brief v2.82.0 reads pre-computed metrics). Scripts written for R20 (secrets consolidation audit) and R5 (Power Tuning instructions).
+
+### Changes
+
+**R57 — `mcp/strength_helpers.py`**
+- Added `_ATTIA_TARGETS` dict: 4 lifts (deadlift 2.0×BW, squat 1.75×, bench 1.5×, OHP 1.0×) with minimum/target/elite ratios + centenarian projection at 85.
+- Added `_ATTIA_STATUS_TIERS`: exceeds_target / at_target / approaching / progressing / below_minimum.
+- Added `attia_benchmark_status(lift_key, bw_ratio)` — returns full status dict with pct_of_target, gap, labels.
+
+**R57 — `mcp/tools_strength.py`**
+- Added `tool_get_centenarian_benchmarks(args)` — queries Hevy data for 4 compound lifts, fetches Withings BW, computes Attia benchmark status for each, returns overall % of targets + priority lift.
+
+**R57 — `mcp/registry.py`**
+- Changed `from mcp.tools_strength import *` to explicit imports (avoids namespace pollution).
+- Added `get_centenarian_benchmarks` tool entry.
+
+**R6 — `mcp/handler.py`**
+- Added `import concurrent.futures`.
+- Wrapped tool call in `ThreadPoolExecutor` with 30s timeout. On `TimeoutError`, returns `mcp_error(QUERY_TOO_BROAD)` instead of letting the Lambda time out at 300s.
+- Exception handling and EMF metric emission preserved.
+
+**R54 — `lambdas/evening_nudge_lambda.py`** (new)
+- Checks 3 sources: supplements (DDB supplements partition), journal (Notion DDB query), How We Feel (apple_health state_of_mind fields + state_of_mind partition).
+- Only sends email if at least 1 source is incomplete — no email on fully complete days.
+- HTML email: amber header, amber nudge bar, missing items table, complete items below fold, quick-action guide.
+
+**R54 — `cdk/stacks/email_stack.py`**
+- Added `EveningNudge` Lambda: `evening-nudge`, schedule `cron(0 3 * * ? *)` (8:00 PM PDT), 60s timeout, 256 MB.
+
+**R54 — `cdk/stacks/role_policies.py`**
+- Added `email_evening_nudge()`: DDB GetItem+Query, KMS, SES, DLQ. No ai-keys (no AI calls).
+
+**R20 — `deploy/consolidate_secrets.sh`** (new)
+- Audit script: lists all secrets, checks whether any Lambda reads `life-platform/habitify` or `life-platform/webhook-key` directly. Prints deletion commands to run after confirmation.
+
+### R1 confirmed done
+R1 (split daily brief compute from render) was completed in v2.82.0. `daily_brief_lambda.py` reads from `computed_metrics` partition written by `daily-metrics-compute`. Inline fallback exists only as a safety net. Marking done in tracker.
+
+### Deployed
+- `life-platform-mcp` (R57 centenarian tool + R6 timeout) ✅ **pending — run deploy**
+- `evening-nudge` Lambda ✅ **pending — `cd cdk && npx cdk deploy LifePlatformEmail`**
+
+### Terminal commands to run
+```bash
+# 1. Run Risk-7 alarm (script already written, just needs executing)
+bash deploy/create_compute_staleness_alarm.sh
+
+# 2. Build new MCP stable Layer (ADR-027) + follow CDK update prompt
+bash deploy/build_mcp_stable_layer.sh
+
+# 3. Deploy MCP Lambda (R57 + R6)
+bash deploy/deploy_and_verify.sh life-platform-mcp lambdas/mcp_server.py
+
+# 4. Deploy evening-nudge via CDK
+cd cdk && npx cdk deploy LifePlatformEmail && cd ..
+
+# 5. Run secrets consolidation audit (R20 — read-only, no deletes)
+bash deploy/consolidate_secrets.sh
+```
+
+### R5 (Lambda Power Tuning)
+Run the AWS Lambda Power Tuning SAR tool against `life-platform-mcp`:
+```bash
+# Deploy the Power Tuning SAR (one-time)
+aws serverlessrepo create-cloud-formation-change-set \
+  --application-id arn:aws:serverlessrepo:us-east-1:451282441545:applications/aws-lambda-power-tuning \
+  --stack-name lambda-power-tuning \
+  --capabilities CAPABILITY_IAM \
+  --region us-west-2
+
+# Then invoke it targeting life-platform-mcp:
+# Use the Step Functions console at:
+# https://us-west-2.console.aws.amazon.com/states/home?region=us-west-2#/statemachines
+# Input: {"lambdaARN": "arn:aws:lambda:us-west-2:205930651321:function:life-platform-mcp",
+#          "powerValues": [512, 768, 1024, 1536],
+#          "num": 10, "payload": {}, "parallelInvocation": true}
+```
+
+---
+
 ## v3.7.30 — 2026-03-15: R31 + R55 + R49 (review tracker closure)
 
 ### Summary

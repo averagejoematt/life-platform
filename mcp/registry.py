@@ -4,7 +4,11 @@ Tool registry: maps tool names to their functions and JSON schemas.
 from mcp.config import SOURCES, RAW_DAY_LIMIT, P40_GROUPS
 from mcp.tools_data import *
 from mcp.tools_calendar import tool_get_calendar_events, tool_get_schedule_load
-from mcp.tools_strength import *
+from mcp.tools_strength import (
+    tool_get_exercise_history, tool_get_strength_prs, tool_get_muscle_volume,
+    tool_get_strength_progress, tool_get_workout_frequency, tool_get_strength_standards,
+    tool_get_strength, tool_get_centenarian_benchmarks,
+)
 from mcp.tools_training import *
 from mcp.tools_health import *
 from mcp.tools_sleep import *
@@ -451,6 +455,32 @@ TOOLS = {
                     "end_date":    {"type": "string", "description": "[progress/prs] End date YYYY-MM-DD (default: today)."},
                     "exercise":    {"type": "string", "description": "[prs] Filter by exercise name (partial match)."},
                     "muscle_group":{"type": "string", "description": "[progress] Filter by muscle group."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "get_centenarian_benchmarks": {
+        "fn": tool_get_centenarian_benchmarks,
+        "schema": {
+            "name": "get_centenarian_benchmarks",
+            "description": (
+                "Compare compound lift 1RMs against Peter Attia's centenarian decathlon targets. "
+                "Shows current bodyweight-relative 1RM vs the ratio needed NOW to maintain functional independence at 80-85. "
+                "Based on Attia's framework: ~8-12% strength decline per decade from 40 means you need ~2x BW deadlift today "
+                "to maintain 1x BW at 85. Returns: status (exceeds_target / at_target / approaching / progressing / below_minimum), "
+                "% of target, lbs to close the gap, overall readiness score across all 4 lifts, and the priority lift (biggest gap). "
+                "Lifts covered: deadlift (target 2.0x BW), squat (1.75x), bench press (1.5x), overhead press (1.0x). "
+                "Requires Hevy workout data + Withings bodyweight. "
+                "Use for: 'Attia benchmarks', 'centenarian decathlon', 'longevity strength targets', "
+                "'how strong do I need to be?', 'functional strength for old age', 'am I on track for 80?'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "end_date":         {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "bodyweight_lbs":   {"type": "number", "description": "Override bodyweight in lbs (default: latest Withings reading)."},
+                    "bodyweight_source":{"type": "string", "description": "Source for bodyweight: 'withings' (default)."},
                 },
                 "required": [],
             },

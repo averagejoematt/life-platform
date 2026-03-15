@@ -72,3 +72,7 @@ class EmailStack(Stack):
 
         _partner_env = {**_email_env, "PARTNER_EMAIL": "[partner-address-redacted]", "EMAIL_SENDER": "awsdev@mattsusername.com"}
         create_platform_lambda(self, "PartnerWeeklyEmail", function_name="partner-weekly-email", handler="partner_email_lambda.lambda_handler", source_file="lambdas/partner_email_lambda.py", schedule="cron(30 17 ? * 1 *)", timeout_seconds=90, memory_mb=256, environment=_partner_env, custom_policies=rp.email_partner(), **shared)
+
+        # R54: Evening nudge — checks supplements/journal/How We Feel completeness at 8 PM PT
+        # cron(0 3 * * ? *) = 3:00 AM UTC = 8:00 PM PDT (UTC-7). Adjust after DST ends.
+        create_platform_lambda(self, "EveningNudge", function_name="evening-nudge", handler="evening_nudge_lambda.lambda_handler", source_file="lambdas/evening_nudge_lambda.py", schedule="cron(0 3 * * ? *)", timeout_seconds=60, memory_mb=256, environment=_email_env, custom_policies=rp.email_evening_nudge(), **shared)
