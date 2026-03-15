@@ -1,3 +1,8 @@
+# RETIRED v3.7.46 — ADR-030. Google Calendar integration abandoned.
+# All integration paths were blocked by Smartsheet IT or macOS restrictions.
+# Kept as reference only. Do not deploy or activate.
+# See docs/DECISIONS.md ADR-030 for full decision log.
+
 #!/usr/bin/env python3
 """
 setup/calendar_sync.py — Mac-native calendar sync for Life Platform.
