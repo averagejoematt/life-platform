@@ -3,7 +3,7 @@ Tool registry: maps tool names to their functions and JSON schemas.
 """
 from mcp.config import SOURCES, RAW_DAY_LIMIT, P40_GROUPS
 from mcp.tools_data import *
-from mcp.tools_calendar import tool_get_calendar_events, tool_get_schedule_load
+# tools_calendar retired v3.7.46 (ADR-030) — google_calendar import removed
 from mcp.tools_strength import (
     tool_get_exercise_history, tool_get_strength_prs, tool_get_muscle_volume,
     tool_get_strength_progress, tool_get_workout_frequency, tool_get_strength_standards,
@@ -38,55 +38,8 @@ TOOLS = {
             "inputSchema": {"type": "object", "properties": {}, "required": []},
         },
     },
-    "get_calendar_events": {
-        "fn": tool_get_calendar_events,
-        "schema": {
-            "name": "get_calendar_events",
-            "description": (
-                "Google Calendar events. Three views: "
-                "'day' (default) = full event list for a specific date with titles, times, durations. "
-                "'range' = day-by-day event count + meeting minutes summary over a date range (requires start_date=). "
-                "'lookahead' = pre-computed 14-day forward summary (fastest). "
-                "Use for: 'what\'s on my calendar today?', 'am I free tomorrow?', 'show my schedule this week', "
-                "'what meetings do I have?', 'my upcoming events', 'calendar for [date]'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "view":       {"type": "string", "enum": ["day", "range", "lookahead"],
-                                  "description": "day (default), range, or lookahead."},
-                    "date":       {"type": "string", "description": "[day] Date YYYY-MM-DD (default: today)."},
-                    "start_date": {"type": "string", "description": "[range] Start date YYYY-MM-DD."},
-                    "end_date":   {"type": "string", "description": "[range] End date YYYY-MM-DD (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
-    "get_schedule_load": {
-        "fn": tool_get_schedule_load,
-        "schema": {
-            "name": "get_schedule_load",
-            "description": (
-                "Scheduling intelligence: meeting load analysis, focus block availability, "
-                "day-of-week patterns, and week-ahead assessment. "
-                "Classifies days as clear/light/moderate/heavy/very_heavy. "
-                "Shows historical patterns: busiest/lightest DOW, avg meeting minutes, focus day frequency. "
-                "Use for: 'do I have a heavy week?', 'when are my best focus blocks?', "
-                "'how busy is this week?', 'what\'s my typical schedule?', 'best day for deep work', "
-                "'am I overloaded this week?', 'schedule vs health correlation'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "days":         {"type": "integer", "description": "Days of lookahead (default: 14)."},
-                    "history_days": {"type": "integer", "description": "Days of historical patterns to analyse (default: 30)."},
-                    "start_date":   {"type": "string",  "description": "Lookahead start date (default: today)."},
-                },
-                "required": [],
-            },
-        },
-    },
+    # get_calendar_events + get_schedule_load removed v3.7.46 (ADR-030)
+    # Google Calendar integration retired — Smartsheet IT blocks all zero-touch options.
     "get_daily_snapshot": {
         "fn": tool_get_daily_snapshot,
         "schema": {
