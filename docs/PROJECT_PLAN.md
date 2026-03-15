@@ -1,7 +1,7 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-15 (v3.7.29 — SEC-3 MEDIUM closed, CLEANUP-4 Decimal import fix, ADR-027 utils.py created)
+> Last update: 2026-03-15 (v3.7.31 — Attia centenarian benchmarks tool, evening nudge Lambda, MCP tool timeout, Layer v10, compute staleness alarm deployed)
 
 ---
 
@@ -56,7 +56,7 @@ Items are grouped by priority tier. Within each tier, items are ordered by ROI (
 | R8-LT5 | **Review SLO targets** — evaluate whether 99%/99.5% targets are appropriate based on 90 days of operational data. | R8 §17 roadmap | S (assessment) | LOW — operational maturity | Gated on 90 days data |
 | R8-LT6 | **Lambda@Edge auth — verify CDK management** | R8 Finding-6, R8 §4 S | S (15min) | LOW | ✅ Done (v3.7.19) — confirmed manually managed outside CDK, documented in ARCHITECTURE.md |
 | R8-LT7 | **Add disclaimer to `get_hypotheses` MCP tool** — unconfirmed hypotheses require 3 observations before promotion. | R8 §12 AI-2 | S (5min) | LOW — analytical transparency | ✅ Done (v3.7.17) — registry description updated |
-| Risk-7 | **Compute pipeline timing: staleness observability** — Daily Brief now emits `ComputePipelineStaleness` CloudWatch metric when `computed_metrics` is missing or >4h stale. Alarm `life-platform-compute-pipeline-stale` to be created via `deploy/create_compute_staleness_alarm.sh`. | R8 Top-10 Risk 7 | S (30min) | MEDIUM — makes silent timing failure visible | ✅ Code done (v3.7.17). Run alarm script to complete. |
+| Risk-7 | **Compute pipeline timing: staleness observability** — Daily Brief emits `ComputePipelineStaleness` metric. Alarm `life-platform-compute-pipeline-stale` deployed. | R8 Top-10 Risk 7 | — | MEDIUM | ✅ DONE v3.7.31 — alarm deployed `deploy/create_compute_staleness_alarm.sh` |
 | R8-LT8 | **DLQ consumer: event-driven vs scheduled** | R8 §6 R-3 | S (30min) | LOW | ✅ Done (v3.7.19) — ADR-024 written, retain schedule model |
 | R8-LT9 | **Pre-compute weekly correlation matrix** — `SOURCE#weekly_correlations` partition. | Pre-R8 | M (3h) | LOW | ✅ Done (v3.7.20) — `weekly-correlation-compute` Lambda, 20 pairs, Sunday 11:30 AM PT |
 
@@ -71,7 +71,7 @@ These are not architecture decisions — they're deferred deletions and one-time
 | CLEANUP-3 | **Google Calendar OAuth activation** — run `python3 setup/setup_google_calendar_auth.py`. Not an engineering task. Deferred since v3.7.21. | R9-R13 every review | S (20min) | ⏳ Still pending — carry to Apr 13 |
 | CLEANUP-4 | **`ingestion_validator.py` Decimal import fix** — `_Decimal` was used in typed_fields loop with no import anywhere in the file (live NameError risk). `from decimal import Decimal as _Decimal` moved to module level. `weekly_correlation_compute_lambda.py` was already clean. | R12 Elena + Marcus | S | ✅ Done (v3.7.29) |
 | SEC-3 MEDIUM | **`validate_date_range` in `mcp/utils.py`** — new stable module. Prevents unbounded DDB range scans from MCP tool date inputs. Auto-applied in `handler._validate_tool_args` step 4 to all tools with `start_date`/`end_date` or `date` args. `validate_single_date` also included. | R13 Yael / board | S | ✅ Done (v3.7.29) |
-| ADR-027 EXEC | **Stable MCP core → Layer** — `mcp/utils.py` now exists as stable module. `build_mcp_stable_layer.sh` lists all 6 stable modules including `utils.py`. Full Layer rebuild deferred to Apr 13 with SIMP-1 Phase 2. | ADR-027 | M (15min) | ⏳ Script ready, execution deferred Apr 13 |
+| ADR-027 EXEC | **Stable MCP core → Layer** — Layer v10 published with 6 stable mcp/ modules. Ingestion + Email stacks updated to `:10`. | ADR-027 | — | ✅ DONE v3.7.31 — `life-platform-shared-utils:10` live, CDK deployed |
 
 ---
 
@@ -101,6 +101,14 @@ These are not architecture decisions — they're deferred deletions and one-time
 | R8-P0d | ARCHITECTURE.md secrets table updated | v3.7.15 | 2026-03-13 |
 | R8-P0e | CV_THRESHOLDS stale comments fixed | v3.7.15 | 2026-03-13 |
 | R8-P0f | SCHEMA.md added to sync_doc_metadata.py | v3.7.15 | 2026-03-13 |
+| R57 | Attia centenarian decathlon benchmarks MCP tool (`get_centenarian_benchmarks`) | v3.7.31 | 2026-03-15 |
+| R6 | Per-tool 30s soft timeout in MCP handler | v3.7.31 | 2026-03-15 |
+| R54 | Evening nudge Lambda (`evening-nudge`, 8 PM PT daily) | v3.7.31 | 2026-03-15 |
+| R55 | Withings OAuth consecutive-error alarm | v3.7.30 | 2026-03-15 |
+| R31 | MCP error standardisation (`mcp_error()`, `ERROR_CODES`) | v3.7.30 | 2026-03-15 |
+| R49 | ONBOARDING.md, deploy/README.md, DATA_FLOW_DIAGRAM.md | v3.7.30 | 2026-03-15 |
+| ADR-027 | Stable Layer v10 (mcp/ core modules) + CDK rollout | v3.7.31 | 2026-03-15 |
+| Risk-7 | Compute pipeline staleness alarm deployed | v3.7.31 | 2026-03-15 |
 | R8-P0g | Architecture Review #8 conducted (A-) | v3.7.15 | 2026-03-13 |
 | TB7-* | All TB7 items closed | v3.7.8 | 2026-03-13 |
 | PROD-1 | CDK migration (8 stacks) | v3.4.0 | 2026-03-10 |
@@ -128,8 +136,8 @@ These are not architecture decisions — they're deferred deletions and one-time
 
 | Metric | Current | Target | Notes |
 |--------|---------|--------|-------|
-| MCP tools | 88 | ≤80 (SIMP-1 Phase 2) | Phase 1 complete (116→88). Phase 2 gated ~Apr 13 |
-| Lambdas | 42 (CDK) + 1 Lambda@Edge | — | Lambda@Edge (`cf-auth`) in us-east-1, manually managed |
+| MCP tools | 89 | ≤80 (SIMP-1 Phase 2) | Phase 1 complete (116→89). Phase 2 gated ~Apr 13 |
+| Lambdas | 43 (CDK) + 1 Lambda@Edge | — | Lambda@Edge (`cf-auth`) in us-east-1, manually managed |
 | CloudWatch alarms | 49 | — | +SLO-5 warmer alarm (v3.7.22) |
 | Monthly cost | ~$10 | <$25 | Well under budget |
 | Active secrets | 11 | — | +google-calendar (v3.7.21) |

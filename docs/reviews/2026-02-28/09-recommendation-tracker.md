@@ -181,7 +181,7 @@
 | R9 | Monthly habit_scores backfill re-run | 15 min | Phase 2 |
 | R11 | Monitor profile record size | 15 min | Phase 2 |
 | R13 | Export IAM policies to security/ directory | 30 min | Phase 3 |
-| R20 | Secrets Manager consolidation (save $2/mo) | 1-2 hr | Phase 4 |
+| R20 | Secrets Manager consolidation — delete `webhook-key` (unused, LastAccessed: None) | 5 min | Phase 4 |
 | R40 | CloudWatch ops dashboard | 1 hr | Phase 6 |
 | R48 | Doc consolidation (13→11 docs) | 1 hr | Phase 7 |
 | R49 | Create ONBOARDING.md, deploy/README.md, DATA_FLOW_DIAGRAM.md | 2 hr | Phase 7 |
