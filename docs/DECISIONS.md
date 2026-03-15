@@ -533,3 +533,34 @@ When a significant decision is made — a design pattern chosen, an approach rej
 **Usage:** `python3 -m pytest tests/test_integration_aws.py -v --tb=short`
 
 **Outcome:** Run as part of session-close ritual after CDK deploys. Add to `post_cdk_reconcile_smoke.sh` as a step.
+
+---
+
+## ADR-029 — MCP Monolith: Retain Single Lambda, Revisit at 100+ Calls/Day
+
+**Status:** Active — decision not to split (R13-F03)
+**Date:** 2026-03-15 (R13 Finding-03)
+
+**Context (R13-F03 finding):** The MCP server is a single Lambda (`life-platform-mcp`, 768 MB, 89 tools). At current usage (personal, 1 operator, ~5-20 calls/day), response latency is dominated by DynamoDB queries, not Lambda compute. R13 raised the question: should the MCP Lambda be split into read-light (cached metadata, tool list) and read-heavy (correlation, longitudinal, search) functions?
+
+**Options considered:**
+
+1. **Split into 2 Lambdas** — `mcp-read-light` (cached tools, tool list) and `mcp-read-heavy` (correlation, full scans). Pro: read-light can have aggressive keep-warm; read-heavy can scale independently. Con: routing layer needed; doubles deployment complexity; MCP spec doesn't natively support tool-based routing.
+
+2. **Split into N micro-Lambdas by domain** — one Lambda per tool module (health, training, nutrition, etc.). Pro: independent scaling. Con: MCP protocol requires a single endpoint for tool discovery; routing becomes a full API gateway problem.
+
+3. **Retain single Lambda with tiered caching** (chosen). Pro: simple; nightly warmer already pre-computes 14 expensive tools (<100ms cached); SIMP-1 Phase 2 targeting ≤80 tools further reduces cold payload. Con: if usage grows 5-10×, cold start time may degrade.
+
+**Decision:** Retain single Lambda. Revisit when either:
+- Daily MCP call volume exceeds 100/day (currently <20), OR
+- p95 latency on uncached tools exceeds 15 seconds (currently <8s)
+
+Monitor via X-Ray (added R13-XR, v3.7.40). X-Ray traces will surface which tools dominate latency if a split ever becomes necessary.
+
+**Split trigger checklist (when to re-evaluate):**
+- [ ] X-Ray shows consistent >10s p95 on read-heavy tools
+- [ ] Cold start time >3s after SIMP-1 Phase 2 (≤80 tools)
+- [ ] Usage grows to >100 MCP calls/day
+- [ ] Second operator/user is onboarded (multi-tenant changes the equation entirely)
+
+**Outcome:** No action. X-Ray tracing in place. Re-evaluate at AR #16 or when trigger conditions met.

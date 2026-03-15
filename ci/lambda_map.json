@@ -77,7 +77,8 @@
       "nutrition-review", "wednesday-chronicle", "weekly-plate",
       "monday-compass", "anomaly-detector", "character-sheet-compute",
       "daily-metrics-compute", "daily-insight-compute",
-      "adaptive-mode-compute", "hypothesis-engine", "dashboard-refresh"
+      "adaptive-mode-compute", "hypothesis-engine", "dashboard-refresh",
+      "weekly-correlation-compute"
     ]
   },
 

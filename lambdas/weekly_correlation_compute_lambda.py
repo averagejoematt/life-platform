@@ -59,18 +59,18 @@ LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "90"))
 # HELPERS
 # ==============================================================================
 
-def d2f(obj):
-    """Recursively convert DynamoDB Decimal to float.
-
-    R13-F10: Canonical copy lives in digest_utils.py (shared layer).
-    This local copy is retained for safety until the next layer rebuild
-    confirms digest_utils is available in this Lambda's execution context.
-    Future: replace with `from digest_utils import d2f` after layer v12+.
-    """
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
-    return obj
+# R13-F10: d2f now imported from digest_utils (shared layer).
+# weekly-correlation-compute added to shared_layer.consumers in ci/lambda_map.json.
+try:
+    from digest_utils import d2f
+except ImportError:
+    # Fallback for local testing without layer
+    from decimal import Decimal as _Decimal
+    def d2f(obj):
+        if isinstance(obj, list):    return [d2f(i) for i in obj]
+        if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
+        if isinstance(obj, _Decimal): return float(obj)
+        return obj
 
 
 def _to_dec(val):

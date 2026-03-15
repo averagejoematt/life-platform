@@ -201,7 +201,20 @@ def nightly_cache_warmer():
         logger.error(f"[warmer] character_sheet failed: {e}")
         results["character_sheet"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
 
-    # 13. get_cgm → dashboard (via dispatcher — was: tool_get_cgm_dashboard)
+    # 13. get_centenarian_benchmarks — Attia decathlon targets
+    _t = time.time()
+    try:
+        logger.info("[warmer] computing centenarian_benchmarks")
+        from mcp.tools_strength import tool_get_centenarian_benchmarks
+        data = tool_get_centenarian_benchmarks({})
+        ddb_cache_set("centenarian_benchmarks_today", data)
+        mem_cache_set("centenarian_benchmarks_today", data)
+        results["centenarian_benchmarks"] = {"status": "ok", "ms": int((time.time()-_t)*1000)}
+    except Exception as e:
+        logger.error(f"[warmer] centenarian_benchmarks failed: {e}")
+        results["centenarian_benchmarks"] = {"status": f"error: {e}", "ms": int((time.time()-_t)*1000)}
+
+    # 14. get_cgm → dashboard (via dispatcher — was: tool_get_cgm_dashboard)
     _t = time.time()
     try:
         logger.info("[warmer] computing cgm dashboard (via dispatcher)")
