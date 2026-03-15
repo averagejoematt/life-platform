@@ -44,7 +44,7 @@
 | Item | Priority | Notes |
 |------|----------|-------|
 | ~~R16-F06: Verify webhook-key deletion~~ | ~~Low~~ | ~~`DeletedDate: 2026-03-14` confirmed.~~ ✅ Closed |
-| **GitHub Actions unblock** | Medium | Account-level bug: API shows `enabled:true`, token has `workflow` scope, repo is public, all permissions correct — but dispatch returns HTTP 422 "Actions has been disabled for this user" and UI button fails. File support ticket at https://support.github.com. CI/CD infrastructure is fully built and correct — will activate once GitHub resolves. |
+| **GitHub Actions unblock** | Medium | Account-level bug: API shows `enabled:true`, token has `workflow` scope, repo is public, all permissions correct — but dispatch returns HTTP 422 "Actions has been disabled for this user" and UI button fails. **Support ticket filed 2026-03-15.** CI/CD infrastructure fully built — activate once GitHub resolves by running: `gh workflow run ci-cd.yml --ref main` |
 | **Monitor CI/CD first pipeline run** | Low | Check Actions tab: https://github.com/averagejoematt/life-platform/actions — confirm lint → test → plan passes |
 | **Deploy canary_lambda.py** | Low | Canary threshold change is local only — needs deploy to take effect: `bash deploy/deploy_lambda.sh life-platform-canary lambdas/canary_lambda.py` |
 | R14-F04: MCP_TOOL_CATALOG.md | Low | Persisting — update catalog for ADR-030 retirements |
