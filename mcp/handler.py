@@ -25,6 +25,7 @@ import urllib.parse
 from mcp.config import logger, __version__
 from mcp.core import get_api_key, decimal_to_float
 from mcp.registry import TOOLS
+from mcp.utils import validate_date_range, validate_single_date
 from mcp.warmer import nightly_cache_warmer
 
 # ── MCP protocol constants ────────────────────────────────────────────────────
@@ -133,6 +134,23 @@ def _validate_tool_args(name: str, arguments: dict) -> str | None:
                 f"Argument '{arg_name}' exceeds maximum length "
                 f"({len(arg_val)} > {MAX_STRING_LEN} chars)"
             )
+
+    # 4. SEC-3 MEDIUM: Date range validation — prevents unbounded DDB range scans.
+    # Automatically applied to any tool that accepts start_date + end_date args.
+    # validate_date_range enforces YYYY-MM-DD format, calendar validity, ordering,
+    # and a 365-day span cap (730-day hard max). See mcp/utils.py.
+    if "start_date" in arguments and "end_date" in arguments:
+        date_err = validate_date_range(
+            arguments["start_date"], arguments["end_date"]
+        )
+        if date_err:
+            return f"Invalid date range: {date_err}"
+
+    # Single-date tools (e.g. "date" argument only)
+    elif "date" in arguments and isinstance(arguments["date"], str):
+        date_err = validate_single_date(arguments["date"])
+        if date_err:
+            return f"Invalid date: {date_err}"
 
     return None
 

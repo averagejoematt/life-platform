@@ -7,7 +7,7 @@ for audit. Critical validation failures skip DDB write entirely.
 
 USAGE:
 
-    from ingestion_validator import validate_item, ValidationSeverity
+    from ingestion_validator import validate_item, validate_and_write
 
     result = validate_item("whoop", item, date_str="2026-03-08")
     if result.should_skip_ddb:
@@ -47,6 +47,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from decimal import Decimal as _Decimal
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -437,11 +438,11 @@ def validate_item(source: str, item: dict, date_str: str = "") -> ValidationResu
             result.errors.append(f"Required field missing: '{req_field}'")
 
     # 2. Type checks (WARNING — not critical, Decimal/int mismatches are common)
+    # _Decimal imported at module level — do not re-import inside this loop.
     for fld, expected_types in schema.get("typed_fields", {}).items():
         if fld not in item or item[fld] is None:
             continue
         # Allow Decimal (DynamoDB) as valid for numeric types
-        from decimal import Decimal as _Decimal
         actual = item[fld]
         if isinstance(expected_types, tuple):
             valid_types = expected_types + (_Decimal,)

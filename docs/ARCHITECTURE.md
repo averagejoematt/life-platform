@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-15 (v3.7.28 — 88 tools, 30-module MCP package, 20 data sources, 42 Lambdas, 11 secrets, 49 alarms, 8 CDK stacks deployed)
+Last updated: 2026-03-15 (v3.7.28 — 88 tools, 31-module MCP package, 20 data sources, 42 Lambdas, 11 secrets, 49 alarms, 8 CDK stacks deployed)
 
 ---
 
@@ -263,7 +263,7 @@ No GSI by design — all access patterns served by PK+SK queries.
 **Auth:** `x-api-key` header check; key in `life-platform/ai-keys`
 **Protocol:** JSON-RPC 2.0 / MCP spec 2025-06-18
 
-30-module package structure:
+31-module package structure:
 ```
 mcp/
   handler.py, config.py, utils.py, core.py, helpers.py
@@ -416,7 +416,7 @@ AWS Budget alerts at $5 (25%), $10 (50%), $20 (100%) → `awsdev@mattsusername.c
 ~/Documents/Claude/life-platform/
   mcp_server.py                   ← MCP Lambda entry point
   mcp_bridge.py                   ← Local MCP adapter (Claude Desktop stdio → Lambda HTTPS)
-  mcp/                            ← MCP server package (30 modules)
+  mcp/                            ← MCP server package (31 modules)
     handler.py, config.py, utils.py, core.py, helpers.py, warmer.py
     labs_helpers.py, strength_helpers.py, registry.py
     tools_sleep, tools_health, tools_training, tools_nutrition, tools_habits
