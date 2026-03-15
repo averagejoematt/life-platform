@@ -2,7 +2,7 @@
 
 > Documents the Intelligence Compounding (IC) features: how the platform learns, remembers, and improves over time.
 > For the IC roadmap and future phases, see PROJECT_PLAN.md (Tier 7).
-> Last updated: 2026-03-15 (v3.7.41)
+> Last updated: 2026-03-15 (v3.7.48)
 
 ---
 
@@ -79,7 +79,7 @@ The architecture decision (ADR-016) is explicit: no vector store, no embeddings,
 
 ---
 
-## Live IC Features (as of v3.7.41)
+## IC Features (as of v3.7.48)
 
 ### IC-1: platform_memory Partition
 **Status:** Live (v2.86.0)
@@ -107,6 +107,40 @@ The architecture decision (ADR-016) is explicit: no vector store, no embeddings,
 **What it does:** Board of Directors + TL;DR AI calls use two-pass reasoning. Pass 1 generates structured JSON identifying patterns and connections. Pass 2 writes coaching output using Pass 1 analysis. ~2× token cost but material quality improvement — model reasons before writing.
 
 **Model routing (TB7-23, confirmed 2026-03-13):** Both Pass 1 (analysis) and Pass 2 (output) use `AI_MODEL` = `claude-sonnet-4-6` via `call_anthropic()` in `ai_calls.py`. There is **no quality asymmetry** between the two passes — both run on Sonnet. The Haiku reference at line 515 of `daily_insight_compute_lambda.py` is the IC-8 intent evaluator, which correctly uses Haiku (classification task, not coaching). IC-3 itself has no Haiku dependency.
+
+### IC-4: Failure Pattern Recognition
+**Status:** Data-gated skeleton (not yet live — data gate: `days_available >= 42` in `habit_scores`)
+**Lambda:** `failure_pattern_compute_lambda.py` (CDK-wired and EventBridge-scheduled pending activation ~2026-05-01)
+**What it does:** Identifies recurring failure patterns in habit execution — specifically, which antecedent conditions (high TSB, poor sleep, high Todoist load, travel) consistently precede multi-day habit streaks breaking. Writes failure pattern summaries to `MEMORY#failure_patterns` in `platform_memory`. Coaching AI uses these patterns to preemptively warn: "Last 3 times load exceeded 80 + sleep efficiency dropped below 78%, habits collapsed for 4+ days."
+
+**Activation checklist:**
+1. Verify `days_available >= 42` in `habit_scores` partition
+2. Add to `cdk/stacks/compute_stack.py` with EventBridge rule
+3. Update `ci/lambda_map.json` (remove `not_deployed` flag)
+4. Deploy via CDK + run `post_cdk_reconcile_smoke.sh`
+
+**Key output fields:**
+- `antecedent_conditions` — conditions that preceded failure (list of {metric, threshold, direction})
+- `failure_type` — e.g. `habit_streak_collapse`, `nutrition_drift`, `sleep_degradation`
+- `recurrence_count` — how many times this pattern has been observed
+- `recovery_days` — median days to recover after this pattern fires
+
+---
+
+### IC-5: Momentum Warning
+**Status:** Data-gated skeleton (not yet live — data gate: `days_available >= 42` in `computed_metrics`)
+**Lambda:** `momentum_warning_compute_lambda.py` (CDK-wired and EventBridge-scheduled pending activation ~2026-05-01)
+**What it does:** Early-warning system that detects leading indicators of momentum loss — sustained low habit completion + declining pillar scores + rising TSB — before they manifest as a measurable setback. Writes momentum signals to `MEMORY#momentum_warnings`. Coaching AI surfaces these as forward-looking alerts rather than retrospective observations.
+
+**Activation checklist:** Same as IC-4 — pair them in the same CDK deploy to share one activation pass.
+
+**Key output fields:**
+- `momentum_signal` — `warning` | `at_risk` | `stable` | `building`
+- `leading_indicators` — list of metrics trending unfavorably with direction and days_trending
+- `at_risk_pillars` — pillar names with current trajectory
+- `suggested_intervention` — highest-leverage action to reverse momentum (e.g. `prioritize_sleep`, `reduce_training_load`)
+
+---
 
 ### IC-6: Milestone Architecture
 **Status:** Live (v2.86.0)
@@ -457,4 +491,4 @@ These decisions are documented to prevent revisiting:
 
 ---
 
-*Last updated: 2026-03-15 (v3.7.41 — hypothesis engine v1.2.0, weekly correlation compute + BH FDR, W3 validator, ADR-025)*
+*Last updated: 2026-03-15 (v3.7.48 — IC-4/IC-5 skeleton descriptions added (R14-F02))*

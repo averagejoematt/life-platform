@@ -31,7 +31,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
                          │ DynamoDB queries
 ┌────────────────────────▼────────────────────────────────────┐
 │  SERVE LAYER                                                │
-│  MCP Server Lambda (89 tools, 768 MB) + Lambda Function URL │
+│  MCP Server Lambda (87 tools, 768 MB) + Lambda Function URL │
 │  ← Claude Desktop + claude.ai + Claude mobile via remote MCP│
 │                                                             │
 │  COMPUTE LAYER (IC intelligence features)                   │
@@ -257,7 +257,7 @@ No GSI by design — all access patterns served by PK+SK queries.
 
 ### MCP Server
 
-**Lambda:** `life-platform-mcp` | **Tools:** 89 | **Memory:** 768 MB | **Modules:** 31
+**Lambda:** `life-platform-mcp` | **Tools:** 87 | **Memory:** 768 MB | **Modules:** 31
 **Local endpoint:** `https://votqefkra435xwrccmapxxbj6y0jawgn.lambda-url.us-west-2.on.aws/`
 **Remote MCP:** `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` — OAuth 2.1 auto-approve + HMAC Bearer (enables claude.ai + mobile)
 **Auth:** `x-api-key` header check; key in `life-platform/ai-keys`
