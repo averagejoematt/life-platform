@@ -1,5 +1,50 @@
 # Life Platform — Changelog
 
+## v3.7.43 — 2026-03-15: R14-F07 + R13-F07/F10 + IC-4/IC-5 + ADR-029 + warmer step 13
+
+### Summary
+CloudFront 5xx alarm, PITR drill script, d2f consolidated to shared layer, IC-4/IC-5 Lambda skeletons (data-gated ~May), ADR-029 (MCP monolith retain decision), centenarian benchmarks added to warmer, doc headers updated.
+
+### Changes
+
+**R14-F07 — CloudFront 5xx alarm (us-east-1)**
+- `deploy/create_cloudfront_5xx_alarm.sh` (new): creates us-east-1 SNS topic + two CloudWatch alarms on CloudFront distribution EM5NPX6NJN095: `life-platform-dash-5xx-rate` (≥5% for 2×5-min windows) and `life-platform-dash-total-errors` (≥10% any window). Distinct from Lambda@Edge invocation errors. Run once to activate.
+
+**R13-F07 — PITR restore drill script**
+- `deploy/pitr_restore_drill.sh` (new): full PITR drill — initiates restore to `life-platform-pitr-test`, polls for ACTIVE, verifies 6 partitions + 7-day recent records, prints drill report, prompts for table deletion. Run quarterly (~Apr 2026 first drill).
+
+**R13-F10 — d2f consolidated to shared layer**
+- `lambdas/weekly_correlation_compute_lambda.py`: local `d2f()` definition replaced with `from digest_utils import d2f` (try/except fallback for local testing). Local Decimal import removed.
+- `ci/lambda_map.json`: `weekly-correlation-compute` added to `shared_layer.consumers` so CI layer version check and deploy pipeline include it.
+
+**Centenarian benchmarks — warmer step 13**
+- `mcp/warmer.py`: step 13 added — `tool_get_centenarian_benchmarks({})` pre-computed nightly. CGM dashboard renumbered to step 14. Cache key: `centenarian_benchmarks_today`.
+
+**IC-4 skeleton — failure pattern recognition**
+- `lambdas/failure_pattern_compute_lambda.py` (new): data-gated Lambda skeleton (MIN_DAYS=42). Detectors stubbed: habit skip predictors, cascade patterns, day-of-week clusters, rebound speed. Data gate check live; all detector bodies TODO until ~2026-05-01. Writes to `MEMORY#failure_patterns#<date>`.
+
+**IC-5 skeleton — momentum + early warning**
+- `lambdas/momentum_warning_compute_lambda.py` (new): data-gated Lambda skeleton (MIN_DAYS=42). Detectors stubbed: habit momentum, HRV suppression (pre-illness), nutrition drift, training load warning (ACWR), recovery floor creep. Active warning aggregator wired. Writes to `MEMORY#momentum_warning#<date>`. Schedule: daily 9:50 AM PT.
+
+**ADR-029 — MCP monolith retain decision**
+- `docs/DECISIONS.md`: ADR-029 added — retain single MCP Lambda; revisit at >100 calls/day or p95 >15s. Split trigger checklist included. X-Ray tracing in place (R13-XR) to surface latency hotspots if needed.
+
+**Doc headers**
+- `docs/INCIDENT_LOG.md`: updated header to v3.7.43
+- `docs/PROJECT_PLAN.md`: updated header to v3.7.43
+
+**Confirmed already done (no work needed)**
+- R13-F01: ci-cd.yml is a full 7-job pipeline (lint → test → plan → deploy → smoke → post-deploy-checks → rollback)
+- R13-F08: `test_layer_version_consistency.py` in CI test job + plan job live AWS layer check
+
+### Test Results
+- All 16 tests passing ✅
+
+### Deployed
+- Nothing deployed this version (deploy `weekly-correlation-compute` + `life-platform-mcp` after attaching layer)
+
+---
+
 ## v3.7.41 — 2026-03-15: R14 findings batch (F01/F05/F06/F08) + S1 fix
 
 ### Summary

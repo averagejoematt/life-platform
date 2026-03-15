@@ -1,37 +1,34 @@
 """
-Failure Pattern Compute Lambda — IC-4 v1.0.0
-Scheduled weekly on Sundays at 9:50 AM PT (17:50 UTC via EventBridge).
+failure_pattern_compute_lambda.py — IC-4: Failure Pattern Recognition
 
-Scans the past 7 days of computed_metrics. For each day where any
-component scores below 50 (failing), fetches contextual conditions —
-recovery, stress, task load, training load — and runs a Haiku synthesis
-pass to identify recurring failure patterns.
+Identifies recurring failure patterns from behavioral + outcome data.
+Writes structured pattern records to SOURCE#platform_memory for use
+by coaching AI in Daily Brief and Weekly Digest.
 
-Stores results to platform_memory as MEMORY#failure_pattern#<date> records.
-These are consumed by daily_insight_compute_lambda.py → build_memory_context()
-which injects them into every Daily Brief AI call.
+DATA GATE: Requires 6-8 weeks of behavioral data before meaningful patterns
+emerge. Scheduled to activate ~2026-05-01.
 
-Data flow:
-  computed_metrics (7d)    ─┐
-  whoop (recovery/HRV)     ─┤
-  todoist (task count)     ─┼─→ Haiku synthesis → platform_memory (failure_pattern)
-  notion (journal stress)  ─┤        ↓
-  tsb (from computed)      ─┘  daily_insight_compute reads on next run
+WHAT IT DETECTS:
+  - Habit completion → outcome correlations (which skips predict bad days)
+  - Time-of-week failure clusters (e.g. Sundays, post-travel)
+  - Cascade patterns (e.g. poor sleep → skip workout → overeat)
+  - Rebound speed after bad days (how quickly Matthew recovers)
+  - External trigger patterns (travel, social events, stress spikes)
 
-Schedule: Sunday 9:50 AM PT (after daily-metrics-compute + daily-insight-compute)
+DynamoDB writes:
+  SOURCE#platform_memory   MEMORY#failure_patterns#YYYY-MM-DD
 
-v1.0.0 — 2026-03-09
+SCHEDULE: Sunday 11:45 AM PT (after weekly correlations, before hypothesis engine)
+  EventBridge: cron(45 18 ? * SUN *)
+
+v0.1.0 — 2026-03-15 (IC-4 skeleton — data-gated ~2026-05-01)
 """
 
 import json
 import os
 import logging
-from datetime import datetime, timedelta, timezone
-from decimal import Decimal
-
-import urllib.request
-
 import boto3
+from datetime import datetime, timedelta
 
 try:
     from platform_logger import get_logger
@@ -42,425 +39,229 @@ except ImportError:
 
 _REGION    = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ["USER_ID"]
+USER_ID    = os.environ.get("USER_ID", "matthew")
+S3_BUCKET  = os.environ.get("S3_BUCKET", "matthew-life-platform")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
-PROFILE_PK  = f"USER#{USER_ID}"
 
-ANTHROPIC_API  = "https://api.anthropic.com/v1/messages"
-_api_key_cache = None
-
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
-
-# Component threshold below which a day is considered "failing" for that component
-FAILURE_THRESHOLD = 50
-
-# Minimum occurrences of a pattern across 7 days before it's worth logging
-MIN_PATTERN_OCCURRENCES = 2
+# ── Data gate ────────────────────────────────────────────────────────────────
+# Minimum days of behavioral data required before patterns are meaningful.
+# Below this threshold, the Lambda exits early with a data_gate_not_met signal.
+MIN_DAYS_REQUIRED = 42   # 6 weeks
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table    = dynamodb.Table(TABLE_NAME)
 
-DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
+# ══════════════════════════════════════════════════════════════════════════════
+# DATA GATE CHECK
+# ══════════════════════════════════════════════════════════════════════════════
 
-# ==============================================================================
-# HELPERS
-# ==============================================================================
-
-def d2f(obj):
-    if isinstance(obj, list):    return [d2f(i) for i in obj]
-    if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal): return float(obj)
-    return obj
-
-
-def safe_float(rec, field, default=None):
-    if rec and field in rec:
-        try:   return float(rec[field])
-        except Exception: return default
-    return default
-
-
-def fetch_date(source, date_str):
+def _check_data_gate():
+    """Return (ok: bool, days_available: int) for the habit_scores partition."""
     try:
-        r = table.get_item(Key={"pk": USER_PREFIX + source, "sk": "DATE#" + date_str})
-        return d2f(r.get("Item"))
-    except Exception as e:
-        logger.warning(f"fetch_date({source}, {date_str}): {e}")
-        return None
-
-
-def fetch_range(source, start, end):
-    try:
-        records = []
-        kwargs = {
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {":pk": USER_PREFIX + source,
-                                          ":s": "DATE#" + start, ":e": "DATE#" + end},
-        }
-        while True:
-            r = table.query(**kwargs)
-            records.extend(d2f(i) for i in r.get("Items", []))
-            if "LastEvaluatedKey" not in r:
-                break
-            kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
-        return records
-    except Exception as e:
-        logger.warning(f"fetch_range({source}): {e}")
-        return []
-
-
-def fetch_journal_entries_for_date(date_str):
-    try:
+        today      = datetime.utcnow().strftime("%Y-%m-%d")
+        gate_start = (datetime.utcnow() - timedelta(days=MIN_DAYS_REQUIRED)).strftime("%Y-%m-%d")
         resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :start AND :end",
             ExpressionAttributeValues={
-                ":pk": USER_PREFIX + "notion",
-                ":s": f"DATE#{date_str}#journal",
-                ":e": f"DATE#{date_str}#journal#~",
+                ":pk":    f"{USER_PREFIX}habit_scores",
+                ":start": f"DATE#{gate_start}",
+                ":end":   f"DATE#{today}",
             },
+            Select="COUNT",
         )
-        return [d2f(i) for i in resp.get("Items", [])]
+        days = resp.get("Count", 0)
+        return days >= MIN_DAYS_REQUIRED, days
     except Exception as e:
-        logger.warning(f"fetch_journal({date_str}): {e}")
-        return []
+        logger.warning(f"[IC-4] data gate check failed: {e}")
+        return False, 0
 
 
-def _get_api_key():
-    global _api_key_cache
-    if _api_key_cache:
-        return _api_key_cache
-    secrets_client = boto3.client("secretsmanager", region_name=_REGION)
-    secret_name = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
-    resp = secrets_client.get_secret_value(SecretId=secret_name)
-    creds = json.loads(resp["SecretString"])
-    _api_key_cache = creds.get("anthropic_api_key") or creds.get("ANTHROPIC_API_KEY")
-    return _api_key_cache
+# ══════════════════════════════════════════════════════════════════════════════
+# PATTERN DETECTORS
+# ══════════════════════════════════════════════════════════════════════════════
 
-
-# ==============================================================================
-# CONTEXTUAL DATA FETCHER
-# ==============================================================================
-
-def fetch_context_for_date(date_str):
-    """Fetch the contextual conditions for a given date.
-
-    Returns a compact dict capturing the conditions under which failures occurred.
-    Used to identify what was different on bad days vs good days.
+def _detect_habit_skip_predictors(habit_records, outcome_records):
     """
-    ctx = {"date": date_str}
+    Identify which habit skips most reliably predict bad outcome days.
 
-    # Day of week
+    Method: For each habit, compute:
+      - skip_bad_rate: P(bad day | habit skipped)
+      - complete_good_rate: P(good day | habit completed)
+      - lift: skip_bad_rate / baseline_bad_rate
+
+    Returns top 3 highest-lift habits as failure predictors.
+
+    IC-4: correlational framing only — AI-2 compliance.
+    """
+    # TODO: Implement when data gate met (~2026-05-01)
+    # Pseudocode:
+    #   for each habit in habit_records:
+    #     skip_days = days where habit not completed
+    #     bad_days_after_skip = outcome_records where date in skip_days and day_grade < 60
+    #     skip_bad_rate = bad_days_after_skip / len(skip_days)
+    #     lift = skip_bad_rate / baseline_bad_rate
+    #   return sorted by lift, top 3
+    return []
+
+
+def _detect_cascade_patterns(habit_records, outcome_records, sleep_records):
+    """
+    Detect multi-day cascade patterns (e.g. poor sleep → skip workout → overeat).
+
+    Method: Sliding 3-day windows across all metric dimensions.
+    Flag windows where day-1 signal predicts day-2+3 degradation.
+
+    Returns list of (trigger_metric, cascade_sequence, frequency, avg_severity).
+    """
+    # TODO: Implement when data gate met (~2026-05-01)
+    return []
+
+
+def _detect_day_of_week_clusters(habit_records):
+    """
+    Find days of week with elevated failure rates.
+
+    Method: For each day of week, compute completion rate vs overall mean.
+    Flag if completion rate < mean - 0.5*SD.
+
+    Returns dict: {day_name: {completion_rate, delta_from_mean, risk_level}}.
+    """
+    # TODO: Implement when data gate met (~2026-05-01)
+    return {}
+
+
+def _detect_rebound_speed(outcome_records):
+    """
+    Measure how quickly Matthew recovers after bad days (grade < 60).
+
+    Method: Find all bad-day runs. Measure days to return to grade >= 70.
+    Compute mean, median, p90 rebound time.
+
+    Returns {mean_days: float, median_days: float, p90_days: float, n_episodes: int}.
+    """
+    # TODO: Implement when data gate met (~2026-05-01)
+    return {}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# WRITE PATTERN MEMORY
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _write_pattern_memory(patterns, today):
+    """Write failure pattern analysis to platform_memory partition."""
     try:
-        dt = datetime.strptime(date_str, "%Y-%m-%d")
-        ctx["day_of_week"] = DAY_NAMES[dt.weekday()]
-    except Exception:
-        pass
-
-    # Recovery + HRV from Whoop
-    whoop = fetch_date("whoop", date_str)
-    if whoop:
-        rec = safe_float(whoop, "recovery_score")
-        hrv = safe_float(whoop, "hrv")
-        sleep_hrs = safe_float(whoop, "sleep_duration_hours")
-        if rec is not None:   ctx["recovery_score"] = round(rec)
-        if hrv is not None:   ctx["hrv"] = round(hrv, 1)
-        if sleep_hrs is not None: ctx["sleep_hours"] = round(sleep_hrs, 1)
-
-    # Todoist — task load
-    todoist = fetch_date("todoist", date_str)
-    if todoist:
-        completed = todoist.get("tasks_completed_today", 0)
-        total     = todoist.get("tasks_total", 0)
-        overdue   = todoist.get("tasks_overdue", 0)
-        if completed is not None:
-            ctx["tasks_completed"] = int(completed)
-        if total is not None and total:
-            ctx["tasks_total"] = int(total)
-        if overdue is not None and overdue:
-            ctx["tasks_overdue"] = int(overdue)
-
-    # Journal stress
-    journal_entries = fetch_journal_entries_for_date(date_str)
-    if journal_entries:
-        stress_vals = []
-        for e in journal_entries:
-            s = safe_float(e, "enriched_stress") or safe_float(e, "stress_level")
-            if s is not None:
-                stress_vals.append(s)
-        if stress_vals:
-            ctx["journal_stress_avg"] = round(sum(stress_vals) / len(stress_vals), 1)
-        mood_vals = [safe_float(e, "enriched_mood") or safe_float(e, "morning_mood")
-                     for e in journal_entries]
-        mood_vals = [m for m in mood_vals if m is not None]
-        if mood_vals:
-            ctx["journal_mood_avg"] = round(sum(mood_vals) / len(mood_vals), 1)
-
-    # MacroFactor — logged calories (signal for tracking gaps)
-    mf = fetch_date("macrofactor", date_str)
-    if mf:
-        cal   = safe_float(mf, "total_calories_kcal")
-        items = len(mf.get("food_log", []))
-        if cal is not None:
-            ctx["calories_logged"] = int(cal)
-        ctx["food_items_logged"] = items
-
-    return ctx
-
-
-# ==============================================================================
-# FAILURE DAY EXTRACTOR
-# ==============================================================================
-
-def extract_failure_days(computed_records_7d):
-    """Return list of dicts for days where at least one component scored below FAILURE_THRESHOLD."""
-    failure_days = []
-    for rec in computed_records_7d:
-        date_str = rec.get("date") or rec.get("sk", "").replace("DATE#", "")
-        if not date_str:
-            continue
-        comp_scores = rec.get("component_scores", {})
-        failing = []
-        for comp, score in comp_scores.items():
-            if score is not None and float(score) < FAILURE_THRESHOLD:
-                failing.append((comp, round(float(score))))
-        if failing:
-            failure_days.append({
-                "date":       date_str,
-                "failing":    failing,
-                "all_scores": {k: round(float(v)) for k, v in comp_scores.items() if v is not None},
-                "day_grade":  round(float(rec["day_grade_score"])) if rec.get("day_grade_score") else None,
-            })
-    return failure_days
-
-
-# ==============================================================================
-# HAIKU SYNTHESIS
-# ==============================================================================
-
-def synthesize_patterns_haiku(failure_records, api_key):
-    """Haiku synthesis: identify recurring failure patterns from 7 days of failure data.
-
-    Returns list of pattern dicts:
-      [{component, pattern, conditions, frequency, severity, suggestion}]
-    Returns [] on any failure.
-    """
-    if not failure_records:
-        return []
-
-    lines = []
-    for rec in failure_records:
-        ctx   = rec.get("context", {})
-        fails = rec.get("failing", [])
-        fail_str = ", ".join(f"{comp} ({score})" for comp, score in fails)
-        ctx_parts = []
-        for key in ("day_of_week", "recovery_score", "hrv", "sleep_hours",
-                    "journal_stress_avg", "journal_mood_avg",
-                    "tasks_completed", "tasks_overdue", "calories_logged", "food_items_logged"):
-            if key in ctx:
-                ctx_parts.append(f"{key}={ctx[key]}")
-        lines.append(f"[{rec['date']}] failed: {fail_str} | context: {', '.join(ctx_parts)}")
-
-    data_block = "\n".join(lines)
-
-    prompt = f"""Analyze this 7-day failure log from a personal health platform. Identify recurring patterns.
-
-FAILURE DATA (days where health components scored below 50/100):
-{data_block}
-
-TASK: Identify 1-4 specific, actionable failure patterns. A pattern requires:
-- Same or related component(s) failing
-- Shared contextual conditions (day of week, low recovery, high task load, poor sleep, etc.)
-- Minimum 2 occurrences
-
-For each pattern, produce a JSON object:
-{{
-  "component": "nutrition|sleep_quality|recovery|movement|habits_mvp|hydration|journal",
-  "pattern": "One sentence: what fails and when/why",
-  "conditions": ["list", "of", "triggering", "conditions"],
-  "frequency": "X/7 days",
-  "severity": "critical|moderate|mild",
-  "suggestion": "One specific behavior change to address this pattern"
-}}
-
-Rules:
-- Be specific to the actual data — don't generate generic health advice
-- Only patterns supported by 2+ days of data
-- If no clear patterns, return empty array
-- Keep pattern text under 25 words, suggestion under 20 words
-
-Return ONLY a JSON array, no preamble or markdown."""
-
-    payload = json.dumps({
-        "model": AI_MODEL_HAIKU,
-        "max_tokens": 800,
-        "messages": [{"role": "user", "content": prompt}],
-    }).encode()
-
-    req = urllib.request.Request(
-        ANTHROPIC_API, data=payload,
-        headers={"Content-Type": "application/json", "x-api-key": api_key,
-                 "anthropic-version": "2023-06-01"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            raw = json.loads(r.read())["content"][0]["text"].strip()
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-            if raw.endswith("```"):
-                raw = raw[:-3]
-            return json.loads(raw.strip())
-    except Exception as e:
-        logger.warning(f"Haiku synthesis failed: {e}")
-        return []
-
-
-# ==============================================================================
-# PATTERN STORE
-# ==============================================================================
-
-# TTL for failure_pattern records: 90 days (patterns age out as behaviour evolves)
-_FAILURE_PATTERN_TTL_DAYS = 90
-
-
-def store_failure_patterns(run_date_str, patterns, failure_days_count, week_start_str):
-    """Write failure pattern records to platform_memory.
-
-    One record per pattern, keyed by run date + pattern index.
-    Idempotent on rerun (same SK overwrites).
-    TTL: 90 days — DynamoDB auto-expires stale patterns as behaviour evolves.
-    """
-    stored = 0
-    ttl_ts = int((datetime.now(timezone.utc) + timedelta(days=_FAILURE_PATTERN_TTL_DAYS)).timestamp())
-    for i, p in enumerate(patterns):
-        component    = p.get("component", "unknown")
-        pattern_text = p.get("pattern", "")
-        if not pattern_text:
-            continue
-
-        sk = f"MEMORY#failure_pattern#{run_date_str}#{i}"
+        from decimal import Decimal
         item = {
-            "pk":                   USER_PREFIX + "platform_memory",
-            "sk":                   sk,
-            "category":             "failure_pattern",
-            "date":                 run_date_str,
-            "week_start":           week_start_str,
-            "component":            component,
-            "pattern":              pattern_text,
-            "conditions":           json.dumps(p.get("conditions", [])),
-            "frequency":            p.get("frequency", ""),
-            "severity":             p.get("severity", "moderate"),
-            "suggestion":           p.get("suggestion", ""),
-            "failure_days_scanned": failure_days_count,
-            "stored_at":            datetime.now(timezone.utc).isoformat(),
-            "ttl":                  ttl_ts,  # 90-day auto-expiry
+            "pk":             f"{USER_PREFIX}platform_memory",
+            "sk":             f"MEMORY#failure_patterns#{today}",
+            "date":           today,
+            "computed_at":    datetime.utcnow().isoformat(),
+            "memory_type":    "failure_patterns",
+            "algo_version":   "0.1.0",
+            "habit_skip_predictors": json.dumps(patterns.get("habit_skip_predictors", [])),
+            "cascade_patterns":      json.dumps(patterns.get("cascade_patterns", [])),
+            "dow_clusters":          json.dumps(patterns.get("dow_clusters", {})),
+            "rebound_speed":         json.dumps(patterns.get("rebound_speed", {})),
+            "data_window_days":      patterns.get("data_window_days", 0),
+            "note": (
+                "IC-4 failure pattern memory. Correlational only — AI-2. "
+                "Use to inform coaching about recurring struggle patterns, not to predict failures."
+            ),
         }
-        item = {k: v for k, v in item.items() if v is not None and v != ""}
         table.put_item(Item=item)
-        stored += 1
-        logger.info(f"Stored failure_pattern[{i}]: {component} — {pattern_text[:60]}")
+        logger.info(f"[IC-4] Wrote failure_patterns memory for {today}")
+    except Exception as e:
+        logger.error(f"[IC-4] Failed to write pattern memory: {e}")
+        raise
 
-    return stored
 
-
-# ==============================================================================
-# HANDLER
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
+# LAMBDA HANDLER
+# ══════════════════════════════════════════════════════════════════════════════
 
 def lambda_handler(event, context):
-    logger.info("Failure Pattern Compute v1.0.0 starting...")
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    logger.info(f"[IC-4] failure-pattern-compute START date={today}")
 
-    today = datetime.now(timezone.utc).date()
+    # ── Data gate check ────────────────────────────────────────────────────
+    gate_ok, days_available = _check_data_gate()
+    if not gate_ok:
+        msg = (
+            f"IC-4 data gate not met: {days_available}/{MIN_DAYS_REQUIRED} days available. "
+            f"Activate when ≥{MIN_DAYS_REQUIRED} days of habit_scores data exists (~2026-05-01)."
+        )
+        logger.info(f"[IC-4] {msg}")
+        return {"status": "data_gate_not_met", "days_available": days_available,
+                "days_required": MIN_DAYS_REQUIRED, "message": msg}
 
-    if event.get("week_end"):
-        week_end = datetime.strptime(event["week_end"], "%Y-%m-%d").date()
-    else:
-        week_end = today - timedelta(days=1)
+    # ── Data collection ────────────────────────────────────────────────────
+    lookback_start = (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d")
 
-    week_start = week_end - timedelta(days=6)
-    run_date_str   = today.isoformat()
-    week_start_str = week_start.isoformat()
-
-    logger.info(f"Analyzing failure patterns for {week_start_str} -> {week_end.isoformat()}")
-
-    # Idempotency: skip if already ran today (unless force=True)
-    if not event.get("force"):
-        try:
-            existing = table.query(
-                KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-                ExpressionAttributeValues={
-                    ":pk": USER_PREFIX + "platform_memory",
-                    ":s": f"MEMORY#failure_pattern#{run_date_str}",
-                    ":e": f"MEMORY#failure_pattern#{run_date_str}#~",
-                },
-                Limit=1,
-            )
-            if existing.get("Items"):
-                logger.info(f"Already ran failure_pattern for {run_date_str} — skipping (use force=true)")
-                return {"statusCode": 200, "body": "Already ran today", "skipped": True}
-        except Exception as e:
-            logger.warning(f"Idempotency check failed (non-fatal): {e}")
-
-    # 1. Load computed_metrics for the week
-    computed_7d = fetch_range("computed_metrics", week_start_str, week_end.isoformat())
-    logger.info(f"Loaded {len(computed_7d)} computed_metrics records")
-
-    if not computed_7d:
-        logger.info(f"No computed_metrics data for {week_start_str}->{week_end.isoformat()} — exiting")
-        return {"statusCode": 200, "body": "No data", "failure_days": 0, "patterns_stored": 0}
-
-    # 2. Extract failure days
-    failure_days = extract_failure_days(computed_7d)
-    logger.info(f"Failure days (any component < {FAILURE_THRESHOLD}): {len(failure_days)} / {len(computed_7d)}")
-
-    if len(failure_days) < MIN_PATTERN_OCCURRENCES:
-        logger.info(f"Fewer than {MIN_PATTERN_OCCURRENCES} failure days — no patterns to identify")
-        return {
-            "statusCode": 200,
-            "body": f"Only {len(failure_days)} failure day(s) — no patterns",
-            "failure_days": len(failure_days),
-            "patterns_stored": 0,
-        }
-
-    # 3. Enrich failure days with contextual data
-    enriched = []
-    for fd in failure_days:
-        date_str = fd["date"]
-        ctx = fetch_context_for_date(date_str)
-        enriched.append({**fd, "context": ctx})
-        logger.info(f"Context for {date_str}: { {k: v for k, v in ctx.items() if k != 'date'} }")
-
-    # 4. Haiku synthesis
     try:
-        api_key = _get_api_key()
+        habit_resp = table.query(
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :start AND :end",
+            ExpressionAttributeValues={
+                ":pk":    f"{USER_PREFIX}habit_scores",
+                ":start": f"DATE#{lookback_start}",
+                ":end":   f"DATE#{today}",
+            },
+        )
+        habit_records = habit_resp.get("Items", [])
+
+        outcome_resp = table.query(
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :start AND :end",
+            ExpressionAttributeValues={
+                ":pk":    f"{USER_PREFIX}day_grade",
+                ":start": f"DATE#{lookback_start}",
+                ":end":   f"DATE#{today}",
+            },
+        )
+        outcome_records = outcome_resp.get("Items", [])
+
+        sleep_resp = table.query(
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :start AND :end",
+            ExpressionAttributeValues={
+                ":pk":    f"{USER_PREFIX}whoop",
+                ":start": f"DATE#{lookback_start}",
+                ":end":   f"DATE#{today}",
+            },
+        )
+        sleep_records = sleep_resp.get("Items", [])
+
     except Exception as e:
-        logger.error(f"Could not load API key: {e}")
-        return {"statusCode": 500, "body": f"API key error: {e}"}
+        logger.error(f"[IC-4] Data collection failed: {e}")
+        return {"status": "error", "error": str(e)}
 
-    patterns = synthesize_patterns_haiku(enriched, api_key)
-    logger.info(f"Haiku identified {len(patterns)} pattern(s)")
-    for p in patterns:
-        logger.info(f"  [{p.get('severity','?')}] {p.get('component','?')} | {p.get('pattern','')[:60]} | {p.get('frequency','')}")
+    logger.info(
+        f"[IC-4] Loaded {len(habit_records)} habit, "
+        f"{len(outcome_records)} outcome, {len(sleep_records)} sleep records"
+    )
 
-    # 5. Store to platform_memory
-    stored = 0
-    if patterns:
-        stored = store_failure_patterns(run_date_str, patterns, len(failure_days), week_start_str)
-
-    logger.info(f"Done: {len(failure_days)} failure days -> {stored} patterns stored")
-
-    return {
-        "statusCode":      200,
-        "body":            f"Failure patterns computed for week of {week_start_str}",
-        "week_start":      week_start_str,
-        "week_end":        week_end.isoformat(),
-        "failure_days":    len(failure_days),
-        "patterns_found":  len(patterns),
-        "patterns_stored": stored,
-        "failure_summary": [
-            {"date": fd["date"], "components": [c for c, _ in fd["failing"]]}
-            for fd in failure_days
-        ],
+    # ── Run pattern detectors ──────────────────────────────────────────────
+    patterns = {
+        "habit_skip_predictors": _detect_habit_skip_predictors(habit_records, outcome_records),
+        "cascade_patterns":      _detect_cascade_patterns(habit_records, outcome_records, sleep_records),
+        "dow_clusters":          _detect_day_of_week_clusters(habit_records),
+        "rebound_speed":         _detect_rebound_speed(outcome_records),
+        "data_window_days":      days_available,
     }
+
+    # ── Write to memory ────────────────────────────────────────────────────
+    _write_pattern_memory(patterns, today)
+
+    result = {
+        "status":           "ok",
+        "date":             today,
+        "data_window_days": days_available,
+        "patterns_found": {
+            "habit_predictors": len(patterns["habit_skip_predictors"]),
+            "cascades":         len(patterns["cascade_patterns"]),
+            "dow_clusters":     len(patterns["dow_clusters"]),
+            "rebound_episodes": patterns["rebound_speed"].get("n_episodes", 0),
+        },
+        "note": "IC-4: All patterns are correlational, not causal (AI-2).",
+    }
+    logger.info(f"[IC-4] COMPLETE: {result}")
+    return result

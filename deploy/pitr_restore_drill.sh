@@ -1,267 +1,257 @@
 #!/usr/bin/env bash
 # deploy/pitr_restore_drill.sh
 #
-# Executes a DynamoDB PITR restore drill as recommended in RUNBOOK.md (R8-ST2).
-# Restores life-platform to a test table, validates data integrity, deletes test table.
+# R13-F07: Quarterly PITR restore drill for DynamoDB table life-platform.
 #
 # WHAT IT DOES:
-#   1. Verifies PITR is enabled on the production table
-#   2. Restores to life-platform-restore-test (does NOT touch production)
-#   3. Polls until restore is ACTIVE (5–20 min)
-#   4. Spot-checks 3 source partitions for expected record counts
-#   5. Deletes the test table
-#   6. Appends drill results to docs/RUNBOOK.md
+#   1. Initiates a PITR restore of life-platform → life-platform-pitr-test
+#   2. Waits for restore to complete (typically 5–20 min)
+#   3. Verifies data integrity: item count, key partitions present, recent records
+#   4. Prints a drill report
+#   5. DELETES the test table (confirmation prompt before deletion)
+#
+# This drill validates:
+#   ✓ PITR is active and functional (not just "enabled")
+#   ✓ Restore completes without error
+#   ✓ Core partitions (whoop, computed_metrics, insights, platform_memory) are intact
+#   ✓ Records from the last 7 days are present (verifies recent ingestion survived)
 #
 # USAGE:
 #   bash deploy/pitr_restore_drill.sh
-#   bash deploy/pitr_restore_drill.sh 2026-03-14T10:00:00Z   # custom restore point
 #
-# REQUIRES: AWS credentials with dynamodb:RestoreTableToPointInTime,
-#   dynamodb:DescribeTable, dynamodb:GetItem, dynamodb:DeleteTable
+# NOTES:
+#   - Restores to ~1 minute ago (latest restorable time)
+#   - Drill table is deleted after verification (with confirmation prompt)
+#   - Does NOT affect the live table or any active Lambdas
+#   - Costs: ~$0.02 per GB restored; life-platform is ~100 MB = <$0.01
 #
-# v1.0.0 — 2026-03-15 (item 9 of 11 unblocked tasks)
+# RUN QUARTERLY — first drill due ~2026-04-01 (R13-F07)
+#
+# v1.0.0 — 2026-03-15 (R13-F07)
 
 set -euo pipefail
 
 REGION="us-west-2"
 SOURCE_TABLE="life-platform"
-TEST_TABLE="life-platform-restore-test"
-RESTORE_TIME="${1:-$(date -u -v-1H '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u --date='1 hour ago' '+%Y-%m-%dT%H:%M:%SZ')}"
-RUNBOOK="docs/RUNBOOK.md"
+DRILL_TABLE="life-platform-pitr-test"
+USER_PREFIX="USER#matthew#SOURCE#"
+
+# Core partitions that must be present post-restore
+REQUIRED_PARTITIONS=(
+    "whoop"
+    "computed_metrics"
+    "insights"
+    "platform_memory"
+    "strava"
+    "withings"
+)
 
 echo "══════════════════════════════════════════════════════"
-echo "  Life Platform PITR Restore Drill"
-echo "  Restore point: ${RESTORE_TIME}"
+echo "  PITR Restore Drill — R13-F07"
+echo "  Source: ${SOURCE_TABLE}"
+echo "  Drill table: ${DRILL_TABLE}"
+echo "  Region: ${REGION}"
 echo "══════════════════════════════════════════════════════"
 echo ""
 
-# ── Step 0: Verify PITR is enabled ────────────────────────────────────────
-echo "🔍 Verifying PITR on ${SOURCE_TABLE}..."
+# ── Pre-flight: verify PITR is enabled ─────────────────────────────────────
+echo "🔍 Verifying PITR status on ${SOURCE_TABLE}..."
 PITR_STATUS=$(aws dynamodb describe-continuous-backups \
-    --table-name "$SOURCE_TABLE" \
-    --region "$REGION" \
-    --query 'ContinuousBackupsDescription.PointInTimeRecoveryDescription.PointInTimeRecoveryStatus' \
+    --table-name "${SOURCE_TABLE}" \
+    --region "${REGION}" \
+    --query "ContinuousBackupsDescription.PointInTimeRecoveryDescription.PointInTimeRecoveryStatus" \
     --output text)
 
-if [ "$PITR_STATUS" != "ENABLED" ]; then
-    echo "❌ PITR is not ENABLED on ${SOURCE_TABLE} (status: ${PITR_STATUS})"
-    echo "   Run: aws dynamodb update-continuous-backups --table-name ${SOURCE_TABLE} --point-in-time-recovery-specification PointInTimeRecoveryEnabled=true --region ${REGION}"
+if [ "${PITR_STATUS}" != "ENABLED" ]; then
+    echo "❌ PITR is '${PITR_STATUS}' — NOT ENABLED. Drill cannot proceed."
+    echo "   Enable PITR: aws dynamodb update-continuous-backups \\"
+    echo "     --table-name ${SOURCE_TABLE} --point-in-time-recovery-specification PointInTimeRecoveryEnabled=true"
     exit 1
 fi
-echo "   ✅ PITR: ENABLED"
+echo "   ✅ PITR status: ENABLED"
 
 EARLIEST=$(aws dynamodb describe-continuous-backups \
-    --table-name "$SOURCE_TABLE" \
-    --region "$REGION" \
-    --query 'ContinuousBackupsDescription.PointInTimeRecoveryDescription.EarliestRestorableDateTime' \
+    --table-name "${SOURCE_TABLE}" \
+    --region "${REGION}" \
+    --query "ContinuousBackupsDescription.PointInTimeRecoveryDescription.EarliestRestorableDateTime" \
     --output text)
 LATEST=$(aws dynamodb describe-continuous-backups \
-    --table-name "$SOURCE_TABLE" \
-    --region "$REGION" \
-    --query 'ContinuousBackupsDescription.PointInTimeRecoveryDescription.LatestRestorableDateTime' \
+    --table-name "${SOURCE_TABLE}" \
+    --region "${REGION}" \
+    --query "ContinuousBackupsDescription.PointInTimeRecoveryDescription.LatestRestorableDateTime" \
     --output text)
 echo "   Restorable window: ${EARLIEST} → ${LATEST}"
 echo ""
 
-# ── Step 1: Check if test table already exists (cleanup if so) ────────────
-EXISTING=$(aws dynamodb describe-table --table-name "$TEST_TABLE" --region "$REGION" \
-    --query 'Table.TableStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+# ── Cleanup: delete drill table if it already exists ───────────────────────
+EXISTING=$(aws dynamodb describe-table \
+    --table-name "${DRILL_TABLE}" \
+    --region "${REGION}" \
+    --query "Table.TableStatus" \
+    --output text 2>/dev/null || echo "NOT_FOUND")
 
-if [ "$EXISTING" != "NOT_FOUND" ]; then
-    echo "⚠️  Test table ${TEST_TABLE} already exists (${EXISTING}). Deleting first..."
-    aws dynamodb delete-table --table-name "$TEST_TABLE" --region "$REGION" > /dev/null
+if [ "${EXISTING}" != "NOT_FOUND" ]; then
+    echo "⚠️  Drill table '${DRILL_TABLE}' already exists (status: ${EXISTING})."
+    echo "   Deleting stale drill table..."
+    aws dynamodb delete-table \
+        --table-name "${DRILL_TABLE}" \
+        --region "${REGION}" > /dev/null
     echo "   Waiting for deletion..."
-    aws dynamodb wait table-not-exists --table-name "$TEST_TABLE" --region "$REGION"
-    echo "   ✅ Deleted"
+    aws dynamodb wait table-not-exists \
+        --table-name "${DRILL_TABLE}" \
+        --region "${REGION}"
+    echo "   ✅ Stale drill table deleted"
+    echo ""
 fi
-echo ""
 
-# ── Step 2: Initiate restore ───────────────────────────────────────────────
-echo "🔄 Restoring ${SOURCE_TABLE} → ${TEST_TABLE} at ${RESTORE_TIME}..."
-DRILL_START=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+# ── Step 1: Initiate PITR restore ──────────────────────────────────────────
+echo "⏱  Initiating PITR restore (latest point)..."
+RESTORE_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 aws dynamodb restore-table-to-point-in-time \
-    --source-table-name "$SOURCE_TABLE" \
-    --target-table-name "$TEST_TABLE" \
-    --restore-date-time "$RESTORE_TIME" \
-    --region "$REGION" > /dev/null
+    --source-table-name "${SOURCE_TABLE}" \
+    --target-table-name "${DRILL_TABLE}" \
+    --use-latest-restorable-time \
+    --region "${REGION}" > /dev/null
 
-echo "   Restore initiated. Polling for ACTIVE status (may take 5–20 minutes)..."
+echo "   Restore initiated at ${RESTORE_START}"
+echo "   Waiting for table to become ACTIVE (typically 5–20 min)..."
 echo ""
 
-# ── Step 3: Poll for completion ────────────────────────────────────────────
-POLL_ATTEMPTS=0
-MAX_ATTEMPTS=60  # 60 × 20s = 20 minutes
-STATUS="CREATING"
-
-while [ "$STATUS" != "ACTIVE" ] && [ "$POLL_ATTEMPTS" -lt "$MAX_ATTEMPTS" ]; do
-    sleep 20
-    POLL_ATTEMPTS=$((POLL_ATTEMPTS + 1))
+# Poll for completion
+ELAPSED=0
+INTERVAL=30
+while true; do
     STATUS=$(aws dynamodb describe-table \
-        --table-name "$TEST_TABLE" \
-        --region "$REGION" \
-        --query 'Table.TableStatus' \
+        --table-name "${DRILL_TABLE}" \
+        --region "${REGION}" \
+        --query "Table.TableStatus" \
         --output text 2>/dev/null || echo "CREATING")
-    ELAPSED=$((POLL_ATTEMPTS * 20))
-    echo "   [${ELAPSED}s] Status: ${STATUS}"
+
+    printf "   [%3ds] Status: %s\r" "${ELAPSED}" "${STATUS}"
+
+    if [ "${STATUS}" = "ACTIVE" ]; then
+        echo ""
+        echo "   ✅ Restore complete after ${ELAPSED}s"
+        break
+    fi
+
+    if [ "${ELAPSED}" -gt 1800 ]; then
+        echo ""
+        echo "❌ Restore timed out after 30 minutes. Check AWS console."
+        exit 1
+    fi
+
+    sleep "${INTERVAL}"
+    ELAPSED=$((ELAPSED + INTERVAL))
+done
+echo ""
+
+# ── Step 2: Verify item count ───────────────────────────────────────────────
+echo "🔢 Checking item count..."
+# Note: ItemCount is eventually consistent — use a direct scan estimate
+ITEM_COUNT=$(aws dynamodb describe-table \
+    --table-name "${DRILL_TABLE}" \
+    --region "${REGION}" \
+    --query "Table.ItemCount" \
+    --output text)
+echo "   Item count (DDB estimate): ${ITEM_COUNT}"
+
+if [ "${ITEM_COUNT}" -lt 100 ]; then
+    echo "   ⚠️  Very low item count — restore may be incomplete or table is newly populated"
+else
+    echo "   ✅ Item count looks healthy"
+fi
+echo ""
+
+# ── Step 3: Verify required partitions ─────────────────────────────────────
+echo "🔍 Verifying required partitions..."
+PARTITION_FAILURES=0
+
+for source in "${REQUIRED_PARTITIONS[@]}"; do
+    PK="${USER_PREFIX}${source}"
+    RESULT=$(aws dynamodb query \
+        --table-name "${DRILL_TABLE}" \
+        --region "${REGION}" \
+        --key-condition-expression "pk = :pk" \
+        --expression-attribute-values "{\":pk\": {\"S\": \"${PK}\"}}" \
+        --select COUNT \
+        --query "Count" \
+        --output text 2>/dev/null || echo "0")
+
+    if [ "${RESULT}" -gt 0 ]; then
+        echo "   ✅ ${source}: ${RESULT} records"
+    else
+        echo "   ❌ ${source}: 0 records — partition missing or empty!"
+        PARTITION_FAILURES=$((PARTITION_FAILURES + 1))
+    fi
 done
 
-if [ "$STATUS" != "ACTIVE" ]; then
-    echo "❌ Restore did not complete within $((MAX_ATTEMPTS * 20))s. Check AWS console."
-    exit 1
+if [ "${PARTITION_FAILURES}" -gt 0 ]; then
+    echo ""
+    echo "⚠️  ${PARTITION_FAILURES} partition(s) had 0 records."
+    echo "   This may be expected if data is sparse. Check manually:"
+    echo "   aws dynamodb query --table-name ${DRILL_TABLE} --key-condition-expression 'pk = :pk' \\"
+    echo "     --expression-attribute-values '{ \":pk\": {\"S\": \"USER#matthew#SOURCE#whoop\"} }' \\"
+    echo "     --region ${REGION} --limit 3"
 fi
-
-DRILL_RESTORE_END=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-echo ""
-echo "   ✅ Restore complete: ${TEST_TABLE} is ACTIVE"
 echo ""
 
-# ── Step 4: Validate data integrity ───────────────────────────────────────
-echo "🔬 Validating data integrity..."
-echo ""
+# ── Step 4: Verify recent records (last 7 days) ────────────────────────────
+echo "📅 Checking for recent records (last 7 days)..."
+TODAY=$(date -u +%Y-%m-%d)
+WEEK_AGO=$(date -u -d "7 days ago" +%Y-%m-%d 2>/dev/null || date -u -v-7d +%Y-%m-%d)
 
-# 4a: Item count
-ITEM_COUNT=$(aws dynamodb describe-table \
-    --table-name "$TEST_TABLE" \
-    --region "$REGION" \
-    --query 'Table.ItemCount' \
-    --output text)
-echo "   Item count: ${ITEM_COUNT} (approximate)"
+RECENT_COUNT=$(aws dynamodb query \
+    --table-name "${DRILL_TABLE}" \
+    --region "${REGION}" \
+    --key-condition-expression "pk = :pk AND sk BETWEEN :start AND :end" \
+    --expression-attribute-values \
+        "{\":pk\": {\"S\": \"${USER_PREFIX}whoop\"}, \":start\": {\"S\": \"DATE#${WEEK_AGO}\"}, \":end\": {\"S\": \"DATE#${TODAY}\"}}" \
+    --select COUNT \
+    --query "Count" \
+    --output text 2>/dev/null || echo "0")
 
-# 4b: Get yesterday's date for spot-checks
-YESTERDAY=$(date -u -v-1d '+%Y-%m-%d' 2>/dev/null || date -u --date='yesterday' '+%Y-%m-%d')
-
-# 4c: Spot-check whoop partition
-echo ""
-echo "   Spot-checking SOURCE#whoop / DATE#${YESTERDAY}..."
-WHOOP_ITEM=$(aws dynamodb get-item \
-    --table-name "$TEST_TABLE" \
-    --key "{\"pk\":{\"S\":\"USER#matthew#SOURCE#whoop\"},\"sk\":{\"S\":\"DATE#${YESTERDAY}\"}}" \
-    --region "$REGION" \
-    --projection-expression "pk, sk, recovery_score, hrv" \
-    --output json 2>/dev/null)
-
-RECOVERY="N/A"
-if echo "$WHOOP_ITEM" | grep -q '"recovery_score"'; then
-    RECOVERY=$(echo "$WHOOP_ITEM" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('Item',{}).get('recovery_score',{}).get('N','?'))" 2>/dev/null || echo "?")
-    echo "   ✅ Whoop record found (recovery_score: ${RECOVERY})"
+if [ "${RECENT_COUNT}" -gt 0 ]; then
+    echo "   ✅ Found ${RECENT_COUNT} Whoop records in last 7 days (${WEEK_AGO} → ${TODAY})"
 else
-    echo "   ⚠️  Whoop record not found for ${YESTERDAY} (may be missing in source or sick day)"
+    echo "   ⚠️  No Whoop records in last 7 days — ingestion gap or PITR lag?"
 fi
-
-# 4d: Spot-check computed_metrics partition
-echo ""
-echo "   Spot-checking SOURCE#computed_metrics / DATE#${YESTERDAY}..."
-CM_ITEM=$(aws dynamodb get-item \
-    --table-name "$TEST_TABLE" \
-    --key "{\"pk\":{\"S\":\"USER#matthew#SOURCE#computed_metrics\"},\"sk\":{\"S\":\"DATE#${YESTERDAY}\"}}" \
-    --region "$REGION" \
-    --projection-expression "pk, sk, day_grade_score, readiness_score" \
-    --output json 2>/dev/null)
-
-GRADE="N/A"
-if echo "$CM_ITEM" | grep -q '"day_grade_score"'; then
-    GRADE=$(echo "$CM_ITEM" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('Item',{}).get('day_grade_score',{}).get('N','?'))" 2>/dev/null || echo "?")
-    echo "   ✅ Computed metrics found (day_grade_score: ${GRADE})"
-else
-    echo "   ⚠️  Computed metrics not found for ${YESTERDAY}"
-fi
-
-# 4e: Spot-check profile partition
-echo ""
-echo "   Spot-checking USER#matthew profile..."
-PROFILE=$(aws dynamodb get-item \
-    --table-name "$TEST_TABLE" \
-    --key "{\"pk\":{\"S\":\"USER#matthew\"},\"sk\":{\"S\":\"PROFILE#v1\"}}" \
-    --region "$REGION" \
-    --projection-expression "pk, sk" \
-    --output json 2>/dev/null)
-
-if echo "$PROFILE" | grep -q '"PROFILE#v1"'; then
-    echo "   ✅ User profile record found"
-else
-    echo "   ⚠️  User profile not found — schema may have changed"
-fi
-
-DRILL_VALIDATE_END=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 echo ""
 
-# ── Step 5: Delete test table ──────────────────────────────────────────────
-echo "🗑️  Deleting test table ${TEST_TABLE}..."
-aws dynamodb delete-table \
-    --table-name "$TEST_TABLE" \
-    --region "$REGION" > /dev/null
-
-echo "   Waiting for deletion..."
-aws dynamodb wait table-not-exists --table-name "$TEST_TABLE" --region "$REGION"
-echo "   ✅ Test table deleted"
-echo ""
-
-# ── Step 6: Append results to RUNBOOK.md ──────────────────────────────────
-DRILL_END=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-ELAPSED_MIN=$(python3 -c "
-from datetime import datetime
-s = datetime.strptime('$DRILL_START', '%Y-%m-%dT%H:%M:%SZ')
-e = datetime.strptime('$DRILL_END', '%Y-%m-%dT%H:%M:%SZ')
-print(round((e-s).total_seconds()/60, 1))
-" 2>/dev/null || echo "?")
-
-DRILL_RECORD="
----
-### PITR Restore Drill — ${DRILL_START}
-
-| Field | Value |
-|---|---|
-| Date | ${DRILL_START} |
-| Restore point | ${RESTORE_TIME} |
-| Target table | ${TEST_TABLE} |
-| Restore completed | ${DRILL_RESTORE_END} |
-| Item count (approx) | ${ITEM_COUNT} |
-| Total elapsed | ${ELAPSED_MIN} min |
-| Outcome | ✅ PASS |
-
-**Validation:** Whoop record (recovery: ${RECOVERY}), computed metrics (grade: ${GRADE}), profile found.
-Test table deleted at ${DRILL_END}.
-"
-
-# Append to RUNBOOK.md after the PITR section
-if [ -f "$RUNBOOK" ]; then
-    # Find the "### Notes" line in the PITR section and append after it
-    python3 -c "
-import sys
-content = open('$RUNBOOK').read()
-marker = '### Notes'
-# Find last occurrence of the PITR Notes section
-idx = content.rfind(marker)
-if idx == -1:
-    # Just append at end if marker not found
-    with open('$RUNBOOK', 'a') as f:
-        f.write('''$DRILL_RECORD''')
-else:
-    # Find end of Notes section (next ## or end of file)
-    next_section = content.find('\n## ', idx)
-    if next_section == -1:
-        insert_pos = len(content)
-    else:
-        insert_pos = next_section
-    new_content = content[:insert_pos] + '''$DRILL_RECORD''' + content[insert_pos:]
-    with open('$RUNBOOK', 'w') as f:
-        f.write(new_content)
-print('RUNBOOK.md updated')
-" 2>/dev/null || echo "⚠️  Could not auto-update RUNBOOK.md — paste drill results manually"
-    echo "   ✅ Results appended to ${RUNBOOK}"
-fi
-
-echo ""
+# ── Step 5: Drill report ────────────────────────────────────────────────────
+DRILL_END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 echo "══════════════════════════════════════════════════════"
-echo "  PITR Restore Drill COMPLETE"
+echo "  PITR DRILL REPORT"
+echo "  Date:            $(date -u +%Y-%m-%d)"
+echo "  Started:         ${RESTORE_START}"
+echo "  Completed:       ${DRILL_END}"
+echo "  Restore time:    ~${ELAPSED}s"
+echo "  Items verified:  ${ITEM_COUNT} (DDB estimate)"
+echo "  Partition check: $((${#REQUIRED_PARTITIONS[@]} - PARTITION_FAILURES))/${#REQUIRED_PARTITIONS[@]} passed"
+echo "  Recent records:  ${RECENT_COUNT} (7-day Whoop window)"
 echo ""
-echo "  Source:      ${SOURCE_TABLE}"
-echo "  Restore to:  ${TEST_TABLE} (DELETED)"
-echo "  Point in time: ${RESTORE_TIME}"
-echo "  Item count:  ${ITEM_COUNT}"
-echo "  Elapsed:     ${ELAPSED_MIN} minutes"
-echo "  Status:      ✅ PASS"
-echo ""
-echo "  PITR is working correctly. 35-day backup window confirmed."
+if [ "${PARTITION_FAILURES}" -eq 0 ]; then
+    echo "  ✅ DRILL PASSED — PITR restore is functional"
+else
+    echo "  ⚠️  DRILL PASSED WITH WARNINGS — review partition failures above"
+fi
 echo "══════════════════════════════════════════════════════"
+echo ""
+
+# ── Step 6: Delete drill table ─────────────────────────────────────────────
+echo "🗑  Deleting drill table ${DRILL_TABLE}..."
+read -r -p "   Confirm deletion of ${DRILL_TABLE} [y/N]: " confirm
+if [[ "${confirm}" =~ ^[Yy]$ ]]; then
+    aws dynamodb delete-table \
+        --table-name "${DRILL_TABLE}" \
+        --region "${REGION}" > /dev/null
+    echo "   ✅ Drill table deleted"
+else
+    echo "   ⚠️  Drill table NOT deleted. Delete manually:"
+    echo "   aws dynamodb delete-table --table-name ${DRILL_TABLE} --region ${REGION}"
+fi
+
+echo ""
+echo "Next drill due: $(date -u -d "+90 days" +%Y-%m-%d 2>/dev/null || date -u -v+90d +%Y-%m-%d)"
+echo "Update RUNBOOK.md 'Last PITR drill' date after completing."

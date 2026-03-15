@@ -1,7 +1,7 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-14 (v3.7.29 — Architecture Review #13 conducted, 15 findings tracked)
+> Last update: 2026-03-15 (v3.7.43 — R14 findings closed, IC-4/IC-5 skeletons, ADR-029, R13-F10)
 
 ---
 
