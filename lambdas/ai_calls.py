@@ -1307,8 +1307,14 @@ JOURNAL ENTRIES:
 {journal_text}
 
 Write EXACTLY two parts separated by " || ":
-Part 1: A perspective/reflection on what he wrote — something profound, motivating, or reframing. Not a summary. A mirror that shows him something he might not see. 2 sentences max.
-Part 2: One specific tactical thing he can try JUST TODAY that would make a material difference based on what he wrote. Be concrete (e.g. "practice box breathing for 30 seconds before each meal" or "text one person you're grateful for before noon"). 1 sentence.
+Part 1: A perspective/reflection on what he wrote. Not a summary — a mirror that shows him something he might not see. 2 sentences max.
+Part 2: One specific tactical thing he can try JUST TODAY. Be concrete (e.g. "practice box breathing for 30 seconds before each meal" or "text one person you're grateful for before noon"). 1 sentence.
+
+TONE RULES:
+- Match the emotional truth of what he actually wrote — don't force motivation onto a flat day or add caveats to a genuinely good day.
+- If the journal shows avoidance, deflection, or a recurring unfinished intention, name it directly and without softening. "You've written about X three times this week without acting on it" is more useful than "consider taking action."
+- If the journal shows genuine progress or insight, celebrate it without qualification. Not every note needs a challenge.
+- 'Profound' is not a goal — honest is.
 
 Format: [reflection] || [tactical thing]
 No labels, no formatting. Natural voice. Max 80 words total."""
@@ -1514,6 +1520,7 @@ If there are ACTIVE EFFECTS like Sleep Drag, note the impact.
 CRITICAL: If habit gaps connect to metric outcomes (e.g. missed wind-down → low sleep efficiency), NAME THE LIKELY CORRELATIVE PATTERN (correlation, not proven causal). Don't just list the gap — connect the dots, but frame as a pattern to investigate, not a certainty.
 CROSS-PILLAR: If the trade-off analysis above identifies a limiting factor or optimization call, incorporate it — don't coach conflicting pillars independently.
 RED TEAM CHECK: If the analysis pass flagged a challenge (⚠️ above), consider it. If the correlation might be misleading or there's a confounding factor, adjust your coaching accordingly — don't give confident advice based on shaky signal. Intellectual honesty > false certainty.
+OPENING RULE: DO NOT open with a metric readout. The form 'Recovery was X%, HRV was Y, today do Z' is explicitly banned as an opener — it's a data dump, not coaching. Open instead with a pattern ("Three nights of short sleep are compounding..."), a direct challenge ("The T0 miss yesterday is the third this week..."), or a concrete observation that requires inference, not just reading. The metric data exists in the scorecard above — the BoD's job is to interpret it, not repeat it.
 DO NOT start with "Matthew". Max 60 words."""
 
     if brief_mode == "flourishing":
@@ -1641,7 +1648,7 @@ YESTERDAY'S SIGNALS:
 {tradeoff_ctx}
 
 RULES:
-- TL;DR: One sentence, max 20 words. The single most important takeaway from yesterday. Specific. Not generic.
+- TL;DR: One sentence, max 20 words. Must reference at least ONE SPECIFIC NUMBER from yesterday's data. The single most important takeaway — something that could only apply to yesterday's specific combination, not a generic summary. WRONG: 'Strong day overall, maintain momentum.' RIGHT: '81% recovery + 34g protein short — Zone 2 walk today, protein shake first.'
 - Guidance: 3-4 items, each with an emoji prefix and 1 sentence. SMART — derived from the data above, not static advice. Each item should be something that could ONLY apply to TODAY given this specific data combination.
 - CROSS-PILLAR TRADE-OFFS: If the trade-off analysis above identifies a limiting factor or optimization call, let it shape guidance priority. When pillars conflict, guide toward the constraint, not all pillars simultaneously.
 - TDEE-aware nutrition guidance: use the TDEE context to reason about whether today's intake target should be maintained, increased (recovery day), or whether yesterday's intake looks like a logging gap vs genuine restriction.
