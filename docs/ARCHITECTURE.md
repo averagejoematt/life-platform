@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-15 (v3.7.43 — 89 tools, 31-module MCP package, 20 data sources, 43 Lambdas, 10 secrets, 49 alarms, 8 CDK stacks deployed)
+Last updated: 2026-03-15 (v3.7.44 — 89 tools, 31-module MCP package, 20 data sources, 43 Lambdas, 10 secrets, 49 alarms, 8 CDK stacks deployed)
 
 ---
 
@@ -281,9 +281,9 @@ Cold start: ~700–800ms. Warm: 23–30ms. Cached tools: <100ms.
 
 ### Cache warmer
 
-EventBridge triggers MCP Lambda at 10:00 AM PDT daily (`source: aws.events`). Pre-computes 13 tools → `CACHE#matthew` partition, 26-hour TTL. Runtime: ~90s (13 steps).
+EventBridge triggers MCP Lambda at 10:00 AM PDT daily (`source: aws.events`). Pre-computes 14 tools → `CACHE#matthew` partition, 26-hour TTL. Runtime: ~90s (14 steps).
 
-Cached tools (SIMP-1 updated, v3.7.18–19): `get_longitudinal_summary` (aggregate year + month), `get_longitudinal_summary` (records), `get_longitudinal_summary` (seasonal), `get_health` (dashboard), `get_health` (risk_profile), `get_health` (trajectory), `get_habits` (dashboard), `get_training` (load), `get_training` (periodization), `get_training` (recommendation), `get_character` (sheet), `get_cgm` (dashboard). Steps 9-13 added v3.7.19.
+Cached tools (SIMP-1 updated, v3.7.18–19; step 13 added v3.7.43): `get_longitudinal_summary` (aggregate year + month), `get_longitudinal_summary` (records), `get_longitudinal_summary` (seasonal), `get_health` (dashboard), `get_health` (risk_profile), `get_health` (trajectory), `get_habits` (dashboard), `get_training` (load), `get_training` (periodization), `get_training` (recommendation), `get_character` (sheet), `get_strength` (centenarian_benchmarks), `get_cgm` (dashboard). Steps 9-12 added v3.7.19; step 13 (centenarian) added v3.7.43; step 14 (cgm) added v3.7.19.
 
 ### Email / Intelligence cadence
 
@@ -317,6 +317,8 @@ The IC (Intelligence Capability) system implements a compute → store → read 
 **Live features:** IC-1 (anomaly detection), IC-2 (training load), IC-3 (nutrition tracking), IC-6 (CGM correlation), IC-7 (cross-pillar trade-offs, `ai_calls.py`), IC-8 (intent vs execution gap — `daily-insight-compute`, writes to `platform_memory` partition), IC-15 (insights persistence), IC-16 (progressive context), IC-17 (readiness synthesis), IC-18 (hypothesis engine), IC-19 (N=1 experiments + IC-19 Board spec: slow drift detector, sustained anomaly tracking v2.3.0, hypothesis-experiment bridge), IC-23 (Character Sheet scoring), IC-24 (adaptive mode), IC-25 (decisions module).
 
 **Data-gated next:** IC-4 (failure patterns, ~Apr 18), IC-5 (momentum warning, ~Apr 18), IC-26 (temporal mining, ~May), IC-27 (multi-resolution handoff, ~May).
+
+**Skeleton Lambdas (source written, NOT yet CDK-wired or EventBridge-scheduled):** `lambdas/failure_pattern_compute_lambda.py` (IC-4) and `lambdas/momentum_warning_compute_lambda.py` (IC-5). Data gate: `days_available >= 42` in `habit_scores` (IC-4) and `computed_metrics` (IC-5). Activate ~2026-05-01. See handover v3.7.43 for activation checklist.
 
 ### Local integration — mcp_bridge.py
 
