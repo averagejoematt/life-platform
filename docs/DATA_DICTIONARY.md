@@ -1,6 +1,6 @@
 # Life Platform — Data Dictionary
 
-**Version:** v3.7.25 | **Last updated:** 2026-03-15
+**Version:** v3.7.26 | **Last updated:** 2026-03-15
 
 > Maps every tracked metric to its authoritative source, update frequency, and overlap with other sources.
 > For field-level DynamoDB schema, see SCHEMA.md.

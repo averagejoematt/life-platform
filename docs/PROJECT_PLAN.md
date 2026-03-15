@@ -1,7 +1,7 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-14 (v3.7.20 — all actionable R8 items resolved, SIMP-1 Phase 1 complete)
+> Last update: 2026-03-15 (v3.7.26 — R9-R12 complete, brief quality improved, all actionable items resolved)
 
 ---
 
@@ -37,11 +37,11 @@ Items are grouped by priority tier. Within each tier, items are ordered by ROI (
 
 | ID | Item | Source | Effort | Impact | Status |
 |----|------|--------|--------|--------|--------|
-| R8-ST1 | **Google Calendar integration** — highest-priority unbuilt data source. OAuth token rotation pattern, ~6-8h. | Pre-R8, TB7-18 | L (6-8h) | MEDIUM — new data source for scheduling/planning intelligence | Not started |
+| R8-ST1 | **Google Calendar integration** — Lambda + 2 MCP tools deployed v3.7.21. OAuth still requires one-time setup: `python3 setup/setup_google_calendar_auth.py`. Tracked as CLEANUP-3. | Pre-R8, TB7-18 | S (20min remaining) | MEDIUM — code live, data flow pending OAuth | ⏳ Deployed (v3.7.21), OAuth pending (CLEANUP-3) |
 | R8-ST2 | **Document and test DynamoDB restore procedure** — write runbook section, execute PITR restore to test table, verify data integrity across partitions. | R8 Finding-6, R8 Top-10 #6 | S (1h) | MEDIUM — critical insurance for core data asset | ✅ Done (v3.7.17) — runbook written. Drill (actual restore) still recommended. |
 | R8-ST3 | **Create "maintenance mode" Lambda profile** — config to disable non-essential Lambdas during vacation/absence. | R8 §6 R-5, R8 Top-10 #9 | S (30min) | MEDIUM — operational resilience during absence | ✅ Done (v3.7.17) — `deploy/maintenance_mode.sh enable\|disable\|status` |
 | R8-ST4 | **Add OAuth token health monitoring** — alert if any OAuth refresh token hasn't been updated in >60 days. | R8 §6 R-2, R8 Top-10 | M (2h) | MEDIUM — prevents multi-source auth cascade failure | ✅ Done (v3.7.17) — freshness_checker extended, OAuthSecretDescribe IAM added |
-| R8-ST5 | **Pre-compute composite scores** — `SOURCE#composite_scores` DynamoDB partition written nightly. | Pre-R8, SIMP-1 prereq | M (3-4h) | HIGH | ✅ Done (v3.7.20) — `write_composite_scores()` in daily-metrics-compute |
+| R8-ST5 | **Pre-compute composite scores** — Implemented v3.7.20, then superseded by ADR-025 (v3.7.25). All fields consolidated into `computed_metrics` partition. `write_composite_scores()` call removed from lambda_handler; dead code removal tracked as CLEANUP-1. | Pre-R8, SIMP-1 prereq | — | — | ✅ Done + deprecated (ADR-025) |
 | R8-ST6 | **CDK diff IAM change → blocking gate** — make CI pipeline block (not just warn) when CDK diff detects IAM/policy changes. | R8 §10 CD-4 | S (30min) | MEDIUM — prevents future IAM drift | ✅ Done (v3.7.17) — ci-cd.yml warning → error + exit 1 |
 | R8-ST7 | **Tighten HAE webhook S3 write scope** — tightened from `raw/matthew/*` to 5 explicit paths. | R8 §5 IAM | S (15min) | LOW — least-privilege refinement | ✅ Done (v3.7.17) — role_policies.py updated, CDK deploy pending |
 
@@ -111,6 +111,10 @@ These are not architecture decisions — they're deferred deletions and one-time
 
 | # | Date | Version | Grade | Key Findings |
 |---|------|---------|-------|-------------|
+| R12 | 2026-03-15 | v3.7.25 | A- | Validator S3 bug, 4 partitions unwired, composite_scores stale. All 8 items resolved same session. |
+| R11 | 2026-03-15 | v3.7.24 | A | Engineering strategy: deploy_and_verify.sh, integration tests I1-I10, auto-discover counters, checklists. All 9 items resolved. |
+| R10 | 2026-03-15 | v3.7.23 | A | Double-warmer, Calendar pre-auth handler, health_context wired. All items resolved. |
+| R9 | 2026-03-14 | v3.7.22 | A | tools_calendar cold-start, n-gated correlations, dedicated warmer Lambda, 9 dispatcher tests. All 21 items resolved. |
 | R8 | 2026-03-13 | v3.7.15 | A- | COST-B secret drift, webhook auth broken, complexity limits. Full report: `docs/reviews/architecture_review_8_full.md` |
 | R7 | 2026-03-11 | v3.5.x | — | TB7 hardening sprint (25 items) |
 | R6 | 2026-03-10 | v3.4.x | — | CDK migration review |
@@ -122,13 +126,13 @@ These are not architecture decisions — they're deferred deletions and one-time
 
 | Metric | Current | Target | Notes |
 |--------|---------|--------|-------|
-| MCP tools | 86 | ≤80 (SIMP-1 Phase 2) | Phase 1 complete. Phase 2 gated ~Apr 13 |
-| Lambdas | 43 | — | +weekly-correlation-compute (v3.7.20) |
-| CloudWatch alarms | 47 | — | Post-COST-A |
+| MCP tools | 88 | ≤80 (SIMP-1 Phase 2) | Phase 1 complete (116→88). Phase 2 gated ~Apr 13 |
+| Lambdas | 42 (CDK) + 1 Lambda@Edge | — | Lambda@Edge (`cf-auth`) in us-east-1, manually managed |
+| CloudWatch alarms | 49 | — | +SLO-5 warmer alarm (v3.7.22) |
 | Monthly cost | ~$10 | <$25 | Well under budget |
-| Active secrets | 10 | — | Reconciled v3.7.15 |
-| CI linters | 9 | — | Added IAM/secrets lint v3.7.15 |
-| SLOs defined | 4 | 4 | SLO-1 through SLO-4 |
+| Active secrets | 11 | — | +google-calendar (v3.7.21) |
+| CI linters | 9 | — | H1-H5, S1-S4, IAM, registry, handler, wiring, DDB patterns |
+| SLOs defined | 5 | — | SLO-1 through SLO-5 (warmer added v3.7.22) |
 | IC features live | 14 of 30 | — | Next: IC-4/IC-5 (~May 2026) |
-| Data sources | 19 | 20 (Google Cal) | Next integration |
-| Architecture review grade | A- | A | Gap: SIMP-1 + integration tests |
+| Data sources | 20 | — | google_calendar deployed; OAuth pending (CLEANUP-3) |
+| Architecture review grade | A- | A | Composite R12. Gap: SIMP-1 Phase 2 + Calendar OAuth |

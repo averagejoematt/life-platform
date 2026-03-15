@@ -1,5 +1,29 @@
 # Life Platform — Changelog
 
+## v3.7.26 — 2026-03-15: Brief quality improvements + Lambda@Edge audit
+
+### Summary
+Three prompt changes to improve Daily Brief coaching quality. Lambda@Edge audit script and CloudFront buddy auth correction. April cleanup items formally tracked in PROJECT_PLAN.
+
+### Changes
+
+**Brief quality — `lambdas/ai_calls.py` (3 prompt edits)**
+- **BoD opening rule**: Banned metric-readout openers (`"Recovery was X%, HRV was Y..."` form explicitly prohibited). BoD must open with a pattern, direct challenge, or inference. The scorecard already shows the numbers — the BoD's job is to interpret, not repeat.
+- **TL;DR specificity**: Must reference at least one specific number from yesterday's data. Wrong/right examples added inline. `"Strong day, keep it up"` form eliminated.
+- **Journal coach tone**: Removed forced-positivity bias (`"profound, motivating"` requirement deleted). Unlocked direct naming of avoidance patterns and unfinished intentions. Added: `"'Profound' is not a goal — honest is."`
+
+**Lambda@Edge audit**
+- `deploy/create_lambda_edge_alarm.sh` (new): creates `life-platform-cf-auth-errors` alarm in us-east-1. Script verifies `life-platform/cf-auth` secret exists in us-east-1 (Lambda@Edge requirement), finds function name, creates CloudWatch alarm (threshold: ≥5 errors in 2 consecutive 5-min windows).
+- `docs/ARCHITECTURE.md`: Fixed buddy CloudFront row — was incorrectly documented as `Lambda@Edge auth (life-platform-buddy-auth)`. Buddy is intentionally public (Tom's accountability page, no PII). No such auth function exists.
+
+**PROJECT_PLAN Tier 2.5 — April 13 Cleanup**
+- `docs/PROJECT_PLAN.md`: New `Tier 2.5` section added with 4 explicit cleanup items (CLEANUP-1 through CLEANUP-4): dead code removal, Lambda@Edge lambda_map.json entry, Calendar OAuth activation, validator docstring fixes. These were previously tracked only in handovers.
+
+### Deployed
+- `daily-brief` Lambda (3 prompt quality improvements to `ai_calls.py`)
+
+---
+
 ## v3.7.25 — 2026-03-15: R12 post-board sweep (8 items)
 
 ### Summary
