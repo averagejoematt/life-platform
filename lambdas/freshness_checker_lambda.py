@@ -37,7 +37,7 @@ SOURCES = {
     "macrofactor":     "MacroFactor nutrition",
     "garmin":          "Garmin biometrics",
     "habitify":        "Habitify habits",
-    "google_calendar": "Google Calendar events",  # R8-ST1 — added v3.7.21
+    # google_calendar retired v3.7.46 — see ADR-030 in DECISIONS.md
 }
 
 # Field-level completeness checks — key fields that should be non-null in a healthy record.
@@ -54,7 +54,7 @@ FIELD_COMPLETENESS_CHECKS: dict[str, list[str]] = {
     "withings":        ["weight_lbs"],
     "habitify":        ["total_completed"],
     "todoist":         ["tasks_completed"],
-    "google_calendar": ["event_count"],
+    # google_calendar removed — ADR-030
 }
 
 def lambda_handler(event, context):

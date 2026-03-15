@@ -52,6 +52,8 @@ When a significant decision is made — a design pattern chosen, an approach rej
 | ADR-026 | Local MCP endpoint: AuthType NONE + in-Lambda API key check (accepted) | ✅ Active | 2026-03-14 |
 | ADR-027 | MCP two-tier structure: stable core → Layer, volatile tools → Lambda zip | ✅ Active | 2026-03-14 |
 | ADR-028 | Integration tests as quality gate: test-in-AWS after every deploy | ✅ Active | 2026-03-14 |
+| ADR-029 | MCP monolith: retain single Lambda, revisit at 100+ calls/day | ✅ Active | 2026-03-15 |
+| ADR-030 | Google Calendar integration: retired — no viable zero-touch data path | ✅ Active | 2026-03-15 |
 
 ---
 
@@ -564,3 +566,47 @@ Monitor via X-Ray (added R13-XR, v3.7.40). X-Ray traces will surface which tools
 - [ ] Second operator/user is onboarded (multi-tenant changes the equation entirely)
 
 **Outcome:** No action. X-Ray tracing in place. Re-evaluate at AR #16 or when trigger conditions met.
+
+---
+
+## ADR-030 — Google Calendar Integration: Retired
+
+**Status:** Active — decision not to pursue  
+**Date:** 2026-03-15 (v3.7.46)
+
+**Context:** Google Calendar was added as a data source in v3.7.21 with a pending OAuth setup step (CLEANUP-3). The intent was to provide daily meeting load, focus block count, and schedule context to MCP tools and the Daily Brief. On 2026-03-15, all viable integration paths were systematically evaluated.
+
+**Options evaluated and blocked:**
+
+| Approach | Blocker |
+|----------|---------|
+| OAuth via Google Cloud project | Smartsheet IT caps personal Google Cloud projects on work account |
+| Secret ICS URL | Disabled by Google Workspace admin (option not shown in calendar settings) |
+| Google Apps Script | script.google.com blocked by Smartsheet IT |
+| AppleScript → Calendar.app | Calendar.app makes CalDAV network calls on every query; hangs indefinitely on a 21-day window even for single-day queries |
+| SQLite direct read of Calendar cache | macOS TCC blocks Terminal from `~/Library/Calendars/` without Full Disk Access |
+| Zapier Find Events | Free tier returns 1 event max, not all events for a day; insufficient for meeting load computation |
+| launchd → run every 4 hours | Mac lid is typically closed; unreliable data collection |
+
+**Decision:** Retire the Google Calendar integration. Remove from freshness checker, MCP registry, and tool catalog. Mark Lambda and CDK resources as inactive.
+
+**Reasoning:** Calendar data would add meeting load context and focus block detection — useful but supplementary. Todoist already covers planned workload. The platform produces complete Daily Briefs, Weekly Digests, and IC intelligence without calendar data. No viable zero-touch data path exists given Smartsheet IT restrictions on the work Google Workspace account. Personal calendar is Proton (no API). The cost of carrying a permanently-pending data source (showing as a gap in every architecture review, maintaining a Lambda that always returns `pending_oauth`) exceeds the value.
+
+**What was removed (v3.7.46):**
+- `get_calendar_events` and `get_schedule_load` removed from `mcp/registry.py`
+- `google_calendar` removed from `freshness_checker_lambda.py` SOURCES and FIELD_COMPLETENESS_CHECKS
+- `google_calendar_lambda.py` marked `not_deployed` in `ci/lambda_map.json`
+- `setup/calendar_sync.py`, `setup/run_calendar_sync.sh`, `setup/com.matthewwalker.calendar-sync.plist` deleted
+- `life-platform/google-calendar` secret scheduled for deletion (manual step)
+- CDK removal from `ingestion_stack.py` deferred to next CDK deploy session
+
+**What was retained:**
+- `lambdas/google_calendar_lambda.py` — archived in place, not deleted (useful reference if integration becomes viable again)
+- DynamoDB `SOURCE#google_calendar` records — harmless, no cost, provide historical context
+
+**Revisit conditions:**
+- Smartsheet IT allows Google Cloud project creation on work account, OR
+- Personal calendar moves from Proton to a platform with an accessible API, OR
+- Apple Calendar grants Terminal Full Disk Access in a managed way
+
+**Outcome:** Integration retired. Tool count: 89 → 87. Data sources: 20 → 19 active.

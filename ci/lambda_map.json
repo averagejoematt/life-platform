@@ -42,7 +42,7 @@
     "lambdas/key_rotator_lambda.py":         { "function": "mcp-key-rotator" },
     "lambdas/pip_audit_lambda.py":           { "function": "pip-audit" },
     "lambdas/brittany_email_lambda.py":      { "function": "brittany-weekly-email" },
-    "lambdas/google_calendar_lambda.py":      { "function": "google-calendar-ingestion" },
+    "lambdas/google_calendar_lambda.py":      { "function": "google-calendar-ingestion", "not_deployed": true },
     "lambdas/evening_nudge_lambda.py":        { "function": "evening-nudge" },
     "lambdas/weekly_correlation_compute_lambda.py": { "function": "weekly-correlation-compute" },
     "lambdas/failure_pattern_compute_lambda.py": { "function": "failure-pattern-compute", "not_deployed": true },

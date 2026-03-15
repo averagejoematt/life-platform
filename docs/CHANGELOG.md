@@ -1,5 +1,29 @@
 # Life Platform — Changelog
 
+## v3.7.46 — 2026-03-15: ADR-030 — Google Calendar integration retired
+
+### Summary
+Retired the Google Calendar integration after exhausting all viable zero-touch data paths. All approaches were blocked by Smartsheet IT policy or macOS restrictions. Removed from freshness checker, MCP registry (87 tools, down from 89), and marked Lambda as not_deployed. ADR-030 documents the full decision with the options-and-blockers table for future reference.
+
+### Changes
+- `mcp/registry.py`: removed `get_calendar_events` and `get_schedule_load` tools; removed `tools_calendar` import. Tool count 89 → 87.
+- `lambdas/freshness_checker_lambda.py`: removed `google_calendar` from SOURCES and FIELD_COMPLETENESS_CHECKS. Source count 10 → 9.
+- `ci/lambda_map.json`: `google_calendar_lambda.py` marked `not_deployed: true`.
+- `setup/calendar_sync.py`, `setup/run_calendar_sync.sh`, `setup/com.matthewwalker.calendar-sync.plist`: deleted (Mac-native approach failed: CalDAV hangs on AppleScript queries; SQLite blocked by TCC).
+- `docs/DECISIONS.md`: ADR-030 added with full options-and-blockers table. ADR-029 added to index (was missing).
+
+### Pending manual steps
+- `aws secretsmanager delete-secret --secret-id life-platform/google-calendar --recovery-window-in-days 7 --region us-west-2`
+- CDK: remove `google-calendar-ingestion` from `ingestion_stack.py` (next CDK deploy session)
+
+### Test Results
+- All 83 tests passing ✅
+
+### Deployed
+- Nothing deployed — doc/code cleanup only. MCP Lambda deploy needed to reduce live tool count from 89 → 87.
+
+---
+
 ## v3.7.45 — 2026-03-15: R13-F01/F02/F07/F08/F10/F15 — CI/CD activation + lambda_map fixes
 
 ### Summary
