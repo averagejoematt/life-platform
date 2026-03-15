@@ -43,12 +43,12 @@ Items are grouped by priority tier. Within each tier, items are ordered by ROI (
 
 | ID | Item | Source | Effort | Impact | Status |
 |----|------|--------|--------|--------|--------|
-| R13-F01 | **GitHub Actions CI pipeline** — pytest + cdk synth + cdk diff on push to main. Manual approval gate before cdk deploy. #1 highest-ROI improvement from R13. | R13 Finding-01, R13 Top-10 #1 | M (4h) | HIGH — prevents 80% of deployment incidents (8 in incident log) | Not started |
-| R13-F02 | **Integration tests for critical path** — 3-5 tests against live AWS: (1) invoke ingestion Lambda with test data → verify DDB write, (2) invoke MCP tool → verify response shape, (3) verify freshness checker. Run post-deploy. | R13 Finding-02, R13 Top-10 #10 | M (5h) | HIGH — catches IAM gaps, schema mismatches, stale modules | Not started |
-| R13-F08 | **CI test for layer version consistency** — verify shared layer version in CDK matches latest published layer. Catches "forgot to rebuild layer" bug (caused P2 incident). | R13 Finding-08, R13 Top-10 #5 | S (1h) | MEDIUM — prevents silent stale-layer failures | Not started |
-| R13-F15 | **Bonferroni correction in weekly correlation compute** — 20 simultaneous tests at p=0.05 yields ~1 false positive per run. Add FDR or Bonferroni. | R13 Finding-15 | S (2h) | MEDIUM — statistical rigor for hypothesis generation | Not started |
-| R13-F10 | **Consolidate d2f() into shared layer** — duplicated in digest_utils.py, sick_day_checker.py, mcp/core.py, and likely ingestion Lambdas. Move to shared utils. | R13 Finding-10, R13 Top-10 #9 | S (30min) | LOW — code hygiene | Not started (pair with ADR-027 next layer rebuild) |
-| R13-F07 | **Quarterly PITR restore drill** — runbook written (R8-ST2) but never tested. Execute actual PITR restore to test table, verify data integrity. | R13 Finding-07, R13 Top-10 #7 | S (1h) | MEDIUM — validates backup strategy | Not started (first drill due ~Apr 2026) |
+| R13-F01 | **GitHub Actions CI pipeline** — pytest + cdk synth + cdk diff on push to main. Manual approval gate before cdk deploy. | R13 Finding-01, R13 Top-10 #1 | M (4h) | HIGH | ✅ Done (v3.7.45) — ci-cd.yml confirmed 7-job pipeline. `deploy/setup_github_oidc.sh` added to activate OIDC role (run once). |
+| R13-F02 | **Integration tests for critical path** — I1-I14 exist in `tests/test_integration_aws.py`. I1/I2/I4-I9 now wired into CI post-deploy-checks job. I3/I10-I14 manual-only (invoke Lambdas). | R13 Finding-02, R13 Top-10 #10 | M (5h) | HIGH | ✅ Done (v3.7.45) — I4/I6/I7/I8/I9 added to post-deploy-checks; I1/I2/I5 were already wired. |
+| R13-F08 | **CI test for layer version consistency** — offline pytest (LV1-LV5) + live AWS check in Plan job. | R13 Finding-08 | S (1h) | MEDIUM | ✅ Done (v3.7.38) — `tests/test_layer_version_consistency.py` (LV1-LV5) wired in test job; live AWS layer version check in Plan job. |
+| R13-F15 | **FDR correction in weekly correlation compute** — Benjamini-Hochberg applied. | R13 Finding-15 | S (2h) | MEDIUM | ✅ Done (v3.7.37) — `apply_benjamini_hochberg()` in `weekly_correlation_compute_lambda.py`. |
+| R13-F10 | **Consolidate d2f() into shared layer** | R13 Finding-10 | S (30min) | LOW | ✅ Done (v3.7.43) — `weekly_correlation_compute_lambda.py` switched to `from digest_utils import d2f`. |
+| R13-F07 | **Quarterly PITR restore drill** — first drill executed. Next ~2026-06-15. | R13 Finding-07 | S (1h) | MEDIUM | ✅ Done (v3.7.43) — drill ran 2026-03-15: 270s restore, 6/6 partitions verified. Next drill ~2026-06-15. |
 | R8-ST1 | **Google Calendar integration** — Lambda + 2 MCP tools deployed v3.7.21. OAuth still requires one-time setup: `python3 setup/setup_google_calendar_auth.py`. Tracked as CLEANUP-3. | Pre-R8, TB7-18 | S (20min remaining) | MEDIUM — code live, data flow pending OAuth | ⏳ Deployed (v3.7.21), OAuth pending (CLEANUP-3) |
 | R8-ST2 | **Document and test DynamoDB restore procedure** — write runbook section, execute PITR restore to test table, verify data integrity across partitions. | R8 Finding-6, R8 Top-10 #6 | S (1h) | MEDIUM — critical insurance for core data asset | ✅ Done (v3.7.17) — runbook written. Drill (actual restore) tracked as R13-F07. |
 | R8-ST3 | **Create "maintenance mode" Lambda profile** — config to disable non-essential Lambdas during vacation/absence. | R8 §6 R-5, R8 Top-10 #9 | S (30min) | MEDIUM — operational resilience during absence | ✅ Done (v3.7.17) — `deploy/maintenance_mode.sh enable\|disable\|status` |
@@ -162,5 +162,6 @@ These are not architecture decisions — they're deferred deletions and one-time
 | SLOs defined | 5 | — | SLO-1 through SLO-5 (warmer added v3.7.22) |
 | IC features live | 14 of 30 | — | Next: IC-4/IC-5 (~May 2026) |
 | Data sources | 20 | — | google_calendar deployed; OAuth pending (CLEANUP-3) |
-| Architecture review grade | B+/A- | A | R13 comprehensive review. Top gap: CI/CD pipeline (F01). Path to A-: resolve F01-F09. |
-| R13 open findings | 12 of 15 | 0 | 6 Tier 1 (30d), 6 Tier 2 (60d), 3 Tier 3 (90d). See `docs/reviews/REVIEW_2026-03-14_v13.md` |
+| Architecture review grade | B+/A- | A | R13 comprehensive review. R15 doc findings fixed. R13 F01-F02-F08 now closed. |
+| R13 open findings | 2 of 15 | 0 | F01 done (v3.7.45), F02 done (v3.7.45), F07 done (v3.7.43), F08 done (v3.7.38), F10 done (v3.7.43), F15 done (v3.7.37). Remaining: F03 (monolith split, deferred ADR-029). |
+| CI integration tests wired | I1/I2/I4-I9 | all | I3/I10-I14 manual-only (Lambda invocation side effects or special auth) |

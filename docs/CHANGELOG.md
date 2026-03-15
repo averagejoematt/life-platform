@@ -1,5 +1,40 @@
 # Life Platform — Changelog
 
+## v3.7.45 — 2026-03-15: R13-F01/F02/F07/F08/F10/F15 — CI/CD activation + lambda_map fixes
+
+### Summary
+Closed the last open R13 findings. R13-F01 (CI/CD pipeline): confirmed 7-job pipeline exists; `deploy/setup_github_oidc.sh` created so the OIDC role can actually be provisioned. R13-F02 (integration tests): I4/I6/I7/I8/I9 wired into CI post-deploy-checks (I1/I2/I5 were already wired). `ci/lambda_map.json` fixed: 3 live Lambdas that were missing; `failure_pattern_compute` and `momentum_warning_compute` flagged as `not_deployed` skeletons so the deploy job no longer attempts to push code to non-existent functions. R13-F07/F08/F10/F15 confirmed done and PROJECT_PLAN status updated.
+
+### Changes
+
+**R13-F01 — CI/CD pipeline activation**
+- `deploy/setup_github_oidc.sh` (new): creates GitHub OIDC identity provider in AWS IAM and the `github-actions-deploy-role` with scoped permissions (Lambda deploy, S3 artifacts, DDB describe, SNS publish, CDK bootstrap role assume, CloudWatch/EB/SQS/SecretsManager read). Run once before first pipeline trigger.
+- PROJECT_PLAN: R13-F01 marked done (v3.7.45).
+
+**R13-F02 — Integration tests wired into CI**
+- `.github/workflows/ci-cd.yml` post-deploy-checks job: added I4 (DDB health), I6 (EB rules), I7 (CW alarm count), I8 (S3 config files), I9 (DLQ empty). All read-only/safe to run in CI.
+- I3/I10-I14 remain manual-only (invoke Lambdas with potential side effects or require special auth).
+- PROJECT_PLAN: R13-F02 marked done.
+
+**lambda_map.json fixes**
+- `ci/lambda_map.json`: added `google_calendar_lambda.py` → `google-calendar-ingestion`, `evening_nudge_lambda.py` → `evening-nudge`, `weekly_correlation_compute_lambda.py` → `weekly-correlation-compute`.
+- Added `not_deployed: true` to `failure_pattern_compute_lambda.py` and `momentum_warning_compute_lambda.py` (skeleton Lambdas — source exists but function not yet in AWS).
+- `.github/workflows/ci-cd.yml` deploy job: added `not_deployed` skip check alongside existing `native_deps` check.
+- Updated `_updated` timestamp to v3.7.45.
+
+**R13-F07/F08/F10/F15 — Stale PROJECT_PLAN status corrected**
+- R13-F07 (PITR drill): marked done v3.7.43. R13-F08 (layer CI test): marked done v3.7.38. R13-F10 (d2f consolidation): marked done v3.7.43. R13-F15 (BH FDR): marked done v3.7.37.
+- Key Metrics table updated: R13 open findings 12→2 (only F03 monolith split deferred per ADR-029).
+
+### Test Results
+- All 83 tests passing ✅ (no new tests — CI changes only)
+
+### Deployed
+- Nothing deployed — CI/CD infrastructure + doc fixes only
+- **To activate CI/CD:** `bash deploy/setup_github_oidc.sh` (once), then create GitHub `production` Environment in repo settings
+
+---
+
 ## v3.7.44 — 2026-03-15: R15-F01 through R15-F06 doc accuracy + test guard
 
 ### Summary
