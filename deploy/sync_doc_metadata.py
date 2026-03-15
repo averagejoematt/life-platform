@@ -59,36 +59,53 @@ def _auto_discover_tool_count() -> int | None:
             return None
         tools_section = src[tools_start:]
         # Match 4-space-indented string keys at the top level of TOOLS dict
-        tool_names = re.findall(r'^    "([a-z_]+)"\s*:\s*\{', tools_section, re.MULTILINE)
+        # Note: [a-z0-9_]+ to handle names like get_zone2_breakdown
+        tool_names = re.findall(r'^    "([a-z0-9_]+)"\s*:\s*\{', tools_section, re.MULTILINE)
         return len(tool_names) if tool_names else None
     except Exception:
         return None
 
 
 def _auto_discover_lambda_count() -> int | None:
-    """Count unique function_name= entries across all CDK stack files."""
+    """Count unique function_name= entries across all CDK stack files.
+
+    Returns None if count seems suspiciously low (< 30), which could mean
+    some stack files were not readable. Caller falls back to PLATFORM_FACTS.
+    Lambda@Edge functions in web_stack.py use different CDK patterns and
+    may not be counted by this method.
+    """
     cdk_stacks_dir = ROOT / "cdk" / "stacks"
     if not cdk_stacks_dir.exists():
         return None
     try:
         names = set()
+        stack_files_read = 0
         for stack_file in cdk_stacks_dir.glob("*.py"):
-            src = stack_file.read_text(encoding="utf-8")
-            # Match function_name="some-name" and function_name='some-name'
-            found = re.findall(r'function_name=["\']([a-z0-9_-]+)["\']', src)
-            names.update(found)
-        return len(names) if names else None
+            try:
+                src = stack_file.read_text(encoding="utf-8")
+                found = re.findall(r'function_name=["\']([a-z0-9_-]+)["\']', src)
+                names.update(found)
+                stack_files_read += 1
+            except Exception:
+                pass
+        # If we read fewer than 5 stack files, something is wrong — don't trust count
+        if stack_files_read < 5:
+            return None
+        # If count is suspiciously low, don't override manual value
+        if len(names) < 30:
+            return None
+        return len(names)
     except Exception:
         return None
 
 
 def _auto_discover_module_count() -> int | None:
-    """Count mcp/tools_*.py modules."""
+    """Count all .py modules in mcp/ (excluding __init__.py)."""
     mcp_dir = ROOT / "mcp"
     if not mcp_dir.exists():
         return None
     try:
-        return len(list(mcp_dir.glob("tools_*.py")))
+        return len([f for f in mcp_dir.glob("*.py") if f.name != "__init__.py"])
     except Exception:
         return None
 
@@ -147,14 +164,14 @@ def _apply_auto_discovered(facts: dict) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 
 PLATFORM_FACTS = {
-    # Core counts
-    "version":          "v3.7.22",
-    "date":             "2026-03-14",
-    "lambda_count":     45,
-    "tool_count":       88,
-    "module_count":     31,       # mcp/ modules
-    "secret_count":     11,       # active secrets (10 original + google-calendar added v3.7.21)
-    "alarm_count":      49,       # +2 R9: mcp-warmer-error + slo-warmer-completeness
+    # Core counts (tool_count + lambda_count auto-discovered from source when available)
+    "version":          "v3.7.24",
+    "date":             "2026-03-15",
+    "lambda_count":     45,       # fallback: auto-discovery may under-count Lambda@Edge
+    "tool_count":       88,       # fallback: auto-discovery requires registry.py parseable
+    "module_count":     31,       # fallback: all mcp/*.py except __init__.py
+    "secret_count":     11,       # active secrets
+    "alarm_count":      49,
     "data_sources":     20,       # google_calendar live (pending OAuth setup)
     "cdk_stacks":       8,
     "iam_roles":        43,
