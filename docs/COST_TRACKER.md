@@ -10,7 +10,7 @@ Last updated: 2026-03-15 (v3.7.33)
 
 | Service | Cost/Month | Notes |
 |---------|-----------|-------|
-| **Secrets Manager** | $4.40 | 11 active secrets × $0.40/secret/month. `api-keys` permanently deleted 2026-03-14. `google-calendar` added v3.7.21. |
+| **Secrets Manager** | $4.00 | 10 active secrets × $0.40/secret/month. `api-keys` deleted 2026-03-14. `webhook-key` scheduled deletion 2026-03-22. |
 | **Lambda** | ~$0.50 | ~2,500 invocations/month (13 ingestion + 35 Lambda schedule runs + MCP on-demand + Dropbox poll) |
 | **DynamoDB** | ~$0.30 | On-demand pay-per-request, ~5,000 WCU + ~15,000 RCU/month |
 | **S3** | ~$0.05 | ~2.5 GB stored (raw archives + dashboard + blog + buddy + avatar), minimal GET/PUT |

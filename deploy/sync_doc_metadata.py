@@ -154,7 +154,7 @@ def _apply_auto_discovered(facts: dict) -> dict:
     facts["secrets_cost"] = f"${facts['secret_count'] * 0.40:.2f}"
     facts["secrets_cost_note"] = (
         f"{facts['secret_count']} active secrets × $0.40/secret/month. "
-        f"`api-keys` permanently deleted 2026-03-14. `google-calendar` added v3.7.21."
+        f"`api-keys` deleted 2026-03-14. `webhook-key` scheduled deletion 2026-03-22."
     )
     return facts
 
@@ -170,7 +170,7 @@ PLATFORM_FACTS = {
     "lambda_count":     45,       # fallback: auto-discovery may under-count Lambda@Edge
     "tool_count":       88,       # fallback: auto-discovery requires registry.py parseable
     "module_count":     31,       # fallback: all mcp/*.py except __init__.py
-    "secret_count":     11,       # active secrets
+    "secret_count":     10,       # active secrets (webhook-key scheduled deletion 2026-03-22)
     "alarm_count":      49,
     "data_sources":     20,       # google_calendar live (pending OAuth setup)
     "cdk_stacks":       8,
@@ -180,8 +180,8 @@ PLATFORM_FACTS = {
     "api_keys_status":  "PERMANENTLY DELETED 2026-03-14",
 
     # Cost
-    "secrets_cost":     "$4.40",  # secret_count × $0.40
-    "secrets_cost_note": "11 active secrets × $0.40/secret/month. `api-keys` permanently deleted 2026-03-14. `google-calendar` added v3.7.21.",
+    "secrets_cost":     "$4.00",  # secret_count × $0.40
+    "secrets_cost_note": "10 active secrets × $0.40/secret/month. `api-keys` deleted 2026-03-14. `webhook-key` scheduled deletion 2026-03-22.",
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -297,12 +297,7 @@ RULES = [
         "**Version:** {version} | **Last updated:** {date} | **Total tools:** {tool_count}",
     ),
 
-    # ── DATA_DICTIONARY.md ───────────────────────────────────────────────────
-    (
-        "docs/DATA_DICTIONARY.md",
-        r"\*\*Version:\*\* [^\|]+ \| \*\*Last updated:\*\* \d{4}-\d{2}-\d{2}",
-        "**Version:** {version} | **Last updated:** {date}",
-    ),
+    # DATA_DICTIONARY.md archived v3.7.32 — merged into SCHEMA.md
 
     # ── SLOs.md ──────────────────────────────────────────────────────────────
     (
