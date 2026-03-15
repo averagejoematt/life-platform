@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-15 (v3.7.25 — 88 tools, 30-module MCP package, 20 data sources, 42 Lambdas, 11 secrets, 49 alarms, 8 CDK stacks deployed)
+Last updated: 2026-03-15 (v3.7.26 — 88 tools, 30-module MCP package, 20 data sources, 42 Lambdas, 11 secrets, 49 alarms, 8 CDK stacks deployed)
 
 ---
 
@@ -74,7 +74,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | SNS topic | Alert routing | `life-platform-alerts` |
 | CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` (`d14jnhrgfrte42.cloudfront.net`) → S3 `/dashboard`, Lambda@Edge auth (`life-platform-cf-auth`), alias `dash.averagejoematt.com`. **Note (R8-LT6):** Lambda@Edge auth functions are manually managed outside CDK — `web_stack.py` has zero Lambda@Edge references. Intentionally left unmanaged: Lambda@Edge requires us-east-1 deployment which complicates CDK stack boundaries. Document-only; no CDK migration planned. |
 | CloudFront (blog) | CDN (public) | `E1JOC1V6E6DDYI` (`d1aufb59hb2r1q.cloudfront.net`) → S3 `/blog`, NO auth, alias `blog.averagejoematt.com` |
-| CloudFront (buddy) | CDN + auth | `ETTJ44FT0Z4GO` (`d1empeau04e0eg.cloudfront.net`) → S3 `/buddy`, Lambda@Edge auth (`life-platform-buddy-auth`), alias `buddy.averagejoematt.com`, PriceClass_100, HTTP/2+3 |
+| CloudFront (buddy) | CDN (public) | `ETTJ44FT0Z4GO` (`d1empeau04e0eg.cloudfront.net`) → S3 `/buddy`, **NO auth** (intentionally public — Tom's accountability page, no PII), alias `buddy.averagejoematt.com`, PriceClass_100, HTTP/2+3 |
 | ACM Certificate | TLS | `arn:aws:acm:us-east-1:205930651321:certificate/8e560416-...` — `dash.averagejoematt.com` (DNS-validated) |
 | SES Receipt Rule Set | Inbound email routing | `life-platform-inbound` (active) — rule `insight-capture` routes `insight@aws.mattsusername.com` → S3 |
 | CloudWatch | Alarms + logs | **~49 metric alarms**, all Lambdas monitored |
@@ -257,7 +257,7 @@ No GSI by design — all access patterns served by PK+SK queries.
 
 ### MCP Server
 
-**Lambda:** `life-platform-mcp` | **Tools:** 86 | **Memory:** 1024 MB | **Modules:** 31
+**Lambda:** `life-platform-mcp` | **Tools:** 88 | **Memory:** 1024 MB | **Modules:** 31
 **Local endpoint:** `https://votqefkra435xwrccmapxxbj6y0jawgn.lambda-url.us-west-2.on.aws/`
 **Remote MCP:** `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` — OAuth 2.1 auto-approve + HMAC Bearer (enables claude.ai + mobile)
 **Auth:** `x-api-key` header check; key in `life-platform/ai-keys`
