@@ -60,6 +60,19 @@ Items are grouped by priority tier. Within each tier, items are ordered by ROI (
 | R8-LT8 | **DLQ consumer: event-driven vs scheduled** | R8 §6 R-3 | S (30min) | LOW | ✅ Done (v3.7.19) — ADR-024 written, retain schedule model |
 | R8-LT9 | **Pre-compute weekly correlation matrix** — `SOURCE#weekly_correlations` partition. | Pre-R8 | M (3h) | LOW | ✅ Done (v3.7.20) — `weekly-correlation-compute` Lambda, 20 pairs, Sunday 11:30 AM PT |
 
+### Tier 2.5 — April 13 Cleanup (run before R13)
+
+These are not architecture decisions — they're deferred deletions and one-time setups.
+
+| ID | Item | Source | Effort | Status |
+|----|------|--------|--------|--------|
+| CLEANUP-1 | **Remove `write_composite_scores()` dead code** — function body still exists in `daily_metrics_compute_lambda.py` but has no caller since v3.7.25. Remove entirely once `computed_metrics` has 30+ days of history. | ADR-025 + R12 Viktor | S (5min) | Not started |
+| CLEANUP-2 | **Lambda@Edge in `ci/lambda_map.json`** — `cf-auth` function exists in `lambdas/cf-auth/index.mjs`, deployed to us-east-1, manually associated with CloudFront distributions. Add to `lambda_map.json` with `region: us-east-1` note so it's not invisible to tooling. | R12 Yael | S (15min) | Not started |
+| CLEANUP-3 | **Google Calendar OAuth activation** — run `python3 setup/setup_google_calendar_auth.py`. Not an engineering task. Has been deferred since v3.7.21. | R9-R12 every review | S (20min) | Not started |
+| CLEANUP-4 | **Validator docstring cleanup** — `ingestion_validator.py` docstring says "adaptive_mode, computed_insights" twice. Fix the human-readable list. Also fix the `from datetime import` inside lagged correlation loop in `weekly_correlation_compute_lambda.py`. | R12 Elena + Marcus | S (5min) | Not started |
+
+---
+
 ### Tier 4 — Deferred / Data-Gated
 
 | ID | Item | Source | Target Date | Gate |
