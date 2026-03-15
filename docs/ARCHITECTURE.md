@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-15 (v3.7.33 — 89 tools, 31-module MCP package, 20 data sources, 43 Lambdas, 11 secrets, 49 alarms, 8 CDK stacks deployed)
+Last updated: 2026-03-15 (v3.7.33 — 89 tools, 31-module MCP package, 20 data sources, 43 Lambdas, 10 secrets, 49 alarms, 8 CDK stacks deployed)
 
 ---
 
@@ -372,7 +372,7 @@ Each Lambda has a **dedicated, least-privilege IAM role** (43 roles total as of 
 
 ## Secrets Manager
 
-**11 active secrets** at $0.40/month each = **~$4.40/month**
+**10 active secrets** at $0.40/month each = **~$4.00/month**
 
 | Secret | Used By | Contents |
 |---|---|---|
@@ -397,7 +397,7 @@ Target: under $25/month | Current: ~$10/month
 
 | Driver | Monthly Cost |
 |---|---|
-| Secrets Manager (11 active secrets) | ~$4.40 |
+| Secrets Manager (10 active secrets) | ~$4.00 |
 | Lambda invocations (~2,000/mo) | ~$0.50 |
 | DynamoDB (on-demand, low RCU/WCU) | ~$1.00 |
 | S3 (~2.5 GB stored + requests) | ~$0.50 |
