@@ -1,5 +1,51 @@
 # Life Platform — Changelog
 
+## v3.7.35 — 2026-03-15: TB7-4 + R13-F05/F09/F12/F04 security hardening
+
+### Summary
+Security hardening sprint clearing the deadline-bound TB7-4 and four R13 findings. Secret permanently deleted, MCP auth made fail-closed, write rate limiting added, medical disclaimers injected, and a new CI linter prevents future Todoist-style secret reference bugs.
+
+### Changes
+
+**TB7-4 — `life-platform/api-keys` permanent deletion**
+- Grep confirmed: all references were in `cdk/cdk.out/` (stale build artifacts), none in live source
+- `aws secretsmanager delete-secret --force-delete-without-recovery` executed ✅
+- Secret ARN `arn:aws:secretsmanager:us-west-2:205930651321:secret:life-platform/api-keys-t2ADCR` permanently gone
+
+**R13-F05 — MCP OAuth fail-closed**
+- `mcp/handler.py` `_get_bearer_token()`: returns sentinel `"__NO_KEY_CONFIGURED__"` instead of `None` when no API key is set
+- `_validate_bearer()`: removed `if expected is None: return True` accept-all bypass
+- Result: no API key configured → all requests rejected (was: all requests accepted)
+
+**R13-F12 — Write tool rate limiting**
+- `mcp/handler.py`: `_check_write_rate_limit()` added; 10 calls/invocation cap on 5 write tools
+- Protected tools: `create_todoist_task`, `delete_todoist_task`, `log_supplement`, `write_platform_memory`, `delete_platform_memory`
+- `mcp/utils.py`: `RATE_LIMIT` error code + default suggestions added
+
+**R13-F09 — Medical disclaimers on health-assessment tools (partial)**
+- `mcp/tools_health.py`: `_disclaimer` field injected via `tool_get_health()` dispatcher (covers dashboard, risk_profile, trajectory views)
+- `mcp/tools_health.py`: `tool_get_readiness_score()` return dict gets `_disclaimer` directly
+- `mcp/tools_cgm.py`: `_disclaimer` field injected via `tool_get_cgm()` dispatcher (covers dashboard, fasting views)
+- BP dashboard + HR recovery tools not found in local source — carry to next session
+
+**R13-F04 — CI secret reference linter**
+- `tests/test_secret_references.py` (new): SR1–SR4 tests scan `lambdas/`, `mcp/`, `mcp_server.py` for secret name literals
+  - SR1: all referenced names must be in KNOWN_SECRETS
+  - SR2: no references to deleted secrets
+  - SR3: all names follow `life-platform/*` convention
+  - SR4: scanner sanity check (guards against silent false-green)
+- `.github/workflows/ci-cd.yml`: new test step wired into CI `test` job after IAM/secrets linter
+- All 4 tests pass ✅
+
+### Test Results
+- `test_secret_references.py`: 4/4 ✅
+- `test_mcp_registry.py`: 7/7 ✅
+
+### Deployed
+- `life-platform-mcp` ✅
+
+---
+
 ## v3.7.34 — 2026-03-15: R5 power-tuning + inbox hygiene (OK alarm removal)
 
 ### Summary

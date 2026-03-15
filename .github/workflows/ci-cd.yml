@@ -204,6 +204,14 @@ jobs:
           python3 -m pytest tests/test_iam_secrets_consistency.py -v --tb=short
           echo "::endgroup::"
 
+      - name: Secret references linter (test_secret_references.py)
+        # R13-F04: Validates Lambda source secret name literals against known-secrets list.
+        # Prevents Todoist-style 2-day outage caused by wrong SECRET_NAME default value.
+        run: |
+          echo "::group::Secret references linter"
+          python3 -m pytest tests/test_secret_references.py -v --tb=short
+          echo "::endgroup::"
+
   # ════════════════════════════════════════════════════════════════
   # Job 3: Plan — validate map, detect changes, build deploy plan
   # ════════════════════════════════════════════════════════════════

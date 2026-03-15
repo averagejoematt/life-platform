@@ -71,6 +71,13 @@ def handle_tools_call(params):
         logger.warning(f"[SEC-3] Input validation failed for '{name}': {validation_error}")
         raise ValueError(f"Invalid arguments for tool '{name}': {validation_error}")
     logger.info(f"Calling tool '{name}' with args: {arguments}")
+    # R13-F12: Rate limit write tools before execution
+    rate_err = _check_write_rate_limit(name)
+    if rate_err:
+        return {"content": [{"type": "text", "text": json.dumps(
+            mcp_error(message=rate_err, error_code="RATE_LIMIT"),
+            default=str
+        )}]}
     _t0 = time.time()
     # R6: per-tool soft timeout — returns a structured error instead of hanging
     # the Lambda until the 300s hard limit. 30s is the default; query-too-broad
@@ -314,6 +321,43 @@ def _parse_body(event):
 _BEARER_TOKEN_CACHE = {}
 _BEARER_CACHE_TTL = 300  # 5 min — ensures warm containers pick up new key after rotation
 
+# R13-F12: Per-invocation write tool rate limiting.
+# In-memory only — resets on each Lambda cold start / invocation context.
+# Prevents accidental runaway loops from hammering write operations.
+_WRITE_TOOL_CALLS: dict = {}
+_WRITE_TOOL_RATE_LIMIT = 10  # max calls per write tool per Lambda invocation
+
+_RATE_LIMITED_TOOLS = {
+    "create_todoist_task",
+    "delete_todoist_task",
+    "log_supplement",
+    "write_platform_memory",
+    "delete_platform_memory",
+}
+
+
+def _check_write_rate_limit(tool_name: str):
+    """R13-F12: Check if a write tool has exceeded its per-invocation rate limit.
+
+    Returns an error message string if limit exceeded, None if OK.
+    In-memory counter resets on every Lambda invocation — prevents runaway
+    loops within a single session, not across sessions.
+    """
+    if tool_name not in _RATE_LIMITED_TOOLS:
+        return None
+    count = _WRITE_TOOL_CALLS.get(tool_name, 0)
+    if count >= _WRITE_TOOL_RATE_LIMIT:
+        logger.warning(
+            f"[R13-F12] Write rate limit hit for '{tool_name}': "
+            f"{count} calls this invocation (limit {_WRITE_TOOL_RATE_LIMIT})"
+        )
+        return (
+            f"Tool '{tool_name}' has been called {count} times this invocation "
+            f"(limit: {_WRITE_TOOL_RATE_LIMIT}). Rate limit prevents runaway write loops."
+        )
+    _WRITE_TOOL_CALLS[tool_name] = count + 1
+    return None
+
 def _get_bearer_token():
     """Derive a deterministic Bearer token from the API key using HMAC.
     Cached with 5-min TTL to support key rotation without redeployment."""
@@ -323,10 +367,13 @@ def _get_bearer_token():
 
     api_key = get_api_key()
     if not api_key:
-        # Fallback: accept any token if no API key configured
-        _BEARER_TOKEN_CACHE["token"] = None
+        # R13-F05: fail-closed — no API key means all requests are rejected.
+        # Return a non-None sentinel so _validate_bearer performs a real
+        # (always-failing) comparison rather than bypassing auth entirely.
+        _BEARER_TOKEN_CACHE["token"] = "__NO_KEY_CONFIGURED__"
         _BEARER_TOKEN_CACHE["ts"] = now
-        return None
+        logger.warning("[SEC] API key not configured — MCP auth is fail-closed (all tokens rejected)")
+        return "__NO_KEY_CONFIGURED__"
     sig = hmac.new(api_key.encode(), b"life-platform-bearer-v1", hashlib.sha256).hexdigest()
     _BEARER_TOKEN_CACHE["token"] = f"lp_{sig}"
     _BEARER_TOKEN_CACHE["ts"] = now
@@ -334,10 +381,16 @@ def _get_bearer_token():
 
 
 def _validate_bearer(event):
-    """Validate Bearer token from Authorization header. Returns True if valid."""
+    """Validate Bearer token from Authorization header. Returns True if valid.
+
+    R13-F05: fail-closed — when no API key is configured, all requests are
+    rejected rather than accepted. Previously returned True (accept-all) when
+    expected was None, creating a false security boundary.
+    """
     expected = _get_bearer_token()
-    if expected is None:
-        return True  # No API key configured — skip validation
+    # _get_bearer_token() now returns a sentinel string when no key is configured,
+    # so the hmac.compare_digest below will always fail in that case. No special
+    # case needed — fail-closed is the default path.
     auth_header = (event.get("headers") or {}).get("authorization", "")
     if not auth_header.lower().startswith("bearer "):
         return False
