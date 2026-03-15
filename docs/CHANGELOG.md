@@ -1,5 +1,55 @@
 # Life Platform — Changelog
 
+## v3.7.39 — 2026-03-15: LV1 fix — centralize layer version + LV5
+
+### Summary
+LV1 in the new layer consistency test caught a real defect: `SHARED_LAYER_ARN` with hardcoded `:10` was duplicated independently in `ingestion_stack.py` and `email_stack.py`. Fixed by introducing `cdk/stacks/constants.py` as the single source of truth. Both stacks now import from there. Added LV5 to prevent regression.
+
+### Changes
+- `cdk/stacks/constants.py` (new): `SHARED_LAYER_VERSION`, `SHARED_LAYER_ARN`, `ACCT`, `REGION` — single place to bump the layer version on every rebuild
+- `cdk/stacks/ingestion_stack.py`: removed local `SHARED_LAYER_ARN` definition, imports from `constants`
+- `cdk/stacks/email_stack.py`: removed local `SHARED_LAYER_ARN` and `REGION`/`ACCT`, imports from `constants`
+- `tests/test_layer_version_consistency.py`: LV1 now excludes `constants.py` from scan; +LV5 ensures no other stack file has an inline layer ARN
+
+### Test Results
+- `test_mcp_registry.py`: 7/7 ✅
+- `test_secret_references.py`: 4/4 ✅
+- `test_layer_version_consistency.py`: 5/5 ✅ (LV1 was failing, now passes)
+
+### Deployed
+- No Lambda deploys — CDK source + test-only changes
+
+---
+
+## v3.7.38 — 2026-03-15: R13-F08 layer CI pytest + R13-F01 closed + R13-F02 I12/I13
+
+### Summary
+Layer version consistency linter added to CI (offline, LV1-LV4). R13-F01 closed — full CI/CD pipeline already existed. Two new live-AWS integration tests added: I12 (MCP tool call shape) and I13 (freshness checker data).
+
+### Changes
+- `tests/test_layer_version_consistency.py` (new): LV1–LV4, wired into ci-cd.yml
+- R13-F01 CLOSED: `ci-cd.yml` already implements pytest+synth+diff+approve+deploy+smoke (was marked "not started" erroneously)
+- `tests/test_integration_aws.py`: +I12 (MCP tools/call with `get_data_freshness`, validates JSON-RPC response shape), +I13 (freshness checker returns structured source data)
+
+### Test Results
+- All 15 tests passing before LV1 fix was applied (LV1 intentionally failed first)
+
+---
+
+## v3.7.37 — 2026-03-15: R13-F15 BH FDR correction + R13-F10 d2f annotation
+
+### Summary
+Benjamini-Hochberg FDR correction applied to weekly correlation compute. With 23 simultaneous tests at alpha=0.05, naive thresholding produces ~1.15 expected false positives per run; BH controls the false discovery rate instead. d2f() annotated with canonical-copy deferred note.
+
+### Changes
+- `lambdas/weekly_correlation_compute_lambda.py`: +`pearson_p_value()`, +`apply_benjamini_hochberg()`, wired into `compute_correlations()`. Each pair now gets `p_value`, `p_value_fdr`, `fdr_significant` fields.
+- `lambdas/weekly_correlation_compute_lambda.py`: `d2f()` annotated with R13-F10 deferred note (canonical copy in `digest_utils.py`, switch after layer v12)
+
+### Deployed
+- `weekly-correlation-compute` ✅
+
+---
+
 ## v3.7.36 — 2026-03-15: R13-F09 complete + R13-F06 + R13-F08-dur
 
 ### Summary
