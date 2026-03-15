@@ -43,7 +43,7 @@
 
 | Item | Priority | Notes |
 |------|----------|-------|
-| **R16-F06: Verify webhook-key deletion** | Low | `aws secretsmanager describe-secret --secret-id life-platform/webhook-key --region us-west-2` — check for `DeletedDate` field |
+| ~~R16-F06: Verify webhook-key deletion~~ | ~~Low~~ | ~~`DeletedDate: 2026-03-14` confirmed. ARCHITECTURE.md updated — 9 active secrets, webhook-key struck through.~~ ✅ Closed |
 | **Monitor CI/CD first pipeline run** | Low | Check Actions tab: https://github.com/averagejoematt/life-platform/actions — confirm lint → test → plan passes |
 | **Deploy canary_lambda.py** | Low | Canary threshold change is local only — needs deploy to take effect: `bash deploy/deploy_lambda.sh life-platform-canary lambdas/canary_lambda.py` |
 | R14-F04: MCP_TOOL_CATALOG.md | Low | Persisting — update catalog for ADR-030 retirements |

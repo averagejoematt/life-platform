@@ -70,7 +70,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | Lambda Function URL (MCP) | MCP HTTPS endpoint | `https://votqefkra435xwrccmapxxbj6y0jawgn.lambda-url.us-west-2.on.aws/` (AuthType NONE — auth handled in Lambda via API key header) |
 | Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` (OAuth 2.1 auto-approve + HMAC Bearer) |
 | API Gateway | HTTP endpoint | `health-auto-export-api` (a76xwxt2wa) — webhook ingest |
-| Secrets Manager | Credential store | 10 secrets: 4 OAuth (`whoop`, `withings`, `strava`, `garmin`) + `eightsleep` + `ai-keys` (Anthropic + MCP) + `ingestion-keys` (Notion/Todoist/Habitify/Dropbox/webhook keys bundle) + `habitify` (dedicated) + `webhook-key` + `mcp-api-key` — **`api-keys` permanently deleted 2026-03-14; `google-calendar` permanently deleted 2026-03-15 (ADR-030)** |
+| Secrets Manager | Credential store | 9 active secrets: 4 OAuth (`whoop`, `withings`, `strava`, `garmin`) + `eightsleep` + `ai-keys` (Anthropic + MCP) + `ingestion-keys` (Notion/Todoist/Habitify/Dropbox/webhook keys bundle) + `habitify` (dedicated) + `mcp-api-key` (`webhook-key` deleted 2026-03-14) — **`api-keys` permanently deleted 2026-03-14; `google-calendar` permanently deleted 2026-03-15 (ADR-030)** |
 | SNS topic | Alert routing | `life-platform-alerts` |
 | CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` (`d14jnhrgfrte42.cloudfront.net`) → S3 `/dashboard`, Lambda@Edge auth (`life-platform-cf-auth`), alias `dash.averagejoematt.com`. **Note (R8-LT6):** Lambda@Edge auth functions are manually managed outside CDK — `web_stack.py` has zero Lambda@Edge references. Intentionally left unmanaged: Lambda@Edge requires us-east-1 deployment which complicates CDK stack boundaries. Document-only; no CDK migration planned. |
 | CloudFront (blog) | CDN (public) | `E1JOC1V6E6DDYI` (`d1aufb59hb2r1q.cloudfront.net`) → S3 `/blog`, NO auth, alias `blog.averagejoematt.com` |
@@ -388,7 +388,7 @@ Each Lambda has a **dedicated, least-privilege IAM role** (43 roles total as of 
 | `life-platform/ai-keys` | All email/compute/MCP Lambdas | Anthropic API key + MCP bearer token (90-day auto-rotation via `mcp-key-rotator`) |
 | `life-platform/ingestion-keys` | Notion, Todoist, Habitify, Dropbox, HAE webhook | COST-B bundle: per-service key fields (`notion_api_key`, `todoist_api_key`, `habitify_api_key`, `dropbox_app_key`, `health_auto_export_api_key`) |
 | `life-platform/habitify` | Habitify Lambda | Dedicated Habitify API key (also in `ingestion-keys` — see ADR-014) |
-| `life-platform/webhook-key` | *(reserved)* | Dedicated HAE webhook auth key (exists but not yet primary — Lambda reads `ingestion-keys`) |
+| ~~`life-platform/webhook-key`~~ | ~~*(reserved)*~~ | ~~**SCHEDULED FOR DELETION 2026-03-14.** Dedicated HAE webhook auth key — never became primary (Lambda reads `ingestion-keys`). DeletedDate: 2026-03-14 (R16-F06 verified).~~ |
 | `life-platform/mcp-api-key` | MCP Key Rotator Lambda | MCP server bearer token (90-day auto-rotation, consumed by `ai-keys`) |
 | ~~`life-platform/google-calendar`~~ | ~~Google Calendar Lambda~~ | ~~**PERMANENTLY DELETED 2026-03-15 (ADR-030).**~~ |
 | ~~`life-platform/api-keys`~~ | ~~Legacy~~ | ~~**PERMANENTLY DELETED 2026-03-14.**~~ |
