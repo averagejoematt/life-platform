@@ -1,5 +1,20 @@
 # Life Platform — Changelog
 
+## v3.7.32 — 2026-03-15: R20 webhook-key deletion + doc audit fixes
+
+### Summary
+R20 secrets consolidation: `webhook-key` scheduled for deletion (7-day recovery window, permanent ~2026-03-22). No Lambda ever read this secret. Saves ~$0.40/mo. Also patched PROJECT_PLAN.md and INFRASTRUCTURE.md with several stale fields found in post-session doc audit.
+
+### Changes
+- `docs/INFRASTRUCTURE.md`: `webhook-key` marked for deletion, secrets count 11→10, Lambda count corrected (44 = 43 CDK + 1 Edge), `evening-nudge` and `failure-pattern-compute` and `google-calendar-ingestion` added to Lambda lists
+- `docs/PROJECT_PLAN.md`: version header updated to v3.7.31, Risk-7 and ADR-027 marked done, Key Metrics corrected (tools 89, lambdas 43), completed items table updated with today's work
+- AWS: `life-platform/webhook-key` scheduled for deletion (7-day recovery window)
+
+### Deployed
+- No Lambda changes — documentation + secrets management only
+
+---
+
 ## v3.7.31 — 2026-03-15: R57 centenarian benchmarks + R6 timeout + R54 evening nudge + R6
 
 ### Summary
