@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-15 (v3.7.30 — 88 tools, 31-module MCP package, 20 data sources, 42 Lambdas, 11 secrets, 49 alarms, 8 CDK stacks deployed)
+Last updated: 2026-03-15 (v3.7.31 — 89 tools, 31-module MCP package, 20 data sources, 43 Lambdas, 11 secrets, 49 alarms, 8 CDK stacks deployed)
 
 ---
 
@@ -31,7 +31,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
                          │ DynamoDB queries
 ┌────────────────────────▼────────────────────────────────────┐
 │  SERVE LAYER                                                │
-│  MCP Server Lambda (88 tools, 1024 MB) + Lambda Function URL│
+│  MCP Server Lambda (89 tools, 1024 MB) + Lambda Function URL│
 │  ← Claude Desktop + claude.ai + Claude mobile via remote MCP│
 │                                                             │
 │  COMPUTE LAYER (IC intelligence features)                   │
@@ -347,7 +347,7 @@ Health Auto Export → API Gateway → Webhook → DynamoDB + S3
                               daily-metrics · daily-insight
                               hypothesis-engine
                                                     │
-                               MCP Lambda (88 tools)
+                               MCP Lambda (89 tools)
                                                     │
                       Lambda Function URL (local) / Remote MCP URL
                                                     │
@@ -433,7 +433,7 @@ AWS Budget alerts at $5 (25%), $10 (50%), $20 (100%) → `awsdev@mattsusername.c
     PROJECT_PLAN.md               ← Roadmap and backlog
     USER_GUIDE.md                 ← How to use MCP tools
     FEATURES.md                   ← Feature showcase
-    MCP_TOOL_CATALOG.md           ← All 88 tools with params, cache, deps
+    MCP_TOOL_CATALOG.md           ← All 89 tools with params, cache, deps
     DATA_DICTIONARY.md            ← Every metric → SOT source
     COST_TRACKER.md               ← Budget tracking
     INCIDENT_LOG.md               ← Operational incident history

@@ -27,7 +27,8 @@ from mcp.helpers import (
 from mcp.strength_helpers import (
     classify_exercise, is_bodyweight, estimate_1rm,
     extract_hevy_sessions, volume_status, classify_standard,
-    _VOLUME_LANDMARKS, _STRENGTH_STANDARDS, _STANDARD_LEVELS,
+    attia_benchmark_status,
+    _VOLUME_LANDMARKS, _STRENGTH_STANDARDS, _STANDARD_LEVELS, _ATTIA_TARGETS,
 )
 def tool_get_exercise_history(args):
     """Deep dive on a single exercise: all sessions, PR chronology, estimated 1RM trend."""
@@ -458,6 +459,105 @@ def tool_get_strength_standards(args):
         "overall_strength_level": overall,
         "lifts": results,
         "note": "Standards based on bodyweight multipliers (male norms). Female lifters typically achieve 70–80% of these values.",
+    }
+
+
+def tool_get_centenarian_benchmarks(args):
+    """Compare compound lift 1RMs against Attia centenarian decathlon targets."""
+    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    bw_source  = args.get("bodyweight_source", "withings")
+
+    # Get bodyweight
+    bodyweight = None
+    bw_items = query_source("withings", "2000-01-01", end_date)
+    for item in reversed(sorted(bw_items, key=lambda x: x.get("date") or "")):
+        w = (item.get("weight_lbs") or item.get("data", {}).get("weight_lbs")
+             or item.get("data", {}).get("weight"))
+        if w:
+            bodyweight = float(w)
+            break
+    if bodyweight is None:
+        bodyweight = float(args.get("bodyweight_lbs", 0))
+    if not bodyweight:
+        return {"error": "Could not determine bodyweight. Pass bodyweight_lbs or ensure Withings data exists."}
+
+    # Canonical exercise names to search for each lift
+    _LIFT_SEARCH = {
+        "deadlift":        "deadlift",
+        "squat":           "squat",
+        "bench press":     "bench press",
+        "overhead press":  "overhead press",
+    }
+
+    hevy_items = query_source("hevy", "2000-01-01", end_date)
+
+    best_1rms: dict[str, tuple[float, str]] = {}
+    for item in hevy_items:
+        date_str = item.get("date") or item.get("sk", "")[:10]
+        for workout in item.get("data", {}).get("workouts", []):
+            for ex in workout.get("exercises", []):
+                name_lc = ex.get("name", "").lower()
+                for lift_key, keyword in _LIFT_SEARCH.items():
+                    if keyword not in name_lc:
+                        continue
+                    for s in ex.get("sets", []):
+                        if s.get("set_type") == "warmup":
+                            continue
+                        w = float(s.get("weight_lbs", 0) or 0)
+                        r = int(s.get("reps", 0) or 0)
+                        e1rm = estimate_1rm(w, r)
+                        if e1rm and (lift_key not in best_1rms or e1rm > best_1rms[lift_key][0]):
+                            best_1rms[lift_key] = (e1rm, date_str)
+
+    lifts_out = {}
+    statuses  = []
+    for lift_key in _ATTIA_TARGETS:
+        if lift_key not in best_1rms:
+            lifts_out[lift_key] = {
+                "status": "no_data",
+                "status_label": "No lift data found",
+                "note": f"Log {lift_key} in Hevy to start tracking.",
+            }
+            continue
+        best, best_date = best_1rms[lift_key]
+        ratio  = round(best / bodyweight, 3)
+        result = attia_benchmark_status(lift_key, ratio)
+        result["best_estimated_1rm_lbs"] = best
+        result["date_achieved"]           = best_date
+        result["lbs_to_target"] = round(
+            max(0, (_ATTIA_TARGETS[lift_key]["target_ratio"] - ratio) * bodyweight), 1
+        )
+        lifts_out[lift_key] = result
+        statuses.append(result["status"])
+
+    # Overall readiness score (0-100) based on weighted pct_of_target
+    pcts = [
+        v["pct_of_target"]
+        for v in lifts_out.values()
+        if "pct_of_target" in v
+    ]
+    overall_pct = round(sum(pcts) / len(pcts), 1) if pcts else None
+
+    # Weakest lift by gap to target
+    lifts_with_gap = [
+        (k, v) for k, v in lifts_out.items()
+        if v.get("gap_to_target_bw_ratio", 0) > 0
+    ]
+    priority_lift = (
+        min(lifts_with_gap, key=lambda x: x[1]["pct_of_target"])[0]
+        if lifts_with_gap else None
+    )
+
+    return {
+        "bodyweight_lbs": bodyweight,
+        "as_of_date": end_date,
+        "overall_pct_of_targets": overall_pct,
+        "priority_lift": priority_lift,
+        "framework": (
+            "Peter Attia centenarian decathlon — ratios needed NOW to maintain "
+            "functional independence at 80-85. Assumes ~8-12% strength decline per decade from 40."
+        ),
+        "lifts": lifts_out,
     }
 
 

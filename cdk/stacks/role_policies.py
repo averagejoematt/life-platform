@@ -588,6 +588,32 @@ def email_brittany() -> list[iam.PolicyStatement]:
     return _email_base()
 
 
+def email_evening_nudge() -> list[iam.PolicyStatement]:
+    """Evening nudge: DDB read (supplements, notion, apple_health, state_of_mind), SES. No ai-keys needed."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="SES",
+            actions=["ses:SendEmail", "sesv2:SendEmail"],
+            resources=[SES_IDENTITY],
+        ),
+        iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ),
+    ]
+
+
 # ═════════════════════════════════════════════════════════════════════════
 # OPERATIONAL STACK — 8 Lambdas
 # ═════════════════════════════════════════════════════════════════════════
