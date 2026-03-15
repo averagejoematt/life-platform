@@ -4,6 +4,7 @@ Lab / DEXA / Genome query helpers.
 import json
 import logging
 
+from boto3.dynamodb.conditions import Key
 from mcp.config import table, s3_client, S3_BUCKET, USER_PREFIX, logger
 from mcp.core import decimal_to_float, query_source
 
