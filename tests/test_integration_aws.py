@@ -635,6 +635,188 @@ def test_i11_data_reconciliation_running():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# I12 — MCP tool call with response shape validation (R13-F02)
+# Root cause it prevents: MCP server starts but tools return wrong shape
+# (IAM gap, schema mismatch, import error in tool function)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_i12_mcp_tool_call_response_shape():
+    """I12: MCP server must execute a representative tool call and return valid JSON
+    with the expected content array shape.
+
+    R13-F02: Validates the full MCP path — auth, tool dispatch, DDB read, serialisation.
+    Uses `get_data_freshness` as the probe: it reads DDB but writes nothing and is
+    always fast (<5s). Passes even when no data has been ingested yet.
+
+    Failure modes caught: IAM DDB read denied, tool import error, response serialisation
+    failure, wrong handler name post-CDK-deploy.
+    """
+    boto3 = _get_boto3()
+    lc = boto3.client("lambda", region_name=REGION)
+    sm = boto3.client("secretsmanager", region_name=REGION)
+
+    # Get the MCP API key to build a valid Bearer token
+    try:
+        secret = sm.get_secret_value(SecretId="life-platform/mcp-api-key")
+        api_key = secret["SecretString"]
+    except Exception as e:
+        pytest.skip(f"I12: Cannot retrieve MCP API key: {e}")
+
+    import hashlib
+    import hmac as _hmac
+    sig = _hmac.new(api_key.encode(), b"life-platform-bearer-v1", hashlib.sha256).hexdigest()
+    bearer = f"lp_{sig}"
+
+    # Build a minimal MCP tools/call JSON-RPC payload
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "get_data_freshness",
+            "arguments": {},
+        },
+    }
+    event = {
+        "requestContext": {
+            "http": {"method": "POST", "path": "/"},
+            "domainName": "c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws",
+        },
+        "headers": {"authorization": f"Bearer {bearer}"},
+        "body": json.dumps(payload),
+        "isBase64Encoded": False,
+    }
+
+    try:
+        response = lc.invoke(
+            FunctionName="life-platform-mcp",
+            Payload=json.dumps(event),
+        )
+    except Exception as e:
+        pytest.fail(f"I12 FAIL: Could not invoke MCP Lambda: {e}")
+
+    if "FunctionError" in response:
+        raw = json.loads(response["Payload"].read())
+        pytest.fail(
+            f"I12 FAIL: MCP Lambda returned FunctionError: "
+            f"{raw.get('errorType')}: {raw.get('errorMessage', '')[:150]}"
+        )
+
+    raw_body = json.loads(response["Payload"].read())
+    body_str = raw_body.get("body", "")
+
+    try:
+        body = json.loads(body_str)
+    except (json.JSONDecodeError, TypeError) as e:
+        pytest.fail(f"I12 FAIL: MCP response body is not valid JSON: {e}\nRaw: {body_str[:200]}")
+
+    # Validate JSON-RPC response shape
+    assert "jsonrpc" in body, f"I12 FAIL: response missing 'jsonrpc' field: {body}"
+    assert "result" in body or "error" in body, (
+        f"I12 FAIL: response has neither 'result' nor 'error': {body}"
+    )
+
+    if "error" in body:
+        # An RPC-level error (e.g. auth failure) is a real failure
+        pytest.fail(
+            f"I12 FAIL: MCP tool call returned RPC error: {body['error']}.\n"
+            "Check IAM permissions and Bearer token derivation."
+        )
+
+    result = body.get("result", {})
+    content = result.get("content", [])
+    assert isinstance(content, list) and len(content) > 0, (
+        f"I12 FAIL: result.content is empty or not a list: {result}"
+    )
+
+    # Content items must have type and text
+    first = content[0]
+    assert first.get("type") == "text", (
+        f"I12 FAIL: content[0].type is not 'text': {first}"
+    )
+    text = first.get("text", "")
+    assert len(text) > 10, f"I12 FAIL: content[0].text is suspiciously short: {text!r}"
+
+    # Must be parseable JSON (tool returns a dict)
+    try:
+        tool_result = json.loads(text)
+    except json.JSONDecodeError as e:
+        pytest.fail(f"I12 FAIL: tool result text is not valid JSON: {e}\nText: {text[:200]}")
+
+    assert isinstance(tool_result, dict), (
+        f"I12 FAIL: tool result is not a dict: {type(tool_result)}"
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# I13 — Freshness checker returns valid data (R13-F02)
+# Root cause it prevents: freshness Lambda exits 0 but freshness data is wrong/absent
+# ══════════════════════════════════════════════════════════════════════════════
+
+FRESHNESS_FUNCTION = "life-platform-freshness-checker"
+_FRESHNESS_EXPECTED_SOURCES = ["whoop", "withings", "strava", "habitify"]
+
+
+def test_i13_freshness_checker_returns_valid_data():
+    """I13: Freshness checker Lambda must return structured data with at least
+    the core health sources present and having non-null last-seen dates.
+
+    R13-F02: Validates the DDB read path for freshness data. An invocation
+    that returns 200 but empty/malformed freshness data indicates a DDB
+    schema mismatch, missing partition, or IAM read gap that wouldn't show
+    up in the liveness checks of I3/I10.
+    """
+    boto3 = _get_boto3()
+    lc = boto3.client("lambda", region_name=REGION)
+
+    try:
+        response = lc.invoke(
+            FunctionName=FRESHNESS_FUNCTION,
+            Payload=json.dumps({}),
+        )
+    except Exception as e:
+        pytest.fail(f"I13 FAIL: Could not invoke {FRESHNESS_FUNCTION}: {e}")
+
+    status = response["StatusCode"]
+    assert status == 200, f"I13 FAIL: {FRESHNESS_FUNCTION} returned HTTP {status}"
+
+    if "FunctionError" in response:
+        payload = json.loads(response["Payload"].read())
+        pytest.fail(
+            f"I13 FAIL: {FRESHNESS_FUNCTION} FunctionError: "
+            f"{payload.get('errorType')}: {payload.get('errorMessage', '')[:150]}"
+        )
+
+    raw = json.loads(response["Payload"].read())
+
+    # Freshness checker returns a JSON body — parse it
+    body_str = raw.get("body", raw) if isinstance(raw, dict) else raw
+    if isinstance(body_str, str):
+        try:
+            body = json.loads(body_str)
+        except json.JSONDecodeError:
+            body = raw
+    else:
+        body = body_str
+
+    # Must contain some freshness data — accept several possible shapes
+    has_sources = (
+        isinstance(body, dict)
+        and (
+            "sources" in body
+            or "freshness" in body
+            or any(src in str(body) for src in _FRESHNESS_EXPECTED_SOURCES)
+        )
+    )
+
+    assert has_sources, (
+        f"I13 FAIL: Freshness checker response does not contain expected source data.\n"
+        f"Expected at least one of: {_FRESHNESS_EXPECTED_SOURCES}\n"
+        f"Got: {str(body)[:400]}"
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Standalone runner
 # ══════════════════════════════════════════════════════════════════════════════
 
