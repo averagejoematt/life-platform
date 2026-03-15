@@ -1891,6 +1891,8 @@ def tool_get_blood_pressure_dashboard(args):
                             "pulse": d.get("pulse"), "class": classify_bp(d["systolic"], d["diastolic"])}
                            for d in bp_days],
         "coaching": coaching,
+        # R13-F09: Medical disclaimer on all health-assessment tool responses
+        "_disclaimer": "For personal health tracking only. Not medical advice. Consult a qualified healthcare provider before making health decisions based on this data.",
     }
 
 
@@ -2054,6 +2056,8 @@ def tool_get_blood_pressure_correlation(args):
             "huberman": "Consistent Zone 2 cardio (150 min/week) is the most evidence-backed BP intervention after sodium. Acute post-exercise hypotension lasts 12-24 hours.",
             "walker": "Poor sleep quality (especially <85% efficiency) reliably raises next-day BP by 5-10 mmHg via sympathetic overdrive.",
         },
+        # R13-F09: Medical disclaimer on all health-assessment tool responses
+        "_disclaimer": "For personal health tracking only. Not medical advice. Consult a qualified healthcare provider before making health decisions based on this data.",
     }
 
 
