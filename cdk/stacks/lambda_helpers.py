@@ -75,6 +75,8 @@ def create_platform_lambda(
     s3_write: bool = True,
     needs_ses: bool = False,
     ses_domain: str = None,
+    # ── Observability ──
+    tracing: _lambda.Tracing = None,  # R13-XR: pass _lambda.Tracing.ACTIVE for X-Ray
 ) -> _lambda.Function:
     """Create a Lambda function with standard Life Platform conventions.
 
@@ -200,6 +202,7 @@ def create_platform_lambda(
         environment=env,
         dead_letter_queue=dlq if use_dlq_constructor else None,
         layers=([shared_layer] if shared_layer else []) + (additional_layers or []),
+        tracing=tracing,  # R13-XR: None = CDK default (PASS_THROUGH); ACTIVE = X-Ray
     )
 
     # Set DLQ via L1 escape hatch when using existing role — avoids auto-grant.
