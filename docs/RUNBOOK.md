@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-Last updated: 2026-03-14 (v3.7.22 — 88 MCP tools, 31-module package, 45 Lambdas, 20 data sources)
+Last updated: 2026-03-15 (v3.7.22 — 87 MCP tools, 22-module package, 42 Lambdas, 20 data sources)
 
 ---
 
@@ -418,6 +418,46 @@ aws ce get-cost-and-usage \
 
 ---
 
+## Lambda Environment Variable Audit
+
+Manually-set env vars (set via console or CLI outside of CDK) can override CDK's desired state and cause silent failures when secrets are renamed or deleted. Run this audit after any secret restructuring or CDK migration.
+
+```bash
+# List all Lambda functions and their environment variables
+aws lambda list-functions --region us-west-2 \
+  --query 'Functions[*].{Name:FunctionName,Env:Environment.Variables}' \
+  --output json | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for fn in sorted(data, key=lambda x: x['Name']):
+    env = fn.get('Env') or {}
+    if env:
+        print(fn['Name'])
+        for k, v in env.items():
+            # Redact secret values
+            print(f'  {k} = {v[:4]}...' if len(v) > 8 else f'  {k} = {v}')
+"
+```
+
+**What to look for:**
+- `SECRET_NAME` pointing at a deleted secret (e.g., `life-platform/api-keys`)
+- `TABLE_NAME` values different from `life-platform`
+- Any env var not set by CDK in `cdk/stacks/lambda_helpers.py` or `role_policies.py`
+
+**How to remove a rogue env var:**
+```bash
+aws lambda update-function-configuration \
+  --function-name <function-name> \
+  --environment '{"Variables":{}}' \
+  --region us-west-2
+# Or remove a specific variable while keeping others:
+# Get current vars, remove the bad one, then put the remainder back
+```
+
+**ADR-014 principle:** Env vars should only exist in CDK. If it's not in a stack file, it shouldn't exist on the Lambda.
+
+---
+
 ## Deployment Best Practices (from PIR-2026-02-28)
 
 1. **Always smoke test after deploy:** Invoke Lambda and check for errors:
@@ -452,20 +492,75 @@ aws lambda invoke --function-name withings-data-ingestion --payload '{}' /tmp/te
 
 ---
 
-## Adding a New Data Source Checklist
+## Adding a New Data Source — Complete Checklist
 
-1. Create dedicated IAM role with least-privilege permissions
-2. Store credentials in Secrets Manager under `life-platform/<source>`
-3. Write Lambda function with structured error handling
-4. Deploy to Lambda with the dedicated role and DLQ configured
-5. Add EventBridge rule (if scheduled) OR configure S3 trigger (if file-based)
-6. Create CloudWatch error alarm: `ingestion-error-<source>`
-7. Update SCHEMA.md with new DynamoDB keys
-8. Update CHANGELOG.md and PROJECT_PLAN.md
-9. Register new MCP tools if applicable and bump MCP version
-10. If new tool is heavy (>1s compute), consider adding to cache warmer (12 tools currently)
-11. Update RUNBOOK.md, USER_GUIDE.md, FEATURES.md, MCP_TOOL_CATALOG.md as applicable
-12. Commit and push: `git add -A && git commit -m "vX.XX.X: <summary>" && git push`
+> **Use this checklist for every new ingestion source.** Missing any of these steps creates
+> technical debt that the next architecture review will find. Complete all steps in the same
+> session as the feature work — don't defer.
+
+### Code & Infrastructure
+- [ ] **Lambda**: Write `lambdas/<source>_lambda.py`. Use `ingestion_framework.py` base if possible (new sources should always use the framework — see ADR-019). Add graceful handling for missing secrets (return 200, not 500, before OAuth is set up).
+- [ ] **CDK IAM**: Add `ingestion_<source>()` policy function in `cdk/stacks/role_policies.py` with least-privilege DDB/S3/secret permissions
+- [ ] **CDK Stack**: Wire Lambda in `cdk/stacks/ingestion_stack.py` with correct handler, schedule, and IAM
+- [ ] **Secret**: Create `life-platform/<source>` in Secrets Manager (use platform CMK: `alias/life-platform-dynamodb`). Add row to INFRASTRUCTURE.md Secrets table.
+- [ ] **Deploy CDK**: `source cdk/.venv/bin/activate && npx cdk deploy LifePlatformIngestion`
+- [ ] **Deploy Lambda code**: `bash deploy/deploy_and_verify.sh <function-name> lambdas/<source>_lambda.py`
+
+### Platform Wiring (the steps most often missed)
+- [ ] **SOURCES list**: Add source name to `SOURCES` list in `mcp/config.py`
+- [ ] **Freshness checker**: Add source to monitored list in `lambdas/freshness_checker_lambda.py`
+- [ ] **Ingestion validator**: Add source schema to `_SCHEMAS` dict in `lambdas/ingestion_validator.py`. Update docstring count.
+- [ ] **MCP tools**: Add `mcp/tools_<source>.py` with at least one tool. Register in `mcp/registry.py`. Run `python3 -m pytest tests/test_mcp_registry.py -v` before deploying MCP.
+- [ ] **Cache warmer** (if new tools are expensive >1s): Add warm step to `mcp/warmer.py`
+- [ ] **SLO-2**: Update monitored source count in `docs/SLOs.md`
+
+### CI & Tests
+- [ ] **CI Lambda map**: Update `ci/lambda_map.json` with new function name and handler
+- [ ] **Registry test**: Verify `python3 -m pytest tests/test_mcp_registry.py -v` still passes (all R1-R7 green)
+
+### Documentation (all in one pass — don't skip any)
+- [ ] **SCHEMA.md**: Add DynamoDB key patterns and fields
+- [ ] **ARCHITECTURE.md**: Add Lambda to ingest schedule table + update source count in overview
+- [ ] **INFRASTRUCTURE.md**: Add Lambda to Lambdas section (correct category)
+- [ ] **DECISIONS.md**: Add ADR if any non-obvious design decision was made
+- [ ] **CHANGELOG.md**: Add version entry
+- [ ] **sync_doc_metadata.py**: Run `python3 deploy/sync_doc_metadata.py --apply` to auto-update counters in all docs
+
+### Final verification
+- [ ] Manually invoke Lambda: `aws lambda invoke --function-name <name> --payload '{}' /tmp/test.json && cat /tmp/test.json`
+- [ ] Check DynamoDB: `aws dynamodb get-item --table-name life-platform --key '{"pk":{"S":"USER#matthew#SOURCE#<source>"},"sk":{"S":"DATE#<yesterday>"}}'`
+- [ ] Git commit + push: `git add -A && git commit -m "vX.X.X: add <source> ingestion" && git push`
+
+---
+
+## Adding a New MCP Tool — Complete Checklist
+
+> **Use this checklist every time you add a tool.** Done right, a new tool takes <30 minutes.
+> Done wrong, it creates import errors and registry drift caught in the next review.
+
+### Code
+- [ ] **Implement function**: Add `tool_<name>(params)` function to the appropriate `mcp/tools_<domain>.py` module. Function MUST be defined **before** the TOOLS dict (NameError otherwise — see ADR-020).
+- [ ] **Register in TOOLS dict**: Add entry to `mcp/registry.py` with `fn`, `schema.name`, `schema.description`, `schema.inputSchema`. Tool name in schema must match the TOOLS dict key exactly.
+- [ ] **Warm if expensive**: If the tool takes >1s (DDB range scan, multi-source), add a warm step to `mcp/warmer.py` calling the dispatcher, not the raw function.
+
+### Validation (before any deploy)
+- [ ] **Registry linter**: `python3 -m pytest tests/test_mcp_registry.py -v` — all R1-R7 must pass
+  - R1: import resolves to a real file
+  - R2: `fn` reference points to a real function
+  - R3: schema has name + description + inputSchema
+  - R4: no duplicate tool names
+  - R5: tool count within expected range (update `EXPECTED_MIN_TOOLS`/`EXPECTED_MAX_TOOLS` if intentional)
+- [ ] **Update R5 range**: If adding tools intentionally, update `EXPECTED_MIN_TOOLS`/`EXPECTED_MAX_TOOLS` in `tests/test_mcp_registry.py`
+
+### Deploy
+- [ ] `bash deploy/deploy_and_verify.sh life-platform-mcp lambdas/mcp_server.py`
+
+### Documentation
+- [ ] **MCP_TOOL_CATALOG.md**: Add new tool row
+- [ ] **ARCHITECTURE.md**: Update tool count in serve layer description (auto-updated by sync_doc_metadata.py)
+- [ ] **CHANGELOG.md**: Add version entry
+- [ ] `python3 deploy/sync_doc_metadata.py --apply`
+- [ ] `git add -A && git commit -m "vX.X.X: add <tool_name> MCP tool" && git push`
 
 ---
 
@@ -474,7 +569,7 @@ aws lambda invoke --function-name withings-data-ingestion --payload '{}' /tmp/te
 At the end of every working session — in this order:
 
 ```bash
-# Step 1: Sync all doc metadata (tool counts, secrets, alarms, version, date)
+# Step 1: Sync all doc metadata (auto-discovers tool + Lambda counts from source)
 python3 deploy/sync_doc_metadata.py          # dry run — review changes
 python3 deploy/sync_doc_metadata.py --apply  # apply if changes look right
 
@@ -482,7 +577,13 @@ python3 deploy/sync_doc_metadata.py --apply  # apply if changes look right
 git add -A && git commit -m "vX.XX.X: <what changed>" && git push
 ```
 
-**That's it for standard sessions.** The sync script handles all counter/header drift automatically.
+**If CDK was deployed this session** — also run integration tests:
+```bash
+python3 -m pytest tests/test_integration_aws.py -v --tb=short
+# I1-I10: handler names, Layer version, invocability, DDB, secrets, EB rules, alarms, S3, DLQ, MCP
+```
+
+**That's it for standard sessions.** The sync script auto-discovers tool and Lambda counts from source files — no manual PLATFORM_FACTS updates needed for those.
 
 For sessions where more than counters changed, use the trigger matrix below.
 

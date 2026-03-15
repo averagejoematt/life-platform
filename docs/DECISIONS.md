@@ -50,6 +50,8 @@ When a significant decision is made — a design pattern chosen, an approach rej
 | ADR-024 | DLQ consumer: schedule-triggered vs SQS event source mapping | ✅ Active | 2026-03-14 |
 | ADR-025 | composite_scores vs computed_metrics: consolidate into computed_metrics | ✅ Active | 2026-03-14 |
 | ADR-026 | Local MCP endpoint: AuthType NONE + in-Lambda API key check (accepted) | ✅ Active | 2026-03-14 |
+| ADR-027 | MCP two-tier structure: stable core → Layer, volatile tools → Lambda zip | ✅ Active | 2026-03-14 |
+| ADR-028 | Integration tests as quality gate: test-in-AWS after every deploy | ✅ Active | 2026-03-14 |
 
 ---
 
@@ -483,3 +485,51 @@ When a significant decision is made — a design pattern chosen, an approach rej
 - AWS IAM AuthType: breaks Claude Desktop bridge without significant rework.
 
 **Outcome:** Document and accept. Local endpoint: `AuthType NONE` + `x-api-key` in-Lambda. Remote endpoint: `AuthType NONE` + HMAC Bearer. Both require valid auth tokens before any processing. No migration planned.
+
+---
+
+## ADR-027 — MCP Two-Tier Structure: Stable Core → Layer, Volatile Tools → Zip
+
+**Status:** Active  
+**Date:** 2026-03-14 (R11 engineering strategy)
+
+**Context:** The MCP server is a monolith with 88 tools and 31 modules. Every tool change requires deploying all 31 modules together. The blast radius of a broken `tools_calendar.py` is the entire MCP server going down. R11 board (Priya Nakamura) identified that stable infrastructure and volatile tool modules are bundled together unnecessarily.
+
+**Decision:** Split MCP into two tiers:
+- **Stable core → Lambda Layer:** `config.py`, `core.py`, `helpers.py`, `labs_helpers.py`, `strength_helpers.py`, `utils.py` — infrastructure that changes monthly at most
+- **Volatile tools → Lambda zip:** `mcp_server.py`, `handler.py`, `registry.py`, `warmer.py`, `tools_*.py` — tool logic that changes every session
+
+**Reasoning:** Lambda resolves imports from both `/opt/python/` (Layer) and `/var/task/` (zip), so a mixed Layer+zip `mcp` package works transparently. Stable modules stay at their versioned Layer state unless explicitly updated. Tool additions/changes only touch the zip.
+
+**Why not move registry.py to Layer:** `registry.py` imports all tool functions at load time. If registry was in the Layer and tools in the zip, the Layer would need the zip to be present before it could import — defeating the separation. Registry stays in the zip with the tools it depends on.
+
+**Migration:** Script at `deploy/build_mcp_stable_layer.sh`. Requires one-time Layer rebuild and CDK update. After migration, `deploy_lambda.sh` workflow is unchanged — it packages only the specified source file.
+
+**Outcome:** Implement before next major MCP expansion. Script ready. See `deploy/build_mcp_stable_layer.sh`.
+
+---
+
+## ADR-028 — Integration Tests as Quality Gate: Test-in-AWS After Every Deploy
+
+**Status:** Active  
+**Date:** 2026-03-14 (R11 engineering strategy)
+
+**Context:** 90 offline unit tests pass reliably but cannot catch: wrong IAM permissions, Lambda Layer version mismatches, wrong handler module names, missing EventBridge rules, or secret deletions. These are the root causes of ~80% of historical incidents. Jin Park (R11): "The gap between changed and verified working is where incidents live."
+
+**Decision:** `tests/test_integration_aws.py` (10 tests, I1-I10) runs against live AWS. Required after every CDK deploy. Optional but recommended after any Lambda code deploy. Tests are read-only: no writes, no state changes. Skip gracefully when no credentials present.
+
+**Tests implemented:**
+- I1: Lambda handler names match expected (catches CDK reconcile regression)
+- I2: Lambda Layer version current (catches stale module copies)
+- I3: Spot-check Lambda invocability — no ImportModuleError
+- I4: DynamoDB has deletion protection + PITR enabled
+- I5: Required secrets exist; deleted secrets are gone
+- I6: Critical EventBridge rules exist and are ENABLED
+- I7: CloudWatch alarm count meets minimum threshold
+- I8: S3 bucket exists with critical config files
+- I9: SQS DLQ has zero messages
+- I10: MCP Lambda responds to invocation
+
+**Usage:** `python3 -m pytest tests/test_integration_aws.py -v --tb=short`
+
+**Outcome:** Run as part of session-close ritual after CDK deploys. Add to `post_cdk_reconcile_smoke.sh` as a step.

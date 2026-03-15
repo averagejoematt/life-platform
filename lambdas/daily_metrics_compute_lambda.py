@@ -445,7 +445,15 @@ def store_computed_metrics(
         item["source_fingerprints"] = source_fingerprints
 
     item = {k: v for k, v in item.items() if v is not None}
-    table.put_item(Item=item)
+    # DATA-2: Validate before write
+    try:
+        from ingestion_validator import validate_and_write as _vaw
+        _vaw(table, None, None, "computed_metrics", item, date_str, use_safe_put=False)
+    except ImportError:
+        table.put_item(Item=item)  # validator not in Lambda env — write directly
+    except Exception as ve:
+        logger.warning("Validation wrapper failed (falling back to direct write): %s", ve)
+        table.put_item(Item=item)
     logger.info(
         "Stored computed_metrics: %s — grade=%s (%s) readiness=%s (%s) "
         "T0_streak=%s TSB=%s",
@@ -471,7 +479,14 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights):
         for comp, score in component_scores.items():
             if score is not None:
                 item["component_" + comp] = Decimal(str(score))
-        table.put_item(Item=item)
+        # DATA-2: Validate before write
+        try:
+            from ingestion_validator import validate_and_write as _vaw
+            _vaw(table, None, None, "day_grade", item, date_str, use_safe_put=False)
+        except ImportError:
+            table.put_item(Item=item)
+        except Exception:
+            table.put_item(Item=item)
         logger.info(f"Stored day_grade: {date_str} → {total_score} ({grade})")
     except Exception as e:
         logger.warning(f"store_day_grade failed: {e}")
