@@ -20,7 +20,7 @@ from constructs import Construct
 from stacks.lambda_helpers import create_platform_lambda
 from stacks import role_policies as rp
 
-SHARED_LAYER_ARN = "arn:aws:lambda:us-west-2:205930651321:layer:life-platform-shared-utils:4"
+SHARED_LAYER_ARN = "arn:aws:lambda:us-west-2:205930651321:layer:life-platform-shared-utils:10"  # ADR-027: v10 adds stable mcp/ core modules
 ACCT = "205930651321"
 REGION = "us-west-2"
 INGESTION_DLQ_ARN  = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
