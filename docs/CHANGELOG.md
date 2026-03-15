@@ -1,5 +1,40 @@
 # Life Platform — Changelog
 
+## v3.7.36 — 2026-03-15: R13-F09 complete + R13-F06 + R13-F08-dur
+
+### Summary
+Three more R13 findings closed. Medical disclaimers now on all 6 health-assessment tools (complete). Cross-source correlation upgraded with n-gating, p-value, and 95% CI. Duration alarms deployed for Daily Brief and MCP Lambda.
+
+### Changes
+
+**R13-F09 — Medical disclaimers complete**
+- `mcp/tools_lifestyle.py`: `_disclaimer` added to `tool_get_blood_pressure_dashboard` and `tool_get_blood_pressure_correlation` return dicts
+- `mcp/tools_training.py`: `_disclaimer` added to `tool_get_hr_recovery_trend` return dict
+- All 6 health-assessment tools now covered (health/cgm dispatchers from v3.7.35 + these 3)
+
+**R13-F06 — Cross-source correlation n-gating + statistics**
+- `mcp/tools_training.py` `tool_get_cross_source_correlation`: hard minimum raised 10→14
+- N-gating: strong requires n≥50, moderate requires n≥30; smaller samples downgraded with explanation
+- P-value added: two-tailed t-test (math.erf approximation, no scipy dependency)
+- 95% CI added: Fisher z-transform method
+- New output fields: `p_value`, `significance`, `ci_95`, `n_gating_note`
+
+**R13-F08-dur — Duration alarms**
+- `deploy/create_duration_alarms.sh` (new): creates two CloudWatch p95 duration alarms
+  - `life-platform-daily-brief-duration-p95`: fires if p95 >240s for 3 consecutive 5-min windows
+  - `life-platform-mcp-duration-p95`: fires if p95 >25s for 3 consecutive 5-min windows (near 30s soft timeout)
+- Alarms notify `life-platform-alerts` SNS, treat missing data as not breaching
+
+### Test Results
+- `test_mcp_registry.py`: 7/7 ✅
+- `test_secret_references.py`: 4/4 ✅
+
+### Deployed
+- `life-platform-mcp` ✅
+- Duration alarms created via `deploy/create_duration_alarms.sh` ✅
+
+---
+
 ## v3.7.35 — 2026-03-15: TB7-4 + R13-F05/F09/F12/F04 security hardening
 
 ### Summary
