@@ -53,6 +53,22 @@ if [ ! -f "$SOURCE_FILE" ]; then
     exit 1
 fi
 
+# ── MCP guard: life-platform-mcp requires the full mcp/ package in the zip ──
+# deploy_lambda.sh only packages the single handler file. For MCP, this strips
+# the mcp/ directory and breaks the Lambda. Use the correct build pattern:
+#   zip -j $ZIP mcp_server.py mcp_bridge.py && zip -r $ZIP mcp/ -x "mcp/__pycache__/*"
+# See deploy/archive/20260314/deploy_mcp_consolidation.sh for reference.
+if [ "$FUNCTION_NAME" = "life-platform-mcp" ]; then
+    echo "❌ FATAL: Use the full MCP build — deploy_lambda.sh cannot package life-platform-mcp."
+    echo "   Run this instead:"
+    echo "     ZIP=/tmp/mcp_deploy.zip"
+    echo "     rm -f \$ZIP"
+    echo "     zip -j \$ZIP mcp_server.py mcp_bridge.py"
+    echo "     zip -r \$ZIP mcp/ -x 'mcp/__pycache__/*' 'mcp/*.pyc'"
+    echo "     aws lambda update-function-code --function-name life-platform-mcp --zip-file fileb://\$ZIP --region us-west-2"
+    exit 1
+fi
+
 # Validate extra files exist before doing any work
 for extra in "${EXTRA_FILES[@]+"${EXTRA_FILES[@]}"}"; do
     if [ ! -f "$extra" ]; then
