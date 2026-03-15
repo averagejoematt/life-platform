@@ -1,5 +1,33 @@
 # Life Platform — Changelog
 
+## v3.7.47 — 2026-03-15: CDK cleanup + MCP deploy guard + MCP connection fix
+
+### Summary
+Removed `google-calendar-ingestion` Lambda and EventBridge rule from CDK (completing ADR-030 cleanup). Fixed a production MCP outage caused by `deploy_lambda.sh` stripping the `mcp/` package from the Lambda zip. Added a hard guard to `deploy_lambda.sh` to prevent recurrence. Created life-platform constellation icon (assets/life-platform-icon.svg) and uploaded to S3.
+
+### Changes
+- `cdk/stacks/ingestion_stack.py`: block 16 replaced with retirement comment — CDK will delete `google-calendar-ingestion` Lambda + EventBridge rule on next deploy
+- `cdk/stacks/role_policies.py`: `ingestion_google_calendar()` function removed
+- `deploy/deploy_lambda.sh`: MCP guard added — exits with clear error if `life-platform-mcp` is passed, with correct build commands printed
+- `assets/life-platform-icon.svg`: constellation logo (Option B) — 256×256, uploaded to `s3://matthew-life-platform/dashboard/assets/`
+
+### Incident: MCP outage (resolved)
+`bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` strips the `mcp/` package from the zip, leaving only the handler stub. The Lambda boots but routes all requests through the bridge handler (which returns 401) rather than the remote MCP handler. Fixed by deploying with the correct full build:
+```bash
+zip -j $ZIP mcp_server.py mcp_bridge.py && zip -r $ZIP mcp/ -x 'mcp/__pycache__/*'
+aws lambda update-function-code --function-name life-platform-mcp --zip-file fileb://$ZIP
+```
+Root cause documented in deploy_lambda.sh guard. MCP connector reconnected successfully.
+
+### Test Results
+- 83/83 tests passing ✅
+
+### Deployed
+- MCP Lambda redeployed with full mcp/ package ✅
+- CDK deploy pending (removes google-calendar-ingestion from AWS)
+
+---
+
 ## v3.7.46 — 2026-03-15: ADR-030 — Google Calendar integration retired
 
 ### Summary

@@ -54,6 +54,7 @@ When a significant decision is made — a design pattern chosen, an approach rej
 | ADR-028 | Integration tests as quality gate: test-in-AWS after every deploy | ✅ Active | 2026-03-14 |
 | ADR-029 | MCP monolith: retain single Lambda, revisit at 100+ calls/day | ✅ Active | 2026-03-15 |
 | ADR-030 | Google Calendar integration: retired — no viable zero-touch data path | ✅ Active | 2026-03-15 |
+| ADR-031 | MCP Lambda deploy: always use full zip build (guard in deploy_lambda.sh) | ✅ Active | 2026-03-15 |
 
 ---
 
@@ -610,3 +611,27 @@ Monitor via X-Ray (added R13-XR, v3.7.40). X-Ray traces will surface which tools
 - Apple Calendar grants Terminal Full Disk Access in a managed way
 
 **Outcome:** Integration retired. Tool count: 89 → 87. Data sources: 20 → 19 active.
+
+---
+
+## ADR-031 — MCP Lambda Deploy: Always Use Full Zip Build
+
+**Status:** Active — operational constraint  
+**Date:** 2026-03-15 (v3.7.47)
+
+**Context:** On 2026-03-15, `bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` was used to deploy the MCP Lambda after removing the calendar tools. The script only packaged `mcp_server.py`, stripping the `mcp/` package from the zip. The Lambda booted without error but routed all requests through the bridge handler (which checks `x-api-key`, not Bearer) instead of the remote MCP handler, causing all OAuth endpoints to return `{"error": "Unauthorized"}`. The connector showed "error connecting" in claude.ai. Took ~30 minutes to diagnose.
+
+**Root cause:** `deploy_lambda.sh` is designed for single-file Lambdas. The MCP Lambda is a multi-module package (`mcp_server.py` + `mcp_bridge.py` + the full `mcp/` directory). `update-function-code` replaces the entire zip, so previous content of `mcp/` was deleted.
+
+**Decision:** `deploy_lambda.sh` now hard-rejects `life-platform-mcp` at line ~55 with a clear error and prints the correct build commands. MCP deploys must always use:
+
+```bash
+cd /path/to/life-platform
+ZIP=/tmp/mcp_deploy.zip
+rm -f $ZIP
+zip -j $ZIP mcp_server.py mcp_bridge.py
+zip -r $ZIP mcp/ -x 'mcp/__pycache__/*' 'mcp/*.pyc'
+aws lambda update-function-code --function-name life-platform-mcp --zip-file fileb://$ZIP --region us-west-2
+```
+
+**Outcome:** Guard in place. Incident cannot recur via `deploy_lambda.sh`. MCP build pattern documented in RUNBOOK.md.

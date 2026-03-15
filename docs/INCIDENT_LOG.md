@@ -1,6 +1,6 @@
 # Life Platform — Incident Log
 
-Last updated: 2026-03-15 (v3.7.43)
+Last updated: 2026-03-15 (v3.7.47)
 
 > Tracks operational incidents, outages, and bugs that affected data flow or system behavior.
 > For full details on any incident, check the corresponding CHANGELOG entry or handover file.
@@ -64,6 +64,14 @@ Last updated: 2026-03-15 (v3.7.43)
 6. **Data quality / scoring logic** (zero-score defaults, dedup, sign errors) — 4 incidents
 
 **CDK drift watch-out (new pattern as of v3.7.10):** IAM policy changes in `role_policies.py` only take effect when the relevant stack is deployed. After any refactor touching role policies (secrets consolidation, prefix changes, etc.), always redeploy the affected stack immediately and verify with a smoke invoke. Do not assume CDK state matches AWS state without a deploy.
+
+**MCP Lambda deploy watch-out (ADR-031, v3.7.47):** `deploy_lambda.sh life-platform-mcp` strips the `mcp/` package — the Lambda boots clean but routes everything through the bridge handler (401 on all requests). Always use the full zip build for MCP:
+```bash
+ZIP=/tmp/mcp_deploy.zip && rm -f $ZIP
+zip -j $ZIP mcp_server.py mcp_bridge.py && zip -r $ZIP mcp/ -x 'mcp/__pycache__/*' 'mcp/*.pyc'
+aws lambda update-function-code --function-name life-platform-mcp --zip-file fileb://$ZIP --region us-west-2
+```
+`deploy_lambda.sh` now hard-rejects `life-platform-mcp` with a clear error. Symptom: `{"error": "Unauthorized"}` from OAuth endpoints; Lambda logs show clean START/END with no errors (misleading).
 
 **CDK packaging watch-out:** `Code.from_asset("..")` bundles source files one directory deep in the zip — Lambda can't find the handler. Always use `Code.from_asset("../lambdas")` (points at the lambdas directory directly). When CDK-managing Lambdas for the first time, verify a sample function works before assuming all 23 are healthy. `deploy_lambda.sh` is immune to this bug.
 
