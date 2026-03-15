@@ -368,6 +368,8 @@ Each Lambda has a **dedicated, least-privilege IAM role** (43 roles total as of 
 - No role has `dynamodb:Scan` or cross-account permissions
 - All roles CDK-owned via `role_policies.py` — no manually-created or shared roles remain
 
+**MCP write rate limit (R13-F12 / R14-F03):** The MCP server enforces a per-invocation write cap on state-mutating tools (supplement logging, decision journal, hypothesis updates, travel log). This limit is **per Lambda invocation** — it resets with every new request. It is not a sliding time-window rate limit. Current protection stack: Function URL AuthType NONE + HMAC Bearer token validation (fail-closed) + Lambda reserved concurrency cap + per-invocation write counter. A caller who authenticates correctly can submit one request at a time; the invocation cap prevents a single runaway request from flooding DynamoDB with writes, but does not prevent a high-frequency caller from making many sequential requests. Acceptable for a personal-use, single-operator platform. Revisit if multi-user access is ever added.
+
 ---
 
 ## Secrets Manager

@@ -2,7 +2,7 @@
 
 > Documents the Intelligence Compounding (IC) features: how the platform learns, remembers, and improves over time.
 > For the IC roadmap and future phases, see PROJECT_PLAN.md (Tier 7).
-> Last updated: 2026-03-09 (v3.3.9)
+> Last updated: 2026-03-15 (v3.7.41)
 
 ---
 
@@ -10,7 +10,7 @@
 
 The Intelligence Layer transforms the platform from a stateless data observer into a compounding intelligence engine. Rather than running the same analysis fresh each day and generating the same generic insight repeatedly, the IC system:
 
-1. **Persists** insights and patterns to DynamoDB (`platform_memory`, `insights`, `decisions`, `hypotheses`)
+1. **Persists** insights and patterns to DynamoDB (`platform_memory`, `insights`, `decisions`, `hypotheses`, `weekly_correlations`)
 2. **Compounds** — each new analysis reads previous findings as context
 3. **Learns** Matthew's specific biology, psychology, and failure patterns over time
 4. **Self-improves** — coaching calibration evolves as evidence accumulates
@@ -33,15 +33,24 @@ The architecture decision (ADR-016) is explicit: no vector store, no embeddings,
 │           ├─ platform_memory pull (relevant records)         │
 │           └─ structured JSON handoff to Daily Brief          │
 │                                                              │
-│  SUNDAY   hypothesis-engine (11 AM PT)                       │
-│           └─ cross-domain hypotheses → hypotheses DDB        │
+│  SUNDAY 11:30 AM  weekly-correlation-compute                 │
+│           ├─ 23 Pearson pairs (20 cross-sectional + 3 lagged)│
+│           ├─ Benjamini-Hochberg FDR correction (v3.7.37)     │
+│           └─ writes SOURCE#weekly_correlations | WEEK#<iso>  │
+│                                                              │
+│  SUNDAY 12:00 PM  hypothesis-engine v1.2.0                   │
+│           ├─ reads weekly_correlations as context            │
+│           ├─ cross-domain hypotheses → SOURCE#hypotheses DDB │
+│           ├─ validation: fields + domains + numeric criteria  │
+│           ├─ dedup against active hypotheses                 │
+│           └─ 30-day hard expiry; 3 confirms → permanent      │
 └─────────────────────────────────┬────────────────────────────┘
                                   │ reads pre-computed data
 ┌─────────────────────────────────▼────────────────────────────┐
 │  AI CALL LAYER (all email/digest Lambdas)                    │
 │                                                              │
 │  IC-3: Chain-of-thought two-pass (BoD + TL;DR)               │
-│    Pass 1: identify patterns + causal chains (JSON)          │
+│    Pass 1: identify patterns + connections (JSON)            │
 │    Pass 2: write coaching output using Pass 1 analysis       │
 │                                                              │
 │  IC-7: Cross-pillar trade-off reasoning instruction          │
@@ -50,6 +59,9 @@ The architecture decision (ADR-016) is explicit: no vector store, no embeddings,
 │  IC-25: Diminishing returns detection (per-pillar)           │
 │  IC-17: Red Team / Contrarian Skeptic pass (anti-confirmation│
 │          bias, challenges correlation claims)                │
+│                                                              │
+│  W3: ai_output_validator wired to all 12 AI-output Lambdas  │
+│      (validates shape, required fields, disclaimer presence) │
 └─────────────────────────────────┬────────────────────────────┘
                                   │ writes after generation
 ┌─────────────────────────────────▼────────────────────────────┐
@@ -60,24 +72,25 @@ The architecture decision (ADR-016) is explicit: no vector store, no embeddings,
 │  → SOURCE#platform_memory — failure patterns, milestones,    │
 │    intention tracking, what worked, coaching calibration      │
 │  → SOURCE#decisions — platform decisions + outcomes          │
-│  → SOURCE#hypotheses — weekly generated cross-domain hypotheses│
+│  → SOURCE#hypotheses — weekly cross-domain hypotheses        │
+│  → SOURCE#weekly_correlations — 23-pair FDR-corrected matrix │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Live IC Features (as of v3.3.9)
+## Live IC Features (as of v3.7.41)
 
 ### IC-1: platform_memory Partition
-**Status:** Live (v2.86.0)  
+**Status:** Live (v2.86.0)
 **What it does:** DDB partition `SOURCE#platform_memory`, SK `MEMORY#<category>#<date>`. The compounding substrate — structured memory written by compute Lambdas and digest Lambdas, read back into AI prompts as context. Enables "the last 4 weeks show X pattern" without re-querying raw data.
 
-**Memory categories live:** `milestone_architecture`, `intention_tracking`  
+**Memory categories live:** `milestone_architecture`, `intention_tracking`
 **Memory categories coming:** `failure_patterns` (Month 2), `what_worked` (Month 3), `coaching_calibration` (Month 3), `personal_curves` (Month 4)
 
 ### IC-2: Daily Insight Compute Lambda
-**Status:** Live (v2.86.0)  
-**Lambda:** `daily-insight-compute` (9:42 AM PT)  
+**Status:** Live (v2.86.0)
+**Lambda:** `daily-insight-compute` (9:42 AM PT)
 **What it does:** Pre-computes structured insight JSON before Daily Brief runs. Pulls 7 days of metrics, computes habit×outcome correlations, flags leading indicators, pulls relevant platform_memory records. Daily Brief receives curated intelligence rather than raw data.
 
 **Key output fields in insight JSON:**
@@ -87,62 +100,88 @@ The architecture decision (ADR-016) is explicit: no vector store, no embeddings,
 - `data_quality` — per-source confidence scores (IC-24)
 - `surprise_scores` — per-metric deviation from rolling baseline (IC-23)
 
+**Validator:** `ingestion_validator.py` `computed_insights` schema wired since v3.7.25.
+
 ### IC-3: Chain-of-Thought Two-Pass
-**Status:** Live (v2.86.0)  
-**What it does:** Board of Directors + TL;DR AI calls use two-pass reasoning. Pass 1 generates structured JSON identifying patterns and causal chains. Pass 2 writes coaching output using Pass 1 analysis. ~2× token cost but material quality improvement — model reasons before writing.
+**Status:** Live (v2.86.0)
+**What it does:** Board of Directors + TL;DR AI calls use two-pass reasoning. Pass 1 generates structured JSON identifying patterns and connections. Pass 2 writes coaching output using Pass 1 analysis. ~2× token cost but material quality improvement — model reasons before writing.
 
 **Model routing (TB7-23, confirmed 2026-03-13):** Both Pass 1 (analysis) and Pass 2 (output) use `AI_MODEL` = `claude-sonnet-4-6` via `call_anthropic()` in `ai_calls.py`. There is **no quality asymmetry** between the two passes — both run on Sonnet. The Haiku reference at line 515 of `daily_insight_compute_lambda.py` is the IC-8 intent evaluator, which correctly uses Haiku (classification task, not coaching). IC-3 itself has no Haiku dependency.
 
 ### IC-6: Milestone Architecture
-**Status:** Live (v2.86.0)  
+**Status:** Live (v2.86.0)
 **What it does:** 6 weight/health milestones with biological significance for Matthew stored in `platform_memory`. Surfaced in coaching when approaching each threshold. Example: "At 285 lbs: sleep apnea risk drops substantially (genome flag)." Converts abstract goal into biological waypoints.
 
 **Current milestones:** 285 lbs (sleep apnea risk), 270 lbs (walking pace natural improvement), 250 lbs (Zone 2 accessible at real-workout pace), 225 lbs (FFMI crosses athletic range), 200 lbs (visceral fat normalization target), 185 lbs (goal weight).
 
 ### IC-7: Cross-Pillar Trade-off Reasoning
-**Status:** Live (v2.89.0)  
+**Status:** Live (v2.89.0)
 **What it does:** Explicit instruction added to Board of Directors prompts to reason about trade-offs between pillars rather than analyzing each in isolation. Enables: "Movement is strong but Sleep is degrading — adding training volume at current TSB will compound sleep debt. Optimize sleep first."
 
 ### IC-8: Intent vs. Execution Gap
-**Status:** Live (v2.90.0)  
+**Status:** Live (v2.90.0)
 **What it does:** Journal analysis pass comparing stated intentions ("going to meal prep Sunday") against next-day metrics. Builds personal intention-completion rate. Writes to `MEMORY#intention_tracking`. Coaching AI told when stated intentions have historically not been followed through.
 
 ### IC-15: Insight Ledger
-**Status:** Live (v2.87.0)  
+**Status:** Live (v2.87.0)
 **What it does:** Universal write-on-generate — every email/digest Lambda appends a structured insight record to `SOURCE#insights` via `insight_writer.py` (shared Layer module). Accumulates the raw material for downstream IC features. Schema: pillar, data_sources, confidence, actionable flag, semantic tags, digest_type, generated_text hash (dedup).
 
 ### IC-16: Progressive Context — All Digests
-**Status:** Live (v2.88.0)  
+**Status:** Live (v2.88.0)
 **What it does:** Weekly Digest, Monthly Digest, Chronicle, Nutrition Review, and Weekly Plate all retrieve recent high-value insights before generating. Weekly Digest gets 30-day window; Monthly gets quarterly; Chronicle gets narrative-relevant threads. Each digest reads as if written by someone who has followed Matthew for months. ~500-1,500 extra tokens per call.
 
 ### IC-17: Red Team / Contrarian Pass
-**Status:** Live (v2.87.0)  
+**Status:** Live (v2.87.0)
 **What it does:** "The Skeptic" persona injected into Board of Directors calls. Explicitly tasked to challenge consensus — question whether correlations are causal, flag misleading data, identify when insights are obvious vs. genuinely novel. Counteracts single-model confirmation bias. Prompt-only change, zero cost.
 
-### IC-18: Hypothesis Engine Lambda
-**Status:** Live (v2.89.0)  
-**Lambda:** `hypothesis-engine` (Sunday 11 AM PT)  
-**What it does:** Weekly Lambda pulls 14 days of all-pillar data. Prompts Claude to identify non-obvious cross-domain correlations the existing 144 tools don't explicitly monitor. Writes hypothesis records to `SOURCE#hypotheses`. Subsequent insight compute + digest prompts told to watch for confirming/refuting evidence.
+### IC-18: Hypothesis Engine v1.2.0
+**Status:** Live (v2.89.0 → v1.2.0 validation upgrade v3.7.x)
+**Lambda:** `hypothesis-engine` (Sunday 12:00 PM PT — runs 30 min after weekly-correlation-compute to consume fresh correlation data)
+**What it does:** Weekly Lambda pulls 14 days of all-pillar data plus the current week's correlation matrix. Prompts Claude to identify non-obvious cross-domain connections the existing 89 tools don't explicitly monitor. Writes hypothesis records to `SOURCE#hypotheses`. Subsequent insight compute + digest prompts told to watch for confirming/refuting evidence.
 
-**Validation rules (v1.1.0):** Fields + domains + numeric criteria required. Dedup check against active hypotheses. 30-day hard expiry. Min 7 days sample. 3 confirming checks required for promotion to permanent check.
+**Validation rules (v1.2.0):**
+- Required fields + domains + numeric criteria must be present
+- Dedup check against all active hypotheses before write
+- 30-day hard expiry on all hypotheses
+- Minimum 7 days sample data required
+- 3 confirming checks required before promotion to permanent check
+- Weekly correlations read as context to avoid re-hypothesising already-confirmed pairs
 
-Access: `get_active_hypotheses`, `evaluate_hypothesis` MCP tools.
+Access: `get_active_hypotheses`, `evaluate_hypothesis`, `get_hypotheses`, `update_hypothesis_outcome` MCP tools.
 
 ### IC-19: Decision Journal
-**Status:** Live (v2.88.0)  
-**What it does:** Tracks platform-guided decisions and their outcomes. `log_decision` MCP tool or inferred from journal + metrics. Builds trust-calibration dataset. Access via `log_decision`, `get_decision_journal`, `get_decision_effectiveness` MCP tools.
+**Status:** Live (v2.88.0)
+**What it does:** Tracks platform-guided decisions and their outcomes. `log_decision` MCP tool or inferred from journal + metrics. Builds trust-calibration dataset. Access via `log_decision`, `get_decisions`, `update_decision_outcome` MCP tools.
 
 ### IC-23: Attention-Weighted Prompt Budgeting
-**Status:** Live (v2.88.0)  
+**Status:** Live (v2.88.0)
 **What it does:** Pre-processing step computes "surprise score" for every metric — deviation from personal rolling baseline. High-surprise metrics get expanded context in AI prompts; low-surprise ones compress to one line or are omitted. `_compute_surprise_scores(data, baselines)` returns metric → surprise_score (0-1). Information theory applied to prompt engineering.
 
 ### IC-24: Data Quality Scoring
-**Status:** Live (v2.88.0)  
+**Status:** Live (v2.88.0)
 **What it does:** `_compute_data_quality(data)` runs before AI calls. Per-source confidence score based on completeness, recency, and consistency. Outputs compact quality block injected into prompts: "⚠️ Nutrition: 800 cal — likely incomplete (7d avg 1,750)". AI treats flagged sources with skepticism.
 
 ### IC-25: Diminishing Returns Detector
-**Status:** Live (v2.88.0)  
+**Status:** Live (v2.88.0)
 **What it does:** Weekly computation of each pillar's score trajectory vs. effort (habit completion rate, active habit count). When high effort + flat trajectory detected, coaching redirects to highest-leverage pillar. "Sleep optimization is mature at 82 — your biggest lever is movement consistency at 45%."
+
+### Weekly Correlation Compute (R8-LT9)
+**Status:** Live (v3.7.20)
+**Lambda:** `weekly-correlation-compute` (Sunday 11:30 AM PT — runs before hypothesis engine)
+**What it does:** Computes 23 Pearson correlation pairs weekly over a 90-day rolling window and writes results to `SOURCE#weekly_correlations | WEEK#<iso_week>`. Results feed directly into hypothesis engine context and are surfaced in `get_schedule_load` coaching notes.
+
+**Correlation pairs (v3.7.25):**
+- 20 cross-sectional pairs (sleep vs recovery, HRV vs performance, etc.)
+- 3 lagged pairs: `hrv_predicts_next_day_load`, `recovery_predicts_next_day_load`, `load_predicts_next_day_recovery`
+- Each pair includes: `correlation_type` (`cross_sectional` vs `lagged_Nd`), `lag_days`, Pearson r
+
+**Statistical rigour (v3.7.37):** Benjamini-Hochberg FDR correction applied. With 23 simultaneous tests at α=0.05, naive thresholding produces ~1.15 expected false positives per run; BH controls the false discovery rate instead. Each pair now carries `p_value`, `p_value_fdr`, `fdr_significant` fields.
+
+**N-gating (v3.7.22):** `interpret_r()` is n-gated — `moderate` requires n≥30, `strong` requires n≥50. Prevents spurious strong-labelled correlations during the first 3 months of data accumulation.
+
+### W3: AI Output Validator
+**Status:** Live (v3.7.x)
+**What it does:** `ai_output_validator` wired into all 12 AI-output Lambdas. Validates response shape, required field presence, and health disclaimer footer before any AI-generated content is written to DDB or sent via email. Catches silent prompt failures (empty responses, malformed JSON, missing disclaimer) that would otherwise propagate undetected into the insight ledger.
 
 ---
 
@@ -190,6 +229,8 @@ All prompts use correlative framing:
 ### 4. Health Disclaimer (AI-1)
 All AI-generated emails include footer: *"This platform provides personal health data aggregation and AI-generated insights for informational purposes only. Always consult a qualified healthcare provider for medical advice."*
 
+Footer presence validated by W3 `ai_output_validator` before send.
+
 ---
 
 ## Shared Module: insight_writer.py
@@ -235,8 +276,6 @@ IC features are gated by how much data exists. Don't build IC features before th
 
 ---
 
----
-
 ## Known Statistical Limitations
 
 > Authored in consultation with **Dr. Henning Brandt** (Statistician / Quantitative Methods Lead). Standing question: *"Are the conclusions actually valid?"*
@@ -247,7 +286,7 @@ IC features are gated by how much data exists. Don't build IC features before th
 
 ### 1. Exponential Moving Average (EMA) — Banister TSB Model
 
-**Where used:** `daily_metrics_compute_lambda.py` → `compute_tsb()`  
+**Where used:** `daily_metrics_compute_lambda.py` → `compute_tsb()`
 **Parameters:** ATL (Acute Training Load): τ = 7 days, λ = exp(−1/7) ≈ 0.867. CTL (Chronic Training Load): τ = 42 days, λ = exp(−1/42) ≈ 0.976.
 
 **How to read λ and τ:** For any EMA with decay factor λ, the time constant τ = −1/ln(λ) is the *mean age of the data* — the average number of days back that a given observation contributes. A λ of 0.85, for instance, yields τ ≈ 6.2 days (−1/ln(0.85)). The ATL used here (λ ≈ 0.867, τ = 7 days) is slightly longer-memory. Concretely:
@@ -271,7 +310,7 @@ IC features are gated by how much data exists. Don't build IC features before th
 
 ### 2. Z-Score Anomaly Detection — Adaptive Threshold
 
-**Where used:** `anomaly_detector_lambda.py` → `check_anomalies()`  
+**Where used:** `anomaly_detector_lambda.py` → `check_anomalies()`
 **Method:** For each of 13 metrics, compute a 30-day rolling mean (μ) and standard deviation (σ). Flag if z = (x − μ)/σ exceeds the CV-adaptive threshold in the anomalous direction.
 
 **Adaptive thresholds:**
@@ -300,7 +339,7 @@ IC features are gated by how much data exists. Don't build IC features before th
 
 ### 3. Non-Overlapping Window Drift Detection
 
-**Where used:** `daily_insight_compute_lambda.py` → `_compute_slow_drift()`  
+**Where used:** `daily_insight_compute_lambda.py` → `_compute_slow_drift()`
 **Method:** Compare recent-window mean (days 1–14 before yesterday) against baseline-window mean (days 15–28 before yesterday). Express drift as (recent_mean − baseline_mean) / baseline_SD. Windows are explicitly non-overlapping by design (Henning gate).
 
 > **TB7-22 (2026-03-13):** Windows equalized from 7d recent/8-28d baseline to 14d recent/15-28d baseline (`daily_insight_compute_lambda.py` v1.4.0). Rationale: asymmetric windows produced a volatile recent mean (N=7) vs stable baseline mean (N=21), inflating apparent drift severity. Equal 14d windows have the same standard error of the mean, making comparisons statistically equivalent.
@@ -319,7 +358,7 @@ IC features are gated by how much data exists. Don't build IC features before th
 
 ### 4. Three-Day Consecutive Trend Signal
 
-**Where used:** `daily_insight_compute_lambda.py` → `detect_metric_trends()`  
+**Where used:** `daily_insight_compute_lambda.py` → `detect_metric_trends()`
 **Method:** Detect if a metric has moved monotonically in one direction for 3 consecutive days.
 
 **Statistical validity:** This is an ordinal test, not a parametric one. It makes no distributional assumption, which is a strength. The weakness is sensitivity:
@@ -333,7 +372,7 @@ IC features are gated by how much data exists. Don't build IC features before th
 
 ### 5. IC-23 Surprise Scoring
 
-**Where used:** `ai_calls.py` → `_compute_surprise_scores()`  
+**Where used:** `ai_calls.py` → `_compute_surprise_scores()`
 **Method:** Compute percentage deviation of todayʼs metric from its 7-day mean. Map linearly to a 0–1 surprise score using metric-specific scaling factors (e.g. HRV: 40% deviation → surprise 1.0; glucose: 20% deviation → surprise 1.0).
 
 **This is not a statistical test.** It is a heuristic attention-allocation mechanism. The scaling factors were chosen by judgment and are not tied to any distributional model. Specifically:
@@ -343,7 +382,35 @@ IC features are gated by how much data exists. Don't build IC features before th
 
 ---
 
-### 6. Validity Precondition Summary
+### 6. Weekly Correlation Compute — Pearson + BH FDR
+
+**Where used:** `weekly_correlation_compute_lambda.py` → `compute_correlations()`
+**Method:** Pearson r over 90-day rolling window, 23 pairs (20 cross-sectional + 3 lagged). Two-tailed p-value from t-distribution (df = n−2). Benjamini-Hochberg FDR correction applied across all 23 pairs simultaneously (v3.7.37).
+
+**Pearson r validity conditions:**
+- Assumes a linear relationship. Non-linear associations (e.g. U-shaped HRV vs training load curve) will produce r ≈ 0 even when a real relationship exists.
+- Both variables must have variance. If one metric is near-constant for weeks (e.g. during illness), r is undefined and the pair is excluded.
+- Assumes no extreme outliers dominate the correlation. A single anomalous data point can shift Pearson r by ±0.2 at n=30.
+
+**N-gating (prevents spurious strong labels at low n):**
+- `strong` (|r| ≥ 0.7) requires n ≥ 50
+- `moderate` (|r| ≥ 0.4) requires n ≥ 30
+- `weak` (|r| ≥ 0.2) requires n ≥ 14
+- Below the threshold, the label is downgraded one tier (e.g. r=0.7 at n=35 → `moderate`, not `strong`)
+
+**FDR correction (BH):** With 23 simultaneous tests, testing at α=0.05 without correction yields ~1.15 expected false discoveries. BH ranks p-values and adjusts the threshold: a pair is `fdr_significant` if its sorted p-value rank k satisfies p(k) ≤ (k/23) × 0.05. This controls the expected proportion of false discoveries among significant results, not the per-test false positive rate. At typical n=60-90 early in the platform's life, expect 3-7 FDR-significant pairs per week.
+
+**Lagged pairs:** Three lagged correlations track temporal precedence:
+- `hrv_predicts_next_day_load`: does today's HRV predict tomorrow's training load?
+- `recovery_predicts_next_day_load`: does today's Whoop recovery predict tomorrow's effort?
+- `load_predicts_next_day_recovery`: does today's training load predict tomorrow's recovery?
+- Lag computed by shifting one series by 1 day and matching overlapping dates. Serial autocorrelation is not explicitly corrected — lagged correlations in autocorrelated series have inflated effective n. Treat as directional signals, not precise probability statements.
+
+**On-demand correlation tool note (R14-F08):** `tool_get_cross_source_correlation` is a single-pair test with no multiple-comparison correction. When p < 0.05, the tool adds a `_note` field warning that the weekly report applies BH FDR correction across 23 pairs and is more conservative. Do not treat on-demand p-values as equivalent to the weekly report's `fdr_significant` flag.
+
+---
+
+### 7. Validity Precondition Summary
 
 | Method | File | Minimum data for valid output | Key assumption | Known failure mode |
 |--------|------|------------------------------|----------------|--------------------|
@@ -353,10 +420,12 @@ IC features are gated by how much data exists. Don't build IC features before th
 | Non-overlapping drift | `daily_insight_compute_lambda.py` | 14 days baseline (hardcoded gate) | Stationarity of baseline window | Breaks during intentional protocol changes |
 | 3-day trend | `daily_insight_compute_lambda.py` | 3 days (pure ordinal) | None (distribution-free) | High FP rate under serial correlation |
 | Surprise scoring | `ai_calls.py` | 7 days | None (heuristic) | 7-day mean distorted by recent outliers |
+| Weekly Pearson (cross-sectional) | `weekly_correlation_compute_lambda.py` | 30 days (n-gated; weak at 14) | Linear relationship; no extreme outliers | Non-linear relationships invisible; low n inflates r |
+| Weekly Pearson (lagged) | `weekly_correlation_compute_lambda.py` | 30 days + 1 day lag | Same as cross-sectional | Autocorrelation inflates effective n on lagged pairs |
 
 ---
 
-### 7. What a New Engineer Must Not Do
+### 8. What a New Engineer Must Not Do
 
 1. **Do not lower Z-score thresholds without recomputing the expected FP rate.** Z=1.0 at 13 metrics produces ~2.6 expected false alerts per day. The 2-source gate will not save you — it shifts the problem to correlated metrics (e.g. HRV and recovery score move together).
 
@@ -368,9 +437,13 @@ IC features are gated by how much data exists. Don't build IC features before th
 
 5. **Surprise scores are prompt engineering, not statistics.** They should not be persisted to DynamoDB as evidence of anomalous events or used to gate any downstream logic.
 
+6. **Do not treat on-demand correlation p-values as equivalent to the weekly report.** The weekly report corrects for 23 simultaneous tests via BH FDR. An on-demand single-pair p=0.04 has not been corrected; the same pair in the weekly report may not be `fdr_significant`.
+
+7. **Do not remove the W3 ai_output_validator gate.** It is the last line of defence against silent prompt failures (empty responses, missing disclaimers) propagating into the insight ledger and downstream coaching.
+
 ---
 
-## What NOT to Build (ADR-016, ADR-017)
+## What NOT to Build (ADR-016, ADR-017, ADR-025)
 
 These decisions are documented to prevent revisiting:
 
@@ -380,6 +453,8 @@ These decisions are documented to prevent revisiting:
 
 **Fine-tuning:** Addresses style/format consistency, not reasoning quality. The coaching quality gap is a reasoning + context problem. Fine-tuning on 2-week data would overfit to initial state.
 
+**composite_scores DDB partition (ADR-025):** `write_composite_scores()` removed from active compute pipeline (v3.7.25). The `computed_metrics` partition covers the same use case with less DDB write overhead. Dead code fully deleted v3.7.28. Do not reintroduce.
+
 ---
 
-*Last updated: 2026-03-13 (v3.7.7 — TB7-21/22/23)*
+*Last updated: 2026-03-15 (v3.7.41 — hypothesis engine v1.2.0, weekly correlation compute + BH FDR, W3 validator, ADR-025)*
