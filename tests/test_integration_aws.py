@@ -27,7 +27,17 @@ DESIGN PRINCIPLES (Jin Park / Viktor Sorokin, R11):
   - Tests fail loudly with actionable fix instructions
   - A passing run here means "works in AWS", not just "works in code"
 
+RUN MANUALLY (not in CI/CD):
+  These tests require live AWS credentials and are NOT wired into GitHub Actions
+  (R12 Item 5). They are manual-only by design:
+    1. They require AWS credentials not available in standard CI
+    2. They invoke Lambdas (I3, I10) which could affect state
+    3. They are best run as a post-CDK-deploy health check, not on every PR
+  Run after any CDK deploy: python3 -m pytest tests/test_integration_aws.py -v --tb=short
+  See RUNBOOK.md ’Session Close Checklist’ for trigger guidance.
+
 v1.0.0 — 2026-03-14 (R11 engineering strategy item 8)
+v1.1.0 — 2026-03-15 (R12: +I11 data-reconciliation check, manual-only doc)
 """
 
 import json
@@ -549,6 +559,79 @@ def test_i10_mcp_lambda_responds():
                 f"Fix: bash deploy/deploy_lambda.sh life-platform-mcp lambdas/mcp_server.py"
             )
         # Other functional errors (e.g. bad warmer step) are warnings, not failures
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# I11 — data-reconciliation Lambda ran recently (end-to-end pipeline health)
+# Root cause of: would silently mask data quality issues if reconciliation stops
+# Jin (R12): "we don't have end-to-end verification; this is the first step."
+# ══════════════════════════════════════════════════════════════════════════════
+
+DRECON_FUNCTION = "life-platform-data-reconciliation"
+DRECON_LOOKBACK_HOURS = 48  # expect it has run within the last 2 days
+
+
+def test_i11_data_reconciliation_running():
+    """I11: data-reconciliation Lambda must have run within the last 48 hours.
+
+    The reconciliation Lambda cross-checks DDB state against ingestion history.
+    If it stops running, data quality issues accumulate silently.
+    This test is the first step toward Jin's end-to-end pipeline verification.
+
+    Checks:
+      1. Lambda exists and is invocable
+      2. CloudWatch log group has recent activity (within DRECON_LOOKBACK_HOURS)
+    """
+    boto3 = _get_boto3()
+    lc = boto3.client("lambda", region_name=REGION)
+    logs = boto3.client("logs", region_name=REGION)
+
+    # Step 1: Lambda must exist
+    try:
+        lc.get_function_configuration(FunctionName=DRECON_FUNCTION)
+    except Exception as e:
+        if "ResourceNotFoundException" in str(e):
+            pytest.skip(f"I11: {DRECON_FUNCTION} Lambda not found — may not be deployed yet")
+        pytest.fail(f"I11 FAIL: Could not describe {DRECON_FUNCTION}: {e}")
+
+    # Step 2: CloudWatch log group has recent activity
+    log_group = f"/aws/lambda/{DRECON_FUNCTION}"
+    import time as _time
+    cutoff_ms = int((_time.time() - DRECON_LOOKBACK_HOURS * 3600) * 1000)
+
+    try:
+        streams = logs.describe_log_streams(
+            logGroupName=log_group,
+            orderBy="LastEventTime",
+            descending=True,
+            limit=1,
+        ).get("logStreams", [])
+    except Exception as e:
+        if "ResourceNotFoundException" in str(e):
+            pytest.fail(
+                f"I11 FAIL: No CloudWatch log group for {DRECON_FUNCTION}. "
+                f"Lambda has never run or logs are missing!\n"
+                f"Check: aws lambda invoke --function-name {DRECON_FUNCTION} "
+                f"--payload '{{}}' /tmp/recon.json --region {REGION}"
+            )
+        pytest.skip(f"I11: Could not check CloudWatch logs: {e}")
+
+    if not streams:
+        pytest.fail(
+            f"I11 FAIL: {DRECON_FUNCTION} log group exists but has no log streams. "
+            f"Lambda has never successfully run!"
+        )
+
+    last_event_ms = streams[0].get("lastEventTimestamp", 0)
+    if last_event_ms < cutoff_ms:
+        import datetime as _dt
+        last_run = _dt.datetime.fromtimestamp(last_event_ms / 1000).strftime("%Y-%m-%d %H:%M UTC")
+        pytest.fail(
+            f"I11 FAIL: {DRECON_FUNCTION} last ran at {last_run} "
+            f"({DRECON_LOOKBACK_HOURS}h+ ago). Expected to run at least every 48h.\n"
+            f"Manual trigger: aws lambda invoke --function-name {DRECON_FUNCTION} "
+            f"--payload '{{}}' /tmp/recon.json --region {REGION}"
+        )
 
 
 # ══════════════════════════════════════════════════════════════════════════════

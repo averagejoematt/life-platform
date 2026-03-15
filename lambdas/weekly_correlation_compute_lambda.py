@@ -271,62 +271,111 @@ def assemble_daily_series(start_date, end_date):
 # CORRELATION COMPUTATION
 # ==============================================================================
 
-# Pairs to compute: (metric_a, metric_b, label)
+# Pairs to compute: (metric_a, metric_b, label, lag_days)
+# lag_days: 0 = same-day cross-sectional; N = metric_a on day D predicts metric_b on day D+N
+# Henning (R12): distinguish cross_sectional vs lagged correlations in output —
+# lagged correlations have fewer effective degrees of freedom and must not be
+# interpreted using the same significance thresholds as cross-sectional.
 CORRELATION_PAIRS = [
-    # Recovery / HRV
-    ("hrv",           "recovery_score",  "hrv_vs_recovery"),
-    ("sleep_duration","recovery_score",  "sleep_duration_vs_recovery"),
-    ("sleep_score",   "recovery_score",  "sleep_score_vs_recovery"),
-    ("hrv",           "sleep_score",     "hrv_vs_sleep_score"),
-    ("resting_hr",    "recovery_score",  "rhr_vs_recovery"),
+    # Recovery / HRV (cross-sectional)
+    ("hrv",           "recovery_score",  "hrv_vs_recovery",               0),
+    ("sleep_duration","recovery_score",  "sleep_duration_vs_recovery",    0),
+    ("sleep_score",   "recovery_score",  "sleep_score_vs_recovery",       0),
+    ("hrv",           "sleep_score",     "hrv_vs_sleep_score",            0),
+    ("resting_hr",    "recovery_score",  "rhr_vs_recovery",               0),
 
-    # Training
-    ("tsb",           "recovery_score",  "tsb_vs_recovery"),
-    ("strain",        "hrv",             "strain_vs_hrv"),
-    ("training_kj",   "hrv",             "training_load_vs_hrv"),
-    ("training_mins", "recovery_score",  "training_mins_vs_recovery"),
+    # Training (cross-sectional; lagged versions are the higher-value analysis)
+    ("tsb",           "recovery_score",  "tsb_vs_recovery",               0),
+    ("strain",        "hrv",             "strain_vs_hrv",                 0),
+    ("training_kj",   "hrv",             "training_load_vs_hrv",          0),
+    ("training_mins", "recovery_score",  "training_mins_vs_recovery",     0),
 
-    # Nutrition
-    ("protein_g",     "recovery_score",  "protein_vs_recovery"),
-    ("calories",      "hrv",             "calories_vs_hrv"),
-    ("carbs_g",       "hrv",             "carbs_vs_hrv"),
+    # Nutrition (cross-sectional)
+    ("protein_g",     "recovery_score",  "protein_vs_recovery",           0),
+    ("calories",      "hrv",             "calories_vs_hrv",               0),
+    ("carbs_g",       "hrv",             "carbs_vs_hrv",                  0),
 
-    # Activity / Steps
-    ("steps",         "recovery_score",  "steps_vs_recovery"),
-    ("steps",         "hrv",             "steps_vs_hrv"),
-    ("steps",         "sleep_score",     "steps_vs_sleep"),
+    # Activity / Steps (cross-sectional)
+    ("steps",         "recovery_score",  "steps_vs_recovery",             0),
+    ("steps",         "hrv",             "steps_vs_hrv",                  0),
+    ("steps",         "sleep_score",     "steps_vs_sleep",                0),
 
-    # Habits
-    ("habit_pct",     "day_grade",       "habit_pct_vs_day_grade"),
-    ("habit_pct",     "recovery_score",  "habit_pct_vs_recovery"),
-    ("tier0_streak",  "day_grade",       "tier0_streak_vs_day_grade"),
+    # Habits (cross-sectional)
+    ("habit_pct",     "day_grade",       "habit_pct_vs_day_grade",        0),
+    ("habit_pct",     "recovery_score",  "habit_pct_vs_recovery",         0),
+    ("tier0_streak",  "day_grade",       "tier0_streak_vs_day_grade",     0),
 
-    # Weight / Nutrition
-    ("calories",      "day_grade",       "calories_vs_day_grade"),
-    ("readiness",     "day_grade",       "readiness_vs_day_grade"),
+    # Weight / Nutrition (cross-sectional)
+    ("calories",      "day_grade",       "calories_vs_day_grade",         0),
+    ("readiness",     "day_grade",       "readiness_vs_day_grade",        0),
+
+    # Lagged predictive pairs (lag_days > 0)
+    # Henning: lagged pairs test whether metric_a TODAY predicts metric_b TOMORROW.
+    # Degrees of freedom reduced by lag_days; interpretation requires higher n thresholds.
+    ("hrv",           "training_kj",     "hrv_predicts_next_day_load",    1),
+    ("recovery_score","training_kj",     "recovery_predicts_next_day_load", 1),
+    ("training_kj",   "recovery_score",  "load_predicts_next_day_recovery", 1),
 ]
 
 
 def compute_correlations(series):
-    """Compute all pairs from the daily series dict."""
+    """Compute all pairs from the daily series dict.
+
+    Handles both cross-sectional (lag=0) and lagged (lag>0) pairs.
+    Lagged pairs: xs from day D, ys from day D+lag_days.
+
+    Henning (R12): correlation_type distinguishes cross_sectional from lagged.
+    Lagged correlations have reduced effective degrees of freedom; n-gating
+    thresholds still apply but interpretation must note the predictive framing.
+    """
     dates = sorted(series.keys())
     results = {}
 
-    for metric_a, metric_b, label in CORRELATION_PAIRS:
-        xs = [series[d].get(metric_a) for d in dates]
-        ys = [series[d].get(metric_b) for d in dates]
+    for pair in CORRELATION_PAIRS:
+        # Support old 3-tuple format (no lag) and new 4-tuple format (with lag)
+        if len(pair) == 4:
+            metric_a, metric_b, label, lag_days = pair
+        else:
+            metric_a, metric_b, label = pair
+            lag_days = 0
+
+        if lag_days == 0:
+            # Cross-sectional: same day for both metrics
+            xs = [series[d].get(metric_a) for d in dates]
+            ys = [series[d].get(metric_b) for d in dates]
+            correlation_type = "cross_sectional"
+        else:
+            # Lagged: xs from day D, ys from day D+lag_days
+            # For each date, find the lagged date and pair them
+            xs, ys = [], []
+            for i, d in enumerate(dates):
+                # Find target date = d + lag_days
+                try:
+                    from datetime import datetime as _dt, timedelta as _td
+                    target_date = (_dt.strptime(d, "%Y-%m-%d") + _td(days=lag_days)).strftime("%Y-%m-%d")
+                except Exception:
+                    continue
+                if target_date in series:
+                    x_val = series[d].get(metric_a)
+                    y_val = series[target_date].get(metric_b)
+                    xs.append(x_val)
+                    ys.append(y_val)
+            correlation_type = f"lagged_{lag_days}d"
+
         r, n = pearson_r(xs, ys)
         results[label] = {
-            "metric_a":       metric_a,
-            "metric_b":       metric_b,
-            "pearson_r":      r,
-            "r_squared":      round(r ** 2, 4) if r is not None else None,
-            "n_days":         n,
-            "interpretation": interpret_r(r, n),  # n-gated: moderate≥30, strong≥50
-            "direction":      ("positive" if r > 0 else "negative") if r is not None else None,
+            "metric_a":        metric_a,
+            "metric_b":        metric_b,
+            "pearson_r":       r,
+            "r_squared":       round(r ** 2, 4) if r is not None else None,
+            "n_days":          n,
+            "interpretation":  interpret_r(r, n),  # n-gated: moderate≥30, strong≥50
+            "direction":       ("positive" if r > 0 else "negative") if r is not None else None,
+            "correlation_type": correlation_type,   # Henning R12: cross_sectional vs lagged
+            "lag_days":        lag_days if lag_days > 0 else None,
         }
         if r is not None:
-            logger.info("  %-40s r=%.3f (n=%d, %s)", label, r, n, interpret_r(r))
+            logger.info("  %-45s r=%.3f (n=%d, %s, %s)", label, r, n, interpret_r(r, n), correlation_type)
 
     return results
 

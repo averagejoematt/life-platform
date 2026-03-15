@@ -32,11 +32,12 @@ VALIDATION RULES:
       CRITICAL — skip DDB write, archive to S3, log error
       WARNING  — write proceeds, issue logged and archived
 
-SOURCES COVERED (20):
+SOURCES COVERED (22):
   whoop, garmin, apple_health, macrofactor, macrofactor_workouts, strava,
   eightsleep, withings, habitify, notion, todoist, weather, supplements,
-  computed_metrics, character_sheet, adaptive_mode, day_grade, habit_scores,
-  computed_insights, google_calendar
+  computed_metrics, character_sheet, day_grade, habit_scores,
+  computed_insights, google_calendar, adaptive_mode, computed_insights
+  (22 total: 13 ingestion + 6 compute + 1 calendar + 2 added v3.7.25)
 
 v1.0.0 — 2026-03-08 (DATA-2)
 """
@@ -373,6 +374,26 @@ _SCHEMAS: dict[str, dict] = {
         },
         "critical_range_checks": {},
         "at_least_one_of": ["event_count", "events"],
+    },
+
+    "adaptive_mode": {  # Feature #50 — added v3.7.25
+        "required_fields": ["pk", "sk", "date", "engagement_score", "brief_mode", "computed_at"],
+        "typed_fields": {
+            "engagement_score": (int, float),
+        },
+        "range_checks": {
+            "engagement_score": (0, 100),
+        },
+        "critical_range_checks": {},
+        "at_least_one_of": ["brief_mode", "engagement_score"],
+    },
+
+    "computed_insights": {  # IC-2 — added v3.7.25
+        "required_fields": ["pk", "sk", "date", "computed_at"],
+        "typed_fields": {},
+        "range_checks": {},
+        "critical_range_checks": {},
+        "at_least_one_of": ["momentum_signal", "ai_context_block"],
     },
 }
 

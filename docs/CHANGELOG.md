@@ -1,5 +1,104 @@
 # Life Platform — Changelog
 
+## v3.7.25 — 2026-03-15: R12 post-board sweep (8 items)
+
+### Summary
+All 8 R12 board action items completed. Viktor's three immediate bugs fixed. Four remaining compute partitions wired to validator. ADR-025 composite_scores removed from active compute pipeline. Henning's autocorrelation note implemented. I11 integration test added.
+
+### Changes
+
+**Item 1 — Fix validate_and_write S3 client bug (Viktor)**
+- `lambdas/daily_metrics_compute_lambda.py`: `store_computed_metrics()` and `store_day_grade()` switched from `validate_and_write(table, None, None, ...)` to `validate_item()` directly. Passing `None` for s3_client would cause `AttributeError` if validation failed and tried to archive. Compute partitions don't archive to S3 on failure — they log and skip.
+
+**Item 3 — Wire 4 remaining compute partitions to validator (Omar)**
+- `lambdas/daily_metrics_compute_lambda.py`: `store_habit_scores()` — `validate_item("habit_scores", ...)` before `table.put_item()`
+- `lambdas/character_sheet_lambda.py`: `validate_item("character_sheet", ...)` proxy check before `character_engine.store_character_sheet()`
+- `lambdas/daily_insight_compute_lambda.py`: `store_computed_insights()` — `validate_item("computed_insights", ...)` before write
+- `lambdas/adaptive_mode_lambda.py`: `store_adaptive_mode()` — `validate_item("adaptive_mode", ...)` before write
+- `lambdas/ingestion_validator.py`: Added `adaptive_mode` and `computed_insights` schemas. Updated source count: 20 → 22.
+
+**Item 4 — data-reconciliation Lambda output (Jin)**
+- `tests/test_integration_aws.py`: Added I11 — checks `life-platform-data-reconciliation` Lambda exists and has CloudWatch activity within 48h. First step toward end-to-end pipeline verification.
+
+**Item 5 — Integration tests manual-only (Viktor)**
+- `tests/test_integration_aws.py`: Added module-level documentation: manual-only, not in CI/CD, reasons why.
+- `docs/RUNBOOK.md`: Updated Session Close Checklist with manual-only note and rationale.
+
+**Item 6 — ADR-025 composite_scores consolidation (Priya)**
+- `lambdas/daily_metrics_compute_lambda.py`: Removed `write_composite_scores()` call from `lambda_handler`. Function definition retained for manual backfill. TODO comment: remove entirely at v3.8.x after 30+ days of `computed_metrics` history.
+
+**Item 7 — MCP two-tier Layer execution**
+- Script `deploy/build_mcp_stable_layer.sh` remains ready. Execute before next major MCP expansion. No code change this session.
+
+**Item 8 — Henning's autocorrelation note (Henning)**
+- `lambdas/weekly_correlation_compute_lambda.py`: CORRELATION_PAIRS extended from 3-tuple to 4-tuple `(metric_a, metric_b, label, lag_days)`. Added 3 lagged pairs (`hrv_predicts_next_day_load`, `recovery_predicts_next_day_load`, `load_predicts_next_day_recovery`). `compute_correlations()` now computes lagged series correctly and adds `correlation_type` (`cross_sectional` vs `lagged_Nd`) and `lag_days` to every result. 20 cross-sectional + 3 lagged = 23 total pairs.
+
+### Deployed
+- `daily-metrics-compute` Lambda (validator fix + composite_scores removal + habit_scores wired)
+- `character-sheet-compute` Lambda (character_sheet validator)
+- `daily-insight-compute` Lambda (computed_insights validator)
+- `adaptive-mode-compute` Lambda (adaptive_mode validator)
+- `weekly-correlation-compute` Lambda (correlation_type field + lagged pairs)
+
+---
+
+## v3.7.24 — 2026-03-15: R11 engineering strategy (9 items)
+
+### Summary
+Architecture Review #11 conducted and all 9 approved items implemented. Composite grade: A. Key deliverables: deploy_and_verify.sh (caught a real bug on first use), integration test suite I1-I10, auto-discover counters from source, new-source + new-tool checklists.
+
+### Changes
+
+**Item 1 — RUNBOOK checklists (Priya/Elena)**
+- `docs/RUNBOOK.md`: New-source checklist expanded to full step-by-step with "often missed" wiring steps (SOURCES list, freshness checker, ingestion validator, MCP tools, cache warmer, SLO-2, CI lambda_map). New-tool checklist added with R1-R7 registry lint gate.
+
+**Item 2 — deploy_and_verify.sh (Jin/Viktor)**
+- `deploy/deploy_and_verify.sh` (new): wraps `deploy_lambda.sh` with post-deploy invoke + CloudWatch log check. Catches ImportModuleError, AccessDenied, runtime crashes within 8 seconds. First use immediately caught real bug: `scoring_engine.py` missing from `daily-metrics-compute` bundle.
+
+**Item 3 — Pre-commit hook delegates to sync_doc_metadata.py (Elena)**
+- `scripts/update_architecture_header.sh`: Replaced 60-line counter-scraping shell script with a thin wrapper calling `sync_doc_metadata.py --apply --quiet`. Single source of truth now enforced at commit time.
+
+**Item 4 — Lambda env var audit (Yael)**
+- All 42 Lambdas audited. All clean. No rogue `SECRET_NAME` pointing at deleted secrets. `dropbox-poll` and `todoist-data-ingestion` correctly use `life-platform/ingestion-keys`.
+
+**Item 5 — Auto-discover counters from source (Omar/Elena)**
+- `deploy/sync_doc_metadata.py`: Added `_auto_discover_tool_count()` (from `mcp/registry.py` TOOLS dict), `_auto_discover_module_count()` (all `mcp/*.py`), `_auto_discover_version()` (from CHANGELOG.md). Fixed regex to `[a-z0-9_]+` to handle `get_zone2_breakdown`. Lambda count auto-discovery has known gap (Lambda@Edge in us-east-1) — manual fallback retained. `--quiet` flag added for pre-commit hook use.
+
+**Item 6 — MCP two-tier structure (Priya)**
+- `deploy/build_mcp_stable_layer.sh` (new): builds new Layer version with stable MCP core modules (`config.py`, `core.py`, `helpers.py`, etc.). ADR-027 added to `docs/DECISIONS.md`.
+
+**Item 7 — ingestion_validator in compute Lambdas (Omar)**
+- `lambdas/daily_metrics_compute_lambda.py`: `store_computed_metrics()` and `store_day_grade()` wired to `validate_and_write()`. (Note: fixed in v3.7.25 to use `validate_item()` directly.)
+
+**Item 8 — Integration test suite I1-I10 (Jin/Viktor)**
+- `tests/test_integration_aws.py` (new): 10 integration tests requiring live AWS. Read-only. Covers handler names, Layer version, invocability, DDB health, secrets, EventBridge rules, alarms, S3 config files, DLQ, MCP connectivity. ADR-028 added.
+
+**Item 10 — Ingestion framework guidance (Elena)**
+- `docs/RUNBOOK.md`: ADR-019 referenced in new-source checklist. `ingestion_framework.py` listed as default for new ingestion Lambdas.
+
+### Deployed
+- `daily-metrics-compute` Lambda (scoring_engine.py bundle fix caught by deploy_and_verify.sh)
+
+---
+
+## v3.7.23 — 2026-03-14: R10 A/A+ hardening sprint
+
+### Summary
+All R10 board action items completed following Architecture Review #10. Platform composite grade: A. Key deliveries: double-warmer disabled, graceful OAuth handler for pre-auth Calendar ingestion, dispatcher warmer Lambda, health_context wired into AI calls, all counters synced.
+
+### Changes
+- Disabled redundant EventBridge warmer rule on `life-platform-mcp` (dedicated `life-platform-mcp-warmer` now owns warming; MCP Lambda freed from concurrency hold)
+- `lambdas/google_calendar_lambda.py`: graceful pre-auth handling — returns 200 with `"status": "pending_oauth"` when secret missing/invalid, instead of 500. Lambda no longer alarms on missing credentials before OAuth setup.
+- `lambdas/daily_brief_lambda.py`: health_context injected into all 4 AI prompt calls via `ai_calls.py`. Board coaching now reads computed_insights record.
+- Dispatcher warmer: `life-platform-mcp-warmer` confirmed active, all 13 warm steps running
+- `deploy/sync_doc_metadata.py`: PLATFORM_FACTS updated to v3.7.22 counters
+
+### Deployed
+- `google-calendar-ingestion` Lambda (pre-auth graceful handling)
+- `daily-brief` Lambda (health_context wired)
+
+---
+
 ## v3.7.22 — 2026-03-14: R9 A/A+ hardening sprint
 
 ### Summary

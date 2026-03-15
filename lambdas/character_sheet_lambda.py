@@ -423,7 +423,30 @@ def lambda_handler(event, context):
         for eff in effects:
             logger.info(f"[character]   EFFECT: {eff.get('emoji', '')} {eff.get('name', '')}")
 
-    # ── Store ──
+    # ── Store (with DATA-2 validation — Item 3, R12) ──
+    # validate_item before store_character_sheet, which adds pk/sk and Decimal-converts.
+    # We validate a lightweight proxy item — only the fields the schema checks.
+    try:
+        from ingestion_validator import validate_item as _vi
+        _val_proxy = {
+            "pk":              USER_PREFIX + "character_sheet",
+            "sk":              "DATE#" + yesterday_str,
+            "date":            yesterday_str,
+            "character_level": record.get("character_level"),
+            "character_tier":  record.get("character_tier"),
+            "computed_at":     record.get("computed_at", ""),
+        }
+        _vr = _vi("character_sheet", _val_proxy, yesterday_str)
+        if _vr.should_skip_ddb:
+            logger.error("[character][DATA-2] Skipping character_sheet write: %s", _vr.errors)
+            return {"statusCode": 500, "body": f"Validation failed: {_vr.errors}"}
+        if _vr.warnings:
+            logger.warning("[character][DATA-2] character_sheet warnings: %s", _vr.warnings)
+    except ImportError:
+        pass  # validator not bundled
+    except Exception as ve:
+        logger.warning("[character][DATA-2] validate_item failed (proceeding): %s", ve)
+
     try:
         character_engine.store_character_sheet(table, USER_PREFIX, record)
         logger.info(f"[character] Stored: {yesterday_str} — Level {char_level} ({char_emoji} {char_tier}) — {len(events)} events")

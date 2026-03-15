@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-Last updated: 2026-03-15 (v3.7.22 — 88 MCP tools, 30-module package, 42 Lambdas, 20 data sources)
+Last updated: 2026-03-15 (v3.7.25 — 88 MCP tools, 30-module package, 42 Lambdas, 20 data sources)
 
 ---
 
@@ -580,8 +580,13 @@ git add -A && git commit -m "vX.XX.X: <what changed>" && git push
 **If CDK was deployed this session** — also run integration tests:
 ```bash
 python3 -m pytest tests/test_integration_aws.py -v --tb=short
-# I1-I10: handler names, Layer version, invocability, DDB, secrets, EB rules, alarms, S3, DLQ, MCP
+# I1-I11: handler names, Layer version, invocability, DDB, secrets, EB rules,
+#         alarms, S3, DLQ, MCP, data-reconciliation freshness
 ```
+
+**Integration tests are MANUAL-ONLY** (R12, ADR-028 note): not wired into GitHub Actions.
+Require live AWS credentials. Run after CDK deploys, or when investigating an incident.
+Do NOT add to CI/CD without setting up a dedicated OIDC role with CloudWatch Logs read access.
 
 **That's it for standard sessions.** The sync script auto-discovers tool and Lambda counts from source files — no manual PLATFORM_FACTS updates needed for those.
 
