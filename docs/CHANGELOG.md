@@ -1,5 +1,37 @@
 # Life Platform — Changelog
 
+## v3.7.41 — 2026-03-15: R14 findings batch (F01/F05/F06/F08) + S1 fix
+
+### Summary
+Batch close of four R14 findings: ARCHITECTURE.md memory corrected, 5 dead debug test stubs deleted, FDR note added to on-demand correlation tool, monitoring gaps table confirmed resolved. Also fixed a pre-existing S1 CI failure (google_calendar missing from lambda_s3_paths.json).
+
+### Changes
+
+**R14-F01 — Doc drift fix**
+- `docs/ARCHITECTURE.md`: MCP Lambda memory corrected `1024 MB` → `768 MB` in ASCII diagram (line 34); detail table on line 260 was already correct
+- Tool count 89 confirmed via registry.py auto-discovery (no discrepancy)
+
+**R14-F05 — Empty test stubs deleted**
+- `tests/test_dropbox.py`, `test_dropbox2.py`, `test_dropbox3.py`, `test_dropbox_token.py`, `test_habitify_api.py`: deleted (debug scripts, not pytest tests, 0 assertions each)
+- `tests/test_business_logic.py`: retained (60+ real unit tests)
+
+**R14-F06 — Monitoring gaps confirmed resolved**
+- `docs/INCIDENT_LOG.md` Open Monitoring Gaps table: both "No duration/throttle alarms" and "No CDK drift detection" rows already had strikethrough + Resolved notes from prior sessions — no action needed
+
+**R14-F08 — FDR note on on-demand correlation**
+- `mcp/tools_training.py` `tool_get_cross_source_correlation`: added `_note` field to response when `p_value < 0.05` explaining this is a single-pair test without FDR correction, and that the weekly report uses Benjamini-Hochberg
+
+**I14 — Canary integration test**
+- `tests/test_integration_aws.py`: `test_i14_canary_mcp_check_passes()` confirmed already fully implemented (added in a prior session — not a gap)
+
+**S1 fix — google_calendar S3 path**
+- `ci/lambda_s3_paths.json`: added `google_calendar` exception documenting that it uses `raw/google_calendar/*` (pre-convention, same pattern as todoist)
+
+### Test Results
+- All 16 tests passing ✅
+
+---
+
 ## v3.7.40 — 2026-03-15: R13-F14 MCP canary 15min + R13-XR X-Ray tracing
 
 ### Summary
