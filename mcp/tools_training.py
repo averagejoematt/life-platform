@@ -469,6 +469,15 @@ def tool_get_cross_source_correlation(args):
         "mean_b":          round(sum(ys)/len(ys), 2),
         "n_gating_note":   "strong requires n≥50, moderate requires n≥30, weak requires n≥14. Smaller samples are downgraded to prevent spurious strong-labelled correlations.",
         "coaching_note":   "r > 0.4 is practically meaningful for coaching. r² tells you what % of variance is explained. Always check p-value before acting on a correlation.",
+        # R14-F08: FDR note — on-demand test is a single pair, not FDR-corrected
+        **({
+            "_note": (
+                "This is a single-pair test (no multiple-comparison correction). "
+                "The weekly report applies FDR correction (Benjamini-Hochberg) across all pairs, "
+                "so p-values there are more conservative. "
+                "For exploratory use only — do not act on a single p<0.05 without replication."
+            )
+        } if p_value is not None and p_value < 0.05 else {}),
     }
 
 

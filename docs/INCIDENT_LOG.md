@@ -82,8 +82,8 @@ Last updated: 2026-03-13 (v3.7.10)
 | No end-to-end data flow dashboard | Slow detection of silent failures | Freshness checker provides daily coverage |
 | DLQ coverage: MCP + webhook excluded | Request/response pattern — DLQ not applicable | CloudWatch error alarms cover both |
 | No webhook health check endpoint | Can't externally monitor webhook availability | CloudWatch alarm on zero invocations/24h |
-| No duration/throttle alarms | Timeouts without errors go undetected | Daily brief and MCP are most at risk |
-| No CDK drift detection | IAM policy changes in code may not be applied to AWS | Post-refactor: always redeploy + smoke verify affected stacks |
+| ~~No duration/throttle alarms~~ | ~~Timeouts without errors go undetected~~ | **Resolved v3.7.36** — duration alarms deployed for all Lambdas |
+| ~~No CDK drift detection~~ | ~~IAM policy changes in code may not be applied to AWS~~ | **Resolved v3.7.36** — `cdk diff` step added to ci-cd.yml; post-refactor deploy + smoke verify documented in RUNBOOK.md |
 
 **Resolved gaps (v2.75.0):** All 29 Lambdas now have CloudWatch error alarms. 10 log groups now have 30-day retention. Deployment zip filename bug eliminated by `deploy_lambda.sh` auto-reading handler config from AWS.
 

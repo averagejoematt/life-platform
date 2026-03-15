@@ -817,6 +817,105 @@ def test_i13_freshness_checker_returns_valid_data():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# I14 — Canary Lambda MCP check passes end-to-end (R14-F04)
+# Root cause it prevents: canary silently broken for ~5 versions due to
+# auth changes (R13-F05 HMAC bearer migration) not reflected in canary's
+# Bearer token derivation — canary reported "skip" but not caught as failure.
+# ══════════════════════════════════════════════════════════════════════════════
+
+CANARY_FUNCTION = "life-platform-canary"
+
+
+def test_i14_canary_mcp_check_passes():
+    """I14: Canary Lambda must execute the mcp_only=True path without errors
+    and report all_pass=True.
+
+    R14-F04: The canary was silently broken for ~5 versions after the
+    R13-F05 HMAC bearer auth migration. The mcp_only path tests exactly the
+    auth derivation + MCP tool-list round-trip that broke. A test here catches
+    future canary regressions immediately rather than discovering them at the
+    next architecture review.
+
+    Failure modes caught:
+      - ImportModuleError in canary_lambda (structural)
+      - MCP auth derivation mismatch (HMAC secret changed or rotated)
+      - MCP Lambda unreachable / returned wrong HTTP status
+      - MCP tools/list returned < 50 tools (SIMP-1 headroom guard)
+      - Canary SES or CloudWatch IAM gaps (env var errors that prevent invocation)
+
+    Note: mcp_only=True skips the DDB/S3 round-trip checks so this test is
+    read-safe — no write operations on real data partitions.
+    """
+    boto3 = _get_boto3()
+    lc = boto3.client("lambda", region_name=REGION)
+
+    # Invoke canary in mcp_only mode — skips DDB/S3, only tests MCP reachability
+    try:
+        response = lc.invoke(
+            FunctionName=CANARY_FUNCTION,
+            Payload=json.dumps({"mcp_only": True, "__integration_test": True}),
+        )
+    except Exception as e:
+        pytest.fail(f"I14 FAIL: Could not invoke {CANARY_FUNCTION}: {e}")
+
+    status = response["StatusCode"]
+    assert status == 200, f"I14 FAIL: Lambda invocation returned HTTP {status}"
+
+    # Check for Lambda-level errors (import error, unhandled exception, etc.)
+    if "FunctionError" in response:
+        raw = json.loads(response["Payload"].read())
+        error_type = raw.get("errorType", "unknown")
+        error_msg = raw.get("errorMessage", "")[:200]
+        pytest.fail(
+            f"I14 FAIL: {CANARY_FUNCTION} FunctionError ({error_type}): {error_msg}\n"
+            f"If ImportModuleError: redeploy canary — bash deploy/deploy_lambda.sh "
+            f"{CANARY_FUNCTION} lambdas/canary_lambda.py\n"
+            f"If auth error: check life-platform/mcp-api-key secret and HMAC derivation in canary_lambda.py"
+        )
+
+    raw_payload = json.loads(response["Payload"].read())
+
+    # Parse the canary response body
+    body_str = raw_payload.get("body", "")
+    try:
+        body = json.loads(body_str)
+    except (json.JSONDecodeError, TypeError) as e:
+        pytest.fail(
+            f"I14 FAIL: Canary response body is not valid JSON: {e}\nRaw: {str(raw_payload)[:300]}"
+        )
+
+    # Must report all_pass=True — any failure in the MCP check shows here
+    all_pass = body.get("all_pass", False)
+    failures = body.get("failures", -1)
+    results = body.get("results", {})
+    mcp_result = results.get("mcp", {})
+
+    assert all_pass, (
+        f"I14 FAIL: Canary reported {failures} failure(s) in mcp_only mode.\n"
+        f"MCP result: {mcp_result}\n\n"
+        f"Most likely causes:\n"
+        f"  1. MCP auth regression — check life-platform/mcp-api-key and HMAC derivation\n"
+        f"     (canary derives Bearer via hmac(api_key, b'life-platform-bearer-v1', sha256))\n"
+        f"  2. MCP Lambda unreachable — check life-platform-mcp CloudWatch logs\n"
+        f"  3. MCP tools/list < 50 tools — SIMP-1 cut went too far or deploy regressed\n"
+        f"  4. MCP_FUNCTION_URL env var missing on canary Lambda\n\n"
+        f"Full canary response: {json.dumps(body, indent=2)}"
+    )
+
+    # Verify MCP result has expected shape
+    assert mcp_result.get("ok") is True, (
+        f"I14 FAIL: MCP check did not return ok=True: {mcp_result}"
+    )
+
+    # Latency sanity check — MCP cold start should be < 10s
+    latency_ms = mcp_result.get("latency_ms", 0)
+    assert latency_ms < 10_000, (
+        f"I14 WARN: MCP latency {latency_ms}ms exceeds 10s — Lambda may be cold-starting "
+        f"or experiencing resource contention."
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Standalone runner
 # ══════════════════════════════════════════════════════════════════════════════
 
