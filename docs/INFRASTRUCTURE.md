@@ -1,7 +1,8 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-03-15 (v3.7.31 — 43 Lambdas, 11 active secrets, 89 MCP tools, ~49 alarms)
+> Last updated: 2026-03-15 (v3.7.31 — 43 Lambdas, 10 active secrets, 89 MCP tools, ~50 alarms)
+> Note: `webhook-key` scheduled for deletion 2026-03-15 (7-day recovery window). Count reflects post-deletion state.
 
 ---
 
@@ -132,7 +133,7 @@ All DNS-validated via Route 53 CNAME records.
 
 ---
 
-## Secrets Manager (11 active secrets)
+## Secrets Manager (10 active secrets — `webhook-key` scheduled for deletion 2026-03-22)
 
 All under prefix `life-platform/`. No values stored in this doc — access via AWS console or CLI.
 
@@ -148,7 +149,7 @@ All under prefix `life-platform/`. No values stored in this doc — access via A
 | `notion` | API key | Notion integration key + database ID |
 | `habitify` | API key | Habitify API token. Own dedicated secret — NOT bundled in api-keys (different Lambda consumer set). |
 | `google-calendar` | Google Calendar Lambda | OAuth2 refresh_token + client credentials. CMK-encrypted. Auto-refreshed by Lambda. Added v3.7.22. |
-| `webhook-key` | Reserved | Dedicated HAE webhook auth key — **no Lambda reads this** (LastAccessed: None). Pending deletion via `aws secretsmanager delete-secret --secret-id life-platform/webhook-key --recovery-window-in-days 7`. Saves ~$0.40/mo. |
+| ~~`webhook-key`~~ | ~~Reserved~~ | ~~**SCHEDULED FOR DELETION 2026-03-15** (recovery window 7 days). No Lambda ever read this secret (LastAccessed: None). Saves ~$0.40/mo.~~ |
 | ~~`api-keys`~~ | ~~Legacy bundle~~ | ~~**PERMANENTLY DELETED 2026-03-14.** All Lambdas migrated to per-service secrets.~~ |
 
 ---
