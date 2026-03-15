@@ -351,8 +351,7 @@ def compute_correlations(series):
             for i, d in enumerate(dates):
                 # Find target date = d + lag_days
                 try:
-                    from datetime import datetime as _dt, timedelta as _td
-                    target_date = (_dt.strptime(d, "%Y-%m-%d") + _td(days=lag_days)).strftime("%Y-%m-%d")
+                    target_date = (datetime.strptime(d, "%Y-%m-%d") + timedelta(days=lag_days)).strftime("%Y-%m-%d")
                 except Exception:
                     continue
                 if target_date in series:

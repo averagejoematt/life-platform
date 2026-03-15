@@ -361,7 +361,7 @@ Health Auto Export → API Gateway → Webhook → DynamoDB + S3
 Each Lambda has a **dedicated, least-privilege IAM role** (43 roles total as of v3.5.0, CDK-managed). No shared roles.
 
 - **Ingestion roles (13 dedicated):** DynamoDB write, S3 write, Secrets Manager read (scoped to own secret), SQS DLQ send
-- **MCP role:** DynamoDB `GetItem` + `Query` + `PutItem`; S3 `GetObject` on `raw/cgm_readings/*`
+- **MCP role:** DynamoDB `GetItem` + `Query` + `PutItem` + `UpdateItem` + `BatchGetItem`; S3 `GetObject` on `config/*` and `raw/matthew/cgm_readings/*`; `ListBucket` scoped to `raw/matthew/cgm_readings/` prefix; `PutObject` on `config/*` only. (**Note:** previously `BUCKET_ARN/*` — tightened to explicit prefixes v3.7.27, Yael SEC review)
 - **Email/digest roles (7 dedicated):** DynamoDB read/write, `life-platform/ai-keys` secret, SES SendEmail scoped to `mattsusername.com`, S3 PutObject on `dashboard/*` and `buddy/*`
 - **Compute roles (5 dedicated):** DynamoDB read/write, `life-platform/ai-keys` (IC compute Lambdas that call Anthropic)
 - **Operational roles (14 dedicated):** scoped per function (e.g. canary: DDB write+read+delete only; dlq-consumer: SQS ReceiveMessage + DDB write)
