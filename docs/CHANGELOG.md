@@ -1,5 +1,46 @@
 # Life Platform — Changelog
 
+## v3.7.44 — 2026-03-15: R15-F01 through R15-F06 doc accuracy + test guard
+
+### Summary
+Six R15 review findings resolved. Five were doc accuracy issues across INFRASTRUCTURE.md and ARCHITECTURE.md; one was a silent test collection failure in `test_business_logic.py`.
+
+### Changes
+
+**R15-F01 — test_business_logic.py: 0 tests collected on import failure**
+- `tests/test_business_logic.py`: added import guard — `try/except ImportError` around `scoring_engine`/`character_engine` imports; sets module-level `pytestmark = pytest.mark.skip` with diagnostic message if imports fail. Previously a path issue would silently report 0 collected tests.
+- Fixed `day_grade_weights` key `"sleep"` → `"sleep_quality"` in `TestComputeDayGrade._minimal_profile()` — `COMPONENT_SCORERS` in `scoring_engine.py` uses `sleep_quality` not `sleep`. The mismatch caused the sleep weight to be 0, making `test_empty_data_low_score` and `test_perfect_data_returns_high_score` pass for the wrong reason.
+- Tests now: 83 collected, 83 passing ✅
+
+**R15-F02 — INFRASTRUCTURE secrets table wrong**
+- Removed standalone `todoist` and `notion` rows (both live inside `ingestion-keys`).
+- Added `ingestion-keys` row (JSON bundle: notion/todoist/habitify/dropbox/HAE webhook keys).
+- Added `mcp-api-key` row (rotation target for MCP bearer token, consumed by `ai-keys`).
+
+**R15-F03 — Lambda@Edge count 1 vs 2; buddy page contradictory auth**
+- INFRASTRUCTURE Lambda count: 44 → 45, subtitle: `1 Lambda@Edge` → `2 Lambda@Edge`.
+- Lambda@Edge section rewritten: `life-platform-cf-auth` listed as password-gating dashboard; `life-platform-buddy-auth` listed as function-exists-but-buddy-CloudFront-runs-without-auth (intentionally public).
+- Buddy Page row auth: `Lambda@Edge password (life-platform-buddy-auth)` → `None (public — Tom's accountability page, no PII)`.
+
+**R15-F04 — IC-4/IC-5 skeletons not in CDK/architecture inventory**
+- INFRASTRUCTURE Compute list: `failure-pattern-compute` removed from CDK-wired list; replaced with `weekly-correlation-compute` (which IS CDK-wired). Added skeleton callout block for IC-4 (`failure_pattern_compute_lambda.py`) and IC-5 (`momentum_warning_compute_lambda.py`) with activation date and data gate.
+- ARCHITECTURE IC section: added `Skeleton Lambdas` paragraph for IC-4/IC-5 matching handover v3.7.43 activation checklist.
+
+**R15-F05 — INFRASTRUCTURE MCP memory says 1024 MB (was fixed in ARCHITECTURE, not INFRASTRUCTURE)**
+- INFRASTRUCTURE MCP Server table: `1024 MB` → `768 MB`.
+
+**R15-F06 — Warmer step count 12/13/14 inconsistency**
+- INFRASTRUCTURE cache warmer: `12 tools` → `14 tools`.
+- ARCHITECTURE cache warmer: `13 tools / 13 steps` → `14 tools / 14 steps`; cached tools list updated to include `get_strength (centenarian_benchmarks)` as step 13 and `get_cgm (dashboard)` as step 14; per-version attribution added.
+
+### Test Results
+- All 83 tests passing ✅
+
+### Deployed
+- Nothing deployed — doc + test fixes only
+
+---
+
 ## v3.7.43 — 2026-03-15: R14-F07 + R13-F07/F10 + IC-4/IC-5 + ADR-029 + warmer step 13
 
 ### Summary
