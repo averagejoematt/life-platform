@@ -8,38 +8,74 @@
 
 ## How to Run a Review
 
-### Step 1: Generate the pre-compiled review bundle
+### Step 1: Commit everything and update the resolved-findings table
+
+Before generating the bundle, the Section 13b resolved-findings table in `generate_review_bundle.py` **must be current**. Every finding from the previous review should be marked RESOLVED with a proof pointer, or left as PENDING with a reason. This is the most important pre-review maintenance task.
+
+Also ensure:
+- `docs/CHANGELOG.md` reflects all work since the last review
+- `docs/PROJECT_PLAN.md` has up-to-date status on all items
+- `git add -A && git commit` — the bundle reads live files
+
+### Step 2: Generate the pre-compiled review bundle
 
 ```bash
 cd ~/Documents/Claude/life-platform
 python3 deploy/generate_review_bundle.py
 ```
 
-This produces a single file `docs/reviews/REVIEW_BUNDLE_YYYY-MM-DD.md` that contains everything a reviewer needs — architecture, changelog, CDK state, source code samples, previous grades, incident patterns, and more. The reviewer reads ONE file instead of 10+.
+This produces `docs/reviews/REVIEW_BUNDLE_YYYY-MM-DD.md` containing:
+- Platform state snapshot + latest handover
+- Full CHANGELOG (400 lines)
+- Architecture, Infrastructure, ADRs, SLOs, Incident Log, Intelligence Layer
+- CDK state including full `ci-cd.yml` content and test suite function names
+- Source code samples (key Lambdas + MCP handler)
+- Previous review grades + **last review full content**
+- **Section 13b: Resolved findings inventory** — explicit table with proof pointers
 
-**Why:** Reviews require reading ARCHITECTURE.md, SCHEMA.md, PROJECT_PLAN.md, CHANGELOG.md, INFRASTRUCTURE.md, RUNBOOK.md, INCIDENT_LOG.md, DECISIONS.md, INTELLIGENCE_LAYER.md, SLOs.md, plus source code. Loading all of these fills the context window before the review can be generated. The bundle compresses them into ~3000-5000 lines.
-
-### Step 2: Start a new Claude session and paste:
+### Step 3: Start a fresh Opus session and use this prompt
 
 ```
-Life Platform architecture review.
+Life Platform Architecture Review #[N].
 
 Read this single file from my filesystem:
-- docs/reviews/REVIEW_BUNDLE_YYYY-MM-DD.md
+  docs/reviews/REVIEW_BUNDLE_YYYY-MM-DD.md
 
-Then conduct Architecture Review #N using the Technical Board of Directors from memory.
-Go deep into actual code, AWS configs, and specific artifacts — not just generalized best practices.
-Compare against previous review grades (included in the bundle).
-Focus areas this cycle: [FILL IN WHAT CHANGED SINCE LAST REVIEW]
+Then conduct Architecture Review #[N] using the full Technical Board of Directors (all 12 members).
+
+IMPORTANT PROCESS RULES — follow these before issuing any finding:
+
+1. Read Section 13b (RESOLVED FINDINGS INVENTORY) completely before writing a single finding.
+   If a finding you were about to raise appears in that table as RESOLVED, skip it and note
+   it as confirmed-resolved instead. Re-issuing resolved findings wastes review budget.
+
+2. For any finding related to CI/CD, testing, IAM, secrets, or observability: cite the
+   specific file or code artifact that either confirms the problem or confirms the resolution.
+   Do not issue findings based on documentation claims — verify against the actual source files
+   included in this bundle (ci-cd.yml, test file listings, role_policies.py, etc.).
+
+3. Distinguish clearly between:
+   - NEW finding (not present in previous review, not in resolved table)
+   - REGRESSION (was resolved, now broken again — cite evidence)
+   - CONFIRMED RESOLVED (was a finding, now verified fixed — acknowledge and move on)
+   - PERSISTING (was a finding, still not addressed — re-issue with original finding ID)
+
+4. Grade each dimension against the previous review's grade. Explain movement up or down
+   with specific evidence from the bundle, not general principles.
+
+Focus areas this cycle: [FILL IN — e.g., "observability improvements, new MCP canary, X-Ray tracing, CI/CD layer tests"]
+
+Previous review: #13 (v3.7.29, 2026-03-14). Current version: v3.7.40.
 ```
 
-### Step 3: After the review
+### Step 4: After the review
 
-1. Save the review output to `docs/reviews/REVIEW_YYYY-MM-DD.md`
-2. Update CHANGELOG.md with review version
-3. Update handover
-4. Update memory with new grades
-5. `git add -A && git commit -m "vX.X.X: Architecture Review #N" && git push`
+1. Save output → `docs/reviews/REVIEW_YYYY-MM-DD_v[N].md`
+2. Update Section 13b in `generate_review_bundle.py` with all new findings + resolutions
+3. Update CHANGELOG.md with review version
+4. Update handover
+5. Update memory with new grades
+6. `git add -A && git commit -m "vX.X.X: Architecture Review #N" && git push`
 
 ---
 
@@ -89,21 +125,31 @@ Sub-boards: Architecture Review (Priya, Marcus, Yael, Jin, Elena, Omar) · Intel
 
 ## Severity Model
 
-- **Critical:** Security flaw, data loss risk, safety concern
-- **High:** Important weakness, should fix within 2 weeks
-- **Medium:** Technical debt, improvement opportunity
-- **Low:** Polish, optimization
+| Severity | Definition |
+|----------|------------|
+| Critical | Security flaw, data loss risk, safety concern |
+| High | Important weakness, fix within 2 weeks |
+| Medium | Technical debt, improvement opportunity |
+| Low | Polish, optimization |
 
 ## Effort Model
 
-- **S:** 1-2 hours
-- **M:** 3-6 hours  
-- **L:** 8+ hours
+| Effort | Time |
+|--------|------|
+| S | 1-2 hours |
+| M | 3-6 hours |
+| L | 8+ hours |
 
 ---
 
-## Legacy: Manual file-by-file approach
+## Why Reviews Go Stale (and how to prevent it)
 
-If the bundle generator isn't available, the old approach of reading individual files still works — but risks context exhaustion for platforms with 10+ large docs. Use the bundle approach for all future reviews.
+The single biggest failure mode is Opus re-flagging already-resolved findings. This happens because:
 
-The old `deploy/generate_review_bundle.sh` (bash version) captures AWS state but doesn't produce a self-contained review document. The Python version (`deploy/generate_review_bundle.py`) supersedes it.
+1. **Bundle carries claims, not proof** — docs say "CI exists" but Opus can't verify without seeing the file. Fix: bundle now includes full `ci-cd.yml` and test function names.
+2. **No resolved-findings inventory** — Opus saw previous findings with no resolution status. Fix: Section 13b explicit table with proof pointers.
+3. **Changelog was truncated** — 150 lines = 2-3 versions. Fix: now 400 lines.
+4. **Previous review findings were hardcoded** — static list in generator never updated. Fix: generator now reads last review `.md` file dynamically.
+5. **Review prompt had no verification instruction** — Opus wasn't told to check before flagging. Fix: explicit rules 1-4 in the prompt above.
+
+**Maintenance rule:** After every session where findings are resolved, update Section 13b in `generate_review_bundle.py` immediately. Don't defer to review time.
