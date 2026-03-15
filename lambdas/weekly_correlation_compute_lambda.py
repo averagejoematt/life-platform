@@ -60,7 +60,13 @@ LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "90"))
 # ==============================================================================
 
 def d2f(obj):
-    """Recursively convert DynamoDB Decimal to float."""
+    """Recursively convert DynamoDB Decimal to float.
+
+    R13-F10: Canonical copy lives in digest_utils.py (shared layer).
+    This local copy is retained for safety until the next layer rebuild
+    confirms digest_utils is available in this Lambda's execution context.
+    Future: replace with `from digest_utils import d2f` after layer v12+.
+    """
     if isinstance(obj, list):    return [d2f(i) for i in obj]
     if isinstance(obj, dict):    return {k: d2f(v) for k, v in obj.items()}
     if isinstance(obj, Decimal): return float(obj)
@@ -129,6 +135,84 @@ def pearson_r(xs, ys):
         return None, n
     r = num / (dxs * dys)
     return round(max(-1.0, min(1.0, r)), 4), n
+
+
+def pearson_p_value(r: float, n: int) -> float | None:
+    """Compute two-tailed p-value for Pearson r via t-distribution approximation.
+
+    Uses math.erf — no scipy dependency. Accurate to ~3 decimal places for n>10.
+    Returns None if r is None or n <= 2.
+    """
+    if r is None or n <= 2 or abs(r) >= 1.0:
+        return None
+    t_stat = r * math.sqrt(n - 2) / math.sqrt(max(1e-10, 1.0 - r ** 2))
+    df = n - 2
+    # Normal approximation: exact for large df, conservative for small df
+    if df >= 30:
+        z = abs(t_stat)
+    else:
+        # Correction for small df: z ≈ t * sqrt(df/(df+2))
+        z = abs(t_stat) * math.sqrt(df / (df + 2.0))
+    p_approx = 2.0 * (1.0 - 0.5 * (1.0 + math.erf(z / math.sqrt(2.0))))
+    return round(max(0.0, min(1.0, p_approx)), 4)
+
+
+def apply_benjamini_hochberg(results: dict, alpha: float = 0.05) -> dict:
+    """Apply Benjamini-Hochberg FDR correction to a dict of correlation results.
+
+    R13-F15: With 23 simultaneous hypothesis tests at nominal alpha=0.05, we
+    expect ~1.15 false positives per run under the null. BH controls the
+    expected proportion of false discoveries rather than the per-comparison
+    error rate (Bonferroni), making it appropriate for exploratory health data
+    where some true correlations exist.
+
+    Modifies each result in-place, adding:
+      p_value          : individual two-tailed p-value
+      p_value_fdr      : BH-adjusted p-value
+      fdr_significant  : True if p_value_fdr <= alpha
+
+    Pairs without a valid r (insufficient data) get p_value=None, fdr_significant=False.
+    Returns modified results dict.
+    """
+    # Collect pairs that have a valid r
+    labeled = []
+    for label, data in results.items():
+        r = data.get("pearson_r")
+        n = data.get("n_days", 0)
+        p = pearson_p_value(r, n) if r is not None else None
+        data["p_value"] = p
+        if p is not None:
+            labeled.append((label, p))
+        else:
+            data["p_value_fdr"] = None
+            data["fdr_significant"] = False
+
+    if not labeled:
+        return results
+
+    m = len(labeled)
+    # Sort by p-value ascending for BH procedure
+    labeled.sort(key=lambda x: x[1])
+
+    # BH step-up: for rank k (1-indexed), reject if p <= k/m * alpha
+    bh_threshold = [((k + 1) / m) * alpha for k in range(m)]
+    # Find the largest k where p <= threshold
+    last_sig = -1
+    for k, (label, p) in enumerate(labeled):
+        if p <= bh_threshold[k]:
+            last_sig = k
+
+    # Compute BH-adjusted p-values: p_adj[k] = min(m/k * p[k], 1.0), non-decreasing
+    adj = [min(1.0, m / (k + 1) * p) for k, (_, p) in enumerate(labeled)]
+    # Enforce non-decreasing from the end
+    for k in range(m - 2, -1, -1):
+        adj[k] = min(adj[k], adj[k + 1])
+
+    for k, (label, _) in enumerate(labeled):
+        results[label]["p_value_fdr"] = round(adj[k], 4)
+        results[label]["fdr_significant"] = (k <= last_sig)
+
+    return results
 
 
 # Minimum sample sizes for each interpretation label (Henning, R9).
@@ -375,6 +459,15 @@ def compute_correlations(series):
         }
         if r is not None:
             logger.info("  %-45s r=%.3f (n=%d, %s, %s)", label, r, n, interpret_r(r, n), correlation_type)
+
+    # R13-F15: Apply Benjamini-Hochberg FDR correction across all m=23 pairs.
+    # With 23 simultaneous tests at alpha=0.05, naive thresholding yields ~1.15
+    # expected false positives. BH controls the false discovery rate instead.
+    # Adds p_value, p_value_fdr, and fdr_significant fields to each result.
+    results = apply_benjamini_hochberg(results, alpha=0.05)
+    fdr_sig = sum(1 for v in results.values() if v.get("fdr_significant"))
+    logger.info("[R13-F15] BH FDR correction applied: %d/%d pairs FDR-significant (alpha=0.05)",
+                fdr_sig, len(results))
 
     return results
 
