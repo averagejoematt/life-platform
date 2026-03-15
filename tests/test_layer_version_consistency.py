@@ -56,12 +56,19 @@ _LAYER_CONSUMERS = _MAP.get("shared_layer", {}).get("consumers", [])
 # ── CDK source files ──────────────────────────────────────────────────────────
 
 def _get_cdk_python_sources():
-    """Return all .py files in cdk/stacks/."""
+    """Return .py files in cdk/stacks/, excluding constants.py.
+
+    constants.py is excluded because it intentionally defines SHARED_LAYER_ARN
+    with the concrete version number as the single source of truth. The CDK
+    stacks import from there rather than hardcoding versions themselves, which
+    is the correct pattern (one place to update on every layer rebuild).
+    """
     sources = []
     if not os.path.isdir(CDK_STACKS_DIR):
         return sources
+    EXCLUDE = {"constants.py"}  # intentionally holds the canonical layer version
     for fname in os.listdir(CDK_STACKS_DIR):
-        if fname.endswith(".py") and not fname.startswith("__"):
+        if fname.endswith(".py") and not fname.startswith("__") and fname not in EXCLUDE:
             sources.append(os.path.join(CDK_STACKS_DIR, fname))
     return sources
 
@@ -184,6 +191,31 @@ def test_lv3_all_layer_modules_exist_on_disk():
 # ══════════════════════════════════════════════════════════════════════════════
 # LV4 — Consumer count sanity check
 # ══════════════════════════════════════════════════════════════════════════════
+
+def test_lv5_layer_version_only_in_constants():
+    """LV5: The hardcoded layer version number must only appear in constants.py,
+    not copied into individual stack files.
+
+    After the refactor: ingestion_stack.py and email_stack.py import
+    SHARED_LAYER_ARN from stacks.constants rather than defining it locally.
+    This test catches regressions where someone copies the ARN back into a
+    stack file instead of using the import.
+    """
+    if not _CDK_SOURCE:
+        pytest.skip("No CDK stack sources found in cdk/stacks/")
+
+    hardcoded_re = re.compile(
+        r"arn:aws:lambda:[^:]+:[^:]+:layer:" + re.escape(SHARED_LAYER_NAME) + r":\d+"
+    )
+    matches = hardcoded_re.findall(_CDK_SOURCE)
+
+    assert not matches, (
+        f"LV5 FAIL: {len(matches)} hardcoded layer ARN(s) with version numbers found "
+        f"in CDK stack files (other than constants.py):\n"
+        + "\n".join(f"  {m}" for m in matches)
+        + "\n\nImport SHARED_LAYER_ARN from stacks.constants instead of copying the ARN."
+    )
+
 
 def test_lv4_consumer_count_sanity():
     """LV4: The shared layer consumer list must have at least a minimum count.

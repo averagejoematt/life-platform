@@ -24,11 +24,8 @@ from constructs import Construct
 
 from stacks.lambda_helpers import create_platform_lambda
 from stacks import role_policies as rp
+from stacks.constants import SHARED_LAYER_ARN, ACCT, REGION  # single source of truth for layer version
 
-REGION = "us-west-2"
-ACCT = "205930651321"
-
-SHARED_LAYER_ARN     = f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:10"  # ADR-027: v10 adds stable mcp/ core modules
 INGESTION_DLQ_ARN    = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
 LIFE_PLATFORM_TABLE  = "life-platform"
 LIFE_PLATFORM_BUCKET = "matthew-life-platform"
