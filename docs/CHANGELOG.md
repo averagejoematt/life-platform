@@ -26,6 +26,14 @@ Root cause documented in deploy_lambda.sh guard. MCP connector reconnected succe
 - MCP Lambda redeployed with full mcp/ package ✅
 - CDK deploy pending (removes google-calendar-ingestion from AWS)
 
+### Architecture Review #16 (conducted post-v3.7.47)
+- **Grade: A** (all dimensions hold from R15)
+- 6 new findings (1 Medium: R16-F04 CI/CD activation; 5 Low: doc drift from Google Calendar retirement)
+- All 6 R15 findings confirmed resolved
+- 4 carried forward (R14-F02, R14-F04, R13-F07, R13-F11)
+- MCP outage incident analyzed with prevention confirmed (ADR-031)
+- Full report: `docs/reviews/REVIEW_2026-03-15_v16.md`
+
 ---
 
 ## v3.7.46 — 2026-03-15: ADR-030 — Google Calendar integration retired

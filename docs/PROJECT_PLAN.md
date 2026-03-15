@@ -1,7 +1,7 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-15 (v3.7.43 — R14 findings closed, IC-4/IC-5 skeletons, ADR-029, R13-F10)
+> Last update: 2026-03-15 (v3.7.47 — R16 review conducted, R15 findings closed, ADR-030/031, Google Calendar retired)
 
 ---
 
@@ -49,7 +49,7 @@ Items are grouped by priority tier. Within each tier, items are ordered by ROI (
 | R13-F15 | **FDR correction in weekly correlation compute** — Benjamini-Hochberg applied. | R13 Finding-15 | S (2h) | MEDIUM | ✅ Done (v3.7.37) — `apply_benjamini_hochberg()` in `weekly_correlation_compute_lambda.py`. |
 | R13-F10 | **Consolidate d2f() into shared layer** | R13 Finding-10 | S (30min) | LOW | ✅ Done (v3.7.43) — `weekly_correlation_compute_lambda.py` switched to `from digest_utils import d2f`. |
 | R13-F07 | **Quarterly PITR restore drill** — first drill executed. Next ~2026-06-15. | R13 Finding-07 | S (1h) | MEDIUM | ✅ Done (v3.7.43) — drill ran 2026-03-15: 270s restore, 6/6 partitions verified. Next drill ~2026-06-15. |
-| R8-ST1 | **Google Calendar integration** — Lambda + 2 MCP tools deployed v3.7.21. OAuth still requires one-time setup: `python3 setup/setup_google_calendar_auth.py`. Tracked as CLEANUP-3. | Pre-R8, TB7-18 | S (20min remaining) | MEDIUM — code live, data flow pending OAuth | ⏳ Deployed (v3.7.21), OAuth pending (CLEANUP-3) |
+| R8-ST1 | **Google Calendar integration** — Retired (ADR-030, v3.7.46). All 7 data paths blocked by Smartsheet IT or macOS restrictions. Lambda removed from CDK (v3.7.47). | Pre-R8, TB7-18 | — | — | ❌ Retired (ADR-030) |
 | R8-ST2 | **Document and test DynamoDB restore procedure** — write runbook section, execute PITR restore to test table, verify data integrity across partitions. | R8 Finding-6, R8 Top-10 #6 | S (1h) | MEDIUM — critical insurance for core data asset | ✅ Done (v3.7.17) — runbook written. Drill (actual restore) tracked as R13-F07. |
 | R8-ST3 | **Create "maintenance mode" Lambda profile** — config to disable non-essential Lambdas during vacation/absence. | R8 §6 R-5, R8 Top-10 #9 | S (30min) | MEDIUM — operational resilience during absence | ✅ Done (v3.7.17) — `deploy/maintenance_mode.sh enable\|disable\|status` |
 | R8-ST4 | **Add OAuth token health monitoring** — alert if any OAuth refresh token hasn't been updated in >60 days. | R8 §6 R-2, R8 Top-10 | M (2h) | MEDIUM — prevents multi-source auth cascade failure | ✅ Done (v3.7.17) — freshness_checker extended, OAuthSecretDescribe IAM added |
@@ -83,10 +83,24 @@ These are not architecture decisions — they're deferred deletions and one-time
 |----|------|--------|--------|--------|
 | CLEANUP-1 | **Remove `write_composite_scores()` dead code** | ADR-025 + R12 Viktor | S | ✅ Done (v3.7.28) |
 | CLEANUP-2 | **Lambda@Edge in `ci/lambda_map.json`** | R12 Yael | S | ✅ Done (v3.7.27) — `lambda_edge` section with cf-auth, region, CloudFront ID |
-| CLEANUP-3 | **Google Calendar OAuth activation** — run `python3 setup/setup_google_calendar_auth.py`. Not an engineering task. Deferred since v3.7.21. | R9-R13 every review | S (20min) | ⏳ Still pending — carry to Apr 13 |
+| CLEANUP-3 | **Google Calendar OAuth activation** — N/A: integration retired (ADR-030, v3.7.46). All setup scripts deleted. | R9-R13 every review | — | ❌ Retired (ADR-030) |
 | CLEANUP-4 | **`ingestion_validator.py` Decimal import fix** — `_Decimal` was used in typed_fields loop with no import anywhere in the file (live NameError risk). `from decimal import Decimal as _Decimal` moved to module level. `weekly_correlation_compute_lambda.py` was already clean. | R12 Elena + Marcus | S | ✅ Done (v3.7.29) |
 | SEC-3 MEDIUM | **`validate_date_range` in `mcp/utils.py`** — new stable module. Prevents unbounded DDB range scans from MCP tool date inputs. Auto-applied in `handler._validate_tool_args` step 4 to all tools with `start_date`/`end_date` or `date` args. `validate_single_date` also included. | R13 Yael / board | S | ✅ Done (v3.7.29) |
 | ADR-027 EXEC | **Stable MCP core → Layer** — Layer v10 published with 6 stable mcp/ modules. Ingestion + Email stacks updated to `:10`. | ADR-027 | — | ✅ DONE v3.7.31 — `life-platform-shared-utils:10` live, CDK deployed |
+
+---
+
+### R16 Findings (2026-03-15, v3.7.47)
+
+| ID | Item | Source | Effort | Impact | Status |
+|----|------|--------|--------|--------|--------|
+| R16-F01 | **ARCHITECTURE inline tool count 89→87** — Serve Layer MCP Server table still says 89 after Google Calendar retirement. | R16 Omar | XS | LOW | ⏳ Pending |
+| R16-F02 | **INFRASTRUCTURE `google-calendar` secret still listed** — delete secret + update table. | R16 Yael | XS | LOW | ⏳ Pending |
+| R16-F03 | **INFRASTRUCTURE Lambda list still has `google-calendar-ingestion`** — execute CDK deploy + update doc. | R16 Marcus | S | LOW | ⏳ Pending (CDK deploy needed) |
+| R16-F04 | **CI/CD pipeline activation** — run `setup_github_oidc.sh`, create GitHub `production` Environment, trigger first pipeline run. Closes TB7-1. | R16 Elena | M | MEDIUM | ⏳ Pending — highest-leverage item |
+| R16-F05 | **Canary tool count threshold <50→<80** — tighten to match 87-tool reality. | R16 Jin | XS | LOW | ⏳ Pending |
+| R16-F06 | **`webhook-key` deletion status** — verify via `describe-secret`, update INFRASTRUCTURE. | R16 Yael | XS | LOW | ⏳ Pending |
+| R14-F02 | **INTELLIGENCE_LAYER.md staleness** — persisting across R14/R15/R16. Add IC-4/IC-5 descriptions. | R14 Sarah (carry) | S | LOW | ⏳ Persisting |
 
 ---
 
@@ -137,6 +151,9 @@ These are not architecture decisions — they're deferred deletions and one-time
 
 | # | Date | Version | Grade | Key Findings |
 |---|------|---------|-------|-------------|
+| R16 | 2026-03-15 | v3.7.47 | A | 6 new findings (1 Medium: CI/CD activation; 5 Low: doc drift from Google Calendar retirement). All 6 R15 findings closed. 4 carried forward. MCP outage incident analyzed. Report: `docs/reviews/REVIEW_2026-03-15_v16.md` |
+| R15 | 2026-03-15 | v3.7.43 | A | 6 Low findings (all doc drift). All R14 findings resolved. Zero dimension changes. Platform in steady-state. Report: `docs/reviews/REVIEW_2026-03-15_v15.md` |
+| R14 | 2026-03-15 | v3.7.40 | A | 8 findings. MCP canary + X-Ray tracing. Security hardening. Report: `docs/reviews/REVIEW_2026-03-15_v14.md` |
 | R13 | 2026-03-14 | v3.7.29 | B+/A- | Full external-style review. 15 findings: no CI/CD pipeline (#1 risk), no integration tests, OAuth fail-open, correlation n-gating gap, no PITR drill, layer version fragility, no medical disclaimers in MCP responses. 30-60-90 roadmap. Report: `docs/reviews/REVIEW_2026-03-14_v13.md` |
 | R12 | 2026-03-15 | v3.7.25 | A- | Validator S3 bug, 4 partitions unwired, composite_scores stale. All 8 items resolved same session. |
 | R11 | 2026-03-15 | v3.7.24 | A | Engineering strategy: deploy_and_verify.sh, integration tests I1-I10, auto-discover counters, checklists. All 9 items resolved. |
