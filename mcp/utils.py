@@ -108,6 +108,7 @@ ERROR_CODES = {
     "PARTIAL_DATA":     "Data returned but one or more fields are incomplete.",
     "QUERY_TOO_BROAD":  "Query spans too many days — use a narrower date range.",
     "INTERNAL":         "Internal processing error.",
+    "RATE_LIMIT":       "Write tool rate limit exceeded for this invocation.",
 }
 
 
@@ -184,6 +185,10 @@ def _default_suggestions(error_code: str) -> list[str]:
         "INTERNAL": [
             "Retry the request — this may be a transient error.",
             "If the error persists, check CloudWatch logs for the MCP Lambda.",
+        ],
+        "RATE_LIMIT": [
+            "You have called this write tool too many times in one session.",
+            "Start a new conversation to reset the per-session counter.",
         ],
     }
     return _DEFAULTS.get(error_code, ["Retry or check system status."])

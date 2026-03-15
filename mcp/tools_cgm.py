@@ -913,6 +913,13 @@ def tool_get_fasting_glucose_validation(args):
     }
 
 
+# R13-F09: Standard medical disclaimer for CGM health-assessment responses.
+_CGM_DISCLAIMER = (
+    "For personal health tracking only. Not medical advice. "
+    "Consult a qualified healthcare provider before making health decisions based on this data."
+)
+
+
 def tool_get_cgm(args):
     """Unified CGM intelligence dispatcher."""
     VALID_VIEWS = {
@@ -923,4 +930,8 @@ def tool_get_cgm(args):
     if view not in VALID_VIEWS:
         return {"error": f"Unknown view '{view}'.", "valid_views": list(VALID_VIEWS.keys()),
                 "hint": "'dashboard' for time-in-range, variability, mean glucose, clinical flags. 'fasting' for overnight nadir-based fasting glucose validation."}
-    return VALID_VIEWS[view](args)
+    result = VALID_VIEWS[view](args)
+    # R13-F09: Inject disclaimer into all CGM view responses
+    if isinstance(result, dict) and "error" not in result:
+        result["_disclaimer"] = _CGM_DISCLAIMER
+    return result

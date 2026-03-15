@@ -391,6 +391,8 @@ def tool_get_readiness_score(args):
             "Weights: Whoop recovery 35%, Whoop sleep quality 25%, HRV 7d trend 20%, TSB form 10%, "
             "Garmin Body Battery 10%. Missing components are excluded and remaining weights re-normalised."
         ),
+        # R13-F09: Medical disclaimer on all health-assessment tool responses
+        "_disclaimer": "For personal health tracking only. Not medical advice. Consult a qualified healthcare provider before making health decisions based on this data.",
     }
 
 
@@ -2037,6 +2039,13 @@ def tool_get_daily_metrics(args):
     return VALID_VIEWS[view](args)
 
 
+# R13-F09: Standard medical disclaimer injected into all health-assessment responses.
+_HEALTH_DISCLAIMER = (
+    "For personal health tracking only. Not medical advice. "
+    "Consult a qualified healthcare provider before making health decisions based on this data."
+)
+
+
 def tool_get_health(args):
     """
     Unified health intelligence dispatcher. Routes to the appropriate underlying
@@ -2056,4 +2065,8 @@ def tool_get_health(args):
             "valid_views": list(VALID_VIEWS.keys()),
             "hint": "Default is 'dashboard'. Use 'risk_profile' for CV/metabolic/longevity risk, 'trajectory' for forward-looking projections.",
         }
-    return VALID_VIEWS[view](args)
+    result = VALID_VIEWS[view](args)
+    # R13-F09: Inject disclaimer into all health view responses
+    if isinstance(result, dict) and "error" not in result:
+        result["_disclaimer"] = _HEALTH_DISCLAIMER
+    return result
