@@ -1,8 +1,78 @@
-# Life Platform — DynamoDB Schema Reference
+# Life Platform — Schema & Data Dictionary
 
 **Table:** `life-platform` (us-west-2)  
 **Design:** Single-table with composite keys  
 **Last updated:** 2026-03-15 (v3.7.32 — 89 MCP tools, 20 data sources, 43 Lambdas, 12 cached tools)
+
+> Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
+
+---
+
+## Source-of-Truth (SOT) Domains
+
+Each health domain has exactly one authoritative source. When multiple devices measure the same thing, only the SOT source is used for scoring, grading, and coaching. The SOT mapping lives in the user profile and can be changed without code deploys.
+
+| Domain | SOT Source | Why This Source |
+|--------|-----------|-------------------|
+| **Cardio** | Strava | GPS accuracy, activity classification |
+| **Strength** | Hevy / MacroFactor Workouts | Set-level granularity (weight × reps × RIR) |
+| **Physiology** (HRV, RHR, recovery) | Whoop | Clinical-grade sensor, worn 24/7 |
+| **Nutrition** | MacroFactor | User-logged meals with per-food granularity |
+| **Sleep Duration & Staging** | Whoop | Captures all sleep regardless of location (v2.55.0) |
+| **Sleep Environment** | Eight Sleep | Pod sensor (pressure + temperature), unique to bed |
+| **Body** (weight, body fat) | Withings | Smart scale, daily weigh-in |
+| **Steps** | Apple Health | iPhone always-on, most accurate daily step count |
+| **Tasks** | Todoist | Primary task manager |
+| **Habits** | Habitify | Active tracking app |
+| **Stress** | Garmin | Epix Gen 2 all-day HRV-derived stress score |
+| **Body Battery** | Garmin | Proprietary Garmin metric |
+| **Gait** | Apple Health | Apple Watch accelerometer via HAE webhook |
+| **Energy Expenditure** | Apple Health | Apple Watch active + basal calories (real measurement) |
+| **CGM** | Apple Health | Dexcom Stelo → HealthKit → webhook |
+| **Caffeine** | Apple Health | Caffeine tracking app → HealthKit → webhook |
+| **Water** | Apple Health | Water tracking app → HealthKit → webhook |
+| **Journal** | Notion | Structured journal templates with AI enrichment |
+| **Supplements** | Supplements (MCP) | Manual logging via `log_supplement` MCP tool |
+| **Weather** | Weather (Open-Meteo) | Automated Lambda sync + on-demand MCP fetch |
+| **State of Mind** | State of Mind (How We Feel) | Via Apple HealthKit → HAE webhook |
+
+---
+
+## Metric Overlap Map
+
+Where multiple sources measure the same thing:
+
+| Metric | SOT | Also Available From | Resolution |
+|--------|-----|-------------------|------------|
+| **HRV** | Whoop | Garmin (`hrv_last_night`), Eight Sleep (`hrv`), Apple Health (`hrv_sdnn_apple`) | Whoop for coaching; `get_device_agreement` cross-validates |
+| **Resting Heart Rate** | Whoop | Garmin, Eight Sleep, Apple Health | Same cross-validation pattern |
+| **Sleep Duration** | Whoop | Eight Sleep, Garmin | Whoop captures couch/travel sleep |
+| **Sleep Staging** | Whoop | Eight Sleep | Whoop hours → pct via `normalize_whoop_sleep()` |
+| **Steps** | Apple Health | Garmin | Apple preferred (phone always-on) |
+| **Active Calories** | Apple Health | Garmin | Apple for TDEE; Garmin retained for training metrics |
+| **Body Composition** | Withings (daily) | DEXA (semi-annual) | Withings for trending; DEXA for absolute accuracy |
+
+### Three-Tier Source Filtering (HAE Webhook)
+
+| Tier | Behavior | Metrics |
+|------|----------|---------|
+| **Tier 1** (Apple-exclusive) | All readings ingested | Steps, active/basal calories, gait, flights, water, caffeine |
+| **Tier 2** (Cross-device) | Filtered to Apple Watch only, `_apple` suffix | HR, RHR, HRV, respiratory rate, SpO2 |
+| **Tier 3** (Skip) | Blocked at ingestion | Nutrition (MacroFactor SOT), sleep environment (Eight Sleep SOT), body comp (Withings SOT) |
+
+---
+
+## Known Data Gaps
+
+| Gap | Period | Impact |
+|-----|--------|--------|
+| Habit tracking | 2025-11-10 → 2026-02-22 | No habit data. No fix possible. |
+| Garmin | 2026-01-19 → 2026-02-23 | App sync issue. Backfilled from Feb 23 forward. |
+| MacroFactor | Before 2026-02-22 | Mock data only; real import pending. |
+| CGM | 2025-01-25 → 2026-02-24 | Dexcom gap. CGM data: Sep 2024–Jan 2025 + Feb 2026 onward. |
+| Journal | Before 2026-02-24 | Notion system created Feb 24. No prior subjective data. |
+| State of Mind | Before 2026-02-27 | How We Feel integration added v2.41.0. |
+| Supplements | Before 2026-02-26 | Manual MCP logging started v2.36.0. |
 
 ---
 

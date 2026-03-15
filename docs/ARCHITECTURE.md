@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-15 (v3.7.32 — 89 tools, 31-module MCP package, 20 data sources, 43 Lambdas, 11 secrets, 49 alarms, 8 CDK stacks deployed)
+Last updated: 2026-03-15 (v3.7.33 — 89 tools, 31-module MCP package, 20 data sources, 43 Lambdas, 11 secrets, 49 alarms, 8 CDK stacks deployed)
 
 ---
 
@@ -427,14 +427,14 @@ AWS Budget alerts at $5 (25%), $10 (50%), $20 (100%) → `awsdev@mattsusername.c
 
   docs/
     ARCHITECTURE.md               ← This file
-    SCHEMA.md                     ← DynamoDB field definitions per source
+    SCHEMA.md                     ← DynamoDB schema + SOT domains + metric overlap + data gaps
+    PLATFORM_GUIDE.md             ← Feature guide + query examples + troubleshooting
+    ONBOARDING.md                 ← Start here — mental models + quick reference
+    DATA_FLOW_DIAGRAM.md          ← 7 Mermaid diagrams of system flows
     RUNBOOK.md                    ← Operational procedures + schedule
     CHANGELOG.md                  ← Version history
     PROJECT_PLAN.md               ← Roadmap and backlog
-    USER_GUIDE.md                 ← How to use MCP tools
-    FEATURES.md                   ← Feature showcase
     MCP_TOOL_CATALOG.md           ← All 89 tools with params, cache, deps
-    DATA_DICTIONARY.md            ← Every metric → SOT source
     COST_TRACKER.md               ← Budget tracking
     INCIDENT_LOG.md               ← Operational incident history
     HANDOVER_LATEST.md            ← Pointer to most recent handover
