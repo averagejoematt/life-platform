@@ -1,5 +1,51 @@
 # Life Platform — Changelog
 
+## v3.7.27 — 2026-03-15: 10-item unblocked sweep
+
+### Summary
+Full Technical Board planning session. 10 of 11 unblocked items completed. Lambda@Edge alarm live (us-east-1, no SNS action — region constraint). MCP S3 scope tightened in CDK (committed, CDK deploy pending from cdk/ dir). Freshness checker gains field-level completeness. I1/I2/I5 wired into CI/CD post-deploy job. CloudWatch ops dashboard live. PITR drill executed. SEC-3 high finding documented (S3 path traversal in CGM tools). CLEANUP-2/4 complete.
+
+### Changes
+
+**Lambda@Edge alarm (item 1)**
+- `deploy/create_lambda_edge_alarm.sh`: fixed to remove `--alarm-actions` with wrong-region SNS ARN. Alarm created in us-east-1 (console monitoring only — us-east-1 SNS topic needed for email).
+
+**CLEANUP-2 — ci/lambda_map.json (item 2)**
+- Added `lambda_edge` section with `cf-auth` entry, `region: us-east-1`, CloudFront distribution ID, and manual-management note.
+
+**CLEANUP-4 — docstring + import fixes (items 3–4)**
+- `lambdas/ingestion_validator.py`: docstring fixed — duplicate `computed_insights` removed, count 22→20.
+- `lambdas/weekly_correlation_compute_lambda.py`: `from datetime import` inside lagged correlation loop removed, uses top-level imports.
+
+**MCP S3 permissions tightened (item 5)**
+- `cdk/stacks/role_policies.py` `mcp_server()`: tightened from `BUCKET_ARN/*` to `config/*` + `raw/matthew/cgm_readings/*`. `ListBucket` scoped to CGM prefix only. CDK deploy pending.
+- `docs/ARCHITECTURE.md`: IAM section updated.
+
+**SEC-3 input validation assessment (item 6)**
+- `docs/sec3_input_validation_assessment.md`: HIGH finding (S3 path traversal in `_load_cgm_readings`), MEDIUM (unbounded date range), implementation plan. Fix before R13.
+
+**I1/I2/I5 wired into CI/CD (item 7)**
+- `.github/workflows/ci-cd.yml`: `post-deploy-checks` job added after `deploy`. I1 + I2 blocking; I5 `continue-on-error: true` pending OIDC role `secretsmanager:DescribeSecret`.
+
+**PITR restore drill (item 8)**
+- `deploy/pitr_restore_drill.sh`: new script. Drill executed — restore ACTIVE in 4m40s, 3 partitions validated, test table deleted. Script fixed: `RECOVERY`/`GRADE` initialized before conditional to avoid `unbound variable`.
+
+**CloudWatch operational dashboard (item 9)**
+- `deploy/create_operational_dashboard.sh`: new script. `life-platform-ops` dashboard created live — 5-row layout covering alarms, Lambda errors, DLQ, freshness, pipeline staleness, MCP duration, DDB capacity.
+
+**Freshness checker field completeness (item 10)**
+- `lambdas/freshness_checker_lambda.py`: `FIELD_COMPLETENESS_CHECKS` dict (10 sources). Per-source `GetItem` after freshness pass. `partial_sources` list, SNS alert, `PartialCompletenessCount` CloudWatch metric. Deployed live.
+
+### Deployed
+- `life-platform-freshness-checker` ✅
+- `life-platform-ops` CloudWatch dashboard ✅
+- `life-platform-cf-auth-errors` alarm (us-east-1) ✅
+
+### Pending deploy
+- CDK `LifePlatformMcp` (MCP S3 scope — must run `cd cdk && npx cdk deploy LifePlatformMcp`)
+
+---
+
 ## v3.7.26 — 2026-03-15: Brief quality improvements + Lambda@Edge audit
 
 ### Summary
