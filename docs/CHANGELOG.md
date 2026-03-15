@@ -1,5 +1,28 @@
 # Life Platform — Changelog
 
+## v3.7.48 — 2026-03-15: R16 findings sweep (doc fixes + canary + CI/CD trigger)
+
+### Summary
+Resolved all R16 findings: tool count corrected to 87 throughout docs, canary threshold raised from 50 to 80, IC-4/IC-5 skeleton descriptions added to INTELLIGENCE_LAYER.md, ARCHITECTURE.md google-calendar secret rows cleaned up, CDK deploy completed removing `google-calendar-ingestion` from AWS, CI/CD pipeline first run triggered (closes TB7-1). `google-calendar` secret confirmed already deleted (ResourceNotFoundException on delete attempt — deleted in v3.7.46 session).
+
+### Changes
+- `docs/ARCHITECTURE.md`: SERVE LAYER and MCP Server section tool count 89→87; resource table secrets count 11→10; google-calendar row struck through as permanently deleted (ADR-030)
+- `lambdas/canary_lambda.py`: MCP tools/list threshold raised `< 50` → `< 80` (R16-F05); error message updated to match
+- `docs/INTELLIGENCE_LAYER.md`: IC-4 (Failure Pattern Recognition) and IC-5 (Momentum Warning) skeleton descriptions added with activation checklists and key output fields (R14-F02); version updated to v3.7.48
+- CDK deploy: `LifePlatformIngestion` deployed — `google-calendar-ingestion` Lambda + EventBridge rule removed from AWS (R16-F03). 10/10 post-reconcile smoke passed.
+
+### R16-F02 / R16-F06 status
+- `life-platform/google-calendar`: `ResourceNotFoundException` on delete — already deleted during v3.7.46. R16-F02 closed.
+- `life-platform/webhook-key`: verify command pending (R16-F06)
+
+### R16-F04: CI/CD first pipeline run
+- Committed and pushed to main — first GitHub Actions pipeline run triggered (closes TB7-1)
+
+### Test Results
+- 83/83 tests passing ✅
+
+---
+
 ## v3.7.47 — 2026-03-15: CDK cleanup + MCP deploy guard + MCP connection fix
 
 ### Summary
