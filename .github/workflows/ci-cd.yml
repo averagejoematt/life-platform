@@ -628,6 +628,12 @@ jobs:
               continue
             fi
 
+            SKELETON=$(jq -r --arg f "$SRC" '.lambdas[$f].not_deployed // false' "${{ env.LAMBDA_MAP }}")
+            if [ "$SKELETON" = "true" ]; then
+              echo "  ⚠️ SKIPPED: $FUNC is a skeleton (\'not_deployed\' flag) — activate before deploying via CDK"
+              continue
+            fi
+
             if bash deploy/deploy_lambda.sh "$FUNC" "$SRC"; then
               aws lambda wait function-updated \
                 --function-name "$FUNC" \
@@ -783,14 +789,48 @@ jobs:
             -v --tb=short -m integration 2>&1
           echo "I2 complete"
 
+      - name: I4 — DynamoDB table healthy (deletion protection + PITR enabled)
+        # Catastrophic if DDB deletion protection was accidentally disabled.
+        run: |
+          python3 -m pytest tests/test_integration_aws.py::test_i4_dynamodb_table_healthy \
+            -v --tb=short -m integration 2>&1
+          echo "I4 complete"
+
       - name: I5 — Required secrets exist in Secrets Manager
         # Catches stale SECRET_NAME env vars pointing at deleted secrets.
-        # continue-on-error: true until github-actions-deploy-role gets secretsmanager:DescribeSecret.
         continue-on-error: true
         run: |
           python3 -m pytest tests/test_integration_aws.py::test_i5_required_secrets_exist \
             -v --tb=short -m integration 2>&1
           echo "I5 complete"
+
+      - name: I6 — Critical EventBridge rules exist and are enabled
+        # Missing/disabled rules cause scheduled Lambdas to stop silently.
+        run: |
+          python3 -m pytest tests/test_integration_aws.py::test_i6_eventbridge_rules_exist_and_enabled \
+            -v --tb=short -m integration 2>&1
+          echo "I6 complete"
+
+      - name: I7 — CloudWatch alarm count meets minimum threshold
+        # Guards against accidental alarm deletion after a CDK or console change.
+        run: |
+          python3 -m pytest tests/test_integration_aws.py::test_i7_cloudwatch_alarms_exist \
+            -v --tb=short -m integration 2>&1
+          echo "I7 complete"
+
+      - name: I8 — S3 critical config files present
+        # board_of_directors.json / character_sheet.json / profile.json must exist.
+        run: |
+          python3 -m pytest tests/test_integration_aws.py::test_i8_s3_bucket_and_config_files \
+            -v --tb=short -m integration 2>&1
+          echo "I8 complete"
+
+      - name: I9 — Ingestion DLQ empty (no silent Lambda failures)
+        # Non-zero DLQ means a Lambda is silently failing. Hard failure so it’s caught immediately.
+        run: |
+          python3 -m pytest tests/test_integration_aws.py::test_i9_dlq_empty \
+            -v --tb=short -m integration 2>&1
+          echo "I9 complete"
 
   # ════════════════════════════════════════════════════════════════
   # Job 6: Auto-rollback on smoke failure (TB7-25)
