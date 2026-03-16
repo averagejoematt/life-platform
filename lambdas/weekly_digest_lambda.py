@@ -49,6 +49,7 @@ from digest_utils import (
     d2f, avg, fmt, fmt_num, safe_float,
     dedup_activities,
     _normalize_whoop_sleep,
+    compute_confidence,     # BS-05: confidence badges
 )
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
@@ -979,8 +980,21 @@ def build_html(data, commentary, profile):
         elif line.strip():
             board_html += f'<p style="font-size:13px;color:#333;line-height:1.6;margin:0 0 8px;">{line}</p>'
 
+    # BS-05: confidence badge on Insight of the Week
+    # Henning: weekly insight n = days_graded (7 → always LOW per <14 rule, correctly signals snapshot)
+    _insight_badge = ""
+    try:
+        _wk_dg = t.get("day_grades")
+        _dg_n = _wk_dg.get("days_graded") if _wk_dg else None
+        _wk_conf = compute_confidence(days_of_data=_dg_n)
+        _insight_badge = _wk_conf["badge_html"]
+    except Exception:
+        _insight_badge = ""
+
     insight_box = (f'<div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:10px;'
-                   f'padding:16px 20px;margin-bottom:24px;">{insight_html}</div>') if insight_html else ""
+                   f'padding:16px 20px;margin-bottom:24px;">'
+                   + (f'<div style="margin-bottom:8px;">{_insight_badge}</div>' if _insight_badge else "")
+                   + f'{insight_html}</div>') if insight_html else ""
 
     # ══════════════════════════════════════════════════════════════════════════
     # DAY GRADE WEEKLY TREND (NEW)

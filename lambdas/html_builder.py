@@ -628,6 +628,34 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
             html += ('<p style="color:#475569;font-size:10px;margin:8px 0 0;">'
                      'TSB: <span style="color:' + tsb_color + ';">' + str(round(tsb, 1)) + ' (' + tsb_label + ')</span></p>')
 
+        # BS-09: ACWR training load alert
+        try:
+            computed_metrics = data.get("computed_metrics") or {}
+            acwr_val = computed_metrics.get("acwr")
+            acwr_zone = str(computed_metrics.get("zone", ""))
+            acwr_alert = computed_metrics.get("alert", False)
+            acwr_reason = str(computed_metrics.get("alert_reason", ""))
+            if acwr_val is not None:
+                _av = float(acwr_val)
+                acwr_color = ("#ef4444" if acwr_alert
+                              else "#f59e0b" if _av > 1.3 or _av < 0.8
+                              else "#22c55e")
+                zone_label = acwr_zone.upper() if acwr_zone else ""
+                html += ('<p style="color:#475569;font-size:10px;margin:4px 0 0;">'
+                         'ACWR: <span style="color:' + acwr_color + ';font-weight:600;">'
+                         + str(round(_av, 2))
+                         + (' \u2014 ' + zone_label if zone_label else '')
+                         + '</span></p>')
+                if acwr_alert and acwr_reason:
+                    html += ('<div style="background:#1c0a0a;border-left:3px solid #ef4444;'
+                             'border-radius:0 6px 6px 0;padding:8px 12px;margin-top:8px;">'
+                             '<p style="color:#f87171;font-size:11px;margin:0;font-weight:700;">'
+                             '\u26a0\ufe0f TRAINING LOAD ALERT</p>'
+                             '<p style="color:#fca5a5;font-size:11px;margin:2px 0 0;line-height:1.5;">'
+                             + acwr_reason + '</p></div>')
+        except Exception:
+            pass
+
         html += '</div><!-- /S:training -->'
     except Exception as _e:
         html += _section_error_html("Training Report", _e)
