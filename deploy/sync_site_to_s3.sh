@@ -26,7 +26,7 @@ DRY_RUN="${1:-}"
 # Find CloudFront distribution ID for averagejoematt.com
 CF_DIST_ID=$(aws cloudformation describe-stacks \
   --stack-name LifePlatformWeb \
-  --region "$REGION" \
+  --region us-east-1 \
   --query "Stacks[0].Outputs[?OutputKey=='AmjDistributionId'].OutputValue" \
   --output text 2>/dev/null || echo "")
 

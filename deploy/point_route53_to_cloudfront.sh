@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-REGION="us-west-2"
+REGION="us-east-1"  # LifePlatformWeb deploys to us-east-1 (CloudFront requirement)
 ACCT="205930651321"
 STACK_NAME="LifePlatformWeb"
 
