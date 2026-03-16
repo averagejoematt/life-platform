@@ -1,5 +1,32 @@
 # Life Platform — Changelog
 
+## v3.7.50 — 2026-03-16: Website Phase 1 scaffold + real-time API engine
+
+### Summary
+Full website scaffold built and deployed to S3. Signal aesthetic. 5 pages (homepage, platform, character, journal, journal post template). Full design token system + responsive CSS (5 breakpoints). Real-time API engine (`site_api_lambda.py`) with viral defence: CloudFront TTL caching + Lambda concurrency cap 20. Cost at 50k hits: ~$0.33. Both boards convened on website roadmap — 5-phase plan produced. Web board of 12 design/product leaders provided specific directives (Jony Ive: remove scanlines; Bret Victor: build timeline scrubber; Karpathy: never expose MCP publicly).
+
+### Files created
+- `averagejoematt-site/` — full website repo: 5 pages, 3 CSS files, 2 JSON schemas, DEPLOY.md
+- `lambdas/site_writer.py` — writes public_stats.json + character_stats.json from existing Lambdas (2 extra `put_object` calls, ~$0.00/month cost)
+- `lambdas/site_api_lambda.py` — read-only real-time API (4 endpoints: vitals/journey/character/status), viral-safe
+
+### Site deployed
+- `aws s3 sync averagejoematt-site/ s3://matthew-life-platform/site/` ✅
+- `responsive.css` needs re-sync (created after initial upload)
+
+### Pending to go live
+- Deploy site_api_lambda via CDK (reserved concurrency = 20)
+- API Gateway HTTP API + CloudFront behaviour for /api/*
+- Route 53 A record for averagejoematt.com
+- Wire site_writer.py into daily-brief and character-sheet-compute Lambdas
+- IAM: add S3 site/* write to both Lambda roles
+
+### Cost analysis
+- 50k viral hits: ~$0.33 total
+- Defence: WAF $5/mo flat + Lambda concurrency cap + existing $5 budget alert
+
+---
+
 ## v3.7.49 — 2026-03-15: Board-recommended bug fixes + health coaching features
 
 ### Summary
