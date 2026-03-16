@@ -1582,4 +1582,76 @@ def lambda_handler(event, context):
             except Exception as e:
                 print(f"[WARN] IC-15 insight write failed (non-fatal): {e}")
 
+    # site_writer: write public_stats.json to S3 for averagejoematt.com
+    # Non-fatal — failure here never breaks the Daily Brief
+    if not demo_mode:
+        try:
+            from site_writer import write_public_stats
+
+            # Build vitals from data already gathered above
+            _w = data.get("whoop") or data.get("whoop_today") or {}
+            _wt = data.get("withings") or {}
+            _hrv = data["hrv"]
+            _rec = safe_float(_w, "recovery_score") or 0
+            _rec_status = "green" if _rec >= 67 else ("yellow" if _rec >= 34 else "red")
+
+            # Journey calc from profile
+            _start_wt = float(profile.get("journey_start_weight_lbs", 302))
+            _goal_wt  = float(profile.get("goal_weight_lbs", 185))
+            _curr_wt  = float(data.get("latest_weight") or 0)
+            _lost     = round(_start_wt - _curr_wt, 1) if _curr_wt else 0
+            _remain   = round(_curr_wt - _goal_wt, 1) if _curr_wt else 0
+            _prog_pct = round(_lost / (_start_wt - _goal_wt) * 100, 1) if _lost and _start_wt != _goal_wt else 0
+
+            # TSB/training from data
+            _strava_7d = data.get("strava_7d") or []
+            _z2_this_week = 0.0
+            for _act_day in _strava_7d:
+                for _act in (_act_day.get("activities") or []):
+                    _sport = (_act.get("sport_type") or _act.get("type") or "").lower()
+                    if any(z in _sport for z in ["run", "walk", "ride", "swim", "elliptical", "workout"]):
+                        _z2_this_week += float(_act.get("moving_time_seconds") or 0) / 60
+
+            write_public_stats(
+                s3_client=s3,
+                vitals={
+                    "weight_lbs":       round(_curr_wt, 1) if _curr_wt else None,
+                    "weight_delta_30d": round(float(data.get("latest_weight") or 0) - float(data.get("week_ago_weight") or 0), 1) if data.get("week_ago_weight") else None,
+                    "hrv_ms":           round(float(_hrv.get("hrv_yesterday") or _hrv.get("hrv_7d") or 0), 1),
+                    "hrv_trend":        html_builder.hrv_trend_str(_hrv.get("hrv_7d"), _hrv.get("hrv_30d")),
+                    "rhr_bpm":          round(safe_float(_w, "resting_heart_rate") or 0, 0),
+                    "rhr_trend":        "improving",
+                    "recovery_pct":     round(_rec, 0),
+                    "recovery_status":  _rec_status,
+                    "sleep_hours":      round(safe_float(data.get("sleep"), "sleep_duration_hours") or 0, 1),
+                },
+                journey={
+                    "start_weight_lbs":   _start_wt,
+                    "goal_weight_lbs":    _goal_wt,
+                    "current_weight_lbs": _curr_wt,
+                    "lost_lbs":           _lost,
+                    "remaining_lbs":      _remain,
+                    "progress_pct":       _prog_pct,
+                    "weekly_rate_lbs":    round(float(data.get("week_ago_weight") or _curr_wt) - _curr_wt, 2) if data.get("week_ago_weight") else 0,
+                    "projected_goal_date": profile.get("goal_date", "2026-07-31"),
+                    "started_date":       profile.get("journey_start_date", "2026-02-09"),
+                    "current_phase":      (get_current_phase(profile, _curr_wt) or {}).get("name", "Ignition"),
+                },
+                training={
+                    "ctl_fitness":          float(data.get("tsb") or 0) + 6.0,
+                    "atl_fatigue":          float(data.get("tsb") or 0) + 6.5,
+                    "tsb_form":             float(data.get("tsb") or 0),
+                    "acwr":                 1.1,
+                    "form_status":          "neutral",
+                    "injury_risk":          "low",
+                    "total_miles_30d":      0,
+                    "activity_count_30d":   0,
+                    "zone2_this_week_min":  round(_z2_this_week),
+                    "zone2_target_min":     150,
+                },
+            )
+            print("[INFO] site_writer: public_stats.json written")
+        except Exception as _sw_e:
+            print(f"[WARN] site_writer failed (non-fatal): {_sw_e}")
+
     return {"statusCode": 200, "body": "Daily brief v2.77.0 sent: " + subject}

@@ -429,11 +429,14 @@ def compute_anomaly_detector() -> list[iam.PolicyStatement]:
 
 
 def compute_character_sheet() -> list[iam.PolicyStatement]:
-    """Character sheet: DDB read+write, KMS, S3 config read, ai-keys."""
+    """Character sheet: DDB read+write, KMS, S3 config read, ai-keys, S3 site/ write.
+    site/character_stats.json written via site_writer.py for averagejoematt.com.
+    """
     return _compute_base(
         needs_kms=True,
         needs_s3_config=True,
         needs_ai_keys=True,
+        needs_s3_write=["site/*"],
     )
 
 
@@ -551,11 +554,12 @@ def _email_base(
 
 
 def email_daily_brief() -> list[iam.PolicyStatement]:
-    """Daily brief: DDB read, S3 config, ai-keys, SES, writes dashboard/ + buddy/ to S3.
+    """Daily brief: DDB read, S3 config, ai-keys, SES, writes dashboard/ + buddy/ + site/ to S3.
     Risk-7: also emits ComputePipelineStaleness metric to CloudWatch.
+    site/public_stats.json written via site_writer.py for averagejoematt.com.
     """
     return _email_base(
-        needs_s3_write=["dashboard/*", "buddy/*"],
+        needs_s3_write=["dashboard/*", "buddy/*", "site/*"],
         extra_statements=[
             iam.PolicyStatement(
                 sid="CloudWatchMetrics",

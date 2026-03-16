@@ -457,6 +457,57 @@ def lambda_handler(event, context):
     elapsed = time.time() - t0
     logger.info("[character] Done in %.1fs", elapsed)
 
+    # site_writer: write character_stats.json to S3 for averagejoematt.com
+    # Non-fatal — failure here never breaks character sheet compute
+    try:
+        from site_writer import write_character_stats
+
+        PILLAR_EMOJI_MAP = {
+            "sleep": "😴", "movement": "🏋️", "nutrition": "🥗",
+            "metabolic": "📊", "mind": "🧠", "relationships": "💬", "consistency": "🎯"
+        }
+        pillars_for_site = [
+            {
+                "name":      p,
+                "emoji":     PILLAR_EMOJI_MAP.get(p, ""),
+                "level":     float(record.get(f"pillar_{p}", {}).get("level", 1)),
+                "raw_score": float(record.get(f"pillar_{p}", {}).get("raw_score", 0)),
+                "tier":      record.get(f"pillar_{p}", {}).get("tier", "Foundation"),
+                "xp_delta":  float(record.get(f"pillar_{p}", {}).get("xp_delta", 0)),
+                "trend":     "up" if float(record.get(f"pillar_{p}", {}).get("xp_delta", 0)) > 0 else "neutral",
+            }
+            for p in PILLAR_ORDER
+        ]
+
+        timeline_events = [
+            {
+                "date":            ev.get("date", yesterday_str),
+                "character_level": float(ev.get("new_level", char_level)),
+                "event":           ev.get("description", f"{ev.get('pillar', 'overall')} level up"),
+            }
+            for ev in (events or [])
+        ]
+
+        write_character_stats(
+            s3_client=boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2")),
+            character={
+                "level":              float(char_level),
+                "tier":               char_tier,
+                "tier_emoji":         char_emoji,
+                "xp_total":           float(record.get("character_xp", 0)),
+                "days_active":        int(history_depth),
+                "level_events_count": len(events),
+                "next_tier":          "Momentum",
+                "next_tier_level":    21,
+                "started_date":       "2026-02-22",
+            },
+            pillars=pillars_for_site,
+            timeline=timeline_events,
+        )
+        logger.info("[character] site_writer: character_stats.json written")
+    except Exception as _sw_e:
+        logger.warning(f"[character] site_writer failed (non-fatal): {_sw_e}")
+
     return {
         "statusCode": 200,
         "body": f"Character sheet computed for {yesterday_str}: Level {char_level} ({char_emoji} {char_tier})",
