@@ -982,6 +982,160 @@ def build_email_html(title, stats_line, body_html, week_num, date_str, blog_url)
 # BLOG HTML
 # ══════════════════════════════════════════════════════════════════════════════
 
+# ══════════════════════════════════════════════════════════════════════════════
+# JOURNAL PUBLISHER (averagejoematt.com/journal/) — Signal aesthetic
+# Writes to site/journal/posts/week-{nn}/index.html + site/journal/posts.json
+# ══════════════════════════════════════════════════════════════════════════════
+
+def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_installments):
+    """Publish installment to the Signal-themed journal on averagejoematt.com.
+
+    Writes:
+      site/journal/posts/week-{nn}/index.html  — the post itself
+      site/journal/posts.json                   — manifest for the listing page
+
+    Non-fatal: failure here never breaks the Chronicle email.
+    """
+    try:
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        date_display = dt.strftime("%B %-d, %Y")
+        date_mono = date_str
+    except Exception:
+        date_display = date_str
+        date_mono = date_str
+
+    # Extract read time (~250 words/min)
+    word_count = len(body_html.split())
+    read_min = max(4, round(word_count / 250))
+
+    # Convert blog body_html (built for email) to prose-ready Signal HTML
+    # Remap email-style <p> to prose <p> — classes already handled by Signal serif
+    post_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="{title} — Week {week_num} of The Measured Life by Elena Voss">
+  <meta property="og:title" content="{title} — The Measured Life">
+  <meta property="og:description" content="{stats_line}">
+  <meta property="og:type" content="article">
+  <title>{title} — The Measured Life</title>
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    :root {{
+      --accent: var(--c-amber-500);
+      --accent-dim: var(--c-amber-300);
+      --accent-bg: var(--c-amber-100);
+      --accent-bg-subtle: var(--c-amber-050);
+      --border: rgba(200,132,58,0.15);
+    }}
+    .reading-progress {{ position:fixed;top:var(--nav-height);left:0;right:0;height:2px;background:var(--border-subtle);z-index:var(--z-overlay); }}
+    .reading-progress__fill {{ height:100%;background:var(--accent);width:0%;transition:width 0.1s linear; }}
+    .post-header {{ padding:calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-10);border-bottom:1px solid var(--border);max-width:calc(var(--prose-width) + var(--page-padding) * 2);margin:0 auto; }}
+    .post-header__series {{ font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3); }}
+    .post-header__title {{ font-family:var(--font-serif);font-size:clamp(28px,4vw,46px);color:var(--text);line-height:1.15;font-weight:400;font-style:italic;margin-bottom:var(--space-5); }}
+    .post-header__meta {{ display:flex;align-items:center;gap:var(--space-5);font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted); }}
+    .post-header__stats {{ font-size:var(--text-xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3); }}
+    .post-body {{ max-width:calc(var(--prose-width) + var(--page-padding) * 2);margin:0 auto;padding:var(--space-10) var(--page-padding) var(--space-20); }}
+    .prose {{ font-family:var(--font-serif); }}
+    .prose p {{ font-size:18px;line-height:1.85;color:var(--text);margin-bottom:var(--space-6); }}
+    .prose p:first-child::first-letter {{ font-size:64px;line-height:0.8;float:left;margin-right:var(--space-3);margin-top:8px;color:var(--accent);font-family:var(--font-serif); }}
+    .prose blockquote {{ border-left:2px solid var(--accent);padding:var(--space-4) var(--space-6);background:var(--accent-bg-subtle);margin:var(--space-8) 0;font-style:italic;font-size:17px;color:var(--text);line-height:1.7; }}
+    .prose hr {{ border:none;border-top:1px solid var(--border);margin:var(--space-10) 0; }}
+    .prose .signature {{ text-align:center;font-size:14px;color:var(--text-muted);font-style:italic; }}
+    .prose strong {{ color:var(--text);font-weight:700; }}
+    .post-nav {{ max-width:calc(var(--prose-width) + var(--page-padding) * 2);margin:0 auto;padding:var(--space-6) var(--page-padding) var(--space-16);border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:var(--space-6); }}
+    .post-nav a {{ font-family:var(--font-serif);font-size:17px;color:var(--text);text-decoration:none;transition:color var(--dur-fast); }}
+    .post-nav a:hover {{ color:var(--accent); }}
+    .post-nav span {{ display:block;font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-1); }}
+  </style>
+</head>
+<body>
+<div class="reading-progress"><div class="reading-progress__fill" id="rp"></div></div>
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/#experiment" class="nav__link">The experiment</a>
+    <a href="/platform/" class="nav__link">The platform</a>
+    <a href="/journal/" class="nav__link active">Journal</a>
+    <a href="/character/" class="nav__link">Character</a>
+  </div>
+  <div class="nav__status"><div class="pulse" style="background:var(--accent)"></div><span>The Measured Life</span></div>
+</nav>
+<div class="post-header">
+  <div class="post-header__series">The Measured Life &middot; Week {week_num} &middot; By Elena Voss</div>
+  <h1 class="post-header__title">&ldquo;{title}&rdquo;</h1>
+  <div class="post-header__meta">
+    <span>{date_display}</span>
+    <span>&middot;</span>
+    <span>{read_min} min read</span>
+  </div>
+  <div class="post-header__stats">{stats_line}</div>
+</div>
+<article class="post-body">
+  <div class="prose">
+    {body_html}
+  </div>
+</article>
+<div class="post-nav">
+  <a href="/journal/"><span>&larr; All installments</span>The Measured Life archive</a>
+  <a href="/"><span>The experiment</span>averagejoematt.com &rarr;</a>
+</div>
+<footer class="footer">
+  <div class="footer__brand" style="color:var(--accent)">AMJ</div>
+  <div class="footer__links">
+    <a href="/" class="footer__link">Home</a>
+    <a href="/character/" class="footer__link">Character</a>
+  </div>
+  <div class="footer__copy">// words when there's something worth saying</div>
+</footer>
+<script>
+  const rp = document.getElementById('rp');
+  window.addEventListener('scroll', () => {{
+    const pct = window.scrollY / (document.body.scrollHeight - window.innerHeight) * 100;
+    rp.style.width = Math.min(pct, 100) + '%';
+  }});
+</script>
+</body>
+</html>"""
+
+    # Write the post
+    post_key = f"site/journal/posts/week-{week_num:02d}/index.html"
+    s3.put_object(
+        Bucket=S3_BUCKET, Key=post_key,
+        Body=post_html.encode("utf-8"),
+        ContentType="text/html; charset=utf-8",
+        CacheControl="max-age=300",
+    )
+    logger.info(f"[journal] Post written: {post_key}")
+
+    # Update posts.json manifest
+    posts_manifest = []
+    for inst in sorted(all_installments, key=lambda x: x.get("week_number", 0), reverse=True):
+        wn = inst.get("week_number", 0)
+        posts_manifest.append({
+            "week": wn,
+            "title": inst.get("title", ""),
+            "date": inst.get("date", ""),
+            "stats_line": inst.get("stats_line", ""),
+            "url": f"/journal/posts/week-{wn:02d}/",
+            "excerpt": (inst.get("content_markdown") or "")[:300].strip(),
+            "word_count": inst.get("word_count", 0),
+            "has_board_interview": inst.get("has_board_interview", False),
+        })
+
+    s3.put_object(
+        Bucket=S3_BUCKET, Key="site/journal/posts.json",
+        Body=json.dumps({"posts": posts_manifest, "updated_at": datetime.now(timezone.utc).isoformat()}, indent=2).encode("utf-8"),
+        ContentType="application/json",
+        CacheControl="max-age=300",
+    )
+    logger.info(f"[journal] posts.json manifest updated ({len(posts_manifest)} posts)")
+
+    return f"https://averagejoematt.com/journal/posts/week-{week_num:02d}/"
+
+
 BLOG_POST_TEMPLATE = '''<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1473,6 +1627,14 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.warning(f"Blog publish failed: {e}")
         blog_url = "https://averagejoematt.com/blog/"
+
+    # Publish to Signal-themed journal on averagejoematt.com (non-fatal)
+    try:
+        journal_url = publish_to_journal(title, stats_line, body_html, week_num,
+                                         date_str, all_installments)
+        logger.info(f"[journal] Published: {journal_url}")
+    except Exception as e:
+        logger.warning(f"[journal] publish_to_journal failed (non-fatal): {e}")
 
     # Send email
     email_html = build_email_html(title, stats_line, body_html, week_num,

@@ -586,8 +586,10 @@ def email_nutrition_review() -> list[iam.PolicyStatement]:
 
 
 def email_wednesday_chronicle() -> list[iam.PolicyStatement]:
-    """Wednesday chronicle: DDB read, S3 config, ai-keys, SES, writes blog post to S3."""
-    return _email_base(needs_s3_write=["blog/*"])
+    """Wednesday chronicle: DDB read, S3 config, ai-keys, SES, writes blog/* + site/journal/* to S3.
+    site/journal/posts/week-{nn}/index.html + site/journal/posts.json written via publish_to_journal.
+    """
+    return _email_base(needs_s3_write=["blog/*", "site/journal/*"])
 
 
 def email_weekly_plate() -> list[iam.PolicyStatement]:
