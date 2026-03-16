@@ -1,5 +1,48 @@
 # Life Platform — Changelog
 
+## v3.7.53 — 2026-03-16: Journal live, radar chart, favicon, blog integration
+
+### Summary
+Journal listing page now shows all 3 existing posts (Prologue, Empty Journal, DoorDash Chronicle) via dynamic posts.json manifest. Character page radar chart wired into live HTML. Constellation favicon deployed across all 5 pages. Blog subdomain redirects to journal. Wednesday Chronicle Lambda now dual-publishes to Signal-themed journal on every run.
+
+### Changes
+- `lambdas/wednesday_chronicle_lambda.py`: Added `publish_to_journal()` — writes Signal-amber-themed post HTML to `site/journal/posts/week-{nn}/index.html` and updates `site/journal/posts.json` manifest on every Chronicle run
+- `cdk/stacks/role_policies.py`: `email_wednesday_chronicle()` IAM — added `site/journal/*` S3 write
+- `averagejoematt-site/journal/index.html`: Now fetches `posts.json` dynamically and renders post listing — no manual HTML edits needed per post
+- `averagejoematt-site/character/index.html`: `renderRadar()` function wired in — animated SVG radar reads from `character_stats.json`, green/amber/red by score
+- `averagejoematt-site/assets/icons/`: favicon.svg + 6 PNG sizes (16/32/48/180/192/512px) — constellation icon in Signal palette
+- All 5 HTML pages: `<link rel="icon">` + `<link rel="apple-touch-icon">` + `<meta name="theme-color">` added
+- S3 routing rule: `blog.averagejoematt.com` → 301 redirect to `averagejoematt.com/journal/`
+- `deploy/gen_favicons.py`: Pillow-based favicon generator (run in CDK venv)
+- `deploy/backfill_journal.py`: One-time backfill of 3 existing blog posts to Signal journal format
+
+### Deployed
+- `wednesday-chronicle` Lambda ✅
+- CDK `LifePlatformEmail` (IAM site/journal/*) ✅ — 10/10 smoke
+- S3: `site/journal/posts/week-00/`, `week-02/`, `week-03/` + `posts.json` manifest ✅
+- S3: `site/assets/icons/*` (7 files) ✅
+- CloudFront invalidation: `/journal/*`, `/character/*`, `/assets/icons/*` ✅
+
+---
+
+## v3.7.52 — 2026-03-16: site_writer wired into daily-brief + character-sheet; TB7-4 cleared
+
+### Summary
+Both Lambdas now write live data to S3 for the public website on every daily run. TB7-4 permanently closed — `life-platform/api-keys` secret deleted after grep confirmed zero code references.
+
+### Changes
+- `lambdas/daily_brief_lambda.py`: calls `site_writer.write_public_stats()` at end of handler — writes `site/public_stats.json` (non-fatal, skipped in demo mode)
+- `lambdas/character_sheet_lambda.py`: calls `site_writer.write_character_stats()` at end of handler — writes `site/character_stats.json` (non-fatal)
+- `cdk/stacks/role_policies.py`: `email_daily_brief()` — added `site/*` to S3 write list; `compute_character_sheet()` — added `needs_s3_write=["site/*"]`
+- TB7-4: `life-platform/api-keys` permanently deleted 2026-03-15T19:39:37 UTC
+
+### Deployed
+- `daily-brief` Lambda ✅
+- `character-sheet-compute` Lambda ✅
+- CDK `LifePlatformCompute` + `LifePlatformEmail` (IAM site/*) ✅ — 10/10 smoke
+
+---
+
 ## v3.7.51 — 2026-03-16: CDK web stack wired — site_api_lambda + averagejoematt.com distribution
 
 ### Summary
