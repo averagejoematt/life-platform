@@ -46,19 +46,7 @@
 
 ## Pending Next Session
 
-### P0 — CDK Web Deploy (subscribe endpoint)
-```bash
-cd cdk && source .venv/bin/activate
-npx cdk deploy LifePlatformWeb --require-approval never
-cd ..
-bash deploy/post_cdk_reconcile_smoke.sh
-```
-After deploy, CloudFront invalidation needed:
-```bash
-aws cloudfront create-invalidation \
-  --distribution-id <AMJ_DIST_ID> --paths '/*'
-```
-Then test: `POST https://averagejoematt.com/api/subscribe`
+### P0 — None. All P0s resolved this session.
 
 ### High — Next Session
 | Item | Notes |
@@ -66,8 +54,7 @@ Then test: `POST https://averagejoematt.com/api/subscribe`
 | BS-05 confidence badges in Chronicle | `wednesday_chronicle_lambda.py` — badge after BoD interview sections |
 | Essential Seven in Weekly Digest summary | Show aggregate streak + completion bar in weekly email |
 | ACWR in Weekly Digest Training section | Read `acwr` from `computed_metrics` in weekly Banister block |
-| **TB7-4 `api-keys` grep sweep** | ⚠️ DEADLINE WAS TODAY — do first next session |
-| TB7-1 GitHub `production` gate | Verify in repo settings |
+| TB7-1 GitHub `production` gate | Verify at github.com/averagejoematt/life-platform/settings/environments — confirm required reviewer gate exists |
 | TB7-18–27 | Queued |
 
 ### Deferred (unchanged)
