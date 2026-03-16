@@ -1,9 +1,9 @@
 # Life Platform — Changelog
 
-## v3.7.58 — 2026-03-16: BS-09 ACWR in Daily Brief + BS-05 Confidence Badges in Weekly Digest
+## v3.7.58 — 2026-03-16: BS-09 ACWR in Daily Brief + BS-05 Confidence Badges + CDK Web + TB7-4
 
 ### Summary
-Three targeted surface changes: ACWR training load alert surfaced in Daily Brief Training Report (reads from `computed_metrics` written by `acwr-compute`); confidence badge applied to Weekly Digest Insight of the Week box (Henning's n<14=LOW rule, correctly signals snapshot nature of weekly data); CDK Web deploy confirmed live wiring `/api/subscribe*` CloudFront route.
+Full session: completed v3.7.55 P0 deploy, surfaced ACWR in Daily Brief Training Report, applied confidence badge to Weekly Digest insight box, deployed CDK LifePlatformWeb (wiring /api/subscribe), permanently deleted life-platform/api-keys secret (TB7-4).
 
 ### Changes
 - `lambdas/daily_brief_lambda.py`: Added `computed_metrics` fetch in `gather_daily_data`. Returns `computed_metrics` in data dict. Logs ACWR zone + alert status at startup.
@@ -14,11 +14,14 @@ Three targeted surface changes: ACWR training load alert surfaced in Daily Brief
 - `daily-brief` Lambda (+ html_builder, ai_calls, output_writers, board_loader, digest_utils, insight_writer, platform_logger, retry_utils, ai_output_validator, site_writer)
 - `weekly-digest` Lambda (+ digest_utils, insight_writer, platform_logger, retry_utils, ai_output_validator, board_loader)
 - `life-platform-mcp` full zip (digest_utils + html_builder bundled)
+- CDK `LifePlatformWeb` — distribution `E3S424OXQZ8NBE`, SubscriberFunctionUrl live, /api/subscribe* CloudFront route active
 
 ### Also This Session
 - `deploy/setup_email_subscriber.sh`: First-time IAM role + Lambda creation script for `email-subscriber` (executed successfully)
-- Full v3.7.55 deploy completed clean (10/10 smoke checks passed)
-- ACWR backfill run: 2026-03-15 → 1.056, safe zone
+- Full v3.7.55 deploy: 10/10 smoke checks passed
+- ACWR backfill 2026-03-15: 1.056, safe zone
+- TB7-4: `life-platform/api-keys` grep sweep clean → permanently deleted
+- CloudFront invalidation `E3S424OXQZ8NBE` triggered
 
 ---
 
