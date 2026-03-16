@@ -38,6 +38,7 @@ Deploy script `deploy_v3756_restore_signal_homepage.sh` ran `aws s3 sync --delet
 
 ### Hardening Applied
 - S3 bucket policy: Deny `s3:DeleteObject` for `matthew-admin` on `raw/*`, `config/*`, `uploads/*`, `dashboard/*`, `exports/*`, `deploys/*`, `cloudtrail/*`, `imports/*` (ADR-032)
+- NOTE: Public read policy for `site/*` and `blog/*` was NOT restored in this recovery. Discovered 2026-03-16 when CDK Web invalidation exposed 403. Restored via `deploy/bucket_policy.json`. Policy file now committed to repo.
 - `deploy/lib/safe_sync.sh`: Wrapper blocks syncs to bucket root, runs `--dryrun` gate, aborts if >100 deletions (ADR-033)
 - Removed `deploy/deploy_v3756_restore_signal_homepage.sh` (the offending script)
 - Config files re-uploaded from git
