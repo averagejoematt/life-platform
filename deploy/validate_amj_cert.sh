@@ -15,35 +15,42 @@ HOSTED_ZONE_ID="${HOSTED_ZONE_ID:?Set HOSTED_ZONE_ID env var}"
 
 echo "Fetching DNS validation records for $CERT_ARN..."
 
-CNAME_NAME=$(aws acm describe-certificate \
+echo "Fetching all DNS validation records (handles multiple SANs)..."
+
+# Get all domain validation options as JSON
+VALIDATION_OPTIONS=$(aws acm describe-certificate \
   --certificate-arn "$CERT_ARN" \
   --region us-east-1 \
-  --query "Certificate.DomainValidationOptions[0].ResourceRecord.Name" \
-  --output text)
+  --query "Certificate.DomainValidationOptions" \
+  --output json)
 
-CNAME_VALUE=$(aws acm describe-certificate \
-  --certificate-arn "$CERT_ARN" \
-  --region us-east-1 \
-  --query "Certificate.DomainValidationOptions[0].ResourceRecord.Value" \
-  --output text)
+# Count how many domains need validation
+NUM_DOMAINS=$(echo "$VALIDATION_OPTIONS" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+echo "Found $NUM_DOMAINS domain(s) to validate."
 
-echo "CNAME: $CNAME_NAME → $CNAME_VALUE"
-echo "Adding to Route 53 hosted zone $HOSTED_ZONE_ID..."
+# Build the Changes array for all domains
+CHANGES="[]"
+for i in $(seq 0 $((NUM_DOMAINS - 1))); do
+  NAME=$(echo "$VALIDATION_OPTIONS" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['ResourceRecord']['Name'])")
+  VALUE=$(echo "$VALIDATION_OPTIONS" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['ResourceRecord']['Value'])")
+  DOMAIN=$(echo "$VALIDATION_OPTIONS" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[$i]['DomainName'])")
+  echo "  Adding CNAME for $DOMAIN: $NAME → $VALUE"
 
-aws route53 change-resource-record-sets \
-  --hosted-zone-id "$HOSTED_ZONE_ID" \
-  --change-batch "{
-    \"Changes\": [{
-      \"Action\": \"UPSERT\",
-      \"ResourceRecordSet\": {
-        \"Name\": \"$CNAME_NAME\",
-        \"Type\": \"CNAME\",
-        \"TTL\": 300,
-        \"ResourceRecords\": [{\"Value\": \"$CNAME_VALUE\"}]
-      }
-    }]
-  }"
+  aws route53 change-resource-record-sets \
+    --hosted-zone-id "$HOSTED_ZONE_ID" \
+    --change-batch "{
+      \"Changes\": [{
+        \"Action\": \"UPSERT\",
+        \"ResourceRecordSet\": {
+          \"Name\": \"$NAME\",
+          \"Type\": \"CNAME\",
+          \"TTL\": 300,
+          \"ResourceRecords\": [{\"Value\": \"$VALUE\"}]
+        }
+      }]
+    }" > /dev/null
+done
 
 echo ""
-echo "✅ CNAME record added. Waiting for certificate validation (~2 min)..."
+echo "✅ All $NUM_DOMAINS CNAME record(s) added. Waiting for certificate validation (~2 min)..."
 echo "   Check status: aws acm describe-certificate --certificate-arn $CERT_ARN --region us-east-1 --query Certificate.Status --output text"
