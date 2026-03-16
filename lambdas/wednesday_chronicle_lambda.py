@@ -970,6 +970,7 @@ def build_email_html(title, stats_line, body_html, week_num, date_str, blog_url)
     <p style="font-family:-apple-system,sans-serif;font-size:11px;color:#999;margin:0;">
       Read the full series at <a href="{blog_url}" style="color:#666;">averagejoematt.com/blog</a>
     </p>
+    <p style="font-family:-apple-system,sans-serif;font-size:12px;color:#888;margin:10px 0 4px;">Know someone who'd want this? They can get their own at <a href="https://averagejoematt.com/subscribe" style="color:#555;">averagejoematt.com/subscribe</a></p>
     <p style="font-family:-apple-system,sans-serif;font-size:9px;color:#bbb;margin:6px 0 0;">&#9874;&#65039; Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your diet, exercise, or supplement regimen.</p>
   </div>
 

@@ -1565,6 +1565,8 @@ def lambda_handler(event, context):
             component_details=component_details, character_sheet=character_sheet)
         output_writers.write_clinical_json(data, profile, yesterday)
         output_writers.write_buddy_json(data, profile, yesterday, character_sheet=character_sheet)
+        # BS-02: hero stats for averagejoematt.com homepage (Jordan: delta, not absolute)
+        output_writers.write_public_stats_json(data, profile, streak_data=streak_data)
 
         # IC-15: Insight Ledger — persist AI-generated insights for compounding
         if _HAS_INSIGHT_WRITER:

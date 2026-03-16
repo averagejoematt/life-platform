@@ -1927,6 +1927,50 @@ TOOLS = {
             },
         },
     },
+    # ── BS-01: Essential Seven Protocol ─────────────────────────────────────────────
+    "get_essential_seven": {
+        "fn": tool_get_essential_seven,
+        "schema": {
+            "name": "get_essential_seven",
+            "description": (
+                "BS-01: Essential Seven Protocol — Tier 0 habits only (the non-negotiable core). "
+                "Returns per-habit streak, today's status, last failure date, completion rate, and aggregate streak. "
+                "James Clear + Attia: 65 habits is too many; these 7 are the foundation everything else rests on. "
+                "Use for: 'how are my essential habits?', 'Essential Seven streak', 'which core habit am I missing?', "
+                "'non-negotiable habits', 'Tier 0 status'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "date":      {"type": "string", "description": "Target date (YYYY-MM-DD). Defaults to yesterday."},
+                    "days_back": {"type": "integer", "description": "Lookback window for streaks and completion rates (default 30)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    # ── BS-09: ACWR Training Load ────────────────────────────────────────────────────
+    "get_acwr_status": {
+        "fn": tool_get_acwr_status,
+        "schema": {
+            "name": "get_acwr_status",
+            "description": (
+                "BS-09: Acute:Chronic Workload Ratio status from Whoop strain data. "
+                "Reads pre-computed ACWR from computed_metrics partition (written nightly by acwr-compute Lambda). "
+                "Safe zone: 0.8–1.3. Above 1.3 = injury risk, below 0.8 = detraining. "
+                "Gabbett et al. thresholds. Proxy note: Whoop strain is cardiac-based; use as directional signal, not precise injury predictor. "
+                "Use for: 'what is my ACWR?', 'am I overtraining?', 'is my training load safe?', 'injury risk assessment'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "date":      {"type": "string", "description": "End date for status query (YYYY-MM-DD). Defaults to yesterday."},
+                    "days_back": {"type": "integer", "description": "Days of history to return (default 14)."},
+                },
+                "required": [],
+            },
+        },
+    },
     "get_decisions": {
         "fn": tool_get_decisions,
         "schema": {

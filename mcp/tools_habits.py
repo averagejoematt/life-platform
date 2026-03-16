@@ -1177,3 +1177,142 @@ def tool_get_vice_streak_history(args):
         "vices": vice_reports,
         "coaching_note": "Vice streaks are built on identity, not willpower. A relapse isn't failure — it's data. Look for patterns in timing and context.",
     }
+
+
+def tool_get_essential_seven(args):
+    """
+    BS-01: Essential Seven Protocol.
+    Returns Tier 0 habits only — the non-negotiable core. Streak, today's status,
+    last failure date, and cascade risk (from computed_metrics habit_scores partition).
+    Sarah Chen directive: define the surface (Daily Brief HTML + MCP) before building.
+    Clear + Attia: 65 habits is too many; Essential Seven is the fix.
+    """
+    target_date = args.get("date", (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d"))
+    days_back   = int(args.get("days_back", 30))
+    start_date  = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=days_back - 1)).strftime("%Y-%m-%d")
+
+    def _sf(v):
+        if v is None: return None
+        try: return float(v)
+        except (TypeError, ValueError): return None
+
+    # ── Profile: get Tier 0 registry ───────────────────────────────────────────
+    profile  = get_profile()
+    registry = profile.get("habit_registry", {})
+
+    tier0 = [
+        name for name, meta in registry.items()
+        if meta.get("tier") == 0 and meta.get("status") == "active"
+    ]
+
+    if not tier0:
+        # Fallback: mvp_habits list
+        tier0 = profile.get("mvp_habits", [])
+
+    if not tier0:
+        return {"error": "No Tier 0 habits found in profile. Check habit_registry or mvp_habits."}
+
+    # ── Habitify records ──────────────────────────────────────────────────
+    habit_records = query_source("habitify", start_date, target_date)
+    by_date = {r["date"]: r for r in sorted(habit_records, key=lambda r: r.get("date", ""))}
+
+    # ── Per-habit streak + last-fail analysis ─────────────────────────────────
+    today_rec = by_date.get(target_date, {})
+    today_habits = today_rec.get("habits", {}) if today_rec else {}
+
+    habit_rows = []
+    for habit in tier0:
+        meta     = registry.get(habit, {})
+        # Today's status
+        today_val = _sf(today_habits.get(habit))
+        today_done = bool(today_val and today_val >= 1)
+
+        # Streak: walk back from target_date
+        streak       = 0
+        last_fail_date = None
+        for i in range(days_back):
+            d   = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=i)).strftime("%Y-%m-%d")
+            rec = by_date.get(d, {})
+            habits_map = rec.get("habits", {}) if rec else {}
+            val = _sf(habits_map.get(habit))
+            done = bool(val and val >= 1)
+            if done:
+                streak += 1
+            else:
+                last_fail_date = d
+                break
+
+        # Completion rate over window
+        dates_with_data = [d for d in by_date if start_date <= d <= target_date]
+        done_count = sum(
+            1 for d in dates_with_data
+            if _sf((by_date[d].get("habits") or {}).get(habit)) and
+               _sf((by_date[d].get("habits") or {}).get(habit)) >= 1
+        )
+        completion_pct = round(done_count / len(dates_with_data) * 100) if dates_with_data else None
+
+        habit_rows.append({
+            "habit":           habit,
+            "tier":            0,
+            "today":           today_done,
+            "streak_days":     streak,
+            "last_fail":       last_fail_date,
+            "completion_pct":  completion_pct,
+            "applicable_days": meta.get("applicable_days", "all"),
+            "synergy_group":   meta.get("synergy_group"),
+        })
+
+    # ── Aggregate streak (all T0 complete) ─────────────────────────────────────
+    aggregate_streak = 0
+    for i in range(days_back):
+        d   = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=i)).strftime("%Y-%m-%d")
+        rec = by_date.get(d, {})
+        habits_map = rec.get("habits", {}) if rec else {}
+        if not habits_map:
+            break
+        all_done = all(
+            _sf(habits_map.get(h)) and _sf(habits_map.get(h)) >= 1
+            for h in tier0
+            if registry.get(h, {}).get("applicable_days") != "weekdays"
+               or datetime.strptime(d, "%Y-%m-%d").weekday() < 5
+        )
+        if all_done:
+            aggregate_streak += 1
+        else:
+            break
+
+    # ── Today's score ───────────────────────────────────────────────────────
+    today_done_count  = sum(1 for h in habit_rows if h["today"])
+    today_total       = len(habit_rows)
+
+    # ── Weakest link (most failures in window) ──────────────────────────────
+    weakest = min(
+        (h for h in habit_rows if h["completion_pct"] is not None),
+        key=lambda h: h["completion_pct"],
+        default=None,
+    )
+
+    # ── Board coaching ───────────────────────────────────────────────────────
+    coaching = []
+    if aggregate_streak >= 7:
+        coaching.append(f"Clear: {aggregate_streak}-day Essential Seven streak. This is identity-level consistency — you're becoming someone who does these things.")
+    elif aggregate_streak >= 3:
+        coaching.append(f"Clear: {aggregate_streak} consecutive days with all 7. Enough to feel momentum; not enough to take for granted.")
+    if weakest and weakest["completion_pct"] < 60:
+        coaching.append(f"Attia: '{weakest['habit']}' is your weakest link at {weakest['completion_pct']}% completion. The chain is only as strong as this one.")
+    if today_done_count < today_total:
+        missing = [h["habit"] for h in habit_rows if not h["today"]]
+        coaching.append(f"Today: {today_done_count}/{today_total} Essential habits done. Still open: {', '.join(missing)}.")
+
+    return {
+        "date":              target_date,
+        "habits":            habit_rows,
+        "aggregate_streak":  aggregate_streak,
+        "today_done":        today_done_count,
+        "today_total":       today_total,
+        "today_pct":         round(today_done_count / today_total * 100) if today_total else 0,
+        "weakest_habit":     weakest["habit"] if weakest else None,
+        "window_days":       days_back,
+        "coaching":          coaching,
+        "tier":              "Tier 0 — non-negotiable core (Essential Seven Protocol, BS-01)",
+    }

@@ -1,5 +1,45 @@
 # Life Platform — Changelog
 
+## v3.7.55 — 2026-03-16: BS-01/02/03/05/09 — Board Directives Implementation
+
+### Summary
+Full session implementing 6 priorities from the Board Summit, with directives from CTO (Raj), Product (Sarah/Jordan), and UI/UX (Ava). Phase sequence reordered per Sarah Chen: hero redesign before subscribe backend. Jordan Kim's subscribe CTA added to Chronicle. Raj Srinivasan's ACWR proxy note + unsub-never-delete pattern. Ava Moreau's design language applied across all new pages.
+
+### New Files
+- `lambdas/acwr_compute_lambda.py`: BS-09 ACWR compute Lambda. Whoop strain → 7d/28d rolling avg → ratio → zone classification (safe/caution/danger/detraining). Writes to `computed_metrics` via UpdateItem merge. 9:55 AM PT daily.
+- `lambdas/email_subscriber_lambda.py`: BS-03 email subscriber. Subscribe/confirm/unsubscribe handlers. DDB `subscribers` partition. SES double opt-in. Confirmation email + welcome email (Ava brand copy). Raj directive: `status=unsubscribed` on unsub — never hard-delete.
+- `site/index.html`: BS-02 homepage hero. Dark charcoal (#0D1117), amber (#F0B429), JetBrains Mono. Live lbs-lost counter (Jordan: delta not absolute), days-in, streak, journey %. One CTA → /subscribe.
+- `site/subscribe.html`: BS-03 subscribe page. Ava's 3-questions-then-form design. Who/what/why answered before email field. Dark charcoal theme. Success/error states.
+- `deploy/deploy_v3755_session.sh`: Full session deploy script.
+
+### Modified Files
+- `lambdas/output_writers.py`: Added `write_public_stats_json()` — writes `site/public_stats.json` with `lbs_lost` (delta), `days_in`, `tier0_streak`, `journey_pct`. Jordan directive: expose delta not absolute.
+- `lambdas/daily_brief_lambda.py`: Wire `write_public_stats_json()` after other output_writers calls.
+- `lambdas/wednesday_chronicle_lambda.py`: Jordan directive — subscribe CTA footer added to email body.
+- `lambdas/html_builder.py`: BS-01 Essential Seven 7-row scorecard inserted after Scorecard section. Ava: green ✓ / amber ✗, JetBrains Mono streak, progress bar. BS-05 confidence badge on BoD insight section.
+- `lambdas/digest_utils.py`: Added `compute_confidence()` + `_confidence_badge()`. Henning Brandt rules: n<30=LOW, n≥50+sig+effect=HIGH, else MEDIUM. Teal/amber/gray inline HTML pills.
+- `lambdas/html_builder.py`: Import `compute_confidence` from `digest_utils` with graceful fallback.
+- `mcp/tools_training.py`: Added `tool_get_acwr_status()`. Reads computed_metrics ACWR fields. `_proxy_note` added per Raj (cardiac proxy, not mechanical load).
+- `mcp/tools_habits.py`: Added `tool_get_essential_seven()`. Tier 0 per-habit streak, today status, last fail, completion rate, aggregate streak, Clear/Attia coaching.
+- `mcp/registry.py`: Registered `get_essential_seven` and `get_acwr_status`.
+- `cdk/stacks/compute_stack.py`: Added `ACWRCompute` Lambda construct at `cron(55 16 * * ? *)`.
+- `cdk/stacks/role_policies.py`: Added `compute_acwr()` + `operational_email_subscriber()` policy functions.
+- `ci/lambda_map.json`: Added `email_subscriber` + `acwr_compute` entries. Added shared module files to `skip_deploy`.
+
+### Board Directives Applied
+- **Raj**: ACWR `_proxy_note` (cardiac proxy caveat), unsub = `status:unsubscribed` never delete
+- **Sarah**: Phase sequence flipped — hero (BS-02) before subscribe backend (BS-03); Essential Seven surface defined before building
+- **Jordan**: Subscribe CTA in Chronicle footer, hero delta = `lbs_lost` not absolute weight
+- **Ava**: Subscribe page 3-questions design, confirmation/welcome email brand copy, 7-row Essential Seven scorecard (green/amber, no red), confidence badge inline teal/amber/gray pills
+
+### Not Yet Deployed
+- Requires manual first-deploy of `email-subscriber` Lambda (IAM role creation + Function + API Gateway route)
+- `acwr-compute` CDK deploy pending
+- Site S3 sync pending
+- MCP redeploy pending
+
+---
+
 ## v3.7.54 — 2026-03-16: Joint Board Summit — roadmap integration
 
 ### Summary

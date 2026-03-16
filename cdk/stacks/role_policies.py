@@ -489,6 +489,11 @@ def compute_dashboard_refresh() -> list[iam.PolicyStatement]:
     )
 
 
+def compute_acwr() -> list[iam.PolicyStatement]:
+    """ACWR compute (BS-09): reads Whoop strain from DDB, writes acwr fields to computed_metrics."""
+    return _compute_base(needs_kms=True)
+
+
 def compute_failure_pattern() -> list[iam.PolicyStatement]:
     """Failure pattern compute (IC-4): reads DDB metrics, uses ai-keys for pattern analysis, writes to DDB."""
     return _compute_base(
@@ -899,6 +904,32 @@ def operational_insight_email_parser() -> list[iam.PolicyStatement]:
 # ═════════════════════════════════════════════════════════════════════════
 # WEB API STACK — 1 Lambda (read-only public site API)
 # ═════════════════════════════════════════════════════════════════════════
+
+def operational_email_subscriber() -> list[iam.PolicyStatement]:
+    """Email subscriber Lambda (BS-03): DDB read+write (subscribers partition), KMS, SES send."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="SES",
+            actions=["ses:SendEmail", "sesv2:SendEmail"],
+            resources=[SES_IDENTITY],
+        ),
+        iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ),
+    ]
+
 
 def site_api() -> list[iam.PolicyStatement]:
     """Site API Lambda: read-only access to DDB + KMS only.

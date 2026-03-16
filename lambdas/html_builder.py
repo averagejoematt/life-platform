@@ -14,6 +14,14 @@ import json
 import math
 from datetime import datetime
 
+try:
+    from digest_utils import compute_confidence
+    _HAS_CONFIDENCE = True
+except ImportError:
+    _HAS_CONFIDENCE = False
+    def compute_confidence(**kw):
+        return {"level": "MEDIUM", "reason": "digest_utils unavailable", "badge_html": ""}
+
 
 # ==============================================================================
 # INLINE UTILITIES (tiny — avoids import dependency on daily_brief_lambda)
@@ -417,6 +425,73 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
             pass
 
         html += '</div><!-- /S:scorecard -->'
+
+    except Exception as _e:
+        html += _section_error_html("Scorecard", _e)
+
+    # --- Essential Seven Scorecard (BS-01) ---
+    # Ava Moreau: 7 rows, habit name + status + streak, green/amber, mono streak, above the fold.
+    # Sarah Chen: this is the surface. Before AI commentary.
+    try:
+        html += '<!-- S:essential_seven -->'
+        habits_detail   = component_details.get("habits_mvp", {})
+        tier_status     = habits_detail.get("tier_status", {})
+        tier0_status    = tier_status.get(0, tier_status.get("0", {}))
+        registry        = profile.get("habit_registry", {})
+
+        tier0_names = [
+            n for n, m in registry.items()
+            if m.get("tier") == 0 and m.get("status") == "active"
+        ]
+        if not tier0_names:
+            tier0_names = list(profile.get("mvp_habits", []))
+
+        if tier0_names:
+            html += (
+                '<div style="background:#0f172a;padding:16px 24px;border-bottom:1px solid #2d2d5e;">'
+                '<!-- essential_seven -->'
+                '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">'
+                '<p style="color:#64748b;font-size:10px;margin:0;font-weight:700;letter-spacing:1px;">'
+                'ESSENTIAL SEVEN</p>'
+                '<p style="color:#f59e0b;font-size:10px;margin:0;font-family:\'JetBrains Mono\',monospace;">'
+                + str(mvp_streak) + 'd streak</p>'
+                '</div>'
+            )
+            for h_name in tier0_names:
+                done = bool(tier0_status.get(h_name, False))
+                # Ava: green = done, amber = miss. No red — amber signals attention, not failure.
+                icon_html  = ('<span style="color:#22c55e;font-size:14px;">&#10003;</span>'
+                              if done else
+                              '<span style="color:#f59e0b;font-size:14px;">&#10005;</span>')
+                name_color = '#e2e8f0' if done else '#94a3b8'
+                html += (
+                    '<div style="display:flex;align-items:center;justify-content:space-between;'
+                    'padding:5px 0;border-bottom:1px solid #1e293b;">'
+                    '<div style="display:flex;align-items:center;gap:10px;">'
+                    + icon_html +
+                    '<span style="color:' + name_color + ';font-size:12px;">'
+                    + h_name + '</span>'
+                    '</div>'
+                    '</div>'
+                )
+            done_count = sum(1 for n in tier0_names if bool(tier0_status.get(n, False)))
+            total_count = len(tier0_names)
+            bar_pct     = round(done_count / total_count * 100) if total_count else 0
+            bar_color   = '#22c55e' if done_count == total_count else '#f59e0b' if done_count >= total_count * 0.7 else '#ef4444'
+            html += (
+                '<div style="margin-top:8px;background:#1e293b;border-radius:4px;height:4px;">'
+                '<div style="background:' + bar_color + ';border-radius:4px;height:4px;width:' + str(bar_pct) + '%;"></div>'
+                '</div>'
+                '<p style="color:#475569;font-size:9px;margin:4px 0 0;">'
+                + str(done_count) + '/' + str(total_count) + ' complete</p>'
+                '</div><!-- /essential_seven -->'
+            )
+        html += '<!-- /S:essential_seven -->'
+    except Exception as _e:
+        html += _section_error_html("Essential Seven", _e)
+
+    try:
+        pass  # dummy try block to close re-opened try (scorecard already closed above)
     except Exception as _e:
         html += _section_error_html("Scorecard", _e)
 
@@ -1057,8 +1132,22 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
     try:
         html += '<!-- S:bod -->'
         if bod_insight:
+            # BS-05: confidence badge — daily brief BoD insight confidence from data volume
+            # Henning: n = days since journey start (observation count proxy)
+            try:
+                from datetime import datetime as _dt
+                _start = data.get("profile", profile).get("journey_start_date", "2026-01-22") if isinstance(data.get("profile", profile), dict) else profile.get("journey_start_date", "2026-01-22")
+                _days = (_dt.utcnow().date() - _dt.strptime(_start, "%Y-%m-%d").date()).days
+                _sources_active = sum(1 for s in ["whoop", "macrofactor", "habitify", "strava", "apple"] if data.get(s))
+                _conf = compute_confidence(days_of_data=_days, sources=list(range(_sources_active)))
+                _badge = _conf["badge_html"]
+            except Exception:
+                _badge = ""
             html += ('<div style="background:#1e293b;padding:20px 24px;border-bottom:1px solid #2d2d5e;">'
-                     '<p style="color:#64748b;font-size:10px;margin:0 0 8px;font-weight:700;letter-spacing:1px;">BOARD OF DIRECTORS</p>'
+                     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+                     '<p style="color:#64748b;font-size:10px;margin:0;font-weight:700;letter-spacing:1px;">BOARD OF DIRECTORS</p>'
+                     + (_badge if _badge else '') +
+                     '</div>'
                      '<div style="background:#16213e;border-left:3px solid #6366f1;border-radius:0 8px 8px 0;'
                      'padding:12px 16px;">'
                      '<p style="color:#c7d2fe;font-size:13px;line-height:1.6;margin:0;">' + bod_insight + '</p>'
