@@ -333,6 +333,76 @@ def sanitize_for_demo(html, data, profile):
 # DASHBOARD JSON WRITER
 # ==============================================================================
 
+# ==============================================================================
+# PUBLIC STATS JSON WRITER (BS-02)
+# Writes site/public_stats.json — the data powering the homepage hero.
+# Jordan Kim directive: expose delta (lbs_lost), not absolute weight.
+# Ava Moreau directive: the delta IS the story.
+# ==============================================================================
+
+def write_public_stats_json(data, profile, streak_data=None):
+    """Write site/public_stats.json for the averagejoematt.com homepage hero.
+
+    Called by Daily Brief after all compute is complete.
+    Public — NO PII beyond what's already on the public site.
+    Fields are deliberately minimal and narrative-focused.
+    """
+    try:
+        today = datetime.now(timezone.utc).date()
+
+        journey_start_date = profile.get("journey_start_date", "2026-01-22")
+        journey_start_weight = float(profile.get("journey_start_weight_lbs", 302))
+        goal_weight = float(profile.get("goal_weight_lbs", 185))
+        current_weight = data.get("latest_weight")
+
+        # Days since start
+        try:
+            start_dt = datetime.strptime(journey_start_date, "%Y-%m-%d").date()
+            days_in = (today - start_dt).days
+        except Exception:
+            days_in = 0
+
+        # Delta — the story, per Jordan & Ava
+        lbs_lost = None
+        if current_weight:
+            lbs_lost = round(journey_start_weight - float(current_weight), 1)
+
+        # Journey completion %
+        journey_pct = None
+        if current_weight and journey_start_weight != goal_weight:
+            total = journey_start_weight - goal_weight
+            lost = journey_start_weight - float(current_weight)
+            journey_pct = round(max(0, min(100, lost / total * 100)), 1)
+
+        # Streaks
+        tier0_streak = None
+        if streak_data:
+            tier0_streak = streak_data.get("tier0_streak")
+        elif data.get("latest_weight"):  # fallback: read from computed_metrics via data dict
+            tier0_streak = data.get("tier0_streak")
+
+        stats = {
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "days_in": days_in,
+            "lbs_lost": lbs_lost,                    # Jordan: delta, not absolute
+            "journey_pct": journey_pct,
+            "tier0_streak": tier0_streak,
+            "goal_lbs": int(goal_weight),
+            "journey_start_date": journey_start_date,
+        }
+
+        _s3.put_object(
+            Bucket=_S3_BUCKET,
+            Key="site/public_stats.json",
+            Body=json.dumps(stats, default=str),
+            ContentType="application/json",
+            CacheControl="max-age=300",
+        )
+        print("[INFO] public_stats.json written")
+    except Exception as e:
+        print("[WARN] write_public_stats_json failed: " + str(e))
+
+
 def write_dashboard_json(data, profile, day_grade_score, grade, component_scores,
                           readiness_score, readiness_colour, tldr_guidance, yesterday,
                           component_details=None, character_sheet=None):

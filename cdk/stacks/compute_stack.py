@@ -157,6 +157,20 @@ class ComputeStack(Stack):
         # ══════════════════════════════════════════════════════════════
         # 8. failure-pattern-compute — Sunday 9:50 AM PT (previously unmanaged)
         # ══════════════════════════════════════════════════════════════
+        # ══════════════════════════════════════════════════════════════
+        # 9. acwr-compute — BS-09 (9:55 AM PT — after adaptive-mode, before brief)
+        # ══════════════════════════════════════════════════════════════
+        create_platform_lambda(
+            self, "ACWRCompute",
+            function_name="acwr-compute",
+            handler="acwr_compute_lambda.lambda_handler",
+            source_file="lambdas/acwr_compute_lambda.py",
+            schedule="cron(55 16 * * ? *)",
+            timeout_seconds=60, memory_mb=256,
+            custom_policies=rp.compute_acwr(),
+            **shared,
+        )
+
         create_platform_lambda(
             self, "FailurePatternCompute",
             function_name="failure-pattern-compute",

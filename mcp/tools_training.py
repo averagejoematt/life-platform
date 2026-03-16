@@ -1827,6 +1827,102 @@ def tool_get_exercise_efficiency_trend(args):
     }
 
 
+def tool_get_acwr_status(args):
+    """
+    BS-09: Acute:Chronic Workload Ratio status.
+    Reads pre-computed acwr fields from the computed_metrics partition.
+    Falls back to live computation from Whoop strain if pre-computed record is missing.
+    """
+    end_date   = args.get("date", (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d"))
+    days_back  = int(args.get("days_back", 14))   # how many days of history to return
+
+    def _sf(v):
+        if v is None: return None
+        try: return float(v)
+        except (TypeError, ValueError): return None
+
+    # ── Read from computed_metrics (prefer pre-computed) ─────────────────────
+    cm_records = query_source("computed_metrics",
+                              (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days_back - 1)).strftime("%Y-%m-%d"),
+                              end_date)
+
+    history = []
+    for rec in sorted(cm_records, key=lambda r: r.get("date", ""), reverse=True):
+        acwr = _sf(rec.get("acwr"))
+        if acwr is None and "acute_load_7d" not in rec:
+            continue  # skip records that have no ACWR data at all
+        history.append({
+            "date":             rec.get("date"),
+            "acwr":             acwr,
+            "acute_load_7d":    _sf(rec.get("acute_load_7d")),
+            "chronic_load_28d": _sf(rec.get("chronic_load_28d")),
+            "zone":             rec.get("acwr_zone", "unknown"),
+            "alert":            bool(rec.get("acwr_alert", False)),
+            "alert_reason":     rec.get("acwr_alert_reason"),
+        })
+
+    if not history:
+        return {
+            "error": "No ACWR data found in computed_metrics. acwr-compute Lambda may not have run yet for this date range.",
+            "hint": "Run the acwr-compute Lambda manually: aws lambda invoke --function-name acwr-compute --payload '{\"date\":\"" + end_date + "\"}' /tmp/out.json",
+        }
+
+    latest = history[0]
+
+    # ── Trend (last 7 days with data) ────────────────────────────────────────
+    recent_acwrs = [h["acwr"] for h in history if h.get("acwr") is not None][:7]
+    trend = None
+    if len(recent_acwrs) >= 3:
+        if recent_acwrs[0] > recent_acwrs[-1] * 1.05:
+            trend = "rising"
+        elif recent_acwrs[0] < recent_acwrs[-1] * 0.95:
+            trend = "falling"
+        else:
+            trend = "stable"
+
+    # ── Alert count ──────────────────────────────────────────────────────────
+    alerts_7d = sum(1 for h in history[:7] if h.get("alert"))
+
+    # ── Board coaching note ──────────────────────────────────────────────────
+    zone    = latest.get("zone", "unknown")
+    acwr    = latest.get("acwr")
+    coaching = None
+    if zone == "danger":
+        coaching = "Attia + Galpin: ACWR above 1.5 is the strongest predictor of non-contact injury in the next 7 days. Rest is not optional this week."
+    elif zone == "caution":
+        coaching = "Galpin: ACWR in the caution zone (1.3-1.5). Reduce volume by 30-40%. Maintain intensity on 1-2 key sessions; cut accessory work."
+    elif zone == "safe":
+        coaching = "Galpin: ACWR in the optimal window (0.8-1.3). Current load progression is appropriate for continued adaptation."
+    elif zone == "detraining":
+        coaching = "Attia: Chronic load exceeds acute — you are doing less than your body is adapted to. Increase training frequency or duration this week."
+
+    return {
+        "date":          latest.get("date"),
+        "acwr":          acwr,
+        "zone":          zone,
+        "alert":         latest.get("alert"),
+        "alert_reason":  latest.get("alert_reason"),
+        "acute_load_7d": latest.get("acute_load_7d"),
+        "chronic_load_28d": latest.get("chronic_load_28d"),
+        "trend_7d":      trend,
+        "alerts_last_7d": alerts_7d,
+        "coaching":      coaching,
+        "history":       history,
+        "interpretation": (
+            "ACWR = 7-day avg Whoop strain / 28-day avg Whoop strain. "
+            "Safe zone: 0.8-1.3. Above 1.3: elevated injury risk. Below 0.8: detraining. "
+            "Source: Gabbett et al. (2016), Hulin et al. (2014)."
+        ),
+        "_proxy_note": (
+            "Whoop strain is a cardiac stress measure (heart rate-based), not a mechanical load "
+            "measure. Gabbett thresholds were validated on team sport athletes using session RPE. "
+            "Heavy strength training at low cardiac output may not register as high acute load. "
+            "Use ACWR as a directional recovery signal, not a precise injury predictor."
+        ),
+        "_disclaimer": "For personal training guidance only. Not medical advice.",
+    }
+
+
 def tool_get_training(args):
     """Unified training intelligence dispatcher.
     Board vote 11-0: training_load, training_recommendation, training_periodization

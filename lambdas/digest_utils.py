@@ -273,3 +273,95 @@ def _banister_core(kj_by_date, today):
         ctl = ctl * cd + load * (1 - cd)
         atl = atl * ad + load * (1 - ad)
     return {"ctl": round(ctl, 1), "atl": round(atl, 1), "tsb": round(ctl - atl, 1)}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# BS-05: AI CONFIDENCE SCORING (IC-27)
+# Henning Brandt directive: n<30 = LOW, no sig p-value = MEDIUM, n≥50+sig+effect = HIGH
+# Raj: 3 rules cover 90% of cases. Ship that. Refine later.
+# ═════════════════════════════════════════════════════════════════════════════
+
+def compute_confidence(n=None, p_value=None, effect_size=None, sources=None, days_of_data=None):
+    """
+    BS-05 / IC-27: Compute AI insight confidence level.
+    Returns a dict with level (HIGH / MEDIUM / LOW) and a short reason string.
+
+    Rules (Henning Brandt, Raj Srinivasan):
+      LOW:    n < 30  OR  days_of_data < 14  OR  no data at all
+      HIGH:   n >= 50  AND  (p_value is None OR p_value < 0.05)  AND  effect_size meets threshold
+      MEDIUM: everything else
+
+    Convenience helpers:
+      sources  = list of source names that contributed data (to check source completeness)
+      days_of_data = days of actual observations (for non-paired analyses)
+
+    Returns:
+      {"level": "HIGH" | "MEDIUM" | "LOW",
+       "reason": str,
+       "badge_html": str (inline HTML pill for email)}
+    """
+    # Determine effective n
+    effective_n = n
+    if effective_n is None and days_of_data is not None:
+        effective_n = days_of_data
+
+    # LOW gates (Henning: n<30 = low confidence regardless of p-value)
+    if effective_n is not None and effective_n < 14:
+        reason = f"n={effective_n} (need ≥14 for any signal)"
+        return {"level": "LOW", "reason": reason, "badge_html": _confidence_badge("LOW")}
+
+    if effective_n is not None and effective_n < 30:
+        reason = f"n={effective_n} (preliminary — need ≥30 for moderate confidence)"
+        return {"level": "LOW", "reason": reason, "badge_html": _confidence_badge("LOW")}
+
+    if days_of_data is not None and days_of_data < 14:
+        reason = f"{days_of_data} days of data (need ≥14)"
+        return {"level": "LOW", "reason": reason, "badge_html": _confidence_badge("LOW")}
+
+    # Source completeness check
+    if sources is not None and len(sources) == 0:
+        return {"level": "LOW", "reason": "no data sources", "badge_html": _confidence_badge("LOW")}
+
+    # HIGH gates (Raj: n≥50 + sig + meaningful effect)
+    n_ok     = effective_n is not None and effective_n >= 50
+    p_ok     = p_value is None or p_value < 0.05   # if no p_value given, assume it's not a correlation
+    eff_ok   = effect_size is None or abs(effect_size) >= 0.2   # Cohen's d ≥0.2 or r ≥0.2
+
+    if n_ok and p_ok and eff_ok:
+        parts = [f"n={effective_n}"]
+        if p_value is not None:
+            parts.append(f"p={p_value:.3f}")
+        if effect_size is not None:
+            parts.append(f"effect={abs(effect_size):.2f}")
+        reason = ", ".join(parts)
+        return {"level": "HIGH", "reason": reason, "badge_html": _confidence_badge("HIGH")}
+
+    # MEDIUM: 30 ≤ n < 50, or p not significant, or effect too small
+    parts = []
+    if effective_n is not None:
+        parts.append(f"n={effective_n}")
+    if p_value is not None and p_value >= 0.05:
+        parts.append(f"p={p_value:.3f} (not significant)")
+    if not n_ok and effective_n is not None and effective_n >= 30:
+        parts.append("need ≥50 for high confidence")
+    reason = "; ".join(parts) if parts else "moderate data"
+    return {"level": "MEDIUM", "reason": reason, "badge_html": _confidence_badge("MEDIUM")}
+
+
+def _confidence_badge(level):
+    """
+    Ava Moreau: teal=HIGH, amber=MEDIUM, gray=LOW.
+    Inline, small caps, fits in prose.
+    """
+    styles = {
+        "HIGH":   ("background:#0f3d30;color:#34d399;border:1px solid #065f46;", "HIGH CONFIDENCE"),
+        "MEDIUM": ("background:#3d2a00;color:#f59e0b;border:1px solid #854d0e;", "MEDIUM CONFIDENCE"),
+        "LOW":    ("background:#1e2530;color:#64748b;border:1px solid #334155;", "LOW CONFIDENCE"),
+    }
+    style, label = styles.get(level, styles["LOW"])
+    return (
+        '<span style="' + style + 'border-radius:4px;padding:1px 6px;'
+        'font-size:9px;font-weight:700;letter-spacing:0.08em;'
+        'font-family:-apple-system,sans-serif;white-space:nowrap;">' +
+        label + '</span>'
+    )
