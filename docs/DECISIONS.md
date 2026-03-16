@@ -2,7 +2,7 @@
 
 > Permanent log of significant architectural, design, and operational decisions.
 > Each ADR captures the decision, context, alternatives considered, and outcome.
-> Last updated: 2026-03-14 (v3.7.23)
+> Last updated: 2026-03-16 (v3.7.57)
 
 ---
 
@@ -55,6 +55,8 @@ When a significant decision is made — a design pattern chosen, an approach rej
 | ADR-029 | MCP monolith: retain single Lambda, revisit at 100+ calls/day | ✅ Active | 2026-03-15 |
 | ADR-030 | Google Calendar integration: retired — no viable zero-touch data path | ✅ Active | 2026-03-15 |
 | ADR-031 | MCP Lambda deploy: always use full zip build (guard in deploy_lambda.sh) | ✅ Active | 2026-03-15 |
+| ADR-032 | S3 bucket policy: Deny DeleteObject on data prefixes for deploy user | ✅ Active | 2026-03-16 |
+| ADR-033 | Safe S3 sync: wrapper function with dryrun gate and root-block | ✅ Active | 2026-03-16 |
 
 ---
 
@@ -635,3 +637,49 @@ aws lambda update-function-code --function-name life-platform-mcp --zip-file fil
 ```
 
 **Outcome:** Guard in place. Incident cannot recur via `deploy_lambda.sh`. MCP build pattern documented in RUNBOOK.md.
+
+---
+
+## ADR-032 — S3 Bucket Policy: Deny DeleteObject on Data Prefixes for Deploy User
+
+**Status:** Active
+**Date:** 2026-03-16 (v3.7.57, post-incident hardening)
+**Context:** On 2026-03-16, a one-off deploy script ran `aws s3 sync --delete` to the bucket root, deleting 35,188 objects across all S3 prefixes. The operator's IAM user (`matthew-admin`) had full S3 permissions. S3 versioning saved the data, but the incident exposed that no guard existed to prevent deploy scripts from deleting data objects.
+
+**Decision:** S3 bucket policy with an explicit Deny on `s3:DeleteObject` for `matthew-admin` on all data prefixes: `raw/*`, `config/*`, `uploads/*`, `dashboard/*`, `exports/*`, `deploys/*`, `cloudtrail/*`, `imports/*`. The `site/` prefix is excluded so that `sync_site_to_s3.sh --delete` can still clean up old site files.
+
+**Reasoning:** An explicit Deny in a resource-based policy overrides any Allow in the IAM user's identity policy. This makes it physically impossible for any CLI command or script running as `matthew-admin` to delete objects in protected prefixes — regardless of bugs, typos, or `--delete` flags. Lambda execution roles are different principals and are unaffected.
+
+**Alternatives considered:**
+- IAM policy restriction on `matthew-admin`: Less reliable — a broad `s3:*` Allow anywhere in the user's policies would override a narrower Deny. Resource-based Deny is absolute.
+- Separate bucket for data: Architecturally cleaner (see long-term recommendation) but higher migration effort. Bucket policy is immediate.
+- MFA Delete: Requires MFA for every delete — impractical for automated processes.
+
+**To temporarily bypass (for legitimate bulk deletes):**
+```bash
+# Remove the bucket policy temporarily
+aws s3api delete-bucket-policy --bucket matthew-life-platform
+# Do the work...
+# Re-apply the policy
+aws s3api put-bucket-policy --bucket matthew-life-platform --policy file:///tmp/bucket_policy.json
+```
+
+**Outcome:** Policy applied and verified. `matthew-admin` can upload/overwrite but cannot delete under protected prefixes. Tested: upload succeeded, delete returned `AccessDenied`.
+
+---
+
+## ADR-033 — Safe S3 Sync: Wrapper Function with Dryrun Gate and Root-Block
+
+**Status:** Active
+**Date:** 2026-03-16 (v3.7.57, post-incident hardening)
+**Context:** The Mar 16 S3 bucket wipe was caused by `aws s3 sync --delete` targeting the bucket root. The canonical `sync_site_to_s3.sh` correctly uses `S3_PREFIX="site"`, but a one-off script bypassed this. A defense-in-depth wrapper is needed for any future script that uses `--delete`.
+
+**Decision:** `deploy/lib/safe_sync.sh` provides a `safe_sync()` bash function that: (1) blocks any sync to bucket root, (2) runs `--dryrun` first and counts deletions, (3) aborts if deletions exceed 100 (configurable). Deploy scripts should `source deploy/lib/safe_sync.sh` and call `safe_sync` instead of raw `aws s3 sync --delete`.
+
+**Reasoning:** The wrapper catches two failure modes: wrong target (bucket root) and unexpectedly large deletions (wrong source). Both are cheap checks — one string match and one dryrun pass — that prevent catastrophic outcomes. The 100-deletion threshold is generous enough for normal site deploys but catches the "syncing 17 files against 35,000" scenario.
+
+**Alternatives considered:**
+- Pre-commit hook scanning for `aws s3 sync --delete`: catches at commit time, not runtime. Doesn't protect ad-hoc CLI usage.
+- CI/CD pipeline only: the platform doesn't have a full CI/CD pipeline for deploys yet.
+
+**Outcome:** `deploy/lib/safe_sync.sh` committed. Combined with ADR-032 (bucket policy) and S3 versioning, the platform now has three independent layers of protection against accidental S3 data deletion.

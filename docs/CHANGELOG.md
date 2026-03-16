@@ -1,5 +1,37 @@
 # Life Platform — Changelog
 
+## v3.7.57 — 2026-03-16: P1 Incident Recovery + Post-Incident Hardening
+
+### Summary
+Deploy script `deploy_v3756_restore_signal_homepage.sh` ran `aws s3 sync --delete` from a 17-file website directory to the S3 bucket root, deleting 35,188 objects across all prefixes. DynamoDB was unaffected. Full recovery achieved via S3 versioning (delete marker removal). Three layers of hardening applied to prevent recurrence.
+
+### Incident
+- **Root cause:** One-off deploy script synced to `s3://$BUCKET/` instead of `s3://$BUCKET/site/`. The `--delete` flag deleted all non-website objects.
+- **Impact:** 34,221 raw data files (2009–2026), 753 CloudTrail logs, 56 dashboard assets, 26 MacroFactor CSVs, 25 Lambda deploy zips, 24 config files, 24 export JSONs, and 7 other prefixes wiped.
+- **Recovery:** S3 versioning was enabled pre-incident. Python batch script removed all delete markers. All 35,273 objects restored and verified against forensic counts.
+- **TTR:** ~2 hours from incident to full recovery.
+
+### Hardening Applied
+- S3 bucket policy: Deny `s3:DeleteObject` for `matthew-admin` on `raw/*`, `config/*`, `uploads/*`, `dashboard/*`, `exports/*`, `deploys/*`, `cloudtrail/*`, `imports/*` (ADR-032)
+- `deploy/lib/safe_sync.sh`: Wrapper blocks syncs to bucket root, runs `--dryrun` gate, aborts if >100 deletions (ADR-033)
+- Removed `deploy/deploy_v3756_restore_signal_homepage.sh` (the offending script)
+- Config files re-uploaded from git
+- Requirements files synced from `lambdas/requirements/` to `config/requirements/`
+
+### New Files
+- `deploy/lib/safe_sync.sh`: Safe S3 sync wrapper with root-block and dryrun gate
+
+### Deleted Files
+- `deploy/deploy_v3756_restore_signal_homepage.sh`: One-off script that caused the incident
+
+### Documentation Updated
+- `docs/INCIDENT_LOG.md`: P1 incident entry + new patterns (one-off scripts, S3 sync --delete)
+- `docs/DECISIONS.md`: ADR-032 (bucket policy), ADR-033 (safe sync wrapper)
+- `docs/CHANGELOG.md`: This entry
+- `handovers/HANDOVER_v3.7.57.md`: Session handover
+
+---
+
 ## v3.7.56 — 2026-03-16: BS-03 API Gateway route — /api/subscribe wired
 
 ### Summary
