@@ -207,11 +207,51 @@ class WebStack(Stack):
             handler="site_api_lambda.lambda_handler",
             table=local_table,
             bucket=local_bucket,
-            dlq=None,          # No DLQ — public read-only API, cross-region DLQ not supported
-            alerts_topic=None, # No SNS alarm — Lambda concurrency cap is the defence
+            dlq=None,
+            alerts_topic=None,
             custom_policies=rp.site_api(),
             timeout_seconds=15,
             memory_mb=256,
+        )
+
+        # ══════════════════════════════════════════════════════════════
+        # Email Subscriber Lambda — BS-03
+        # Handles POST /api/subscribe, GET /api/subscribe?action=confirm,
+        # GET /api/subscribe?action=unsubscribe
+        # Separate origin from site-api: needs POST forwarding + no cache.
+        # ══════════════════════════════════════════════════════════════
+        subscriber_fn = create_platform_lambda(
+            self, "EmailSubscriberLambda",
+            function_name="email-subscriber",
+            source_file="lambdas/email_subscriber_lambda.py",
+            handler="email_subscriber_lambda.lambda_handler",
+            table=local_table,
+            bucket=local_bucket,
+            dlq=local_dlq,
+            alerts_topic=None,
+            custom_policies=rp.operational_email_subscriber(),
+            timeout_seconds=15,
+            memory_mb=256,
+            environment={
+                "USER_ID":      "matthew",
+                "TABLE_NAME":   "life-platform",
+                "S3_BUCKET":    BUCKET,
+                "EMAIL_SENDER": "lifeplatform@mattsusername.com",
+                "SITE_URL":     "https://averagejoematt.com",
+            },
+        )
+
+        subscriber_url = subscriber_fn.add_function_url(
+            auth_type=_lambda.FunctionUrlAuthType.NONE,
+            cors=_lambda.FunctionUrlCorsOptions(
+                allowed_origins=["https://averagejoematt.com", "https://www.averagejoematt.com"],
+                allowed_methods=[_lambda.HttpMethod.ALL],
+                allowed_headers=["Content-Type"],
+            ),
+        )
+
+        subscriber_url_domain = cdk.Fn.select(
+            2, cdk.Fn.split("/", subscriber_url.url)
         )
 
         # Viral defence note: Reserved concurrency removed — us-east-1 account
@@ -256,7 +296,7 @@ class WebStack(Stack):
                     ssl_support_method="sni-only",
                     minimum_protocol_version="TLSv1.2_2021",
                 ),
-                # Two origins
+                # Three origins
                 origins=[
                     # Origin 1: S3 static site (default)
                     cloudfront.CfnDistribution.OriginProperty(
@@ -269,10 +309,21 @@ class WebStack(Stack):
                             origin_protocol_policy="http-only",
                         ),
                     ),
-                    # Origin 2: Lambda Function URL (real-time API)
+                    # Origin 2: site-api Lambda Function URL (read-only, cacheable)
                     cloudfront.CfnDistribution.OriginProperty(
                         domain_name=fn_url_domain,
                         id="LambdaApiOrigin",
+                        custom_origin_config=cloudfront.CfnDistribution.CustomOriginConfigProperty(
+                            http_port=80,
+                            https_port=443,
+                            origin_protocol_policy="https-only",
+                            origin_ssl_protocols=["TLSv1.2"],
+                        ),
+                    ),
+                    # Origin 3: email-subscriber Lambda Function URL (write, no cache)
+                    cloudfront.CfnDistribution.OriginProperty(
+                        domain_name=subscriber_url_domain,
+                        id="SubscriberLambdaOrigin",
                         custom_origin_config=cloudfront.CfnDistribution.CustomOriginConfigProperty(
                             http_port=80,
                             https_port=443,
@@ -293,21 +344,40 @@ class WebStack(Stack):
                     max_ttl=86400,
                     min_ttl=0,
                 ),
-                # /api/* behaviour: Lambda Function URL with TTL caching
-                # CloudFront caches per path so vitals/journey/character each get
-                # their own TTL as returned in Cache-Control from the Lambda.
+                # Cache behaviors — ORDER MATTERS: most-specific first.
                 cache_behaviors=[
+                    # /api/subscribe* — email-subscriber Lambda.
+                    # POST body must be forwarded; responses must NOT be cached.
+                    # Query strings forwarded for ?action=confirm&token=... flow.
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/api/subscribe*",
+                        target_origin_id="SubscriberLambdaOrigin",
+                        viewer_protocol_policy="https-only",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
+                            query_string=True,   # confirm token + action param
+                            headers=["Origin", "Content-Type"],
+                            cookies=cloudfront.CfnDistribution.CookiesProperty(forward="none"),
+                        ),
+                        default_ttl=0,   # never cache subscribe responses
+                        max_ttl=0,
+                        min_ttl=0,
+                        allowed_methods=[
+                            "GET", "HEAD", "OPTIONS",
+                            "POST", "PUT", "PATCH", "DELETE",  # POST required for subscribe
+                        ],
+                        cached_methods=["GET", "HEAD"],
+                    ),
+                    # /api/* — site-api Lambda (read-only, TTL-cached).
                     cloudfront.CfnDistribution.CacheBehaviorProperty(
                         path_pattern="/api/*",
                         target_origin_id="LambdaApiOrigin",
                         viewer_protocol_policy="https-only",
-                        # Forward Cache-Control header from Lambda (Lambda sets TTL per endpoint)
                         forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
                             query_string=False,
-                            headers=["Origin"],  # needed for CORS
+                            headers=["Origin"],
                         ),
-                        default_ttl=300,   # 5 min default (vitals endpoint)
-                        max_ttl=3600,      # Journey endpoint sets 3600s
+                        default_ttl=300,
+                        max_ttl=3600,
                         min_ttl=0,
                         allowed_methods=["GET", "HEAD", "OPTIONS"],
                         cached_methods=["GET", "HEAD"],
@@ -349,4 +419,8 @@ class WebStack(Stack):
         cdk.CfnOutput(self, "SiteApiFunctionUrl",
             value=site_api_url.url,
             description="Lambda Function URL for life-platform-site-api (CloudFront origin only)",
+        )
+        cdk.CfnOutput(self, "SubscriberFunctionUrl",
+            value=subscriber_url.url,
+            description="Lambda Function URL for email-subscriber (CloudFront /api/subscribe* origin only)",
         )

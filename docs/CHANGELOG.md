@@ -1,5 +1,19 @@
 # Life Platform — Changelog
 
+## v3.7.56 — 2026-03-16: BS-03 API Gateway route — /api/subscribe wired
+
+### Summary
+Wired `email-subscriber` Lambda into CloudFront as a third origin on `averagejoematt.com`. Added `/api/subscribe*` cache behavior with POST forwarding, no caching, query string forwarding (for `?action=confirm&token=` flow). Subscribe form is now fully functional end-to-end.
+
+### Changes
+- `cdk/stacks/web_stack.py`: Added `EmailSubscriberLambda` construct + Function URL. Added `SubscriberLambdaOrigin` as third origin on AMJ CloudFront distribution. Added `/api/subscribe*` cache behavior (POST allowed, TTL=0, query strings forwarded). `/api/*` behavior unchanged (GET-only, TTL-cached). Added `SubscriberFunctionUrl` output.
+- `deploy/deploy_v3756_subscriber_route.sh`: CDK deploy + smoke + CloudFront invalidation.
+
+### Deployed
+- CDK LifePlatformWeb pending deploy
+
+---
+
 ## v3.7.55 — 2026-03-16: BS-01/02/03/05/09 — Board Directives Implementation
 
 ### Summary
