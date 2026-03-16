@@ -1,6 +1,50 @@
 # Life Platform — Runbook
 
-Last updated: 2026-03-16 (v3.7.56 — 89 MCP tools, 31-module package, 45 Lambdas, 19 data sources)
+Last updated: 2026-03-16 (v3.7.57 — 89 MCP tools, 31-module package, 45 Lambdas, 19 data sources)
+
+---
+
+## S3 Safety Rules (ADR-032, ADR-033)
+
+**Never run `aws s3 sync --delete` to the bucket root.** On 2026-03-16, this deleted 35,188 objects. Three protection layers are now in place:
+
+1. **Bucket policy:** `matthew-admin` cannot `DeleteObject` on `raw/*`, `config/*`, `uploads/*`, `dashboard/*`, `exports/*`, `deploys/*`, `cloudtrail/*`, `imports/*`. Lambda roles are unaffected.
+2. **safe_sync wrapper:** `source deploy/lib/safe_sync.sh` then call `safe_sync "$SRC" "$DST"` instead of raw `aws s3 sync --delete`. Blocks bucket-root targets and aborts if dryrun shows >100 deletions.
+3. **S3 versioning:** Enabled. Even if objects are deleted, they can be recovered by removing delete markers.
+
+**For site deploys:** Always use `bash deploy/sync_site_to_s3.sh`. It targets `s3://matthew-life-platform/site/` with correct cache-control headers.
+
+**To recover from accidental S3 deletion:**
+```bash
+# Check if versioning saved the objects
+aws s3api list-object-versions --bucket matthew-life-platform --prefix raw/strava/ --max-keys 5
+
+# Batch restore (removes delete markers)
+cat > /tmp/restore_s3.py << 'SCRIPT'
+import boto3, sys
+bucket = "matthew-life-platform"
+prefix = sys.argv[1] if len(sys.argv) > 1 else ""
+s3 = boto3.client("s3", region_name="us-west-2")
+total = 0
+for page in s3.get_paginator("list_object_versions").paginate(Bucket=bucket, Prefix=prefix):
+    batch = [{"Key": dm["Key"], "VersionId": dm["VersionId"]} for dm in page.get("DeleteMarkers", []) if dm["IsLatest"]]
+    if batch:
+        s3.delete_objects(Bucket=bucket, Delete={"Objects": batch[:1000], "Quiet": True})
+        total += len(batch)
+        print(f"  Restored {total}...", flush=True)
+print(f"Done. Restored {total} objects.")
+SCRIPT
+python3 /tmp/restore_s3.py raw/
+```
+
+**To temporarily bypass the bucket policy (for legitimate bulk deletes):**
+```bash
+aws s3api delete-bucket-policy --bucket matthew-life-platform
+# Do the work...
+# Re-apply: aws s3api put-bucket-policy --bucket matthew-life-platform --policy file:///tmp/bucket_policy.json
+```
+
+**No one-off deploy scripts.** Two P1/P2 incidents (Mar 11, Mar 16) traced to one-off scripts bypassing canonical tooling. Use canonical scripts with flags, or modify them temporarily.
 
 ---
 

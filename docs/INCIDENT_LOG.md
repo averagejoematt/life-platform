@@ -1,6 +1,6 @@
 # Life Platform — Incident Log
 
-Last updated: 2026-03-15 (v3.7.47)
+Last updated: 2026-03-16 (v3.7.57)
 
 > Tracks operational incidents, outages, and bugs that affected data flow or system behavior.
 > For full details on any incident, check the corresponding CHANGELOG entry or handover file.
@@ -22,6 +22,7 @@ Last updated: 2026-03-15 (v3.7.47)
 
 | Date | Severity | Summary | Root Cause | TTD* | TTR* | Data Loss? |
 |------|----------|---------|------------|------|------|------------|
+| 2026-03-16 | **P1** | **S3 bucket wipe — 35,188 objects deleted across all prefixes.** Deploy script `deploy_v3756_restore_signal_homepage.sh` ran `aws s3 sync --delete` from 17-file website dir to bucket root, deleting entire raw data archive (34,221 files, 2009–2026), config (24), deploys (25), dashboard (56), CloudTrail (753), exports (24), uploads/macrofactor (26), and 7 other prefixes. DynamoDB untouched. | One-off deploy script synced to `s3://$BUCKET/` (bucket root) instead of `s3://$BUCKET/site/`. The `--delete` flag treated all non-website objects as orphans. Canonical `sync_site_to_s3.sh` correctly uses `S3_PREFIX="site"` — the one-off script bypassed this. | Immediate (operator noticed deletions streaming in terminal) | ~2 hours. Full recovery via S3 versioning — delete markers removed with batch Python script. All 35,273 objects confirmed restored. | **No — full recovery.** S3 versioning was enabled pre-incident. All objects recovered by removing delete markers. Verified: `raw/` = 34,222, all other prefixes match forensic counts. |
 | 2026-03-12 | **P3** | Mar 12 alarm storm — 20+ ALARM/OK emails in 24h across todoist, daily-insight-compute, failure-pattern-compute, monday-compass, DLQ, freshness | CDK drift: `TodoistIngestionRole` missing `s3:PutObject` on `raw/todoist/*`. Policy correct in `role_policies.py` but never applied to AWS (likely stale from COST-B bundling refactor). Todoist Lambda threw `AccessDenied` on every invocation → cascading staleness alarms. | Alarm emails (real-time) | ~1 day (detected next session) — `cdk deploy LifePlatformIngestion` (54s) | No — Todoist data gap Mar 12 only. No backfill attempted (single day, non-critical). |
 | 2026-03-12 | **P4** | `freshness_checker_lambda.py` duplicate sick-day suppression block silently breaking sick-day alert suppression | Copy-paste bug: sick-day block duplicated, second copy reset `_sick_suppress = False` after first set it `True`. Suppression never fired on sick days. | Code review during incident investigation | Fixed in v3.7.10 — awaiting deploy |
 | 2026-02-28 | **P1** | 5 of 6 API ingestion Lambdas failing after engineering hardening (v2.43.0) | Handler mismatches (4 Lambdas had `lambda_function.py` but handlers pointed to `X_lambda.lambda_handler`), Garmin missing deps + IAM, Withings cascading OAuth expiry | ~hours (next scheduled run) | ~2 hr (sequential fixes) | No — gap-aware backfill self-healed all missing data. Full PIR: `docs/PIR-2026-02-28-ingestion-outage.md` |
@@ -56,12 +57,21 @@ Last updated: 2026-03-15 (v3.7.47)
 ## Patterns & Observations
 
 **Most common root causes:**
-1. **Deployment errors** (wrong function ordering, missing IAM, wrong binary, CDK packaging, inline zip path prefix) — 8 incidents
+1. **Deployment errors** (wrong function ordering, missing IAM, wrong binary, CDK packaging, inline zip path prefix, **S3 sync to wrong target**) — 9 incidents
 2. **CDK drift** (IAM policies correct in code but not applied to AWS) — 3 incidents (Mar 12 Todoist, Mar 04 character-sheet, Mar 09 CDK packaging)
 3. **Stale config / env var overrides** (SECRET_NAME env var pointing at deleted secret) — 3 incidents
 4. **Wrong component investigated** (two Apple Health Lambdas, alarm dimension mismatch) — 3 incidents
 5. **Missing infrastructure** (EventBridge rule never created, IAM missing permission, CDK stack missing layer reference) — 3 incidents
 6. **Data quality / scoring logic** (zero-score defaults, dedup, sign errors) — 4 incidents
+7. **One-off deploy scripts bypassing canonical tooling** — 2 incidents (Mar 11 Brittany email inline zip, **Mar 16 S3 bucket wipe**)
+
+**S3 sync --delete watch-out (ADR-032/033, v3.7.57):** `aws s3 sync --delete` to the bucket root will delete every object not in the source directory. This is the most destructive single command in the platform. **Hardening applied:**
+1. S3 bucket policy denies `s3:DeleteObject` on `raw/`, `config/`, `uploads/`, `dashboard/`, `exports/`, `deploys/`, `cloudtrail/`, `imports/` for `matthew-admin` — deploy scripts physically cannot delete data files.
+2. `deploy/lib/safe_sync.sh` wrapper blocks syncs to bucket root and aborts if dryrun shows >100 deletions.
+3. S3 versioning enabled — delete markers are recoverable.
+4. One-off deploy scripts are prohibited. All site deploys use `sync_site_to_s3.sh` with `S3_PREFIX="site"`.
+
+**One-off deploy script watch-out (new pattern as of v3.7.57):** One-off scripts (`deploy_vXXXX_do_thing.sh`) bypass the safety patterns built into canonical tooling. Two separate P1/P2 incidents traced to one-off scripts that didn't use `deploy_lambda.sh` or `sync_site_to_s3.sh`. **Rule: no one-off deploy scripts.** Use canonical scripts with flags/arguments, or modify the canonical script temporarily.
 
 **CDK drift watch-out (new pattern as of v3.7.10):** IAM policy changes in `role_policies.py` only take effect when the relevant stack is deployed. After any refactor touching role policies (secrets consolidation, prefix changes, etc.), always redeploy the affected stack immediately and verify with a smoke invoke. Do not assume CDK state matches AWS state without a deploy.
 
