@@ -477,6 +477,57 @@ IC features are gated by how much data exists. Don't build IC features before th
 
 ---
 
+## Board Summit IC Additions (2026-03-16)
+
+The following IC features were identified by the Joint Board Summit (Health & Personal Results Board × Technical & Product Board). They supplement the existing IC roadmap. Full rationale in `board_summit_2026-03-16.md`.
+
+### IC-27: AI Confidence Scoring (BS-05)
+**Status:** Planned — Board Summit priority #5
+**Target:** Next 90 days
+**What it does:** Attaches a 3-level confidence badge (High / Medium / Low) to every AI-generated insight. Criteria per insight type: data completeness (are all relevant sources present?), sample size (n-gating per Henning's statistical validity flags), effect size (is the observed delta practically meaningful?), and statistical significance (p-value or CI width where applicable). Badge injected into all email digest outputs and MCP coaching responses.
+
+**Henning's rules:**
+- Any correlation with n<30 → Low confidence regardless of p-value
+- Any "trend" label with <12 weekly observations → re-labeled "preliminary pattern"
+- Meal-level CGM claims require minimum 5 repetitions of same meal
+- DEXA-anchored estimates limited to 1 decimal place
+
+### IC-28: Habit Cascade Detector (BS-06)
+**Status:** Planned — Board Summit priority #6
+**Target:** Next 90 days (data gate: 60+ days Habitify data)
+**What it does:** Computes conditional probability matrix from Habitify completion data: P(fail habit Y | failed habit X within 48h). Identifies the top-3 cascade chains where one failure statistically predicts subsequent failures. Writes cascade patterns to `MEMORY#habit_cascades` in `platform_memory`. Daily Brief surfaces proactive warnings: "You skipped Morning Sunlight — your Primary Exercise completion rate drops to 40% when this happens."
+
+**Relationship to IC-4:** Complementary but distinct. IC-4 identifies *antecedent conditions* (external: high TSB, poor sleep) that precede habit collapse. IC-28 identifies *habit-to-habit contagion* (internal: which specific habits drag others down).
+
+### IC-29: Deficit Sustainability Tracker (BS-12)
+**Status:** Planned — Board Summit priority #12
+**Target:** 90-180 days
+**What it does:** Multi-signal early warning for unsustainable caloric deficit. Monitors HRV trend, sleep quality trend, habit completion trend, and training output simultaneously. When 3+ of these signals degrade concurrently during an active deficit, flags "deficit too aggressive this week" with a concrete recommendation (e.g., increase calories by 200 for 3 days). Writes to `MEMORY#deficit_warnings`.
+
+**Key inputs:** MacroFactor calorie data, Whoop HRV/recovery, Eight Sleep quality, Habitify Tier 0 completion rate, Strava/Hevy training volume.
+
+### IC-30: Autonomic Balance Score (BS-MP1)
+**Status:** Planned — Later
+**Target:** 90-180 days
+**What it does:** Synthesizes HRV trend, resting heart rate, respiratory rate, and sleep quality into a single nervous system state score mapped to a 4-quadrant model: high-energy/positive (flow), high-energy/negative (stress), low-energy/positive (recovery), low-energy/negative (burnout). Used to contextualize other metrics: "Your nutrition compliance dropped. Your autonomic state has been in the stress quadrant for 5 consecutive days — this looks like willpower depletion."
+
+### IC-31: Meal-Level CGM Response Scorer (BS-10)
+**Status:** Planned — Board Summit priority #10
+**Target:** 90 days (data gate: sufficient CGM + MacroFactor overlap)
+**What it does:** Matches MacroFactor meal timestamps with CGM glucose curves to score each meal's postprandial response (peak delta from baseline, AUC above baseline, time to return to baseline). Builds a personal food response database over time. Cross-references against genome SNPs (e.g., TCF7L2 variants affecting glucose disposal). Writes to new DDB partition `SOURCE#meal_responses`.
+
+### Planned Enhancements to Existing Features
+
+**Unified Sleep Record (BS-08):** Not an IC feature per se, but a data architecture change that enables downstream IC improvements. Reconcile Whoop (HRV, staging), Eight Sleep (temperature, environment), and Apple Health (duration) into a single canonical sleep record per night. Source-of-truth priority rules per field. Enables sleep environment optimization and circadian compliance scoring.
+
+**ACWR Training Load Model (BS-09):** New scheduled Lambda computing acute:chronic workload ratio from Whoop strain + Strava training impulse. Alerts when ratio >1.3 (injury risk) or <0.8 (detraining). Critical safety feature at Matthew's body weight and deficit.
+
+**Decision Journal Analytics (BS-T2-6):** Enhancement to IC-19. Adds calibration scoring (predicted vs. actual outcomes), decision category breakdown, regret analysis, and time-to-outcome tracking. Requires 50+ decisions with recorded outcomes.
+
+**Biomarker Trajectory Engine (BS-T2-2):** Enhancement to IC-18 hypothesis engine. For each biomarker with 3+ data points, compute linear regression with 95% CI. Flag biomarkers where the CI band crosses a clinical threshold within 2 projected draws. Henning caution: 7 points = wide CIs, report uncertainty prominently.
+
+---
+
 ## What NOT to Build (ADR-016, ADR-017, ADR-025)
 
 These decisions are documented to prevent revisiting:
@@ -491,4 +542,4 @@ These decisions are documented to prevent revisiting:
 
 ---
 
-*Last updated: 2026-03-15 (v3.7.48 — IC-4/IC-5 skeleton descriptions added (R14-F02))*
+*Last updated: 2026-03-16 (v3.7.54 — Board Summit IC additions IC-27 through IC-31 + planned enhancements)*

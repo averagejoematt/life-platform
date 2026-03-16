@@ -1,5 +1,21 @@
 # Life Platform — Changelog
 
+## v3.7.54 — 2026-03-16: Joint Board Summit — roadmap integration
+
+### Summary
+Joint Board Summit (Health Board × Technical Board, 21 members) produced comprehensive roadmap across personal results, website, and commercialization dimensions. 15-item priority stack integrated into PROJECT_PLAN.md. 5 new IC features (IC-27–31) added to INTELLIGENCE_LAYER.md. Website evolved from 4-page to 10-page site map with content strategy, email capture plan, and design language directive.
+
+### Changes
+- `docs/PROJECT_PLAN.md`: Board Summit Roadmap section — priority stack (BS-01–15), 6-domain personal results roadmap (18 features across sleep/nutrition/training/behavioral/longevity/mental performance), website roadmap (10-page site map, content strategy, email capture, design language), commercialization assessment (wedge product, 3 paths to $1M ARR, architecture gaps, IP assets), technical tiers (BS-T1–T3), statistical validity flags (Henning Brandt)
+- `docs/INTELLIGENCE_LAYER.md`: IC-27 (AI Confidence Scoring), IC-28 (Habit Cascade Detector), IC-29 (Deficit Sustainability Tracker), IC-30 (Autonomic Balance Score), IC-31 (Meal-Level CGM Response Scorer), planned enhancements section (Unified Sleep Record, ACWR, Decision Journal Analytics, Biomarker Trajectory Engine)
+- `handovers/HANDOVER_v3.7.54.md`: New handover with board summit context, key decisions, consensus themes, commercial wedge, prioritized next-session items
+- `handovers/HANDOVER_LATEST.md`: Updated pointer to v3.7.54
+
+### Not Deployed
+Documentation-only session. No Lambda deployments.
+
+---
+
 ## v3.7.53 — 2026-03-16: Journal live, radar chart, favicon, blog integration
 
 ### Summary
