@@ -376,6 +376,16 @@ def gather_daily_data(profile, yesterday):
     else:
         print("[INFO] No computed_insights for " + yesterday + " — IC-2 Lambda may not have run yet")
 
+    # BS-09: ACWR training load (written by acwr-compute Lambda at 9:55 AM)
+    computed_metrics = fetch_date("computed_metrics", yesterday)
+    if computed_metrics and computed_metrics.get("acwr"):
+        _acwr_zone = computed_metrics.get("zone", "?")
+        _acwr_alert = computed_metrics.get("alert", False)
+        print("[INFO] ACWR loaded for " + yesterday + ": " + str(round(float(computed_metrics["acwr"]), 3)) +
+              " (" + _acwr_zone + ")" + (" \u26a0 ALERT" if _acwr_alert else ""))
+    else:
+        print("[INFO] No computed_metrics/ACWR for " + yesterday + " — acwr-compute may not have run yet")
+
     return {
         "date": yesterday,
         "whoop": whoop, "whoop_today": whoop_today, "sleep": sleep,
@@ -401,6 +411,7 @@ def gather_daily_data(profile, yesterday):
         "strava_7d": strava_7d,
         "todoist": todoist_yesterday,
         "computed_insights": computed_insights,
+        "computed_metrics": computed_metrics,   # BS-09: ACWR + training load alert
     }
 
 

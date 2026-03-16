@@ -1,5 +1,27 @@
 # Life Platform — Changelog
 
+## v3.7.58 — 2026-03-16: BS-09 ACWR in Daily Brief + BS-05 Confidence Badges in Weekly Digest
+
+### Summary
+Three targeted surface changes: ACWR training load alert surfaced in Daily Brief Training Report (reads from `computed_metrics` written by `acwr-compute`); confidence badge applied to Weekly Digest Insight of the Week box (Henning's n<14=LOW rule, correctly signals snapshot nature of weekly data); CDK Web deploy confirmed live wiring `/api/subscribe*` CloudFront route.
+
+### Changes
+- `lambdas/daily_brief_lambda.py`: Added `computed_metrics` fetch in `gather_daily_data`. Returns `computed_metrics` in data dict. Logs ACWR zone + alert status at startup.
+- `lambdas/html_builder.py`: ACWR inline display added to Training Report section (green/amber/red by zone). Alert banner rendered when `alert=True` — dark red box with `alert_reason` text.
+- `lambdas/weekly_digest_lambda.py`: `compute_confidence` imported from `digest_utils`. Confidence badge computed from `days_graded` and prepended to Insight of the Week box.
+
+### Deployed
+- `daily-brief` Lambda (+ html_builder, ai_calls, output_writers, board_loader, digest_utils, insight_writer, platform_logger, retry_utils, ai_output_validator, site_writer)
+- `weekly-digest` Lambda (+ digest_utils, insight_writer, platform_logger, retry_utils, ai_output_validator, board_loader)
+- `life-platform-mcp` full zip (digest_utils + html_builder bundled)
+
+### Also This Session
+- `deploy/setup_email_subscriber.sh`: First-time IAM role + Lambda creation script for `email-subscriber` (executed successfully)
+- Full v3.7.55 deploy completed clean (10/10 smoke checks passed)
+- ACWR backfill run: 2026-03-15 → 1.056, safe zone
+
+---
+
 ## v3.7.57 — 2026-03-16: P1 Incident Recovery + Post-Incident Hardening
 
 ### Summary
