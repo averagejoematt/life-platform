@@ -207,11 +207,10 @@ class WebStack(Stack):
             handler="site_api_lambda.lambda_handler",
             table=local_table,
             bucket=local_bucket,
-            dlq=local_dlq,
-            alerts_topic=local_alerts,
-            alarm_name="site-api-error-life-platform-site-api",
+            dlq=None,          # No DLQ — public read-only API, cross-region DLQ not supported
+            alerts_topic=None, # No SNS alarm — Lambda concurrency cap is the defence
             custom_policies=rp.site_api(),
-            timeout_seconds=15,   # Fast reads only — DDB GetItem/Query
+            timeout_seconds=15,
             memory_mb=256,
         )
 
