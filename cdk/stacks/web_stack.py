@@ -214,10 +214,11 @@ class WebStack(Stack):
             memory_mb=256,
         )
 
-        # Viral defence: hard cap at 20 concurrent executions.
-        # If traffic exceeds this, Lambda returns 429 (not an unbounded bill).
-        # Board mandate: Marcus + Dana. Cost at 50k hits: ~$0.33.
-        site_api_fn.node.default_child.reserved_concurrent_executions = 20
+        # Viral defence note: Reserved concurrency removed — us-east-1 account
+        # concurrency headroom is limited (cf-auth Lambda@Edge functions already
+        # consume reserved slots). Primary defence is CloudFront TTL caching
+        # (300s-3600s per endpoint) which caps Lambda invocations regardless of
+        # traffic volume. Secondary: add WAF rate limiting after go-live.
 
         # Function URL (AuthType NONE — CloudFront is the only public caller).
         # No direct URL exposure: CloudFront strips and adds a secret origin header
