@@ -227,7 +227,7 @@ class WebStack(Stack):
             handler="email_subscriber_lambda.lambda_handler",
             table=local_table,
             bucket=local_bucket,
-            dlq=local_dlq,
+            dlq=None,          # DLQ omitted: web_stack deploys to us-east-1, DLQ is us-west-2
             alerts_topic=None,
             custom_policies=rp.operational_email_subscriber(),
             timeout_seconds=15,
