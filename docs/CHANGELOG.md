@@ -1,5 +1,33 @@
 # Life Platform — Changelog
 
+## v3.7.51 — 2026-03-16: CDK web stack wired — site_api_lambda + averagejoematt.com distribution
+
+### Summary
+LifePlatformWeb CDK stack updated to create `life-platform-site-api` Lambda (read-only, reserved concurrency=20 viral defence), Lambda Function URL, and `averagejoematt.com` CloudFront distribution with two origins (S3 /site static + Lambda /api/*). Four deploy scripts added covering the full go-live sequence: ACM cert request, DNS validation, CDK deploy, Route 53 A records, S3 sync with correct cache-control headers, and site smoke tests.
+
+### Files changed
+- `cdk/stacks/web_stack.py` — site_api_fn Lambda + Function URL + AmjDistribution added
+- `cdk/stacks/role_policies.py` — `site_api()` function added (DDB GetItem/Query + KMS Decrypt only)
+- `ci/lambda_map.json` — site_api_lambda added; site_writer.py added to skip_deploy
+- `deploy/request_amj_cert.sh` — NEW: request ACM cert in us-east-1
+- `deploy/validate_amj_cert.sh` — NEW: auto-add DNS CNAME to Route 53 for cert validation
+- `deploy/deploy_web_stack.sh` — NEW: CDK deploy with PLACEHOLDER guard + smoke test
+- `deploy/point_route53_to_cloudfront.sh` — NEW: A+AAAA alias records for root + www
+- `deploy/sync_site_to_s3.sh` — NEW: tiered cache-control sync + CloudFront invalidation
+- `deploy/smoke_test_site.sh` — NEW: end-to-end site smoke tests (pages + API + headers)
+
+### Run order to go live
+```
+bash deploy/request_amj_cert.sh
+# update CERT_ARN_AMJ in web_stack.py
+bash deploy/deploy_web_stack.sh
+bash deploy/point_route53_to_cloudfront.sh
+bash deploy/sync_site_to_s3.sh
+bash deploy/smoke_test_site.sh
+```
+
+---
+
 ## v3.7.50 — 2026-03-16: Website Phase 1 scaffold + real-time API engine
 
 ### Summary

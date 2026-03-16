@@ -891,6 +891,32 @@ def operational_insight_email_parser() -> list[iam.PolicyStatement]:
 
 
 # ═════════════════════════════════════════════════════════════════════════
+# WEB API STACK — 1 Lambda (read-only public site API)
+# ═════════════════════════════════════════════════════════════════════════
+
+def site_api() -> list[iam.PolicyStatement]:
+    """Site API Lambda: read-only access to DDB + KMS only.
+
+    Serves averagejoematt.com real-time data endpoints.
+    NO write permissions. NO Secrets access. NO S3 write.
+    Yael directive: never expose MCP endpoint publicly — this is a
+    separate, minimal-permission Lambda.
+    """
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt"],
+            resources=[KMS_KEY_ARN],
+        ),
+    ]
+
+
+# ═════════════════════════════════════════════════════════════════════════
 # MCP STACK — 1 Lambda
 # ═════════════════════════════════════════════════════════════════════════
 

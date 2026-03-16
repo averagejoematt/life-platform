@@ -95,6 +95,10 @@
         "cloudfront_distribution": "EM5NPX6NJN095",
         "protects": "dash.averagejoematt.com",
         "note": "Manually deployed — NOT CDK-managed. Lambda@Edge requires us-east-1 and cannot be deployed from us-west-2 CDK stacks. Secret: life-platform/cf-auth (must exist in us-east-1). Alarm: life-platform-cf-auth-errors (us-east-1 CloudWatch)."
+      },
+      "lambdas/site_api_lambda.py": {
+        "function": "life-platform-site-api",
+        "note": "CDK-managed (LifePlatformWeb stack). Read-only public API for averagejoematt.com. Reserved concurrency=20."
       }
     }
   },
@@ -105,7 +109,8 @@
       "lambdas/ingestion_validator.py",
       "lambdas/item_size_guard.py",
       "lambdas/sick_day_checker.py",
-      "lambdas/digest_utils.py"
+      "lambdas/digest_utils.py",
+      "lambdas/site_writer.py"
     ]
   }
 }
