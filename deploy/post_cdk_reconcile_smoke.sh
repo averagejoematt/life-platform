@@ -166,4 +166,15 @@ if [[ "$FAILED" -gt 0 ]]; then
   exit 1
 fi
 
+# ── S3 public read check (catches bucket policy wipe after P1 incident pattern) ────────────
+echo "=== S3 public read verification ==="
+S3_HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+  "http://matthew-life-platform.s3-website-us-west-2.amazonaws.com/site/index.html")
+if [[ "$S3_HTTP" == "200" ]]; then
+  echo -e "  ${GREEN}✅ S3 site/index.html — public read OK (200)${RESET}"
+else
+  echo -e "  ${RED}⚠ S3 site/index.html — public read BROKEN ($S3_HTTP)${RESET}"
+  echo "  Fix: aws s3api put-bucket-policy --bucket matthew-life-platform --region us-west-2 --policy file://deploy/bucket_policy.json"
+fi
+
 echo -e "${GREEN}✅ All checks passed. CDK reconcile looks clean.${RESET}"
