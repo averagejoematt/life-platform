@@ -1,7 +1,7 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-16 (v3.7.61 — Full Board Summit gap-fill: 8 missing items added (BS-T2-7, BS-T3-5, BS-T3-6, WEB-CE, WEB-NET, WEB-WCT, EMAIL-P2/P3), IC-27–31 defined explicitly. Sprint plan (4 sprints + SIMP-1 mini) added. Board sprint review aligned. See docs/SPRINT_PLAN.md.)
+> Last update: 2026-03-17 (v3.7.69 — Full Board Summit gap-fill: 8 missing items added (BS-T2-7, BS-T3-5, BS-T3-6, WEB-CE, WEB-NET, WEB-WCT, EMAIL-P2/P3), IC-27–31 defined explicitly. Sprint plan (4 sprints + SIMP-1 mini) added. Board sprint review aligned. See docs/SPRINT_PLAN.md.)
 
 ---
 
@@ -320,6 +320,9 @@ Site map target (from 4 pages to 10):
 | SIMP-1 Ph2 | 5 | ~Apr 13 | Rationalization | 89→≤80 tools, EMF review | ~5h |
 | Sprint 3 | 6-9 | ~May 11 | Advanced Intelligence + Content | BS-12, BS-SL1, BS-MP1, BS-MP2, BS-13, BS-T2-5, WEB-WCT, IC-28, IC-29 | ~38h |
 | Sprint 4 | 10-13 | ~Jun 8 | Website Interactive + Architecture | BS-11, WEB-CE, BS-BM2, BS-14 | ~27h | ✅ COMPLETE |
+| Sprint 5 | 14-15 | ~Apr 1 | Website + Distribution | S2-T1-1 thru S2-T1-10, DEPLOY, DIST-1 | ~12h | Not started |
+
+**Sprint 5 next-session focus:** All website work — `/story` page, `/about` page, email CTA components, design language enforcement, pending Sprint 4 deploy, and first distribution event.
 
 **Backlog activation schedule:**
 - ~May 2026: BS-06 (Habit Cascade), IC-27, BS-T2-7 (data gates)
@@ -328,6 +331,100 @@ Site map target (from 4 pages to 10):
 - ~September 2026: EMAIL-P3 Community launch
 - Post-DEXA: BS-BM3, BS-T2-3
 - ~2028+: BS-BM1, BS-T2-2, IC-31
+
+---
+
+## Board Summit #2 Roadmap (2026-03-17, v3.7.69)
+
+> Post-sprint review session. All 4 Board Summit #1 sprints complete (30 items shipped).
+> Full summit record: `docs/reviews/BOARD_SUMMIT_2_2026-03-17.md`
+> **Focus shift: Distribution + Website + Behavior Change**
+
+### Summit #2 Key Findings
+
+1. **Distribution is the #1 priority** — unanimous across all 16 board members. Zero subscribers with working infrastructure is a distribution failure. First external content (HN post, Twitter thread) is the highest-leverage action.
+2. **Rate-of-loss medical concern** — Norton/Attia: >2.5 lbs/week at 287 lbs = lean tissue loss risk. Platform detects but doesn't prescribe. Wire Deficit Sustainability flags into specific calorie increase recommendations.
+3. **Engineering-as-avoidance pattern** — Viktor/Goggins: 30 items shipped in ~48h while rate flags fire. Platform grows faster than the person. Shift ratio toward transformation time.
+4. **Website needs human presence** — Moreau: no photo, emotional arc buried under metrics. Story page and About page are prerequisites for anyone subscribing.
+5. **MCP `Key` import bug** — blocking multiple live tools. One-line fix, do first.
+
+### Sprint 5 Plan (Website + Distribution)
+
+| ID | Feature | Effort | Owner | Notes |
+|----|---------|--------|-------|-------|
+| S2-T1-1 | **MCP `Key` Import Bug Fix** | XS (15 min) | Claude | `from boto3.dynamodb.conditions import Key` in `tools_lifestyle.py` |
+| S2-T1-6 | **`/story` Page** — deep origin narrative | S (content) | Matthew | Manual writing. Emotional entry point for subscribers. |
+| S2-T1-7 | **`/about` Page** — bio, professional context, links | XS | Matthew + Claude | Quick page. |
+| S2-T1-8 | **Email CTA on All Pages** — footer capture component | S (2h) | Claude | Consistent subscribe CTA on all 7+ pages |
+| S2-T1-9 | **Adaptive Deficit Ceiling** — wire BS-12 flags into Daily Brief prescriptions | M (3h) | Claude | Specific calorie increase recommendations when flags fire |
+| S2-T1-10 | **Weekly Habit Review Automation** — Sunday structured review | M (3h) | Claude | Auto-generated in Daily Brief |
+| DEPLOY | **Sprint 4 Pending Deploy** — site-api, S3 sync, CloudFront invalidation | S (15 min) | Matthew | Run `deploy/deploy_sprint4.sh` |
+| DIST-1 | **First Distribution Event** — HN post, Twitter thread, or build log | S (content) | Matthew | Non-negotiable. Nothing matters until people know this exists. |
+
+**Sprint 5 theme: Distribution + Behavior Change**
+**Estimated effort:** ~10-12h engineering + manual content creation
+
+### Summit #2 Tier 2 Additions (90-180 Days)
+
+| ID | Feature | Champion | Size | Dependency |
+|----|---------|----------|------|------------|
+| S2-T2-1 | BS-06 Habit Cascade Detector | Clear / Anika | M | 60+ days Habitify (~May) |
+| S2-T2-2 | "What Would My Board Say?" — Free AI Tool (lead magnet) | Kim / Raj | L | Anthropic API frontend integration |
+| S2-T2-3 | IC-9 Episodic Memory ("what worked") | Anika / Omar | L | 3 months platform_memory data |
+| S2-T2-4 | Resistance Training Load → ACWR Integration | Attia / Jin | M | Strength data source |
+| S2-T2-5 | Lab-to-Lifestyle Correlation Bridge | Patrick / Henning | M | Next blood draw |
+| S2-T2-6 | Sleep Debt Accumulation Model | Huberman / Omar | M | 60+ nights sleep data |
+| S2-T2-7 | Protein Distribution Scoring | Norton / Patrick | M | MacroFactor meal timestamps |
+| S2-T2-8 | EMAIL-P2 Data Drop Monthly Exclusive | Kim | M | 100+ subscribers |
+| S2-T2-9 | IC-11 Coaching Calibration | Anika | L | 3 months decision data |
+| S2-T2-10 | Genome-Informed Daily Nudges | Patrick / Anika | M | Genome data (available) |
+
+### Summit #2 Tier 3 Additions (180-365 Days)
+
+| ID | Feature | Champion | Size | Dependency |
+|----|---------|----------|------|------------|
+| S2-T3-1 | Authentication & User Accounts | Yael / Marcus | L | Commercial validation |
+| S2-T3-2 | Data Source Abstraction Layer (plugin architecture) | Priya / Omar | XL | Multi-user demand |
+| S2-T3-3 | AI Coaching Personalization Framework | Anika / Elena | XL | Multi-user demand |
+| S2-T3-4 | Compliance & Data Governance (HIPAA/GDPR) | Yael | XL | Commercial path chosen |
+| S2-T3-5 | Paid Tier Infrastructure (Stripe) | Raj / Dana | L | 500+ free subscribers |
+| S2-T3-6 | IC-20 Titan Embeddings | Anika / Omar | L | 4+ months insight corpus |
+
+### Website Roadmap (Summit #2 — 12-page target)
+
+| # | Page | Purpose | Status |
+|---|------|---------|--------|
+| 1 | `/` (Home) | Transformation story hero — live weight, progress bar, Chronicle excerpt | ✅ Live |
+| 2 | `/story` | Deep origin narrative — emotional anchor | **Sprint 5** |
+| 3 | `/live` | Transformation Timeline — interactive weight chart | ✅ Live |
+| 4 | `/journal` | Weekly Signal newsletter + data essays + build logs | ✅ Live (evolve) |
+| 5 | `/experiments` | N=1 Experiment Archive with case studies | ✅ Live |
+| 6 | `/character` | Character Sheet — 7-pillar radar chart | ✅ Live (evolve) |
+| 7 | `/explorer` | Correlation Explorer — 23-pair Pearson matrix | ✅ Live |
+| 8 | `/biology` | Genome Risk Dashboard — 110 SNPs | ✅ Live |
+| 9 | `/platform` | Platform architecture — "how I built this" | ✅ Live (evolve) |
+| 10 | `/tools` | Free interactive tools: sleep calc, habit audit, BoD builder | Later (S2-T2-2) |
+| 11 | `/subscribe` | Email list landing page | ✅ Live |
+| 12 | `/about` | Brief bio, professional context, links, contact | **Sprint 5** |
+
+### Design Language (Ava Moreau — enforced across all pages)
+
+- Background: `#0D1117` (dark charcoal), Text: `#E6EDF3` (warm white), Accent: `#F0B429` (amber/gold)
+- Data positive: `#2EA98F` (teal), Data negative: `#E85D5D` (coral), Secondary: `#8B949E` (cool gray)
+- Typography: Inter (headlines 600/700, body 400), JetBrains Mono (data/code)
+- Max line length: 65 chars body text. Charts animate on scroll. Skeleton loading states everywhere.
+- Emotional tone: personal field journal, not clinical dashboard or SaaS landing page.
+
+### Commercialization Update (Summit #2)
+
+- **Wedge unchanged:** AI Health Coaching Email ($19-49/month). Infrastructure built. Needs audience first.
+- **Path 3 (Content/Media) elevated:** Fastest to first dollar. No multi-user engineering. Authenticity is moat.
+- **Unit economics flag (Dana):** Per-user Opus cost ~$1.80/month for daily coaching. 10 Opus features × 2,000 users = $36K/month API cost. Model routing (Sonnet fast-path + Opus deep) essential before multi-user.
+- **Privacy policy gap (Yael):** Subscribe page live without visible privacy policy. Ship with Sprint 5.
+
+### Next Summit Trigger
+
+Board Summit #3: 500 subscribers OR 90-day journey milestone (2026-05-22), whichever comes first.
 
 ---
 
@@ -393,5 +490,6 @@ Site map target (from 4 pages to 10):
 | Architecture review grade | A | A | R16 grade A. R17 targeting ~June 2026. All 4 sprints complete. |
 | R13 open findings | 0 of 15 | 0 | All closed. F03 (monolith split) deferred via ADR-029. |
 | CI integration tests wired | I1/I2/I4-I9 | all | I3/I10-I14 manual-only (Lambda invocation side effects or special auth) |
-| Board Summit features | 45 total | — | Sprint 1-4: 26 features. Backlog: 19 features. See SPRINT_PLAN.md. |
-| Email subscribers | 0 | 500 (6 months) | Subscribe backend live v3.7.60. SES sandbox exit pending. |
+| Board Summit features | 45 total (S1) + Sprint 5 (S2) | — | Sprint 1-4: 30 shipped. Sprint 5: 8 items (website + distribution focus). See SPRINT_PLAN.md. |
+| Email subscribers | 0 | 500 (6 months) | Subscribe backend live v3.7.60. SES production confirmed. Board Summit #2 unanimously identified distribution as #1 priority. |
+| Board Summits | 2 | — | Summit #1 (v3.7.54): 45-item roadmap. Summit #2 (v3.7.69): post-sprint review + Sprint 5 plan. |

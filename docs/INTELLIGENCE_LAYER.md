@@ -543,4 +543,4 @@ These decisions are documented to prevent revisiting:
 
 ---
 
-*Last updated: 2026-03-17 (v3.7.68 — IC-29 live as deficit sustainability + metabolic adaptation. IC-30 live as autonomic balance. BS-MP2 journal sentiment trajectory also deployed but is not an IC feature.)*
+*Last updated: 2026-03-17 (v3.7.69 — Board Summit #2 conducted. No new IC features this session. Sprint 5 planned: adaptive deficit ceiling (wires IC-29 into prescriptive coaching) + weekly habit review automation. IC-4/IC-5 activation approaching data gate ~Apr 5. Full Summit #2 record: `docs/reviews/BOARD_SUMMIT_2_2026-03-17.md`.)*
