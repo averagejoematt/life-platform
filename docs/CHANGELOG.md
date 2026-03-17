@@ -1,3 +1,21 @@
+## v3.7.66 — 2026-03-17: MCP Key bug fix + BS-T2-5 complete
+
+### Summary
+Two fixes shipped. MCP `Key` NameError resolved (missing boto3.dynamodb.conditions import in `tools_lifestyle.py` — was breaking `list_experiments`, `create_experiment`, `end_experiment`, and any other experiments function using `Key()` expressions). BS-T2-5 Chronicle Newsletter Full Delivery completed: rate bump to SES production limits + token-based unsubscribe replacing raw-email URL exposure.
+
+### MCP `Key` NameError Fix
+- `mcp/tools_lifestyle.py`: Added `from boto3.dynamodb.conditions import Key` import (line 10). Was present in usage at lines 285 and 2455 but never imported. Affected `list_experiments`, `create_experiment`, `end_experiment`, `get_experiment_results`, `log_insight`, and related functions. **MCP DEPLOYED ✅**
+
+### BS-T2-5: Chronicle Newsletter Full Delivery — COMPLETE ✅
+- `cdk/stacks/email_stack.py`: `SEND_RATE_PER_SEC` bumped `"1.0"` → `"14.0"`. At 14/sec, ~300 subscribers deliver in ~22s. **CDK LifePlatformEmail DEPLOYED ✅**
+- `lambdas/chronicle_email_sender_lambda.py`: Unsubscribe URL changed from `?email=<raw>` to `?h=<email_hash>` — raw email never exposed in URL params. Function signature updated to accept full subscriber dict. **DEPLOYED ✅**
+- `lambdas/email_subscriber_lambda.py`: `handle_unsubscribe_by_hash()` added. Router prefers `?h=` param (backward-compatible). Welcome email unsub link updated to hash-based. **DEPLOYED ✅**
+
+### Sprint 3 Status
+- BS-T2-5: ✅ COMPLETE (was ⚠️ 90%)
+- Sprint 3 now 5/9 complete
+
+---
 # Life Platform — Changelog
 
 ## v3.7.65 — 2026-03-17: Sprint 3 partial — IC-28, WEB-WCT, BS-13 deployed
