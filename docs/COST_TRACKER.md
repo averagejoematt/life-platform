@@ -1,6 +1,6 @@
 # Life Platform — Cost Tracker
 
-Last updated: 2026-03-17 (v3.7.66)
+Last updated: 2026-03-17 (v3.7.67)
 
 > Budget target: **$25/month**. Design constraint: every feature must justify its cost.
 

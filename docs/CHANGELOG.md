@@ -1,3 +1,28 @@
+## v3.7.68 — 2026-03-17: Sprint 4 complete — BS-11, WEB-CE, BS-BM2, BS-14
+
+### Summary
+Sprint 4 fully closed (4/4). Three new website pages deployed: BS-11 Transformation Timeline (`/live/`), WEB-CE Correlation Explorer (`/explorer/`), BS-BM2 Genome-Informed Risk Dashboard (`/biology/`). Three new API endpoints added to `site_api_lambda.py`: `/api/timeline`, `/api/correlations`, `/api/genome_risks`. BS-14 Multi-User Data Isolation design doc written. Site page count: 4 → 7.
+
+### BS-11: Transformation Timeline — NEW ✅
+- `site/live/index.html`: Interactive SVG weight chart spanning the full journey (302→current→185). Overlays life events (amber markers), experiment bands (purple shading), and character level-up dots (blue). Tooltip on hover. Events list below chart. Responsive, scrollable on mobile.
+- `lambdas/site_api_lambda.py`: `handle_timeline()` — `/api/timeline` endpoint. Returns weight series, life events, experiments, and level-up events from DynamoDB. Cache 3600s.
+
+### WEB-CE: Correlation Explorer — NEW ✅
+- `site/explorer/index.html`: Displays 23 weekly correlation pairs from the platform’s Pearson matrix. Filter buttons: All, Strong (≥ 0.5), Moderate (≥ 0.35), FDR Significant, Lagged (predictive). r-value bar visualization with color coding (green positive, red negative). Methodology explainer section with BH FDR correction documentation.
+- `lambdas/site_api_lambda.py`: `handle_correlations()` — `/api/correlations` endpoint. Returns latest `weekly_correlations` record. Strips raw data, exposes only r, n, strength, FDR significance. Cache 3600s.
+
+### BS-BM2: Genome-Informed Risk Dashboard — NEW ✅
+- `site/biology/index.html`: Displays 110 SNPs grouped by category (metabolism, cardiovascular, nutrients, etc.). Risk summary header (unfavorable/mixed/neutral/favorable counts). SNP cards with gene name, rsID, risk badge, summary, implications, interventions, and evidence strength. Filter by risk level. Medical disclaimer footer.
+- `lambdas/site_api_lambda.py`: `handle_genome_risks()` — `/api/genome_risks` endpoint. Returns SNPs grouped by category with risk levels. No raw genotypes exposed. Cache 86400s (24h).
+
+### BS-14: Multi-User Data Isolation Design — COMPLETE ✅
+- `docs/design/MULTI_USER_ISOLATION.md`: Comprehensive schema analysis. Key finding: 100% of DynamoDB partitions already user-prefixed — zero schema migration needed. Identified 3 Priority-1 remediation items (Lambda user routing, S3 path prefixing, MCP auth middleware). Estimated total effort to reach user #2: ~8-10 hours. Cost model at 10/100 users. 4-phase migration strategy. Reviewed by Yael (Security) + Omar (Data).
+
+### Sprint 4 Status: COMPLETE (4/4) ✅
+- BS-11 ✅, WEB-CE ✅, BS-BM2 ✅, BS-14 ✅
+
+---
+
 ## v3.7.67 — 2026-03-17: Sprint 3 complete — BS-12, BS-SL1, BS-MP1, BS-MP2, IC-29, hero fix
 
 ### Summary

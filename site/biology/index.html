@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Genome-informed risk dashboard — 110 SNPs mapped to interventions, evidence, and what to monitor.">
+  <title>Genome Risk Dashboard — Matthew Walker</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .page-header { padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12); border-bottom: 1px solid var(--border); max-width: var(--max-width); margin: 0 auto; }
+    .page-header__title { font-family: var(--font-display); font-size: var(--text-h1); line-height: var(--lh-display); letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-4); }
+    .page-header__title span { color: var(--accent); }
+    .page-header__sub { font-family: var(--font-mono); font-size: var(--text-base); color: var(--text-muted); max-width: 600px; line-height: var(--lh-body); }
+
+    .risk-summary { max-width: var(--max-width); margin: 0 auto; padding: var(--space-8) var(--page-padding); display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
+    .risk-summary__item { background: var(--bg); padding: var(--space-6); text-align: center; }
+    .risk-summary__count { font-family: var(--font-display); font-size: 44px; line-height: 1; }
+    .risk-summary__count.unfavorable { color: var(--c-red-status); }
+    .risk-summary__count.mixed { color: var(--c-yellow-status); }
+    .risk-summary__count.neutral { color: var(--text-muted); }
+    .risk-summary__count.favorable { color: var(--accent); }
+    .risk-summary__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-top: var(--space-2); }
+
+    .controls { max-width: var(--max-width); margin: 0 auto; padding: var(--space-6) var(--page-padding); display: flex; gap: var(--space-4); flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+    .filter-btn { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--ls-label); text-transform: uppercase; padding: var(--space-2) var(--space-4); border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; transition: all var(--dur-fast); background: transparent; }
+    .filter-btn.active, .filter-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg-subtle); }
+
+    .categories { max-width: var(--max-width); margin: 0 auto; padding: var(--space-8) var(--page-padding); }
+    .category { margin-bottom: var(--space-10); }
+    .category__header { display: flex; align-items: baseline; gap: var(--space-4); margin-bottom: var(--space-4); padding-bottom: var(--space-3); border-bottom: 1px solid var(--border); }
+    .category__name { font-family: var(--font-display); font-size: var(--text-h3); color: var(--text); text-transform: capitalize; }
+    .category__count { font-size: var(--text-xs); color: var(--text-faint); }
+
+    .snp-card { padding: var(--space-5) var(--space-6); border: 1px solid var(--border-subtle); background: var(--surface); margin-bottom: var(--space-3); transition: border-color var(--dur-fast); }
+    .snp-card:hover { border-color: var(--border-strong); }
+    .snp-card.unfavorable { border-left: 3px solid var(--c-red-status); }
+    .snp-card.mixed { border-left: 3px solid var(--c-yellow-status); }
+    .snp-card.favorable { border-left: 3px solid var(--accent); }
+    .snp-card.neutral { border-left: 3px solid var(--border); }
+
+    .snp-card__head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3); }
+    .snp-card__gene { font-family: var(--font-display); font-size: 22px; color: var(--text); letter-spacing: var(--ls-display); }
+    .snp-card__rsid { font-size: var(--text-2xs); color: var(--text-faint); font-family: var(--font-mono); }
+    .snp-card__risk { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; padding: 2px 8px; }
+    .snp-card__risk.unfavorable { color: var(--c-red-status); background: rgba(255,82,82,0.1); }
+    .snp-card__risk.mixed { color: var(--c-yellow-status); background: rgba(245,166,35,0.1); }
+    .snp-card__risk.favorable { color: var(--accent); background: var(--accent-bg-subtle); }
+    .snp-card__risk.neutral { color: var(--text-muted); background: var(--surface-raised); }
+
+    .snp-card__summary { font-size: var(--text-sm); color: var(--text); line-height: var(--lh-body); margin-bottom: var(--space-3); }
+    .snp-card__implications { font-size: var(--text-xs); color: var(--text-muted); line-height: var(--lh-body); margin-bottom: var(--space-3); }
+
+    .snp-card__interventions { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border-subtle); }
+    .snp-card__int-label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--accent-dim); margin-bottom: var(--space-2); }
+    .snp-card__int-list { font-size: var(--text-xs); color: var(--text-muted); line-height: 1.8; }
+    .snp-card__evidence { font-size: var(--text-2xs); color: var(--text-faint); margin-top: var(--space-2); }
+
+    .disclaimer { max-width: var(--max-width); margin: 0 auto; padding: var(--space-8) var(--page-padding); border-top: 1px solid var(--border); }
+    .disclaimer p { font-size: var(--text-xs); color: var(--text-faint); line-height: var(--lh-body); max-width: var(--prose-width); }
+
+    .loading { text-align: center; padding: var(--space-16); color: var(--text-muted); }
+
+    @media (max-width: 768px) {
+      .risk-summary { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="nav">
+    <a href="/" class="nav__brand">SIGNAL</a>
+    <div class="nav__links">
+      <a href="/character/" class="nav__link">Character</a>
+      <a href="/journal/" class="nav__link">Journal</a>
+      <a href="/experiments/" class="nav__link">Experiments</a>
+      <a href="/live/" class="nav__link">Timeline</a>
+      <a href="/explorer/" class="nav__link">Explorer</a>
+      <a href="/biology/" class="nav__link active">Biology</a>
+      <a href="/platform/" class="nav__link">Platform</a>
+    </div>
+    <div class="nav__status"><span class="pulse"></span> LIVE</div>
+  </nav>
+
+  <header class="page-header animate-in">
+    <div class="eyebrow">BS-BM2 — Genome Risk Dashboard</div>
+    <h1 class="page-header__title">Your <span>DNA</span>, decoded</h1>
+    <p class="page-header__sub">110 SNPs from whole-genome sequencing — mapped to what they mean, what literature says, and what to actually do about each one.</p>
+  </header>
+
+  <div class="risk-summary animate-in" id="risk-summary">
+    <div class="risk-summary__item"><div class="risk-summary__count unfavorable" id="ct-unfav">—</div><div class="risk-summary__label">Unfavorable</div></div>
+    <div class="risk-summary__item"><div class="risk-summary__count mixed" id="ct-mixed">—</div><div class="risk-summary__label">Mixed</div></div>
+    <div class="risk-summary__item"><div class="risk-summary__count neutral" id="ct-neutral">—</div><div class="risk-summary__label">Neutral</div></div>
+    <div class="risk-summary__item"><div class="risk-summary__count favorable" id="ct-fav">—</div><div class="risk-summary__label">Favorable</div></div>
+  </div>
+
+  <div class="controls animate-in">
+    <button class="filter-btn active" data-filter="all">All SNPs</button>
+    <button class="filter-btn" data-filter="unfavorable">Unfavorable</button>
+    <button class="filter-btn" data-filter="mixed">Mixed</button>
+    <button class="filter-btn" data-filter="favorable">Favorable</button>
+  </div>
+
+  <div class="categories animate-in" id="categories">
+    <div class="loading">Loading genome data…</div>
+  </div>
+
+  <div class="disclaimer">
+    <p>This dashboard displays personal genomic data for educational and self-tracking purposes only. SNP interpretations are based on published research as of early 2026 and may not reflect the latest findings. Genetic variants are one factor among many — environment, behavior, and epigenetics play equally important roles. This is not a diagnostic tool. Always consult a qualified healthcare provider or genetic counselor for medical decisions based on genetic data.</p>
+  </div>
+
+  <footer class="footer">
+    <span class="footer__brand">SIGNAL</span>
+    <div class="footer__links">
+      <a href="/" class="footer__link">Home</a>
+      <a href="/platform/" class="footer__link">Platform</a>
+    </div>
+    <span class="footer__copy">© 2026 Matthew Walker</span>
+  </footer>
+
+  <div class="challenge-bar" id="challenge-bar" style="display:none;">
+    <span class="challenge-bar__pip"></span>
+    <span class="challenge-bar__label" id="cbar-label"></span>
+    <span class="challenge-bar__divider"></span>
+    <span class="challenge-bar__text" id="cbar-text"></span>
+  </div>
+
+<script>
+const API = 'https://averagejoematt.com';
+let genomeData = null;
+let activeFilter = 'all';
+
+async function init() {
+  try {
+    const res = await fetch(`${API}/api/genome_risks`);
+    const json = await res.json();
+    genomeData = json.genome;
+    const rs = genomeData.risk_summary;
+    document.getElementById('ct-unfav').textContent = rs.unfavorable || 0;
+    document.getElementById('ct-mixed').textContent = rs.mixed || 0;
+    document.getElementById('ct-neutral').textContent = rs.neutral || 0;
+    document.getElementById('ct-fav').textContent = rs.favorable || 0;
+    renderCategories(genomeData.categories);
+  } catch (e) {
+    document.getElementById('categories').innerHTML = '<div class="loading">Could not load genome data.</div>';
+  }
+  // Challenge bar
+  try {
+    const cr = await fetch(`${API}/api/current_challenge`);
+    const cj = await cr.json();
+    const ch = cj.current_challenge;
+    if (ch && ch.challenge) {
+      document.getElementById('cbar-label').textContent = `Week ${ch.week_num || '?'}`;
+      document.getElementById('cbar-text').innerHTML = `<strong>${ch.challenge}</strong>`;
+      document.getElementById('challenge-bar').style.display = 'flex';
+    }
+  } catch(_) {}
+}
+
+function renderCategories(categories) {
+  const container = document.getElementById('categories');
+  if (!categories || !Object.keys(categories).length) {
+    container.innerHTML = '<div class="loading">No genome categories found.</div>';
+    return;
+  }
+
+  // Sort categories: most unfavorable first
+  const catOrder = Object.entries(categories).sort((a, b) => {
+    const aU = a[1].filter(s => s.risk_level === 'unfavorable').length;
+    const bU = b[1].filter(s => s.risk_level === 'unfavorable').length;
+    return bU - aU;
+  });
+
+  container.innerHTML = catOrder.map(([cat, snps]) => {
+    const filtered = activeFilter === 'all' ? snps : snps.filter(s => s.risk_level === activeFilter);
+    if (!filtered.length) return '';
+
+    return `<div class="category">
+      <div class="category__header">
+        <div class="category__name">${cat}</div>
+        <div class="category__count">${filtered.length} SNP${filtered.length !== 1 ? 's' : ''}</div>
+      </div>
+      ${filtered.map(s => {
+        const intList = Array.isArray(s.interventions) ? s.interventions.join(' · ') : (s.interventions || '');
+        return `<div class="snp-card ${s.risk_level}">
+          <div class="snp-card__head">
+            <div>
+              <span class="snp-card__gene">${s.gene || '—'}</span>
+              <span class="snp-card__rsid">${s.rsid || ''}</span>
+            </div>
+            <span class="snp-card__risk ${s.risk_level}">${s.risk_level}</span>
+          </div>
+          ${s.summary ? `<div class="snp-card__summary">${s.summary}</div>` : ''}
+          ${s.implications ? `<div class="snp-card__implications">${s.implications}</div>` : ''}
+          ${intList ? `<div class="snp-card__interventions">
+            <div class="snp-card__int-label">Interventions</div>
+            <div class="snp-card__int-list">${intList}</div>
+          </div>` : ''}
+          ${s.evidence ? `<div class="snp-card__evidence">Evidence: ${s.evidence}</div>` : ''}
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = btn.dataset.filter;
+    if (genomeData) renderCategories(genomeData.categories);
+  });
+});
+
+init();
+</script>
+</body>
+</html>
