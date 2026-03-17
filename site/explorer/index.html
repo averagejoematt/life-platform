@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Cross-source correlation explorer — what actually predicts what in one person's health data.">
+  <title>Correlation Explorer — Matthew Walker</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .page-header { padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12); border-bottom: 1px solid var(--border); max-width: var(--max-width); margin: 0 auto; }
+    .page-header__title { font-family: var(--font-display); font-size: var(--text-h1); line-height: var(--lh-display); letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-4); }
+    .page-header__title span { color: var(--accent); }
+    .page-header__sub { font-family: var(--font-mono); font-size: var(--text-base); color: var(--text-muted); max-width: 600px; line-height: var(--lh-body); }
+
+    .explainer { max-width: var(--max-width); margin: 0 auto; padding: var(--space-8) var(--page-padding); display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
+    .explainer__item { background: var(--bg); padding: var(--space-6); }
+    .explainer__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-2); }
+    .explainer__value { font-family: var(--font-display); font-size: 32px; color: var(--accent); line-height: 1; }
+    .explainer__note { font-size: var(--text-2xs); color: var(--text-faint); margin-top: var(--space-2); }
+
+    .controls { max-width: var(--max-width); margin: 0 auto; padding: var(--space-6) var(--page-padding); display: flex; gap: var(--space-4); flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--border); }
+    .filter-btn { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--ls-label); text-transform: uppercase; padding: var(--space-2) var(--space-4); border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; transition: all var(--dur-fast); background: transparent; }
+    .filter-btn.active, .filter-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg-subtle); }
+
+    .pairs-grid { max-width: var(--max-width); margin: 0 auto; padding: var(--space-8) var(--page-padding); display: grid; gap: var(--space-4); }
+
+    .pair-card { display: grid; grid-template-columns: 1fr 120px 1fr 60px; gap: var(--space-4); align-items: center; padding: var(--space-5) var(--space-6); border: 1px solid var(--border-subtle); background: var(--surface); transition: border-color var(--dur-fast); }
+    .pair-card:hover { border-color: var(--accent); }
+    .pair-card.fdr { border-left: 3px solid var(--accent); }
+
+    .pair-card__var { font-size: var(--text-sm); color: var(--text); }
+    .pair-card__source { font-size: var(--text-2xs); color: var(--text-faint); text-transform: uppercase; letter-spacing: var(--ls-tag); margin-top: 2px; }
+
+    .pair-card__r { text-align: center; }
+    .pair-card__rval { font-family: var(--font-display); font-size: 36px; line-height: 1; }
+    .pair-card__rval.pos { color: var(--accent); }
+    .pair-card__rval.neg { color: var(--c-red-status); }
+    .pair-card__rval.weak { color: var(--text-faint); }
+    .pair-card__rlabel { font-size: var(--text-2xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: var(--ls-tag); margin-top: 2px; }
+
+    .pair-card__n { font-size: var(--text-xs); color: var(--text-faint); text-align: right; }
+
+    .pair-card__bar { grid-column: 1 / -1; height: 4px; background: var(--surface-raised); margin-top: var(--space-1); overflow: hidden; position: relative; }
+    .pair-card__barfill { position: absolute; top: 0; height: 100%; transition: width var(--dur-slow) var(--ease-out); }
+
+    .methodology { max-width: var(--max-width); margin: 0 auto; padding: var(--space-10) var(--page-padding); border-top: 1px solid var(--border); }
+    .methodology h3 { font-family: var(--font-display); font-size: var(--text-h3); color: var(--text); margin-bottom: var(--space-4); }
+    .methodology p { font-size: var(--text-sm); color: var(--text-muted); line-height: var(--lh-body); max-width: var(--prose-width); margin-bottom: var(--space-4); }
+
+    .loading { text-align: center; padding: var(--space-16); color: var(--text-muted); }
+
+    @media (max-width: 768px) {
+      .explainer { grid-template-columns: 1fr; }
+      .pair-card { grid-template-columns: 1fr 80px; }
+      .pair-card__var:nth-child(3) { grid-column: 1; }
+      .pair-card__n { grid-column: 2; grid-row: 2; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="nav">
+    <a href="/" class="nav__brand">SIGNAL</a>
+    <div class="nav__links">
+      <a href="/character/" class="nav__link">Character</a>
+      <a href="/journal/" class="nav__link">Journal</a>
+      <a href="/experiments/" class="nav__link">Experiments</a>
+      <a href="/live/" class="nav__link">Timeline</a>
+      <a href="/explorer/" class="nav__link active">Explorer</a>
+      <a href="/biology/" class="nav__link">Biology</a>
+      <a href="/platform/" class="nav__link">Platform</a>
+    </div>
+    <div class="nav__status"><span class="pulse"></span> LIVE</div>
+  </nav>
+
+  <header class="page-header animate-in">
+    <div class="eyebrow">WEB-CE — Correlation Explorer</div>
+    <h1 class="page-header__title">What <span>actually</span> predicts what?</h1>
+    <p class="page-header__sub">23 cross-source correlations computed weekly from 90 days of real data. Benjamini-Hochberg FDR corrected. Not theory — measurement.</p>
+  </header>
+
+  <div class="explainer animate-in">
+    <div class="explainer__item">
+      <div class="explainer__label">Pairs tested</div>
+      <div class="explainer__value" id="stat-pairs">—</div>
+      <div class="explainer__note">Cross-source + 3 lagged predictors</div>
+    </div>
+    <div class="explainer__item">
+      <div class="explainer__label">FDR significant</div>
+      <div class="explainer__value" id="stat-sig">—</div>
+      <div class="explainer__note">After Benjamini-Hochberg correction</div>
+    </div>
+    <div class="explainer__item">
+      <div class="explainer__label">Data week</div>
+      <div class="explainer__value" id="stat-week">—</div>
+      <div class="explainer__note">90-day rolling window</div>
+    </div>
+  </div>
+
+  <div class="controls animate-in">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="strong">Strong (|r| ≥ 0.5)</button>
+    <button class="filter-btn" data-filter="moderate">Moderate (|r| ≥ 0.35)</button>
+    <button class="filter-btn" data-filter="fdr">FDR Significant</button>
+    <button class="filter-btn" data-filter="lagged">Lagged (predictive)</button>
+  </div>
+
+  <div class="pairs-grid animate-in" id="pairs-grid">
+    <div class="loading">Loading correlation data…</div>
+  </div>
+
+  <div class="methodology animate-in">
+    <h3>How this works</h3>
+    <p>Every Sunday, the platform computes Pearson correlations between 23 metric pairs across a 90-day rolling window — sleep vs recovery, HRV vs training output, nutrition vs body composition, and more.</p>
+    <p>To control for multiple testing (23 simultaneous tests at α=0.05 would produce ~1.15 expected false positives), Benjamini-Hochberg FDR correction is applied. A pair marked "FDR significant" has survived this correction. Strength labels (strong, moderate, weak) are n-gated: "strong" requires n≥50, "moderate" requires n≥30.</p>
+    <p>Three lagged pairs test temporal precedence: does today's HRV predict tomorrow's training output? These use a 1-day shift and are flagged separately. Autocorrelation is not explicitly corrected — treat lagged results as directional signals.</p>
+    <p style="color: var(--text-faint); font-size: var(--text-2xs); margin-top: var(--space-6);">Correlation does not imply causation. N=1 data. This is observation, not prescription.</p>
+  </div>
+
+  <footer class="footer">
+    <span class="footer__brand">SIGNAL</span>
+    <div class="footer__links">
+      <a href="/" class="footer__link">Home</a>
+      <a href="/platform/" class="footer__link">Platform</a>
+    </div>
+    <span class="footer__copy">© 2026 Matthew Walker</span>
+  </footer>
+
+  <div class="challenge-bar" id="challenge-bar" style="display:none;">
+    <span class="challenge-bar__pip"></span>
+    <span class="challenge-bar__label" id="cbar-label"></span>
+    <span class="challenge-bar__divider"></span>
+    <span class="challenge-bar__text" id="cbar-text"></span>
+  </div>
+
+<script>
+const API = 'https://averagejoematt.com';
+let allPairs = [];
+
+async function init() {
+  try {
+    const res = await fetch(`${API}/api/correlations`);
+    const json = await res.json();
+    const c = json.correlations;
+    allPairs = c.pairs || [];
+    document.getElementById('stat-pairs').textContent = c.count;
+    document.getElementById('stat-sig').textContent = allPairs.filter(p => p.fdr_significant).length;
+    document.getElementById('stat-week').textContent = c.week || '—';
+    renderPairs(allPairs);
+  } catch(e) {
+    document.getElementById('pairs-grid').innerHTML = '<div class="loading">Could not load correlation data.</div>';
+  }
+  // Challenge bar
+  try {
+    const cr = await fetch(`${API}/api/current_challenge`);
+    const cj = await cr.json();
+    const ch = cj.current_challenge;
+    if (ch && ch.challenge) {
+      document.getElementById('cbar-label').textContent = `Week ${ch.week_num || '?'}`;
+      document.getElementById('cbar-text').innerHTML = `<strong>${ch.challenge}</strong>`;
+      document.getElementById('challenge-bar').style.display = 'flex';
+    }
+  } catch(_) {}
+}
+
+function renderPairs(pairs) {
+  const grid = document.getElementById('pairs-grid');
+  if (!pairs.length) { grid.innerHTML = '<div class="loading">No pairs match this filter.</div>'; return; }
+
+  grid.innerHTML = pairs.map(p => {
+    const absR = Math.abs(p.r);
+    const rClass = absR >= 0.5 ? (p.r > 0 ? 'pos' : 'neg') : absR >= 0.35 ? (p.r > 0 ? 'pos' : 'neg') : 'weak';
+    const fdrClass = p.fdr_significant ? 'fdr' : '';
+    const barColor = p.r > 0 ? '#00e5a0' : '#ff5252';
+    const barW = Math.round(absR * 100);
+    const lagTag = p.lag_days > 0 ? ` <span style="color:var(--c-amber-500);font-size:9px;">▶ ${p.lag_days}d lag</span>` : '';
+
+    return `<div class="pair-card ${fdrClass}">
+      <div><div class="pair-card__var">${p.label_a || p.field_a}${lagTag}</div><div class="pair-card__source">${p.source_a}</div></div>
+      <div class="pair-card__r"><div class="pair-card__rval ${rClass}">${p.r > 0 ? '+' : ''}${p.r.toFixed(2)}</div><div class="pair-card__rlabel">${p.strength}${p.fdr_significant ? ' ✓' : ''}</div></div>
+      <div><div class="pair-card__var">${p.label_b || p.field_b}</div><div class="pair-card__source">${p.source_b}</div></div>
+      <div class="pair-card__n">n=${p.n}</div>
+      <div class="pair-card__bar"><div class="pair-card__barfill" style="width:${barW}%;background:${barColor};"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// Filter buttons
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const f = btn.dataset.filter;
+    let filtered = allPairs;
+    if (f === 'strong')   filtered = allPairs.filter(p => Math.abs(p.r) >= 0.5);
+    if (f === 'moderate') filtered = allPairs.filter(p => Math.abs(p.r) >= 0.35);
+    if (f === 'fdr')      filtered = allPairs.filter(p => p.fdr_significant);
+    if (f === 'lagged')   filtered = allPairs.filter(p => p.lag_days > 0);
+    renderPairs(filtered);
+  });
+});
+
+init();
+</script>
+</body>
+</html>

@@ -502,6 +502,173 @@ def handle_status() -> dict:
         return _error(503, f"DynamoDB unavailable: {e}")
 
 
+# ── BS-11: Timeline data ────────────────────────────────────────
+
+def handle_timeline() -> dict:
+    """
+    GET /api/timeline
+    Returns weight series + life events + experiments + level-ups
+    for the interactive Transformation Timeline page.
+    Cache: 3600s.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    start = "2026-02-09"
+
+    # Weight series (full journey)
+    wt_items = _query_source("withings", start, today)
+    weights = sorted(
+        [{"date": i["sk"].replace("DATE#", ""), "lbs": round(float(i["weight_lbs"]), 1)}
+         for i in wt_items if i.get("weight_lbs")],
+        key=lambda x: x["date"]
+    )
+
+    # Life events
+    life_pk = f"USER#{USER_ID}#SOURCE#life_events"
+    le_resp = table.query(KeyConditionExpression=Key("pk").eq(life_pk))
+    life_events = [
+        {"date": i.get("date", ""), "title": i.get("title", ""),
+         "type": i.get("type", "other"), "weight": int(i.get("emotional_weight", 3))}
+        for i in _decimal_to_float(le_resp.get("Items", []))
+    ]
+
+    # Experiments
+    exp_pk = f"USER#{USER_ID}#SOURCE#experiments"
+    exp_resp = table.query(KeyConditionExpression=Key("pk").eq(exp_pk))
+    experiments = [
+        {"name": i.get("name", ""), "start": i.get("start_date", ""),
+         "end": i.get("end_date"), "status": i.get("status", "active")}
+        for i in _decimal_to_float(exp_resp.get("Items", []))
+        if i.get("sk", "").startswith("EXP#")
+    ]
+
+    # Character level history
+    cs_pk = f"{USER_PREFIX}character_sheet"
+    cs_resp = table.query(
+        KeyConditionExpression=Key("pk").eq(cs_pk) & Key("sk").begins_with("DATE#"),
+        ScanIndexForward=True,
+    )
+    level_events = []
+    prev_level = 0
+    for item in _decimal_to_float(cs_resp.get("Items", [])):
+        lvl = int(float(item.get("character_level", 0)))
+        if lvl > prev_level and prev_level > 0:
+            level_events.append({
+                "date": item.get("sk", "").replace("DATE#", ""),
+                "level": lvl,
+                "tier": item.get("character_tier", ""),
+            })
+        prev_level = lvl
+
+    return _ok({
+        "timeline": {
+            "weights":      weights,
+            "life_events":  sorted(life_events, key=lambda x: x["date"]),
+            "experiments":  sorted(experiments, key=lambda x: x["start"]),
+            "level_ups":    level_events,
+            "journey_start": "2026-02-09",
+            "start_weight":  302.0,
+            "goal_weight":   185.0,
+        }
+    }, cache_seconds=3600)
+
+
+# ── WEB-CE: Correlation data ────────────────────────────────────
+
+def handle_correlations() -> dict:
+    """
+    GET /api/correlations
+    Returns the most recent weekly correlation matrix (23 pairs)
+    for the public Correlation Explorer.
+    Cache: 3600s.
+    """
+    pk = f"{USER_PREFIX}weekly_correlations"
+    resp = table.query(
+        KeyConditionExpression=Key("pk").eq(pk),
+        ScanIndexForward=False,
+        Limit=1,
+    )
+    items = _decimal_to_float(resp.get("Items", []))
+    if not items:
+        return _error(503, "No correlation data available yet.")
+
+    record = items[0]
+    pairs = record.get("pairs", [])
+    week = record.get("sk", "").replace("WEEK#", "")
+
+    public_pairs = []
+    for p in pairs:
+        public_pairs.append({
+            "source_a":  p.get("source_a", ""),
+            "field_a":   p.get("field_a", ""),
+            "label_a":   p.get("label_a", p.get("field_a", "")),
+            "source_b":  p.get("source_b", ""),
+            "field_b":   p.get("field_b", ""),
+            "label_b":   p.get("label_b", p.get("field_b", "")),
+            "r":         round(float(p.get("r", 0)), 3),
+            "n":         int(p.get("n", 0)),
+            "strength":  p.get("strength", "weak"),
+            "fdr_significant": p.get("fdr_significant", False),
+            "correlation_type": p.get("correlation_type", "cross_sectional"),
+            "lag_days":  int(p.get("lag_days", 0)),
+        })
+
+    return _ok({
+        "correlations": {
+            "week":  week,
+            "pairs": sorted(public_pairs, key=lambda x: -abs(x["r"])),
+            "count": len(public_pairs),
+            "methodology": "Pearson r over 90-day rolling window. Benjamini-Hochberg FDR correction. n-gated strength labels.",
+        }
+    }, cache_seconds=3600)
+
+
+# ── BS-BM2: Genome risk data ────────────────────────────────────
+
+def handle_genome_risks() -> dict:
+    """
+    GET /api/genome_risks
+    Returns genome SNPs grouped by category with risk levels.
+    No raw genotypes exposed. Cache: 86400s (24h).
+    """
+    pk = f"{USER_PREFIX}genome"
+    resp = table.query(KeyConditionExpression=Key("pk").eq(pk))
+    items = _decimal_to_float(resp.get("Items", []))
+
+    if not items:
+        return _error(503, "No genome data available.")
+
+    categories = {}
+    risk_summary = {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}
+
+    for snp in items:
+        cat = snp.get("category", "other")
+        risk = snp.get("risk_level", "neutral")
+        risk_summary[risk] = risk_summary.get(risk, 0) + 1
+
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append({
+            "gene":         snp.get("gene", ""),
+            "rsid":         snp.get("rsid", snp.get("sk", "").replace("SNP#", "")),
+            "risk_level":   risk,
+            "summary":      snp.get("summary", ""),
+            "implications":  snp.get("implications", ""),
+            "interventions": snp.get("interventions", []),
+            "evidence":     snp.get("evidence_strength", "moderate"),
+        })
+
+    for cat in categories:
+        categories[cat].sort(key=lambda x: {"unfavorable": 0, "mixed": 1, "neutral": 2, "favorable": 3}.get(x["risk_level"], 2))
+
+    return _ok({
+        "genome": {
+            "total_snps":   len(items),
+            "risk_summary": risk_summary,
+            "categories":   categories,
+        }
+    }, cache_seconds=86400)
+
+
 # ── Router ──────────────────────────────────────────────────
 
 ROUTES = {
@@ -515,6 +682,10 @@ ROUTES = {
     "/api/habit_streaks":   handle_habit_streaks,
     "/api/experiments":        handle_experiments,
     "/api/current_challenge":  handle_current_challenge,
+    # Sprint 4: BS-11, WEB-CE, BS-BM2
+    "/api/timeline":           handle_timeline,
+    "/api/correlations":       handle_correlations,
+    "/api/genome_risks":       handle_genome_risks,
 }
 
 

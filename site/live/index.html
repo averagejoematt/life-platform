@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Interactive transformation timeline — every weigh-in, experiment, and milestone from 302 lbs to goal.">
+  <title>Transformation Timeline — Matthew Walker</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .page-header { padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12); border-bottom: 1px solid var(--border); max-width: var(--max-width); margin: 0 auto; }
+    .page-header__title { font-family: var(--font-display); font-size: var(--text-h1); line-height: var(--lh-display); letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-4); }
+    .page-header__title span { color: var(--accent); }
+    .page-header__sub { font-family: var(--font-mono); font-size: var(--text-base); color: var(--text-muted); max-width: 560px; line-height: var(--lh-body); }
+    .page-header__meta { margin-top: var(--space-8); display: flex; gap: var(--space-8); flex-wrap: wrap; }
+    .meta-stat { border-left: 2px solid var(--accent); padding-left: var(--space-4); }
+    .meta-stat__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-1); }
+    .meta-stat__value { font-family: var(--font-display); font-size: 28px; color: var(--text); letter-spacing: var(--ls-display); }
+
+    .timeline-container { max-width: var(--max-width); margin: 0 auto; padding: var(--space-10) var(--page-padding); }
+    .chart-wrapper { position: relative; width: 100%; overflow-x: auto; border: 1px solid var(--border); background: var(--surface); }
+    .chart-wrapper svg { display: block; min-width: 900px; }
+    .chart-wrapper svg text { font-family: var(--font-mono); }
+
+    .tooltip { position: fixed; background: var(--surface-raised); border: 1px solid var(--accent); padding: var(--space-3) var(--space-4); font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text); pointer-events: none; z-index: var(--z-modal); display: none; max-width: 240px; }
+    .tooltip__date { color: var(--accent); font-weight: 700; }
+    .tooltip__value { margin-top: 2px; }
+
+    .legend { display: flex; gap: var(--space-6); flex-wrap: wrap; margin-top: var(--space-6); }
+    .legend__item { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--text-muted); }
+    .legend__dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    .events-list { max-width: var(--max-width); margin: 0 auto; padding: var(--space-10) var(--page-padding); }
+    .events-list h2 { font-family: var(--font-display); font-size: var(--text-h3); color: var(--text); margin-bottom: var(--space-6); }
+    .event-row { display: grid; grid-template-columns: 100px 12px 1fr; gap: var(--space-4); align-items: start; padding: var(--space-4) 0; border-bottom: 1px solid var(--border-subtle); }
+    .event-row__date { font-size: var(--text-xs); color: var(--text-muted); font-family: var(--font-mono); letter-spacing: var(--ls-tag); }
+    .event-row__dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 3px; }
+    .event-row__text { font-size: var(--text-sm); color: var(--text); }
+    .event-row__type { font-size: var(--text-2xs); color: var(--text-faint); text-transform: uppercase; letter-spacing: var(--ls-tag); margin-top: 2px; }
+    .loading { text-align: center; padding: var(--space-16); color: var(--text-muted); font-size: var(--text-sm); }
+
+    @media (max-width: 768px) {
+      .page-header__meta { gap: var(--space-4); }
+      .event-row { grid-template-columns: 80px 10px 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav class="nav">
+    <a href="/" class="nav__brand">SIGNAL</a>
+    <div class="nav__links">
+      <a href="/character/" class="nav__link">Character</a>
+      <a href="/journal/" class="nav__link">Journal</a>
+      <a href="/experiments/" class="nav__link">Experiments</a>
+      <a href="/live/" class="nav__link active">Timeline</a>
+      <a href="/explorer/" class="nav__link">Explorer</a>
+      <a href="/biology/" class="nav__link">Biology</a>
+      <a href="/platform/" class="nav__link">Platform</a>
+    </div>
+    <div class="nav__status"><span class="pulse"></span> LIVE</div>
+  </nav>
+
+  <!-- Header -->
+  <header class="page-header animate-in">
+    <div class="eyebrow">BS-11 — Transformation Timeline</div>
+    <h1 class="page-header__title">302 → <span id="current-weight">…</span> → 185</h1>
+    <p class="page-header__sub">Every weigh-in, every experiment, every milestone — from day one to today. Click any point to see what was happening that day.</p>
+    <div class="page-header__meta">
+      <div class="meta-stat"><div class="meta-stat__label">Days on journey</div><div class="meta-stat__value" id="days-count">—</div></div>
+      <div class="meta-stat"><div class="meta-stat__label">Lbs lost</div><div class="meta-stat__value" id="lbs-lost">—</div></div>
+      <div class="meta-stat"><div class="meta-stat__label">Data points</div><div class="meta-stat__value" id="data-points">—</div></div>
+    </div>
+  </header>
+
+  <!-- Chart -->
+  <section class="timeline-container animate-in">
+    <div class="chart-wrapper" id="chart-wrapper">
+      <div class="loading" id="chart-loading">Loading timeline data…</div>
+    </div>
+    <div class="legend">
+      <div class="legend__item"><span class="legend__dot" style="background: var(--accent);"></span> Weight</div>
+      <div class="legend__item"><span class="legend__dot" style="background: #f5a623;"></span> Life event</div>
+      <div class="legend__item"><span class="legend__dot" style="background: #7c3aed;"></span> Experiment</div>
+      <div class="legend__item"><span class="legend__dot" style="background: #3b82f6;"></span> Level up</div>
+    </div>
+  </section>
+
+  <!-- Events list -->
+  <section class="events-list animate-in" id="events-section" style="display:none;">
+    <h2>Journey Events</h2>
+    <div id="events-list"></div>
+  </section>
+
+  <!-- Tooltip -->
+  <div class="tooltip" id="tooltip"><div class="tooltip__date"></div><div class="tooltip__value"></div></div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <span class="footer__brand">SIGNAL</span>
+    <div class="footer__links">
+      <a href="/" class="footer__link">Home</a>
+      <a href="/platform/" class="footer__link">Platform</a>
+      <a href="/journal/" class="footer__link">Journal</a>
+    </div>
+    <span class="footer__copy">© 2026 Matthew Walker</span>
+  </footer>
+
+  <!-- Challenge bar -->
+  <div class="challenge-bar" id="challenge-bar" style="display:none;">
+    <span class="challenge-bar__pip"></span>
+    <span class="challenge-bar__label" id="cbar-label"></span>
+    <span class="challenge-bar__divider"></span>
+    <span class="challenge-bar__text" id="cbar-text"></span>
+  </div>
+
+<script>
+const API = 'https://averagejoematt.com';
+const CHART_H = 400, PAD_T = 40, PAD_B = 50, PAD_L = 60, PAD_R = 30;
+const tooltip = document.getElementById('tooltip');
+
+async function init() {
+  try {
+    const res = await fetch(`${API}/api/timeline`);
+    const json = await res.json();
+    const tl = json.timeline;
+    render(tl);
+    renderEvents(tl);
+    // Header stats
+    const wts = tl.weights;
+    if (wts.length) {
+      const curr = wts[wts.length - 1].lbs;
+      document.getElementById('current-weight').textContent = curr;
+      document.getElementById('lbs-lost').textContent = Math.round(tl.start_weight - curr);
+      document.getElementById('data-points').textContent = wts.length;
+    }
+    const d0 = new Date(tl.journey_start);
+    const days = Math.floor((Date.now() - d0) / 86400000);
+    document.getElementById('days-count').textContent = days;
+  } catch (e) {
+    document.getElementById('chart-loading').textContent = 'Could not load timeline data.';
+  }
+  // Challenge bar
+  try {
+    const cr = await fetch(`${API}/api/current_challenge`);
+    const cj = await cr.json();
+    const ch = cj.current_challenge;
+    if (ch && ch.challenge) {
+      document.getElementById('cbar-label').textContent = `Week ${ch.week_num || '?'}`;
+      document.getElementById('cbar-text').innerHTML = `<strong>${ch.challenge}</strong>`;
+      document.getElementById('challenge-bar').style.display = 'flex';
+    }
+  } catch(_) {}
+}
+
+function render(tl) {
+  const wts = tl.weights;
+  if (!wts.length) return;
+  const wrapper = document.getElementById('chart-wrapper');
+  const W = Math.max(wrapper.clientWidth, 900);
+  const plotW = W - PAD_L - PAD_R, plotH = CHART_H - PAD_T - PAD_B;
+
+  const dates = wts.map(w => new Date(w.date));
+  const minDate = dates[0], maxDate = dates[dates.length - 1];
+  const dateRange = maxDate - minDate || 1;
+  const lbsVals = wts.map(w => w.lbs);
+  const minLbs = Math.min(...lbsVals, tl.goal_weight) - 5;
+  const maxLbs = Math.max(...lbsVals, tl.start_weight) + 5;
+  const lbsRange = maxLbs - minLbs || 1;
+
+  const x = d => PAD_L + ((new Date(d) - minDate) / dateRange) * plotW;
+  const y = v => PAD_T + (1 - (v - minLbs) / lbsRange) * plotH;
+
+  // Build SVG
+  let svg = `<svg viewBox="0 0 ${W} ${CHART_H}" xmlns="http://www.w3.org/2000/svg">`;
+  // Grid lines
+  for (let lb = Math.ceil(minLbs / 10) * 10; lb <= maxLbs; lb += 10) {
+    const yy = y(lb);
+    svg += `<line x1="${PAD_L}" y1="${yy}" x2="${W - PAD_R}" y2="${yy}" stroke="rgba(0,229,160,0.06)" stroke-width="1"/>`;
+    svg += `<text x="${PAD_L - 8}" y="${yy + 4}" fill="#4a6050" font-size="10" text-anchor="end">${lb}</text>`;
+  }
+  // Goal line
+  svg += `<line x1="${PAD_L}" y1="${y(tl.goal_weight)}" x2="${W - PAD_R}" y2="${y(tl.goal_weight)}" stroke="#00e5a0" stroke-width="1" stroke-dasharray="4 4" opacity="0.4"/>`;
+  svg += `<text x="${W - PAD_R + 4}" y="${y(tl.goal_weight) + 4}" fill="#00e5a0" font-size="9" opacity="0.6">GOAL ${tl.goal_weight}</text>`;
+  // Start line
+  svg += `<line x1="${PAD_L}" y1="${y(tl.start_weight)}" x2="${W - PAD_R}" y2="${y(tl.start_weight)}" stroke="#ff5252" stroke-width="1" stroke-dasharray="4 4" opacity="0.3"/>`;
+
+  // Experiment bands
+  (tl.experiments || []).forEach(exp => {
+    if (!exp.start) return;
+    const x1 = x(exp.start), x2 = exp.end ? x(exp.end) : x(maxDate);
+    svg += `<rect x="${x1}" y="${PAD_T}" width="${Math.max(x2 - x1, 2)}" height="${plotH}" fill="rgba(124,58,237,0.08)"/>`;
+  });
+
+  // Weight line
+  let path = '';
+  wts.forEach((w, i) => {
+    const px = x(w.date), py = y(w.lbs);
+    path += (i === 0 ? 'M' : 'L') + `${px},${py}`;
+  });
+  svg += `<path d="${path}" fill="none" stroke="#00e5a0" stroke-width="2" stroke-linejoin="round"/>`;
+
+  // Weight dots (interactive)
+  wts.forEach(w => {
+    const px = x(w.date), py = y(w.lbs);
+    svg += `<circle cx="${px}" cy="${py}" r="3" fill="#00e5a0" opacity="0.7" data-date="${w.date}" data-lbs="${w.lbs}" class="wt-dot" style="cursor:pointer"/>`;
+  });
+
+  // Life event markers
+  (tl.life_events || []).forEach(e => {
+    if (!e.date) return;
+    const px = x(e.date);
+    svg += `<line x1="${px}" y1="${PAD_T}" x2="${px}" y2="${PAD_T + plotH}" stroke="#f5a623" stroke-width="1" opacity="0.4"/>`;
+    svg += `<circle cx="${px}" cy="${PAD_T + 8}" r="5" fill="#f5a623" data-date="${e.date}" data-title="${e.title}" class="ev-dot" style="cursor:pointer"/>`;
+  });
+
+  // Level-up markers
+  (tl.level_ups || []).forEach(l => {
+    if (!l.date) return;
+    const px = x(l.date);
+    svg += `<circle cx="${px}" cy="${PAD_T + plotH - 8}" r="5" fill="#3b82f6" data-date="${l.date}" data-level="${l.level}" data-tier="${l.tier}" class="lvl-dot" style="cursor:pointer"/>`;
+  });
+
+  // X-axis month labels
+  const mo = new Date(minDate);
+  mo.setDate(1);
+  while (mo <= maxDate) {
+    const px = x(mo.toISOString().slice(0, 10));
+    if (px >= PAD_L && px <= W - PAD_R) {
+      svg += `<text x="${px}" y="${CHART_H - 8}" fill="#4a6050" font-size="10" text-anchor="middle">${mo.toLocaleString('en', {month:'short', year:'2-digit'})}</text>`;
+    }
+    mo.setMonth(mo.getMonth() + 1);
+  }
+
+  svg += '</svg>';
+  wrapper.innerHTML = svg;
+
+  // Tooltip handlers
+  wrapper.querySelectorAll('.wt-dot').forEach(dot => {
+    dot.addEventListener('mouseenter', e => showTip(e, dot.dataset.date, `${dot.dataset.lbs} lbs`));
+    dot.addEventListener('mouseleave', hideTip);
+  });
+  wrapper.querySelectorAll('.ev-dot').forEach(dot => {
+    dot.addEventListener('mouseenter', e => showTip(e, dot.dataset.date, dot.dataset.title));
+    dot.addEventListener('mouseleave', hideTip);
+  });
+  wrapper.querySelectorAll('.lvl-dot').forEach(dot => {
+    dot.addEventListener('mouseenter', e => showTip(e, dot.dataset.date, `Level ${dot.dataset.level} (${dot.dataset.tier})`));
+    dot.addEventListener('mouseleave', hideTip);
+  });
+}
+
+function showTip(e, date, text) {
+  tooltip.querySelector('.tooltip__date').textContent = date;
+  tooltip.querySelector('.tooltip__value').textContent = text;
+  tooltip.style.display = 'block';
+  tooltip.style.left = (e.clientX + 12) + 'px';
+  tooltip.style.top = (e.clientY - 30) + 'px';
+}
+function hideTip() { tooltip.style.display = 'none'; }
+
+function renderEvents(tl) {
+  const all = [];
+  (tl.life_events || []).forEach(e => all.push({date: e.date, text: e.title, type: 'Life Event', color: '#f5a623'}));
+  (tl.experiments || []).forEach(e => all.push({date: e.start, text: `${e.name} (${e.status})`, type: 'Experiment', color: '#7c3aed'}));
+  (tl.level_ups || []).forEach(e => all.push({date: e.date, text: `Reached Level ${e.level} — ${e.tier}`, type: 'Level Up', color: '#3b82f6'}));
+  if (!all.length) return;
+  all.sort((a, b) => b.date.localeCompare(a.date));
+
+  const container = document.getElementById('events-list');
+  container.innerHTML = all.map(e => `
+    <div class="event-row">
+      <div class="event-row__date">${e.date}</div>
+      <div class="event-row__dot" style="background:${e.color};"></div>
+      <div><div class="event-row__text">${e.text}</div><div class="event-row__type">${e.type}</div></div>
+    </div>`).join('');
+  document.getElementById('events-section').style.display = 'block';
+}
+
+init();
+</script>
+</body>
+</html>
