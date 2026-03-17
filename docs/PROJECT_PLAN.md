@@ -1,7 +1,7 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-16 (v3.7.54 — Board Summit roadmap integrated: 15-item priority stack, 6-domain personal results roadmap, website roadmap, commercialization assessment, IC-27–IC-31 planned)
+> Last update: 2026-03-16 (v3.7.61 — Full Board Summit gap-fill: 8 missing items added (BS-T2-7, BS-T3-5, BS-T3-6, WEB-CE, WEB-NET, WEB-WCT, EMAIL-P2/P3), IC-27–31 defined explicitly. Sprint plan (4 sprints + SIMP-1 mini) added. Board sprint review aligned. See docs/SPRINT_PLAN.md.)
 
 ---
 
@@ -64,7 +64,7 @@ Items are grouped by priority tier. Within each tier, items are ordered by ROI (
 | R13-F14 | **MCP endpoint canary** — synthetic probe of remote MCP Function URL every 15 min. Existing canary tests DDB+S3+MCP but may not exercise the remote Function URL path. | R13 Finding-14 | S (2h) | MEDIUM — catches remote MCP downtime | ✅ Done (v3.7.40) |
 | R13-F03 | **MCP monolith split assessment** — if MCP usage increases 5-10x, split into read-light (cached, metadata) and read-heavy (correlation, longitudinal, search) Lambdas. | R13 Finding-03 | L | MEDIUM — scaling readiness | Not needed now. Revisit at productization or >100 MCP calls/day. |
 | R13-XR | **X-Ray tracing on MCP Lambda** — enables per-DDB-query latency diagnosis. Currently diagnosis requires log parsing. | R13 §Observability | S (2h) | LOW — operational maturity | ✅ Done (v3.7.40) |
-| R8-LT1 | **Architecture Review #14** — post-R13 validation. Targeting ~2026-05-15 (after R13 30-day items resolved). | R13 30-60-90 roadmap | L (1 session) | HIGH — validates R13 improvements | Gated on R13-F01 through F09 |
+| R8-LT1 | **Architecture Review #17** — post-sprint-4 validation. Targeting ~2026-06-08 (after Sprint 4 complete). | Board Summit | L (1 session) | HIGH — validates sprint work | Gated on Sprint 4 completion |
 | R8-LT2 | **Evaluate IC-4/IC-5 readiness** — failure pattern recognition + momentum/early warning. Data maturity gate ~6-8 weeks behavioral data. | INTELLIGENCE_LAYER.md | S (assessment) | MEDIUM — next IC features | Gated on data (~May 2026) |
 | R8-LT3 | **Unit tests for business logic** — pytest unit tests for scoring_engine, character_engine, day grade computation. | R8 §9 testability | M-L | MEDIUM | ✅ Done (v3.7.20) — 74/74 tests in `tests/test_business_logic.py` |
 | R8-LT4 | **DynamoDB export to S3 for analytics isolation** — separate analytical workload from transactional. Export to Parquet via DDB export, query with Athena. | R8 §17 roadmap | L | LOW — premature until data volume warrants | Not started |
@@ -121,11 +121,12 @@ These are not architecture decisions — they're deferred deletions and one-time
 
 ---
 
-## Board Summit Roadmap (2026-03-16)
+## Board Summit Roadmap (2026-03-16, updated 2026-03-16 v3.7.61)
 
 > Joint session: Health & Personal Results Board × Technical & Product Board.
 > Full summit record: `board_summit_2026-03-16.md` (in outputs).
-> Recommendations integrated into existing tiers where applicable; new items below.
+> Board Sprint Review: `docs/reviews/BOARD_SPRINT_REVIEW_2026-03-16.md`
+> **Implementation sprint plan: `docs/SPRINT_PLAN.md`** (4 sprints + SIMP-1 mini, all 45 features inventoried)
 
 ### Synthesized Priority Stack (Top 15)
 
@@ -133,83 +134,104 @@ Ranked by combined impact × feasibility × strategic importance across all thre
 
 | Rank | ID | Feature | Champion | Horizon | Status |
 |------|-----|---------|----------|---------|--------|
-| 1 | BS-01 | **Essential Seven Protocol** — Formalize Tier 0 habits as primary tracking interface; dedicated view, streak counts, failure analysis | Clear | Now | Not started |
-| 2 | BS-02 | **Website Hero Redesign** — Transformation story hero with live weight data, compelling narrative hook | Moreau | Now | Not started |
-| 3 | BS-03 | **Email Capture + Weekly Signal Newsletter** — SES-backed subscribe flow + Chronicle→email pipeline | Kim / Marcus | Now | Not started |
-| 4 | BS-04 | **Pre-Computed Composite Scores** — Move expensive computations to scheduled Lambdas (extends R8-ST5/ADR-025 work) | Priya | Now | Partially done (ADR-025) |
-| 5 | BS-05 | **AI Confidence Scoring** — 3-level badge (High/Medium/Low) on every AI-generated insight based on data completeness, sample size, effect size | Henning | Now | Not started |
-| 6 | BS-06 | **Habit Cascade Detector** — Conditional probability matrix: P(fail Y \| failed X within 48h). Surface top-3 cascades in Daily Brief | Clear / Anika | Now | Not started (needs 60+ days Habitify data) |
-| 7 | BS-07 | **Website API Layer** — API Gateway + Lambda serving public data endpoints (extends v3.7.51 site_api work) | Marcus | Now | Partially done (site_api exists) |
-| 8 | BS-08 | **Unified Sleep Record** — Merge Whoop/Eight Sleep/Apple Health into canonical sleep record per night in DDB | Omar / Huberman | Now | Not started |
-| 9 | BS-09 | **ACWR Training Load Model** — Acute:chronic workload ratio from Whoop strain + Strava. Alert >1.3 or <0.8 | Attia / Jin | Now | Not started |
-| 10 | BS-10 | **Meal-Level CGM Response Scorer** — Match MacroFactor meal timestamps with CGM glucose curves. Personal food response database | Patrick / Anika | Soon | Not started (needs CGM data maturity) |
-| 11 | BS-11 | **Transformation Timeline (Website)** — Interactive scrollable journey visualization, shareable | Moreau / Kim | Soon | Not started (needs BS-07 API layer) |
-| 12 | BS-12 | **Deficit Sustainability Tracker** — Multi-signal early warning for unsustainable caloric deficit | Norton / Attia | Soon | Not started |
-| 13 | BS-13 | **N=1 Experiment Archive (Website)** — Public experiment case studies with data | Patrick / Kim | Soon | Not started |
-| 14 | BS-14 | **Multi-User Data Isolation Design** — Schema design for tenant isolation (design doc only) | Yael / Omar | Soon | Not started |
-| 15 | BS-15 | **Board of Directors Interactive Tool (Website)** — "Build your own health advisory board" lead magnet | Chen / Kim | Later | Not started |
+| 1 | BS-01 | **Essential Seven Protocol** — Formalize Tier 0 habits as primary tracking interface; dedicated view, streak counts, failure analysis | Clear | **Sprint 1** | Not started |
+| 2 | BS-02 | **Website Hero Redesign** — Transformation story hero with live weight data, compelling narrative hook | Moreau | **Sprint 1** | Not started |
+| 3 | BS-03 | **Email Capture + Weekly Signal Newsletter** — SES-backed subscribe flow + Chronicle→email pipeline | Kim / Marcus | **Sprint 1** | Subscribe backend ✅ (v3.7.60); pipeline not started |
+| 4 | BS-04 | **Pre-Computed Composite Scores** — Move expensive computations to scheduled Lambdas (extends R8-ST5/ADR-025 work) | Priya | Done | ✅ Done (ADR-025) |
+| 5 | BS-05 | **AI Confidence Scoring** — 3-level badge (High/Medium/Low) on every AI-generated insight based on data completeness, sample size, effect size | Henning | **Sprint 1** | Not started (moved from Sprint 2 per Yael — must precede email-to-subscribers) |
+| 6 | BS-06 | **Habit Cascade Detector** — Conditional probability matrix: P(fail Y \| failed X within 48h). Surface top-3 cascades in Daily Brief | Clear / Anika | Backlog | Not started (needs 60+ days Habitify data, ~May 2026) |
+| 7 | BS-07 | **Website API Layer** — API Gateway + Lambda serving public data endpoints (extends v3.7.51 site_api work) | Marcus | **Sprint 2** | Partially done (site_api exists) |
+| 8 | BS-08 | **Unified Sleep Record** — Merge Whoop/Eight Sleep/Apple Health into canonical sleep record per night in DDB | Omar / Huberman | **Sprint 2** | Conflict resolution rules doc → Sprint 1 prereq; implementation Sprint 2 |
+| 9 | BS-09 | **ACWR Training Load Model** — Acute:chronic workload ratio from Whoop strain + Strava. Alert >1.3 or <0.8 | Attia / Jin | **Sprint 1** | Not started. Pure compute Lambda (no LLM). |
+| 10 | BS-10 | **Meal-Level CGM Response Scorer** — Match MacroFactor meal timestamps with CGM glucose curves. Personal food response database | Patrick / Anika | Backlog | Not started (needs CGM data maturity, ~June 2026) |
+| 11 | BS-11 | **Transformation Timeline (Website)** — Interactive scrollable journey visualization, shareable | Moreau / Kim | **Sprint 4** | Not started (needs BS-07 API layer) |
+| 12 | BS-12 | **Deficit Sustainability Tracker** — Multi-signal early warning for unsustainable caloric deficit | Norton / Attia | **Sprint 3** | Not started (moved Sprint 2→3: data needs to mature) |
+| 13 | BS-13 | **N=1 Experiment Archive (Website)** — Public experiment case studies with data | Patrick / Kim | **Sprint 3** | Not started |
+| 14 | BS-14 | **Multi-User Data Isolation Design** — Schema design for tenant isolation (design doc only) | Yael / Omar | **Sprint 4** | Not started (design-only; schema review of Sprints 1-3 patterns) |
+| 15 | BS-15 | **Board of Directors Interactive Tool (Website)** — "Build your own health advisory board" lead magnet | Chen / Kim | Backlog | Not started |
 
 ### Personal Results Roadmap (6 Domains)
 
 **Domain 1: Sleep & Recovery Intelligence**
-- BS-08: Unified Sleep Record (ranked #8)
-- BS-SL1: Sleep Environment Optimizer — cross-reference Eight Sleep temperature data with Whoop staging to find optimal personal settings
-- BS-SL2: Circadian Compliance Score — pre-sleep behavioral score from light exposure, meal timing, screen use
+- BS-08: Unified Sleep Record (Sprint 2) — conflict resolution rules → Sprint 1 prereq
+- BS-SL1: Sleep Environment Optimizer — cross-reference Eight Sleep temperature data with Whoop staging to find optimal personal settings. *Sprint 3.*
+- BS-SL2: Circadian Compliance Score — pre-sleep behavioral score from light exposure, meal timing, screen use. *Sprint 2 (Huberman: ships with BS-08).* Sonnet.
+- IC-30: Sleep Environment Intelligence IC feature — *Backlog (after BS-SL1 runs 4+ weeks).*
 
 **Domain 2: Nutrition & Metabolic Intelligence**
-- BS-10: Meal-Level CGM Response Scorer (ranked #10)
-- BS-12: Deficit Sustainability Tracker (ranked #12)
-- BS-NU1: Protein Timing & Distribution Score — score each day on 30g+ per feeding across 4+ feedings
+- BS-10: Meal-Level CGM Response Scorer (Backlog — CGM data maturity)
+- BS-12: Deficit Sustainability Tracker (Sprint 3) — Opus
+- BS-NU1: Protein Timing & Distribution Score (Sprint 2) — **Opus** (changed from Sonnet per Norton/Patrick)
+- IC-29: Metabolic Adaptation Intelligence IC feature — TDEE divergence tracking. *Sprint 3.* Opus.
 
 **Domain 3: Training & Performance Intelligence**
-- BS-09: ACWR Training Load Model (ranked #9)
-- BS-TR1: Centenarian Decathlon Progress Tracker — elevate existing `get_centenarian_benchmarks` to living dashboard
-- BS-TR2: Zone 2 Cardiac Efficiency Trend — track pace-at-HR over time for repeated workout types
+- BS-09: ACWR Training Load Model (Sprint 1) — pure compute Lambda, no LLM
+- BS-TR1: Centenarian Decathlon Progress Tracker — elevate existing `get_centenarian_benchmarks` to living dashboard. *Sprint 2.* No LLM.
+- BS-TR2: Zone 2 Cardiac Efficiency Trend — track pace-at-HR over time for repeated workout types. *Sprint 2.* No LLM.
+- IC-28: Training Load Intelligence IC feature — wire ACWR into Daily Brief context. *Sprint 3.* Sonnet.
 
 **Domain 4: Behavioral & Habit System**
-- BS-01: Essential Seven Protocol (ranked #1)
-- BS-06: Habit Cascade Detector (ranked #6)
-- BS-BH1: Vice Streak Amplifier — dedicated streak tracker with compounding value calculation and public visualization
+- BS-01: Essential Seven Protocol (Sprint 1) — Sonnet
+- BS-06: Habit Cascade Detector (Backlog — 60+ days Habitify data, ~May 2026) — Opus
+- BS-BH1: Vice Streak Amplifier — dedicated streak tracker with compounding value. *Sprint 2.* Sonnet.
+- BS-MP3: Decision Fatigue Detector (proactive) — elevate existing tool. *Sprint 2.* Sonnet.
+- IC-27: Habit Cascade Intelligence IC feature — *Backlog (data-gated, same as BS-06).*
 
 **Domain 5: Longevity & Biomarker Intelligence**
-- BS-BM1: Biomarker Trajectory Alert System — slope + 95% CI per biomarker, flag clinical threshold crossings
-- BS-BM2: Genome-Informed Risk Dashboard — static personalized page mapping SNPs to interventions and monitoring metrics
-- BS-BM3: DEXA-Anchored Body Composition Model — Bayesian daily estimate between scans
+- BS-BM1: Biomarker Trajectory Alert System — **Backlog** (Henning: 7 draws only, CIs too wide. Gate: ≥10 blood draws ~2028+)
+- BS-BM2: Genome-Informed Risk Dashboard — static personalized SNP-to-intervention page. *Sprint 4.* Opus.
+- BS-BM3: DEXA-Anchored Body Composition Model — Bayesian daily estimate between scans. *Backlog (needs DEXA scan #2).*
+- IC-31: Biomarker Trajectory Intelligence IC feature — *Backlog (same gate as BS-BM1).*
+- BS-T2-2: Biomarker Trajectory Engine (Tier 2) — linear regression + 95% CI per biomarker. *Backlog (data-gated).*
+- BS-T2-3: DEXA-Anchored Composition Model (Tier 2) — Bayesian model. *Backlog (needs DEXA #2).*
 
 **Domain 6: Mental Performance & State of Mind**
-- BS-MP1: Autonomic Balance Score — HRV + RHR + RR + sleep quality → 4-quadrant nervous system state
-- BS-MP2: Journal Sentiment Trajectory — structured sentiment analysis with divergence detection against physiological metrics
-- BS-MP3: Decision Fatigue Detector — elevate existing tool to proactive alert when task load exceeds threshold + habits declining
+- BS-MP1: Autonomic Balance Score — HRV + RHR + RR + sleep quality → 4-quadrant nervous system state. *Sprint 3.* **Opus** (confirmed by Anika + Huberman).
+- BS-MP2: Journal Sentiment Trajectory — structured sentiment analysis with divergence detection. *Sprint 3.* Opus.
+- BS-MP3: Decision Fatigue Detector (proactive alert) — *Sprint 2.* Sonnet.
+- BS-T2-6: Decision Journal Analytics — calibration score, regret analysis. *Backlog (needs 50+ decisions).*
 
 ### Website Roadmap
 
 Site map target (from 4 pages to 10):
 
-| Page | Purpose | Priority | Dependency |
-|------|---------|----------|------------|
-| `/` (Home) | Transformation story hero with live weight + streak data | **Now** (BS-02) | public_stats.json |
-| `/story` | Origin story: where he started, what he built, where he's going. Updated quarterly | Soon | Manual content |
-| `/live` | Curated privacy-calibrated dashboard: weight trend, training, Character Sheet, streaks | Soon | BS-07 API layer |
+| Page | Purpose | Sprint | Dependency |
+|------|---------|--------|------------|
+| `/` (Home) | Transformation story hero with live weight + streak data | **Sprint 1 (BS-02)** | public_stats.json |
+| `/story` | Origin story: where he started, what he built, where he's going. Updated quarterly | Sprint 3+ | Manual content |
+| `/live` | Curated privacy-calibrated dashboard: weight trend, training, Character Sheet, streaks | Sprint 4 | BS-07 API layer |
 | `/journal` | Evolves from Chronicle hub to broader content: weekly signals + data essays + build logs | Exists | — |
-| `/experiments` | N=1 Experiment Archive with case studies | Soon (BS-13) | experiment data |
+| `/experiments` | N=1 Experiment Archive with case studies | **Sprint 3 (BS-13)** | experiment data |
 | `/character` | Interactive 7-pillar explorer with educational context | Exists (evolve) | — |
 | `/build` | Technical deep dives on platform architecture | Later | Manual content |
 | `/tools` | Free interactive tools: sleep calc, habit quiz, BoD builder | Later (BS-15) | — |
-| `/about` | Brief bio, professional context, why this exists | Soon | Manual content |
-| `/subscribe` | Focused email list landing page | **Now** (BS-03) | SES subscriber backend |
+| `/about` | Brief bio, professional context, why this exists | Sprint 3+ | Manual content |
+| `/subscribe` | Focused email list landing page | ✅ Live (v3.7.60) | — |
+
+**Interactive Features (ranked by strategic value):**
+1. Transformation Timeline — `Sprint 4 (BS-11)`. Requires API layer.
+2. Correlation Explorer — `Sprint 4 (WEB-CE)`. Pre-computed correlations from DDB.
+3. Board of Directors Builder — `Backlog (BS-15)`.
+4. N=1 Experiment Template Tool — `Backlog (WEB-NET)`. Underestimated effort; requires backend session + download.
+5. Weekly Challenge Ticker — `Sprint 3 (WEB-WCT)`. Persistent element all pages.
 
 **Content Strategy:**
-- Weekly Signal (automated Wednesday, 500 words) — evolves from Chronicle
+- Weekly Signal (automated Wednesday, 500 words max) — evolves from Chronicle, delivered to subscribers (Sprint 1+3)
 - Data Essays (monthly, 1,500-3,000 words) — SEO + shareability engine
 - Build Logs (biweekly) — technical content for developer audience, cross-posted to dev.to/HN
 
-**Email Capture:** SES + DynamoDB subscriber table + double opt-in. Target: 500 subscribers in 6 months.
+**Email Capture & Community Phases:**
+- Phase 1 (Now): SES subscribe backend ✅ live. Chronicle→email pipeline Sprint 1. Target: 500 subscribers in 6 months.
+- Phase 2 (EMAIL-P2, target June 16, 2026): Monthly "Data Drop" email-exclusive content — full data export from one domain. Rewards subscribers with radical transparency content.
+- Phase 3 (EMAIL-P3, target September 16, 2026): Discord or Circle community launch — invite-only from email list. Features testing ground.
 
 **Design Language (Ava Moreau directive):**
 - Dark charcoal (#0D1117) background, warm white (#E6EDF3) text, amber/gold (#F0B429) accent
+- Data positive: muted teal (#2EA98F), Data negative: muted coral (#E85D5D), Secondary: cool gray (#8B949E)
 - Typography: Inter (headlines + body), JetBrains Mono (data/code)
-- Micro-animations on data updates; hover states on every data point; skeleton loading states
+- Micro-animations on data updates; hover states on every data point; skeleton loading states; charts animate on scroll-into-view
 - Emotional tone: personal notebook connected to 19 data sources, not clinical dashboard
+- Prerequisite before any website feature ships: write the 50-word "why should a stranger care" paragraph
 
 ### Commercialization Assessment
 
@@ -220,49 +242,92 @@ Site map target (from 4 pages to 10):
 2. B2B Longevity Clinic ($500/mo × 170 clinics) — white-label dashboard + HIPAA. 18-24 months.
 3. Content + Community ($10/mo premium × 50K subs + info product) — fastest to first dollar, no extra engineering.
 
-**Architecture gap for multi-user:** T2-1 (data isolation design), T3-1 (auth), T3-2 (data source abstraction), T3-3 (AI personalization framework), T3-4 (compliance). Design T2-1 now; build nothing until wedge validated.
+**Architecture gap for multi-user:** BS-T2-1/BS-14 (data isolation design — Sprint 4), BS-T3-1 (auth), BS-T3-2 (data source abstraction), BS-T3-3 (AI personalization framework), BS-T3-4 (compliance). Design BS-14 now; build nothing until wedge validated.
 
 **IP assets:** Cross-source intelligence architecture, AI coaching prompt architecture (BoD personas, two-pass CoT), N=1 experiment framework, Chronicle format, personal transformation narrative.
 
+**Unit economics reminder (Dana Torres):** Per-user cost at current architecture is ~$8-15/month. $39/month subscription has thin margins after payment processing and support costs. Model every new Opus-assigned Lambda for per-user cost at scale. Add Sonnet fast-path + Opus deep-analysis mode as TODO in daily-run Lambdas.
+
 ### Board Technical Roadmap (supplements existing tiers)
 
-**Tier 1 additions (Next 90 Days):**
+**Tier 1 additions (Next 90 Days — see SPRINT_PLAN.md for sprint assignments):**
 
-| ID | Feature | Complexity | IC Basis |
-|----|---------|------------|----------|
-| BS-T1-1 | Email Capture Backend (SES + DDB subscriber table + double opt-in) | S | — |
-| BS-T1-2 | Habit Cascade Detector Lambda | M | IC-4 |
-| BS-T1-3 | ACWR Training Load Model Lambda | S | — |
-| BS-T1-4 | Meal-Level CGM Response Scorer | L | IC-11 |
-| BS-T1-5 | AI Confidence Scoring (badge on all AI insights) | M | IC-3 |
-| BS-T1-6 | Unified Sleep Record reconciliation | M | — |
+| ID | Feature | Sprint | Model | Complexity | IC Basis |
+|----|---------|--------|-------|------------|----------|
+| BS-T1-1 (= BS-03) | Chronicle → Email Pipeline | Sprint 1 | Sonnet | S | — |
+| BS-T1-2 (= BS-09) | ACWR Training Load Model Lambda | Sprint 1 | None | S | — |
+| BS-T1-3 (= BS-05) | AI Confidence Scoring | Sprint 1 | Sonnet | M | IC-3 |
+| BS-T1-4 (= BS-08) | Unified Sleep Record reconciliation | Sprint 2 | None | M | — |
+| BS-T1-5 (= BS-12) | Deficit Sustainability Tracker | Sprint 3 | Opus | M | IC-3 |
+| BS-T1-6 (= BS-07) | Website API Layer | Sprint 2 | None | M | — |
 
 **Tier 2 additions (90-180 Days):**
 
-| ID | Feature | Complexity | IC Basis |
-|----|---------|------------|----------|
-| BS-T2-1 | Multi-User Data Isolation Architecture (design only) | L | — |
-| BS-T2-2 | Biomarker Trajectory Engine (linear regression + 95% CI per biomarker) | M | IC-18 |
-| BS-T2-3 | DEXA-Anchored Composition Model (Bayesian) | L | — |
-| BS-T2-4 | Public Dashboard API (extends site_api with privacy filters) | M | — |
-| BS-T2-5 | Chronicle→Newsletter Pipeline (automated email delivery to subscribers) | M | — |
-| BS-T2-6 | Decision Journal Analytics (calibration score, regret analysis) | M | IC-19 |
+| ID | Feature | Sprint | Model | Complexity | IC Basis |
+|----|---------|--------|-------|------------|----------|
+| BS-T2-1 (= BS-14) | Multi-User Data Isolation Architecture (design only) | Sprint 4 | Opus | L | — |
+| BS-T2-2 | Biomarker Trajectory Engine (linear regression + 95% CI per biomarker) | Backlog | Opus | M | IC-18 |
+| BS-T2-3 | DEXA-Anchored Composition Model (Bayesian) | Backlog | Opus | L | — |
+| BS-T2-4 (= BS-11) | Transformation Timeline website | Sprint 4 | None | L | — |
+| BS-T2-5 | Chronicle → Newsletter Delivery Pipeline (full automation + subscriber send) | Sprint 3 | None | M | — |
+| BS-T2-6 | Decision Journal Analytics (calibration score, regret analysis) | Backlog | Opus | M | IC-19 |
+| **BS-T2-7** | **Experiment Results Auto-Analysis** — when N=1 experiment ends, auto-run before/during/after comparisons on all relevant metrics using declared hypothesis variables. Generate structured experiment report. | **Backlog** | **Opus** | M | IC-18 |
 
 **Tier 3 additions (180-365 Days):**
 
-| ID | Feature | Complexity | IC Basis |
-|----|---------|------------|----------|
-| BS-T3-1 | Authentication & User Accounts (Cognito or Auth0) | L | — |
-| BS-T3-2 | Data Source Abstraction Layer (plugin architecture for multi-user) | XL | — |
-| BS-T3-3 | AI Coaching Personalization Framework (decouple from Matthew-specific context) | XL | IC-3 |
-| BS-T3-4 | Compliance & Data Governance (HIPAA, GDPR) | XL | — |
+| ID | Feature | Model | Complexity | IC Basis | Notes |
+|----|---------|-------|------------|----------|-------|
+| BS-T3-1 | Authentication & User Accounts (Cognito or Auth0) | None | L | — | Commercialization prerequisite |
+| BS-T3-2 | Data Source Abstraction Layer (plugin architecture for multi-user) | None | XL | — | Multi-user prerequisite |
+| BS-T3-3 | AI Coaching Personalization Framework (decouple from Matthew-specific context) | Opus | XL | IC-3 | Multi-user prerequisite |
+| BS-T3-4 | Compliance & Data Governance (HIPAA, GDPR) | None | XL | — | Commercialization prerequisite |
+| **BS-T3-5** | **Real-Time Streaming Pipeline** — Replace batch-based ingestion with EventBridge + SQS for sources supporting webhooks (CGM, Whoop). Enables real-time alerts and live dashboard updates. | None | L | — | Most sources don't support true webhooks; evaluate at 180 days. ~Sep 2026. |
+| **BS-T3-6** | **Cost-Optimized Multi-Tenant DynamoDB** — when user count exceeds ~10, evaluate DDB cost at scale. Current single-table design may need GSI optimization, TTL policies for ephemeral data, possible move to provisioned capacity with auto-scaling. | None | L | — | Gate: user count >10. Dana Torres: model unit economics first. |
 
-**Statistical Validity Flags (Henning Brandt):**
+**Statistical Validity Flags (Henning Brandt — applies to all sprint work):**
 - Correlations with n<30: show "low confidence" badge regardless of p-value
 - Weekly correlation matrix: report corrected significance threshold alongside each result
 - Meal-level CGM scoring: minimum 5 repetitions of same meal before any claims
 - DEXA-anchored model: never report lean mass estimates to >1 decimal place (DEXA itself ±1 lb)
 - Any "trend" based on <12 weekly observations: re-label as "preliminary pattern"
+- **New (v3.7.61):** AI Confidence Scoring (BS-05) requires written specification before implementation. Spec must define: sample size (n), effect size threshold, p-value/CI requirement, data freshness cutoff per insight type.
+
+### IC-27 through IC-31 — Explicit Definitions
+
+> Planned in v3.7.54 header; defined explicitly in v3.7.61.
+
+| ID | Name | Description | Model | Gate | Sprint |
+|----|------|-------------|-------|------|--------|
+| IC-27 | **Habit Cascade Intelligence** | Conditional probability matrix: P(fail habit Y within 48h given fail of habit X). Surface top-3 cascade pairs in Daily Brief as predictive warnings. Build and update weekly from Habitify completion data. | Opus | 60+ days consistent Habitify data (~May 2026) | Backlog |
+| IC-28 | **Training Load Intelligence** | Wire ACWR data (from BS-09) into Daily Brief context. When ACWR is elevated or suppressed, contextualize all training metrics with prescriptive guidance: specific volume adjustments, cross-reference with historical injury-risk periods, recovery protocols. | Sonnet | BS-09 live (Sprint 1) | Sprint 3 |
+| IC-29 | **Metabolic Adaptation Intelligence** | Track actual TDEE vs. MacroFactor adaptive estimate divergence. When weight loss rate diverges from calorie-deficit prediction, flag metabolic adaptation: "Your effective TDEE has dropped ~X calories from baseline." Distinguish genuine adaptation from tracking inaccuracy. | Opus | 6+ weeks weight + calorie data | Sprint 3 |
+| IC-30 | **Sleep Environment Intelligence** | Wire Sleep Environment Optimizer data (BS-SL1) into Daily Brief and Evening Nudge. Surface personalized temperature recommendations. Detect when environmental conditions are trending against sleep quality. Cross-reference with training load and nutrition timing. | Opus | BS-SL1 running 4+ weeks with output | Backlog (~Aug 2026) |
+| IC-31 | **Biomarker Trajectory Intelligence** | Proactive flagging of biomarkers trending toward clinical thresholds. Compute linear regression + 95% CI per biomarker. Cross-reference trajectory with lifestyle data from same period: "Your LDL increased X% between Draw 5 and 6. During that period, Zone 2 training volume was Y and saturated fat intake was Z." | Opus | ≥10 blood draws (currently 7; ~2028+) | Backlog |
+
+---
+
+## Sprint Implementation Plan
+
+> Full sprint plan with effort estimates, model assignments, deliverables, and prerequisites: **`docs/SPRINT_PLAN.md`**
+> Board Sprint Review record: **`docs/reviews/BOARD_SPRINT_REVIEW_2026-03-16.md`**
+
+### Sprint Overview
+
+| Sprint | Weeks | Target | Theme | Items | Est. Hours |
+|--------|-------|--------|-------|-------|-----------|
+| Sprint 1 | 1-2 | ~Mar 30 | Foundation + Audience | BS-01, BS-02, BS-03, BS-05, BS-09 | ~19h |
+| Sprint 2 | 3-4 | ~Apr 13 | Intelligence Core + Sleep | BS-07, BS-08, BS-SL2, BS-BH1, BS-MP3, BS-TR1, BS-TR2, BS-NU1 | ~27h |
+| SIMP-1 Ph2 | 5 | ~Apr 13 | Rationalization | 89→≤80 tools, EMF review | ~5h |
+| Sprint 3 | 6-9 | ~May 11 | Advanced Intelligence + Content | BS-12, BS-SL1, BS-MP1, BS-MP2, BS-13, BS-T2-5, WEB-WCT, IC-28, IC-29 | ~38h |
+| Sprint 4 | 10-13 | ~Jun 8 | Website Interactive + Architecture | BS-11, WEB-CE, BS-BM2, BS-14 | ~27h |
+
+**Backlog activation schedule:**
+- ~May 2026: BS-06 (Habit Cascade), IC-27, BS-T2-7 (data gates)
+- ~June 2026: EMAIL-P2 Data Drop, BS-10 (CGM maturity)
+- ~August 2026: IC-30 (after BS-SL1 matures)
+- ~September 2026: EMAIL-P3 Community launch
+- Post-DEXA: BS-BM3, BS-T2-3
+- ~2028+: BS-BM1, BS-T2-2, IC-31
 
 ---
 
@@ -316,15 +381,17 @@ Site map target (from 4 pages to 10):
 
 | Metric | Current | Target | Notes |
 |--------|---------|--------|-------|
-| MCP tools | 87 | ≤80 (SIMP-1 Phase 2) | Phase 1 complete (116→87 via ADR-030). Phase 2 gated ~Apr 13 |
-| Lambdas | 43 (CDK) + 1 Lambda@Edge | — | Lambda@Edge (`cf-auth`) in us-east-1, manually managed |
+| MCP tools | 89 | ≤80 (SIMP-1 Phase 2) | Phase 1 complete (116→89 via ADR-030). Phase 2 gated ~Apr 13 |
+| Lambdas | 45 (CDK) + 1 Lambda@Edge + 1 us-east-1 manual | — | email-subscriber in us-east-1 |
 | CloudWatch alarms | 49 | — | +SLO-5 warmer alarm (v3.7.22) |
-| Monthly cost | ~$10 | <$25 | Well under budget |
+| Monthly cost | ~$13 | <$25 | Well under budget |
 | Active secrets | 9 | — | webhook-key deleted 2026-03-14; google-calendar deleted 2026-03-15 (ADR-030) |
 | CI linters | 9 | — | H1-H5, S1-S4, IAM, registry, handler, wiring, DDB patterns |
 | SLOs defined | 5 | — | SLO-1 through SLO-5 (warmer added v3.7.22) |
-| IC features live | 14 of 31 | — | Next: IC-4/IC-5 (~May 2026). IC-27–31 planned (Board Summit) |
+| IC features live | 14 of 31 | — | IC-27–31 now explicitly defined (v3.7.61). Next: IC-28/29 Sprint 3. |
 | Data sources | 19 | — | google_calendar retired (ADR-030, v3.7.46) |
-| Architecture review grade | A | A | R16 grade A. All R16 findings closed. Platform in steady state. |
+| Architecture review grade | A | A | R16 grade A. R17 targeting ~June 2026 (post Sprint 4). |
 | R13 open findings | 0 of 15 | 0 | All closed. F03 (monolith split) deferred via ADR-029. |
 | CI integration tests wired | I1/I2/I4-I9 | all | I3/I10-I14 manual-only (Lambda invocation side effects or special auth) |
+| Board Summit features | 45 total | — | Sprint 1-4: 26 features. Backlog: 19 features. See SPRINT_PLAN.md. |
+| Email subscribers | 0 | 500 (6 months) | Subscribe backend live v3.7.60. SES sandbox exit pending. |
