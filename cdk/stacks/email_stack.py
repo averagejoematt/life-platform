@@ -4,9 +4,12 @@ EmailStack — email/digest Lambdas + EventBridge schedules.
 v2.0 (v3.4.0): CDK-managed IAM roles replace existing_role_arn references.
   All 8 Lambdas get dedicated CDK-owned roles with least-privilege policies.
 
-Lambdas (8):
+v2.1 (v3.7.62): BS-03 Chronicle Email Sender added.
+
+Lambdas (9):
   daily-brief, weekly-digest, monthly-digest, nutrition-review,
-  wednesday-chronicle, weekly-plate, monday-compass, brittany-weekly-email
+  wednesday-chronicle, weekly-plate, monday-compass, brittany-weekly-email,
+  evening-nudge, chronicle-email-sender (BS-03)
 
 """
 
@@ -73,3 +76,25 @@ class EmailStack(Stack):
         # R54: Evening nudge — checks supplements/journal/How We Feel completeness at 8 PM PT
         # cron(0 3 * * ? *) = 3:00 AM UTC = 8:00 PM PDT (UTC-7). Adjust after DST ends.
         create_platform_lambda(self, "EveningNudge", function_name="evening-nudge", handler="evening_nudge_lambda.lambda_handler", source_file="lambdas/evening_nudge_lambda.py", schedule="cron(0 3 * * ? *)", timeout_seconds=60, memory_mb=256, environment=_email_env, custom_policies=rp.email_evening_nudge(), **shared)
+
+        # BS-03: Chronicle Email Sender — delivers Chronicle installment to confirmed subscribers.
+        # Fires 10 min after wednesday-chronicle (cron(0 15 ? * WED *) = 8:00 AM PT).
+        # Viktor guard: clean no-op if no installment found this week.
+        # Independent DLQ + alarm from wednesday-chronicle.
+        # timeout_seconds=300: headroom for ~300 subs at 1/sec rate limit.
+        # Bump SEND_RATE_PER_SEC env var after SES production access is granted.
+        create_platform_lambda(
+            self, "ChronicleEmailSender",
+            function_name="chronicle-email-sender",
+            handler="chronicle_email_sender_lambda.lambda_handler",
+            source_file="lambdas/chronicle_email_sender_lambda.py",
+            schedule="cron(10 15 ? * WED *)",
+            timeout_seconds=300,
+            memory_mb=256,
+            environment={
+                "SITE_URL":          "https://averagejoematt.com",
+                "SEND_RATE_PER_SEC": "1.0",
+            },
+            custom_policies=rp.email_chronicle_sender(),
+            **shared,
+        )
