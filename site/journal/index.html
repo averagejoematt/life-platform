@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
   <meta name="theme-color" content="#080c0a">
-  <link rel="stylesheet" href="../assets/css/tokens.css">
-  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
   <style>
     /*
       Journal skin — same dark base as Signal, but:
@@ -32,6 +32,7 @@
       border-bottom: 1px solid var(--border);
       max-width: var(--max-width);
       margin: 0 auto;
+      margin-top: 33px; /* ticker height */
     }
     .journal-header__title {
       font-family: var(--font-display);
@@ -117,23 +118,53 @@
   <a href="/" class="nav__brand">AMJ</a>
   <div class="nav__links">
     <a href="/#experiment" class="nav__link">The experiment</a>
-    <a href="/#platform" class="nav__link">The platform</a>
-    <a href="../journal/" class="nav__link active">Journal</a>
-    <a href="../character/" class="nav__link">Character</a>
+    <a href="/platform/" class="nav__link">The platform</a>
+    <a href="/journal/" class="nav__link active">Journal</a>
+    <a href="/character/" class="nav__link">Character</a>
   </div>
   <div class="nav__status">
-    <div class="pulse" style="background:var(--accent)"></div>
-    <span>Writing</span>
+    <div class="pulse"></div>
+    <span id="nav-date">Writing</span>
   </div>
 </nav>
 
-<div class="journal-header">
+<!-- Ticker — same as homepage, amber accent -->
+<div class="ticker" style="margin-top:var(--nav-height)">
+  <div class="ticker__inner">
+    <span class="ticker__item">THE MEASURED LIFE</span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">WEIGHT <strong id="tk-weight">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">HRV <strong id="tk-hrv">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">RECOVERY <strong id="tk-recovery">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">STREAK <strong id="tk-streak">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">JOURNEY <strong id="tk-journey">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">THE MEASURED LIFE</span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">WEIGHT <strong id="tk-weight-2">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">HRV <strong id="tk-hrv-2">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">RECOVERY <strong id="tk-recovery-2">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">STREAK <strong id="tk-streak-2">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">JOURNEY <strong id="tk-journey-2">—</strong></span>
+    <span class="ticker__item">⬥</span>
+  </div>
+</div>
+
+<div class="journal-header animate-in">
   <div class="eyebrow">The lab notebook</div>
   <h1 class="journal-header__title">Journal</h1>
   <p class="journal-header__sub">Long-form writing about what I'm actually finding. Data-backed, honest, and updated when something interesting happens — not on a schedule.</p>
 </div>
 
-<div class="journal-list" id="journal-list">
+<div class="journal-list animate-in" id="journal-list">
   <div class="journal-placeholder" id="journal-loading">
     <div class="jp-coming">Loading...</div>
   </div>
@@ -179,13 +210,47 @@
 </script>
 
 <footer class="footer">
-  <div class="footer__brand" style="color:var(--accent)">AMJ</div>
+  <div class="footer__brand">AMJ</div>
   <div class="footer__links">
     <a href="/" class="footer__link">Home</a>
-    <a href="../character/" class="footer__link">Character</a>
+    <a href="/platform/" class="footer__link">Platform</a>
+    <a href="/character/" class="footer__link">Character</a>
   </div>
-  <div class="footer__copy">// words when there's something worth saying</div>
+  <div class="footer__copy">// updated weekly by life-platform</div>
 </footer>
+
+<script>
+(async function() {
+  const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  try {
+    const r = await fetch('/site/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const raw = await r.json();
+    const v = raw.vitals   || {};
+    const j = raw.journey  || {};
+    const p = raw.platform || {};
+    const meta = raw._meta || {};
+    const genAt = meta.generated_at || raw.updated_at;
+    if (genAt) {
+      const d = new Date(genAt);
+      setText('nav-date', d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+    }
+    const streak = p.tier0_streak != null ? p.tier0_streak : null;
+    [
+      ['tk-weight',    v.weight_lbs   ? v.weight_lbs.toFixed(1) + ' LBS'                : '—'],
+      ['tk-hrv',       v.hrv_ms       ? Math.round(v.hrv_ms) + ' MS'                    : '—'],
+      ['tk-recovery',  v.recovery_pct ? Math.round(v.recovery_pct) + '%'                : '—'],
+      ['tk-streak',    streak != null  ? streak + 'D STREAK'                             : '—'],
+      ['tk-journey',   j.progress_pct != null ? j.progress_pct.toFixed(1) + '% TO GOAL' : '—'],
+      ['tk-weight-2',  v.weight_lbs   ? v.weight_lbs.toFixed(1) + ' LBS'                : '—'],
+      ['tk-hrv-2',     v.hrv_ms       ? Math.round(v.hrv_ms) + ' MS'                    : '—'],
+      ['tk-recovery-2',v.recovery_pct ? Math.round(v.recovery_pct) + '%'                : '—'],
+      ['tk-streak-2',  streak != null  ? streak + 'D STREAK'                             : '—'],
+      ['tk-journey-2', j.progress_pct != null ? j.progress_pct.toFixed(1) + '% TO GOAL' : '—'],
+    ].forEach(([id, val]) => setText(id, val));
+  } catch(e) { /* silent — ticker stays at em dashes */ }
+})();
+</script>
 
 </body>
 </html>

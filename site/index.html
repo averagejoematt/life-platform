@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="I built an AI operating system for my body. 19 data sources. Real numbers. One hypothesis: compounding data changes everything.">
   <meta property="og:title" content="Matthew Walker — Signal / Human Systems">
-  <meta property="og:description" content="19 data sources. 87 intelligence tools. Real numbers. No filtered highlight reel.">
+  <meta property="og:description" content="19 data sources. 89 intelligence tools. Real numbers. No filtered highlight reel.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com">
   <title>Matthew Walker — Signal / Human Systems</title>
@@ -186,6 +186,191 @@
       .sources-grid { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
+
+  <!-- BS-02: Transformation story hero styles -->
+  <style>
+  /* ── BS-02 Hero ───────────────────────────────────────────────────────── */
+  .hero {
+    background: #0D1117;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 24px 60px;
+    position: relative;
+    overflow: hidden;
+    border-bottom: none;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(46, 169, 143, 0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #F0B429;
+    margin: 0 0 32px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.1s;
+  }
+  .weight-counter {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 0 0 32px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.2s;
+  }
+  .weight-node { text-align: center; }
+  .weight-node .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #8B949E;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .weight-node .value {
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 36px;
+    font-weight: 700;
+    color: #E6EDF3;
+    line-height: 1;
+  }
+  .weight-node.start .value  { color: #8B949E; }
+  .weight-node.current .value { color: #F0B429; }
+  .weight-node.goal .value   { color: #2EA98F; }
+  .weight-arrow { color: #8B949E; font-size: 20px; margin-top: 18px; }
+  .progress-bar-wrap {
+    width: 100%;
+    max-width: 460px;
+    margin: 0 0 12px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.3s;
+  }
+  .progress-bar-track {
+    background: rgba(255,255,255,0.06);
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #F0B429, #2EA98F);
+    border-radius: 4px;
+    transition: width 1s ease;
+    width: 0%;
+  }
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #484f58;
+  }
+  .hero-why {
+    max-width: 560px;
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    color: #8B949E;
+    line-height: 1.7;
+    text-align: center;
+    margin: 12px 0 40px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.4s;
+  }
+  .hero-why strong { color: #E6EDF3; font-weight: 600; }
+  .hero-below-fold {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 640px;
+    margin: 0 0 48px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.5s;
+  }
+  .stat-chip {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 14px 20px;
+    text-align: center;
+    min-width: 140px;
+  }
+  .stat-chip .chip-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #484f58;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .stat-chip .chip-value { font-size: 22px; font-weight: 700; color: #E6EDF3; line-height: 1; }
+  .chronicle-teaser {
+    max-width: 500px;
+    background: rgba(240,180,41,0.04);
+    border: 1px solid rgba(240,180,41,0.12);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 0 0 48px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.6s;
+    text-decoration: none;
+    display: block;
+  }
+  .chronicle-teaser:hover { background: rgba(240,180,41,0.07); border-color: rgba(240,180,41,0.2); }
+  .chronicle-teaser .teaser-kicker {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #F0B429;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .chronicle-teaser .teaser-title { font-size: 15px; font-weight: 600; color: #E6EDF3; line-height: 1.4; }
+  .scroll-invite {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: #484f58;
+    letter-spacing: 1px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.7s;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .scroll-invite:hover { color: #8B949E; }
+  .skeleton {
+    background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+    display: inline-block;
+  }
+  @keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  </style>
 </head>
 <body>
 
@@ -233,78 +418,76 @@
   </div>
 </div>
 
+<!-- BS-02: Transformation Story Hero -->
 <section class="hero" id="experiment">
-  <div class="hero-left animate-in">
-    <div class="eyebrow" style="margin-bottom:var(--space-8)">Signal / Human Systems</div>
-    <h1 class="hero-name">Matthew<br><span>Walker</span></h1>
-    <p class="hero-body">
-      I built an AI operating system for my body.<br>
-      19 data sources. 87 intelligence tools.<br>
-      One hypothesis: compounding data changes everything.
-    </p>
-    <div class="hero-actions">
-      <a href="/#about" class="btn btn--ghost">Read the experiment</a>
-      <a href="/platform/" class="btn btn--ghost">See the platform</a>
+
+  <p class="hero-label">The Weekly Signal</p>
+
+  <!-- Live weight counter: 302 → current → 185 -->
+  <div class="weight-counter">
+    <div class="weight-node start">
+      <span class="label">Started</span>
+      <span class="value">302</span>
     </div>
-    <div class="hero-subscribe">
-      <div class="hero-subscribe-label">// updates when something interesting happens</div>
-      <div class="subscribe-row">
-        <input type="email" class="subscribe-input" placeholder="your@email.com" id="hero-email">
-        <button class="btn btn--primary" id="hero-subscribe-btn">Follow the journey</button>
-      </div>
-      <div class="hero-subscribe-note" id="subscribe-msg">Weekly signal. Real numbers. No fluff.</div>
+    <span class="weight-arrow">→</span>
+    <div class="weight-node current">
+      <span class="label">Today</span>
+      <span class="value" id="hero-weight">
+        <span class="skeleton" style="width:64px;height:36px;">&nbsp;</span>
+      </span>
+    </div>
+    <span class="weight-arrow">→</span>
+    <div class="weight-node goal">
+      <span class="label">Goal</span>
+      <span class="value">185</span>
     </div>
   </div>
 
-  <div class="hero-right animate-in">
-    <div class="vitals-date" id="vitals-date">// Live vitals — loading...</div>
-    <div class="vitals-grid">
-      <div class="vital">
-        <div class="vital__label">Weight</div>
-        <div class="vital__value"><span id="v-weight">—</span><span class="vital__unit"> lbs</span></div>
-        <div class="vital__delta" id="v-weight-delta">—</div>
-      </div>
-      <div class="vital">
-        <div class="vital__label">HRV</div>
-        <div class="vital__value"><span id="v-hrv">—</span><span class="vital__unit"> ms</span></div>
-        <div class="vital__delta" id="v-hrv-delta">—</div>
-      </div>
-      <div class="vital">
-        <div class="vital__label">Recovery</div>
-        <div class="vital__value"><span id="v-recovery">—</span><span class="vital__unit"> %</span></div>
-        <div class="vital__delta" id="v-recovery-status">—</div>
-      </div>
-      <div class="vital">
-        <div class="vital__label">RHR</div>
-        <div class="vital__value"><span id="v-rhr">—</span><span class="vital__unit"> bpm</span></div>
-        <div class="vital__delta" id="v-rhr-delta">—</div>
-      </div>
+  <!-- Progress bar -->
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" id="hero-progress-fill"></div>
     </div>
-    <div class="journey-section">
-      <div class="journey-row">
-        <div>
-          <div class="journey-row__label">Journey progress</div>
-          <div class="journey-row__bar-track">
-            <div class="journey-row__bar-fill" id="j-bar" style="width:0%"></div>
-          </div>
-        </div>
-        <div class="journey-row__value"><span id="j-pct">—</span><span> %</span></div>
-      </div>
-      <div class="journey-row">
-        <div>
-          <div class="journey-row__label">Zone 2 this week</div>
-          <div class="journey-row__bar-track">
-            <div class="journey-row__bar-fill" id="z2-bar" style="width:0%"></div>
-          </div>
-        </div>
-        <div class="journey-row__value"><span id="z2-val">—</span><span> / 150 min</span></div>
-      </div>
-      <div class="journey-row">
-        <div><div class="journey-row__label">Weekly loss rate</div></div>
-        <div class="journey-row__value"><span id="j-rate">—</span><span> lbs/wk</span></div>
-      </div>
+    <div class="progress-meta">
+      <span id="hero-lost-lbs">— lbs lost</span>
+      <span id="hero-progress-pct">—%</span>
     </div>
   </div>
+
+  <!-- Narrative paragraph (BS-02 TODO: set HERO_WHY_PARAGRAPH + paragraph_is_placeholder=False in site_writer.py) -->
+  <p class="hero-why" id="hero-why">
+    Most people optimize in the dark — gut feelings, Instagram advice, someone's podcast take.
+    I connect 19 data sources to a custom AI and publish every number, every week, without filtering.
+    <strong>302 lbs to 185.</strong> Every failure included. This is what systematic self-improvement actually looks like.
+  </p>
+
+  <!-- Below-fold stat chips -->
+  <div class="hero-below-fold">
+    <div class="stat-chip">
+      <span class="chip-label">Days on Journey</span>
+      <span class="chip-value" id="hero-days">—</span>
+    </div>
+    <div class="stat-chip">
+      <span class="chip-label">Current Streak</span>
+      <span class="chip-value" id="hero-streak">—</span>
+    </div>
+    <div class="stat-chip">
+      <span class="chip-label">Data Sources</span>
+      <span class="chip-value">19</span>
+    </div>
+  </div>
+
+  <!-- Latest Chronicle headline -->
+  <a class="chronicle-teaser" href="/journal/" id="chronicle-teaser" style="display:none;">
+    <span class="teaser-kicker">Latest: The Measured Life</span>
+    <span class="teaser-title" id="chronicle-teaser-title"></span>
+  </a>
+
+  <!-- Scroll invitation -->
+  <p class="scroll-invite" onclick="document.getElementById('about').scrollIntoView({behavior:'smooth'})">
+    See the actual numbers below &darr;
+  </p>
+
 </section>
 
 <section class="about-section" id="about">
@@ -365,121 +548,112 @@
 </footer>
 
 <script>
+// Unified data loader — fetches /site/public_stats.json once, populates ticker + BS-02 hero.
 (async function() {
+  // Helper: null-safe text setter
+  const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  const setWidth = (id, pct) => { const el = document.getElementById(id); if (el) el.style.width = pct; };
+
   try {
-    const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
+    const r = await fetch('/site/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
     if (!r.ok) throw new Error('no data');
     const raw = await r.json();
 
-    // Data is nested under vitals/journey/training — flatten for convenience
-    const v = raw.vitals    || {};
-    const j = raw.journey   || {};
-    const t = raw.training  || {};
-    const p = raw.platform  || {};
-    const meta = raw._meta  || {};
+    const v    = raw.vitals   || {};
+    const j    = raw.journey  || {};
+    const t    = raw.training || {};
+    const p    = raw.platform || {};
+    const hero = raw.hero     || {};
+    const meta = raw._meta    || {};
 
     // Nav date
     const genAt = meta.generated_at || raw.updated_at;
     if (genAt) {
       const d = new Date(genAt);
-      document.getElementById('nav-date').textContent =
-        d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      document.getElementById('vitals-date').textContent =
-        '// Live vitals — ' + d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    }
-
-    // Weight
-    if (v.weight_lbs) {
-      document.getElementById('v-weight').textContent = v.weight_lbs.toFixed(1);
-      const lost = j.lost_lbs;
-      if (lost && lost > 0) {
-        document.getElementById('v-weight-delta').textContent = '↓ ' + lost.toFixed(1) + ' lbs lost';
-      }
-    }
-    // HRV
-    if (v.hrv_ms) {
-      document.getElementById('v-hrv').textContent = Math.round(v.hrv_ms);
-      const el = document.getElementById('v-hrv-delta');
-      el.textContent = v.hrv_trend || '—';
-      if ((v.hrv_trend||'').includes('down')) el.classList.add('warn');
-    }
-    // Recovery
-    if (v.recovery_pct) {
-      document.getElementById('v-recovery').textContent = Math.round(v.recovery_pct);
-      const el = document.getElementById('v-recovery-status');
-      el.textContent = v.recovery_status || '—';
-      if (v.recovery_status === 'red') el.classList.add('warn');
-    }
-    // RHR
-    if (v.rhr_bpm) {
-      document.getElementById('v-rhr').textContent = Math.round(v.rhr_bpm);
-      document.getElementById('v-rhr-delta').textContent = v.rhr_trend || '—';
-    }
-    // Journey bars
-    if (j.progress_pct != null) {
-      document.getElementById('j-pct').textContent = j.progress_pct.toFixed
-        ? j.progress_pct.toFixed(1) : j.progress_pct;
-      setTimeout(() => { document.getElementById('j-bar').style.width = Math.min(j.progress_pct, 100) + '%'; }, 300);
-    }
-    if (t.zone2_this_week_min != null) {
-      document.getElementById('z2-val').textContent = Math.round(t.zone2_this_week_min);
-      const z2target = t.zone2_target_min || 150;
-      setTimeout(() => { document.getElementById('z2-bar').style.width = Math.min((t.zone2_this_week_min / z2target) * 100, 100) + '%'; }, 400);
-    }
-    // Weekly rate — only show if sane (< 10 lbs/wk)
-    if (j.weekly_rate_lbs != null && Math.abs(j.weekly_rate_lbs) < 10) {
-      document.getElementById('j-rate').textContent = Math.abs(j.weekly_rate_lbs).toFixed(2);
+      setText('nav-date', d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
     }
 
     // Ticker
     const streak = p.tier0_streak != null ? p.tier0_streak : null;
-    const tv = [
-      ['tk-weight',    v.weight_lbs   ? v.weight_lbs.toFixed(1) + ' LBS'           : '—'],
-      ['tk-hrv',       v.hrv_ms       ? Math.round(v.hrv_ms) + ' MS'               : '—'],
-      ['tk-recovery',  v.recovery_pct ? Math.round(v.recovery_pct) + '%'           : '—'],
-      ['tk-streak',    streak != null  ? streak + 'D STREAK'                        : '—'],
+    [
+      ['tk-weight',    v.weight_lbs   ? v.weight_lbs.toFixed(1) + ' LBS'                : '—'],
+      ['tk-hrv',       v.hrv_ms       ? Math.round(v.hrv_ms) + ' MS'                    : '—'],
+      ['tk-recovery',  v.recovery_pct ? Math.round(v.recovery_pct) + '%'                : '—'],
+      ['tk-streak',    streak != null  ? streak + 'D STREAK'                             : '—'],
       ['tk-journey',   j.progress_pct != null ? j.progress_pct.toFixed(1) + '% TO GOAL' : '—'],
-      ['tk-weight-2',  v.weight_lbs   ? v.weight_lbs.toFixed(1) + ' LBS'           : '—'],
-      ['tk-hrv-2',     v.hrv_ms       ? Math.round(v.hrv_ms) + ' MS'               : '—'],
-      ['tk-recovery-2',v.recovery_pct ? Math.round(v.recovery_pct) + '%'           : '—'],
-      ['tk-streak-2',  streak != null  ? streak + 'D STREAK'                        : '—'],
+      ['tk-weight-2',  v.weight_lbs   ? v.weight_lbs.toFixed(1) + ' LBS'                : '—'],
+      ['tk-hrv-2',     v.hrv_ms       ? Math.round(v.hrv_ms) + ' MS'                    : '—'],
+      ['tk-recovery-2',v.recovery_pct ? Math.round(v.recovery_pct) + '%'                : '—'],
+      ['tk-streak-2',  streak != null  ? streak + 'D STREAK'                             : '—'],
       ['tk-journey-2', j.progress_pct != null ? j.progress_pct.toFixed(1) + '% TO GOAL' : '—'],
-    ];
-    tv.forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.textContent = val; });
+    ].forEach(([id, val]) => setText(id, val));
+
+    // BS-02 Hero: weight counter
+    const cw = hero.current_weight_lbs || j.current_weight_lbs || v.weight_lbs;
+    if (cw) setText('hero-weight', (Math.round(cw * 10) / 10).toString());
+
+    // BS-02 Hero: progress bar
+    const pct     = hero.progress_pct || j.progress_pct || 0;
+    const lostLbs = hero.lost_lbs     || j.lost_lbs;
+    setTimeout(() => setWidth('hero-progress-fill', Math.min(pct, 100) + '%'), 300);
+    if (lostLbs != null) setText('hero-lost-lbs', (Math.round(lostLbs * 10) / 10) + ' lbs lost');
+    if (pct     != null) setText('hero-progress-pct', (Math.round(pct * 10) / 10) + '%');
+
+    // BS-02 Hero: stat chips
+    if (hero.days_on_journey != null) setText('hero-days', hero.days_on_journey);
+    if (streak != null)               setText('hero-streak', 'Day ' + streak);
+
+    // BS-02 Hero: narrative paragraph (only if real — not placeholder)
+    if (hero.why_paragraph && !hero.paragraph_is_placeholder) {
+      const hw = document.getElementById('hero-why');
+      if (hw) hw.textContent = hero.why_paragraph;
+    }
+
+    // BS-02 Hero: Chronicle teaser
+    const cl = raw.chronicle_latest;
+    if (cl && cl.title) {
+      setText('chronicle-teaser-title', 'Week ' + (cl.week_num || '?') + ': "' + cl.title + '"');
+      const ct = document.getElementById('chronicle-teaser');
+      if (ct) ct.style.display = 'block';
+    }
 
   } catch(e) {
-    document.getElementById('vitals-date').textContent = '// Live vitals — data updates at 10am PT';
+    // Silent fail — static fallback content already visible
   }
 
-  document.getElementById('hero-subscribe-btn').addEventListener('click', async () => {
-    const email = document.getElementById('hero-email').value.trim();
-    const msg = document.getElementById('subscribe-msg');
-    if (!email || !email.includes('@')) {
-      msg.textContent = 'Enter a valid email address.';
-      msg.style.color = 'var(--c-yellow-status)';
-      return;
-    }
-    msg.textContent = 'Subscribing...';
-    try {
-      const res = await fetch('/api/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, source: 'homepage' }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        msg.textContent = '✓ Check your inbox to confirm.';
-        msg.style.color = 'var(--accent)';
-        document.getElementById('hero-email').value = '';
-      } else {
-        msg.textContent = data.error || 'Something went wrong.';
+  // Subscribe form — wires up only if form elements exist in page
+  const subBtn = document.getElementById('hero-subscribe-btn');
+  if (subBtn) {
+    subBtn.addEventListener('click', async () => {
+      const email = document.getElementById('hero-email').value.trim();
+      const msg   = document.getElementById('subscribe-msg');
+      if (!email || !email.includes('@')) {
+        msg.textContent = 'Enter a valid email address.';
         msg.style.color = 'var(--c-yellow-status)';
+        return;
       }
-    } catch { msg.textContent = 'Network error — try again.'; msg.style.color = 'var(--c-yellow-status)'; }
-  });
-  document.getElementById('hero-email').addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('hero-subscribe-btn').click();
-  });
+      msg.textContent = 'Subscribing...';
+      try {
+        const res  = await fetch('/api/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, source: 'homepage' }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          msg.textContent = '✓ Check your inbox to confirm.';
+          msg.style.color = 'var(--accent)';
+          document.getElementById('hero-email').value = '';
+        } else {
+          msg.textContent = data.error || 'Something went wrong.';
+          msg.style.color = 'var(--c-yellow-status)';
+        }
+      } catch { msg.textContent = 'Network error — try again.'; msg.style.color = 'var(--c-yellow-status)'; }
+    });
+    document.getElementById('hero-email').addEventListener('keydown', e => {
+      if (e.key === 'Enter') subBtn.click();
+    });
+  }
 })();
 </script>
 </body>
