@@ -508,6 +508,309 @@ def store_correlations(week_key, correlations, start_date, end_date, computed_at
 
 
 # ==============================================================================
+# BS-TR1: CENTENARIAN DECATHLON PROGRESS TRACKER
+# ==============================================================================
+
+# Attia centenarian targets: bodyweight-relative 1RM targets at current age,
+# computed to ensure functional independence at 80-85 given ~8-12% decline/decade.
+CENTENARIAN_TARGETS = {
+    "deadlift":         2.0,   # x bodyweight
+    "squat":            1.75,
+    "bench_press":      1.5,
+    "overhead_press":   1.0,
+}
+
+
+def _compute_centenarian_progress(series, end_date):
+    """Compute centenarian decathlon benchmark progress.
+
+    Reads latest bodyweight from series (withings), then queries hevy partition
+    for 1RM estimates per lift. Writes snapshot dict.
+    """
+    try:
+        # Latest bodyweight from Withings (use dates near end_date)
+        d30_start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
+        wt_recs = fetch_range("withings", d30_start, end_date)
+        wt_vals = [safe_float(r, "weight_lbs") for r in wt_recs if safe_float(r, "weight_lbs")]
+        if not wt_vals:
+            logger.warning("BS-TR1: No bodyweight data — skipping centenarian progress")
+            return None
+        bodyweight_lbs = wt_vals[-1]  # most recent
+
+        # 1RM estimates from Hevy computed_metrics or hevy partition
+        # Read from hevy source — look for computed 1rm fields written by hevy ingestion
+        d180_start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=180)).strftime("%Y-%m-%d")
+        hevy_recs = fetch_range("hevy", d180_start, end_date)
+
+        # Collect max estimated_1rm per exercise name across all records
+        lift_1rm = {}  # normalized_name → max 1RM (lbs)
+        LIFT_ALIASES = {
+            "deadlift":       ["deadlift", "romanian deadlift", "rdl"],
+            "squat":          ["squat", "back squat", "front squat", "goblet squat"],
+            "bench_press":    ["bench press", "incline bench", "flat bench"],
+            "overhead_press": ["overhead press", "ohp", "shoulder press", "military press"],
+        }
+        ALIAS_TO_LIFT = {}
+        for lift, aliases in LIFT_ALIASES.items():
+            for alias in aliases:
+                ALIAS_TO_LIFT[alias] = lift
+
+        for rec in hevy_recs:
+            exercises = rec.get("exercises") or []
+            for ex in exercises:
+                ex_name = (ex.get("title") or ex.get("exercise_name") or "").lower().strip()
+                e1rm = safe_float(ex, "estimated_1rm_lbs") or safe_float(ex, "e1rm_lbs")
+                if not e1rm:
+                    continue
+                for alias, lift in ALIAS_TO_LIFT.items():
+                    if alias in ex_name:
+                        lift_1rm[lift] = max(lift_1rm.get(lift, 0.0), e1rm)
+                        break
+
+        # Score each lift
+        lift_scores = {}
+        overall_ready = 0
+        lifts_scored  = 0
+        for lift, target_ratio in CENTENARIAN_TARGETS.items():
+            target_lbs  = target_ratio * bodyweight_lbs
+            current_lbs = lift_1rm.get(lift)
+            if current_lbs is None:
+                lift_scores[lift] = {"status": "no_data", "target_lbs": round(target_lbs, 1)}
+                continue
+            pct_of_target = current_lbs / target_lbs
+            gap_lbs       = max(0.0, target_lbs - current_lbs)
+            if pct_of_target >= 1.0:
+                status = "exceeds_target"
+            elif pct_of_target >= 0.9:
+                status = "at_target"
+            elif pct_of_target >= 0.75:
+                status = "approaching"
+            elif pct_of_target >= 0.5:
+                status = "progressing"
+            else:
+                status = "below_minimum"
+            lift_scores[lift] = {
+                "current_lbs":   round(current_lbs, 1),
+                "target_lbs":    round(target_lbs, 1),
+                "target_ratio":  target_ratio,
+                "pct_of_target": round(pct_of_target * 100, 1),
+                "gap_lbs":       round(gap_lbs, 1),
+                "status":        status,
+            }
+            overall_ready += pct_of_target
+            lifts_scored  += 1
+
+        overall_readiness = round(overall_ready / lifts_scored * 100, 1) if lifts_scored else None
+        priority_lift = min(
+            (l for l in CENTENARIAN_TARGETS if l in lift_1rm),
+            key=lambda l: lift_1rm.get(l, 0) / (CENTENARIAN_TARGETS[l] * bodyweight_lbs),
+            default=None,
+        )
+
+        return {
+            "bodyweight_lbs":    round(bodyweight_lbs, 1),
+            "lifts":             lift_scores,
+            "overall_readiness": overall_readiness,
+            "priority_lift":     priority_lift,
+            "lifts_scored":      lifts_scored,
+        }
+    except Exception as e:
+        logger.warning("BS-TR1 centenarian progress failed (non-fatal): %s", e)
+        return None
+
+
+def store_centenarian_progress(week_key, progress, end_date, computed_at):
+    """Write centenarian progress snapshot to SOURCE#centenarian_progress."""
+    if not progress:
+        return
+    item = {
+        "pk":          USER_PREFIX + "centenarian_progress",
+        "sk":          "WEEK#" + week_key,
+        "week":        week_key,
+        "date":        end_date,
+        "computed_at": computed_at,
+    }
+    # Decimal-safe fields
+    def _safe_dec(v):
+        if v is None: return None
+        try: return Decimal(str(round(float(v), 4)))
+        except Exception: return None
+
+    item["bodyweight_lbs"] = _safe_dec(progress["bodyweight_lbs"])
+    item["overall_readiness"] = _safe_dec(progress["overall_readiness"])
+    if progress["priority_lift"]:
+        item["priority_lift"] = progress["priority_lift"]
+    item["lifts_scored"] = Decimal(str(progress["lifts_scored"]))
+    # Encode lift_scores as a map
+    lifts_enc = {}
+    for lift, data in progress["lifts"].items():
+        lifts_enc[lift] = {k: (_safe_dec(v) if isinstance(v, float) else v)
+                          for k, v in data.items() if v is not None}
+    item["lifts"] = lifts_enc
+    table.put_item(Item=item)
+    logger.info("BS-TR1: Stored centenarian_progress for week %s (readiness=%.1f%%)",
+                week_key, progress["overall_readiness"] or 0)
+
+
+# ==============================================================================
+# BS-TR2: ZONE 2 CARDIAC EFFICIENCY TREND
+# ==============================================================================
+
+# Zone 2 HR range (as % of max HR) — matches get_zone2_breakdown defaults
+ZONE2_HR_LOW  = int(os.environ.get("ZONE2_HR_LOW", "110"))
+ZONE2_HR_HIGH = int(os.environ.get("ZONE2_HR_HIGH", "139"))
+ZONE2_MIN_DURATION_MINUTES = int(os.environ.get("ZONE2_MIN_DURATION_MINUTES", "20"))
+
+
+def _compute_zone2_efficiency(series, end_date):
+    """Compute weekly Zone 2 cardiac efficiency (pace-at-HR).
+
+    For each Strava activity with avg_heartrate in Zone 2 range and duration
+    >= ZONE2_MIN_DURATION_MINUTES, compute: efficiency = speed_mph / avg_heartrate.
+    Higher = better (faster pace at same HR, or same pace at lower HR).
+    Aggregates weekly efficiency, computes linear regression trend.
+    """
+    try:
+        d90_start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=90)).strftime("%Y-%m-%d")
+        strava_recs = fetch_range("strava", d90_start, end_date)
+
+        # Per-week: collect efficiency samples
+        week_samples = {}  # week_key → [efficiency values]
+        for rec in strava_recs:
+            date_str = rec.get("date") or rec.get("sk", "").replace("DATE#", "")[:10]
+            if not date_str:
+                continue
+            try:
+                dt = datetime.strptime(date_str, "%Y-%m-%d")
+                iso = dt.isocalendar()
+                week_key = f"{iso[0]}-W{iso[1]:02d}"
+            except Exception:
+                continue
+            activities = rec.get("activities", [])
+            for act in activities:
+                avg_hr   = safe_float(act, "average_heartrate")
+                duration_s = safe_float(act, "moving_time_seconds") or 0
+                distance_m = safe_float(act, "distance") or 0  # metres from Strava
+                sport_type = (act.get("sport_type") or "").lower()
+
+                if avg_hr is None or avg_hr < ZONE2_HR_LOW or avg_hr > ZONE2_HR_HIGH:
+                    continue
+                if duration_s < ZONE2_MIN_DURATION_MINUTES * 60:
+                    continue
+                if sport_type in ("weightraining", "weighttraining", "strength"):
+                    continue
+                # Compute efficiency: (distance_miles / duration_hours) / avg_hr
+                # = speed_mph / avg_hr → dimensionless efficiency metric
+                duration_h  = duration_s / 3600
+                distance_mi = distance_m * 0.000621371
+                if duration_h <= 0 or distance_mi <= 0:
+                    continue
+                speed_mph   = distance_mi / duration_h
+                efficiency  = speed_mph / avg_hr  # higher = better
+                week_samples.setdefault(week_key, []).append(round(efficiency, 6))
+
+        if not week_samples:
+            logger.info("BS-TR2: No Zone 2 sessions found in 90-day window")
+            return None
+
+        # Weekly averages (chronological)
+        weeks_sorted = sorted(week_samples.keys())
+        weekly = []
+        for wk in weeks_sorted:
+            samples = week_samples[wk]
+            weekly.append({
+                "week":           wk,
+                "avg_efficiency": round(sum(samples) / len(samples), 6),
+                "n_sessions":     len(samples),
+            })
+
+        # Linear regression trend
+        if len(weekly) >= 4:
+            y_vals = [w["avg_efficiency"] for w in weekly]
+            n = len(y_vals)
+            xs = list(range(n))
+            x_mean = sum(xs) / n
+            y_mean = sum(y_vals) / n
+            num = sum((xs[i] - x_mean) * (y_vals[i] - y_mean) for i in range(n))
+            den = sum((xs[i] - x_mean) ** 2 for i in range(n))
+            slope_per_week = (num / den) if den else 0.0
+            pct_change = round(slope_per_week / max(y_mean, 1e-9) * 100, 2)
+            if slope_per_week > 0.0001:
+                trend = "improving"
+            elif slope_per_week < -0.0001:
+                trend = "declining"
+            else:
+                trend = "stable"
+        else:
+            slope_per_week = None
+            pct_change     = None
+            trend          = "insufficient_data"
+
+        latest_eff   = weekly[-1]["avg_efficiency"] if weekly else None
+        baseline_eff = weekly[0]["avg_efficiency"]  if weekly else None
+
+        return {
+            "weeks_analyzed":          len(weekly),
+            "weekly":                  weekly,
+            "trend":                   trend,
+            "slope_per_week":          round(slope_per_week, 8) if slope_per_week is not None else None,
+            "pct_change_per_week":     pct_change,
+            "latest_efficiency":       latest_eff,
+            "baseline_efficiency":     baseline_eff,
+            "zone2_hr_range":          f"{ZONE2_HR_LOW}–{ZONE2_HR_HIGH} bpm",
+            "interpretation":          (
+                "Efficiency = speed_mph ÷ avg_HR. Higher = better fitness at same HR. "
+                "Improving trend = aerobic base is growing."
+            ),
+        }
+    except Exception as e:
+        logger.warning("BS-TR2 zone2 efficiency failed (non-fatal): %s", e)
+        return None
+
+
+def store_zone2_efficiency(week_key, efficiency, end_date, computed_at):
+    """Write zone2 efficiency snapshot to SOURCE#zone2_efficiency."""
+    if not efficiency:
+        return
+
+    def _safe_dec(v):
+        if v is None: return None
+        try: return Decimal(str(round(float(v), 8)))
+        except Exception: return None
+
+    # Build weekly list (Decimal-safe)
+    weekly_enc = []
+    for w in efficiency.get("weekly", []):
+        weekly_enc.append({
+            "week":           w["week"],
+            "avg_efficiency": _safe_dec(w["avg_efficiency"]),
+            "n_sessions":     Decimal(str(w["n_sessions"])),
+        })
+
+    item = {
+        "pk":                    USER_PREFIX + "zone2_efficiency",
+        "sk":                    "WEEK#" + week_key,
+        "week":                  week_key,
+        "date":                  end_date,
+        "computed_at":           computed_at,
+        "weeks_analyzed":        Decimal(str(efficiency["weeks_analyzed"])),
+        "trend":                 efficiency["trend"],
+        "latest_efficiency":     _safe_dec(efficiency["latest_efficiency"]),
+        "baseline_efficiency":   _safe_dec(efficiency["baseline_efficiency"]),
+        "zone2_hr_range":        efficiency["zone2_hr_range"],
+        "weekly":                weekly_enc,
+    }
+    if efficiency.get("slope_per_week") is not None:
+        item["slope_per_week"]       = _safe_dec(efficiency["slope_per_week"])
+    if efficiency.get("pct_change_per_week") is not None:
+        item["pct_change_per_week"]  = _safe_dec(efficiency["pct_change_per_week"])
+
+    table.put_item(Item=item)
+    logger.info("BS-TR2: Stored zone2_efficiency for week %s (trend=%s, weeks=%d)",
+                week_key, efficiency["trend"], efficiency["weeks_analyzed"])
+
+
+# ==============================================================================
 # LAMBDA HANDLER
 # ==============================================================================
 
@@ -576,8 +879,24 @@ def lambda_handler(event, context):
     logger.info("Computing %d correlation pairs...", len(CORRELATION_PAIRS))
     correlations = compute_correlations(series)
 
-    # Store
+    # Store correlations
     store_correlations(week_key, correlations, start_date, end_date, computed_at)
+
+    # BS-TR1: Centenarian Decathlon Progress (non-fatal)
+    try:
+        logger.info("BS-TR1: Computing centenarian decathlon progress...")
+        centenarian = _compute_centenarian_progress(series, end_date)
+        store_centenarian_progress(week_key, centenarian, end_date, computed_at)
+    except Exception as e:
+        logger.warning("BS-TR1 failed (non-fatal): %s", e)
+
+    # BS-TR2: Zone 2 Cardiac Efficiency Trend (non-fatal)
+    try:
+        logger.info("BS-TR2: Computing Zone 2 cardiac efficiency trend...")
+        zone2_eff = _compute_zone2_efficiency(series, end_date)
+        store_zone2_efficiency(week_key, zone2_eff, end_date, computed_at)
+    except Exception as e:
+        logger.warning("BS-TR2 failed (non-fatal): %s", e)
 
     elapsed = time.time() - t0
     significant = {k: v for k, v in correlations.items()

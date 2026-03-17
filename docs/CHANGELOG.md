@@ -1,5 +1,40 @@
 # Life Platform — Changelog
 
+## v3.7.64 — 2026-03-17: Sprint 2 complete — BS-MP3, BS-TR1, BS-TR2, BS-BH1, BS-07, BS-08, BS-SL2
+
+### Summary
+Full Sprint 2 implemented and deployed in one session. 6 of 7 planned features shipped (BS-NU1 shelved per plan). Two new compute Lambdas added to CDK, MCP deployed with new `get_vice_streaks` tool, site-api Lambda created via LifePlatformWeb CDK deploy, SES confirmed out of sandbox.
+
+### New Lambda Files
+- `lambdas/sleep_reconciler_lambda.py`: BS-08 Unified Sleep Record — merges Whoop/Eight Sleep/Apple Health per conflict resolution rules. Runs 7:00 AM PT daily. Writes to `SOURCE#sleep_unified`.
+- `lambdas/circadian_compliance_lambda.py`: BS-SL2 Circadian Compliance Score — 4-component pre-sleep behavioral score (0-100). Runs 7:00 PM PT daily. Writes to `SOURCE#circadian`.
+
+### Modified Files
+- `lambdas/daily_insight_compute_lambda.py`: BS-MP3 — `_compute_decision_fatigue_alert()` added. Fires when active+overdue Todoist tasks >15 AND T0 habit completion <60% this week. Priority 3 signal in AI context block. **DEPLOYED ✅**
+- `lambdas/weekly_correlation_compute_lambda.py`: BS-TR1 + BS-TR2 — `_compute_centenarian_progress()` and `_compute_zone2_efficiency()` added. Both run Sunday after correlations. Write to `SOURCE#centenarian_progress` and `SOURCE#zone2_efficiency`. **DEPLOYED ✅**
+- `lambdas/site_api_lambda.py`: BS-07 — 4 new routes: `/api/weight_progress`, `/api/character_stats`, `/api/habit_streaks`, `/api/experiments`. All 1h cache TTL.
+- `mcp/tools_habits.py`: BS-BH1 — `tool_get_vice_streaks()` added. Compounding value formula (streak^1.5/10), streak risk rating, milestone coaching, portfolio total.
+- `mcp/registry.py`: BS-BH1 — `get_vice_streaks` tool registered. Import updated to explicit names. **MCP DEPLOYED ✅**
+- `ci/lambda_map.json`: BS-08 and BS-SL2 registered as `sleep_reconciler` and `circadian_compliance` sections.
+- `cdk/stacks/compute_stack.py`: BS-08 + BS-SL2 Lambdas added (SleepReconciler + CircadianCompliance). **CDK DEPLOYED ✅** (LifePlatformCompute)
+- `cdk/stacks/role_policies.py`: `compute_sleep_reconciler()` and `compute_circadian_compliance()` policies added.
+
+### Infrastructure
+- `LifePlatformCompute` deployed: sleep-reconciler + circadian-compliance Lambdas created with EventBridge schedules.
+- `LifePlatformWeb` deployed: life-platform-site-api Lambda created (us-east-1). Function URL: `https://lxhjl2qvq2ystwp47464uhs2ti0hpdcq.lambda-url.us-east-1.on.aws/`
+- SES: `ProductionAccessEnabled: true` confirmed.
+- MCP tool count: 89 → 90 (`get_vice_streaks` added).
+- CDK Lambda count: 46 → 48 (sleep-reconciler + circadian-compliance).
+
+### Pending (next session)
+- BS-08 backfill: invoke `sleep-reconciler` with `{"start_date": "2026-02-01", "end_date": "2026-03-16"}` to populate historical records
+- BS-SL2 first run: invoke `circadian-compliance` manually to confirm scoring works
+- `HERO_WHY_PARAGRAPH` in `site_writer.py` (deferred from Sprint 1)
+- TB7-25: CI/CD rollback scope verification
+- TB7-27: MCP tool tiering design doc (pre-SIMP-1 Phase 2)
+
+---
+
 ## v3.7.63 — 2026-03-17: BS-02 hero live, journal Signal alignment, SES sandbox exit
 
 ### Summary

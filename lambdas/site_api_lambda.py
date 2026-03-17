@@ -318,6 +318,144 @@ def handle_character() -> dict:
     }, cache_seconds=900)
 
 
+def handle_weight_progress() -> dict:
+    """
+    GET /api/weight_progress
+    Returns: daily weight readings for last 180 days.
+    Cache: 3600s (1 hr).
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d180  = (datetime.now(timezone.utc) - timedelta(days=180)).strftime("%Y-%m-%d")
+    items = _query_source("withings", d180, today)
+
+    readings = sorted(
+        [
+            {
+                "date":       item["sk"].replace("DATE#", ""),
+                "weight_lbs": round(float(item["weight_lbs"]), 1),
+            }
+            for item in items
+            if item.get("weight_lbs")
+        ],
+        key=lambda x: x["date"],
+    )
+
+    return _ok({"weight_progress": readings}, cache_seconds=3600)
+
+
+def handle_character_stats() -> dict:
+    """
+    GET /api/character_stats
+    Returns: current character level, tier, and all 7 pillar scores.
+    Cache: 3600s (1 hr) — computed nightly.
+    """
+    today     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    pk = f"{USER_PREFIX}character_sheet"
+    record = None
+    for date_str in [today, yesterday]:
+        resp = table.get_item(Key={"pk": pk, "sk": f"DATE#{date_str}"})
+        record = _decimal_to_float(resp.get("Item"))
+        if record:
+            break
+    if not record:
+        return _error(503, "Character sheet not computed yet")
+
+    PILLARS = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
+    pillars = {}
+    for p in PILLARS:
+        pd = record.get(f"pillar_{p}", {})
+        pillars[p] = {
+            "level":     float(pd.get("level", 1)),
+            "raw_score": float(pd.get("raw_score", 0)),
+            "tier":      pd.get("tier", "Foundation"),
+        }
+
+    return _ok({
+        "character_stats": {
+            "level":       float(record.get("character_level", 1)),
+            "tier":        record.get("character_tier", "Foundation"),
+            "tier_emoji":  record.get("character_tier_emoji", "🔨"),
+            "xp_total":    float(record.get("character_xp", 0)),
+            "as_of_date":  date_str,
+        },
+        "pillars": pillars,
+    }, cache_seconds=3600)
+
+
+def handle_habit_streaks() -> dict:
+    """
+    GET /api/habit_streaks
+    Returns: Tier 0 habit streaks for public display (aggregate streak only, no habit names).
+    Cache: 3600s (1 hr).
+    """
+    today     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # Read latest habit_scores record
+    pk = f"{USER_PREFIX}habit_scores"
+    resp = table.query(
+        KeyConditionExpression="pk = :pk",
+        ExpressionAttributeValues={":pk": pk},
+        ScanIndexForward=False,
+        Limit=3,
+    )
+    items = _decimal_to_float(resp.get("Items", []))
+    record = items[0] if items else None
+
+    if not record:
+        return _error(503, "Habit scores not available")
+
+    t0_done  = int(record.get("tier0_done", 0))
+    t0_total = int(record.get("tier0_total", 1))
+    t0_pct   = round(t0_done / t0_total * 100) if t0_total else 0
+
+    # Compute aggregate T0 streak from habit_scores (t0_streak field if present)
+    t0_streak = int(record.get("t0_perfect_streak") or record.get("t0_aggregate_streak") or 0)
+
+    return _ok({
+        "habit_streaks": {
+            "as_of_date":      record.get("date", yesterday),
+            "tier0_pct":       t0_pct,
+            "tier0_done":      t0_done,
+            "tier0_total":     t0_total,
+            "aggregate_streak": t0_streak,
+        }
+    }, cache_seconds=3600)
+
+
+def handle_experiments() -> dict:
+    """
+    GET /api/experiments
+    Returns: list of experiments with status (no sensitive metric data).
+    Cache: 3600s (1 hr).
+    """
+    pk = f"{USER_PREFIX}experiments"
+    resp = table.query(
+        KeyConditionExpression="pk = :pk",
+        ExpressionAttributeValues={":pk": pk},
+        ScanIndexForward=False,
+        Limit=50,
+    )
+    items = _decimal_to_float(resp.get("Items", []))
+
+    experiments = [
+        {
+            "name":       item.get("name", "Unnamed"),
+            "status":     item.get("status", "unknown"),
+            "start_date": item.get("start_date", ""),
+            "end_date":   item.get("end_date"),
+            "hypothesis": item.get("hypothesis", ""),
+            "tags":       item.get("tags", []),
+        }
+        for item in items
+        if item.get("sk", "").startswith("EXP#")
+    ]
+    experiments.sort(key=lambda x: x["start_date"], reverse=True)
+
+    return _ok({"experiments": experiments}, cache_seconds=3600)
+
+
 def handle_status() -> dict:
     """
     GET /api/status
@@ -334,10 +472,15 @@ def handle_status() -> dict:
 # ── Router ──────────────────────────────────────────────────
 
 ROUTES = {
-    "/api/vitals":    handle_vitals,
-    "/api/journey":   handle_journey,
-    "/api/character": handle_character,
-    "/api/status":    handle_status,
+    "/api/vitals":          handle_vitals,
+    "/api/journey":         handle_journey,
+    "/api/character":       handle_character,
+    "/api/status":          handle_status,
+    # BS-07: new public endpoints
+    "/api/weight_progress": handle_weight_progress,
+    "/api/character_stats": handle_character_stats,
+    "/api/habit_streaks":   handle_habit_streaks,
+    "/api/experiments":     handle_experiments,
 }
 
 

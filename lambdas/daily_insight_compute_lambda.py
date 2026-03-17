@@ -78,6 +78,10 @@ table    = dynamodb.Table(TABLE_NAME)
 # AI model constant — read from env so model can be updated without redeployment
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
+# BS-MP3: Decision Fatigue Detector — proactive alert threshold
+DECISION_FATIGUE_THRESHOLD = int(os.environ.get("DECISION_FATIGUE_THRESHOLD", "15"))
+DECISION_FATIGUE_HABIT_THRESHOLD = float(os.environ.get("DECISION_FATIGUE_HABIT_THRESHOLD", "0.60"))
+
 
 # ==============================================================================
 # HELPERS
@@ -1232,6 +1236,95 @@ def _build_experiment_context(yesterday_str, profile):
 
 
 # ==============================================================================
+# BS-MP3: DECISION FATIGUE DETECTOR (proactive)
+# ==============================================================================
+
+def _compute_decision_fatigue_alert(yesterday_str, habit_7d):
+    """BS-MP3: Proactive decision fatigue alert.
+
+    Fires when BOTH conditions are true simultaneously:
+      1. Active + overdue Todoist tasks > DECISION_FATIGUE_THRESHOLD (default 15)
+      2. T0 habit completion < DECISION_FATIGUE_HABIT_THRESHOLD (default 60%) this week
+
+    Reads the most recent Todoist DDB record for task load.
+    Returns a (fired: bool, alert_block: str) tuple. Non-fatal.
+    """
+    try:
+        # ── 1. Todoist task load from DDB ──────────────────────────────────────
+        pk = USER_PREFIX + "todoist"
+        resp = table.query(
+            KeyConditionExpression="pk = :pk",
+            ExpressionAttributeValues={":pk": pk},
+            ScanIndexForward=False,
+            Limit=3,
+        )
+        todoist_items = [d2f(i) for i in resp.get("Items", [])]
+
+        active_count  = None
+        overdue_count = None
+        for item in todoist_items:
+            # Try various field names written by different ingestion versions
+            ac = item.get("active_task_count") or item.get("active_count") or item.get("total_active")
+            oc = item.get("overdue_count") or item.get("overdue_task_count") or item.get("overdue")
+            if ac is not None:
+                active_count  = int(ac)
+                overdue_count = int(oc or 0)
+                break
+
+        if active_count is None:
+            logger.info("BS-MP3: No Todoist task count found in DDB — skipping decision fatigue check")
+            return False, ""
+
+        total_load = active_count + overdue_count
+
+        # ── 2. T0 habit completion rate this week ─────────────────────────────
+        if not habit_7d:
+            return False, ""
+
+        t0_rates = [
+            safe_float(r, "tier0_pct") or safe_float(r, "t0_completion_rate")
+            for r in habit_7d
+        ]
+        t0_rates = [v for v in t0_rates if v is not None]
+        t0_avg_7d = sum(t0_rates) / len(t0_rates) if t0_rates else None
+
+        if t0_avg_7d is None:
+            return False, ""
+
+        # ── 3. Evaluate thresholds ────────────────────────────────────────────
+        load_breached  = total_load > DECISION_FATIGUE_THRESHOLD
+        habits_breached = t0_avg_7d < DECISION_FATIGUE_HABIT_THRESHOLD
+        fired = load_breached and habits_breached
+
+        logger.info(
+            "BS-MP3: total_load=%d (threshold=%d), t0_avg_7d=%.2f (threshold=%.2f) → fired=%s",
+            total_load, DECISION_FATIGUE_THRESHOLD, t0_avg_7d, DECISION_FATIGUE_HABIT_THRESHOLD, fired,
+        )
+
+        if not fired:
+            return False, ""
+
+        # ── 4. Build alert block ──────────────────────────────────────────────
+        t0_pct_str    = f"{int(t0_avg_7d * 100)}%"
+        overdue_note  = f" ({overdue_count} overdue)" if overdue_count > 0 else ""
+        alert = (
+            f"\U0001f9e0 DECISION FATIGUE DETECTED (BS-MP3):\n"
+            f"  Task load: {total_load} active+overdue tasks{overdue_note} "
+            f"(threshold: >{DECISION_FATIGUE_THRESHOLD})\n"
+            f"  T0 habit completion: {t0_pct_str} this week "
+            f"(threshold: <{int(DECISION_FATIGUE_HABIT_THRESHOLD * 100)}%)\n"
+            f"INSTRUCTION: Decision load is elevated and it is correlating with habit slippage. "
+            f"Name this pattern directly. Suggest 1-2 specific tasks Matthew could cancel, delegate, "
+            f"or defer today to protect evening habit completion. Be specific, not vague."
+        )
+        return True, alert
+
+    except Exception as e:
+        logger.warning("BS-MP3 decision fatigue check failed (non-fatal): %s", e)
+        return False, ""
+
+
+# ==============================================================================
 # AI CONTEXT BLOCK ASSEMBLER  (priority queue version — IC-19 v1.3.0)
 # ==============================================================================
 
@@ -1241,7 +1334,8 @@ def build_ai_context_block(momentum_signal, this_week_avg, prev_week_avg, trend_
                             early_warning_block="",
                             slow_drift_metrics=None,
                             experiment_ctx="",
-                            social_flag=""):
+                            social_flag="",
+                            decision_fatigue_block=""):
     """Assemble the compact text block injected into all Daily Brief AI prompts.
 
     Delegates to _build_prioritized_context_block() with priority-ranked signals.
@@ -1268,7 +1362,11 @@ def build_ai_context_block(momentum_signal, this_week_avg, prev_week_avg, trend_
                 line += f" {d['note']}"
             signals.append({"priority": 2, "content": line, "token_estimate": 40})
 
-    # P3: Sustained anomaly context (informational only — full alert sent separately)
+    # P3: Decision Fatigue (BS-MP3) — fires when task load AND habit completion both breach thresholds
+    if decision_fatigue_block:
+        signals.append({"priority": 3, "content": decision_fatigue_block, "token_estimate": 50})
+
+    # P3b: Sustained anomaly context (informational only — full alert sent separately)
     # (No content here — the anomaly detector sends its own email; we just note it)
 
     # P4: Significant slow drift
@@ -1510,6 +1608,15 @@ def lambda_handler(event, context):
     except Exception:
         pass
 
+    # ── 5g. BS-MP3: Decision Fatigue Detector (proactive) ───────────────────────────
+    df_fired, decision_fatigue_block = False, ""
+    try:
+        df_fired, decision_fatigue_block = _compute_decision_fatigue_alert(yesterday_str, habit_7d)
+        if df_fired:
+            logger.info("BS-MP3: Decision fatigue alert fired for %s", yesterday_str)
+    except Exception as e:
+        logger.warning("BS-MP3 failed (non-fatal): %s", e)
+
     # ── 6. Assemble AI context block ──
     ai_block = build_ai_context_block(
         momentum_signal, this_week_avg, prev_week_avg, trend_pct,
@@ -1517,7 +1624,8 @@ def lambda_handler(event, context):
         synergy_health, memory_ctx, intention_gap_ctx, early_warning_block,
         slow_drift_metrics=slow_drift_metrics,
         experiment_ctx=experiment_ctx,
-        social_flag=social_flag)
+        social_flag=social_flag,
+        decision_fatigue_block=decision_fatigue_block)
     logger.info(f"AI context block: {len(ai_block)} chars")
 
     # ── 7. Store ──
@@ -1545,7 +1653,8 @@ def lambda_handler(event, context):
         "declining_count": len(declining),
         "improving_count": len(improving),
         "weakest_habits":  weakest[:3],
-        "ic8_active":      bool(intention_gap_ctx),
-        "ic5_warning":     ic5_warning,
-        "ic5_markers":     ic5_markers,
+        "ic8_active":            bool(intention_gap_ctx),
+        "ic5_warning":           ic5_warning,
+        "ic5_markers":           ic5_markers,
+        "decision_fatigue_fired": df_fired,
     }
