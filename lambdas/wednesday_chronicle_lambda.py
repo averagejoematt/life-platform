@@ -73,6 +73,15 @@ try:
 except ImportError:
     _HAS_AI_VALIDATOR = False
 
+# BS-05: Confidence badge
+try:
+    from digest_utils import compute_confidence, _confidence_badge
+    _HAS_CONFIDENCE = True
+except ImportError:
+    _HAS_CONFIDENCE = False
+    def _confidence_badge(level):
+        return ""
+
 # OBS-1: Structured logger
 try:
     from platform_logger import get_logger
@@ -934,6 +943,14 @@ def build_email_html(title, stats_line, body_html, week_num, date_str, blog_url)
     except Exception:
         date_display = date_str
 
+    # BS-05: Confidence badge — Chronicle is always n=7 (one week of data)
+    # Henning: n<14 = LOW. Correct — weekly snapshot is preliminary by design.
+    try:
+        _conf = compute_confidence(days_of_data=7)
+        _badge_html = _conf["badge_html"]
+    except Exception:
+        _badge_html = _confidence_badge("LOW") if _HAS_CONFIDENCE else ""
+
     return f'''<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -950,7 +967,7 @@ def build_email_html(title, stats_line, body_html, week_num, date_str, blog_url)
   <div style="padding:28px 40px 8px;">
     <h1 style="font-size:26px;font-weight:400;color:#1a1a1a;margin:0 0 8px;line-height:1.3;font-style:italic;">"{title}"</h1>
     <p style="font-family:-apple-system,sans-serif;font-size:12px;color:#999;margin:0;">Week {week_num} &middot; {date_display}</p>
-    <p style="font-family:-apple-system,sans-serif;font-size:11px;color:#b0b0a8;margin:6px 0 0;">{stats_line}</p>
+    <p style="font-family:-apple-system,sans-serif;font-size:11px;color:#b0b0a8;margin:6px 0 0;">{stats_line} {_badge_html}</p>
   </div>
 
   <!-- Body -->

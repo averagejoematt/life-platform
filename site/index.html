@@ -367,63 +367,83 @@
 <script>
 (async function() {
   try {
-    const r = await fetch('/site/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
+    const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
     if (!r.ok) throw new Error('no data');
-    const s = await r.json();
+    const raw = await r.json();
 
-    if (s.updated_at) {
-      const d = new Date(s.updated_at);
+    // Data is nested under vitals/journey/training — flatten for convenience
+    const v = raw.vitals    || {};
+    const j = raw.journey   || {};
+    const t = raw.training  || {};
+    const p = raw.platform  || {};
+    const meta = raw._meta  || {};
+
+    // Nav date
+    const genAt = meta.generated_at || raw.updated_at;
+    if (genAt) {
+      const d = new Date(genAt);
       document.getElementById('nav-date').textContent =
         d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       document.getElementById('vitals-date').textContent =
         '// Live vitals — ' + d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     }
 
-    if (s.weight_lbs) {
-      document.getElementById('v-weight').textContent = s.weight_lbs.toFixed(1);
-      if (s.lbs_lost) {
-        document.getElementById('v-weight-delta').textContent = '↓ ' + s.lbs_lost.toFixed(1) + ' lbs lost';
+    // Weight
+    if (v.weight_lbs) {
+      document.getElementById('v-weight').textContent = v.weight_lbs.toFixed(1);
+      const lost = j.lost_lbs;
+      if (lost && lost > 0) {
+        document.getElementById('v-weight-delta').textContent = '↓ ' + lost.toFixed(1) + ' lbs lost';
       }
     }
-    if (s.hrv_ms) {
-      document.getElementById('v-hrv').textContent = Math.round(s.hrv_ms);
+    // HRV
+    if (v.hrv_ms) {
+      document.getElementById('v-hrv').textContent = Math.round(v.hrv_ms);
       const el = document.getElementById('v-hrv-delta');
-      el.textContent = s.hrv_trend || '—';
-      if ((s.hrv_trend||'').includes('down')) el.classList.add('warn');
+      el.textContent = v.hrv_trend || '—';
+      if ((v.hrv_trend||'').includes('down')) el.classList.add('warn');
     }
-    if (s.recovery_pct) {
-      document.getElementById('v-recovery').textContent = Math.round(s.recovery_pct);
+    // Recovery
+    if (v.recovery_pct) {
+      document.getElementById('v-recovery').textContent = Math.round(v.recovery_pct);
       const el = document.getElementById('v-recovery-status');
-      el.textContent = s.recovery_status || '—';
-      if (s.recovery_status === 'red') el.classList.add('warn');
+      el.textContent = v.recovery_status || '—';
+      if (v.recovery_status === 'red') el.classList.add('warn');
     }
-    if (s.rhr_bpm) {
-      document.getElementById('v-rhr').textContent = Math.round(s.rhr_bpm);
-      document.getElementById('v-rhr-delta').textContent = s.rhr_trend || '—';
+    // RHR
+    if (v.rhr_bpm) {
+      document.getElementById('v-rhr').textContent = Math.round(v.rhr_bpm);
+      document.getElementById('v-rhr-delta').textContent = v.rhr_trend || '—';
     }
-    if (s.progress_pct != null) {
-      document.getElementById('j-pct').textContent = s.progress_pct.toFixed(1);
-      setTimeout(() => { document.getElementById('j-bar').style.width = Math.min(s.progress_pct, 100) + '%'; }, 300);
+    // Journey bars
+    if (j.progress_pct != null) {
+      document.getElementById('j-pct').textContent = j.progress_pct.toFixed
+        ? j.progress_pct.toFixed(1) : j.progress_pct;
+      setTimeout(() => { document.getElementById('j-bar').style.width = Math.min(j.progress_pct, 100) + '%'; }, 300);
     }
-    if (s.zone2_this_week_min != null) {
-      document.getElementById('z2-val').textContent = Math.round(s.zone2_this_week_min);
-      setTimeout(() => { document.getElementById('z2-bar').style.width = Math.min((s.zone2_this_week_min / 150) * 100, 100) + '%'; }, 400);
+    if (t.zone2_this_week_min != null) {
+      document.getElementById('z2-val').textContent = Math.round(t.zone2_this_week_min);
+      const z2target = t.zone2_target_min || 150;
+      setTimeout(() => { document.getElementById('z2-bar').style.width = Math.min((t.zone2_this_week_min / z2target) * 100, 100) + '%'; }, 400);
     }
-    if (s.weekly_rate_lbs != null) {
-      document.getElementById('j-rate').textContent = Math.abs(s.weekly_rate_lbs).toFixed(2);
+    // Weekly rate — only show if sane (< 10 lbs/wk)
+    if (j.weekly_rate_lbs != null && Math.abs(j.weekly_rate_lbs) < 10) {
+      document.getElementById('j-rate').textContent = Math.abs(j.weekly_rate_lbs).toFixed(2);
     }
 
+    // Ticker
+    const streak = p.tier0_streak != null ? p.tier0_streak : null;
     const tv = [
-      ['tk-weight', s.weight_lbs ? s.weight_lbs.toFixed(1) + ' LBS' : '—'],
-      ['tk-hrv', s.hrv_ms ? Math.round(s.hrv_ms) + ' MS' : '—'],
-      ['tk-recovery', s.recovery_pct ? Math.round(s.recovery_pct) + '%' : '—'],
-      ['tk-streak', s.tier0_streak != null ? s.tier0_streak + 'D' : '—'],
-      ['tk-journey', s.progress_pct != null ? s.progress_pct.toFixed(1) + '% COMPLETE' : '—'],
-      ['tk-weight-2', s.weight_lbs ? s.weight_lbs.toFixed(1) + ' LBS' : '—'],
-      ['tk-hrv-2', s.hrv_ms ? Math.round(s.hrv_ms) + ' MS' : '—'],
-      ['tk-recovery-2', s.recovery_pct ? Math.round(s.recovery_pct) + '%' : '—'],
-      ['tk-streak-2', s.tier0_streak != null ? s.tier0_streak + 'D' : '—'],
-      ['tk-journey-2', s.progress_pct != null ? s.progress_pct.toFixed(1) + '% COMPLETE' : '—'],
+      ['tk-weight',    v.weight_lbs   ? v.weight_lbs.toFixed(1) + ' LBS'           : '—'],
+      ['tk-hrv',       v.hrv_ms       ? Math.round(v.hrv_ms) + ' MS'               : '—'],
+      ['tk-recovery',  v.recovery_pct ? Math.round(v.recovery_pct) + '%'           : '—'],
+      ['tk-streak',    streak != null  ? streak + 'D STREAK'                        : '—'],
+      ['tk-journey',   j.progress_pct != null ? j.progress_pct.toFixed(1) + '% TO GOAL' : '—'],
+      ['tk-weight-2',  v.weight_lbs   ? v.weight_lbs.toFixed(1) + ' LBS'           : '—'],
+      ['tk-hrv-2',     v.hrv_ms       ? Math.round(v.hrv_ms) + ' MS'               : '—'],
+      ['tk-recovery-2',v.recovery_pct ? Math.round(v.recovery_pct) + '%'           : '—'],
+      ['tk-streak-2',  streak != null  ? streak + 'D STREAK'                        : '—'],
+      ['tk-journey-2', j.progress_pct != null ? j.progress_pct.toFixed(1) + '% TO GOAL' : '—'],
     ];
     tv.forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.textContent = val; });
 
