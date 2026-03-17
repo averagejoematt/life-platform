@@ -968,6 +968,7 @@ def site_api() -> list[iam.PolicyStatement]:
     NO write permissions. NO Secrets access. NO S3 write.
     Yael directive: never expose MCP endpoint publicly — this is a
     separate, minimal-permission Lambda.
+    WEB-WCT: Added S3 site/config/* read for /api/current_challenge endpoint.
     """
     return [
         iam.PolicyStatement(
@@ -979,6 +980,11 @@ def site_api() -> list[iam.PolicyStatement]:
             sid="KMS",
             actions=["kms:Decrypt"],
             resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="S3SiteConfigRead",
+            actions=["s3:GetObject"],
+            resources=[f"{BUCKET_ARN}/site/config/*"],
         ),
     ]
 

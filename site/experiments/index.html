@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="N=1 Experiment Archive — real self-experiments with data, hypotheses, and outcomes.">
+  <meta property="og:title" content="N=1 Experiments — Matthew Walker">
+  <meta property="og:description" content="Real self-experiments with data. Hypothesis, protocol, duration, result — no filtering.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/experiments/">
+  <title>N=1 Experiments — Matthew Walker</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .page-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .page-header__kicker { margin-bottom: var(--space-4); }
+    .page-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      letter-spacing: var(--ls-display);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .page-header__title span { color: var(--accent); }
+    .page-header__sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      max-width: 560px;
+    }
+    .page-header__meta {
+      margin-top: var(--space-8);
+      display: flex;
+      gap: var(--space-8);
+      flex-wrap: wrap;
+    }
+    .meta-stat { border-left: 2px solid var(--accent); padding-left: var(--space-4); }
+    .meta-stat__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-1);
+    }
+    .meta-stat__value {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+    }
+
+    /* N=1 explainer strip */
+    .explainer {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+    }
+    .explainer__item { background: var(--bg); padding: var(--space-8); }
+    .explainer__num {
+      font-family: var(--font-display);
+      font-size: 48px;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: var(--space-3);
+      letter-spacing: var(--ls-display);
+    }
+    .explainer__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-2);
+    }
+    .explainer__desc {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-mono);
+    }
+
+    /* Experiment list */
+    .experiments-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding) var(--space-20);
+    }
+    .experiments-filter { display: flex; gap: var(--space-2); margin-bottom: var(--space-8); flex-wrap: wrap; }
+    .filter-btn {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: var(--space-2) var(--space-4);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      background: transparent;
+      cursor: pointer;
+      transition: all var(--dur-fast);
+    }
+    .filter-btn:hover, .filter-btn.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-bg-subtle);
+    }
+
+    /* Experiment card */
+    .exp-card {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      margin-bottom: var(--space-6);
+      transition: border-color var(--dur-fast);
+    }
+    .exp-card:hover { border-color: var(--accent-dim); }
+    .exp-card--active .exp-card__header { position: relative; }
+    .exp-card--active .exp-card__header::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, var(--accent) 0%, transparent 60%);
+    }
+    .exp-card__header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: start;
+      gap: var(--space-6);
+      padding: var(--space-6) var(--space-8);
+      border-bottom: 1px solid var(--border);
+    }
+    .exp-card__name {
+      font-family: var(--font-display);
+      font-size: 28px;
+      letter-spacing: var(--ls-display);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .exp-card__hypothesis {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-mono);
+      max-width: 600px;
+    }
+    .exp-card__hypothesis em { color: var(--text); font-style: normal; }
+    .exp-status {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-1) var(--space-3);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      border: 1px solid currentColor;
+      white-space: nowrap;
+    }
+    .exp-status--active    { color: var(--accent); border-color: var(--accent-dim); background: var(--accent-bg-subtle); }
+    .exp-status--completed { color: #2EA98F; border-color: rgba(46,169,143,0.3); background: rgba(46,169,143,0.05); }
+    .exp-status--abandoned { color: var(--text-muted); border-color: var(--border); }
+    .exp-status__dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .exp-card__body {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+    }
+    .exp-card__field { background: var(--surface); padding: var(--space-5) var(--space-8); }
+    .exp-card__field-label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-2);
+    }
+    .exp-card__field-value {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text);
+      line-height: var(--lh-mono);
+    }
+    .exp-card__outcome {
+      padding: var(--space-5) var(--space-8);
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: var(--space-6);
+      align-items: start;
+    }
+    .exp-card__outcome-label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      white-space: nowrap;
+      padding-top: 2px;
+    }
+    .exp-card__outcome-text {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-mono);
+    }
+    .exp-days {
+      font-family: var(--font-display);
+      font-size: 40px;
+      color: var(--accent);
+      letter-spacing: var(--ls-display);
+      line-height: 1;
+    }
+    .exp-days span {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+      display: block;
+      margin-top: var(--space-1);
+    }
+    .exp-tags { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
+    .exp-tag {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: 2px var(--space-2);
+      background: var(--surface-raised);
+      color: var(--text-muted);
+    }
+
+    /* Empty state */
+    .empty-state {
+      padding: var(--space-20) 0;
+      text-align: center;
+      border: 1px dashed var(--border);
+    }
+    .empty-state__title {
+      font-family: var(--font-display);
+      font-size: 36px;
+      color: var(--text-muted);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-4);
+    }
+    .empty-state__sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-tag);
+      line-height: var(--lh-mono);
+      max-width: 400px;
+      margin: 0 auto;
+    }
+    .empty-state__coming {
+      margin-top: var(--space-8);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+    }
+
+    /* Methodology */
+    .methodology {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: var(--space-12);
+    }
+    .methodology__label {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      letter-spacing: var(--ls-display);
+      color: var(--text-muted);
+    }
+    .methodology__text {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-mono);
+    }
+    .methodology__text p + p { margin-top: var(--space-4); }
+    .methodology__text strong { color: var(--text); }
+
+    @media (max-width: 768px) {
+      .explainer { grid-template-columns: 1fr; }
+      .exp-card__body { grid-template-columns: 1fr 1fr; }
+      .exp-card__header { grid-template-columns: 1fr; }
+      .methodology { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/#experiment" class="nav__link">The experiment</a>
+    <a href="/platform/" class="nav__link">The platform</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/character/" class="nav__link">Character</a>
+  </div>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span id="nav-date">Live</span>
+  </div>
+</nav>
+
+<div class="page-header animate-in">
+  <div class="page-header__kicker">
+    <span class="label label-accent">// N=1 Experiment Archive</span>
+  </div>
+  <h1 class="page-header__title">The Lab <span>Notebook</span></h1>
+  <p class="page-header__sub">Self-experiments with a clear hypothesis, defined protocol, and real data. No cherry-picking. Results published regardless of outcome.</p>
+  <div class="page-header__meta">
+    <div class="meta-stat">
+      <div class="meta-stat__label">Total experiments</div>
+      <div class="meta-stat__value" id="stat-total">—</div>
+    </div>
+    <div class="meta-stat">
+      <div class="meta-stat__label">Active now</div>
+      <div class="meta-stat__value" id="stat-active">—</div>
+    </div>
+    <div class="meta-stat">
+      <div class="meta-stat__label">Completed</div>
+      <div class="meta-stat__value" id="stat-completed">—</div>
+    </div>
+  </div>
+</div>
+
+<div class="explainer animate-in">
+  <div class="explainer__item">
+    <div class="explainer__num">H</div>
+    <div class="explainer__label">Hypothesis</div>
+    <div class="explainer__desc">Every experiment starts with a falsifiable hypothesis. What specifically do I expect to change, and by how much?</div>
+  </div>
+  <div class="explainer__item">
+    <div class="explainer__num">P</div>
+    <div class="explainer__label">Protocol</div>
+    <div class="explainer__desc">Defined intervention, duration, and measurement approach. Baseline established before starting. No mid-experiment changes.</div>
+  </div>
+  <div class="explainer__item">
+    <div class="explainer__num">D</div>
+    <div class="explainer__label">Data</div>
+    <div class="explainer__desc">Results from 19 live data sources — sleep, HRV, glucose, body composition, habits. Compared against pre-experiment baseline.</div>
+  </div>
+</div>
+
+<div class="experiments-section animate-in">
+  <div class="experiments-filter">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="active">Active</button>
+    <button class="filter-btn" data-filter="completed">Completed</button>
+    <button class="filter-btn" data-filter="abandoned">Abandoned</button>
+  </div>
+  <div id="experiment-list">
+    <div class="empty-state"><div class="empty-state__title">Loading…</div></div>
+  </div>
+</div>
+
+<div class="methodology">
+  <div class="methodology__label">On the methodology</div>
+  <div class="methodology__text">
+    <p>These are <strong>N=1 experiments</strong> — single-subject self-experiments with no control group. The scientific limitations are real: no blinding, no randomization, seasonal confounders, regression to the mean. Results apply to me specifically and may not generalize.</p>
+    <p>What makes them useful anyway: <strong>consistency of measurement</strong>. With 19 live data sources running continuously, the baseline data is dense enough that meaningful signal can emerge from even a single-person study — particularly for outcomes with low day-to-day variance like resting HRV and fasting glucose.</p>
+    <p>Experiments are tracked inside the Life Platform. Each one has a defined start date, hypothesis variables, and auto-comparison against the pre-experiment window. Results are published here unchanged — including the ones that didn't work.</p>
+  </div>
+</div>
+
+<footer class="footer">
+  <div class="footer__brand">AMJ</div>
+  <div class="footer__links">
+    <a href="/" class="footer__link">Home</a>
+    <a href="/journal/" class="footer__link">Journal</a>
+    <a href="/character/" class="footer__link">Character</a>
+    <a href="/experiments/" class="footer__link">Experiments</a>
+    <a href="/platform/" class="footer__link">Platform</a>
+    <a href="/subscribe.html" class="footer__link">Subscribe</a>
+  </div>
+  <div class="footer__copy">// N=1 since Feb 2026</div>
+</footer>
+
+<!-- WEB-WCT: Weekly Challenge Ticker -->
+<div class="challenge-bar" id="challenge-bar" style="display:none">
+  <span class="challenge-bar__pip"></span>
+  <span class="challenge-bar__label" id="cb-week">Week —</span>
+  <span class="challenge-bar__divider"></span>
+  <span class="challenge-bar__text" id="cb-challenge">Loading challenge…</span>
+  <span class="challenge-bar__divider"></span>
+  <span class="challenge-bar__progress" id="cb-progress"></span>
+</div>
+
+<script>
+(function() {
+  // Nav date
+  const navEl = document.getElementById('nav-date');
+  if (navEl) navEl.textContent = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}).toUpperCase();
+
+  function formatDate(s) {
+    if (!s) return '—';
+    try { return new Date(s+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}).toUpperCase(); }
+    catch(e) { return s; }
+  }
+
+  function daysBetween(a, b) {
+    try {
+      return Math.max(0, Math.round((new Date(b ? b+'T12:00:00' : Date.now()) - new Date(a+'T12:00:00')) / 86400000));
+    } catch(e) { return 0; }
+  }
+
+  function statusBadge(status) {
+    const labels = {active:'Running', completed:'Completed', abandoned:'Abandoned'};
+    return `<span class="exp-status exp-status--${status}"><span class="exp-status__dot"></span>${labels[status]||status}</span>`;
+  }
+
+  function renderCard(exp) {
+    const isActive = exp.status === 'active';
+    const days = daysBetween(exp.start_date, isActive ? null : exp.end_date);
+    const tags = (exp.tags||[]).map(t=>`<span class="exp-tag">${t}</span>`).join('');
+    const outcomeHtml = exp.outcome
+      ? `<div class="exp-card__outcome"><div class="exp-card__outcome-label">Outcome</div><div class="exp-card__outcome-text">${exp.outcome}</div></div>`
+      : isActive
+      ? `<div class="exp-card__outcome"><div class="exp-card__outcome-label">Status</div><div class="exp-card__outcome-text">Experiment in progress — results published on completion.</div></div>`
+      : '';
+
+    return `<div class="exp-card exp-card--${exp.status}" data-status="${exp.status}">
+      <div class="exp-card__header">
+        <div>
+          <div class="exp-card__name">${exp.name}</div>
+          <div class="exp-card__hypothesis"><em>Hypothesis:</em> ${exp.hypothesis||'Not specified'}</div>
+          ${tags ? `<div class="exp-tags">${tags}</div>` : ''}
+        </div>
+        <div style="text-align:right">
+          ${statusBadge(exp.status)}
+          <div class="exp-days" style="margin-top:var(--space-4)">${days}<span>${isActive ? 'days in' : 'days total'}</span></div>
+        </div>
+      </div>
+      <div class="exp-card__body">
+        <div class="exp-card__field"><div class="exp-card__field-label">Started</div><div class="exp-card__field-value">${formatDate(exp.start_date)}</div></div>
+        <div class="exp-card__field"><div class="exp-card__field-label">${isActive ? 'Running' : 'Ended'}</div><div class="exp-card__field-value">${isActive ? 'Ongoing' : formatDate(exp.end_date)}</div></div>
+        <div class="exp-card__field"><div class="exp-card__field-label">Category</div><div class="exp-card__field-value">${(exp.tags||[]).join(', ')||'—'}</div></div>
+        <div class="exp-card__field"><div class="exp-card__field-label">Result</div><div class="exp-card__field-value">${exp.status==='completed'?'Published':exp.status==='active'?'Pending':'Abandoned'}</div></div>
+      </div>
+      ${outcomeHtml}
+    </div>`;
+  }
+
+  function renderEmpty(filter) {
+    const msgs = {
+      all:       ['No experiments yet','The first N=1 experiment will appear here once logged to the platform.'],
+      active:    ['No active experiments','No experiments running right now.'],
+      completed: ['No completed experiments','Completed experiments with outcomes will appear here.'],
+      abandoned: ['None abandoned','No experiments have been abandoned.'],
+    };
+    const [title, sub] = msgs[filter]||msgs.all;
+    return `<div class="empty-state">
+      <div class="empty-state__title">${title}</div>
+      <div class="empty-state__sub">${sub}</div>
+      <div class="empty-state__coming">// First experiments launching soon</div>
+    </div>`;
+  }
+
+  let allExperiments = [];
+
+  function applyFilter(filter) {
+    document.querySelectorAll('.filter-btn').forEach(btn =>
+      btn.classList.toggle('active', btn.dataset.filter === filter));
+    const filtered = filter === 'all' ? allExperiments : allExperiments.filter(e => e.status === filter);
+    document.getElementById('experiment-list').innerHTML =
+      filtered.length ? filtered.map(renderCard).join('') : renderEmpty(filter);
+  }
+
+  document.querySelectorAll('.filter-btn').forEach(btn =>
+    btn.addEventListener('click', () => applyFilter(btn.dataset.filter)));
+
+  fetch('https://averagejoematt.com/api/experiments')
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      const exps = (data && data.experiments) ? data.experiments : [];
+      allExperiments = exps;
+      document.getElementById('stat-total').textContent     = exps.length;
+      document.getElementById('stat-active').textContent    = exps.filter(e=>e.status==='active').length;
+      document.getElementById('stat-completed').textContent = exps.filter(e=>e.status==='completed').length;
+      applyFilter('all');
+    })
+    .catch(() => {
+      ['stat-total','stat-active','stat-completed'].forEach(id =>
+        document.getElementById(id).textContent = '0');
+      document.getElementById('experiment-list').innerHTML = renderEmpty('all');
+    });
+
+  // Weekly Challenge Ticker
+  fetch('https://averagejoematt.com/api/current_challenge')
+    .then(r=>r.ok?r.json():null).then(data=>{
+      if(!data||!data.current_challenge) return;
+      const c = data.current_challenge;
+      const bar = document.getElementById('challenge-bar');
+      if(c.week_num) document.getElementById('cb-week').textContent='Week '+c.week_num+' Challenge';
+      if(c.challenge) document.getElementById('cb-challenge').innerHTML='<strong>'+c.challenge+'</strong>'+(c.detail?' — '+c.detail:'');
+      if(c.days_total) document.getElementById('cb-progress').textContent=(c.days_complete||0)+'/'+c.days_total+' days';
+      bar.style.display='flex';
+    }).catch(()=>{});
+})();
+</script>
+</body>
+</html>

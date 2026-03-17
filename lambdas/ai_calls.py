@@ -1202,6 +1202,62 @@ def _build_recent_training_summary(data):
 
 
 # ==============================================================================
+# IC-28: ACWR TRAINING LOAD COACHING CONTEXT
+# Reads ACWR fields from computed_metrics (already written by acwr-compute before
+# the Daily Brief runs). Provides prescriptive training guidance to the coach prompt.
+# ==============================================================================
+
+def _build_acwr_coaching_context(data):
+    """IC-28: Extract ACWR training load status for the training coach prompt.
+
+    Reads acwr/acwr_zone/acwr_alert/acwr_alert_reason from the computed_metrics
+    record available in `data`. Returns a compact string for prompt injection,
+    or empty string if no ACWR data present.
+    """
+    computed = data.get("computed_metrics") or {}
+    zone   = computed.get("acwr_zone", "")
+    acwr   = _safe_float(computed, "acwr")
+    alert  = bool(computed.get("acwr_alert"))
+    reason = computed.get("acwr_alert_reason", "")
+    acute  = _safe_float(computed, "acute_load_7d")
+    chron  = _safe_float(computed, "chronic_load_28d")
+
+    if not zone or zone == "unknown" or acwr is None:
+        return ""
+
+    acwr_str  = f"{acwr:.2f}"
+    acute_str = f"{acute:.1f}" if acute is not None else "?"
+    chron_str = f"{chron:.1f}" if chron is not None else "?"
+
+    lines = [f"TRAINING LOAD — ACWR (IC-28): {acwr_str} zone={zone.upper()} | 7d acute={acute_str} | 28d chronic={chron_str}"]
+    if reason:
+        lines.append(f"  {reason}")
+
+    if zone == "danger":
+        lines.append(
+            "  COACHING RULE: ACWR is in the DANGER zone (>1.5). You MUST prescribe specific volume "
+            "reductions in the training section. E.g. 'Zone 2 walk only today', "
+            "'reduce planned volume by 40-50%', 'no PRs, no new load today'. "
+            "Do NOT coach this as a normal training day."
+        )
+    elif zone == "caution":
+        lines.append(
+            "  COACHING RULE: ACWR is elevated (1.3-1.5). Prescribe volume reduction: "
+            "lower intensity, no PRs, prioritise recovery session over planned workout if applicable."
+        )
+    elif zone == "detraining":
+        lines.append(
+            "  COACHING RULE: ACWR is below 0.8 — chronic load exceeds recent load. "
+            "Gently flag under-stimulation. If recovery metrics support it, suggest a "
+            "training session today to bring acute load up. This is an opportunity, not an alarm."
+        )
+    else:  # safe
+        lines.append("  COACHING NOTE: Training load is in the optimal zone (0.8-1.3). Validate current approach.")
+
+    return "\n".join(lines)
+
+
+# ==============================================================================
 # AI CALLS
 # ==============================================================================
 
@@ -1221,6 +1277,9 @@ def call_training_nutrition_coach(data, profile, api_key):
     # P5: TDEE context
     tdee_ctx = _build_tdee_context(data, profile)
 
+    # IC-28: ACWR training load context
+    acwr_ctx = _build_acwr_coaching_context(data)
+
     # IC-24: Data quality (critical for nutrition coaching)
     data_quality_block, _quality_scores = _compute_data_quality(data, profile)
 
@@ -1234,6 +1293,8 @@ def call_training_nutrition_coach(data, profile, api_key):
 {data_quality_block}
 
 {tdee_ctx}
+
+{acwr_ctx}
 
 LAST 7 DAYS TRAINING CONTEXT:
 {recent_training}

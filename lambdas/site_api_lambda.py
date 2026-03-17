@@ -459,6 +459,35 @@ def handle_experiments() -> dict:
     return _ok({"experiments": experiments}, cache_seconds=3600)
 
 
+def handle_current_challenge() -> dict:
+    """
+    GET /api/current_challenge
+    Returns the current weekly challenge from S3 config.
+    Manually updated each Monday via:
+      aws s3 cp current_challenge.json s3://matthew-life-platform/site/config/current_challenge.json
+    Cache: 3600s (1 hr) — changes once/week, no need for shorter TTL.
+    """
+    S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+    S3_REGION = os.environ.get("S3_REGION", "us-west-2")
+    try:
+        s3_client = boto3.client("s3", region_name=S3_REGION)
+        resp = s3_client.get_object(Bucket=S3_BUCKET, Key="site/config/current_challenge.json")
+        data = json.loads(resp["Body"].read())
+        return _ok({"current_challenge": data}, cache_seconds=3600)
+    except Exception as e:
+        logger.warning(f"[site_api] current_challenge S3 fetch failed: {e}")
+        # Fallback: static placeholder so ticker degrades gracefully
+        return _ok({
+            "current_challenge": {
+                "week_num": None,
+                "challenge": "Check back soon",
+                "detail": "",
+                "days_complete": 0,
+                "days_total": 7,
+            }
+        }, cache_seconds=60)
+
+
 def handle_status() -> dict:
     """
     GET /api/status
@@ -484,7 +513,8 @@ ROUTES = {
     "/api/weight_progress": handle_weight_progress,
     "/api/character_stats": handle_character_stats,
     "/api/habit_streaks":   handle_habit_streaks,
-    "/api/experiments":     handle_experiments,
+    "/api/experiments":        handle_experiments,
+    "/api/current_challenge":  handle_current_challenge,
 }
 
 

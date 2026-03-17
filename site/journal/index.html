@@ -256,5 +256,29 @@
 })();
 </script>
 
+<!-- WEB-WCT: Weekly Challenge Ticker -->
+<div class="challenge-bar" id="challenge-bar" style="display:none">
+  <span class="challenge-bar__pip"></span>
+  <span class="challenge-bar__label" id="cb-week">Week —</span>
+  <span class="challenge-bar__divider"></span>
+  <span class="challenge-bar__text" id="cb-challenge">Loading challenge…</span>
+  <span class="challenge-bar__divider"></span>
+  <span class="challenge-bar__progress" id="cb-progress"></span>
+</div>
+<script>
+(function(){
+  const API = 'https://lxhjl2qvq2ystwp47464uhs2jti0hpdcq.lambda-url.us-east-1.on.aws/api/current_challenge';
+  fetch(API).then(r=>r.ok?r.json():null).then(data=>{
+    if(!data||!data.current_challenge) return;
+    const c = data.current_challenge;
+    const bar = document.getElementById('challenge-bar');
+    if(c.week_num) document.getElementById('cb-week').textContent = 'Week '+c.week_num+' Challenge';
+    if(c.challenge) document.getElementById('cb-challenge').innerHTML = '<strong>'+c.challenge+'</strong>'+(c.detail?' — '+c.detail:'');
+    if(c.days_total) document.getElementById('cb-progress').textContent = (c.days_complete||0)+'/'+c.days_total+' days';
+    bar.style.display = 'flex';
+  }).catch(()=>{});
+})();
+</script>
+
 </body>
 </html>
