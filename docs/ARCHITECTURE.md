@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-17 (v3.7.66 — 90 tools, 31-module MCP package, 19 data sources, 48 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed)
+Last updated: 2026-03-17 (v3.7.67 — 95 tools, 31-module MCP package, 19 data sources, 48 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed)
 
 ---
 
@@ -349,7 +349,7 @@ Health Auto Export → API Gateway → Webhook → DynamoDB + S3
                               daily-metrics · daily-insight
                               hypothesis-engine
                                                     │
-                               MCP Lambda (90 tools)
+                               MCP Lambda (95 tools)
                                                     │
                       Lambda Function URL (local) / Remote MCP URL
                                                     │
@@ -438,7 +438,7 @@ AWS Budget alerts at $5 (25%), $10 (50%), $20 (100%) → `awsdev@mattsusername.c
     RUNBOOK.md                    ← Operational procedures + schedule
     CHANGELOG.md                  ← Version history
     PROJECT_PLAN.md               ← Roadmap and backlog
-    MCP_TOOL_CATALOG.md           ← All 90 tools with params, cache, deps
+    MCP_TOOL_CATALOG.md           ← All 95 tools with params, cache, deps
     COST_TRACKER.md               ← Budget tracking
     INCIDENT_LOG.md               ← Operational incident history
     HANDOVER_LATEST.md            ← Pointer to most recent handover

@@ -23,7 +23,7 @@ CloudFront: add a /site/* behaviour pointing to S3 origin.
 v1.1.0 — 2026-03-17 (BS-02): hero section added to public_stats.json.
   Contains narrative copy, live counter values, and Chronicle headline for
   the averagejoematt.com homepage transformation story hero.
-  TODO (BS-02): Replace HERO_WHY_PARAGRAPH placeholder with your 50-word paragraph.
+v1.1.1 — 2026-03-17: Hero paragraph finalised, placeholder flag set to False.
 """
 
 import json
@@ -38,10 +38,7 @@ PUBLIC_STATS_KEY = "site/public_stats.json"
 CHARACTER_STATS_KEY = "site/character_stats.json"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BS-02: Hero narrative copy
-# TODO: Replace this placeholder with your actual 50-word paragraph.
-# This is the "why should a stranger care about your health data?" paragraph.
-# Ava directive: transformation story format, personal voice, no filter.
+# BS-02: Hero narrative copy (finalised v3.7.67)
 # ─────────────────────────────────────────────────────────────────────────────
 HERO_WHY_PARAGRAPH = (
     "Most people optimize in the dark — gut feelings, Instagram advice, someone's podcast take. "
@@ -100,8 +97,7 @@ def _compute_hero(vitals: dict, journey: dict) -> dict:
         "progress_pct":     progress_pct,
         "projected_goal_date": goal_date,
         "journey_started":  JOURNEY_START_DATE,
-        # TODO (BS-02): Remove placeholder flag after Matthew writes his paragraph
-        "paragraph_is_placeholder": True,
+        "paragraph_is_placeholder": False,
     }
 
 

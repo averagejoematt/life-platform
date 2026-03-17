@@ -568,3 +568,175 @@ def tool_get_sleep_environment_analysis(args):
         ),
         "source": "eightsleep (intervals + trends)",
     }
+
+
+# ── BS-SL1: Sleep Environment Optimizer ────────────────────────────────────
+
+def tool_get_sleep_environment_analysis(args):
+    """
+    BS-SL1: Cross-reference Eight Sleep bed temperature data with Whoop sleep
+    staging and efficiency to find personal optimal temperature settings.
+    Huberman/Walker: core body temperature drop of 1-3°F is the primary
+    trigger for sleep onset. Eight Sleep controls this precisely.
+    """
+    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    days       = int(args.get("days", 90))
+    start_date = args.get("start_date") or (
+        datetime.utcnow() - timedelta(days=days)
+    ).strftime("%Y-%m-%d")
+
+    data = parallel_query_sources(["eightsleep", "whoop"], start_date, end_date)
+    es_items = {i.get("date"): i for i in data.get("eightsleep", []) if i.get("date")}
+    wh_items = {i.get("date"): i for i in data.get("whoop", []) if i.get("date")}
+
+    # Build paired dataset
+    paired = []
+    for date_key in sorted(set(es_items.keys()) & set(wh_items.keys())):
+        es = es_items[date_key]
+        wh = wh_items[date_key]
+
+        bed_temp  = es.get("bed_temperature_f") or es.get("bed_temp_f")
+        room_temp = es.get("room_temperature_f") or es.get("room_temp_f")
+        es_level  = es.get("sleep_temperature_level") or es.get("temperature_level")
+
+        efficiency   = wh.get("sleep_efficiency")
+        deep_pct     = wh.get("deep_sleep_pct") or wh.get("sws_pct")
+        rem_pct      = wh.get("rem_sleep_pct")
+        hrv          = wh.get("hrv")
+        sleep_score  = wh.get("sleep_performance_pct") or wh.get("sleep_score")
+        duration_h   = wh.get("sleep_duration_hours")
+
+        if bed_temp is None and room_temp is None:
+            continue
+        if efficiency is None and deep_pct is None:
+            continue
+
+        paired.append({
+            "date":          date_key,
+            "bed_temp_f":    float(bed_temp) if bed_temp else None,
+            "room_temp_f":   float(room_temp) if room_temp else None,
+            "temp_level":    es_level,
+            "efficiency":    float(efficiency) if efficiency else None,
+            "deep_pct":      float(deep_pct) if deep_pct else None,
+            "rem_pct":       float(rem_pct) if rem_pct else None,
+            "hrv":           float(hrv) if hrv else None,
+            "sleep_score":   float(sleep_score) if sleep_score else None,
+            "duration_h":    float(duration_h) if duration_h else None,
+        })
+
+    if len(paired) < 14:
+        return {"error": f"Need ≥14 nights of paired Eight Sleep + Whoop data. Found {len(paired)}."}
+
+    # ── Temperature band analysis ──
+    def bucket_temp(t):
+        if t is None:
+            return None
+        if t < 64:
+            return "cold (<64°F)"
+        elif t < 67:
+            return "cool (64-66°F)"
+        elif t < 70:
+            return "neutral (67-69°F)"
+        elif t < 73:
+            return "warm (70-72°F)"
+        else:
+            return "hot (73°F+)"
+
+    band_stats = defaultdict(lambda: {
+        "nights": 0, "efficiency": [], "deep_pct": [], "rem_pct": [],
+        "hrv": [], "sleep_score": [], "duration_h": [],
+    })
+    for p in paired:
+        band = bucket_temp(p.get("bed_temp_f"))
+        if not band:
+            band = bucket_temp(p.get("room_temp_f"))
+        if not band:
+            continue
+        bs = band_stats[band]
+        bs["nights"] += 1
+        for field in ["efficiency", "deep_pct", "rem_pct", "hrv", "sleep_score", "duration_h"]:
+            if p.get(field) is not None:
+                bs[field].append(p[field])
+
+    def safe_avg(vals):
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    band_results = []
+    for band_name in ["cold (<64°F)", "cool (64-66°F)", "neutral (67-69°F)", "warm (70-72°F)", "hot (73°F+)"]:
+        bs = band_stats.get(band_name)
+        if not bs or bs["nights"] < 3:
+            continue
+        band_results.append({
+            "band":            band_name,
+            "nights":          bs["nights"],
+            "avg_efficiency":  safe_avg(bs["efficiency"]),
+            "avg_deep_pct":    safe_avg(bs["deep_pct"]),
+            "avg_rem_pct":     safe_avg(bs["rem_pct"]),
+            "avg_hrv":         safe_avg(bs["hrv"]),
+            "avg_sleep_score": safe_avg(bs["sleep_score"]),
+            "avg_duration_h":  safe_avg(bs["duration_h"]),
+        })
+
+    # Find optimal band by composite score (efficiency + deep + HRV)
+    best_band = None
+    best_composite = -1
+    for br in band_results:
+        eff = br.get("avg_efficiency") or 0
+        dep = br.get("avg_deep_pct") or 0
+        hrv_v = br.get("avg_hrv") or 0
+        # Normalize: efficiency 0-100, deep 0-30, HRV 0-200
+        composite = eff / 100 * 40 + dep / 30 * 30 + min(hrv_v / 100, 1.0) * 30
+        br["composite_score"] = round(composite, 1)
+        if composite > best_composite:
+            best_composite = composite
+            best_band = br["band"]
+
+    # ── Correlations: bed temp vs sleep metrics ──
+    correlations = []
+    bed_temps = [p["bed_temp_f"] for p in paired if p.get("bed_temp_f") is not None]
+    for metric_name, metric_key in [("efficiency", "efficiency"), ("deep_sleep_pct", "deep_pct"),
+                                     ("rem_sleep_pct", "rem_pct"), ("HRV", "hrv")]:
+        vals = [p[metric_key] for p in paired if p.get("bed_temp_f") is not None and p.get(metric_key) is not None]
+        temps = [p["bed_temp_f"] for p in paired if p.get("bed_temp_f") is not None and p.get(metric_key) is not None]
+        if len(vals) >= 14:
+            r = pearson_r(temps, vals)
+            if r is not None:
+                correlations.append({
+                    "metric": metric_name,
+                    "r":      r,
+                    "n":      len(vals),
+                    "interpretation": (
+                        f"{'Cooler' if r < 0 else 'Warmer'} bed temps "
+                        f"correlate with {'better' if (r < 0 and metric_name != 'HRV') or (r > 0 and metric_name == 'HRV') else 'lower'} {metric_name}"
+                        if abs(r) >= 0.2 else f"No meaningful correlation with {metric_name}"
+                    ),
+                })
+
+    # ── Recommendations ──
+    recommendations = []
+    if best_band:
+        recommendations.append(f"Your best sleep occurs in the {best_band} range. Set Eight Sleep to target this band.")
+    cool_bands = [br for br in band_results if "cold" in br["band"] or "cool" in br["band"]]
+    warm_bands = [br for br in band_results if "warm" in br["band"] or "hot" in br["band"]]
+    if cool_bands and warm_bands:
+        cool_eff = safe_avg([b.get("avg_efficiency") or 0 for b in cool_bands])
+        warm_eff = safe_avg([b.get("avg_efficiency") or 0 for b in warm_bands])
+        if cool_eff and warm_eff and cool_eff > warm_eff + 2:
+            recommendations.append(
+                f"Cool nights average {cool_eff}% efficiency vs {warm_eff}% warm. "
+                "Huberman/Walker: cooler is better for deep sleep initiation."
+            )
+
+    return {
+        "period":          {"start_date": start_date, "end_date": end_date, "paired_nights": len(paired)},
+        "optimal_band":    best_band,
+        "band_analysis":   band_results,
+        "correlations":    correlations,
+        "recommendations": recommendations,
+        "methodology":     (
+            "Pairs Eight Sleep bed temperature with Whoop sleep staging nightly. "
+            "Groups nights into temperature bands and compares sleep efficiency, deep %, "
+            "REM %, and HRV across bands. Composite score weights: efficiency 40%, deep 30%, HRV 30%. "
+            "Clinical reference: Huberman/Walker recommend 65-68°F (18-20°C) for optimal sleep."
+        ),
+    }

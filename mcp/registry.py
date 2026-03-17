@@ -11,8 +11,12 @@ from mcp.tools_strength import (
 )
 from mcp.tools_training import *
 from mcp.tools_health import *
+from mcp.tools_health import tool_get_autonomic_balance  # BS-MP1
 from mcp.tools_sleep import *
+from mcp.tools_sleep import tool_get_sleep_environment_analysis  # BS-SL1
 from mcp.tools_nutrition import *
+# BS-12 + IC-29 explicit imports
+from mcp.tools_nutrition import tool_get_deficit_sustainability, tool_get_metabolic_adaptation
 from mcp.tools_correlation import *
 from mcp.tools_habits import (
     tool_get_habits, tool_compare_habit_periods, tool_get_habit_registry,
@@ -24,6 +28,7 @@ from mcp.tools_habits import (
 from mcp.tools_labs import *
 from mcp.tools_cgm import *
 from mcp.tools_journal import *
+from mcp.tools_journal import tool_get_journal_sentiment_trajectory  # BS-MP2
 from mcp.tools_lifestyle import *
 from mcp.tools_board import *
 from mcp.tools_character import *
@@ -2099,6 +2104,130 @@ TOOLS = {
                                       "description": "Optional 1-5 strength of evidence (5=very strong confirmation)."},
                 },
                 "required": ["sk", "verdict"],
+            },
+        },
+    },
+    # ── BS-12: Deficit Sustainability Tracker ──
+    "get_deficit_sustainability": {
+        "fn": tool_get_deficit_sustainability,
+        "schema": {
+            "name": "get_deficit_sustainability",
+            "description": (
+                "BS-12: Multi-signal early warning for unsustainable caloric deficit. "
+                "Monitors 5 channels simultaneously: HRV trend, sleep quality, recovery, "
+                "Tier 0 habit completion, and training output. When 3+ degrade concurrently "
+                "during an active deficit → flags with severity and calorie increase recommendation. "
+                "Attia / Huberman: aggressive deficits destroy adherence, sleep, and muscle. "
+                "Use for: 'is my deficit sustainable?', 'am I cutting too hard?', "
+                "'deficit health check', 'should I eat more?', 'deficit sustainability'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
+                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "days":       {"type": "integer", "description": "Rolling window in days (default: 14)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    # ── IC-29: Metabolic Adaptation Intelligence ──
+    "get_metabolic_adaptation": {
+        "fn": tool_get_metabolic_adaptation,
+        "schema": {
+            "name": "get_metabolic_adaptation",
+            "description": (
+                "IC-29: TDEE divergence tracker — detects metabolic adaptation during prolonged deficit. "
+                "Compares expected weight loss (from caloric deficit) against actual weight loss. "
+                "Adaptation ratio = actual/expected. <0.60 = moderate adaptation, <0.35 = severe. "
+                "McDonald/Norton: metabolic adaptation = TDEE suppression beyond what weight loss predicts. "
+                "Use for: 'metabolic adaptation', 'is my metabolism slowing?', 'TDEE divergence', "
+                "'why has my weight loss stalled?', 'diet break needed?', 'expected vs actual loss'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
+                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "weeks":      {"type": "integer", "description": "Weeks of data to analyse (default: 8)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    # ── BS-SL1: Sleep Environment Optimizer ──
+    "get_sleep_environment_analysis": {
+        "fn": tool_get_sleep_environment_analysis,
+        "schema": {
+            "name": "get_sleep_environment_analysis",
+            "description": (
+                "BS-SL1: Cross-reference Eight Sleep bed temperature data with Whoop sleep staging "
+                "to find your personal optimal temperature settings. Groups nights by temperature band, "
+                "compares sleep efficiency, deep %%, REM %%, and HRV across bands. Finds optimal band "
+                "via composite scoring. Includes Pearson correlations between bed temp and each sleep metric. "
+                "Huberman/Walker: core body temperature drop of 1-3°F triggers sleep onset. "
+                "Use for: 'optimal sleep temperature', 'sleep environment', 'Eight Sleep settings', "
+                "'does cooler bed improve my sleep?', 'temperature vs sleep quality', 'sleep optimization'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
+                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "days":       {"type": "integer", "description": "Rolling window in days (default: 90)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    # ── BS-MP1: Autonomic Balance Score ──
+    "get_autonomic_balance": {
+        "fn": tool_get_autonomic_balance,
+        "schema": {
+            "name": "get_autonomic_balance",
+            "description": (
+                "BS-MP1: Autonomic Balance Score — synthesizes HRV, resting heart rate, respiratory rate, "
+                "and sleep quality into a 4-quadrant nervous system state model: Flow (high energy + positive), "
+                "Stress (high energy + negative), Recovery (low energy + positive), Burnout (low energy + negative). "
+                "Balance score 0-100, 7-day trend, state transitions, consecutive days in state. "
+                "Porges polyvagal theory + Huberman ANS framework. Sustained burnout >3 days is a strong signal. "
+                "Use for: 'autonomic balance', 'nervous system state', 'am I in burnout?', "
+                "'flow state trend', 'ANS status', 'sympathetic vs parasympathetic', 'stress vs recovery state'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
+                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "days":       {"type": "integer", "description": "Rolling window in days (default: 30)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    # ── BS-MP2: Journal Sentiment Trajectory ──
+    "get_journal_sentiment_trajectory": {
+        "fn": tool_get_journal_sentiment_trajectory,
+        "schema": {
+            "name": "get_journal_sentiment_trajectory",
+            "description": (
+                "BS-MP2: Structured sentiment trajectory with divergence detection. "
+                "Tracks mood, energy, and stress trajectories from enriched journal entries via linear regression. "
+                "Detects divergence (mood rising while energy falls = burnout precursor, Beck CBT). "
+                "Identifies inflection points where trajectories reverse. Surfaces recurring themes and emotions. "
+                "Seligman PERMA: mood-energy divergence is a leading indicator of unsustainable effort. "
+                "Use for: 'journal sentiment', 'mood trajectory', 'mood vs energy divergence', "
+                "'emotional trend', 'journal patterns over time', 'inflection points', 'sentiment analysis'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
+                    "end_date":   {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
+                    "days":       {"type": "integer", "description": "Rolling window in days (default: 60)."},
+                },
+                "required": [],
             },
         },
     },
