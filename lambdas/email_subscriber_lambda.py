@@ -48,7 +48,11 @@ except ImportError:
     logger = logging.getLogger("email-subscriber")
     logger.setLevel(logging.INFO)
 
-REGION     = os.environ.get("AWS_REGION", "us-west-2")
+# AWS_REGION is set automatically by Lambda to the function's deployment region.
+# email-subscriber deploys to us-east-1 (web_stack.py) but DDB is in us-west-2.
+# DYNAMODB_REGION env var overrides to ensure cross-region DDB access.
+REGION          = os.environ.get("AWS_REGION", "us-east-1")      # Lambda's own region (SES)
+DYNAMODB_REGION = os.environ.get("DYNAMODB_REGION", "us-west-2") # DDB table region
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET  = os.environ.get("S3_BUCKET", "matthew-life-platform")
 USER_ID    = os.environ["USER_ID"]
@@ -57,9 +61,9 @@ SITE_URL   = os.environ.get("SITE_URL", "https://averagejoematt.com")
 
 SUBSCRIBERS_PK = f"USER#{USER_ID}#SOURCE#subscribers"
 
-dynamodb = boto3.resource("dynamodb", region_name=REGION)
+dynamodb = boto3.resource("dynamodb", region_name=DYNAMODB_REGION)  # us-west-2
 table    = dynamodb.Table(TABLE_NAME)
-ses      = boto3.client("sesv2", region_name=REGION)
+ses      = boto3.client("sesv2", region_name=REGION)                # us-east-1 (SES identity)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
