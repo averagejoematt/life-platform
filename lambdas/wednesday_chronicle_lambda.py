@@ -1495,7 +1495,7 @@ def publish_to_blog(title, stats_line, body_html, week_num, date_str, all_instal
 # ══════════════════════════════════════════════════════════════════════════════
 
 def store_installment(date_str, week_num, title, stats_line, raw_markdown,
-                      body_html, themes, has_board):
+                      body_html, themes, has_board, confidence_level="MEDIUM", confidence_badge_html=""):  # BS-05
     """Store installment in DynamoDB for continuity and blog generation."""
     try:
         item = {
@@ -1513,6 +1513,8 @@ def store_installment(date_str, week_num, title, stats_line, raw_markdown,
             "has_board_interview": has_board,
             "series_title": "The Measured Life",
             "author": "Elena Voss",
+            "_confidence_level": confidence_level,       # BS-05
+            "_confidence_badge_html": confidence_badge_html,  # BS-05 — used by chronicle-email-sender
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
         table.put_item(Item=item)
@@ -1607,6 +1609,28 @@ def lambda_handler(event, context):
 
     # Parse the installment
     title, stats_line, body_md = parse_installment(raw_installment)
+
+    # BS-05: Compute confidence badge based on total journey data depth.
+    # Henning: LOW (<14d data), MEDIUM (14-49d), HIGH (≥50d + sig + effect).
+    # Chronicle draws on full journey history — use days-since-start as n.
+    _conf_level = "MEDIUM"
+    _conf_badge_html = ""
+    _conf_reason = ""
+    if _HAS_CONFIDENCE:
+        try:
+            _journey_start = data.get("profile", {}).get("journey_start_date", "2026-02-09")
+            _journey_days = (
+                datetime.strptime(data["dates"]["end"], "%Y-%m-%d") -
+                datetime.strptime(_journey_start, "%Y-%m-%d")
+            ).days
+            _conf = compute_confidence(days_of_data=_journey_days)
+            _conf_level = _conf.get("level", "MEDIUM")
+            _conf_badge_html = _conf.get("badge_html", "")
+            _conf_reason = _conf.get("reason", "")
+            logger.info(f"BS-05 confidence: {_conf_level} ({_conf_reason})")
+        except Exception as _ce:
+            logger.warning(f"BS-05 confidence compute failed (non-fatal): {_ce}")
+
     logger.info(f"Title: \"{title}\"")
 
     # Convert to HTML
@@ -1618,7 +1642,9 @@ def lambda_handler(event, context):
     # Store in DynamoDB
     date_str = data["dates"]["end"]
     store_installment(date_str, week_num, title, stats_line, raw_installment,
-                      body_html, [], has_board)
+                      body_html, [], has_board,
+                      confidence_level=_conf_level,
+                      confidence_badge_html=_conf_badge_html)
 
     # Publish to blog
     # Get all installments for index (including this new one)

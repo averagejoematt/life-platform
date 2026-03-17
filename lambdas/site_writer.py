@@ -19,6 +19,11 @@ S3 path: s3://matthew-life-platform/site/public_stats.json
          s3://matthew-life-platform/site/character_stats.json
 
 CloudFront: add a /site/* behaviour pointing to S3 origin.
+
+v1.1.0 — 2026-03-17 (BS-02): hero section added to public_stats.json.
+  Contains narrative copy, live counter values, and Chronicle headline for
+  the averagejoematt.com homepage transformation story hero.
+  TODO (BS-02): Replace HERO_WHY_PARAGRAPH placeholder with your 50-word paragraph.
 """
 
 import json
@@ -32,6 +37,23 @@ S3_BUCKET = "matthew-life-platform"
 PUBLIC_STATS_KEY = "site/public_stats.json"
 CHARACTER_STATS_KEY = "site/character_stats.json"
 
+# ─────────────────────────────────────────────────────────────────────────────
+# BS-02: Hero narrative copy
+# TODO: Replace this placeholder with your actual 50-word paragraph.
+# This is the "why should a stranger care about your health data?" paragraph.
+# Ava directive: transformation story format, personal voice, no filter.
+# ─────────────────────────────────────────────────────────────────────────────
+HERO_WHY_PARAGRAPH = (
+    "Most people optimize in the dark — gut feelings, Instagram advice, someone's podcast take. "
+    "I connect 19 data sources to a custom AI and publish every number, every week, without filtering. "
+    "302 lbs to 185. Every failure included. This is what systematic self-improvement actually looks like."
+)
+
+# Journey start date — used for "X days on journey" counter
+JOURNEY_START_DATE = "2026-02-09"
+JOURNEY_START_WEIGHT = 302.0
+GOAL_WEIGHT = 185.0
+
 
 def _json_safe(obj):
     """Convert Decimal and other non-JSON-serializable types."""
@@ -44,7 +66,82 @@ def _json_safe(obj):
     return obj
 
 
-def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict, platform: dict = None) -> bool:
+def _compute_hero(vitals: dict, journey: dict) -> dict:
+    """
+    BS-02: Build the hero section for the homepage transformation story.
+
+    Returns a dict the website JS reads to populate:
+    - Live weight counter (302 → current → 185)
+    - Days on journey
+    - Progress percentage
+    - The narrative paragraph
+    - Scroll invitation line
+    """
+    today = datetime.now(timezone.utc).date()
+    try:
+        start = datetime.strptime(JOURNEY_START_DATE, "%Y-%m-%d").date()
+        days_on_journey = (today - start).days
+    except Exception:
+        days_on_journey = 0
+
+    current_weight = journey.get("current_weight_lbs") or vitals.get("weight_lbs")
+    lost_lbs       = journey.get("lost_lbs")
+    progress_pct   = journey.get("progress_pct")
+    goal_date      = journey.get("projected_goal_date", "")
+
+    return {
+        "why_paragraph":    HERO_WHY_PARAGRAPH,
+        "scroll_invitation": "See the actual numbers below →",
+        "days_on_journey":  days_on_journey,
+        "start_weight_lbs": JOURNEY_START_WEIGHT,
+        "goal_weight_lbs":  GOAL_WEIGHT,
+        "current_weight_lbs": current_weight,
+        "lost_lbs":         lost_lbs,
+        "progress_pct":     progress_pct,
+        "projected_goal_date": goal_date,
+        "journey_started":  JOURNEY_START_DATE,
+        # TODO (BS-02): Remove placeholder flag after Matthew writes his paragraph
+        "paragraph_is_placeholder": True,
+    }
+
+
+def _get_latest_chronicle_headline(table_client, user_id: str) -> dict | None:
+    """
+    BS-02: Fetch the most recent Chronicle headline for the below-fold section.
+    Non-fatal — returns None if unavailable.
+    """
+    if table_client is None:
+        return None
+    try:
+        from datetime import timedelta
+        today = datetime.now(timezone.utc).date()
+        week_ago = (today - timedelta(days=7)).isoformat()
+        resp = table_client.query(
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
+            ExpressionAttributeValues={
+                ":pk": f"USER#{user_id}#SOURCE#chronicle",
+                ":s":  f"DATE#{week_ago}",
+                ":e":  f"DATE#{today.isoformat()}",
+            },
+            ScanIndexForward=False,
+            Limit=1,
+        )
+        items = resp.get("Items", [])
+        if items:
+            item = items[0]
+            return {
+                "title":      item.get("title", ""),
+                "week_num":   int(item.get("week_number", 0)),
+                "date":       item.get("date", ""),
+                "stats_line": item.get("stats_line", ""),
+            }
+    except Exception as exc:
+        logger.warning("[site_writer] Chronicle headline fetch failed: %s", exc)
+    return None
+
+
+def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
+                       platform: dict = None, table_client=None, user_id: str = "matthew") -> bool:
     """
     Write public_stats.json to S3 from daily-brief-lambda data.
 
@@ -52,38 +149,51 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict, p
     computations are done but before returning.
 
     Args:
-        s3_client:  boto3 S3 client (already initialised in the Lambda)
-        vitals:     dict with keys: weight_lbs, weight_delta_30d, hrv_ms,
-                    hrv_trend, rhr_bpm, rhr_trend, recovery_pct, recovery_status,
-                    sleep_hours
-        journey:    dict with keys: start_weight_lbs, goal_weight_lbs,
-                    current_weight_lbs, lost_lbs, remaining_lbs, progress_pct,
-                    weekly_rate_lbs, projected_goal_date, days_to_goal,
-                    started_date, current_phase, next_milestone_lbs,
-                    next_milestone_date, next_milestone_name
-        training:   dict with keys: ctl_fitness, atl_fatigue, tsb_form, acwr,
-                    form_status, injury_risk, total_miles_30d, activity_count_30d,
-                    zone2_this_week_min, zone2_target_min
-        platform:   optional dict with keys: mcp_tools, data_sources, lambdas,
-                    last_review_grade (defaults used if None)
+        s3_client:    boto3 S3 client (already initialised in the Lambda)
+        vitals:       dict with keys: weight_lbs, weight_delta_30d, hrv_ms,
+                      hrv_trend, rhr_bpm, rhr_trend, recovery_pct, recovery_status,
+                      sleep_hours
+        journey:      dict with keys: start_weight_lbs, goal_weight_lbs,
+                      current_weight_lbs, lost_lbs, remaining_lbs, progress_pct,
+                      weekly_rate_lbs, projected_goal_date, days_to_goal,
+                      started_date, current_phase, next_milestone_lbs,
+                      next_milestone_date, next_milestone_name
+        training:     dict with keys: ctl_fitness, atl_fatigue, tsb_form, acwr,
+                      form_status, injury_risk, total_miles_30d, activity_count_30d,
+                      zone2_this_week_min, zone2_target_min
+        platform:     optional dict with keys: mcp_tools, data_sources, lambdas,
+                      last_review_grade (defaults used if None)
+        table_client: optional DynamoDB table resource for Chronicle headline fetch
+        user_id:      user ID for Chronicle headline query (default: 'matthew')
 
     Returns:
         True on success, False on failure (non-fatal — never raise)
     """
     try:
+        hero = _compute_hero(vitals, journey)
+
+        # BS-02: Fetch latest Chronicle headline for below-fold section
+        chronicle_headline = None
+        if table_client is not None:
+            chronicle_headline = _get_latest_chronicle_headline(table_client, user_id)
+
         payload = {
             "_meta": {
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "generated_by": "daily-brief-lambda",
-                "version": "1.0.0",
+                "version": "1.1.0",
             },
-            "vitals": _json_safe(vitals),
-            "journey": _json_safe(journey),
+            # BS-02: Transformation story hero data
+            "hero": _json_safe(hero),
+            # BS-02: Latest Chronicle headline for below-fold
+            "chronicle_latest": _json_safe(chronicle_headline) if chronicle_headline else None,
+            "vitals":   _json_safe(vitals),
+            "journey":  _json_safe(journey),
             "training": _json_safe(training),
             "platform": _json_safe(platform or {
-                "mcp_tools": 87,
+                "mcp_tools": 89,
                 "data_sources": 19,
-                "lambdas": 42,
+                "lambdas": 46,
                 "last_review_grade": "A",
             }),
         }
@@ -95,7 +205,7 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict, p
             ContentType="application/json",
             CacheControl="max-age=86400",  # CloudFront caches for 24h
         )
-        logger.info("[site_writer] public_stats.json written to S3")
+        logger.info("[site_writer] public_stats.json written to S3 (hero + chronicle included)")
         return True
 
     except Exception as e:

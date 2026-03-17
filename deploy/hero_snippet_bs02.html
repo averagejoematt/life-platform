@@ -1,0 +1,383 @@
+<!--
+  BS-02: Homepage Hero Redesign — Transformation Story Format
+  
+  Drop this block into averagejoematt.com's index.html,
+  replacing whatever hero section currently exists.
+  
+  Reads from /site/public_stats.json (written daily by Daily Brief Lambda).
+  Falls back to skeleton loading state if fetch fails.
+  
+  Design language: Ava Moreau directive
+    - Dark charcoal (#0D1117) background
+    - Warm white (#E6EDF3) text
+    - Amber/gold (#F0B429) accent
+    - Inter (headlines), JetBrains Mono (data)
+    - Micro-animations on data updates
+    
+  TODO: Remove paragraph_is_placeholder check after Matthew writes his paragraph.
+-->
+
+<style>
+  /* ── Hero ─────────────────────────────────────────────────────────── */
+  .hero {
+    background: #0D1117;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 24px 60px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(46, 169, 143, 0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #F0B429;
+    margin: 0 0 32px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.1s;
+  }
+
+  /* Live weight counter */
+  .weight-counter {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 0 0 32px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.2s;
+  }
+
+  .weight-node {
+    text-align: center;
+  }
+
+  .weight-node .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #8B949E;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .weight-node .value {
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 36px;
+    font-weight: 700;
+    color: #E6EDF3;
+    line-height: 1;
+  }
+
+  .weight-node.start .value  { color: #8B949E; }
+  .weight-node.current .value { color: #F0B429; }
+  .weight-node.goal .value   { color: #2EA98F; }
+
+  .weight-arrow {
+    color: #8B949E;
+    font-size: 20px;
+    margin-top: 18px;
+  }
+
+  /* Progress bar */
+  .progress-bar-wrap {
+    width: 100%;
+    max-width: 460px;
+    margin: 0 0 12px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.3s;
+  }
+
+  .progress-bar-track {
+    background: rgba(255,255,255,0.06);
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #F0B429, #2EA98F);
+    border-radius: 4px;
+    transition: width 1s ease;
+    width: 0%;
+  }
+
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #484f58;
+  }
+
+  /* Narrative paragraph */
+  .hero-why {
+    max-width: 560px;
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    color: #8B949E;
+    line-height: 1.7;
+    text-align: center;
+    margin: 12px 0 40px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.4s;
+  }
+
+  .hero-why strong {
+    color: #E6EDF3;
+    font-weight: 600;
+  }
+
+  /* Below-fold strip */
+  .hero-below-fold {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 640px;
+    margin: 0 0 48px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.5s;
+  }
+
+  .stat-chip {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 14px 20px;
+    text-align: center;
+    min-width: 140px;
+  }
+
+  .stat-chip .chip-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #484f58;
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  .stat-chip .chip-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #E6EDF3;
+    line-height: 1;
+  }
+
+  /* Chronicle headline */
+  .chronicle-teaser {
+    max-width: 500px;
+    background: rgba(240,180,41,0.04);
+    border: 1px solid rgba(240,180,41,0.12);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 0 0 48px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.6s;
+    text-decoration: none;
+    display: block;
+  }
+
+  .chronicle-teaser:hover {
+    background: rgba(240,180,41,0.07);
+    border-color: rgba(240,180,41,0.2);
+  }
+
+  .chronicle-teaser .teaser-kicker {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #F0B429;
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  .chronicle-teaser .teaser-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #E6EDF3;
+    line-height: 1.4;
+  }
+
+  /* Scroll invite */
+  .scroll-invite {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: #484f58;
+    letter-spacing: 1px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.7s;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+
+  .scroll-invite:hover { color: #8B949E; }
+
+  /* Skeleton loading state */
+  .skeleton {
+    background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+    display: inline-block;
+  }
+
+  @keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+</style>
+
+<!-- ── Hero Section ──────────────────────────────────────────────────────── -->
+<section class="hero" id="hero">
+
+  <p class="hero-label">The Weekly Signal</p>
+
+  <!-- Live weight counter: 302 → current → 185 -->
+  <div class="weight-counter">
+    <div class="weight-node start">
+      <span class="label">Started</span>
+      <span class="value">302</span>
+    </div>
+    <span class="weight-arrow">→</span>
+    <div class="weight-node current">
+      <span class="label">Today</span>
+      <span class="value" id="hero-weight">
+        <span class="skeleton" style="width:64px;height:36px;">&nbsp;</span>
+      </span>
+    </div>
+    <span class="weight-arrow">→</span>
+    <div class="weight-node goal">
+      <span class="label">Goal</span>
+      <span class="value">185</span>
+    </div>
+  </div>
+
+  <!-- Progress bar -->
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" id="hero-progress-fill"></div>
+    </div>
+    <div class="progress-meta">
+      <span id="hero-lost-lbs">— lbs lost</span>
+      <span id="hero-progress-pct">—%</span>
+    </div>
+  </div>
+
+  <!-- Narrative paragraph (TODO: replace with your 50-word paragraph) -->
+  <p class="hero-why" id="hero-why">
+    <!-- Loaded from public_stats.json — fallback shown until fetch completes -->
+    Most people optimize in the dark — gut feelings, Instagram advice, someone's podcast take.
+    I connect 19 data sources to a custom AI and publish every number, every week, without filtering.
+    <strong>302 lbs to 185.</strong> Every failure included. This is what systematic self-improvement actually looks like.
+  </p>
+
+  <!-- Below-fold stat chips -->
+  <div class="hero-below-fold">
+    <div class="stat-chip">
+      <span class="chip-label">Days on Journey</span>
+      <span class="chip-value" id="hero-days">—</span>
+    </div>
+    <div class="stat-chip">
+      <span class="chip-label">Current Streak</span>
+      <span class="chip-value" id="hero-streak">—</span>
+    </div>
+    <div class="stat-chip">
+      <span class="chip-label">Data Sources</span>
+      <span class="chip-value">19</span>
+    </div>
+  </div>
+
+  <!-- Latest Chronicle headline (below fold) -->
+  <a class="chronicle-teaser" href="/journal/" id="chronicle-teaser" style="display:none;">
+    <span class="teaser-kicker">Latest: The Measured Life</span>
+    <span class="teaser-title" id="chronicle-teaser-title"></span>
+  </a>
+
+  <!-- Scroll invitation -->
+  <p class="scroll-invite" onclick="document.getElementById('dashboard').scrollIntoView({behavior:'smooth'})">
+    See the actual numbers below &darr;
+  </p>
+
+</section>
+
+<script>
+(async function loadHeroStats() {
+  try {
+    const res = await fetch('/site/public_stats.json?t=' + Date.now());
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const hero     = data.hero     || {};
+    const journey  = data.journey  || {};
+    const platform = data.platform || {};
+
+    // Weight counter
+    const cw = hero.current_weight_lbs || journey.current_weight_lbs;
+    if (cw) {
+      document.getElementById('hero-weight').textContent = Math.round(cw * 10) / 10;
+    }
+
+    // Progress bar
+    const pct = hero.progress_pct || journey.progress_pct || 0;
+    const lostLbs = hero.lost_lbs || journey.lost_lbs;
+    document.getElementById('hero-progress-fill').style.width = Math.min(pct, 100) + '%';
+    if (lostLbs != null)
+      document.getElementById('hero-lost-lbs').textContent = Math.round(lostLbs * 10) / 10 + ' lbs lost';
+    if (pct != null)
+      document.getElementById('hero-progress-pct').textContent = Math.round(pct * 10) / 10 + '%';
+
+    // Days on journey
+    if (hero.days_on_journey != null)
+      document.getElementById('hero-days').textContent = hero.days_on_journey;
+
+    // Streak (from platform)
+    if (platform.tier0_streak != null)
+      document.getElementById('hero-streak').textContent = 'Day ' + platform.tier0_streak;
+
+    // Why paragraph (if NOT placeholder — wait for Matthew's real paragraph)
+    if (hero.why_paragraph && !hero.paragraph_is_placeholder) {
+      document.getElementById('hero-why').textContent = hero.why_paragraph;
+    }
+
+    // Chronicle teaser
+    const cl = data.chronicle_latest;
+    if (cl && cl.title) {
+      document.getElementById('chronicle-teaser-title').textContent =
+        'Week ' + (cl.week_num || '?') + ': "' + cl.title + '"';
+      document.getElementById('chronicle-teaser').style.display = 'block';
+    }
+
+  } catch (e) {
+    // Silent — static fallback already in HTML
+  }
+})();
+</script>
