@@ -643,3 +643,328 @@ def tool_get_nutrition(args):
             "hint": "Default is 'summary'. Use 'macros' for calorie/protein adherence, 'meal_timing' for eating window analysis, 'micronutrients' for RDA scoring.",
         }
     return VALID_VIEWS[view](args)
+
+
+# ── BS-12: Deficit Sustainability Tracker ────────────────────────────────────
+
+def tool_get_deficit_sustainability(args):
+    """
+    BS-12: Multi-signal early warning for unsustainable caloric deficit.
+    Monitors 5 channels simultaneously over a rolling window:
+      1. HRV trend (Whoop) — declining HRV under deficit = ANS stress
+      2. Sleep quality (Whoop) — efficiency + deep sleep % degradation
+      3. Recovery trend (Whoop) — sustained low recovery under deficit
+      4. Habit completion (Habitify Tier 0) — behavioural unravelling
+      5. Training output (Strava + Hevy) — volume/intensity dropping
+    When 3+ of 5 degrade concurrently during an active deficit → flag.
+    Attia / Huberman: aggressive deficits destroy adherence and muscle.
+    """
+    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    days       = int(args.get("days", 14))
+    start_date = args.get("start_date") or (
+        datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days - 1)
+    ).strftime("%Y-%m-%d")
+
+    # ── 1. Caloric deficit detection ──
+    mf_items = query_source("macrofactor", start_date, end_date)
+    if len(mf_items) < 7:
+        return {"error": f"Need ≥7 days of MacroFactor data. Found {len(mf_items)}."}
+
+    cals = [float(i.get("total_calories_kcal", 0) or 0) for i in mf_items if i.get("total_calories_kcal")]
+    avg_cal = sum(cals) / len(cals) if cals else 0
+
+    # Estimate TDEE from profile or Withings
+    profile = get_profile()
+    tdee_estimate = profile.get("tdee_estimate")
+    if not tdee_estimate:
+        wt_items = query_source("withings", start_date, end_date)
+        if wt_items:
+            latest_wt = sorted(wt_items, key=lambda x: x.get("date", ""), reverse=True)[0]
+            weight_kg = float(latest_wt.get("weight_lbs", 220)) * 0.453592
+            bmr = 10 * weight_kg + 6.25 * 182.88 - 5 * 35 + 5
+            tdee_estimate = round(bmr * 1.55)
+        else:
+            tdee_estimate = 2400
+
+    deficit_kcal = round(tdee_estimate - avg_cal)
+    deficit_pct  = round(deficit_kcal / tdee_estimate * 100, 1) if tdee_estimate else 0
+    in_deficit   = deficit_kcal > 200
+
+    # ── 2. Pull multi-source data ──
+    sources = parallel_query_sources(
+        ["whoop", "habitify", "strava", "hevy"], start_date, end_date
+    )
+    whoop_items   = sorted(sources.get("whoop", []),   key=lambda x: x.get("date", ""))
+    habit_items   = sorted(sources.get("habitify", []),key=lambda x: x.get("date", ""))
+    strava_items  = sorted(sources.get("strava", []),  key=lambda x: x.get("date", ""))
+    hevy_items    = sorted(sources.get("hevy", []),    key=lambda x: x.get("date", ""))
+
+    def safe_avg(vals):
+        v = [x for x in vals if x is not None]
+        return round(sum(v) / len(v), 2) if v else None
+
+    def trend_direction(vals):
+        """Simple: compare last-third avg to first-third avg."""
+        v = [x for x in vals if x is not None]
+        if len(v) < 6:
+            return "insufficient_data", 0
+        third = len(v) // 3
+        first_avg = sum(v[:third]) / third
+        last_avg  = sum(v[-third:]) / third
+        if first_avg == 0:
+            return "stable", 0
+        delta_pct = round((last_avg - first_avg) / abs(first_avg) * 100, 1)
+        if delta_pct < -5:
+            return "declining", delta_pct
+        elif delta_pct > 5:
+            return "improving", delta_pct
+        return "stable", delta_pct
+
+    # ── Channel 1: HRV trend ──
+    hrv_vals = [float(w.get("hrv", 0)) for w in whoop_items if w.get("hrv")]
+    hrv_dir, hrv_delta = trend_direction(hrv_vals)
+    hrv_avg = safe_avg(hrv_vals)
+    hrv_degraded = hrv_dir == "declining" and abs(hrv_delta) > 8
+
+    # ── Channel 2: Sleep quality ──
+    eff_vals  = [float(w.get("sleep_efficiency", 0)) for w in whoop_items if w.get("sleep_efficiency")]
+    deep_vals = [float(w.get("deep_sleep_pct") or w.get("sws_pct", 0)) for w in whoop_items
+                 if w.get("deep_sleep_pct") or w.get("sws_pct")]
+    eff_dir, eff_delta   = trend_direction(eff_vals)
+    deep_dir, deep_delta = trend_direction(deep_vals)
+    sleep_degraded = (eff_dir == "declining" and abs(eff_delta) > 3) or \
+                     (deep_dir == "declining" and abs(deep_delta) > 8)
+
+    # ── Channel 3: Recovery trend ──
+    rec_vals = [float(w.get("recovery_score", 0)) for w in whoop_items if w.get("recovery_score")]
+    rec_dir, rec_delta = trend_direction(rec_vals)
+    rec_avg = safe_avg(rec_vals)
+    recovery_degraded = rec_dir == "declining" and abs(rec_delta) > 10
+
+    # ── Channel 4: Habit completion (Tier 0) ──
+    t0_rates = []
+    for h in habit_items:
+        t0 = h.get("tier_0_completion_rate") or h.get("t0_rate")
+        if t0 is not None:
+            t0_rates.append(float(t0))
+    t0_dir, t0_delta = trend_direction(t0_rates)
+    t0_avg = safe_avg(t0_rates)
+    habits_degraded = t0_dir == "declining" and abs(t0_delta) > 10
+
+    # ── Channel 5: Training output ──
+    daily_kj = {}
+    for s in strava_items:
+        d = s.get("date", "")
+        kj = float(s.get("total_kilojoules", 0) or 0)
+        daily_kj[d] = daily_kj.get(d, 0) + kj
+    training_vals = [daily_kj[d] for d in sorted(daily_kj)] if daily_kj else []
+    train_dir, train_delta = trend_direction(training_vals)
+    training_degraded = train_dir == "declining" and abs(train_delta) > 15
+
+    # ── Composite assessment ──
+    channels = [
+        {"name": "HRV",              "status": "degraded" if hrv_degraded else "stable",
+         "direction": hrv_dir,       "delta_pct": hrv_delta, "avg": hrv_avg},
+        {"name": "Sleep Quality",     "status": "degraded" if sleep_degraded else "stable",
+         "direction": eff_dir,       "delta_pct": eff_delta},
+        {"name": "Recovery",          "status": "degraded" if recovery_degraded else "stable",
+         "direction": rec_dir,       "delta_pct": rec_delta, "avg": rec_avg},
+        {"name": "Habit Completion",  "status": "degraded" if habits_degraded else "stable",
+         "direction": t0_dir,        "delta_pct": t0_delta, "avg": t0_avg},
+        {"name": "Training Output",   "status": "degraded" if training_degraded else "stable",
+         "direction": train_dir,     "delta_pct": train_delta},
+    ]
+    degraded_count = sum(1 for c in channels if c["status"] == "degraded")
+
+    if not in_deficit:
+        severity = "NOT_IN_DEFICIT"
+        recommendation = "No active deficit detected. Monitor normally."
+    elif degraded_count >= 4:
+        severity = "CRITICAL"
+        recommendation = f"4+ channels degrading under {deficit_kcal} kcal/day deficit. Increase intake by 300-400 kcal for 5-7 days. Prioritise sleep and reduce training intensity."
+    elif degraded_count >= 3:
+        severity = "WARNING"
+        recommendation = f"3 channels degrading under {deficit_kcal} kcal/day deficit. Consider adding 200 kcal/day for 3-5 days and scheduling a deload."
+    elif degraded_count >= 2:
+        severity = "WATCH"
+        recommendation = "2 channels showing stress. Monitor closely — this may resolve or escalate."
+    else:
+        severity = "SUSTAINABLE"
+        recommendation = "Deficit appears sustainable. All systems holding."
+
+    return {
+        "period":           {"start_date": start_date, "end_date": end_date, "days": days},
+        "deficit":          {
+            "in_deficit":       in_deficit,
+            "avg_intake_kcal":  round(avg_cal),
+            "estimated_tdee":   tdee_estimate,
+            "deficit_kcal":     deficit_kcal,
+            "deficit_pct":      deficit_pct,
+            "deficit_label":    "aggressive" if deficit_pct > 25 else "moderate" if deficit_pct > 15 else "mild" if deficit_pct > 5 else "maintenance",
+        },
+        "channels":         channels,
+        "degraded_count":   degraded_count,
+        "severity":         severity,
+        "recommendation":   recommendation,
+        "methodology":      (
+            "Monitors 5 channels: HRV trend, sleep quality, recovery, T0 habit completion, training output. "
+            "Compares first-third vs last-third of the window. 3+ concurrent degradations = deficit unsustainable. "
+            "Based on Attia, Huberman: aggressive deficits erode adherence, sleep, and lean mass."
+        ),
+    }
+
+
+# ── IC-29: Metabolic Adaptation Intelligence ─────────────────────────────────
+
+def tool_get_metabolic_adaptation(args):
+    """
+    IC-29: TDEE divergence tracker — detects metabolic adaptation during prolonged deficit.
+    Compares expected weight loss (from caloric deficit) against actual weight loss.
+    When actual loss < 60% of expected → adaptation flag.
+    Lyle McDonald / Layne Norton: metabolic adaptation = TDEE suppression beyond
+    what weight loss alone predicts. Key signal for diet breaks and reverse diets.
+    """
+    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    weeks      = int(args.get("weeks", 8))
+    start_date = args.get("start_date") or (
+        datetime.strptime(end_date, "%Y-%m-%d") - timedelta(weeks=weeks)
+    ).strftime("%Y-%m-%d")
+
+    # Pull nutrition + weight data
+    data = parallel_query_sources(["macrofactor", "withings"], start_date, end_date)
+    mf_items = sorted(data.get("macrofactor", []), key=lambda x: x.get("date", ""))
+    wt_items = sorted(data.get("withings", []),    key=lambda x: x.get("date", ""))
+
+    if len(mf_items) < 14:
+        return {"error": f"Need ≥14 days of MacroFactor data. Found {len(mf_items)}."}
+    if len(wt_items) < 4:
+        return {"error": f"Need ≥4 Withings weigh-ins. Found {len(wt_items)}."}
+
+    # ── Weekly aggregation ──
+    def iso_week(date_str):
+        return datetime.strptime(date_str, "%Y-%m-%d").strftime("%G-W%V")
+
+    weekly_cal   = defaultdict(list)
+    weekly_wt    = defaultdict(list)
+    for item in mf_items:
+        d = item.get("date", "")
+        cal = item.get("total_calories_kcal")
+        if d and cal:
+            weekly_cal[iso_week(d)].append(float(cal))
+    for item in wt_items:
+        d = item.get("date", "")
+        wt = item.get("weight_lbs")
+        if d and wt:
+            weekly_wt[iso_week(d)].append(float(wt))
+
+    weeks_sorted = sorted(set(weekly_cal.keys()) & set(weekly_wt.keys()))
+    if len(weeks_sorted) < 3:
+        return {"error": "Need ≥3 weeks with both nutrition and weight data."}
+
+    # Estimate TDEE from profile or Mifflin
+    profile = get_profile()
+    base_tdee = profile.get("tdee_estimate")
+    if not base_tdee:
+        first_wt = sum(weekly_wt[weeks_sorted[0]]) / len(weekly_wt[weeks_sorted[0]])
+        weight_kg = first_wt * 0.453592
+        bmr = 10 * weight_kg + 6.25 * 182.88 - 5 * 35 + 5
+        base_tdee = round(bmr * 1.55)
+
+    weekly_data = []
+    for wk in weeks_sorted:
+        avg_cal = sum(weekly_cal[wk]) / len(weekly_cal[wk])
+        avg_wt  = sum(weekly_wt[wk])  / len(weekly_wt[wk])
+        weekly_data.append({
+            "week":        wk,
+            "avg_cal":     round(avg_cal),
+            "avg_weight":  round(avg_wt, 1),
+            "cal_days":    len(weekly_cal[wk]),
+            "wt_days":     len(weekly_wt[wk]),
+        })
+
+    # ── Expected vs actual weight loss ──
+    # 1 lb fat ≈ 3500 kcal deficit
+    total_deficit_kcal = 0
+    for wd in weekly_data:
+        weekly_deficit = (base_tdee - wd["avg_cal"]) * 7
+        total_deficit_kcal += max(weekly_deficit, 0)  # only count deficit weeks
+
+    expected_loss_lbs = round(total_deficit_kcal / 3500, 1)
+    actual_loss_lbs   = round(weekly_data[0]["avg_weight"] - weekly_data[-1]["avg_weight"], 1)
+
+    # Adaptation ratio: actual / expected
+    if expected_loss_lbs > 0.5:
+        adaptation_ratio = round(actual_loss_lbs / expected_loss_lbs, 2)
+    else:
+        adaptation_ratio = None
+
+    # Weekly rate analysis
+    for i, wd in enumerate(weekly_data):
+        if i == 0:
+            wd["weekly_loss_lbs"] = None
+        else:
+            wd["weekly_loss_lbs"] = round(weekly_data[i-1]["avg_weight"] - wd["avg_weight"], 2)
+
+    recent_rates = [wd["weekly_loss_lbs"] for wd in weekly_data[-4:] if wd.get("weekly_loss_lbs") is not None]
+    early_rates  = [wd["weekly_loss_lbs"] for wd in weekly_data[1:5] if wd.get("weekly_loss_lbs") is not None]
+    recent_avg   = round(sum(recent_rates) / len(recent_rates), 2) if recent_rates else None
+    early_avg    = round(sum(early_rates) / len(early_rates), 2) if early_rates else None
+
+    rate_slowdown = None
+    if recent_avg is not None and early_avg is not None and early_avg > 0.3:
+        rate_slowdown = round((1 - recent_avg / early_avg) * 100, 1)
+
+    # ── Severity classification ──
+    if adaptation_ratio is None:
+        severity = "INSUFFICIENT_DATA"
+        recommendation = "Not enough deficit data to assess metabolic adaptation."
+    elif adaptation_ratio >= 0.85:
+        severity = "NONE"
+        recommendation = "Weight loss tracking close to expected. No adaptation detected."
+    elif adaptation_ratio >= 0.60:
+        severity = "MILD"
+        recommendation = (
+            f"Losing {round(adaptation_ratio*100)}% of expected. Mild adaptation is normal "
+            "during sustained deficit. Consider a 1-week maintenance-calorie diet break "
+            "every 6-8 weeks (Trexler et al.)."
+        )
+    elif adaptation_ratio >= 0.35:
+        severity = "MODERATE"
+        recommendation = (
+            f"Losing only {round(adaptation_ratio*100)}% of expected. TDEE has likely "
+            "suppressed significantly. Recommend a 10-14 day diet break at estimated maintenance "
+            f"({base_tdee} kcal) to restore metabolic rate before resuming deficit."
+        )
+    else:
+        severity = "SEVERE"
+        recommendation = (
+            f"Losing only {round(adaptation_ratio*100)}% of expected — plateau territory. "
+            "Strong recommendation: 2-3 week reverse diet (increase 100 kcal/week), "
+            "then reassess TDEE before resuming any deficit. Check thyroid markers (TSH, T3, T4) "
+            "at next blood draw."
+        )
+
+    return {
+        "period":              {"start_date": start_date, "end_date": end_date, "weeks_analysed": len(weeks_sorted)},
+        "metabolic_adaptation": {
+            "expected_loss_lbs":    expected_loss_lbs,
+            "actual_loss_lbs":      actual_loss_lbs,
+            "adaptation_ratio":     adaptation_ratio,
+            "severity":             severity,
+            "estimated_base_tdee":  base_tdee,
+        },
+        "rate_analysis":        {
+            "early_avg_lbs_per_week":  early_avg,
+            "recent_avg_lbs_per_week": recent_avg,
+            "rate_slowdown_pct":       rate_slowdown,
+        },
+        "weekly_data":          weekly_data,
+        "recommendation":       recommendation,
+        "methodology":          (
+            "Compares cumulative caloric deficit (intake vs estimated TDEE) to actual weight change. "
+            "Adaptation ratio = actual_loss / expected_loss. <0.60 = moderate adaptation, <0.35 = severe. "
+            "Based on Trexler, McDonald, Norton metabolic adaptation frameworks. "
+            "Note: weight fluctuations, water retention, and measurement error add noise — "
+            "minimum 3-week window recommended for reliable signal."
+        ),
+    }

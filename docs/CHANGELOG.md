@@ -1,3 +1,35 @@
+## v3.7.67 — 2026-03-17: Sprint 3 complete — BS-12, BS-SL1, BS-MP1, BS-MP2, IC-29, hero fix
+
+### Summary
+Sprint 3 fully closed (9/9). Five Opus-tier MCP tools deployed: BS-12 Deficit Sustainability Tracker, BS-SL1 Sleep Environment Optimizer, BS-MP1 Autonomic Balance Score, BS-MP2 Journal Sentiment Trajectory, IC-29 Metabolic Adaptation Intelligence. HERO_WHY_PARAGRAPH placeholder flag flipped to False in `site_writer.py`. MCP tool count 90 → 95.
+
+### BS-12: Deficit Sustainability Tracker — NEW ✅
+- `mcp/tools_nutrition.py`: `tool_get_deficit_sustainability()`. Multi-signal early warning for unsustainable caloric deficit. Monitors 5 channels (HRV trend, sleep quality, recovery, T0 habit completion, training output). Compares first-third vs last-third of window. 3+ concurrent degradations → severity flag with calorie increase recommendation. Sources: MacroFactor, Whoop, Habitify, Strava.
+
+### BS-SL1: Sleep Environment Optimizer — NEW ✅
+- `mcp/tools_sleep.py`: `tool_get_sleep_environment_analysis()`. Cross-references Eight Sleep bed temperature with Whoop sleep staging. Groups nights into temperature bands, compares efficiency/deep%/REM%/HRV across bands. Composite scoring (efficiency 40%, deep 30%, HRV 30%) finds personal optimal band. Pearson correlations between bed temp and each metric.
+
+### BS-MP1: Autonomic Balance Score — NEW ✅
+- `mcp/tools_health.py`: `tool_get_autonomic_balance()`. 4-quadrant nervous system state model (Flow/Stress/Recovery/Burnout) from HRV, RHR, respiratory rate, sleep efficiency Z-scores against personal baselines. Balance score 0-100, 7-day trend, state transitions, consecutive-days-in-state tracking. Porges polyvagal + Huberman ANS framework.
+
+### BS-MP2: Journal Sentiment Trajectory — NEW ✅
+- `mcp/tools_journal.py`: `tool_get_journal_sentiment_trajectory()`. Linear regression on enriched mood/energy/stress scores. Divergence detection (mood↑/energy↓ = burnout precursor per Beck CBT). Inflection point detection via rolling average local minima/maxima. Recurring theme and emotion frequency analysis.
+
+### IC-29: Metabolic Adaptation Intelligence — NEW ✅
+- `mcp/tools_nutrition.py`: `tool_get_metabolic_adaptation()`. TDEE divergence tracker. Compares expected weight loss (from caloric deficit × 3500 kcal/lb) against actual Withings weight change. Adaptation ratio = actual/expected. Weekly rate analysis with early-vs-recent slowdown detection. Severity: none/mild/moderate/severe with diet break recommendations per Trexler/McDonald/Norton.
+
+### HERO_WHY_PARAGRAPH — COMPLETE ✅
+- `lambdas/site_writer.py`: `paragraph_is_placeholder` flag set to `False`. TODO comments removed. Paragraph was already written (50 words, transformation story format). Version bumped to v1.1.1.
+
+### Registry
+- `mcp/registry.py`: 5 new tool imports + 5 TOOLS dict entries. Tool count 90 → 95.
+- All 8 doc files updated via `sync_doc_metadata.py --apply`.
+
+### Sprint 3 Status: COMPLETE (9/9) ✅
+- IC-28 ✅, WEB-WCT ✅, BS-13 ✅, BS-T2-5 ✅, BS-12 ✅, BS-SL1 ✅, BS-MP1 ✅, BS-MP2 ✅, IC-29 ✅
+
+---
+
 ## v3.7.66 — 2026-03-17: MCP Key bug fix + BS-T2-5 complete
 
 ### Summary

@@ -560,3 +560,195 @@ def tool_get_mood(args):
         return {"error": f"Unknown view '{view}'.", "valid_views": list(VALID_VIEWS.keys()),
                 "hint": "'trend' for journal-derived mood/energy/stress scores, 'state_of_mind' for Apple Health How We Feel valence data."}
     return VALID_VIEWS[view](args)
+
+
+# ── BS-MP2: Journal Sentiment Trajectory ─────────────────────────────────
+
+def tool_get_journal_sentiment_trajectory(args):
+    """
+    BS-MP2: Structured sentiment analysis with divergence detection.
+    Tracks mood, energy, and stress trajectories from enriched journal entries,
+    detects divergence (e.g., mood rising while energy falls), and identifies
+    inflection points where trajectories change direction.
+    Seligman PERMA + Beck CBT: mood-energy divergence is a leading indicator
+    of unsustainable effort or suppressed emotional processing.
+    """
+    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    days       = int(args.get("days", 60))
+    start_date = args.get("start_date") or (
+        datetime.utcnow() - timedelta(days=days)
+    ).strftime("%Y-%m-%d")
+
+    entries = _query_journal(start_date, end_date)
+    if len(entries) < 7:
+        return {"error": f"Need ≥7 journal entries for trajectory analysis. Found {len(entries)}."}
+
+    # Extract enriched sentiment signals
+    daily_signals = []
+    for entry in sorted(entries, key=lambda x: x.get("date", x.get("sk", ""))):
+        date_str = entry.get("date")
+        if not date_str:
+            sk = entry.get("sk", "")
+            if "DATE#" in sk:
+                date_str = sk.split("DATE#")[1][:10]
+        if not date_str:
+            continue
+
+        mood    = entry.get("enriched_mood_score") or entry.get("mood_score")
+        energy  = entry.get("enriched_energy_score") or entry.get("energy_score")
+        stress  = entry.get("enriched_stress_score") or entry.get("stress_score")
+        themes  = entry.get("enriched_themes", [])
+        emotions = entry.get("enriched_emotions", [])
+        ownership = entry.get("enriched_ownership_score")
+        social_q  = entry.get("enriched_social_quality")
+
+        if mood is None and energy is None and stress is None:
+            continue
+
+        daily_signals.append({
+            "date":       date_str,
+            "mood":       float(mood) if mood is not None else None,
+            "energy":     float(energy) if energy is not None else None,
+            "stress":     float(stress) if stress is not None else None,
+            "ownership":  float(ownership) if ownership is not None else None,
+            "social_quality": social_q,
+            "themes":     themes[:3] if themes else [],
+            "emotions":   emotions[:3] if emotions else [],
+        })
+
+    if len(daily_signals) < 5:
+        return {"error": "Insufficient enriched journal data for trajectory analysis."}
+
+    # ── Rolling averages (7-entry window) ──
+    def rolling_avg(signals, field, window=7):
+        result = []
+        vals = [(s["date"], s.get(field)) for s in signals]
+        for i in range(len(vals)):
+            window_vals = [v for _, v in vals[max(0, i - window + 1):i + 1] if v is not None]
+            result.append({
+                "date": vals[i][0],
+                "raw":  vals[i][1],
+                "rolling_avg": round(sum(window_vals) / len(window_vals), 1) if window_vals else None,
+            })
+        return result
+
+    mood_trend   = rolling_avg(daily_signals, "mood")
+    energy_trend = rolling_avg(daily_signals, "energy")
+    stress_trend = rolling_avg(daily_signals, "stress")
+
+    # ── Linear regression for overall trajectory ──
+    def compute_slope(signals, field):
+        vals = [(i, float(s.get(field))) for i, s in enumerate(signals) if s.get(field) is not None]
+        if len(vals) < 5:
+            return None, None
+        xs = [v[0] for v in vals]
+        ys = [v[1] for v in vals]
+        result = _linear_regression(xs, ys)
+        if result:
+            return round(result[0], 3), round(result[1], 2)  # slope, intercept
+        return None, None
+
+    mood_slope, _   = compute_slope(daily_signals, "mood")
+    energy_slope, _ = compute_slope(daily_signals, "energy")
+    stress_slope, _ = compute_slope(daily_signals, "stress")
+
+    def slope_label(slope):
+        if slope is None:
+            return "insufficient_data"
+        if slope > 0.05:
+            return "rising"
+        elif slope < -0.05:
+            return "falling"
+        return "stable"
+
+    # ── Divergence detection ──
+    divergences = []
+    if mood_slope is not None and energy_slope is not None:
+        if (mood_slope > 0.03 and energy_slope < -0.03):
+            divergences.append({
+                "type":   "mood_up_energy_down",
+                "signal": "Mood rising while energy falls — possible forced positivity or emotional suppression. Monitor for burnout onset.",
+                "mood_slope":   mood_slope,
+                "energy_slope": energy_slope,
+            })
+        elif (mood_slope < -0.03 and energy_slope > 0.03):
+            divergences.append({
+                "type":   "mood_down_energy_up",
+                "signal": "Energy available but mood declining — may indicate social disconnection, value misalignment, or unprocessed emotion.",
+                "mood_slope":   mood_slope,
+                "energy_slope": energy_slope,
+            })
+    if stress_slope is not None and mood_slope is not None:
+        if stress_slope > 0.05 and mood_slope > 0.03:
+            divergences.append({
+                "type":   "stress_and_mood_both_rising",
+                "signal": "Both stress and mood rising — may indicate eustress (productive challenge). Sustainable if sleep and recovery hold.",
+                "stress_slope": stress_slope,
+                "mood_slope":   mood_slope,
+            })
+
+    # ── Inflection point detection ──
+    def find_inflections(trend_data):
+        inflections = []
+        avgs = [t.get("rolling_avg") for t in trend_data]
+        for i in range(2, len(avgs) - 2):
+            if avgs[i-2] is None or avgs[i-1] is None or avgs[i] is None or avgs[i+1] is None:
+                continue
+            # Local minimum
+            if avgs[i-1] > avgs[i] < avgs[i+1] and avgs[i-2] > avgs[i-1]:
+                inflections.append({"date": trend_data[i]["date"], "type": "trough", "value": avgs[i]})
+            # Local maximum
+            elif avgs[i-1] < avgs[i] > avgs[i+1] and avgs[i-2] < avgs[i-1]:
+                inflections.append({"date": trend_data[i]["date"], "type": "peak", "value": avgs[i]})
+        return inflections
+
+    mood_inflections   = find_inflections(mood_trend)
+    energy_inflections = find_inflections(energy_trend)
+
+    # ── Theme frequency (top recurring themes) ──
+    theme_counts = defaultdict(int)
+    for s in daily_signals:
+        for t in s.get("themes", []):
+            if t:
+                theme_counts[t.lower()] += 1
+    top_themes = sorted(theme_counts.items(), key=lambda x: -x[1])[:8]
+
+    # ── Emotion frequency ──
+    emotion_counts = defaultdict(int)
+    for s in daily_signals:
+        for e in s.get("emotions", []):
+            if e:
+                emotion_counts[e.lower()] += 1
+    top_emotions = sorted(emotion_counts.items(), key=lambda x: -x[1])[:8]
+
+    # ── Summary stats ──
+    def safe_avg(field):
+        vals = [s[field] for s in daily_signals if s.get(field) is not None]
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    return {
+        "period":        {"start_date": start_date, "end_date": end_date, "entries_analysed": len(daily_signals)},
+        "trajectories":  {
+            "mood":   {"slope": mood_slope,   "direction": slope_label(mood_slope),   "avg": safe_avg("mood")},
+            "energy": {"slope": energy_slope,  "direction": slope_label(energy_slope), "avg": safe_avg("energy")},
+            "stress": {"slope": stress_slope,  "direction": slope_label(stress_slope), "avg": safe_avg("stress")},
+        },
+        "divergences":   divergences,
+        "inflections":   {
+            "mood":   mood_inflections,
+            "energy": energy_inflections,
+        },
+        "top_themes":    [{"theme": t, "count": c} for t, c in top_themes],
+        "top_emotions":  [{"emotion": e, "count": c} for e, c in top_emotions],
+        "mood_trend":    mood_trend,
+        "energy_trend":  energy_trend,
+        "stress_trend":  stress_trend,
+        "daily_signals": daily_signals,
+        "methodology":   (
+            "Extracts enriched mood/energy/stress scores from Haiku-processed journal entries. "
+            "Linear regression computes overall trajectory slope (>0.05 rising, <-0.05 falling). "
+            "Divergence detection flags when trajectories move in opposing directions — "
+            "mood↑/energy↓ is a burnout precursor (Beck CBT). Inflection points found via "
+            "rolling average local minima/maxima. Theme and emotion frequency surfaces recurring patterns."
+        ),
+    }

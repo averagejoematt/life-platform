@@ -2124,3 +2124,180 @@ def tool_get_health(args):
     if isinstance(result, dict) and "error" not in result:
         result["_disclaimer"] = _HEALTH_DISCLAIMER
     return result
+
+
+# ── BS-MP1: Autonomic Balance Score ──────────────────────────────────────
+
+def tool_get_autonomic_balance(args):
+    """
+    BS-MP1: Synthesizes HRV, resting heart rate, respiratory rate, and sleep
+    quality into a 4-quadrant nervous system state model:
+      - Flow (high energy + positive): high HRV, low RHR, good sleep, normal RR
+      - Stress (high energy + negative): low HRV, elevated RHR, poor sleep
+      - Recovery (low energy + positive): moderate HRV, low RHR, high deep sleep
+      - Burnout (low energy + negative): low HRV, elevated RHR, poor sleep, elevated RR
+    Provides rolling 7-day trend and state transition detection.
+    Porges polyvagal theory + Huberman ANS framework.
+    """
+    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    days       = int(args.get("days", 30))
+    start_date = args.get("start_date") or (
+        datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days - 1)
+    ).strftime("%Y-%m-%d")
+
+    whoop_items = query_source("whoop", start_date, end_date)
+    if len(whoop_items) < 7:
+        return {"error": f"Need ≥7 days of Whoop data. Found {len(whoop_items)}."}
+
+    items = sorted(whoop_items, key=lambda x: x.get("date", ""))
+
+    # Compute personal baselines (full window)
+    def safe_list(field):
+        return [float(i[field]) for i in items if i.get(field) is not None]
+
+    hrv_all = safe_list("hrv")
+    rhr_all = safe_list("resting_heart_rate")
+    rr_all  = safe_list("respiratory_rate")
+    eff_all = safe_list("sleep_efficiency")
+    rec_all = safe_list("recovery_score")
+
+    def avg(vals):
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    def std(vals):
+        if len(vals) < 2:
+            return 0
+        m = sum(vals) / len(vals)
+        return round(math.sqrt(sum((v - m)**2 for v in vals) / (len(vals) - 1)), 2)
+
+    baselines = {
+        "hrv":  {"mean": avg(hrv_all), "sd": std(hrv_all)},
+        "rhr":  {"mean": avg(rhr_all), "sd": std(rhr_all)},
+        "rr":   {"mean": avg(rr_all),  "sd": std(rr_all)},
+        "eff":  {"mean": avg(eff_all),  "sd": std(eff_all)},
+        "rec":  {"mean": avg(rec_all),  "sd": std(rec_all)},
+    }
+
+    def z_score(value, baseline):
+        if value is None or baseline["sd"] == 0:
+            return 0
+        return round((value - baseline["mean"]) / baseline["sd"], 2)
+
+    def classify_quadrant(hrv_z, rhr_z, eff_z, rr_z):
+        """
+        4-quadrant model:
+          Energy axis: HRV_z (positive = high vagal tone = energy available)
+          Valence axis: composite of RHR_z (inverted), efficiency_z, RR_z (inverted)
+        """
+        energy = hrv_z
+        valence = (-rhr_z + eff_z - rr_z) / 3  # positive = good recovery signals
+
+        if energy >= 0 and valence >= 0:
+            return "FLOW", energy, valence
+        elif energy >= 0 and valence < 0:
+            return "STRESS", energy, valence
+        elif energy < 0 and valence >= 0:
+            return "RECOVERY", energy, valence
+        else:
+            return "BURNOUT", energy, valence
+
+    # ── Daily scoring ──
+    daily_states = []
+    for item in items:
+        hrv_val = item.get("hrv")
+        rhr_val = item.get("resting_heart_rate")
+        rr_val  = item.get("respiratory_rate")
+        eff_val = item.get("sleep_efficiency")
+        rec_val = item.get("recovery_score")
+
+        hrv_z = z_score(float(hrv_val) if hrv_val else None, baselines["hrv"])
+        rhr_z = z_score(float(rhr_val) if rhr_val else None, baselines["rhr"])
+        rr_z  = z_score(float(rr_val)  if rr_val  else None, baselines["rr"])
+        eff_z = z_score(float(eff_val)  if eff_val else None, baselines["eff"])
+
+        quadrant, energy, valence = classify_quadrant(hrv_z, rhr_z, eff_z, rr_z)
+
+        # Autonomic balance score 0-100
+        # Centre is 50; flow pushes up, burnout pulls down
+        raw_score = 50 + (energy + valence) * 12.5
+        balance_score = max(0, min(100, round(raw_score)))
+
+        daily_states.append({
+            "date":           item.get("date"),
+            "quadrant":       quadrant,
+            "balance_score":  balance_score,
+            "energy_axis":    round(energy, 2),
+            "valence_axis":   round(valence, 2),
+            "hrv":            float(hrv_val) if hrv_val else None,
+            "rhr":            float(rhr_val) if rhr_val else None,
+            "rr":             float(rr_val)  if rr_val  else None,
+            "efficiency":     float(eff_val) if eff_val else None,
+            "recovery":       float(rec_val) if rec_val else None,
+        })
+
+    # ── Current state (latest) ──
+    current = daily_states[-1] if daily_states else {}
+
+    # ── 7-day rolling trend ──
+    recent_7 = daily_states[-7:] if len(daily_states) >= 7 else daily_states
+    quadrant_counts = defaultdict(int)
+    for ds in recent_7:
+        quadrant_counts[ds["quadrant"]] += 1
+    dominant_state = max(quadrant_counts, key=quadrant_counts.get) if quadrant_counts else "UNKNOWN"
+    avg_score_7d = avg([ds["balance_score"] for ds in recent_7])
+
+    # State transitions
+    transitions = []
+    for i in range(1, len(daily_states)):
+        if daily_states[i]["quadrant"] != daily_states[i-1]["quadrant"]:
+            transitions.append({
+                "date":  daily_states[i]["date"],
+                "from":  daily_states[i-1]["quadrant"],
+                "to":    daily_states[i]["quadrant"],
+            })
+
+    # Consecutive days in current state
+    streak = 1
+    if len(daily_states) >= 2:
+        for i in range(len(daily_states) - 2, -1, -1):
+            if daily_states[i]["quadrant"] == current.get("quadrant"):
+                streak += 1
+            else:
+                break
+
+    # ── Contextual coaching ──
+    _coaching = {
+        "FLOW":     "Autonomic nervous system in optimal state. High vagal tone + good recovery signals. Train hard, challenge yourself, or tackle high-cognitive-load work.",
+        "STRESS":   "High sympathetic activation. HRV is available but recovery signals are poor. Risk of overreach if sustained >3 days. Prioritise parasympathetic activators: box breathing, cold exposure, early sleep.",
+        "RECOVERY": "Low energy but positive recovery trajectory. Body is rebuilding. Light movement only — this state precedes a Flow transition if respected.",
+        "BURNOUT":  "Low HRV + poor recovery + elevated RHR/RR. Sustained burnout erodes training adaptations and habit compliance. Immediate priorities: sleep hygiene, caloric adequacy, social connection, reduce training volume 50%.",
+    }
+
+    return {
+        "period":           {"start_date": start_date, "end_date": end_date, "days_with_data": len(daily_states)},
+        "current_state":    {
+            "date":          current.get("date"),
+            "quadrant":      current.get("quadrant"),
+            "balance_score": current.get("balance_score"),
+            "energy_axis":   current.get("energy_axis"),
+            "valence_axis":  current.get("valence_axis"),
+            "days_in_state": streak,
+            "coaching":      _coaching.get(current.get("quadrant"), ""),
+        },
+        "seven_day_trend":  {
+            "dominant_state":     dominant_state,
+            "avg_balance_score":  avg_score_7d,
+            "state_distribution": dict(quadrant_counts),
+        },
+        "baselines":        baselines,
+        "transitions":      transitions[-10:],  # last 10 transitions
+        "daily_states":     daily_states,
+        "methodology":      (
+            "4-quadrant autonomic model using Z-scores against personal baselines. "
+            "Energy axis = HRV Z-score (vagal tone). Valence axis = mean of inverted RHR Z, "
+            "sleep efficiency Z, inverted respiratory rate Z. Balance score 0-100 maps both axes. "
+            "Based on Porges polyvagal theory + Huberman ANS framework. "
+            "Sustained burnout (>3 consecutive days) is a strong signal to reduce load."
+        ),
+        "_disclaimer": "This platform provides personal health data aggregation and AI-generated insights for informational purposes only. Always consult a qualified healthcare provider for medical advice.",
+    }
