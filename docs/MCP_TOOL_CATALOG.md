@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-**Version:** v3.7.62 | **Last updated:** 2026-03-17 | **Total tools:** 89
+**Version:** v3.7.63 | **Last updated:** 2026-03-17 | **Total tools:** 89
 
 > SIMP-1 Phase 1 complete (v3.7.17–19): 116 → 86 tools via 13 view-dispatchers. ADR-030 (v3.7.46): `get_calendar_events` + `get_schedule_load` retired (Google Calendar integration blocked by IT policy). 88 → 87 tools.
 > Many previously standalone tools are now `view=` parameters of a parent dispatcher.
