@@ -26,9 +26,13 @@ Full Sprint 2 implemented and deployed in one session. 6 of 7 planned features s
 - MCP tool count: 89 → 90 (`get_vice_streaks` added).
 - CDK Lambda count: 46 → 48 (sleep-reconciler + circadian-compliance).
 
+### Post-deploy fixes
+- **site-api cross-region bug**: Lambda runs in us-east-1, DDB in us-west-2. Fixed by injecting `DYNAMODB_REGION=us-west-2` env var in CDK web_stack.py and reading `DDB_REGION` in Lambda instead of `AWS_REGION`. Committed separately.
+- BS-08 backfill: 43/44 nights stored (2026-02-01 to 2026-03-16)
+- BS-SL2 first run: 38/100 (poor) confirmed working
+- `/api/status` + `/api/weight_progress` smoke tested OK
+
 ### Pending (next session)
-- BS-08 backfill: invoke `sleep-reconciler` with `{"start_date": "2026-02-01", "end_date": "2026-03-16"}` to populate historical records
-- BS-SL2 first run: invoke `circadian-compliance` manually to confirm scoring works
 - `HERO_WHY_PARAGRAPH` in `site_writer.py` (deferred from Sprint 1)
 - TB7-25: CI/CD rollback scope verification
 - TB7-27: MCP tool tiering design doc (pre-SIMP-1 Phase 2)

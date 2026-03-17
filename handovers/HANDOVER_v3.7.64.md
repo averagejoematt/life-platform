@@ -14,90 +14,87 @@
 | Tests | 83/83 passing (pre-existing failures unchanged) |
 | Architecture grade | A (R16) |
 | Website | LIVE — averagejoematt.com |
-| Sprint 2 | ✅ COMPLETE (6/7 features — BS-NU1 shelved) |
+| Sprint 2 | COMPLETE (6/7 features — BS-NU1 shelved) |
 
 ---
 
 ## What Was Done This Session
+
+### Pre-sprint cleanup
+- Journal page deployed to S3 + CloudFront invalidated
+- SES production access confirmed: `ProductionAccessEnabled: true`, `Status: GRANTED`
 
 ### Sprint 2 — All 6 features implemented and deployed
 
 **BS-MP3: Decision Fatigue Detector (proactive)**
 - `_compute_decision_fatigue_alert()` added to `daily_insight_compute_lambda.py`
 - Fires when active+overdue Todoist tasks >15 AND T0 habit completion <60% this week
-- Priority 3 signal in AI context block (between severe drift and IC-8 gap)
+- Priority 3 signal in AI context block
 - Env vars: `DECISION_FATIGUE_THRESHOLD=15`, `DECISION_FATIGUE_HABIT_THRESHOLD=0.60`
-- Status: ✅ Deployed
+- Status: DEPLOYED
 
-**BS-TR1 + BS-TR2: Centenarian Decathlon Tracker + Zone 2 Efficiency Trend**
-- `_compute_centenarian_progress()` and `_compute_zone2_efficiency()` added to `weekly_correlation_compute_lambda.py`
-- Both run Sunday after correlations (non-fatal, wrapped in try/except)
-- Write to: `SOURCE#centenarian_progress | WEEK#<iso_week>` and `SOURCE#zone2_efficiency | WEEK#<iso_week>`
-- BS-TR1: Scores deadlift/squat/bench/OHP vs Attia bodyweight-relative targets
-- BS-TR2: Efficiency = speed_mph / avg_HR for Zone 2 sessions, linear regression trend
-- Status: ✅ Deployed
+**BS-TR1 + BS-TR2: Centenarian Decathlon + Zone 2 Efficiency**
+- Both added to `weekly_correlation_compute_lambda.py`
+- BS-TR1: scores deadlift/squat/bench/OHP vs Attia bodyweight-relative targets. Writes to `SOURCE#centenarian_progress`
+- BS-TR2: efficiency = speed_mph / avg_HR for Zone 2 sessions, linear regression trend. Writes to `SOURCE#zone2_efficiency`
+- Both run Sunday after correlations (non-fatal)
+- Status: DEPLOYED
 
 **BS-BH1: Vice Streak Amplifier**
 - `tool_get_vice_streaks()` added to `mcp/tools_habits.py`
-- Compounding value formula: `streak^1.5 / 10` (Day 30 ≈ 16.4 vs Day 3 ≈ 0.5)
-- Returns: current streak, max streak, compounding value, streak risk rating, next milestone, portfolio total
+- Compounding value: `streak^1.5 / 10` (Day 30 ≈ 16.4 vs Day 3 ≈ 0.5)
+- Returns: current streak, max, compounding value, risk rating, next milestone, portfolio total
 - Registered as `get_vice_streaks` in `mcp/registry.py`
-- Status: ✅ MCP deployed
+- Status: MCP DEPLOYED
 
 **BS-07: Website API Layer**
-- 4 new routes added to `site_api_lambda.py`:
-  - `/api/weight_progress` — 180 days of daily weights (1h cache)
-  - `/api/character_stats` — level, tier, all 7 pillar scores (1h cache)
-  - `/api/habit_streaks` — T0 aggregate streak + pct (1h cache)
-  - `/api/experiments` — experiment list + status (1h cache)
-- `LifePlatformWeb` CDK deployed → `life-platform-site-api` Lambda created in us-east-1
+- 4 new routes in `site_api_lambda.py`: `/api/weight_progress`, `/api/character_stats`, `/api/habit_streaks`, `/api/experiments`
+- `LifePlatformWeb` CDK deployed — `life-platform-site-api` Lambda created in us-east-1
+- **Cross-region fix**: Lambda in us-east-1, DDB in us-west-2. Fixed via `DYNAMODB_REGION=us-west-2` env var in CDK + `DDB_REGION` env var in Lambda code.
 - Function URL: `https://lxhjl2qvq2ystwp47464uhs2ti0hpdcq.lambda-url.us-east-1.on.aws/`
-- Status: ✅ CDK deployed
+- Smoke tested: `/api/status` OK, `/api/weight_progress` returned 33 records
+- Status: DEPLOYED + VERIFIED
 
 **BS-08: Unified Sleep Record**
-- `lambdas/sleep_reconciler_lambda.py` written (new)
-- Conflict resolution: Apple Health → duration, Whoop → staging/HRV/recovery, Eight Sleep → env
+- `lambdas/sleep_reconciler_lambda.py` (new)
+- Conflict rules: Apple Health → duration, Whoop → staging/HRV/recovery, Eight Sleep → env
 - Writes to: `SOURCE#sleep_unified | DATE#<date>`
-- `LifePlatformCompute` CDK deployed → `sleep-reconciler` Lambda created (7:00 AM PT daily)
-- Status: ✅ CDK deployed — **needs backfill**
+- CDK: `sleep-reconciler` Lambda, 7:00 AM PT daily
+- Backfill run: 43 nights stored (2026-02-01 to 2026-03-16), 1 skipped (no data)
+- Status: DEPLOYED + BACKFILLED
 
 **BS-SL2: Circadian Compliance Score**
-- `lambdas/circadian_compliance_lambda.py` written (new)
-- 4 components × 25 pts each: morning light, meal timing, screen wind-down, sleep consistency
+- `lambdas/circadian_compliance_lambda.py` (new)
+- 4 components x 25 pts: morning light, meal timing, screen wind-down, sleep consistency
 - Writes to: `SOURCE#circadian | DATE#<date>`
-- `LifePlatformCompute` CDK deployed → `circadian-compliance` Lambda created (7:00 PM PT daily)
-- Status: ✅ CDK deployed — **needs first manual run to verify**
-
-### Other
-- SES confirmed: `ProductionAccessEnabled: true`, `Status: GRANTED`
-- Journal page deployed + CloudFront invalidated (from previous session)
-- `ci/lambda_map.json` updated with BS-08 + BS-SL2 entries
+- CDK: `circadian-compliance` Lambda, 7:00 PM PT daily
+- First run: 38/100 (poor) — morning_light weakest (expected, Lambda ran at 3 AM)
+- Status: DEPLOYED + VERIFIED
 
 ---
 
 ## Immediate Next Actions
 
-| Item | Command |
-|------|---------|
-| Backfill BS-08 sleep records | `aws lambda invoke --function-name sleep-reconciler --payload '{"start_date":"2026-02-01","end_date":"2026-03-16"}' /tmp/bs08.json && cat /tmp/bs08.json` |
-| Test BS-SL2 first run | `aws lambda invoke --function-name circadian-compliance --payload '{}' /tmp/bssl2.json && cat /tmp/bssl2.json` |
-| Test site-api new routes | `curl https://lxhjl2qvq2ystwp47464uhs2ti0hpdcq.lambda-url.us-east-1.on.aws/api/weight_progress` |
-| HERO_WHY_PARAGRAPH | Edit `HERO_WHY_PARAGRAPH` in `lambdas/site_writer.py`, set `paragraph_is_placeholder: False`, redeploy daily-brief |
+| Item | Notes |
+|------|-------|
+| HERO_WHY_PARAGRAPH | Edit in `lambdas/site_writer.py`, set `paragraph_is_placeholder: False`, redeploy daily-brief |
+| TB7-25 | CI/CD rollback scope verification |
+| TB7-27 | MCP tool tiering design doc (pre-SIMP-1 Phase 2) |
 
 ---
 
-## Sprint 2 Status
+## Sprint 2 Final Status
 
 | ID | Feature | Status |
 |----|---------|--------|
-| BS-07 | Website API Layer | ✅ Deployed |
-| BS-08 | Unified Sleep Record | ✅ Deployed — needs backfill |
-| BS-SL2 | Circadian Compliance Score | ✅ Deployed — needs first run |
-| BS-BH1 | Vice Streak Amplifier | ✅ MCP deployed |
-| BS-MP3 | Decision Fatigue Detector | ✅ Deployed |
-| BS-TR1 | Centenarian Decathlon Tracker | ✅ Deployed (runs Sunday) |
-| BS-TR2 | Zone 2 Cardiac Efficiency | ✅ Deployed (runs Sunday) |
-| BS-NU1 | Protein Timing Score | ❌ Shelved (Opus cost, data maturity) |
+| BS-07 | Website API Layer | DEPLOYED + VERIFIED |
+| BS-08 | Unified Sleep Record | DEPLOYED + BACKFILLED |
+| BS-SL2 | Circadian Compliance Score | DEPLOYED + VERIFIED |
+| BS-BH1 | Vice Streak Amplifier | MCP DEPLOYED |
+| BS-MP3 | Decision Fatigue Detector | DEPLOYED |
+| BS-TR1 | Centenarian Decathlon Tracker | DEPLOYED (runs Sunday) |
+| BS-TR2 | Zone 2 Cardiac Efficiency | DEPLOYED (runs Sunday) |
+| BS-NU1 | Protein Timing Score | SHELVED (Opus cost, data maturity) |
 
 ---
 
@@ -110,20 +107,10 @@
 | BS-MP1 | Autonomic Balance Score | 4h | Opus |
 | BS-MP2 | Journal Sentiment Trajectory | 4h | Opus |
 | BS-13 | N=1 Experiment Archive (Website) | 3h | None |
-| BS-T2-5 | Chronicle → Newsletter Delivery | 4h | None |
+| BS-T2-5 | Chronicle Newsletter Delivery | 4h | None |
 | WEB-WCT | Weekly Challenge Ticker | 2h | None |
 | IC-28 | Training Load Intelligence (IC) | 3h | Sonnet |
 | IC-29 | Metabolic Adaptation Intelligence (IC) | 4h | Opus |
-
----
-
-## Other Pending (unchanged)
-
-| Item | Notes |
-|------|-------|
-| TB7-25 | CI/CD rollback scope verification |
-| TB7-27 | MCP tool tiering design doc (pre-SIMP-1 Phase 2) |
-| SIMP-1 Phase 2 | ~April 13 EMF gate (90 → ≤80 tools) |
 
 ---
 
@@ -132,38 +119,39 @@
 | File | Change |
 |------|--------|
 | `lambdas/daily_insight_compute_lambda.py` | BS-MP3: decision fatigue alert |
-| `lambdas/weekly_correlation_compute_lambda.py` | BS-TR1 + BS-TR2: centenarian + zone2 efficiency |
-| `lambdas/site_api_lambda.py` | BS-07: 4 new public API routes |
+| `lambdas/weekly_correlation_compute_lambda.py` | BS-TR1 + BS-TR2 |
+| `lambdas/site_api_lambda.py` | BS-07: 4 new routes + DDB_REGION fix |
 | `lambdas/sleep_reconciler_lambda.py` | BS-08: new file |
 | `lambdas/circadian_compliance_lambda.py` | BS-SL2: new file |
-| `mcp/tools_habits.py` | BS-BH1: get_vice_streaks tool |
-| `mcp/registry.py` | BS-BH1: registered + import fix |
+| `mcp/tools_habits.py` | BS-BH1: get_vice_streaks |
+| `mcp/registry.py` | BS-BH1: registered |
 | `ci/lambda_map.json` | BS-08 + BS-SL2 registered |
-| `cdk/stacks/compute_stack.py` | BS-08 + BS-SL2 Lambda definitions |
+| `cdk/stacks/compute_stack.py` | BS-08 + BS-SL2 Lambda defs |
 | `cdk/stacks/role_policies.py` | BS-08 + BS-SL2 IAM policies |
+| `cdk/stacks/web_stack.py` | site-api DYNAMODB_REGION env var |
 | `docs/CHANGELOG.md` | v3.7.64 entry |
-| `handovers/HANDOVER_v3.7.64.md` | This file |
+| `site/journal/index.html` | Signal alignment (prev session) |
 
 ---
 
 ## Infrastructure State
-- LifePlatformCompute: deployed ✅ (sleep-reconciler + circadian-compliance added)
-- LifePlatformWeb: deployed ✅ (site-api Lambda created)
-- MCP Lambda: deployed ✅ (get_vice_streaks live)
-- daily-insight-compute: deployed ✅ (BS-MP3 live)
-- weekly-correlation-compute: deployed ✅ (BS-TR1+TR2 run next Sunday)
-- SES: production access enabled ✅
-- All other infrastructure: unchanged from v3.7.63
+- LifePlatformCompute: DEPLOYED (sleep-reconciler + circadian-compliance added)
+- LifePlatformWeb: DEPLOYED (site-api Lambda created + DDB region fix)
+- MCP Lambda: DEPLOYED (get_vice_streaks live)
+- daily-insight-compute: DEPLOYED (BS-MP3 live)
+- weekly-correlation-compute: DEPLOYED (BS-TR1+TR2 run next Sunday)
+- SES: production access enabled
+- All other infrastructure: unchanged
 
 ---
 
-## Sprint Roadmap Quick Reference
+## Sprint Roadmap
 
 ```
-Sprint 1  ✅ COMPLETE (~Mar 17)  BS-01 BS-02 BS-03 BS-05 BS-09
-Sprint 2  ✅ COMPLETE (~Mar 17)  BS-07 BS-08 BS-SL2 BS-BH1 BS-MP3 BS-TR1 BS-TR2
-SIMP-1 Ph2 (~Apr 13)             90→≤80 tools
-Sprint 3  (~May 11)              BS-12 BS-SL1 BS-MP1 BS-MP2 BS-13
-                                  BS-T2-5 WEB-WCT IC-28 IC-29
-Sprint 4  (~Jun 8)               BS-11 WEB-CE BS-BM2 BS-14
+Sprint 1  COMPLETE (~Mar 17)   BS-01 BS-02 BS-03 BS-05 BS-09
+Sprint 2  COMPLETE (~Mar 17)   BS-07 BS-08 BS-SL2 BS-BH1 BS-MP3 BS-TR1 BS-TR2
+SIMP-1 Ph2 (~Apr 13)           90 to 80 tools (EMF telemetry gate)
+Sprint 3  (~May 11)            BS-12 BS-SL1 BS-MP1 BS-MP2 BS-13
+                                BS-T2-5 WEB-WCT IC-28 IC-29
+Sprint 4  (~Jun 8)             BS-11 WEB-CE BS-BM2 BS-14
 ```
