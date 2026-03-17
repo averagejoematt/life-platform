@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The Story — why Matthew Walker built an AI operating system for his body, and what happened next.">
+  <meta property="og:title" content="The Story — Matthew Walker">
+  <meta property="og:description" content="302 lbs. January 2026. And a decision to stop optimizing in the dark.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://averagejoematt.com/story/">
+  <title>The Story — Matthew Walker</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    /* ── Story header ── */
+    .story-header {
+      min-height: 60vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: calc(var(--nav-height) + var(--space-20)) var(--page-padding) var(--space-16);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+    .story-header::before {
+      content: '';
+      position: absolute;
+      top: -100px; left: 50%;
+      transform: translateX(-50%);
+      width: 800px; height: 600px;
+      background: radial-gradient(ellipse, rgba(0,229,160,0.04) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .story-header__kicker {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-6);
+      animation: fadeUp 0.5s ease forwards 0.1s;
+      opacity: 0;
+    }
+    .story-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-8);
+      max-width: 900px;
+      animation: fadeUp 0.5s ease forwards 0.2s;
+      opacity: 0;
+    }
+    .story-header__title span { color: var(--accent); }
+    .story-header__lede {
+      font-size: var(--text-xl);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      max-width: var(--prose-width);
+      border-left: 2px solid var(--accent-dim);
+      padding-left: var(--space-5);
+      animation: fadeUp 0.5s ease forwards 0.3s;
+      opacity: 0;
+    }
+    .story-header__lede strong { color: var(--text); }
+
+    /* ── Milestone bar ── */
+    .milestones {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-top: none;
+    }
+    .milestone {
+      background: var(--surface);
+      padding: var(--space-6);
+    }
+    .milestone__date {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-2);
+    }
+    .milestone__value {
+      font-family: var(--font-display);
+      font-size: 32px;
+      color: var(--text);
+      line-height: 1;
+      letter-spacing: var(--ls-display);
+    }
+    .milestone__label {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      margin-top: var(--space-2);
+    }
+
+    /* ── Prose sections ── */
+    .story-body {
+      max-width: var(--prose-width);
+      margin: 0 auto;
+      padding: var(--space-20) var(--page-padding);
+    }
+    .story-chapter {
+      margin-bottom: var(--space-20);
+    }
+    .chapter-num {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+    }
+    .chapter-title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-8);
+    }
+    .chapter-body {
+      font-family: var(--font-serif);
+      font-size: 17px;
+      color: var(--text-muted);
+      line-height: 1.85;
+    }
+    .chapter-body p { margin-bottom: var(--space-5); }
+    .chapter-body p:last-child { margin-bottom: 0; }
+    .chapter-body strong { color: var(--text); font-weight: 600; }
+    .chapter-body em { color: var(--text); font-style: italic; }
+
+    /* Placeholder blocks — Matthew fills these in */
+    .placeholder {
+      background: rgba(0, 229, 160, 0.04);
+      border: 1px dashed var(--border-strong);
+      padding: var(--space-6) var(--space-8);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--accent-dim);
+      line-height: var(--lh-body);
+      border-radius: 0;
+    }
+    .placeholder__tag {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: var(--space-2);
+    }
+    .placeholder__prompt {
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    /* ── Pull quote ── */
+    .pull-quote {
+      border-left: 3px solid var(--accent);
+      padding: var(--space-6) var(--space-8);
+      margin: var(--space-10) 0;
+      font-family: var(--font-serif);
+      font-size: 22px;
+      font-style: italic;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    /* ── Data moment ── */
+    .data-moment {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-6) var(--space-8);
+      margin: var(--space-8) 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .data-moment__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .data-moment .highlight { color: var(--accent); font-weight: 700; }
+
+    /* ── Next / prev ── */
+    .story-nav {
+      padding: var(--space-12) var(--page-padding);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: center;
+      gap: var(--space-4);
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 900px) {
+      .milestones { grid-template-columns: repeat(2, 1fr); }
+      .story-body { padding: var(--space-12) var(--page-padding); }
+    }
+    @media (max-width: 600px) {
+      .milestones { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/#experiment" class="nav__link">The experiment</a>
+    <a href="/platform/" class="nav__link">The platform</a>
+    <a href="/story/" class="nav__link active">Story</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/about/" class="nav__link">About</a>
+  </div>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span>Live</span>
+  </div>
+</nav>
+
+<!-- Header -->
+<header class="story-header">
+  <p class="story-header__kicker">// The origin</p>
+  <h1 class="story-header__title">302 pounds.<br>One <span>decision</span>.</h1>
+  <p class="story-header__lede">
+    Most people optimize in the dark — gut feelings, Instagram advice, someone's podcast take.
+    I decided to build the infrastructure to <strong>know</strong>.
+    This is what that actually looks like.
+  </p>
+</header>
+
+<!-- Milestone bar (live data) -->
+<div class="milestones">
+  <div class="milestone">
+    <div class="milestone__date">January 2026</div>
+    <div class="milestone__value">302</div>
+    <div class="milestone__label">Starting weight (lbs)</div>
+  </div>
+  <div class="milestone">
+    <div class="milestone__date">Today</div>
+    <div class="milestone__value" id="story-weight">—</div>
+    <div class="milestone__label">Current weight (lbs)</div>
+  </div>
+  <div class="milestone">
+    <div class="milestone__date">The goal</div>
+    <div class="milestone__value">185</div>
+    <div class="milestone__label">Target weight (lbs)</div>
+  </div>
+  <div class="milestone">
+    <div class="milestone__date">Built</div>
+    <div class="milestone__value">95</div>
+    <div class="milestone__label">Intelligence tools</div>
+  </div>
+</div>
+
+<!-- Story body -->
+<div class="story-body">
+
+  <!-- Chapter 1 -->
+  <div class="story-chapter">
+    <p class="chapter-num">Chapter 01</p>
+    <h2 class="chapter-title">The Moment</h2>
+    <div class="chapter-body">
+      <div class="placeholder">
+        <p class="placeholder__tag">// Matthew — write this section</p>
+        <p class="placeholder__prompt">
+          The specific moment you decided to actually change. Not the general "I've been overweight for years" — the specific day, situation, or realization.
+          What were you doing? What did you see, feel, or think? What made this time different from the dozen other times you'd tried?
+          (3–5 paragraphs, in your own words. This is the part a stranger needs to feel before they'll care about the data.)
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chapter 2 -->
+  <div class="story-chapter">
+    <p class="chapter-num">Chapter 02</p>
+    <h2 class="chapter-title">The Problem With Previous Attempts</h2>
+    <div class="chapter-body">
+      <div class="placeholder">
+        <p class="placeholder__tag">// Matthew — write this section</p>
+        <p class="placeholder__prompt">
+          What had you tried before, and why did it fail? Not a list — a story.
+          The app you downloaded and deleted. The diet you lasted 11 days on. The gym membership.
+          What was the fundamental thing that kept going wrong?
+          (2–3 paragraphs. Help the reader recognize themselves here.)
+        </p>
+      </div>
+
+      <div class="pull-quote">
+        "The problem wasn't motivation. I had that. The problem was I was making decisions without data."
+      </div>
+      <!-- NOTE: Replace pull quote above with your actual words if this isn't accurate. -->
+
+    </div>
+  </div>
+
+  <!-- Chapter 3 -->
+  <div class="story-chapter">
+    <p class="chapter-num">Chapter 03</p>
+    <h2 class="chapter-title">The Build</h2>
+    <div class="chapter-body">
+      <p>
+        I'm not a developer. My background is IT leadership — managing teams, vendors, enterprise infrastructure.
+        I've never shipped production code at work. But I understand systems, and I've spent 15 years
+        watching what happens when complex systems are built without clear principles.
+      </p>
+      <p>
+        So I applied the same frameworks I use at work to myself. Architecture decisions.
+        Data governance. Version control. Automated testing. An external review board.
+        The Life Platform was always going to be a <em>real</em> system, or it was going to be nothing.
+      </p>
+
+      <div class="data-moment">
+        <div class="data-moment__label">// current build stats</div>
+        <span class="highlight">48</span> Lambda functions &nbsp;·&nbsp;
+        <span class="highlight">19</span> data sources &nbsp;·&nbsp;
+        <span class="highlight">95</span> intelligence tools &nbsp;·&nbsp;
+        <span class="highlight">83/83</span> tests passing &nbsp;·&nbsp;
+        <span class="highlight">~$13/mo</span> on AWS
+      </div>
+
+      <div class="placeholder">
+        <p class="placeholder__tag">// Matthew — add 2–3 paragraphs here</p>
+        <p class="placeholder__prompt">
+          What was it actually like to build this as a non-engineer?
+          The early frustrations, the things that surprised you, the moment you realized Claude could actually write production code.
+          What was your role? What did you have to learn? What turned out to be easier — or harder — than expected?
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chapter 4 -->
+  <div class="story-chapter">
+    <p class="chapter-num">Chapter 04</p>
+    <h2 class="chapter-title">What the Data Has Shown</h2>
+    <div class="chapter-body">
+      <div class="placeholder">
+        <p class="placeholder__tag">// Matthew — write this section (most powerful section)</p>
+        <p class="placeholder__prompt">
+          What has the platform actually taught you about yourself?
+          Not "my HRV improved" — the human insight underneath the number.
+          The thing you discovered about your sleep, your eating patterns, your stress response, your habits, that you genuinely didn't know before.
+          (3–4 paragraphs. This is where a data skeptic becomes a believer — because the insights are personal and surprising.)
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chapter 5 -->
+  <div class="story-chapter">
+    <p class="chapter-num">Chapter 05</p>
+    <h2 class="chapter-title">Why Public</h2>
+    <div class="chapter-body">
+      <div class="placeholder">
+        <p class="placeholder__tag">// Matthew — write this section</p>
+        <p class="placeholder__prompt">
+          Why are you doing this in the open, with the actual numbers, including the bad weeks?
+          Not the strategic reason — the personal one. What does public accountability do for you specifically?
+          And what do you hope someone reading this walks away thinking?
+          (2–3 paragraphs.)
+        </p>
+      </div>
+
+      <p>
+        Every week, an AI journalist named Elena Voss reads 19 data sources and writes a chronicle of what the numbers say.
+        She doesn't soften bad weeks. She doesn't celebrate plateaus as progress.
+        The point is that the data tells the truth, even when I don't want it to.
+      </p>
+    </div>
+  </div>
+
+</div><!-- /story-body -->
+
+<!-- CTA -->
+<section style="
+  padding: var(--space-16) var(--page-padding);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  text-align: center;
+">
+  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
+  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Follow the experiment.</h3>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
+    Real numbers from 19 data sources. Every Wednesday, in your inbox. No highlight reel — every failure included.
+  </p>
+  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
+    <input id="story-email" type="email" placeholder="your@email.com" style="
+      flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);
+      font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);
+      outline:none;
+    ">
+    <button id="story-subscribe-btn" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap">Subscribe</button>
+  </div>
+  <p id="story-subscribe-msg" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
+</section>
+
+<div class="story-nav">
+  <a href="/journal/" class="btn btn--ghost">Read the Chronicle →</a>
+  <a href="/platform/" class="btn btn--ghost">See the Platform →</a>
+</div>
+
+<footer class="footer">
+  <div class="footer__brand">AMJ</div>
+  <div class="footer__links">
+    <a href="/story/" class="footer__link">Story</a>
+    <a href="/journal/" class="footer__link">Journal</a>
+    <a href="/platform/" class="footer__link">Platform</a>
+    <a href="/character/" class="footer__link">Character</a>
+    <a href="/subscribe" class="footer__link">Subscribe</a>
+  </div>
+  <div class="footer__copy">// updated daily by life-platform</div>
+</footer>
+
+<script>
+// Live weight
+(async function() {
+  try {
+    const r = await fetch('/site/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    const w = (d.vitals || {}).weight_lbs || (d.hero || {}).current_weight_lbs;
+    if (w) document.getElementById('story-weight').textContent = (Math.round(w * 10) / 10).toFixed(1);
+  } catch(e) {}
+})();
+
+// Subscribe form
+document.getElementById('story-subscribe-btn').addEventListener('click', async () => {
+  const email = document.getElementById('story-email').value.trim();
+  const msg = document.getElementById('story-subscribe-msg');
+  if (!email || !email.includes('@')) {
+    msg.textContent = 'Enter a valid email address.';
+    msg.style.color = 'var(--c-yellow-status)';
+    return;
+  }
+  msg.textContent = 'Subscribing...';
+  try {
+    const res = await fetch('/api/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, source: 'story_page' }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msg.textContent = '✓ You\'re in. Check your inbox to confirm.';
+      msg.style.color = 'var(--c-amber-500)';
+      document.getElementById('story-email').value = '';
+    } else {
+      msg.textContent = data.error || 'Something went wrong.';
+      msg.style.color = 'var(--c-yellow-status)';
+    }
+  } catch { msg.textContent = 'Network error — try again.'; msg.style.color = 'var(--c-yellow-status)'; }
+});
+document.getElementById('story-email').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('story-subscribe-btn').click();
+});
+</script>
+</body>
+</html>

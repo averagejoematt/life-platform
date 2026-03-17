@@ -379,6 +379,74 @@
   </div>
 </div>
 
+<!-- S2-T1-8: Email CTA footer — injected by add_email_cta.py -->
+<section class="email-cta-footer" style="
+  padding: var(--space-16) var(--page-padding);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  text-align: center;
+">
+  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
+  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
+    Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.
+  </p>
+  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
+    <input id="cta-email-experiments" type="email" placeholder="your@email.com" style="
+      flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);
+      font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);
+      outline:none;transition:border-color var(--dur-fast);
+    " onfocus="this.style.borderColor='var(--c-amber-400)'" onblur="this.style.borderColor='var(--c-amber-500)'">
+    <button
+      onclick="amjSubscribe('experiments')"
+      class="btn btn--primary"
+      style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">
+      Subscribe
+    </button>
+  </div>
+  <p id="cta-msg-experiments" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
+</section>
+<script>
+(function() {
+  // S2-T1-8: Shared subscribe helper (idempotent — safe to include multiple times)
+  if (!window.amjSubscribe) {
+    window.amjSubscribe = async function(slug) {
+      var email = document.getElementById('cta-email-' + slug).value.trim();
+      var msg   = document.getElementById('cta-msg-'   + slug);
+      if (!email || !email.includes('@')) {
+        msg.textContent = 'Enter a valid email address.';
+        msg.style.color = 'var(--c-yellow-status)';
+        return;
+      }
+      msg.textContent = 'Subscribing…';
+      msg.style.color = 'var(--text-muted)';
+      try {
+        var res  = await fetch('/api/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email, source: slug + '_cta' }),
+        });
+        var data = await res.json();
+        if (res.ok) {
+          msg.textContent = '✓ Check your inbox to confirm.';
+          msg.style.color = 'var(--c-amber-500)';
+          document.getElementById('cta-email-' + slug).value = '';
+        } else {
+          msg.textContent = data.error || 'Something went wrong.';
+          msg.style.color = 'var(--c-yellow-status)';
+        }
+      } catch(e) {
+        msg.textContent = 'Network error — try again.';
+        msg.style.color = 'var(--c-yellow-status)';
+      }
+    };
+  }
+  // Enter key support for this page's input
+  var inp = document.getElementById('cta-email-experiments');
+  if (inp) inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') window.amjSubscribe('experiments'); });
+})();
+</script>
 <footer class="footer">
   <div class="footer__brand">AMJ</div>
   <div class="footer__links">

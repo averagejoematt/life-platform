@@ -1412,6 +1412,183 @@ def _compute_decision_fatigue_alert(yesterday_str, habit_7d):
         return False, ""
 
 
+
+
+# ==============================================================================
+# S2-T1-9: ADAPTIVE DEFICIT CEILING  (BS-12 — Norton / Attia / Medical)
+# Two-tier alert wired into the Daily Brief:
+#   Tier A (RATE):  weight loss >2.5 lbs/week over 14 days
+#                   Priority 2 — rate alone is a medical signal (Norton/Attia)
+#   Tier B (MULTI): HRV drops >15% from 7d baseline
+#                   AND sleep quality degrades (efficiency < 80% for 3+ of last 7d)
+#                   AND ≥2 T0 habits failed this week
+#                   Priority 1 — multi-signal = physiological cost is real now
+#
+# Prescription: specific kcal increase + reassessment window, not just a flag.
+# Medical disclaimer appended per R13-F09.
+# Non-fatal throughout.
+# ==============================================================================
+
+# Tier A threshold: >2.5 lbs/week is the hard medical line (Norton/Attia board spec)
+DEFICIT_RATE_THRESHOLD_LBS_WEEK  = float(os.environ.get("DEFICIT_RATE_THRESHOLD", "2.5"))
+# Tier B thresholds
+DEFICIT_HRV_DROP_PCT              = float(os.environ.get("DEFICIT_HRV_DROP_PCT", "0.15"))   # 15%
+DEFICIT_SLEEP_EFF_FLOOR           = float(os.environ.get("DEFICIT_SLEEP_EFF_FLOOR", "80.0"))
+DEFICIT_SLEEP_BAD_DAYS_GATE       = int(os.environ.get("DEFICIT_SLEEP_BAD_DAYS", "3"))
+DEFICIT_T0_FAIL_GATE              = int(os.environ.get("DEFICIT_T0_FAIL_GATE", "2"))
+# Prescription params
+DEFICIT_KCAL_INCREASE             = int(os.environ.get("DEFICIT_KCAL_INCREASE", "200"))
+DEFICIT_REASSESS_DAYS             = int(os.environ.get("DEFICIT_REASSESS_DAYS", "5"))
+
+
+def _compute_deficit_ceiling_alert(yesterday_str, habit_7d, computed_7d, profile):
+    """S2-T1-9: Adaptive deficit ceiling alert.
+
+    Returns (tier, alert_block) where tier is None / "rate" / "multi".
+    Non-fatal throughout — returns (None, "") on any failure.
+    """
+    try:
+        today    = datetime.now(timezone.utc).date()
+        yest     = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
+        wt_start = (yest - timedelta(days=13)).isoformat()  # 14-day window
+
+        # ── Tier A: rate-of-loss check (Withings scale) ──────────────────────
+        wt_recs = fetch_range("withings", wt_start, yesterday_str)
+        wt_vals = []
+        for r in sorted(wt_recs, key=lambda x: x.get("date", "")):
+            v = safe_float(r, "weight_lbs")
+            if v is not None:
+                wt_vals.append(v)
+
+        rate_alert = False
+        rate_lbs_week = None
+        if len(wt_vals) >= 4:
+            # Regression slope over the 14-day window → lbs/day → lbs/week
+            slope = _linreg_slope(wt_vals)  # lbs/day (negative = losing)
+            if slope is not None:
+                rate_lbs_week = abs(slope) * 7  # absolute weekly loss
+                if rate_lbs_week > DEFICIT_RATE_THRESHOLD_LBS_WEEK:
+                    rate_alert = True
+
+        # ── Tier B: multi-signal check ───────────────────────────────────────
+        multi_alert     = False
+        hrv_drop_fired  = False
+        sleep_fired     = False
+        t0_fail_fired   = False
+
+        # HRV: compare 7d recent vs 14d baseline (same as slow_drift logic)
+        hrv_baseline_start = (yest - timedelta(days=21)).isoformat()
+        hrv_baseline_end   = (yest - timedelta(days=8)).isoformat()
+        hrv_recent_start   = (yest - timedelta(days=7)).isoformat()
+
+        hrv_baseline_recs = fetch_range("whoop", hrv_baseline_start, hrv_baseline_end)
+        hrv_recent_recs   = fetch_range("whoop", hrv_recent_start, yesterday_str)
+
+        baseline_hrv_vals = [safe_float(r, "hrv") for r in hrv_baseline_recs
+                             if safe_float(r, "hrv") is not None]
+        recent_hrv_vals   = [safe_float(r, "hrv") for r in hrv_recent_recs
+                             if safe_float(r, "hrv") is not None]
+
+        if len(baseline_hrv_vals) >= 7 and len(recent_hrv_vals) >= 3:
+            baseline_hrv_mean = sum(baseline_hrv_vals) / len(baseline_hrv_vals)
+            recent_hrv_mean   = sum(recent_hrv_vals) / len(recent_hrv_vals)
+            if baseline_hrv_mean > 0:
+                hrv_drop_pct = (baseline_hrv_mean - recent_hrv_mean) / baseline_hrv_mean
+                if hrv_drop_pct >= DEFICIT_HRV_DROP_PCT:
+                    hrv_drop_fired = True
+
+        # Sleep efficiency: count days <80% in last 7d
+        sleep_eff_vals = []
+        for r in hrv_recent_recs:
+            v = safe_float(r, "sleep_efficiency_percentage")
+            if v is not None:
+                sleep_eff_vals.append(v)
+        bad_sleep_days = sum(1 for v in sleep_eff_vals if v < DEFICIT_SLEEP_EFF_FLOOR)
+        if bad_sleep_days >= DEFICIT_SLEEP_BAD_DAYS_GATE:
+            sleep_fired = True
+
+        # T0 habits: count distinct T0 failures this week
+        if habit_7d:
+            sorted_habits = sorted(habit_7d, key=lambda x: x.get("date", ""))
+            recent_habits = sorted_habits[-7:]
+            all_missed = []
+            for r in recent_habits:
+                all_missed.extend(r.get("missed_tier0") or [])
+            unique_failed = len(set(all_missed))
+            if unique_failed >= DEFICIT_T0_FAIL_GATE:
+                t0_fail_fired = True
+
+        multi_channels = sum([hrv_drop_fired, sleep_fired, t0_fail_fired])
+        if multi_channels >= 2:
+            multi_alert = True
+
+        # ── Neither tier fired → clean return ────────────────────────────────
+        if not rate_alert and not multi_alert:
+            logger.info(
+                "S2-T1-9: No deficit ceiling alert (rate=%.2f lbs/wk, multi_channels=%d/%d)",
+                rate_lbs_week or 0, multi_channels, 3
+            )
+            return None, ""
+
+        # ── Build prescription ────────────────────────────────────────────────
+        cal_target     = profile.get("calorie_target", 1800)
+        new_ceiling    = cal_target + DEFICIT_KCAL_INCREASE
+        prot_target    = profile.get("protein_target_g", 190)
+
+        rate_str = f"{rate_lbs_week:.1f} lbs/wk" if rate_lbs_week else "unknown"
+
+        if multi_alert:
+            tier = "multi"
+            headline = "🚨 DEFICIT CEILING BREACHED — MULTI-SIGNAL (BS-12)"
+            channels_desc = ", ".join([
+                x for x, fired in [
+                    ("HRV ↓ >15%",               hrv_drop_fired),
+                    (f"sleep eff <{int(DEFICIT_SLEEP_EFF_FLOOR)}% ({bad_sleep_days}+ days)", sleep_fired),
+                    (f"{unique_failed if t0_fail_fired else '?'} T0 habits failing",            t0_fail_fired),
+                ] if fired
+            ])
+            body = (
+                f"  {channels_desc}
+"
+                f"  Weight rate: {rate_str}"
+            )
+        else:
+            tier = "rate"
+            headline = f"⚠️ DEFICIT RATE ALERT (S2-T1-9): {rate_str} loss — threshold >{DEFICIT_RATE_THRESHOLD_LBS_WEEK} lbs/wk"
+            body = f"  Weight loss rate exceeds safe threshold for lean tissue preservation."
+
+        prescription = (
+            f"  PRESCRIPTION: Increase daily calorie target by {DEFICIT_KCAL_INCREASE} kcal for "
+            f"{DEFICIT_REASSESS_DAYS} days ({cal_target} → {new_ceiling} kcal/day). "
+            f"Maintain protein at {prot_target}g. Reassess trend at day {DEFICIT_REASSESS_DAYS}."
+        )
+
+        instruction = (
+            "INSTRUCTION: Name this directly and prescribe the specific calorie adjustment above. "
+            "Do NOT soften with vague language like 'consider eating more'. "
+            "Norton: lean tissue loss at this rate is irreversible on a fat-loss timeline. "
+            "Attia: the goal is fat loss, not weight loss — protect the muscle. "
+            "Give the exact number: increase to {new_ceiling} kcal/day for {reassess} days.".format(
+                new_ceiling=new_ceiling, reassess=DEFICIT_REASSESS_DAYS
+            )
+        )
+
+        disclaimer = "  _For personal tracking only. Consult a qualified healthcare provider for medical decisions._"
+
+        alert_block = "
+".join([headline, body, prescription, instruction, disclaimer])
+
+        logger.warning(
+            "S2-T1-9: Deficit ceiling alert FIRED — tier=%s, rate=%.2f lbs/wk, "
+            "hrv_drop=%s, sleep=%s, t0_fail=%s",
+            tier, rate_lbs_week or 0, hrv_drop_fired, sleep_fired, t0_fail_fired
+        )
+        return tier, alert_block
+
+    except Exception as e:
+        logger.warning("S2-T1-9 deficit ceiling check failed (non-fatal): %s", e)
+        return None, ""
+
 # ==============================================================================
 # AI CONTEXT BLOCK ASSEMBLER  (priority queue version — IC-19 v1.3.0)
 # ==============================================================================
@@ -1424,7 +1601,9 @@ def build_ai_context_block(momentum_signal, this_week_avg, prev_week_avg, trend_
                             experiment_ctx="",
                             social_flag="",
                             decision_fatigue_block="",
-                            acwr_signal=None):
+                            acwr_signal=None,
+                            deficit_ceiling_block="",
+                            deficit_ceiling_tier=None):
     """Assemble the compact text block injected into all Daily Brief AI prompts.
 
     Delegates to _build_prioritized_context_block() with priority-ranked signals.
@@ -1438,6 +1617,14 @@ def build_ai_context_block(momentum_signal, this_week_avg, prev_week_avg, trend_
     # P1: IC-5 Early Warning (always surfaces)
     if early_warning_block:
         signals.append({"priority": 1, "content": early_warning_block, "token_estimate": 60})
+
+    # P1b: S2-T1-9 Multi-signal deficit ceiling (always surfaces — physiological cost is real)
+    if deficit_ceiling_block and deficit_ceiling_tier == "multi":
+        signals.append({"priority": 1, "content": deficit_ceiling_block, "token_estimate": 70})
+
+    # P2b: Rate-only deficit ceiling (elevated priority — medical threshold exceeded)
+    if deficit_ceiling_block and deficit_ceiling_tier == "rate":
+        signals.append({"priority": 2, "content": deficit_ceiling_block, "token_estimate": 55})
 
     # P2: Severe slow drift (displaces lower signals — Attia/Henning)
     if slow_drift_metrics:
@@ -1724,6 +1911,18 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.warning("IC-28 ACWR signal failed (non-fatal): %s", e)
 
+    # ── 5i. S2-T1-9: Adaptive Deficit Ceiling Alert (non-fatal) ──────────────────
+    deficit_ceiling_tier, deficit_ceiling_block = None, ""
+    try:
+        deficit_ceiling_tier, deficit_ceiling_block = _compute_deficit_ceiling_alert(
+            yesterday_str, habit_7d, computed_7d, profile
+        )
+        if deficit_ceiling_tier:
+            logger.warning("S2-T1-9: Deficit ceiling alert tier=%s fired for %s",
+                           deficit_ceiling_tier, yesterday_str)
+    except Exception as e:
+        logger.warning("S2-T1-9 deficit ceiling failed (non-fatal): %s", e)
+
     # ── 6. Assemble AI context block ──
     ai_block = build_ai_context_block(
         momentum_signal, this_week_avg, prev_week_avg, trend_pct,
@@ -1733,7 +1932,9 @@ def lambda_handler(event, context):
         experiment_ctx=experiment_ctx,
         social_flag=social_flag,
         decision_fatigue_block=decision_fatigue_block,
-        acwr_signal=acwr_signal)
+        acwr_signal=acwr_signal,
+        deficit_ceiling_block=deficit_ceiling_block,
+        deficit_ceiling_tier=deficit_ceiling_tier)
     logger.info(f"AI context block: {len(ai_block)} chars")
 
     # ── 7. Store ──
@@ -1765,4 +1966,5 @@ def lambda_handler(event, context):
         "ic5_warning":           ic5_warning,
         "ic5_markers":           ic5_markers,
         "decision_fatigue_fired": df_fired,
+        "deficit_ceiling_tier": deficit_ceiling_tier,
     }
