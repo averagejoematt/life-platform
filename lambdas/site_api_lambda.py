@@ -463,7 +463,8 @@ def handle_status() -> dict:
     Cache: 60s.
     """
     try:
-        table.load()
+        # Use GetItem (allowed by policy) rather than table.load() which triggers DescribeTable
+        table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
         return _ok({"status": "ok", "platform": "life-platform"}, cache_seconds=60)
     except Exception as e:
         return _error(503, f"DynamoDB unavailable: {e}")
