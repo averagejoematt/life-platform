@@ -53,6 +53,74 @@ html, body {
   padding: var(--space-20) var(--page-padding);
 }
 
+/* ── Challenge Ticker Bar ───────────────────────────────── */
+.challenge-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: calc(var(--z-nav) - 1);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 var(--page-padding);
+  gap: var(--space-4);
+  overflow: hidden;
+}
+.challenge-bar__label {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--ls-tag);
+  text-transform: uppercase;
+  color: var(--accent);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.challenge-bar__divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+.challenge-bar__text {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+.challenge-bar__text strong {
+  color: var(--text);
+}
+.challenge-bar__progress {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--ls-tag);
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.challenge-bar__pip {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+/* Give footer room above challenge bar */
+body { padding-bottom: 36px; }
+@media (max-width: 768px) {
+  .challenge-bar__text { display: none; }
+  body { padding-bottom: 36px; }
+}
+
 /* ── Nav ─────────────────────────────────────────────────── */
 .nav {
   position: fixed;

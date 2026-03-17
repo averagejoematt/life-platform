@@ -1236,6 +1236,94 @@ def _build_experiment_context(yesterday_str, profile):
 
 
 # ==============================================================================
+# IC-28: ACWR TRAINING LOAD SIGNAL
+# Reads ACWR fields written to computed_metrics by acwr-compute Lambda.
+# acwr-compute runs at 9:55 AM PT (16:55 UTC); daily-insight-compute runs at
+# 10:45 AM PT (17:45 UTC) — data is always available by the time this runs.
+# ==============================================================================
+
+def _build_acwr_signal(computed_7d):
+    """IC-28: Extract ACWR training load status from computed_metrics.
+
+    Returns a signal dict for the priority queue, or None if no ACWR data.
+    Priority assignment:
+      - danger/caution (alert=True): P4 — alongside significant drift, warrants
+        explicit training prescription in the Daily Brief
+      - detraining (alert=True, zone=detraining): P4 — under-stimulation is also
+        actionable
+      - safe (alert=False): P8 — informational acknowledgement only
+      - no data / unknown: None — skip entirely
+    """
+    # Take the most recent record with ACWR fields
+    latest = None
+    for rec in sorted(computed_7d, key=lambda x: x.get("date", ""), reverse=True):
+        if rec.get("acwr_zone") and rec.get("acwr_zone") != "unknown":
+            latest = rec
+            break
+
+    if not latest:
+        return None
+
+    acwr      = safe_float(latest, "acwr")
+    zone      = latest.get("acwr_zone", "unknown")
+    alert     = bool(latest.get("acwr_alert"))
+    reason    = latest.get("acwr_alert_reason", "")
+    acute_7d  = safe_float(latest, "acute_load_7d")
+    chron_28d = safe_float(latest, "chronic_load_28d")
+
+    if zone == "unknown" or acwr is None:
+        return None
+
+    # Build signal content
+    acwr_str  = f"{acwr:.2f}" if acwr is not None else "?"
+    acute_str = f"{acute_7d:.1f}" if acute_7d is not None else "?"
+    chron_str = f"{chron_28d:.1f}" if chron_28d is not None else "?"
+
+    ZONE_ICONS = {
+        "danger":     "\U0001f6a8",
+        "caution":    "\u26a0\ufe0f",
+        "detraining": "\U0001f4c9",
+        "safe":       "\u2705",
+    }
+    icon = ZONE_ICONS.get(zone, "\u2139\ufe0f")
+
+    if zone == "danger":
+        instruction = (
+            "INSTRUCTION: ACWR is in the DANGER zone. Name this explicitly in training guidance. "
+            "Prescribe specific reductions: e.g. 'Zone 2 walk only, no strength today', "
+            "or 'reduce planned volume by 40-50%'. Do NOT coach as a normal training day."
+        )
+        priority = 4
+    elif zone == "caution":
+        instruction = (
+            "INSTRUCTION: ACWR is elevated — injury risk is real. "
+            "Prescribe volume reduction today: lower intensity, avoid new PRs, "
+            "prioritise recovery session if scheduled."
+        )
+        priority = 4
+    elif zone == "detraining":
+        instruction = (
+            "INSTRUCTION: ACWR is below 0.8 — chronic load exceeds acute. "
+            "Gently flag under-stimulation risk. Suggest a training session today "
+            "if recovery metrics support it. Don't alarm — this is an opportunity."
+        )
+        priority = 4
+    else:  # safe
+        instruction = "Training load is in the optimal zone."
+        priority = 8
+
+    content = (
+        f"{icon} TRAINING LOAD (ACWR) — IC-28: "
+        f"ACWR {acwr_str} ({zone.upper()}) | "
+        f"7d acute: {acute_str} | 28d chronic: {chron_str}\n"
+        f"  {reason}\n"
+        f"  {instruction}"
+    )
+
+    return {"priority": priority, "content": content, "token_estimate": 45}
+
+
+# ==============================================================================
 # BS-MP3: DECISION FATIGUE DETECTOR (proactive)
 # ==============================================================================
 
@@ -1335,7 +1423,8 @@ def build_ai_context_block(momentum_signal, this_week_avg, prev_week_avg, trend_
                             slow_drift_metrics=None,
                             experiment_ctx="",
                             social_flag="",
-                            decision_fatigue_block=""):
+                            decision_fatigue_block="",
+                            acwr_signal=None):
     """Assemble the compact text block injected into all Daily Brief AI prompts.
 
     Delegates to _build_prioritized_context_block() with priority-ranked signals.
@@ -1368,6 +1457,10 @@ def build_ai_context_block(momentum_signal, this_week_avg, prev_week_avg, trend_
 
     # P3b: Sustained anomaly context (informational only — full alert sent separately)
     # (No content here — the anomaly detector sends its own email; we just note it)
+
+    # P4: ACWR training load alert (danger/caution/detraining)
+    if acwr_signal and acwr_signal.get("priority", 99) <= 4:
+        signals.append(acwr_signal)
 
     # P4: Significant slow drift
     if slow_drift_metrics:
@@ -1413,6 +1506,10 @@ def build_ai_context_block(momentum_signal, this_week_avg, prev_week_avg, trend_
     # P7: Active experiments (descriptive)
     if experiment_ctx:
         signals.append({"priority": 7, "content": experiment_ctx, "token_estimate": 60})
+
+    # P8: ACWR safe zone (informational)
+    if acwr_signal and acwr_signal.get("priority", 99) >= 8:
+        signals.append(acwr_signal)
 
     # P8: Improving metrics
     for imp in improving[:2]:
@@ -1617,6 +1714,16 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.warning("BS-MP3 failed (non-fatal): %s", e)
 
+    # ── 5h. IC-28: ACWR Training Load Signal ────────────────────────────────────────
+    acwr_signal = None
+    try:
+        acwr_signal = _build_acwr_signal(computed_7d)
+        if acwr_signal:
+            zone = acwr_signal["content"].split("(")[1].split(")")[0] if "(" in acwr_signal["content"] else "?"
+            logger.info("IC-28: ACWR signal built — zone=%s priority=%d", zone, acwr_signal["priority"])
+    except Exception as e:
+        logger.warning("IC-28 ACWR signal failed (non-fatal): %s", e)
+
     # ── 6. Assemble AI context block ──
     ai_block = build_ai_context_block(
         momentum_signal, this_week_avg, prev_week_avg, trend_pct,
@@ -1625,7 +1732,8 @@ def lambda_handler(event, context):
         slow_drift_metrics=slow_drift_metrics,
         experiment_ctx=experiment_ctx,
         social_flag=social_flag,
-        decision_fatigue_block=decision_fatigue_block)
+        decision_fatigue_block=decision_fatigue_block,
+        acwr_signal=acwr_signal)
     logger.info(f"AI context block: {len(ai_block)} chars")
 
     # ── 7. Store ──

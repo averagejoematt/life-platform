@@ -1,5 +1,43 @@
 # Life Platform — Changelog
 
+## v3.7.65 — 2026-03-17: Sprint 3 partial — IC-28, WEB-WCT, BS-13 deployed
+
+### Summary
+First Sprint 3 session. 3 of 9 Sprint 3 features shipped. IC-28 wires ACWR training load into Daily Brief context. WEB-WCT adds a persistent weekly challenge ticker to all 5 site pages. BS-13 launches the `/experiments` public archive page. BS-T2-5 assessed: 90% complete (pipeline already works, rate bump + token-based unsubscribe remain). MCP `Key` import error flagged for cleanup.
+
+### IC-28: Training Load Intelligence (IC feature)
+- `lambdas/daily_insight_compute_lambda.py`: `_build_acwr_signal()` added. Reads ACWR fields (`acwr`, `acwr_zone`, `acwr_alert`, `acwr_alert_reason`, `acute_load_7d`, `chronic_load_28d`) from `computed_7d` records. Injects as priority-4 signal (danger/caution/detraining) or priority-8 (safe) into `ai_context_block`. Wired in `lambda_handler` step 5h (non-fatal). **DEPLOYED ✅**
+- `lambdas/ai_calls.py`: `_build_acwr_coaching_context()` added. Reads ACWR from `data["computed_metrics"]`. Zone-specific coaching rules injected into `call_training_nutrition_coach` prompt — DANGER zone is a hard instruction. **DEPLOYED ✅** (via daily-brief multi-file deploy)
+- Timing confirmed correct: ACWR runs 9:55 AM PT (16:55 UTC), insight-compute runs 10:45 AM PT (17:45 UTC). No CDK change needed.
+
+### WEB-WCT: Weekly Challenge Ticker
+- `site/assets/css/base.css`: `.challenge-bar` component added — fixed bottom bar, 36px height, amber pip + label + text + progress. `body { padding-bottom: 36px }` added. Mobile: text hidden, label only.
+- `site/config/current_challenge.json`: Seeded to S3 (`site/config/current_challenge.json`). Week 4 challenge: "4+ protein feedings of 30g+ daily".
+- `lambdas/site_api_lambda.py`: `/api/current_challenge` route added. Reads from S3 `site/config/current_challenge.json` via boto3 (not public URL). Route registered in ROUTES dict. IAM `S3SiteConfigRead` policy added inline and to `role_policies.py`. **DEPLOYED ✅** (us-east-1 direct zip deploy)
+- `site/index.html`, `site/journal/index.html`, `site/character/index.html`, `site/platform/index.html`: Challenge bar HTML + fetch script added before `</body>`. **S3 SYNCED ✅**
+- `cdk/stacks/role_policies.py`: `site_api()` updated with `S3SiteConfigRead` statement (`s3:GetObject` on `site/config/*`). IAM inline policy applied live via `aws iam put-role-policy`.
+- Smoke test: `curl https://averagejoematt.com/api/current_challenge` returns full challenge JSON. ✅
+
+### BS-13: N=1 Experiment Archive (Website)
+- `site/experiments/index.html`: New page. Reads from `/api/experiments`. Filter buttons (All / Active / Completed / Abandoned). Experiment cards with status badge, hypothesis, day counter, 4-field data grid, outcome row. Active experiments show amber top-border accent. Empty state with graceful message. N=1 methodology explainer strip (H/P/D). Full Signal aesthetic. **DEPLOYED ✅** (`/experiments/` live)
+- `/api/experiments` endpoint: already live from BS-07 — no changes needed.
+- Challenge ticker included on `/experiments/` page.
+
+### BS-T2-5: Chronicle Newsletter Full Delivery (Assessment)
+- `wednesday_chronicle_lambda.py` already includes `publish_to_journal()` — writes `site/journal/posts/week-{nn}/index.html` + `site/journal/posts.json` manifest. ✅
+- `chronicle_email_sender_lambda.py` (BS-03) already delivers to confirmed subscribers. ✅
+- **Remaining gaps (not blocking):** SEND_RATE_PER_SEC still at 1.0 (needs bump to 14.0 now SES production confirmed); unsubscribe link uses raw email instead of token. Flagged for next session.
+
+### Bug flagged
+- MCP `list_experiments` (and others): `NameError: name 'Key' is not defined`. Transient or import-level bug in MCP Lambda. Source not yet identified. Needs CloudWatch log investigation next session.
+
+### Infrastructure
+- `life-platform-site-api` (us-east-1): deployed 3x this session (path fix, code fix, final). Live with `/api/current_challenge` route.
+- CloudFront invalidations: `/assets/css/base.css`, `/`, `/journal/`, `/character/`, `/platform/`, `/experiments/`.
+- S3 synced: `site/` (all pages + CSS), `site/experiments/index.html`, `site/config/current_challenge.json`.
+
+---
+
 ## v3.7.64 — 2026-03-17: Sprint 2 complete — BS-MP3, BS-TR1, BS-TR2, BS-BH1, BS-07, BS-08, BS-SL2
 
 ### Summary
