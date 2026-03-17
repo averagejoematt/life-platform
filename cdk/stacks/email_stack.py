@@ -93,7 +93,7 @@ class EmailStack(Stack):
             memory_mb=256,
             environment={
                 "SITE_URL":          "https://averagejoematt.com",
-                "SEND_RATE_PER_SEC": "1.0",
+                "SEND_RATE_PER_SEC": "14.0",
             },
             custom_policies=rp.email_chronicle_sender(),
             **shared,

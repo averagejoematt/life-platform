@@ -129,7 +129,7 @@ def _get_confirmed_subscribers() -> list[dict]:
 # EMAIL BUILDER
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _build_subscriber_email(installment: dict, subscriber_email: str) -> tuple[str, str]:
+def _build_subscriber_email(installment: dict, subscriber: dict) -> tuple[str, str]:
     """
     Build the subscriber-facing Chronicle email.
     Signal-branded (Ava Moreau directive). Newsletter format.
@@ -283,7 +283,7 @@ def lambda_handler(event, context):
         if not email:
             continue
 
-        subject, html = _build_subscriber_email(installment, email)
+        subject, html = _build_subscriber_email(installment, sub)
 
         try:
             ses.send_email(

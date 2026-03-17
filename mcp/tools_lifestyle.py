@@ -7,6 +7,7 @@ import re
 import logging
 from datetime import datetime, timedelta
 from collections import defaultdict
+from boto3.dynamodb.conditions import Key
 
 from mcp.config import (
     table, s3_client, S3_BUCKET, USER_PREFIX, USER_ID, SOURCES,
