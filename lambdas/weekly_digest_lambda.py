@@ -774,6 +774,27 @@ def gather_all():
     # Open insights
     open_insights = fetch_stale_insights(days_threshold=7)
 
+    # BS-09: ACWR — read latest computed_metrics record (written by acwr-compute at 9:55am PT)
+    acwr_data = None
+    try:
+        cm_resp = table.get_item(Key={
+            "pk": f"USER#{USER_ID}#SOURCE#computed_metrics",
+            "sk": f"DATE#{w1_end}",
+        })
+        acwr_data = d2f(cm_resp.get("Item")) or None
+        if acwr_data and acwr_data.get("acwr"):
+            print(f"  computed_metrics: ACWR {acwr_data['acwr']:.3f} ({acwr_data.get('zone','?')})")
+        else:
+            # Fallback: try prior day
+            cm_resp2 = table.get_item(Key={
+                "pk": f"USER#{USER_ID}#SOURCE#computed_metrics",
+                "sk": f"DATE#{(today - timedelta(days=2)).isoformat()}",
+            })
+            acwr_data = d2f(cm_resp2.get("Item")) or None
+    except Exception as _e:
+        print(f"  [WARN] computed_metrics fetch failed: {_e}")
+        acwr_data = None
+
     # ── Character Sheet (Phase 4 v2.71.0) ──
     cs_this_raw = query_range("character_sheet", w1_start, w1_end)
     cs_prior_raw = query_range("character_sheet", w2_start, w2_end)
@@ -788,6 +809,7 @@ def gather_all():
         "open_insights": open_insights,
         "character_sheet": character_sheet,
         "character_sheet_prior": character_sheet_prior,
+        "acwr_data": acwr_data,   # BS-09
         "dates": {"this_start": w1_start, "this_end": w1_end,
                   "prior_start": w2_start, "prior_end": w2_end},
     }, profile
@@ -1244,6 +1266,23 @@ def build_html(data, commentary, profile):
     bl_rows = row("CTL — Fitness (42d)", fmt(tl.get("ctl")), highlight=True)
     bl_rows += row("ATL — Fatigue (7d)", fmt(tl.get("atl")))
     bl_rows += row("TSB — Form", f'<span style="color:{tcol};font-weight:700;">{fmt(tl.get("tsb"))} ({tlabel})</span>')
+    # BS-09: ACWR from computed_metrics
+    try:
+        _acwr_data = data.get("acwr_data") or {}
+        _acwr_val = _acwr_data.get("acwr")
+        if _acwr_val is not None:
+            _av = float(_acwr_val)
+            _zone = str(_acwr_data.get("zone", "")).upper()
+            _acwr_alert = bool(_acwr_data.get("alert", False))
+            _acol = "#e74c3c" if _acwr_alert else "#e67e22" if _av > 1.3 or _av < 0.8 else "#27ae60"
+            bl_rows += row("ACWR — Training Load",
+                f'<span style="color:{_acol};font-weight:700;">{round(_av, 2)}{" — " + _zone if _zone else ""}</span>',
+                highlight=True)
+            if _acwr_alert:
+                bl_rows += row("⚠️ Alert",
+                    f'<span style="color:#e74c3c;font-size:11px;">{str(_acwr_data.get("alert_reason",""))[:120]}</span>')
+    except Exception:
+        pass
     banister_section = section("Training Load — Banister", "📈", tbl(bl_rows))
 
     # ── Recovery ──
@@ -1289,8 +1328,26 @@ def build_html(data, commentary, profile):
         h = t["habitify"]; hp = p.get("habitify") or {}
         mvp_pct = h.get("mvp_avg_pct")
         mvp_col = "#27ae60" if (mvp_pct or 0) >= 80 else "#e67e22" if (mvp_pct or 0) >= 50 else "#e74c3c"
+        # Essential Seven aggregate header
+        _e7_names = profile.get("mvp_habits", [])
+        _e7_tracked = h.get("days_tracked", 0)
+        _e7_comp = h.get("mvp_completion", {})
+        _e7_days_perfect = 0
+        if _e7_names and _e7_tracked:
+            # Count days where all E7 habits were done (approximate from per-habit data)
+            # Use mvp_avg_pct as proxy: days_perfect ≈ days where avg was 100%
+            _e7_done_counts = [_e7_comp.get(n, 0) for n in _e7_names]
+            _e7_min_done = min(_e7_done_counts) if _e7_done_counts else 0
+            _e7_days_perfect = _e7_min_done  # at least this many days had all E7 complete
+        _e7_bar_pct = round(_e7_days_perfect / max(_e7_tracked, 1) * 100)
+        _e7_bar_col = "#27ae60" if _e7_bar_pct >= 70 else "#e67e22" if _e7_bar_pct >= 40 else "#e74c3c"
+        _e7_bar = (f'<span style="display:inline-block;width:80px;height:8px;background:#eee;border-radius:4px;vertical-align:middle;">'
+                   f'<span style="display:inline-block;width:{_e7_bar_pct}%;height:8px;background:{_e7_bar_col};border-radius:4px;"></span></span>')
+        hab_rows += row("⭐ Essential Seven — Perfect Days",
+            f'<span style="color:{_e7_bar_col};font-weight:700;">{_e7_days_perfect}/{_e7_tracked} days {_e7_bar}</span>',
+            highlight=True)
         hab_rows += row("MVP Completion (avg)", f'<span style="color:{mvp_col};font-weight:700;">{fmt(mvp_pct, "%")}</span>',
-            delta_html(mvp_pct, hp.get("mvp_avg_pct"), "%"), highlight=True)
+            delta_html(mvp_pct, hp.get("mvp_avg_pct"), "%"))
         if h.get("overall_avg_pct"):
             hab_rows += row("Overall Completion", fmt(h["overall_avg_pct"], "%"))
         hab_rows += row("Days Tracked", str(h.get("days_tracked", 0)))

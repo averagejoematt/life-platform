@@ -1,5 +1,38 @@
 # Life Platform — Changelog
 
+## v3.7.59 — 2026-03-17: Site unification + data fixes + BS-05/BS-09 in Weekly/Chronicle
+
+### Summary
+Full session: Signal teal homepage + subscribe rebuilt on token system, S3 public read restored (P1 recovery gap), homepage JS fixed (nested data paths), daily-brief site_writer data bugs fixed (weight/rate calc), BS-05 badge in Chronicle email, ACWR + Essential Seven in Weekly Digest, TB7-4 complete, TB7-18 confirmed retired.
+
+### Changes
+- `site/index.html`: Rebuilt on Signal token system — dark teal, two-column hero, live vitals grid, data ticker, journey progress bars, inline subscribe form. Fetches `/public_stats.json` with correct nested field paths.
+- `site/subscribe.html`: Rebuilt on token system — teal, two-column, what-you-get panel.
+- `site/`: All S3 pages pulled into repo (character, journal, platform, assets) — fully version controlled.
+- `deploy/bucket_policy.json`: Canonical bucket policy committed (PublicReadSite + PublicReadBlog + ProtectData). Restores public read wiped in P1 recovery.
+- `deploy/post_cdk_reconcile_smoke.sh`: S3 public read check added — curls site/index.html after every CDK deploy.
+- `lambdas/daily_brief_lambda.py`: site_writer data bugs fixed — weight_delta_30d direction, weekly_rate_lbs null guard, hrv/rhr/recovery None guards, tier0_streak + days_in added to platform block, ACWR wired from computed_metrics.
+- `lambdas/wednesday_chronicle_lambda.py`: BS-05 confidence badge on Chronicle email stats line. `compute_confidence(days_of_data=7)` → LOW CONFIDENCE (correct per Henning n<14 rule).
+- `lambdas/weekly_digest_lambda.py`: ACWR row in Banister section (from computed_metrics, with alert row). Essential Seven perfect-days row in Habits section. `acwr_data` fetched in `gather_all()`.
+- `docs/CHANGELOG.md`: P1 recovery gap noted in v3.7.57 entry.
+
+### Deployed
+- `daily-brief` Lambda ✅
+- `weekly-digest` Lambda ✅
+- `wednesday-chronicle` Lambda ✅
+- `site/index.html` + `site/subscribe.html` to S3 ✅
+- CloudFront invalidations (2) ✅
+
+### Also This Session
+- `.git` leak deleted from `site/.git/` in S3
+- TB7-4: `life-platform/api-keys` permanently deleted ✅
+- TB7-18: Confirmed retired (Google Calendar, ADR-030) ✅
+- CDK LifePlatformWeb deployed: E3S424OXQZ8NBE, `/api/subscribe` live ✅
+- CDK LifePlatformCompute + v3.7.55 full deploy ✅
+- ACWR backfill 2026-03-15: 1.056 safe zone ✅
+
+---
+
 ## v3.7.58 — 2026-03-16: BS-09 ACWR in Daily Brief + BS-05 Confidence Badges + CDK Web + TB7-4
 
 ### Summary

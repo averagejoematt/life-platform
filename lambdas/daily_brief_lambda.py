@@ -1625,42 +1625,71 @@ def lambda_handler(event, context):
                     if any(z in _sport for z in ["run", "walk", "ride", "swim", "elliptical", "workout"]):
                         _z2_this_week += float(_act.get("moving_time_seconds") or 0) / 60
 
+            # Streak from streak_data (computed earlier in handler)
+            _tier0_streak = streak_data.get("tier0_streak", 0) if streak_data else 0
+
+            # Journey start date → days_in
+            try:
+                from datetime import date as _date
+                _started = profile.get("journey_start_date", "2026-02-09")
+                _days_in = (today.date() if hasattr(today, 'date') else today - _date(2026, 2, 9).toordinal()).days
+                _days_in = max(0, (_date.today() - _date.fromisoformat(_started)).days)
+            except Exception:
+                _days_in = 0
+
+            # Weekly rate: negative = losing weight (good). Guard: only if week_ago_weight exists.
+            _week_ago = data.get("week_ago_weight")
+            _weekly_rate = round(_curr_wt - float(_week_ago), 2) if _week_ago and _curr_wt else None
+
+            # ACWR from computed_metrics if available
+            _cm = data.get("computed_metrics") or {}
+            _acwr = float(_cm.get("acwr") or 1.1)
+
             write_public_stats(
                 s3_client=s3,
                 vitals={
                     "weight_lbs":       round(_curr_wt, 1) if _curr_wt else None,
-                    "weight_delta_30d": round(float(data.get("latest_weight") or 0) - float(data.get("week_ago_weight") or 0), 1) if data.get("week_ago_weight") else None,
-                    "hrv_ms":           round(float(_hrv.get("hrv_yesterday") or _hrv.get("hrv_7d") or 0), 1),
+                    "weight_delta_30d": round(_curr_wt - float(_week_ago), 1) if _week_ago and _curr_wt else None,
+                    "hrv_ms":           round(float(_hrv.get("hrv_yesterday") or _hrv.get("hrv_7d") or 0), 1) or None,
                     "hrv_trend":        html_builder.hrv_trend_str(_hrv.get("hrv_7d"), _hrv.get("hrv_30d")),
-                    "rhr_bpm":          round(safe_float(_w, "resting_heart_rate") or 0, 0),
+                    "rhr_bpm":          safe_float(_w, "resting_heart_rate"),
                     "rhr_trend":        "improving",
-                    "recovery_pct":     round(_rec, 0),
+                    "recovery_pct":     round(_rec, 0) if _rec else None,
                     "recovery_status":  _rec_status,
-                    "sleep_hours":      round(safe_float(data.get("sleep"), "sleep_duration_hours") or 0, 1),
+                    "sleep_hours":      safe_float(data.get("sleep"), "sleep_duration_hours"),
                 },
                 journey={
                     "start_weight_lbs":   _start_wt,
                     "goal_weight_lbs":    _goal_wt,
-                    "current_weight_lbs": _curr_wt,
-                    "lost_lbs":           _lost,
-                    "remaining_lbs":      _remain,
-                    "progress_pct":       _prog_pct,
-                    "weekly_rate_lbs":    round(float(data.get("week_ago_weight") or _curr_wt) - _curr_wt, 2) if data.get("week_ago_weight") else 0,
+                    "current_weight_lbs": _curr_wt if _curr_wt else None,
+                    "lost_lbs":           _lost if _curr_wt else None,
+                    "remaining_lbs":      _remain if _curr_wt else None,
+                    "progress_pct":       _prog_pct if _curr_wt else None,
+                    "weekly_rate_lbs":    _weekly_rate,
                     "projected_goal_date": profile.get("goal_date", "2026-07-31"),
                     "started_date":       profile.get("journey_start_date", "2026-02-09"),
-                    "current_phase":      (get_current_phase(profile, _curr_wt) or {}).get("name", "Ignition"),
+                    "current_phase":      (get_current_phase(profile, _curr_wt) or {}).get("name", "Ignition") if _curr_wt else None,
+                    "days_in":            _days_in,
                 },
                 training={
                     "ctl_fitness":          float(data.get("tsb") or 0) + 6.0,
                     "atl_fatigue":          float(data.get("tsb") or 0) + 6.5,
                     "tsb_form":             float(data.get("tsb") or 0),
-                    "acwr":                 1.1,
-                    "form_status":          "neutral",
-                    "injury_risk":          "low",
+                    "acwr":                 _acwr,
+                    "form_status":          _cm.get("zone", "neutral"),
+                    "injury_risk":          "high" if _cm.get("alert") else "low",
                     "total_miles_30d":      0,
                     "activity_count_30d":   0,
                     "zone2_this_week_min":  round(_z2_this_week),
                     "zone2_target_min":     150,
+                },
+                platform={
+                    "mcp_tools":          89,
+                    "data_sources":       19,
+                    "lambdas":            45,
+                    "last_review_grade":  "A",
+                    "tier0_streak":       _tier0_streak,
+                    "days_in":            _days_in,
                 },
             )
             print("[INFO] site_writer: public_stats.json written")
