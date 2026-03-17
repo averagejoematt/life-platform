@@ -63,13 +63,16 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 # ── Config ─────────────────────────────────────────────────
-REGION     = os.environ.get("AWS_REGION", "us-west-2")
-TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ.get("USER_ID", "matthew")
+TABLE_NAME  = os.environ.get("TABLE_NAME", "life-platform")
+USER_ID     = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
+# DynamoDB is always us-west-2 even when this Lambda runs in us-east-1 (web stack).
+# DYNAMODB_REGION env var injected by CDK; defaults to us-west-2.
+DDB_REGION = os.environ.get("DYNAMODB_REGION", "us-west-2")
+
 # ── AWS clients (module-level for warm container reuse) ─────
-dynamodb = boto3.resource("dynamodb", region_name=REGION)
+dynamodb = boto3.resource("dynamodb", region_name=DDB_REGION)
 table    = dynamodb.Table(TABLE_NAME)
 
 # ── CORS headers ────────────────────────────────────────────

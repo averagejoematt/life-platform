@@ -212,6 +212,11 @@ class WebStack(Stack):
             custom_policies=rp.site_api(),
             timeout_seconds=15,
             memory_mb=256,
+            environment={
+                "USER_ID":         "matthew",
+                "TABLE_NAME":      "life-platform",
+                "DYNAMODB_REGION": "us-west-2",  # DDB is us-west-2; Lambda runs in us-east-1
+            },
         )
 
         # ══════════════════════════════════════════════════════════════
