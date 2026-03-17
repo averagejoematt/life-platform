@@ -1,0 +1,166 @@
+/*
+  tokens.css — Design token system for averagejoematt.com
+  Signal aesthetic: dark biopunk data terminal
+  Board directive: Jony Ive — "trust the numbers"
+  
+  HOW TO USE:
+    All pages import this file first.
+    Never hardcode a color, font, or spacing value outside this file.
+    Journal pages use --accent-journal instead of --accent.
+    
+  SECTIONS:
+    1. Color primitives
+    2. Semantic tokens (light/dark mode)
+    3. Typography
+    4. Spacing
+    5. Animation
+    6. Z-index
+*/
+
+/* ── 1. Color primitives ─────────────────────────────────── */
+:root {
+  /* Base */
+  --c-black:          #080c0a;
+  --c-surface-1:      #0e1510;
+  --c-surface-2:      #141f17;
+  --c-surface-3:      #1a2c1e;
+
+  /* Signal green (primary accent) */
+  --c-green-500:      #00e5a0;
+  --c-green-400:      #00c88a;
+  --c-green-300:      #00a370;
+  --c-green-100:      rgba(0, 229, 160, 0.12);
+  --c-green-050:      rgba(0, 229, 160, 0.06);
+
+  /* Journal amber (journal/blog accent) */
+  --c-amber-500:      #c8843a;
+  --c-amber-400:      #e09a4a;
+  --c-amber-300:      #a06820;
+  --c-amber-100:      rgba(200, 132, 58, 0.12);
+  --c-amber-050:      rgba(200, 132, 58, 0.06);
+
+  /* Text scale */
+  --c-text-primary:   #e8ede9;
+  --c-text-secondary: #7a9080;
+  --c-text-muted:     #4a6050;
+  --c-text-disabled:  #2a3c30;
+
+  /* Borders */
+  --c-border-strong:  rgba(0, 229, 160, 0.25);
+  --c-border-mid:     rgba(0, 229, 160, 0.12);
+  --c-border-subtle:  rgba(0, 229, 160, 0.06);
+  --c-border-neutral: rgba(255, 255, 255, 0.06);
+
+  /* Status */
+  --c-green-status:   #00e5a0;
+  --c-yellow-status:  #f5a623;
+  --c-red-status:     #ff5252;
+}
+
+/* ── 2. Semantic tokens ──────────────────────────────────── */
+:root {
+  --bg:               var(--c-black);
+  --surface:          var(--c-surface-1);
+  --surface-raised:   var(--c-surface-2);
+  --surface-high:     var(--c-surface-3);
+
+  --accent:           var(--c-green-500);
+  --accent-dim:       var(--c-green-300);
+  --accent-bg:        var(--c-green-100);
+  --accent-bg-subtle: var(--c-green-050);
+
+  /* Journal pages override these two */
+  --accent-journal:        var(--c-amber-500);
+  --accent-journal-dim:    var(--c-amber-300);
+  --accent-journal-bg:     var(--c-amber-100);
+
+  --text:             var(--c-text-primary);
+  --text-muted:       var(--c-text-secondary);
+  --text-faint:       var(--c-text-muted);
+
+  --border:           var(--c-border-mid);
+  --border-strong:    var(--c-border-strong);
+  --border-subtle:    var(--c-border-subtle);
+}
+
+/* ── 3. Typography ───────────────────────────────────────── */
+:root {
+  /* Fonts */
+  --font-display:  'Bebas Neue', 'Impact', sans-serif;
+  --font-mono:     'Space Mono', 'Courier New', monospace;
+  --font-serif:    'Lora', 'Georgia', 'Times New Roman', serif;
+  --font-sans:     'Inter', system-ui, sans-serif;
+
+  /* Scale (display) */
+  --text-hero:     clamp(72px, 9vw, 140px);
+  --text-h1:       clamp(48px, 6vw, 88px);
+  --text-h2:       clamp(36px, 4vw, 56px);
+  --text-h3:       clamp(24px, 3vw, 36px);
+
+  /* Scale (body) */
+  --text-xl:       20px;
+  --text-lg:       16px;
+  --text-base:     14px;
+  --text-sm:       12px;
+  --text-xs:       11px;
+  --text-2xs:      10px;
+
+  /* Line heights */
+  --lh-display:    0.92;
+  --lh-heading:    1.05;
+  --lh-body:       1.75;
+  --lh-mono:       1.6;
+
+  /* Letter spacing */
+  --ls-display:    0.02em;
+  --ls-heading:    0.01em;
+  --ls-label:      0.12em;
+  --ls-tag:        0.2em;
+}
+
+/* ── 4. Spacing ──────────────────────────────────────────── */
+:root {
+  --space-1:    4px;
+  --space-2:    8px;
+  --space-3:    12px;
+  --space-4:    16px;
+  --space-5:    20px;
+  --space-6:    24px;
+  --space-8:    32px;
+  --space-10:   40px;
+  --space-12:   48px;
+  --space-16:   64px;
+  --space-20:   80px;
+  --space-24:   96px;
+  --space-32:   128px;
+
+  /* Layout */
+  --nav-height:     64px;
+  --max-width:      1280px;
+  --content-width:  1100px;
+  --prose-width:    680px;
+  --page-padding:   48px;
+  --page-padding-sm: 24px;
+}
+
+/* ── 5. Animation ────────────────────────────────────────── */
+:root {
+  --ease-out:     cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out:  cubic-bezier(0.83, 0, 0.17, 1);
+  --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --dur-fast:     120ms;
+  --dur-mid:      240ms;
+  --dur-slow:     400ms;
+  --dur-page:     600ms;
+}
+
+/* ── 6. Z-index ──────────────────────────────────────────── */
+:root {
+  --z-base:     0;
+  --z-raised:   10;
+  --z-overlay:  50;
+  --z-nav:      100;
+  --z-modal:    200;
+  --z-toast:    300;
+}

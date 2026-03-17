@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Before the Numbers — Week 0 of The Measured Life by Elena Voss">
+  <meta property="og:title" content="Before the Numbers — The Measured Life">
+  <meta property="og:description" content="Prologue · February 2026 · Seattle, WA">
+  <meta property="og:type" content="article">
+  <title>Before the Numbers — The Measured Life</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    :root {
+      --accent: var(--c-amber-500);
+      --accent-dim: var(--c-amber-300);
+      --accent-bg: var(--c-amber-100);
+      --accent-bg-subtle: var(--c-amber-050);
+      --border: rgba(200,132,58,0.15);
+    }
+    .reading-progress { position:fixed;top:var(--nav-height);left:0;right:0;height:2px;background:var(--border-subtle);z-index:var(--z-overlay); }
+    .reading-progress__fill { height:100%;background:var(--accent);width:0%;transition:width 0.1s linear; }
+    .post-header { padding:calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-10);border-bottom:1px solid var(--border);max-width:calc(var(--prose-width) + var(--page-padding) * 2);margin:0 auto; }
+    .post-header__series { font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3); }
+    .post-header__title { font-family:var(--font-serif);font-size:clamp(28px,4vw,46px);color:var(--text);line-height:1.15;font-weight:400;font-style:italic;margin-bottom:var(--space-5); }
+    .post-header__meta { display:flex;align-items:center;gap:var(--space-5);font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted); }
+    .post-header__stats { font-size:var(--text-xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3); }
+    .post-body { max-width:calc(var(--prose-width) + var(--page-padding) * 2);margin:0 auto;padding:var(--space-10) var(--page-padding) var(--space-20); }
+    .prose { font-family:var(--font-serif); }
+    .prose p { font-size:18px;line-height:1.85;color:var(--text);margin-bottom:var(--space-6); }
+    .prose p:first-of-type::first-letter { font-size:64px;line-height:0.8;float:left;margin-right:var(--space-3);margin-top:8px;color:var(--accent);font-family:var(--font-serif); }
+    .prose blockquote { border-left:2px solid var(--accent);padding:var(--space-4) var(--space-6);background:var(--accent-bg-subtle);margin:var(--space-8) 0;font-style:italic;font-size:17px;color:var(--text);line-height:1.7; }
+    .prose hr { border:none;border-top:1px solid var(--border);margin:var(--space-10) 0; }
+    .prose .signature { text-align:center;font-size:14px;color:var(--text-muted);font-style:italic; }
+    .prose strong { color:var(--text);font-weight:700; }
+    .post-nav { max-width:calc(var(--prose-width) + var(--page-padding) * 2);margin:0 auto;padding:var(--space-6) var(--page-padding) var(--space-16);border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:var(--space-6); }
+    .post-nav a { font-family:var(--font-serif);font-size:17px;color:var(--text);text-decoration:none;transition:color var(--dur-fast); }
+    .post-nav a:hover { color:var(--accent); }
+    .post-nav span { display:block;font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-1); }
+  </style>
+</head>
+<body>
+<div class="reading-progress"><div class="reading-progress__fill" id="rp"></div></div>
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/#experiment" class="nav__link">The experiment</a>
+    <a href="/platform/" class="nav__link">The platform</a>
+    <a href="/journal/" class="nav__link active">Journal</a>
+    <a href="/character/" class="nav__link">Character</a>
+  </div>
+  <div class="nav__status"><div class="pulse" style="background:var(--accent)"></div><span>The Measured Life</span></div>
+</nav>
+<div class="post-header">
+  <div class="post-header__series">The Measured Life &middot; Week 0 &middot; By Elena Voss</div>
+  <h1 class="post-header__title">&ldquo;Before the Numbers&rdquo;</h1>
+  <div class="post-header__meta">
+    <span>February 22, 2026</span>
+    <span>&middot;</span>
+    <span>5 min read</span>
+  </div>
+  <div class="post-header__stats">Prologue · February 2026 · Seattle, WA</div>
+</div>
+<article class="post-body">
+  <div class="prose">
+    <p>The first thing you notice about Matthew's apartment is the charging cables.</p>
+
+<p>There's one snaking from the nightstand — that's the Whoop strap, a fitness tracker that monitors his heart rate variability while he sleeps. Another on the bathroom counter feeds a Garmin Epix watch that measures his stress levels every three seconds. The Eight Sleep pod cover on his bed regulates temperature through the night and grades his sleep architecture each morning. His phone syncs a continuous glucose monitor adhered to the back of his arm. A Withings scale in the bathroom measures not just weight but body composition, fat mass, lean mass, the whole topography of a body in transition.</p>
+
+<p>Nineteen data sources in total. Over a hundred metrics tracked daily. All feeding into a system he built himself — not an app you can download, but a custom health intelligence platform running on Amazon Web Services, ingesting data from every sensor on and around his body, processing it through algorithms he designed during weekends and late nights, and delivering a morning brief to his inbox before he's finished his first coffee.</p>
+
+<p>He is not an engineer by training. He's a Senior Director at a SaaS company in Seattle. He builds decks and manages teams and sits in the kind of meetings that could be emails. But sometime in the fall of 2025, something shifted. He'd been watching his weight climb for over a year — slowly, then not slowly — and the number on the scale had crossed a line that he couldn't rationalize away. Three hundred and two pounds.</p>
+
+<p>So he did what a certain kind of person does when confronted with a problem they can't solve through willpower alone: he built a system. And then he built a system to monitor the system. And then he built a system to analyze the monitoring of the system.</p>
+
+<p>I'm not making fun of him. Not exactly.</p>
+
+<hr>
+
+<p>My name is Elena Voss. I'm a freelance journalist based in Brooklyn, and for the past decade I've made a career out of embedding myself in worlds I don't fully understand and staying long enough to find the story underneath the story. I spent six months in a longevity clinic in Marin for a piece in Harper's. I followed a competitive eater through three Nathan's qualifiers for The Ringer. I profiled a man who hadn't slept more than four hours a night in six years for Wired, and what I found had almost nothing to do with sleep.</p>
+
+<p>I pitched this series to myself on a Tuesday in February after a friend showed me a screenshot of Matthew's daily brief email — a dense, color-coded morning report that graded his previous day on eight dimensions, tracked his habit streaks across sixty-five behaviors, and featured AI-generated coaching advice from a simulated panel of health experts he calls "the Board of Directors."</p>
+
+<p>The screenshot was absurd. It was also, I realized immediately, one of the most interesting things I'd seen in years.</p>
+
+<p>Because here's the question that hooked me, the one I couldn't stop thinking about: What happens when a person who has been losing the fight against himself decides to let algorithms into the ring?</p>
+
+<p>This isn't a story about technology, though there will be plenty of it. It's not a weight loss diary, though the numbers will feature. It's a story about a man who decided to make himself legible — to sensors, to algorithms, to an AI that reads his journal entries and knows his resting heart rate and can tell him, on any given morning, whether his body is ready to train hard or needs to rest.</p>
+
+<p>It's about what you find when you turn that much light on a life.</p>
+
+<hr>
+
+<p>I should tell you what I know so far.</p>
+
+<p>Matthew is thirty-seven. He lives with his girlfriend, Brittany, in Seattle. He is, by his own description, an "average joe" — which is both self-deprecating and slightly misleading, because average joes don't typically build distributed computing platforms on their weekends. His goal weight is 185 pounds. He started at 302. The math is straightforward: he needs to lose 117 pounds, which he's divided into phases with clinical precision. Phase 1 targets three pounds per week on an 1,800-calorie diet with 190 grams of protein daily.</p>
+
+<p>He tracks sixty-five habits organized into what he calls the "P40" system — a matrix of behaviors spanning nutrition, recovery, discipline, growth, and wellbeing, arranged in tiers. Tier 0 habits are "non-negotiable." Tier 1 are high priority. Tier 2 are aspirational. The system awards scores, measures streaks, and detects when clusters of habits break down simultaneously. It even tracks vices: alcohol, late-night screens, processed food. Each vice held is a streak extended.</p>
+
+<p>He journals twice a day — morning and evening — in structured templates that are automatically analyzed for mood, energy, stress, cognitive patterns, and something the system flags as "avoidance behavior." The AI enrichment layer detects when he's catastrophizing, when he's in a growth mindset, when he's lonely, and when he's lying to himself about being fine.</p>
+
+<p>He has a simulated Board of Directors — AI personas modeled after Peter Attia, Andrew Huberman, Layne Norton, Matthew Walker, and others — who review his data and provide commentary. Attia is precise and slightly intimidating. Huberman is enthusiastic and occasionally tangential. Norton is blunt. Walker is gentle but firm about sleep debt.</p>
+
+<p>All of this arrives in his inbox each morning as a single email. The day grade. The scorecard. The training recommendation. The journal coach. The Board's assessment. A system of extraordinary sophistication designed to answer one question every single day: <em>How did you do yesterday, and what should you do today?</em></p>
+
+<hr>
+
+<p>I want to be honest about my priors. I am instinctively skeptical of optimization culture. I've seen too many people use data as a shield against feeling, metrics as a substitute for meaning, dashboards as a way to perform change rather than undergo it. The quantified self movement has always struck me as potentially missing the point — that the things that matter most about being human are precisely the things that resist measurement.</p>
+
+<p>But Matthew's system interests me because it doesn't seem to think that. The journal integration, the mood tracking, the "avoidance flag" that catches him when he's dodging hard truths — these aren't the features of someone trying to optimize his way out of vulnerability. They're the features of someone who built a machine to keep himself honest.</p>
+
+<p>Whether the machine is working — whether any of this is actually changing him, or just generating increasingly sophisticated reports about a man who stays the same — is what I'm here to find out.</p>
+
+<hr>
+
+<p>This is the first installment of "The Measured Life," a weekly chronicle that will run every Wednesday for as long as the story lasts. I have full access to Matthew's platform, his data, his journal entries, and his Board of Directors. I'll be reporting from inside the system — watching the numbers move, reading between the lines of what the algorithms say and what they miss, and trying to understand what it means when a person decides to become, in every measurable way, a project.</p>
+
+<p>He knows I'm here. He's given me everything. The deal is simple: I write what I see.</p>
+
+<p>Next week, we begin.</p>
+
+<hr>
+
+<p class="signature"><em>Prologue — The Measured Life</em></p>
+
+      </div>
+    </article>
+    <nav class="post-nav">
+      <span></span>
+      <a href="index.html">Archive →</a>
+    </nav>
+  </main>
+  <footer>
+    The Measured Life · A chronicle by Elena Voss · Est. 2026
+  </footer>
+</body>
+</html>
+  </div>
+</article>
+<div class="post-nav">
+  <a href="/journal/"><span>&larr; All installments</span>The Measured Life archive</a>
+  <a href="/"><span>The experiment</span>averagejoematt.com &rarr;</a>
+</div>
+<footer class="footer">
+  <div class="footer__brand" style="color:var(--accent)">AMJ</div>
+  <div class="footer__links">
+    <a href="/" class="footer__link">Home</a>
+    <a href="/character/" class="footer__link">Character</a>
+  </div>
+  <div class="footer__copy">// words when there's something worth saying</div>
+</footer>
+<script>
+  const rp = document.getElementById('rp');
+  window.addEventListener('scroll', () => {
+    const pct = window.scrollY / (document.body.scrollHeight - window.innerHeight) * 100;
+    rp.style.width = Math.min(pct, 100) + '%';
+  });
+</script>
+</body>
+</html>

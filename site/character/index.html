@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Character Sheet — tracking life optimization across 7 pillars in real time.">
+  <title>Character Sheet — Matthew Walker</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <style>
+    /* Character page uses teal accent (same as Signal) */
+    .page-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+    }
+    .page-header__kicker { margin-bottom: var(--space-4); }
+    .page-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .page-header__title span { color: var(--accent); }
+    .page-header__sub {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 500px;
+      line-height: var(--lh-body);
+    }
+
+    /* Character card */
+    .character-card {
+      margin: var(--space-12) var(--page-padding);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+    .cc-left {
+      padding: var(--space-10);
+      border-right: 1px solid var(--border);
+    }
+    .cc-level-ring {
+      width: 120px; height: 120px;
+      border: 2px solid var(--accent);
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: var(--space-6);
+      position: relative;
+    }
+    .cc-level-ring::before {
+      content: '';
+      position: absolute;
+      inset: 4px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+    }
+    .cc-level-num {
+      font-family: var(--font-display);
+      font-size: 56px;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .cc-level-label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .cc-title {
+      font-family: var(--font-display);
+      font-size: 36px;
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .cc-tier {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-label);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      border: 1px solid var(--border);
+      padding: var(--space-1) var(--space-3);
+      margin-bottom: var(--space-6);
+    }
+    .cc-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+    }
+    .cc-stat {
+      border-left: 1px solid var(--border);
+      padding-left: var(--space-3);
+    }
+    .cc-stat__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-1); }
+    .cc-stat__value { font-family: var(--font-display); font-size: 28px; color: var(--text); }
+
+    .cc-right { padding: var(--space-10); }
+    .cc-tier-map { margin-bottom: var(--space-8); }
+    .tier-row {
+      display: grid;
+      grid-template-columns: 100px 1fr 80px;
+      align-items: center;
+      gap: var(--space-4);
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--border-subtle);
+      opacity: 0.4;
+    }
+    .tier-row.current { opacity: 1; }
+    .tier-row.current .tier-name { color: var(--accent); }
+    .tier-name { font-family: var(--font-display); font-size: 20px; color: var(--text-muted); }
+    .tier-bar { height: 2px; background: var(--surface-raised); }
+    .tier-bar__fill { height: 100%; background: var(--accent); transition: width 1s var(--ease-out); }
+    .tier-range { font-size: var(--text-xs); color: var(--text-muted); letter-spacing: var(--ls-tag); text-align: right; }
+
+    /* Radar chart */
+    .radar-section {
+      padding: var(--space-12) var(--page-padding);
+      border-top: 1px solid var(--border);
+    }
+    .radar-layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: var(--space-12);
+      align-items: start;
+    }
+    .radar-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-8);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .radar-title {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-4);
+      align-self: flex-start;
+    }
+    .radar-bars {
+      width: 100%;
+    }
+    .radar-bar-row {
+      display: grid;
+      grid-template-columns: 90px 1fr 44px;
+      gap: var(--space-3);
+      align-items: center;
+      margin-bottom: var(--space-3);
+    }
+    .radar-bar-name {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+    }
+    .radar-bar-track {
+      height: 3px;
+      background: var(--surface-raised);
+      overflow: hidden;
+    }
+    .radar-bar-fill {
+      height: 100%;
+      transition: width 1.2s var(--ease-out);
+    }
+    .radar-bar-score {
+      font-size: var(--text-xs);
+      color: var(--text);
+      text-align: right;
+      font-family: var(--font-mono);
+    }
+
+    /* Pillars grid */
+    .pillars-section {
+      padding: var(--space-12) var(--page-padding);
+      border-top: 1px solid var(--border);
+    }
+    .pillars-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-top: var(--space-8);
+    }
+    .pillar-card {
+      background: var(--surface);
+      padding: var(--space-6);
+      transition: background var(--dur-fast);
+    }
+    .pillar-card:hover { background: var(--surface-raised); }
+    .pillar-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-4);
+    }
+    .pillar-card__name {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-label);
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .pillar-card__xp {
+      font-size: var(--text-xs);
+      color: var(--accent);
+    }
+    .pillar-card__xp.neg { color: var(--c-yellow-status); }
+    .pillar-card__level {
+      font-family: var(--font-display);
+      font-size: 48px;
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: var(--space-3);
+    }
+    .pillar-card__bar {
+      height: 2px;
+      background: var(--surface-high);
+      margin-bottom: var(--space-2);
+    }
+    .pillar-card__bar-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 1.2s var(--ease-out);
+    }
+    .pillar-card__raw {
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+    }
+
+    /* Timeline */
+    .timeline-section {
+      padding: var(--space-12) var(--page-padding);
+      border-top: 1px solid var(--border);
+    }
+    .event-list {
+      margin-top: var(--space-8);
+      border: 1px solid var(--border);
+    }
+    .event-row {
+      display: grid;
+      grid-template-columns: 120px 60px 1fr auto;
+      align-items: center;
+      gap: var(--space-4);
+      padding: var(--space-4) var(--space-6);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .event-row:last-child { border-bottom: none; }
+    .event-date { font-size: var(--text-xs); color: var(--accent-dim); letter-spacing: var(--ls-tag); text-transform: uppercase; }
+    .event-arrow { font-family: var(--font-display); font-size: 22px; color: var(--accent); text-align: center; }
+    .event-text { font-size: var(--text-sm); color: var(--text); }
+    .event-levels { font-size: var(--text-xs); color: var(--text-muted); letter-spacing: var(--ls-tag); white-space: nowrap; }
+
+    @media (max-width: 900px) {
+      .character-card { grid-template-columns: 1fr; }
+      .cc-left { border-right: none; border-bottom: 1px solid var(--border); }
+      .pillars-grid { grid-template-columns: 1fr 1fr; }
+      .event-row { grid-template-columns: 90px 40px 1fr; }
+      .event-levels { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/#experiment" class="nav__link">The experiment</a>
+    <a href="/#platform" class="nav__link">The platform</a>
+    <a href="../journal/" class="nav__link">Journal</a>
+    <a href="../character/" class="nav__link active">Character</a>
+  </div>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span>Live</span>
+  </div>
+</nav>
+
+<div class="page-header">
+  <div class="eyebrow page-header__kicker">Character Sheet</div>
+  <h1 class="page-header__title">Level <span id="h-level">2</span> — <span id="h-tier">Foundation</span></h1>
+  <p class="page-header__sub">Life optimization tracked across 7 pillars. Scores are computed nightly from real wearable, habit, and biometric data — not self-reported.</p>
+</div>
+
+<!-- Main character card -->
+<div class="character-card">
+  <div class="cc-left">
+    <div class="cc-level-ring">
+      <div class="cc-level-num" id="cc-level">2</div>
+      <div class="cc-level-label">Level</div>
+    </div>
+    <div class="cc-title" id="cc-name">Matthew Walker</div>
+    <div class="cc-tier" id="cc-tier">🔨 Foundation tier</div>
+    <div class="cc-stats">
+      <div class="cc-stat">
+        <div class="cc-stat__label">Total XP</div>
+        <div class="cc-stat__value" id="cc-xp">38</div>
+      </div>
+      <div class="cc-stat">
+        <div class="cc-stat__label">Days active</div>
+        <div class="cc-stat__value" id="cc-days">20</div>
+      </div>
+      <div class="cc-stat">
+        <div class="cc-stat__label">Level events</div>
+        <div class="cc-stat__value" id="cc-events">16</div>
+      </div>
+      <div class="cc-stat">
+        <div class="cc-stat__label">Next tier</div>
+        <div class="cc-stat__value" id="cc-next">Lv 21</div>
+      </div>
+    </div>
+  </div>
+  <div class="cc-right">
+    <div class="label" style="margin-bottom:var(--space-5)">Tier progression</div>
+    <div class="cc-tier-map" id="tier-map">
+      <!-- Injected by JS -->
+    </div>
+    <div class="label label-accent" style="margin-top:var(--space-4)">// Tiers unlock through sustained performance over multiple weeks. Level 21 required for Momentum.</div>
+  </div>
+</div>
+
+<!-- Radar chart -->
+<section class="radar-section">
+  <div class="eyebrow">Pillar radar</div>
+  <div class="radar-layout">
+    <div class="radar-container">
+      <div class="radar-title">// seven pillars — live scores</div>
+      <svg id="radar-svg" viewBox="0 0 280 280" width="260" height="260" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div>
+      <div class="label label-accent" style="margin-bottom:var(--space-5);">Score breakdown</div>
+      <div class="radar-bars" id="radar-bars"></div>
+      <div style="margin-top:var(--space-6);padding-top:var(--space-6);border-top:1px solid var(--border);">
+        <div class="label" style="margin-bottom:var(--space-4);">Score legend</div>
+        <div style="display:flex;gap:var(--space-6);flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-xs);color:var(--text-muted);"><div style="width:8px;height:8px;background:#1D9E75;border-radius:50%;"></div> 50+ strong</div>
+          <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-xs);color:var(--text-muted);"><div style="width:8px;height:8px;background:#BA7517;border-radius:50%;"></div> 25–49 building</div>
+          <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-xs);color:var(--text-muted);"><div style="width:8px;height:8px;background:#E24B4A;border-radius:50%;"></div> &lt;25 focus area</div>
+          <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-xs);color:var(--text-muted);"><div style="width:8px;height:8px;background:#4a6050;border-radius:50%;"></div> no data</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Pillars -->
+<section class="pillars-section">
+  <div class="eyebrow">7 pillars</div>
+  <h2 class="text-h3" style="color:var(--text)">Pillar scores</h2>
+  <div class="pillars-grid" id="pillars-grid">
+    <!-- Injected by JS -->
+  </div>
+</section>
+
+<!-- Timeline -->
+<section class="timeline-section">
+  <div class="eyebrow">Level history</div>
+  <h2 class="text-h3" style="color:var(--text)">Event log</h2>
+  <div class="event-list" id="event-list">
+    <!-- Injected by JS -->
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="footer__brand">AMJ</div>
+  <div class="footer__links">
+    <a href="/" class="footer__link">Home</a>
+    <a href="../journal/" class="footer__link">Journal</a>
+  </div>
+  <div class="footer__copy">// updated nightly by character-sheet-compute</div>
+</footer>
+
+<script>
+  const DEFAULTS = { character:{ level:2, tier:'Foundation', tier_emoji:'🔨', xp_total:38, days_active:20, level_events_count:16, next_tier:'Momentum', next_tier_level:21 }, pillars:[ { name:'sleep', emoji:'😴', level:2, raw_score:60.0, xp_delta:2, trend:'up' }, { name:'movement', emoji:'🏋️', level:2, raw_score:0.0, xp_delta:-1, trend:'neutral' }, { name:'nutrition', emoji:'🥗', level:2, raw_score:12.2, xp_delta:-1, trend:'neutral' }, { name:'metabolic', emoji:'📊', level:2, raw_score:40.0, xp_delta:1, trend:'up' }, { name:'mind', emoji:'🧠', level:2, raw_score:7.1, xp_delta:-1, trend:'neutral' }, { name:'relationships', emoji:'💬', level:2, raw_score:40.0, xp_delta:1, trend:'up' }, { name:'consistency', emoji:'🎯', level:2, raw_score:14.3, xp_delta:-1, trend:'neutral' } ], timeline:[ { date:'2026-02-22', character_level:1, event:'Platform activated' }, { date:'2026-02-26', character_level:2, event:'First level up — all pillars' }, { date:'2026-02-28', character_level:2, event:'Nutrition joins the board' }, { date:'2026-03-11', character_level:2, event:'Second tier cycle complete' } ], tiers:[ { name:'Foundation', emoji:'🔨', min_level:1, max_level:20, status:'current' }, { name:'Momentum', emoji:'🔥', min_level:21, max_level:40, status:'locked' }, { name:'Discipline', emoji:'⚔️', min_level:41, max_level:60, status:'locked' }, { name:'Mastery', emoji:'🏆', min_level:61, max_level:80, status:'locked' }, { name:'Elite', emoji:'👑', min_level:81, max_level:100, status:'locked' } ] };
+
+  function hydrate(data) {
+    const { character, pillars, timeline, tiers } = data;
+
+    // Header
+    document.getElementById('h-level').textContent = character.level;
+    document.getElementById('h-tier').textContent  = character.tier;
+    document.getElementById('cc-level').textContent = character.level;
+    document.getElementById('cc-tier').textContent  = `${character.tier_emoji} ${character.tier} tier`;
+    document.getElementById('cc-xp').textContent   = character.xp_total;
+    document.getElementById('cc-days').textContent  = character.days_active;
+    document.getElementById('cc-events').textContent = character.level_events_count;
+    document.getElementById('cc-next').textContent  = `Lv ${character.next_tier_level}`;
+
+    // Tier map
+    const tierMap = document.getElementById('tier-map');
+    tierMap.innerHTML = tiers.map(t => {
+      const progress = t.status === 'current'
+        ? Math.min(((character.level - t.min_level) / (t.max_level - t.min_level)) * 100, 100)
+        : t.status === 'locked' ? 0 : 100;
+      return `<div class="tier-row ${t.status === 'current' ? 'current' : ''}">
+        <div class="tier-name">${t.emoji} ${t.name}</div>
+        <div class="tier-bar"><div class="tier-bar__fill" style="width:${progress}%"></div></div>
+        <div class="tier-range">${t.min_level}–${t.max_level}</div>
+      </div>`;
+    }).join('');
+
+    // Pillars
+    const pg = document.getElementById('pillars-grid');
+    pg.innerHTML = pillars.map(p => {
+      const xpSign = p.xp_delta >= 0 ? '+' : '';
+      const xpClass = p.xp_delta >= 0 ? '' : 'neg';
+      const barW = Math.min(p.raw_score, 100);
+      return `<div class="pillar-card">
+        <div class="pillar-card__header">
+          <div class="pillar-card__name">${p.name}</div>
+          <div class="pillar-card__xp ${xpClass}">${xpSign}${p.xp_delta} XP</div>
+        </div>
+        <div class="pillar-card__level">${p.level}</div>
+        <div class="pillar-card__bar"><div class="pillar-card__bar-fill" data-w="${barW}"></div></div>
+        <div class="pillar-card__raw">raw ${p.raw_score.toFixed(1)} / 100</div>
+      </div>`;
+    }).join('');
+
+    setTimeout(() => {
+      document.querySelectorAll('.pillar-card__bar-fill').forEach(el => {
+        el.style.width = el.dataset.w + '%';
+      });
+    }, 300);
+
+    // Event list
+    const el = document.getElementById('event-list');
+    el.innerHTML = [...data.timeline].reverse().map(ev => `
+      <div class="event-row">
+        <div class="event-date">${ev.date}</div>
+        <div class="event-arrow">↑</div>
+        <div class="event-text">${ev.event}</div>
+        <div class="event-levels">Lv ${ev.character_level}</div>
+      </div>`).join('');
+  }
+
+  function renderRadar(pillars) {
+    const svg = document.getElementById('radar-svg');
+    const barsEl = document.getElementById('radar-bars');
+    if (!svg || !barsEl) return;
+    svg.innerHTML = '';
+
+    const N = pillars.length;
+    const cx = 140, cy = 140, R = 108, levels = 5;
+
+    function pt(angle, radius) {
+      const a = angle - Math.PI / 2;
+      return { x: cx + radius * Math.cos(a), y: cy + radius * Math.sin(a) };
+    }
+    function color(score) {
+      if (score >= 50) return '#1D9E75';
+      if (score >= 25) return '#BA7517';
+      if (score > 0)  return '#E24B4A';
+      return '#4a6050';
+    }
+    function svgEl(tag, attrs) {
+      const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k, v));
+      return el;
+    }
+
+    // Rings
+    for (let l = 1; l <= levels; l++) {
+      const pts = Array.from({length: N}, (_, i) => {
+        const p = pt((2*Math.PI*i)/N, (R/levels)*l);
+        return p.x+','+p.y;
+      });
+      svg.appendChild(svgEl('polygon', { points: pts.join(' '), fill: 'none',
+        stroke: 'rgba(0,229,160,0.08)', 'stroke-width': '0.5' }));
+    }
+    // Axes
+    for (let i = 0; i < N; i++) {
+      const p = pt((2*Math.PI*i)/N, R);
+      svg.appendChild(svgEl('line', { x1: cx, y1: cy, x2: p.x, y2: p.y,
+        stroke: 'rgba(0,229,160,0.08)', 'stroke-width': '0.5' }));
+    }
+    // Data polygon
+    const dataRadii = pillars.map(p => (p.raw_score / 100) * R);
+    const polyPts = dataRadii.map((r, i) => {
+      const p = pt((2*Math.PI*i)/N, r); return p.x+','+p.y;
+    }).join(' ');
+    const poly = svgEl('polygon', { points: polyPts,
+      fill: 'rgba(0,229,160,0.10)', stroke: '#00e5a0',
+      'stroke-width': '1.5', 'stroke-linejoin': 'round' });
+    poly.style.transformOrigin = cx+'px '+cy+'px';
+    poly.style.transform = 'scale(0)';
+    poly.style.transition = 'transform 0.8s cubic-bezier(0.34,1.56,0.64,1)';
+    svg.appendChild(poly);
+    setTimeout(() => { poly.style.transform = 'scale(1)'; }, 150);
+    // Dots
+    pillars.forEach((p, i) => {
+      const pos = pt((2*Math.PI*i)/N, (p.raw_score/100)*R);
+      const dot = svgEl('circle', { cx: pos.x, cy: pos.y, r: '4',
+        fill: color(p.raw_score), stroke: '#080c0a', 'stroke-width': '1.5' });
+      dot.style.opacity = '0';
+      dot.style.transition = 'opacity 0.3s '+(0.6+i*0.06)+'s';
+      svg.appendChild(dot);
+      setTimeout(() => { dot.style.opacity = '1'; }, 150);
+    });
+    // Emoji labels
+    pillars.forEach((p, i) => {
+      const pos = pt((2*Math.PI*i)/N, R+18);
+      const t = svgEl('text', { x: pos.x, y: pos.y, 'text-anchor': 'middle',
+        'dominant-baseline': 'middle', 'font-size': '11', fill: '#7a9080' });
+      t.textContent = p.emoji || p.name.slice(0,2);
+      svg.appendChild(t);
+    });
+    // Centre level
+    const lvl = svgEl('text', { x: cx, y: cy-6, 'text-anchor': 'middle',
+      'font-size': '20', 'font-weight': '500', fill: '#e8ede9' });
+    lvl.textContent = document.getElementById('cc-level')?.textContent || '2';
+    svg.appendChild(lvl);
+    const lvlLabel = svgEl('text', { x: cx, y: cy+10, 'text-anchor': 'middle',
+      'font-size': '8', fill: '#7a9080', 'letter-spacing': '0.08em' });
+    lvlLabel.textContent = 'LEVEL';
+    svg.appendChild(lvlLabel);
+
+    // Bars
+    barsEl.innerHTML = pillars.map(p => {
+      const c = color(p.raw_score);
+      const w = Math.max(p.raw_score, p.raw_score > 0 ? 2 : 0);
+      return `<div class="radar-bar-row">
+        <div class="radar-bar-name">${p.emoji || ''} ${p.name}</div>
+        <div class="radar-bar-track">
+          <div class="radar-bar-fill" data-w="${w}" style="width:0%;background:${c}"></div>
+        </div>
+        <div class="radar-bar-score">${p.raw_score.toFixed(1)}</div>
+      </div>`;
+    }).join('');
+    setTimeout(() => {
+      barsEl.querySelectorAll('.radar-bar-fill').forEach(el => {
+        el.style.width = el.dataset.w + '%';
+      });
+    }, 300);
+  }
+
+  fetch('../data/character_stats.json')
+    .then(r => r.json())
+    .then(data => { hydrate(data); renderRadar(data.pillars || DEFAULTS.pillars); })
+    .catch(() => { hydrate(DEFAULTS); renderRadar(DEFAULTS.pillars); });
+</script>
+</body>
+</html>

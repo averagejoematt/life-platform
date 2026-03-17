@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The Platform — a custom AWS AI system built on Claude.">
+  <title>The Platform — Matthew Walker</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <style>
+    .page-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-12);
+      align-items: end;
+    }
+    .page-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      color: var(--text);
+    }
+    .page-header__title span { color: var(--accent); }
+    .page-header__meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+    }
+    .meta-stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-4) var(--space-5);
+    }
+    .meta-stat__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-1); }
+    .meta-stat__value { font-family: var(--font-display); font-size: 36px; color: var(--accent); line-height: 1; }
+    .meta-stat__unit { font-size: 13px; color: var(--text-muted); }
+
+    /* Architecture diagram */
+    .arch-section {
+      padding: var(--space-16) var(--page-padding);
+      border-top: 1px solid var(--border);
+    }
+    .arch-layers {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-top: var(--space-8);
+    }
+    .arch-layer {
+      background: var(--surface);
+      display: grid;
+      grid-template-columns: 180px 1fr;
+    }
+    .arch-layer__label {
+      padding: var(--space-6);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .arch-layer__name {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--accent);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-1);
+    }
+    .arch-layer__sub { font-size: var(--text-2xs); color: var(--text-muted); letter-spacing: var(--ls-tag); text-transform: uppercase; }
+    .arch-layer__content { padding: var(--space-6); }
+    .arch-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+    }
+    .chip {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      padding: var(--space-1) var(--space-3);
+      white-space: nowrap;
+    }
+    .chip.active { color: var(--accent); border-color: var(--accent-dim); background: var(--accent-bg-subtle); }
+
+    /* Stack section */
+    .stack-section {
+      padding: var(--space-16) var(--page-padding);
+      border-top: 1px solid var(--border);
+    }
+    .stack-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-top: var(--space-8);
+    }
+    .stack-card {
+      background: var(--surface);
+      padding: var(--space-8) var(--space-6);
+    }
+    .stack-card:hover { background: var(--surface-raised); }
+    .stack-card__category {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+    }
+    .stack-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+      padding-bottom: var(--space-4);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .stack-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+    .stack-item__bullet {
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 5px;
+    }
+    .stack-item__name { font-size: var(--text-sm); color: var(--text); font-weight: 700; margin-bottom: 2px; }
+    .stack-item__desc { font-size: var(--text-xs); color: var(--text-muted); line-height: 1.5; }
+
+    /* AI section */
+    .ai-section {
+      padding: var(--space-16) var(--page-padding);
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-12);
+    }
+    .ai-section__left { }
+    .ai-section__body p {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      margin-bottom: var(--space-4);
+    }
+    .ai-section__body p strong { color: var(--text); }
+    .ai-tools-sample {
+      margin-top: var(--space-6);
+      border: 1px solid var(--border);
+    }
+    .tool-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: var(--text-xs);
+    }
+    .tool-row:last-child { border-bottom: none; }
+    .tool-name { color: var(--accent); font-family: var(--font-mono); }
+    .tool-desc { color: var(--text-muted); }
+
+    /* Review history */
+    .reviews-section {
+      padding: var(--space-16) var(--page-padding);
+      border-top: 1px solid var(--border);
+    }
+    .review-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-top: var(--space-8);
+    }
+    .review-card {
+      background: var(--surface);
+      padding: var(--space-6);
+    }
+    .review-card__num { font-family: var(--font-display); font-size: 42px; color: var(--accent); line-height: 1; margin-bottom: var(--space-2); }
+    .review-card__grade { font-family: var(--font-display); font-size: 28px; color: var(--text); }
+    .review-card__date { font-size: var(--text-xs); color: var(--text-muted); letter-spacing: var(--ls-tag); text-transform: uppercase; margin-bottom: var(--space-3); }
+    .review-card__note { font-size: var(--text-xs); color: var(--text-muted); line-height: 1.5; }
+
+    @media (max-width: 900px) {
+      .page-header { grid-template-columns: 1fr; }
+      .arch-layer { grid-template-columns: 1fr; }
+      .arch-layer__label { border-right: none; border-bottom: 1px solid var(--border); }
+      .stack-grid { grid-template-columns: 1fr; }
+      .ai-section { grid-template-columns: 1fr; }
+      .review-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/#experiment" class="nav__link">The experiment</a>
+    <a href="../platform/" class="nav__link active">The platform</a>
+    <a href="../journal/" class="nav__link">Journal</a>
+    <a href="../character/" class="nav__link">Character</a>
+  </div>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span>v3.7.49</span>
+  </div>
+</nav>
+
+<div class="page-header">
+  <div>
+    <div class="eyebrow">Architecture</div>
+    <h1 class="page-header__title">The<br><span>Platform</span></h1>
+  </div>
+  <div class="page-header__meta">
+    <div class="meta-stat">
+      <div class="meta-stat__label">MCP tools</div>
+      <div class="meta-stat__value">87</div>
+    </div>
+    <div class="meta-stat">
+      <div class="meta-stat__label">Data sources</div>
+      <div class="meta-stat__value">19</div>
+    </div>
+    <div class="meta-stat">
+      <div class="meta-stat__label">AWS Lambdas</div>
+      <div class="meta-stat__value">42</div>
+    </div>
+    <div class="meta-stat">
+      <div class="meta-stat__label">Arch grade</div>
+      <div class="meta-stat__value">A</div>
+    </div>
+  </div>
+</div>
+
+<!-- Architecture layers -->
+<section class="arch-section">
+  <div class="eyebrow">System design</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Three-layer architecture</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body)">Everything flows inward to a single DynamoDB table, then outward through Claude. The design philosophy: get data in automatically, store it cheaply, make it queryable without a data engineering background.</p>
+
+  <div class="arch-layers">
+    <div class="arch-layer">
+      <div class="arch-layer__label">
+        <div class="arch-layer__name">INGEST</div>
+        <div class="arch-layer__sub">19 sources → DynamoDB</div>
+      </div>
+      <div class="arch-layer__content">
+        <div class="arch-chips">
+          <span class="chip active">Whoop</span>
+          <span class="chip active">Withings</span>
+          <span class="chip active">Strava</span>
+          <span class="chip active">Apple Health</span>
+          <span class="chip active">MacroFactor</span>
+          <span class="chip active">Eight Sleep</span>
+          <span class="chip active">Garmin</span>
+          <span class="chip active">Hevy</span>
+          <span class="chip active">Habitify</span>
+          <span class="chip active">Notion Journal</span>
+          <span class="chip active">Todoist</span>
+          <span class="chip active">Dexcom CGM</span>
+          <span class="chip active">Lab Draws ×7</span>
+          <span class="chip active">DEXA Scans</span>
+          <span class="chip active">Genome 110 SNPs</span>
+          <span class="chip active">Blood Pressure</span>
+          <span class="chip active">State of Mind</span>
+          <span class="chip active">Weather</span>
+          <span class="chip active">Supplements</span>
+        </div>
+      </div>
+    </div>
+    <div class="arch-layer">
+      <div class="arch-layer__label">
+        <div class="arch-layer__name">STORE</div>
+        <div class="arch-layer__sub">Single-table DynamoDB</div>
+      </div>
+      <div class="arch-layer__content">
+        <div class="arch-chips">
+          <span class="chip active">DynamoDB on-demand</span>
+          <span class="chip active">S3 raw + config</span>
+          <span class="chip active">Single-table design</span>
+          <span class="chip active">PITR 35-day</span>
+          <span class="chip active">KMS CMK encryption</span>
+          <span class="chip active">Deletion protection</span>
+          <span class="chip">No GSI — PK+SK only</span>
+          <span class="chip">TTL on cache partition</span>
+        </div>
+      </div>
+    </div>
+    <div class="arch-layer">
+      <div class="arch-layer__label">
+        <div class="arch-layer__name">SERVE</div>
+        <div class="arch-layer__sub">87 MCP tools → Claude</div>
+      </div>
+      <div class="arch-layer__content">
+        <div class="arch-chips">
+          <span class="chip active">Remote MCP (OAuth 2.1)</span>
+          <span class="chip active">Claude Desktop (local)</span>
+          <span class="chip active">claude.ai + mobile</span>
+          <span class="chip active">Lambda Function URL</span>
+          <span class="chip active">HMAC Bearer auth</span>
+          <span class="chip active">26h TTL cache</span>
+          <span class="chip active">Nightly warmer (13 tools)</span>
+          <span class="chip">768MB / 300s timeout</span>
+        </div>
+      </div>
+    </div>
+    <div class="arch-layer">
+      <div class="arch-layer__label">
+        <div class="arch-layer__name">COMPUTE</div>
+        <div class="arch-layer__sub">Pre-brief intelligence</div>
+      </div>
+      <div class="arch-layer__content">
+        <div class="arch-chips">
+          <span class="chip active">character-sheet-compute</span>
+          <span class="chip active">daily-metrics-compute</span>
+          <span class="chip active">daily-insight-compute</span>
+          <span class="chip active">adaptive-mode-compute</span>
+          <span class="chip active">hypothesis-engine (Sun)</span>
+          <span class="chip active">weekly-correlation-compute</span>
+          <span class="chip">IC-4 failure patterns (May)</span>
+          <span class="chip">IC-5 momentum warning (May)</span>
+        </div>
+      </div>
+    </div>
+    <div class="arch-layer">
+      <div class="arch-layer__label">
+        <div class="arch-layer__name">EMAIL</div>
+        <div class="arch-layer__sub">7 AI digests / week</div>
+      </div>
+      <div class="arch-layer__content">
+        <div class="arch-chips">
+          <span class="chip active">Daily Brief (11 AM)</span>
+          <span class="chip active">Monday Compass</span>
+          <span class="chip active">Wednesday Chronicle</span>
+          <span class="chip active">Weekly Digest (Sun)</span>
+          <span class="chip active">Nutrition Review (Sat)</span>
+          <span class="chip active">Weekly Plate (Fri)</span>
+          <span class="chip active">Monthly Digest</span>
+          <span class="chip active">Anomaly Detector</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tech stack -->
+<section class="stack-section">
+  <div class="eyebrow">Tech stack</div>
+  <h2 class="text-h3" style="color:var(--text)">What it's built on</h2>
+  <div class="stack-grid">
+    <div class="stack-card">
+      <div class="stack-card__category">Infrastructure</div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">AWS Lambda + CDK</div><div class="stack-item__desc">42 functions across 8 CDK stacks. All IAM roles dedicated and least-privilege. EventBridge scheduling.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">DynamoDB + S3</div><div class="stack-item__desc">Single-table design. On-demand billing. PITR. KMS CMK encryption. Static site on CloudFront.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">SES + SNS + SQS</div><div class="stack-item__desc">Email delivery, alert routing, dead-letter queue for failed Lambdas.</div></div></div>
+    </div>
+    <div class="stack-card">
+      <div class="stack-card__category">AI / Intelligence</div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Claude (Anthropic)</div><div class="stack-item__desc">Sonnet for coaching, Haiku for classification. ~$3/month API cost. MCP protocol for tool calls.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">MCP Server (custom)</div><div class="stack-item__desc">87-tool Lambda backed by DynamoDB. OAuth 2.1 + HMAC auth. 31-module package. Nightly cache warmer.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Hypothesis Engine</div><div class="stack-item__desc">Weekly Pearson correlation matrix (23 pairs, BH FDR correction) feeds AI hypothesis generation.</div></div></div>
+    </div>
+    <div class="stack-card">
+      <div class="stack-card__category">Quality + CI/CD</div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">83 automated tests</div><div class="stack-item__desc">CDK handler consistency, S3 path linting, IAM/secrets cross-check, MCP registry integrity, DynamoDB patterns.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">GitHub Actions CI</div><div class="stack-item__desc">Lint → test → plan → deploy (manual approval gate). OIDC federation. Auto-rollback on smoke failure.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Synthetic canary</div><div class="stack-item__desc">Every 4 hours: DynamoDB round-trip, S3 round-trip, MCP endpoint health. SES alert on failure.</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- AI tools sample -->
+<section class="ai-section">
+  <div>
+    <div class="eyebrow">Intelligence layer</div>
+    <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-4)">87 tools that know your body</h2>
+    <div class="ai-section__body">
+      <p>The MCP server gives Claude direct access to every data point. Natural language queries across 18 months of longitudinal health data — no SQL, no dashboards, no context switching.</p>
+      <p><strong>Ask anything.</strong> "Did my HRV drop the week after I increased Zone 2 training?" "What's the correlation between my sleep onset time and next-day recovery?" "Which habits most predict a good P40 score?"</p>
+      <p>The platform answers these questions because it has the data, the statistical methods, and 87 purpose-built tools to surface them.</p>
+    </div>
+  </div>
+  <div>
+    <div class="label label-accent" style="margin-bottom:var(--space-4)">// sample tools</div>
+    <div class="ai-tools-sample">
+      <div class="tool-row"><span class="tool-name">get_health</span><span class="tool-desc">Morning briefing + risk profile</span></div>
+      <div class="tool-row"><span class="tool-name">get_cross_source_correlation</span><span class="tool-desc">Pearson r between any two metrics</span></div>
+      <div class="tool-row"><span class="tool-name">get_character</span><span class="tool-desc">7-pillar life optimization score</span></div>
+      <div class="tool-row"><span class="tool-name">get_hypotheses</span><span class="tool-desc">Weekly AI-generated biology hypotheses</span></div>
+      <div class="tool-row"><span class="tool-name">get_glucose_meal_response</span><span class="tool-desc">Postprandial CGM analysis</span></div>
+      <div class="tool-row"><span class="tool-name">get_centenarian_benchmarks</span><span class="tool-desc">Attia decathlon targets vs current</span></div>
+      <div class="tool-row"><span class="tool-name">get_biological_age</span><span class="tool-desc">Levine PhenoAge from 9 biomarkers</span></div>
+      <div class="tool-row"><span class="tool-name">get_genome_insights</span><span class="tool-desc">110 SNP interpretations by category</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- Review history -->
+<section class="reviews-section">
+  <div class="eyebrow">Architecture reviews</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Reviewed 16 times by a 12-member AI board</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">Every major change triggers a full architecture review. 12 expert AI personas — cloud architect, security lead, statistician, product architect, adversarial reviewer — vote, score, and issue findings.</p>
+  <div class="review-grid">
+    <div class="review-card">
+      <div class="review-card__num">R16</div>
+      <div class="review-card__date">Mar 15, 2026</div>
+      <div class="review-card__grade">A</div>
+      <div class="review-card__note">CI/CD activation, Google Calendar retired. All 6 R15 findings resolved.</div>
+    </div>
+    <div class="review-card">
+      <div class="review-card__num">R15</div>
+      <div class="review-card__date">Mar 15, 2026</div>
+      <div class="review-card__grade">A</div>
+      <div class="review-card__note">Platform steady state. Zero dimension changes from R14.</div>
+    </div>
+    <div class="review-card">
+      <div class="review-card__num">R14</div>
+      <div class="review-card__date">Mar 15, 2026</div>
+      <div class="review-card__grade">A</div>
+      <div class="review-card__note">MCP canary, X-Ray tracing, security hardening.</div>
+    </div>
+    <div class="review-card">
+      <div class="review-card__num">R13</div>
+      <div class="review-card__date">Mar 14, 2026</div>
+      <div class="review-card__grade">B+</div>
+      <div class="review-card__note">15 findings. No CI/CD pipeline was #1 risk. All resolved by R15.</div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="footer__brand">AMJ</div>
+  <div class="footer__links">
+    <a href="/" class="footer__link">Home</a>
+    <a href="../journal/" class="footer__link">Journal</a>
+    <a href="../character/" class="footer__link">Character</a>
+  </div>
+  <div class="footer__copy">// v3.7.49 · 83/83 tests passing · all systems nominal</div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,48 @@
+{
+  "_meta": {
+    "generated_at": "2026-03-16T17:00:44.416538+00:00",
+    "generated_by": "daily-brief-lambda",
+    "version": "1.0.0"
+  },
+  "vitals": {
+    "weight_lbs": null,
+    "weight_delta_30d": -287.7,
+    "hrv_ms": 66.2,
+    "hrv_trend": "56ms 7d avg (+33% vs 30d, trending up)",
+    "rhr_bpm": 52.0,
+    "rhr_trend": "improving",
+    "recovery_pct": 89.0,
+    "recovery_status": "green",
+    "sleep_hours": 7.7
+  },
+  "journey": {
+    "start_weight_lbs": 302.0,
+    "goal_weight_lbs": 185.0,
+    "current_weight_lbs": 0.0,
+    "lost_lbs": 0,
+    "remaining_lbs": 0,
+    "progress_pct": 0,
+    "weekly_rate_lbs": 287.69,
+    "projected_goal_date": "2026-07-31",
+    "started_date": "2026-02-22",
+    "current_phase": "Chisel"
+  },
+  "training": {
+    "ctl_fitness": 6.0,
+    "atl_fatigue": 6.5,
+    "tsb_form": 0.0,
+    "acwr": 1.1,
+    "form_status": "neutral",
+    "injury_risk": "low",
+    "total_miles_30d": 0,
+    "activity_count_30d": 0,
+    "zone2_this_week_min": 42,
+    "zone2_target_min": 150
+  },
+  "platform": {
+    "mcp_tools": 87,
+    "data_sources": 19,
+    "lambdas": 42,
+    "last_review_grade": "A"
+  }
+}
