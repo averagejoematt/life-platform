@@ -1,5 +1,27 @@
 # Life Platform — Changelog
 
+## v3.7.63 — 2026-03-17: BS-02 hero live, journal Signal alignment, SES sandbox exit
+
+### Summary
+Post-Sprint-1 cleanup session. BS-02 hero drop-in applied to `index.html` and deployed live. Journal page brought into Signal design system parity (ticker, live data, nav/CSS path fixes, animate-in). SES production access request submitted. `ci/lambda_map.json` confirmed already had `chronicle_email_sender` — no action needed.
+
+### Modified Files
+- `site/index.html`: BS-02 hero drop-in applied (transformation story format: 302→current→185 counter, progress bar, stat chips, Chronicle teaser). JS unified to single fetch `/site/public_stats.json`. OG description updated to 89 tools. **DEPLOYED ✅** (S3 + CloudFront invalidation E3S424OXQZ8NBE)
+- `site/journal/index.html`: Signal design system alignment — ticker added with live data feed, CSS paths corrected to absolute (`/assets/css/`), nav links fixed (`/platform/` `/journal/` `/character/`), `animate-in` classes added to header + list, footer links/copy updated, live data JS added (populates ticker + nav date from `/site/public_stats.json`).
+- `lambdas/daily_brief_lambda.py` (via `site_writer.py`): Redeployed to pick up hero changes. **DEPLOYED ✅**
+
+### Infrastructure
+- SES production access request submitted via `aws sesv2 put-account-details`. Pending AWS review (~24h).
+- CloudFront invalidation ICSV1P164RAIOE8A6WR5RNEBI in progress for `E3S424OXQZ8NBE` (averagejoematt.com).
+
+### Pending (next session)
+- BS-02 paragraph: write 50-word `HERO_WHY_PARAGRAPH` in `site_writer.py`, set `paragraph_is_placeholder: False`, redeploy daily-brief
+- Verify SES production access granted: `aws sesv2 get-account`
+- Deploy journal page to S3
+- Sprint 2 prereqs: BS-08 sleep conflict rules doc, BS-05 confidence spec per-insight-type
+
+---
+
 ## v3.7.62 — 2026-03-17: Sprint 1 complete — BS-01, BS-02, BS-03, BS-05, BS-09
 
 ### Summary
