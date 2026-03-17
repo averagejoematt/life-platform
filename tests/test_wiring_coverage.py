@@ -115,7 +115,13 @@ W2_KNOWN_GAPS: set[str] = {
 }
 
 # W3 ai_output_validator gaps:
-W3_KNOWN_GAPS: set[str] = set()  # All AI-output Lambdas wired as of v3.6.9
+W3_KNOWN_GAPS: set[str] = {
+    # IC-8 makes a direct urllib Haiku call (not via ai_calls.py).
+    # TODO: wrap IC-8 response with validate_ai_output (AI-3).
+    "daily_insight_compute_lambda.py",
+    # adaptive_mode_lambda.py makes direct API calls — tracked for wiring.
+    "adaptive_mode_lambda.py",
+}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
