@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Journal — Matthew Walker</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <style>
+    /*
+      Journal skin — same dark base as Signal, but:
+      - Accent: amber (--accent-journal) instead of teal
+      - Body type: Lora serif at 18px for reading
+      - Frank Chimero directive: "still dark, but warmer"
+      - Rasmus directive: "serif for narrative, mono for data"
+    */
+    :root {
+      --accent: var(--c-amber-500);
+      --accent-dim: var(--c-amber-300);
+      --accent-bg: var(--c-amber-100);
+      --accent-bg-subtle: var(--c-amber-050);
+      --border: rgba(200, 132, 58, 0.15);
+      --border-strong: rgba(200, 132, 58, 0.3);
+    }
+
+    .journal-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .journal-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .journal-header__sub {
+      font-family: var(--font-serif);
+      font-size: 18px;
+      color: var(--text-muted);
+      font-style: italic;
+      line-height: var(--lh-body);
+      max-width: 500px;
+    }
+
+    .journal-list {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+    }
+    .journal-post {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: var(--space-8);
+      padding: var(--space-8) 0;
+      border-bottom: 1px solid var(--border-subtle);
+      text-decoration: none;
+      transition: all var(--dur-fast);
+    }
+    .journal-post:hover .journal-post__title { color: var(--accent); }
+    .journal-post__date {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding-top: 4px;
+    }
+    .journal-post__tag {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-2);
+    }
+    .journal-post__title {
+      font-family: var(--font-serif);
+      font-size: 22px;
+      color: var(--text);
+      line-height: 1.35;
+      margin-bottom: var(--space-2);
+      transition: color var(--dur-fast);
+    }
+    .journal-post__excerpt {
+      font-family: var(--font-serif);
+      font-size: 15px;
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .journal-placeholder {
+      padding: var(--space-16) 0;
+      text-align: center;
+      border: 1px dashed var(--border);
+    }
+    .jp-coming {
+      font-family: var(--font-display);
+      font-size: 36px;
+      color: var(--text-muted);
+      margin-bottom: var(--space-4);
+    }
+    .jp-sub {
+      font-family: var(--font-serif);
+      font-size: 16px;
+      color: var(--text-faint);
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/#experiment" class="nav__link">The experiment</a>
+    <a href="/#platform" class="nav__link">The platform</a>
+    <a href="../journal/" class="nav__link active">Journal</a>
+    <a href="../character/" class="nav__link">Character</a>
+  </div>
+  <div class="nav__status">
+    <div class="pulse" style="background:var(--accent)"></div>
+    <span>Writing</span>
+  </div>
+</nav>
+
+<div class="journal-header">
+  <div class="eyebrow">The lab notebook</div>
+  <h1 class="journal-header__title">Journal</h1>
+  <p class="journal-header__sub">Long-form writing about what I'm actually finding. Data-backed, honest, and updated when something interesting happens — not on a schedule.</p>
+</div>
+
+<div class="journal-list" id="journal-list">
+  <div class="journal-placeholder" id="journal-loading">
+    <div class="jp-coming">Loading...</div>
+  </div>
+</div>
+
+<script>
+  fetch('/journal/posts.json')
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      const list = document.getElementById('journal-list');
+      if (!data || !data.posts || data.posts.length === 0) {
+        list.innerHTML = `<div class="journal-placeholder">
+          <div class="jp-coming">First installment coming soon</div>
+          <div class="jp-sub">The Measured Life by Elena Voss — a weekly chronicle of the experiment.</div>
+        </div>`;
+        return;
+      }
+      list.innerHTML = data.posts.map(p => {
+        let date = '';
+        try {
+          const d = new Date(p.date + 'T12:00:00');
+          date = d.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+        } catch(e) { date = p.date; }
+        const boardBadge = p.has_board_interview
+          ? `<span style="font-size:var(--text-2xs);color:var(--accent-dim);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-left:var(--space-4);">Board interview</span>`
+          : '';
+        return `<a href="${p.url}" class="journal-post">
+          <div class="journal-post__date">${date}</div>
+          <div>
+            <div class="journal-post__tag">The Measured Life · Week ${p.week}${boardBadge}</div>
+            <div class="journal-post__title">&ldquo;${p.title}&rdquo;</div>
+            <div class="journal-post__excerpt">${p.stats_line || ''}</div>
+          </div>
+        </a>`;
+      }).join('');
+    })
+    .catch(() => {
+      document.getElementById('journal-list').innerHTML = `<div class="journal-placeholder">
+        <div class="jp-coming">First installment coming soon</div>
+        <div class="jp-sub">The Measured Life by Elena Voss.</div>
+      </div>`;
+    });
+</script>
+
+<footer class="footer">
+  <div class="footer__brand" style="color:var(--accent)">AMJ</div>
+  <div class="footer__links">
+    <a href="/" class="footer__link">Home</a>
+    <a href="../character/" class="footer__link">Character</a>
+  </div>
+  <div class="footer__copy">// words when there's something worth saying</div>
+</footer>
+
+</body>
+</html>

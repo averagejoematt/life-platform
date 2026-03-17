@@ -1,0 +1,121 @@
+{
+  "_meta": {
+    "generated_at": "2026-03-16T17:35:20.024986+00:00",
+    "generated_by": "character-sheet-compute-lambda",
+    "version": "1.0.0"
+  },
+  "character": {
+    "level": 2.0,
+    "tier": "Foundation",
+    "tier_emoji": "\ud83d\udd28",
+    "xp_total": 42.0,
+    "days_active": 20,
+    "level_events_count": 0,
+    "next_tier": "Momentum",
+    "next_tier_level": 21,
+    "started_date": "2026-02-22"
+  },
+  "pillars": [
+    {
+      "name": "sleep",
+      "emoji": "\ud83d\ude34",
+      "level": 2.0,
+      "raw_score": 75.3,
+      "tier": "Foundation",
+      "xp_delta": 2.0,
+      "trend": "up"
+    },
+    {
+      "name": "movement",
+      "emoji": "\ud83c\udfcb\ufe0f",
+      "level": 2.0,
+      "raw_score": 8.2,
+      "tier": "Foundation",
+      "xp_delta": -1.0,
+      "trend": "neutral"
+    },
+    {
+      "name": "nutrition",
+      "emoji": "\ud83e\udd57",
+      "level": 2.0,
+      "raw_score": 12.2,
+      "tier": "Foundation",
+      "xp_delta": -1.0,
+      "trend": "neutral"
+    },
+    {
+      "name": "metabolic",
+      "emoji": "\ud83d\udcca",
+      "level": 2.0,
+      "raw_score": 100.0,
+      "tier": "Foundation",
+      "xp_delta": 3.0,
+      "trend": "up"
+    },
+    {
+      "name": "mind",
+      "emoji": "\ud83e\udde0",
+      "level": 2.0,
+      "raw_score": 48.0,
+      "tier": "Foundation",
+      "xp_delta": 1.0,
+      "trend": "up"
+    },
+    {
+      "name": "relationships",
+      "emoji": "\ud83d\udcac",
+      "level": 2.0,
+      "raw_score": 40.0,
+      "tier": "Foundation",
+      "xp_delta": 1.0,
+      "trend": "up"
+    },
+    {
+      "name": "consistency",
+      "emoji": "\ud83c\udfaf",
+      "level": 2.0,
+      "raw_score": 13.3,
+      "tier": "Foundation",
+      "xp_delta": -1.0,
+      "trend": "neutral"
+    }
+  ],
+  "timeline": [],
+  "tiers": [
+    {
+      "name": "Foundation",
+      "emoji": "\ud83d\udd28",
+      "min_level": 1,
+      "max_level": 20,
+      "status": "current"
+    },
+    {
+      "name": "Momentum",
+      "emoji": "\ud83d\udd25",
+      "min_level": 21,
+      "max_level": 40,
+      "status": "locked"
+    },
+    {
+      "name": "Discipline",
+      "emoji": "\u2694\ufe0f",
+      "min_level": 41,
+      "max_level": 60,
+      "status": "locked"
+    },
+    {
+      "name": "Mastery",
+      "emoji": "\ud83c\udfc6",
+      "min_level": 61,
+      "max_level": 80,
+      "status": "locked"
+    },
+    {
+      "name": "Elite",
+      "emoji": "\ud83d\udc51",
+      "min_level": 81,
+      "max_level": 100,
+      "status": "locked"
+    }
+  ]
+}

@@ -1,0 +1,208 @@
+/*
+  responsive.css — Mobile-first breakpoint system
+  Board directives:
+    Jony Ive:  "one vital at a time on mobile, not four crammed in"
+    John Maeda: "one number, one colour, one action on mobile"
+    Rasmus: "touch targets 44px minimum"
+  
+  Breakpoints:
+    xs:  320px  (small phone)
+    sm:  480px  (large phone)
+    md:  768px  (tablet)
+    lg:  1024px (laptop)
+    xl:  1280px (desktop — this is the default design width)
+*/
+
+/* ── Utilities ───────────────────────────────────────────── */
+.hide-mobile  { display: block; }
+.show-mobile  { display: none; }
+.hide-tablet  { display: block; }
+
+/* ── xl: 1280px+ (default — already handled in base.css) ─── */
+
+/* ── lg: 1024px ──────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  :root { --page-padding: 36px; }
+
+  .hero__body { grid-template-columns: 1fr 1fr; gap: var(--space-8); }
+  .hero__left { padding-right: var(--space-8); }
+  .hero__right { padding-left: var(--space-8); }
+
+  .hero__vitals-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .experiment { gap: var(--space-10); }
+  .progress-numbers { grid-template-columns: 1fr 1fr; }
+  .platform-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Character page */
+  .pillars-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ── md: 768px (tablet) ──────────────────────────────────── */
+@media (max-width: 768px) {
+  :root { --page-padding: 24px; --nav-height: 56px; }
+
+  /* Nav — collapse links, keep brand + status */
+  .nav__links { display: none; }
+  .nav__mobile-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px; height: 36px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 16px;
+    background: transparent;
+  }
+
+  /* Mobile nav drawer */
+  .nav__drawer {
+    position: fixed;
+    top: var(--nav-height);
+    left: 0; right: 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: var(--space-4) var(--page-padding);
+    z-index: calc(var(--z-nav) - 1);
+    display: none;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .nav__drawer.open { display: flex; }
+  .nav__drawer .nav__link {
+    font-size: var(--text-sm);
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  /* Hero — stacked */
+  .hero__body {
+    grid-template-columns: 1fr;
+    padding: 0 var(--page-padding);
+  }
+  .hero__left {
+    padding: var(--space-10) 0 var(--space-8);
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero__right {
+    padding: var(--space-8) 0 var(--space-10);
+  }
+
+  /* Jony Ive directive: 2x2 vitals grid on tablet, full-width on phone */
+  .hero__vitals-grid { grid-template-columns: 1fr 1fr; }
+
+  .vital__value { font-size: 36px; }
+
+  /* Ticker — narrower spacing */
+  .ticker__item { padding: 0 var(--space-5); font-size: 10px; }
+
+  /* Experiment — single column */
+  .experiment {
+    grid-template-columns: 1fr;
+    padding: var(--space-12) var(--page-padding);
+  }
+  .experiment__sticky { position: static; }
+
+  .progress-numbers { grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  .prog-stat__value { font-size: 30px; }
+
+  /* Sources — fewer columns */
+  .sources-grid { grid-template-columns: repeat(3, 1fr); }
+
+  /* Platform — 2 col */
+  .platform-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Writing */
+  .writing-grid { grid-template-columns: 1fr; }
+
+  /* Footer — stacked */
+  .footer {
+    flex-direction: column;
+    gap: var(--space-5);
+    text-align: center;
+    padding: var(--space-8) var(--page-padding);
+  }
+  .footer__links { justify-content: center; }
+
+  /* Character page */
+  .character-card { grid-template-columns: 1fr; }
+  .cc-left { border-right: none; border-bottom: 1px solid var(--border); }
+  .pillars-grid { grid-template-columns: 1fr 1fr; }
+  .page-header { padding: calc(var(--nav-height) + var(--space-10)) var(--page-padding) var(--space-8); }
+
+  /* Platform page */
+  .arch-layer { grid-template-columns: 1fr; }
+  .arch-layer__label { border-right: none; border-bottom: 1px solid var(--border); }
+  .stack-grid { grid-template-columns: 1fr; }
+  .ai-section { grid-template-columns: 1fr; }
+  .review-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Journal */
+  .journal-post { grid-template-columns: 1fr; gap: var(--space-2); }
+  .journal-post__date { padding-top: 0; }
+
+  /* Post */
+  .prose p { font-size: 17px; }
+  .data-callout__grid { grid-template-columns: 1fr 1fr; }
+
+  .hide-mobile { display: none; }
+  .show-mobile { display: block; }
+}
+
+/* ── sm: 480px (large phone) ─────────────────────────────── */
+@media (max-width: 480px) {
+  :root { --page-padding: 20px; }
+
+  /* John Maeda directive: ONE vital hero on small phone */
+  .hero__vitals-grid { grid-template-columns: 1fr; }
+
+  /* Show only the most important vital on small screens */
+  .hero__vitals-grid .vital:nth-child(2),
+  .hero__vitals-grid .vital:nth-child(3),
+  .hero__vitals-grid .vital:nth-child(4) {
+    display: none;
+  }
+  .hero__vitals-see-all {
+    display: block;
+    font-size: var(--text-xs);
+    color: var(--accent);
+    letter-spacing: var(--ls-tag);
+    text-transform: uppercase;
+    margin-top: var(--space-3);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  /* When expanded, show all */
+  .hero__vitals-grid.expanded .vital { display: block; }
+
+  .hero__name { font-size: clamp(60px, 18vw, 88px); }
+
+  .hero__ctas { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+  .hero__ctas .btn { width: 100%; text-align: center; }
+
+  .progress-numbers { grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+  .prog-stat__value { font-size: 26px; }
+
+  .sources-grid { grid-template-columns: 1fr 1fr; }
+  .platform-grid { grid-template-columns: 1fr; }
+
+  /* Character */
+  .pillars-grid { grid-template-columns: 1fr; }
+  .cc-stats { grid-template-columns: 1fr 1fr; }
+
+  /* Platform */
+  .review-grid { grid-template-columns: 1fr; }
+  .page-header { grid-template-columns: 1fr; }
+  .page-header__meta { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── xs: 320px (small phone) ─────────────────────────────── */
+@media (max-width: 360px) {
+  :root { --page-padding: 16px; }
+  .hero__name { font-size: 52px; }
+  .ticker__item { padding: 0 var(--space-4); }
+}

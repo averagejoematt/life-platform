@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!--
+    JOURNAL POST TEMPLATE
+    Copy this file to: journal/posts/your-post-slug/index.html
+    Fill in the meta tags and article content below.
+    The amber accent and serif body type are set automatically.
+    For data callouts mid-article, use <div class="data-callout"> blocks.
+    For pull quotes, use <blockquote>.
+    For code/tool names, use <code>.
+  -->
+  <meta name="description" content="POST DESCRIPTION HERE">
+  <meta property="og:title" content="POST TITLE — Matthew Walker">
+  <meta property="og:description" content="POST DESCRIPTION HERE">
+  <meta property="og:type" content="article">
+  <title>POST TITLE — Matthew Walker</title>
+  <link rel="stylesheet" href="../../assets/css/tokens.css">
+  <link rel="stylesheet" href="../../assets/css/base.css">
+  <style>
+    /* Journal post amber skin */
+    :root {
+      --accent: var(--c-amber-500);
+      --accent-dim: var(--c-amber-300);
+      --accent-bg: var(--c-amber-100);
+      --accent-bg-subtle: var(--c-amber-050);
+      --border: rgba(200, 132, 58, 0.15);
+      --border-strong: rgba(200, 132, 58, 0.3);
+    }
+
+    /* Post header */
+    .post-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      max-width: calc(var(--prose-width) + var(--page-padding) * 2);
+      margin: 0 auto;
+    }
+    .post-header__tag {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+    }
+    .post-header__title {
+      font-family: var(--font-serif);
+      font-size: clamp(32px, 4vw, 52px);
+      line-height: 1.15;
+      color: var(--text);
+      margin-bottom: var(--space-5);
+      font-weight: 400;
+    }
+    .post-header__deck {
+      font-family: var(--font-serif);
+      font-size: 20px;
+      line-height: 1.65;
+      color: var(--text-muted);
+      font-style: italic;
+      margin-bottom: var(--space-6);
+      max-width: 560px;
+    }
+    .post-header__meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-6);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .post-header__meta span { display: flex; align-items: center; gap: var(--space-2); }
+    .post-header__divider { color: var(--text-faint); }
+
+    /* Reading progress bar */
+    .reading-progress {
+      position: fixed;
+      top: var(--nav-height);
+      left: 0; right: 0;
+      height: 2px;
+      background: var(--border-subtle);
+      z-index: var(--z-overlay);
+    }
+    .reading-progress__fill {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+
+    /* Article body */
+    .post-body {
+      max-width: calc(var(--prose-width) + var(--page-padding) * 2);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding) var(--space-20);
+    }
+
+    /* Prose styles — Lora serif at reading size */
+    .prose { font-family: var(--font-serif); }
+    .prose p {
+      font-size: 18px;
+      line-height: 1.85;
+      color: var(--text);
+      margin-bottom: var(--space-6);
+    }
+    .prose p:first-child::first-letter {
+      font-size: 64px;
+      line-height: 0.8;
+      float: left;
+      margin-right: var(--space-3);
+      margin-top: 8px;
+      color: var(--accent);
+      font-family: var(--font-serif);
+    }
+    .prose h2 {
+      font-family: var(--font-display);
+      font-size: 36px;
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      margin: var(--space-12) 0 var(--space-4);
+      line-height: 1.1;
+    }
+    .prose h3 {
+      font-family: var(--font-serif);
+      font-size: 22px;
+      color: var(--text);
+      font-style: italic;
+      margin: var(--space-8) 0 var(--space-3);
+    }
+    .prose a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+    .prose a:hover { color: var(--accent-dim); }
+    .prose strong { color: var(--text); font-weight: 700; font-style: normal; }
+    .prose em { font-style: italic; }
+    .prose code {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--accent);
+      background: var(--accent-bg-subtle);
+      padding: 1px var(--space-2);
+      border: 1px solid var(--border);
+    }
+    .prose ul, .prose ol {
+      margin: 0 0 var(--space-6) var(--space-6);
+      list-style: disc;
+    }
+    .prose ol { list-style: decimal; }
+    .prose li {
+      font-family: var(--font-serif);
+      font-size: 18px;
+      line-height: 1.7;
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .prose blockquote {
+      border-left: 2px solid var(--accent);
+      padding: var(--space-4) var(--space-6);
+      margin: var(--space-8) 0;
+      font-size: 22px;
+      font-style: italic;
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .prose blockquote cite {
+      display: block;
+      font-style: normal;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-top: var(--space-3);
+    }
+    .prose hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: var(--space-10) 0;
+    }
+
+    /* Data callout — inline data block mid-article */
+    .data-callout {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      padding: var(--space-6) var(--space-6);
+      margin: var(--space-8) 0;
+    }
+    .data-callout__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+    }
+    .data-callout__grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+    }
+    .data-callout__stat {}
+    .data-callout__stat-label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      margin-bottom: var(--space-1);
+    }
+    .data-callout__stat-value {
+      font-family: var(--font-display);
+      font-size: 32px;
+      color: var(--text);
+      line-height: 1;
+    }
+    .data-callout__stat-unit { font-size: 12px; color: var(--accent-dim); }
+    .data-callout__note {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      margin-top: var(--space-4);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--border-subtle);
+      line-height: 1.6;
+    }
+
+    /* Post footer / next */
+    .post-footer {
+      max-width: calc(var(--prose-width) + var(--page-padding) * 2);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding) var(--space-16);
+      border-top: 1px solid var(--border);
+    }
+    .post-footer__label { font-size: var(--text-xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-4); }
+    .post-footer__nav { display: flex; justify-content: space-between; gap: var(--space-6); }
+    .post-footer__link {
+      font-family: var(--font-serif);
+      font-size: 18px;
+      color: var(--text);
+      text-decoration: none;
+      transition: color var(--dur-fast);
+      flex: 1;
+    }
+    .post-footer__link:hover { color: var(--accent); }
+    .post-footer__link span { display: block; font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-1); }
+    .post-footer__link.right { text-align: right; }
+  </style>
+</head>
+<body>
+
+<!-- Reading progress bar -->
+<div class="reading-progress">
+  <div class="reading-progress__fill" id="reading-progress"></div>
+</div>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/#experiment" class="nav__link">The experiment</a>
+    <a href="/platform/" class="nav__link">The platform</a>
+    <a href="/journal/" class="nav__link active">Journal</a>
+    <a href="/character/" class="nav__link">Character</a>
+  </div>
+  <div class="nav__status">
+    <div class="pulse" style="background:var(--accent)"></div>
+    <span>Writing</span>
+  </div>
+</nav>
+
+<!-- POST HEADER -->
+<div class="post-header">
+  <div class="post-header__tag">The experiment · POST CATEGORY</div>
+  <h1 class="post-header__title">
+    POST TITLE GOES HERE — MAKE IT SPECIFIC AND DATA-DRIVEN
+  </h1>
+  <p class="post-header__deck">
+    A one-sentence deck that tells the reader exactly what they'll find. Be specific. Not "a journey" but "what I found when I correlated HRV with sleep onset time."
+  </p>
+  <div class="post-header__meta">
+    <span>POST DATE</span>
+    <span class="post-header__divider">·</span>
+    <span>X MIN READ</span>
+    <span class="post-header__divider">·</span>
+    <span>WEIGHT AT TIME: XXX LBS</span>
+  </div>
+</div>
+
+<!-- POST BODY -->
+<article class="post-body">
+  <div class="prose">
+
+    <p>
+      Your opening paragraph goes here. The first letter will be enlarged automatically (drop cap). Set the scene — what question were you trying to answer? What data did you have? Be specific from the first sentence. Not "I've been thinking about health" but "On the morning of March 15, my HRV was 54ms and my recovery score was 75%."
+    </p>
+
+    <!-- EXAMPLE: Data callout block — use when citing actual numbers mid-article -->
+    <div class="data-callout">
+      <div class="data-callout__label">// data snapshot — week 5 of the experiment</div>
+      <div class="data-callout__grid">
+        <div class="data-callout__stat">
+          <div class="data-callout__stat-label">Weight</div>
+          <div class="data-callout__stat-value">287.7<span class="data-callout__stat-unit"> lbs</span></div>
+        </div>
+        <div class="data-callout__stat">
+          <div class="data-callout__stat-label">HRV avg</div>
+          <div class="data-callout__stat-value">40.8<span class="data-callout__stat-unit"> ms</span></div>
+        </div>
+        <div class="data-callout__stat">
+          <div class="data-callout__stat-label">Recovery avg</div>
+          <div class="data-callout__stat-value">65.4<span class="data-callout__stat-unit"> %</span></div>
+        </div>
+      </div>
+      <div class="data-callout__note">Source: Whoop 4.0 + Withings Body+ · 29 days of data · AI-computed via platform</div>
+    </div>
+
+    <h2>SECTION HEADING</h2>
+
+    <p>
+      Body copy continues here. Write in the first person. Be honest about what surprised you. <strong>Bold the key finding in each paragraph</strong> so skimmers can extract the story without reading every word.
+    </p>
+
+    <p>
+      Tool names look like this: <code>get_health(view=trajectory)</code>. Use them when referencing specific platform features — it grounds the writing in the technical reality.
+    </p>
+
+    <blockquote>
+      A pull quote goes here. Use it for a key insight, a surprising finding, or something that crystallizes the whole post in one sentence.
+      <cite>Your name, date</cite>
+    </blockquote>
+
+    <h3>A sub-section heading in italic serif</h3>
+
+    <p>
+      Continue the argument. Each section should answer: what did I observe, what does the data say, what did I do about it?
+    </p>
+
+    <ul>
+      <li>Bullet point one — be specific</li>
+      <li>Bullet point two — include the number</li>
+      <li>Bullet point three — say what changed</li>
+    </ul>
+
+    <hr>
+
+    <p>
+      Closing paragraph. What changed? What are you going to try next? What would you do differently? Leave the reader with a specific, actionable takeaway — not "I'm continuing the journey" but "I'm adding a third strength session per week starting Monday."
+    </p>
+
+  </div>
+</article>
+
+<!-- POST FOOTER NAV -->
+<div class="post-footer">
+  <div class="post-footer__label">More writing</div>
+  <div class="post-footer__nav">
+    <a href="/journal/" class="post-footer__link">
+      <span>← Previous</span>
+      All posts
+    </a>
+    <a href="#" class="post-footer__link right">
+      <span>Next →</span>
+      Next post title
+    </a>
+  </div>
+</div>
+
+<footer class="footer">
+  <div class="footer__brand" style="color:var(--accent)">AMJ</div>
+  <div class="footer__links">
+    <a href="/" class="footer__link">Home</a>
+    <a href="/character/" class="footer__link">Character</a>
+  </div>
+  <div class="footer__copy">// words when there's something worth saying</div>
+</footer>
+
+<script>
+  /* Reading progress bar */
+  const fill = document.getElementById('reading-progress');
+  window.addEventListener('scroll', () => {
+    const body = document.body;
+    const scrollTop = window.scrollY;
+    const docHeight = body.scrollHeight - window.innerHeight;
+    fill.style.width = docHeight > 0 ? `${(scrollTop / docHeight) * 100}%` : '0%';
+  });
+</script>
+</body>
+</html>
