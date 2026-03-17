@@ -7,7 +7,7 @@ Post-Sprint-1 cleanup session. BS-02 hero drop-in applied to `index.html` and de
 
 ### Modified Files
 - `site/index.html`: BS-02 hero drop-in applied (transformation story format: 302→current→185 counter, progress bar, stat chips, Chronicle teaser). JS unified to single fetch `/site/public_stats.json`. OG description updated to 89 tools. **DEPLOYED ✅** (S3 + CloudFront invalidation E3S424OXQZ8NBE)
-- `site/journal/index.html`: Signal design system alignment — ticker added with live data feed, CSS paths corrected to absolute (`/assets/css/`), nav links fixed (`/platform/` `/journal/` `/character/`), `animate-in` classes added to header + list, footer links/copy updated, live data JS added (populates ticker + nav date from `/site/public_stats.json`).
+- `site/journal/index.html`: Full Signal design system alignment — serif fonts (Lora) removed entirely, replaced with Bebas Neue + Space Mono throughout. Ticker added with live data. CSS border overrides removed (was bleeding amber tint into all surfaces). Nav links fixed to absolute paths. `animate-in` classes added. Live data JS added.
 - `lambdas/daily_brief_lambda.py` (via `site_writer.py`): Redeployed to pick up hero changes. **DEPLOYED ✅**
 
 ### Infrastructure

@@ -11,68 +11,64 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    /*
-      Journal skin — same dark base as Signal, but:
-      - Accent: amber (--accent-journal) instead of teal
-      - Body type: Lora serif at 18px for reading
-      - Frank Chimero directive: "still dark, but warmer"
-      - Rasmus directive: "serif for narrative, mono for data"
-    */
+    /* Journal accent override — amber instead of teal, same terminal aesthetic */
     :root {
-      --accent: var(--c-amber-500);
-      --accent-dim: var(--c-amber-300);
-      --accent-bg: var(--c-amber-100);
+      --accent:           var(--c-amber-500);
+      --accent-dim:       var(--c-amber-300);
+      --accent-bg:        var(--c-amber-100);
       --accent-bg-subtle: var(--c-amber-050);
-      --border: rgba(200, 132, 58, 0.15);
-      --border-strong: rgba(200, 132, 58, 0.3);
     }
 
+    /* ── Header ──────────────────────────────────────────── */
     .journal-header {
-      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-10);
       border-bottom: 1px solid var(--border);
       max-width: var(--max-width);
       margin: 0 auto;
-      margin-top: 33px; /* ticker height */
     }
     .journal-header__title {
       font-family: var(--font-display);
       font-size: var(--text-h1);
       line-height: var(--lh-display);
+      letter-spacing: var(--ls-display);
       color: var(--text);
-      margin-bottom: var(--space-3);
+      margin-bottom: var(--space-4);
     }
     .journal-header__sub {
-      font-family: var(--font-serif);
-      font-size: 18px;
+      font-family: var(--font-mono);
+      font-size: var(--text-base);
       color: var(--text-muted);
-      font-style: italic;
       line-height: var(--lh-body);
-      max-width: 500px;
+      max-width: 560px;
     }
 
+    /* ── Post list ───────────────────────────────────────── */
     .journal-list {
       max-width: var(--max-width);
       margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
+      padding: var(--space-8) var(--page-padding) var(--space-20);
     }
     .journal-post {
       display: grid;
-      grid-template-columns: 140px 1fr;
+      grid-template-columns: 160px 1fr;
       gap: var(--space-8);
       padding: var(--space-8) 0;
       border-bottom: 1px solid var(--border-subtle);
       text-decoration: none;
       transition: all var(--dur-fast);
     }
+    .journal-post:hover { background: var(--accent-bg-subtle); padding-left: var(--space-3); }
     .journal-post:hover .journal-post__title { color: var(--accent); }
     .journal-post__date {
+      font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       color: var(--text-muted);
-      padding-top: 4px;
+      padding-top: 3px;
     }
     .journal-post__tag {
+      font-family: var(--font-mono);
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
@@ -80,21 +76,25 @@
       margin-bottom: var(--space-2);
     }
     .journal-post__title {
-      font-family: var(--font-serif);
-      font-size: 22px;
+      font-family: var(--font-display);
+      font-size: 28px;
+      letter-spacing: var(--ls-display);
       color: var(--text);
-      line-height: 1.35;
+      line-height: 1.1;
       margin-bottom: var(--space-2);
       transition: color var(--dur-fast);
     }
     .journal-post__excerpt {
-      font-family: var(--font-serif);
-      font-size: 15px;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
       color: var(--text-muted);
-      line-height: var(--lh-body);
+      line-height: var(--lh-mono);
+      letter-spacing: 0.01em;
     }
+
+    /* ── Empty / loading state ───────────────────────────── */
     .journal-placeholder {
-      padding: var(--space-16) 0;
+      padding: var(--space-20) 0;
       text-align: center;
       border: 1px dashed var(--border);
     }
@@ -105,10 +105,14 @@
       margin-bottom: var(--space-4);
     }
     .jp-sub {
-      font-family: var(--font-serif);
-      font-size: 16px;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
       color: var(--text-faint);
-      font-style: italic;
+      letter-spacing: var(--ls-tag);
+    }
+
+    @media (max-width: 768px) {
+      .journal-post { grid-template-columns: 1fr; gap: var(--space-2); }
     }
   </style>
 </head>
@@ -128,7 +132,7 @@
   </div>
 </nav>
 
-<!-- Ticker — same as homepage, amber accent -->
+<!-- Ticker -->
 <div class="ticker" style="margin-top:var(--nav-height)">
   <div class="ticker__inner">
     <span class="ticker__item">THE MEASURED LIFE</span>
@@ -161,11 +165,11 @@
 <div class="journal-header animate-in">
   <div class="eyebrow">The lab notebook</div>
   <h1 class="journal-header__title">Journal</h1>
-  <p class="journal-header__sub">Long-form writing about what I'm actually finding. Data-backed, honest, and updated when something interesting happens — not on a schedule.</p>
+  <p class="journal-header__sub">Long-form writing about what I'm actually finding. Data-backed, honest, updated when something interesting happens — not on a schedule.</p>
 </div>
 
 <div class="journal-list animate-in" id="journal-list">
-  <div class="journal-placeholder" id="journal-loading">
+  <div class="journal-placeholder">
     <div class="jp-coming">Loading...</div>
   </div>
 </div>
@@ -186,10 +190,10 @@
         let date = '';
         try {
           const d = new Date(p.date + 'T12:00:00');
-          date = d.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+          date = d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}).toUpperCase();
         } catch(e) { date = p.date; }
         const boardBadge = p.has_board_interview
-          ? `<span style="font-size:var(--text-2xs);color:var(--accent-dim);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-left:var(--space-4);">Board interview</span>`
+          ? `<span style="margin-left:16px;color:var(--accent-dim);">// Board interview</span>`
           : '';
         return `<a href="${p.url}" class="journal-post">
           <div class="journal-post__date">${date}</div>
@@ -248,7 +252,7 @@
       ['tk-streak-2',  streak != null  ? streak + 'D STREAK'                             : '—'],
       ['tk-journey-2', j.progress_pct != null ? j.progress_pct.toFixed(1) + '% TO GOAL' : '—'],
     ].forEach(([id, val]) => setText(id, val));
-  } catch(e) { /* silent — ticker stays at em dashes */ }
+  } catch(e) { /* silent */ }
 })();
 </script>
 
