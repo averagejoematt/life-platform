@@ -1,5 +1,28 @@
 # Life Platform — Changelog
 
+## v3.7.60 — 2026-03-17: TB7-26 WAF + subscribe end-to-end fix
+
+### Summary
+WAF WebACL live on averagejoematt.com CloudFront. Subscribe flow fixed (email-subscriber was writing DDB to us-east-1 instead of us-west-2). Subscribe test 5/5 passing.
+
+### Changes
+- `lambdas/email_subscriber_lambda.py`: Added `DYNAMODB_REGION` env var (defaults `us-west-2`). DynamoDB client now uses `DYNAMODB_REGION`; SES client uses `REGION` (us-east-1). Fixes cross-region DDB access from us-east-1 Lambda.
+- `cdk/stacks/web_stack.py`: `DYNAMODB_REGION=us-west-2` added to `EmailSubscriberLambda` environment.
+- `deploy/setup_waf.sh`: **NEW** — creates WAF WebACL with 2 rate rules, attaches to CloudFront E3S424OXQZ8NBE via `update-distribution`.
+- `deploy/test_subscribe.sh`: **NEW** — end-to-end subscribe flow test (5 assertions: HTTP 200, body, 400 invalid, 400 empty, DDB record).
+
+### Deployed
+- `email-subscriber` Lambda code (us-east-1) ✅
+- `email-subscriber` env var `DYNAMODB_REGION=us-west-2` updated ✅
+- WAF WebACL `life-platform-amj-waf` created + attached to E3S424OXQZ8NBE ✅
+
+### WAF Rules
+- `SubscribeRateLimit`: /api/subscribe* — block >60 req/5min per IP
+- `GlobalRateLimit`: all paths — block >1000 req/5min per IP
+- Cost: ~$6/month
+
+---
+
 ## v3.7.59 — 2026-03-17: Site unification + data fixes + BS-05/BS-09 in Weekly/Chronicle
 
 ### Summary

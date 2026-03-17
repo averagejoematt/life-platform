@@ -233,11 +233,12 @@ class WebStack(Stack):
             timeout_seconds=15,
             memory_mb=256,
             environment={
-                "USER_ID":      "matthew",
-                "TABLE_NAME":   "life-platform",
-                "S3_BUCKET":    BUCKET,
-                "EMAIL_SENDER": "lifeplatform@mattsusername.com",
-                "SITE_URL":     "https://averagejoematt.com",
+                "USER_ID":          "matthew",
+                "TABLE_NAME":       "life-platform",
+                "S3_BUCKET":        BUCKET,
+                "EMAIL_SENDER":     "lifeplatform@mattsusername.com",
+                "SITE_URL":         "https://averagejoematt.com",
+                "DYNAMODB_REGION":  "us-west-2",  # DDB table is in us-west-2; Lambda runs in us-east-1
             },
         )
 
