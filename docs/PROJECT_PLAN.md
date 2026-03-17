@@ -144,17 +144,17 @@ Ranked by combined impact × feasibility × strategic importance across all thre
 | 8 | BS-08 | **Unified Sleep Record** — Merge Whoop/Eight Sleep/Apple Health into canonical sleep record per night in DDB | Omar / Huberman | **Sprint 2** | Conflict resolution rules doc → Sprint 1 prereq; implementation Sprint 2 |
 | 9 | BS-09 | **ACWR Training Load Model** — Acute:chronic workload ratio from Whoop strain + Strava. Alert >1.3 or <0.8 | Attia / Jin | **Sprint 1** | Not started. Pure compute Lambda (no LLM). |
 | 10 | BS-10 | **Meal-Level CGM Response Scorer** — Match MacroFactor meal timestamps with CGM glucose curves. Personal food response database | Patrick / Anika | Backlog | Not started (needs CGM data maturity, ~June 2026) |
-| 11 | BS-11 | **Transformation Timeline (Website)** — Interactive scrollable journey visualization, shareable | Moreau / Kim | **Sprint 4** | Not started (needs BS-07 API layer) |
-| 12 | BS-12 | **Deficit Sustainability Tracker** — Multi-signal early warning for unsustainable caloric deficit | Norton / Attia | **Sprint 3** | Not started (moved Sprint 2→3: data needs to mature) |
-| 13 | BS-13 | **N=1 Experiment Archive (Website)** — Public experiment case studies with data | Patrick / Kim | **Sprint 3** | Not started |
-| 14 | BS-14 | **Multi-User Data Isolation Design** — Schema design for tenant isolation (design doc only) | Yael / Omar | **Sprint 4** | Not started (design-only; schema review of Sprints 1-3 patterns) |
+| 11 | BS-11 | **Transformation Timeline (Website)** — Interactive scrollable journey visualization, shareable | Moreau / Kim | **Sprint 4** | ✅ Done (v3.7.68) |
+| 12 | BS-12 | **Deficit Sustainability Tracker** — Multi-signal early warning for unsustainable caloric deficit | Norton / Attia | **Sprint 3** | ✅ Done (v3.7.67) |
+| 13 | BS-13 | **N=1 Experiment Archive (Website)** — Public experiment case studies with data | Patrick / Kim | **Sprint 3** | ✅ Done (v3.7.65) |
+| 14 | BS-14 | **Multi-User Data Isolation Design** — Schema design for tenant isolation (design doc only) | Yael / Omar | **Sprint 4** | ✅ Done (v3.7.68) |
 | 15 | BS-15 | **Board of Directors Interactive Tool (Website)** — "Build your own health advisory board" lead magnet | Chen / Kim | Backlog | Not started |
 
 ### Personal Results Roadmap (6 Domains)
 
 **Domain 1: Sleep & Recovery Intelligence**
 - BS-08: Unified Sleep Record (Sprint 2) — conflict resolution rules → Sprint 1 prereq
-- BS-SL1: Sleep Environment Optimizer — cross-reference Eight Sleep temperature data with Whoop staging to find optimal personal settings. *Sprint 3.*
+- BS-SL1: Sleep Environment Optimizer — cross-reference Eight Sleep temperature data with Whoop staging to find optimal personal settings. *Sprint 3.* ✅ Done (v3.7.67)
 - BS-SL2: Circadian Compliance Score — pre-sleep behavioral score from light exposure, meal timing, screen use. *Sprint 2 (Huberman: ships with BS-08).* Sonnet.
 - IC-30: Sleep Environment Intelligence IC feature — *Backlog (after BS-SL1 runs 4+ weeks).*
 
@@ -162,7 +162,7 @@ Ranked by combined impact × feasibility × strategic importance across all thre
 - BS-10: Meal-Level CGM Response Scorer (Backlog — CGM data maturity)
 - BS-12: Deficit Sustainability Tracker (Sprint 3) — Opus
 - BS-NU1: Protein Timing & Distribution Score (Sprint 2) — **Opus** (changed from Sonnet per Norton/Patrick)
-- IC-29: Metabolic Adaptation Intelligence IC feature — TDEE divergence tracking. *Sprint 3.* Opus.
+- IC-29: Metabolic Adaptation Intelligence IC feature — TDEE divergence tracking. *Sprint 3.* Opus. ✅ Done (v3.7.67)
 
 **Domain 3: Training & Performance Intelligence**
 - BS-09: ACWR Training Load Model (Sprint 1) — pure compute Lambda, no LLM
@@ -186,8 +186,8 @@ Ranked by combined impact × feasibility × strategic importance across all thre
 - BS-T2-3: DEXA-Anchored Composition Model (Tier 2) — Bayesian model. *Backlog (needs DEXA #2).*
 
 **Domain 6: Mental Performance & State of Mind**
-- BS-MP1: Autonomic Balance Score — HRV + RHR + RR + sleep quality → 4-quadrant nervous system state. *Sprint 3.* **Opus** (confirmed by Anika + Huberman).
-- BS-MP2: Journal Sentiment Trajectory — structured sentiment analysis with divergence detection. *Sprint 3.* Opus.
+- BS-MP1: Autonomic Balance Score — HRV + RHR + RR + sleep quality → 4-quadrant nervous system state. *Sprint 3.* **Opus** (confirmed by Anika + Huberman). ✅ Done (v3.7.67)
+- BS-MP2: Journal Sentiment Trajectory — structured sentiment analysis with divergence detection. *Sprint 3.* Opus. ✅ Done (v3.7.67)
 - BS-MP3: Decision Fatigue Detector (proactive alert) — *Sprint 2.* Sonnet.
 - BS-T2-6: Decision Journal Analytics — calibration score, regret analysis. *Backlog (needs 50+ decisions).*
 
@@ -319,7 +319,7 @@ Site map target (from 4 pages to 10):
 | Sprint 2 | 3-4 | ~Apr 13 | Intelligence Core + Sleep | BS-07, BS-08, BS-SL2, BS-BH1, BS-MP3, BS-TR1, BS-TR2, BS-NU1 | ~27h |
 | SIMP-1 Ph2 | 5 | ~Apr 13 | Rationalization | 89→≤80 tools, EMF review | ~5h |
 | Sprint 3 | 6-9 | ~May 11 | Advanced Intelligence + Content | BS-12, BS-SL1, BS-MP1, BS-MP2, BS-13, BS-T2-5, WEB-WCT, IC-28, IC-29 | ~38h |
-| Sprint 4 | 10-13 | ~Jun 8 | Website Interactive + Architecture | BS-11, WEB-CE, BS-BM2, BS-14 | ~27h |
+| Sprint 4 | 10-13 | ~Jun 8 | Website Interactive + Architecture | BS-11, WEB-CE, BS-BM2, BS-14 | ~27h | ✅ COMPLETE |
 
 **Backlog activation schedule:**
 - ~May 2026: BS-06 (Habit Cascade), IC-27, BS-T2-7 (data gates)
@@ -381,16 +381,16 @@ Site map target (from 4 pages to 10):
 
 | Metric | Current | Target | Notes |
 |--------|---------|--------|-------|
-| MCP tools | 89 | ≤80 (SIMP-1 Phase 2) | Phase 1 complete (116→89 via ADR-030). Phase 2 gated ~Apr 13 |
-| Lambdas | 45 (CDK) + 1 Lambda@Edge + 1 us-east-1 manual | — | email-subscriber in us-east-1 |
+| MCP tools | 95 | ≤80 (SIMP-1 Phase 2) | Phase 1 complete (116→89). Sprint 3 added 5 tools (90→95). Phase 2 gated ~Apr 13 |
+| Lambdas | 48 (CDK) + 1 Lambda@Edge + 1 us-east-1 (site-api) + 1 us-west-2 manual (email-subscriber) | — | |
 | CloudWatch alarms | 49 | — | +SLO-5 warmer alarm (v3.7.22) |
 | Monthly cost | ~$13 | <$25 | Well under budget |
 | Active secrets | 9 | — | webhook-key deleted 2026-03-14; google-calendar deleted 2026-03-15 (ADR-030) |
 | CI linters | 9 | — | H1-H5, S1-S4, IAM, registry, handler, wiring, DDB patterns |
 | SLOs defined | 5 | — | SLO-1 through SLO-5 (warmer added v3.7.22) |
-| IC features live | 14 of 31 | — | IC-27–31 now explicitly defined (v3.7.61). Next: IC-28/29 Sprint 3. |
+| IC features live | 16 of 31 | — | IC-29 (deficit+metabolic) + IC-30 (autonomic balance) deployed v3.7.67. |
 | Data sources | 19 | — | google_calendar retired (ADR-030, v3.7.46) |
-| Architecture review grade | A | A | R16 grade A. R17 targeting ~June 2026 (post Sprint 4). |
+| Architecture review grade | A | A | R16 grade A. R17 targeting ~June 2026. All 4 sprints complete. |
 | R13 open findings | 0 of 15 | 0 | All closed. F03 (monolith split) deferred via ADR-029. |
 | CI integration tests wired | I1/I2/I4-I9 | all | I3/I10-I14 manual-only (Lambda invocation side effects or special auth) |
 | Board Summit features | 45 total | — | Sprint 1-4: 26 features. Backlog: 19 features. See SPRINT_PLAN.md. |

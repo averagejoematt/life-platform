@@ -2,7 +2,7 @@
 
 > Documents the Intelligence Compounding (IC) features: how the platform learns, remembers, and improves over time.
 > For the IC roadmap and future phases, see PROJECT_PLAN.md (Tier 7).
-> Last updated: 2026-03-15 (v3.7.48)
+> Last updated: 2026-03-17 (v3.7.68)
 
 ---
 
@@ -499,17 +499,18 @@ The following IC features were identified by the Joint Board Summit (Health & Pe
 
 **Relationship to IC-4:** Complementary but distinct. IC-4 identifies *antecedent conditions* (external: high TSB, poor sleep) that precede habit collapse. IC-28 identifies *habit-to-habit contagion* (internal: which specific habits drag others down).
 
-### IC-29: Deficit Sustainability Tracker (BS-12)
-**Status:** Planned — Board Summit priority #12
-**Target:** 90-180 days
-**What it does:** Multi-signal early warning for unsustainable caloric deficit. Monitors HRV trend, sleep quality trend, habit completion trend, and training output simultaneously. When 3+ of these signals degrade concurrently during an active deficit, flags "deficit too aggressive this week" with a concrete recommendation (e.g., increase calories by 200 for 3 days). Writes to `MEMORY#deficit_warnings`.
+### IC-29: Deficit Sustainability + Metabolic Adaptation (BS-12)
+**Status:** Live (v3.7.67)
+**Deployed as:** Two MCP tools in `mcp/tools_nutrition.py`:
+- `tool_get_deficit_sustainability()` — 5-channel real-time deficit early warning (HRV, sleep, recovery, habits, training output). Compares first-third vs last-third of rolling window. 3+ concurrent degradations → severity flag.
+- `tool_get_metabolic_adaptation()` — TDEE divergence tracker. Compares expected weight loss (caloric deficit × 3500 kcal/lb) against actual Withings weight change. Adaptation ratio = actual/expected. Severity classification with diet break recommendations per Trexler/McDonald/Norton.
 
-**Key inputs:** MacroFactor calorie data, Whoop HRV/recovery, Eight Sleep quality, Habitify Tier 0 completion rate, Strava/Hevy training volume.
+**Key inputs:** MacroFactor calorie data, Whoop HRV/recovery, Habitify Tier 0 completion rate, Strava training output, Withings weight.
 
 ### IC-30: Autonomic Balance Score (BS-MP1)
-**Status:** Planned — Later
-**Target:** 90-180 days
-**What it does:** Synthesizes HRV trend, resting heart rate, respiratory rate, and sleep quality into a single nervous system state score mapped to a 4-quadrant model: high-energy/positive (flow), high-energy/negative (stress), low-energy/positive (recovery), low-energy/negative (burnout). Used to contextualize other metrics: "Your nutrition compliance dropped. Your autonomic state has been in the stress quadrant for 5 consecutive days — this looks like willpower depletion."
+**Status:** Live (v3.7.67)
+**Deployed as:** MCP tool `tool_get_autonomic_balance()` in `mcp/tools_health.py`.
+**What it does:** Synthesizes HRV, resting heart rate, respiratory rate, and sleep efficiency into Z-scores against personal baselines, then maps to a 4-quadrant model: Flow (high energy + positive), Stress (high energy + negative), Recovery (low energy + positive), Burnout (low energy + negative). Balance score 0-100. 7-day trend with dominant state. State transition detection. Consecutive days in state tracking. Porges polyvagal + Huberman ANS framework.
 
 ### IC-31: Meal-Level CGM Response Scorer (BS-10)
 **Status:** Planned — Board Summit priority #10
@@ -542,4 +543,4 @@ These decisions are documented to prevent revisiting:
 
 ---
 
-*Last updated: 2026-03-16 (v3.7.54 — Board Summit IC additions IC-27 through IC-31 + planned enhancements)*
+*Last updated: 2026-03-17 (v3.7.68 — IC-29 live as deficit sustainability + metabolic adaptation. IC-30 live as autonomic balance. BS-MP2 journal sentiment trajectory also deployed but is not an IC feature.)*

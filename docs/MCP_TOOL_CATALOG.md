@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-**Version:** v3.7.67 | **Last updated:** 2026-03-17 | **Total tools:** 95
+**Version:** v3.7.68 | **Last updated:** 2026-03-17 | **Total tools:** 95
 
 > SIMP-1 Phase 1 complete (v3.7.17–19): 116 → 86 tools via 13 view-dispatchers. ADR-030 (v3.7.46): `get_calendar_events` + `get_schedule_load` retired (Google Calendar integration blocked by IT policy). 88 → 87 tools.
 > Many previously standalone tools are now `view=` parameters of a parent dispatcher.
@@ -28,7 +28,7 @@
 
 ---
 
-## Quick Reference — All 87 Tools
+## Quick Reference — All 95 Tools
 
 ### Core Data Access
 | Tool | Key Params | Description |
@@ -48,12 +48,15 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `get_health` | view= (dashboard\|risk_profile\|trajectory), domain= | Unified health: morning briefing / CV+metabolic risk / forward projections. risk_profile and trajectory warmed nightly. |
+| `get_autonomic_balance` | start_date=, end_date=, days= | BS-MP1: 4-quadrant ANS model (Flow/Stress/Recovery/Burnout). Balance score 0-100, 7d trend, state transitions |
 | `get_daily_metrics` | view= (movement\|energy\|hydration), step_target= | Daily activity: NEAT/steps / calorie balance / water intake |
 | `get_labs` | view= (results\|trends\|out_of_range), biomarker=, category= | Lab intelligence: draws / trajectory / chronic flags |
 | `get_training` | view= (load\|periodization\|recommendation), weeks= | Training intelligence: CTL/ATL/TSB / mesocycle analysis / today's workout. All warmed nightly. |
 | `get_cgm` | view= (dashboard\|fasting), days= | CGM: time-in-range + variability / fasting glucose validation. Dashboard warmed nightly. |
 | `get_mood` | view= (trend\|state_of_mind), days= | Mood intelligence: journal-derived scores / Apple Health HWF valence |
 | `get_nutrition` | view= (summary\|macros\|meal_timing\|micronutrients), calorie_target=, protein_target= | Nutrition intelligence: macro breakdown / adherence / eating window / RDA scoring |
+| `get_deficit_sustainability` | start_date=, end_date=, days= | BS-12: 5-channel deficit early warning (HRV, sleep, recovery, habits, training). 3+ degradations → flag |
+| `get_metabolic_adaptation` | start_date=, end_date=, weeks= | IC-29: TDEE divergence tracker. Expected vs actual weight loss, adaptation ratio, diet break recs |
 
 ### Weight & Body Composition
 | Tool | Key Params | Description |
@@ -82,6 +85,7 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `get_sleep_analysis` | start_date=, end_date=, target_sleep_hours= | Clinical analysis: architecture %, WASO, circadian timing, debt |
+| `get_sleep_environment_analysis` | start_date=, end_date=, days= | BS-SL1: Eight Sleep temp × Whoop staging. Temperature band analysis, optimal band detection, Pearson correlations |
 
 ### Habits
 | Tool | Key Params | Description |
@@ -143,6 +147,7 @@
 | `get_journal_entries` | start_date=, end_date=, template= | Retrieve entries with AI-enriched fields |
 | `search_journal` | query, start_date=, end_date= | Full-text search across all journal fields |
 | `get_journal_insights` | start_date=, end_date= | Cross-entry patterns: themes, emotions, avoidance |
+| `get_journal_sentiment_trajectory` | start_date=, end_date=, days= | BS-MP2: Mood/energy/stress regression, divergence detection, inflection points |
 | `get_journal_correlations` | start_date=, end_date= | Journal mood/stress vs wearable data |
 
 ### Coaching Log / Insights
