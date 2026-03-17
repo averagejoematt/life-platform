@@ -1,5 +1,5 @@
 # Life Platform — Sprint Plan
-**Board-Aligned Implementation Roadmap | v3.7.68 | March 17, 2026**
+**Board-Aligned Implementation Roadmap | v3.7.69 | March 17, 2026**
 *Derived from Joint Board Summit Record (March 15, 2026) + Board Sprint Review (March 16, 2026)*
 
 ---
@@ -109,6 +109,38 @@ Before Sprint 3 begins, run EMF telemetry review. Target: ≤80 tools. Dedicate 
 - Remaining capacity (~8-10h) → R17 Architecture Review prep
 - Run `python3 deploy/generate_review_bundle.py` before R17
 - R17 target: ~June 2026 (post Sprint 4)
+
+---
+
+## SPRINT 5 — Weeks 14-15 (Board Summit #2)
+**Theme: Website + Distribution + Behavior Change**
+**Capacity: ~15h | Load: ~12h**
+**Source: Board Summit #2 (2026-03-17) — post-sprint review. Full record: `docs/reviews/BOARD_SUMMIT_2_2026-03-17.md`**
+
+| ID | Feature | Effort | Model | Deliverable | Champion |
+|----|---------|--------|-------|-------------|----------|
+| S2-T1-1 | **MCP `Key` Import Bug Fix** — Add `from boto3.dynamodb.conditions import Key` to `tools_lifestyle.py`. Blocking `list_experiments`, `create_experiment`, `end_experiment` and others. | XS (15m) | None | One-line fix + MCP redeploy | Elena |
+| S2-T1-6 | **`/story` Page** — Deep origin narrative. Where he started, what he built, why it matters. The emotional entry point that makes a stranger care enough to subscribe. Manual content by Matthew. | S (content) | None (static) | `site/story/index.html`. S3 deploy. | Moreau |
+| S2-T1-7 | **`/about` Page** — Brief bio, professional context (IT leadership → solo builder), links, contact. Quick page. | XS (1h) | None (static) | `site/about/index.html`. S3 deploy. | Moreau |
+| S2-T1-8 | **Email CTA on All Pages** — Consistent footer subscribe component across all 7+ site pages. Amber accent, one-line value prop, single email field. Links to `/subscribe`. | S (2h) | None (frontend) | Footer component. All pages updated. S3 deploy + invalidation. | Kim |
+| S2-T1-9 | **Adaptive Deficit Ceiling** — Wire BS-12 Deficit Sustainability flags into Daily Brief with specific calorie increase recommendations. When 3+ channels degrade concurrently: "Increase by 200 kcal for 5 days, then reassess." Move from observation to prescription. | M (3h) | Sonnet | `daily_insight_compute_lambda.py` + `ai_calls.py` update. Redeploy daily-brief. | Norton / Attia |
+| S2-T1-10 | **Weekly Habit Review Automation** — Every Sunday, auto-generate structured review in Daily Brief: T0 completion rates, patterns preceding misses, T1 candidates for promotion/retirement, vice streak status. | M (3h) | Sonnet | `daily_insight_compute_lambda.py` + `ai_calls.py` update. Sunday-aware logic. | Clear |
+| DEPLOY | **Sprint 4 Pending Deploy** — Run `deploy/deploy_sprint4.sh`. site-api Lambda, S3 page sync, CloudFront invalidation. | S (15m) | None (ops) | 3 new API endpoints live. 3 new pages live. | Jin |
+| DIST-1 | **First Distribution Event** — HN post, Twitter thread, or build log. Title suggestion: "I built a personal health AI with 19 data sources, 95 tools, and a $13/month bill." | S (content) | None | External audience discovery. Non-negotiable. | Kim / Raj |
+
+**Sprint 5 Prerequisites:**
+- Matthew writes `/story` page content (manual — this cannot be delegated to AI)
+- Matthew writes `/about` page content (brief bio, can be assisted)
+- Sprint 4 deploy completed before any Sprint 5 work begins
+
+**Sprint 5 Definition of Done:**
+- MCP `Key` bug fixed and MCP Lambda redeployed
+- `/story` and `/about` pages live on averagejoematt.com
+- Email capture CTA visible on every page
+- Adaptive deficit ceiling wired into Daily Brief
+- Weekly habit review generating on Sundays
+- At least one external distribution event published
+- Privacy policy visible on /subscribe page (Yael requirement)
 
 ---
 
@@ -236,6 +268,10 @@ Week 10-13:  SPRINT 4 ✅ COMPLETE — Website Interactive + Architecture
              BS-11 Transformation Timeline | WEB-CE Correlation Explorer
              BS-BM2 Genome Dashboard | BS-14 Multi-User Design Doc
 
+Week 14-15:  SPRINT 5 — Website + Distribution (Board Summit #2)
+             S2-T1-1 Key bug fix | /story page | /about page | Email CTAs
+             Adaptive Deficit Ceiling | Weekly Habit Review | First Distribution Event
+
 ~June 2026:  EMAIL-P2 Data Drop #1 | R17 Architecture Review
 ~Aug 2026:   IC-30 Sleep Environment IC (after BS-SL1 matures)
 ~Sep 2026:   EMAIL-P3 Community launch
@@ -251,6 +287,7 @@ Post-DEXA:   BS-BM3, BS-T2-3 DEXA Body Composition
 
 ---
 
-*Board review conducted: March 16, 2026 | 22 board members (Health + Technical) | Confidence: HIGH*
+*Board Summit #1: March 16, 2026 | Board Summit #2: March 17, 2026 | 16 board members (Health + Technical)*
+*Summit #1 record: `docs/reviews/BOARD_SUMMIT_2026-03-16.md` | Summit #2 record: `docs/reviews/BOARD_SUMMIT_2_2026-03-17.md`*
 *Board Sprint Review full record: `docs/reviews/BOARD_SPRINT_REVIEW_2026-03-16.md`*
 *Champions listed are advisory — Matthew Walker is the implementer*

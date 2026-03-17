@@ -1,3 +1,18 @@
+## v3.7.69 — 2026-03-17: Board Summit #2 — post-sprint review + Sprint 5 plan
+
+### Summary
+Board Summit #2 conducted (16 members, Health + Technical boards). Post-sprint review: all 4 Summit #1 sprints complete (30 items shipped). Summit identified distribution as unanimous #1 priority (zero subscribers despite working infrastructure). Rate-of-loss medical concern flagged (>2.5 lbs/wk). Sprint 5 planned: 8 items focused on website (story page, about page, email CTAs, design enforcement) + behavior change (adaptive deficit ceiling, weekly habit review) + distribution (first HN/Twitter event). Full summit record: `docs/reviews/BOARD_SUMMIT_2_2026-03-17.md`.
+
+### Changes
+- `docs/PROJECT_PLAN.md`: Board Summit #2 section — Sprint 5 plan (8 items), Summit #2 Tier 2 additions (10 items), Tier 3 additions (6 items), 12-page website roadmap, design language directive, commercialization update, next summit trigger
+- `docs/SPRINT_PLAN.md`: Sprint 5 section added — 8 items, theme: Website + Distribution + Behavior Change, prerequisites, definition of done
+- `docs/reviews/BOARD_SUMMIT_2_2026-03-17.md`: Full summit record (7 sections: opening statements, personal results roadmap, website roadmap, technical roadmap, commercialization paths, priority stack, board challenges)
+
+### Not Deployed
+Documentation-only session. No Lambda deployments. Sprint 4 deploy still pending (`deploy/deploy_sprint4.sh`).
+
+---
+
 ## v3.7.68 — 2026-03-17: Sprint 4 complete — BS-11, WEB-CE, BS-BM2, BS-14
 
 ### Summary
