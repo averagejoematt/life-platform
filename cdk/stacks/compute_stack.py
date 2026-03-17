@@ -171,6 +171,34 @@ class ComputeStack(Stack):
             **shared,
         )
 
+        # ══════════════════════════════════════════════════════════════
+        # 10. sleep-reconciler — BS-08 (7:00 AM PT — after ingestion, before daily brief)
+        # ══════════════════════════════════════════════════════════════
+        create_platform_lambda(
+            self, "SleepReconciler",
+            function_name="sleep-reconciler",
+            handler="sleep_reconciler_lambda.lambda_handler",
+            source_file="lambdas/sleep_reconciler_lambda.py",
+            schedule="cron(0 14 * * ? *)",  # 7:00 AM PT daily
+            timeout_seconds=60, memory_mb=256,
+            custom_policies=rp.compute_sleep_reconciler(),
+            **shared,
+        )
+
+        # ══════════════════════════════════════════════════════════════
+        # 11. circadian-compliance — BS-SL2 (7:00 PM PT — evening nudge window)
+        # ══════════════════════════════════════════════════════════════
+        create_platform_lambda(
+            self, "CircadianCompliance",
+            function_name="circadian-compliance",
+            handler="circadian_compliance_lambda.lambda_handler",
+            source_file="lambdas/circadian_compliance_lambda.py",
+            schedule="cron(0 2 * * ? *)",  # 7:00 PM PT daily (02:00 UTC)
+            timeout_seconds=60, memory_mb=256,
+            custom_policies=rp.compute_circadian_compliance(),
+            **shared,
+        )
+
         create_platform_lambda(
             self, "FailurePatternCompute",
             function_name="failure-pattern-compute",

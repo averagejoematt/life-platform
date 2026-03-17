@@ -984,6 +984,52 @@ def site_api() -> list[iam.PolicyStatement]:
 
 
 # ═════════════════════════════════════════════════════════════════════════
+# BS-08 / BS-SL2 — Sleep Reconciler + Circadian Compliance
+# ═════════════════════════════════════════════════════════════════════════
+
+def compute_sleep_reconciler() -> list[iam.PolicyStatement]:
+    """BS-08: Unified Sleep Record — reads Whoop/Eight Sleep/Apple Health, writes sleep_unified."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ),
+    ]
+
+
+def compute_circadian_compliance() -> list[iam.PolicyStatement]:
+    """BS-SL2: Circadian Compliance Score — reads journal/MacroFactor/Whoop/Strava, writes circadian."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ),
+    ]
+
+
+# ═════════════════════════════════════════════════════════════════════════
 # MCP STACK — 1 Lambda
 # ═════════════════════════════════════════════════════════════════════════
 

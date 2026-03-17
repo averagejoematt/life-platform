@@ -14,7 +14,13 @@ from mcp.tools_health import *
 from mcp.tools_sleep import *
 from mcp.tools_nutrition import *
 from mcp.tools_correlation import *
-from mcp.tools_habits import *
+from mcp.tools_habits import (
+    tool_get_habits, tool_compare_habit_periods, tool_get_habit_registry,
+    tool_get_habit_tier_report, tool_get_vice_streak_history,
+    tool_get_vice_streaks,
+    tool_get_essential_seven,
+    tool_get_garmin_summary, tool_get_device_agreement,
+)
 from mcp.tools_labs import *
 from mcp.tools_cgm import *
 from mcp.tools_journal import *
@@ -1249,6 +1255,32 @@ TOOLS = {
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (default: 90 days ago)."},
                     "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
                     "vice_name": {"type": "string", "description": "Filter by vice name (partial match, case-insensitive)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    # ── BS-BH1: Vice Streak Amplifier ──
+    "get_vice_streaks": {
+        "fn": tool_get_vice_streaks,
+        "schema": {
+            "name": "get_vice_streaks",
+            "description": (
+                "BS-BH1: Vice Streak Amplifier — dedicated tracker with compounding value calculation. "
+                "For each active vice streak, computes: current streak length, longest ever streak, "
+                "compounding value (streak^1.5 / 10 — day 30 is ~3x day 3), streak risk rating, "
+                "relapse history, next milestone day, and portfolio total value. "
+                "Identity-based framing: by day 30 you're no longer fighting it — it's who you are. "
+                "Use for: 'vice streaks', 'how is my No Alcohol streak going?', 'vice portfolio value', "
+                "'how many days until my next milestone?', 'how are all my vices tracking?', "
+                "'compounding vice streak value', 'vice identity score'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "days_back":  {"type": "integer", "description": "Lookback window for streak history (default: 90)."},
+                    "end_date":   {"type": "string",  "description": "End date YYYY-MM-DD (default: yesterday)."},
+                    "vice_name":  {"type": "string",  "description": "Filter by vice name (partial match, case-insensitive)."},
                 },
                 "required": [],
             },

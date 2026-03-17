@@ -1,6 +1,6 @@
 {
   "_comment": "Lambda source file → AWS function name mapping for CI/CD. Used by .github/workflows/ci-cd.yml",
-  "_updated": "2026-03-17 v3.7.62",
+  "_updated": "2026-03-17 v3.7.64",
 
   "lambdas": {
     "lambdas/strava_lambda.py":              { "function": "strava-data-ingestion" },
@@ -119,6 +119,24 @@
       "handler": "acwr_compute_lambda.lambda_handler",
       "stack": "LifePlatformCompute",
       "note": "BS-09: Whoop strain ACWR. Runs 9:55 AM PT daily. Writes to computed_metrics partition."
+    }
+  },
+
+  "sleep_reconciler": {
+    "lambdas/sleep_reconciler_lambda.py": {
+      "function": "sleep-reconciler",
+      "handler": "sleep_reconciler_lambda.lambda_handler",
+      "stack": "LifePlatformCompute",
+      "note": "BS-08: Unified Sleep Record — merges Whoop/Eight Sleep/Apple Health nightly. Runs 7:00 AM PT daily. Writes to sleep_unified partition."
+    }
+  },
+
+  "circadian_compliance": {
+    "lambdas/circadian_compliance_lambda.py": {
+      "function": "circadian-compliance",
+      "handler": "circadian_compliance_lambda.lambda_handler",
+      "stack": "LifePlatformCompute",
+      "note": "BS-SL2: Circadian Compliance Score — pre-sleep behavioral score (0-100). Runs 7:00 PM PT daily. Writes to circadian partition. Surfaces in Evening Nudge."
     }
   },
 
