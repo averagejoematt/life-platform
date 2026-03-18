@@ -143,9 +143,11 @@ def ingestion_withings() -> list[iam.PolicyStatement]:
 
 
 def ingestion_habitify() -> list[iam.PolicyStatement]:
+    # ADR-014: life-platform/habitify has its own dedicated secret (restored 2026-03-10
+    # after accidental deletion). NOT bundled in ingestion-keys — keep separate.
     return _ingestion_base(
         "habitify",
-        secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
+        secret_name="life-platform/habitify",
         s3_prefix="raw/matthew/habitify/*",
     )
 
