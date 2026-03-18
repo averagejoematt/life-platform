@@ -5,9 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="I built an AI operating system for my body. 19 data sources. Real numbers. One hypothesis: compounding data changes everything.">
   <meta property="og:title" content="Matthew Walker — Signal / Human Systems">
-  <meta property="og:description" content="19 data sources. 89 intelligence tools. Real numbers. No filtered highlight reel.">
+  <meta property="og:description" content="302 → 185. 19 data sources. 95 AI tools. Every number public. Built by a non-engineer with Claude.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Matthew Walker — Signal / Human Systems">
+  <meta name="twitter:description" content="302 → 185. 19 data sources. Every number public. Built with Claude.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <title>Matthew Walker — Signal / Human Systems</title>
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
@@ -393,27 +401,27 @@
   <div class="ticker__inner">
     <span class="ticker__item">SIGNAL / HUMAN SYSTEMS</span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item">WEIGHT <strong id="tk-weight">—</strong></span>
+    <span class="ticker__item">WEIGHT <strong id="tk-weight">287.7 LBS</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item">HRV <strong id="tk-hrv">—</strong></span>
+    <span class="ticker__item">HRV <strong id="tk-hrv">54 MS</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item">RECOVERY <strong id="tk-recovery">—</strong></span>
+    <span class="ticker__item">RECOVERY <strong id="tk-recovery">75%</strong></span>
     <span class="ticker__item">⬥</span>
     <span class="ticker__item">STREAK <strong id="tk-streak">—</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item">JOURNEY <strong id="tk-journey">—</strong></span>
+    <span class="ticker__item">JOURNEY <strong id="tk-journey">12.2% TO GOAL</strong></span>
     <span class="ticker__item">⬥</span>
     <span class="ticker__item">SIGNAL / HUMAN SYSTEMS</span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item">WEIGHT <strong id="tk-weight-2">—</strong></span>
+    <span class="ticker__item">WEIGHT <strong id="tk-weight-2">287.7 LBS</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item">HRV <strong id="tk-hrv-2">—</strong></span>
+    <span class="ticker__item">HRV <strong id="tk-hrv-2">54 MS</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item">RECOVERY <strong id="tk-recovery-2">—</strong></span>
+    <span class="ticker__item">RECOVERY <strong id="tk-recovery-2">75%</strong></span>
     <span class="ticker__item">⬥</span>
     <span class="ticker__item">STREAK <strong id="tk-streak-2">—</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item">JOURNEY <strong id="tk-journey-2">—</strong></span>
+    <span class="ticker__item">JOURNEY <strong id="tk-journey-2">12.2% TO GOAL</strong></span>
     <span class="ticker__item">⬥</span>
   </div>
 </div>
@@ -432,8 +440,7 @@
     <span class="weight-arrow">→</span>
     <div class="weight-node current">
       <span class="label">Today</span>
-      <span class="value" id="hero-weight">
-        <span class="skeleton" style="width:64px;height:36px;">&nbsp;</span>
+      <span class="value" id="hero-weight">287.7</span>
       </span>
     </div>
     <span class="weight-arrow">→</span>
@@ -449,8 +456,8 @@
       <div class="progress-bar-fill" id="hero-progress-fill"></div>
     </div>
     <div class="progress-meta">
-      <span id="hero-lost-lbs">— lbs lost</span>
-      <span id="hero-progress-pct">—%</span>
+      <span id="hero-lost-lbs">14.3 lbs lost</span>
+      <span id="hero-progress-pct">12.2%</span>
     </div>
   </div>
 
@@ -489,6 +496,212 @@
   </p>
 
 </section>
+
+<!-- ── Trend Sparklines + AI Brief ────────────────────────── -->
+<section style="
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--border);
+" id="signals">
+  <!-- Left: Sparkline trends -->
+  <div style="padding: var(--space-12) var(--page-padding); border-right: 1px solid var(--border);">
+    <div class="eyebrow" style="margin-bottom: var(--space-6)">Live signals</div>
+    <h2 class="text-h2" style="color: var(--text); margin-bottom: var(--space-8)">The numbers <span style="color:var(--accent)">this month</span></h2>
+
+    <div id="sparklines" style="display: flex; flex-direction: column; gap: var(--space-6);">
+      <!-- Weight sparkline -->
+      <div style="border: 1px solid var(--border); background: var(--surface); padding: var(--space-4) var(--space-5);">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-3);">
+          <span style="font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted);">Weight (30d)</span>
+          <span id="spark-weight-val" style="font-family: var(--font-display); font-size: 24px; color: var(--accent); letter-spacing: var(--ls-display);">—</span>
+        </div>
+        <svg id="spark-weight" viewBox="0 0 300 50" style="width: 100%; height: 50px; display: block;"></svg>
+        <div style="display: flex; justify-content: space-between; margin-top: var(--space-1);">
+          <span id="spark-weight-delta" style="font-size: var(--text-2xs); color: var(--accent-dim);"></span>
+          <span style="font-size: var(--text-2xs); color: var(--text-faint);">lbs</span>
+        </div>
+      </div>
+
+      <!-- HRV sparkline -->
+      <div style="border: 1px solid var(--border); background: var(--surface); padding: var(--space-4) var(--space-5);">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-3);">
+          <span style="font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted);">HRV (30d avg)</span>
+          <span id="spark-hrv-val" style="font-family: var(--font-display); font-size: 24px; color: var(--accent); letter-spacing: var(--ls-display);">—</span>
+        </div>
+        <svg id="spark-hrv" viewBox="0 0 300 50" style="width: 100%; height: 50px; display: block;"></svg>
+        <div style="display: flex; justify-content: space-between; margin-top: var(--space-1);">
+          <span id="spark-hrv-trend" style="font-size: var(--text-2xs); color: var(--accent-dim);"></span>
+          <span style="font-size: var(--text-2xs); color: var(--text-faint);">ms</span>
+        </div>
+      </div>
+
+      <!-- Recovery sparkline -->
+      <div style="border: 1px solid var(--border); background: var(--surface); padding: var(--space-4) var(--space-5);">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-3);">
+          <span style="font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted);">Recovery (7d)</span>
+          <span id="spark-rec-val" style="font-family: var(--font-display); font-size: 24px; color: var(--accent); letter-spacing: var(--ls-display);">—</span>
+        </div>
+        <svg id="spark-rec" viewBox="0 0 300 50" style="width: 100%; height: 50px; display: block;"></svg>
+        <div style="display: flex; justify-content: space-between; margin-top: var(--space-1);">
+          <span id="spark-rec-status" style="font-size: var(--text-2xs); color: var(--accent-dim);"></span>
+          <span style="font-size: var(--text-2xs); color: var(--text-faint);">%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: AI Brief excerpt -->
+  <div style="padding: var(--space-12) var(--page-padding); display: flex; flex-direction: column;">
+    <div class="eyebrow" style="margin-bottom: var(--space-6)">Today's AI brief</div>
+    <h2 class="text-h2" style="color: var(--text); margin-bottom: var(--space-8)">What <span style="color:var(--accent)">Claude</span> sees</h2>
+
+    <div id="ai-brief" style="
+      flex: 1;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: var(--space-8);
+      display: flex;
+      flex-direction: column;
+    ">
+      <div style="font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--accent-dim); margin-bottom: var(--space-4);">
+        // Daily Intelligence Brief
+      </div>
+      <div id="brief-content" style="
+        font-family: var(--font-serif);
+        font-size: 16px;
+        color: var(--text-muted);
+        line-height: 1.8;
+        flex: 1;
+      ">
+        <p style="margin-bottom: var(--space-4);">Every morning, the platform reads data from 19 sources and Claude generates a coaching brief — interpreting patterns, flagging risks, and suggesting adjustments.</p>
+        <p style="margin-bottom: var(--space-4);">This isn't a template. It's a unique analysis synthesized from last night's sleep, yesterday's training, this week's habits, and months of accumulated data.</p>
+        <p style="color: var(--text-faint); font-size: var(--text-xs); font-family: var(--font-mono);">Live brief excerpts coming soon. Subscribe to The Weekly Signal to get the full version every Wednesday.</p>
+      </div>
+      <div style="border-top: 1px solid var(--border-subtle); padding-top: var(--space-4); margin-top: var(--space-6); display: flex; gap: var(--space-4);">
+        <a href="/platform/" class="btn btn--ghost" style="font-size: var(--text-xs);">How it works →</a>
+        <a href="/ask/" class="btn btn--ghost" style="font-size: var(--text-xs); border-color: var(--accent-dim); color: var(--accent);">Ask the data →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  @media (max-width: 900px) {
+    #signals { grid-template-columns: 1fr !important; }
+    #signals > div:first-child { border-right: none !important; border-bottom: 1px solid var(--border); }
+  }
+</style>
+
+<script>
+// ── Sparkline renderer ──────────────────────────────────────
+function drawSparkline(svgId, values, opts = {}) {
+  const svg = document.getElementById(svgId);
+  if (!svg || !values.length) return;
+
+  const W = 300, H = 50, PAD = 4;
+  const color = opts.color || '#00e5a0';
+  const fillColor = opts.fill || 'rgba(0, 229, 160, 0.08)';
+  const min = opts.min != null ? opts.min : Math.min(...values) - 1;
+  const max = opts.max != null ? opts.max : Math.max(...values) + 1;
+  const range = max - min || 1;
+
+  const points = values.map((v, i) => {
+    const x = PAD + (i / (values.length - 1)) * (W - PAD * 2);
+    const y = H - PAD - ((v - min) / range) * (H - PAD * 2);
+    return `${x},${y}`;
+  });
+
+  const pathD = 'M' + points.join('L');
+  const areaD = pathD + `L${PAD + ((values.length - 1) / (values.length - 1)) * (W - PAD * 2)},${H}L${PAD},${H}Z`;
+
+  svg.innerHTML = `
+    <path d="${areaD}" fill="${fillColor}" />
+    <path d="${pathD}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" />
+    <circle cx="${points[points.length - 1].split(',')[0]}" cy="${points[points.length - 1].split(',')[1]}" r="3" fill="${color}" />
+  `;
+}
+
+// ── Load sparkline data from static JSON + API fallback ──────
+(async function() {
+  const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
+  // Try static JSON first (zero Lambda cost), fall back to API
+  let trends = null, vitals = null, briefExcerpt = null;
+  try {
+    const r = await fetch('/site/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
+    if (r.ok) {
+      const d = await r.json();
+      trends = d.trends || {};
+      vitals = d.vitals || {};
+      briefExcerpt = d.brief_excerpt;
+    }
+  } catch(e) {}
+
+  // Weight sparkline
+  const wt = (trends && trends.weight_daily) || [];
+  if (wt.length > 2) {
+    const vals = wt.map(r => r.lbs);
+    drawSparkline('spark-weight', vals);
+    setText('spark-weight-val', vals[vals.length - 1].toFixed(1));
+    const delta = vals[vals.length - 1] - vals[0];
+    setText('spark-weight-delta', (delta > 0 ? '+' : '') + delta.toFixed(1) + ' lbs (30d)');
+  } else {
+    // Fallback: try API
+    try {
+      const wpRes = await fetch('https://averagejoematt.com/api/weight_progress');
+      if (wpRes.ok) {
+        const wpData = await wpRes.json();
+        const readings = (wpData.weight_progress || []).slice(-30);
+        if (readings.length > 2) {
+          const vals = readings.map(r => r.weight_lbs);
+          drawSparkline('spark-weight', vals);
+          setText('spark-weight-val', vals[vals.length - 1].toFixed(1));
+          const delta = vals[vals.length - 1] - vals[0];
+          setText('spark-weight-delta', (delta > 0 ? '+' : '') + delta.toFixed(1) + ' lbs (30d)');
+        }
+      }
+    } catch(e) {}
+  }
+
+  // HRV sparkline
+  const hrv = (trends && trends.hrv_daily) || [];
+  if (hrv.length > 2) {
+    const vals = hrv.map(r => r.ms);
+    drawSparkline('spark-hrv', vals);
+    setText('spark-hrv-val', Math.round(vals[vals.length - 1]));
+    const first7avg = vals.slice(0, 7).reduce((a, b) => a + b, 0) / Math.min(vals.length, 7);
+    const last7avg = vals.slice(-7).reduce((a, b) => a + b, 0) / Math.min(vals.length, 7);
+    setText('spark-hrv-trend', last7avg > first7avg * 1.03 ? '↗ improving' : last7avg < first7avg * 0.97 ? '↘ declining' : '→ stable');
+  } else if (vitals && vitals.hrv_ms) {
+    setText('spark-hrv-val', Math.round(vitals.hrv_ms));
+    setText('spark-hrv-trend', vitals.hrv_trend ? '↗ ' + vitals.hrv_trend : '');
+  }
+
+  // Recovery sparkline
+  const rec = (trends && trends.recovery_daily) || [];
+  if (rec.length > 2) {
+    const vals = rec.map(r => r.pct);
+    drawSparkline('spark-rec', vals, { min: 0, max: 100, color: '#2EA98F', fill: 'rgba(46,169,143,0.08)' });
+    setText('spark-rec-val', Math.round(vals[vals.length - 1]));
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+    setText('spark-rec-status', avg >= 67 ? 'green' : avg >= 34 ? 'yellow' : 'red');
+  } else if (vitals && vitals.recovery_pct) {
+    setText('spark-rec-val', Math.round(vitals.recovery_pct));
+    setText('spark-rec-status', vitals.recovery_status || '');
+  }
+
+  // AI Brief excerpt
+  if (briefExcerpt) {
+    const el = document.getElementById('brief-content');
+    if (el) {
+      el.innerHTML = `
+        <p style="margin-bottom: var(--space-4); color: var(--text);">${briefExcerpt}</p>
+        <p style="color: var(--text-faint); font-size: var(--text-xs); font-family: var(--font-mono);">Generated this morning from 19 live data sources by Claude.</p>
+      `;
+    }
+  }
+})();
+</script>
 
 <section class="about-section" id="about">
   <div class="about-left">
@@ -546,8 +759,9 @@
 ">
   <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
   <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
-    Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:520px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
+    Every Wednesday: the real weight, one chart, one AI insight, one honest reflection.<br>
+    A 3-minute read from 19 data sources. No highlight reel — every failure included.
   </p>
   <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
     <input id="cta-email-home" type="email" placeholder="your@email.com" style="

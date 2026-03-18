@@ -4,6 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Character Sheet — tracking life optimization across 7 pillars in real time.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Character Sheet — Matthew Walker">
+  <meta name="twitter:description" content="7-pillar scoring system tracking sleep, movement, nutrition, metabolic, mind, relationships, consistency.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:title" content="Character Sheet — Matthew Walker">
+  <meta property="og:description" content="7-pillar scoring system tracking sleep, movement, nutrition, metabolic, mind, relationships, consistency.">
+  <meta property="og:type" content="website">
   <title>Character Sheet — Matthew Walker</title>
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
@@ -375,6 +385,28 @@
   </div>
 </section>
 
+<!-- N=1 Disclaimer -->
+<aside style="
+  max-width: var(--prose-width);
+  margin: 0 auto;
+  padding: var(--space-10) var(--page-padding);
+  border-top: 1px solid var(--border-subtle);
+">
+  <p style="
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    line-height: var(--lh-body);
+    letter-spacing: var(--ls-label);
+  ">
+    <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
+    This is a single-person experiment. Correlations observed in this data may not
+    apply to anyone else. I track everything to make better decisions for myself,
+    not to prove universal principles. Where I note that X correlates with Y, I
+    mean in my data, during this period, with confounders I can’t fully control for.
+  </p>
+</aside>
+
 <!-- S2-T1-8: Email CTA footer — injected by add_email_cta.py -->
 <section class="email-cta-footer" style="
   padding: var(--space-16) var(--page-padding);
@@ -446,10 +478,13 @@
 <footer class="footer">
   <div class="footer__brand">AMJ</div>
   <div class="footer__links">
-    <a href="/" class="footer__link">Home</a>
-    <a href="../journal/" class="footer__link">Journal</a>
+    <a href="/story/" class="footer__link">Story</a>
+    <a href="/journal/" class="footer__link">Journal</a>
+    <a href="/platform/" class="footer__link">Platform</a>
+    <a href="/character/" class="footer__link">Character</a>
+    <a href="/subscribe" class="footer__link">Subscribe</a>
   </div>
-  <div class="footer__copy">// updated nightly by character-sheet-compute</div>
+  <div class="footer__copy">// updated daily by life-platform</div>
 </footer>
 
 <script>

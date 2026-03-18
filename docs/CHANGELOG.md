@@ -1,3 +1,58 @@
+## v3.7.75 — 2026-03-18: Website strategy review + 14 enhancements deployed
+
+### Summary
+Comprehensive website strategy review (30-persona expert panel) followed by execution of 14 site enhancements across quick wins, structural improvements, and ambitious new features. Homepage now has live sparklines, AI brief widget, and "Ask the Platform" page frontend. All data pages have N=1 disclaimers. Full OG/Twitter social cards on every page. RSS feed live.
+
+### Changes
+
+**Website Review (docs/)**
+- `website_review.md` — Full 10-section expert panel review: first impressions, design, content strategy, page gaps, retention mechanics, AI showcase, commercialization, technical board, health credibility, 30/60/90 roadmap
+
+**Quick Wins (deployed to S3/CloudFront)**
+- `deploy/inline_stats.py` — Bake public_stats.json values into HTML at deploy time (fixes "dashes" problem)
+- `deploy/generate_og_image.py` — Generate OG social preview image with live stats from tokens.css palette
+- `site/sitemap.xml` + `site/robots.txt` — SEO foundation (13 URLs)
+- `site/404.html` — Branded "Signal Lost" error page + CloudFront custom error response configured
+- OG/Twitter meta tags added to all 11 pages (homepage, story, journal, platform, character, live, explorer, experiments, biology, about, ask)
+- N=1 disclaimers on character, explorer, experiments, biology pages
+- Newsletter CTA copy improved with specificity ("Every Wednesday: the real weight, one chart, one AI insight")
+- RSS autodiscovery `<link>` tags on homepage + journal
+
+**Homepage Enhancements**
+- "Live Signals" section — 3 sparkline charts (weight 30d, HRV, recovery) with SVG renderer, reads from static JSON first (zero Lambda cost), API fallback
+- "What Claude Sees" widget — AI brief excerpt panel, auto-populates from `public_stats.json` `brief_excerpt` field
+- "Ask the data" CTA linking to /ask/
+
+**Ask the Platform (/ask/)**
+- `site/ask/index.html` — Full interactive Q&A page: suggestion chips, session rate limiting (5/session), typing animation, conversation UI
+- `lambdas/site_api_lambda.py` — `/api/ask` POST endpoint: Claude Haiku 4.5 powered, IP rate limiting (5/hr via DynamoDB TTL), data sanitization layer, ~$0.0007/question
+- `lambdas/ask_endpoint.py` — Standalone reference implementation
+
+**Trend Arrays + Brief Excerpt (Lambda code ready, needs deploy)**
+- `lambdas/site_writer.py` v1.2.0 — New `trends` and `brief_excerpt` params for public_stats.json
+- `lambdas/daily_brief_lambda.py` — Builds weight_daily (30d), hrv_daily (30d), sleep_daily (14d), recovery_daily (14d) arrays; extracts TL;DR + first guidance item as brief excerpt
+
+**RSS Feed**
+- `deploy/generate_rss.py` — Generates rss.xml from journal posts directory
+- `site/rss.xml` — 4 journal posts, Atom self-link, auto-generated at deploy time
+
+**Story Page Writing Prompts**
+- All 5 chapter placeholders replaced with specific, actionable prompts ("Start with:" sentences, bullet questions, tone guidance, audience notes)
+- Stats updated: 853 tests, $10/mo
+
+**Deploy Scripts**
+- `deploy/deploy_site_quick_wins.sh` — Phase 1 deploy (stats inline + OG image + S3 sync)
+- `deploy/deploy_site_phase2.sh` — Phase 2 deploy (meta fix + RSS + full sync)
+- `deploy/deploy_site_all.sh` — Full deploy (all 6 steps)
+- `deploy/fix_site_meta.py` — Batch OG/Twitter/nav/footer consistency fixer
+
+### Not yet deployed (code ready)
+- `/api/ask` backend: needs Anthropic API key in Secrets Manager + site-api Lambda deploy
+- Trend arrays + brief excerpt: needs daily-brief Lambda deploy
+- /story page content: needs Matthew to write 5 chapters
+
+---
+
 ## v3.7.74 — 2026-03-18: 44 pre-existing test failures resolved + CI actions bumped to Node 24
 
 ### Summary

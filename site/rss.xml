@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>The Measured Life — Matthew Walker</title>
+    <link>https://averagejoematt.com/journal/</link>
+    <description>Weekly chronicles from 19 data sources. Every number, every failure, every week. Written by Elena Voss.</description>
+    <language>en-us</language>
+    <lastBuildDate>Wed, 18 Mar 2026 19:56:18 +0000</lastBuildDate>
+    <atom:link href="https://averagejoematt.com/rss.xml" rel="self" type="application/rss+xml"/>
+    <image>
+      <url>https://averagejoematt.com/assets/images/og-image.png</url>
+      <title>The Measured Life</title>
+      <link>https://averagejoematt.com/journal/</link>
+    </image>
+    <item>
+      <title>The DoorDash Chronicle — The Measured Life</title>
+      <link>https://averagejoematt.com/journal/posts/week-03/</link>
+      <guid isPermaLink="true">https://averagejoematt.com/journal/posts/week-03/</guid>
+      <description>Weight: tracking paused · Grade: sick days logged</description>
+      <pubDate>Thu, 05 Mar 2026 12:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>The Empty Journal — The Measured Life</title>
+      <link>https://averagejoematt.com/journal/posts/week-02/</link>
+      <guid isPermaLink="true">https://averagejoematt.com/journal/posts/week-02/</guid>
+      <description>Week 2 · February 25 – March 3, 2026 · Seattle, WA</description>
+      <pubDate>Thu, 26 Feb 2026 12:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Before the Numbers — The Measured Life</title>
+      <link>https://averagejoematt.com/journal/posts/week-01/</link>
+      <guid isPermaLink="true">https://averagejoematt.com/journal/posts/week-01/</guid>
+      <description>Week 1 · February 28, 2026</description>
+      <pubDate>Thu, 19 Feb 2026 12:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Before the Numbers — The Measured Life</title>
+      <link>https://averagejoematt.com/journal/posts/week-00/</link>
+      <guid isPermaLink="true">https://averagejoematt.com/journal/posts/week-00/</guid>
+      <description>Prologue · February 2026 · Seattle, WA</description>
+      <pubDate>Thu, 12 Feb 2026 12:00:00 +0000</pubDate>
+    </item>
+  </channel>
+</rss>

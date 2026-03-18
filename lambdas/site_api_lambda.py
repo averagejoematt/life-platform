@@ -669,6 +669,118 @@ def handle_genome_risks() -> dict:
     }, cache_seconds=86400)
 
 
+# ── Ask the Platform (AI Q&A) ─────────────────────────────────────
+
+import re
+import hashlib
+import urllib.request
+
+_anthropic_key_cache = None
+
+def _get_anthropic_key():
+    """Fetch Anthropic API key from Secrets Manager (cached after first call)."""
+    global _anthropic_key_cache
+    if _anthropic_key_cache:
+        return _anthropic_key_cache
+    try:
+        sm = boto3.client("secretsmanager", region_name="us-west-2")
+        resp = sm.get_secret_value(SecretId="life-platform/anthropic-api-key")
+        _anthropic_key_cache = resp["SecretString"]
+        return _anthropic_key_cache
+    except Exception as e:
+        logger.error(f"[ask] Failed to fetch API key: {e}")
+        return None
+
+
+def _ask_rate_check(ip_hash: str) -> tuple:
+    """Rate limit: 5 questions per IP-hash per hour via DynamoDB TTL."""
+    import time as _time
+    pk = f"RATELIMIT#ask#{ip_hash}"
+    now = int(_time.time())
+    hour_ago = now - 3600
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(pk) & Key("sk").gte(f"TS#{hour_ago}"),
+        )
+        count = len(resp.get("Items", []))
+        if count >= 5:
+            return False, 0
+        table.put_item(Item={"pk": pk, "sk": f"TS#{now}", "ttl": Decimal(str(now + 7200))})
+        return True, 5 - count - 1
+    except Exception as e:
+        logger.warning(f"[ask] Rate check failed: {e}")
+        return True, 4  # Fail open
+
+
+def _ask_fetch_context() -> dict:
+    """Fetch sanitized aggregate data for the AI prompt."""
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    yesterday_str = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    ctx = {}
+    w = _latest_item("withings")
+    if w and w.get("weight_lbs"):
+        ctx["weight_lbs"] = float(w["weight_lbs"])
+    wh = _latest_item("whoop")
+    if wh:
+        if wh.get("hrv"): ctx["hrv_ms"] = float(wh["hrv"])
+        if wh.get("resting_heart_rate"): ctx["rhr_bpm"] = float(wh["resting_heart_rate"])
+        if wh.get("recovery_score"): ctx["recovery_pct"] = float(wh["recovery_score"])
+        if wh.get("sleep_duration_hours"): ctx["sleep_hours"] = float(wh["sleep_duration_hours"])
+    cs_pk = f"{USER_PREFIX}character_sheet"
+    for d in [today_str, yesterday_str]:
+        resp = table.get_item(Key={"pk": cs_pk, "sk": f"DATE#{d}"})
+        rec = _decimal_to_float(resp.get("Item"))
+        if rec:
+            ctx["character_level"] = float(rec.get("character_level", 1))
+            ctx["character_tier"] = rec.get("character_tier", "Foundation")
+            pillars = {}
+            for p in ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]:
+                pd = rec.get(f"pillar_{p}", {})
+                pillars[p] = {"level": float(pd.get("level", 1)), "raw_score": float(pd.get("raw_score", 0)), "tier": pd.get("tier", "Foundation")}
+            ctx["pillars"] = pillars
+            break
+    hs_pk = f"{USER_PREFIX}habit_scores"
+    hs_resp = table.query(KeyConditionExpression=Key("pk").eq(hs_pk), ScanIndexForward=False, Limit=1)
+    hs_items = _decimal_to_float(hs_resp.get("Items", []))
+    if hs_items:
+        ctx["tier0_streak"] = int(hs_items[0].get("t0_perfect_streak", 0) or 0)
+    return ctx
+
+
+def _ask_build_prompt(ctx: dict) -> str:
+    pillars_str = ""
+    if "pillars" in ctx:
+        pillars_str = "\n".join(
+            f"    {n}: level {p['level']:.0f}, score {p['raw_score']:.1f}, tier {p['tier']}"
+            for n, p in ctx["pillars"].items()
+        )
+    return f"""You are the AI behind Matthew Walker's Life Platform — a personal health intelligence system tracking 19 data sources.
+
+CURRENT DATA:
+  Weight: {ctx.get('weight_lbs', '?')} lbs (started 302, goal 185)
+  HRV: {ctx.get('hrv_ms', '?')} ms
+  RHR: {ctx.get('rhr_bpm', '?')} bpm
+  Recovery: {ctx.get('recovery_pct', '?')}%
+  Sleep: {ctx.get('sleep_hours', '?')} hours
+  Character level: {ctx.get('character_level', '?')} (tier: {ctx.get('character_tier', '?')})
+  T0 habit streak: {ctx.get('tier0_streak', '?')} days
+  Pillars:
+{pillars_str or '    Not available'}
+
+RULES:
+- Answer from the data above. If you don't have data, say so honestly.
+- Be specific: "HRV is 54ms" not "HRV is moderate."
+- N=1 data. Note this for comparative claims.
+- Never give medical advice. Say "the data shows X" not "you should do Y."
+- Keep answers concise: 2-4 short paragraphs max.
+- Bold key findings with **asterisks**."""
+
+
+def handle_ask() -> dict:
+    """Handled specially in lambda_handler — this is a placeholder for ROUTES."""
+    return _error(405, "Use POST method")
+
+
 # ── Router ──────────────────────────────────────────────────
 
 ROUTES = {
@@ -686,6 +798,8 @@ ROUTES = {
     "/api/timeline":           handle_timeline,
     "/api/correlations":       handle_correlations,
     "/api/genome_risks":       handle_genome_risks,
+    # Website Review: Ask the Platform
+    "/api/ask":                handle_ask,
 }
 
 
@@ -700,6 +814,68 @@ def lambda_handler(event, context):
     # CORS preflight
     if method == "OPTIONS":
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
+
+    # Special handling: /api/ask accepts POST
+    if path == "/api/ask":
+        if method != "POST":
+            return _error(405, "Use POST method")
+        source_ip = (
+            event.get("requestContext", {}).get("http", {}).get("sourceIp") or
+            event.get("requestContext", {}).get("identity", {}).get("sourceIp") or
+            "unknown"
+        )
+        try:
+            question = json.loads(event.get("body") or "{}").get("question", "").strip()[:500]
+            question = re.sub(r'<[^>]+>', '', question)
+            if len(question) < 5:
+                return _error(400, "Question too short")
+
+            ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+            allowed, remaining = _ask_rate_check(ip_hash)
+            if not allowed:
+                return {
+                    "statusCode": 429,
+                    "headers": {**CORS_HEADERS, "Retry-After": "3600"},
+                    "body": json.dumps({"error": "Rate limit exceeded. 5 questions per hour.", "remaining": 0}),
+                }
+
+            api_key = _get_anthropic_key()
+            if not api_key:
+                return _error(503, "AI service configuration error")
+
+            ctx = _ask_fetch_context()
+            system_prompt = _ask_build_prompt(ctx)
+
+            req_body = json.dumps({
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 600,
+                "system": system_prompt,
+                "messages": [{"role": "user", "content": question}],
+            })
+
+            req = urllib.request.Request(
+                "https://api.anthropic.com/v1/messages",
+                data=req_body.encode(),
+                headers={
+                    "Content-Type": "application/json",
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                },
+            )
+
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                result = json.loads(resp.read())
+
+            answer = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
+
+            return {
+                "statusCode": 200,
+                "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+                "body": json.dumps({"answer": answer, "remaining": remaining}),
+            }
+        except Exception as e:
+            logger.error(f"[site_api] /api/ask failed: {e}")
+            return _error(500, "AI service error")
 
     if method != "GET":
         return _error(405, "Method not allowed")

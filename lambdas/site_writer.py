@@ -137,7 +137,8 @@ def _get_latest_chronicle_headline(table_client, user_id: str) -> dict | None:
 
 
 def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
-                       platform: dict = None, table_client=None, user_id: str = "matthew") -> bool:
+                       platform: dict = None, table_client=None, user_id: str = "matthew",
+                       trends: dict = None, brief_excerpt: str = None) -> bool:
     """
     Write public_stats.json to S3 from daily-brief-lambda data.
 
@@ -177,7 +178,7 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
             "_meta": {
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "generated_by": "daily-brief-lambda",
-                "version": "1.1.0",
+                "version": "1.2.0",
             },
             # BS-02: Transformation story hero data
             "hero": _json_safe(hero),
@@ -187,11 +188,15 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
             "journey":  _json_safe(journey),
             "training": _json_safe(training),
             "platform": _json_safe(platform or {
-                "mcp_tools": 89,
+                "mcp_tools": 95,
                 "data_sources": 19,
-                "lambdas": 46,
+                "lambdas": 48,
                 "last_review_grade": "A",
             }),
+            # v1.2.0: Trend arrays for homepage sparkline charts
+            "trends": _json_safe(trends or {}),
+            # v1.2.0: AI brief excerpt for "What Claude Sees" homepage widget
+            "brief_excerpt": brief_excerpt,
         }
 
         s3_client.put_object(
