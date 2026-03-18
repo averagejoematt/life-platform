@@ -19,6 +19,8 @@ v1.1.0: Expert panel prompt dynamically built from s3://matthew-life-platform/co
 import json
 import os
 import logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 import time
 import boto3
 import urllib.error

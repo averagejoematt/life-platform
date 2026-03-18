@@ -7,6 +7,7 @@ import re
 import logging
 from datetime import datetime, timedelta
 from collections import defaultdict
+from decimal import Decimal
 
 from mcp.config import (
     table, s3_client, S3_BUCKET, USER_PREFIX, USER_ID, SOURCES,

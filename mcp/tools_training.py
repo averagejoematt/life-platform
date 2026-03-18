@@ -1023,7 +1023,7 @@ def tool_get_training_recommendation(args):
         for workout in (item.get("workouts") or []):
             for exercise in (workout.get("exercises") or []):
                 ename = exercise.get("exercise_name", "")
-                cls = classify_exercise(ename)
+                cls = classify_exercise(ename)  # noqa: F821
                 for mg in cls["muscle_groups"]:
                     if mg not in muscle_last_trained or d > muscle_last_trained[mg]:
                         muscle_last_trained[mg] = d

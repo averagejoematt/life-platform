@@ -28,6 +28,8 @@ v1.0.0 — 2026-03-08
 import json
 import os
 import logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 import time
 import urllib.error
 import urllib.parse

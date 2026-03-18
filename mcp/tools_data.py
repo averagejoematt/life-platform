@@ -4,14 +4,16 @@ Data access tools: sources, latest, daily summary, date range, search, compare.
 import json
 import math
 import re
+import bisect
 import logging
 from datetime import datetime, timedelta
 from collections import defaultdict
+from boto3.dynamodb.conditions import Key
 
 from mcp.config import (
     table, s3_client, S3_BUCKET, USER_PREFIX, USER_ID, SOURCES,
     P40_GROUPS, FIELD_ALIASES, logger,
-    INSIGHTS_PK, EXPERIMENTS_PK, TRAVEL_PK,
+    INSIGHTS_PK, EXPERIMENTS_PK, TRAVEL_PK, RAW_DAY_LIMIT,
 )
 from mcp.core import (
     query_source, parallel_query_sources, query_source_range,
@@ -469,8 +471,8 @@ def tool_get_longitudinal_summary(args):
     """
     VALID_VIEWS = {
         "aggregate":  tool_get_aggregated_summary,
-        "seasonal":   tool_get_seasonal_patterns,
-        "records":    tool_get_personal_records,
+        "seasonal":   tool_get_seasonal_patterns,  # noqa: F821
+        "records":    tool_get_personal_records,  # noqa: F821
     }
     view = (args.get("view") or "aggregate").lower().strip()
     if view not in VALID_VIEWS:

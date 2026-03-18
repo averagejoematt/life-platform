@@ -148,7 +148,7 @@ def _build_subscriber_email(installment: dict, subscriber: dict) -> tuple[str, s
     unsub_url   = (
         f"{SITE_URL}/api/subscribe"
         f"?action=unsubscribe"
-        f"&email={urllib.parse.quote(subscriber_email)}"
+        f"&email={urllib.parse.quote(subscriber_email)}"  # noqa: F821 — defined in enclosing scope
     )
     journal_url = f"{SITE_URL}/journal/"
 

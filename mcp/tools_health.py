@@ -7,6 +7,7 @@ import re
 import logging
 from datetime import datetime, timedelta
 from collections import defaultdict
+from decimal import Decimal
 
 from mcp.config import (
     table, s3_client, S3_BUCKET, USER_PREFIX, USER_ID, SOURCES,
@@ -1301,9 +1302,9 @@ def tool_get_day_type_analysis(args):
     mf_data = {}
     if "nutrition" in metrics:
         pk_mf = USER_PREFIX + "macrofactor"
-        table = get_table()
+        # table already imported from mcp.config
         try:
-            mf_items = query_date_range(table, pk_mf, start_date, end_date)
+            mf_items = query_source_range(table, pk_mf, start_date, end_date)
             mf_data = {item["date"]: item for item in mf_items if item.get("date")}
         except Exception:
             pass
@@ -1375,7 +1376,7 @@ def tool_get_day_type_analysis(args):
     return {
         "period": {"start_date": start_date, "end_date": end_date, "total_days": len(classified)},
         "day_type_distribution": type_counts,
-        "thresholds": DAY_TYPE_THRESHOLDS,
+        "thresholds": DAY_TYPE_THRESHOLDS,  # noqa: F821
         "summaries": summaries,
         "insights": insights,
         "classification_source": "Whoop strain (primary) > computed load score > Strava distance/time",
