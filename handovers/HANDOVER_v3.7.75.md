@@ -100,6 +100,7 @@ Sprint 5  COMPLETE — buildable (v3.7.72) | /story + DIST-1 remaining
 v3.7.73   Maintenance — CI fixed, Habitify restored, inbox cleared
 v3.7.74   Maintenance — 44 test failures → 0, CI Node 24 bump
 v3.7.75   Website — Strategy review + 14 enhancements deployed
+v3.7.75b  Documentation — PROJECT_PLAN.md + SPRINT_PLAN.md updated with all 23 WR items
 NEXT      /story prose → DIST-1 → /api/ask backend → daily-brief deploy
 SIMP-1 Ph2 (~Apr 13)   95 → 80 tools
 ```

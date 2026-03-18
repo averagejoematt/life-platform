@@ -90,6 +90,36 @@ These are not architecture decisions — they're deferred deletions and one-time
 
 ---
 
+### Website Strategy Review (2026-03-18, v3.7.75)
+
+Comprehensive 30-persona expert panel review produced 30/60/90 roadmap. 14 items executed same session. Remaining items below.
+
+| ID | Item | Source | Effort | Impact | Status |
+|----|------|--------|--------|--------|--------|
+| WR-01 | **Stats inlining at deploy time** — `deploy/inline_stats.py` bakes public_stats.json into HTML, eliminating JS-dependent dashes on first paint | Review §1 | S | HIGH | ✅ Done (v3.7.75) |
+| WR-02 | **OG social preview image + meta tags** — `deploy/generate_og_image.py` + og:image/twitter:card on all 11 pages | Review §2, §5 | S | HIGH | ✅ Done (v3.7.75) |
+| WR-03 | **sitemap.xml + robots.txt** — SEO foundation, 13 URLs | Review §5 | XS | MEDIUM | ✅ Done (v3.7.75) |
+| WR-04 | **Custom 404 page** — Branded "Signal Lost" + CloudFront error response | Review §4 | XS | MEDIUM | ✅ Done (v3.7.75) |
+| WR-05 | **N=1 disclaimers on data pages** — character, explorer, experiments, biology | Review §9 (Attia, Henning) | XS | MEDIUM | ✅ Done (v3.7.75) |
+| WR-06 | **Newsletter CTA copy specificity** — "Every Wednesday: real weight, one chart, one AI insight" | Review §5 | XS | MEDIUM | ✅ Done (v3.7.75) |
+| WR-07 | **Homepage sparklines + AI brief widget** — "Live Signals" section with weight/HRV/recovery charts, "What Claude Sees" panel | Review §4, §6 | M | HIGH | ✅ Done (v3.7.75) — sparklines from /api/weight_progress; trend arrays from daily-brief pending deploy |
+| WR-08 | **/ask/ page (Ask the Platform)** — Interactive AI Q&A, suggestion chips, rate limiting | Review §4, §6 | L | HIGH | ✅ Frontend done (v3.7.75). Backend code ready, needs API key + Lambda deploy |
+| WR-09 | **RSS feed + autodiscovery** — `deploy/generate_rss.py`, /rss.xml, `<link>` tags on homepage + journal | Review §5 | S | MEDIUM | ✅ Done (v3.7.75) |
+| WR-10 | **Story page writing prompts** — 5 chapters with "Start with:" sentences, bullet questions, audience notes | Review §3 | S | HIGH | ✅ Done (v3.7.75) |
+| WR-11 | **Trend arrays in public_stats.json** — weight_daily, hrv_daily, sleep_daily, recovery_daily arrays | Review §4 | S | HIGH | ⏳ Code ready in daily_brief_lambda.py. Needs Lambda deploy. |
+| WR-12 | **AI brief excerpt in public_stats.json** — TL;DR + first guidance item for homepage widget | Review §6 | S | HIGH | ⏳ Code ready. Needs Lambda deploy. |
+| WR-13 | **/api/ask backend** — Claude Haiku 4.5 endpoint in site_api_lambda.py | Review §6 | S | HIGH | ⏳ Code ready. Needs API key in Secrets Manager + IAM + Lambda deploy. |
+| WR-14 | **Write /story page content** — 5 chapters (The Moment, Previous Attempts, The Build, What Data Showed, Why Public) | Review §3 (CRITICAL) | L (Matthew) | **CRITICAL** | ⬜ Distribution gate — Matthew only |
+| WR-15 | **Before/during photos on /story** — Side-by-side with date stamps. #1 shareable format for transformation. | Review §3, §5 | S (Matthew) | HIGH | ⬜ Matthew only |
+| WR-16 | **Dual-path navigation** — "Follow the Journey" vs. "See the Platform" CTAs below hero for two audiences | Review §3 | S | MEDIUM | ⬜ |
+| WR-17 | **Dynamic social cards (Lambda@Edge)** — OG images with live stats, cached by CloudFront | Review §10 (90-day) | M | MEDIUM | ⬜ |
+| WR-18 | **"Build Your Own" guide/course MVP** — Free guide (markdown → PDF), measure downloads, if >200 → paid cohort | Review §7 (90-day) | L | MEDIUM | ⬜ Gated on /story + 10 weeks published data |
+| WR-19 | **Press page / media hook on /about** — 3-sentence pitch + contact for journalists/podcasters | Review §5 | XS | MEDIUM | ⬜ |
+| WR-20 | **Video: "What my morning brief looks like"** — 60-second screen recording of daily brief email | Review §3 | S (Matthew) | HIGH | ⬜ Matthew only |
+| WR-21 | **Self-host fonts** — Replace 4 Google Fonts calls with self-hosted + font-display: swap + subsetting | Review §2 (Osmani) | S | LOW | ⬜ |
+| WR-22 | **Entrance animations on scroll** — Subtle fade-up on data sections using existing animation tokens | Review §2 | S | LOW | ⬜ |
+| WR-23 | **genome /biology noindex consideration** — SNP data is sensitive; consider noindex meta if not intended for Google | Review §8 (Yael) | XS | MEDIUM | ⬜ |
+
 ### R16 Findings (2026-03-15, v3.7.47)
 
 | ID | Item | Source | Effort | Impact | Status |
@@ -490,6 +520,6 @@ Board Summit #3: 500 subscribers OR 90-day journey milestone (2026-05-22), which
 | Architecture review grade | A | A | R16 grade A. R17 targeting ~June 2026. All 4 sprints complete. |
 | R13 open findings | 0 of 15 | 0 | All closed. F03 (monolith split) deferred via ADR-029. |
 | CI integration tests wired | I1/I2/I4-I9 | all | I3/I10-I14 manual-only (Lambda invocation side effects or special auth) |
-| Board Summit features | 45 total (S1) + Sprint 5 (S2) | — | Sprint 1-4: 30 shipped. Sprint 5: 8 items (website + distribution focus). See SPRINT_PLAN.md. |
+| Board Summit features | 45 total (S1) + Sprint 5 (S2) + 23 WR items | — | Sprint 1-4: 30 shipped. Sprint 5: 8 items + 23 Website Review items (10 done, 3 code-ready, 10 backlog). See SPRINT_PLAN.md. |
 | Email subscribers | 0 | 500 (6 months) | Subscribe backend live v3.7.60. SES production confirmed. Board Summit #2 unanimously identified distribution as #1 priority. |
 | Board Summits | 2 | — | Summit #1 (v3.7.54): 45-item roadmap. Summit #2 (v3.7.69): post-sprint review + Sprint 5 plan. |
