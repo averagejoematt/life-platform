@@ -112,35 +112,48 @@ Before Sprint 3 begins, run EMF telemetry review. Target: ≤80 tools. Dedicate 
 
 ---
 
-## SPRINT 5 — Weeks 14-15 (Board Summit #2)
+## SPRINT 5 — Weeks 14-15 (Board Summit #2 + Website Review)
 **Theme: Website + Distribution + Behavior Change**
 **Capacity: ~15h | Load: ~12h**
-**Source: Board Summit #2 (2026-03-17) — post-sprint review. Full record: `docs/reviews/BOARD_SUMMIT_2_2026-03-17.md`**
+**Source: Board Summit #2 (2026-03-17) + Website Strategy Review (2026-03-18)**
 
-| ID | Feature | Effort | Model | Deliverable | Champion |
-|----|---------|--------|-------|-------------|----------|
-| S2-T1-1 | **MCP `Key` Import Bug Fix** — Add `from boto3.dynamodb.conditions import Key` to `tools_lifestyle.py`. Blocking `list_experiments`, `create_experiment`, `end_experiment` and others. | XS (15m) | None | One-line fix + MCP redeploy | Elena |
-| S2-T1-6 | **`/story` Page** — Deep origin narrative. Where he started, what he built, why it matters. The emotional entry point that makes a stranger care enough to subscribe. Manual content by Matthew. | S (content) | None (static) | `site/story/index.html`. S3 deploy. | Moreau |
-| S2-T1-7 | **`/about` Page** — Brief bio, professional context (IT leadership → solo builder), links, contact. Quick page. | XS (1h) | None (static) | `site/about/index.html`. S3 deploy. | Moreau |
-| S2-T1-8 | **Email CTA on All Pages** — Consistent footer subscribe component across all 7+ site pages. Amber accent, one-line value prop, single email field. Links to `/subscribe`. | S (2h) | None (frontend) | Footer component. All pages updated. S3 deploy + invalidation. | Kim |
-| S2-T1-9 | **Adaptive Deficit Ceiling** — Wire BS-12 Deficit Sustainability flags into Daily Brief with specific calorie increase recommendations. When 3+ channels degrade concurrently: "Increase by 200 kcal for 5 days, then reassess." Move from observation to prescription. | M (3h) | Sonnet | `daily_insight_compute_lambda.py` + `ai_calls.py` update. Redeploy daily-brief. | Norton / Attia |
-| S2-T1-10 | **Weekly Habit Review Automation** — Every Sunday, auto-generate structured review in Daily Brief: T0 completion rates, patterns preceding misses, T1 candidates for promotion/retirement, vice streak status. | M (3h) | Sonnet | `daily_insight_compute_lambda.py` + `ai_calls.py` update. Sunday-aware logic. | Clear |
-| DEPLOY | **Sprint 4 Pending Deploy** — Run `deploy/deploy_sprint4.sh`. site-api Lambda, S3 page sync, CloudFront invalidation. | S (15m) | None (ops) | 3 new API endpoints live. 3 new pages live. | Jin |
-| DIST-1 | **First Distribution Event** — HN post, Twitter thread, or build log. Title suggestion: "I built a personal health AI with 19 data sources, 95 tools, and a $13/month bill." | S (content) | None | External audience discovery. Non-negotiable. | Kim / Raj |
+| ID | Feature | Effort | Model | Deliverable | Champion | Status |
+|----|---------|--------|-------|-------------|----------|--------|
+| S2-T1-1 | **MCP `Key` Import Bug Fix** | XS (15m) | None | One-line fix + MCP redeploy | Elena | ✅ Done (v3.7.72) |
+| S2-T1-6 | **`/story` Page structure** — Page built with 5 chapter scaffolding + writing prompts | S | None (static) | `site/story/index.html` | Moreau | ✅ Structure done (v3.7.75). **Content pending (Matthew).** |
+| S2-T1-7 | **`/about` Page** | XS (1h) | None (static) | `site/about/index.html` | Moreau | ✅ Done (v3.7.72) |
+| S2-T1-8 | **Email CTA on All Pages** | S (2h) | None (frontend) | Footer component on all pages | Kim | ✅ Done (v3.7.72) |
+| S2-T1-9 | **Adaptive Deficit Ceiling** | M (3h) | Sonnet | Daily Brief integration | Norton / Attia | ⬜ |
+| S2-T1-10 | **Weekly Habit Review Automation** | M (3h) | Sonnet | Sunday-aware logic in daily-brief | Clear | ⬜ |
+| DEPLOY | **Sprint 4 Pending Deploy** | S (15m) | None (ops) | site-api, S3 sync, CloudFront | Jin | ✅ Done (v3.7.72) |
+| DIST-1 | **First Distribution Event** | S (content) | None | HN post or Twitter thread | Kim / Raj | ⬜ Gated on /story prose |
+| WR-01–10 | **Website Review Quick Wins (10 items)** — Stats inlining, OG images, sitemap, 404, disclaimers, sparklines, AI brief widget, /ask/ frontend, RSS, story prompts | M (6h) | None | 11 pages enhanced, 7 deploy scripts | Review panel | ✅ All done (v3.7.75) |
+| WR-11 | **Trend arrays in public_stats.json** | S | None | daily_brief_lambda.py updated | Review §4 | ⏳ Code ready. Needs daily-brief Lambda deploy. |
+| WR-12 | **AI brief excerpt in public_stats.json** | S | None | daily_brief_lambda.py updated | Review §6 | ⏳ Code ready. Needs daily-brief Lambda deploy. |
+| WR-13 | **/api/ask backend** | S | Haiku 4.5 | site_api_lambda.py updated | Review §6 | ⏳ Code ready. Needs API key + IAM + site-api Lambda deploy. |
+| WR-14 | **Write /story page content (5 chapters)** | L (Matthew) | None | Personal prose in 5 placeholders | Review §3 | ⬜ **CRITICAL — distribution gate** |
+| WR-15 | **Before/during photos on /story** | S (Matthew) | None | Side-by-side with date stamps | Review §3 | ⬜ |
+| WR-16 | **Dual-path navigation** | S | None | Two CTAs below hero | Review §3 | ⬜ |
+| WR-19 | **Press page / media hook on /about** | XS | None | 3-sentence pitch + contact | Review §5 | ⬜ |
 
 **Sprint 5 Prerequisites:**
 - Matthew writes `/story` page content (manual — this cannot be delegated to AI)
-- Matthew writes `/about` page content (brief bio, can be assisted)
-- Sprint 4 deploy completed before any Sprint 5 work begins
+- Before/during photos taken and added to /story
+- Sprint 4 deploy completed ✅
 
 **Sprint 5 Definition of Done:**
-- MCP `Key` bug fixed and MCP Lambda redeployed
-- `/story` and `/about` pages live on averagejoematt.com
-- Email capture CTA visible on every page
-- Adaptive deficit ceiling wired into Daily Brief
-- Weekly habit review generating on Sundays
-- At least one external distribution event published
-- Privacy policy visible on /subscribe page (Yael requirement)
+- ✅ MCP `Key` bug fixed and MCP Lambda redeployed
+- ✅ `/story` structure and `/about` pages live on averagejoematt.com
+- ✅ Email capture CTA visible on every page
+- ✅ Website review quick wins deployed (10 items)
+- ⏳ /api/ask backend live (code ready, needs deploy)
+- ⏳ Trend arrays + brief excerpt flowing to public_stats.json (code ready, needs deploy)
+- ⬜ /story prose written by Matthew
+- ⬜ Before/during photos added
+- ⬜ Adaptive deficit ceiling wired into Daily Brief
+- ⬜ Weekly habit review generating on Sundays
+- ⬜ At least one external distribution event published
+- ⬜ Privacy policy visible on /subscribe page (Yael requirement)
 
 ---
 
@@ -170,6 +183,23 @@ Before Sprint 3 begins, run EMF telemetry review. Target: ≤80 tools. Dedicate 
 | EMAIL-P3 | Discord/Circle Community Launch — invite-only from email list | Month 6 of email list | **September 16, 2026** |
 | BS-T3-5 | Real-Time Streaming Pipeline — EventBridge + SQS for CGM/Whoop webhooks | 180+ day horizon | ~September 2026 |
 | BS-T3-6 | Cost-Optimized Multi-Tenant DynamoDB — GSI optimization, provisioned capacity | User count >10 | TBD post-commercialization |
+
+---
+
+## BACKLOG — Website Review 60/90-Day Items
+
+| ID | Feature | Source | Effort | Target | Notes |
+|----|---------|--------|--------|--------|-------|
+| WR-17 | **Dynamic social cards (Lambda@Edge)** — OG images with live stats, cached by CloudFront | Review §10 | M | 90 days | Every social share shows real-time stats |
+| WR-18 | **"Build Your Own" guide/course MVP** — Free PDF guide, measure downloads, if >200 → paid cohort | Review §7 | L | 90 days | Gated on /story + 10 weeks data |
+| WR-20 | **Video: daily brief screen recording** — 60-second "what my morning looks like" | Review §3 | S (Matthew) | 60 days | Makes AI story visceral |
+| WR-21 | **Self-host fonts** — Replace Google Fonts with local + font-display: swap + subset | Review §2 | S | 60 days | Performance improvement |
+| WR-22 | **Scroll entrance animations** — Subtle fade-up on data sections | Review §2 | S | 60 days | Uses existing animation tokens |
+| WR-23 | **Genome /biology noindex** — Consider robots noindex for sensitive SNP data | Review §8 | XS | 30 days | Security/privacy decision |
+| WR-24 | **"Ask the Platform" paid tier behind subscription** — Gate unlimited questions behind newsletter signup | Review §7 | S | 90 days | After /api/ask proven |
+| WR-25 | **Newsletter "The Weekly Signal" launch** — First issue sent to subscribers | Review §5, §7 | S | 60 days | Gated on /story + 3+ subscribers |
+| WR-26 | **Paid behind-the-platform tier ($5/month)** — Full daily briefs, architecture deep-dives, raw data | Review §7 | M | 90 days | Gated on >200 free subscribers |
+| WR-27 | **CGM glucose response visualizations** — Meal-tagged glucose curves as public content | Review §9 (Patrick) | M | 60 days | High-interest for metabolic health crowd |
 
 ---
 
@@ -268,11 +298,14 @@ Week 10-13:  SPRINT 4 ✅ COMPLETE — Website Interactive + Architecture
              BS-11 Transformation Timeline | WEB-CE Correlation Explorer
              BS-BM2 Genome Dashboard | BS-14 Multi-User Design Doc
 
-Week 14-15:  SPRINT 5 — Website + Distribution (Board Summit #2)
-             S2-T1-1 Key bug fix | /story page | /about page | Email CTAs
-             Adaptive Deficit Ceiling | Weekly Habit Review | First Distribution Event
+Week 14-15:  SPRINT 5 — Website + Distribution (Board Summit #2 + Review)
+             S2-T1-1 Key bug fix ✅ | /story structure ✅ | /about page ✅ | Email CTAs ✅
+             Website Review: 10 quick wins ✅ | sparklines ✅ | /ask/ page ✅ | RSS ✅
+             REMAINING: /story prose | photos | /api/ask deploy | DIST-1 | deficit ceiling
 
-~June 2026:  EMAIL-P2 Data Drop #1 | R17 Architecture Review
+~April 2026: WR-23 genome noindex decision | WR-25 Newsletter launch (post /story)
+~May 2026:   WR-20 Video content | WR-21 Self-host fonts | WR-27 CGM visualizations
+~June 2026:  EMAIL-P2 Data Drop #1 | R17 Architecture Review | WR-17 Dynamic social cards
 ~Aug 2026:   IC-30 Sleep Environment IC (after BS-SL1 matures)
 ~Sep 2026:   EMAIL-P3 Community launch
 
