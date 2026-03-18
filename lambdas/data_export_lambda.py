@@ -125,67 +125,71 @@ def export_profile(export_date):
 
 
 def lambda_handler(event, context):
-    """
-    Main handler.
+    try:
+        """
+        Main handler.
 
-    Event:
-      {} or {"export_type": "full"} — full export of all partitions
-      {"export_type": "source", "source": "whoop"} — single source
-    """
-    export_type = event.get("export_type", "full")
-    export_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        Event:
+          {} or {"export_type": "full"} — full export of all partitions
+          {"export_type": "source", "source": "whoop"} — single source
+        """
+        export_type = event.get("export_type", "full")
+        export_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    logger.info(f"Starting {export_type} export for {export_date}")
+        logger.info(f"Starting {export_type} export for {export_date}")
 
-    results = {}
-    total_items = 0
-    sources_exported = 0
+        results = {}
+        total_items = 0
+        sources_exported = 0
 
-    if export_type == "source":
-        source = event.get("source")
-        if not source:
-            return {"statusCode": 400, "body": "Missing 'source' parameter"}
-        sources_to_export = [source]
-    else:
-        sources_to_export = ALL_SOURCES
+        if export_type == "source":
+            source = event.get("source")
+            if not source:
+                return {"statusCode": 400, "body": "Missing 'source' parameter"}
+            sources_to_export = [source]
+        else:
+            sources_to_export = ALL_SOURCES
 
-    for source in sources_to_export:
-        try:
-            items = query_partition(source)
-            if items:
-                count = export_to_s3(source, items, export_date)
-                results[source] = count
-                total_items += count
-                sources_exported += 1
-                logger.info(f"  ✓ {source}: {count} items")
-            else:
-                logger.info(f"  - {source}: empty")
-        except Exception as e:
-            results[source] = f"ERROR: {e}"
-            logger.error(f"  ✗ {source}: {e}")
+        for source in sources_to_export:
+            try:
+                items = query_partition(source)
+                if items:
+                    count = export_to_s3(source, items, export_date)
+                    results[source] = count
+                    total_items += count
+                    sources_exported += 1
+                    logger.info(f"  ✓ {source}: {count} items")
+                else:
+                    logger.info(f"  - {source}: empty")
+            except Exception as e:
+                results[source] = f"ERROR: {e}"
+                logger.error(f"  ✗ {source}: {e}")
 
-    # Export profile
-    profile_count = export_profile(export_date)
-    if profile_count:
-        results["profile"] = profile_count
-        total_items += profile_count
+        # Export profile
+        profile_count = export_profile(export_date)
+        if profile_count:
+            results["profile"] = profile_count
+            total_items += profile_count
 
-    # Write manifest
-    manifest = {
-        "export_date": export_date,
-        "export_type": export_type,
-        "total_items": total_items,
-        "sources_exported": sources_exported,
-        "s3_prefix": f"s3://{S3_BUCKET}/exports/{export_date}/",
-        "results": results,
-    }
-    s3.put_object(
-        Bucket=S3_BUCKET,
-        Key=f"exports/{export_date}/manifest.json",
-        Body=json.dumps(manifest, indent=2).encode("utf-8"),
-        ContentType="application/json",
-    )
+        # Write manifest
+        manifest = {
+            "export_date": export_date,
+            "export_type": export_type,
+            "total_items": total_items,
+            "sources_exported": sources_exported,
+            "s3_prefix": f"s3://{S3_BUCKET}/exports/{export_date}/",
+            "results": results,
+        }
+        s3.put_object(
+            Bucket=S3_BUCKET,
+            Key=f"exports/{export_date}/manifest.json",
+            Body=json.dumps(manifest, indent=2).encode("utf-8"),
+            ContentType="application/json",
+        )
 
-    logger.info(f"Export complete: {total_items} items across {sources_exported} sources")
+        logger.info(f"Export complete: {total_items} items across {sources_exported} sources")
 
-    return {"statusCode": 200, "body": json.dumps(manifest)}
+        return {"statusCode": 200, "body": json.dumps(manifest)}
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

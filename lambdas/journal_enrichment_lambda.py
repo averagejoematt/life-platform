@@ -422,109 +422,113 @@ def query_journal_entries(start_date, end_date, full_sync=False):
 
 
 def lambda_handler(event, context):
-    """
-    Lambda entry point.
+    try:
+        """
+        Lambda entry point.
 
-    Event formats:
-      {}                              → last 2 days
-      {"date": "YYYY-MM-DD"}          → specific date
-      {"start": "...", "end": "..."}  → date range
-      {"full_sync": true}             → all entries
-      {"force": true}                 → re-enrich already-enriched entries
-    """
-    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
-    force = event.get("force", False)
-    full_sync = event.get("full_sync", False)
+        Event formats:
+          {}                              → last 2 days
+          {"date": "YYYY-MM-DD"}          → specific date
+          {"start": "...", "end": "..."}  → date range
+          {"full_sync": true}             → all entries
+          {"force": true}                 → re-enrich already-enriched entries
+        """
+        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+        force = event.get("force", False)
+        full_sync = event.get("full_sync", False)
 
-    if full_sync:
-        start_date = "2020-01-01"
-        end_date = "2099-12-31"
-        logger.info("Full sync mode")
-    elif "start" in event and "end" in event:
-        start_date = event["start"]
-        end_date = event["end"]
-    elif "date" in event:
-        start_date = event["date"]
-        end_date = event["date"]
-    else:
-        pacific = timezone(timedelta(hours=-8))
-        now_pacific = datetime.now(pacific)
-        end_date = now_pacific.strftime("%Y-%m-%d")
-        start_date = (now_pacific - timedelta(days=1)).strftime("%Y-%m-%d")
+        if full_sync:
+            start_date = "2020-01-01"
+            end_date = "2099-12-31"
+            logger.info("Full sync mode")
+        elif "start" in event and "end" in event:
+            start_date = event["start"]
+            end_date = event["end"]
+        elif "date" in event:
+            start_date = event["date"]
+            end_date = event["date"]
+        else:
+            pacific = timezone(timedelta(hours=-8))
+            now_pacific = datetime.now(pacific)
+            end_date = now_pacific.strftime("%Y-%m-%d")
+            start_date = (now_pacific - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    logger.info(f"Enriching journal entries: {start_date} → {end_date} "
-                f"(force={force}, full_sync={full_sync})")
+        logger.info(f"Enriching journal entries: {start_date} → {end_date} "
+                    f"(force={force}, full_sync={full_sync})")
 
-    entries = query_journal_entries(start_date, end_date, full_sync)
-    logger.info(f"Found {len(entries)} journal entries")
+        entries = query_journal_entries(start_date, end_date, full_sync)
+        logger.info(f"Found {len(entries)} journal entries")
 
-    enriched = 0
-    skipped = 0
-    errors = 0
+        enriched = 0
+        skipped = 0
+        errors = 0
 
-    for item in entries:
-        sk = item.get("sk", "")
-        raw_text = item.get("raw_text", "")
+        for item in entries:
+            sk = item.get("sk", "")
+            raw_text = item.get("raw_text", "")
 
-        # Skip if too short
-        if len(raw_text) < MIN_TEXT_LENGTH:
-            logger.info(f"Skipping {sk}: raw_text too short ({len(raw_text)} chars)")
-            skipped += 1
-            continue
+            # Skip if too short
+            if len(raw_text) < MIN_TEXT_LENGTH:
+                logger.info(f"Skipping {sk}: raw_text too short ({len(raw_text)} chars)")
+                skipped += 1
+                continue
 
-        # Skip if already enriched (unless force)
-        if not force and item.get("enriched_at"):
-            logger.info(f"Skipping {sk}: already enriched at {item['enriched_at']}")
-            skipped += 1
-            continue
+            # Skip if already enriched (unless force)
+            if not force and item.get("enriched_at"):
+                logger.info(f"Skipping {sk}: already enriched at {item['enriched_at']}")
+                skipped += 1
+                continue
 
-        template = item.get("template", "Unknown")
-        date = item.get("date", "")
-        structured_scores = build_structured_scores(item)
+            template = item.get("template", "Unknown")
+            date = item.get("date", "")
+            structured_scores = build_structured_scores(item)
 
-        logger.info(f"Enriching {sk} ({template}, {len(raw_text)} chars)...")
+            logger.info(f"Enriching {sk} ({template}, {len(raw_text)} chars)...")
 
-        try:
-            enrichment = call_haiku(raw_text, date, template, structured_scores)
-            if enrichment:
-                applied = apply_enrichment(item, enrichment)
-                if applied:
-                    enriched += 1
-                    logger.info(f"  ✓ Enriched {sk}: "
-                                f"mood={enrichment.get('mood_score')}, "
-                                f"stress={enrichment.get('stress_score')}, "
-                                f"themes={enrichment.get('themes', [])}")
+            try:
+                enrichment = call_haiku(raw_text, date, template, structured_scores)
+                if enrichment:
+                    applied = apply_enrichment(item, enrichment)
+                    if applied:
+                        enriched += 1
+                        logger.info(f"  ✓ Enriched {sk}: "
+                                    f"mood={enrichment.get('mood_score')}, "
+                                    f"stress={enrichment.get('stress_score')}, "
+                                    f"themes={enrichment.get('themes', [])}")
 
-                    # Defense mechanism detection (second Haiku call) — v2.72.0 #41
-                    if ENRICH_DEFENSE_PATTERNS and (force or not item.get("defense_enriched_at")):
-                        try:
-                            defense = call_haiku_defense(
-                                raw_text, date, template,
-                                enrichment.get("mood_score"),
-                                enrichment.get("stress_score"),
-                                enrichment.get("themes", []),
-                            )
-                            if defense:
-                                apply_defense_enrichment(item, defense)
-                                logger.info(f"    ✓ Defense: {defense.get('defense_patterns', [])}")
-                        except Exception as de:
-                            logger.warning(f"    Defense enrichment failed for {sk}: {de}")
+                        # Defense mechanism detection (second Haiku call) — v2.72.0 #41
+                        if ENRICH_DEFENSE_PATTERNS and (force or not item.get("defense_enriched_at")):
+                            try:
+                                defense = call_haiku_defense(
+                                    raw_text, date, template,
+                                    enrichment.get("mood_score"),
+                                    enrichment.get("stress_score"),
+                                    enrichment.get("themes", []),
+                                )
+                                if defense:
+                                    apply_defense_enrichment(item, defense)
+                                    logger.info(f"    ✓ Defense: {defense.get('defense_patterns', [])}")
+                            except Exception as de:
+                                logger.warning(f"    Defense enrichment failed for {sk}: {de}")
+                    else:
+                        skipped += 1
                 else:
-                    skipped += 1
-            else:
+                    errors += 1
+                    logger.error(f"  ✗ No enrichment returned for {sk}")
+            except Exception as e:
                 errors += 1
-                logger.error(f"  ✗ No enrichment returned for {sk}")
-        except Exception as e:
-            errors += 1
-            logger.error(f"  ✗ Error enriching {sk}: {e}")
+                logger.error(f"  ✗ Error enriching {sk}: {e}")
 
-    summary = {
-        "entries_found": len(entries),
-        "enriched": enriched,
-        "skipped": skipped,
-        "errors": errors,
-        "date_range": f"{start_date} → {end_date}",
-    }
-    logger.info(f"Complete: {summary}")
+        summary = {
+            "entries_found": len(entries),
+            "enriched": enriched,
+            "skipped": skipped,
+            "errors": errors,
+            "date_range": f"{start_date} → {end_date}",
+        }
+        logger.info(f"Complete: {summary}")
 
-    return {"statusCode": 200, "body": json.dumps(summary)}
+        return {"statusCode": 200, "body": json.dumps(summary)}
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

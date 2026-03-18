@@ -358,88 +358,92 @@ def find_missing_dates(lookback_days=LOOKBACK_DAYS):
 
 
 def lambda_handler(event, context):
-    """
-    Lambda entry point.
+    try:
+        """
+        Lambda entry point.
 
-    Event formats:
-      {}                                → gap-aware lookback (default for 6:15am schedule)
-      {"date": "YYYY-MM-DD"}            → fetch specific date
-      {"start": "...", "end": "..."}    → backfill date range
-    """
-    import time as _time
-    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+        Event formats:
+          {}                                → gap-aware lookback (default for 6:15am schedule)
+          {"date": "YYYY-MM-DD"}            → fetch specific date
+          {"start": "...", "end": "..."}    → backfill date range
+        """
+        import time as _time
+        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
 
-    api_key = get_api_key()
-    area_map = fetch_areas(api_key)
-    logger.info(f"Fetched {len(area_map)} areas: {list(area_map.values())}")
+        api_key = get_api_key()
+        area_map = fetch_areas(api_key)
+        logger.info(f"Fetched {len(area_map)} areas: {list(area_map.values())}")
 
-    # ── Mode 1: Explicit date range backfill ──
-    if "start" in event and "end" in event:
-        start = datetime.strptime(event["start"], "%Y-%m-%d")
-        end = datetime.strptime(event["end"], "%Y-%m-%d")
-        days_written = 0
-        current = start
-        while current <= end:
-            date_str = current.strftime("%Y-%m-%d")
-            item = process_day(api_key, area_map, date_str)
+        # ── Mode 1: Explicit date range backfill ──
+        if "start" in event and "end" in event:
+            start = datetime.strptime(event["start"], "%Y-%m-%d")
+            end = datetime.strptime(event["end"], "%Y-%m-%d")
+            days_written = 0
+            current = start
+            while current <= end:
+                date_str = current.strftime("%Y-%m-%d")
+                item = process_day(api_key, area_map, date_str)
+                if item:
+                    write_to_dynamo(item)
+                    days_written += 1
+                current += timedelta(days=1)
+            return {"statusCode": 200, "body": f"Backfilled {days_written} days"}
+
+        # ── Mode 2: Explicit single date ──
+        if "date" in event:
+            target_date = event["date"]
+            print(f"Habitify ingestion — explicit date={target_date}")
+            item = process_day(api_key, area_map, target_date)
             if item:
                 write_to_dynamo(item)
-                days_written += 1
-            current += timedelta(days=1)
-        return {"statusCode": 200, "body": f"Backfilled {days_written} days"}
+                return {
+                    "statusCode": 200,
+                    "body": json.dumps({
+                        "date": target_date,
+                        "completion_pct": float(item["completion_pct"]),
+                        "total_completed": item["total_completed"],
+                        "total_possible": item["total_possible"],
+                    }),
+                }
+            return {"statusCode": 200, "body": json.dumps({"date": target_date, "message": "No data"})}
 
-    # ── Mode 2: Explicit single date ──
-    if "date" in event:
-        target_date = event["date"]
-        print(f"Habitify ingestion — explicit date={target_date}")
-        item = process_day(api_key, area_map, target_date)
-        if item:
-            write_to_dynamo(item)
-            return {
-                "statusCode": 200,
-                "body": json.dumps({
-                    "date": target_date,
-                    "completion_pct": float(item["completion_pct"]),
-                    "total_completed": item["total_completed"],
-                    "total_possible": item["total_possible"],
-                }),
-            }
-        return {"statusCode": 200, "body": json.dumps({"date": target_date, "message": "No data"})}
+        # ── Mode 3: Scheduled run — gap-aware lookback ──
+        print(f"[GAP-FILL] Habitify gap-aware lookback ({LOOKBACK_DAYS} days)")
+        missing_dates = find_missing_dates()
 
-    # ── Mode 3: Scheduled run — gap-aware lookback ──
-    print(f"[GAP-FILL] Habitify gap-aware lookback ({LOOKBACK_DAYS} days)")
-    missing_dates = find_missing_dates()
+        if not missing_dates:
+            return {"statusCode": 200, "body": json.dumps({"message": "No gaps to fill", "lookback_days": LOOKBACK_DAYS})}
 
-    if not missing_dates:
-        return {"statusCode": 200, "body": json.dumps({"message": "No gaps to fill", "lookback_days": LOOKBACK_DAYS})}
+        results = {}
+        for i, date_str in enumerate(missing_dates):
+            print(f"[GAP-FILL] Ingesting {date_str} ({i+1}/{len(missing_dates)})")
+            try:
+                item = process_day(api_key, area_map, date_str)
+                if item:
+                    write_to_dynamo(item)
+                    results[date_str] = float(item["completion_pct"])
+                else:
+                    results[date_str] = "no data"
+            except Exception as e:
+                print(f"[GAP-FILL] ERROR on {date_str}: {e}")
+                results[date_str] = f"error: {e}"
+            if i < len(missing_dates) - 1:
+                _time.sleep(0.5)  # Gentle pacing
 
-    results = {}
-    for i, date_str in enumerate(missing_dates):
-        print(f"[GAP-FILL] Ingesting {date_str} ({i+1}/{len(missing_dates)})")
-        try:
-            item = process_day(api_key, area_map, date_str)
-            if item:
-                write_to_dynamo(item)
-                results[date_str] = float(item["completion_pct"])
-            else:
-                results[date_str] = "no data"
-        except Exception as e:
-            print(f"[GAP-FILL] ERROR on {date_str}: {e}")
-            results[date_str] = f"error: {e}"
-        if i < len(missing_dates) - 1:
-            _time.sleep(0.5)  # Gentle pacing
+        filled = sum(1 for v in results.values() if isinstance(v, float))
+        print(f"[GAP-FILL] Complete: {filled}/{len(missing_dates)} days filled")
 
-    filled = sum(1 for v in results.values() if isinstance(v, float))
-    print(f"[GAP-FILL] Complete: {filled}/{len(missing_dates)} days filled")
-
-    return {
-        "statusCode": 200,
-        "body": json.dumps({
-            "mode": "gap_fill",
-            "lookback_days": LOOKBACK_DAYS,
-            "gaps_found": len(missing_dates),
-            "gaps_filled": filled,
-            "details": results,
-        }, default=str),
-    }
+        return {
+            "statusCode": 200,
+            "body": json.dumps({
+                "mode": "gap_fill",
+                "lookback_days": LOOKBACK_DAYS,
+                "gaps_found": len(missing_dates),
+                "gaps_filled": filled,
+                "details": results,
+            }, default=str),
+        }
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise
 

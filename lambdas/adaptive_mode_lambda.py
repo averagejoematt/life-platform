@@ -272,47 +272,51 @@ def compute_adaptive_mode(date_str):
 # ── Lambda handler ────────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
-    """
-    Entry point. Accepts:
-      - {} or {"date": "YYYY-MM-DD"}  → compute for given/today date
-      - {"backfill_days": N}           → compute for last N days
-    """
-    logger.info(f"Event: {json.dumps(event)}")
+    try:
+        """
+        Entry point. Accepts:
+          - {} or {"date": "YYYY-MM-DD"}  → compute for given/today date
+          - {"backfill_days": N}           → compute for last N days
+        """
+        logger.info(f"Event: {json.dumps(event)}")
 
-    # Determine date(s) to process
-    if "backfill_days" in event:
-        days = int(event["backfill_days"])
-        base = datetime.now(timezone.utc).date()
-        dates = [(base - timedelta(days=i)).isoformat() for i in range(days)]
-    elif "date" in event:
-        dates = [event["date"]]
-    else:
-        # Default: yesterday (Daily Brief reads yesterday's data)
-        yesterday = (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
-        dates = [yesterday]
+        # Determine date(s) to process
+        if "backfill_days" in event:
+            days = int(event["backfill_days"])
+            base = datetime.now(timezone.utc).date()
+            dates = [(base - timedelta(days=i)).isoformat() for i in range(days)]
+        elif "date" in event:
+            dates = [event["date"]]
+        else:
+            # Default: yesterday (Daily Brief reads yesterday's data)
+            yesterday = (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
+            dates = [yesterday]
 
-    results = []
-    for date_str in dates:
-        try:
-            result = compute_adaptive_mode(date_str)
-            store_adaptive_mode(date_str, result)
-            results.append(result)
-            logger.info(
-                f"{date_str}: {result['mode_label']} "
-                f"(score={result['engagement_score']}, "
-                f"journal={result['component_scores']['journal']}, "
-                f"t0={result['component_scores']['t0_habits']}, "
-                f"t1={result['component_scores']['t1_habits']}, "
-                f"trend={result['component_scores']['grade_trend']})"
-            )
-        except Exception as e:
-            logger.error(f"Failed to compute adaptive mode for {date_str}: {e}", exc_info=True)
-            results.append({"date": date_str, "error": str(e)})
+        results = []
+        for date_str in dates:
+            try:
+                result = compute_adaptive_mode(date_str)
+                store_adaptive_mode(date_str, result)
+                results.append(result)
+                logger.info(
+                    f"{date_str}: {result['mode_label']} "
+                    f"(score={result['engagement_score']}, "
+                    f"journal={result['component_scores']['journal']}, "
+                    f"t0={result['component_scores']['t0_habits']}, "
+                    f"t1={result['component_scores']['t1_habits']}, "
+                    f"trend={result['component_scores']['grade_trend']})"
+                )
+            except Exception as e:
+                logger.error(f"Failed to compute adaptive mode for {date_str}: {e}", exc_info=True)
+                results.append({"date": date_str, "error": str(e)})
 
-    if len(results) == 1:
-        return results[0]
+        if len(results) == 1:
+            return results[0]
 
-    return {
-        "processed": len(results),
-        "results": results,
-    }
+        return {
+            "processed": len(results),
+            "results": results,
+        }
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

@@ -184,93 +184,97 @@ def send_confirmation(insight_text, insight_id, recipient_email):
 
 
 def lambda_handler(event, context):
-    """
-    Triggered by S3 event when SES deposits a raw email.
+    try:
+        """
+        Triggered by S3 event when SES deposits a raw email.
     
-    Event can come from:
-    1. S3 Event Notification (has 'Records' with s3 info)
-    2. SES direct invocation (has 'Records' with ses info)
-    """
-    print(f"[INFO] Insight Email Parser v1.1.0 triggered")
+        Event can come from:
+        1. S3 Event Notification (has 'Records' with s3 info)
+        2. SES direct invocation (has 'Records' with ses info)
+        """
+        print(f"[INFO] Insight Email Parser v1.1.0 triggered")
 
-    for record in event.get("Records", []):
-        # Handle S3 trigger
-        s3_info = record.get("s3", {})
-        bucket = s3_info.get("bucket", {}).get("name", S3_BUCKET)
-        key = s3_info.get("object", {}).get("key", "")
+        for record in event.get("Records", []):
+            # Handle S3 trigger
+            s3_info = record.get("s3", {})
+            bucket = s3_info.get("bucket", {}).get("name", S3_BUCKET)
+            key = s3_info.get("object", {}).get("key", "")
 
-        if not key:
-            # Handle SES direct invocation
-            ses_info = record.get("ses", {})
-            mail = ses_info.get("mail", {})
-            message_id = mail.get("messageId", "")
-            if message_id:
-                key = f"raw/inbound_email/{message_id}"
-            else:
-                print("[WARN] No S3 key or SES messageId found, skipping")
+            if not key:
+                # Handle SES direct invocation
+                ses_info = record.get("ses", {})
+                mail = ses_info.get("mail", {})
+                message_id = mail.get("messageId", "")
+                if message_id:
+                    key = f"raw/inbound_email/{message_id}"
+                else:
+                    print("[WARN] No S3 key or SES messageId found, skipping")
+                    continue
+
+            print(f"[INFO] Processing: s3://{bucket}/{key}")
+
+            # Read raw email from S3
+            try:
+                obj = s3.get_object(Bucket=bucket, Key=key)
+                raw_email = obj["Body"].read().decode("utf-8", errors="replace")
+            except Exception as e:
+                print(f"[ERROR] Failed to read email from S3: {e}")
                 continue
 
-        print(f"[INFO] Processing: s3://{bucket}/{key}")
+            # Parse email
+            msg = email.message_from_string(raw_email, policy=policy.default)
 
-        # Read raw email from S3
-        try:
-            obj = s3.get_object(Bucket=bucket, Key=key)
-            raw_email = obj["Body"].read().decode("utf-8", errors="replace")
-        except Exception as e:
-            print(f"[ERROR] Failed to read email from S3: {e}")
-            continue
+            # Security: check sender
+            from_addr = msg.get("From", "")
+            sender_email = re.search(r'[\w.+-]+@[\w-]+\.[\w.]+', from_addr)
+            sender = sender_email.group(0).lower() if sender_email else ""
 
-        # Parse email
-        msg = email.message_from_string(raw_email, policy=policy.default)
+            if sender not in ALLOWED_SENDERS:
+                print(f"[WARN] Unauthorized sender: {sender}. Allowed: {ALLOWED_SENDERS}. Ignoring.")
+                continue
 
-        # Security: check sender
-        from_addr = msg.get("From", "")
-        sender_email = re.search(r'[\w.+-]+@[\w-]+\.[\w.]+', from_addr)
-        sender = sender_email.group(0).lower() if sender_email else ""
+            subject = msg.get("Subject", "")
+            print(f"[INFO] From: {sender}, Subject: {subject}")
 
-        if sender not in ALLOWED_SENDERS:
-            print(f"[WARN] Unauthorized sender: {sender}. Allowed: {ALLOWED_SENDERS}. Ignoring.")
-            continue
-
-        subject = msg.get("Subject", "")
-        print(f"[INFO] From: {sender}, Subject: {subject}")
-
-        # Extract text body
-        body_text = ""
-        if msg.is_multipart():
-            for part in msg.walk():
-                if part.get_content_type() == "text/plain":
-                    body_text = part.get_content()
-                    break
-            # Fallback to HTML if no plain text
-            if not body_text:
+            # Extract text body
+            body_text = ""
+            if msg.is_multipart():
                 for part in msg.walk():
-                    if part.get_content_type() == "text/html":
-                        html_content = part.get_content()
-                        # Basic HTML stripping
-                        body_text = re.sub(r'<[^>]+>', '', html_content)
+                    if part.get_content_type() == "text/plain":
+                        body_text = part.get_content()
                         break
-        else:
-            body_text = msg.get_content()
+                # Fallback to HTML if no plain text
+                if not body_text:
+                    for part in msg.walk():
+                        if part.get_content_type() == "text/html":
+                            html_content = part.get_content()
+                            # Basic HTML stripping
+                            body_text = re.sub(r'<[^>]+>', '', html_content)
+                            break
+            else:
+                body_text = msg.get_content()
 
-        # Extract reply text
-        reply_text = extract_reply_text(body_text)
+            # Extract reply text
+            reply_text = extract_reply_text(body_text)
 
-        if not reply_text or len(reply_text) < 5:
-            print(f"[WARN] Reply text too short or empty: '{reply_text[:50]}'")
-            continue
+            if not reply_text or len(reply_text) < 5:
+                print(f"[WARN] Reply text too short or empty: '{reply_text[:50]}'")
+                continue
 
-        print(f"[INFO] Extracted reply ({len(reply_text)} chars): {reply_text[:100]}...")
+            print(f"[INFO] Extracted reply ({len(reply_text)} chars): {reply_text[:100]}...")
 
-        # Save as insight
-        insight_id, date_saved = save_insight(reply_text, source_email_subject=subject)
-        print(f"[INFO] Insight saved: {insight_id}")
+            # Save as insight
+            insight_id, date_saved = save_insight(reply_text, source_email_subject=subject)
+            print(f"[INFO] Insight saved: {insight_id}")
 
-        # Send confirmation back to sender
-        try:
-            send_confirmation(reply_text, insight_id, recipient_email=sender)
-            print(f"[INFO] Confirmation email sent to {sender}")
-        except Exception as e:
-            print(f"[WARN] Confirmation email failed: {e}")
+            # Send confirmation back to sender
+            try:
+                send_confirmation(reply_text, insight_id, recipient_email=sender)
+                print(f"[INFO] Confirmation email sent to {sender}")
+            except Exception as e:
+                print(f"[WARN] Confirmation email failed: {e}")
 
-    return {"statusCode": 200, "body": json.dumps({"status": "ok"})}
+        return {"statusCode": 200, "body": json.dumps({"status": "ok"})}
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

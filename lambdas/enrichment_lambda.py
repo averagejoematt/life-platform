@@ -285,30 +285,34 @@ def enrich_date_range(start_date: str, end_date: str):
 # ── Lambda handler ────────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
-    today     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    logger.set_date(today)  # OBS-1
-    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    try:
+        today     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        logger.set_date(today)  # OBS-1
+        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    if event.get("backfill"):
-        start_date = event.get("start_date", "2020-01-01")
-        end_date   = event.get("end_date", today)
-        logger.info(f"[enrichment] Backfill mode: {start_date} → {end_date}")
-    elif "start_date" in event and "end_date" in event:
-        start_date = event["start_date"]
-        end_date   = event["end_date"]
-    else:
-        # Default: yesterday (nightly run)
-        start_date = yesterday
-        end_date   = yesterday
+        if event.get("backfill"):
+            start_date = event.get("start_date", "2020-01-01")
+            end_date   = event.get("end_date", today)
+            logger.info(f"[enrichment] Backfill mode: {start_date} → {end_date}")
+        elif "start_date" in event and "end_date" in event:
+            start_date = event["start_date"]
+            end_date   = event["end_date"]
+        else:
+            # Default: yesterday (nightly run)
+            start_date = yesterday
+            end_date   = yesterday
 
-    result = enrich_date_range(start_date, end_date)
+        result = enrich_date_range(start_date, end_date)
 
-    return {
-        "statusCode": 200,
-        "body": json.dumps({
-            "mode":       "backfill" if event.get("backfill") else "nightly",
-            "start_date": start_date,
-            "end_date":   end_date,
-            **result,
-        })
-    }
+        return {
+            "statusCode": 200,
+            "body": json.dumps({
+                "mode":       "backfill" if event.get("backfill") else "nightly",
+                "start_date": start_date,
+                "end_date":   end_date,
+                **result,
+            })
+        }
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

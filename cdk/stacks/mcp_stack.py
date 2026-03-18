@@ -52,7 +52,7 @@ class McpStack(Stack):
         # diagnosis that previously required CloudWatch log parsing.
         mcp = create_platform_lambda(self, "McpServer",
             function_name=MCP_FUNCTION_NAME,
-            source_file="lambdas/mcp_server.py",
+            source_file="mcp_server.py",
             handler="mcp_server.lambda_handler",
             timeout_seconds=300,
             memory_mb=768,  # R5: power-tuned — 768 MB is cost-optimal (AWS Lambda Power Tuning v4.4.0)
@@ -80,7 +80,7 @@ class McpStack(Stack):
         # Uses same IAM policy as MCP server (reads same DDB partitions, writes cache).
         warmer = create_platform_lambda(self, "McpWarmer",
             function_name=WARMER_FUNCTION_NAME,
-            source_file="lambdas/mcp_server.py",
+            source_file="mcp_server.py",
             handler="mcp_server.lambda_handler",
             schedule="cron(0 17 * * ? *)",  # 10:00 AM PT daily
             timeout_seconds=300,

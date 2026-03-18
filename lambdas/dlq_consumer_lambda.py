@@ -280,98 +280,102 @@ def send_alert(permanent_failures: list[dict]) -> None:
 # ── Main handler ───────────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
-    if not DLQ_URL:
-        logger.error("DLQ_URL env var not set — cannot poll SQS")
-        return {"statusCode": 500, "body": "DLQ_URL not configured"}
+    try:
+        if not DLQ_URL:
+            logger.error("DLQ_URL env var not set — cannot poll SQS")
+            return {"statusCode": 500, "body": "DLQ_URL not configured"}
 
-    logger.info(f"DLQ consumer starting — polling {DLQ_URL}")
-    now = datetime.now(timezone.utc).isoformat()
+        logger.info(f"DLQ consumer starting — polling {DLQ_URL}")
+        now = datetime.now(timezone.utc).isoformat()
 
-    # ── Poll DLQ ──────────────────────────────────────────────────────────────
-    response = sqs.receive_message(
-        QueueUrl=DLQ_URL,
-        MaxNumberOfMessages=MAX_MESSAGES_PER_RUN,
-        AttributeNames=["All"],
-        MessageAttributeNames=["All"],
-        WaitTimeSeconds=5,  # long poll, up to 5s
-    )
-    messages = response.get("Messages", [])
+        # ── Poll DLQ ──────────────────────────────────────────────────────────────
+        response = sqs.receive_message(
+            QueueUrl=DLQ_URL,
+            MaxNumberOfMessages=MAX_MESSAGES_PER_RUN,
+            AttributeNames=["All"],
+            MessageAttributeNames=["All"],
+            WaitTimeSeconds=5,  # long poll, up to 5s
+        )
+        messages = response.get("Messages", [])
 
-    if not messages:
-        logger.info("DLQ empty — nothing to process")
+        if not messages:
+            logger.info("DLQ empty — nothing to process")
+            return {
+                "statusCode": 200,
+                "body": json.dumps({"messages_found": 0, "checked_at": now}),
+            }
+
+        logger.info(f"Found {len(messages)} messages in DLQ")
+
+        # ── Process each message ──────────────────────────────────────────────────
+        stats = {"transient": 0, "permanent": 0, "retried_ok": 0, "retried_fail": 0}
+        permanent_failures = []
+
+        for msg in messages:
+            msg_id = msg.get("MessageId", "?")
+            receive_count = int(msg.get("Attributes", {}).get("ApproximateReceiveCount", "1"))
+            fn_name = extract_function_name(msg) or "unknown"
+            logger.info(f"Processing message {msg_id} (receive_count={receive_count}, fn={fn_name})")
+
+            classification = classify_message(msg)
+            retry_attempted = False
+            retry_ok = False
+
+            if classification == "transient":
+                stats["transient"] += 1
+                retry_attempted = True
+                retry_ok = retry_message(msg)
+                if retry_ok:
+                    stats["retried_ok"] += 1
+                else:
+                    stats["retried_fail"] += 1
+                    # Retry failed — escalate to permanent handling
+                    classification = "permanent"
+
+            if classification == "permanent":
+                stats["permanent"] += 1
+                s3_key = archive_to_s3(msg, classification, retry_attempted)
+                permanent_failures.append({
+                    "message_id": msg_id,
+                    "function_name": fn_name,
+                    "body": msg.get("Body", ""),
+                    "s3_key": s3_key,
+                    "receive_count": receive_count,
+                })
+
+            # Always delete from DLQ after processing
+            try:
+                sqs.delete_message(
+                    QueueUrl=DLQ_URL,
+                    ReceiptHandle=msg["ReceiptHandle"],
+                )
+                logger.info(f"  🗑️  Deleted from DLQ: {msg_id}")
+            except Exception as e:
+                logger.error(f"  Failed to delete message {msg_id}: {e}")
+
+        # ── Alert on permanent failures ───────────────────────────────────────────
+        if permanent_failures:
+            send_alert(permanent_failures)
+
+        # ── Summary ───────────────────────────────────────────────────────────────
+        logger.info(
+            f"DLQ run complete: "
+            f"processed={len(messages)} "
+            f"transient={stats['transient']} "
+            f"permanent={stats['permanent']} "
+            f"retried_ok={stats['retried_ok']} "
+            f"retried_fail={stats['retried_fail']}"
+        )
+
         return {
             "statusCode": 200,
-            "body": json.dumps({"messages_found": 0, "checked_at": now}),
+            "body": json.dumps({
+                "messages_processed": len(messages),
+                "stats": stats,
+                "permanent_failures": [f["message_id"] for f in permanent_failures],
+                "ran_at": now,
+            }),
         }
-
-    logger.info(f"Found {len(messages)} messages in DLQ")
-
-    # ── Process each message ──────────────────────────────────────────────────
-    stats = {"transient": 0, "permanent": 0, "retried_ok": 0, "retried_fail": 0}
-    permanent_failures = []
-
-    for msg in messages:
-        msg_id = msg.get("MessageId", "?")
-        receive_count = int(msg.get("Attributes", {}).get("ApproximateReceiveCount", "1"))
-        fn_name = extract_function_name(msg) or "unknown"
-        logger.info(f"Processing message {msg_id} (receive_count={receive_count}, fn={fn_name})")
-
-        classification = classify_message(msg)
-        retry_attempted = False
-        retry_ok = False
-
-        if classification == "transient":
-            stats["transient"] += 1
-            retry_attempted = True
-            retry_ok = retry_message(msg)
-            if retry_ok:
-                stats["retried_ok"] += 1
-            else:
-                stats["retried_fail"] += 1
-                # Retry failed — escalate to permanent handling
-                classification = "permanent"
-
-        if classification == "permanent":
-            stats["permanent"] += 1
-            s3_key = archive_to_s3(msg, classification, retry_attempted)
-            permanent_failures.append({
-                "message_id": msg_id,
-                "function_name": fn_name,
-                "body": msg.get("Body", ""),
-                "s3_key": s3_key,
-                "receive_count": receive_count,
-            })
-
-        # Always delete from DLQ after processing
-        try:
-            sqs.delete_message(
-                QueueUrl=DLQ_URL,
-                ReceiptHandle=msg["ReceiptHandle"],
-            )
-            logger.info(f"  🗑️  Deleted from DLQ: {msg_id}")
-        except Exception as e:
-            logger.error(f"  Failed to delete message {msg_id}: {e}")
-
-    # ── Alert on permanent failures ───────────────────────────────────────────
-    if permanent_failures:
-        send_alert(permanent_failures)
-
-    # ── Summary ───────────────────────────────────────────────────────────────
-    logger.info(
-        f"DLQ run complete: "
-        f"processed={len(messages)} "
-        f"transient={stats['transient']} "
-        f"permanent={stats['permanent']} "
-        f"retried_ok={stats['retried_ok']} "
-        f"retried_fail={stats['retried_fail']}"
-    )
-
-    return {
-        "statusCode": 200,
-        "body": json.dumps({
-            "messages_processed": len(messages),
-            "stats": stats,
-            "permanent_failures": [f["message_id"] for f in permanent_failures],
-            "ran_at": now,
-        }),
-    }
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

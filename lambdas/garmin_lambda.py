@@ -781,54 +781,58 @@ def ingest_day(target_date: str, secret: dict, api=None) -> dict:
 
 # ── Lambda handler ─────────────────────────────────────────────────────────────
 def lambda_handler(event, context):
-    import time as _time
-    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+    try:
+        import time as _time
+        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
 
-    secret = get_secret()
+        secret = get_secret()
 
-    # ── Mode 1: Explicit date override (manual invocation / backfill) ──
-    if event.get("date"):
-        target_date = event["date"]
-        print(f"Garmin ingestion — explicit date={target_date}")
-        result = ingest_day(target_date, secret)
-        if not result:
-            return {"statusCode": 204, "body": json.dumps({"message": f"No Garmin data for {target_date}"})}
+        # ── Mode 1: Explicit date override (manual invocation / backfill) ──
+        if event.get("date"):
+            target_date = event["date"]
+            print(f"Garmin ingestion — explicit date={target_date}")
+            result = ingest_day(target_date, secret)
+            if not result:
+                return {"statusCode": 204, "body": json.dumps({"message": f"No Garmin data for {target_date}"})}
+            return {
+                "statusCode": 200,
+                "body": json.dumps({"date": target_date, "fields_written": len(result)}, default=str),
+            }
+
+        # ── Mode 2: Scheduled run — gap-aware lookback ──
+        print(f"Garmin ingestion — gap-aware lookback ({LOOKBACK_DAYS} days)")
+        missing_dates = find_missing_dates()
+
+        if not missing_dates:
+            return {"statusCode": 200, "body": json.dumps({"message": "No gaps to fill", "lookback_days": LOOKBACK_DAYS})}
+
+        # Auth once, reuse across all gap days
+        api = get_garmin_client(secret)
+        results = {}
+        for i, date_str in enumerate(missing_dates):
+            print(f"[GAP-FILL] Ingesting {date_str} ({i+1}/{len(missing_dates)})")
+            try:
+                result = ingest_day(date_str, secret, api=api)
+                results[date_str] = len(result) if result else 0
+            except Exception as e:
+                print(f"[GAP-FILL] ERROR on {date_str}: {e}")
+                results[date_str] = f"error: {e}"
+            if i < len(missing_dates) - 1:
+                _time.sleep(1)  # Rate limit pacing
+
+        filled = sum(1 for v in results.values() if isinstance(v, int) and v > 0)
+        print(f"[GAP-FILL] Complete: {filled}/{len(missing_dates)} days filled")
+
         return {
             "statusCode": 200,
-            "body": json.dumps({"date": target_date, "fields_written": len(result)}, default=str),
+            "body": json.dumps({
+                "mode": "gap_fill",
+                "lookback_days": LOOKBACK_DAYS,
+                "gaps_found": len(missing_dates),
+                "gaps_filled": filled,
+                "details": results,
+            }, default=str),
         }
-
-    # ── Mode 2: Scheduled run — gap-aware lookback ──
-    print(f"Garmin ingestion — gap-aware lookback ({LOOKBACK_DAYS} days)")
-    missing_dates = find_missing_dates()
-
-    if not missing_dates:
-        return {"statusCode": 200, "body": json.dumps({"message": "No gaps to fill", "lookback_days": LOOKBACK_DAYS})}
-
-    # Auth once, reuse across all gap days
-    api = get_garmin_client(secret)
-    results = {}
-    for i, date_str in enumerate(missing_dates):
-        print(f"[GAP-FILL] Ingesting {date_str} ({i+1}/{len(missing_dates)})")
-        try:
-            result = ingest_day(date_str, secret, api=api)
-            results[date_str] = len(result) if result else 0
-        except Exception as e:
-            print(f"[GAP-FILL] ERROR on {date_str}: {e}")
-            results[date_str] = f"error: {e}"
-        if i < len(missing_dates) - 1:
-            _time.sleep(1)  # Rate limit pacing
-
-    filled = sum(1 for v in results.values() if isinstance(v, int) and v > 0)
-    print(f"[GAP-FILL] Complete: {filled}/{len(missing_dates)} days filled")
-
-    return {
-        "statusCode": 200,
-        "body": json.dumps({
-            "mode": "gap_fill",
-            "lookback_days": LOOKBACK_DAYS,
-            "gaps_found": len(missing_dates),
-            "gaps_filled": filled,
-            "details": results,
-        }, default=str),
-    }
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

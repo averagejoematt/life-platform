@@ -248,70 +248,74 @@ def _build_subscriber_email(installment: dict, subscriber: dict) -> tuple[str, s
 # ─────────────────────────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
-    logger.info("Chronicle Email Sender v1.0.0 — BS-03 — starting")
+    try:
+        logger.info("Chronicle Email Sender v1.0.0 — BS-03 — starting")
 
-    # Viktor guard: is there an installment from this week?
-    installment = _get_this_weeks_installment()
-    if not installment:
-        logger.info("No installment found this week — clean no-op")
+        # Viktor guard: is there an installment from this week?
+        installment = _get_this_weeks_installment()
+        if not installment:
+            logger.info("No installment found this week — clean no-op")
+            return {
+                "statusCode": 200,
+                "body":    "No Chronicle installment found this week — no-op",
+                "sent":    0,
+                "skipped": True,
+            }
+
+        title    = installment.get("title", "")
+        week_num = installment.get("week_number", "?")
+        logger.info("Installment found — Week %s: \"%s\"", week_num, title)
+
+        # Load confirmed subscribers
+        subscribers = _get_confirmed_subscribers()
+        if not subscribers:
+            logger.info("No confirmed subscribers yet — no-op")
+            return {"statusCode": 200, "body": "No confirmed subscribers", "sent": 0}
+
+        logger.info("Sending to %d confirmed subscriber(s)", len(subscribers))
+
+        # Send rate: 1/sec default (SES sandbox); bump SEND_RATE_PER_SEC after production access
+        rate_delay = 1.0 / max(SEND_RATE_PER_SEC, 0.1)
+
+        sent = failed = 0
+
+        for i, sub in enumerate(subscribers):
+            email = sub.get("email", "").strip()
+            if not email:
+                continue
+
+            subject, html = _build_subscriber_email(installment, sub)
+
+            try:
+                ses.send_email(
+                    FromEmailAddress=SENDER,
+                    Destination={"ToAddresses": [email]},
+                    Content={"Simple": {
+                        "Subject": {"Data": subject, "Charset": "UTF-8"},
+                        "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
+                    }},
+                )
+                sent += 1
+                logger.info("Sent %d/%d (%s...)", i + 1, len(subscribers), email[:6])
+            except Exception as exc:
+                failed += 1
+                logger.error("Failed send to %s...: %s", email[:6], exc)
+
+            # Rate-limit between sends (skip delay after last subscriber)
+            if i < len(subscribers) - 1:
+                time.sleep(rate_delay)
+
+        logger.info("Done — sent: %d, failed: %d, total: %d", sent, failed, len(subscribers))
+
         return {
             "statusCode": 200,
-            "body":    "No Chronicle installment found this week — no-op",
-            "sent":    0,
-            "skipped": True,
+            "body":     f"Chronicle Week {week_num} sent to {sent}/{len(subscribers)} subscribers",
+            "sent":     sent,
+            "failed":   failed,
+            "total":    len(subscribers),
+            "week_num": week_num,
+            "title":    title,
         }
-
-    title    = installment.get("title", "")
-    week_num = installment.get("week_number", "?")
-    logger.info("Installment found — Week %s: \"%s\"", week_num, title)
-
-    # Load confirmed subscribers
-    subscribers = _get_confirmed_subscribers()
-    if not subscribers:
-        logger.info("No confirmed subscribers yet — no-op")
-        return {"statusCode": 200, "body": "No confirmed subscribers", "sent": 0}
-
-    logger.info("Sending to %d confirmed subscriber(s)", len(subscribers))
-
-    # Send rate: 1/sec default (SES sandbox); bump SEND_RATE_PER_SEC after production access
-    rate_delay = 1.0 / max(SEND_RATE_PER_SEC, 0.1)
-
-    sent = failed = 0
-
-    for i, sub in enumerate(subscribers):
-        email = sub.get("email", "").strip()
-        if not email:
-            continue
-
-        subject, html = _build_subscriber_email(installment, sub)
-
-        try:
-            ses.send_email(
-                FromEmailAddress=SENDER,
-                Destination={"ToAddresses": [email]},
-                Content={"Simple": {
-                    "Subject": {"Data": subject, "Charset": "UTF-8"},
-                    "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-                }},
-            )
-            sent += 1
-            logger.info("Sent %d/%d (%s...)", i + 1, len(subscribers), email[:6])
-        except Exception as exc:
-            failed += 1
-            logger.error("Failed send to %s...: %s", email[:6], exc)
-
-        # Rate-limit between sends (skip delay after last subscriber)
-        if i < len(subscribers) - 1:
-            time.sleep(rate_delay)
-
-    logger.info("Done — sent: %d, failed: %d, total: %d", sent, failed, len(subscribers))
-
-    return {
-        "statusCode": 200,
-        "body":     f"Chronicle Week {week_num} sent to {sent}/{len(subscribers)} subscribers",
-        "sent":     sent,
-        "failed":   failed,
-        "total":    len(subscribers),
-        "week_num": week_num,
-        "title":    title,
-    }
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

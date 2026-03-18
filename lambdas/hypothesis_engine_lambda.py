@@ -822,105 +822,109 @@ def write_hypothesis_context_to_memory(active_hypotheses):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def lambda_handler(event, context):
-    logger.info("IC-18: Hypothesis Engine v1.2.0 (AI-4 + IC-19 D3B) starting...")
+    try:
+        logger.info("IC-18: Hypothesis Engine v1.2.0 (AI-4 + IC-19 D3B) starting...")
 
-    api_key = get_anthropic_key()
+        api_key = get_anthropic_key()
 
-    # 1. Gather data
-    data = gather_data()
-    if not data:
-        return {"statusCode": 500, "body": "Failed to gather data"}
+        # 1. Gather data
+        data = gather_data()
+        if not data:
+            return {"statusCode": 500, "body": "Failed to gather data"}
 
-    daily_rows = build_data_narrative(data)
-    logger.info(f"Built data narrative: {len(daily_rows)} days")
+        daily_rows = build_data_narrative(data)
+        logger.info(f"Built data narrative: {len(daily_rows)} days")
 
-    # AI-4: Check data completeness before any hypothesis work
-    is_sufficient, complete_days, total_days, completeness_msg = check_data_completeness(daily_rows)
-    logger.info(f"[AI-4] Data completeness: {completeness_msg}")
+        # AI-4: Check data completeness before any hypothesis work
+        is_sufficient, complete_days, total_days, completeness_msg = check_data_completeness(daily_rows)
+        logger.info(f"[AI-4] Data completeness: {completeness_msg}")
 
-    # 2. Load existing hypotheses
-    all_hypotheses = load_existing_hypotheses()
-    pending_hypotheses = [h for h in all_hypotheses if h.get("status") in ("pending", "confirming")]
-    pending_count = len(pending_hypotheses)
-    logger.info(f"Existing: {len(all_hypotheses)} total, {pending_count} pending/confirming")
-
-    # AI-4: Enforce hard expiry on all non-terminal hypotheses
-    expired_updates = enforce_hard_expiry(all_hypotheses)
-    expired_count = 0
-    for sk, status, reason in expired_updates:
-        update_hypothesis_status(sk, status, reason)
-        expired_count += 1
-    if expired_count:
-        logger.info(f"[AI-4] Hard expiry: archived {expired_count} hypotheses older than {HARD_EXPIRY_DAYS} days")
-        # Reload after expiry to get accurate pending count
+        # 2. Load existing hypotheses
         all_hypotheses = load_existing_hypotheses()
         pending_hypotheses = [h for h in all_hypotheses if h.get("status") in ("pending", "confirming")]
         pending_count = len(pending_hypotheses)
+        logger.info(f"Existing: {len(all_hypotheses)} total, {pending_count} pending/confirming")
 
-    # 3. Check pending hypotheses against new data
-    updates_made = 0
-    if pending_hypotheses:
-        updates = check_pending_hypotheses(pending_hypotheses, daily_rows, api_key)
-        for sk, new_status, evidence_note in updates:
-            update_hypothesis_status(sk, new_status, evidence_note)
-            updates_made += 1
-        logger.info(f"Hypothesis checks: {updates_made} updated")
+        # AI-4: Enforce hard expiry on all non-terminal hypotheses
+        expired_updates = enforce_hard_expiry(all_hypotheses)
+        expired_count = 0
+        for sk, status, reason in expired_updates:
+            update_hypothesis_status(sk, status, reason)
+            expired_count += 1
+        if expired_count:
+            logger.info(f"[AI-4] Hard expiry: archived {expired_count} hypotheses older than {HARD_EXPIRY_DAYS} days")
+            # Reload after expiry to get accurate pending count
+            all_hypotheses = load_existing_hypotheses()
+            pending_hypotheses = [h for h in all_hypotheses if h.get("status") in ("pending", "confirming")]
+            pending_count = len(pending_hypotheses)
 
-    # 4. Generate new hypotheses if room exists AND data is sufficient
-    new_hypotheses_stored = 0
-    validation_rejected = 0
-    if not is_sufficient:
-        logger.info(f"[AI-4] Skipping generation — {completeness_msg}")
-    elif pending_count < MAX_PENDING_HYPOTHESES:
-        slots_available = MAX_PENDING_HYPOTHESES - pending_count
-        n_to_generate = min(MAX_NEW_HYPOTHESES, slots_available)
-        logger.info(f"Generating {n_to_generate} new hypotheses ({slots_available} slots)")
+        # 3. Check pending hypotheses against new data
+        updates_made = 0
+        if pending_hypotheses:
+            updates = check_pending_hypotheses(pending_hypotheses, daily_rows, api_key)
+            for sk, new_status, evidence_note in updates:
+                update_hypothesis_status(sk, new_status, evidence_note)
+                updates_made += 1
+            logger.info(f"Hypothesis checks: {updates_made} updated")
 
-        result = generate_hypotheses(daily_rows, all_hypotheses, api_key)
+        # 4. Generate new hypotheses if room exists AND data is sufficient
+        new_hypotheses_stored = 0
+        validation_rejected = 0
+        if not is_sufficient:
+            logger.info(f"[AI-4] Skipping generation — {completeness_msg}")
+        elif pending_count < MAX_PENDING_HYPOTHESES:
+            slots_available = MAX_PENDING_HYPOTHESES - pending_count
+            n_to_generate = min(MAX_NEW_HYPOTHESES, slots_available)
+            logger.info(f"Generating {n_to_generate} new hypotheses ({slots_available} slots)")
 
-        if result and "hypotheses" in result:
-            existing_texts = [h.get("hypothesis", "")[:100] for h in all_hypotheses]
+            result = generate_hypotheses(daily_rows, all_hypotheses, api_key)
 
-            for hyp in result["hypotheses"][:n_to_generate]:
-                # AI-4: Full validation before storing
-                is_valid, issues = validate_hypothesis(hyp, existing_texts)
-                if not is_valid:
-                    logger.warning(f"[AI-4] Rejected hypothesis '{hyp.get('hypothesis_id', '?')}': {issues}")
-                    validation_rejected += 1
-                    continue
+            if result and "hypotheses" in result:
+                existing_texts = [h.get("hypothesis", "")[:100] for h in all_hypotheses]
 
-                # Clamp monitoring_window_days to valid range
-                window = hyp.get("monitoring_window_days", 21)
-                try:
-                    window = max(7, min(30, int(window)))
-                except (ValueError, TypeError):
-                    window = 21
-                hyp["monitoring_window_days"] = window
+                for hyp in result["hypotheses"][:n_to_generate]:
+                    # AI-4: Full validation before storing
+                    is_valid, issues = validate_hypothesis(hyp, existing_texts)
+                    if not is_valid:
+                        logger.warning(f"[AI-4] Rejected hypothesis '{hyp.get('hypothesis_id', '?')}': {issues}")
+                        validation_rejected += 1
+                        continue
 
-                store_hypothesis(hyp)
-                new_hypotheses_stored += 1
+                    # Clamp monitoring_window_days to valid range
+                    window = hyp.get("monitoring_window_days", 21)
+                    try:
+                        window = max(7, min(30, int(window)))
+                    except (ValueError, TypeError):
+                        window = 21
+                    hyp["monitoring_window_days"] = window
 
-            logger.info(f"Stored {new_hypotheses_stored} new hypotheses, rejected {validation_rejected}")
+                    store_hypothesis(hyp)
+                    new_hypotheses_stored += 1
+
+                logger.info(f"Stored {new_hypotheses_stored} new hypotheses, rejected {validation_rejected}")
+            else:
+                logger.warning("Hypothesis generation returned no results")
         else:
-            logger.warning("Hypothesis generation returned no results")
-    else:
-        logger.info(f"Hypothesis cap reached ({pending_count} pending) — skipping generation")
+            logger.info(f"Hypothesis cap reached ({pending_count} pending) — skipping generation")
 
-    # 5. Write monitoring context to platform_memory for IC-16 consumption
-    all_hypotheses_updated = load_existing_hypotheses()
-    active = [h for h in all_hypotheses_updated
-              if h.get("status") in ("pending", "confirming", "confirmed")]
-    write_hypothesis_context_to_memory(active)
+        # 5. Write monitoring context to platform_memory for IC-16 consumption
+        all_hypotheses_updated = load_existing_hypotheses()
+        active = [h for h in all_hypotheses_updated
+                  if h.get("status") in ("pending", "confirming", "confirmed")]
+        write_hypothesis_context_to_memory(active)
 
-    summary = {
-        "new_hypotheses": new_hypotheses_stored,
-        "validation_rejected": validation_rejected,
-        "expired_by_hard_limit": expired_count,
-        "hypotheses_checked": len(pending_hypotheses),
-        "hypotheses_updated": updates_made,
-        "total_active": len(active),
-        "data_complete_days": complete_days,
-        "data_sufficient": is_sufficient,
-    }
-    logger.info(f"Complete: {summary}")
-    return {"statusCode": 200, "body": json.dumps(summary)}
+        summary = {
+            "new_hypotheses": new_hypotheses_stored,
+            "validation_rejected": validation_rejected,
+            "expired_by_hard_limit": expired_count,
+            "hypotheses_checked": len(pending_hypotheses),
+            "hypotheses_updated": updates_made,
+            "total_active": len(active),
+            "data_complete_days": complete_days,
+            "data_sufficient": is_sufficient,
+        }
+        logger.info(f"Complete: {summary}")
+        return {"statusCode": 200, "body": json.dumps(summary)}
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

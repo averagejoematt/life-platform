@@ -273,111 +273,115 @@ def upload_to_s3(filename, content_bytes):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def lambda_handler(event, context):
-    """
-    Poll Dropbox for new MacroFactor CSVs.
+    try:
+        """
+        Poll Dropbox for new MacroFactor CSVs.
 
-    Event formats:
-      {}                    → standard poll (default for EventBridge)
-      {"force": true}       → reprocess all files (ignore processed tracker)
-    """
-    logger.info("Dropbox poll starting...")
-    force = event.get("force", False)
+        Event formats:
+          {}                    → standard poll (default for EventBridge)
+          {"force": true}       → reprocess all files (ignore processed tracker)
+        """
+        logger.info("Dropbox poll starting...")
+        force = event.get("force", False)
 
-    # ── Auth ──
-    secret_data = get_dropbox_secret()
-    access_token = refresh_access_token(
-        secret_data["dropbox_app_key"],
-        secret_data["dropbox_app_secret"],
-        secret_data["dropbox_refresh_token"],
-    )
-    logger.info("Access token obtained")
+        # ── Auth ──
+        secret_data = get_dropbox_secret()
+        access_token = refresh_access_token(
+            secret_data["dropbox_app_key"],
+            secret_data["dropbox_app_secret"],
+            secret_data["dropbox_refresh_token"],
+        )
+        logger.info("Access token obtained")
 
-    # ── List files ──
-    files = list_folder(access_token)
-    logger.info(f"Found {len(files)} files in app folder")
+        # ── List files ──
+        files = list_folder(access_token)
+        logger.info(f"Found {len(files)} files in app folder")
 
-    if not files:
-        return {"statusCode": 200, "body": "No files found"}
+        if not files:
+            return {"statusCode": 200, "body": "No files found"}
 
-    # ── Filter to MacroFactor CSVs ──
-    csv_files = []
-    skipped = []
-    for f in files:
-        name = f.get("name", "")
-        lower = name.lower()
+        # ── Filter to MacroFactor CSVs ──
+        csv_files = []
+        skipped = []
+        for f in files:
+            name = f.get("name", "")
+            lower = name.lower()
 
-        if not lower.startswith("macrofactor"):
-            skipped.append(f"not MacroFactor: {name}")
-            continue
+            if not lower.startswith("macrofactor"):
+                skipped.append(f"not MacroFactor: {name}")
+                continue
 
-        if lower.endswith(".csv"):
-            csv_files.append(f)
-        elif lower.endswith(".xlsx") or lower.endswith(".xls"):
-            skipped.append(f"XLSX skipped (CSV only): {name}")
-            logger.info(f"Skipping XLSX file: {name} — export as CSV from MacroFactor")
-        else:
-            skipped.append(f"unknown extension: {name}")
+            if lower.endswith(".csv"):
+                csv_files.append(f)
+            elif lower.endswith(".xlsx") or lower.endswith(".xls"):
+                skipped.append(f"XLSX skipped (CSV only): {name}")
+                logger.info(f"Skipping XLSX file: {name} — export as CSV from MacroFactor")
+            else:
+                skipped.append(f"unknown extension: {name}")
 
-    if skipped:
-        logger.info(f"Skipped {len(skipped)} files: {skipped}")
+        if skipped:
+            logger.info(f"Skipped {len(skipped)} files: {skipped}")
 
-    if not csv_files:
-        logger.info("No new MacroFactor CSVs to process")
-        return {"statusCode": 200, "body": "No MacroFactor CSVs found"}
+        if not csv_files:
+            logger.info("No new MacroFactor CSVs to process")
+            return {"statusCode": 200, "body": "No MacroFactor CSVs found"}
 
-    # ── Check which are new ──
-    processed_hashes = get_processed_hashes() if not force else set()
-    downloaded = 0
-    already_processed = 0
+        # ── Check which are new ──
+        processed_hashes = get_processed_hashes() if not force else set()
+        downloaded = 0
+        already_processed = 0
 
-    for f in csv_files:
-        name = f["name"]
-        path = f["path_lower"]
-        size = f.get("size", 0)
-        modified = f.get("server_modified", "")
+        for f in csv_files:
+            name = f["name"]
+            path = f["path_lower"]
+            size = f.get("size", 0)
+            modified = f.get("server_modified", "")
 
-        logger.info(f"Checking: {name} ({size:,} bytes, modified {modified})")
+            logger.info(f"Checking: {name} ({size:,} bytes, modified {modified})")
 
-        # Download to check hash
-        content = download_file(access_token, path)
-        file_hash = compute_hash(content)
+            # Download to check hash
+            content = download_file(access_token, path)
+            file_hash = compute_hash(content)
 
-        if file_hash in processed_hashes:
-            already_processed += 1
-            logger.info(f"  Already processed (hash {file_hash}) — skipping")
-            continue
+            if file_hash in processed_hashes:
+                already_processed += 1
+                logger.info(f"  Already processed (hash {file_hash}) — skipping")
+                continue
 
-        # Validate it's a MacroFactor export (diary or nutrition summary)
-        first_line = content[:500].decode("utf-8-sig", errors="replace").split("\n")[0]
-        mf_markers = ["Food Name", "Calories", "Protein", "Carbs", "Fat", "Date"]
-        if not any(m in first_line for m in mf_markers):
-            logger.warning(f"  {name} doesn't look like a MacroFactor export — skipping")
-            logger.warning(f"  First line: {first_line[:200]}")
-            continue
+            # Validate it's a MacroFactor export (diary or nutrition summary)
+            first_line = content[:500].decode("utf-8-sig", errors="replace").split("\n")[0]
+            mf_markers = ["Food Name", "Calories", "Protein", "Carbs", "Fat", "Date"]
+            if not any(m in first_line for m in mf_markers):
+                logger.warning(f"  {name} doesn't look like a MacroFactor export — skipping")
+                logger.warning(f"  First line: {first_line[:200]}")
+                continue
 
-        # Upload to S3 (triggers existing macrofactor-data-ingestion Lambda)
-        s3_key = upload_to_s3(name, content)
+            # Upload to S3 (triggers existing macrofactor-data-ingestion Lambda)
+            s3_key = upload_to_s3(name, content)
 
-        # Mark as processed
-        mark_file_processed(name, file_hash, size)
-        downloaded += 1
-        logger.info(f"  ✓ Processed: {name} → {s3_key}")
+            # Mark as processed
+            mark_file_processed(name, file_hash, size)
+            downloaded += 1
+            logger.info(f"  ✓ Processed: {name} → {s3_key}")
 
-        # Move to processed/ folder (keeps rolling 7-day window)
-        dest = f"/life-platform/processed/{name}"
-        move_file(access_token, path, dest)
+            # Move to processed/ folder (keeps rolling 7-day window)
+            dest = f"/life-platform/processed/{name}"
+            move_file(access_token, path, dest)
 
-    # Clean up old processed files (keep rolling 7-day window)
-    if downloaded > 0:
-        cleanup_processed(access_token)
+        # Clean up old processed files (keep rolling 7-day window)
+        if downloaded > 0:
+            cleanup_processed(access_token)
 
-    summary = {
-        "files_in_folder": len(files),
-        "csv_files": len(csv_files),
-        "downloaded": downloaded,
-        "already_processed": already_processed,
-        "skipped": len(skipped),
-    }
-    logger.info(f"Complete: {json.dumps(summary)}")
+        summary = {
+            "files_in_folder": len(files),
+            "csv_files": len(csv_files),
+            "downloaded": downloaded,
+            "already_processed": already_processed,
+            "skipped": len(skipped),
+        }
+        logger.info(f"Complete: {json.dumps(summary)}")
 
-    return {"statusCode": 200, "body": json.dumps(summary)}
+        return {"statusCode": 200, "body": json.dumps(summary)}
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

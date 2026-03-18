@@ -330,66 +330,70 @@ def send_alert(failures: list[dict], canary_ts: str) -> None:
 # ── Handler ────────────────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
-    canary_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    try:
+        canary_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    # Generate a unique payload hash for this canary run
-    payload_hash = hashlib.sha256(f"canary-{canary_ts}".encode()).hexdigest()[:16]
-    payload = {"hash": payload_hash, "ts": canary_ts}
+        # Generate a unique payload hash for this canary run
+        payload_hash = hashlib.sha256(f"canary-{canary_ts}".encode()).hexdigest()[:16]
+        payload = {"hash": payload_hash, "ts": canary_ts}
 
-    # R13-F14: mcp_only=true skips DDB/S3 for the 15-min MCP probe
-    mcp_only = event.get("mcp_only", False)
-    mode = "mcp-only" if mcp_only else "full"
-    print(f"Canary run ({mode}): {canary_ts} | hash={payload_hash}")
+        # R13-F14: mcp_only=true skips DDB/S3 for the 15-min MCP probe
+        mcp_only = event.get("mcp_only", False)
+        mode = "mcp-only" if mcp_only else "full"
+        print(f"Canary run ({mode}): {canary_ts} | hash={payload_hash}")
 
-    results = {}
-    failures = []
+        results = {}
+        failures = []
 
-    if not mcp_only:
-        # ── DynamoDB check ──────────────────────────────────────────────────────
-        ddb_ok, ddb_msg, ddb_ms = check_dynamodb(canary_ts, payload)
-        results["dynamodb"] = {"ok": ddb_ok, "message": ddb_msg, "latency_ms": round(ddb_ms)}
-        print(f"  DDB:  {'✅' if ddb_ok else '❌'} {ddb_msg}")
-        emit("CanaryDDBPass" if ddb_ok else "CanaryDDBFail", 1)
-        emit("CanaryLatencyDDB_ms", ddb_ms, "Milliseconds")
-        if not ddb_ok:
-            failures.append({"check": "DynamoDB", "message": ddb_msg})
+        if not mcp_only:
+            # ── DynamoDB check ──────────────────────────────────────────────────────
+            ddb_ok, ddb_msg, ddb_ms = check_dynamodb(canary_ts, payload)
+            results["dynamodb"] = {"ok": ddb_ok, "message": ddb_msg, "latency_ms": round(ddb_ms)}
+            print(f"  DDB:  {'✅' if ddb_ok else '❌'} {ddb_msg}")
+            emit("CanaryDDBPass" if ddb_ok else "CanaryDDBFail", 1)
+            emit("CanaryLatencyDDB_ms", ddb_ms, "Milliseconds")
+            if not ddb_ok:
+                failures.append({"check": "DynamoDB", "message": ddb_msg})
 
-        # ── S3 check ────────────────────────────────────────────────────────────
-        s3_ok, s3_msg, s3_ms = check_s3(canary_ts, payload)
-        results["s3"] = {"ok": s3_ok, "message": s3_msg, "latency_ms": round(s3_ms)}
-        print(f"  S3:   {'✅' if s3_ok else '❌'} {s3_msg}")
-        emit("CanaryS3Pass" if s3_ok else "CanaryS3Fail", 1)
-        emit("CanaryLatencyS3_ms", s3_ms, "Milliseconds")
-        if not s3_ok:
-            failures.append({"check": "S3", "message": s3_msg})
+            # ── S3 check ────────────────────────────────────────────────────────────
+            s3_ok, s3_msg, s3_ms = check_s3(canary_ts, payload)
+            results["s3"] = {"ok": s3_ok, "message": s3_msg, "latency_ms": round(s3_ms)}
+            print(f"  S3:   {'✅' if s3_ok else '❌'} {s3_msg}")
+            emit("CanaryS3Pass" if s3_ok else "CanaryS3Fail", 1)
+            emit("CanaryLatencyS3_ms", s3_ms, "Milliseconds")
+            if not s3_ok:
+                failures.append({"check": "S3", "message": s3_msg})
 
-    # ── MCP check ───────────────────────────────────────────────────────────
-    mcp_ok, mcp_msg, mcp_ms = check_mcp(canary_ts)
-    if mcp_ok is not None:  # None = skipped
-        results["mcp"] = {"ok": mcp_ok, "message": mcp_msg, "latency_ms": round(mcp_ms)}
-        print(f"  MCP:  {'✅' if mcp_ok else '❌'} {mcp_msg}")
-        emit("CanaryMCPPass" if mcp_ok else "CanaryMCPFail", 1)
-        emit("CanaryLatencyMCP_ms", mcp_ms, "Milliseconds")
-        if not mcp_ok:
-            failures.append({"check": "MCP Lambda", "message": mcp_msg})
-    else:
-        results["mcp"] = {"ok": None, "message": mcp_msg, "latency_ms": 0}
-        print(f"  MCP:  ⚪ {mcp_msg}")
+        # ── MCP check ───────────────────────────────────────────────────────────
+        mcp_ok, mcp_msg, mcp_ms = check_mcp(canary_ts)
+        if mcp_ok is not None:  # None = skipped
+            results["mcp"] = {"ok": mcp_ok, "message": mcp_msg, "latency_ms": round(mcp_ms)}
+            print(f"  MCP:  {'✅' if mcp_ok else '❌'} {mcp_msg}")
+            emit("CanaryMCPPass" if mcp_ok else "CanaryMCPFail", 1)
+            emit("CanaryLatencyMCP_ms", mcp_ms, "Milliseconds")
+            if not mcp_ok:
+                failures.append({"check": "MCP Lambda", "message": mcp_msg})
+        else:
+            results["mcp"] = {"ok": None, "message": mcp_msg, "latency_ms": 0}
+            print(f"  MCP:  ⚪ {mcp_msg}")
 
-    # ── Alert if any failures ───────────────────────────────────────────────
-    if failures:
-        print(f"  Sending alert: {len(failures)} failure(s)")
-        send_alert(failures, canary_ts)
+        # ── Alert if any failures ───────────────────────────────────────────────
+        if failures:
+            print(f"  Sending alert: {len(failures)} failure(s)")
+            send_alert(failures, canary_ts)
 
-    all_ok = len(failures) == 0
-    print(f"Canary complete: {'ALL PASS ✅' if all_ok else f'{len(failures)} FAILURES ❌'}")
+        all_ok = len(failures) == 0
+        print(f"Canary complete: {'ALL PASS ✅' if all_ok else f'{len(failures)} FAILURES ❌'}")
 
-    return {
-        "statusCode": 200 if all_ok else 500,
-        "body": json.dumps({
-            "canary_ts": canary_ts,
-            "all_pass": all_ok,
-            "failures": len(failures),
-            "results": results,
-        }),
-    }
+        return {
+            "statusCode": 200 if all_ok else 500,
+            "body": json.dumps({
+                "canary_ts": canary_ts,
+                "all_pass": all_ok,
+                "failures": len(failures),
+                "results": results,
+            }),
+        }
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

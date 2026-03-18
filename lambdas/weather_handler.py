@@ -16,6 +16,13 @@ import os
 import urllib.request
 from ingestion_framework import IngestionConfig, run_ingestion
 
+try:
+    from platform_logger import get_logger
+    logger = get_logger("weather-ingestion")
+except ImportError:
+    import logging
+    logger = logging.getLogger("weather-ingestion")
+
 # ── Seattle coordinates ──
 LAT = float(os.environ.get("WEATHER_LAT", "47.6062"))
 LON = float(os.environ.get("WEATHER_LON", "-122.3321"))
@@ -92,5 +99,9 @@ def transform(raw, date_str):
 # ── Lambda entry point ────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
-    """Entry point — delegates entirely to the ingestion framework."""
-    return run_ingestion(config, authenticate, fetch_day, transform, event, context)
+    try:
+        """Entry point — delegates entirely to the ingestion framework."""
+        return run_ingestion(config, authenticate, fetch_day, transform, event, context)
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

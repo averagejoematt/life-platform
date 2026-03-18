@@ -683,59 +683,63 @@ def _ingest_with_retry(wake_date, secret):
 
 
 def lambda_handler(event, context):
-    import time as _time
-    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+    try:
+        import time as _time
+        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
 
-    # ── Mode 1: Explicit date (manual invoke / backfill) ──
-    if event.get("date"):
-        wake_date = event["date"]
-        print(f"Eight Sleep ingestion — explicit date={wake_date}")
+        # ── Mode 1: Explicit date (manual invoke / backfill) ──
+        if event.get("date"):
+            wake_date = event["date"]
+            print(f"Eight Sleep ingestion — explicit date={wake_date}")
+            secret = get_secret()
+            secret = _ensure_auth(secret)
+            result, _ = _ingest_with_retry(wake_date, secret)
+            if not result:
+                return {"statusCode": 204, "body": json.dumps({"message": f"No sleep data for {wake_date}"})}
+            return {
+                "statusCode": 200,
+                "body": json.dumps({
+                    "wake_date": wake_date,
+                    "sleep_score": result.get("sleep_score"),
+                    "sleep_duration_hours": result.get("sleep_duration_hours"),
+                }, default=str),
+            }
+
+        # ── Mode 2: Scheduled run — gap-aware lookback ──
+        print(f"[GAP-FILL] Eight Sleep gap-aware lookback ({LOOKBACK_DAYS} days)")
+        missing_dates = find_missing_dates()
+
+        if not missing_dates:
+            return {"statusCode": 200, "body": json.dumps({"message": "No gaps to fill", "lookback_days": LOOKBACK_DAYS})}
+
         secret = get_secret()
         secret = _ensure_auth(secret)
-        result, _ = _ingest_with_retry(wake_date, secret)
-        if not result:
-            return {"statusCode": 204, "body": json.dumps({"message": f"No sleep data for {wake_date}"})}
+        results = {}
+
+        for i, wake_date in enumerate(missing_dates):
+            print(f"[GAP-FILL] Ingesting {wake_date} ({i+1}/{len(missing_dates)})")
+            try:
+                result, secret = _ingest_with_retry(wake_date, secret)
+                results[wake_date] = result.get("sleep_score") if result else "no data"
+            except Exception as e:
+                print(f"[GAP-FILL] ERROR on {wake_date}: {e}")
+                results[wake_date] = f"error: {e}"
+            if i < len(missing_dates) - 1:
+                _time.sleep(1)  # Rate limit pacing
+
+        filled = sum(1 for v in results.values() if v not in ("no data",) and not str(v).startswith("error"))
+        print(f"[GAP-FILL] Complete: {filled}/{len(missing_dates)} days filled")
+
         return {
             "statusCode": 200,
             "body": json.dumps({
-                "wake_date": wake_date,
-                "sleep_score": result.get("sleep_score"),
-                "sleep_duration_hours": result.get("sleep_duration_hours"),
+                "mode": "gap_fill",
+                "lookback_days": LOOKBACK_DAYS,
+                "gaps_found": len(missing_dates),
+                "gaps_filled": filled,
+                "details": results,
             }, default=str),
         }
-
-    # ── Mode 2: Scheduled run — gap-aware lookback ──
-    print(f"[GAP-FILL] Eight Sleep gap-aware lookback ({LOOKBACK_DAYS} days)")
-    missing_dates = find_missing_dates()
-
-    if not missing_dates:
-        return {"statusCode": 200, "body": json.dumps({"message": "No gaps to fill", "lookback_days": LOOKBACK_DAYS})}
-
-    secret = get_secret()
-    secret = _ensure_auth(secret)
-    results = {}
-
-    for i, wake_date in enumerate(missing_dates):
-        print(f"[GAP-FILL] Ingesting {wake_date} ({i+1}/{len(missing_dates)})")
-        try:
-            result, secret = _ingest_with_retry(wake_date, secret)
-            results[wake_date] = result.get("sleep_score") if result else "no data"
-        except Exception as e:
-            print(f"[GAP-FILL] ERROR on {wake_date}: {e}")
-            results[wake_date] = f"error: {e}"
-        if i < len(missing_dates) - 1:
-            _time.sleep(1)  # Rate limit pacing
-
-    filled = sum(1 for v in results.values() if v not in ("no data",) and not str(v).startswith("error"))
-    print(f"[GAP-FILL] Complete: {filled}/{len(missing_dates)} days filled")
-
-    return {
-        "statusCode": 200,
-        "body": json.dumps({
-            "mode": "gap_fill",
-            "lookback_days": LOOKBACK_DAYS,
-            "gaps_found": len(missing_dates),
-            "gaps_filled": filled,
-            "details": results,
-        }, default=str),
-    }
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

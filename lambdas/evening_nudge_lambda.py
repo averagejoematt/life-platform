@@ -184,58 +184,62 @@ def _build_html(today_str: str, missing: list[dict], complete: list[dict]) -> st
 
 
 def lambda_handler(event, context):
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    logger.info(f"[nudge] Checking data completeness for {today}")
+    try:
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        logger.info(f"[nudge] Checking data completeness for {today}")
 
-    checks = [
-        {
-            "name": "Supplements",
-            "icon": "💊",
-            "fn": _check_supplements,
-        },
-        {
-            "name": "Journal",
-            "icon": "📓",
-            "fn": _check_journal,
-        },
-        {
-            "name": "How We Feel",
-            "icon": "💭",
-            "fn": _check_how_we_feel,
-        },
-    ]
+        checks = [
+            {
+                "name": "Supplements",
+                "icon": "💊",
+                "fn": _check_supplements,
+            },
+            {
+                "name": "Journal",
+                "icon": "📓",
+                "fn": _check_journal,
+            },
+            {
+                "name": "How We Feel",
+                "icon": "💭",
+                "fn": _check_how_we_feel,
+            },
+        ]
 
-    missing  = []
-    complete = []
+        missing  = []
+        complete = []
 
-    for check in checks:
-        try:
-            done, detail = check["fn"](today)
-            entry = {"name": check["name"], "icon": check.get("icon", ""), "detail": detail}
-            if done:
-                complete.append(entry)
-            else:
-                missing.append(entry)
-        except Exception as e:
-            logger.warning(f"[nudge] Check '{check['name']}' failed: {e}")
-            missing.append({"name": check["name"], "icon": check.get("icon", ""), "detail": "Check failed"})
+        for check in checks:
+            try:
+                done, detail = check["fn"](today)
+                entry = {"name": check["name"], "icon": check.get("icon", ""), "detail": detail}
+                if done:
+                    complete.append(entry)
+                else:
+                    missing.append(entry)
+            except Exception as e:
+                logger.warning(f"[nudge] Check '{check['name']}' failed: {e}")
+                missing.append({"name": check["name"], "icon": check.get("icon", ""), "detail": "Check failed"})
 
-    logger.info(f"[nudge] Missing: {[m['name'] for m in missing]} | Complete: {[c['name'] for c in complete]}")
+        logger.info(f"[nudge] Missing: {[m['name'] for m in missing]} | Complete: {[c['name'] for c in complete]}")
 
-    if not missing:
-        logger.info("[nudge] All sources complete — no email needed today")
-        return {"statusCode": 200, "body": "All complete — no nudge sent"}
+        if not missing:
+            logger.info("[nudge] All sources complete — no email needed today")
+            return {"statusCode": 200, "body": "All complete — no nudge sent"}
 
-    html    = _build_html(today, missing, complete)
-    subject = f"Evening nudge · {len(missing)} thing(s) to log before bed"
+        html    = _build_html(today, missing, complete)
+        subject = f"Evening nudge · {len(missing)} thing(s) to log before bed"
 
-    ses.send_email(
-        FromEmailAddress=SENDER,
-        Destination={"ToAddresses": [RECIPIENT]},
-        Content={"Simple": {
-            "Subject": {"Data": subject, "Charset": "UTF-8"},
-            "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-        }},
-    )
-    logger.info(f"[nudge] Sent: {subject}")
-    return {"statusCode": 200, "body": f"Nudge sent: {subject}"}
+        ses.send_email(
+            FromEmailAddress=SENDER,
+            Destination={"ToAddresses": [RECIPIENT]},
+            Content={"Simple": {
+                "Subject": {"Data": subject, "Charset": "UTF-8"},
+                "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
+            }},
+        )
+        logger.info(f"[nudge] Sent: {subject}")
+        return {"statusCode": 200, "body": f"Nudge sent: {subject}"}
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise
