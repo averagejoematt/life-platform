@@ -43,6 +43,7 @@ except ImportError:
 
 _REGION    = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
+USER_ID    = os.environ.get("USER_ID", "matthew")
 SENDER     = os.environ["EMAIL_SENDER"]
 RECIPIENT  = os.environ.get("BRITTANY_EMAIL", "awsdev@mattsusername.com")
 ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
@@ -78,7 +79,7 @@ def avg(vals):
     return round(sum(v) / len(v), 1) if v else None
 
 def query_range(source, start_date, end_date):
-    pk = "USER#matthew#SOURCE#" + source
+    pk = f"USER#{USER_ID}#SOURCE#{source}"
     records = {}
     kwargs = {
         "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
@@ -99,7 +100,7 @@ def query_journal_range(start_date, end_date):
     kwargs = {
         "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
         "ExpressionAttributeValues": {
-            ":pk": "USER#matthew#SOURCE#notion",
+            ":pk": f"USER#{USER_ID}#SOURCE#notion",
             ":s": "DATE#" + start_date + "#journal#",
             ":e": "DATE#" + end_date + "#journal#zzz",
         },
@@ -116,7 +117,7 @@ def query_journal_range(start_date, end_date):
 
 def fetch_profile():
     try:
-        r = table.get_item(Key={"pk": "USER#matthew", "sk": "PROFILE#v1"})
+        r = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
         return d2f(r.get("Item", {}))
     except Exception as e:
         print("[ERROR] fetch_profile: " + str(e))

@@ -1526,6 +1526,27 @@ def lambda_handler(event, context):
         except Exception as _e:
             print("[WARN] get_protocol_recs failed: " + str(_e))
 
+    # ── S2-T1-10: Weekly Habit Review (Sunday only) ──────────────────────────────
+    _weekly_habit_review = None
+    try:
+        import calendar
+        _is_sunday = (datetime.now(timezone.utc).weekday() == 6)  # 6 = Sunday
+        if _is_sunday:
+            # Fetch 7-day habit_scores for the review
+            _whr_habit_7d = fetch_range(
+                "habit_scores",
+                (datetime.now(timezone.utc).date() - timedelta(days=7)).isoformat(),
+                yesterday,
+            )
+            if _whr_habit_7d:
+                from html_builder import _compute_weekly_habit_review
+                _weekly_habit_review = _compute_weekly_habit_review(_whr_habit_7d, profile)
+                print("[INFO] S2-T1-10: Weekly Habit Review computed for Sunday brief")
+            else:
+                print("[WARN] S2-T1-10: No habit_scores data for weekly review")
+    except Exception as _whr_err:
+        print("[WARN] S2-T1-10: Weekly habit review failed (non-fatal): " + str(_whr_err))
+
     try:
         html = html_builder.build_html(
             data, profile, day_grade_score, grade, component_scores, component_details,
@@ -1534,7 +1555,8 @@ def lambda_handler(event, context):
             character_sheet=character_sheet, brief_mode=brief_mode,
             engagement_score=engagement_score,
             triggered_rewards=triggered_rewards, protocol_recs=protocol_recs,
-            compute_stale=_compute_stale, compute_age_msg=_compute_age_msg)
+            compute_stale=_compute_stale, compute_age_msg=_compute_age_msg,
+            weekly_habit_review=_weekly_habit_review)
     except Exception as e:
         print("[ERROR] build_html crashed, sending minimal brief: " + str(e))
         html = ('<!DOCTYPE html><html><body style="font-family:sans-serif;padding:20px;">'
