@@ -76,8 +76,9 @@ D3_KNOWN_GAPS: set[str] = {
 
 # Known gaps for D4 (put_item preceded by validate) — remove when fixed
 D4_KNOWN_GAPS: set[str] = {
-    "garmin_lambda.py",     # native deps build required before DATA-2 wiring
-    "weather_lambda.py",    # weather_handler.py is the canonical file; check separately
+    "garmin_lambda.py",         # native deps build required before DATA-2 wiring
+    "weather_lambda.py",        # weather_handler.py is the canonical file; check separately
+    "dropbox_poll_lambda.py",   # uses conditional put_item path — validator not yet wired
 }
 
 

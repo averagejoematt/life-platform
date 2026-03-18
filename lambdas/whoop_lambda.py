@@ -172,79 +172,83 @@ def find_missing_dates(lookback_days=LOOKBACK_DAYS):
 
 
 def lambda_handler(event, context):
-    import time as _time
-    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+    try:
+        import time as _time
+        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
 
-    # Support date_override from EventBridge event payload
-    # 'today' = pull today's data (for recovery refresh after wake)
-    # 'YYYY-MM-DD' = pull specific date
-    # None/missing = gap-aware lookback
-    date_override = event.get('date_override') if isinstance(event, dict) else None
+        # Support date_override from EventBridge event payload
+        # 'today' = pull today's data (for recovery refresh after wake)
+        # 'YYYY-MM-DD' = pull specific date
+        # None/missing = gap-aware lookback
+        date_override = event.get('date_override') if isinstance(event, dict) else None
 
-    # ── Auth (shared across all modes) ──
-    print("[INFO] Reading credentials from Secrets Manager...")
-    credentials = json.loads(
-        _secretsmanager.get_secret_value(SecretId=SECRET_NAME)["SecretString"]
-    )
-    print("[INFO] Refreshing Whoop access token...")
-    access_token, new_refresh_token = refresh_access_token(
-        credentials["client_id"],
-        credentials["client_secret"],
-        credentials["refresh_token"],
-    )
-    print("[INFO] Access token refreshed successfully")
-    credentials["access_token"] = access_token
-    credentials["refresh_token"] = new_refresh_token
-    _secretsmanager.update_secret(
-        SecretId=SECRET_NAME,
-        SecretString=json.dumps(credentials),
-    )
-    print("[INFO] Tokens updated in Secrets Manager")
+        # ── Auth (shared across all modes) ──
+        print("[INFO] Reading credentials from Secrets Manager...")
+        credentials = json.loads(
+            _secretsmanager.get_secret_value(SecretId=SECRET_NAME)["SecretString"]
+        )
+        print("[INFO] Refreshing Whoop access token...")
+        access_token, new_refresh_token = refresh_access_token(
+            credentials["client_id"],
+            credentials["client_secret"],
+            credentials["refresh_token"],
+        )
+        print("[INFO] Access token refreshed successfully")
+        credentials["access_token"] = access_token
+        credentials["refresh_token"] = new_refresh_token
+        _secretsmanager.update_secret(
+            SecretId=SECRET_NAME,
+            SecretString=json.dumps(credentials),
+        )
+        print("[INFO] Tokens updated in Secrets Manager")
 
-    # ── Mode 1: Explicit date override (recovery refresh or manual) ──
-    if date_override:
-        if date_override == 'today':
-            target_date = datetime.now(timezone.utc).date()
-        else:
-            target_date = datetime.strptime(date_override, '%Y-%m-%d').date()
-        date_str = target_date.strftime("%Y-%m-%d")
-        print(f"[INFO] Single-day mode: date={date_str} (override={date_override})")
-        summary = ingest_day(date_str, access_token, _s3, _table, verbose=True)
-        print(f"[INFO] Completed. summary={summary}")
-        return {"statusCode": 200, "body": json.dumps({"date": date_str, **summary})}
+        # ── Mode 1: Explicit date override (recovery refresh or manual) ──
+        if date_override:
+            if date_override == 'today':
+                target_date = datetime.now(timezone.utc).date()
+            else:
+                target_date = datetime.strptime(date_override, '%Y-%m-%d').date()
+            date_str = target_date.strftime("%Y-%m-%d")
+            print(f"[INFO] Single-day mode: date={date_str} (override={date_override})")
+            summary = ingest_day(date_str, access_token, _s3, _table, verbose=True)
+            print(f"[INFO] Completed. summary={summary}")
+            return {"statusCode": 200, "body": json.dumps({"date": date_str, **summary})}
 
-    # ── Mode 2: Scheduled run — gap-aware lookback ──
-    print(f"[GAP-FILL] Whoop gap-aware lookback ({LOOKBACK_DAYS} days)")
-    missing_dates = find_missing_dates()
+        # ── Mode 2: Scheduled run — gap-aware lookback ──
+        print(f"[GAP-FILL] Whoop gap-aware lookback ({LOOKBACK_DAYS} days)")
+        missing_dates = find_missing_dates()
 
-    if not missing_dates:
-        return {"statusCode": 200, "body": json.dumps({"message": "No gaps to fill", "lookback_days": LOOKBACK_DAYS})}
+        if not missing_dates:
+            return {"statusCode": 200, "body": json.dumps({"message": "No gaps to fill", "lookback_days": LOOKBACK_DAYS})}
 
-    results = {}
-    for i, date_str in enumerate(missing_dates):
-        print(f"[GAP-FILL] Ingesting {date_str} ({i+1}/{len(missing_dates)})")
-        try:
-            summary = ingest_day(date_str, access_token, _s3, _table, verbose=True, call_delay=0.5)
-            results[date_str] = summary.get("workout_count", 0) if summary else 0
-        except Exception as e:
-            print(f"[GAP-FILL] ERROR on {date_str}: {e}")
-            results[date_str] = f"error: {e}"
-        if i < len(missing_dates) - 1:
-            _time.sleep(1)  # Rate limit pacing between days
+        results = {}
+        for i, date_str in enumerate(missing_dates):
+            print(f"[GAP-FILL] Ingesting {date_str} ({i+1}/{len(missing_dates)})")
+            try:
+                summary = ingest_day(date_str, access_token, _s3, _table, verbose=True, call_delay=0.5)
+                results[date_str] = summary.get("workout_count", 0) if summary else 0
+            except Exception as e:
+                print(f"[GAP-FILL] ERROR on {date_str}: {e}")
+                results[date_str] = f"error: {e}"
+            if i < len(missing_dates) - 1:
+                _time.sleep(1)  # Rate limit pacing between days
 
-    filled = sum(1 for v in results.values() if isinstance(v, int))
-    print(f"[GAP-FILL] Complete: {filled}/{len(missing_dates)} days filled")
+        filled = sum(1 for v in results.values() if isinstance(v, int))
+        print(f"[GAP-FILL] Complete: {filled}/{len(missing_dates)} days filled")
 
-    return {
-        "statusCode": 200,
-        "body": json.dumps({
-            "mode": "gap_fill",
-            "lookback_days": LOOKBACK_DAYS,
-            "gaps_found": len(missing_dates),
-            "gaps_filled": filled,
-            "details": results,
-        }, default=str),
-    }
+        return {
+            "statusCode": 200,
+            "body": json.dumps({
+                "mode": "gap_fill",
+                "lookback_days": LOOKBACK_DAYS,
+                "gaps_found": len(missing_dates),
+                "gaps_filled": filled,
+                "details": results,
+            }, default=str),
+        }
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise
 
 
 # ── Core per-day ingestion (shared by Lambda and backfill) ────────────────────

@@ -104,25 +104,29 @@ STEPS = {
 
 
 def lambda_handler(event, context):
-    secret_id = event["SecretId"]
-    client_request_token = event["ClientRequestToken"]
-    step = event["Step"]
+    try:
+        secret_id = event["SecretId"]
+        client_request_token = event["ClientRequestToken"]
+        step = event["Step"]
 
-    logger.info(f"[key-rotator] Step={step}, SecretId={secret_id}, Token={client_request_token[:8]}...")
+        logger.info(f"[key-rotator] Step={step}, SecretId={secret_id}, Token={client_request_token[:8]}...")
 
-    # Verify the secret exists and rotation is enabled
-    metadata = sm.describe_secret(SecretId=secret_id)
-    if not metadata.get("RotationEnabled"):
-        raise ValueError(f"Rotation is not enabled for secret {secret_id}")
+        # Verify the secret exists and rotation is enabled
+        metadata = sm.describe_secret(SecretId=secret_id)
+        if not metadata.get("RotationEnabled"):
+            raise ValueError(f"Rotation is not enabled for secret {secret_id}")
 
-    # Verify the version is in the right state
-    versions = metadata.get("VersionIdsToStages", {})
-    if client_request_token not in versions:
-        raise ValueError(f"Secret version {client_request_token} has no stage for rotation")
+        # Verify the version is in the right state
+        versions = metadata.get("VersionIdsToStages", {})
+        if client_request_token not in versions:
+            raise ValueError(f"Secret version {client_request_token} has no stage for rotation")
 
-    handler = STEPS.get(step)
-    if not handler:
-        raise ValueError(f"Unknown rotation step: {step}")
+        handler = STEPS.get(step)
+        if not handler:
+            raise ValueError(f"Unknown rotation step: {step}")
 
-    handler(secret_id, client_request_token)
-    logger.info(f"[key-rotator] Step={step} completed successfully")
+        handler(secret_id, client_request_token)
+        logger.info(f"[key-rotator] Step={step} completed successfully")
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

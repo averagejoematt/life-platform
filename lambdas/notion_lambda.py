@@ -506,80 +506,84 @@ def write_entries(entries_by_date):
 # ── Lambda handler ────────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
-    """
-    Lambda entry point.
+    try:
+        """
+        Lambda entry point.
 
-    Event formats:
-      {}                              → fetch last 2 days (scheduled default)
-      {"date": "YYYY-MM-DD"}          → fetch entries for specific date
-      {"start": "...", "end": "..."}  → backfill date range
-      {"full_sync": true}             → fetch ALL entries (initial load)
-    """
-    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
-    api_key, database_id = get_secrets()
+        Event formats:
+          {}                              → fetch last 2 days (scheduled default)
+          {"date": "YYYY-MM-DD"}          → fetch entries for specific date
+          {"start": "...", "end": "..."}  → backfill date range
+          {"full_sync": true}             → fetch ALL entries (initial load)
+        """
+        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+        api_key, database_id = get_secrets()
 
-    # Determine date range
-    full_sync = event.get("full_sync", False)
+        # Determine date range
+        full_sync = event.get("full_sync", False)
 
-    if full_sync:
-        logger.info("Full sync mode — fetching all entries")
-        start_date = None
-        end_date = None
-    elif "start" in event and "end" in event:
-        start_date = event["start"]
-        end_date = event["end"]
-        logger.info(f"Backfill mode: {start_date} → {end_date}")
-    elif "date" in event:
-        start_date = event["date"]
-        end_date = event["date"]
-        logger.info(f"Single date mode: {start_date}")
-    else:
-        # Default: last 2 days (captures late-night entries + today's morning)
-        pacific = timezone(timedelta(hours=-8))
-        now_pacific = datetime.now(pacific)
-        end_date = now_pacific.strftime("%Y-%m-%d")
-        start_date = (now_pacific - timedelta(days=1)).strftime("%Y-%m-%d")
-        logger.info(f"Scheduled mode: {start_date} → {end_date}")
+        if full_sync:
+            logger.info("Full sync mode — fetching all entries")
+            start_date = None
+            end_date = None
+        elif "start" in event and "end" in event:
+            start_date = event["start"]
+            end_date = event["end"]
+            logger.info(f"Backfill mode: {start_date} → {end_date}")
+        elif "date" in event:
+            start_date = event["date"]
+            end_date = event["date"]
+            logger.info(f"Single date mode: {start_date}")
+        else:
+            # Default: last 2 days (captures late-night entries + today's morning)
+            pacific = timezone(timedelta(hours=-8))
+            now_pacific = datetime.now(pacific)
+            end_date = now_pacific.strftime("%Y-%m-%d")
+            start_date = (now_pacific - timedelta(days=1)).strftime("%Y-%m-%d")
+            logger.info(f"Scheduled mode: {start_date} → {end_date}")
 
-    # Query Notion
-    pages = query_database(api_key, database_id, start_date, end_date,
-                           full_sync=full_sync)
-    logger.info(f"Retrieved {len(pages)} pages from Notion")
+        # Query Notion
+        pages = query_database(api_key, database_id, start_date, end_date,
+                               full_sync=full_sync)
+        logger.info(f"Retrieved {len(pages)} pages from Notion")
 
-    if not pages:
+        if not pages:
+            return {
+                "statusCode": 200,
+                "body": json.dumps({
+                    "message": "No entries found",
+                    "start_date": start_date,
+                    "end_date": end_date,
+                }),
+            }
+
+        # Parse pages into items grouped by date
+        entries_by_date = {}  # {date: [(template, item), ...]}
+        skipped = 0
+
+        for page in pages:
+            result = parse_page(page, api_key=api_key)
+            if result is None:
+                skipped += 1
+                continue
+            date_str, template, item = result
+            entries_by_date.setdefault(date_str, []).append((template, item))
+
+        # Write to DynamoDB
+        written = write_entries(entries_by_date)
+
+        summary = {
+            "dates_processed": len(entries_by_date),
+            "entries_written": written,
+            "entries_skipped": skipped,
+            "date_range": f"{start_date} → {end_date}" if not full_sync else "full sync",
+        }
+        logger.info(f"Complete: {summary}")
+
         return {
             "statusCode": 200,
-            "body": json.dumps({
-                "message": "No entries found",
-                "start_date": start_date,
-                "end_date": end_date,
-            }),
+            "body": json.dumps(summary),
         }
-
-    # Parse pages into items grouped by date
-    entries_by_date = {}  # {date: [(template, item), ...]}
-    skipped = 0
-
-    for page in pages:
-        result = parse_page(page, api_key=api_key)
-        if result is None:
-            skipped += 1
-            continue
-        date_str, template, item = result
-        entries_by_date.setdefault(date_str, []).append((template, item))
-
-    # Write to DynamoDB
-    written = write_entries(entries_by_date)
-
-    summary = {
-        "dates_processed": len(entries_by_date),
-        "entries_written": written,
-        "entries_skipped": skipped,
-        "date_range": f"{start_date} → {end_date}" if not full_sync else "full sync",
-    }
-    logger.info(f"Complete: {summary}")
-
-    return {
-        "statusCode": 200,
-        "body": json.dumps(summary),
-    }
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

@@ -694,18 +694,22 @@ def refresh_buddy(profile, yesterday, today):
 # ==============================================================================
 
 def lambda_handler(event, context):
-    """
-    Main entry point. Runs as lightweight intraday refresh.
-    No AI calls, no email — just data refresh for dashboard + buddy.
-    """
-    print("[INFO] Dashboard refresh starting")
+    try:
+        """
+        Main entry point. Runs as lightweight intraday refresh.
+        No AI calls, no email — just data refresh for dashboard + buddy.
+        """
+        print("[INFO] Dashboard refresh starting")
 
-    profile = load_profile()
-    today = datetime.now(timezone.utc).date()
-    yesterday = (today - timedelta(days=1)).isoformat()
+        profile = load_profile()
+        today = datetime.now(timezone.utc).date()
+        yesterday = (today - timedelta(days=1)).isoformat()
 
-    refresh_dashboard(profile, yesterday, today)
-    refresh_buddy(profile, yesterday, today)
+        refresh_dashboard(profile, yesterday, today)
+        refresh_buddy(profile, yesterday, today)
 
-    print("[INFO] Dashboard refresh complete")
-    return {"statusCode": 200, "body": "Dashboard refreshed"}
+        print("[INFO] Dashboard refresh complete")
+        return {"statusCode": 200, "body": "Dashboard refreshed"}
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

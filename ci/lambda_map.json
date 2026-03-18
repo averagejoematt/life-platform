@@ -51,8 +51,8 @@
   },
 
   "mcp": {
-    "_comment": "MCP server is special — requires full mcp/ package",
-    "source": "lambdas/mcp_server.py",
+    "_comment": "MCP server is special — requires full mcp/ package; lives at project root not lambdas/",
+    "source": "mcp_server.py",
     "function": "life-platform-mcp",
     "package_dir": "mcp/",
     "triggers": ["mcp_server.py", "mcp/"]
@@ -162,7 +162,12 @@
       "lambdas/ai_calls.py",
       "lambdas/scoring_engine.py",
       "lambdas/board_loader.py",
-      "lambdas/insight_writer.py"
+      "lambdas/insight_writer.py",
+      "lambdas/acwr_compute_lambda.py",
+      "lambdas/circadian_compliance_lambda.py",
+      "lambdas/sleep_reconciler_lambda.py",
+      "lambdas/site_api_lambda.py",
+      "lambdas/email_subscriber_lambda.py"
     ]
   }
 }

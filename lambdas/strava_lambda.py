@@ -466,80 +466,84 @@ def save_to_dynamodb(date_str, activities):
 
 
 def lambda_handler(event, context):
-    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
-    if "start_date" in event and "end_date" in event:
-        start_date = datetime.strptime(event["start_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        end_date = datetime.strptime(event["end_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-    elif "date" in event:
-        target = datetime.strptime(event["date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        start_date = target
-        end_date = target + timedelta(days=1)
-    else:
-        # Gap-aware: fetch last LOOKBACK_DAYS days to catch any missed syncs
-        # Strava API returns all activities in the window; put_item upserts safely
-        now = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        start_date = now - timedelta(days=LOOKBACK_DAYS)
-        end_date = now
-        print(f"[GAP-FILL] Strava lookback: fetching last {LOOKBACK_DAYS} days")
+    try:
+        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+        if "start_date" in event and "end_date" in event:
+            start_date = datetime.strptime(event["start_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            end_date = datetime.strptime(event["end_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        elif "date" in event:
+            target = datetime.strptime(event["date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            start_date = target
+            end_date = target + timedelta(days=1)
+        else:
+            # Gap-aware: fetch last LOOKBACK_DAYS days to catch any missed syncs
+            # Strava API returns all activities in the window; put_item upserts safely
+            now = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+            start_date = now - timedelta(days=LOOKBACK_DAYS)
+            end_date = now
+            print(f"[GAP-FILL] Strava lookback: fetching last {LOOKBACK_DAYS} days")
 
-    print(f"Fetching Strava activities from {start_date.date()} to {end_date.date()}")
+        print(f"Fetching Strava activities from {start_date.date()} to {end_date.date()}")
 
-    secret = get_secret()
-    after_ts = start_date.timestamp()
-    before_ts = (end_date + timedelta(days=1)).timestamp()
+        secret = get_secret()
+        after_ts = start_date.timestamp()
+        before_ts = (end_date + timedelta(days=1)).timestamp()
 
-    activities, secret = fetch_activities(secret, after_ts, before_ts)
-    print(f"Found {len(activities)} total activities in range")
+        activities, secret = fetch_activities(secret, after_ts, before_ts)
+        print(f"Found {len(activities)} total activities in range")
 
-    if not activities:
-        return {"statusCode": 200, "body": json.dumps({"activities_found": 0})}
+        if not activities:
+            return {"statusCode": 200, "body": json.dumps({"activities_found": 0})}
 
-    # Deduplicate multi-device recordings at ingestion time (v2.34.0)
-    orig_count = len(activities)
-    activities = dedup_activities(activities)
-    if len(activities) < orig_count:
-        print(f"[DEDUP] Global dedup: {orig_count} → {len(activities)} activities")
+        # Deduplicate multi-device recordings at ingestion time (v2.34.0)
+        orig_count = len(activities)
+        activities = dedup_activities(activities)
+        if len(activities) < orig_count:
+            print(f"[DEDUP] Global dedup: {orig_count} → {len(activities)} activities")
 
-    by_date = {}
-    for activity in activities:
-        local_date = activity["start_date_local"][:10]
-        if local_date not in by_date:
-            by_date[local_date] = []
-        by_date[local_date].append(activity)
+        by_date = {}
+        for activity in activities:
+            local_date = activity["start_date_local"][:10]
+            if local_date not in by_date:
+                by_date[local_date] = []
+            by_date[local_date].append(activity)
 
-    for date_str, day_activities in sorted(by_date.items()):
-        normalized = []
-        for a in day_activities:
-            # Fetch HR zones for activities with heart rate data (Phase 2)
-            zone_data = {}
-            hr_recovery = {}
-            if a.get("has_heartrate") and a.get("id"):
-                zone_data, secret = fetch_activity_zones(str(a["id"]), secret)
-                # Fetch HR streams for recovery metrics (>= 10 min activities)
-                elapsed = a.get("elapsed_time") or 0
-                if elapsed >= 600:
-                    hr_recovery, secret = fetch_activity_streams(str(a["id"]), secret)
-            normalized.append(normalize_activity(a, zone_data, hr_recovery if a.get("has_heartrate") else None))
-        # ── Field presence validation (F2.5) ──────────────────────────────────────
-        for act in normalized:
-            STRAVA_CRITICAL = ["strava_id", "name", "type", "start_date_local",
-                               "moving_time_seconds", "distance_meters"]
-            STRAVA_EXPECTED = ["average_heartrate", "total_elevation_gain_feet",
-                               "kilojoules"]
-            missing_crit = [f for f in STRAVA_CRITICAL if not act.get(f)]
-            missing_exp = [f for f in STRAVA_EXPECTED if act.get(f) is None]
-            if missing_crit:
-                print(f"[VALIDATION] ⚠️ CRITICAL fields missing for activity {act.get('strava_id','?')}: {missing_crit}")
-            if missing_exp:
-                print(f"[VALIDATION] Expected fields missing for activity {act.get('strava_id','?')}: {missing_exp}")
+        for date_str, day_activities in sorted(by_date.items()):
+            normalized = []
+            for a in day_activities:
+                # Fetch HR zones for activities with heart rate data (Phase 2)
+                zone_data = {}
+                hr_recovery = {}
+                if a.get("has_heartrate") and a.get("id"):
+                    zone_data, secret = fetch_activity_zones(str(a["id"]), secret)
+                    # Fetch HR streams for recovery metrics (>= 10 min activities)
+                    elapsed = a.get("elapsed_time") or 0
+                    if elapsed >= 600:
+                        hr_recovery, secret = fetch_activity_streams(str(a["id"]), secret)
+                normalized.append(normalize_activity(a, zone_data, hr_recovery if a.get("has_heartrate") else None))
+            # ── Field presence validation (F2.5) ──────────────────────────────────────
+            for act in normalized:
+                STRAVA_CRITICAL = ["strava_id", "name", "type", "start_date_local",
+                                   "moving_time_seconds", "distance_meters"]
+                STRAVA_EXPECTED = ["average_heartrate", "total_elevation_gain_feet",
+                                   "kilojoules"]
+                missing_crit = [f for f in STRAVA_CRITICAL if not act.get(f)]
+                missing_exp = [f for f in STRAVA_EXPECTED if act.get(f) is None]
+                if missing_crit:
+                    print(f"[VALIDATION] ⚠️ CRITICAL fields missing for activity {act.get('strava_id','?')}: {missing_crit}")
+                if missing_exp:
+                    print(f"[VALIDATION] Expected fields missing for activity {act.get('strava_id','?')}: {missing_exp}")
 
-        save_to_s3(date_str, normalized, day_activities)
-        save_to_dynamodb(date_str, normalized)
+            save_to_s3(date_str, normalized, day_activities)
+            save_to_dynamodb(date_str, normalized)
 
-    return {
-        "statusCode": 200,
-        "body": json.dumps({
-            "activities_found": len(activities),
-            "dates_covered": len(by_date)
-        })
-    }
+        return {
+            "statusCode": 200,
+            "body": json.dumps({
+                "activities_found": len(activities),
+                "dates_covered": len(by_date)
+            })
+        }
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

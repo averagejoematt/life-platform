@@ -28,7 +28,8 @@ PASS = "PASS"
 FAIL = "FAIL"
 results = []
 
-def test(name, fn):
+def _run(name, fn):
+    """Run a named test case and record result. Not named 'test' to avoid pytest collection."""
     try:
         fn()
         results.append((PASS, name))
@@ -155,22 +156,22 @@ def test_validate_json_ok():
     )
     assert not r.blocked
 
-test("empty string blocked", test_empty_blocked)
-test("None blocked", test_none_blocked)
-test("too short blocked", test_too_short_blocked)
-test("truncated mid-sentence blocked", test_truncated_blocked)
-test("good coaching text passes", test_good_text_passes)
-test("HIIT + red recovery -> blocked", test_dangerous_training_red_recovery)
-test("aggressive + borderline recovery -> warn only", test_aggressive_borderline_warns)
-test("dangerously low calories -> blocked", test_low_cal_blocked)
-test("causation language -> warn", test_causation_warns)
-test("2+ generic phrases -> warn", test_generic_phrases_warn)
-test("sanitized_text returns fallback when blocked", test_sanitized_text_fallback)
-test("sanitized_text returns original when passing", test_sanitized_text_original)
-test("all output types have non-empty fallbacks", test_fallbacks_all_types)
-test("validate_json: None input -> blocked", test_validate_json_none_blocked)
-test("validate_json: missing required key -> blocked", test_validate_json_missing_key)
-test("validate_json: all keys present -> passes", test_validate_json_ok)
+_run("empty string blocked", test_empty_blocked)
+_run("None blocked", test_none_blocked)
+_run("too short blocked", test_too_short_blocked)
+_run("truncated mid-sentence blocked", test_truncated_blocked)
+_run("good coaching text passes", test_good_text_passes)
+_run("HIIT + red recovery -> blocked", test_dangerous_training_red_recovery)
+_run("aggressive + borderline recovery -> warn only", test_aggressive_borderline_warns)
+_run("dangerously low calories -> blocked", test_low_cal_blocked)
+_run("causation language -> warn", test_causation_warns)
+_run("2+ generic phrases -> warn", test_generic_phrases_warn)
+_run("sanitized_text returns fallback when blocked", test_sanitized_text_fallback)
+_run("sanitized_text returns original when passing", test_sanitized_text_original)
+_run("all output types have non-empty fallbacks", test_fallbacks_all_types)
+_run("validate_json: None input -> blocked", test_validate_json_none_blocked)
+_run("validate_json: missing required key -> blocked", test_validate_json_missing_key)
+_run("validate_json: all keys present -> passes", test_validate_json_ok)
 
 
 # ======================================================================
@@ -241,13 +242,13 @@ def test_helpers_no_raise():
     logger.ddb_write("whoop", "2026-03-10", size_bytes=1024)
     logger.s3_write("dashboard/data.json", size_bytes=4096)
 
-test("get_logger returns PlatformLogger", test_get_logger_type)
-test("get_logger is singleton per source", test_get_logger_singleton)
-test("set_date updates correlation_id", test_set_date)
-test("set_correlation_id works", test_set_correlation_id)
-test("info() produces valid structured JSON", test_info_json_output)
-test("positional %s args interpolated into message", test_positional_args)
-test("convenience helpers don't raise", test_helpers_no_raise)
+_run("get_logger returns PlatformLogger", test_get_logger_type)
+_run("get_logger is singleton per source", test_get_logger_singleton)
+_run("set_date updates correlation_id", test_set_date)
+_run("set_correlation_id works", test_set_correlation_id)
+_run("info() produces valid structured JSON", test_info_json_output)
+_run("positional %s args interpolated into message", test_positional_args)
+_run("convenience helpers don't raise", test_helpers_no_raise)
 
 
 # ======================================================================
@@ -314,15 +315,15 @@ def test_delete_sick_day():
         Key={"pk": "USER#matthew#SOURCE#sick_days", "sk": "DATE#2026-03-10"}
     )
 
-test("check_sick_day: None when not found", test_check_sick_day_none)
-test("check_sick_day: returns item when found", test_check_sick_day_found)
-test("check_sick_day: Decimal -> float conversion", test_check_sick_day_decimal)
-test("check_sick_day: DDB error returns None", test_check_sick_day_ddb_error)
-test("get_sick_days_range: empty -> []", test_get_sick_days_range_empty)
-test("get_sick_days_range: DDB error -> []", test_get_sick_days_range_error)
-test("write_sick_day: correct fields in item", test_write_sick_day_fields)
-test("write_sick_day: no reason field if not provided", test_write_sick_day_no_reason)
-test("delete_sick_day: calls delete_item with right key", test_delete_sick_day)
+_run("check_sick_day: None when not found", test_check_sick_day_none)
+_run("check_sick_day: returns item when found", test_check_sick_day_found)
+_run("check_sick_day: Decimal -> float conversion", test_check_sick_day_decimal)
+_run("check_sick_day: DDB error returns None", test_check_sick_day_ddb_error)
+_run("get_sick_days_range: empty -> []", test_get_sick_days_range_empty)
+_run("get_sick_days_range: DDB error -> []", test_get_sick_days_range_error)
+_run("write_sick_day: correct fields in item", test_write_sick_day_fields)
+_run("write_sick_day: no reason field if not provided", test_write_sick_day_no_reason)
+_run("delete_sick_day: calls delete_item with right key", test_delete_sick_day)
 
 
 # ======================================================================
@@ -458,29 +459,29 @@ def test_banister_with_training():
     assert result["ctl"] > 0
     assert result["atl"] > 0
 
-test("d2f: Decimal to float", test_d2f_decimal)
-test("d2f: nested dict/list", test_d2f_nested)
-test("avg: basic mean", test_avg_basic)
-test("avg: None values ignored", test_avg_none_ignored)
-test("avg: empty list -> None", test_avg_empty)
-test("avg: all None -> None", test_avg_all_none)
-test("fmt: formats number", test_fmt_value)
-test("fmt: None -> em dash", test_fmt_none)
-test("fmt: appends unit", test_fmt_with_unit)
-test("fmt_num: thousands separator", test_fmt_num)
-test("fmt_num: None -> em dash", test_fmt_num_none)
-test("safe_float: extracts value", test_safe_float_present)
-test("safe_float: missing key -> None", test_safe_float_missing)
-test("safe_float: missing key -> default", test_safe_float_default)
-test("dedup: different sports kept", test_dedup_different_sports)
-test("dedup: near-duplicate removed, richer kept", test_dedup_removes_duplicate)
-test("dedup: empty list", test_dedup_empty)
-test("_normalize_whoop_sleep: all aliases", test_normalize_whoop_sleep)
-test("ex_whoop_from_list: avgs and count", test_ex_whoop_from_list)
-test("ex_whoop_from_list: empty -> None", test_ex_whoop_empty)
-test("ex_withings_from_list: latest by sk", test_ex_withings_latest)
-test("banister: zero input -> all zeros", test_banister_zero_input)
-test("banister: 30 days training -> CTL > 0", test_banister_with_training)
+_run("d2f: Decimal to float", test_d2f_decimal)
+_run("d2f: nested dict/list", test_d2f_nested)
+_run("avg: basic mean", test_avg_basic)
+_run("avg: None values ignored", test_avg_none_ignored)
+_run("avg: empty list -> None", test_avg_empty)
+_run("avg: all None -> None", test_avg_all_none)
+_run("fmt: formats number", test_fmt_value)
+_run("fmt: None -> em dash", test_fmt_none)
+_run("fmt: appends unit", test_fmt_with_unit)
+_run("fmt_num: thousands separator", test_fmt_num)
+_run("fmt_num: None -> em dash", test_fmt_num_none)
+_run("safe_float: extracts value", test_safe_float_present)
+_run("safe_float: missing key -> None", test_safe_float_missing)
+_run("safe_float: missing key -> default", test_safe_float_default)
+_run("dedup: different sports kept", test_dedup_different_sports)
+_run("dedup: near-duplicate removed, richer kept", test_dedup_removes_duplicate)
+_run("dedup: empty list", test_dedup_empty)
+_run("_normalize_whoop_sleep: all aliases", test_normalize_whoop_sleep)
+_run("ex_whoop_from_list: avgs and count", test_ex_whoop_from_list)
+_run("ex_whoop_from_list: empty -> None", test_ex_whoop_empty)
+_run("ex_withings_from_list: latest by sk", test_ex_withings_latest)
+_run("banister: zero input -> all zeros", test_banister_zero_input)
+_run("banister: 30 days training -> CTL > 0", test_banister_with_training)
 
 
 # ======================================================================
@@ -536,11 +537,11 @@ def test_list_supported_sources():
     assert "whoop" in sources
     assert "withings" in sources
 
-test("validate_item: valid Whoop passes", test_validate_whoop_ok)
-test("validate_item: out-of-range -> error/warning", test_validate_whoop_out_of_range)
-test("validate_item: empty -> soft warn, no hard block", test_validate_empty_record)
-test("ValidationResult: has correct fields", test_validation_result_structure)
-test("list_supported_sources: returns list with whoop, withings", test_list_supported_sources)
+_run("validate_item: valid Whoop passes", test_validate_whoop_ok)
+_run("validate_item: out-of-range -> error/warning", test_validate_whoop_out_of_range)
+_run("validate_item: empty -> soft warn, no hard block", test_validate_empty_record)
+_run("ValidationResult: has correct fields", test_validation_result_structure)
+_run("list_supported_sources: returns list with whoop, withings", test_list_supported_sources)
 
 
 # ======================================================================
@@ -626,12 +627,12 @@ def test_email_lambdas_dont_call_anthropic_directly():
         "Import and use ai_calls wrappers instead."
     )
 
-test("call_anthropic: has output_type + health_context params", test_call_anthropic_has_output_type_param)
-test("ai_output_validator: importable (_AI_VALIDATOR_AVAILABLE=True)", test_ai_validator_importable)
-test("AIOutputType: importable with correct members", test_ai_output_type_importable)
-test("call_board_of_directors: passes BOD_COACHING output_type", test_bod_caller_passes_output_type)
-test("call_journal_coach: passes JOURNAL_COACH output_type", test_journal_caller_passes_output_type)
-test("email Lambdas: no direct call_anthropic() bypass", test_email_lambdas_dont_call_anthropic_directly)
+_run("call_anthropic: has output_type + health_context params", test_call_anthropic_has_output_type_param)
+_run("ai_output_validator: importable (_AI_VALIDATOR_AVAILABLE=True)", test_ai_validator_importable)
+_run("AIOutputType: importable with correct members", test_ai_output_type_importable)
+_run("call_board_of_directors: passes BOD_COACHING output_type", test_bod_caller_passes_output_type)
+_run("call_journal_coach: passes JOURNAL_COACH output_type", test_journal_caller_passes_output_type)
+_run("email Lambdas: no direct call_anthropic() bypass", test_email_lambdas_dont_call_anthropic_directly)
 
 
 # ======================================================================

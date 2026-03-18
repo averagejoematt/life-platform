@@ -318,80 +318,84 @@ def save_day(date_str, day):
 
 
 def lambda_handler(event, context):
-    print("Apple Health Lambda triggered")
-    print(f"Event: {json.dumps(event, default=str)}")
+    try:
+        print("Apple Health Lambda triggered")
+        print(f"Event: {json.dumps(event, default=str)}")
 
-    # Get S3 trigger info
-    record = event["Records"][0]["s3"]
-    bucket = record["bucket"]["name"]
-    key = record["object"]["key"]
-    print(f"Processing: s3://{bucket}/{key}")
+        # Get S3 trigger info
+        record = event["Records"][0]["s3"]
+        bucket = record["bucket"]["name"]
+        key = record["object"]["key"]
+        print(f"Processing: s3://{bucket}/{key}")
 
-    # Determine cutoff date (latest stored minus overlap buffer)
-    latest_date = get_latest_stored_date()
-    cutoff_dt = datetime.strptime(latest_date, "%Y-%m-%d") - timedelta(days=OVERLAP_DAYS)
-    cutoff_date = cutoff_dt.strftime("%Y-%m-%d")
-    print(f"Latest stored date: {latest_date}, processing from: {cutoff_date}")
+        # Determine cutoff date (latest stored minus overlap buffer)
+        latest_date = get_latest_stored_date()
+        cutoff_dt = datetime.strptime(latest_date, "%Y-%m-%d") - timedelta(days=OVERLAP_DAYS)
+        cutoff_date = cutoff_dt.strftime("%Y-%m-%d")
+        print(f"Latest stored date: {latest_date}, processing from: {cutoff_date}")
 
-    # Download export from S3
-    print("Downloading export from S3...")
-    response = s3_client.get_object(Bucket=bucket, Key=key)
-    body = response["Body"].read()
+        # Download export from S3
+        print("Downloading export from S3...")
+        response = s3_client.get_object(Bucket=bucket, Key=key)
+        body = response["Body"].read()
 
-    # Handle gzipped or plain XML
-    if key.endswith(".gz"):
-        xml_data = gzip.decompress(body)
-    else:
-        xml_data = body
+        # Handle gzipped or plain XML
+        if key.endswith(".gz"):
+            xml_data = gzip.decompress(body)
+        else:
+            xml_data = body
 
-    xml_stream = io.BytesIO(xml_data)
+        xml_stream = io.BytesIO(xml_data)
 
-    # Parse
-    print("Parsing XML...")
-    day_sums, day_avg_acc, bg_readings, day_workouts, day_sleep = process_xml(
-        xml_stream, cutoff_date
-    )
+        # Parse
+        print("Parsing XML...")
+        day_sums, day_avg_acc, bg_readings, day_workouts, day_sleep = process_xml(
+            xml_stream, cutoff_date
+        )
 
-    # Collect all dates in this parse
-    all_dates = set()
-    all_dates.update(day_sums.keys())
-    all_dates.update(day_avg_acc.keys())
-    all_dates.update(bg_readings.keys())
-    all_dates.update(day_workouts.keys())
-    all_dates.update(day_sleep.keys())
+        # Collect all dates in this parse
+        all_dates = set()
+        all_dates.update(day_sums.keys())
+        all_dates.update(day_avg_acc.keys())
+        all_dates.update(bg_readings.keys())
+        all_dates.update(day_workouts.keys())
+        all_dates.update(day_sleep.keys())
 
-    print(f"Found data for {len(all_dates)} days")
+        print(f"Found data for {len(all_dates)} days")
 
-    # Save each day
-    saved = 0
-    errors = 0
-    for date_str in sorted(all_dates):
-        try:
-            day = build_day_record(
-                date_str, day_sums, day_avg_acc, bg_readings, day_workouts, day_sleep
-            )
-            save_day(date_str, day)
-            saved += 1
-        except Exception as e:
-            errors += 1
-            print(f"ERROR saving {date_str}: {e}")
+        # Save each day
+        saved = 0
+        errors = 0
+        for date_str in sorted(all_dates):
+            try:
+                day = build_day_record(
+                    date_str, day_sums, day_avg_acc, bg_readings, day_workouts, day_sleep
+                )
+                save_day(date_str, day)
+                saved += 1
+            except Exception as e:
+                errors += 1
+                print(f"ERROR saving {date_str}: {e}")
 
-    print(f"Saved {saved} days, {errors} errors")
+        print(f"Saved {saved} days, {errors} errors")
 
-    # Archive the processed file
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    archive_key = f"imports/apple_health/processed/{ts}_export.xml.gz"
-    archive_body = gzip.compress(xml_data) if not key.endswith(".gz") else body
-    s3_client.put_object(Bucket=S3_BUCKET, Key=archive_key, Body=archive_body)
-    s3_client.delete_object(Bucket=bucket, Key=key)
-    print(f"Archived to {archive_key}")
+        # Archive the processed file
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        archive_key = f"imports/apple_health/processed/{ts}_export.xml.gz"
+        archive_body = gzip.compress(xml_data) if not key.endswith(".gz") else body
+        s3_client.put_object(Bucket=S3_BUCKET, Key=archive_key, Body=archive_body)
+        s3_client.delete_object(Bucket=bucket, Key=key)
+        print(f"Archived to {archive_key}")
 
-    return {
-        "statusCode": 200,
-        "body": json.dumps({
-            "days_saved": saved,
-            "errors": errors,
-            "date_range": f"{min(all_dates)} → {max(all_dates)}" if all_dates else "none",
-            "cutoff_used": cutoff_date,
-        }),
-    }
+        return {
+            "statusCode": 200,
+            "body": json.dumps({
+                "days_saved": saved,
+                "errors": errors,
+                "date_range": f"{min(all_dates)} → {max(all_dates)}" if all_dates else "none",
+                "cutoff_used": cutoff_date,
+            }),
+        }
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

@@ -502,39 +502,43 @@ def build_report_html(all_checks, run_time_str):
 # ---------------------------------------------------------------------------
 
 def lambda_handler(event, context):
-    run_time     = pt_now()
-    run_time_str = run_time.strftime("%A, %b %-d at %-I:%M %p PT")
-    print(f"[QA] Smoke test starting — {run_time_str}")
+    try:
+        run_time     = pt_now()
+        run_time_str = run_time.strftime("%A, %b %-d at %-I:%M %p PT")
+        print(f"[QA] Smoke test starting — {run_time_str}")
 
-    all_checks  = []
-    all_checks += check_ddb_freshness()
-    all_checks += check_s3_freshness()
-    all_checks += check_score_sanity()
-    all_checks += check_blog_links()
-    all_checks += check_lambda_secrets()
-    all_checks += check_avatar_assets()
-    all_checks += check_mcp_tool_calls()
+        all_checks  = []
+        all_checks += check_ddb_freshness()
+        all_checks += check_s3_freshness()
+        all_checks += check_score_sanity()
+        all_checks += check_blog_links()
+        all_checks += check_lambda_secrets()
+        all_checks += check_avatar_assets()
+        all_checks += check_mcp_tool_calls()
 
-    html = build_report_html(all_checks, run_time_str)
+        html = build_report_html(all_checks, run_time_str)
 
-    fails  = [c for c in all_checks if c.passed is False]
-    warns  = [c for c in all_checks if c.passed is None]
+        fails  = [c for c in all_checks if c.passed is False]
+        warns  = [c for c in all_checks if c.passed is None]
 
-    if not fails and not warns:
-        print(f"[QA] All clear — no email sent (green-only suppression)")
-        return {"statusCode": 200, "body": json.dumps({"failed": 0, "warned": 0, "emailed": False})}
+        if not fails and not warns:
+            print(f"[QA] All clear — no email sent (green-only suppression)")
+            return {"statusCode": 200, "body": json.dumps({"failed": 0, "warned": 0, "emailed": False})}
 
-    subject = (f"⚠️ QA: {len(warns)} warning{'s' if len(warns)>1 else ''} — {run_time.strftime('%b %-d')}" if not fails
-               else f"🔴 QA: {len(fails)} failure{'s' if len(fails)>1 else ''} — {run_time.strftime('%b %-d')}")
+        subject = (f"⚠️ QA: {len(warns)} warning{'s' if len(warns)>1 else ''} — {run_time.strftime('%b %-d')}" if not fails
+                   else f"🔴 QA: {len(fails)} failure{'s' if len(fails)>1 else ''} — {run_time.strftime('%b %-d')}")
 
-    ses.send_email(
-        FromEmailAddress=SENDER,
-        Destination={"ToAddresses": [RECIPIENT]},
-        Content={"Simple": {
-            "Subject": {"Data": subject, "Charset": "UTF-8"},
-            "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
-        }},
-    )
+        ses.send_email(
+            FromEmailAddress=SENDER,
+            Destination={"ToAddresses": [RECIPIENT]},
+            Content={"Simple": {
+                "Subject": {"Data": subject, "Charset": "UTF-8"},
+                "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
+            }},
+        )
 
-    print(f"[QA] Done — {len(fails)} failures, {len(warns)} warnings, email sent")
-    return {"statusCode": 200, "body": json.dumps({"failed": len(fails), "warned": len(warns), "emailed": True})}
+        print(f"[QA] Done — {len(fails)} failures, {len(warns)} warnings, email sent")
+        return {"statusCode": 200, "body": json.dumps({"failed": len(fails), "warned": len(warns), "emailed": True})}
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise

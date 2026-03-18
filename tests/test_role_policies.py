@@ -61,8 +61,14 @@ DDB_WRITE_ACTIONS = {
 
 # Actions for which a wildcard (*) resource is genuinely required by AWS
 WILDCARD_RESOURCE_ALLOWLIST = {
-    "cloudwatch:putmetricdata",   # CloudWatch requires * — no resource-level support
-    "ses:sendemail",              # Canary SESAlert stmt uses * intentionally
+    "cloudwatch:putmetricdata",        # CloudWatch requires * — no resource-level support
+    "ses:sendemail",                   # Canary SESAlert stmt uses * intentionally
+    "xray:puttracesegments",           # X-Ray does not support resource-level restrictions
+    "xray:puttelemetryrecords",        # X-Ray does not support resource-level restrictions
+    "xray:getsamplingrules",           # X-Ray does not support resource-level restrictions
+    "xray:getsamplingtargets",         # X-Ray does not support resource-level restrictions
+    "secretsmanager:listsecrets",      # List operation — no resource-level support
+    "lambda:listfunctions",            # List operation — no resource-level support
 }
 
 

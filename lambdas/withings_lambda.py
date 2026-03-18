@@ -431,57 +431,61 @@ def _ingest_single_day(date_str, secret):
 
 # ── Lambda handler ─────────────────────────────────────────────────────────────
 def lambda_handler(event, context):
-    import time as _time
-    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+    try:
+        import time as _time
+        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
 
-    # ── Mode 1: Explicit date (manual invoke / backfill) ──
-    if "date" in event:
-        date_str = event["date"]
-        print(f"Withings ingestion — explicit date={date_str}")
-        secret = get_secret()
-        measurements = _ingest_single_day(date_str, secret)
-        return {
-            "statusCode": 200,
-            "date": date_str,
-            "measurements_found": len(measurements) > 0,
-            "fields_captured": list(measurements.keys()),
-        }
-
-    # ── Mode 2: Scheduled run — gap-aware lookback ──
-    print(f"[GAP-FILL] Withings gap-aware lookback ({LOOKBACK_DAYS} days)")
-    missing_dates = find_missing_dates()
-
-    if not missing_dates:
-        return {"statusCode": 200, "body": json.dumps({"message": "No gaps to fill", "lookback_days": LOOKBACK_DAYS})}
-
-    secret = get_secret()
-    results = {}
-
-    for i, date_str in enumerate(missing_dates):
-        print(f"[GAP-FILL] Checking {date_str} ({i+1}/{len(missing_dates)})")
-        try:
-            # Re-read secret each iteration — token refresh invalidates the old
-            # refresh_token, so we must always use the latest from Secrets Manager
+        # ── Mode 1: Explicit date (manual invoke / backfill) ──
+        if "date" in event:
+            date_str = event["date"]
+            print(f"Withings ingestion — explicit date={date_str}")
             secret = get_secret()
             measurements = _ingest_single_day(date_str, secret)
-            results[date_str] = list(measurements.keys()) if measurements else "no data"
-        except Exception as e:
-            print(f"[GAP-FILL] ERROR on {date_str}: {e}")
-            results[date_str] = f"error: {e}"
-        if i < len(missing_dates) - 1:
-            _time.sleep(0.5)  # Gentle pacing
+            return {
+                "statusCode": 200,
+                "date": date_str,
+                "measurements_found": len(measurements) > 0,
+                "fields_captured": list(measurements.keys()),
+            }
 
-    filled = sum(1 for v in results.values() if isinstance(v, list))
-    print(f"[GAP-FILL] Complete: {filled}/{len(missing_dates)} days had measurements")
+        # ── Mode 2: Scheduled run — gap-aware lookback ──
+        print(f"[GAP-FILL] Withings gap-aware lookback ({LOOKBACK_DAYS} days)")
+        missing_dates = find_missing_dates()
 
-    return {
-        "statusCode": 200,
-        "body": json.dumps({
-            "mode": "gap_fill",
-            "lookback_days": LOOKBACK_DAYS,
-            "gaps_checked": len(missing_dates),
-            "gaps_with_data": filled,
-            "details": results,
-        }, default=str),
-    }
+        if not missing_dates:
+            return {"statusCode": 200, "body": json.dumps({"message": "No gaps to fill", "lookback_days": LOOKBACK_DAYS})}
+
+        secret = get_secret()
+        results = {}
+
+        for i, date_str in enumerate(missing_dates):
+            print(f"[GAP-FILL] Checking {date_str} ({i+1}/{len(missing_dates)})")
+            try:
+                # Re-read secret each iteration — token refresh invalidates the old
+                # refresh_token, so we must always use the latest from Secrets Manager
+                secret = get_secret()
+                measurements = _ingest_single_day(date_str, secret)
+                results[date_str] = list(measurements.keys()) if measurements else "no data"
+            except Exception as e:
+                print(f"[GAP-FILL] ERROR on {date_str}: {e}")
+                results[date_str] = f"error: {e}"
+            if i < len(missing_dates) - 1:
+                _time.sleep(0.5)  # Gentle pacing
+
+        filled = sum(1 for v in results.values() if isinstance(v, list))
+        print(f"[GAP-FILL] Complete: {filled}/{len(missing_dates)} days had measurements")
+
+        return {
+            "statusCode": 200,
+            "body": json.dumps({
+                "mode": "gap_fill",
+                "lookback_days": LOOKBACK_DAYS,
+                "gaps_checked": len(missing_dates),
+                "gaps_with_data": filled,
+                "details": results,
+            }, default=str),
+        }
+    except Exception as e:
+        logger.error("lambda_handler failed: %s", e, exc_info=True)
+        raise
 
