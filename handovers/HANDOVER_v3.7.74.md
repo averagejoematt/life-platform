@@ -56,7 +56,7 @@ Full diagnosis and fix of all pre-existing test failures in one session.
 |-------|----------|-------|
 | /story prose | CRITICAL | Distribution gate — Matthew writes 5 chapters |
 | DIST-1 | HIGH | HN post or Twitter thread — needs /story first |
-| SES production access | MEDIUM | Check support.aws.amazon.com for case status |
+| SES production access | ✅ RESOLVED | Moved out of sandbox 2026-03-16, us-west-2, case 177371266400095 |
 | chronicle_email_sender subscriber_email scope | LOW | F821 suppressed with noqa — real scope analysis deferred |
 | Stale layers (I2) | LOW | anomaly-detector, character-sheet-compute, daily-metrics-compute on v9 vs v10 |
 | W2/D4 known gaps | LOW | dropbox_poll, enrichment, health_auto_export, journal_enrichment not yet wired to ingestion_validator |
