@@ -6,7 +6,7 @@ v2.1 (v3.4.0): CDK-managed IAM roles + CDK-managed EventBridge rules.
   - EventBridge rules created via schedule= (no more add_permission workaround).
   - Old console-created EB rules should be deleted after deploy.
 
-Covers 15 Lambdas (13 scheduled + 1 S3-triggered + 1 API Gateway-triggered).
+Covers 16 Lambdas (13 scheduled + 1 S3-triggered + 1 API Gateway-triggered).
 """
 
 import aws_cdk as cdk
