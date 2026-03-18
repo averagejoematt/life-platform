@@ -1548,8 +1548,7 @@ def _compute_deficit_ceiling_alert(yesterday_str, habit_7d, computed_7d, profile
                 ] if fired
             ])
             body = (
-                f"  {channels_desc}
-"
+                f"  {channels_desc}\n"
                 f"  Weight rate: {rate_str}"
             )
         else:
@@ -1575,8 +1574,7 @@ def _compute_deficit_ceiling_alert(yesterday_str, habit_7d, computed_7d, profile
 
         disclaimer = "  _For personal tracking only. Consult a qualified healthcare provider for medical decisions._"
 
-        alert_block = "
-".join([headline, body, prescription, instruction, disclaimer])
+        alert_block = "\n".join([headline, body, prescription, instruction, disclaimer])
 
         logger.warning(
             "S2-T1-9: Deficit ceiling alert FIRED — tier=%s, rate=%.2f lbs/wk, "

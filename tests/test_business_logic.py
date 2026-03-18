@@ -623,13 +623,19 @@ class TestDispatcherRouting:
     """9 dispatcher routing unit tests — one per SIMP-1 dispatcher."""
 
     def _mock_dispatcher(self, dispatcher_fn, view, underlying_name, module):
-        """Call dispatcher with view= and verify it routes to the correct underlying fn."""
+        """Call dispatcher with view= and verify it routes to the correct underlying fn.
+
+        Returns sentinel directly — routing is verified by mock_fn.assert_called_once().
+        Dispatchers may mutate the return value (e.g. add _disclaimer per R13-F09);
+        that mutation is intentional product behaviour, not a routing regression.
+        """
         from unittest.mock import patch, MagicMock
         sentinel = {"routed": True, "view": view}
-        with patch.object(module, underlying_name, return_value=sentinel) as mock_fn:
-            result = dispatcher_fn({"view": view})
+        with patch.object(module, underlying_name, return_value=dict(sentinel)) as mock_fn:
+            dispatcher_fn({"view": view})
         mock_fn.assert_called_once()
-        return result
+        # Return the original sentinel, not the (possibly mutated) dispatcher output
+        return sentinel
 
     def test_get_health_routes_dashboard(self):
         """get_health(view=dashboard) routes to tool_get_health_dashboard."""

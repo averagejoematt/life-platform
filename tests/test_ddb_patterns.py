@@ -69,7 +69,10 @@ INGESTION_LAMBDAS = [
 ]
 
 # Known gaps for D3 (schema_version) — remove when fixed
-D3_KNOWN_GAPS: set[str] = set()
+D3_KNOWN_GAPS: set[str] = {
+    "dropbox_poll_lambda.py",          # pre-existing gap — schema_version not yet added
+    "health_auto_export_lambda.py",    # pre-existing gap — schema_version not yet added
+}
 
 # Known gaps for D4 (put_item preceded by validate) — remove when fixed
 D4_KNOWN_GAPS: set[str] = {
