@@ -7,6 +7,7 @@ import re
 import logging
 from datetime import datetime, timedelta
 from collections import defaultdict
+from decimal import Decimal
 
 from mcp.config import (
     table, s3_client, S3_BUCKET, USER_PREFIX, USER_ID, SOURCES,
@@ -399,8 +400,7 @@ def tool_get_nutrition_summary(args):
     start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=29)).strftime("%Y-%m-%d"))
 
     pk = USER_PREFIX + "macrofactor"
-    table = get_table()
-    items = query_date_range(table, pk, start_date, end_date)
+    items = query_source_range(table, pk, start_date, end_date)
 
     if not items:
         return {"error": "No MacroFactor data found for the requested range.", "start_date": start_date, "end_date": end_date}
@@ -490,9 +490,8 @@ def tool_get_macro_targets(args):
     calorie_target = args.get("calorie_target")   # optional override
     protein_target = args.get("protein_target")   # optional override
 
-    table = get_table()
     pk_mf = USER_PREFIX + "macrofactor"
-    items = query_date_range(table, pk_mf, start_date, end_date)
+    items = query_source_range(table, pk_mf, start_date, end_date)
 
     if not items:
         return {"error": "No MacroFactor data found.", "start_date": start_date, "end_date": end_date}
@@ -501,7 +500,7 @@ def tool_get_macro_targets(args):
     if not calorie_target:
         try:
             pk_wt = USER_PREFIX + "withings"
-            wt_items = query_date_range(table, pk_wt,
+            wt_items = query_source_range(table, pk_wt,
                 (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=14)).strftime("%Y-%m-%d"),
                 end_date)
             wt_items_sorted = sorted(wt_items, key=lambda x: x["date"], reverse=True)
@@ -577,7 +576,6 @@ def tool_get_food_log(args):
     """
     date_str = args.get("date", (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d"))
 
-    table = get_table()
     pk = USER_PREFIX + "macrofactor"
 
     response = table.get_item(Key={"pk": pk, "sk": f"DATE#{date_str}"})

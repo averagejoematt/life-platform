@@ -11,10 +11,11 @@ import logging
 from datetime import datetime, timedelta
 
 from mcp.config import logger, SOURCES
-from mcp.core import ddb_cache_set, mem_cache_set
+from mcp.core import ddb_cache_set, mem_cache_set, parallel_query_sources
 
 # Steps 1-4: aggregate/record tools not yet consolidated — call directly
 from mcp.tools_data import tool_get_sources, tool_get_field_stats
+from mcp.helpers import aggregate_items
 from mcp.tools_training import tool_get_seasonal_patterns, tool_get_personal_records
 
 # Steps 5-13: call SIMP-1 dispatchers (not underlying functions).

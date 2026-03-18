@@ -2,12 +2,14 @@
 Lifestyle tools: insights, supplements, weather, social, meditation, travel, BP, experiments, gait, energy, movement, state_of_mind.
 """
 import json
+import urllib.request
 import math
 import re
 import logging
 from datetime import datetime, timedelta
 from collections import defaultdict
 from boto3.dynamodb.conditions import Key
+from decimal import Decimal
 
 from mcp.config import (
     table, s3_client, S3_BUCKET, USER_PREFIX, USER_ID, SOURCES,
@@ -58,12 +60,12 @@ def _is_traveling(date_str=None):
     """Check if a given date (or today) falls within an active trip. Returns trip dict or None."""
     check_date = date_str or datetime.utcnow().strftime("%Y-%m-%d")
     try:
-        resp = get_table().query(
+        resp = table.query(
             KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
             ExpressionAttributeValues={":pk": TRAVEL_PK, ":prefix": "TRIP#"},
         )
         for item in resp.get("Items", []):
-            item = _d2f(item)
+            item = decimal_to_float(item)
             start = item.get("start_date", "")
             end = item.get("end_date") or "9999-12-31"
             if start <= check_date <= end:
@@ -164,7 +166,7 @@ def _fetch_weather_range(start_date, end_date):
 
             daily = data.get("daily", {})
             dates = daily.get("time", [])
-            table = boto3.resource("dynamodb", region_name=_REGION).Table(TABLE_NAME)
+            table = boto3.resource("dynamodb", region_name=_REGION).Table(TABLE_NAME)  # noqa: F821
 
             new_records = []
             for i, date_str in enumerate(dates):
@@ -393,7 +395,7 @@ def tool_log_supplement(args):
     # Remove None values
     entry = {k: v for k, v in entry.items() if v is not None and v != ""}
 
-    table = boto3.resource("dynamodb", region_name=_REGION).Table(TABLE_NAME)
+    table = boto3.resource("dynamodb", region_name=_REGION).Table(TABLE_NAME)  # noqa: F821
 
     # Try to append to existing record, or create new
     try:
@@ -1232,7 +1234,7 @@ def tool_log_travel(args):
     """
     action = args.get("action", "start").lower()
     today = datetime.utcnow().strftime("%Y-%m-%d")
-    tbl = get_table()
+    tbl = table
 
     if action == "end":
         # Find the active trip and close it
@@ -1349,14 +1351,14 @@ def tool_get_travel_log(args):
     status_filter = (args.get("status") or "").lower()
 
     try:
-        resp = get_table().query(
+        resp = table.query(
             KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
             ExpressionAttributeValues={":pk": TRAVEL_PK, ":prefix": "TRIP#"},
         )
     except Exception as e:
         return {"error": f"Failed to query travel log: {e}"}
 
-    trips = [_d2f(item) for item in resp.get("Items", [])]
+    trips = [decimal_to_float(item) for item in resp.get("Items", [])]
     if status_filter:
         trips = [t for t in trips if t.get("status") == status_filter]
 
@@ -1408,18 +1410,18 @@ def tool_get_jet_lag_recovery(args):
     # Find the trip
     if trip_id:
         try:
-            resp = get_table().get_item(Key={"pk": TRAVEL_PK, "sk": trip_id})
-            trip = _d2f(resp.get("Item") or {})
+            resp = table.get_item(Key={"pk": TRAVEL_PK, "sk": trip_id})
+            trip = decimal_to_float(resp.get("Item") or {})
         except Exception:
             trip = {}
     else:
         # Find most recent completed trip
         try:
-            resp = get_table().query(
+            resp = table.query(
                 KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
                 ExpressionAttributeValues={":pk": TRAVEL_PK, ":prefix": "TRIP#"},
             )
-            trips = [_d2f(i) for i in resp.get("Items", [])]
+            trips = [decimal_to_float(i) for i in resp.get("Items", [])]
             completed = [t for t in trips if t.get("status") == "completed"]
             completed.sort(key=lambda t: t.get("end_date", ""), reverse=True)
             trip = completed[0] if completed else {}

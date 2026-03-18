@@ -5,7 +5,7 @@ import json
 import math
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from collections import defaultdict
 
 from mcp.config import (
@@ -39,7 +39,7 @@ def tool_get_exercise_history(args):
     end_date   = args.get("end_date", date.today().isoformat())
     include_warmups = args.get("include_warmups", False)
 
-    items = query_range("hevy", start_date, end_date)
+    items = query_source_range("hevy", start_date, end_date)
     sessions = extract_hevy_sessions(items, exercise_name, include_warmups)
     if not sessions:
         return {"error": f"No sessions found for '{exercise_name}' in [{start_date}, {end_date}]"}
@@ -98,7 +98,7 @@ def tool_get_strength_prs(args):
     muscle_filter = args.get("muscle_group_filter", "").strip().lower()
     min_sessions  = int(args.get("min_sessions", 3))
 
-    items = query_range("hevy", start_date, end_date)
+    items = query_source_range("hevy", start_date, end_date)
 
     # Collect per-exercise: best weight, best 1rm, session count
     exercise_data: dict = {}
@@ -171,7 +171,7 @@ def tool_get_muscle_volume(args):
     end_date   = args.get("end_date", date.today().isoformat())
     period     = args.get("period", "week")  # "week" or "month"
 
-    items = query_range("hevy", start_date, end_date)
+    items = query_source_range("hevy", start_date, end_date)
 
     start_dt = datetime.fromisoformat(start_date)
     end_dt   = datetime.fromisoformat(end_date)
@@ -250,7 +250,7 @@ def tool_get_strength_progress(args):
     end_date   = args.get("end_date", date.today().isoformat())
     plateau_days = int(args.get("plateau_threshold_days", 90))
 
-    items = query_range("hevy", start_date, end_date)
+    items = query_source_range("hevy", start_date, end_date)
     sessions = extract_hevy_sessions(items, exercise_name)
     if not sessions:
         return {"error": f"No sessions found for '{exercise_name}'"}
@@ -324,7 +324,7 @@ def tool_get_workout_frequency(args):
     start_date = args.get("start_date", "2000-01-01")
     end_date   = args.get("end_date", date.today().isoformat())
 
-    items = query_range("hevy", start_date, end_date)
+    items = query_source_range("hevy", start_date, end_date)
 
     workout_dates = sorted({
         (item.get("date") or item.get("sk", "")[:10])
@@ -388,7 +388,7 @@ def tool_get_strength_standards(args):
     # Get bodyweight
     bodyweight = None
     if bw_source == "withings":
-        bw_items = query_range("withings", "2000-01-01", end_date)
+        bw_items = query_source_range("withings", "2000-01-01", end_date)
         for item in reversed(sorted(bw_items, key=lambda x: x.get("date") or x.get("sk", ""))):
             w = item.get("data", {}).get("weight_lbs") or item.get("data", {}).get("weight")
             if w:
@@ -400,7 +400,7 @@ def tool_get_strength_standards(args):
         return {"error": "Could not determine bodyweight. Pass bodyweight_lbs or ensure Withings data exists."}
 
     # Get all hevy data up to end_date
-    items = query_range("hevy", "2000-01-01", end_date)
+    items = query_source_range("hevy", "2000-01-01", end_date)
 
     # Find best 1RM for each standard lift
     standard_lifts = {
