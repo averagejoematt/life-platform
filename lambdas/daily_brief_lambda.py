@@ -1667,6 +1667,44 @@ def lambda_handler(event, context):
             _cm = data.get("computed_metrics") or {}
             _acwr = float(_cm.get("acwr") or 1.1)
 
+            # v1.2.0: Build trend arrays for homepage sparklines
+            _trends = {}
+            try:
+                # Weight trend (last 12 weeks of weekly averages)
+                _wt_90d = fetch_range("withings", (today - timedelta(days=84)).isoformat(), yesterday)
+                _wt_vals = [(w.get("sk", "").replace("DATE#", ""), safe_float(w, "weight_lbs")) for w in _wt_90d if safe_float(w, "weight_lbs")]
+                if _wt_vals:
+                    _trends["weight_daily"] = [{"date": d, "lbs": round(v, 1)} for d, v in _wt_vals[-30:]]
+
+                # HRV trend (last 30 days)
+                _hrv_vals = [(r.get("sk", "").replace("DATE#", ""), safe_float(r, "hrv")) for r in hrv_30d_recs if safe_float(r, "hrv")]
+                if _hrv_vals:
+                    _trends["hrv_daily"] = [{"date": d, "ms": round(v, 1)} for d, v in _hrv_vals]
+
+                # Sleep trend (last 14 days)
+                _sleep_vals = [(r.get("sk", "").replace("DATE#", ""), safe_float(r, "sleep_duration_hours")) for r in hrv_30d_recs if safe_float(r, "sleep_duration_hours")]
+                if _sleep_vals:
+                    _trends["sleep_daily"] = [{"date": d, "hrs": round(v, 1)} for d, v in _sleep_vals[-14:]]
+
+                # Recovery trend (last 14 days)
+                _rec_vals = [(r.get("sk", "").replace("DATE#", ""), safe_float(r, "recovery_score")) for r in hrv_30d_recs if safe_float(r, "recovery_score")]
+                if _rec_vals:
+                    _trends["recovery_daily"] = [{"date": d, "pct": round(v, 0)} for d, v in _rec_vals[-14:]]
+            except Exception as _te:
+                print(f"[WARN] Trend array build failed (non-fatal): {_te}")
+
+            # v1.2.0: Extract AI brief excerpt for homepage widget
+            _brief_excerpt = None
+            try:
+                _tldr = tldr_guidance.get("tldr", "")
+                _guidance_items = tldr_guidance.get("guidance", [])
+                if _tldr:
+                    _brief_excerpt = _tldr
+                    if _guidance_items and len(_guidance_items) > 0:
+                        _brief_excerpt += " " + _guidance_items[0]
+            except Exception:
+                pass
+
             write_public_stats(
                 s3_client=s3,
                 vitals={
@@ -1706,13 +1744,15 @@ def lambda_handler(event, context):
                     "zone2_target_min":     150,
                 },
                 platform={
-                    "mcp_tools":          89,
+                    "mcp_tools":          95,
                     "data_sources":       19,
-                    "lambdas":            45,
+                    "lambdas":            48,
                     "last_review_grade":  "A",
                     "tier0_streak":       _tier0_streak,
                     "days_in":            _days_in,
                 },
+                trends=_trends,
+                brief_excerpt=_brief_excerpt,
             )
             print("[INFO] site_writer: public_stats.json written")
         except Exception as _sw_e:

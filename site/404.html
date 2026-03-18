@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Signal Lost — Matthew Walker</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .error-page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: var(--page-padding);
+      text-align: center;
+    }
+    .error-code {
+      font-family: var(--font-display);
+      font-size: clamp(120px, 20vw, 240px);
+      line-height: 0.85;
+      letter-spacing: var(--ls-display);
+      color: var(--surface-raised);
+      margin-bottom: var(--space-4);
+      user-select: none;
+    }
+    .error-label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-8);
+    }
+    .error-message {
+      font-family: var(--font-mono);
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 440px;
+      line-height: var(--lh-body);
+      margin-bottom: var(--space-10);
+    }
+    .error-links {
+      display: flex;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/character/" class="nav__link">Character</a>
+  </div>
+</nav>
+
+<main class="error-page">
+  <div class="error-code">404</div>
+  <p class="error-label">// signal lost</p>
+  <p class="error-message">
+    The data you're looking for isn't here. It may have moved,
+    or you may have followed a broken link. The platform is still
+    running — try one of these instead.
+  </p>
+  <div class="error-links">
+    <a href="/" class="btn btn--primary">Homepage</a>
+    <a href="/journal/" class="btn btn--ghost">Journal</a>
+    <a href="/platform/" class="btn btn--ghost">Platform</a>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="footer__brand">AMJ</div>
+  <div class="footer__copy">// updated daily by life-platform</div>
+</footer>
+</body>
+</html>

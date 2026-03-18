@@ -4,6 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Cross-source correlation explorer — what actually predicts what in one person's health data.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Correlation Explorer — Matthew Walker">
+  <meta name="twitter:description" content="23 cross-source correlations. FDR corrected. What actually predicts what in one person's health data.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:title" content="Correlation Explorer — Matthew Walker">
+  <meta property="og:description" content="23 cross-source correlations. FDR corrected. What actually predicts what in one person's health data.">
+  <meta property="og:type" content="website">
   <title>Correlation Explorer — Matthew Walker</title>
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="stylesheet" href="/assets/css/tokens.css">
@@ -62,18 +72,18 @@
 <body>
 
   <nav class="nav">
-    <a href="/" class="nav__brand">SIGNAL</a>
-    <div class="nav__links">
-      <a href="/character/" class="nav__link">Character</a>
-      <a href="/journal/" class="nav__link">Journal</a>
-      <a href="/experiments/" class="nav__link">Experiments</a>
-      <a href="/live/" class="nav__link">Timeline</a>
-      <a href="/explorer/" class="nav__link active">Explorer</a>
-      <a href="/biology/" class="nav__link">Biology</a>
-      <a href="/platform/" class="nav__link">Platform</a>
-    </div>
-    <div class="nav__status"><span class="pulse"></span> LIVE</div>
-  </nav>
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/#experiment" class="nav__link">The experiment</a>
+    <a href="/platform/" class="nav__link">The platform</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/character/" class="nav__link">Character</a>
+  </div>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span>Live</span>
+  </div>
+</nav>
 
   <header class="page-header animate-in">
     <div class="eyebrow">WEB-CE — Correlation Explorer</div>
@@ -118,6 +128,14 @@
     <p>Three lagged pairs test temporal precedence: does today's HRV predict tomorrow's training output? These use a 1-day shift and are flagged separately. Autocorrelation is not explicitly corrected — treat lagged results as directional signals.</p>
     <p style="color: var(--text-faint); font-size: var(--text-2xs); margin-top: var(--space-6);">Correlation does not imply causation. N=1 data. This is observation, not prescription.</p>
   </div>
+
+  <!-- N=1 Disclaimer -->
+  <aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle)">
+    <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label)">
+      <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
+      This is a single-person experiment. Correlations observed in this data may not apply to anyone else. I track everything to make better decisions for myself, not to prove universal principles. Where I note that X correlates with Y, I mean in my data, during this period, with confounders I can’t fully control for.
+    </p>
+  </aside>
 
   <!-- S2-T1-8: Email CTA footer — injected by add_email_cta.py -->
 <section class="email-cta-footer" style="
@@ -188,13 +206,16 @@
 })();
 </script>
 <footer class="footer">
-    <span class="footer__brand">SIGNAL</span>
-    <div class="footer__links">
-      <a href="/" class="footer__link">Home</a>
-      <a href="/platform/" class="footer__link">Platform</a>
-    </div>
-    <span class="footer__copy">© 2026 Matthew Walker</span>
-  </footer>
+  <div class="footer__brand">AMJ</div>
+  <div class="footer__links">
+    <a href="/story/" class="footer__link">Story</a>
+    <a href="/journal/" class="footer__link">Journal</a>
+    <a href="/platform/" class="footer__link">Platform</a>
+    <a href="/character/" class="footer__link">Character</a>
+    <a href="/subscribe" class="footer__link">Subscribe</a>
+  </div>
+  <div class="footer__copy">// updated daily by life-platform</div>
+</footer>
 
   <div class="challenge-bar" id="challenge-bar" style="display:none;">
     <span class="challenge-bar__pip"></span>

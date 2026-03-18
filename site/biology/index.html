@@ -4,6 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Genome-informed risk dashboard — 110 SNPs mapped to interventions, evidence, and what to monitor.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Genome Risk Dashboard — Matthew Walker">
+  <meta name="twitter:description" content="110 SNPs mapped to interventions, evidence, and what to monitor.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:title" content="Genome Risk Dashboard — Matthew Walker">
+  <meta property="og:description" content="110 SNPs mapped to interventions, evidence, and what to monitor.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
   <title>Genome Risk Dashboard — Matthew Walker</title>
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="stylesheet" href="/assets/css/tokens.css">
@@ -70,18 +83,18 @@
 <body>
 
   <nav class="nav">
-    <a href="/" class="nav__brand">SIGNAL</a>
-    <div class="nav__links">
-      <a href="/character/" class="nav__link">Character</a>
-      <a href="/journal/" class="nav__link">Journal</a>
-      <a href="/experiments/" class="nav__link">Experiments</a>
-      <a href="/live/" class="nav__link">Timeline</a>
-      <a href="/explorer/" class="nav__link">Explorer</a>
-      <a href="/biology/" class="nav__link active">Biology</a>
-      <a href="/platform/" class="nav__link">Platform</a>
-    </div>
-    <div class="nav__status"><span class="pulse"></span> LIVE</div>
-  </nav>
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/#experiment" class="nav__link">The experiment</a>
+    <a href="/platform/" class="nav__link">The platform</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/character/" class="nav__link">Character</a>
+  </div>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span>Live</span>
+  </div>
+</nav>
 
   <header class="page-header animate-in">
     <div class="eyebrow">BS-BM2 — Genome Risk Dashboard</div>
@@ -110,6 +123,14 @@
   <div class="disclaimer">
     <p>This dashboard displays personal genomic data for educational and self-tracking purposes only. SNP interpretations are based on published research as of early 2026 and may not reflect the latest findings. Genetic variants are one factor among many — environment, behavior, and epigenetics play equally important roles. This is not a diagnostic tool. Always consult a qualified healthcare provider or genetic counselor for medical decisions based on genetic data.</p>
   </div>
+
+  <!-- N=1 Disclaimer -->
+  <aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle)">
+    <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label)">
+      <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
+      This is a single-person experiment. SNP interpretations are probabilistic, not deterministic. Genetic variants are one factor among many. I track everything to make better decisions for myself, not to prove universal principles.
+    </p>
+  </aside>
 
   <!-- S2-T1-8: Email CTA footer — injected by add_email_cta.py -->
 <section class="email-cta-footer" style="
@@ -180,13 +201,16 @@
 })();
 </script>
 <footer class="footer">
-    <span class="footer__brand">SIGNAL</span>
-    <div class="footer__links">
-      <a href="/" class="footer__link">Home</a>
-      <a href="/platform/" class="footer__link">Platform</a>
-    </div>
-    <span class="footer__copy">© 2026 Matthew Walker</span>
-  </footer>
+  <div class="footer__brand">AMJ</div>
+  <div class="footer__links">
+    <a href="/story/" class="footer__link">Story</a>
+    <a href="/journal/" class="footer__link">Journal</a>
+    <a href="/platform/" class="footer__link">Platform</a>
+    <a href="/character/" class="footer__link">Character</a>
+    <a href="/subscribe" class="footer__link">Subscribe</a>
+  </div>
+  <div class="footer__copy">// updated daily by life-platform</div>
+</footer>
 
   <div class="challenge-bar" id="challenge-bar" style="display:none;">
     <span class="challenge-bar__pip"></span>

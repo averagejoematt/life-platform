@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Ask the Platform — interrogate real health data from 19 sources with AI.">
+  <meta property="og:title" content="Ask the Platform — Matthew Walker">
+  <meta property="og:description" content="Ask questions about one person's health data. AI answers from 19 real data sources.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/ask/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Ask the Platform — Matthew Walker">
+  <meta name="twitter:description" content="Ask questions about one person's health data. AI answers from 19 real data sources.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>Ask the Platform — Matthew Walker</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .ask-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .ask-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      letter-spacing: var(--ls-display);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .ask-header__title span { color: var(--accent); }
+    .ask-header__sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      max-width: 600px;
+    }
+
+    /* Stats strip */
+    .data-strip {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .data-strip__item {
+      background: var(--surface);
+      padding: var(--space-4) var(--space-6);
+      text-align: center;
+    }
+    .data-strip__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-1);
+    }
+    .data-strip__value {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--accent);
+      line-height: 1;
+      letter-spacing: var(--ls-display);
+    }
+
+    /* Chat container */
+    .ask-container {
+      max-width: var(--prose-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding) var(--space-20);
+    }
+
+    /* Input area */
+    .ask-input-wrap {
+      position: relative;
+      margin-bottom: var(--space-8);
+    }
+    .ask-input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: var(--text-base);
+      padding: var(--space-5) var(--space-6);
+      padding-right: 80px;
+      outline: none;
+      transition: border-color var(--dur-fast);
+      line-height: var(--lh-body);
+      resize: none;
+      min-height: 56px;
+      max-height: 200px;
+    }
+    .ask-input::placeholder { color: var(--text-faint); }
+    .ask-input:focus { border-color: var(--accent); }
+    .ask-btn {
+      position: absolute;
+      right: var(--space-2);
+      bottom: var(--space-2);
+      background: var(--accent);
+      color: var(--bg);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: var(--space-2) var(--space-4);
+      border: none;
+      cursor: pointer;
+      transition: opacity var(--dur-fast);
+    }
+    .ask-btn:hover { opacity: 0.85; }
+    .ask-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .ask-hint {
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-tag);
+      margin-top: var(--space-2);
+    }
+    .ask-hint span { color: var(--accent-dim); }
+
+    /* Suggested questions */
+    .suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      margin-bottom: var(--space-8);
+    }
+    .suggestion-chip {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      padding: var(--space-2) var(--space-4);
+      cursor: pointer;
+      transition: all var(--dur-fast);
+      background: transparent;
+    }
+    .suggestion-chip:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-bg-subtle);
+    }
+
+    /* Conversation */
+    .conversation { display: flex; flex-direction: column; gap: var(--space-6); }
+
+    .msg {
+      padding: var(--space-5) var(--space-6);
+      animation: fadeUp 0.3s ease forwards;
+    }
+    .msg--user {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+    }
+    .msg--ai {
+      background: var(--accent-bg-subtle);
+      border: 1px solid var(--border-subtle);
+      border-left: 3px solid var(--accent-dim);
+    }
+    .msg__role {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-2);
+    }
+    .msg--user .msg__role { color: var(--accent); }
+    .msg--ai .msg__role { color: var(--accent-dim); }
+    .msg__body {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--text);
+      line-height: var(--lh-body);
+    }
+    .msg__body p { margin-bottom: var(--space-3); }
+    .msg__body p:last-child { margin-bottom: 0; }
+    .msg__body strong { color: var(--accent); }
+
+    /* Loading state */
+    .msg--loading .msg__body {
+      color: var(--text-muted);
+    }
+    .typing-dots::after {
+      content: '';
+      animation: dots 1.5s steps(4, end) infinite;
+    }
+    @keyframes dots {
+      0%   { content: ''; }
+      25%  { content: '.'; }
+      50%  { content: '..'; }
+      75%  { content: '...'; }
+      100% { content: ''; }
+    }
+
+    /* Rate limit banner */
+    .rate-banner {
+      background: var(--surface);
+      border: 1px solid var(--c-amber-500);
+      padding: var(--space-5) var(--space-6);
+      margin-bottom: var(--space-6);
+      display: none;
+    }
+    .rate-banner p {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .rate-banner p strong { color: var(--c-amber-500); }
+
+    /* N=1 disclaimer */
+    .ask-disclaimer {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      line-height: var(--lh-body);
+      letter-spacing: var(--ls-label);
+      border-top: 1px solid var(--border-subtle);
+      padding-top: var(--space-6);
+      margin-top: var(--space-10);
+    }
+    .ask-disclaimer span { color: var(--accent-dim); }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 768px) {
+      .data-strip { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/#experiment" class="nav__link">The experiment</a>
+    <a href="/platform/" class="nav__link">The platform</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/character/" class="nav__link">Character</a>
+  </div>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span>Live</span>
+  </div>
+</nav>
+
+<header class="ask-header animate-in">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">
+    <span class="label label-accent">// Ask the Platform</span>
+  </div>
+  <h1 class="ask-header__title">Ask <span>my data</span> anything</h1>
+  <p class="ask-header__sub">
+    AI-powered answers from 19 live data sources. Ask about weight, sleep, HRV, habits, training, nutrition, or any pattern in the data. The platform answers from real numbers.
+  </p>
+</header>
+
+<div class="data-strip animate-in">
+  <div class="data-strip__item">
+    <div class="data-strip__label">Current weight</div>
+    <div class="data-strip__value" id="ds-weight">—</div>
+  </div>
+  <div class="data-strip__item">
+    <div class="data-strip__label">HRV</div>
+    <div class="data-strip__value" id="ds-hrv">—</div>
+  </div>
+  <div class="data-strip__item">
+    <div class="data-strip__label">Recovery</div>
+    <div class="data-strip__value" id="ds-recovery">—</div>
+  </div>
+  <div class="data-strip__item">
+    <div class="data-strip__label">Progress</div>
+    <div class="data-strip__value" id="ds-progress">—</div>
+  </div>
+</div>
+
+<div class="ask-container">
+
+  <div class="suggestions" id="suggestions">
+    <button class="suggestion-chip" data-q="What happens to Matthew's HRV when he sleeps less than 7 hours?">HRV vs. sleep</button>
+    <button class="suggestion-chip" data-q="How has the weight trend looked over the last 30 days?">Weight trend</button>
+    <button class="suggestion-chip" data-q="Which pillar on the Character Sheet is weakest right now?">Weakest pillar</button>
+    <button class="suggestion-chip" data-q="What's the correlation between training volume and recovery?">Training vs. recovery</button>
+    <button class="suggestion-chip" data-q="How much Zone 2 training has Matthew done this week vs target?">Zone 2 progress</button>
+    <button class="suggestion-chip" data-q="Give me a summary of where things stand today.">Today's snapshot</button>
+  </div>
+
+  <div class="ask-input-wrap">
+    <textarea id="ask-input" class="ask-input" placeholder="Ask a question about the data..." rows="1"></textarea>
+    <button id="ask-btn" class="ask-btn" onclick="submitQuestion()">Ask</button>
+  </div>
+  <div class="ask-hint"><span id="ask-remaining">5</span> questions remaining this session</div>
+
+  <div class="rate-banner" id="rate-banner">
+    <p><strong>Session limit reached.</strong> You've used your 5 questions for this session. Subscribe to The Weekly Signal for ongoing data access, or come back later.</p>
+  </div>
+
+  <div class="conversation" id="conversation"></div>
+
+  <div class="ask-disclaimer">
+    <span>// N=1 DISCLAIMER</span><br>
+    This is a single-person experiment. Answers are generated by AI from one person's health data and should not be interpreted as medical advice or generalizable findings. The AI may occasionally misinterpret data or identify spurious patterns.
+  </div>
+</div>
+
+<!-- Email CTA -->
+<section class="email-cta-footer" style="
+  padding: var(--space-16) var(--page-padding);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  text-align: center;
+">
+  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
+  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:520px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
+    Every Wednesday: the real weight, one chart, one AI insight, one honest reflection.<br>
+    A 3-minute read from 19 data sources. No highlight reel — every failure included.
+  </p>
+  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
+    <input id="cta-email-ask" type="email" placeholder="your@email.com" style="
+      flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);
+      font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);
+      outline:none;transition:border-color var(--dur-fast);
+    " onfocus="this.style.borderColor='var(--c-amber-400)'" onblur="this.style.borderColor='var(--c-amber-500)'">
+    <button onclick="amjSubscribe('ask')" class="btn btn--primary"
+      style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">
+      Subscribe
+    </button>
+  </div>
+  <p id="cta-msg-ask" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
+</section>
+<script>
+(function() {
+  if (!window.amjSubscribe) {
+    window.amjSubscribe = async function(slug) {
+      var email = document.getElementById('cta-email-' + slug).value.trim();
+      var msg   = document.getElementById('cta-msg-'   + slug);
+      if (!email || !email.includes('@')) { msg.textContent = 'Enter a valid email address.'; msg.style.color = 'var(--c-yellow-status)'; return; }
+      msg.textContent = 'Subscribing…'; msg.style.color = 'var(--text-muted)';
+      try {
+        var res = await fetch('/api/subscribe', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email, source: slug+'_cta'}) });
+        var data = await res.json();
+        if (res.ok) { msg.textContent = '✓ Check your inbox to confirm.'; msg.style.color = 'var(--c-amber-500)'; document.getElementById('cta-email-'+slug).value=''; }
+        else { msg.textContent = data.error||'Something went wrong.'; msg.style.color='var(--c-yellow-status)'; }
+      } catch(e) { msg.textContent='Network error — try again.'; msg.style.color='var(--c-yellow-status)'; }
+    };
+  }
+  var inp = document.getElementById('cta-email-ask');
+  if (inp) inp.addEventListener('keydown', function(e) { if (e.key==='Enter') window.amjSubscribe('ask'); });
+})();
+</script>
+
+<footer class="footer">
+  <div class="footer__brand">AMJ</div>
+  <div class="footer__links">
+    <a href="/story/" class="footer__link">Story</a>
+    <a href="/journal/" class="footer__link">Journal</a>
+    <a href="/platform/" class="footer__link">Platform</a>
+    <a href="/character/" class="footer__link">Character</a>
+    <a href="/subscribe" class="footer__link">Subscribe</a>
+  </div>
+  <div class="footer__copy">// updated daily by life-platform</div>
+</footer>
+
+<script>
+const API_BASE = 'https://averagejoematt.com';
+const MAX_QUESTIONS = 5;
+let questionsUsed = 0;
+let platformData = null;
+
+// ── Load platform context data ──────────────────────────────
+async function loadContext() {
+  try {
+    const [vitals, journey, character] = await Promise.all([
+      fetch(`${API_BASE}/api/vitals`).then(r => r.ok ? r.json() : null),
+      fetch(`${API_BASE}/api/journey`).then(r => r.ok ? r.json() : null),
+      fetch(`${API_BASE}/api/character`).then(r => r.ok ? r.json() : null),
+    ]);
+
+    platformData = { vitals, journey, character };
+
+    // Populate data strip
+    const v = vitals?.vitals || {};
+    const j = journey?.journey || {};
+    if (v.weight_lbs) document.getElementById('ds-weight').textContent = v.weight_lbs + ' lbs';
+    if (v.hrv_ms) document.getElementById('ds-hrv').textContent = Math.round(v.hrv_ms) + ' ms';
+    if (v.recovery_pct) document.getElementById('ds-recovery').textContent = Math.round(v.recovery_pct) + '%';
+    if (j.progress_pct) document.getElementById('ds-progress').textContent = j.progress_pct + '%';
+  } catch (e) {
+    // Silently fail — the data strip will show dashes
+  }
+}
+
+// ── Build system prompt from live data ──────────────────────
+function buildSystemPrompt() {
+  const v = platformData?.vitals?.vitals || {};
+  const j = platformData?.journey?.journey || {};
+  const c = platformData?.character?.character || {};
+  const pillars = platformData?.character?.pillars || [];
+
+  const pillarSummary = pillars.map(p =>
+    `${p.name}: level ${p.level}, raw_score ${p.raw_score?.toFixed(1)}, tier "${p.tier}"`
+  ).join('\n    ');
+
+  return `You are the AI behind Matthew Walker's Life Platform — a personal health intelligence system that tracks 19 data sources. You answer questions about Matthew's real health data.
+
+CURRENT DATA (as of today):
+  Weight: ${v.weight_lbs || '?'} lbs (started at 302 lbs, goal 185 lbs)
+  Weight lost: ${j.lost_lbs || '?'} lbs (${j.progress_pct || '?'}% to goal)
+  Weekly rate: ${j.weekly_rate_lbs || '?'} lbs/week
+  Projected goal date: ${j.projected_goal_date || '?'}
+  HRV: ${v.hrv_ms || '?'} ms (trend: ${v.hrv_trend || '?'})
+  RHR: ${v.rhr_bpm || '?'} bpm (trend: ${v.rhr_trend || '?'})
+  Recovery: ${v.recovery_pct || '?'}% (status: ${v.recovery_status || '?'})
+  Sleep: ${v.sleep_hours || '?'} hours last night
+  Character level: ${c.level || '?'} (tier: ${c.tier || '?'})
+  Pillars:
+    ${pillarSummary || 'Not yet loaded'}
+  Journey start: ${j.started_date || '2026-02-09'}
+  Days to goal: ${j.days_to_goal || '?'}
+
+RULES:
+- Answer from the data above. If data isn't available, say so honestly.
+- Be specific with numbers. "Your HRV is 54ms" not "your HRV is moderate."
+- Use a direct, data-driven voice. No fluff. Match the terminal aesthetic of the site.
+- Always note that this is N=1 data when making any comparative claims.
+- Never give medical advice. Say "the data shows X" not "you should do Y."
+- Keep answers concise — 2-4 paragraphs max.
+- When asked about trends, note the direction and timeframe.
+- If asked something the data can't answer, suggest what data would be needed.`;
+}
+
+// ── Submit question ─────────────────────────────────────────
+async function submitQuestion() {
+  const input = document.getElementById('ask-input');
+  const question = input.value.trim();
+  if (!question) return;
+  if (questionsUsed >= MAX_QUESTIONS) return;
+
+  questionsUsed++;
+  document.getElementById('ask-remaining').textContent = MAX_QUESTIONS - questionsUsed;
+  input.value = '';
+
+  // Hide suggestions after first question
+  document.getElementById('suggestions').style.display = 'none';
+
+  // Add user message
+  addMessage('user', question);
+
+  // Add loading message
+  const loadingId = addMessage('ai', '<span class="typing-dots">Querying 19 data sources</span>', true);
+
+  // Disable input while loading
+  document.getElementById('ask-btn').disabled = true;
+
+  try {
+    const response = await fetch(`${API_BASE}/api/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question,
+        context_hash: platformData ? 'loaded' : 'none',
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Platform unavailable');
+    }
+
+    const data = await response.json();
+    updateMessage(loadingId, data.answer || 'No answer available.');
+  } catch (e) {
+    updateMessage(loadingId, `Signal lost: ${e.message}. The platform may not have the /api/ask endpoint deployed yet. Check back soon.`);
+  }
+
+  document.getElementById('ask-btn').disabled = false;
+
+  if (questionsUsed >= MAX_QUESTIONS) {
+    document.getElementById('rate-banner').style.display = 'block';
+    document.getElementById('ask-btn').disabled = true;
+  }
+}
+
+function addMessage(role, content, isLoading = false) {
+  const conv = document.getElementById('conversation');
+  const id = 'msg-' + Date.now();
+  const roleLabel = role === 'user' ? 'You' : 'Life Platform';
+  const cls = role === 'user' ? 'msg--user' : (isLoading ? 'msg--ai msg--loading' : 'msg--ai');
+
+  conv.innerHTML += `<div class="msg ${cls}" id="${id}">
+    <div class="msg__role">${roleLabel}</div>
+    <div class="msg__body">${content}</div>
+  </div>`;
+
+  // Scroll to bottom
+  conv.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  return id;
+}
+
+function updateMessage(id, content) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('msg--loading');
+  // Convert markdown-ish formatting to HTML
+  const html = content
+    .split('\n\n').map(p => `<p>${p}</p>`).join('')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  el.querySelector('.msg__body').innerHTML = html;
+  el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+// ── Suggestion chips ────────────────────────────────────────
+document.querySelectorAll('.suggestion-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.getElementById('ask-input').value = chip.dataset.q;
+    submitQuestion();
+  });
+});
+
+// ── Auto-resize textarea ────────────────────────────────────
+const textarea = document.getElementById('ask-input');
+textarea.addEventListener('input', () => {
+  textarea.style.height = 'auto';
+  textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+});
+textarea.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    submitQuestion();
+  }
+});
+
+// ── Init ────────────────────────────────────────────────────
+loadContext();
+</script>
+</body>
+</html>
