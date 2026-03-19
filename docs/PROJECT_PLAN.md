@@ -106,19 +106,19 @@ Comprehensive 30-persona expert panel review produced 30/60/90 roadmap. 14 items
 | WR-08 | **/ask/ page (Ask the Platform)** — Interactive AI Q&A, suggestion chips, rate limiting | Review §4, §6 | L | HIGH | ✅ Frontend done (v3.7.75). Backend code ready, needs API key + Lambda deploy |
 | WR-09 | **RSS feed + autodiscovery** — `deploy/generate_rss.py`, /rss.xml, `<link>` tags on homepage + journal | Review §5 | S | MEDIUM | ✅ Done (v3.7.75) |
 | WR-10 | **Story page writing prompts** — 5 chapters with "Start with:" sentences, bullet questions, audience notes | Review §3 | S | HIGH | ✅ Done (v3.7.75) |
-| WR-11 | **Trend arrays in public_stats.json** — weight_daily, hrv_daily, sleep_daily, recovery_daily arrays | Review §4 | S | HIGH | ⏳ Code ready in daily_brief_lambda.py. Needs Lambda deploy. |
-| WR-12 | **AI brief excerpt in public_stats.json** — TL;DR + first guidance item for homepage widget | Review §6 | S | HIGH | ⏳ Code ready. Needs Lambda deploy. |
-| WR-13 | **/api/ask backend** — Claude Haiku 4.5 endpoint in site_api_lambda.py | Review §6 | S | HIGH | ⏳ Code ready. Needs API key in Secrets Manager + IAM + Lambda deploy. |
+| WR-11 | **Trend arrays in public_stats.json** — weight_daily, hrv_daily, sleep_daily, recovery_daily arrays | Review §4 | S | HIGH | ✅ Done (v3.7.76) — daily-brief Lambda deployed with site_writer v1.2.0. Fires tomorrow 10am PT. |
+| WR-12 | **AI brief excerpt in public_stats.json** — TL;DR + first guidance item for homepage widget | Review §6 | S | HIGH | ✅ Done (v3.7.76) — included in site_writer v1.2.0 deploy. |
+| WR-13 | **/api/ask backend** — Claude Haiku 4.5 endpoint in site_api_lambda.py | Review §6 | S | HIGH | ✅ Done (v3.7.76) — secret + IAM + Lambda + CloudFront POST behavior all live. Smoke tested. |
 | WR-14 | **Write /story page content** — 5 chapters (The Moment, Previous Attempts, The Build, What Data Showed, Why Public) | Review §3 (CRITICAL) | L (Matthew) | **CRITICAL** | ⬜ Distribution gate — Matthew only |
 | WR-15 | **Before/during photos on /story** — Side-by-side with date stamps. #1 shareable format for transformation. | Review §3, §5 | S (Matthew) | HIGH | ⬜ Matthew only |
-| WR-16 | **Dual-path navigation** — "Follow the Journey" vs. "See the Platform" CTAs below hero for two audiences | Review §3 | S | MEDIUM | ⬜ |
-| WR-17 | **Dynamic social cards (Lambda@Edge)** — OG images with live stats, cached by CloudFront | Review §10 (90-day) | M | MEDIUM | ⬜ |
+| WR-16 | **Dual-path navigation** — "Follow the Journey" vs. "See the Platform" CTAs below hero for two audiences | Review §3 | S | MEDIUM | ✅ Done (v3.7.76) — two-column CTA block, amber/green identity |
+| WR-17 | **Dynamic social cards (Lambda@Edge)** — OG images with live stats, cached by CloudFront | Review §10 (90-day) | M | MEDIUM | ⚠️ Partial (v3.7.76) — Lambda + CDK wired, Function URL 403 TBD |
 | WR-18 | **"Build Your Own" guide/course MVP** — Free guide (markdown → PDF), measure downloads, if >200 → paid cohort | Review §7 (90-day) | L | MEDIUM | ⬜ Gated on /story + 10 weeks published data |
-| WR-19 | **Press page / media hook on /about** — 3-sentence pitch + contact for journalists/podcasters | Review §5 | XS | MEDIUM | ⬜ |
+| WR-19 | **Press page / media hook on /about** — 3-sentence pitch + contact for journalists/podcasters | Review §5 | XS | MEDIUM | ✅ Done (v3.7.76) — 3-para pitch + angles + mailto |
 | WR-20 | **Video: "What my morning brief looks like"** — 60-second screen recording of daily brief email | Review §3 | S (Matthew) | HIGH | ⬜ Matthew only |
-| WR-21 | **Self-host fonts** — Replace 4 Google Fonts calls with self-hosted + font-display: swap + subsetting | Review §2 (Osmani) | S | LOW | ⬜ |
-| WR-22 | **Entrance animations on scroll** — Subtle fade-up on data sections using existing animation tokens | Review §2 | S | LOW | ⬜ |
-| WR-23 | **genome /biology noindex consideration** — SNP data is sensitive; consider noindex meta if not intended for Google | Review §8 (Yael) | XS | MEDIUM | ⬜ |
+| WR-21 | **Self-host fonts** — Replace 4 Google Fonts calls with self-hosted + font-display: swap + subsetting | Review §2 (Osmani) | S | LOW | ✅ Done (v3.7.76) — 9 woff2 on S3, Google Fonts import removed |
+| WR-22 | **Entrance animations on scroll** — Subtle fade-up on data sections using existing animation tokens | Review §2 | S | LOW | ✅ Done (v3.7.76) — reveal.js IntersectionObserver, homepage wired |
+| WR-23 | **genome /biology noindex consideration** — SNP data is sensitive; consider noindex meta if not intended for Google | Review §8 (Yael) | XS | MEDIUM | ✅ Done (v3.7.76) — noindex, nofollow meta tag added |
 
 ### R16 Findings (2026-03-15, v3.7.47)
 
