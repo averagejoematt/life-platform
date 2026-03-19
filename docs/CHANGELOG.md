@@ -1,3 +1,65 @@
+## v3.7.76 — 2026-03-18: /api/ask live, daily-brief deployed, WR-16/19/21/22/23/17
+
+### Summary
+/api/ask wired end-to-end (secret, IAM, CloudFront POST behavior, Lambda deployed). daily-brief Lambda redeployed with site_writer v1.2.0 (trends + brief_excerpt). Six website enhancements shipped: dual-path CTAs (WR-16), press section on /about (WR-19), biology noindex (WR-23), scroll animations (WR-22), self-hosted fonts (WR-21), dynamic OG image Lambda (WR-17 partial).
+
+### Changes
+
+**Backend — /api/ask**
+- `life-platform/anthropic-api-key` secret created in Secrets Manager (us-west-2)
+- IAM policy `ask-secrets` added to site-api Lambda role
+- CloudFront: `/api/ask` behavior added (POST allowed, no cache, Content-Type forwarded)
+- CloudFront: site-api Function URL CORS updated (GET + POST + Content-Type header)
+- `site-api` Lambda deployed to us-east-1
+- CDK `LifePlatformWeb` deployed to wire new CloudFront behaviors
+- Smoke test: `/api/ask` returns live weight + recovery data via Haiku 4.5 ✅
+
+**Backend — daily-brief**
+- `daily_brief_lambda.py` redeployed with 9 extra modules including `site_writer.py` v1.2.0
+- Next 10am PT run will write trend arrays + brief_excerpt to public_stats.json
+- Enables homepage sparklines and "What Claude Sees" AI brief widget
+
+**Website — WR-16: Dual-path CTAs**
+- Homepage: two-column CTA block below chronicle teaser
+- "Follow the Journey" (amber, → /story/) and "See the Platform" (green, → /platform/)
+- Serves both audience types with distinct visual identity
+
+**Website — WR-19: Press section**
+- `/about` page: new "For press & media" section above subscribe CTA
+- 3-paragraph pitch (non-engineer + experiment + enterprise AI proof of concept)
+- Angles/Good-for/Location metadata grid + mailto CTA
+
+**Website — WR-23: biology noindex**
+- `<meta name="robots" content="noindex, nofollow">` added to `/biology/index.html`
+- SNP data excluded from Google indexing
+
+**Website — WR-22: Scroll animations**
+- `site/assets/js/reveal.js` — IntersectionObserver fade-up on scroll (fires once)
+- `base.css` — `.reveal` / `.is-visible` classes with graceful fallback for old browsers
+- Homepage: signals, about-section, email-cta-footer wired with `reveal` class
+
+**Website — WR-21: Self-hosted fonts**
+- Google Fonts `@import` removed from `base.css`
+- 9 `@font-face` declarations pointing to `/assets/fonts/*.woff2`
+- 9 woff2 files uploaded to S3: Bebas Neue, Space Mono (4 variants), Lora (4 variants)
+- `deploy/download_and_upload_fonts.sh` — UA-spoofed fetch to get real woff2 from Google
+- Privacy: no external request to fonts.googleapis.com on page load
+
+**Website — WR-17: Dynamic OG image (partial)**
+- `lambdas/og_image_lambda.mjs` — Node 20 Lambda generating SVG OG image with live stats
+- `deploy/deploy_og_image.sh` — One-time setup script (fixed: create-function-url-config)
+- `life-platform-og-image` Lambda created in us-east-1, role + Function URL wired
+- CDK `web_stack.py` — OgImageOrigin + `/og` cache behavior added, deployed
+- ⚠️ Function URL returning 403 (Lambda direct invocation works fine — debug next session)
+
+**Infrastructure**
+- `deploy/download_and_upload_fonts.sh` — new font deploy utility
+- `deploy/deploy_og_image.sh` — new og-image Lambda deploy script
+- `site/assets/js/reveal.js` — new shared scroll animation script
+- `site/assets/js/` directory created
+
+---
+
 ## v3.7.75 — 2026-03-18: Website strategy review + 14 enhancements deployed
 
 ### Summary
