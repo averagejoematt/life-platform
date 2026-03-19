@@ -1,3 +1,35 @@
+## v3.7.77 — 2026-03-19: Reveal.js extended, platform.html stats updated, WR-17 debugged
+
+### Summary
+Scroll reveal animations (WR-22) extended to all 5 remaining pages (platform, experiments, journal, character, ask). platform/index.html stats corrected: 87→95 tools, 42→48 Lambdas, 83→853 tests, v3.7.49→v3.7.76, 768MB→1024MB. WR-17 OG Function URL 403 fully debugged — Lambda executes correctly (200/SVG confirmed), 403 is pre-dispatch at AWS service layer, root cause unresolved after exhausting all standard causes (policy, VPC, concurrency, org SCP, trust policy, CORS). Parking as known issue; static OG image remains live. OG Lambda Function URL updated to vatekozraszerm4hm5lxse6x3i0peokq (new URL after URL recreate).
+
+### Changes
+
+**Website — WR-22 reveal.js extended**
+- `/platform/` — arch-section, stack-section, ai-section, reviews-section, email-cta reveal
+- `/experiments/` — explainer, experiments-section, methodology, email-cta reveal
+- `/journal/` — journal-header, journal-list, email-cta reveal
+- `/character/` — character-card, radar-section, pillars-section, timeline-section, email-cta reveal
+- `/ask/` — ask-header, data-strip, email-cta reveal
+- reveal.js script tag added to all 5 pages
+
+**Website — platform/index.html stats audit**
+- MCP tools: 87 → 95
+- Lambdas: 42 → 48
+- Tests: 83 → 853
+- Version badge: v3.7.49 → v3.7.76
+- Lambda memory: 768MB → 1024MB
+
+**WR-17 debug (parked)**
+- Lambda direct invoke: 200 OK, 4837-byte SVG confirmed working
+- Resource policy: correct (FunctionURLPublicAccess, AuthType NONE)
+- Checked: VPC (none), concurrency (unset), trust policy (lambda.amazonaws.com ok), org SCP (not in org), permissions boundary (none), inline policies (clean)
+- Function URL recreated without CORS config — still 403 pre-dispatch
+- Root cause: unknown. Static og-image.png remains live fallback.
+- New Function URL: vatekozraszerm4hm5lxse6x3i0peokq.lambda-url.us-east-1.on.aws
+
+---
+
 ## v3.7.76 — 2026-03-18: /api/ask live, daily-brief deployed, WR-16/19/21/22/23/17
 
 ### Summary
