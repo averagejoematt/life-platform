@@ -58,9 +58,9 @@ jobs:
     name: Lint + Syntax Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
@@ -108,9 +108,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
@@ -233,7 +233,7 @@ jobs:
       layer_changed: ${{ steps.plan.outputs.layer_changed }}
       mcp_changed: ${{ steps.plan.outputs.mcp_changed }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2  # Need HEAD~1 for diff
 
@@ -505,7 +505,7 @@ jobs:
     if: needs.plan.outputs.has_deploys == 'true'
     environment: production   # ← Manual approval gate
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -759,9 +759,9 @@ jobs:
     needs: deploy
     if: needs.deploy.result == 'success'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
@@ -844,7 +844,7 @@ jobs:
     needs: [plan, deploy, smoke-test]
     if: needs.smoke-test.result == 'failure' && needs.deploy.result == 'success'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4

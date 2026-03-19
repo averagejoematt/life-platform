@@ -1424,6 +1424,7 @@ def lambda_handler(event, context):
             print("[WARN] compute_readiness failed: " + str(e))
             readiness_score, readiness_colour = None, "gray"
 
+    streak_data = None  # FIX: always initialise so write_public_stats_json ref is safe
     if _computed:
         mvp_streak   = int(float(_computed.get("tier0_streak",  0)))
         full_streak  = int(float(_computed.get("tier01_streak", 0)))
