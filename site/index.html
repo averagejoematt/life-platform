@@ -352,6 +352,56 @@
     margin-bottom: 6px;
   }
   .chronicle-teaser .teaser-title { font-size: 15px; font-weight: 600; color: #E6EDF3; line-height: 1.4; }
+  /* WR-16: Dual-path CTAs */
+  .hero-dual-cta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    margin-top: var(--space-10);
+  }
+  .dual-cta {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-6) var(--space-5);
+    background: var(--surface);
+    text-decoration: none;
+    transition: background var(--dur-fast);
+  }
+  .dual-cta:hover { background: var(--surface-raised); }
+  .dual-cta--journey:hover .dual-cta__title { color: var(--c-amber-400); }
+  .dual-cta--platform:hover .dual-cta__title { color: var(--accent); }
+  .dual-cta__label {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--ls-tag);
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .dual-cta--journey .dual-cta__label { color: var(--c-amber-500); }
+  .dual-cta--platform .dual-cta__label { color: var(--accent-dim); }
+  .dual-cta__title {
+    font-family: var(--font-display);
+    font-size: var(--text-h3);
+    color: var(--text);
+    letter-spacing: var(--ls-display);
+    line-height: 1.1;
+    transition: color var(--dur-fast);
+  }
+  .dual-cta__sub {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    line-height: var(--lh-body);
+  }
+  .dual-cta__arrow {
+    font-size: var(--text-sm);
+    color: var(--text-faint);
+    margin-top: var(--space-2);
+  }
+
   .scroll-invite {
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
@@ -490,6 +540,22 @@
     <span class="teaser-title" id="chronicle-teaser-title"></span>
   </a>
 
+  <!-- WR-16: Dual-path navigation CTAs -->
+  <div class="hero-dual-cta">
+    <a href="/story/" class="dual-cta dual-cta--journey">
+      <span class="dual-cta__label">// the human side</span>
+      <span class="dual-cta__title">Follow the Journey</span>
+      <span class="dual-cta__sub">302 lbs. A goal. Every failure included.</span>
+      <span class="dual-cta__arrow">&darr;</span>
+    </a>
+    <a href="/platform/" class="dual-cta dual-cta--platform">
+      <span class="dual-cta__label">// the technical side</span>
+      <span class="dual-cta__title">See the Platform</span>
+      <span class="dual-cta__sub">48 Lambdas. 95 AI tools. $13/month.</span>
+      <span class="dual-cta__arrow">&darr;</span>
+    </a>
+  </div>
+
   <!-- Scroll invitation -->
   <p class="scroll-invite" onclick="document.getElementById('about').scrollIntoView({behavior:'smooth'})">
     See the actual numbers below &darr;
@@ -498,7 +564,7 @@
 </section>
 
 <!-- ── Trend Sparklines + AI Brief ────────────────────────── -->
-<section style="
+<section class="reveal" style="
   display: grid;
   grid-template-columns: 1fr 1fr;
   border-bottom: 1px solid var(--border);
@@ -703,7 +769,7 @@ function drawSparkline(svgId, values, opts = {}) {
 })();
 </script>
 
-<section class="about-section" id="about">
+<section class="about-section reveal" id="about">
   <div class="about-left">
     <div class="eyebrow" style="margin-bottom:var(--space-6)">The experiment</div>
     <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-6)">Why I'm doing this in public</h2>
@@ -750,7 +816,7 @@ function drawSparkline(svgId, values, opts = {}) {
 </section>
 
 <!-- S2-T1-8: Email CTA footer — injected by add_email_cta.py -->
-<section class="email-cta-footer" style="
+<section class="email-cta-footer reveal" style="
   padding: var(--space-16) var(--page-padding);
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
@@ -962,5 +1028,6 @@ function drawSparkline(svgId, values, opts = {}) {
   }).catch(()=>{});
 })();
 </script>
+<script src="/assets/js/reveal.js"></script>
 </body>
 </html>
