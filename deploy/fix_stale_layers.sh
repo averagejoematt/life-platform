@@ -10,9 +10,9 @@ ACCOUNT="205930651321"
 LAYER_ARN="arn:aws:lambda:$REGION:$ACCOUNT:layer:life-platform-shared-utils:10"
 
 LAMBDAS=(
-  "life-platform-anomaly-detector"
-  "life-platform-character-sheet-compute"
-  "life-platform-daily-metrics-compute"
+  "anomaly-detector"
+  "character-sheet-compute"
+  "daily-metrics-compute"
 )
 
 echo "=== I2: Fix Stale Layer Versions (v9 → v10) ==="
