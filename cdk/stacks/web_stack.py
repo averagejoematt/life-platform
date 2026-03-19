@@ -269,11 +269,23 @@ class WebStack(Stack):
         # Function URL (AuthType NONE — CloudFront is the only public caller).
         # No direct URL exposure: CloudFront strips and adds a secret origin header
         # (add that hardening in a follow-up once the cert is live).
+        # ══════════════════════════════════════════════════════════════
+        # OG Image Lambda — life-platform-og-image (WR-17)
+        # Dynamic SVG social preview image with live stats.
+        # Imported by ARN — deployed separately via deploy/deploy_og_image.sh.
+        # ══════════════════════════════════════════════════════════════
+        og_image_fn = _lambda.Function.from_function_arn(
+            self, "OgImageLambda",
+            function_arn=f"arn:aws:lambda:us-east-1:{ACCT}:function:life-platform-og-image",
+        )
+        og_image_url_domain = "fj5u62xcm2bk2fwuiyvf3wzqqm0mwcmk.lambda-url.us-east-1.on.aws"
+
         site_api_url = site_api_fn.add_function_url(
             auth_type=_lambda.FunctionUrlAuthType.NONE,
             cors=_lambda.FunctionUrlCorsOptions(
                 allowed_origins=["https://averagejoematt.com", "https://www.averagejoematt.com"],
-                allowed_methods=[_lambda.HttpMethod.GET],
+                allowed_methods=[_lambda.HttpMethod.GET, _lambda.HttpMethod.POST],
+                allowed_headers=["Content-Type"],
             ),
         )
 
@@ -315,7 +327,18 @@ class WebStack(Stack):
                             origin_protocol_policy="http-only",
                         ),
                     ),
-                    # Origin 2: site-api Lambda Function URL (read-only, cacheable)
+                    # Origin 2: og-image Lambda Function URL (dynamic SVG, 1hr cache)
+                    cloudfront.CfnDistribution.OriginProperty(
+                        domain_name=og_image_url_domain,
+                        id="OgImageOrigin",
+                        custom_origin_config=cloudfront.CfnDistribution.CustomOriginConfigProperty(
+                            http_port=80,
+                            https_port=443,
+                            origin_protocol_policy="https-only",
+                            origin_ssl_protocols=["TLSv1.2"],
+                        ),
+                    ),
+                    # Origin 3: site-api Lambda Function URL (read-only, cacheable)
                     cloudfront.CfnDistribution.OriginProperty(
                         domain_name=fn_url_domain,
                         id="LambdaApiOrigin",
@@ -370,6 +393,38 @@ class WebStack(Stack):
                         allowed_methods=[
                             "GET", "HEAD", "OPTIONS",
                             "POST", "PUT", "PATCH", "DELETE",  # POST required for subscribe
+                        ],
+                        cached_methods=["GET", "HEAD"],
+                    ),
+                    # /og — dynamic SVG OG image with live stats (WR-17).
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/og",
+                        target_origin_id="OgImageOrigin",
+                        viewer_protocol_policy="https-only",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
+                            query_string=False,
+                        ),
+                        default_ttl=3600,   # 1hr cache — stats update daily
+                        max_ttl=3600,
+                        min_ttl=0,
+                        allowed_methods=["GET", "HEAD"],
+                        cached_methods=["GET", "HEAD"],
+                    ),
+                    # /api/ask — site-api Lambda (AI Q&A, POST only, no cache).
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/api/ask",
+                        target_origin_id="LambdaApiOrigin",
+                        viewer_protocol_policy="https-only",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
+                            query_string=False,
+                            headers=["Origin", "Content-Type"],
+                        ),
+                        default_ttl=0,   # never cache AI responses
+                        max_ttl=0,
+                        min_ttl=0,
+                        allowed_methods=[
+                            "GET", "HEAD", "OPTIONS",
+                            "POST", "PUT", "PATCH", "DELETE",
                         ],
                         cached_methods=["GET", "HEAD"],
                     ),
