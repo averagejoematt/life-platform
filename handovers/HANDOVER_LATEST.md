@@ -1,1 +1,1 @@
-→ See handovers/HANDOVER_v3.7.80.md
+→ See handovers/HANDOVER_v3.7.82.md
