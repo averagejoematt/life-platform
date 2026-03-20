@@ -123,9 +123,11 @@ Before Sprint 3 begins, run EMF telemetry review. Target: ≤80 tools. Dedicate 
 | S2-T1-6 | **`/story` Page structure** — Page built with 5 chapter scaffolding + writing prompts | S | None (static) | `site/story/index.html` | Moreau | ✅ Structure done (v3.7.75). **Content pending (Matthew).** |
 | S2-T1-7 | **`/about` Page** | XS (1h) | None (static) | `site/about/index.html` | Moreau | ✅ Done (v3.7.72) |
 | S2-T1-8 | **Email CTA on All Pages** | S (2h) | None (frontend) | Footer component on all pages | Kim | ✅ Done (v3.7.72) |
-| S2-T1-9 | **Adaptive Deficit Ceiling** | M (3h) | Sonnet | Daily Brief integration | Norton / Attia | ⬜ |
-| S2-T1-10 | **Weekly Habit Review Automation** | M (3h) | Sonnet | Sunday-aware logic in daily-brief | Clear | ⬜ |
+| S2-T1-9 | **Adaptive Deficit Ceiling** | M (3h) | Sonnet | Daily Brief integration | Norton / Attia | ✅ Done (v3.7.72) |
+| S2-T1-10 | **Weekly Habit Review Automation** | M (3h) | Sonnet | Sunday-aware logic in daily-brief | Clear | ✅ Done (v3.7.72) |
 | DEPLOY | **Sprint 4 Pending Deploy** | S (15m) | None (ops) | site-api, S3 sync, CloudFront | Jin | ✅ Done (v3.7.72) |
+| WR-24 | **Subscriber gate on /ask/** | S | None | 3 anon / 20 sub q/hr, /api/verify_subscriber | Kim | ✅ Done (v3.7.80) |
+| S2-T2-2 | **"What Would My Board Say?" /board/** | L | Haiku 4.5 | /board/ + /api/board_ask, 6 personas | Kim / Raj | ✅ Done (v3.7.80) |
 | DIST-1 | **First Distribution Event** | S (content) | None | HN post or Twitter thread | Kim / Raj | ⬜ Gated on /story prose |
 | WR-01–10 | **Website Review Quick Wins (10 items)** — Stats inlining, OG images, sitemap, 404, disclaimers, sparklines, AI brief widget, /ask/ frontend, RSS, story prompts | M (6h) | None | 11 pages enhanced, 7 deploy scripts | Review panel | ✅ All done (v3.7.75) |
 | WR-11 | **Trend arrays in public_stats.json** | S | None | daily_brief_lambda.py updated | Review §4 | ⏳ Code ready. Needs daily-brief Lambda deploy. |
@@ -150,8 +152,8 @@ Before Sprint 3 begins, run EMF telemetry review. Target: ≤80 tools. Dedicate 
 - ⏳ Trend arrays + brief excerpt flowing to public_stats.json (code ready, needs deploy)
 - ⬜ /story prose written by Matthew
 - ⬜ Before/during photos added
-- ⬜ Adaptive deficit ceiling wired into Daily Brief
-- ⬜ Weekly habit review generating on Sundays
+- ✅ Adaptive deficit ceiling wired into Daily Brief (v3.7.72)
+- ✅ Weekly habit review generating on Sundays (v3.7.72)
 - ⬜ At least one external distribution event published
 - ⬜ Privacy policy visible on /subscribe page (Yael requirement)
 
@@ -196,7 +198,7 @@ Before Sprint 3 begins, run EMF telemetry review. Target: ≤80 tools. Dedicate 
 | WR-21 | **Self-host fonts** — Replace Google Fonts with local + font-display: swap + subset | Review §2 | S | 60 days | Performance improvement |
 | WR-22 | **Scroll entrance animations** — Subtle fade-up on data sections | Review §2 | S | 60 days | Uses existing animation tokens |
 | WR-23 | **Genome /biology noindex** — Consider robots noindex for sensitive SNP data | Review §8 | XS | 30 days | Security/privacy decision |
-| WR-24 | **"Ask the Platform" paid tier behind subscription** — Gate unlimited questions behind newsletter signup | Review §7 | S | 90 days | After /api/ask proven |
+| WR-24 | **"Ask the Platform" subscriber gate** — 3 anon / 20 subscriber q/hr via email verify | Review §7 | S | ✅ Done (v3.7.80) | — |
 | WR-25 | **Newsletter "The Weekly Signal" launch** — First issue sent to subscribers | Review §5, §7 | S | 60 days | Gated on /story + 3+ subscribers |
 | WR-26 | **Paid behind-the-platform tier ($5/month)** — Full daily briefs, architecture deep-dives, raw data | Review §7 | M | 90 days | Gated on >200 free subscribers |
 | WR-27 | **CGM glucose response visualizations** — Meal-tagged glucose curves as public content | Review §9 (Patrick) | M | 60 days | High-interest for metabolic health crowd |
@@ -298,13 +300,13 @@ Week 10-13:  SPRINT 4 ✅ COMPLETE — Website Interactive + Architecture
              BS-11 Transformation Timeline | WEB-CE Correlation Explorer
              BS-BM2 Genome Dashboard | BS-14 Multi-User Design Doc
 
-Week 14-15:  SPRINT 5 — Website + Distribution (Board Summit #2 + Review)
-             S2-T1-1 Key bug fix ✅ | /story structure ✅ | /about page ✅ | Email CTAs ✅
-             Website Review: 10 quick wins ✅ | sparklines ✅ | /ask/ page ✅ | RSS ✅
-             REMAINING: /story prose | photos | /api/ask deploy | DIST-1 | deficit ceiling
+Week 14-15:  SPRINT 5 ✅ COMPLETE (buildable) — Website + Distribution
+             S2-T1-9 deficit ceiling ✅ | S2-T1-10 weekly habit review ✅
+             WR-24 subscriber gate ✅ | S2-T2-2 /board/ page ✅
+             REMAINING: /story prose | photos | DIST-1
 
 ~April 2026: WR-23 genome noindex decision | WR-25 Newsletter launch (post /story)
-~May 2026:   WR-20 Video content | WR-21 Self-host fonts | WR-27 CGM visualizations
+~May 2026:   WR-20 Video content | WR-27 CGM visualizations
 ~June 2026:  EMAIL-P2 Data Drop #1 | R17 Architecture Review | WR-17 Dynamic social cards
 ~Aug 2026:   IC-30 Sleep Environment IC (after BS-SL1 matures)
 ~Sep 2026:   EMAIL-P3 Community launch

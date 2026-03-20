@@ -78,8 +78,8 @@ table    = dynamodb.Table(TABLE_NAME)
 # ── CORS headers ────────────────────────────────────────────
 CORS_HEADERS = {
     "Access-Control-Allow-Origin":  "https://averagejoematt.com",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-Subscriber-Token",
     "Content-Type":                 "application/json",
 }
 
@@ -238,6 +238,7 @@ def handle_journey() -> dict:
     recent = [(d, w) for d, w in weight_series
               if d >= (datetime.now(timezone.utc) - timedelta(days=28)).strftime("%Y-%m-%d")]
     weekly_rate = 0.0
+    slope_per_day = 0.0
     if len(recent) >= 4:
         x = [(datetime.strptime(d, "%Y-%m-%d") - datetime.strptime(recent[0][0], "%Y-%m-%d")).days for d, _ in recent]
         y = [w for _, w in recent]
@@ -669,6 +670,260 @@ def handle_genome_risks() -> dict:
     }, cache_seconds=86400)
 
 
+# ── WR-24: Subscriber verification ──────────────────────────────────────────
+
+import hmac as _hmac
+import base64 as _b64
+
+_token_secret_cache = None
+
+def _get_token_secret() -> str:
+    """Derive token signing secret from the existing Anthropic API key.
+    No new secrets needed."""
+    global _token_secret_cache
+    if _token_secret_cache:
+        return _token_secret_cache
+    import hashlib as _h
+    api_key = _get_anthropic_key() or "fallback-dev-secret"
+    _token_secret_cache = _h.sha256(f"subscriber-token-v1:{api_key}".encode()).hexdigest()
+    return _token_secret_cache
+
+
+def _generate_subscriber_token(email: str) -> str:
+    """Generate a 24hr HMAC token for a confirmed subscriber."""
+    import time as _time
+    expires = int(_time.time()) + 86400
+    payload = f"{email.lower()}:{expires}"
+    secret = _get_token_secret().encode()
+    sig = _hmac.new(secret, payload.encode(), digestmod='sha256').hexdigest()[:32]
+    return _b64.urlsafe_b64encode(f"{payload}:{sig}".encode()).decode()
+
+
+def _validate_subscriber_token(token: str) -> bool:
+    """Return True if token is valid and unexpired."""
+    try:
+        import time as _time
+        decoded = _b64.urlsafe_b64decode(token.encode()).decode()
+        parts = decoded.split(":")
+        if len(parts) != 3:
+            return False
+        email, expires_str, provided_sig = parts
+        if int(_time.time()) > int(expires_str):
+            return False
+        payload = f"{email}:{expires_str}"
+        secret = _get_token_secret().encode()
+        expected = _hmac.new(secret, payload.encode(), digestmod='sha256').hexdigest()[:32]
+        return _hmac.compare_digest(provided_sig, expected)
+    except Exception:
+        return False
+
+
+def _is_confirmed_subscriber(email: str) -> bool:
+    """Check DDB: USER#matthew#SOURCE#subscribers / EMAIL#{sha256} / status=confirmed"""
+    import hashlib as _h
+    email_hash = _h.sha256(email.strip().lower().encode()).hexdigest()
+    try:
+        resp = table.get_item(Key={
+            "pk": f"USER#{USER_ID}#SOURCE#subscribers",
+            "sk": f"EMAIL#{email_hash}",
+        })
+        item = _decimal_to_float(resp.get("Item") or {})
+        return item.get("status") == "confirmed"
+    except Exception as e:
+        logger.warning(f"[verify_subscriber] DDB lookup failed: {e}")
+        return False
+
+
+def _handle_verify_subscriber(event: dict) -> dict:
+    """
+    GET /api/verify_subscriber?email=...
+    Returns a 24hr token if the email is a confirmed subscriber.
+    Frontend stores token in sessionStorage and sends as X-Subscriber-Token header
+    to unlock 20 questions/hr instead of the default 3.
+    """
+    params = event.get("queryStringParameters") or {}
+    email = (params.get("email") or "").strip().lower()
+
+    if not email or "@" not in email or len(email) > 254:
+        return {
+            "statusCode": 400,
+            "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+            "body": json.dumps({"error": "Valid email required"}),
+        }
+
+    if not _is_confirmed_subscriber(email):
+        return {
+            "statusCode": 404,
+            "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+            "body": json.dumps({
+                "error": "Email not found. Subscribe at /subscribe/ to unlock more questions!"
+            }),
+        }
+
+    token = _generate_subscriber_token(email)
+    return {
+        "statusCode": 200,
+        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+        "body": json.dumps({
+            "token": token,
+            "message": "Verified! You now have 20 questions per hour.",
+            "limit": 20,
+        }),
+    }
+
+
+# ── S2-T2-2: Board Ask ────────────────────────────────────────────────────────
+
+PERSONA_PROMPTS = {
+    "attia": {
+        "name": "Peter Attia",
+        "title": "Longevity & Performance Medicine",
+        "system": (
+            "You are Peter Attia, MD, longevity physician and author of Outlive. "
+            "Focus on: VO2max, Zone 2 training, strength, metabolic health, and the four horsemen of chronic disease. "
+            "Evidence-based and nuanced. Distinguish strong evidence from speculation. "
+            "Use first person. 3-5 sentences. Note N=1 for any comparative claim. "
+            "Never give medical advice — reference a physician only if clinically urgent."
+        ),
+    },
+    "huberman": {
+        "name": "Andrew Huberman",
+        "title": "Neuroscience & Sleep",
+        "system": (
+            "You are Andrew Huberman PhD, Stanford neuroscientist. "
+            "Focus on: sleep, light exposure, stress resilience, dopamine, and performance neuroscience. "
+            "Explain the mechanism first, then the protocol. "
+            "Use phrases like 'the data are clear' and 'the mechanism here is'. "
+            "3-5 sentences. Actionable and specific."
+        ),
+    },
+    "patrick": {
+        "name": "Rhonda Patrick",
+        "title": "Cellular Biology & Nutrition",
+        "system": (
+            "You are Rhonda Patrick PhD, biochemist and FoundMyFitness founder. "
+            "Focus on: micronutrients, cellular resilience, omega-3s, heat/cold exposure, inflammation. "
+            "Cite mechanisms. Use 'the research shows' and 'at the cellular level'. "
+            "Thorough, not reductive. 3-5 sentences."
+        ),
+    },
+    "norton": {
+        "name": "Layne Norton",
+        "title": "Evidence-Based Nutrition",
+        "system": (
+            "You are Layne Norton PhD, nutrition scientist and evidence-based coach. "
+            "Focus on: protein synthesis, body composition, muscle retention in deficit. "
+            "No-nonsense, skeptical of broscience. "
+            "Use 'the evidence actually shows' and 'people get this wrong because'. "
+            "Emphasize protein quality, leucine threshold, and adherence. 3-5 sentences."
+        ),
+    },
+    "clear": {
+        "name": "James Clear",
+        "title": "Habit Architecture",
+        "system": (
+            "You are James Clear, author of Atomic Habits. "
+            "Focus on: identity-based change, the four laws of behavior change, habit stacking, systems over goals. "
+            "Aphorism-style language. Make abstract ideas concrete with specific examples. "
+            "3-5 sentences. Actionable and memorable."
+        ),
+    },
+    "goggins": {
+        "name": "David Goggins",
+        "title": "Mental Toughness",
+        "system": (
+            "You are David Goggins, retired Navy SEAL and ultra-endurance athlete. "
+            "You believe most people quit at 40% capacity and that the mind is the limit. "
+            "Brutally honest, intense, no coddling. Use 'stay hard' and 'nobody is coming to save you'. "
+            "3-5 sentences. High energy."
+        ),
+    },
+}
+
+BOARD_RATE_LIMIT = 5  # per IP per hour
+
+
+def _handle_board_ask(event: dict) -> dict:
+    """
+    POST /api/board_ask
+    Body: {"question": str, "personas": ["attia", ...]}
+    Returns: {"responses": {"attia": "...", ...}}
+    S2-T2-2: Lead magnet — each board member answers in their own voice.
+    """
+    source_ip = (
+        event.get("requestContext", {}).get("http", {}).get("sourceIp")
+        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
+        or "unknown"
+    )
+    import time as _time
+    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    rate_pk = f"RATELIMIT#board#{ip_hash}"
+    now = int(_time.time())
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(rate_pk) & Key("sk").gte(f"TS#{now - 3600}"),
+        )
+        if len(resp.get("Items", [])) >= BOARD_RATE_LIMIT:
+            return {
+                "statusCode": 429,
+                "headers": {**CORS_HEADERS, "Retry-After": "3600"},
+                "body": json.dumps({"error": "Rate limit reached. Try again in an hour."}),
+            }
+        table.put_item(Item={"pk": rate_pk, "sk": f"TS#{now}", "ttl": Decimal(str(now + 7200))})
+    except Exception as e:
+        logger.warning(f"[board_ask] Rate check failed: {e}")
+
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except Exception:
+        return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Invalid JSON"})}
+
+    question = re.sub(r"<[^>]+>", "", (body.get("question") or "").strip())[:500]
+    if len(question) < 5:
+        return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Question too short"})}
+
+    requested = body.get("personas") or list(PERSONA_PROMPTS.keys())
+    personas = [p for p in requested if p in PERSONA_PROMPTS][:6]
+    if not personas:
+        personas = ["attia", "huberman", "clear"]
+
+    api_key = _get_anthropic_key()
+    if not api_key:
+        return {"statusCode": 503, "headers": CORS_HEADERS, "body": json.dumps({"error": "AI service unavailable"})}
+
+    responses = {}
+    for pid in personas:
+        p = PERSONA_PROMPTS[pid]
+        try:
+            req_body = json.dumps({
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 300,
+                "system": p["system"],
+                "messages": [{"role": "user", "content": question}],
+            })
+            req = urllib.request.Request(
+                "https://api.anthropic.com/v1/messages",
+                data=req_body.encode(),
+                headers={
+                    "Content-Type": "application/json",
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=20) as r:
+                result = json.loads(r.read())
+            responses[pid] = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
+        except Exception as e:
+            logger.error(f"[board_ask] {pid} failed: {e}")
+            responses[pid] = f"[{p['name']} is temporarily unavailable]"
+
+    return {
+        "statusCode": 200,
+        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+        "body": json.dumps({"responses": responses}),
+    }
+
+
 # ── Ask the Platform (AI Q&A) ─────────────────────────────────────
 
 import re
@@ -692,8 +947,9 @@ def _get_anthropic_key():
         return None
 
 
-def _ask_rate_check(ip_hash: str) -> tuple:
-    """Rate limit: 5 questions per IP-hash per hour via DynamoDB TTL."""
+def _ask_rate_check(ip_hash: str, limit: int = 3) -> tuple:
+    """Rate limit: N questions per IP-hash per hour via DynamoDB TTL.
+    Default limit 3 for anonymous; call with limit=20 for subscribers."""
     import time as _time
     pk = f"RATELIMIT#ask#{ip_hash}"
     now = int(_time.time())
@@ -703,13 +959,13 @@ def _ask_rate_check(ip_hash: str) -> tuple:
             KeyConditionExpression=Key("pk").eq(pk) & Key("sk").gte(f"TS#{hour_ago}"),
         )
         count = len(resp.get("Items", []))
-        if count >= 5:
+        if count >= limit:
             return False, 0
         table.put_item(Item={"pk": pk, "sk": f"TS#{now}", "ttl": Decimal(str(now + 7200))})
-        return True, 5 - count - 1
+        return True, limit - count - 1
     except Exception as e:
         logger.warning(f"[ask] Rate check failed: {e}")
-        return True, 4  # Fail open
+        return True, limit - 1  # Fail open
 
 
 def _ask_fetch_context() -> dict:
@@ -800,6 +1056,9 @@ ROUTES = {
     "/api/genome_risks":       handle_genome_risks,
     # Website Review: Ask the Platform
     "/api/ask":                handle_ask,
+    # WR-24 + S2-T2-2: handled specially in lambda_handler (POST routes)
+    "/api/verify_subscriber":  None,
+    "/api/board_ask":          None,
 }
 
 
@@ -814,6 +1073,18 @@ def lambda_handler(event, context):
     # CORS preflight
     if method == "OPTIONS":
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
+
+    # WR-24: Subscriber verification (GET)
+    if path == "/api/verify_subscriber":
+        if method not in ("GET", "OPTIONS"):
+            return _error(405, "Use GET method")
+        return _handle_verify_subscriber(event)
+
+    # S2-T2-2: Board Ask (POST)
+    if path == "/api/board_ask":
+        if method != "POST":
+            return _error(405, "Use POST method")
+        return _handle_board_ask(event)
 
     # Special handling: /api/ask accepts POST
     if path == "/api/ask":
@@ -831,12 +1102,17 @@ def lambda_handler(event, context):
                 return _error(400, "Question too short")
 
             ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
-            allowed, remaining = _ask_rate_check(ip_hash)
+            # WR-24: Check for valid subscriber token → higher rate limit
+            sub_token = (event.get("headers") or {}).get("x-subscriber-token", "")
+            is_subscriber = bool(sub_token) and _validate_subscriber_token(sub_token)
+            rate_limit = 20 if is_subscriber else 3
+            allowed, remaining = _ask_rate_check(ip_hash, limit=rate_limit)
             if not allowed:
+                limit_msg = "20" if is_subscriber else "3"
                 return {
                     "statusCode": 429,
                     "headers": {**CORS_HEADERS, "Retry-After": "3600"},
-                    "body": json.dumps({"error": "Rate limit exceeded. 5 questions per hour.", "remaining": 0}),
+                    "body": json.dumps({"error": f"Rate limit exceeded. {limit_msg} questions per hour.", "remaining": 0}),
                 }
 
             api_key = _get_anthropic_key()
