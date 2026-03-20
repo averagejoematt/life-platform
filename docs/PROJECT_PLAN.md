@@ -1,7 +1,7 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-20 (v3.7.82 — v3.7.80 WR-24 subscriber gate + S2-T2-2 /board/ page. v3.7.81 nav/footer standardised across all 12 pages — /story/ now in primary nav. v3.7.82 in-memory rate limiting (stopped AccessDeniedException alarms). Sprint 5 complete (buildable). See docs/SPRINT_PLAN.md.)
+> Last update: 2026-03-20 (v3.7.82 — R17 Architecture Review conducted (A-). 13 findings, 6 board decisions. Sprint 6 (R17 Hardening) created with 18 items. Platform cost approved to increase ~$13→~$20.40/month for WAF + separate API key. See docs/SPRINT_PLAN.md.)
 
 ---
 
@@ -117,6 +117,7 @@ Board Summit #3: 500 subscribers OR 90-day journey milestone (2026-05-22), which
 
 | ID | Item | Version | Date |
 |----|------|---------|------|
+| R17 | Architecture Review #17 — grade A-. 13 findings, Sprint 6 created. | v3.7.82 | 2026-03-20 |
 | v3.7.82 | In-memory rate limiting for ask + board_ask — stopped AccessDeniedException alarm flood | v3.7.82 | 2026-03-20 |
 | v3.7.81 | Nav + footer standardised across all 12 pages — /story/ promoted to primary nav | v3.7.81 | 2026-03-19 |
 | v3.7.80 | WR-24 subscriber gate on /ask/ · S2-T2-2 /board/ page · sprint plan cleanup | v3.7.80 | 2026-03-19 |
@@ -132,6 +133,7 @@ Board Summit #3: 500 subscribers OR 90-day journey milestone (2026-05-22), which
 
 | # | Date | Version | Grade | Key Findings |
 |---|------|---------|-------|-------------|
+| R17 | 2026-03-20 | v3.7.82 | A- | 13 findings, 6 board decisions. Public endpoint hardening. Sprint 6 created. |
 | R16 | 2026-03-15 | v3.7.47 | A | 6 findings. CI/CD activation. Google Calendar retirement cleanup. |
 | R15 | 2026-03-15 | v3.7.43 | A | 6 Low findings (doc drift). Platform in steady-state. |
 | R14 | 2026-03-15 | v3.7.40 | A | 8 findings. MCP canary + X-Ray tracing. Security hardening. |
@@ -152,10 +154,10 @@ Board Summit #3: 500 subscribers OR 90-day journey milestone (2026-05-22), which
 | MCP tools | 95 | ≤80 (SIMP-1 Phase 2) | Phase 2 gated ~Apr 13 |
 | Lambdas | 49 (CDK) + 1 Lambda@Edge (manually managed) | — | site-api + email-subscriber CDK-managed in us-east-1 |
 | CloudWatch alarms | 49 | — | |
-| Monthly cost | ~$13 | <$25 | Well under budget |
-| Active secrets | 9 | — | webhook-key + google-calendar + api-keys deleted |
+| Monthly cost | ~$13 (→ ~$20.40 post-R17 hardening) | <$25 | WAF +$7, API key secret +$0.40 approved |
+| Active secrets | 9 (→ 10 after R17-04) | — | webhook-key + google-calendar + api-keys deleted |
 | IC features live | 16 of 31 | — | IC-29 + IC-30 deployed v3.7.67 |
 | Data sources | 19 | — | google_calendar retired (ADR-030) |
-| Architecture review grade | A | A | R16 grade A. R17 targeting ~June 2026. |
+| Architecture review grade | A- | A | R17 grade A-. R18 targeting post-DIST-1 (~June 2026). |
 | Email subscribers | 0 | 500 (6 months) | Subscribe backend live. Distribution is #1 priority. |
 | Website pages live | 12 | — | /ask/ + /board/ added v3.7.80 |

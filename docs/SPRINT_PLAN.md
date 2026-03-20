@@ -1,6 +1,6 @@
 # Life Platform — Sprint Plan
 **Board-Aligned Implementation Roadmap | v3.7.82 | March 20, 2026**
-*Derived from Joint Board Summit Record (March 15, 2026) + Board Sprint Review (March 16, 2026)*
+*Derived from Joint Board Summit Record (March 15, 2026) + Board Sprint Review (March 16, 2026) + Architecture Review #17 (March 20, 2026)*
 
 ---
 
@@ -127,6 +127,54 @@ This document translates the Board Summit recommendations into an ordered, reali
 
 ---
 
+## SPRINT 6 — R17 Hardening Sprint (~2 weeks)
+**Theme: Public Endpoint Security + Pre-DIST-1 Readiness**
+**Source: Architecture Review #17 (2026-03-20) + Board Deliberation**
+**Cost impact: +$7.40/month (WAF $7 + API key secret $0.40) — Matthew approved**
+
+#### Tier 0 — Before DIST-1 (Critical Path)
+
+| ID | Feature | Effort | Model | Deliverable | Status |
+|----|---------|--------|-------|-------------|--------|
+| R17-01 | WAF WebACL + rate-based rules on amj CloudFront | M | None (CDK) | CDK: WAF WebACL in LifePlatformWeb stack. 100 req/5min/IP on /api/ask, 50/5min on /api/board_ask | ⬜ |
+| R17-02 | Privacy policy + AI disclaimer page | S | None (content) | `site/privacy/index.html` + footer/subscribe links | ⬜ |
+| R17-03 | CloudWatch dashboard for site-api | S | None (CDK/CLI) | Dashboard: invocations, errors, p50/p95 latency, duration. Alarms: error >5%, p95 >5s, invocations >1000/hr | ⬜ |
+| R17-04 | Separate Anthropic API key for site-api | S | None (ops) | New secret `life-platform/site-api-ai-key`, update site_api env var | ⬜ |
+| R17-05 | External uptime monitor | XS | None (manual) | UptimeRobot free tier on /api/vitals | ⬜ Matthew only |
+| R17-06 | PITR restore drill | S | None (ops) | Execute script, document in `docs/reviews/PITR_DRILL_2026-03.md` | ⬜ Matthew only |
+| R17-07 | Remove google_calendar from config.py SOURCES | XS | None | One-line edit in `mcp/config.py` | ⬜ |
+| R17-08 | Verify + fix MCP Lambda memory docs | XS | None (ops) | Check live config, update ARCHITECTURE.md | ⬜ |
+
+#### Tier 1 — 60-Day Items (Post-DIST-1)
+
+| ID | Feature | Effort | Model | Deliverable | Status |
+|----|---------|--------|-------|-------------|--------|
+| R17-09 | Move site-api Lambda to us-west-2 | M | None (CDK) | CDK: Lambda in LifePlatformOperational, update CF origin | ⬜ |
+| R17-10 | SIMP-1 Phase 2 (95→≤80 tools) | L | **Opus** | EMF telemetry review, tool deprecation, registry cleanup | ⬜ |
+| R17-11 | Site-api model strings to env vars | S | None | Update site_api_lambda.py to read AI_MODEL_HAIKU from env | ⬜ |
+| R17-12 | Site-api observability alarms | S | None (CDK) | 3 alarms: error rate, p95 latency, invocation spike | ⬜ |
+| R17-13 | IC-4/IC-5 activation | M | Sonnet | CDK EventBridge rules + deploy (data gate ~Apr 18) | ⬜ |
+| R17-14 | ADR-025 cleanup (composite_scores) | S | None | Remove dead code, update SCHEMA.md | ⬜ |
+
+#### Tier 2 — 90-Day Items
+
+| ID | Feature | Effort | Model | Deliverable | Status |
+|----|---------|--------|-------|-------------|--------|
+| R17-15 | CSP headers via CloudFront response headers policy | S | None (CDK) | CDK: response headers policy on amj distribution | ⬜ |
+| R17-16 | Anthropic API graceful degradation | M | None | Timeout + fallback in ai_calls.py; each email Lambda handles `ai_unavailable` | ⬜ |
+| R17-17 | DynamoDB TTL policy for non-critical partitions | S | None | TTL on anomaly records >365d, cached tools | ⬜ |
+| R17-18 | CORS explicit headers on site-api | S | None | Add Access-Control-Allow-Origin to all responses | ⬜ |
+
+**Sprint 6 Board Decisions (R17 session, 2026-03-20):**
+1. Rate limiting → WAF rate-based rules (not DDB counters — preserves site-api read-only IAM)
+2. WAF config → WebACL + 2 rate rules, no managed rule set (Raj: don't gold-plate)
+3. Cross-region → Move site-api to us-west-2 (60-day, $0)
+4. API key isolation → Separate secret (+$0.40/mo)
+5. Uptime monitoring → UptimeRobot free tier
+6. Circuit breaker → Graceful degradation in ai_calls.py (no new deps)
+
+---
+
 ## BACKLOG — Website Review 60/90-Day Items
 
 | ID | Feature | Source | Status | Notes |
@@ -213,9 +261,14 @@ Week 14-15:  SPRINT 5 ✅ COMPLETE (buildable) — Website + Distribution
              v3.7.82: in-memory rate limiting fix ✅
              REMAINING: /story prose | photos | DIST-1
 
-~April 2026: SIMP-1 Phase 2 (95→≤80 tools)
+NOW:         SPRINT 6 — R17 Hardening Sprint (~2 weeks, March/April 2026)
+  Tier 0:    WAF + privacy + dashboard + PITR drill + cleanup (pre-DIST-1)
+  Tier 1:    Site-api migration + SIMP-1 Ph2 + IC-4/IC-5 (60 days)
+  Tier 2:    CSP + graceful degradation + TTL + CORS (90 days)
+
+~April 2026: R17 Tier 0 complete → DIST-1 → SIMP-1 Phase 2 (95→≤80 tools)
 ~May 2026:   WR-25 Newsletter launch (post /story) | BS-06/IC-27 (data)
-~June 2026:  EMAIL-P2 Data Drop #1 | R17 Architecture Review
+~June 2026:  EMAIL-P2 Data Drop #1 | R18 Architecture Review (post-DIST-1)
 ~Aug 2026:   IC-30 (after BS-SL1 matures)
 ~Sep 2026:   EMAIL-P3 Community launch | BS-T3-5 Streaming
 
@@ -233,4 +286,5 @@ Post-DEXA:   BS-BM3, BS-T2-3 DEXA Body Composition
 *Board Summit #1: March 16, 2026 | Board Summit #2: March 17, 2026 | 16 board members (Health + Technical)*
 *Summit #1 record: `docs/reviews/BOARD_SUMMIT_2026-03-16.md` | Summit #2 record: `docs/reviews/BOARD_SUMMIT_2_2026-03-17.md`*
 *Board Sprint Review full record: `docs/reviews/BOARD_SPRINT_REVIEW_2026-03-16.md`*
+*Architecture Review #17: `docs/reviews/REVIEW_2026-03-20_v17.md` — Sprint 6 derived from R17 findings + board decisions*
 *Champions listed are advisory — Matthew Walker is the implementer*
