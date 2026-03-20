@@ -857,21 +857,17 @@ def _handle_board_ask(event: dict) -> dict:
     )
     import time as _time
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
-    rate_pk = f"RATELIMIT#board#{ip_hash}"
     now = int(_time.time())
-    try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(rate_pk) & Key("sk").gte(f"TS#{now - 3600}"),
-        )
-        if len(resp.get("Items", [])) >= BOARD_RATE_LIMIT:
-            return {
-                "statusCode": 429,
-                "headers": {**CORS_HEADERS, "Retry-After": "3600"},
-                "body": json.dumps({"error": "Rate limit reached. Try again in an hour."}),
-            }
-        table.put_item(Item={"pk": rate_pk, "sk": f"TS#{now}", "ttl": Decimal(str(now + 7200))})
-    except Exception as e:
-        logger.warning(f"[board_ask] Rate check failed: {e}")
+    hour_ago = now - 3600
+    board_ts = [t for t in _board_rate_store.get(ip_hash, []) if t > hour_ago]
+    if len(board_ts) >= BOARD_RATE_LIMIT:
+        return {
+            "statusCode": 429,
+            "headers": {**CORS_HEADERS, "Retry-After": "3600"},
+            "body": json.dumps({"error": "Rate limit reached. Try again in an hour."}),
+        }
+    board_ts.append(now)
+    _board_rate_store[ip_hash] = board_ts[-20:]
 
     try:
         body = json.loads(event.get("body") or "{}")
@@ -932,6 +928,11 @@ import urllib.request
 
 _anthropic_key_cache = None
 
+# In-memory rate limit stores (warm container state — resets on cold start, acceptable for rate limiting)
+# Maps ip_hash -> list of timestamps in the current hour
+_ask_rate_store: dict = {}
+_board_rate_store: dict = {}
+
 def _get_anthropic_key():
     """Fetch Anthropic API key from Secrets Manager (cached after first call)."""
     global _anthropic_key_cache
@@ -948,24 +949,16 @@ def _get_anthropic_key():
 
 
 def _ask_rate_check(ip_hash: str, limit: int = 3) -> tuple:
-    """Rate limit: N questions per IP-hash per hour via DynamoDB TTL.
-    Default limit 3 for anonymous; call with limit=20 for subscribers."""
+    """Rate limit: N questions per IP-hash per hour (in-memory, warm container state)."""
     import time as _time
-    pk = f"RATELIMIT#ask#{ip_hash}"
     now = int(_time.time())
     hour_ago = now - 3600
-    try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(pk) & Key("sk").gte(f"TS#{hour_ago}"),
-        )
-        count = len(resp.get("Items", []))
-        if count >= limit:
-            return False, 0
-        table.put_item(Item={"pk": pk, "sk": f"TS#{now}", "ttl": Decimal(str(now + 7200))})
-        return True, limit - count - 1
-    except Exception as e:
-        logger.warning(f"[ask] Rate check failed: {e}")
-        return True, limit - 1  # Fail open
+    timestamps = [t for t in _ask_rate_store.get(ip_hash, []) if t > hour_ago]
+    if len(timestamps) >= limit:
+        return False, 0
+    timestamps.append(now)
+    _ask_rate_store[ip_hash] = timestamps[-50:]  # cap stored entries
+    return True, limit - len(timestamps)
 
 
 def _ask_fetch_context() -> dict:
