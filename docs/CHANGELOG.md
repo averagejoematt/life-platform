@@ -1,3 +1,34 @@
+## v3.7.78 — 2026-03-19: CI action versions fixed, daily-brief triple-send NameError patched
+
+### Summary
+Inbox triage during sick week. Two root-cause bugs fixed: (1) CI/CD completely broken since v3.7.74 due to non-existent `actions/checkout@v6` + `actions/setup-python@v6` versions — all 6 occurrences corrected to v4/v5. (2) `daily_brief_lambda.py` was triple-sending emails with `Grade: —` due to a `NameError` on `streak_data` when `_computed` was truthy — fixed with a safe `None` initialisation before the branch. Daily-brief deployed.
+
+### Changes
+
+**CI/CD — `.github/workflows/ci-cd.yml`**
+- `actions/checkout@v6` → `@v4` (5 occurrences: lint, test, plan, post-deploy-checks, rollback jobs)
+- `actions/setup-python@v6` → `@v5` (3 occurrences: lint, test, post-deploy-checks jobs)
+- Root cause: v6 of both actions does not exist — every push to main was failing at step 1 before any code ran
+- Note: v3.7.74 changelog entry incorrectly states these were bumped *to* v6 as an upgrade; they were invalid versions that silently broke CI
+
+**daily-brief — `lambdas/daily_brief_lambda.py`**
+- Added `streak_data = None` initialisation before the `if _computed:` / `else:` branch
+- Root cause: when `_computed` is truthy (pre-computed metrics record exists, even with null scores during sick week), the `else:` branch where `streak_data` is assigned never runs → bare `NameError` at `output_writers.write_public_stats_json(data, profile, streak_data=streak_data)` → Lambda crashes after SES email already sent → EventBridge retries twice → 3 emails, all `Grade: —`
+- Fix is minimal and safe: `None` is already handled gracefully in `write_public_stats_json`
+
+### Deploys
+- `daily-brief` (us-west-2): ✅ 2026-03-19 — streak_data NameError fixed, triple-send resolved
+- CI fix committed to main (`b48a9e9`) — next push will actually run
+
+### Root cause of inbox noise (all explained)
+- 6× CI failures: `@v6` actions don't exist
+- 3× CloudWatch `life-platform-dash-total-errors` alarms: daily-brief crashing post-send
+- 1× `life-platform-daily-brief-errors` alarm: same crash
+- QA: 12 failures: data freshness — expected during Matthew's sick week (no logging)
+- Morning Brief triple-send + Grade `—`: streak_data NameError — now fixed
+
+---
+
 ## v3.7.77 — 2026-03-19: Reveal.js extended, platform.html stats updated, WR-17 debugged
 
 ### Summary
