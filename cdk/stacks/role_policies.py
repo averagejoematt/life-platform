@@ -1092,3 +1092,19 @@ def mcp_server() -> list[iam.PolicyStatement]:
             resources=[DLQ_ARN],
         ),
     ]
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# WEB STACK — OG Image Lambda (WR-17)
+# ═════════════════════════════════════════════════════════════════════════
+
+def og_image() -> list[iam.PolicyStatement]:
+    """OG Image Lambda: S3 read-only for public_stats.json."""
+    return [
+        iam.PolicyStatement(
+            sid="S3ReadPublicStats",
+            actions=["s3:GetObject"],
+            resources=[f"{BUCKET_ARN}/site/data/public_stats.json"],
+        ),
+    ]
+

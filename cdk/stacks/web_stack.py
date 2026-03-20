@@ -272,13 +272,40 @@ class WebStack(Stack):
         # ══════════════════════════════════════════════════════════════
         # OG Image Lambda — life-platform-og-image (WR-17)
         # Dynamic SVG social preview image with live stats.
-        # Imported by ARN — deployed separately via deploy/deploy_og_image.sh.
+        # CDK-managed Lambda with proper Function URL permissions.
         # ══════════════════════════════════════════════════════════════
-        og_image_fn = _lambda.Function.from_function_arn(
-            self, "OgImageLambda",
-            function_arn=f"arn:aws:lambda:us-east-1:{ACCT}:function:life-platform-og-image",
+        og_image_role = iam.Role(
+            self, "OgImageLambdaRole",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name(
+                    "service-role/AWSLambdaBasicExecutionRole"
+                ),
+            ],
         )
-        og_image_url_domain = "fj5u62xcm2bk2fwuiyvf3wzqqm0mwcmk.lambda-url.us-east-1.on.aws"
+        for stmt in rp.og_image():
+            og_image_role.add_to_policy(stmt)
+
+        og_image_fn = _lambda.Function(
+            self, "OgImageLambda",
+            function_name="life-platform-og-image",
+            runtime=_lambda.Runtime.NODEJS_20_X,
+            handler="og_image_lambda.handler",
+            code=_lambda.Code.from_asset("../lambdas", exclude=[
+                "*.py", "**/*.py", "__pycache__", "**/__pycache__/**",
+                "*.pyc", "**/*.pyc", "*.md", "dashboard/**", "buddy/**",
+                "cf-auth/**", "requirements/**", ".DS_Store",
+            ]),
+            role=og_image_role,
+            timeout=Duration.seconds(10),
+            memory_size=256,
+        )
+
+        og_image_url = og_image_fn.add_function_url(
+            auth_type=_lambda.FunctionUrlAuthType.NONE,
+        )
+
+        og_image_url_domain = cdk.Fn.select(2, cdk.Fn.split("/", og_image_url.url))
 
         site_api_url = site_api_fn.add_function_url(
             auth_type=_lambda.FunctionUrlAuthType.NONE,
