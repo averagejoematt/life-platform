@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ask My Health Board | Average Joe Matt</title>
+  <meta name="description" content="Get personalized health perspectives from a curated panel of world-class experts — Peter Attia, Andrew Huberman, Rhonda Patrick, and more.">
+  <meta property="og:title" content="Ask My Health Board — Average Joe Matt">
+  <meta property="og:description" content="Real AI-powered responses from Peter Attia, Andrew Huberman, Rhonda Patrick & more on your health questions.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <link rel="canonical" href="https://averagejoematt.com/board/">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .board-hero {
+      text-align: center;
+      padding: 56px 24px 40px;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .board-hero .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 14px;
+    }
+    .board-hero h1 {
+      font-size: clamp(1.8rem, 5vw, 2.8rem);
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--text);
+      margin: 0 0 16px;
+    }
+    .board-hero p { color: var(--text-muted); font-size: 1rem; line-height: 1.65; max-width: 560px; margin: 0 auto 10px; }
+
+    .board-selector { max-width: 800px; margin: 0 auto 32px; padding: 0 24px; }
+    .board-selector h2 { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 14px; }
+    .board-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+    .board-member { background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; padding: 14px 14px 12px; cursor: pointer; transition: border-color 0.2s, background 0.2s; user-select: none; }
+    .board-member:hover { border-color: var(--border-hover, rgba(255,255,255,0.2)); }
+    .board-member.selected { border-color: var(--accent); background: var(--accent-bg-subtle); }
+    .board-member .member-icon { font-size: 1.5rem; margin-bottom: 6px; display: block; }
+    .board-member .member-name { font-weight: 600; font-size: 0.88rem; color: var(--text); margin-bottom: 2px; }
+    .board-member .member-title { font-size: 0.72rem; color: var(--text-muted); line-height: 1.3; }
+    .select-controls { margin-top: 10px; display: flex; gap: 10px; align-items: center; }
+    .select-controls button { background: none; border: none; color: var(--text-muted); font-size: 0.78rem; cursor: pointer; padding: 0; text-decoration: underline; }
+    .select-controls button:hover { color: var(--accent); }
+    .selected-count { font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent); margin-left: auto; }
+
+    .question-area { max-width: 800px; margin: 0 auto 32px; padding: 0 24px; }
+    .question-area label { display: block; font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; }
+    .question-input-wrap { position: relative; }
+    .question-input-wrap textarea { width: 100%; background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; color: var(--text); font-family: var(--font-sans, sans-serif); font-size: 0.97rem; line-height: 1.55; padding: 16px 120px 16px 18px; resize: vertical; min-height: 90px; outline: none; transition: border-color 0.2s; box-sizing: border-box; }
+    .question-input-wrap textarea:focus { border-color: var(--accent); }
+    .question-input-wrap textarea::placeholder { color: var(--text-faint); }
+    .ask-btn { position: absolute; right: 14px; bottom: 14px; background: var(--accent); color: var(--bg); border: none; border-radius: 8px; padding: 10px 20px; font-weight: 700; font-size: 0.88rem; cursor: pointer; transition: opacity 0.2s; white-space: nowrap; }
+    .ask-btn:hover { opacity: 0.85; }
+    .ask-btn:disabled { opacity: 0.4; cursor: default; }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .chip { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 0.8rem; color: var(--text-muted); cursor: pointer; transition: all 0.15s; }
+    .chip:hover { border-color: var(--accent); color: var(--accent); }
+
+    .rate-notice { text-align: center; font-size: 0.78rem; color: var(--text-muted); margin-top: 10px; }
+    .rate-notice span { color: var(--accent); }
+
+    .results-area { max-width: 800px; margin: 0 auto; padding: 0 24px 64px; }
+    .result-header { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 18px; }
+    .result-header span { color: var(--accent); }
+
+    .response-skeleton { border-radius: 12px; padding: 20px; background: var(--surface); border: 1px solid var(--border); margin-bottom: 14px; animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+    .skel-name { height: 14px; width: 120px; background: var(--border); border-radius: 4px; margin-bottom: 12px; }
+    .skel-line { height: 10px; background: var(--border-subtle, rgba(255,255,255,0.05)); border-radius: 4px; margin-bottom: 8px; }
+    .skel-line.short { width: 60%; }
+
+    .persona-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; margin-bottom: 14px; animation: fadeIn 0.4s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .persona-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .persona-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+    .persona-meta .name { font-weight: 600; font-size: 0.95rem; color: var(--text); }
+    .persona-meta .title-tag { font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); }
+    .persona-body { color: var(--text-muted); font-size: 0.9rem; line-height: 1.7; }
+    .persona-body strong { color: var(--text); }
+
+    .error-msg { background: rgba(232,93,93,0.08); border: 1px solid rgba(232,93,93,0.3); border-radius: 10px; padding: 16px 20px; color: #E85D5D; font-size: 0.88rem; }
+
+    .results-cta { margin-top: 32px; padding: 24px; background: var(--accent-bg-subtle); border: 1px solid var(--accent); border-radius: 12px; text-align: center; }
+    .results-cta p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px; }
+    .results-cta a.primary-cta { background: var(--accent); color: var(--bg); font-weight: 700; padding: 11px 24px; border-radius: 8px; text-decoration: none; font-size: 0.9rem; display: inline-block; transition: opacity 0.2s; }
+    .results-cta a.primary-cta:hover { opacity: 0.85; }
+    .results-cta .secondary-link { display: block; margin-top: 10px; color: var(--text-muted); font-size: 0.8rem; text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/#experiment" class="nav__link">The experiment</a>
+    <a href="/platform/" class="nav__link">The platform</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/character/" class="nav__link">Character</a>
+  </div>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span>Live</span>
+  </div>
+</nav>
+
+<div class="board-hero reveal">
+  <div class="eyebrow">Lead Magnet · Free Tool</div>
+  <h1>What Would My Health Board Say?</h1>
+  <p>I've assembled a panel of world-class experts as AI advisors for my transformation. Ask them anything — each responds in their unique voice and with their specific lens.</p>
+  <p style="font-size:0.82rem; color: var(--text-faint); margin-top:8px;">
+    AI personas inspired by real researchers. Not medical advice.
+  </p>
+</div>
+
+<div class="board-selector reveal">
+  <h2>Choose Your Advisors</h2>
+  <div class="board-grid" id="boardGrid"></div>
+  <div class="select-controls">
+    <button onclick="selectAll()">Select all</button>
+    <button onclick="selectNone()">Clear</button>
+    <span class="selected-count" id="selectedCount">6 selected</span>
+  </div>
+</div>
+
+<div class="question-area reveal">
+  <label for="questionInput">Your Question</label>
+  <div class="question-input-wrap">
+    <textarea id="questionInput" placeholder="e.g. Should I train fasted or fed? How do I optimize sleep? What's the minimum effective dose of cardio?" rows="3"></textarea>
+    <button class="ask-btn" id="askBtn" onclick="askBoard()">Ask →</button>
+  </div>
+  <div class="chips" id="chipContainer"></div>
+  <div class="rate-notice">
+    <span id="questionsLeft">3</span> free questions remaining ·
+    <a href="/subscribe/" style="color:var(--accent); text-decoration:none;">Subscribe</a> for unlimited
+  </div>
+</div>
+
+<div class="results-area" id="resultsArea" style="display:none;">
+  <div class="result-header">
+    Board response to: <span id="questionDisplay"></span>
+  </div>
+  <div id="responsesContainer"></div>
+  <div class="results-cta" id="resultsCta" style="display:none;">
+    <p>Want daily AI coaching from your own board? I get a briefing like this every morning — automated from 19 live data sources.</p>
+    <a href="/subscribe/" class="primary-cta">Get the weekly signal →</a>
+    <a href="/platform/" class="secondary-link">See how it's built →</a>
+  </div>
+</div>
+
+<script>
+  const BOARD_MEMBERS = [
+    { id: 'attia',   name: 'Peter Attia',    title: 'Longevity & Performance Medicine', icon: '🩺', focus: 'longevity, Zone 2, VO2max, metabolic health' },
+    { id: 'huberman',name: 'Andrew Huberman', title: 'Neuroscience & Sleep',             icon: '🧠', focus: 'sleep, light exposure, stress, dopamine' },
+    { id: 'patrick', name: 'Rhonda Patrick',  title: 'Cellular Biology & Nutrition',    icon: '🔬', focus: 'micronutrients, heat/cold, omega-3s, inflammation' },
+    { id: 'norton',  name: 'Layne Norton',    title: 'Evidence-Based Nutrition',        icon: '💪', focus: 'protein synthesis, body composition, deficit dieting' },
+    { id: 'clear',   name: 'James Clear',     title: 'Habit Architecture',              icon: '⚡', focus: 'habit stacking, identity-based change, systems' },
+    { id: 'goggins', name: 'David Goggins',   title: 'Mental Toughness',                icon: '🔥', focus: 'callusing the mind, no excuses, 40% rule' },
+  ];
+
+  const CHIPS = [
+    "Should I train fasted or fed?",
+    "How do I optimize sleep quality?",
+    "What's the minimum effective dose of cardio?",
+    "How much protein do I actually need?",
+    "How do I make habits stick?",
+    "Is cold exposure worth it?",
+    "How do I break through a plateau?",
+    "What does research say about Zone 2?",
+  ];
+
+  const BOARD_LIMIT = 3;
+  let selected = new Set(BOARD_MEMBERS.map(m => m.id));
+  let sessionCount = parseInt(sessionStorage.getItem('lp_board_count') || '0');
+
+  function renderGrid() {
+    document.getElementById('boardGrid').innerHTML = BOARD_MEMBERS.map(m => `
+      <div class="board-member${selected.has(m.id) ? ' selected' : ''}" onclick="toggleMember('${m.id}')" title="${m.focus}">
+        <span class="member-icon">${m.icon}</span>
+        <div class="member-name">${m.name}</div>
+        <div class="member-title">${m.title}</div>
+      </div>`).join('');
+    document.getElementById('selectedCount').textContent = `${selected.size} selected`;
+  }
+
+  function toggleMember(id) {
+    if (selected.has(id)) { if (selected.size <= 1) return; selected.delete(id); }
+    else selected.add(id);
+    renderGrid();
+  }
+  function selectAll() { BOARD_MEMBERS.forEach(m => selected.add(m.id)); renderGrid(); }
+  function selectNone() { selected.clear(); selected.add(BOARD_MEMBERS[0].id); renderGrid(); }
+
+  function renderChips() {
+    const shuffled = [...CHIPS].sort(() => Math.random() - 0.5).slice(0, 5);
+    document.getElementById('chipContainer').innerHTML = shuffled.map(q =>
+      `<div class="chip" onclick="useChip(this)">${q}</div>`).join('');
+  }
+  function useChip(el) { document.getElementById('questionInput').value = el.textContent; document.getElementById('questionInput').focus(); }
+
+  function updateRateDisplay() {
+    const left = Math.max(0, BOARD_LIMIT - sessionCount);
+    document.getElementById('questionsLeft').textContent = left;
+    if (sessionCount >= BOARD_LIMIT) document.getElementById('askBtn').disabled = true;
+  }
+
+  function renderSkeletons(n) {
+    return Array.from({length: n}).map(() => `
+      <div class="response-skeleton">
+        <div class="skel-name"></div>
+        <div class="skel-line"></div><div class="skel-line"></div><div class="skel-line short"></div>
+      </div>`).join('');
+  }
+
+  async function askBoard() {
+    const question = document.getElementById('questionInput').value.trim();
+    if (!question) { document.getElementById('questionInput').focus(); return; }
+    if (sessionCount >= BOARD_LIMIT) {
+      document.getElementById('resultsArea').style.display = 'block';
+      document.getElementById('responsesContainer').innerHTML = `
+        <div class="error-msg">You've used your ${BOARD_LIMIT} free questions this session.
+          <a href="/subscribe/" style="color:var(--accent);text-decoration:none;margin-left:6px;">Subscribe for unlimited →</a>
+        </div>`;
+      return;
+    }
+
+    const members = BOARD_MEMBERS.filter(m => selected.has(m.id));
+    if (!members.length) return;
+
+    const btn = document.getElementById('askBtn');
+    btn.disabled = true;
+    btn.textContent = 'Asking...';
+
+    document.getElementById('resultsArea').style.display = 'block';
+    document.getElementById('questionDisplay').textContent = question.length > 80 ? question.slice(0, 77) + '...' : question;
+    document.getElementById('responsesContainer').innerHTML = renderSkeletons(members.length);
+    document.getElementById('resultsCta').style.display = 'none';
+    document.getElementById('resultsArea').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    try {
+      const resp = await fetch('/api/board_ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, personas: members.map(m => m.id) })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Request failed');
+
+      document.getElementById('responsesContainer').innerHTML = members.map(m => {
+        const text = (data.responses[m.id] || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        return `<div class="persona-card">
+          <div class="persona-header">
+            <div class="persona-avatar">${m.icon}</div>
+            <div class="persona-meta">
+              <div class="name">${m.name}</div>
+              <div class="title-tag">${m.title}</div>
+            </div>
+          </div>
+          <div class="persona-body">${text}</div>
+        </div>`;
+      }).join('');
+
+      sessionCount++;
+      sessionStorage.setItem('lp_board_count', sessionCount);
+      updateRateDisplay();
+      setTimeout(() => { document.getElementById('resultsCta').style.display = 'block'; }, 800);
+
+    } catch (err) {
+      document.getElementById('responsesContainer').innerHTML =
+        `<div class="error-msg">Something went wrong: ${err.message}. Please try again.</div>`;
+    } finally {
+      btn.disabled = sessionCount >= BOARD_LIMIT;
+      btn.textContent = 'Ask →';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    renderGrid();
+    renderChips();
+    updateRateDisplay();
+    document.getElementById('questionInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); askBoard(); }
+    });
+  });
+</script>
+
+<footer class="footer">
+  <div class="footer__brand">AMJ</div>
+  <div class="footer__links">
+    <a href="/story/" class="footer__link">Story</a>
+    <a href="/journal/" class="footer__link">Journal</a>
+    <a href="/platform/" class="footer__link">Platform</a>
+    <a href="/character/" class="footer__link">Character</a>
+    <a href="/subscribe/" class="footer__link">Subscribe</a>
+  </div>
+  <div class="footer__copy">// updated daily by life-platform · <a href="/privacy/" class="footer__link">Privacy</a></div>
+</footer>
+
+<script src="/assets/js/reveal.js"></script>
+</body>
+</html>

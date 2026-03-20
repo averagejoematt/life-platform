@@ -437,6 +437,24 @@ class WebStack(Stack):
                         allowed_methods=["GET", "HEAD"],
                         cached_methods=["GET", "HEAD"],
                     ),
+                    # /api/verify_subscriber — subscriber token verify. WR-24.
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/api/verify_subscriber",
+                        target_origin_id="LambdaApiOrigin",
+                        viewer_protocol_policy="https-only",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(query_string=True, headers=["Origin","Content-Type"]),
+                        default_ttl=0, max_ttl=0, min_ttl=0,
+                        allowed_methods=["GET","HEAD","OPTIONS"], cached_methods=["GET","HEAD"],
+                    ),
+                    # /api/board_ask — board persona AI. S2-T2-2.
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/api/board_ask",
+                        target_origin_id="LambdaApiOrigin",
+                        viewer_protocol_policy="https-only",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(query_string=False, headers=["Origin","Content-Type"]),
+                        default_ttl=0, max_ttl=0, min_ttl=0,
+                        allowed_methods=["GET","HEAD","OPTIONS","POST","PUT","PATCH","DELETE"], cached_methods=["GET","HEAD"],
+                    ),
                     # /api/ask — site-api Lambda (AI Q&A, POST only, no cache).
                     cloudfront.CfnDistribution.CacheBehaviorProperty(
                         path_pattern="/api/ask",
