@@ -1,3 +1,21 @@
+## v3.7.83 — 2026-03-20: Operational Efficiency Roadmap + Claude Code Adoption
+
+### Changes
+
+**docs/PROJECT_PLAN.md** — updated
+- Added Operational Efficiency Roadmap section (OE-01 through OE-10), stack-ranked by ROI
+- Derived from full conversation history analysis across all Life Platform sessions
+- Covers: Claude Code adoption, shell aliases, tool surface management, Project Knowledge, terminal anti-patterns, test discipline, memory strategy, Deep Research, doc consolidation, dev environment
+
+**OE-01: Claude Code installed and verified (v2.1.80)**
+- Native binary installed via `curl -fsSL https://claude.ai/install.sh | bash`
+- PATH configured in ~/.zshrc
+- Authenticated via browser (uses existing Pro subscription)
+- First session launched in life-platform directory
+- Claude Code cheat sheet PDF created (2-page transition guide: before/after comparisons, essential commands, Chat vs Code decision matrix)
+
+---
+
 ## R17 Architecture Review — 2026-03-20
 
 ### Summary
