@@ -1,7 +1,7 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-20 (v3.7.82 — R17 Architecture Review conducted (A-). 13 findings, 6 board decisions. Sprint 6 (R17 Hardening) created with 18 items. Platform cost approved to increase ~$13→~$20.40/month for WAF + separate API key. See docs/SPRINT_PLAN.md.)
+> Last update: 2026-03-20 (v3.7.83 — Expert Panel Website Strategy Review conducted. 19 new items (WR-28 through WR-46) added as Sprint 7 "World-Class Website" in SPRINT_PLAN.md. Panel finding: site has world-class infrastructure but undersells the story by 10x. /story/ prose confirmed as #1 priority. Full review: `docs/reviews/WEBSITE_PANEL_REVIEW_2026-03-20.md`.)
 
 ---
 
@@ -34,6 +34,36 @@ All P0 items from Architecture Review #8 are resolved.
 | WR-20 | Video: morning brief recording | ⬜ Matthew only |
 | WR-21–23 | Self-host fonts · scroll animations · biology noindex | ✅ All done (v3.7.76) |
 | WR-24 | Subscriber gate on /ask/ | ✅ Done (v3.7.80/82) |
+
+### Website Strategy Review #2 (2026-03-20, Expert Panel) — see Sprint 7 in SPRINT_PLAN.md
+
+> Full review: `docs/reviews/WEBSITE_PANEL_REVIEW_2026-03-20.md`
+> Source: 30+ expert personas (Jony Ive, Peter Attia, Paul Graham, Andrew Chen, David Perell, Lenny Rachitsky, + 12 Technical Board + Personal Board)
+> Key finding: **"The site has world-class infrastructure but undersells the story by 10x."**
+
+| ID | Item | Priority | Status |
+|----|------|----------|--------|
+| WR-14 | **Write /story/ page (5 chapters)** — panel unanimous #1 | Sprint 7 Tier 0 | ⬜ Matthew only |
+| WR-28 | Fix subpage 404s for crawlers/social previews | Sprint 7 Tier 0 | ⬜ |
+| WR-29 | Populate live data on homepage (fix dashes) | Sprint 7 Tier 0 | ⬜ |
+| WR-30 | Add real daily brief excerpt to homepage | Sprint 7 Tier 0 | ⬜ |
+| WR-15 | Before/during photos | Sprint 7 Tier 0 | ⬜ Matthew only |
+| WR-31 | "Start here" flow for new visitors | Sprint 7 Tier 0 | ⬜ |
+| WR-32 | Newsletter sample/archive page | Sprint 7 Tier 0 | ⬜ |
+| WR-33 | Visual transformation comparison cards (shareable) | Sprint 7 Tier 1 | ⬜ |
+| WR-34 | Data flow animation on /platform/ | Sprint 7 Tier 1 | ⬜ |
+| WR-35 | Running cost ticker on /platform/ | Sprint 7 Tier 1 | ⬜ |
+| WR-36 | Public architecture review artifact | Sprint 7 Tier 1 | ⬜ |
+| WR-37 | Scoring algorithm transparency on /character/ | Sprint 7 Tier 1 | ⬜ |
+| WR-38 | "Discoveries" section — featured correlations | Sprint 7 Tier 1 | ⬜ |
+| WR-39 | "Current Protocols" page/section | Sprint 7 Tier 1 | ⬜ |
+| WR-40 | Response safety filter for /ask/ | Sprint 7 Tier 1 | ⬜ |
+| WR-41 | LinkedIn/Twitter build-in-public campaign | Sprint 7 Tier 2 | ⬜ Matthew only |
+| WR-42 | Hacker News / Product Hunt launch | Sprint 7 Tier 2 | ⬜ Gated on Tier 0 |
+| WR-43 | Animated heartbeat/biometric signature | Sprint 7 Tier 2 | ⬜ |
+| WR-44 | "Tool of the week" on /platform/ | Sprint 7 Tier 2 | ⬜ |
+| WR-45 | Media kit + speaking page | Sprint 7 Tier 2 | ⬜ |
+| WR-46 | Data export / open data page | Sprint 7 Tier 2 | ⬜ |
 
 ---
 
@@ -116,6 +146,9 @@ All Tier 1 (Sprint 1–4) items complete. See SPRINT_PLAN.md for full inventory.
 | 11 | `/board` | "What Would My Board Say?" — 6 AI personas lead magnet | ✅ Live (v3.7.80) |
 | 12 | `/subscribe` | Email list landing page | ✅ Live |
 | 13 | `/about` | Brief bio, professional context, press section | ✅ Live (v3.7.72) |
+| 14 | `/protocols` | Current health protocols with data sources + compliance | ✅ Live (v3.7.84) |
+| 15 | `/platform/reviews` | Public architecture review (R17, 14-member board) | ✅ Live (v3.7.84) |
+| 16 | `/journal/sample` | Newsletter sample issue (The Weekly Signal preview) | ✅ Live (v3.7.84) |
 | — | `/tools` | Free interactive tools: sleep calc, habit audit | Later (S2-T2-2 backlog) |
 
 ### Design Language (Ava Moreau)
@@ -180,4 +213,4 @@ Board Summit #3: 500 subscribers OR 90-day journey milestone (2026-05-22), which
 | Data sources | 19 | — | google_calendar retired (ADR-030) |
 | Architecture review grade | A- | A | R17 grade A-. R18 targeting post-DIST-1 (~June 2026). |
 | Email subscribers | 0 | 500 (6 months) | Subscribe backend live. Distribution is #1 priority. |
-| Website pages live | 12 | — | /ask/ + /board/ added v3.7.80 |
+| Website pages live | 15 | — | +protocols, +platform/reviews, +journal/sample (v3.7.84) |

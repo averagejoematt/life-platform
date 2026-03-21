@@ -166,8 +166,8 @@ def _apply_auto_discovered(facts: dict) -> dict:
 
 PLATFORM_FACTS = {
     # Core counts (tool_count + lambda_count auto-discovered from source when available)
-    "version":          "v3.7.76",
-    "date":             "2026-03-18",
+    "version":          "v3.7.84",
+    "date":             "2026-03-20",
     "lambda_count":     45,       # fallback: auto-discovery may under-count Lambda@Edge
     "tool_count":       88,       # fallback: auto-discovery requires registry.py parseable
     "module_count":     31,       # fallback: all mcp/*.py except __init__.py

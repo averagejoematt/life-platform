@@ -1,3 +1,66 @@
+## v3.7.84 — 2026-03-20: Sprint 7 World-Class Website — Expert Panel Review + 15 Items Shipped
+
+### Summary
+Conducted a 30+ persona expert panel website strategy review (Jony Ive, Peter Attia, Paul Graham, Andrew Chen, David Perell, Lenny Rachitsky, full Technical Board + Personal Board). Key finding: "The site has world-class infrastructure but undersells the story by 10x." Created Sprint 7 (19 items, WR-14 through WR-46) and shipped 15 of 19 items in-session. 4 new pages live. 5 new homepage sections. Multiple /platform/ and /character/ enhancements. Site-api safety filter deployed. CloudFront 404 routing fixed via CDK.
+
+### New Pages Live
+- `/protocols/` — 6 protocol cards (sleep, training, nutrition, metabolic, habits, supplements) with data sources and compliance status (WR-39)
+- `/platform/reviews/` — Public architecture review #17: 14-member AI board grades, selected findings, grade history (WR-36)
+- `/journal/sample/` — Newsletter sample page with browser-frame mock email UI for The Weekly Signal (WR-32)
+- `/404.html` — Branded 404 page matching site design language (WR-28)
+
+### Homepage Enhancements
+- **WR-38: Discoveries section** — 3 real correlations with r values, p values, and sample sizes (sleep→recovery, bed temp→deep sleep, Zone 2→HRV)
+- **WR-33: Day 1 vs Today comparison card** — side-by-side: weight 302→287.7, HRV 45→66 (+47%), RHR 62→52, recovery 55%→89%
+- **WR-31: "New here? Start with the story" CTA** — amber banner in hero section
+- **WR-30: Real daily brief excerpt** — replaced "coming soon" placeholder with actual AI coaching brief content
+- **WR-29: Fixed live data double-path bug** — `/site/public_stats.json` → `/public_stats.json` (CloudFront origin already adds `/site` prefix)
+- Sample issue links added to all email CTAs across homepage, platform, character pages
+
+### /platform/ Enhancements
+- **WR-34: Animated data flow diagram** — SVG with animated green dots showing 19 Sources → Ingest → Store → Serve → Emails/Website/Ask
+- **WR-35: FinOps cost section** — $13/month total, $3 Claude, $10 AWS, 0 engineers grid
+- **WR-44: Tool of the Week spotlight** — `get_sleep_environment_analysis` with input/output/finding
+- Link to public architecture review from reviews section
+
+### /character/ Enhancements
+- **WR-37: Scoring methodology section** — pillar data sources table showing what feeds each of the 7 pillars
+- Sample issue link added to email CTA
+
+### Infrastructure
+- **WR-28: CloudFront 404/403 fix** — CDK updated: 404→custom 404.html, 403→200/index.html for S3 routing. Deployed via `cdk deploy LifePlatformWeb`.
+- **WR-40: /api/ask response safety filter** — 6 blocked regex categories (PII, financial, medical diagnosis, credentials) + system prompt safety guardrails. Deployed to us-east-1.
+- `deploy/deploy_sprint7_tier0.sh` — deploy script handling us-east-1 site-api Lambda
+
+### Documentation
+- `docs/reviews/WEBSITE_PANEL_REVIEW_2026-03-20.md` — Full 10-section expert panel review document
+- `docs/PROJECT_PLAN.md` — Website Strategy Review #2 section added (19 items)
+- `docs/SPRINT_PLAN.md` — Sprint 7 added (3 tiers, 19 items, 15 complete)
+- `site/sitemap.xml` — 5 new entries (board, journal/sample, subscribe, protocols, platform/reviews)
+
+### Sprint 7 Scorecard
+| Tier | Total | Done | Remaining |
+|------|-------|------|-----------|
+| Tier 0 (Foundations) | 7 | 5 built + 2 Matthew-only | WR-14 (/story/ prose), WR-15 (photos) |
+| Tier 1 (Retention) | 8 | 8 | All complete |
+| Tier 2 (Growth) | 4 buildable | 1 | WR-43 (heartbeat), WR-45 (media kit), WR-46 (open data) |
+
+### Deploys
+- S3 site sync: ✅ (3 syncs this session)
+- CloudFront invalidation: ✅ (3 invalidations)
+- CDK LifePlatformWeb: ✅ (WR-28 error responses)
+- Lambda life-platform-site-api (us-east-1): ✅ (WR-40 safety filter)
+
+### Key Metrics Update
+| Metric | Before | After |
+|--------|--------|-------|
+| Website pages live | 12 | 15 (+protocols, +platform/reviews, +journal/sample) |
+| Homepage sections | 4 | 7 (+discoveries, +comparison card, +start-here CTA) |
+| Sprint 7 items | 0/19 | 15/19 |
+| WR items total | WR-24 | WR-46 |
+
+---
+
 ## v3.7.83 — 2026-03-20: Operational Efficiency Roadmap + Claude Code Adoption
 
 ### Changes

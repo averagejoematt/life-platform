@@ -422,7 +422,7 @@
 // Load live weight
 (async function() {
   try {
-    const r = await fetch('/site/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
+    const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
     if (!r.ok) return;
     const d = await r.json();
     const w = (d.vitals || {}).weight_lbs || (d.hero || {}).current_weight_lbs;

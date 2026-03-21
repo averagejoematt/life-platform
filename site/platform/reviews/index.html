@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Architecture Review #17 — a 14-member AI board reviews a personal health platform.">
+  <meta property="og:title" content="Architecture Review #17 — Matthew Walker's Life Platform">
+  <meta property="og:description" content="14 AI expert personas score a solo-built health platform. Grade: A-. 13 findings. Full transparency.">
+  <meta property="og:type" content="article">
+  <title>Architecture Review #17 — Life Platform</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .review-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+    }
+    .review-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .review-header__title span { color: var(--accent); }
+    .review-body {
+      max-width: var(--prose-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+    }
+    .review-body h2 {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin: var(--space-10) 0 var(--space-4);
+      padding-top: var(--space-8);
+      border-top: 1px solid var(--border-subtle);
+    }
+    .review-body h2:first-child { border-top: none; padding-top: 0; }
+    .review-body p {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      margin-bottom: var(--space-4);
+    }
+    .review-body p strong { color: var(--text); }
+    .grade-card {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: var(--space-8);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: var(--space-8);
+      margin: var(--space-8) 0;
+    }
+    .grade-card__grade {
+      font-family: var(--font-display);
+      font-size: 64px;
+      color: var(--accent);
+      line-height: 1;
+      text-align: center;
+    }
+    .grade-card__label {
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: var(--ls-tag);
+      text-align: center;
+      margin-top: var(--space-2);
+    }
+    .grades-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin: var(--space-8) 0;
+    }
+    .grade-cell {
+      background: var(--surface);
+      padding: var(--space-4) var(--space-5);
+    }
+    .grade-cell__name {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-1);
+    }
+    .grade-cell__domain {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      margin-bottom: var(--space-2);
+    }
+    .grade-cell__grade {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--text);
+    }
+    .grade-cell__grade.high { color: var(--accent); }
+    .finding-row {
+      display: grid;
+      grid-template-columns: 80px 1fr auto;
+      gap: var(--space-4);
+      padding: var(--space-4) 0;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: var(--text-sm);
+    }
+    .finding-row:last-child { border-bottom: none; }
+    .finding-id { font-family: var(--font-mono); color: var(--accent-dim); font-size: var(--text-xs); }
+    .finding-text { color: var(--text-muted); line-height: var(--lh-body); }
+    .finding-sev { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; padding: 2px 8px; border: 1px solid; white-space: nowrap; height: fit-content; }
+    .sev-critical { color: var(--c-red-status); border-color: var(--c-red-status); }
+    .sev-high { color: var(--c-yellow-status); border-color: var(--c-yellow-status); }
+    .sev-medium { color: var(--text-muted); border-color: var(--border); }
+    @media (max-width: 768px) {
+      .grade-card { grid-template-columns: 1fr; }
+      .grades-grid { grid-template-columns: 1fr 1fr; }
+      .finding-row { grid-template-columns: 1fr; gap: var(--space-2); }
+    }
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/live/" class="nav__link">Live</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/character/" class="nav__link">Character</a>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+  </div>
+  <div class="nav__status"><div class="pulse"></div><span>Live</span></div>
+</nav>
+
+<header class="review-header reveal">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">Architecture Review #17 &middot; March 20, 2026</div>
+  <h1 class="review-header__title">Grade: <span>A-</span></h1>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body)">
+    Every major platform change triggers a full architecture review. 14 AI expert personas &mdash; cloud architect, security lead, statistician, product architect, adversarial reviewer &mdash; vote, score, and issue findings. This is a real review from the 17th cycle.
+  </p>
+</header>
+
+<div class="review-body">
+
+  <div class="grade-card reveal">
+    <div>
+      <div class="grade-card__grade">A-</div>
+      <div class="grade-card__label">Composite grade</div>
+    </div>
+    <div>
+      <p><strong>Review #17 covers v3.7.47 through v3.7.82</strong> &mdash; 35 releases that shipped a 12-page public website, public-facing AI Q&amp;A endpoints, subscriber management, 2 new intelligence features, and 5 completed sprints.</p>
+      <p>The grade drops from A (R16) to A- not because of regression, but because the platform crossed a critical threshold &mdash; public exposure with AI endpoints &mdash; and the security and observability controls hadn&rsquo;t fully caught up to the new risk surface.</p>
+    </div>
+  </div>
+
+  <h2>Board Grades</h2>
+  <p>Each of the 14 board personas independently grades their domain. The composite is a weighted average.</p>
+
+  <div class="grades-grid reveal">
+    <div class="grade-cell"><div class="grade-cell__name">Priya Nakamura</div><div class="grade-cell__domain">Architecture</div><div class="grade-cell__grade high">A-</div></div>
+    <div class="grade-cell"><div class="grade-cell__name">Marcus Webb</div><div class="grade-cell__domain">AWS</div><div class="grade-cell__grade high">A-</div></div>
+    <div class="grade-cell"><div class="grade-cell__name">Yael Cohen</div><div class="grade-cell__domain">Security + IAM</div><div class="grade-cell__grade">B+</div></div>
+    <div class="grade-cell"><div class="grade-cell__name">Jin Park</div><div class="grade-cell__domain">SRE</div><div class="grade-cell__grade high">A-</div></div>
+    <div class="grade-cell"><div class="grade-cell__name">Elena Reyes</div><div class="grade-cell__domain">Code Quality</div><div class="grade-cell__grade high">A</div></div>
+    <div class="grade-cell"><div class="grade-cell__name">Omar Khalil</div><div class="grade-cell__domain">Data</div><div class="grade-cell__grade high">A</div></div>
+    <div class="grade-cell"><div class="grade-cell__name">Anika Patel</div><div class="grade-cell__domain">AI / LLM</div><div class="grade-cell__grade high">A</div></div>
+    <div class="grade-cell"><div class="grade-cell__name">Henning Brandt</div><div class="grade-cell__domain">Statistics</div><div class="grade-cell__grade high">A</div></div>
+    <div class="grade-cell"><div class="grade-cell__name">Sarah Chen</div><div class="grade-cell__domain">Product</div><div class="grade-cell__grade high">A-</div></div>
+    <div class="grade-cell"><div class="grade-cell__name">Raj Srinivasan</div><div class="grade-cell__domain">Startup / CTO</div><div class="grade-cell__grade">B+</div></div>
+    <div class="grade-cell"><div class="grade-cell__name">Viktor Sorokin</div><div class="grade-cell__domain">Adversarial</div><div class="grade-cell__grade">B+</div></div>
+    <div class="grade-cell"><div class="grade-cell__name">Dana Torres</div><div class="grade-cell__domain">FinOps</div><div class="grade-cell__grade high">A</div></div>
+    <div class="grade-cell"><div class="grade-cell__name">Ava Moreau</div><div class="grade-cell__domain">UX</div><div class="grade-cell__grade high">A-</div></div>
+    <div class="grade-cell"><div class="grade-cell__name">Jordan Kim</div><div class="grade-cell__domain">Growth</div><div class="grade-cell__grade">B+</div></div>
+  </div>
+
+  <h2>What the System Does Well</h2>
+  <p><strong>Architectural coherence:</strong> The three-layer architecture (Ingest &rarr; Store &rarr; Serve) is clean and consistently applied. The Compute&rarr;Store&rarr;Read pattern separates concerns and supports multiple consumers.</p>
+  <p><strong>IAM discipline:</strong> 49 dedicated, least-privilege IAM roles &mdash; one per Lambda &mdash; all CDK-managed. No role has <code>dynamodb:Scan</code>. The site-api role is genuinely read-only.</p>
+  <p><strong>Statistical rigour:</strong> BH FDR correction across 23 correlation pairs, n-gating that downgrades labels at low sample sizes, log-transform for HRV z-scores. The correlative-not-causal framing is maintained throughout all AI prompts.</p>
+  <p><strong>Cost discipline:</strong> ~$13/month for 49 Lambdas, DynamoDB, S3, CloudFront, SES, and 7 AI-generated email digests per week. Remarkable for the scope.</p>
+
+  <h2>Key Findings (Selected)</h2>
+  <p>13 total findings were issued. The most significant are shown below.</p>
+
+  <div style="border:1px solid var(--border);margin:var(--space-6) 0;">
+    <div class="finding-row" style="padding:var(--space-4) var(--space-5);">
+      <div class="finding-id">R17-F01</div>
+      <div class="finding-text"><strong>Public AI endpoints without WAF.</strong> The site-api Lambda serves AI responses with only in-memory rate limiting, which resets on Lambda cold start. No WAF, no persistent rate store.</div>
+      <div class="finding-sev sev-critical">Critical</div>
+    </div>
+    <div class="finding-row" style="padding:var(--space-4) var(--space-5);">
+      <div class="finding-id">R17-F02</div>
+      <div class="finding-text"><strong>In-memory rate limiting is not rate limiting.</strong> Lambda cold starts reset all rate counters. Under sustained load, every new Lambda instance starts with a clean slate.</div>
+      <div class="finding-sev sev-high">High</div>
+    </div>
+    <div class="finding-row" style="padding:var(--space-4) var(--space-5);">
+      <div class="finding-id">R17-F05</div>
+      <div class="finding-text"><strong>Cross-region architecture split.</strong> Site-api in us-east-1, MCP + data in us-west-2, creates latency for public API reads and operational complexity.</div>
+      <div class="finding-sev sev-high">High</div>
+    </div>
+    <div class="finding-row" style="padding:var(--space-4) var(--space-5);">
+      <div class="finding-id">R17-F03</div>
+      <div class="finding-text"><strong>No CloudWatch dashboard for site-api.</strong> Public-facing Lambda has no latency percentiles, error rate tracking, or invocation spike detection.</div>
+      <div class="finding-sev sev-medium">Medium</div>
+    </div>
+    <div class="finding-row" style="padding:var(--space-4) var(--space-5);">
+      <div class="finding-id">R17-F06</div>
+      <div class="finding-text"><strong>No PITR restore drill on record.</strong> DynamoDB Point-in-Time Recovery is enabled but has never been tested. Untested backups are not backups.</div>
+      <div class="finding-sev sev-medium">Medium</div>
+    </div>
+  </div>
+
+  <h2>Review History</h2>
+  <p>The platform has been reviewed 17 times since its inception. Grade trajectory:</p>
+  <div style="display:flex;gap:var(--space-3);flex-wrap:wrap;margin:var(--space-4) 0;">
+    <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);border:1px solid var(--border);padding:4px 10px;">R13: B+</span>
+    <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);border:1px solid var(--border);padding:4px 10px;">R14: A</span>
+    <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);border:1px solid var(--border);padding:4px 10px;">R15: A</span>
+    <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);border:1px solid var(--border);padding:4px 10px;">R16: A</span>
+    <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);border:1px solid var(--accent-dim);padding:4px 10px;">R17: A-</span>
+  </div>
+
+  <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);margin-top:var(--space-8);">
+    // This is a real architecture review from a 14-member AI expert board.<br>
+    // The full review is 3,000+ words with detailed findings and remediation plans.<br>
+    // The platform has addressed all Critical and High findings from previous reviews.<br>
+    // <a href="/platform/" style="color:var(--accent-dim);text-decoration:none;">Back to Platform &rarr;</a>
+  </p>
+</div>
+
+<footer class="footer">
+  <div class="footer__brand">AMJ</div>
+  <div class="footer__links">
+    <a href="/story/" class="footer__link">Story</a>
+    <a href="/live/" class="footer__link">Live</a>
+    <a href="/journal/" class="footer__link">Journal</a>
+    <a href="/platform/" class="footer__link">Platform</a>
+    <a href="/character/" class="footer__link">Character</a>
+    <a href="/subscribe/" class="footer__link">Subscribe</a>
+  </div>
+  <div class="footer__copy">// updated daily by life-platform &middot; <a href="/privacy/" class="footer__link">Privacy</a></div>
+</footer>
+<script src="/assets/js/reveal.js"></script>
+</body>
+</html>

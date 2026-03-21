@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Current Protocols — what Matthew is doing, what the data shows, and what's working.">
+  <meta property="og:title" content="Current Protocols — Matthew Walker">
+  <meta property="og:description" content="The specific health protocols behind the transformation — and whether the data says they're working.">
+  <meta property="og:type" content="website">
+  <title>Current Protocols — Matthew Walker</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .proto-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+    }
+    .proto-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .proto-header__title span { color: var(--accent); }
+    .proto-body {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 var(--page-padding);
+    }
+    .proto-card {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      margin: var(--space-8) 0;
+    }
+    .proto-card__header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      padding: var(--space-5) var(--space-6);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .proto-card__pillar {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+    }
+    .proto-card__status {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border: 1px solid;
+    }
+    .proto-card__status.working { color: var(--accent); border-color: var(--accent-dim); }
+    .proto-card__status.building { color: var(--c-amber-500); border-color: var(--c-amber-300); }
+    .proto-card__status.gap { color: var(--c-red-status); border-color: rgba(255,82,82,0.3); }
+    .proto-card__body { padding: var(--space-6); }
+    .proto-card__name {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .proto-card__desc {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      margin-bottom: var(--space-4);
+    }
+    .proto-detail {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: var(--space-2) var(--space-4);
+      font-size: var(--text-xs);
+      margin-bottom: var(--space-2);
+    }
+    .proto-detail__label {
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+    }
+    .proto-detail__value { color: var(--text-muted); }
+    .proto-detail__value strong { color: var(--text); }
+    .proto-data-note {
+      margin-top: var(--space-4);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--border-subtle);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+    }
+    .proto-data-note span { color: var(--accent-dim); }
+    @media (max-width: 768px) {
+      .proto-detail { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/live/" class="nav__link">Live</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/character/" class="nav__link">Character</a>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+  </div>
+  <div class="nav__status"><div class="pulse"></div><span>Live</span></div>
+</nav>
+
+<header class="proto-header reveal">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">Current Protocols</div>
+  <h1 class="proto-header__title">What I&rsquo;m <span>actually doing</span></h1>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:560px;line-height:var(--lh-body)">
+    The specific protocols behind the transformation &mdash; and whether the data says they&rsquo;re working.
+    Updated as protocols change. Each protocol shows the data source tracking it and current compliance.
+  </p>
+</header>
+
+<div class="proto-body">
+
+  <!-- Sleep -->
+  <div class="proto-card reveal">
+    <div class="proto-card__header">
+      <div class="proto-card__pillar">Sleep Pillar</div>
+      <div class="proto-card__status working">Data: working</div>
+    </div>
+    <div class="proto-card__body">
+      <div class="proto-card__name">Sleep Optimization Protocol</div>
+      <div class="proto-card__desc">Target 7.5&ndash;8.5 hours. Eight Sleep pod for temperature control. Consistent bedtime before 11pm. No screens 30 min before bed.</div>
+      <div class="proto-detail"><span class="proto-detail__label">Target</span><span class="proto-detail__value"><strong>7.5&ndash;8.5 hours</strong> sleep per night, bedtime before 11pm</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Tracking</span><span class="proto-detail__value">Whoop (sleep score, stages, HRV), Eight Sleep (bed temp, timing)</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Current avg</span><span class="proto-detail__value"><strong>7.7 hours</strong> &mdash; within target</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Key finding</span><span class="proto-detail__value">Bedtime after 11pm → -12% next-day recovery (r=-0.38, p=0.04)</span></div>
+      <div class="proto-data-note"><span>// Tracked by:</span> Whoop + Eight Sleep + Apple Health</div>
+    </div>
+  </div>
+
+  <!-- Training -->
+  <div class="proto-card reveal">
+    <div class="proto-card__header">
+      <div class="proto-card__pillar">Movement Pillar</div>
+      <div class="proto-card__status gap">Data: gap</div>
+    </div>
+    <div class="proto-card__body">
+      <div class="proto-card__name">Zone 2 + Strength Protocol</div>
+      <div class="proto-card__desc">150 min/week Zone 2 cardio (walking, cycling, or rowing at conversational pace). 3x/week compound lifts targeting centenarian decathlon benchmarks. ACWR monitoring for injury prevention.</div>
+      <div class="proto-detail"><span class="proto-detail__label">Z2 target</span><span class="proto-detail__value"><strong>150 min/week</strong> at cardiac efficiency HR zone</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Strength</span><span class="proto-detail__value">3x/week compound lifts (tracked via Hevy + Strava)</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Current Z2</span><span class="proto-detail__value"><strong>42 of 150 min</strong> this week &mdash; below target</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">ACWR</span><span class="proto-detail__value">1.1 &mdash; within safe range (0.8&ndash;1.3)</span></div>
+      <div class="proto-data-note"><span>// Tracked by:</span> Garmin + Strava + Whoop + Hevy</div>
+    </div>
+  </div>
+
+  <!-- Nutrition -->
+  <div class="proto-card reveal">
+    <div class="proto-card__header">
+      <div class="proto-card__pillar">Nutrition Pillar</div>
+      <div class="proto-card__status building">Data: building</div>
+    </div>
+    <div class="proto-card__body">
+      <div class="proto-card__name">Caloric Deficit + Protein Priority</div>
+      <div class="proto-card__desc">MacroFactor-managed deficit with adaptive TDEE tracking. Protein target of 1g/lb lean mass. Deficit sustainability monitored by platform (IC-29).</div>
+      <div class="proto-detail"><span class="proto-detail__label">Approach</span><span class="proto-detail__value"><strong>Adaptive deficit</strong> via MacroFactor expenditure model</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Protein</span><span class="proto-detail__value">1g per pound of lean body mass target</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Monitoring</span><span class="proto-detail__value">Deficit sustainability tracker flags when rate exceeds safe loss</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">CGM</span><span class="proto-detail__value">Dexcom Stelo continuous glucose monitor for postprandial response</span></div>
+      <div class="proto-data-note"><span>// Tracked by:</span> MacroFactor + Dexcom Stelo + Withings</div>
+    </div>
+  </div>
+
+  <!-- Metabolic -->
+  <div class="proto-card reveal">
+    <div class="proto-card__header">
+      <div class="proto-card__pillar">Metabolic Pillar</div>
+      <div class="proto-card__status working">Data: working</div>
+    </div>
+    <div class="proto-card__body">
+      <div class="proto-card__name">Biomarker Monitoring</div>
+      <div class="proto-card__desc">Regular lab draws tracking lipids, metabolic panel, inflammation markers, hormones. Blood pressure measured daily. Weight tracked via Withings scale.</div>
+      <div class="proto-detail"><span class="proto-detail__label">Labs</span><span class="proto-detail__value">7 blood draws to date &mdash; tracking 40+ biomarkers</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">BP</span><span class="proto-detail__value">Daily measurement, tracked in platform</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Genome</span><span class="proto-detail__value">110 SNPs analysed for predisposition-aware coaching</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">DEXA</span><span class="proto-detail__value">Baseline scan complete &mdash; #2 scheduled for body comp tracking</span></div>
+      <div class="proto-data-note"><span>// Tracked by:</span> Withings + Labs + BP cuff + Dexcom + Genome</div>
+    </div>
+  </div>
+
+  <!-- Habits -->
+  <div class="proto-card reveal">
+    <div class="proto-card__header">
+      <div class="proto-card__pillar">Consistency Pillar</div>
+      <div class="proto-card__status working">Data: working</div>
+    </div>
+    <div class="proto-card__body">
+      <div class="proto-card__name">Tier 0 Habit System</div>
+      <div class="proto-card__desc">Non-negotiable daily habits tracked via Habitify. The &ldquo;Essential Seven&rdquo; protocol identifies the 7 habits with highest impact on overall score. Streak tracking with compounding value.</div>
+      <div class="proto-detail"><span class="proto-detail__label">System</span><span class="proto-detail__value"><strong>65 habits</strong> in registry, 7 Tier 0 (non-negotiable)</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Tracking</span><span class="proto-detail__value">Habitify daily check-ins + platform P40 scoring</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Vice streaks</span><span class="proto-detail__value">Temptation logging with resist rate tracking</span></div>
+      <div class="proto-data-note"><span>// Tracked by:</span> Habitify + Todoist + platform compute</div>
+    </div>
+  </div>
+
+  <!-- Supplements -->
+  <div class="proto-card reveal">
+    <div class="proto-card__header">
+      <div class="proto-card__pillar">Supplementation</div>
+      <div class="proto-card__status building">Data: building</div>
+    </div>
+    <div class="proto-card__body">
+      <div class="proto-card__name">Supplement Stack</div>
+      <div class="proto-card__desc">Logged daily via platform supplement tracker. Genome-informed where relevant (110 SNP analysis includes methylation, vitamin metabolism, and absorption variants).</div>
+      <div class="proto-detail"><span class="proto-detail__label">Logging</span><span class="proto-detail__value">Daily supplement check-in via platform MCP tool</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Genome link</span><span class="proto-detail__value">SNP-informed decisions on methylfolate, vitamin D, omega-3</span></div>
+      <div class="proto-data-note"><span>// Tracked by:</span> Platform supplement log + genome insights</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- N=1 disclaimer -->
+<aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle);">
+  <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label)">
+    <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
+    These are protocols for one person, informed by one person&rsquo;s data. Nothing here is medical advice.
+    The value is the methodology &mdash; tracking everything, letting data drive decisions, and being honest about what&rsquo;s working and what isn&rsquo;t.
+  </p>
+</aside>
+
+<!-- Email CTA -->
+<section class="email-cta-footer reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface);text-align:center;">
+  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
+  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
+    Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.<br>
+    <a href="/journal/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue &rarr;</a>
+  </p>
+  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
+    <input id="cta-email-protocols" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);outline:none;" onfocus="this.style.borderColor='var(--c-amber-400)'" onblur="this.style.borderColor='var(--c-amber-500)'">
+    <button onclick="amjSubscribe('protocols')" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">Subscribe</button>
+  </div>
+  <p id="cta-msg-protocols" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
+</section>
+<script>
+if(!window.amjSubscribe){window.amjSubscribe=async function(s){var e=document.getElementById('cta-email-'+s).value.trim(),m=document.getElementById('cta-msg-'+s);if(!e||!e.includes('@')){m.textContent='Enter a valid email address.';m.style.color='var(--c-yellow-status)';return}m.textContent='Subscribing\u2026';m.style.color='var(--text-muted)';try{var r=await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:e,source:s+'_cta'})});var d=await r.json();if(r.ok){m.textContent='\u2713 Check your inbox to confirm.';m.style.color='var(--c-amber-500)';document.getElementById('cta-email-'+s).value=''}else{m.textContent=d.error||'Something went wrong.';m.style.color='var(--c-yellow-status)'}}catch(x){m.textContent='Network error \u2014 try again.';m.style.color='var(--c-yellow-status)'}}}
+var inp=document.getElementById('cta-email-protocols');if(inp)inp.addEventListener('keydown',function(e){if(e.key==='Enter')window.amjSubscribe('protocols')});
+</script>
+
+<footer class="footer">
+  <div class="footer__brand">AMJ</div>
+  <div class="footer__links">
+    <a href="/story/" class="footer__link">Story</a>
+    <a href="/live/" class="footer__link">Live</a>
+    <a href="/journal/" class="footer__link">Journal</a>
+    <a href="/platform/" class="footer__link">Platform</a>
+    <a href="/character/" class="footer__link">Character</a>
+    <a href="/protocols/" class="footer__link">Protocols</a>
+    <a href="/experiments/" class="footer__link">Experiments</a>
+    <a href="/explorer/" class="footer__link">Explorer</a>
+    <a href="/ask/" class="footer__link">Ask</a>
+    <a href="/board/" class="footer__link">Board</a>
+    <a href="/about/" class="footer__link">About</a>
+    <a href="/subscribe/" class="footer__link">Subscribe</a>
+  </div>
+  <div class="footer__copy">// updated daily by life-platform &middot; <a href="/privacy/" class="footer__link">Privacy</a></div>
+</footer>
+<script src="/assets/js/reveal.js"></script>
+</body>
+</html>
