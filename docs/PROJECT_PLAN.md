@@ -129,7 +129,9 @@ All Tier 1 (Sprint 1–4) items complete. See SPRINT_PLAN.md for full inventory.
 
 > Focus: Distribution + Website + Behavior Change
 
-### Website Roadmap (12 pages live as of v3.7.82)
+### Website Roadmap (15 pages live as of v3.8.0)
+
+> Full website feature roadmap: `docs/WEBSITE_ROADMAP.md`
 
 | # | Page | Purpose | Status |
 |---|------|---------|--------|
@@ -170,6 +172,8 @@ Board Summit #3: 500 subscribers OR 90-day journey milestone (2026-05-22), which
 
 | ID | Item | Version | Date |
 |----|------|---------|------|
+| v3.8.0 | Sprint 8: Mobile nav (hamburger + bottom nav + grouped footer), content safety filter, website versioning | v3.8.0 | 2026-03-21 |
+| v3.7.84 | Sprint 7: Expert panel review + 15 of 19 website items shipped | v3.7.84 | 2026-03-20 |
 | R17 | Architecture Review #17 — grade A-. 13 findings, Sprint 6 created. | v3.7.82 | 2026-03-20 |
 | v3.7.82 | In-memory rate limiting for ask + board_ask — stopped AccessDeniedException alarm flood | v3.7.82 | 2026-03-20 |
 | v3.7.81 | Nav + footer standardised across all 12 pages — /story/ promoted to primary nav | v3.7.81 | 2026-03-19 |
@@ -214,3 +218,7 @@ Board Summit #3: 500 subscribers OR 90-day journey milestone (2026-05-22), which
 | Architecture review grade | A- | A | R17 grade A-. R18 targeting post-DIST-1 (~June 2026). |
 | Email subscribers | 0 | 500 (6 months) | Subscribe backend live. Distribution is #1 priority. |
 | Website pages live | 15 | — | +protocols, +platform/reviews, +journal/sample (v3.7.84) |
+| HTML files patched | 30 | — | All pages have consistent nav architecture (v3.8.0) |
+| Mobile navigation | ✅ Hamburger + bottom nav | — | Shipped v3.8.0 (was: NONE) |
+| Content filter | ✅ 3-layer active | — | S3 config + system prompt + response scrub (v3.8.0) |
+| Git deploy tags | site-v3.8.0 | — | First tagged deploy with rollback capability |

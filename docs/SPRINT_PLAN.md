@@ -1,6 +1,6 @@
 # Life Platform — Sprint Plan
-**Board-Aligned Implementation Roadmap | v3.7.83 | March 20, 2026**
-*Derived from Joint Board Summit Record (March 15, 2026) + Board Sprint Review (March 16, 2026) + Architecture Review #17 (March 20, 2026) + Expert Panel Website Strategy Review (March 20, 2026)*
+**Board-Aligned Implementation Roadmap | v3.8.0 | March 21, 2026**
+*Derived from Joint Board Summit Record (March 15, 2026) + Board Sprint Review (March 16, 2026) + Architecture Review #17 (March 20, 2026) + Expert Panel Website Strategy Review (March 20, 2026) + Unified Board Summit #3 (March 21, 2026)*
 
 ---
 
@@ -222,14 +222,41 @@ This document translates the Board Summit recommendations into an ordered, reali
 
 **Sprint 7 Definition of Done:**
 - ⬜ /story/ prose written by Matthew (WR-14) — **distribution gate**
-- ✅ All subpages accessible to crawlers and social link previews (WR-28) — CDK updated, needs deploy
+- ✅ All subpages accessible to crawlers and social link previews (WR-28) — CDK deployed
 - ✅ Homepage shows live data, not dashes (WR-29) — fixed double-path bug
 - ✅ Daily brief excerpt visible on homepage (WR-30) — real excerpt replaces placeholder
 - ⬜ At least one photo of Matthew on the site (WR-15)
 - ✅ Newsletter sample viewable before subscribing (WR-32) — `/journal/sample/`
 - ⬜ DIST-1 (HN or Twitter launch) executed with Tier 0 complete
-- ✅ /ask/ has response content filtering (WR-40) — needs Lambda deploy
+- ✅ /ask/ has response content filtering (WR-40) — deployed v3.7.84 + v3.8.0 content filter
 - ⬜ Build-in-public posting cadence established (WR-41)
+
+---
+
+## SPRINT 8 — Mobile Navigation + Content Safety + Website Versioning (v3.8.0)
+**Theme: Navigation Architecture + Content Safety + Infrastructure**
+**Source: Unified Board Summit #3 (2026-03-21) — Technical Board + Personal Board + Web Board (30+ personas)**
+**Critical finding: Mobile visitors have ZERO navigation (nav__links display:none, no hamburger)**
+
+| ID | Feature | Effort | Model | Deliverable | Status |
+|----|---------|--------|-------|-------------|--------|
+| S8-01 | Mobile hamburger menu | S | None | ☰ icon → full-page overlay with grouped sections | ✅ Done |
+| S8-02 | Mobile bottom nav (persistent) | S | None | 60px bar: Home · Ask · Score · Journal · More | ✅ Done |
+| S8-03 | Updated top nav (desktop) | S | None | Story · Live · Journal · Platform · About · Subscribe | ✅ Done |
+| S8-04 | Grouped footer v2 | S | None | 4-column: Journey / Data / Platform / Follow | ✅ Done |
+| S8-05 | nav.js shared component | S | None | Hamburger toggle, active states, keyboard escape, theme prep | ✅ Done |
+| S8-06 | Content safety filter (S3 config) | S | None | config/content_filter.json — blocked vices/keywords | ✅ Done |
+| S8-07 | Content filter Lambda integration | S | None | _load_content_filter(), _scrub_blocked_terms(), system prompt | ✅ Done |
+| S8-08 | Website rollback script | XS | None | deploy/rollback_site.sh — git tag → S3 sync → CF invalidate | ✅ Done |
+| S8-09 | Git tag versioning | XS | None | site-v3.8.0 — first tagged deploy | ✅ Done |
+| S8-10 | Website feature roadmap | M | None | docs/WEBSITE_ROADMAP.md — 12 new pages, APIs, deploy patterns | ✅ Done |
+
+**Sprint 8 Definition of Done:**
+- ✅ Mobile visitors can navigate (hamburger + bottom nav)
+- ✅ All 30 HTML pages patched with consistent nav architecture
+- ✅ Content filter blocks "No porn" and "No marijuana" from all public AI responses
+- ✅ Website can be rolled back to any tagged version
+- ✅ Comprehensive roadmap written for Claude Code continuation
 
 ---
 
@@ -302,7 +329,8 @@ All Sprint 1–4 features shipped (30 items). Sprint 5 complete (buildable). Rem
 | Sprint 4 | ✅ Complete | BS-11, WEB-CE, BS-BM2, BS-14 |
 | Sprint 5 | ✅ Buildable | All technical items done. /story prose + DIST-1 pending (Matthew). |
 | Sprint 6 | ⬜ Active | R17 Hardening: WAF, privacy, dashboard, PITR, cleanup (18 items) |
-| Sprint 7 | ⬜ Planned | World-Class Website: storytelling, live data, distribution (19 items, WR-14 through WR-46) |
+| Sprint 7 | ✅ Complete (buildable) | 17 of 19 done. WR-14 (/story prose) + WR-15 (photos) remain (Matthew only). |
+| Sprint 8 | ✅ Complete | Mobile nav, content filter, grouped footer, versioning (10 items, all done) |
 
 ---
 
@@ -321,15 +349,21 @@ Week 14-15:  SPRINT 5 ✅ COMPLETE (buildable) — Website + Distribution
              v3.7.82: in-memory rate limiting fix ✅
              REMAINING: /story prose | photos | DIST-1
 
+DONE:        SPRINT 7 — World-Class Website ✅ (17/19 items, v3.7.84)
+             WR-14 (/story prose) + WR-15 (photos) remain (Matthew only)
+
+DONE:        SPRINT 8 — Mobile Nav + Content Filter + Versioning ✅ (10/10, v3.8.0)
+             30 pages patched, hamburger + bottom nav, content filter, rollback infra
+
 NOW:         SPRINT 6 — R17 Hardening Sprint (~2 weeks, March/April 2026)
   Tier 0:    WAF + privacy + dashboard + PITR drill + cleanup (pre-DIST-1)
   Tier 1:    Site-api migration + SIMP-1 Ph2 + IC-4/IC-5 (60 days)
   Tier 2:    CSP + graceful degradation + TTL + CORS (90 days)
 
-NEXT:        SPRINT 7 — World-Class Website (~4 weeks, April/May 2026)
-  Tier 0:    /story/ prose + 404 fix + live data + brief excerpt + photos + newsletter sample
-  Tier 1:    Comparison cards + data flow anim + cost ticker + public review + protocols + /ask/ filter
-  Tier 2:    HN launch + build-in-public + heartbeat viz + tool-of-week + media kit + open data
+NEXT:        SPRINT 9 — New Website Pages (see WEBSITE_ROADMAP.md)
+  Phase 1:   /habits/ + /achievements/ + /supplements/ + /benchmarks/ + /journal/archive/
+  Phase 2:   /glucose/ + /sleep/ + /intelligence/ + /progress/ + /accountability/
+  Phase 3:   Gamification (avatar, badges, reading path CTAs)
 
 ~April 2026: R17 Tier 0 complete → Sprint 7 Tier 0 begins
 ~May 2026:   Sprint 7 Tier 0 done → DIST-1 (HN launch) → Sprint 7 Tier 1
@@ -349,8 +383,10 @@ Post-DEXA:   BS-BM3, BS-T2-3 DEXA Body Composition
 
 ---
 
-*Board Summit #1: March 16, 2026 | Board Summit #2: March 17, 2026 | 16 board members (Health + Technical)*
+*Board Summit #1: March 16, 2026 | Board Summit #2: March 17, 2026 | Board Summit #3: March 21, 2026*
 *Summit #1 record: `docs/reviews/BOARD_SUMMIT_2026-03-16.md` | Summit #2 record: `docs/reviews/BOARD_SUMMIT_2_2026-03-17.md`*
 *Board Sprint Review full record: `docs/reviews/BOARD_SPRINT_REVIEW_2026-03-16.md`*
 *Architecture Review #17: `docs/reviews/REVIEW_2026-03-20_v17.md` — Sprint 6 derived from R17 findings + board decisions*
+*Expert Panel Review: `docs/reviews/WEBSITE_PANEL_REVIEW_2026-03-20.md` — Sprint 7 derived from 30+ persona panel*
+*Website Roadmap: `docs/WEBSITE_ROADMAP.md` — comprehensive feature roadmap from Summit #3 for Claude Code*
 *Champions listed are advisory — Matthew Walker is the implementer*
