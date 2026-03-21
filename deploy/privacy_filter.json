@@ -1,0 +1,21 @@
+{
+  "_meta": {
+    "description": "Content privacy filter for public-facing surfaces. Vices listed here are NEVER mentioned in public content: website, /api/ask responses, public_stats.json, newsletters, or any externally visible output.",
+    "last_updated": "2026-03-21",
+    "updated_by": "board_summit_session"
+  },
+  "redacted_vices": [
+    "No porn",
+    "No marijuana"
+  ],
+  "redacted_patterns": [
+    "porn",
+    "pornograph",
+    "marijuana",
+    "cannabis",
+    "weed",
+    "THC"
+  ],
+  "replacement_label": "[private vice]",
+  "notes": "When displaying vice streaks publicly, skip these entirely rather than showing redacted labels. In AI responses, the system prompt instructs Claude to never reference these categories."
+}

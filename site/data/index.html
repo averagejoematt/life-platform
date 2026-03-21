@@ -150,14 +150,50 @@
     <a href="/live/" class="nav__link">Live</a>
     <a href="/journal/" class="nav__link">Journal</a>
     <a href="/platform/" class="nav__link">Platform</a>
-    <a href="/character/" class="nav__link">Character</a>
+    <a href="/about/" class="nav__link">About</a>
     <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
   </div>
+  <button class="nav__hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
   <div class="nav__status">
     <div class="pulse"></div>
-    <span>Live</span>
+    <span id="nav-date"></span>
   </div>
 </nav>
+<!-- Mobile overlay menu -->
+<div class="nav-overlay">
+  <div class="nav-overlay__panel">
+    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The journey</div>
+      <a href="/story/" class="nav-overlay__link">Story</a>
+      <a href="/live/" class="nav-overlay__link">Live</a>
+      <a href="/journal/" class="nav-overlay__link">Journal</a>
+      <a href="/about/" class="nav-overlay__link">About</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The data</div>
+      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/biology/" class="nav-overlay__link">Biology</a>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The platform</div>
+      <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/data/" class="nav-overlay__link">Data</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">Follow</div>
+      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+    </div>
+  </div>
+</div>
 
 <div class="page-header animate-in">
   <p class="page-header__kicker">// transparency protocol</p>
@@ -414,23 +450,64 @@ sk:  <span class="val">"DATE#{YYYY-MM-DD}"</span>              <span class="cmt"
   <p id="cta-msg-data" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
 </section>
 
-<footer class="footer">
-  <div class="footer__brand">AMJ</div>
-  <div class="footer__links">
-    <a href="/story/" class="footer__link">Story</a>
-    <a href="/live/" class="footer__link">Live</a>
-    <a href="/journal/" class="footer__link">Journal</a>
-    <a href="/platform/" class="footer__link">Platform</a>
-    <a href="/character/" class="footer__link">Character</a>
-    <a href="/experiments/" class="footer__link">Experiments</a>
-    <a href="/explorer/" class="footer__link">Explorer</a>
-    <a href="/biology/" class="footer__link">Biology</a>
-    <a href="/ask/" class="footer__link">Ask</a>
-    <a href="/board/" class="footer__link">Board</a>
-    <a href="/about/" class="footer__link">About</a>
-    <a href="/subscribe/" class="footer__link">Subscribe</a>
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <a href="/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span>Ask</span>
+  </a>
+  <a href="/character/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span>Score</span>
+  </a>
+  <a href="/journal/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+    <span>Journal</span>
+  </a>
+  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    <span>More</span>
+  </button>
+</nav>
+<footer class="footer-v2">
+  <div class="footer-v2__grid">
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The journey</div>
+      <a href="/story/" class="footer-v2__link">Story</a>
+      <a href="/live/" class="footer-v2__link">Live</a>
+      <a href="/journal/" class="footer-v2__link">Journal</a>
+      <a href="/about/" class="footer-v2__link">About</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The data</div>
+      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/explorer/" class="footer-v2__link">Explorer</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/biology/" class="footer-v2__link">Biology</a>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The platform</div>
+      <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/data/" class="footer-v2__link">Data</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">Follow</div>
+      <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/rss.xml" class="footer-v2__link">RSS</a>
+      <a href="/privacy/" class="footer-v2__link">Privacy</a>
+    </div>
   </div>
-  <div class="footer__copy">// updated daily by life-platform · <a href="/privacy/" class="footer__link">Privacy</a></div>
+  <div class="footer-v2__bottom">
+    <span class="footer-v2__brand">AMJ</span>
+    <span class="footer-v2__copy">// updated daily by life-platform</span>
+  </div>
 </footer>
 
 <script>
@@ -472,5 +549,6 @@ sk:  <span class="val">"DATE#{YYYY-MM-DD}"</span>              <span class="cmt"
 })();
 </script>
 <script src="/assets/js/reveal.js"></script>
+<script src="/assets/js/nav.js"></script>
 </body>
 </html>

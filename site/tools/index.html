@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Free health calculators — Zone 2 heart rate, HRV baseline, protein timing. Interactive tools anyone can use.">
+  <meta property="og:title" content="Free Health Tools — Matthew Walker">
+  <meta property="og:description" content="Zone 2 calculator. HRV baseline interpreter. Protein timing calculator. Free interactive tools based on real health data.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/tools/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Free Health Tools — Matthew Walker">
+  <meta name="twitter:description" content="Zone 2 calculator. HRV baseline. Protein timing. Free tools anyone can use.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>Free Health Tools — Matthew Walker</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .page-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .page-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .page-header__title span { color: var(--accent); }
+    .page-header__sub {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 560px;
+      line-height: var(--lh-body);
+    }
+
+    /* Tool layout */
+    .tools-body {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 var(--page-padding);
+    }
+    .tool-section {
+      padding: var(--space-12) 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .tool-section__header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: var(--space-4);
+      margin-bottom: var(--space-8);
+      padding-bottom: var(--space-6);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .tool-section__tag {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-2);
+    }
+    .tool-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+    }
+    .tool-section__sub {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      max-width: 480px;
+      line-height: var(--lh-body);
+      margin-top: var(--space-2);
+    }
+    .matthew-badge {
+      background: var(--c-green-050);
+      border: 1px solid var(--c-green-100);
+      padding: var(--space-3) var(--space-5);
+      text-align: center;
+      white-space: nowrap;
+    }
+    .matthew-badge__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+    }
+    .matthew-badge__value {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--accent);
+      line-height: 1.2;
+    }
+
+    /* Input/output layout */
+    .calc-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-8);
+      align-items: start;
+    }
+    .calc-inputs { }
+    .calc-results {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-6);
+    }
+
+    /* Inputs */
+    .input-group {
+      margin-bottom: var(--space-5);
+    }
+    .input-group label {
+      display: block;
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-label);
+      color: var(--text-muted);
+      margin-bottom: var(--space-2);
+      font-family: var(--font-mono);
+    }
+    .input-row {
+      display: flex;
+      gap: var(--space-2);
+      align-items: center;
+    }
+    .calc-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      padding: var(--space-3) var(--space-4);
+      outline: none;
+      transition: border-color var(--dur-fast);
+    }
+    .calc-input:focus { border-color: var(--accent); }
+    .calc-input::placeholder { color: var(--text-faint); }
+    .input-unit {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
+    .calc-btn {
+      display: inline-block;
+      padding: var(--space-3) var(--space-6);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-label);
+      text-transform: uppercase;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      cursor: pointer;
+      transition: background var(--dur-fast);
+      width: 100%;
+      margin-top: var(--space-4);
+    }
+    .calc-btn:hover { background: var(--c-green-400); }
+
+    /* Results */
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: var(--space-4);
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .result-row:last-child { border-bottom: none; }
+    .result-row__label {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+    }
+    .result-row__value {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .result-row__value.accent { color: var(--accent); }
+    .result-row__value.amber  { color: var(--c-amber-500); }
+    .result-row__unit {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+    }
+    .result-placeholder {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      text-align: center;
+      padding: var(--space-8) 0;
+    }
+    .result-tip {
+      margin-top: var(--space-5);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--border-subtle);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      line-height: var(--lh-body);
+      letter-spacing: var(--ls-label);
+    }
+    .result-tip strong { color: var(--accent-dim); }
+
+    /* HRV zones */
+    .hrv-zones { display: grid; gap: var(--space-2); }
+    .hrv-zone {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-3) var(--space-4);
+      border: 1px solid var(--border-subtle);
+      font-size: var(--text-xs);
+    }
+    .hrv-zone.active { border-color: var(--accent); background: var(--c-green-050); }
+    .hrv-zone__label { color: var(--text-muted); font-family: var(--font-mono); }
+    .hrv-zone__range { color: var(--text); }
+    .hrv-zone__meaning { color: var(--text-faint); font-style: italic; }
+
+    /* Protein timing */
+    .protein-schedule { display: grid; gap: var(--space-2); }
+    .protein-meal {
+      display: grid;
+      grid-template-columns: 80px 1fr 60px;
+      gap: var(--space-3);
+      align-items: center;
+      padding: var(--space-3) var(--space-4);
+      border: 1px solid var(--border-subtle);
+      background: var(--surface);
+    }
+    .protein-meal__time { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-faint); }
+    .protein-meal__name { font-size: var(--text-xs); color: var(--text-muted); }
+    .protein-meal__grams { font-family: var(--font-display); font-size: 18px; color: var(--accent); text-align: right; }
+
+    /* N=1 checklist */
+    .checklist {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-3);
+      margin-top: var(--space-6);
+    }
+    .check-item {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: var(--space-3);
+      align-items: start;
+      padding: var(--space-4);
+      border: 1px solid var(--border-subtle);
+      background: var(--surface);
+    }
+    .check-item__num {
+      font-family: var(--font-display);
+      font-size: 24px;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .check-item__title {
+      font-size: var(--text-sm);
+      color: var(--text);
+      margin-bottom: var(--space-1);
+    }
+    .check-item__desc {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+      line-height: var(--lh-body);
+    }
+    .check-item__example {
+      font-size: var(--text-2xs);
+      color: var(--accent-dim);
+      margin-top: var(--space-2);
+      font-family: var(--font-mono);
+    }
+
+    @media (max-width: 768px) {
+      .calc-layout { grid-template-columns: 1fr; }
+      .tool-section__header { grid-template-columns: 1fr; }
+      .matthew-badge { display: none; }
+      .checklist { grid-template-columns: 1fr; }
+      .protein-meal { grid-template-columns: 70px 1fr 50px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/live/" class="nav__link">Live</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/about/" class="nav__link">About</a>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+  </div>
+  <button class="nav__hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span id="nav-date"></span>
+  </div>
+</nav>
+<!-- Mobile overlay menu -->
+<div class="nav-overlay">
+  <div class="nav-overlay__panel">
+    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The journey</div>
+      <a href="/story/" class="nav-overlay__link">Story</a>
+      <a href="/live/" class="nav-overlay__link">Live</a>
+      <a href="/journal/" class="nav-overlay__link">Journal</a>
+      <a href="/about/" class="nav-overlay__link">About</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The data</div>
+      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/biology/" class="nav-overlay__link">Biology</a>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The platform</div>
+      <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/data/" class="nav-overlay__link">Data</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">Follow</div>
+      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+    </div>
+  </div>
+</div>
+
+<header class="page-header reveal">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">Free Calculators</div>
+  <h1 class="page-header__title">Tools anyone can <span>use today</span></h1>
+  <p class="page-header__sub">
+    Interactive calculators based on the same protocols Matthew uses. Enter your numbers, get personalized results.
+    Matthew&rsquo;s current values are shown alongside for comparison.
+  </p>
+</header>
+
+<div class="tools-body">
+
+  <!-- Tool 1: Zone 2 HR Calculator -->
+  <div class="tool-section reveal">
+    <div class="tool-section__header">
+      <div>
+        <div class="tool-section__tag">// Tool 01 — Aerobic Training</div>
+        <div class="tool-section__title">Zone 2 Heart Rate Calculator</div>
+        <div class="tool-section__sub">Find your personal Zone 2 training range — the cardiac efficiency zone that drives fat adaptation and aerobic base.</div>
+      </div>
+      <div class="matthew-badge">
+        <div class="matthew-badge__label">Matthew&rsquo;s RHR</div>
+        <div class="matthew-badge__value" id="z2-matthew">— bpm</div>
+      </div>
+    </div>
+
+    <div class="calc-layout">
+      <div class="calc-inputs">
+        <div class="input-group">
+          <label>Your age</label>
+          <div class="input-row">
+            <input type="number" class="calc-input" id="z2-age" placeholder="e.g. 42" min="15" max="90">
+            <span class="input-unit">years</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Resting heart rate (morning, first thing)</label>
+          <div class="input-row">
+            <input type="number" class="calc-input" id="z2-rhr" placeholder="e.g. 58" min="35" max="90">
+            <span class="input-unit">bpm</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Fitness level</label>
+          <div class="input-row">
+            <select class="calc-input" id="z2-fitness" style="flex:1">
+              <option value="0.85">Beginner (mostly sedentary)</option>
+              <option value="0.87" selected>Moderate (some regular exercise)</option>
+              <option value="0.89">Active (3-4x/week consistent)</option>
+              <option value="0.91">Athletic (5+ days/week, years of training)</option>
+            </select>
+          </div>
+        </div>
+        <button class="calc-btn" onclick="calcZ2()">Calculate my Zone 2 &rarr;</button>
+      </div>
+
+      <div class="calc-results" id="z2-results">
+        <div class="result-placeholder">Enter your age and resting HR to calculate your Zone 2 range.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tool 2: HRV Baseline Interpreter -->
+  <div class="tool-section reveal">
+    <div class="tool-section__header">
+      <div>
+        <div class="tool-section__tag">// Tool 02 — Recovery Intelligence</div>
+        <div class="tool-section__title">HRV Baseline Interpreter</div>
+        <div class="tool-section__sub">Enter your HRV and get training readiness guidance based on population norms and recovery science.</div>
+      </div>
+      <div class="matthew-badge">
+        <div class="matthew-badge__label">Matthew&rsquo;s HRV</div>
+        <div class="matthew-badge__value" id="hrv-matthew">— ms</div>
+      </div>
+    </div>
+
+    <div class="calc-layout">
+      <div class="calc-inputs">
+        <div class="input-group">
+          <label>Your age</label>
+          <div class="input-row">
+            <input type="number" class="calc-input" id="hrv-age" placeholder="e.g. 42" min="18" max="80">
+            <span class="input-unit">years</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Your current HRV reading</label>
+          <div class="input-row">
+            <input type="number" class="calc-input" id="hrv-val" placeholder="e.g. 58" min="10" max="200">
+            <span class="input-unit">ms (RMSSD)</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>How was it measured?</label>
+          <div class="input-row">
+            <select class="calc-input" id="hrv-device" style="flex:1">
+              <option value="whoop">Whoop (overnight RMSSD)</option>
+              <option value="apple">Apple Watch (morning reading)</option>
+              <option value="garmin">Garmin (overnight)</option>
+              <option value="oura">Oura Ring (overnight)</option>
+              <option value="other">Other wearable</option>
+            </select>
+          </div>
+        </div>
+        <button class="calc-btn" onclick="calcHRV()">Interpret my HRV &rarr;</button>
+      </div>
+
+      <div class="calc-results" id="hrv-results">
+        <div class="result-placeholder">Enter your age and HRV to get your readiness interpretation.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tool 3: Protein Timing Calculator -->
+  <div class="tool-section reveal">
+    <div class="tool-section__header">
+      <div>
+        <div class="tool-section__tag">// Tool 03 — Nutrition Protocol</div>
+        <div class="tool-section__title">Protein Timing Calculator</div>
+        <div class="tool-section__sub">Calculate your total protein target and optimal distribution across meals for maximum muscle protein synthesis.</div>
+      </div>
+      <div class="matthew-badge">
+        <div class="matthew-badge__label">Matthew&rsquo;s target</div>
+        <div class="matthew-badge__value">~190g/day</div>
+      </div>
+    </div>
+
+    <div class="calc-layout">
+      <div class="calc-inputs">
+        <div class="input-group">
+          <label>Body weight</label>
+          <div class="input-row">
+            <input type="number" class="calc-input" id="prot-weight" placeholder="e.g. 220" min="80" max="400">
+            <select class="calc-input" id="prot-unit" style="flex:0;min-width:70px">
+              <option value="lbs" selected>lbs</option>
+              <option value="kg">kg</option>
+            </select>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Goal</label>
+          <div class="input-row">
+            <select class="calc-input" id="prot-goal" style="flex:1">
+              <option value="retain">Retain muscle (deficit/maintenance)</option>
+              <option value="build">Build muscle (surplus)</option>
+              <option value="athlete">Athlete performance</option>
+            </select>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Training days per week</label>
+          <div class="input-row">
+            <input type="number" class="calc-input" id="prot-days" placeholder="e.g. 4" min="0" max="7">
+            <span class="input-unit">days/week</span>
+          </div>
+        </div>
+        <button class="calc-btn" onclick="calcProtein()">Calculate protein plan &rarr;</button>
+      </div>
+
+      <div class="calc-results" id="prot-results">
+        <div class="result-placeholder">Enter your weight and training frequency to get a protein distribution plan.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tool 4: Start your own N=1 checklist -->
+  <div class="tool-section reveal">
+    <div class="tool-section__header">
+      <div>
+        <div class="tool-section__tag">// Tool 04 — Getting Started</div>
+        <div class="tool-section__title">Start Your Own N=1 Experiment</div>
+        <div class="tool-section__sub">What to track first. The minimum viable personal health data setup — before you build anything complex.</div>
+      </div>
+    </div>
+
+    <div class="checklist">
+      <div class="check-item">
+        <div class="check-item__num">01</div>
+        <div>
+          <div class="check-item__title">Daily weight (with trend, not single readings)</div>
+          <div class="check-item__desc">// start here — cheapest signal, highest information density per dollar</div>
+          <div class="check-item__example">tool: Withings Body Comp ($99) or any wifi scale. Track 30-day trend, not daily swings.</div>
+        </div>
+      </div>
+      <div class="check-item">
+        <div class="check-item__num">02</div>
+        <div>
+          <div class="check-item__title">Overnight HRV + resting HR</div>
+          <div class="check-item__desc">// recovery signal that changes behavior — skip training when red, push when green</div>
+          <div class="check-item__example">tool: Whoop ($30/mo) or Oura Ring ($299 + $6/mo). Wear it every night.</div>
+        </div>
+      </div>
+      <div class="check-item">
+        <div class="check-item__num">03</div>
+        <div>
+          <div class="check-item__title">Daily habits (3–5 non-negotiables)</div>
+          <div class="check-item__desc">// track what you're actually doing before optimizing anything</div>
+          <div class="check-item__example">tool: Habitify or Streaks. Start with 3 habits maximum. Add when all 3 are consistent.</div>
+        </div>
+      </div>
+      <div class="check-item">
+        <div class="check-item__num">04</div>
+        <div>
+          <div class="check-item__title">Food logging for 30 days (not forever)</div>
+          <div class="check-item__desc">// one month of honest logging teaches your baseline better than any guide</div>
+          <div class="check-item__example">tool: MacroFactor (adaptive TDEE) or Cronometer. Stop after 30 days if stressful.</div>
+        </div>
+      </div>
+      <div class="check-item">
+        <div class="check-item__num">05</div>
+        <div>
+          <div class="check-item__title">One baseline blood panel</div>
+          <div class="check-item__desc">// know your starting biomarkers before you try to change them</div>
+          <div class="check-item__example">service: Function Health, Marek Health, or your GP. Ask for: lipids, glucose, HbA1c, CBC, TSH.</div>
+        </div>
+      </div>
+      <div class="check-item">
+        <div class="check-item__num">06</div>
+        <div>
+          <div class="check-item__title">Write down one hypothesis</div>
+          <div class="check-item__desc">// "if I do X for 30 days, I expect to see Y in metric Z" — N=1 needs a thesis</div>
+          <div class="check-item__example">example: "If I sleep before 10:30pm for 30 days, my 30d avg HRV will increase by 5ms."</div>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top:var(--space-6);font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono)">
+      After 90 days of consistent tracking: <a href="/ask/" style="color:var(--accent-dim);text-decoration:none">ask the platform &rarr;</a> or <a href="/platform/" style="color:var(--accent-dim);text-decoration:none">see the full stack &rarr;</a>
+    </p>
+  </div>
+
+</div><!-- /tools-body -->
+
+<!-- N=1 disclaimer -->
+<aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle);">
+  <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label)">
+    <span style="color:var(--accent-dim)">// CALCULATOR DISCLAIMER</span><br>
+    These calculators use established population formulas (Karvonen method for Z2, age-normalized HRV population data, leucine threshold protein science).
+    They are starting points, not prescriptions. Individual variation is real.
+    Consult a qualified health professional before making significant changes to exercise or nutrition.
+  </p>
+</aside>
+
+<!-- Email CTA -->
+<section class="email-cta-footer reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface);text-align:center;">
+  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
+  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Apply these tools to real data.</h3>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
+    The Wednesday email shows Matthew&rsquo;s Z2 compliance, HRV trends, and protein numbers &mdash; each week, without filtering.<br>
+    <a href="/journal/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue &rarr;</a>
+  </p>
+  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
+    <input id="cta-email-tools" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);outline:none;" onfocus="this.style.borderColor='var(--c-amber-400)'" onblur="this.style.borderColor='var(--c-amber-500)'">
+    <button onclick="amjSubscribe('tools')" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">Subscribe</button>
+  </div>
+  <p id="cta-msg-tools" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
+</section>
+<script>
+if(!window.amjSubscribe){window.amjSubscribe=async function(s){var e=document.getElementById('cta-email-'+s).value.trim(),m=document.getElementById('cta-msg-'+s);if(!e||!e.includes('@')){m.textContent='Enter a valid email address.';m.style.color='var(--c-yellow-status)';return}m.textContent='Subscribing\u2026';m.style.color='var(--text-muted)';try{var r=await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:e,source:s+'_cta'})});var d=await r.json();if(r.ok){m.textContent='\u2713 Check your inbox to confirm.';m.style.color='var(--c-amber-500)';document.getElementById('cta-email-'+s).value=''}else{m.textContent=d.error||'Something went wrong.';m.style.color='var(--c-yellow-status)'}}catch(x){m.textContent='Network error \u2014 try again.';m.style.color='var(--c-yellow-status)'}}}
+var inp=document.getElementById('cta-email-tools');if(inp)inp.addEventListener('keydown',function(e){if(e.key==='Enter')window.amjSubscribe('tools')});
+</script>
+
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <a href="/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span>Ask</span>
+  </a>
+  <a href="/character/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span>Score</span>
+  </a>
+  <a href="/journal/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+    <span>Journal</span>
+  </a>
+  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    <span>More</span>
+  </button>
+</nav>
+<footer class="footer-v2">
+  <div class="footer-v2__grid">
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The journey</div>
+      <a href="/story/" class="footer-v2__link">Story</a>
+      <a href="/live/" class="footer-v2__link">Live</a>
+      <a href="/journal/" class="footer-v2__link">Journal</a>
+      <a href="/about/" class="footer-v2__link">About</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The data</div>
+      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/explorer/" class="footer-v2__link">Explorer</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/biology/" class="footer-v2__link">Biology</a>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The platform</div>
+      <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/data/" class="footer-v2__link">Data</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">Follow</div>
+      <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/rss.xml" class="footer-v2__link">RSS</a>
+      <a href="/privacy/" class="footer-v2__link">Privacy</a>
+    </div>
+  </div>
+  <div class="footer-v2__bottom">
+    <span class="footer-v2__brand">AMJ</span>
+    <span class="footer-v2__copy">// updated daily by life-platform</span>
+  </div>
+</footer>
+
+<script src="/assets/js/reveal.js"></script>
+<script>
+const API = 'https://averagejoematt.com';
+
+// Load Matthew's live values for context
+async function loadMatthewValues() {
+  try {
+    const res = await fetch(`${API}/api/vitals`);
+    const d = await res.json();
+    const v = d.vitals;
+    if (v.rhr_bpm) {
+      // Show Matthew's RHR as context; Z2 range requires age (not stored in public API)
+      document.getElementById('z2-matthew').textContent = `RHR ${Math.round(v.rhr_bpm)} bpm`;
+    }
+    if (v.hrv_ms) {
+      document.getElementById('hrv-matthew').textContent = `${Math.round(v.hrv_ms)} ms`;
+    }
+  } catch(e) {}
+}
+loadMatthewValues();
+
+// ── Zone 2 Calculator ─────────────────────────────────────────────────────────
+function calcZ2() {
+  const age = parseInt(document.getElementById('z2-age').value);
+  const rhr = parseInt(document.getElementById('z2-rhr').value);
+  const coeff = parseFloat(document.getElementById('z2-fitness').value);
+
+  if (!age || !rhr || age < 15 || rhr < 35) {
+    document.getElementById('z2-results').innerHTML = '<div class="result-placeholder" style="color:var(--c-yellow-status)">Please enter valid age (15–90) and resting HR (35–90).</div>';
+    return;
+  }
+
+  // Karvonen method with age-predicted HRmax adjustment for fitness level
+  const hrMax = Math.round(220 - age);
+  const hrReserve = hrMax - rhr;
+
+  // Zone 2: 60–70% of HRR (Karvonen). Adjust ceiling based on fitness.
+  const z2Low  = Math.round(rhr + hrReserve * 0.60);
+  const z2High = Math.round(rhr + hrReserve * 0.70);
+
+  // Nasal-breathing test range (Dr. Phil Maffetone 180 formula crosscheck)
+  const mafLow  = Math.round(180 - age - 5);
+  const mafHigh = Math.round(180 - age);
+
+  // RPE description
+  const rpe = 'RPE 4–5 / 10 — can hold a conversation, slightly breathless';
+
+  document.getElementById('z2-results').innerHTML = `
+    <div class="result-row">
+      <span class="result-row__label">Zone 2 range (Karvonen)</span>
+      <span class="result-row__value accent">${z2Low}–${z2High}<span class="result-row__unit"> bpm</span></span>
+    </div>
+    <div class="result-row">
+      <span class="result-row__label">Max HR (220 - age)</span>
+      <span class="result-row__value">${hrMax}<span class="result-row__unit"> bpm</span></span>
+    </div>
+    <div class="result-row">
+      <span class="result-row__label">Maffetone crosscheck</span>
+      <span class="result-row__value amber">${mafLow}–${mafHigh}<span class="result-row__unit"> bpm</span></span>
+    </div>
+    <div class="result-row">
+      <span class="result-row__label">Effort level</span>
+      <span class="result-row__value" style="font-size:var(--text-xs);color:var(--text-muted);white-space:normal">${rpe}</span>
+    </div>
+    <div class="result-row">
+      <span class="result-row__label">Weekly target</span>
+      <span class="result-row__value" style="font-size:var(--text-xs);color:var(--text-muted)">150 min / week</span>
+    </div>
+    <div class="result-tip">
+      <strong>// Use the nasal breathing test:</strong> If you have to breathe through your mouth to maintain pace, you're above Zone 2.
+      Walk, cycle, or row — any low-impact activity works. The goal is aerobic base, not intensity.
+    </div>`;
+}
+
+// ── HRV Baseline Interpreter ──────────────────────────────────────────────────
+function calcHRV() {
+  const age = parseInt(document.getElementById('hrv-age').value);
+  const hrv = parseInt(document.getElementById('hrv-val').value);
+  const device = document.getElementById('hrv-device').value;
+
+  if (!age || !hrv || age < 18) {
+    document.getElementById('hrv-results').innerHTML = '<div class="result-placeholder" style="color:var(--c-yellow-status)">Please enter valid age and HRV value.</div>';
+    return;
+  }
+
+  // Age-adjusted population norms (Whoop/overnight RMSSD)
+  // Source: aggregate norms from HRV4Training, Whoop population data
+  const ageBand = age < 30 ? 0 : age < 40 ? 1 : age < 50 ? 2 : age < 60 ? 3 : 4;
+  const norms = [
+    { label: '18–29', p25: 52, p50: 72, p75: 96 },
+    { label: '30–39', p25: 46, p50: 64, p75: 84 },
+    { label: '40–49', p25: 40, p50: 56, p75: 76 },
+    { label: '50–59', p25: 35, p50: 49, p75: 66 },
+    { label: '60+',   p25: 28, p50: 40, p75: 56 },
+  ];
+  const norm = norms[ageBand];
+
+  // Device calibration note
+  const deviceNotes = {
+    whoop:  'Whoop RMSSD correlates well with clinical measurements.',
+    apple:  'Apple Watch typically reads ~10–15% lower than Whoop overnight.',
+    garmin: 'Garmin overnight HRV is comparable to Whoop.',
+    oura:   'Oura Ring overnight is comparable to Whoop.',
+    other:  'Different devices have different algorithms — treat these as directional.',
+  };
+
+  let zone, readiness, action, zoneClass;
+  if (hrv >= norm.p75) {
+    zone = 'Above Average'; readiness = 'High'; zoneClass = 'accent';
+    action = 'Green light for intense training or high-stress days. Body is well-recovered.';
+  } else if (hrv >= norm.p50) {
+    zone = 'Average'; readiness = 'Moderate'; zoneClass = '';
+    action = 'Good for most training. Avoid pushing max intensity. Monitor next day.';
+  } else if (hrv >= norm.p25) {
+    zone = 'Below Average'; readiness = 'Low'; zoneClass = 'amber';
+    action = 'Consider Zone 2 only or rest. Prioritize sleep and stress reduction tonight.';
+  } else {
+    zone = 'Low'; readiness = 'Very Low'; zoneClass = 'amber';
+    action = 'Rest or light movement only. HRV this low often precedes illness or overtraining.';
+  }
+
+  document.getElementById('hrv-results').innerHTML = `
+    <div class="result-row">
+      <span class="result-row__label">Your HRV vs age ${norm.label} norms</span>
+      <span class="result-row__value ${zoneClass}">${zone}</span>
+    </div>
+    <div class="result-row">
+      <span class="result-row__label">Training readiness</span>
+      <span class="result-row__value ${zoneClass}">${readiness}</span>
+    </div>
+    <div class="result-row">
+      <span class="result-row__label">Population benchmarks (age ${norm.label})</span>
+      <span class="result-row__value" style="font-size:var(--text-xs);color:var(--text-muted)">25th: ${norm.p25}ms &middot; median: ${norm.p50}ms &middot; 75th: ${norm.p75}ms</span>
+    </div>
+    <div class="result-row">
+      <span class="result-row__label">Recommendation</span>
+      <span class="result-row__value" style="font-size:var(--text-xs);color:var(--text-muted);white-space:normal">${action}</span>
+    </div>
+    <div class="result-tip">
+      <strong>// ${deviceNotes[device]}</strong><br>
+      HRV is most useful as a trend vs your own baseline — not as an absolute number.
+      Track for 30+ days to find your personal normal range.
+    </div>`;
+}
+
+// ── Protein Calculator ────────────────────────────────────────────────────────
+function calcProtein() {
+  const weight = parseFloat(document.getElementById('prot-weight').value);
+  const unit = document.getElementById('prot-unit').value;
+  const goal = document.getElementById('prot-goal').value;
+  const days = parseInt(document.getElementById('prot-days').value) || 3;
+
+  if (!weight || weight < 80) {
+    document.getElementById('prot-results').innerHTML = '<div class="result-placeholder" style="color:var(--c-yellow-status)">Please enter a valid body weight.</div>';
+    return;
+  }
+
+  const weightLbs = unit === 'kg' ? weight * 2.205 : weight;
+  const weightKg  = unit === 'kg' ? weight : weight / 2.205;
+
+  // Protein multipliers based on goal (g/lb lean mass approximation)
+  const multipliers = {
+    retain:  0.82,  // ~0.82g/lb — min to prevent lean mass loss in deficit
+    build:   0.90,  // ~0.9g/lb — enough for MPS when in surplus
+    athlete: 1.00,  // ~1g/lb — for high-frequency training
+  };
+  const gPerLb = multipliers[goal];
+  const totalG = Math.round(weightLbs * gPerLb);
+
+  // Meal distribution (leucine threshold: ~2.5–3g leucine per serving, ~30–40g protein)
+  const meals = [
+    { time: 'Morning',   name: goal === 'retain' ? 'Breakfast / protein shake' : 'Breakfast + shake',   pct: 0.28 },
+    { time: 'Midday',    name: 'Lunch — largest protein meal',                                             pct: 0.32 },
+    { time: 'Afternoon', name: 'Post-workout window (within 2h)',                                          pct: 0.22 },
+    { time: 'Evening',   name: 'Dinner — casein-heavy if possible',                                        pct: 0.18 },
+  ];
+
+  const mealRows = meals.map(m => {
+    const g = Math.round(totalG * m.pct);
+    return `<div class="protein-meal">
+      <span class="protein-meal__time">${m.time}</span>
+      <span class="protein-meal__name">${m.name}</span>
+      <span class="protein-meal__grams">${g}g</span>
+    </div>`;
+  }).join('');
+
+  const trainNote = days >= 5
+    ? 'High training frequency — uniform distribution works; post-workout window is critical.'
+    : days >= 3
+    ? 'Moderate training — front-load protein on training days; casein at night on rest days.'
+    : 'Low training frequency — consistent daily intake matters more than timing.';
+
+  document.getElementById('prot-results').innerHTML = `
+    <div class="result-row">
+      <span class="result-row__label">Daily target</span>
+      <span class="result-row__value accent">${totalG}g<span class="result-row__unit">/day</span></span>
+    </div>
+    <div class="result-row">
+      <span class="result-row__label">Per kg body weight</span>
+      <span class="result-row__value">${(totalG / weightKg).toFixed(1)}<span class="result-row__unit"> g/kg</span></span>
+    </div>
+    <div style="margin: var(--space-4) 0 var(--space-2)">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);font-family:var(--font-mono);margin-bottom:var(--space-2)">Meal distribution</div>
+      <div class="protein-schedule">${mealRows}</div>
+    </div>
+    <div class="result-tip">
+      <strong>// Training note:</strong> ${trainNote}
+      Each meal must hit ~30g minimum to clear the leucine threshold for muscle protein synthesis.
+    </div>`;
+}
+
+// Enter key support on all calculators
+['z2-age','z2-rhr'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('keydown', e => { if(e.key==='Enter') calcZ2(); });
+});
+['hrv-age','hrv-val'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('keydown', e => { if(e.key==='Enter') calcHRV(); });
+});
+['prot-weight','prot-days'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('keydown', e => { if(e.key==='Enter') calcProtein(); });
+});
+</script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>
