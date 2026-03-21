@@ -1,3 +1,63 @@
+## v3.8.0 — 2026-03-21: Sprint 8 — Mobile Navigation, Content Safety Filter, Grouped Footer
+
+### Summary
+Unified Board Summit #3 convened (Technical Board, Personal Board, Web Board — 30+ personas including Jony Ive, Lenny Rachitsky, Julie Zhuo, Andrew Chen, David Perell, Ethan Mollick). Three critical findings: (1) mobile visitors have ZERO navigation (nav__links display:none with no hamburger), (2) site needs three-tier nav architecture (top nav for discovery, bottom nav for engagement, footer for completeness), (3) content filter needed to hide sensitive vices from all public surfaces. All 30 HTML pages patched. Content filter deployed to site-api Lambda.
+
+### Navigation Architecture (30 pages patched)
+- **Mobile hamburger menu** — ☰ icon in top-right, opens full-page overlay with grouped sections (The Journey / The Data / The Platform / Follow)
+- **Mobile bottom nav** — persistent 60px bar with 5 thumb-zone icons: Home · Ask · Score · Journal · More
+- **Updated top nav** (desktop) — Story · Live · Journal · Platform · About · [Subscribe →] (was: Story · Live · Journal · Platform · Character)
+- **Grouped footer v2** — 4-column layout (The Journey / The Data / The Platform / Follow) replaces flat 12-link footer
+- **nav.js shared component** — handles hamburger toggle, bottom nav active state, overlay open/close, keyboard escape, theme toggle prep
+
+### Content Safety Filter
+- **S3 config** — `config/content_filter.json` with blocked vices ("No porn", "No marijuana") and blocked keywords
+- **Lambda integration** — `_load_content_filter()` loads from S3 (cached in warm container), `_scrub_blocked_terms()` strips mentions from AI responses, `_is_blocked_vice()` utility for future endpoints
+- **System prompt** — `/api/ask` prompt now explicitly instructs Claude to never mention blocked terms
+- **Response scrubbing** — both `/api/ask` and `/api/board_ask` responses pass through `_scrub_blocked_terms()` before returning
+
+### Website Versioning Infrastructure
+- **`deploy/rollback_site.sh`** — git-tag-based rollback: checkout tag → S3 sync → CloudFront invalidate
+- **`site-v3.8.0` tag** — first tagged deploy for instant rollback capability
+- **Theme system architecture** designed (Layer 1: git tags for structural, Layer 3: CSS data-theme for visual) — implementation deferred to next session
+
+### Unified Board Summit #3 — Feature Vision
+- Full inventory of 87+ MCP tools mapped to proposed website pages
+- 12 new page concepts identified with data sources already built (habits, achievements, supplements, benchmarks, glucose, sleep, intelligence, progress, accountability, methodology, journal/archive, genome)
+- Gamification vision: SVG avatar evolving with pillar tiers, badge/achievement wall, "since your last visit" indicators
+- Commercialization ladder: Free newsletter → Premium ($10/mo) → Course ($99-299) → Community ($29/mo) → Advisory ($500+/hr)
+- Full website roadmap written to `docs/WEBSITE_ROADMAP.md` for Claude Code continuation
+
+### Files Created
+| File | Purpose |
+|------|---------|
+| `site/assets/js/nav.js` | Shared navigation JS component |
+| `site/assets/css/base.css` (appended) | +5,219 chars: hamburger, bottom nav, overlay, grouped footer CSS |
+| `seeds/content_filter.json` | Content safety filter config (uploaded to S3) |
+| `deploy/deploy_sprint8_nav.py` | Master nav patching script (30 pages) |
+| `deploy/patch_content_filter.py` | Lambda content filter integration script |
+| `deploy/rollback_site.sh` | Git-tag-based site rollback script |
+| `docs/WEBSITE_ROADMAP.md` | Comprehensive roadmap for Claude Code continuation |
+| `handovers/HANDOVER_v3.8.0.md` | Session handover |
+
+### Deploys
+- S3 site sync: ✅ (30 pages + nav.js + base.css)
+- CloudFront invalidation: ✅ (`I8XRHMEYNI8GYEPZFJZHDVCTQJ`)
+- Lambda life-platform-site-api (us-east-1): ✅ (content filter)
+- S3 config: ✅ (`config/content_filter.json`)
+- Git tag: ✅ (`site-v3.8.0`)
+
+### Key Metrics Update
+| Metric | Before | After |
+|--------|--------|-------|
+| Website pages | 15 | 15 (no new pages, all patched) |
+| HTML files patched | 0 | 30 |
+| Mobile navigation | None (display:none) | Hamburger + bottom nav + overlay |
+| Content filter | None | 3-layer (S3 config + prompt + response scrub) |
+| Git tags | None | site-v3.8.0 (first tagged deploy) |
+
+---
+
 ## v3.7.84 — 2026-03-20: Sprint 7 World-Class Website — Expert Panel Review + 15 Items Shipped
 
 ### Summary

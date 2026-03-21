@@ -1,15 +1,15 @@
-→ See handovers/HANDOVER_v3.7.84.md
+→ See handovers/HANDOVER_v3.8.0.md
 
-This session (2026-03-20):
-- Expert Panel Website Strategy Review conducted (30+ personas)
-- Sprint 7 "World-Class Website" created: 19 items (WR-14 through WR-46)
-- 15 of 19 items shipped: 4 new pages, 5 new homepage sections, safety filter, CloudFront fix
-- New pages: /protocols/, /platform/reviews/, /journal/sample/, /404.html
-- CDK deployed (CloudFront error responses), site-api Lambda deployed (us-east-1 safety filter)
-- Website pages: 12 → 15
+This session (2026-03-21):
+- Unified Board Summit #3 (Technical + Personal + Web boards, 30+ personas)
+- Sprint 8 shipped: Mobile hamburger + bottom nav + grouped footer (30 pages patched)
+- Content safety filter deployed (blocks porn/marijuana from all public surfaces)
+- Website versioning: rollback_site.sh + first git tag site-v3.8.0
+- Comprehensive website roadmap: docs/WEBSITE_ROADMAP.md (12 new pages, gamification, commercialization)
 
 Next session entry point:
 1. Sprint 6 Tier 0 remaining: R17-02 (privacy), R17-04 (API key), R17-07 (config cleanup)
 2. Fix public_stats.json — weight_lbs is null (daily_brief_lambda.py issue)
-3. OE-02: shell aliases + Makefile (15 min)
-4. /story/ prose + DIST-1 remain distribution-critical path (Matthew only)
+3. New pages from WEBSITE_ROADMAP.md: /habits/ and /achievements/ are highest impact
+4. Theme system implementation (tokens.css light mode)
+5. /story/ prose + DIST-1 remain distribution-critical path (Matthew only)
