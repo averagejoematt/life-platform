@@ -536,6 +536,19 @@
     </div>
   </div>
 
+  <!-- WR-43: Animated heartbeat/biometric signature -->
+  <div id="heartbeat-wrap" style="
+    width:100%;max-width:460px;
+    margin:var(--space-4) 0 var(--space-2);
+    opacity:0;animation:fadeUp 0.6s ease forwards 0.55s;
+  ">
+    <canvas id="heartbeat-canvas" style="width:100%;height:54px;display:block;"></canvas>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;">
+      <span id="hb-status" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#00e5a0">● LIVE</span>
+      <span id="hb-label" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1px;color:#484f58">HRV — · RHR — · RECOVERY —</span>
+    </div>
+  </div>
+
   <!-- Latest Chronicle headline -->
   <a class="chronicle-teaser" href="/journal/" id="chronicle-teaser" style="display:none;">
     <span class="teaser-kicker">Latest: The Measured Life</span>
@@ -585,6 +598,106 @@
   </p>
 
 </section>
+
+<script>
+// WR-43: Animated heartbeat / biometric signature
+(function() {
+  const canvas = document.getElementById('heartbeat-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const W = 460, H = 54;
+  canvas.width = W; canvas.height = H;
+  const BASELINE = H * 0.62;
+  const AMP = H * 0.42;
+  const SCROLL = 72; // px per second
+
+  let rhr = 52, recoveryPct = 75, hrv = 66;
+  let startTs = null;
+
+  // Simplified ECG shape: normalized y in [-0.3, 1.0] for beat phase t in [0,1]
+  function ecgY(t) {
+    if (t < 0.08)  return 0;
+    if (t < 0.17)  return Math.sin((t - 0.08) / 0.09 * Math.PI) * 0.1;   // P wave
+    if (t < 0.26)  return 0;
+    if (t < 0.30)  return -(t - 0.26) / 0.04 * 0.18;                      // Q dip
+    if (t < 0.335) return -0.18 + (t - 0.30) / 0.035 * 1.18;              // R spike up
+    if (t < 0.375) return 1.0 - (t - 0.335) / 0.04 * 1.25;               // S down
+    if (t < 0.42)  return -0.25 + (t - 0.375) / 0.045 * 0.25;            // back to 0
+    if (t < 0.52)  return 0;
+    if (t < 0.65)  return Math.sin((t - 0.52) / 0.13 * Math.PI) * 0.2;   // T wave
+    return 0;
+  }
+
+  function getColor() {
+    return recoveryPct >= 67 ? '#00e5a0' : recoveryPct >= 34 ? '#c8843a' : '#ff5252';
+  }
+
+  function frame(ts) {
+    if (!startTs) startTs = ts;
+    const elapsed = (ts - startTs) / 1000;
+    const bp = 60 / rhr; // beat period in seconds
+    const c = getColor();
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Subtle baseline
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, BASELINE); ctx.lineTo(W, BASELINE); ctx.stroke();
+
+    // Compute y for each x pixel using scrolling time offset
+    const pts = Array.from({length: W}, (_, x) => {
+      const xTime = elapsed - (W - 1 - x) / SCROLL;
+      const phase = ((xTime % bp) + bp) % bp / bp;
+      return BASELINE - ecgY(phase) * AMP;
+    });
+
+    // Fill under curve
+    ctx.beginPath();
+    ctx.moveTo(0, BASELINE);
+    pts.forEach((y, i) => ctx.lineTo(i, y));
+    ctx.lineTo(W - 1, BASELINE);
+    ctx.closePath();
+    ctx.fillStyle = c + '18';
+    ctx.fill();
+
+    // Stroke ECG line
+    ctx.beginPath();
+    pts.forEach((y, i) => { if (i === 0) ctx.moveTo(0, y); else ctx.lineTo(i, y); });
+    ctx.strokeStyle = c;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // Glowing dot at leading edge
+    const ey = pts[W - 1];
+    const grd = ctx.createRadialGradient(W - 1, ey, 0, W - 1, ey, 8);
+    grd.addColorStop(0, c + 'cc');
+    grd.addColorStop(1, 'transparent');
+    ctx.beginPath(); ctx.arc(W - 1, ey, 8, 0, Math.PI * 2);
+    ctx.fillStyle = grd; ctx.fill();
+    ctx.beginPath(); ctx.arc(W - 1, ey, 3, 0, Math.PI * 2);
+    ctx.fillStyle = c; ctx.fill();
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // Called by the data loader once public_stats.json is loaded
+  window.updateHeartbeat = function(raw) {
+    const v = (raw || {}).vitals || {};
+    if (v.rhr_bpm)      rhr = v.rhr_bpm;
+    if (v.recovery_pct) recoveryPct = v.recovery_pct;
+    if (v.hrv_ms)       hrv = Math.round(v.hrv_ms);
+    const c = getColor();
+    const s = document.getElementById('hb-status');
+    if (s) s.style.color = c;
+    const l = document.getElementById('hb-label');
+    if (l) l.textContent = 'HRV ' + hrv + 'ms · RHR ' + Math.round(rhr) + 'bpm · RECOVERY ' + Math.round(recoveryPct) + '%';
+  };
+})();
+</script>
 
 <!-- ── Trend Sparklines + AI Brief ────────────────────────── -->
 <section class="reveal" style="
@@ -1006,6 +1119,9 @@ function drawSparkline(svgId, values, opts = {}) {
     const p    = raw.platform || {};
     const hero = raw.hero     || {};
     const meta = raw._meta    || {};
+
+    // WR-43: feed live vitals into heartbeat animation
+    if (window.updateHeartbeat) window.updateHeartbeat(raw);
 
     // Nav date
     const genAt = meta.generated_at || raw.updated_at;

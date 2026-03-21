@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-Last updated: 2026-03-20 (v3.7.83 — 95 MCP tools, 31-module package, 49 Lambdas, 19 data sources)
+Last updated: 2026-03-21 (v3.7.84 — 95 MCP tools, 31-module package, 49 Lambdas, 19 data sources)
 
 ---
 
@@ -339,6 +339,28 @@ Apple Health exports can be large. The function has 1024 MB memory and a 5-minut
 
 ---
 
+## DynamoDB TTL Policy (R17-17)
+
+TTL is enabled on the `life-platform` table (attribute: `ttl`, Unix epoch). The table is imported by CDK — TTL cannot be enabled via CDK, only via CLI (run once).
+
+**Partitions that write `ttl`:**
+| Partition | TTL | Purpose |
+|-----------|-----|---------|
+| `CACHE#matthew` | 26 hours | MCP cache warmer pre-computed results |
+| `USER#matthew#SOURCE#anomalies` | 90 days | Anomaly detector records (investigative data only) |
+
+**Enable TTL (run once, idempotent):**
+```bash
+aws dynamodb update-time-to-live \
+  --table-name life-platform \
+  --time-to-live-specification "Enabled=true,AttributeName=ttl" \
+  --region us-west-2
+```
+
+**To add TTL to other partitions:** update the Lambda that writes to that partition to include a `"ttl": int(timestamp)` field. DynamoDB will auto-expire items within ~48h of the TTL passing.
+
+---
+
 ## Verifying DynamoDB TTL is Active
 
 The cache partition uses a 26-hour TTL. Confirm it’s actually enabled:
@@ -389,6 +411,18 @@ aws secretsmanager get-secret-value \
 ```bash
 aws lambda get-function-configuration --function-name life-platform-mcp --query 'MemorySize'
 ```
+
+---
+
+## AWS CLI Setup (OE-05)
+
+Disable the pager to prevent `aws` commands from blocking in non-interactive shells (CI, scripts):
+
+```bash
+aws configure set cli_pager ""
+```
+
+This sets `cli_pager=` in `~/.aws/config`. Run once per machine/CI environment. Without it, commands like `aws logs tail` open `less` and block scripts.
 
 ---
 

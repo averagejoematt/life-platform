@@ -736,6 +736,9 @@ def write_anomaly_record(date_str, flagged, alert_sent, hypothesis, severity,
                          sick_mode=False, sick_reason=None,
                          sustained_metrics=None, sustained_alert_sent=False):
     """Write anomaly record. Additive sustained_metrics field — no schema breakage. (Jin/Omar)"""
+    # R17-17: 90-day TTL — anomaly records are investigative, not long-term data
+    record_dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    ttl_epoch = int((record_dt + timedelta(days=90)).timestamp())
     item = {
         "pk":                    f"USER#{USER_ID}#SOURCE#anomalies",
         "sk":                    f"DATE#{date_str}",
@@ -751,6 +754,7 @@ def write_anomaly_record(date_str, flagged, alert_sent, hypothesis, severity,
         "sick_reason":           sick_reason,
         "detector_version":      "2.5.0",
         "updated_at":            datetime.now(timezone.utc).isoformat(),
+        "ttl":                   ttl_epoch,
     }
     # Sustained streak fields — additive, harmless if absent (IC-19 Deliverable 2)
     if sustained_metrics:

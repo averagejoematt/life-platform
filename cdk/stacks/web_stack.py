@@ -200,27 +200,34 @@ class WebStack(Stack):
 
         # ══════════════════════════════════════════════════════════════
         # Site API Lambda — life-platform-site-api
-        # Read-only. Reserved concurrency = 20 (viral defence).
+        # R17-09: Lambda moved to LifePlatformOperational (us-west-2) for same-region DynamoDB.
+        # Migration Phase 2: once LifePlatformOperational is deployed, set context
+        #   "site_api_fn_url_domain": "<domain-from-SiteApiFunctionUrlDomain-output>"
+        # in cdk.json, then redeploy LifePlatformWeb. Until then, Lambda remains here.
         # ══════════════════════════════════════════════════════════════
-        site_api_fn = create_platform_lambda(
-            self, "SiteApiLambda",
-            function_name="life-platform-site-api",
-            source_file="lambdas/site_api_lambda.py",
-            handler="site_api_lambda.lambda_handler",
-            table=local_table,
-            bucket=local_bucket,
-            dlq=None,
-            alerts_topic=None,
-            custom_policies=rp.site_api(),
-            timeout_seconds=15,
-            memory_mb=256,
-            environment={
-                "USER_ID":         "matthew",
-                "TABLE_NAME":      "life-platform",
-                "DYNAMODB_REGION": "us-west-2",  # DDB is us-west-2; Lambda runs in us-east-1
-                "AI_SECRET_NAME":  "life-platform/site-api-ai-key",  # R17-04: isolated from main ai-keys
-            },
-        )
+        _site_api_ctx_domain = self.node.try_get_context("site_api_fn_url_domain")
+
+        if not _site_api_ctx_domain:
+            # Phase 1: Lambda still in web_stack until R17-09 migration is complete
+            site_api_fn = create_platform_lambda(
+                self, "SiteApiLambda",
+                function_name="life-platform-site-api",
+                source_file="lambdas/site_api_lambda.py",
+                handler="site_api_lambda.lambda_handler",
+                table=local_table,
+                bucket=local_bucket,
+                dlq=None,
+                alerts_topic=None,
+                custom_policies=rp.site_api(),
+                timeout_seconds=15,
+                memory_mb=256,
+                environment={
+                    "USER_ID":         "matthew",
+                    "TABLE_NAME":      "life-platform",
+                    "DYNAMODB_REGION": "us-west-2",  # DDB is us-west-2; Lambda runs in us-east-1
+                    "AI_SECRET_NAME":  "life-platform/site-api-ai-key",
+                },
+            )
 
         # ══════════════════════════════════════════════════════════════
         # Email Subscriber Lambda — BS-03
@@ -310,14 +317,21 @@ class WebStack(Stack):
 
         og_image_url_domain = cdk.Fn.select(2, cdk.Fn.split("/", og_image_url.url))
 
-        site_api_url = site_api_fn.add_function_url(
-            auth_type=_lambda.FunctionUrlAuthType.NONE,
-            cors=_lambda.FunctionUrlCorsOptions(
-                allowed_origins=["https://averagejoematt.com", "https://www.averagejoematt.com"],
-                allowed_methods=[_lambda.HttpMethod.GET, _lambda.HttpMethod.POST],
-                allowed_headers=["Content-Type"],
-            ),
-        )
+        if not _site_api_ctx_domain:
+            site_api_url = site_api_fn.add_function_url(
+                auth_type=_lambda.FunctionUrlAuthType.NONE,
+                cors=_lambda.FunctionUrlCorsOptions(
+                    allowed_origins=["https://averagejoematt.com", "https://www.averagejoematt.com"],
+                    allowed_methods=[_lambda.HttpMethod.GET, _lambda.HttpMethod.POST],
+                    allowed_headers=["Content-Type"],
+                ),
+            )
+            fn_url_domain = cdk.Fn.select(2, cdk.Fn.split("/", site_api_url.url))
+            _site_api_fn_url_for_output = site_api_url.url
+        else:
+            # Phase 2 (R17-09 complete): Lambda is in LifePlatformOperational (us-west-2)
+            fn_url_domain = _site_api_ctx_domain
+            _site_api_fn_url_for_output = f"https://{_site_api_ctx_domain}/"
 
         # ══════════════════════════════════════════════════════════════
         # averagejoematt.com — main website
@@ -325,11 +339,6 @@ class WebStack(Stack):
         #   1. S3 /site  → static pages (default behaviour)
         #   2. Lambda Function URL  → /api/* (real-time data, TTL-cached)
         # ══════════════════════════════════════════════════════════════
-
-        # Extract hostname from Function URL (strips https:// prefix)
-        fn_url_domain = cdk.Fn.select(
-            2, cdk.Fn.split("/", site_api_url.url)
-        )
 
         amj_dist = cloudfront.CfnDistribution(
             self, "AmjDistribution",
@@ -402,6 +411,7 @@ class WebStack(Stack):
                     default_ttl=3600,    # 1h for static assets
                     max_ttl=86400,
                     min_ttl=0,
+                    response_headers_policy_id=amj_security_headers.ref,  # R17-15
                 ),
                 # Cache behaviors — ORDER MATTERS: most-specific first.
                 cache_behaviors=[
@@ -512,6 +522,51 @@ class WebStack(Stack):
                         error_caching_min_ttl=10,
                     ),
                 ],
+            ),
+        )
+
+        # ══════════════════════════════════════════════════════════════
+        # R17-15: Security headers via CloudFront ResponseHeadersPolicy.
+        # Applied to default (S3 static) cache behavior on averagejoematt.com.
+        # Headers: CSP, X-Frame-Options, X-Content-Type-Options,
+        #          Referrer-Policy, Strict-Transport-Security.
+        # ══════════════════════════════════════════════════════════════
+        amj_security_headers = cloudfront.CfnResponseHeadersPolicy(
+            self, "AmjSecurityHeadersPolicy",
+            response_headers_policy_config=cloudfront.CfnResponseHeadersPolicy.ResponseHeadersPolicyConfigProperty(
+                name="life-platform-amj-security-headers",
+                security_headers_config=cloudfront.CfnResponseHeadersPolicy.SecurityHeadersConfigProperty(
+                    content_security_policy=cloudfront.CfnResponseHeadersPolicy.ContentSecurityPolicyProperty(
+                        content_security_policy=(
+                            "default-src 'self'; "
+                            "script-src 'self' 'unsafe-inline'; "
+                            "style-src 'self' 'unsafe-inline'; "
+                            "img-src 'self' data: https:; "
+                            "connect-src 'self'; "
+                            "font-src 'self' data:; "
+                            "frame-ancestors 'none'; "
+                            "base-uri 'self'; "
+                            "form-action 'self'"
+                        ),
+                        override=True,
+                    ),
+                    frame_options=cloudfront.CfnResponseHeadersPolicy.FrameOptionsProperty(
+                        frame_option="DENY",
+                        override=True,
+                    ),
+                    content_type_options=cloudfront.CfnResponseHeadersPolicy.ContentTypeOptionsProperty(
+                        override=True,
+                    ),
+                    referrer_policy=cloudfront.CfnResponseHeadersPolicy.ReferrerPolicyProperty(
+                        referrer_policy="strict-origin-when-cross-origin",
+                        override=True,
+                    ),
+                    strict_transport_security=cloudfront.CfnResponseHeadersPolicy.StrictTransportSecurityProperty(
+                        access_control_max_age_sec=31536000,
+                        include_subdomains=True,
+                        override=True,
+                    ),
+                ),
             ),
         )
 
@@ -646,7 +701,7 @@ class WebStack(Stack):
             description="CloudFront domain to use in Route 53 alias record",
         )
         cdk.CfnOutput(self, "SiteApiFunctionUrl",
-            value=site_api_url.url,
+            value=_site_api_fn_url_for_output,
             description="Lambda Function URL for life-platform-site-api (CloudFront origin only)",
         )
         cdk.CfnOutput(self, "SubscriberFunctionUrl",

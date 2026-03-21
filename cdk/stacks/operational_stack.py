@@ -29,6 +29,16 @@ from constructs import Construct
 from stacks.lambda_helpers import create_platform_lambda
 from stacks import role_policies as rp
 
+# ── R17-09 cross-region note ──────────────────────────────────────────────────
+# site-api Lambda lives here (us-west-2) so it shares a region with DynamoDB.
+# CloudFront (web_stack, us-east-1) references the Function URL as a custom
+# origin — cross-region Function URL origins are fully supported by CloudFront.
+# Migration from web_stack:
+#   1. Deploy LifePlatformOperational → capture SiteApiFunctionUrlDomain output
+#   2. Set context: cdk.json "site_api_fn_url_domain": "<captured-domain>"
+#   3. Run cdk deploy LifePlatformWeb (web_stack will import via context var)
+# ──────────────────────────────────────────────────────────────────────────────
+
 REGION = "us-west-2"
 ACCT = "205930651321"
 INGESTION_DLQ_ARN    = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
@@ -186,5 +196,88 @@ class OperationalStack(Stack):
         dlq_depth = cloudwatch.Alarm(self, "DlqDepthAlarm", alarm_name="life-platform-dlq-depth-warning", metric=cloudwatch.Metric(namespace="AWS/SQS", metric_name="ApproximateNumberOfMessagesVisible", dimensions_map={"QueueName": "life-platform-ingestion-dlq"}, period=Duration.seconds(300), statistic="Maximum"), evaluation_periods=1, threshold=1, comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD, treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
         dlq_depth.add_alarm_action(cw_actions.SnsAction(local_alerts_topic)); dlq_depth.add_ok_action(cw_actions.SnsAction(local_alerts_topic))
 
+        # ── 10. Site API Lambda — life-platform-site-api (R17-09: moved from web_stack us-east-1)
+        # Read-only. DynamoDB same-region (eliminates cross-region latency).
+        # Function URL is a global HTTPS endpoint — CloudFront in us-east-1 can origin to it.
+        site_api_fn = create_platform_lambda(self, "SiteApiLambda",
+            function_name="life-platform-site-api",
+            source_file="lambdas/site_api_lambda.py",
+            handler="site_api_lambda.lambda_handler",
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
+            alerts_topic=None,
+            custom_policies=rp.site_api(),
+            timeout_seconds=15,
+            memory_mb=256,
+            environment={
+                "USER_ID":        "matthew",
+                "TABLE_NAME":     "life-platform",
+                "AI_SECRET_NAME": "life-platform/site-api-ai-key",
+            },
+        )
+
+        site_api_url = site_api_fn.add_function_url(
+            auth_type=_lambda.FunctionUrlAuthType.NONE,
+            cors=_lambda.FunctionUrlCorsOptions(
+                allowed_origins=["https://averagejoematt.com", "https://www.averagejoematt.com"],
+                allowed_methods=[_lambda.HttpMethod.GET, _lambda.HttpMethod.POST],
+                allowed_headers=["Content-Type"],
+            ),
+        )
+
+        site_api_fn_url_domain = cdk.Fn.select(2, cdk.Fn.split("/", site_api_url.url))
+
+        # ── Site API CloudWatch alarms + dashboard (moved from web_stack — alarms must be same region as Lambda)
+        GTE = cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
+
+        site_api_errors = cloudwatch.Metric(
+            namespace="AWS/Lambda", metric_name="Errors",
+            dimensions_map={"FunctionName": "life-platform-site-api"},
+            period=Duration.minutes(5), statistic="Sum",
+        )
+        site_api_invocations = cloudwatch.Metric(
+            namespace="AWS/Lambda", metric_name="Invocations",
+            dimensions_map={"FunctionName": "life-platform-site-api"},
+            period=Duration.minutes(5), statistic="Sum",
+        )
+        site_api_duration_p95 = cloudwatch.Metric(
+            namespace="AWS/Lambda", metric_name="Duration",
+            dimensions_map={"FunctionName": "life-platform-site-api"},
+            period=Duration.minutes(5), statistic="p95",
+        )
+        site_api_duration_p50 = cloudwatch.Metric(
+            namespace="AWS/Lambda", metric_name="Duration",
+            dimensions_map={"FunctionName": "life-platform-site-api"},
+            period=Duration.minutes(5), statistic="p50",
+        )
+
+        cloudwatch.Alarm(self, "SiteApiErrors", alarm_name="site-api-errors",
+            metric=site_api_errors, threshold=1, evaluation_periods=1,
+            comparison_operator=GTE, treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
+
+        cloudwatch.Alarm(self, "SiteApiLatencyHigh", alarm_name="site-api-p95-latency-high",
+            metric=site_api_duration_p95, threshold=5000, evaluation_periods=1,
+            comparison_operator=GTE, treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
+
+        cloudwatch.Alarm(self, "SiteApiInvocationSpike", alarm_name="site-api-invocation-spike",
+            metric=site_api_invocations, threshold=200, evaluation_periods=1,
+            comparison_operator=GTE, treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING)
+
+        cloudwatch.Dashboard(self, "SiteApiDashboard", dashboard_name="life-platform-site-api",
+            widgets=[[
+                cloudwatch.GraphWidget(title="Invocations", left=[site_api_invocations], width=8),
+                cloudwatch.GraphWidget(title="Errors", left=[site_api_errors], width=8),
+                cloudwatch.GraphWidget(title="Duration (p50 / p95)", left=[site_api_duration_p50, site_api_duration_p95], width=8),
+            ]])
+
         cdk.CfnOutput(self, "FreshnessCheckerArn", value=freshness.function_arn, description="Freshness checker Lambda ARN")
         cdk.CfnOutput(self, "CanaryArn", value=canary.function_arn, description="Canary Lambda ARN")
+        cdk.CfnOutput(self, "SiteApiFunctionUrl",
+            value=site_api_url.url,
+            description="Lambda Function URL for life-platform-site-api (us-west-2) — R17-09",
+        )
+        cdk.CfnOutput(self, "SiteApiFunctionUrlDomain",
+            value=site_api_fn_url_domain,
+            description="Function URL domain (without https://) — use in web_stack CloudFront origin after R17-09 migration",
+        )

@@ -892,7 +892,7 @@ def _handle_board_ask(event: dict) -> dict:
         p = PERSONA_PROMPTS[pid]
         try:
             req_body = json.dumps({
-                "model": "claude-haiku-4-5-20251001",
+                "model": AI_MODEL_HAIKU,
                 "max_tokens": 300,
                 "system": p["system"],
                 "messages": [{"role": "user", "content": question}],
@@ -934,7 +934,9 @@ _ask_rate_store: dict = {}
 _board_rate_store: dict = {}
 
 # R17-04: Separate Anthropic key for site-api — injected via CDK env var
-AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/site-api-ai-key")
+AI_SECRET_NAME  = os.environ.get("AI_SECRET_NAME",  "life-platform/site-api-ai-key")
+# R17-11: env-overridable model string — avoids silent deprecation failures
+AI_MODEL_HAIKU  = os.environ.get("AI_MODEL_HAIKU",  "claude-haiku-4-5-20251001")
 
 
 def _get_anthropic_key():
@@ -1155,7 +1157,7 @@ def lambda_handler(event, context):
             system_prompt = _ask_build_prompt(ctx)
 
             req_body = json.dumps({
-                "model": "claude-haiku-4-5-20251001",
+                "model": AI_MODEL_HAIKU,
                 "max_tokens": 600,
                 "system": system_prompt,
                 "messages": [{"role": "user", "content": question}],

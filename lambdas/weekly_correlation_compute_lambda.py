@@ -276,7 +276,8 @@ def assemble_daily_series(start_date, end_date):
         "apple":       fetch_range("apple_health", start_date, end_date),
         "habitify":    fetch_range("habitify",     start_date, end_date),
         "computed":    fetch_range("computed_metrics", start_date, end_date),
-        "composite":   fetch_range("composite_scores",  start_date, end_date),
+        # R17-14 / ADR-025: composite_scores partition removed — all fields consolidated
+        # into computed_metrics since v3.7.28. No new data written to composite_scores.
         "cgm":         fetch_range("apple_health", start_date, end_date),  # CGM is in apple_health
     }
 
@@ -301,7 +302,6 @@ def assemble_daily_series(start_date, end_date):
         ap  = src_map.get("apple")
         hab = src_map.get("habitify")
         cm  = src_map.get("computed")
-        co  = src_map.get("composite")
 
         metrics = {}
 
@@ -314,7 +314,7 @@ def assemble_daily_series(start_date, end_date):
         metrics["strain"]           = safe_float(w, "strain")
 
         # ── Training ─────────────────────────────────────────────────────
-        metrics["tsb"]              = safe_float(cm, "tsb") or safe_float(co, "tsb")
+        metrics["tsb"]              = safe_float(cm, "tsb")
         if st:
             acts = st.get("activities", [])
             metrics["training_kj"]  = sum(float(a.get("kilojoules") or 0) for a in acts)
@@ -333,9 +333,9 @@ def assemble_daily_series(start_date, end_date):
         metrics["steps"]            = safe_float(ap, "steps")
 
         # ── Composite / Computed ──────────────────────────────────────────
-        metrics["day_grade"]        = safe_float(cm, "day_grade_score") or safe_float(co, "day_grade_score")
-        metrics["readiness"]        = safe_float(cm, "readiness_score") or safe_float(co, "readiness_score")
-        metrics["tier0_streak"]     = safe_float(cm, "tier0_streak") or safe_float(co, "tier0_streak")
+        metrics["day_grade"]        = safe_float(cm, "day_grade_score")
+        metrics["readiness"]        = safe_float(cm, "readiness_score")
+        metrics["tier0_streak"]     = safe_float(cm, "tier0_streak")
 
         # ── Habits ────────────────────────────────────────────────────────
         if hab:

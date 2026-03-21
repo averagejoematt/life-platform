@@ -74,16 +74,16 @@ All P0 items from Architecture Review #8 are resolved.
 
 | Rank | ID | Item | Effort | Status |
 |------|------|------|--------|--------|
-| 1 | OE-01 | **Adopt Claude Code for dev sessions** — eliminate cd/chmod/paste friction, auto-iterate on errors, full repo context without handover reads | 2hr setup | ⬜ |
-| 2 | OE-02 | **Shell aliases + project Makefile** — `lp` alias, `lpd`, `lpc` shortcuts, `make deploy-mcp`, `make test`, `make commit` | 15min | ⬜ |
+| 1 | OE-01 | **Adopt Claude Code for dev sessions** — eliminate cd/chmod/paste friction, auto-iterate on errors, full repo context without handover reads | 2hr setup | ✅ Done |
+| 2 | OE-02 | **Shell aliases + project Makefile** — `lp` alias, `lpd`, `lpc` shortcuts, `make deploy-mcp`, `make test`, `make commit` | 15min | ✅ Done — `Makefile` created with test/lint/deploy/CDK/git targets |
 | 3 | OE-03 | **Tool surface management** — create build-mode (LP+FS+AWS only) vs planning-mode tool configs. Disconnect unused MCP tools per session type. | 10min/session | ⬜ |
 | 4 | OE-04 | **Pin stable docs as Project Knowledge** — ARCHITECTURE.md, SCHEMA.md, DECISIONS.md as auto-loaded project context. Reserve handovers for session state only. | 15min | ⬜ |
-| 5 | OE-05 | **Terminal anti-pattern fixes** — disable AWS CLI pager (`aws configure set cli_pager ""`), always use `bash script.sh` not `./script.sh`, never paste multi-line with `#` comments | 5min | ⬜ |
+| 5 | OE-05 | **Terminal anti-pattern fixes** — disable AWS CLI pager (`aws configure set cli_pager ""`), always use `bash script.sh` not `./script.sh`, never paste multi-line with `#` comments | 5min | ✅ Done — RUNBOOK.md updated with `aws configure set cli_pager ""` section |
 | 6 | OE-06 | **Local test-before-deploy discipline** — `make test` before every `make deploy`. Catch missing modules, bad imports, broken signatures pre-production. | Ongoing | ⬜ |
 | 7 | OE-07 | **Expand operational memory** — commit anti-patterns to memory proactively on first encounter (not after 2nd/3rd). Focus on "things that break every few weeks." | Ongoing | ⬜ |
 | 8 | OE-08 | **Use Deep Research for technical decisions** — complement Board of Directors (qualitative judgment) with Deep Research (quantitative data, benchmarks, current best practices) | Per-decision | ⬜ |
 | 9 | OE-09 | **Consolidate session-end documentation** — audit FEATURES.md, USER_GUIDE.md, MCP_TOOL_CATALOG.md for overlap. Reduce 8+ doc updates to essential 3-4. | 1hr | ⬜ |
-| 10 | OE-10 | **Local dev environment standardization** — pinned Python venv with `requirements-dev.txt`, consistent `pip install` without `--break-system-packages`. Consider Docker dev container. | 1hr | ⬜ |
+| 10 | OE-10 | **Local dev environment standardization** — pinned Python venv with `requirements-dev.txt`, consistent `pip install` without `--break-system-packages`. Consider Docker dev container. | 1hr | ✅ Done — `requirements-dev.txt` created with pinned pytest, flake8, boto3, botocore, aws-cdk-lib |
 
 ---
 

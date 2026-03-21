@@ -149,7 +149,7 @@ This document translates the Board Summit recommendations into an ordered, reali
 
 | ID | Feature | Effort | Model | Deliverable | Status |
 |----|---------|--------|-------|-------------|--------|
-| R17-09 | Move site-api Lambda to us-west-2 | M | None (CDK) | CDK: Lambda in LifePlatformOperational, update CF origin | ⬜ |
+| R17-09 | Move site-api Lambda to us-west-2 | M | None (CDK) | CDK: Lambda in LifePlatformOperational, update CF origin | 🔄 Phase 1 done — Lambda added to LifePlatformOperational. Phase 2: deploy Operational → capture SiteApiFunctionUrlDomain output → set `site_api_fn_url_domain` in cdk.json → deploy Web |
 | R17-10 | SIMP-1 Phase 2 (95→≤80 tools) | L | **Opus** | EMF telemetry review, tool deprecation, registry cleanup | ⬜ |
 | R17-11 | Site-api model strings to env vars | S | None | Update site_api_lambda.py to read AI_MODEL_HAIKU from env | ⬜ |
 | R17-12 | Site-api observability alarms | S | None (CDK) | 3 alarms: error rate, p95 latency, invocation spike | ⬜ |
@@ -160,9 +160,9 @@ This document translates the Board Summit recommendations into an ordered, reali
 
 | ID | Feature | Effort | Model | Deliverable | Status |
 |----|---------|--------|-------|-------------|--------|
-| R17-15 | CSP headers via CloudFront response headers policy | S | None (CDK) | CDK: response headers policy on amj distribution | ⬜ |
+| R17-15 | CSP headers via CloudFront response headers policy | S | None (CDK) | CDK: response headers policy on amj distribution | ✅ Done — CfnResponseHeadersPolicy added to web_stack; applied to S3 static default behavior |
 | R17-16 | Anthropic API graceful degradation | M | None | Timeout + fallback in ai_calls.py; each email Lambda handles `ai_unavailable` | ⬜ |
-| R17-17 | DynamoDB TTL policy for non-critical partitions | S | None | TTL on anomaly records >365d, cached tools | ⬜ |
+| R17-17 | DynamoDB TTL policy for non-critical partitions | S | None | TTL on anomaly records >365d, cached tools | ✅ Done — 90-day TTL added to anomaly_detector write_anomaly_record; RUNBOOK.md updated with TTL policy table + enable command |
 | R17-18 | CORS explicit headers on site-api | S | None | Add Access-Control-Allow-Origin to all responses | ⬜ |
 
 **Sprint 6 Board Decisions (R17 session, 2026-03-20):**
@@ -215,10 +215,10 @@ This document translates the Board Summit recommendations into an ordered, reali
 |----|---------|--------|--------|-------------|--------|
 | WR-41 | **LinkedIn/Twitter build-in-public campaign** | S/week (ongoing) | Panel §5,§7 — Sahil: "the distribution IS the product at this stage" | Matthew posts 2x/week: one stat + one insight + one honest reflection. Hooks: $10/month cost story, non-engineer story, weekly weigh-in. Links back to site. Target: 8 weeks sustained. | ⬜ **Matthew only** |
 | WR-42 | **Hacker News / Product Hunt launch event** | S (content) | Panel §10 — "when story is written, live data works, and /ask/ is functional, the site is ready for launch" | "Show HN: I'm a non-engineer who built a 95-tool AI health platform with Claude for $10/month. Ask my data anything." Time for Tuesday morning. Gated on: WR-14 + WR-28 + WR-29 + WR-30 complete. | ⬜ Gated on Tier 0 |
-| WR-43 | **Animated heartbeat/biometric signature** | M (4-6h) | Panel §2 — "the one design element that would make this site instantly memorable" | A live or daily-updated visual pulse on homepage showing HRV/recovery as an organic, breathing graphic. Not a chart — a visual signature that communicates "this system is alive" before anyone reads a word. | ⬜ |
+| WR-43 | **Animated heartbeat/biometric signature** | M (4-6h) | Panel §2 — "the one design element that would make this site instantly memorable" | A live or daily-updated visual pulse on homepage showing HRV/recovery as an organic, breathing graphic. Not a chart — a visual signature that communicates "this system is alive" before anyone reads a word. | ✅ Done — Canvas ECG animation in hero, color-coded by recovery %, speed by RHR |
 | WR-44 | **"Tool of the week" feature on /platform/** | S (1-2h) | Panel §8 — Anika: "the 95-tool list is impressive but static" | Weekly-rotating highlight showing one MCP tool's actual output. e.g., "This week: `get_glucose_meal_response` — here's what it returned for yesterday's dinner." | ✅ Done |
-| WR-45 | **Media kit + speaking page** | S (1-2h) | Panel §7 — "needs to exist before anyone reaches out" | Expand /about/ with: professional bio, talk topics, previous appearances (if any), headshot, contact for media inquiries. | ⬜ |
-| WR-46 | **Data export / open data page** | M (3-4h) | Panel §4 — "for the QS community: downloadable datasets or methodology docs" | Weekly aggregated anonymized data CSV, correlation methodology docs, Character Sheet scoring algorithm. At /data/ or /explorer/export/. | ⬜ |
+| WR-45 | **Media kit + speaking page** | S (1-2h) | Panel §7 — "needs to exist before anyone reaches out" | Expand /about/ with: professional bio, talk topics, previous appearances (if any), headshot, contact for media inquiries. | ✅ Done — Copy-ready bios, 3 talk topics, booking CTA, assets links added to /about/ |
+| WR-46 | **Data export / open data page** | M (3-4h) | Panel §4 — "for the QS community: downloadable datasets or methodology docs" | Weekly aggregated anonymized data CSV, correlation methodology docs, Character Sheet scoring algorithm. At /data/ or /explorer/export/. | ✅ Done — New /data/ page with schema tables, methodology docs, fetch examples, N=1 disclaimer |
 
 **Sprint 7 Definition of Done:**
 - ⬜ /story/ prose written by Matthew (WR-14) — **distribution gate**

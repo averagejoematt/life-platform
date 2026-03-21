@@ -3,6 +3,7 @@
   "context": {
     "account": "205930651321",
     "region": "us-west-2",
+    "site_api_fn_url_domain": "",
     "user_id": "matthew",
     "email_recipient": "lifeplatform@mattsusername.com",
     "email_sender": "lifeplatform@mattsusername.com",
