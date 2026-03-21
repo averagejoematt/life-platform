@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-20 (v3.7.83 — 95 tools, 31-module MCP package, 19 data sources, 49 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed)
+Last updated: 2026-03-21 (v3.7.84 — 95 tools, 31-module MCP package, 19 data sources, 49 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed)
 
 ---
 
@@ -29,7 +29,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
                          │ DynamoDB queries
 ┌────────────────────────▼────────────────────────────────────┐
 │  SERVE LAYER                                                │
-│  MCP Server Lambda (95 tools, 1024 MB) + Lambda Function URL│
+│  MCP Server Lambda (95 tools, 768 MB) + Lambda Function URL │
 │  ← Claude Desktop + claude.ai + Claude mobile via remote MCP│
 │                                                             │
 │  COMPUTE LAYER (IC intelligence features)                   │
@@ -71,7 +71,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | Lambda Function URL (MCP) | MCP HTTPS endpoint | `https://votqefkra435xwrccmapxxbj6y0jawgn.lambda-url.us-west-2.on.aws/` (AuthType NONE — auth handled in Lambda via API key header) |
 | Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws` (OAuth 2.1 auto-approve + HMAC Bearer) |
 | API Gateway | HTTP endpoint | `health-auto-export-api` (a76xwxt2wa) — webhook ingest |
-| Secrets Manager | Credential store | 9 active secrets: 4 OAuth (`whoop`, `withings`, `strava`, `garmin`) + `eightsleep` + `ai-keys` (Anthropic + MCP) + `ingestion-keys` (Notion/Todoist/Habitify/Dropbox/webhook keys bundle) + `habitify` (dedicated) + `mcp-api-key` — **`api-keys` permanently deleted 2026-03-14; `google-calendar` permanently deleted 2026-03-15 (ADR-030); `webhook-key` deleted 2026-03-14** |
+| Secrets Manager | Credential store | 10 active secrets: 4 OAuth (`whoop`, `withings`, `strava`, `garmin`) + `eightsleep` + `ai-keys` (Anthropic + MCP) + `ingestion-keys` (Notion/Todoist/Habitify/Dropbox/webhook keys bundle) + `habitify` (dedicated) + `mcp-api-key` + `site-api-ai-key` (R17-04) — **`api-keys` permanently deleted 2026-03-14; `google-calendar` permanently deleted 2026-03-15 (ADR-030); `webhook-key` deleted 2026-03-14** |
 | SNS topic | Alert routing | `life-platform-alerts` |
 | CloudFront (amj) | CDN (public) | `E3S424OXQZ8NBE` (`d2qlzq81ggequb.cloudfront.net`) → site-api Lambda + S3 `/site`, alias `averagejoematt.com` |
 | CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` → S3 `/dashboard`, Lambda@Edge auth, alias `dash.averagejoematt.com` |
@@ -170,7 +170,7 @@ SK: DATE#YYYY-MM-DD
 
 ### MCP Server
 
-**Lambda:** `life-platform-mcp` | **Tools:** 95 | **Memory:** 1024 MB | **Modules:** 31
+**Lambda:** `life-platform-mcp` | **Tools:** 95 | **Memory:** 768 MB | **Modules:** 31
 **Remote MCP:** `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws`
 **Auth:** `x-api-key` header check + OAuth 2.1/HMAC Bearer for remote MCP
 
@@ -232,7 +232,7 @@ Each Lambda has a **dedicated, least-privilege IAM role** (49 roles total as of 
 - **Email/digest roles (7):** DDB read/write, ai-keys, SES, S3 write
 - **Compute roles (5):** DDB read/write, ai-keys
 - **Operational roles (14):** scoped per function
-- **Site API role:** DDB read-only (`GetItem, Query`), `kms:Decrypt`, S3 `site/config/*` — **NO PutItem, NO Scan, NO Secrets access**
+- **Site API role:** DDB read-only (`GetItem, Query`), `kms:Decrypt`, S3 `site/config/*`, Secrets read (`site-api-ai-key` only) — **NO PutItem, NO Scan**
 - No role has `dynamodb:Scan` or cross-account permissions
 
 ---
@@ -252,6 +252,7 @@ Each Lambda has a **dedicated, least-privilege IAM role** (49 roles total as of 
 | `life-platform/ingestion-keys` | Notion, Todoist, Habitify, Dropbox, HAE webhook — COST-B bundle |
 | `life-platform/habitify` | Habitify Lambda — dedicated key (ADR-014) |
 | `life-platform/mcp-api-key` | MCP Key Rotator — bearer token (90-day auto-rotation) |
+| `life-platform/site-api-ai-key` | Site API Lambda — dedicated Anthropic key (R17-04, isolated from main ai-keys) |
 | ~~`life-platform/webhook-key`~~ | **DELETED 2026-03-14** |
 | ~~`life-platform/google-calendar`~~ | **DELETED 2026-03-15 (ADR-030)** |
 | ~~`life-platform/api-keys`~~ | **DELETED 2026-03-14** |

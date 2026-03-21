@@ -65,6 +65,7 @@ KNOWN_SECRETS = [
     "life-platform/ingestion-keys",  # COST-B bundle: Notion + Habitify + Todoist + Dropbox + HAE webhook keys
     "life-platform/webhook-key",     # Dedicated HAE webhook auth (exists but not yet primary — code reads ingestion-keys)
     "life-platform/mcp-api-key",     # MCP server auth (90-day auto-rotation via key-rotator Lambda)
+    "life-platform/site-api-ai-key", # R17-04: isolated Anthropic key for site-api (separate from main ai-keys)
 ]
 
 # Secrets that have been permanently deleted — must not appear in IAM policies.
@@ -181,8 +182,8 @@ def test_s3_all_known_secrets_referenced():
 def test_s4_known_secrets_count_matches_architecture():
     """S4: The count of known secrets should match what ARCHITECTURE.md documents.
     Update KNOWN_SECRETS when adding or removing secrets."""
-    # As of v3.7.15: 10 active secrets (verified by r8_p0_verify.sh)
-    EXPECTED_COUNT = 10
+    # As of v3.7.84: 11 active secrets (R17-04 added life-platform/site-api-ai-key)
+    EXPECTED_COUNT = 11
     actual = len(KNOWN_SECRETS)
     assert actual == EXPECTED_COUNT, (
         f"S4 FAIL: KNOWN_SECRETS has {actual} entries, expected {EXPECTED_COUNT}. "

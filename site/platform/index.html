@@ -249,6 +249,69 @@
   </div>
 </div>
 
+<!-- WR-34: Animated data flow diagram -->
+<section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);overflow:hidden;">
+  <div class="eyebrow">Data flow</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">How data moves through the system</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">Every morning at 5 AM, data flows from 19 sources into a single DynamoDB table, gets processed by Lambda compute functions, and feeds Claude’s daily intelligence brief.</p>
+  <div id="data-flow" style="position:relative;border:1px solid var(--border);background:var(--surface);padding:var(--space-6);overflow-x:auto;">
+    <svg viewBox="0 0 900 200" style="width:100%;min-width:700px;height:200px;display:block;" xmlns="http://www.w3.org/2000/svg">
+      <!-- Nodes -->
+      <rect x="20" y="60" width="140" height="80" rx="4" fill="#0e1510" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
+      <text x="90" y="90" text-anchor="middle" fill="#00e5a0" font-size="11" font-family="JetBrains Mono,monospace" letter-spacing="1">19 SOURCES</text>
+      <text x="90" y="108" text-anchor="middle" fill="#7a9080" font-size="9" font-family="JetBrains Mono,monospace">Whoop · Garmin · CGM</text>
+      <text x="90" y="122" text-anchor="middle" fill="#4a6050" font-size="9" font-family="JetBrains Mono,monospace">+ 16 more</text>
+
+      <rect x="230" y="60" width="140" height="80" rx="4" fill="#0e1510" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
+      <text x="300" y="90" text-anchor="middle" fill="#00e5a0" font-size="11" font-family="JetBrains Mono,monospace" letter-spacing="1">INGEST</text>
+      <text x="300" y="108" text-anchor="middle" fill="#7a9080" font-size="9" font-family="JetBrains Mono,monospace">Lambda + EventBridge</text>
+      <text x="300" y="122" text-anchor="middle" fill="#4a6050" font-size="9" font-family="JetBrains Mono,monospace">webhooks + cron</text>
+
+      <rect x="440" y="60" width="140" height="80" rx="4" fill="#0e1510" stroke="rgba(240,180,41,0.25)" stroke-width="1"/>
+      <text x="510" y="90" text-anchor="middle" fill="#c8843a" font-size="11" font-family="JetBrains Mono,monospace" letter-spacing="1">STORE</text>
+      <text x="510" y="108" text-anchor="middle" fill="#7a9080" font-size="9" font-family="JetBrains Mono,monospace">DynamoDB single-table</text>
+      <text x="510" y="122" text-anchor="middle" fill="#4a6050" font-size="9" font-family="JetBrains Mono,monospace">S3 + KMS encryption</text>
+
+      <rect x="650" y="60" width="140" height="80" rx="4" fill="#0e1510" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
+      <text x="720" y="90" text-anchor="middle" fill="#00e5a0" font-size="11" font-family="JetBrains Mono,monospace" letter-spacing="1">SERVE</text>
+      <text x="720" y="108" text-anchor="middle" fill="#7a9080" font-size="9" font-family="JetBrains Mono,monospace">95 MCP tools → Claude</text>
+      <text x="720" y="122" text-anchor="middle" fill="#4a6050" font-size="9" font-family="JetBrains Mono,monospace">daily brief + digests</text>
+
+      <!-- Animated arrows -->
+      <line x1="160" y1="100" x2="230" y2="100" stroke="rgba(0,229,160,0.3)" stroke-width="1" stroke-dasharray="4,4">
+        <animate attributeName="stroke-dashoffset" from="8" to="0" dur="1s" repeatCount="indefinite"/>
+      </line>
+      <line x1="370" y1="100" x2="440" y2="100" stroke="rgba(0,229,160,0.3)" stroke-width="1" stroke-dasharray="4,4">
+        <animate attributeName="stroke-dashoffset" from="8" to="0" dur="1s" repeatCount="indefinite"/>
+      </line>
+      <line x1="580" y1="100" x2="650" y2="100" stroke="rgba(0,229,160,0.3)" stroke-width="1" stroke-dasharray="4,4">
+        <animate attributeName="stroke-dashoffset" from="8" to="0" dur="1s" repeatCount="indefinite"/>
+      </line>
+
+      <!-- Animated data dots -->
+      <circle r="3" fill="#00e5a0" opacity="0.8">
+        <animateMotion path="M160,100 L230,100" dur="2s" repeatCount="indefinite" begin="0s"/>
+      </circle>
+      <circle r="3" fill="#00e5a0" opacity="0.8">
+        <animateMotion path="M370,100 L440,100" dur="2s" repeatCount="indefinite" begin="0.7s"/>
+      </circle>
+      <circle r="3" fill="#00e5a0" opacity="0.8">
+        <animateMotion path="M580,100 L650,100" dur="2s" repeatCount="indefinite" begin="1.4s"/>
+      </circle>
+
+      <!-- Output arrows going down -->
+      <line x1="720" y1="140" x2="720" y2="175" stroke="rgba(0,229,160,0.2)" stroke-width="1" stroke-dasharray="4,4">
+        <animate attributeName="stroke-dashoffset" from="8" to="0" dur="1s" repeatCount="indefinite"/>
+      </line>
+      <text x="720" y="192" text-anchor="middle" fill="#4a6050" font-size="8" font-family="JetBrains Mono,monospace" letter-spacing="1">EMAILS · WEBSITE · /ASK</text>
+
+      <!-- Schedule label -->
+      <text x="300" y="30" text-anchor="middle" fill="#4a6050" font-size="8" font-family="JetBrains Mono,monospace" letter-spacing="1.5">EVERY DAY AT 5:00 AM PST</text>
+      <line x1="200" y1="35" x2="400" y2="35" stroke="rgba(0,229,160,0.08)" stroke-width="1"/>
+    </svg>
+  </div>
+</section>
+
 <!-- Architecture layers -->
 <section class="arch-section reveal">
   <div class="eyebrow">System design</div>
@@ -412,11 +475,34 @@
   </div>
 </section>
 
+<!-- WR-44: Tool of the Week -->
+<section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
+  <div class="eyebrow">Tool spotlight</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Tool of the week</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">One of 95 MCP tools that Claude uses to understand my health data. Here&rsquo;s what it actually does.</p>
+  <div style="border:1px solid var(--border);background:var(--surface);">
+    <div style="padding:var(--space-4) var(--space-6);border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--accent)">get_sleep_environment_analysis</span>
+      <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint)">BS-SL1 · Opus</span>
+    </div>
+    <div style="padding:var(--space-6);">
+      <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-4)">Cross-references Eight Sleep bed temperature data with Whoop sleep staging to find the optimal temperature for deep sleep. Runs multi-signal analysis across 14+ nights.</p>
+      <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);border-top:1px solid var(--border-subtle);padding-top:var(--space-4);">
+        <div style="margin-bottom:var(--space-2);"><span style="color:var(--accent-dim)">Input:</span> date range, Eight Sleep + Whoop data</div>
+        <div style="margin-bottom:var(--space-2);"><span style="color:var(--accent-dim)">Output:</span> optimal temperature range, deep sleep correlation, adjustment recommendations</div>
+        <div><span style="color:var(--accent-dim)">Finding:</span> Lowering bed temp by 2°F added +18 min deep sleep per night</div>
+      </div>
+    </div>
+  </div>
+  <p style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-label);margin-top:var(--space-4)">// Tool spotlight rotates periodically. <a href="/ask/" style="color:var(--accent-dim);text-decoration:none">Ask the platform anything →</a></p>
+</section>
+
 <!-- Review history -->
 <section class="reviews-section reveal">
   <div class="eyebrow">Architecture reviews</div>
   <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Reviewed 16 times by a 12-member AI board</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">Every major change triggers a full architecture review. 12 expert AI personas — cloud architect, security lead, statistician, product architect, adversarial reviewer — vote, score, and issue findings.</p>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-4)">Every major change triggers a full architecture review. 14 expert AI personas — cloud architect, security lead, statistician, product architect, adversarial reviewer — vote, score, and issue findings.</p>
+  <p style="margin-bottom:var(--space-8)"><a href="/platform/reviews/" class="btn btn--ghost" style="font-size:var(--text-xs)">Read the latest review (R17: A-) →</a></p>
   <div class="review-grid">
     <div class="review-card">
       <div class="review-card__num">R16</div>
@@ -445,6 +531,36 @@
   </div>
 </section>
 
+<!-- WR-35: Cost transparency section -->
+<section class="arch-section reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
+  <div class="eyebrow">FinOps</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">What this costs to run</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">The entire platform — 49 Lambda functions, DynamoDB, S3, CloudFront, SES, 7 AI-generated email digests per week, and a public website with live data — runs on AWS for less than the cost of a single lunch.</p>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
+    <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">Total monthly</div>
+      <div style="font-family:var(--font-display);font-size:42px;color:var(--accent);line-height:1;">$13</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">/month</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">Claude API</div>
+      <div style="font-family:var(--font-display);font-size:42px;color:var(--text);line-height:1;">$3</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Sonnet + Haiku</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">AWS infra</div>
+      <div style="font-family:var(--font-display);font-size:42px;color:var(--text);line-height:1;">$10</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Lambda + DDB + S3</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">Engineers on team</div>
+      <div style="font-family:var(--font-display);font-size:42px;color:var(--c-amber-500);line-height:1;">0</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Built with Claude</div>
+    </div>
+  </div>
+  <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);margin-top:var(--space-4);letter-spacing:var(--ls-label)">// All serverless. No EC2 instances. No containers. Pay only for what runs.</p>
+</section>
+
 <!-- S2-T1-8: Email CTA footer — injected by add_email_cta.py -->
 <section class="email-cta-footer reveal" style="
   padding: var(--space-16) var(--page-padding);
@@ -456,7 +572,8 @@
   <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
   <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
-    Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.
+    Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.<br>
+    <a href="/journal/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue →</a>
   </p>
   <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
     <input id="cta-email-platform" type="email" placeholder="your@email.com" style="

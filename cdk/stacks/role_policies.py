@@ -964,13 +964,14 @@ def operational_email_subscriber() -> list[iam.PolicyStatement]:
 
 
 def site_api() -> list[iam.PolicyStatement]:
-    """Site API Lambda: read-only access to DDB + KMS only.
+    """Site API Lambda: read-only access to DDB + KMS + site-api AI secret.
 
     Serves averagejoematt.com real-time data endpoints.
-    NO write permissions. NO Secrets access. NO S3 write.
+    NO write permissions. NO S3 write.
     Yael directive: never expose MCP endpoint publicly — this is a
     separate, minimal-permission Lambda.
     WEB-WCT: Added S3 site/config/* read for /api/current_challenge endpoint.
+    R17-04: Added dedicated Secrets read for life-platform/site-api-ai-key (isolated from main ai-keys).
     """
     return [
         iam.PolicyStatement(
@@ -987,6 +988,11 @@ def site_api() -> list[iam.PolicyStatement]:
             sid="S3SiteConfigRead",
             actions=["s3:GetObject"],
             resources=[f"{BUCKET_ARN}/site/config/*"],
+        ),
+        iam.PolicyStatement(
+            sid="AiKeySecret",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/site-api-ai-key")],
         ),
     ]
 

@@ -385,6 +385,52 @@
   </div>
 </section>
 
+<!-- WR-37: Scoring methodology transparency -->
+<section class="reveal" style="padding:var(--space-12) var(--page-padding);border-top:1px solid var(--border);">
+  <div class="eyebrow">Methodology</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-6)">How scores are computed</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-8);">
+    <div>
+      <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-4)">Each pillar’s raw score (0–100) is computed nightly from real wearable, habit, and biometric data — not self-reported. Scores feed into an XP system that determines character level.</p>
+      <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-4)">Pillar weights are configurable but currently equal (14.3% each). The composite Character Score is the weighted average of all 7 pillars. Level progression uses a logarithmic XP curve — early levels come fast, higher levels require sustained performance.</p>
+      <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-label)">// Full algorithm: <a href="/platform/" style="color:var(--accent-dim);text-decoration:none;">see platform architecture</a></p>
+    </div>
+    <div style="border:1px solid var(--border);background:var(--surface);">
+      <div style="padding:var(--space-4) var(--space-5);border-bottom:1px solid var(--border-subtle);">
+        <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim)">// pillar data sources</span>
+      </div>
+      <div style="padding:var(--space-3) var(--space-5);border-bottom:1px solid var(--border-subtle);display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
+        <span style="color:var(--accent);font-family:var(--font-mono)">Sleep</span>
+        <span style="color:var(--text-muted)">Whoop sleep score, Eight Sleep data, sleep duration + efficiency</span>
+      </div>
+      <div style="padding:var(--space-3) var(--space-5);border-bottom:1px solid var(--border-subtle);display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
+        <span style="color:var(--accent);font-family:var(--font-mono)">Movement</span>
+        <span style="color:var(--text-muted)">Strava/Garmin activities, Zone 2 minutes, ACWR ratio, step count</span>
+      </div>
+      <div style="padding:var(--space-3) var(--space-5);border-bottom:1px solid var(--border-subtle);display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
+        <span style="color:var(--accent);font-family:var(--font-mono)">Nutrition</span>
+        <span style="color:var(--text-muted)">MacroFactor calories, protein target, deficit compliance</span>
+      </div>
+      <div style="padding:var(--space-3) var(--space-5);border-bottom:1px solid var(--border-subtle);display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
+        <span style="color:var(--accent);font-family:var(--font-mono)">Metabolic</span>
+        <span style="color:var(--text-muted)">Withings weight, Dexcom CGM glucose, blood pressure, labs</span>
+      </div>
+      <div style="padding:var(--space-3) var(--space-5);border-bottom:1px solid var(--border-subtle);display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
+        <span style="color:var(--accent);font-family:var(--font-mono)">Mind</span>
+        <span style="color:var(--text-muted)">Notion journal sentiment, state-of-mind log, Habitify mindfulness habits</span>
+      </div>
+      <div style="padding:var(--space-3) var(--space-5);border-bottom:1px solid var(--border-subtle);display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
+        <span style="color:var(--accent);font-family:var(--font-mono)">Social</span>
+        <span style="color:var(--text-muted)">Interaction log frequency + depth, journal social references</span>
+      </div>
+      <div style="padding:var(--space-3) var(--space-5);display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
+        <span style="color:var(--accent);font-family:var(--font-mono)">Consist.</span>
+        <span style="color:var(--text-muted)">Habitify T0 streak, vice streak days, Todoist completion rate</span>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- N=1 Disclaimer -->
 <aside style="
   max-width: var(--prose-width);
@@ -418,7 +464,8 @@
   <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
   <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
-    Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.
+    Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.<br>
+    <a href="/journal/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue →</a>
   </p>
   <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
     <input id="cta-email-character" type="email" placeholder="your@email.com" style="

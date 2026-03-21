@@ -56,6 +56,31 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://averagejoematt.com/board/</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://averagejoematt.com/journal/sample/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://averagejoematt.com/subscribe/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://averagejoematt.com/protocols/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://averagejoematt.com/platform/reviews/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://averagejoematt.com/rss.xml</loc>
     <changefreq>weekly</changefreq>
     <priority>0.4</priority>

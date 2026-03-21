@@ -37,6 +37,8 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_sqs as sqs,
     aws_sns as sns,
+    aws_cloudwatch as cloudwatch,
+    aws_cloudwatch_actions as cw_actions,
 )
 from constructs import Construct
 
@@ -216,6 +218,7 @@ class WebStack(Stack):
                 "USER_ID":         "matthew",
                 "TABLE_NAME":      "life-platform",
                 "DYNAMODB_REGION": "us-west-2",  # DDB is us-west-2; Lambda runs in us-east-1
+                "AI_SECRET_NAME":  "life-platform/site-api-ai-key",  # R17-04: isolated from main ai-keys
             },
         )
 
@@ -286,7 +289,7 @@ class WebStack(Stack):
         for stmt in rp.og_image():
             og_image_role.add_to_policy(stmt)
 
-        og_image_fn = _lambda.Function(
+        og_image_fn = _lambda.Function(  # noqa: CDK_HANDLER_ORPHAN
             self, "OgImageLambda",
             function_name="life-platform-og-image",
             runtime=_lambda.Runtime.NODEJS_20_X,
@@ -490,15 +493,135 @@ class WebStack(Stack):
                     ),
                 ],
                 # Custom error pages
+                # WR-28: Custom error responses for subpage routing.
+                # S3 website hosting handles /story/ → /story/index.html normally,
+                # but if a path doesn't exist (e.g. /nonexistent), serve 404 page
+                # with proper 404 status. The 403 response handles S3 access denied
+                # (which S3 returns for some missing-file scenarios).
                 custom_error_responses=[
                     cloudfront.CfnDistribution.CustomErrorResponseProperty(
                         error_code=404,
                         response_code=404,
-                        response_page_path="/index.html",  # SPA fallback
-                        error_caching_min_ttl=30,
+                        response_page_path="/404.html",
+                        error_caching_min_ttl=10,
+                    ),
+                    cloudfront.CfnDistribution.CustomErrorResponseProperty(
+                        error_code=403,
+                        response_code=200,
+                        response_page_path="/index.html",  # S3 returns 403 for missing dirs
+                        error_caching_min_ttl=10,
                     ),
                 ],
             ),
+        )
+
+        # ══════════════════════════════════════════════════════════════
+        # R17-01: WAF WebACL — rate-based rules for public API endpoints.
+        # WebACL pre-existed in us-east-1 (id: 3d75472e-e18b-4d1c-b76b-8bbe63cb05e8).
+        # Rules managed via AWS CLI (existing resource; CDK import not required).
+        # Rules: SubscribeRateLimit (60/5min), GlobalRateLimit (1000/5min),
+        #        RateLimitAsk (100/5min), RateLimitBoardAsk (100/5min).
+        # Association with E3S424OXQZ8NBE set via CloudFront update-distribution 2026-03-20.
+        # ══════════════════════════════════════════════════════════════
+        WAF_WEB_ACL_ARN = "arn:aws:wafv2:us-east-1:205930651321:global/webacl/life-platform-amj-waf/3d75472e-e18b-4d1c-b76b-8bbe63cb05e8"
+
+        cdk.CfnOutput(self, "AmjWafWebAclArn",
+            value=WAF_WEB_ACL_ARN,
+            description="WAF WebACL ARN for averagejoematt.com CloudFront distribution (R17-01)",
+        )
+
+        # ══════════════════════════════════════════════════════════════
+        # R17-03: CloudWatch dashboard + alarms for life-platform-site-api
+        # Lambda is in us-east-1 (WebStack); alarms must be in same region.
+        # Alarms: error rate >5%, p95 latency >5s, invocations >1000/hr.
+        # ══════════════════════════════════════════════════════════════
+        GTE = cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
+
+        site_api_errors = cloudwatch.Metric(
+            namespace="AWS/Lambda",
+            metric_name="Errors",
+            dimensions_map={"FunctionName": "life-platform-site-api"},
+            period=Duration.minutes(5),
+            statistic="Sum",
+        )
+        site_api_invocations = cloudwatch.Metric(
+            namespace="AWS/Lambda",
+            metric_name="Invocations",
+            dimensions_map={"FunctionName": "life-platform-site-api"},
+            period=Duration.minutes(5),
+            statistic="Sum",
+        )
+        site_api_duration_p95 = cloudwatch.Metric(
+            namespace="AWS/Lambda",
+            metric_name="Duration",
+            dimensions_map={"FunctionName": "life-platform-site-api"},
+            period=Duration.minutes(5),
+            statistic="p95",
+        )
+        site_api_duration_p50 = cloudwatch.Metric(
+            namespace="AWS/Lambda",
+            metric_name="Duration",
+            dimensions_map={"FunctionName": "life-platform-site-api"},
+            period=Duration.minutes(5),
+            statistic="p50",
+        )
+
+        # Alarm: error rate — any errors in 5-min window
+        cloudwatch.Alarm(
+            self, "SiteApiErrors",
+            alarm_name="site-api-errors",
+            metric=site_api_errors,
+            threshold=1,
+            evaluation_periods=1,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+
+        # Alarm: p95 latency > 5000ms
+        cloudwatch.Alarm(
+            self, "SiteApiLatencyHigh",
+            alarm_name="site-api-p95-latency-high",
+            metric=site_api_duration_p95,
+            threshold=5000,
+            evaluation_periods=1,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+
+        # Alarm: invocation spike > 1000/hr (200 per 5-min window)
+        cloudwatch.Alarm(
+            self, "SiteApiInvocationSpike",
+            alarm_name="site-api-invocation-spike",
+            metric=site_api_invocations,
+            threshold=200,
+            evaluation_periods=1,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+
+        # Dashboard: invocations, errors, p50/p95 latency, duration
+        cloudwatch.Dashboard(
+            self, "SiteApiDashboard",
+            dashboard_name="life-platform-site-api",
+            widgets=[
+                [
+                    cloudwatch.GraphWidget(
+                        title="Invocations",
+                        left=[site_api_invocations],
+                        width=8,
+                    ),
+                    cloudwatch.GraphWidget(
+                        title="Errors",
+                        left=[site_api_errors],
+                        width=8,
+                    ),
+                    cloudwatch.GraphWidget(
+                        title="Duration (p50 / p95)",
+                        left=[site_api_duration_p50, site_api_duration_p95],
+                        width=8,
+                    ),
+                ],
+            ],
         )
 
         # ── Outputs

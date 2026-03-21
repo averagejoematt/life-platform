@@ -1,6 +1,6 @@
 # Life Platform — Sprint Plan
-**Board-Aligned Implementation Roadmap | v3.7.82 | March 20, 2026**
-*Derived from Joint Board Summit Record (March 15, 2026) + Board Sprint Review (March 16, 2026) + Architecture Review #17 (March 20, 2026)*
+**Board-Aligned Implementation Roadmap | v3.7.83 | March 20, 2026**
+*Derived from Joint Board Summit Record (March 15, 2026) + Board Sprint Review (March 16, 2026) + Architecture Review #17 (March 20, 2026) + Expert Panel Website Strategy Review (March 20, 2026)*
 
 ---
 
@@ -175,6 +175,64 @@ This document translates the Board Summit recommendations into an ordered, reali
 
 ---
 
+## SPRINT 7 — World-Class Website Sprint (~4 weeks, April/May 2026)
+**Theme: Storytelling + Live Data + Distribution Readiness**
+**Source: Expert Panel Website Strategy Review (2026-03-20) — 30+ expert personas across design, product, growth, health tech, AI, and commercialization**
+**Prerequisite: Sprint 6 Tier 0 complete (WAF, privacy, dashboard)**
+
+> The panel's unanimous finding: the site has world-class infrastructure but undersells the story by 10x.
+> Three foundations must be solid before any growth play: (1) /story/ prose, (2) live data working, (3) subpage routing fixed.
+> Sprint 7 is sequenced: Tier 0 unblocks distribution, Tier 1 builds retention, Tier 2 enables growth.
+
+#### Tier 0 — Foundations (Pre-Distribution Critical Path)
+
+| ID | Feature | Effort | Source | Deliverable | Status |
+|----|---------|--------|--------|-------------|--------|
+| WR-14 | **Write /story/ page content (5 chapters)** | L (Matthew) | Panel §1,§3 — unanimous #1 finding | 1,500–2,000 words of Matthew's own prose across 5 chapter placeholders. This is the emotional anchor for the entire site. | ⬜ **CRITICAL — Matthew only** |
+| WR-28 | **Fix subpage 404s for crawlers/link previews** | S (30min) | Panel §1 — all subpages return 404 to server-side fetches | CloudFront custom error response or S3 routing rules for subdirectory index.html files. Currently /story/, /platform/, /live/, /journal/ all 404 when fetched without JS. Breaks SEO, social previews, link sharing. | ✅ CDK updated (needs deploy) |
+| WR-29 | **Populate live data on homepage (fix dashes)** | S (1-2h) | Panel §1,§2 — "broken live data promises are worse than no promises" | Wire `/api/vitals` + `/api/journey` into homepage JS. Fallback to `public_stats.json`. Add "as of [timestamp]" to prevent stale data looking broken. Fix ticker dashes for streak/journey. | ✅ Fixed double-path `/site/public_stats.json` bug |
+| WR-30 | **Add one real daily brief excerpt to homepage** | S (1h) | Panel §6 — "the homepage promises brief excerpts — deliver" | Replace "Live brief excerpts coming soon" placeholder in "What Claude sees" section with a real (redacted if needed) daily brief excerpt. Static is fine; proves the AI capability viscerally. | ✅ Done |
+| WR-15 | **Before/during photos on /story/** | S (Matthew) | Panel §2 — "zero human imagery is the biggest design gap" | At minimum one authentic photo of Matthew on /story/ or homepage. The site has no human anchor — it feels like a dashboard, not a story about a person. | ⬜ **Matthew only** |
+| WR-31 | **"Start here" flow for new visitors** | XS (30min) | Panel §3 — first-time visitors don't know where to go | Add a prominent "New here? Start with the story →" CTA on homepage. Simple routing signal for first-time visitors. | ✅ Done |
+| WR-32 | **Newsletter sample/archive page** | S (1-2h) | Panel §5 — "no one subscribes to an email they can't preview" | Render a recent Weekly Signal email as a public page at `/journal/weekly-signal-sample/` or similar. Link from every subscribe CTA. | ✅ Done (`/journal/sample/`) |
+
+#### Tier 1 — Retention + AI Showcase (Post-Distribution)
+
+| ID | Feature | Effort | Source | Deliverable | Status |
+|----|---------|--------|--------|-------------|--------|
+| WR-33 | **Visual transformation comparison cards** | M (3-4h) | Panel §4,§5 — "the most shareable format in health/fitness" | Auto-generated single-image comparison cards: "Day 1 vs. Today" showing weight, HRV, recovery, body comp deltas. Formatted for Twitter/LinkedIn sharing. Could be a dedicated `/timeline/` enhancement or standalone component. | ✅ Done (homepage) |
+| WR-34 | **Data flow animation on /platform/** | M (3-4h) | Panel §8 — Priya: "the architecture diagram doesn't show the flow" | Interactive or animated diagram showing data moving: Whoop → DynamoDB → Claude → daily brief. Makes the architecture tangible to non-technical visitors. | ✅ Done |
+| WR-35 | **Running cost ticker on /platform/** | S (1-2h) | Panel §8 — Marcus: "the $10/month story is buried" | Live or monthly-updated cost display on /platform/ showing real AWS billing breakdown. The cost story is one of the most compelling parts of the platform. | ✅ Done |
+| WR-36 | **Public architecture review artifact** | M (2-3h) | Panel §6,§8 — "publishing a real AI architecture review would be a first on the public internet" | Redact sensitive findings from R16 or R17, format as public page at `/platform/reviews/` or similar. Show 12-persona voting, grade progression, findings. Fascinating to technical audiences. | ✅ Done (`/platform/reviews/`) |
+| WR-37 | **Scoring algorithm transparency on /character/** | S (1-2h) | Panel §9 — Attia: "if raw scores are weighted non-transparently, sophisticated audiences will question them" | Publish the Character Sheet scoring methodology: what inputs feed each pillar, how raw scores are computed, what "Level 2" means. Link from /character/ page. | ✅ Done |
+| WR-38 | **"Discoveries" section — featured correlations** | M (3-4h) | Panel §8 — Omar: "the correlation matrix is genuinely novel but invisible from the homepage" | A homepage or /live/ section featuring the 3-5 most interesting correlations from the weekly Pearson matrix. e.g., "HRV drops 15% when training >4 days in a row (r=-0.42, p=0.03)." Proof-of-concept storytelling. | ✅ Done (homepage) |
+| WR-39 | **"Current Protocols" page or section** | M (3-4h) | Panel §9 — Huberman: "the QS audience wants actionable protocols, not just scores" | What specific protocols is Matthew following? Morning routines, sleep hygiene, Zone 2 targets, supplement stack, nutrition approach. And whether the data shows they're working. | ✅ Done (`/protocols/`) |
+| WR-40 | **Response safety filter for /ask/ endpoint** | S (1-2h) | Panel §8 — Yael: "the /ask/ page could expose sensitive health data if queries aren't filtered" | Implement response category filter in site_api_lambda.py that blocks certain query categories (mental health specifics, financial data, PII). Already rate-limited; this adds content filtering. | ✅ Done (needs deploy) |
+
+#### Tier 2 — Growth Plays (60-90 Day Horizon)
+
+| ID | Feature | Effort | Source | Deliverable | Status |
+|----|---------|--------|--------|-------------|--------|
+| WR-41 | **LinkedIn/Twitter build-in-public campaign** | S/week (ongoing) | Panel §5,§7 — Sahil: "the distribution IS the product at this stage" | Matthew posts 2x/week: one stat + one insight + one honest reflection. Hooks: $10/month cost story, non-engineer story, weekly weigh-in. Links back to site. Target: 8 weeks sustained. | ⬜ **Matthew only** |
+| WR-42 | **Hacker News / Product Hunt launch event** | S (content) | Panel §10 — "when story is written, live data works, and /ask/ is functional, the site is ready for launch" | "Show HN: I'm a non-engineer who built a 95-tool AI health platform with Claude for $10/month. Ask my data anything." Time for Tuesday morning. Gated on: WR-14 + WR-28 + WR-29 + WR-30 complete. | ⬜ Gated on Tier 0 |
+| WR-43 | **Animated heartbeat/biometric signature** | M (4-6h) | Panel §2 — "the one design element that would make this site instantly memorable" | A live or daily-updated visual pulse on homepage showing HRV/recovery as an organic, breathing graphic. Not a chart — a visual signature that communicates "this system is alive" before anyone reads a word. | ⬜ |
+| WR-44 | **"Tool of the week" feature on /platform/** | S (1-2h) | Panel §8 — Anika: "the 95-tool list is impressive but static" | Weekly-rotating highlight showing one MCP tool's actual output. e.g., "This week: `get_glucose_meal_response` — here's what it returned for yesterday's dinner." | ✅ Done |
+| WR-45 | **Media kit + speaking page** | S (1-2h) | Panel §7 — "needs to exist before anyone reaches out" | Expand /about/ with: professional bio, talk topics, previous appearances (if any), headshot, contact for media inquiries. | ⬜ |
+| WR-46 | **Data export / open data page** | M (3-4h) | Panel §4 — "for the QS community: downloadable datasets or methodology docs" | Weekly aggregated anonymized data CSV, correlation methodology docs, Character Sheet scoring algorithm. At /data/ or /explorer/export/. | ⬜ |
+
+**Sprint 7 Definition of Done:**
+- ⬜ /story/ prose written by Matthew (WR-14) — **distribution gate**
+- ✅ All subpages accessible to crawlers and social link previews (WR-28) — CDK updated, needs deploy
+- ✅ Homepage shows live data, not dashes (WR-29) — fixed double-path bug
+- ✅ Daily brief excerpt visible on homepage (WR-30) — real excerpt replaces placeholder
+- ⬜ At least one photo of Matthew on the site (WR-15)
+- ✅ Newsletter sample viewable before subscribing (WR-32) — `/journal/sample/`
+- ⬜ DIST-1 (HN or Twitter launch) executed with Tier 0 complete
+- ✅ /ask/ has response content filtering (WR-40) — needs Lambda deploy
+- ⬜ Build-in-public posting cadence established (WR-41)
+
+---
+
 ## BACKLOG — Website Review 60/90-Day Items
 
 | ID | Feature | Source | Status | Notes |
@@ -243,6 +301,8 @@ All Sprint 1–4 features shipped (30 items). Sprint 5 complete (buildable). Rem
 | Sprint 3 | ✅ Complete | BS-12, BS-SL1, BS-MP1, BS-MP2, BS-13, BS-T2-5, WEB-WCT, IC-28, IC-29 |
 | Sprint 4 | ✅ Complete | BS-11, WEB-CE, BS-BM2, BS-14 |
 | Sprint 5 | ✅ Buildable | All technical items done. /story prose + DIST-1 pending (Matthew). |
+| Sprint 6 | ⬜ Active | R17 Hardening: WAF, privacy, dashboard, PITR, cleanup (18 items) |
+| Sprint 7 | ⬜ Planned | World-Class Website: storytelling, live data, distribution (19 items, WR-14 through WR-46) |
 
 ---
 
@@ -266,9 +326,15 @@ NOW:         SPRINT 6 — R17 Hardening Sprint (~2 weeks, March/April 2026)
   Tier 1:    Site-api migration + SIMP-1 Ph2 + IC-4/IC-5 (60 days)
   Tier 2:    CSP + graceful degradation + TTL + CORS (90 days)
 
-~April 2026: R17 Tier 0 complete → DIST-1 → SIMP-1 Phase 2 (95→≤80 tools)
-~May 2026:   WR-25 Newsletter launch (post /story) | BS-06/IC-27 (data)
-~June 2026:  EMAIL-P2 Data Drop #1 | R18 Architecture Review (post-DIST-1)
+NEXT:        SPRINT 7 — World-Class Website (~4 weeks, April/May 2026)
+  Tier 0:    /story/ prose + 404 fix + live data + brief excerpt + photos + newsletter sample
+  Tier 1:    Comparison cards + data flow anim + cost ticker + public review + protocols + /ask/ filter
+  Tier 2:    HN launch + build-in-public + heartbeat viz + tool-of-week + media kit + open data
+
+~April 2026: R17 Tier 0 complete → Sprint 7 Tier 0 begins
+~May 2026:   Sprint 7 Tier 0 done → DIST-1 (HN launch) → Sprint 7 Tier 1
+~May 2026:   WR-25 Newsletter launch (post /story) | BS-06/IC-27 (data) | SIMP-1 Phase 2
+~June 2026:  Sprint 7 Tier 2 + EMAIL-P2 Data Drop #1 | R18 Architecture Review
 ~Aug 2026:   IC-30 (after BS-SL1 matures)
 ~Sep 2026:   EMAIL-P3 Community launch | BS-T3-5 Streaming
 

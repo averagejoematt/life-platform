@@ -933,6 +933,10 @@ _anthropic_key_cache = None
 _ask_rate_store: dict = {}
 _board_rate_store: dict = {}
 
+# R17-04: Separate Anthropic key for site-api — injected via CDK env var
+AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/site-api-ai-key")
+
+
 def _get_anthropic_key():
     """Fetch Anthropic API key from Secrets Manager (cached after first call)."""
     global _anthropic_key_cache
@@ -940,11 +944,11 @@ def _get_anthropic_key():
         return _anthropic_key_cache
     try:
         sm = boto3.client("secretsmanager", region_name="us-west-2")
-        resp = sm.get_secret_value(SecretId="life-platform/anthropic-api-key")
+        resp = sm.get_secret_value(SecretId=AI_SECRET_NAME)
         _anthropic_key_cache = resp["SecretString"]
         return _anthropic_key_cache
     except Exception as e:
-        logger.error(f"[ask] Failed to fetch API key: {e}")
+        logger.error(f"[ask] Failed to fetch API key from {AI_SECRET_NAME}: {e}")
         return None
 
 
@@ -996,6 +1000,26 @@ def _ask_fetch_context() -> dict:
     return ctx
 
 
+# WR-40: Question safety filter — block sensitive query categories
+_ASK_BLOCKED_PATTERNS = [
+    r'\b(ssn|social.?security|passport|credit.?card|bank.?account|routing.?number)\b',
+    r'\b(password|api.?key|secret|token|credential)\b',
+    r'\b(address|phone.?number|email.?address|zip.?code|employer.?name)\b',
+    r'\b(salary|income|net.?worth|financial|tax)\b',
+    r'\b(suicid|self.?harm|eating.?disorder|mental.?illness|diagnos)\b',
+    r'\b(medication.?name|prescription|dosage|drug.?interaction)\b',
+]
+
+
+def _ask_question_safe(question: str) -> tuple:
+    """Returns (is_safe, reason). Blocks sensitive query categories."""
+    q_lower = question.lower()
+    for pattern in _ASK_BLOCKED_PATTERNS:
+        if re.search(pattern, q_lower):
+            return False, "This question touches on sensitive personal data that the platform doesn't share publicly. Try asking about weight, sleep, HRV, training, habits, or nutrition trends instead."
+    return True, ""
+
+
 def _ask_build_prompt(ctx: dict) -> str:
     pillars_str = ""
     if "pillars" in ctx:
@@ -1022,7 +1046,13 @@ RULES:
 - N=1 data. Note this for comparative claims.
 - Never give medical advice. Say "the data shows X" not "you should do Y."
 - Keep answers concise: 2-4 short paragraphs max.
-- Bold key findings with **asterisks**."""
+- Bold key findings with **asterisks**.
+
+SAFETY (WR-40):
+- NEVER reveal: addresses, phone numbers, emails, employer details, financial info, passwords, API keys.
+- NEVER provide: medical diagnoses, medication recommendations, mental health assessments.
+- Stick to publicly shared health metrics: weight, HRV, sleep, recovery, training, habits, nutrition trends.
+- If asked about something outside your data, say "I don't have that data" — don't speculate."""
 
 
 def handle_ask() -> dict:
@@ -1093,6 +1123,15 @@ def lambda_handler(event, context):
             question = re.sub(r'<[^>]+>', '', question)
             if len(question) < 5:
                 return _error(400, "Question too short")
+
+            # WR-40: Safety filter
+            is_safe, safety_reason = _ask_question_safe(question)
+            if not is_safe:
+                return {
+                    "statusCode": 200,
+                    "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+                    "body": json.dumps({"answer": safety_reason, "remaining": 999, "filtered": True}),
+                }
 
             ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
             # WR-24: Check for valid subscriber token → higher rate limit
