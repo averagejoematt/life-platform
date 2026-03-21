@@ -1093,13 +1093,15 @@ def call_anthropic(prompt, api_key, max_tokens=200, system=None,
     P1.8: Exponential backoff replaces fixed 2-attempt/5s retry.
     P1.9: Token usage emitted to CloudWatch LifePlatform/AI namespace.
     AI-3 middleware: validates output when output_type is specified (transparent fail-safe).
+    R17-16: Graceful degradation — returns "" (empty string) after all retries exhausted
+            instead of raising. Callers should check: if not result: handle_ai_unavailable().
 
     Args:
         output_type:    AIOutputType enum value — enables AI-3 output validation.
                         Pass None (default) to skip — used for JSON callers and IC passes.
         health_context: Dict of health metrics for context-aware validation checks
                         (e.g. {"recovery_score": 45, "tsb": -12}).
-    Returns text string — safe fallback if output is blocked by validator.
+    Returns text string, or "" if Anthropic is unavailable after all retries.
     """
     body = {
         "model": AI_MODEL,
@@ -1155,7 +1157,10 @@ def call_anthropic(prompt, api_key, max_tokens=200, system=None,
                 time.sleep(delay)
             else:
                 _emit_failure_metric()
-                raise
+                # R17-16: graceful degradation — log and return "" so callers can
+                # still complete with degraded output rather than failing the Lambda.
+                print(f"[ERROR] Anthropic unavailable after {max_attempts} attempts (HTTP {e.code}). Returning empty.")
+                return ""
         except urllib.error.URLError as e:
             print(f"[WARN] Anthropic network error attempt {attempt}/{max_attempts}: {e}")
             if attempt < max_attempts:
@@ -1164,7 +1169,9 @@ def call_anthropic(prompt, api_key, max_tokens=200, system=None,
                 time.sleep(delay)
             else:
                 _emit_failure_metric()
-                raise
+                # R17-16: graceful degradation — network failure after all retries.
+                print(f"[ERROR] Anthropic network unreachable after {max_attempts} attempts: {e}. Returning empty.")
+                return ""
 
 
 # ==============================================================================

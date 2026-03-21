@@ -26,10 +26,10 @@ echo "[1/4] Syncing site/ to S3..."
 aws s3 sync site/ s3://matthew-life-platform/site/ \
   --delete \
   --exclude ".DS_Store" \
-  --exclude "data/*" \
+  --exclude "data/*.json" \
   --cache-control "max-age=300" \
   --region us-west-2
-echo "  ✓ Site synced"
+echo "  ✓ Site synced (data/*.json excluded to preserve pipeline-generated files)"
 
 # 2. Deploy site-api Lambda (WR-40: safety filter)
 # NOTE: site-api is in us-east-1 (CDK WebStack), not us-west-2.

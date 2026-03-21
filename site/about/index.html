@@ -375,6 +375,85 @@
   </div>
 </section>
 
+<!-- WR-45: Media kit + speaking page -->
+<section class="mediakit-section" style="
+  padding: var(--space-16) var(--page-padding);
+  max-width: var(--content-width);
+  margin: 0 auto;
+  border-top: 1px solid var(--border);
+">
+  <div class="eyebrow">For event producers &amp; podcast hosts</div>
+  <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-10)">Speaking &amp; <span style="color:var(--accent)">media kit</span></h2>
+
+  <!-- Copy-ready bios -->
+  <div style="margin-bottom:var(--space-10)">
+    <div style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-5)">// Copy-ready bios</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border)">
+      <div style="background:var(--surface);padding:var(--space-6)">
+        <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-3)">50-word bio</div>
+        <p id="bio-50" style="font-size:var(--text-sm);color:var(--text);line-height:var(--lh-body);margin-bottom:var(--space-4)">Matthew Walker is a Senior IT Director who built a personal health intelligence platform from scratch using AI — no engineering degree required. 19 data sources, 95 AI tools, 48 AWS Lambda functions, running for under $15/month. He publishes every number, every failure, every week.</p>
+        <button onclick="copyBio('bio-50', this)" style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent);background:none;border:1px solid var(--border);padding:var(--space-2) var(--space-3);cursor:pointer;transition:border-color var(--dur-fast)" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">Copy →</button>
+      </div>
+      <div style="background:var(--surface);padding:var(--space-6)">
+        <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-3)">100-word bio</div>
+        <p id="bio-100" style="font-size:var(--text-sm);color:var(--text);line-height:var(--lh-body);margin-bottom:var(--space-4)">Matthew Walker is a Senior IT Director at a Seattle SaaS company and the creator of Life Platform — a personal health intelligence system built entirely with AI assistance. With no formal engineering background, Matthew used Claude as a development partner to build 19 data integrations, 95 intelligence tools, and a fully automated daily coaching brief that runs on AWS for under $15/month. He documents every result publicly — wins, failures, and everything in between. His work is both a personal transformation project and a live proof-of-concept for enterprise AI adoption by non-engineers.</p>
+        <button onclick="copyBio('bio-100', this)" style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent);background:none;border:1px solid var(--border);padding:var(--space-2) var(--space-3);cursor:pointer;transition:border-color var(--dur-fast)" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">Copy →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Talk topics -->
+  <div style="margin-bottom:var(--space-10)">
+    <div style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-5)">// Talk topics</div>
+    <div class="talk-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border)">
+      <div style="background:var(--surface);padding:var(--space-6)">
+        <div style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-3)">AI Without a CS Degree</div>
+        <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-4)">How a non-engineer built production AWS infrastructure using Claude as a full-time engineering partner — and what that means for every knowledge worker who's been told they "can't build."</p>
+        <div style="font-size:var(--text-2xs);color:var(--accent-dim);font-family:var(--font-mono)">AI/tech conferences · Enterprise transformation · L&D teams</div>
+      </div>
+      <div style="background:var(--surface);padding:var(--space-6)">
+        <div style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-3)">Radical Transparency in Health</div>
+        <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-4)">What happens when you publish every biometric, every failure, and every AI coaching brief publicly — and let data drive decisions instead of willpower. A live N=1 experiment in accountability infrastructure.</p>
+        <div style="font-size:var(--text-2xs);color:var(--accent-dim);font-family:var(--font-mono)">Health tech · QS community · Wellness &amp; longevity podcasts</div>
+      </div>
+      <div style="background:var(--surface);padding:var(--space-6)">
+        <div style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-3)">$10/Month AI Infrastructure</div>
+        <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-4)">A working demo of what AI-assisted development can actually cost — and why the economic barrier for building intelligent systems has collapsed. The business case for giving everyone access to AI dev tools.</p>
+        <div style="font-size:var(--text-2xs);color:var(--accent-dim);font-family:var(--font-mono)">Startup audiences · Indie builders · AI adoption leaders</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Booking + assets row -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6)">
+    <div style="border:1px solid var(--border);background:var(--surface);padding:var(--space-6)">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-4)">// Book an appearance</div>
+      <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-5)">Available for podcasts, panel discussions, conference talks, and corporate AI workshops. Remote first. Available in-person in the Pacific Northwest.</p>
+      <div style="display:flex;gap:var(--space-3);flex-wrap:wrap">
+        <a href="mailto:matt@averagejoematt.com?subject=Speaking%20inquiry" class="btn btn--primary">Email to book →</a>
+        <span style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);align-self:center">matt@averagejoematt.com</span>
+      </div>
+    </div>
+    <div style="border:1px solid var(--border);background:var(--surface);padding:var(--space-6)">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-4)">// Assets &amp; reference links</div>
+      <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+        <div style="font-size:var(--text-sm);color:var(--text-muted)">📷 Professional headshot — <span style="font-size:var(--text-2xs);color:var(--text-faint)">available on request</span></div>
+        <div style="font-size:var(--text-sm);color:var(--text-muted)">📋 <a href="/data/" style="color:var(--accent);border-bottom:1px solid var(--accent-dim)">Open data &amp; methodology</a> — data schema, correlations, scoring algorithms</div>
+        <div style="font-size:var(--text-sm);color:var(--text-muted)">🏗️ <a href="/platform/reviews/" style="color:var(--accent);border-bottom:1px solid var(--accent-dim)">Architecture reviews</a> — graded AI-assisted code reviews, all public</div>
+        <div style="font-size:var(--text-sm);color:var(--text-muted)">📰 <a href="/journal/sample/" style="color:var(--accent);border-bottom:1px solid var(--accent-dim)">Newsletter sample</a> — The Weekly Signal, real issue preview</div>
+        <div style="font-size:var(--text-sm);color:var(--text-muted)">🔬 <a href="/experiments/" style="color:var(--accent);border-bottom:1px solid var(--accent-dim)">N=1 Experiment Archive</a> — all active and completed experiments</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+@media (max-width: 900px) {
+  .talk-grid { grid-template-columns: 1fr !important; }
+  .mediakit-section > div:last-child { grid-template-columns: 1fr !important; }
+}
+</style>
+
 <!-- Subscribe CTA -->
 <section class="subscribe-cta" style="
   padding: var(--space-16) var(--page-padding);
@@ -419,6 +498,24 @@
 </footer>
 
 <script>
+// WR-45: Copy bio text to clipboard
+function copyBio(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent.trim()).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'Copied ✓';
+    btn.style.color = 'var(--accent)';
+    setTimeout(() => { btn.textContent = orig; }, 2000);
+  }).catch(() => {
+    // Fallback for browsers without clipboard API
+    const range = document.createRange();
+    range.selectNode(el);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+  });
+}
+
 // Load live weight
 (async function() {
   try {

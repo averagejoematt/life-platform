@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Open data from Life Platform — public_stats.json schema, correlation methodology, Character Sheet scoring algorithm, and data philosophy.">
+  <meta property="og:title" content="Open Data — Matthew Walker / Life Platform">
+  <meta property="og:description" content="Every number is public. Here's the schema, the methodology, and how to use the data.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/data/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>Open Data — Life Platform</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .page-header {
+      padding: calc(var(--nav-height) + var(--space-20)) var(--page-padding) var(--space-16);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--content-width);
+      margin: 0 auto;
+    }
+    .page-header__kicker {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-6);
+    }
+    .page-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-8);
+    }
+    .page-header__title span { color: var(--accent); }
+    .page-header__sub {
+      font-size: var(--text-lg);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      max-width: var(--prose-width);
+    }
+
+    .content-section {
+      padding: var(--space-16) var(--page-padding);
+      max-width: var(--content-width);
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+    .content-section:last-of-type { border-bottom: none; }
+
+    .schema-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: var(--space-6);
+      font-size: var(--text-sm);
+    }
+    .schema-table th {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      text-align: left;
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .schema-table td {
+      padding: var(--space-3) var(--space-4);
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-subtle);
+      vertical-align: top;
+      line-height: var(--lh-body);
+    }
+    .schema-table td:first-child {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    .schema-table td strong { color: var(--text); }
+    .schema-table tr:last-child td { border-bottom: none; }
+
+    .code-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-6);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: 1.7;
+      overflow-x: auto;
+      margin-top: var(--space-4);
+    }
+    .code-block .key   { color: var(--accent); }
+    .code-block .val   { color: var(--c-amber-500); }
+    .code-block .cmt   { color: var(--text-faint); }
+
+    .method-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-top: var(--space-8);
+    }
+    .method-card {
+      background: var(--surface);
+      padding: var(--space-6);
+    }
+    .method-card__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-3);
+    }
+    .method-card__desc {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      margin-bottom: var(--space-4);
+    }
+    .method-card__link {
+      font-size: var(--text-xs);
+      color: var(--accent);
+      font-family: var(--font-mono);
+      text-decoration: none;
+      border-bottom: 1px solid var(--accent-dim);
+    }
+    .method-card__link:hover { border-color: var(--accent); }
+
+    @media (max-width: 900px) {
+      .method-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/live/" class="nav__link">Live</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/character/" class="nav__link">Character</a>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+  </div>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span>Live</span>
+  </div>
+</nav>
+
+<div class="page-header animate-in">
+  <p class="page-header__kicker">// transparency protocol</p>
+  <h1 class="page-header__title">Open <span>Data</span></h1>
+  <p class="page-header__sub">
+    Every number from this experiment is public. Here's the schema, the methodology, and exactly how to access the data — no API key required.
+  </p>
+</div>
+
+<!-- Philosophy -->
+<section class="content-section">
+  <div class="eyebrow">Why it's open</div>
+  <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-8)">The <span style="color:var(--accent)">transparency</span> principle</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-12);align-items:start">
+    <div>
+      <p style="font-size:var(--text-lg);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-5)">
+        Accountability requires visibility. If the numbers aren't public, it's just a journal.
+        Publishing everything — the bad weeks, the stalled progress, the failed experiments —
+        is what makes this a real experiment rather than a highlight reel.
+      </p>
+      <p style="font-size:var(--text-lg);color:var(--text-muted);line-height:var(--lh-body)">
+        The data is also useful. Other builders can use the schema, the methodology, or the
+        correlation analysis as a starting point. N=1 data is limited — but it's honest,
+        and the infrastructure for collecting it is open.
+      </p>
+    </div>
+    <div>
+      <div style="border:1px solid var(--border);background:var(--surface);padding:var(--space-5);margin-bottom:var(--space-4)">
+        <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-2)">What's public</div>
+        <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body)">Daily aggregated vitals · Weekly summary stats · Character sheet scores · Correlation findings · Architecture reviews · Experiment results</div>
+      </div>
+      <div style="border:1px solid var(--border);background:var(--surface);padding:var(--space-5)">
+        <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-2)">What's private</div>
+        <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body)">Raw API payloads · Journal entries · Genome data · Anything identifiable about others · Full lab report PDFs</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Live data feeds -->
+<section class="content-section">
+  <div class="eyebrow">Live feeds</div>
+  <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-4)">Static <span style="color:var(--accent)">JSON endpoints</span></h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);max-width:var(--prose-width);margin-bottom:var(--space-8)">
+    Two static JSON files are regenerated daily by the Life Platform pipeline and served via CloudFront.
+    No authentication, no rate limiting, no API key.
+  </p>
+
+  <!-- public_stats.json -->
+  <div style="margin-bottom:var(--space-10)">
+    <div style="display:flex;align-items:baseline;gap:var(--space-4);margin-bottom:var(--space-4)">
+      <code style="font-family:var(--font-mono);font-size:var(--text-base);color:var(--accent)">public_stats.json</code>
+      <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint)">Updated daily ~11am PT</span>
+    </div>
+    <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-4)">
+      The primary public feed. Aggregated daily vitals, weight journey, training load, and platform stats.
+      This is the file that powers the homepage ticker, sparklines, and Day 1 vs. Today comparison.
+    </p>
+    <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-4)">
+      <a href="/public_stats.json" class="btn btn--ghost" style="font-size:var(--text-xs)">View raw JSON →</a>
+      <a href="https://averagejoematt.com/api/vitals" class="btn btn--ghost" style="font-size:var(--text-xs)">Live API: /api/vitals →</a>
+    </div>
+    <table class="schema-table">
+      <thead>
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>vitals.weight_lbs</td><td>number</td><td>Most recent weigh-in in pounds</td></tr>
+        <tr><td>vitals.hrv_ms</td><td>number</td><td>HRV in milliseconds (Whoop overnight)</td></tr>
+        <tr><td>vitals.hrv_trend</td><td>string</td><td>Human-readable HRV trend (7d avg vs 30d)</td></tr>
+        <tr><td>vitals.rhr_bpm</td><td>number</td><td>Resting heart rate in BPM</td></tr>
+        <tr><td>vitals.recovery_pct</td><td>number</td><td>Whoop recovery score 0–100</td></tr>
+        <tr><td>vitals.sleep_hours</td><td>number</td><td>Total sleep last night in hours</td></tr>
+        <tr><td>journey.start_weight_lbs</td><td>number</td><td>Starting weight (Feb 22, 2026)</td></tr>
+        <tr><td>journey.goal_weight_lbs</td><td>number</td><td>Goal weight (185 lbs)</td></tr>
+        <tr><td>journey.progress_pct</td><td>number</td><td>Percent of total weight-loss goal achieved</td></tr>
+        <tr><td>journey.projected_goal_date</td><td>string</td><td>ISO date of projected goal attainment at current rate</td></tr>
+        <tr><td>training.ctl_fitness</td><td>number</td><td>Chronic Training Load (fitness signal, 42d EMA)</td></tr>
+        <tr><td>training.atl_fatigue</td><td>number</td><td>Acute Training Load (fatigue signal, 7d EMA)</td></tr>
+        <tr><td>training.zone2_this_week_min</td><td>number</td><td>Zone 2 cardio minutes in current week</td></tr>
+        <tr><td>training.zone2_target_min</td><td>number</td><td>Weekly Zone 2 target (150 min)</td></tr>
+        <tr><td>platform.mcp_tools</td><td>number</td><td>Total MCP tools currently registered</td></tr>
+        <tr><td>platform.data_sources</td><td>number</td><td>Active data source integrations</td></tr>
+        <tr><td>platform.lambdas</td><td>number</td><td>Lambda functions deployed</td></tr>
+        <tr><td>trends.weight_daily</td><td>array</td><td>30-day weight readings: <code style="font-family:var(--font-mono);font-size:var(--text-2xs)">[{date, lbs}]</code></td></tr>
+        <tr><td>trends.hrv_daily</td><td>array</td><td>30-day HRV readings: <code style="font-family:var(--font-mono);font-size:var(--text-2xs)">[{date, ms}]</code></td></tr>
+        <tr><td>trends.recovery_daily</td><td>array</td><td>30-day recovery scores: <code style="font-family:var(--font-mono);font-size:var(--text-2xs)">[{date, pct}]</code></td></tr>
+        <tr><td>_meta.generated_at</td><td>string</td><td>ISO timestamp of last pipeline run</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- character_stats.json -->
+  <div>
+    <div style="display:flex;align-items:baseline;gap:var(--space-4);margin-bottom:var(--space-4)">
+      <code style="font-family:var(--font-mono);font-size:var(--text-base);color:var(--accent)">character_stats.json</code>
+      <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint)">Updated daily ~10am PT</span>
+    </div>
+    <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-4)">
+      Character Sheet data — gamified health scoring across 7 pillars. Used by the <a href="/character/" style="color:var(--accent);">/character/</a> page.
+      See the full scoring methodology on the <a href="/character/" style="color:var(--accent);">Character Sheet page</a>.
+    </p>
+    <a href="/data/character_stats.json" class="btn btn--ghost" style="font-size:var(--text-xs);margin-bottom:var(--space-6);display:inline-block">View raw JSON →</a>
+    <table class="schema-table">
+      <thead>
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>character.level</td><td>number</td><td>Overall character level (1–50+)</td></tr>
+        <tr><td>character.tier</td><td>string</td><td>Named tier: Foundation / Momentum / Discipline / Mastery / Elite</td></tr>
+        <tr><td>character.xp</td><td>number</td><td>Total XP accumulated</td></tr>
+        <tr><td>character.days_active</td><td>number</td><td>Days the platform has been tracking</td></tr>
+        <tr><td>pillars[*].name</td><td>string</td><td>Pillar name: sleep · movement · nutrition · metabolic · mind · relationships · consistency</td></tr>
+        <tr><td>pillars[*].level</td><td>number</td><td>Pillar-level score (1–10)</td></tr>
+        <tr><td>pillars[*].raw_score</td><td>number</td><td>Computed raw score 0–100 before level mapping</td></tr>
+        <tr><td>pillars[*].trend</td><td>string</td><td>7-day trend: up / stable / down</td></tr>
+        <tr><td>pillars[*].xp_delta</td><td>number</td><td>XP change from previous day</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Fetch example -->
+  <div style="margin-top:var(--space-10)">
+    <div style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">// Fetch example (browser or Node.js)</div>
+    <div class="code-block">
+<span class="cmt">// Get today's vitals — no auth required</span>
+<span class="key">const</span> res = <span class="key">await</span> fetch(<span class="val">'https://averagejoematt.com/public_stats.json'</span>);
+<span class="key">const</span> data = <span class="key">await</span> res.json();
+
+console.log(data.vitals.hrv_ms);        <span class="cmt">// e.g. 66.2</span>
+console.log(data.vitals.recovery_pct);  <span class="cmt">// e.g. 89</span>
+console.log(data.journey.progress_pct); <span class="cmt">// e.g. 12.4</span>
+
+<span class="cmt">// Or use the API endpoints directly</span>
+<span class="key">const</span> vitals = <span class="key">await</span> fetch(<span class="val">'https://averagejoematt.com/api/vitals'</span>);
+<span class="key">const</span> journey = <span class="key">await</span> fetch(<span class="val">'https://averagejoematt.com/api/journey'</span>);
+    </div>
+  </div>
+</section>
+
+<!-- Methodology -->
+<section class="content-section">
+  <div class="eyebrow">How the numbers are made</div>
+  <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-4)">Methodology <span style="color:var(--accent)">docs</span></h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);max-width:var(--prose-width);margin-bottom:var(--space-8)">
+    Every score, correlation, and algorithm is documented. If you're going to use this data, you should understand how it's computed.
+  </p>
+  <div class="method-grid">
+    <div class="method-card">
+      <div class="method-card__title">Correlation Analysis</div>
+      <div class="method-card__desc">Weekly Pearson correlation across 23 metric pairs with Benjamini-Hochberg FDR correction at α=0.05. Minimum 14-day windows. Results labeled with r, p-value, and sample size.</div>
+      <a href="/explorer/" class="method-card__link">See correlation explorer →</a>
+    </div>
+    <div class="method-card">
+      <div class="method-card__title">Character Sheet Scoring</div>
+      <div class="method-card__desc">7-pillar composite scoring system. Each pillar aggregates 3–8 source metrics using domain-specific weights. Raw scores (0–100) map to levels (1–10) via tiered thresholds. Full weighting table and input signals published.</div>
+      <a href="/character/" class="method-card__link">See scoring methodology →</a>
+    </div>
+    <div class="method-card">
+      <div class="method-card__title">Training Load (ACWR)</div>
+      <div class="method-card__desc">Acute:Chronic Workload Ratio using 7-day (ATL) and 42-day (CTL) exponential moving averages. Sweet spot: 0.8–1.3. Sources: Garmin, Strava, Apple Health activity rings.</div>
+      <a href="/platform/" class="method-card__link">See platform architecture →</a>
+    </div>
+    <div class="method-card">
+      <div class="method-card__title">HRV Trend Analysis</div>
+      <div class="method-card__desc">7-day rolling average vs 30-day baseline, sourced from Whoop overnight HRV. Trend directional signals use ±3% threshold to distinguish meaningful change from noise.</div>
+      <a href="/live/" class="method-card__link">See live dashboard →</a>
+    </div>
+    <div class="method-card">
+      <div class="method-card__title">Deficit Sustainability</div>
+      <div class="method-card__desc">Caloric deficit tracking with protein adequacy, weekly rate validation, and adaptive ceiling to prevent metabolic adaptation. Sources: MacroFactor + Withings.</div>
+      <a href="/protocols/" class="method-card__link">See nutrition protocol →</a>
+    </div>
+    <div class="method-card">
+      <div class="method-card__title">Architecture Reviews</div>
+      <div class="method-card__desc">Monthly AI-graded code reviews using 12 expert personas (Linus, Kelsey, Martin, etc.). Grades A–F on 8 dimensions. All reviews published unredacted.</div>
+      <a href="/platform/reviews/" class="method-card__link">Read all reviews →</a>
+    </div>
+  </div>
+</section>
+
+<!-- DynamoDB Schema -->
+<section class="content-section">
+  <div class="eyebrow">Storage schema</div>
+  <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-4)">DynamoDB <span style="color:var(--accent)">table design</span></h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);max-width:var(--prose-width);margin-bottom:var(--space-6)">
+    All normalized metrics are stored in a single DynamoDB table using a composite key pattern.
+    Raw JSON payloads live in S3.
+  </p>
+  <div class="code-block">
+<span class="cmt">// DynamoDB single-table: "life-platform" (us-west-2)</span>
+<span class="cmt">// No GSIs — all access via composite key</span>
+
+pk:  <span class="val">"USER#matthew#SOURCE#{source}"</span>   <span class="cmt">// e.g. "USER#matthew#SOURCE#whoop"</span>
+sk:  <span class="val">"DATE#{YYYY-MM-DD}"</span>              <span class="cmt">// e.g. "DATE#2026-03-20"</span>
+
+<span class="cmt">// S3 raw storage path convention</span>
+<span class="val">"raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json"</span>
+<span class="cmt">// e.g. "raw/whoop/recovery/2026/03/20.json"</span>
+
+<span class="cmt">// Active sources (19 total)</span>
+<span class="val">whoop · eight_sleep · withings · garmin · strava · apple_health</span>
+<span class="val">macrofactor · habitify · notion · todoist · dexcom · genome</span>
+<span class="val">labs · dexa · weather · travel · blood_pressure · supplements · state_of_mind</span>
+  </div>
+  <div style="margin-top:var(--space-6)">
+    <a href="/platform/" class="btn btn--ghost" style="font-size:var(--text-xs)">Full architecture docs →</a>
+  </div>
+</section>
+
+<!-- N=1 disclaimer -->
+<section class="content-section" style="border-bottom:none">
+  <div style="max-width:var(--prose-width);border-left:3px solid var(--border-strong);padding-left:var(--space-6)">
+    <div style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-3)">// N=1 disclaimer</div>
+    <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-3)">
+      This is one person's data. Correlations in this dataset are not universal truths — they describe patterns
+      in my physiology during a specific period of intentional change. Statistical significance thresholds
+      (p &lt; 0.05 with FDR correction) are noted on all correlation findings, but small n limits generalizability.
+    </p>
+    <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body)">
+      Use this data as a methodology reference, not a prescription. If you're building something similar,
+      the schema and architecture are worth borrowing. The specific numbers are mine.
+    </p>
+  </div>
+  <div style="margin-top:var(--space-10);display:flex;gap:var(--space-4);flex-wrap:wrap">
+    <a href="/ask/" class="btn btn--primary">Ask the data anything →</a>
+    <a href="/about/" class="btn btn--ghost">About the project →</a>
+    <a href="/platform/" class="btn btn--ghost">Platform architecture →</a>
+  </div>
+</section>
+
+<!-- Email CTA -->
+<section style="
+  padding: var(--space-16) var(--page-padding);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  text-align: center;
+">
+  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
+  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
+    Real numbers from 19 data sources. No highlight reel. Every win and every failure, in your inbox on Wednesdays.
+    <br><a href="/journal/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue →</a>
+  </p>
+  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
+    <input id="cta-email-data" type="email" placeholder="your@email.com" style="
+      flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);
+      font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);
+      outline:none;
+    ">
+    <button onclick="amjSubscribe('data')" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">Subscribe</button>
+  </div>
+  <p id="cta-msg-data" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
+</section>
+
+<footer class="footer">
+  <div class="footer__brand">AMJ</div>
+  <div class="footer__links">
+    <a href="/story/" class="footer__link">Story</a>
+    <a href="/live/" class="footer__link">Live</a>
+    <a href="/journal/" class="footer__link">Journal</a>
+    <a href="/platform/" class="footer__link">Platform</a>
+    <a href="/character/" class="footer__link">Character</a>
+    <a href="/experiments/" class="footer__link">Experiments</a>
+    <a href="/explorer/" class="footer__link">Explorer</a>
+    <a href="/biology/" class="footer__link">Biology</a>
+    <a href="/ask/" class="footer__link">Ask</a>
+    <a href="/board/" class="footer__link">Board</a>
+    <a href="/about/" class="footer__link">About</a>
+    <a href="/subscribe/" class="footer__link">Subscribe</a>
+  </div>
+  <div class="footer__copy">// updated daily by life-platform · <a href="/privacy/" class="footer__link">Privacy</a></div>
+</footer>
+
+<script>
+(function() {
+  if (!window.amjSubscribe) {
+    window.amjSubscribe = async function(slug) {
+      const email = document.getElementById('cta-email-' + slug).value.trim();
+      const msg   = document.getElementById('cta-msg-'   + slug);
+      if (!email || !email.includes('@')) {
+        msg.textContent = 'Enter a valid email address.';
+        msg.style.color = 'var(--c-yellow-status)';
+        return;
+      }
+      msg.textContent = 'Subscribing…';
+      msg.style.color = 'var(--text-muted)';
+      try {
+        const res  = await fetch('/api/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, source: slug + '_cta' }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          msg.textContent = '✓ Check your inbox to confirm.';
+          msg.style.color = 'var(--c-amber-500)';
+          document.getElementById('cta-email-' + slug).value = '';
+        } else {
+          msg.textContent = data.error || 'Something went wrong.';
+          msg.style.color = 'var(--c-yellow-status)';
+        }
+      } catch(e) {
+        msg.textContent = 'Network error — try again.';
+        msg.style.color = 'var(--c-yellow-status)';
+      }
+    };
+  }
+  const inp = document.getElementById('cta-email-data');
+  if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter') window.amjSubscribe('data'); });
+})();
+</script>
+<script src="/assets/js/reveal.js"></script>
+</body>
+</html>

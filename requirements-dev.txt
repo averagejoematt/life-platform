@@ -1,0 +1,18 @@
+# Dev dependencies — pinned for reproducible CI
+# Install: pip install -r requirements-dev.txt
+# Runtime deps are in lambdas/ (stdlib only) or cdk/requirements.txt
+
+# Testing
+pytest==9.0.2
+pytest-cov==6.1.0
+
+# Linting
+flake8==7.3.0
+
+# AWS SDK (for tests that call boto3 directly)
+boto3==1.42.59
+botocore==1.42.59
+
+# CDK (synth + diff)
+aws-cdk-lib>=2.170.0
+constructs>=10.0.0
