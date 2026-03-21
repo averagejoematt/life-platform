@@ -1,7 +1,7 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-20 (v3.7.83 — Expert Panel Website Strategy Review conducted. 19 new items (WR-28 through WR-46) added as Sprint 7 "World-Class Website" in SPRINT_PLAN.md. Panel finding: site has world-class infrastructure but undersells the story by 10x. /story/ prose confirmed as #1 priority. Full review: `docs/reviews/WEBSITE_PANEL_REVIEW_2026-03-20.md`.)
+> Last update: 2026-03-21 (v3.8.0 — Unified Board Summit #3. Sprint 8 shipped: mobile nav (hamburger + bottom nav + grouped footer, 30 pages patched), content safety filter (3-layer: S3 config + prompt + response scrub), website versioning (rollback_site.sh + git tags). Comprehensive website roadmap at `docs/WEBSITE_ROADMAP.md`. 12 new page concepts identified with data already built.)
 
 ---
 
@@ -44,26 +44,26 @@ All P0 items from Architecture Review #8 are resolved.
 | ID | Item | Priority | Status |
 |----|------|----------|--------|
 | WR-14 | **Write /story/ page (5 chapters)** — panel unanimous #1 | Sprint 7 Tier 0 | ⬜ Matthew only |
-| WR-28 | Fix subpage 404s for crawlers/social previews | Sprint 7 Tier 0 | ⬜ |
-| WR-29 | Populate live data on homepage (fix dashes) | Sprint 7 Tier 0 | ⬜ |
-| WR-30 | Add real daily brief excerpt to homepage | Sprint 7 Tier 0 | ⬜ |
+| WR-28 | Fix subpage 404s for crawlers/social previews | Sprint 7 Tier 0 | ✅ Done (v3.7.84) |
+| WR-29 | Populate live data on homepage (fix dashes) | Sprint 7 Tier 0 | ✅ Done (v3.7.84) |
+| WR-30 | Add real daily brief excerpt to homepage | Sprint 7 Tier 0 | ✅ Done (v3.7.84) |
 | WR-15 | Before/during photos | Sprint 7 Tier 0 | ⬜ Matthew only |
-| WR-31 | "Start here" flow for new visitors | Sprint 7 Tier 0 | ⬜ |
-| WR-32 | Newsletter sample/archive page | Sprint 7 Tier 0 | ⬜ |
-| WR-33 | Visual transformation comparison cards (shareable) | Sprint 7 Tier 1 | ⬜ |
-| WR-34 | Data flow animation on /platform/ | Sprint 7 Tier 1 | ⬜ |
-| WR-35 | Running cost ticker on /platform/ | Sprint 7 Tier 1 | ⬜ |
-| WR-36 | Public architecture review artifact | Sprint 7 Tier 1 | ⬜ |
-| WR-37 | Scoring algorithm transparency on /character/ | Sprint 7 Tier 1 | ⬜ |
-| WR-38 | "Discoveries" section — featured correlations | Sprint 7 Tier 1 | ⬜ |
-| WR-39 | "Current Protocols" page/section | Sprint 7 Tier 1 | ⬜ |
-| WR-40 | Response safety filter for /ask/ | Sprint 7 Tier 1 | ⬜ |
+| WR-31 | "Start here" flow for new visitors | Sprint 7 Tier 0 | ✅ Done (v3.7.84) |
+| WR-32 | Newsletter sample/archive page | Sprint 7 Tier 0 | ✅ Done (v3.7.84) |
+| WR-33 | Visual transformation comparison cards (shareable) | Sprint 7 Tier 1 | ✅ Done (v3.7.84) |
+| WR-34 | Data flow animation on /platform/ | Sprint 7 Tier 1 | ✅ Done (v3.7.84) |
+| WR-35 | Running cost ticker on /platform/ | Sprint 7 Tier 1 | ✅ Done (v3.7.84) |
+| WR-36 | Public architecture review artifact | Sprint 7 Tier 1 | ✅ Done (v3.7.84) |
+| WR-37 | Scoring algorithm transparency on /character/ | Sprint 7 Tier 1 | ✅ Done (v3.7.84) |
+| WR-38 | "Discoveries" section — featured correlations | Sprint 7 Tier 1 | ✅ Done (v3.7.84) |
+| WR-39 | "Current Protocols" page/section | Sprint 7 Tier 1 | ✅ Done (v3.7.84) |
+| WR-40 | Response safety filter for /ask/ | Sprint 7 Tier 1 | ✅ Done (v3.7.84 + v3.8.0 content filter) |
 | WR-41 | LinkedIn/Twitter build-in-public campaign | Sprint 7 Tier 2 | ⬜ Matthew only |
 | WR-42 | Hacker News / Product Hunt launch | Sprint 7 Tier 2 | ⬜ Gated on Tier 0 |
-| WR-43 | Animated heartbeat/biometric signature | Sprint 7 Tier 2 | ⬜ |
-| WR-44 | "Tool of the week" on /platform/ | Sprint 7 Tier 2 | ⬜ |
-| WR-45 | Media kit + speaking page | Sprint 7 Tier 2 | ⬜ |
-| WR-46 | Data export / open data page | Sprint 7 Tier 2 | ⬜ |
+| WR-43 | Animated heartbeat/biometric signature | Sprint 7 Tier 2 | ✅ Done (v3.7.84) |
+| WR-44 | "Tool of the week" on /platform/ | Sprint 7 Tier 2 | ✅ Done (v3.7.84) |
+| WR-45 | Media kit + speaking page | Sprint 7 Tier 2 | ✅ Done (v3.7.84) |
+| WR-46 | Data export / open data page | Sprint 7 Tier 2 | ✅ Done (v3.7.84) |
 
 ---
 
