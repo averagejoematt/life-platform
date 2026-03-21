@@ -74,6 +74,58 @@ DDB_REGION = os.environ.get("DYNAMODB_REGION", "us-west-2")
 # ── AWS clients (module-level for warm container reuse) ─────
 dynamodb = boto3.resource("dynamodb", region_name=DDB_REGION)
 table    = dynamodb.Table(TABLE_NAME)
+# ── Content safety filter (S3-cached) ───────────────────────
+_content_filter_cache = None
+
+def _load_content_filter():
+    """Load blocked terms from S3 config/content_filter.json. Cached after first call."""
+    global _content_filter_cache
+    if _content_filter_cache is not None:
+        return _content_filter_cache
+    try:
+        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+        s3 = boto3.client("s3", region_name="us-west-2")
+        resp = s3.get_object(Bucket=S3_BUCKET, Key="config/content_filter.json")
+        _content_filter_cache = json.loads(resp["Body"].read())
+        logger.info(f"[content_filter] Loaded: {len(_content_filter_cache.get('blocked_vice_keywords', []))} blocked terms")
+    except Exception as e:
+        logger.warning(f"[content_filter] Failed to load from S3: {e}")
+        _content_filter_cache = {
+            "blocked_vices": ["No porn", "No marijuana"],
+            "blocked_vice_keywords": ["porn", "pornography", "marijuana", "cannabis", "weed", "thc"],
+        }
+    return _content_filter_cache
+
+
+def _scrub_blocked_terms(text: str) -> str:
+    """Remove any mention of blocked terms from public-facing text."""
+    cf = _load_content_filter()
+    result = text
+    for term in cf.get("blocked_vice_keywords", []):
+        pattern = re.compile(re.escape(term), re.IGNORECASE)
+        result = pattern.sub("[filtered]", result)
+    # Also scrub full vice names
+    for vice in cf.get("blocked_vices", []):
+        pattern = re.compile(re.escape(vice), re.IGNORECASE)
+        result = pattern.sub("[filtered]", result)
+    # Clean up any "[filtered]" artifacts in sentences
+    result = re.sub(r'\[filtered\]', '', result)
+    result = re.sub(r'\s{2,}', ' ', result)
+    return result.strip()
+
+
+def _is_blocked_vice(name: str) -> bool:
+    """Check if a vice/habit name matches the blocked list."""
+    cf = _load_content_filter()
+    name_lower = name.lower().strip()
+    for blocked in cf.get("blocked_vices", []):
+        if blocked.lower() == name_lower:
+            return True
+    for kw in cf.get("blocked_vice_keywords", []):
+        if kw.lower() in name_lower:
+            return True
+    return False
+
 
 # ── CORS headers ────────────────────────────────────────────
 CORS_HEADERS = {
@@ -908,7 +960,7 @@ def _handle_board_ask(event: dict) -> dict:
             )
             with urllib.request.urlopen(req, timeout=20) as r:
                 result = json.loads(r.read())
-            responses[pid] = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
+            responses[pid] = _scrub_blocked_terms("".join(b["text"] for b in result.get("content", []) if b.get("type") == "text"))
         except Exception as e:
             logger.error(f"[board_ask] {pid} failed: {e}")
             responses[pid] = f"[{p['name']} is temporarily unavailable]"
@@ -1054,7 +1106,9 @@ SAFETY (WR-40):
 - NEVER reveal: addresses, phone numbers, emails, employer details, financial info, passwords, API keys.
 - NEVER provide: medical diagnoses, medication recommendations, mental health assessments.
 - Stick to publicly shared health metrics: weight, HRV, sleep, recovery, training, habits, nutrition trends.
-- If asked about something outside your data, say "I don't have that data" — don't speculate."""
+- If asked about something outside your data
+- CONTENT FILTER: NEVER mention porn, pornography, marijuana, cannabis, weed, THC, or any related terms.
+- If asked about these topics, respond only with "I don't have data on that specific topic.", say "I don't have that data" — don't speculate."""
 
 
 def handle_ask() -> dict:
@@ -1181,7 +1235,7 @@ def lambda_handler(event, context):
             return {
                 "statusCode": 200,
                 "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-                "body": json.dumps({"answer": answer, "remaining": remaining}),
+                "body": json.dumps({"answer": _scrub_blocked_terms(answer), "remaining": remaining}),
             }
         except Exception as e:
             logger.error(f"[site_api] /api/ask failed: {e}")

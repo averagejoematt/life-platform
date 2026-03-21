@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "description": "Public content safety filter — controls what data is hidden from all public-facing surfaces (website, emails, API responses). Stored in S3, consumed by site-api Lambda and email Lambdas.",
+    "s3_key": "config/content_filter.json",
+    "last_updated": "2026-03-21",
+    "version": "1.0.0"
+  },
+  "blocked_vices": [
+    "No porn",
+    "No marijuana"
+  ],
+  "blocked_vice_keywords": [
+    "porn", "pornography", "marijuana", "cannabis", "weed", "thc", "edible", "edibles"
+  ],
+  "rules": {
+    "vice_streaks": "Exclude any vice whose name case-insensitively matches blocked_vices from all public outputs.",
+    "habit_data": "Exclude matching habits from public habit displays, heatmaps, adherence reports.",
+    "temptation_log": "Never surface temptation entries with matching categories.",
+    "ai_responses": "System prompt must instruct Claude to never mention blocked terms.",
+    "email_digests": "All email Lambdas must filter blocked vices from BoD commentary.",
+    "journal_entries": "Passages mentioning blocked terms must not appear on public pages."
+  }
+}

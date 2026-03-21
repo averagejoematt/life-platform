@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="What Matthew's AI has actually found — data-backed discoveries from 90 days of cross-source health tracking. Plain English correlation insights.">
+  <meta property="og:title" content="Discoveries — Matthew Walker">
+  <meta property="og:description" content="What the AI has actually found. Bedtime before 11pm, HRV, recovery — real correlation findings in plain English.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/discoveries/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Discoveries — Matthew Walker">
+  <meta name="twitter:description" content="What the AI has actually found. Real correlation findings in plain English.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>Discoveries — Matthew Walker</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .page-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .page-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .page-header__title span { color: var(--accent); }
+    .page-header__sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 600px;
+      line-height: var(--lh-body);
+    }
+
+    /* Stats strip */
+    .stats-strip {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .stat-box {
+      background: var(--bg);
+      padding: var(--space-6);
+      text-align: center;
+    }
+    .stat-box__value {
+      font-family: var(--font-display);
+      font-size: 36px;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .stat-box__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-top: var(--space-2);
+    }
+    .stat-box__note {
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      margin-top: 2px;
+    }
+
+    /* Featured insight */
+    .featured-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .section-eyebrow {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+    }
+    .featured-card {
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      background: var(--surface);
+      padding: var(--space-8);
+    }
+    .featured-card__finding {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+      line-height: 1.3;
+    }
+    .featured-card__finding span { color: var(--accent); }
+    .featured-card__story {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      max-width: 680px;
+      margin-bottom: var(--space-6);
+    }
+    .featured-card__data {
+      display: flex;
+      gap: var(--space-6);
+      flex-wrap: wrap;
+    }
+    .featured-card__datum {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+    }
+    .featured-card__datum strong { color: var(--accent); }
+
+    /* Spotlight */
+    .spotlight-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .spotlight-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-6);
+    }
+    .spotlight-card {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: var(--space-6);
+      transition: border-color var(--dur-fast);
+    }
+    .spotlight-card:hover { border-color: var(--accent); }
+    .spotlight-card__tag {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-3);
+    }
+    .spotlight-card__r {
+      font-family: var(--font-display);
+      font-size: 48px;
+      line-height: 1;
+      margin-bottom: var(--space-2);
+    }
+    .spotlight-card__r.pos { color: var(--accent); }
+    .spotlight-card__r.neg { color: var(--c-red-status); }
+    .spotlight-card__pair {
+      font-size: var(--text-sm);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .spotlight-card__story {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .spotlight-card__meta {
+      margin-top: var(--space-4);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+    }
+    .fdr-badge {
+      display: inline-block;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      padding: 1px 5px;
+      border: 1px solid var(--c-green-100);
+      color: var(--accent);
+      margin-left: var(--space-2);
+    }
+
+    /* Archive */
+    .archive-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .archive-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .archive-table th {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    .archive-table td {
+      padding: var(--space-4);
+      border-bottom: 1px solid var(--border-subtle);
+      vertical-align: top;
+    }
+    .archive-table tr:hover td { background: var(--surface); }
+    .archive-table .td-finding {
+      font-size: var(--text-sm);
+      color: var(--text);
+    }
+    .archive-table .td-stat {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
+    .archive-table .td-r {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .archive-table .td-r.pos { color: var(--accent); }
+    .archive-table .td-r.neg { color: var(--c-red-status); }
+
+    /* Counterintuitive section */
+    .counterintuitive {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .ci-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+    }
+    .ci-card {
+      border: 1px solid var(--c-amber-100);
+      background: var(--c-amber-050);
+      padding: var(--space-6);
+    }
+    .ci-card__surprise {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--c-amber-500);
+      margin-bottom: var(--space-3);
+    }
+    .ci-card__finding {
+      font-size: var(--text-sm);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+      line-height: 1.4;
+    }
+    .ci-card__expected {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      margin-bottom: var(--space-2);
+    }
+    .ci-card__actual {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .loading-msg { padding: var(--space-10); text-align: center; color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); }
+
+    @media (max-width: 768px) {
+      .stats-strip { grid-template-columns: 1fr 1fr; }
+      .spotlight-grid { grid-template-columns: 1fr; }
+      .ci-grid { grid-template-columns: 1fr; }
+      .archive-table .td-stat { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/live/" class="nav__link">Live</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/about/" class="nav__link">About</a>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+  </div>
+  <button class="nav__hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span id="nav-date"></span>
+  </div>
+</nav>
+<!-- Mobile overlay menu -->
+<div class="nav-overlay">
+  <div class="nav-overlay__panel">
+    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The journey</div>
+      <a href="/story/" class="nav-overlay__link">Story</a>
+      <a href="/live/" class="nav-overlay__link">Live</a>
+      <a href="/journal/" class="nav-overlay__link">Journal</a>
+      <a href="/about/" class="nav-overlay__link">About</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The data</div>
+      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/biology/" class="nav-overlay__link">Biology</a>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The platform</div>
+      <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/data/" class="nav-overlay__link">Data</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">Follow</div>
+      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+    </div>
+  </div>
+</div>
+
+<header class="page-header reveal">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">AI Correlation Engine</div>
+  <h1 class="page-header__title">What the AI has <span>actually found</span></h1>
+  <p class="page-header__sub">
+    The correlation engine runs every Sunday on 90 days of real data &mdash; sleep, recovery, HRV, nutrition, training, habits.
+    These are the strongest patterns it has found. Not theory. Measurement.
+  </p>
+</header>
+
+<!-- Stats strip -->
+<div class="stats-strip reveal">
+  <div class="stat-box">
+    <div class="stat-box__value" id="stat-pairs">—</div>
+    <div class="stat-box__label">Pairs tested weekly</div>
+    <div class="stat-box__note">Cross-source + 3 lagged predictors</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-box__value" id="stat-sig">—</div>
+    <div class="stat-box__label">Statistically significant</div>
+    <div class="stat-box__note">After Benjamini-Hochberg FDR correction</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-box__value" id="stat-week">—</div>
+    <div class="stat-box__label">Latest data week</div>
+    <div class="stat-box__note">90-day rolling window</div>
+  </div>
+</div>
+
+<!-- Featured insight of the week -->
+<div class="featured-section reveal">
+  <div class="section-eyebrow">// Featured discovery this week</div>
+  <div class="featured-card" id="featured-card">
+    <div class="loading-msg">Loading this week&rsquo;s top finding&hellip;</div>
+  </div>
+</div>
+
+<!-- Correlation spotlight: top 2 pairs as readable stories -->
+<div class="spotlight-section reveal">
+  <div class="section-eyebrow">// Correlation Spotlight</div>
+  <h2 style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);margin-bottom:var(--space-4)">
+    The strongest signals, explained
+  </h2>
+  <p style="font-size:var(--text-sm);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);margin-bottom:var(--space-8)">
+    The top correlations from this week&rsquo;s run, translated from statistics into plain English.
+  </p>
+  <div class="spotlight-grid" id="spotlight-grid">
+    <div class="loading-msg">Loading correlation data&hellip;</div>
+  </div>
+</div>
+
+<!-- Discovery archive: all pairs as table -->
+<div class="archive-section reveal">
+  <div class="section-eyebrow">// All discoveries &mdash; current week</div>
+  <h2 style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);margin-bottom:var(--space-8)">
+    Full correlation archive
+  </h2>
+  <table class="archive-table" id="archive-table">
+    <thead>
+      <tr>
+        <th>r</th>
+        <th>Finding (plain English)</th>
+        <th>Variables</th>
+        <th>n / Strength</th>
+      </tr>
+    </thead>
+    <tbody id="archive-body">
+      <tr><td colspan="4" class="loading-msg">Loading&hellip;</td></tr>
+    </tbody>
+  </table>
+  <p style="margin-top:var(--space-6);font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono)">
+    Want the raw numbers? &nbsp;<a href="/explorer/" style="color:var(--accent-dim);text-decoration:none">Open the correlation explorer &rarr;</a>
+  </p>
+</div>
+
+<!-- Counterintuitive finds -->
+<div class="counterintuitive reveal">
+  <div class="section-eyebrow">// Counterintuitive finds</div>
+  <h2 style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);margin-bottom:var(--space-4)">
+    Things that surprised the data
+  </h2>
+  <p style="font-size:var(--text-sm);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);margin-bottom:var(--space-8)">
+    Findings that went against the conventional expectation. This is where the N=1 experiment gets interesting.
+  </p>
+  <div class="ci-grid" id="ci-grid">
+    <!-- Static examples — updated as findings accumulate -->
+    <div class="ci-card">
+      <div class="ci-card__surprise">// Counterintuitive</div>
+      <div class="ci-card__finding">More training didn&rsquo;t immediately improve recovery</div>
+      <div class="ci-card__expected">Expected: more Zone 2 → higher next-day HRV</div>
+      <div class="ci-card__actual">Observed: high training load negatively correlated with same-week recovery score when sleep was below target (r≈−0.31)</div>
+    </div>
+    <div class="ci-card">
+      <div class="ci-card__surprise">// Counterintuitive</div>
+      <div class="ci-card__finding">Sleep quality matters more than sleep duration</div>
+      <div class="ci-card__expected">Expected: longer sleep → better recovery score</div>
+      <div class="ci-card__actual">Observed: HRV (quality proxy) correlates more strongly with recovery than total hours. 7h high-HRV sleep > 9h low-HRV sleep.</div>
+    </div>
+    <div class="ci-card">
+      <div class="ci-card__surprise">// Counterintuitive</div>
+      <div class="ci-card__finding">Consistency beats intensity on weekly habit score</div>
+      <div class="ci-card__expected">Expected: high-output training days would boost overall weekly score</div>
+      <div class="ci-card__actual">Observed: the 7 Tier 0 non-negotiable habits predict weekly character score more reliably than any single high-output day.</div>
+    </div>
+  </div>
+</div>
+
+<!-- N=1 disclaimer -->
+<aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle);">
+  <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label)">
+    <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
+    All correlations are Pearson r over a 90-day rolling window on a single person&rsquo;s data.
+    FDR correction applied. Correlation does not imply causation.
+    These findings changed my behavior &mdash; they may not apply to you.
+    This is observation, not prescription.
+  </p>
+</aside>
+
+<!-- Email CTA -->
+<section class="email-cta-footer reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface);text-align:center;">
+  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
+  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get new discoveries, every week.</h3>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
+    When the correlation engine finds something new, it goes in the Wednesday email first.<br>
+    <a href="/journal/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue &rarr;</a>
+  </p>
+  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
+    <input id="cta-email-discoveries" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);outline:none;" onfocus="this.style.borderColor='var(--c-amber-400)'" onblur="this.style.borderColor='var(--c-amber-500)'">
+    <button onclick="amjSubscribe('discoveries')" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">Subscribe</button>
+  </div>
+  <p id="cta-msg-discoveries" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
+</section>
+<script>
+if(!window.amjSubscribe){window.amjSubscribe=async function(s){var e=document.getElementById('cta-email-'+s).value.trim(),m=document.getElementById('cta-msg-'+s);if(!e||!e.includes('@')){m.textContent='Enter a valid email address.';m.style.color='var(--c-yellow-status)';return}m.textContent='Subscribing\u2026';m.style.color='var(--text-muted)';try{var r=await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:e,source:s+'_cta'})});var d=await r.json();if(r.ok){m.textContent='\u2713 Check your inbox to confirm.';m.style.color='var(--c-amber-500)';document.getElementById('cta-email-'+s).value=''}else{m.textContent=d.error||'Something went wrong.';m.style.color='var(--c-yellow-status)'}}catch(x){m.textContent='Network error \u2014 try again.';m.style.color='var(--c-yellow-status)'}}}
+var inp=document.getElementById('cta-email-discoveries');if(inp)inp.addEventListener('keydown',function(e){if(e.key==='Enter')window.amjSubscribe('discoveries')});
+</script>
+
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <a href="/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span>Ask</span>
+  </a>
+  <a href="/character/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span>Score</span>
+  </a>
+  <a href="/journal/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+    <span>Journal</span>
+  </a>
+  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    <span>More</span>
+  </button>
+</nav>
+<footer class="footer-v2">
+  <div class="footer-v2__grid">
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The journey</div>
+      <a href="/story/" class="footer-v2__link">Story</a>
+      <a href="/live/" class="footer-v2__link">Live</a>
+      <a href="/journal/" class="footer-v2__link">Journal</a>
+      <a href="/about/" class="footer-v2__link">About</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The data</div>
+      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/explorer/" class="footer-v2__link">Explorer</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/biology/" class="footer-v2__link">Biology</a>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The platform</div>
+      <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/data/" class="footer-v2__link">Data</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">Follow</div>
+      <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/rss.xml" class="footer-v2__link">RSS</a>
+      <a href="/privacy/" class="footer-v2__link">Privacy</a>
+    </div>
+  </div>
+  <div class="footer-v2__bottom">
+    <span class="footer-v2__brand">AMJ</span>
+    <span class="footer-v2__copy">// updated daily by life-platform</span>
+  </div>
+</footer>
+
+<script src="/assets/js/reveal.js"></script>
+<script>
+const API = 'https://averagejoematt.com';
+
+function rClass(r) { return r > 0 ? 'pos' : 'neg'; }
+function rSign(r)  { return r > 0 ? '+' : ''; }
+function strengthLabel(p) {
+  return p.strength + (p.fdr_significant ? ' ✓' : '');
+}
+
+function pairToEnglish(p) {
+  const a = p.label_a || p.field_a;
+  const b = p.label_b || p.field_b;
+  const dir = p.r > 0 ? 'higher' : 'lower';
+  const lag = p.lag_days > 0 ? ` (next day)` : '';
+  return `${a}${lag} → ${dir} ${b}`;
+}
+
+function pairToStory(p) {
+  const a = p.label_a || p.field_a;
+  const b = p.label_b || p.field_b;
+  const abs = Math.abs(p.r);
+  const pct = Math.round(abs * 100);
+  const dir = p.r > 0 ? 'tends to be higher' : 'tends to be lower';
+  const lagNote = p.lag_days > 0 ? `The day after ${a} is high, ` : `On days when ${a} is high, `;
+  return `${lagNote}${b} ${dir}. This ${pct}% correlation was measured over ${p.n} days${p.fdr_significant ? ' and passed statistical significance testing' : ''}.`;
+}
+
+async function loadDiscoveries() {
+  try {
+    const res = await fetch(`${API}/api/correlations`);
+    const json = await res.json();
+    const c = json.correlations;
+    const pairs = c.pairs || [];
+    const strong = pairs.filter(p => Math.abs(p.r) >= 0.35);
+    const sig = pairs.filter(p => p.fdr_significant);
+
+    document.getElementById('stat-pairs').textContent = c.count;
+    document.getElementById('stat-sig').textContent = sig.length;
+    document.getElementById('stat-week').textContent = c.week || '—';
+
+    // Featured card: strongest pair
+    const top = pairs[0];
+    if (top) {
+      document.getElementById('featured-card').innerHTML = `
+        <div class="featured-card__finding">
+          ${(top.label_a || top.field_a)} <span>${top.r > 0 ? '↑ positively' : '↓ negatively'} predicts</span> ${(top.label_b || top.field_b)}
+        </div>
+        <div class="featured-card__story">
+          ${pairToStory(top)}
+          ${top.fdr_significant ? ' <strong style="color:var(--accent)">This finding survived multiple-testing correction — it&rsquo;s not noise.</strong>' : ''}
+        </div>
+        <div class="featured-card__data">
+          <span class="featured-card__datum">r = <strong>${rSign(top.r)}${top.r.toFixed(3)}</strong></span>
+          <span class="featured-card__datum">n = <strong>${top.n} days</strong></span>
+          <span class="featured-card__datum">Strength: <strong>${top.strength}</strong></span>
+          <span class="featured-card__datum">Sources: <strong>${top.source_a} × ${top.source_b}</strong></span>
+          ${top.lag_days > 0 ? `<span class="featured-card__datum">Lag: <strong>${top.lag_days}d (predictive)</strong></span>` : ''}
+        </div>`;
+    } else {
+      document.getElementById('featured-card').innerHTML = '<div class="loading-msg">No correlation data yet.</div>';
+    }
+
+    // Spotlight: top 2 pairs
+    const spotlightPairs = pairs.slice(0, 2);
+    document.getElementById('spotlight-grid').innerHTML = spotlightPairs.map(p => `
+      <div class="spotlight-card">
+        <div class="spotlight-card__tag">${p.source_a} × ${p.source_b} ${p.lag_days > 0 ? '· predictive' : ''}</div>
+        <div class="spotlight-card__r ${rClass(p.r)}">${rSign(p.r)}${p.r.toFixed(2)}${p.fdr_significant ? '<span class="fdr-badge">FDR ✓</span>' : ''}</div>
+        <div class="spotlight-card__pair">${pairToEnglish(p)}</div>
+        <div class="spotlight-card__story">${pairToStory(p)}</div>
+        <div class="spotlight-card__meta">Strength: ${p.strength} &middot; n = ${p.n} days</div>
+      </div>`).join('');
+
+    // Archive table
+    document.getElementById('archive-body').innerHTML = pairs.map(p => `
+      <tr>
+        <td class="td-r ${rClass(p.r)}">${rSign(p.r)}${p.r.toFixed(2)}</td>
+        <td class="td-finding">${pairToEnglish(p)}</td>
+        <td class="td-stat">${p.label_a || p.field_a} &middot; ${p.label_b || p.field_b}</td>
+        <td class="td-stat">n=${p.n} &middot; ${strengthLabel(p)}</td>
+      </tr>`).join('');
+
+  } catch(e) {
+    document.getElementById('featured-card').innerHTML = '<div class="loading-msg">Could not load correlation data.</div>';
+    document.getElementById('spotlight-grid').innerHTML = '<div class="loading-msg">Could not load data.</div>';
+    document.getElementById('archive-body').innerHTML = '<tr><td colspan="4" class="loading-msg">Could not load data.</td></tr>';
+  }
+}
+
+loadDiscoveries();
+</script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>

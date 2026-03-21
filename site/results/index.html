@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Does this actually work? Live proof — weight lost, biometrics improved, protocols scored. Every number public.">
+  <meta property="og:title" content="Results — Matthew Walker">
+  <meta property="og:description" content="302 → 185. Real outcomes, real data, no filtering. Does systematic self-improvement with AI actually work?">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/results/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Results — Matthew Walker">
+  <meta name="twitter:description" content="302 → 185. Real outcomes, real data, no filtering.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>Results — Matthew Walker</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .page-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .page-header__eyebrow {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+    }
+    .page-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .page-header__title span { color: var(--accent); }
+    .page-header__sub {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 560px;
+      line-height: var(--lh-body);
+    }
+
+    /* Hero stats strip */
+    .results-hero {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-stat {
+      background: var(--bg);
+      padding: var(--space-8) var(--space-6);
+      text-align: center;
+    }
+    .hero-stat__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-3);
+    }
+    .hero-stat__value {
+      font-family: var(--font-display);
+      font-size: 48px;
+      line-height: 1;
+      color: var(--accent);
+      letter-spacing: var(--ls-display);
+    }
+    .hero-stat__value.amber { color: var(--c-amber-500); }
+    .hero-stat__sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      margin-top: var(--space-2);
+      letter-spacing: var(--ls-label);
+    }
+
+    /* Transformation bar */
+    .transform-bar {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .transform-bar__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-4);
+      flex-wrap: wrap;
+      gap: var(--space-2);
+    }
+    .transform-bar__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+    }
+    .transform-bar__pct {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--accent);
+    }
+    .transform-bar__track {
+      height: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-bottom: var(--space-3);
+    }
+    .transform-bar__fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--c-amber-500), var(--accent));
+      transition: width 1.4s var(--ease-out);
+      width: 0%;
+    }
+    .transform-bar__labels {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+    }
+    .transform-bar__rate {
+      margin-top: var(--space-4);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+    .transform-bar__rate strong { color: var(--text); }
+
+    /* Section layout */
+    .results-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .results-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .results-section__sub {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-8);
+      line-height: var(--lh-body);
+    }
+
+    /* Biometrics grid */
+    .bio-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+    }
+    .bio-card {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: var(--space-6);
+    }
+    .bio-card__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-2);
+    }
+    .bio-card__value {
+      font-family: var(--font-display);
+      font-size: 36px;
+      line-height: 1;
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .bio-card__trend {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      padding: 2px 6px;
+      display: inline-block;
+    }
+    .bio-card__trend.improving { color: var(--accent); background: var(--c-green-050); border: 1px solid var(--c-green-100); }
+    .bio-card__trend.stable    { color: var(--c-amber-500); background: var(--c-amber-050); border: 1px solid var(--c-amber-100); }
+    .bio-card__trend.declining { color: var(--c-red-status); background: rgba(255,82,82,0.06); border: 1px solid rgba(255,82,82,0.15); }
+    .bio-card__note {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      margin-top: var(--space-3);
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+    }
+
+    /* Protocol scorecard */
+    .scorecard {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-3);
+    }
+    .scorecard-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: var(--space-4);
+      padding: var(--space-4) var(--space-5);
+      border: 1px solid var(--border-subtle);
+      background: var(--surface);
+    }
+    .scorecard-item__name {
+      font-size: var(--text-sm);
+      color: var(--text);
+    }
+    .scorecard-item__sub {
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+      margin-top: 2px;
+    }
+    .scorecard-item__badge {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border: 1px solid;
+      white-space: nowrap;
+    }
+    .scorecard-item__badge.working { color: var(--accent); border-color: var(--c-green-100); }
+    .scorecard-item__badge.building { color: var(--c-amber-500); border-color: var(--c-amber-100); }
+    .scorecard-item__badge.gap { color: var(--c-red-status); border-color: rgba(255,82,82,0.3); }
+
+    /* Discovery cards */
+    .discovery-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+    }
+    .discovery-card {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: var(--space-6);
+      transition: border-color var(--dur-fast);
+    }
+    .discovery-card:hover { border-color: var(--accent); }
+    .discovery-card.featured {
+      grid-column: 1 / -1;
+      border-left: 3px solid var(--accent);
+    }
+    .discovery-card__tag {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .discovery-card__finding {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: var(--text);
+      margin-bottom: var(--space-3);
+      line-height: 1.3;
+    }
+    .discovery-card__stat {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      margin-bottom: var(--space-3);
+    }
+    .discovery-card__impact {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+
+    /* Gap section */
+    .gap-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+    }
+    .gap-item {
+      padding: var(--space-5);
+      border: 1px solid rgba(255,82,82,0.2);
+      background: rgba(255,82,82,0.03);
+    }
+    .gap-item__name {
+      font-size: var(--text-sm);
+      color: var(--c-red-status);
+      margin-bottom: var(--space-2);
+    }
+    .gap-item__desc {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      line-height: var(--lh-body);
+      font-family: var(--font-mono);
+    }
+
+    .loading-skeleton {
+      display: inline-block;
+      height: 1em;
+      width: 4ch;
+      background: var(--surface-raised);
+      border-radius: 2px;
+      vertical-align: middle;
+    }
+
+    @media (max-width: 900px) {
+      .results-hero { grid-template-columns: repeat(2, 1fr); }
+      .bio-grid { grid-template-columns: 1fr; }
+      .scorecard { grid-template-columns: 1fr; }
+      .discovery-grid { grid-template-columns: 1fr; }
+      .discovery-card.featured { grid-column: 1; }
+      .gap-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .results-hero { grid-template-columns: 1fr 1fr; }
+      .hero-stat__value { font-size: 36px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/live/" class="nav__link">Live</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/about/" class="nav__link">About</a>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+  </div>
+  <button class="nav__hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span id="nav-date"></span>
+  </div>
+</nav>
+<!-- Mobile overlay menu -->
+<div class="nav-overlay">
+  <div class="nav-overlay__panel">
+    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The journey</div>
+      <a href="/story/" class="nav-overlay__link">Story</a>
+      <a href="/live/" class="nav-overlay__link">Live</a>
+      <a href="/journal/" class="nav-overlay__link">Journal</a>
+      <a href="/about/" class="nav-overlay__link">About</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The data</div>
+      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/biology/" class="nav-overlay__link">Biology</a>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The platform</div>
+      <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/data/" class="nav-overlay__link">Data</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">Follow</div>
+      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+    </div>
+  </div>
+</div>
+
+<header class="page-header reveal">
+  <div class="page-header__eyebrow">Proof of Work</div>
+  <h1 class="page-header__title">Does this <span>actually work?</span></h1>
+  <p class="page-header__sub">
+    Real transformation numbers, updated daily. Not a highlight reel &mdash; every number, every metric, every gap.
+    Started <strong>Feb 2026</strong> at 302 lbs. Here&rsquo;s what&rsquo;s happened since.
+  </p>
+</header>
+
+<!-- Hero stats strip -->
+<div class="results-hero reveal">
+  <div class="hero-stat">
+    <div class="hero-stat__label">Lbs Lost</div>
+    <div class="hero-stat__value" id="stat-lost">—</div>
+    <div class="hero-stat__sub">since Feb 9 start</div>
+  </div>
+  <div class="hero-stat">
+    <div class="hero-stat__label">Weekly Rate</div>
+    <div class="hero-stat__value amber" id="stat-rate">—</div>
+    <div class="hero-stat__sub">lbs / week (28d avg)</div>
+  </div>
+  <div class="hero-stat">
+    <div class="hero-stat__label">Days Active</div>
+    <div class="hero-stat__value" id="stat-days">—</div>
+    <div class="hero-stat__sub">on journey</div>
+  </div>
+  <div class="hero-stat">
+    <div class="hero-stat__label">Progress</div>
+    <div class="hero-stat__value" id="stat-pct">—</div>
+    <div class="hero-stat__sub">to 185 lb goal</div>
+  </div>
+</div>
+
+<!-- Transformation progress bar -->
+<div class="transform-bar reveal">
+  <div class="transform-bar__header">
+    <span class="transform-bar__title">302 → <span id="bar-current">?</span> → 185</span>
+    <span class="transform-bar__pct" id="bar-pct">—% complete</span>
+  </div>
+  <div class="transform-bar__track">
+    <div class="transform-bar__fill" id="progress-fill"></div>
+  </div>
+  <div class="transform-bar__labels">
+    <span>Start: 302 lbs (Feb 2026)</span>
+    <span>Goal: 185 lbs</span>
+  </div>
+  <div class="transform-bar__rate">
+    Current rate: <strong id="bar-rate">—</strong> &mdash;
+    Projected goal date: <strong id="bar-date">—</strong>
+  </div>
+</div>
+
+<!-- Biometrics section -->
+<div class="results-section reveal">
+  <h2 class="results-section__title">Biometric Improvements</h2>
+  <p class="results-section__sub">
+    Weight is the headline metric, but these are the markers that show what&rsquo;s happening inside.
+    All data from Whoop wearable, updated daily.
+  </p>
+  <div class="bio-grid">
+    <div class="bio-card">
+      <div class="bio-card__label">Heart Rate Variability</div>
+      <div class="bio-card__value" id="bio-hrv">—<span style="font-size:0.45em;color:var(--text-muted)">ms</span></div>
+      <div class="bio-card__trend" id="bio-hrv-trend">loading</div>
+      <div class="bio-card__note">// 30d avg: <span id="bio-hrv-30d">—</span>ms &middot; Higher = better recovery</div>
+    </div>
+    <div class="bio-card">
+      <div class="bio-card__label">Resting Heart Rate</div>
+      <div class="bio-card__value" id="bio-rhr">—<span style="font-size:0.45em;color:var(--text-muted)">bpm</span></div>
+      <div class="bio-card__trend" id="bio-rhr-trend">loading</div>
+      <div class="bio-card__note">// Lower = stronger cardiac fitness</div>
+    </div>
+    <div class="bio-card">
+      <div class="bio-card__label">Recovery Score</div>
+      <div class="bio-card__value" id="bio-recovery">—<span style="font-size:0.45em;color:var(--text-muted)">%</span></div>
+      <div class="bio-card__trend" id="bio-recovery-status">loading</div>
+      <div class="bio-card__note">// Whoop composite: HRV + RHR + sleep</div>
+    </div>
+  </div>
+</div>
+
+<!-- Protocol scorecard -->
+<div class="results-section reveal">
+  <h2 class="results-section__title">Protocol Scorecard</h2>
+  <p class="results-section__sub">
+    Six pillars tracked. Green = data shows working. Amber = building signal. Red = known gap being addressed.
+  </p>
+  <div class="scorecard" id="scorecard-grid">
+    <!-- Populated by JS, fallback static -->
+    <div class="scorecard-item">
+      <div><div class="scorecard-item__name">Sleep Optimization</div><div class="scorecard-item__sub">// whoop + eight sleep</div></div>
+      <div class="scorecard-item__badge working">Working</div>
+    </div>
+    <div class="scorecard-item">
+      <div><div class="scorecard-item__name">Zone 2 + Strength</div><div class="scorecard-item__sub">// garmin + hevy + strava</div></div>
+      <div class="scorecard-item__badge gap">Gap</div>
+    </div>
+    <div class="scorecard-item">
+      <div><div class="scorecard-item__name">Caloric Deficit</div><div class="scorecard-item__sub">// macrofactor + withings</div></div>
+      <div class="scorecard-item__badge building">Building</div>
+    </div>
+    <div class="scorecard-item">
+      <div><div class="scorecard-item__name">Biomarker Monitoring</div><div class="scorecard-item__sub">// labs + bp cuff + dexcom</div></div>
+      <div class="scorecard-item__badge working">Working</div>
+    </div>
+    <div class="scorecard-item">
+      <div><div class="scorecard-item__name">Habit System (Tier 0)</div><div class="scorecard-item__sub">// habitify + todoist</div></div>
+      <div class="scorecard-item__badge working">Working</div>
+    </div>
+    <div class="scorecard-item">
+      <div><div class="scorecard-item__name">Supplement Stack</div><div class="scorecard-item__sub">// genome-informed</div></div>
+      <div class="scorecard-item__badge building">Building</div>
+    </div>
+  </div>
+  <p style="margin-top:var(--space-4);font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono)">
+    <a href="/protocols/" style="color:var(--accent-dim);text-decoration:none">See full protocol detail &rarr;</a>
+  </p>
+</div>
+
+<!-- Data discovery cards -->
+<div class="results-section reveal">
+  <h2 class="results-section__title">What the Data Has Found</h2>
+  <p class="results-section__sub">
+    The correlation engine runs weekly on 90 days of real data. These are the strongest findings &mdash;
+    patterns that changed actual behavior.
+  </p>
+  <div class="discovery-grid" id="discovery-grid">
+    <div class="loading" style="padding:var(--space-8);text-align:center;color:var(--text-muted);font-family:var(--font-mono);font-size:var(--text-xs)">
+      Loading correlation data&hellip;
+    </div>
+  </div>
+  <p style="margin-top:var(--space-6);font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono)">
+    <a href="/discoveries/" style="color:var(--accent-dim);text-decoration:none">See all discoveries &rarr;</a> &nbsp;&middot;&nbsp;
+    <a href="/explorer/" style="color:var(--accent-dim);text-decoration:none">Raw correlation explorer &rarr;</a>
+  </p>
+</div>
+
+<!-- Honest gap section -->
+<div class="results-section reveal">
+  <h2 class="results-section__title">What&rsquo;s Not Working Yet</h2>
+  <p class="results-section__sub">
+    Radical transparency means including the gaps. These are the known weak points as of today.
+  </p>
+  <div class="gap-grid">
+    <div class="gap-item">
+      <div class="gap-item__name">Zone 2 Volume</div>
+      <div class="gap-item__desc">Target: 150 min/week. Current: 42 min. Consistently below target. Root cause: scheduling, not motivation.</div>
+    </div>
+    <div class="gap-item">
+      <div class="gap-item__name">Strength Frequency</div>
+      <div class="gap-item__desc">Target: 3x/week compound lifts. Hitting 1&ndash;2x most weeks. ACWR data shows low chronic load.</div>
+    </div>
+    <div class="gap-item">
+      <div class="gap-item__name">Nutrition Logging</div>
+      <div class="gap-item__desc">MacroFactor data building. CGM data in pipeline but not yet public-facing. Transparency gap being closed.</div>
+    </div>
+  </div>
+</div>
+
+<!-- N=1 disclaimer -->
+<aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle);">
+  <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label)">
+    <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
+    These results are for one person, tracked rigorously, published without filtering. They are not a promise of what you&rsquo;ll achieve.
+    The value is the methodology &mdash; and the proof that systematic tracking produces compounding insight over time.
+    Nothing here is medical advice.
+  </p>
+</aside>
+
+<!-- Email CTA -->
+<section class="email-cta-footer reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface);text-align:center;">
+  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
+  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
+    Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.<br>
+    <a href="/journal/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue &rarr;</a>
+  </p>
+  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
+    <input id="cta-email-results" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);outline:none;" onfocus="this.style.borderColor='var(--c-amber-400)'" onblur="this.style.borderColor='var(--c-amber-500)'">
+    <button onclick="amjSubscribe('results')" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">Subscribe</button>
+  </div>
+  <p id="cta-msg-results" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
+</section>
+<script>
+if(!window.amjSubscribe){window.amjSubscribe=async function(s){var e=document.getElementById('cta-email-'+s).value.trim(),m=document.getElementById('cta-msg-'+s);if(!e||!e.includes('@')){m.textContent='Enter a valid email address.';m.style.color='var(--c-yellow-status)';return}m.textContent='Subscribing\u2026';m.style.color='var(--text-muted)';try{var r=await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:e,source:s+'_cta'})});var d=await r.json();if(r.ok){m.textContent='\u2713 Check your inbox to confirm.';m.style.color='var(--c-amber-500)';document.getElementById('cta-email-'+s).value=''}else{m.textContent=d.error||'Something went wrong.';m.style.color='var(--c-yellow-status)'}}catch(x){m.textContent='Network error \u2014 try again.';m.style.color='var(--c-yellow-status)'}}}
+var inp=document.getElementById('cta-email-results');if(inp)inp.addEventListener('keydown',function(e){if(e.key==='Enter')window.amjSubscribe('results')});
+</script>
+
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <a href="/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span>Ask</span>
+  </a>
+  <a href="/character/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span>Score</span>
+  </a>
+  <a href="/journal/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+    <span>Journal</span>
+  </a>
+  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    <span>More</span>
+  </button>
+</nav>
+<footer class="footer-v2">
+  <div class="footer-v2__grid">
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The journey</div>
+      <a href="/story/" class="footer-v2__link">Story</a>
+      <a href="/live/" class="footer-v2__link">Live</a>
+      <a href="/journal/" class="footer-v2__link">Journal</a>
+      <a href="/about/" class="footer-v2__link">About</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The data</div>
+      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/explorer/" class="footer-v2__link">Explorer</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/biology/" class="footer-v2__link">Biology</a>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The platform</div>
+      <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/data/" class="footer-v2__link">Data</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">Follow</div>
+      <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/rss.xml" class="footer-v2__link">RSS</a>
+      <a href="/privacy/" class="footer-v2__link">Privacy</a>
+    </div>
+  </div>
+  <div class="footer-v2__bottom">
+    <span class="footer-v2__brand">AMJ</span>
+    <span class="footer-v2__copy">// updated daily by life-platform</span>
+  </div>
+</footer>
+
+<script src="/assets/js/reveal.js"></script>
+<script>
+const API = 'https://averagejoematt.com';
+
+function trendClass(t) {
+  if (t === 'improving') return 'improving';
+  if (t === 'declining') return 'declining';
+  return 'stable';
+}
+function trendLabel(t) {
+  if (t === 'improving') return '↑ Improving';
+  if (t === 'declining') return '↓ Declining';
+  if (t === 'insufficient_data') return '– Insufficient data';
+  return '→ Stable';
+}
+
+async function loadJourney() {
+  try {
+    const res = await fetch(`${API}/api/journey`);
+    const json = await res.json();
+    const j = json.journey;
+
+    document.getElementById('stat-lost').textContent = j.lost_lbs > 0 ? j.lost_lbs.toFixed(1) : '—';
+    const rate = Math.abs(j.weekly_rate_lbs);
+    document.getElementById('stat-rate').textContent = rate > 0 ? rate.toFixed(1) : '—';
+
+    const start = new Date('2026-02-09');
+    const today = new Date();
+    const days = Math.floor((today - start) / 86400000);
+    document.getElementById('stat-days').textContent = days;
+    document.getElementById('stat-pct').textContent = j.progress_pct > 0 ? j.progress_pct.toFixed(1) + '%' : '—';
+
+    document.getElementById('bar-current').textContent = j.current_weight_lbs > 0 ? j.current_weight_lbs.toFixed(1) : '?';
+    document.getElementById('bar-pct').textContent = j.progress_pct > 0 ? j.progress_pct.toFixed(1) + '% complete' : '—';
+    document.getElementById('progress-fill').style.width = (j.progress_pct || 0) + '%';
+
+    const rateText = rate > 0 ? rate.toFixed(2) + ' lbs/week (28-day average)' : 'Insufficient data';
+    document.getElementById('bar-rate').textContent = rateText;
+    document.getElementById('bar-date').textContent = j.projected_goal_date || '—';
+  } catch(e) {
+    console.warn('[results] journey load failed', e);
+  }
+}
+
+async function loadVitals() {
+  try {
+    const res = await fetch(`${API}/api/vitals`);
+    const json = await res.json();
+    const v = json.vitals;
+
+    document.getElementById('bio-hrv').innerHTML = (v.hrv_ms || '—') + '<span style="font-size:0.45em;color:var(--text-muted)">ms</span>';
+    document.getElementById('bio-hrv-30d').textContent = v.hrv_30d_avg || '—';
+    const hTrend = document.getElementById('bio-hrv-trend');
+    hTrend.textContent = trendLabel(v.hrv_trend);
+    hTrend.className = 'bio-card__trend ' + trendClass(v.hrv_trend);
+
+    document.getElementById('bio-rhr').innerHTML = (v.rhr_bpm ? Math.round(v.rhr_bpm) : '—') + '<span style="font-size:0.45em;color:var(--text-muted)">bpm</span>';
+    const rTrend = document.getElementById('bio-rhr-trend');
+    rTrend.textContent = trendLabel(v.rhr_trend);
+    rTrend.className = 'bio-card__trend ' + trendClass(v.rhr_trend);
+
+    document.getElementById('bio-recovery').innerHTML = (v.recovery_pct ? Math.round(v.recovery_pct) : '—') + '<span style="font-size:0.45em;color:var(--text-muted)">%</span>';
+    const recStatus = document.getElementById('bio-recovery-status');
+    const statusMap = { green: 'improving', yellow: 'stable', red: 'declining' };
+    const labelMap = { green: 'Green — High', yellow: 'Yellow — Moderate', red: 'Red — Low' };
+    recStatus.textContent = labelMap[v.recovery_status] || v.recovery_status;
+    recStatus.className = 'bio-card__trend ' + (statusMap[v.recovery_status] || 'stable');
+  } catch(e) {
+    console.warn('[results] vitals load failed', e);
+  }
+}
+
+async function loadCorrelations() {
+  try {
+    const res = await fetch(`${API}/api/correlations`);
+    const json = await res.json();
+    const pairs = (json.correlations.pairs || []).filter(p => Math.abs(p.r) >= 0.35).slice(0, 4);
+
+    if (!pairs.length) {
+      document.getElementById('discovery-grid').innerHTML = '<div style="padding:var(--space-8);text-align:center;color:var(--text-faint);font-family:var(--font-mono);font-size:var(--text-xs)">No strong correlations computed yet.</div>';
+      return;
+    }
+
+    const plainEnglish = (p) => {
+      const a = p.label_a || p.field_a;
+      const b = p.label_b || p.field_b;
+      const direction = p.r > 0 ? 'predicts higher' : 'predicts lower';
+      return `${a} ${direction} ${b}`;
+    };
+
+    const impact = (p) => {
+      const abs = Math.abs(p.r);
+      const pct = Math.round(abs * 100);
+      return `A ${pct}% correlation ${p.fdr_significant ? '(statistically significant after FDR correction)' : ''} based on n=${p.n} days.`;
+    };
+
+    const grid = document.getElementById('discovery-grid');
+    grid.innerHTML = pairs.map((p, i) => {
+      const rClass = p.r > 0 ? 'color:var(--accent)' : 'color:var(--c-red-status)';
+      const sign = p.r > 0 ? '+' : '';
+      return `<div class="discovery-card${i === 0 ? ' featured' : ''}">
+        <div class="discovery-card__tag">${i === 0 ? 'Strongest finding' : 'Correlation'} &mdash; ${p.source_a} × ${p.source_b}</div>
+        <div class="discovery-card__finding">${plainEnglish(p)}</div>
+        <div class="discovery-card__stat">r = <strong style="${rClass}">${sign}${p.r.toFixed(2)}</strong> &middot; n = ${p.n} days &middot; ${p.strength}${p.fdr_significant ? ' ✓ FDR' : ''}</div>
+        <div class="discovery-card__impact">${impact(p)}</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('discovery-grid').innerHTML = '<div style="padding:var(--space-8);text-align:center;color:var(--text-faint);font-family:var(--font-mono);font-size:var(--text-xs)">Could not load correlation data.</div>';
+  }
+}
+
+loadJourney();
+loadVitals();
+loadCorrelations();
+</script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>

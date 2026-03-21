@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="This week by the numbers — weight, HRV, recovery, sleep, streak. Live data from Matthew's personal health OS.">
+  <meta property="og:title" content="This Week — Matthew Walker">
+  <meta property="og:description" content="Weekly snapshot: every metric that moved, every pillar scored, the best discovery of the week.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/week/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="This Week — Matthew Walker">
+  <meta name="twitter:description" content="Weekly snapshot: every metric that moved, every pillar scored.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>This Week — Matthew Walker</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .week-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: var(--space-8);
+    }
+    .week-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .week-header__title span { color: var(--accent); }
+    .week-header__sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+    }
+    .week-header__date {
+      text-align: right;
+    }
+    .week-header__week-label {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--accent);
+      line-height: 1;
+    }
+    .week-header__date-label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      margin-top: var(--space-1);
+    }
+
+    /* Big stats card */
+    .stats-card {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .stats-card__inner {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1px;
+      background: var(--border);
+    }
+    .stat-cell {
+      background: var(--bg);
+      padding: var(--space-8) var(--space-6);
+      text-align: center;
+      position: relative;
+    }
+    .stat-cell__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-3);
+    }
+    .stat-cell__value {
+      font-family: var(--font-display);
+      font-size: 40px;
+      line-height: 1;
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+    }
+    .stat-cell__unit {
+      font-size: 0.4em;
+      color: var(--text-muted);
+      letter-spacing: 0;
+    }
+    .stat-cell__delta {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      margin-top: var(--space-2);
+    }
+    .stat-cell__delta.up   { color: var(--accent); }
+    .stat-cell__delta.down { color: var(--c-red-status); }
+    .stat-cell__delta.flat { color: var(--text-faint); }
+    .stat-cell__delta.good-down { color: var(--accent); } /* for RHR, weight */
+
+    /* Character pillar bars */
+    .pillars-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .pillars-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .pillars-section__sub {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-8);
+    }
+    .pillar-list {
+      display: grid;
+      gap: var(--space-3);
+    }
+    .pillar-row {
+      display: grid;
+      grid-template-columns: 140px 1fr 80px 100px;
+      align-items: center;
+      gap: var(--space-4);
+      padding: var(--space-4) var(--space-5);
+      border: 1px solid var(--border-subtle);
+      background: var(--surface);
+    }
+    .pillar-row__name {
+      font-size: var(--text-sm);
+      color: var(--text);
+      text-transform: capitalize;
+    }
+    .pillar-row__bar-track {
+      height: 6px;
+      background: var(--surface-raised);
+      overflow: hidden;
+    }
+    .pillar-row__bar-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 1s var(--ease-out);
+      width: 0%;
+    }
+    .pillar-row__score {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: var(--text);
+      text-align: right;
+    }
+    .pillar-row__tier {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      text-align: right;
+    }
+    .pillar-row.top-mover { border-color: var(--c-green-100); background: var(--c-green-050); }
+    .pillar-row.top-mover .pillar-row__name { color: var(--accent); }
+
+    /* Discovery of the week */
+    .discovery-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .discovery-callout {
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      background: var(--surface);
+      padding: var(--space-7);
+    }
+    .discovery-callout__eyebrow {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .discovery-callout__finding {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--text);
+      margin-bottom: var(--space-3);
+      line-height: 1.3;
+    }
+    .discovery-callout__stat {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+    }
+    .discovery-callout__stat strong { color: var(--accent); }
+
+    /* Share section */
+    .share-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .share-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-3);
+    }
+    .share-card {
+      text-align: center;
+      padding: var(--space-5);
+      border: 1px solid var(--border-subtle);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+    }
+    .share-card strong { display: block; font-family: var(--font-display); font-size: var(--text-h3); color: var(--text); margin-bottom: var(--space-1); }
+    .share-card span { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); }
+
+    .loading-msg { padding: var(--space-8); text-align: center; color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); }
+
+    @media (max-width: 900px) {
+      .week-header { grid-template-columns: 1fr; }
+      .week-header__date { text-align: left; }
+      .stats-card__inner { grid-template-columns: repeat(3, 1fr); }
+      .pillar-row { grid-template-columns: 120px 1fr 60px; }
+      .pillar-row__tier { display: none; }
+      .share-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .stats-card__inner { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/live/" class="nav__link">Live</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/about/" class="nav__link">About</a>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+  </div>
+  <button class="nav__hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span id="nav-date"></span>
+  </div>
+</nav>
+<!-- Mobile overlay menu -->
+<div class="nav-overlay">
+  <div class="nav-overlay__panel">
+    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The journey</div>
+      <a href="/story/" class="nav-overlay__link">Story</a>
+      <a href="/live/" class="nav-overlay__link">Live</a>
+      <a href="/journal/" class="nav-overlay__link">Journal</a>
+      <a href="/about/" class="nav-overlay__link">About</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The data</div>
+      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/biology/" class="nav-overlay__link">Biology</a>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The platform</div>
+      <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/data/" class="nav-overlay__link">Data</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">Follow</div>
+      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+    </div>
+  </div>
+</div>
+
+<header class="week-header reveal">
+  <div>
+    <div class="eyebrow" style="margin-bottom:var(--space-4)">Weekly Snapshot</div>
+    <h1 class="week-header__title">This week, <span>by the numbers</span></h1>
+    <div class="week-header__sub">Live data from 19 sources &mdash; updated daily. Every metric visible, nothing filtered.</div>
+  </div>
+  <div class="week-header__date">
+    <div class="week-header__week-label" id="week-label">Week —</div>
+    <div class="week-header__date-label" id="week-date">Loading&hellip;</div>
+  </div>
+</header>
+
+<!-- Full-bleed stats card -->
+<div class="stats-card reveal">
+  <div class="stats-card__inner">
+    <div class="stat-cell">
+      <div class="stat-cell__label">Weight</div>
+      <div class="stat-cell__value" id="wk-weight">—<span class="stat-cell__unit">lbs</span></div>
+      <div class="stat-cell__delta" id="wk-weight-delta">&middot;</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-cell__label">HRV</div>
+      <div class="stat-cell__value" id="wk-hrv">—<span class="stat-cell__unit">ms</span></div>
+      <div class="stat-cell__delta" id="wk-hrv-delta">&middot;</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-cell__label">Recovery</div>
+      <div class="stat-cell__value" id="wk-recovery">—<span class="stat-cell__unit">%</span></div>
+      <div class="stat-cell__delta" id="wk-recovery-status">&middot;</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-cell__label">Sleep</div>
+      <div class="stat-cell__value" id="wk-sleep">—<span class="stat-cell__unit">hrs</span></div>
+      <div class="stat-cell__delta" id="wk-sleep-note">&middot;</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-cell__label">RHR</div>
+      <div class="stat-cell__value" id="wk-rhr">—<span class="stat-cell__unit">bpm</span></div>
+      <div class="stat-cell__delta" id="wk-rhr-delta">&middot;</div>
+    </div>
+  </div>
+</div>
+
+<!-- Pillar scores -->
+<div class="pillars-section reveal">
+  <h2 class="pillars-section__title">Character Sheet &mdash; This Week</h2>
+  <p class="pillars-section__sub">7 health pillars scored by the platform. The top mover is highlighted.</p>
+  <div class="pillar-list" id="pillar-list">
+    <div class="loading-msg">Loading pillar scores&hellip;</div>
+  </div>
+  <p style="margin-top:var(--space-4);font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono)">
+    <a href="/character/" style="color:var(--accent-dim);text-decoration:none">Full character sheet &rarr;</a>
+  </p>
+</div>
+
+<!-- Discovery of the week -->
+<div class="discovery-section reveal">
+  <h2 style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);margin-bottom:var(--space-4)">Best Discovery This Week</h2>
+  <p style="font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--space-6)">The strongest correlation finding from the weekly AI run.</p>
+  <div class="discovery-callout" id="week-discovery">
+    <div class="loading-msg">Loading&hellip;</div>
+  </div>
+  <p style="margin-top:var(--space-4);font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono)">
+    <a href="/discoveries/" style="color:var(--accent-dim);text-decoration:none">See all discoveries &rarr;</a>
+  </p>
+</div>
+
+<!-- Weekly context / share card -->
+<div class="share-section reveal">
+  <h2 style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);margin-bottom:var(--space-8)">Week in Summary</h2>
+  <div class="share-grid" id="share-grid">
+    <div class="share-card">
+      <strong id="share-lost">—</strong>
+      <span>lbs lost total</span>
+    </div>
+    <div class="share-card">
+      <strong id="share-rate">—</strong>
+      <span>lbs/week rate (28d)</span>
+    </div>
+    <div class="share-card">
+      <strong id="share-days">—</strong>
+      <span>days on journey</span>
+    </div>
+  </div>
+  <p style="margin-top:var(--space-6);font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono)">
+    <a href="/results/" style="color:var(--accent-dim);text-decoration:none">Full results page &rarr;</a> &nbsp;&middot;&nbsp;
+    <a href="/" style="color:var(--accent-dim);text-decoration:none">Live dashboard &rarr;</a>
+  </p>
+</div>
+
+<!-- N=1 disclaimer -->
+<aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle);">
+  <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label)">
+    <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
+    All data is from Matthew Walker&rsquo;s personal health tracking system. Published weekly without filtering.
+    Nothing here is medical advice.
+  </p>
+</aside>
+
+<!-- Email CTA -->
+<section class="email-cta-footer reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface);text-align:center;">
+  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
+  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get this snapshot, every week.</h3>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
+    Every Wednesday: this week&rsquo;s numbers, the strongest discovery, what changed.<br>
+    <a href="/journal/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue &rarr;</a>
+  </p>
+  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
+    <input id="cta-email-week" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);outline:none;" onfocus="this.style.borderColor='var(--c-amber-400)'" onblur="this.style.borderColor='var(--c-amber-500)'">
+    <button onclick="amjSubscribe('week')" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">Subscribe</button>
+  </div>
+  <p id="cta-msg-week" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
+</section>
+<script>
+if(!window.amjSubscribe){window.amjSubscribe=async function(s){var e=document.getElementById('cta-email-'+s).value.trim(),m=document.getElementById('cta-msg-'+s);if(!e||!e.includes('@')){m.textContent='Enter a valid email address.';m.style.color='var(--c-yellow-status)';return}m.textContent='Subscribing\u2026';m.style.color='var(--text-muted)';try{var r=await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:e,source:s+'_cta'})});var d=await r.json();if(r.ok){m.textContent='\u2713 Check your inbox to confirm.';m.style.color='var(--c-amber-500)';document.getElementById('cta-email-'+s).value=''}else{m.textContent=d.error||'Something went wrong.';m.style.color='var(--c-yellow-status)'}}catch(x){m.textContent='Network error \u2014 try again.';m.style.color='var(--c-yellow-status)'}}}
+var inp=document.getElementById('cta-email-week');if(inp)inp.addEventListener('keydown',function(e){if(e.key==='Enter')window.amjSubscribe('week')});
+</script>
+
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <a href="/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span>Ask</span>
+  </a>
+  <a href="/character/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span>Score</span>
+  </a>
+  <a href="/journal/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+    <span>Journal</span>
+  </a>
+  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    <span>More</span>
+  </button>
+</nav>
+<footer class="footer-v2">
+  <div class="footer-v2__grid">
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The journey</div>
+      <a href="/story/" class="footer-v2__link">Story</a>
+      <a href="/live/" class="footer-v2__link">Live</a>
+      <a href="/journal/" class="footer-v2__link">Journal</a>
+      <a href="/about/" class="footer-v2__link">About</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The data</div>
+      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/explorer/" class="footer-v2__link">Explorer</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/biology/" class="footer-v2__link">Biology</a>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The platform</div>
+      <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/data/" class="footer-v2__link">Data</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">Follow</div>
+      <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/rss.xml" class="footer-v2__link">RSS</a>
+      <a href="/privacy/" class="footer-v2__link">Privacy</a>
+    </div>
+  </div>
+  <div class="footer-v2__bottom">
+    <span class="footer-v2__brand">AMJ</span>
+    <span class="footer-v2__copy">// updated daily by life-platform</span>
+  </div>
+</footer>
+
+<script src="/assets/js/reveal.js"></script>
+<script>
+const API = 'https://averagejoematt.com';
+
+function deltaClass(val, isGoodDown) {
+  if (!val || val === 0) return 'flat';
+  if (isGoodDown) return val < 0 ? 'good-down' : 'down';
+  return val > 0 ? 'up' : 'down';
+}
+function deltaArrow(val, isGoodDown) {
+  if (!val) return '—';
+  const sign = val > 0 ? '+' : '';
+  const arrow = val > 0 ? '↑' : '↓';
+  return `${arrow} ${sign}${val}`;
+}
+
+async function loadWeek() {
+  // Week number
+  const start = new Date('2026-02-09');
+  const today = new Date();
+  const days = Math.floor((today - start) / 86400000);
+  const weekNum = Math.ceil(days / 7);
+  document.getElementById('week-label').textContent = `Week ${weekNum}`;
+  document.getElementById('week-date').textContent = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+  try {
+    const [vRes, jRes] = await Promise.all([
+      fetch(`${API}/api/vitals`),
+      fetch(`${API}/api/journey`),
+    ]);
+    const vData = await vRes.json();
+    const jData = await jRes.json();
+    const v = vData.vitals;
+    const j = jData.journey;
+
+    // Vitals
+    document.getElementById('wk-weight').innerHTML = (v.weight_lbs ? v.weight_lbs.toFixed(1) : '—') + '<span class="stat-cell__unit">lbs</span>';
+    if (v.weight_delta_30d) {
+      const wd = v.weight_delta_30d;
+      const el = document.getElementById('wk-weight-delta');
+      el.textContent = (wd < 0 ? '↓ ' : '↑ ') + Math.abs(wd).toFixed(1) + ' lbs (30d)';
+      el.className = 'stat-cell__delta ' + (wd < 0 ? 'good-down' : 'down');
+    }
+
+    document.getElementById('wk-hrv').innerHTML = (v.hrv_ms ? Math.round(v.hrv_ms) : '—') + '<span class="stat-cell__unit">ms</span>';
+    const hd = document.getElementById('wk-hrv-delta');
+    hd.textContent = v.hrv_trend === 'improving' ? '↑ Improving' : v.hrv_trend === 'declining' ? '↓ Declining' : '→ Stable';
+    hd.className = 'stat-cell__delta ' + (v.hrv_trend === 'improving' ? 'up' : v.hrv_trend === 'declining' ? 'down' : 'flat');
+
+    document.getElementById('wk-recovery').innerHTML = (v.recovery_pct ? Math.round(v.recovery_pct) : '—') + '<span class="stat-cell__unit">%</span>';
+    const rd = document.getElementById('wk-recovery-status');
+    rd.textContent = { green: '● Green', yellow: '◐ Yellow', red: '○ Red' }[v.recovery_status] || v.recovery_status;
+    rd.className = 'stat-cell__delta ' + (v.recovery_status === 'green' ? 'up' : v.recovery_status === 'red' ? 'down' : 'flat');
+
+    document.getElementById('wk-sleep').innerHTML = (v.sleep_hours || '—') + '<span class="stat-cell__unit">hrs</span>';
+    const slD = document.getElementById('wk-sleep-note');
+    if (v.sleep_hours) {
+      const ok = v.sleep_hours >= 7.5;
+      slD.textContent = ok ? '✓ On target' : '↓ Below target';
+      slD.className = 'stat-cell__delta ' + (ok ? 'up' : 'down');
+    }
+
+    document.getElementById('wk-rhr').innerHTML = (v.rhr_bpm ? Math.round(v.rhr_bpm) : '—') + '<span class="stat-cell__unit">bpm</span>';
+    const rrd = document.getElementById('wk-rhr-delta');
+    rrd.textContent = v.rhr_trend === 'improving' ? '↓ Improving' : v.rhr_trend === 'declining' ? '↑ Declining' : '→ Stable';
+    rrd.className = 'stat-cell__delta ' + (v.rhr_trend === 'improving' ? 'good-down' : v.rhr_trend === 'declining' ? 'down' : 'flat');
+
+    // Journey
+    document.getElementById('share-lost').textContent = j.lost_lbs > 0 ? j.lost_lbs.toFixed(1) + ' lbs' : '—';
+    document.getElementById('share-rate').textContent = Math.abs(j.weekly_rate_lbs) > 0 ? Math.abs(j.weekly_rate_lbs).toFixed(2) : '—';
+    document.getElementById('share-days').textContent = days;
+  } catch(e) {
+    console.warn('[week] vitals/journey load failed', e);
+  }
+
+  // Pillar scores
+  try {
+    const cRes = await fetch(`${API}/api/character`);
+    const cData = await cRes.json();
+    const pillars = cData.pillars || [];
+
+    const maxXp = Math.max(...pillars.map(p => p.raw_score || 0));
+    const topMover = pillars.reduce((a, b) => (b.xp_delta || 0) > (a.xp_delta || 0) ? b : a, pillars[0] || {});
+
+    document.getElementById('pillar-list').innerHTML = pillars.map(p => {
+      const isTop = p.name === topMover.name && (topMover.xp_delta || 0) > 0;
+      const pct = maxXp > 0 ? Math.round((p.raw_score / maxXp) * 100) : 0;
+      return `<div class="pillar-row${isTop ? ' top-mover' : ''}">
+        <div class="pillar-row__name">${p.emoji || ''} ${p.name}${isTop ? ' ▲' : ''}</div>
+        <div class="pillar-row__bar-track"><div class="pillar-row__bar-fill" style="width:${pct}%;${isTop ? 'background:var(--accent)' : ''}"></div></div>
+        <div class="pillar-row__score">${p.level.toFixed(1)}</div>
+        <div class="pillar-row__tier">${p.tier}</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('pillar-list').innerHTML = '<div class="loading-msg">Could not load pillar data.</div>';
+  }
+
+  // Best discovery
+  try {
+    const corRes = await fetch(`${API}/api/correlations`);
+    const corData = await corRes.json();
+    const top = (corData.correlations.pairs || [])[0];
+    if (top) {
+      const a = top.label_a || top.field_a;
+      const b = top.label_b || top.field_b;
+      const dir = top.r > 0 ? 'higher' : 'lower';
+      document.getElementById('week-discovery').innerHTML = `
+        <div class="discovery-callout__eyebrow">// Strongest signal this week &mdash; ${top.source_a} × ${top.source_b}</div>
+        <div class="discovery-callout__finding">${a} → ${dir} ${b}</div>
+        <div class="discovery-callout__stat">
+          r = <strong>${top.r > 0 ? '+' : ''}${top.r.toFixed(3)}</strong> &middot;
+          n = <strong>${top.n} days</strong> &middot;
+          ${top.strength}${top.fdr_significant ? ' &middot; ✓ FDR significant' : ''}
+          ${top.lag_days > 0 ? ` &middot; ${top.lag_days}d lag (predictive)` : ''}
+        </div>`;
+    } else {
+      document.getElementById('week-discovery').innerHTML = '<div class="loading-msg">No correlation data yet.</div>';
+    }
+  } catch(e) {
+    document.getElementById('week-discovery').innerHTML = '<div class="loading-msg">Could not load discovery data.</div>';
+  }
+}
+
+loadWeek();
+</script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>
