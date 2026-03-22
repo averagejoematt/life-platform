@@ -254,6 +254,62 @@
       text-transform: uppercase;
     }
 
+    /* Data confidence badge */
+    .pillar-confidence {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-top: var(--space-2);
+    }
+    .pillar-confidence--high { color: var(--c-green-500); }
+    .pillar-confidence--low  { color: var(--c-yellow-status); }
+
+    /* Next Level Requirements section */
+    .next-level-section {
+      padding: var(--space-12) var(--page-padding);
+      border-top: 1px solid var(--border);
+    }
+    .next-level-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-6);
+      margin-top: var(--space-8);
+    }
+    .next-level-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-6);
+    }
+    .next-level-card.bottleneck {
+      border-color: var(--accent);
+      background: var(--accent-bg-subtle);
+    }
+    .next-level-card__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .next-level-card__pillar {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .next-level-card__action {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    @media (max-width: 700px) {
+      .next-level-grid { grid-template-columns: 1fr; }
+    }
+
     /* Timeline */
     .timeline-section {
       padding: var(--space-12) var(--page-padding);
@@ -277,12 +333,129 @@
     .event-text { font-size: var(--text-sm); color: var(--text); }
     .event-levels { font-size: var(--text-xs); color: var(--text-muted); letter-spacing: var(--ls-tag); white-space: nowrap; }
 
+    /* Achievement badges */
+    .badges-section {
+      padding: var(--space-12) var(--page-padding);
+      border-top: 1px solid var(--border);
+    }
+    .badges-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+      margin-top: var(--space-8);
+    }
+    .badge-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-5) var(--space-5);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      opacity: 0.4;
+      transition: opacity var(--dur-fast);
+    }
+    .badge-card.earned {
+      opacity: 1;
+      border-color: var(--accent);
+      background: var(--surface-raised);
+    }
+    .badge-card__icon { font-size: 22px; line-height: 1; }
+    .badge-card__name {
+      font-family: var(--font-display);
+      font-size: var(--text-base);
+      color: var(--text);
+    }
+    .badge-card.earned .badge-card__name { color: var(--accent); }
+    .badge-card__desc {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .badge-card__status {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      margin-top: var(--space-1);
+    }
+    .badge-card.earned .badge-card__status { color: var(--c-green-500); }
+    .badge-card:not(.earned) .badge-card__status { color: var(--text-faint); }
+    .badge-date-chip {
+      display: inline-block;
+      background: var(--bg);
+      border: 1px solid var(--accent);
+      color: var(--accent-dim);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-label);
+      padding: 2px var(--space-2);
+      margin-top: var(--space-1);
+    }
+    .badges-group-label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin: var(--space-8) 0 var(--space-2);
+    }
+    .badges-group-label:first-child { margin-top: 0; }
+
+    /* RPG intro section */
+    .rpg-why-section {
+      padding: var(--space-12) var(--page-padding);
+      border-top: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .rpg-why-section p {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      max-width: 640px;
+    }
+
+    /* Avatar section */
+    .char-avatar-section {
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: center;
+    }
+    .char-avatar {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-4);
+    }
+    .char-avatar__face { width: 80px; height: 80px; }
+    .char-avatar__score {
+      font-family: var(--font-display);
+      font-size: 56px;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .char-avatar__score-label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .char-avatar__state {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
     @media (max-width: 900px) {
       .character-card { grid-template-columns: 1fr; }
       .cc-left { border-right: none; border-bottom: 1px solid var(--border); }
       .pillars-grid { grid-template-columns: 1fr 1fr; }
       .event-row { grid-template-columns: 90px 40px 1fr; }
       .event-levels { display: none; }
+      .intro-grid { grid-template-columns: 1fr !important; }
+      .badges-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 600px) {
+      .badges-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -291,12 +464,55 @@
 <nav class="nav">
   <a href="/" class="nav__brand">AMJ</a>
   <div class="nav__links">
-    <a href="/story/" class="nav__link">Story</a>
-    <a href="/live/" class="nav__link">Live</a>
-    <a href="/journal/" class="nav__link">Journal</a>
-    <a href="/platform/" class="nav__link">Platform</a>
-    <a href="/start/" class="nav__link">Explore</a>
-    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Story</button>
+      <div class="nav__dropdown-menu">
+        <a href="/" class="nav__dropdown-item">Home</a>
+        <a href="/story/" class="nav__dropdown-item">My Story</a>
+        <a href="/about/" class="nav__dropdown-item">About</a>
+      </div>
+    </div>
+    <div class="nav__dropdown is-active">
+      <button class="nav__dropdown-btn">The Data</button>
+      <div class="nav__dropdown-menu">
+        <a href="/live/" class="nav__dropdown-item">Live</a>
+        <a href="/character/" class="nav__dropdown-item active">Character</a>
+        <a href="/habits/" class="nav__dropdown-item">Habits</a>
+        <a href="/accountability/" class="nav__dropdown-item">Accountability</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Science</button>
+      <div class="nav__dropdown-menu">
+        <a href="/protocols/" class="nav__dropdown-item">Protocols</a>
+        <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
+        <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
+        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
+        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
+        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
+        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Build</button>
+      <div class="nav__dropdown-menu">
+        <a href="/platform/" class="nav__dropdown-item">Platform</a>
+        <a href="/intelligence/" class="nav__dropdown-item">Intelligence</a>
+        <a href="/board/" class="nav__dropdown-item">Board</a>
+        <a href="/cost/" class="nav__dropdown-item">Cost</a>
+        <a href="/methodology/" class="nav__dropdown-item">Methodology</a>
+        <a href="/tools/" class="nav__dropdown-item">Tools</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">Follow</button>
+      <div class="nav__dropdown-menu">
+        <a href="/chronicle/" class="nav__dropdown-item">Chronicle</a>
+        <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
+        <a href="/ask/" class="nav__dropdown-item">Ask</a>
+      </div>
+    </div>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>
   </div>
   <button class="nav__hamburger" aria-label="Open menu">
     <span></span><span></span><span></span>
@@ -311,54 +527,106 @@
   <div class="nav-overlay__panel">
     <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The journey</div>
-      <a href="/story/" class="nav-overlay__link">Story</a>
-      <a href="/live/" class="nav-overlay__link">Live</a>
-      <a href="/journal/" class="nav-overlay__link">Journal</a>
-      <a href="/week/" class="nav-overlay__link">This Week</a>
+      <div class="nav-overlay__heading">The Story</div>
+      <a href="/" class="nav-overlay__link">Home</a>
+      <a href="/story/" class="nav-overlay__link">My Story</a>
       <a href="/about/" class="nav-overlay__link">About</a>
     </div>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The data</div>
+      <div class="nav-overlay__heading">The Data</div>
+      <a href="/live/" class="nav-overlay__link">Live</a>
       <a href="/character/" class="nav-overlay__link">Character</a>
       <a href="/habits/" class="nav-overlay__link">Habits</a>
-      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
-      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
-      <a href="/results/" class="nav-overlay__link">Results</a>
-      <a href="/progress/" class="nav-overlay__link">Progress</a>
-      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
-      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
-      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
-      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
-      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
-      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
     </div>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The platform</div>
+      <div class="nav-overlay__heading">The Science</div>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Build</div>
       <a href="/platform/" class="nav-overlay__link">Platform</a>
       <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
-      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
-      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
-      <a href="/ask/" class="nav-overlay__link">Ask</a>
       <a href="/board/" class="nav-overlay__link">Board</a>
-      <a href="/data/" class="nav-overlay__link">Data</a>
       <a href="/cost/" class="nav-overlay__link">Cost</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
+      <a href="/tools/" class="nav-overlay__link">Tools</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">Follow</div>
+      <a href="/chronicle/" class="nav-overlay__link">Chronicle</a>
       <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
       <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+      <a href="/privacy/" class="nav-overlay__link">Privacy</a>
     </div>
   </div>
 </div>
 
 
+
+
+
+
+
 <div class="page-header">
-  <div class="eyebrow page-header__kicker">Character Sheet</div>
+  <div class="eyebrow page-header__kicker">The Data</div>
   <h1 class="page-header__title">Level <span id="h-level">2</span> — <span id="h-tier">Foundation</span></h1>
   <p class="page-header__sub">Life optimization tracked across 7 pillars. Scores are computed nightly from real wearable, habit, and biometric data — not self-reported.</p>
 </div>
+
+<!-- Intro narrative -->
+<section class="reveal" style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border);">
+  <div class="intro-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-12);align-items:start;">
+    <div>
+      <h2 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">The Character Sheet</h2>
+      <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-4)">This isn't a weight tracker. It's an experiment: can you quantify whether someone is actually becoming a better version of themselves? Seven pillars. Each measured from real data. No self-reporting. The score is honest, and it's public — because accountability to an audience is itself a performance variable.</p>
+      <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-4)">Every night, 19 data sources feed a scoring engine that grades yesterday across 7 pillars — Sleep, Movement, Nutrition, Metabolic, Mind, Social, Consistency. Each pillar has a raw score of 0–100. The composite becomes your Character Score, which drives level progression on a logarithmic XP curve.</p>
+      <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body)">The tier system — Foundation → Momentum → Chisel → Elite — requires not just a high score today, but sustained performance over multiple weeks. A single great day doesn't level you up. A month of great days does.</p>
+    </div>
+    <div>
+      <div style="border:1px solid var(--border);background:var(--surface);padding:var(--space-6);">
+        <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-5)">// what each tier means</div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-4);">
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
+            <span style="color:var(--text-muted);font-family:var(--font-mono)">Foundation</span>
+            <span style="color:var(--text-muted)">Building consistent habits. Weeks 1–4. Most people live here permanently.</span>
+          </div>
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
+            <span style="color:var(--text-muted);font-family:var(--font-mono)">Momentum</span>
+            <span style="color:var(--text-muted)">Habits are automated. Progress is measurable. The compound curve starts.</span>
+          </div>
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
+            <span style="color:var(--accent);font-family:var(--font-mono)">Chisel</span>
+            <span style="color:var(--accent)">Current tier — optimizing from a stable base. Active experiments running.</span>
+          </div>
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
+            <span style="color:var(--text-faint);font-family:var(--font-mono)">Elite</span>
+            <span style="color:var(--text-faint)">All 7 pillars performing simultaneously. The rarest state.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Avatar -->
+<section class="char-avatar-section reveal">
+  <div class="char-avatar">
+    <svg class="char-avatar__face" id="avatar-face" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="40" cy="40" r="38" fill="var(--surface)" stroke="var(--border)" stroke-width="2"/>
+    </svg>
+    <div class="char-avatar__score" id="avatar-score">—</div>
+    <div class="char-avatar__score-label">composite score</div>
+    <div class="char-avatar__state" id="avatar-state">// loading</div>
+  </div>
+</section>
 
 <!-- Main character card -->
 <div class="character-card reveal">
@@ -430,12 +698,133 @@
   </div>
 </section>
 
+<!-- FEAT-10: Next Level Requirements -->
+<section class="next-level-section reveal" id="next-level-section">
+  <div class="eyebrow">Progression</div>
+  <h2 class="text-h3" style="color:var(--text)">Next Level Requirements</h2>
+  <p style="font-size:var(--text-sm);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);margin-top:var(--space-3)">What needs to move to get to the next level. The bottleneck pillar is the weakest link — improving it has the highest leverage.</p>
+  <div class="next-level-grid" id="next-level-grid">
+    <!-- Injected by JS -->
+  </div>
+</section>
+
 <!-- Timeline -->
 <section class="timeline-section reveal">
   <div class="eyebrow">Level history</div>
   <h2 class="text-h3" style="color:var(--text)">Event log</h2>
   <div class="event-list" id="event-list">
     <!-- Injected by JS -->
+  </div>
+</section>
+
+<!-- Achievement Badges -->
+<section class="badges-section reveal" id="badges-section">
+  <div class="eyebrow">Achievements</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-2)">Achievement Badges</h2>
+  <p style="font-size:var(--text-sm);color:var(--text-muted);max-width:560px;line-height:var(--lh-body)">Earned through sustained effort. Locked badges show the requirement — earned badges show the date unlocked. Dynamically updated from live data.</p>
+
+  <div class="badges-group-label">// streaks</div>
+  <div class="badges-grid" id="badge-grid-streaks">
+    <div class="badge-card" id="badge-week-warrior">
+      <div class="badge-card__icon">🔥</div>
+      <div class="badge-card__name">Week Warrior</div>
+      <div class="badge-card__desc">7-day Tier 0 streak maintained.</div>
+      <div class="badge-card__status" id="badge-week-warrior-status">Requires 7-day streak</div>
+    </div>
+    <div class="badge-card" id="badge-monthly-grind">
+      <div class="badge-card__icon">🔥🔥</div>
+      <div class="badge-card__name">Monthly Grind</div>
+      <div class="badge-card__desc">30-day Tier 0 streak without breaking.</div>
+      <div class="badge-card__status">Requires 30-day streak</div>
+    </div>
+    <div class="badge-card" id="badge-quarterly">
+      <div class="badge-card__icon">🔥🔥🔥</div>
+      <div class="badge-card__name">Quarterly</div>
+      <div class="badge-card__desc">90-day Tier 0 streak. The long game.</div>
+      <div class="badge-card__status">Requires 90-day streak</div>
+    </div>
+  </div>
+
+  <div class="badges-group-label">// level milestones</div>
+  <div class="badges-grid" id="badge-grid-levels">
+    <div class="badge-card earned" id="badge-first-levelup">
+      <div class="badge-card__icon">⬡</div>
+      <div class="badge-card__name">First Level Up</div>
+      <div class="badge-card__desc">Reached Level 2 — the system is working.</div>
+      <div class="badge-date-chip">Earned</div>
+      <div class="badge-card__status">Unlocked</div>
+    </div>
+    <div class="badge-card" id="badge-apprentice">
+      <div class="badge-card__icon">⬡⬡</div>
+      <div class="badge-card__name">Apprentice</div>
+      <div class="badge-card__desc">Reached Level 5 across all pillars.</div>
+      <div class="badge-card__status" id="badge-apprentice-status">Requires Level 5</div>
+    </div>
+    <div class="badge-card" id="badge-journeyman">
+      <div class="badge-card__icon">⬡⬡⬡</div>
+      <div class="badge-card__name">Journeyman</div>
+      <div class="badge-card__desc">Reached Level 10 — sustained performer.</div>
+      <div class="badge-card__status">Requires Level 10</div>
+    </div>
+  </div>
+
+  <div class="badges-group-label">// weight milestones</div>
+  <div class="badges-grid" id="badge-grid-weight">
+    <div class="badge-card earned" id="badge-minus20">
+      <div class="badge-card__icon">⚖️</div>
+      <div class="badge-card__name">-20 lbs</div>
+      <div class="badge-card__desc">First 20 pounds lost from starting weight.</div>
+      <div class="badge-date-chip">Earned</div>
+      <div class="badge-card__status">Unlocked</div>
+    </div>
+    <div class="badge-card" id="badge-sub280">
+      <div class="badge-card__icon">⚖️⚖️</div>
+      <div class="badge-card__name">Sub-280</div>
+      <div class="badge-card__desc">Weight reading below 280 lbs confirmed.</div>
+      <div class="badge-card__status" id="badge-sub280-status">Checking live data…</div>
+    </div>
+    <div class="badge-card" id="badge-sub260">
+      <div class="badge-card__icon">⚖️⚖️⚖️</div>
+      <div class="badge-card__name">Sub-260</div>
+      <div class="badge-card__desc">Weight reading below 260 lbs confirmed.</div>
+      <div class="badge-card__status">Requires weight &lt; 260 lbs</div>
+    </div>
+  </div>
+
+  <div class="badges-group-label">// data consistency</div>
+  <div class="badges-grid" id="badge-grid-data">
+    <div class="badge-card earned" id="badge-100days">
+      <div class="badge-card__icon">📊</div>
+      <div class="badge-card__name">100 Days Tracked</div>
+      <div class="badge-card__desc">100+ days of habit log data recorded.</div>
+      <div class="badge-date-chip">Earned</div>
+      <div class="badge-card__status">Unlocked</div>
+    </div>
+    <div class="badge-card" id="badge-365days">
+      <div class="badge-card__icon">📊📊</div>
+      <div class="badge-card__name">365 Days Tracked</div>
+      <div class="badge-card__desc">One full year of continuous data.</div>
+      <div class="badge-card__status" id="badge-365days-status">Checking live data…</div>
+    </div>
+    <div class="badge-card" style="visibility:hidden;pointer-events:none;"></div>
+  </div>
+
+  <div class="badges-group-label">// experiments</div>
+  <div class="badges-grid" id="badge-grid-experiments">
+    <div class="badge-card earned" id="badge-first-experiment">
+      <div class="badge-card__icon">🔬</div>
+      <div class="badge-card__name">First Experiment</div>
+      <div class="badge-card__desc">Completed the first structured N=1 experiment.</div>
+      <div class="badge-date-chip">Earned</div>
+      <div class="badge-card__status">Unlocked</div>
+    </div>
+    <div class="badge-card" id="badge-hypothesis-confirmed">
+      <div class="badge-card__icon">🔬🔬</div>
+      <div class="badge-card__name">Hypothesis Confirmed</div>
+      <div class="badge-card__desc">N=1 result validated with statistical confidence.</div>
+      <div class="badge-card__status">Requires validated experiment result</div>
+    </div>
+    <div class="badge-card" style="visibility:hidden;pointer-events:none;"></div>
   </div>
 </section>
 
@@ -519,7 +908,7 @@
   <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
     Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.<br>
-    <a href="/journal/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue →</a>
+    <a href="/chronicle/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue →</a>
   </p>
   <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
     <input id="cta-email-character" type="email" placeholder="your@email.com" style="
@@ -579,66 +968,71 @@
 <!-- Mobile bottom nav -->
 <nav class="bottom-nav" aria-label="Mobile navigation">
   <a href="/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     <span>Home</span>
   </a>
-  <a href="/ask/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-    <span>Ask</span>
+  <a href="/live/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/></svg>
+    <span>Live</span>
   </a>
   <a href="/character/" class="bottom-nav__link">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-    <span>Score</span>
+    <span>Character</span>
   </a>
-  <a href="/journal/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
-    <span>Journal</span>
+  <a href="/chronicle/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+    <span>Chronicle</span>
   </a>
-  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-    <span>More</span>
-  </button>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>Ask</span>
+  </a>
 </nav>
+
+<section class="reading-path" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
+  <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>
+  <a href="/habits/" style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-display);">The habits that feed the score →</a>
+  <p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Daily inputs tracked against protocol targets</p>
+</section>
 <footer class="footer-v2">
   <div class="footer-v2__grid">
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The journey</div>
-      <a href="/story/" class="footer-v2__link">Story</a>
-      <a href="/live/" class="footer-v2__link">Live</a>
-      <a href="/journal/" class="footer-v2__link">Journal</a>
-      <a href="/week/" class="footer-v2__link">This Week</a>
+      <div class="footer-v2__heading">The Story</div>
+      <a href="/" class="footer-v2__link">Home</a>
+      <a href="/story/" class="footer-v2__link">My Story</a>
       <a href="/about/" class="footer-v2__link">About</a>
     </div>
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The data</div>
+      <div class="footer-v2__heading">The Data</div>
+      <a href="/live/" class="footer-v2__link">Live</a>
       <a href="/character/" class="footer-v2__link">Character</a>
       <a href="/habits/" class="footer-v2__link">Habits</a>
-      <a href="/achievements/" class="footer-v2__link">Achievements</a>
-      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
-      <a href="/results/" class="footer-v2__link">Results</a>
-      <a href="/progress/" class="footer-v2__link">Progress</a>
-      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
-      <a href="/supplements/" class="footer-v2__link">Supplements</a>
-      <a href="/glucose/" class="footer-v2__link">Glucose</a>
-      <a href="/sleep/" class="footer-v2__link">Sleep</a>
-      <a href="/experiments/" class="footer-v2__link">Experiments</a>
-      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
     </div>
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The platform</div>
+      <div class="footer-v2__heading">The Science</div>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The Build</div>
       <a href="/platform/" class="footer-v2__link">Platform</a>
       <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
-      <a href="/accountability/" class="footer-v2__link">Accountability</a>
-      <a href="/methodology/" class="footer-v2__link">Methodology</a>
-      <a href="/ask/" class="footer-v2__link">Ask</a>
       <a href="/board/" class="footer-v2__link">Board</a>
-      <a href="/data/" class="footer-v2__link">Data</a>
       <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
       <a href="/tools/" class="footer-v2__link">Tools</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">Follow</div>
+      <a href="/chronicle/" class="footer-v2__link">Chronicle</a>
       <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
       <a href="/rss.xml" class="footer-v2__link">RSS</a>
       <a href="/privacy/" class="footer-v2__link">Privacy</a>
     </div>
@@ -665,6 +1059,29 @@
     document.getElementById('cc-events').textContent = character.level_events_count;
     document.getElementById('cc-next').textContent  = `Lv ${character.next_tier_level}`;
 
+    // Avatar — composite score + mood state
+    const scores = pillars.map(p => p.raw_score);
+    const composite = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+    const avatarScore = document.getElementById('avatar-score');
+    const avatarState = document.getElementById('avatar-state');
+    const avatarFace  = document.getElementById('avatar-face');
+    if (avatarScore) avatarScore.textContent = composite.toFixed(0);
+    let moodColor = '#BA7517', moodLabel = '// building momentum';
+    let mouthPath = `<line x1="24" y1="54" x2="56" y2="54" stroke="${moodColor}" stroke-width="3" stroke-linecap="round"/>`;
+    if (composite > 70) {
+      moodColor = '#1D9E75'; moodLabel = '// performing well';
+      mouthPath = `<path d="M24 50 Q40 64 56 50" stroke="${moodColor}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+    } else if (composite < 40) {
+      moodColor = '#E24B4A'; moodLabel = '// needs attention';
+      mouthPath = `<path d="M24 58 Q40 44 56 58" stroke="${moodColor}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+    }
+    if (avatarState) avatarState.textContent = moodLabel;
+    if (avatarFace) avatarFace.innerHTML =
+      `<circle cx="40" cy="40" r="38" fill="var(--surface)" stroke="${moodColor}" stroke-width="2"/>` +
+      `<circle cx="27" cy="32" r="4" fill="${moodColor}"/>` +
+      `<circle cx="53" cy="32" r="4" fill="${moodColor}"/>` +
+      mouthPath;
+
     // Tier map
     const tierMap = document.getElementById('tier-map');
     tierMap.innerHTML = tiers.map(t => {
@@ -684,6 +1101,15 @@
       const xpSign = p.xp_delta >= 0 ? '+' : '';
       const xpClass = p.xp_delta >= 0 ? '' : 'neg';
       const barW = Math.min(p.raw_score, 100);
+      // FEAT-10: data confidence badge (shown when API provides readings count)
+      let confidenceHtml = '';
+      if (p.readings != null) {
+        const confClass = p.readings >= 30 ? 'pillar-confidence--high' : 'pillar-confidence--low';
+        const confLabel = p.readings >= 30 ? '✓ High' : '⚠ Low';
+        confidenceHtml = `<div class="pillar-confidence ${confClass}">${confLabel} (${p.readings} readings)</div>`;
+      } else if (p.raw_score === 0) {
+        confidenceHtml = `<div class="pillar-confidence pillar-confidence--low">⚠ Insufficient data</div>`;
+      }
       return `<div class="pillar-card">
         <div class="pillar-card__header">
           <div class="pillar-card__name">${p.name}</div>
@@ -692,8 +1118,47 @@
         <div class="pillar-card__level">${p.level}</div>
         <div class="pillar-card__bar"><div class="pillar-card__bar-fill" data-w="${barW}"></div></div>
         <div class="pillar-card__raw">raw ${p.raw_score.toFixed(1)} / 100</div>
+        ${confidenceHtml}
       </div>`;
     }).join('');
+
+    // FEAT-10: Next Level Requirements — identify bottleneck pillar
+    const nlGrid = document.getElementById('next-level-grid');
+    if (nlGrid && pillars.length) {
+      const sorted = [...pillars].sort((a, b) => a.raw_score - b.raw_score);
+      const bottleneck = sorted[0];
+      const secondWeakest = sorted[1] || sorted[0];
+
+      const PILLAR_ACTIONS = {
+        sleep:         'Hit 8h sleep + consistent bed time. Prioritize sleep over late training sessions.',
+        movement:      'Log at least one activity per day. Zone 2 cardio 3×/week raises this fastest.',
+        nutrition:     'Hit protein target daily. Caloric deficit within ±5% moves this score most.',
+        metabolic:     'Morning glucose consistency + Withings weigh-in daily. CGM wear rate matters.',
+        mind:          'Journal daily in Notion + log a mindfulness habit in Habitify.',
+        relationships: 'Log at least one meaningful interaction per day in the social habit tracker.',
+        consistency:   'Maintain Tier 0 habit streak without breaking. Avoid vice days.',
+      };
+      const action = PILLAR_ACTIONS[bottleneck.name] || 'Increase raw score by logging more data for this pillar.';
+      const action2 = PILLAR_ACTIONS[secondWeakest.name] || 'Focus on consistent logging and protocol adherence.';
+
+      nlGrid.innerHTML = `
+        <div class="next-level-card bottleneck">
+          <div class="next-level-card__label">// Bottleneck pillar — highest leverage</div>
+          <div class="next-level-card__pillar">${bottleneck.emoji || ''} ${bottleneck.name} — ${bottleneck.raw_score.toFixed(0)}/100</div>
+          <div class="next-level-card__action">${action}</div>
+        </div>
+        <div class="next-level-card">
+          <div class="next-level-card__label">// Second focus area</div>
+          <div class="next-level-card__pillar">${secondWeakest.emoji || ''} ${secondWeakest.name} — ${secondWeakest.raw_score.toFixed(0)}/100</div>
+          <div class="next-level-card__action">${action2}</div>
+        </div>
+        <div class="next-level-card" style="grid-column:1/-1;border-color:var(--border-subtle)">
+          <div class="next-level-card__label">// What moves the composite score</div>
+          <div class="next-level-card__action" style="font-size:var(--text-xs);color:var(--text-muted)">
+            Composite = average of all 7 pillars (14.3% each). Each 10-point increase in any pillar adds ~1.4 points to your Character Score. The bottleneck pillar has the most room to grow — focus there first before optimising pillars already above 70.
+          </div>
+        </div>`;
+    }
 
     setTimeout(() => {
       document.querySelectorAll('.pillar-card__bar-fill').forEach(el => {
@@ -816,6 +1281,86 @@
     .then(r => r.json())
     .then(data => { hydrate(data); renderRadar(data.pillars || DEFAULTS.pillars); })
     .catch(() => { hydrate(DEFAULTS); renderRadar(DEFAULTS.pillars); });
+</script>
+
+<script>
+(function() {
+  function earnBadge(id, dateText) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add('earned');
+    var statusEl = document.getElementById(id + '-status') || el.querySelector('.badge-card__status');
+    if (statusEl) statusEl.textContent = 'Unlocked' + (dateText ? ' \u2014 ' + dateText : '');
+    if (dateText) {
+      var existing = el.querySelector('.badge-date-chip');
+      if (!existing) {
+        var chip = document.createElement('div');
+        chip.className = 'badge-date-chip';
+        chip.textContent = dateText;
+        var desc = el.querySelector('.badge-card__desc');
+        if (desc) desc.after(chip);
+      }
+    }
+  }
+
+  function setHint(id, hint) {
+    var statusEl = document.getElementById(id + '-status');
+    if (!statusEl) {
+      var el = document.getElementById(id);
+      if (el) statusEl = el.querySelector('.badge-card__status');
+    }
+    if (statusEl) statusEl.textContent = hint;
+  }
+
+  // Try /api/achievements first — richer data (unlock_hints, earned_dates)
+  fetch('https://averagejoematt.com/api/achievements')
+    .then(function(r) { return r.ok ? r.json() : Promise.reject('no-ok'); })
+    .then(function(data) {
+      var badges = (data && data.achievements) || (data && data.badges) || [];
+      if (!badges.length) return Promise.reject('empty');
+      badges.forEach(function(badge) {
+        var id = 'badge-' + badge.id.replace(/_/g, '-');
+        if (badge.earned) {
+          earnBadge(id, badge.earned_date || null);
+        } else if (badge.unlock_hint) {
+          setHint(id, badge.unlock_hint);
+        }
+      });
+    })
+    .catch(function() {
+      // Fallback: manual checks
+      Promise.all([
+        fetch('https://averagejoematt.com/api/vitals').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
+        fetch('https://averagejoematt.com/api/character').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
+        fetch('https://averagejoematt.com/api/habit_streaks').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; })
+      ]).then(function(results) {
+        var vitalsData = results[0], characterData = results[1], habitsData = results[2];
+        var hs = (habitsData && habitsData.habit_streaks) || {};
+        var streak = hs.aggregate_streak || 0;
+        if (streak >= 7)  earnBadge('badge-week-warrior');
+        if (streak >= 30) earnBadge('badge-monthly-grind');
+        if (streak >= 90) earnBadge('badge-quarterly');
+        if (streak < 7) setHint('badge-week-warrior', (7 - streak) + ' days to unlock');
+
+        var ch = (characterData && characterData.character) || {};
+        var level = ch.level || 0;
+        if (level >= 5)  earnBadge('badge-apprentice');
+        if (level >= 10) earnBadge('badge-journeyman');
+        if (level < 5 && level > 0) setHint('badge-apprentice', (5 - level) + ' levels to unlock');
+
+        var v = (vitalsData && vitalsData.vitals) || {};
+        var weight = v.weight_lbs ? parseFloat(v.weight_lbs) : null;
+        if (weight !== null) {
+          if (weight < 280) earnBadge('badge-sub280');
+          else setHint('badge-sub280', 'Current: ' + weight.toFixed(1) + ' lbs (need < 280)');
+          if (weight < 260) earnBadge('badge-sub260');
+        }
+        var daysActive = ch.days_active || 0;
+        if (daysActive >= 365) earnBadge('badge-365days');
+        else setHint('badge-365days', daysActive + ' / 365 days tracked');
+      });
+    });
+})();
 </script>
 
 <!-- WEB-WCT: Weekly Challenge Ticker -->

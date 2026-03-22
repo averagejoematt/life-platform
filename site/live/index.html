@@ -4,18 +4,18 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Interactive transformation timeline — every weigh-in, experiment, and milestone from 302 lbs to goal.">
+  <meta name="description" content="Live metrics from 19 data sources: weight, HRV, recovery, habits, and the full transformation timeline from 302 lbs to goal.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Transformation Timeline — Matthew Walker">
-  <meta name="twitter:description" content="Every weigh-in, experiment, and milestone from 302 lbs to goal. Interactive timeline.">
+  <meta name="twitter:title" content="Live Data — Matthew Walker">
+  <meta name="twitter:description" content="Real-time metrics from 19 data sources. Weight, HRV, recovery, habits, and the full transformation timeline.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <meta property="og:title" content="Transformation Timeline — Matthew Walker">
-  <meta property="og:description" content="Every weigh-in, experiment, and milestone from 302 lbs to goal. Interactive timeline.">
+  <meta property="og:title" content="Live Data — Matthew Walker">
+  <meta property="og:description" content="Real-time metrics from 19 data sources. Weight, HRV, recovery, habits, and the full transformation timeline.">
   <meta property="og:type" content="website">
-  <title>Transformation Timeline — Matthew Walker</title>
+  <title>Live — Matthew Walker</title>
     <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="stylesheet" href="/assets/css/tokens.css">
@@ -52,9 +52,92 @@
     .event-row__type { font-size: var(--text-2xs); color: var(--text-faint); text-transform: uppercase; letter-spacing: var(--ls-tag); margin-top: 2px; }
     .loading { text-align: center; padding: var(--space-16); color: var(--text-muted); font-size: var(--text-sm); }
 
+    /* Live Snapshot */
+    .live-snapshot { border-bottom: 1px solid var(--border); background: var(--surface); }
+    .live-snapshot__inner { max-width: var(--max-width); margin: 0 auto; padding: var(--space-8) var(--page-padding); }
+    .snap-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); }
+    .snap-card { background: var(--bg); border: 1px solid var(--border); padding: var(--space-5) var(--space-6); }
+    .snap-card__label { font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--ls-tag); color: var(--text-muted); margin-bottom: var(--space-2); }
+    .snap-card__value { font-family: var(--font-display); font-size: 28px; letter-spacing: var(--ls-display); color: var(--text); line-height: 1; }
+    .snap-card__unit { font-size: var(--text-xs); color: var(--text-muted); font-family: var(--font-mono); }
+    .snap-card__delta { font-size: var(--text-xs); color: var(--text-muted); margin-top: var(--space-2); font-family: var(--font-mono); }
+    .snap-card__delta--pos { color: var(--c-green-500); }
+    .snap-card__delta--neg { color: var(--c-red-status); }
+    .snap-card__delta--green { color: var(--c-green-500); }
+    .snap-card__delta--yellow { color: var(--c-amber-500); }
+    .snap-card__delta--red { color: var(--c-red-status); }
+
+    /* Dashboard panels */
+    .panel-section { border-bottom: 1px solid var(--border); }
+    .panel-section__inner { max-width: var(--max-width); margin: 0 auto; padding: var(--space-8) var(--page-padding); }
+    .panel-label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--accent-dim); margin-bottom: var(--space-6); }
+    .panel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+    .panel-card { background: var(--bg); border: 1px solid var(--border); padding: var(--space-5) var(--space-6); }
+    .panel-card--full { width: 100%; box-sizing: border-box; }
+    .panel-card__heading { font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--ls-tag); color: var(--text-muted); margin-bottom: var(--space-3); }
+    .panel-card__hero { display: flex; align-items: baseline; gap: var(--space-2); }
+    .panel-card__big { font-family: var(--font-display); font-size: 28px; letter-spacing: var(--ls-display); color: var(--text); line-height: 1; }
+    .panel-card__big--muted { color: var(--text-muted); }
+    .panel-card__unit { font-size: var(--text-xs); color: var(--text-muted); font-family: var(--font-mono); }
+    .panel-card__sub { font-size: var(--text-sm); color: var(--text-muted); font-family: var(--font-mono); margin-left: var(--space-2); }
+    .panel-card__foot { font-size: var(--text-xs); color: var(--text-muted); font-family: var(--font-mono); margin-top: var(--space-3); }
+    .panel-card__signal-body { font-size: var(--text-base); color: var(--text-muted); line-height: var(--lh-body); margin-top: var(--space-4); max-width: 640px; }
+    .panel-progress { margin-top: var(--space-4); }
+    .panel-progress__track { height: 3px; background: var(--surface-raised); overflow: hidden; }
+    .panel-progress__fill { height: 100%; transition: width 1s var(--ease-out); }
+    .panel-progress__fill--green { background: var(--c-green-500); }
+    .panel-progress__fill--accent { background: var(--accent); }
+    .load-indicator { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    .load-indicator--green  { background: var(--c-green-500); }
+    .load-indicator--yellow { background: var(--c-amber-500); }
+    .load-indicator--red    { background: var(--c-red-status); }
+
+    /* ── Sleep snapshot ── */
+    .sleep-bar { display: flex; height: 18px; overflow: hidden; border-radius: 2px; margin: var(--space-4) 0; }
+    .sleep-bar__seg { height: 100%; transition: width 1.2s var(--ease-out); }
+    .sleep-bar__seg--deep  { background: var(--accent); }
+    .sleep-bar__seg--rem   { background: rgba(0,229,160,0.45); }
+    .sleep-bar__seg--light { background: rgba(0,229,160,0.2); }
+    .sleep-bar__seg--awake { background: var(--surface-raised); }
+    .sleep-legend { display: flex; gap: var(--space-5); flex-wrap: wrap; margin-top: var(--space-2); }
+    .sleep-legend__item { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-2xs); color: var(--text-muted); font-family: var(--font-mono); }
+    .sleep-legend__dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Zone 2 ring ── */
+    .z2-ring-wrap { display: flex; align-items: center; gap: var(--space-6); }
+    .z2-ring { flex-shrink: 0; }
+    .z2-ring__track { fill: none; stroke: var(--surface-raised); stroke-width: 7; }
+    .z2-ring__fill  { fill: none; stroke: var(--c-green-500); stroke-width: 7; stroke-linecap: round;
+                      transform: rotate(-90deg); transform-origin: 50% 50%;
+                      transition: stroke-dashoffset 1.2s var(--ease-out); }
+
+    /* ── Mood display ── */
+    .mood-scale { display: flex; gap: var(--space-3); margin-top: var(--space-3); }
+    .mood-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
+                justify-content: center; font-family: var(--font-mono); font-size: var(--text-xs);
+                border: 1px solid var(--border); color: var(--text-faint); transition: all var(--dur-fast); }
+    .mood-dot--active { border-color: var(--accent); color: var(--text); background: rgba(0,229,160,0.12); }
+
+    /* ── Journey comparison ── */
+    .journey-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr; border: 1px solid var(--border); }
+    .journey-row { display: contents; }
+    .journey-cell { padding: var(--space-3) var(--space-5); border-bottom: 1px solid var(--border-subtle); border-right: 1px solid var(--border-subtle); background: var(--bg); }
+    .journey-cell:last-child { border-right: none; }
+    .journey-cell--header { background: var(--surface); font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); font-family: var(--font-mono); }
+    .journey-cell__metric { font-size: var(--text-2xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: var(--ls-tag); margin-bottom: var(--space-1); font-family: var(--font-mono); }
+    .journey-val { font-family: var(--font-display); font-size: 22px; color: var(--text); letter-spacing: var(--ls-display); }
+    .journey-val--better { color: var(--c-green-500); }
+    .journey-val--worse  { color: var(--c-red-status); }
+    .journey-delta { font-size: var(--text-2xs); color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px; }
+
     @media (max-width: 768px) {
       .page-header__meta { gap: var(--space-4); }
       .event-row { grid-template-columns: 80px 10px 1fr; }
+      .snap-grid { grid-template-columns: repeat(2, 1fr); }
+      .panel-grid { grid-template-columns: 1fr; }
+      .journey-grid { grid-template-columns: 1fr; }
+      .journey-cell--header:not(:first-child) { display: none; }
+      .z2-ring-wrap { flex-direction: column; align-items: flex-start; }
     }
   </style>
 </head>
@@ -64,12 +147,55 @@
   <nav class="nav">
   <a href="/" class="nav__brand">AMJ</a>
   <div class="nav__links">
-    <a href="/story/" class="nav__link">Story</a>
-    <a href="/live/" class="nav__link active">Live</a>
-    <a href="/journal/" class="nav__link">Journal</a>
-    <a href="/platform/" class="nav__link">Platform</a>
-    <a href="/start/" class="nav__link">Explore</a>
-    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Story</button>
+      <div class="nav__dropdown-menu">
+        <a href="/" class="nav__dropdown-item">Home</a>
+        <a href="/story/" class="nav__dropdown-item">My Story</a>
+        <a href="/about/" class="nav__dropdown-item">About</a>
+      </div>
+    </div>
+    <div class="nav__dropdown is-active">
+      <button class="nav__dropdown-btn">The Data</button>
+      <div class="nav__dropdown-menu">
+        <a href="/live/" class="nav__dropdown-item active">Live</a>
+        <a href="/character/" class="nav__dropdown-item">Character</a>
+        <a href="/habits/" class="nav__dropdown-item">Habits</a>
+        <a href="/accountability/" class="nav__dropdown-item">Accountability</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Science</button>
+      <div class="nav__dropdown-menu">
+        <a href="/protocols/" class="nav__dropdown-item">Protocols</a>
+        <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
+        <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
+        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
+        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
+        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
+        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Build</button>
+      <div class="nav__dropdown-menu">
+        <a href="/platform/" class="nav__dropdown-item">Platform</a>
+        <a href="/intelligence/" class="nav__dropdown-item">Intelligence</a>
+        <a href="/board/" class="nav__dropdown-item">Board</a>
+        <a href="/cost/" class="nav__dropdown-item">Cost</a>
+        <a href="/methodology/" class="nav__dropdown-item">Methodology</a>
+        <a href="/tools/" class="nav__dropdown-item">Tools</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">Follow</button>
+      <div class="nav__dropdown-menu">
+        <a href="/chronicle/" class="nav__dropdown-item">Chronicle</a>
+        <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
+        <a href="/ask/" class="nav__dropdown-item">Ask</a>
+      </div>
+    </div>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>
   </div>
   <button class="nav__hamburger" aria-label="Open menu">
     <span></span><span></span><span></span>
@@ -84,53 +210,86 @@
   <div class="nav-overlay__panel">
     <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The journey</div>
-      <a href="/story/" class="nav-overlay__link">Story</a>
-      <a href="/live/" class="nav-overlay__link">Live</a>
-      <a href="/journal/" class="nav-overlay__link">Journal</a>
-      <a href="/week/" class="nav-overlay__link">This Week</a>
+      <div class="nav-overlay__heading">The Story</div>
+      <a href="/" class="nav-overlay__link">Home</a>
+      <a href="/story/" class="nav-overlay__link">My Story</a>
       <a href="/about/" class="nav-overlay__link">About</a>
     </div>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The data</div>
+      <div class="nav-overlay__heading">The Data</div>
+      <a href="/live/" class="nav-overlay__link">Live</a>
       <a href="/character/" class="nav-overlay__link">Character</a>
       <a href="/habits/" class="nav-overlay__link">Habits</a>
-      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
-      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
-      <a href="/results/" class="nav-overlay__link">Results</a>
-      <a href="/progress/" class="nav-overlay__link">Progress</a>
-      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
-      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
-      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
-      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
-      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
-      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
     </div>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The platform</div>
+      <div class="nav-overlay__heading">The Science</div>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Build</div>
       <a href="/platform/" class="nav-overlay__link">Platform</a>
       <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
-      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
-      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
-      <a href="/ask/" class="nav-overlay__link">Ask</a>
       <a href="/board/" class="nav-overlay__link">Board</a>
-      <a href="/data/" class="nav-overlay__link">Data</a>
       <a href="/cost/" class="nav-overlay__link">Cost</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
+      <a href="/tools/" class="nav-overlay__link">Tools</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">Follow</div>
+      <a href="/chronicle/" class="nav-overlay__link">Chronicle</a>
       <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
       <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+      <a href="/privacy/" class="nav-overlay__link">Privacy</a>
     </div>
   </div>
 </div>
 
 
+
+
+
+
+
+  <!-- Live Snapshot -->
+  <section class="live-snapshot animate-in">
+    <div class="live-snapshot__inner">
+      <div class="snap-grid">
+        <div class="snap-card">
+          <div class="snap-card__label">Weight</div>
+          <div class="snap-card__value"><span id="snap-weight">—</span> <span class="snap-card__unit">lbs</span></div>
+          <div class="snap-card__delta" id="snap-weight-delta">loading…</div>
+        </div>
+        <div class="snap-card">
+          <div class="snap-card__label">HRV</div>
+          <div class="snap-card__value"><span id="snap-hrv">—</span> <span class="snap-card__unit">ms</span></div>
+          <div class="snap-card__delta" id="snap-hrv-delta">loading…</div>
+        </div>
+        <div class="snap-card">
+          <div class="snap-card__label">Recovery</div>
+          <div class="snap-card__value"><span id="snap-recovery">—</span><span class="snap-card__unit">%</span></div>
+          <div class="snap-card__delta" id="snap-recovery-status">loading…</div>
+        </div>
+        <div class="snap-card">
+          <div class="snap-card__label">Habit Streak</div>
+          <div class="snap-card__value"><span id="snap-streak">—</span> <span class="snap-card__unit">days</span></div>
+          <div class="snap-card__delta" id="snap-streak-sub">loading…</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Header -->
   <header class="page-header animate-in">
-    <div class="eyebrow">BS-11 — Transformation Timeline</div>
-    <h1 class="page-header__title">302 → <span id="current-weight">…</span> → 185</h1>
+    <div class="eyebrow">The Data</div>
+    <h1 class="page-header__title"><span id="start-weight">302</span> → <span id="current-weight">…</span> → <span id="goal-weight">185</span></h1>
     <p class="page-header__sub">Every weigh-in, every experiment, every milestone — from day one to today. Click any point to see what was happening that day.</p>
     <div class="page-header__meta">
       <div class="meta-stat"><div class="meta-stat__label">Days on journey</div><div class="meta-stat__value" id="days-count">—</div></div>
@@ -156,6 +315,197 @@
   <section class="events-list animate-in" id="events-section" style="display:none;">
     <h2>Journey Events</h2>
     <div id="events-list"></div>
+  </section>
+
+  <!-- Section 4 — Sleep Snapshot -->
+  <section class="panel-section animate-in" id="sleep-section">
+    <div class="panel-section__inner">
+      <div class="panel-label">// sleep snapshot</div>
+      <div class="panel-grid">
+        <div class="panel-card">
+          <div class="panel-card__heading">Last Night</div>
+          <div class="panel-card__hero">
+            <span id="sleep-hours" class="panel-card__big">—</span>
+            <span class="panel-card__unit">hrs</span>
+            <span class="panel-card__sub" id="sleep-score-label"></span>
+          </div>
+          <div class="sleep-bar">
+            <div class="sleep-bar__seg sleep-bar__seg--deep"  id="sleep-seg-deep"  style="width:0%"></div>
+            <div class="sleep-bar__seg sleep-bar__seg--rem"   id="sleep-seg-rem"   style="width:0%"></div>
+            <div class="sleep-bar__seg sleep-bar__seg--light" id="sleep-seg-light" style="width:0%"></div>
+            <div class="sleep-bar__seg sleep-bar__seg--awake" id="sleep-seg-awake" style="width:100%"></div>
+          </div>
+          <div class="sleep-legend">
+            <div class="sleep-legend__item"><span class="sleep-legend__dot" style="background:var(--accent)"></span>Deep <span id="sleep-pct-deep" style="margin-left:2px">—%</span></div>
+            <div class="sleep-legend__item"><span class="sleep-legend__dot" style="background:rgba(0,229,160,0.45)"></span>REM <span id="sleep-pct-rem" style="margin-left:2px">—%</span></div>
+            <div class="sleep-legend__item"><span class="sleep-legend__dot" style="background:rgba(0,229,160,0.2)"></span>Light <span id="sleep-pct-light" style="margin-left:2px">—%</span></div>
+          </div>
+        </div>
+        <div class="panel-card">
+          <div class="panel-card__heading">7-Day Average</div>
+          <div class="panel-card__hero">
+            <span id="sleep-7d-avg" class="panel-card__big">—</span>
+            <span class="panel-card__unit">hrs</span>
+          </div>
+          <div class="panel-card__foot" id="sleep-efficiency-foot">Efficiency: —</div>
+          <div class="panel-card__foot" style="margin-top:var(--space-2)" id="sleep-trend-foot"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Panel 2 — Habit Status -->
+  <section class="panel-section animate-in">
+    <div class="panel-section__inner">
+      <div class="panel-label">// habit status</div>
+      <div class="panel-grid">
+        <div class="panel-card">
+          <div class="panel-card__heading">Tier 0 Today</div>
+          <div class="panel-card__hero">
+            <span id="p2-t0-pct" class="panel-card__big">—</span><span class="panel-card__unit">%</span>
+            <span class="panel-card__sub" id="p2-t0-count">(—/—)</span>
+          </div>
+          <div class="panel-progress">
+            <div class="panel-progress__track">
+              <div class="panel-progress__fill panel-progress__fill--green" id="p2-t0-bar" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="panel-card__foot" id="p2-streak-foot">Loading…</div>
+        </div>
+        <div class="panel-card">
+          <div class="panel-card__heading">T0 Streak</div>
+          <div class="panel-card__hero">
+            <span id="p2-streak" class="panel-card__big">—</span>
+            <span class="panel-card__unit">days</span>
+          </div>
+          <div class="panel-card__foot" id="p2-best-streak">Best: — days</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Panel 3 — Training Load -->
+  <section class="panel-section animate-in">
+    <div class="panel-section__inner">
+      <div class="panel-label">// training load</div>
+      <div class="panel-grid">
+        <div class="panel-card">
+          <div class="panel-card__heading">Today's Activity</div>
+          <div class="panel-card__hero">
+            <span class="panel-card__big" id="p3-activity">—</span>
+          </div>
+          <div class="panel-card__foot" id="p3-strain">Strain: —</div>
+          <div class="panel-card__foot" style="margin-top:var(--space-2)" id="p3-duration">Duration: —</div>
+        </div>
+        <div class="panel-card">
+          <div class="panel-card__heading">Zone 2 — Weekly Target</div>
+          <div class="z2-ring-wrap" style="margin-top:var(--space-4)">
+            <svg class="z2-ring" width="72" height="72" viewBox="0 0 72 72" aria-hidden="true">
+              <circle class="z2-ring__track" cx="36" cy="36" r="30"/>
+              <circle class="z2-ring__fill" id="z2-ring-fill" cx="36" cy="36" r="30" stroke-dasharray="188.5" stroke-dashoffset="188.5"/>
+            </svg>
+            <div>
+              <div style="font-family:var(--font-display);font-size:22px;letter-spacing:var(--ls-display);color:var(--text)">
+                <span id="z2-actual">—</span><span style="font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono)"> / 150 min</span>
+              </div>
+              <div class="panel-card__foot" id="z2-label" style="margin-top:var(--space-2)">Loading…</div>
+              <div class="panel-card__foot" style="margin-top:var(--space-1)" id="p3-load-label">7d load: —</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 7 — State of Mind -->
+  <section class="panel-section animate-in">
+    <div class="panel-section__inner">
+      <div class="panel-label">// state of mind</div>
+      <div class="panel-card panel-card--full">
+        <div class="panel-card__heading">Most Recent Check-in</div>
+        <div class="mood-scale">
+          <div class="mood-dot" id="mood-1">1</div>
+          <div class="mood-dot" id="mood-2">2</div>
+          <div class="mood-dot" id="mood-3">3</div>
+          <div class="mood-dot" id="mood-4">4</div>
+          <div class="mood-dot" id="mood-5">5</div>
+        </div>
+        <div class="panel-card__foot" id="mood-label" style="margin-top:var(--space-3)">No check-in logged recently</div>
+        <div class="panel-card__foot" id="mood-note" style="margin-top:var(--space-2);color:var(--text-faint)"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Panel 4 — Character Snapshot -->
+  <section class="panel-section animate-in">
+    <div class="panel-section__inner">
+      <div class="panel-label">// character snapshot</div>
+      <div class="panel-grid">
+        <div class="panel-card">
+          <div class="panel-card__heading">Level &amp; Tier</div>
+          <div class="panel-card__hero">
+            <span class="panel-card__big">Level <span id="p4-level">—</span></span>
+          </div>
+          <div class="panel-card__foot" id="p4-tier">— tier</div>
+        </div>
+        <div class="panel-card">
+          <div class="panel-card__heading">XP Progress</div>
+          <div class="panel-progress" style="margin-top:var(--space-3)">
+            <div class="panel-progress__track">
+              <div class="panel-progress__fill panel-progress__fill--accent" id="p4-xp-bar" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="panel-card__foot" id="p4-xp-foot">Loading…</div>
+          <div class="panel-card__foot" style="margin-top:var(--space-2)" id="p4-weak">Weakest Pillar: Loading…</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Panel 5 — Intelligence Signal -->
+  <section class="panel-section animate-in">
+    <div class="panel-section__inner">
+      <div class="panel-label">// intelligence signal</div>
+      <div class="panel-card panel-card--full">
+        <div class="panel-card__heading">Today's Signal</div>
+        <div class="panel-card__signal-body" id="p5-signal">
+          Brief generates at 11 AM PT — check back after that for today's AI analysis.
+        </div>
+        <div class="panel-card__foot" style="margin-top:var(--space-4)">
+          <a href="/board/" style="color:var(--accent-dim);text-decoration:none;font-size:var(--text-xs);letter-spacing:var(--ls-tag)">Full AI brief →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 9 — Since Journey Start -->
+  <section class="panel-section animate-in" id="journey-compare-section">
+    <div class="panel-section__inner">
+      <div class="panel-label">// since journey start</div>
+      <div class="journey-grid">
+        <!-- Header row -->
+        <div class="journey-cell journey-cell--header">Metric</div>
+        <div class="journey-cell journey-cell--header">Day 1</div>
+        <div class="journey-cell journey-cell--header">Today</div>
+        <!-- Weight -->
+        <div class="journey-cell"><div class="journey-cell__metric">Weight</div></div>
+        <div class="journey-cell"><div class="journey-val" id="jc-w-start">—</div></div>
+        <div class="journey-cell"><div class="journey-val" id="jc-w-now">—</div><div class="journey-delta" id="jc-w-delta"></div></div>
+        <!-- Recovery -->
+        <div class="journey-cell"><div class="journey-cell__metric">Recovery</div></div>
+        <div class="journey-cell"><div class="journey-val" id="jc-r-start">—</div></div>
+        <div class="journey-cell"><div class="journey-val" id="jc-r-now">—</div></div>
+        <!-- HRV -->
+        <div class="journey-cell"><div class="journey-cell__metric">HRV</div></div>
+        <div class="journey-cell"><div class="journey-val" id="jc-hrv-start">—</div></div>
+        <div class="journey-cell"><div class="journey-val" id="jc-hrv-now">—</div></div>
+        <!-- RHR -->
+        <div class="journey-cell"><div class="journey-cell__metric">Resting HR</div></div>
+        <div class="journey-cell"><div class="journey-val" id="jc-rhr-start">—</div></div>
+        <div class="journey-cell"><div class="journey-val" id="jc-rhr-now">—</div></div>
+      </div>
+      <div class="panel-card__foot" id="journey-days-note" style="margin-top:var(--space-4)">Loading…</div>
+    </div>
   </section>
 
   <!-- Tooltip -->
@@ -233,66 +583,71 @@
 <!-- Mobile bottom nav -->
 <nav class="bottom-nav" aria-label="Mobile navigation">
   <a href="/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     <span>Home</span>
   </a>
-  <a href="/ask/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-    <span>Ask</span>
+  <a href="/live/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/></svg>
+    <span>Live</span>
   </a>
   <a href="/character/" class="bottom-nav__link">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-    <span>Score</span>
+    <span>Character</span>
   </a>
-  <a href="/journal/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
-    <span>Journal</span>
+  <a href="/chronicle/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+    <span>Chronicle</span>
   </a>
-  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-    <span>More</span>
-  </button>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>Ask</span>
+  </a>
 </nav>
+
+<section class="reading-path" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
+  <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>
+  <a href="/character/" style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-display);">How the score is computed →</a>
+  <p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">The RPG system that turns raw data into a single progression score</p>
+</section>
 <footer class="footer-v2">
   <div class="footer-v2__grid">
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The journey</div>
-      <a href="/story/" class="footer-v2__link">Story</a>
-      <a href="/live/" class="footer-v2__link">Live</a>
-      <a href="/journal/" class="footer-v2__link">Journal</a>
-      <a href="/week/" class="footer-v2__link">This Week</a>
+      <div class="footer-v2__heading">The Story</div>
+      <a href="/" class="footer-v2__link">Home</a>
+      <a href="/story/" class="footer-v2__link">My Story</a>
       <a href="/about/" class="footer-v2__link">About</a>
     </div>
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The data</div>
+      <div class="footer-v2__heading">The Data</div>
+      <a href="/live/" class="footer-v2__link">Live</a>
       <a href="/character/" class="footer-v2__link">Character</a>
       <a href="/habits/" class="footer-v2__link">Habits</a>
-      <a href="/achievements/" class="footer-v2__link">Achievements</a>
-      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
-      <a href="/results/" class="footer-v2__link">Results</a>
-      <a href="/progress/" class="footer-v2__link">Progress</a>
-      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
-      <a href="/supplements/" class="footer-v2__link">Supplements</a>
-      <a href="/glucose/" class="footer-v2__link">Glucose</a>
-      <a href="/sleep/" class="footer-v2__link">Sleep</a>
-      <a href="/experiments/" class="footer-v2__link">Experiments</a>
-      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
     </div>
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The platform</div>
+      <div class="footer-v2__heading">The Science</div>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The Build</div>
       <a href="/platform/" class="footer-v2__link">Platform</a>
       <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
-      <a href="/accountability/" class="footer-v2__link">Accountability</a>
-      <a href="/methodology/" class="footer-v2__link">Methodology</a>
-      <a href="/ask/" class="footer-v2__link">Ask</a>
       <a href="/board/" class="footer-v2__link">Board</a>
-      <a href="/data/" class="footer-v2__link">Data</a>
       <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
       <a href="/tools/" class="footer-v2__link">Tools</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">Follow</div>
+      <a href="/chronicle/" class="footer-v2__link">Chronicle</a>
       <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
       <a href="/rss.xml" class="footer-v2__link">RSS</a>
       <a href="/privacy/" class="footer-v2__link">Privacy</a>
     </div>
@@ -474,7 +829,324 @@ function renderEvents(tl) {
   document.getElementById('events-section').style.display = 'block';
 }
 
+async function initSnapshot() {
+  try {
+    const [vRes, hRes] = await Promise.all([
+      fetch(`${API}/api/vitals`),
+      fetch(`${API}/api/habit_streaks`)
+    ]);
+    const vData = await vRes.json();
+    const hData = await hRes.json();
+    const v  = vData.vitals        || {};
+    const hs = hData.habit_streaks || {};
+
+    // Weight
+    if (v.weight_lbs) {
+      document.getElementById('snap-weight').textContent = v.weight_lbs;
+      const deltaEl = document.getElementById('snap-weight-delta');
+      if (v.weight_delta_30d != null) {
+        const sign = v.weight_delta_30d > 0 ? '+' : '';
+        deltaEl.textContent = sign + v.weight_delta_30d + ' lbs (30d)';
+        // Weight loss is good — negative delta = green
+        deltaEl.className = 'snap-card__delta ' + (v.weight_delta_30d <= 0 ? 'snap-card__delta--pos' : 'snap-card__delta--neg');
+      } else {
+        deltaEl.textContent = '';
+      }
+    } else {
+      document.getElementById('snap-weight-delta').textContent = '';
+    }
+
+    // HRV
+    if (v.hrv_ms) {
+      document.getElementById('snap-hrv').textContent = v.hrv_ms;
+      const deltaEl = document.getElementById('snap-hrv-delta');
+      const avg = v.hrv_30d_avg ? v.hrv_30d_avg + ' ms 30d avg' : '';
+      deltaEl.textContent = avg;
+      if (v.hrv_trend === 'up')   deltaEl.className = 'snap-card__delta snap-card__delta--pos';
+      else if (v.hrv_trend === 'down') deltaEl.className = 'snap-card__delta snap-card__delta--neg';
+      else deltaEl.className = 'snap-card__delta';
+    } else {
+      document.getElementById('snap-hrv-delta').textContent = '';
+    }
+
+    // Recovery
+    if (v.recovery_pct != null) {
+      document.getElementById('snap-recovery').textContent = v.recovery_pct;
+      const statusEl = document.getElementById('snap-recovery-status');
+      const statusMap = { green: ['Optimal', 'snap-card__delta--green'], yellow: ['Moderate', 'snap-card__delta--yellow'], red: ['Needs rest', 'snap-card__delta--red'] };
+      const [label, cls] = statusMap[v.recovery_status] || ['—', ''];
+      statusEl.textContent = label;
+      statusEl.className = 'snap-card__delta ' + cls;
+    } else {
+      document.getElementById('snap-recovery-status').textContent = '';
+    }
+
+    // Streak
+    if (hs.aggregate_streak != null) {
+      document.getElementById('snap-streak').textContent = hs.aggregate_streak;
+      const subEl = document.getElementById('snap-streak-sub');
+      subEl.textContent = hs.tier0_pct != null ? hs.tier0_pct + '% T0 habits today' : '';
+    } else {
+      document.getElementById('snap-streak-sub').textContent = '';
+    }
+  } catch(_) {
+    ['snap-weight-delta','snap-hrv-delta','snap-recovery-status','snap-streak-sub'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '';
+    });
+  }
+}
+
+async function initPanels() {
+  // Panel 2 — Habit Status (from /api/habit_streaks)
+  try {
+    const hRes = await fetch(`${API}/api/habit_streaks`);
+    const hData = await hRes.json();
+    const hs = hData.habit_streaks || {};
+    if (hs.tier0_pct != null) {
+      document.getElementById('p2-t0-pct').textContent = hs.tier0_pct;
+      document.getElementById('p2-t0-bar').style.width = Math.min(hs.tier0_pct, 100) + '%';
+    }
+    if (hs.tier0_done != null && hs.tier0_total != null) {
+      document.getElementById('p2-t0-count').textContent = `(${hs.tier0_done}/${hs.tier0_total})`;
+    }
+    if (hs.aggregate_streak != null) {
+      document.getElementById('p2-streak').textContent = hs.aggregate_streak;
+      document.getElementById('p2-streak-foot').textContent = `Current T0 Streak: ${hs.aggregate_streak} days`;
+    }
+    if (hs.best_streak != null) {
+      document.getElementById('p2-best-streak').textContent = `Best: ${hs.best_streak} days`;
+    }
+  } catch(_) {}
+
+  // Panel 4 — Character Snapshot (from /api/character)
+  try {
+    const cRes = await fetch(`${API}/api/character`);
+    const cData = await cRes.json();
+    const ch = cData.character || {};
+    const pillars = cData.pillars || [];
+    if (ch.level != null) {
+      document.getElementById('p4-level').textContent = ch.level;
+    }
+    if (ch.tier) {
+      document.getElementById('p4-tier').textContent = `${ch.tier_emoji || ''} ${ch.tier} tier`.trim();
+    }
+    // XP progress within current tier
+    if (ch.next_tier_level && ch.level) {
+      const tierStart = ch.current_tier_min_level || 1;
+      const tierEnd = ch.next_tier_level;
+      const pct = Math.min(((ch.level - tierStart) / (tierEnd - tierStart)) * 100, 100);
+      document.getElementById('p4-xp-bar').style.width = pct + '%';
+      document.getElementById('p4-xp-foot').textContent = `${ch.xp_total || '—'} XP total — Next tier: Lv ${ch.next_tier_level}`;
+    }
+    // Weakest pillar
+    if (pillars.length) {
+      const weakest = [...pillars].sort((a, b) => a.raw_score - b.raw_score)[0];
+      if (weakest) {
+        document.getElementById('p4-weak').textContent = `Weakest Pillar: ${weakest.emoji || ''} ${weakest.name} (${weakest.raw_score.toFixed(1)})`;
+      }
+    }
+  } catch(_) {}
+}
+
+// ── Sleep Snapshot ────────────────────────────────────────────────────────
+async function initSleep() {
+  try {
+    const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    const v = d.vitals || {};
+
+    // Last night duration
+    const hrs = v.sleep_duration_hours || v.sleep_hours;
+    if (hrs != null) {
+      document.getElementById('sleep-hours').textContent = parseFloat(hrs).toFixed(1);
+    }
+    // Sleep score label
+    const score = v.sleep_score || v.sleep_quality_score;
+    if (score != null) {
+      const scoreEl = document.getElementById('sleep-score-label');
+      const label = score >= 85 ? 'Excellent' : score >= 70 ? 'Good' : score >= 50 ? 'Fair' : 'Poor';
+      scoreEl.textContent = `(${score}% — ${label})`;
+    }
+    // Sleep stage breakdown (% of time)
+    const deep  = v.sleep_deep_pct  ?? v.deep_sleep_pct;
+    const rem   = v.sleep_rem_pct   ?? v.rem_sleep_pct;
+    const light = v.sleep_light_pct ?? v.light_sleep_pct;
+    if (deep != null && rem != null && light != null) {
+      const awake = Math.max(0, 100 - deep - rem - light);
+      document.getElementById('sleep-seg-deep').style.width  = deep  + '%';
+      document.getElementById('sleep-seg-rem').style.width   = rem   + '%';
+      document.getElementById('sleep-seg-light').style.width = light + '%';
+      document.getElementById('sleep-seg-awake').style.width = awake + '%';
+      document.getElementById('sleep-pct-deep').textContent  = Math.round(deep)  + '%';
+      document.getElementById('sleep-pct-rem').textContent   = Math.round(rem)   + '%';
+      document.getElementById('sleep-pct-light').textContent = Math.round(light) + '%';
+    }
+    // 7-day average
+    const avg7 = v.sleep_7d_avg || v.sleep_avg_7d;
+    if (avg7 != null) {
+      document.getElementById('sleep-7d-avg').textContent = parseFloat(avg7).toFixed(1);
+    }
+    // Efficiency
+    const eff = v.sleep_efficiency_pct || v.sleep_efficiency;
+    if (eff != null) {
+      document.getElementById('sleep-efficiency-foot').textContent = `Efficiency: ${eff}%`;
+    }
+    // Trend note
+    const trend = v.sleep_trend;
+    if (trend) {
+      document.getElementById('sleep-trend-foot').textContent =
+        trend === 'up' ? '↑ Improving vs prior week' :
+        trend === 'down' ? '↓ Declining vs prior week' : 'Stable vs prior week';
+    }
+  } catch(_) {}
+}
+
+// ── Training Load ─────────────────────────────────────────────────────────
+async function initTraining() {
+  try {
+    const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    const t = d.training || {};
+    const v = d.vitals || {};
+
+    // Today's activity
+    const actEl = document.getElementById('p3-activity');
+    const activity = t.today_activity || v.last_activity_type;
+    actEl.textContent = activity || 'Rest Day';
+    if (!activity) actEl.classList.add('panel-card__big--muted');
+
+    const strain = t.today_strain ?? v.strain_score;
+    if (strain != null) {
+      document.getElementById('p3-strain').textContent = `Strain: ${parseFloat(strain).toFixed(1)}/21`;
+    } else {
+      document.getElementById('p3-strain').textContent = 'Strain: —';
+    }
+    const dur = t.today_duration_min ?? v.activity_duration_min;
+    if (dur != null) {
+      document.getElementById('p3-duration').textContent = `Duration: ${dur} min`;
+    } else {
+      document.getElementById('p3-duration').textContent = '';
+    }
+
+    // Zone 2 ring (weekly target: 150 min)
+    const z2 = t.zone2_minutes_7d ?? t.zone2_weekly_min;
+    const Z2_TARGET = 150;
+    const circumference = 188.5; // 2π × 30
+    const z2Min = z2 != null ? Math.min(z2, Z2_TARGET) : 0;
+    const offset = circumference - (z2Min / Z2_TARGET) * circumference;
+    document.getElementById('z2-ring-fill').style.strokeDashoffset = offset;
+    document.getElementById('z2-actual').textContent = z2 != null ? z2 : '—';
+    const z2Pct = z2 != null ? Math.round((z2 / Z2_TARGET) * 100) : null;
+    document.getElementById('z2-label').textContent =
+      z2Pct != null ? `${z2Pct}% of weekly target${z2 >= Z2_TARGET ? ' ✓' : ''}` : 'Zone 2 data loading…';
+
+    // 7-day load label
+    const load = t.load_status || t.acwr_status;
+    const loadMap = { optimal: 'Optimal load', high: 'High load', low: 'Low load', moderate: 'Moderate load' };
+    if (load) {
+      document.getElementById('p3-load-label').textContent = `7d load: ${loadMap[load] || load}`;
+    }
+  } catch(_) {}
+}
+
+// ── State of Mind ─────────────────────────────────────────────────────────
+async function initMood() {
+  try {
+    const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    const m = d.mood || d.state_of_mind || {};
+    const score = m.score ?? m.value;
+    if (score != null) {
+      const s = Math.round(score);
+      for (let i = 1; i <= 5; i++) {
+        const el = document.getElementById('mood-' + i);
+        if (el && i <= s) el.classList.add('mood-dot--active');
+      }
+      const labels = ['', 'Low', 'Below average', 'Average', 'Good', 'Excellent'];
+      document.getElementById('mood-label').textContent = `${s}/5 — ${labels[s] || ''}`;
+      if (m.date) {
+        document.getElementById('mood-note').textContent = `Logged: ${m.date}`;
+      }
+    }
+  } catch(_) {}
+}
+
+// ── Intelligence Signal ────────────────────────────────────────────────────
+async function initIntelligenceSignal() {
+  try {
+    const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    const excerpt = d.brief_excerpt
+      || (d.intelligence && d.intelligence.brief_excerpt)
+      || (d.daily_brief && d.daily_brief.excerpt);
+    if (excerpt && excerpt.trim()) {
+      document.getElementById('p5-signal').textContent = excerpt;
+    }
+  } catch(_) {}
+}
+
+// ── Journey Comparison ────────────────────────────────────────────────────
+async function initJourney() {
+  try {
+    const [tlRes, vRes] = await Promise.all([
+      fetch(`${API}/api/timeline`),
+      fetch(`${API}/api/vitals`),
+    ]);
+    const tl = (await tlRes.json()).timeline || {};
+    const v  = (await vRes.json()).vitals   || {};
+
+    const startW = tl.start_weight;
+    const nowW   = v.weight_lbs;
+    const setVal = (id, val, unit) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val != null ? val + (unit || '') : '—';
+    };
+
+    setVal('jc-w-start', startW, ' lbs');
+    setVal('jc-w-now',   nowW,   ' lbs');
+    if (startW != null && nowW != null) {
+      const delta = (nowW - startW).toFixed(1);
+      const deltaEl = document.getElementById('jc-w-delta');
+      if (deltaEl) {
+        deltaEl.textContent = (delta > 0 ? '+' : '') + delta + ' lbs';
+        deltaEl.classList.add(delta <= 0 ? 'journey-val--better' : 'journey-val--worse');
+      }
+      // Populate goal weight from timeline if available
+      if (tl.goal_weight) document.getElementById('goal-weight').textContent = tl.goal_weight;
+      if (tl.start_weight) document.getElementById('start-weight').textContent = tl.start_weight;
+    }
+
+    setVal('jc-r-start', tl.start_recovery,    '%');
+    setVal('jc-r-now',   v.recovery_pct,        '%');
+    setVal('jc-hrv-start', tl.start_hrv,        ' ms');
+    setVal('jc-hrv-now',   v.hrv_ms,            ' ms');
+    setVal('jc-rhr-start', tl.start_rhr,        ' bpm');
+    setVal('jc-rhr-now',   v.resting_heart_rate, ' bpm');
+
+    // Days on journey note
+    if (tl.journey_start) {
+      const days = Math.floor((Date.now() - new Date(tl.journey_start)) / 86400000);
+      document.getElementById('journey-days-note').textContent =
+        `${days} days since ${tl.journey_start} — all values from first available reading vs. most recent.`;
+    }
+  } catch(_) {
+    document.getElementById('journey-days-note').textContent = '';
+  }
+}
+
 init();
+initSnapshot();
+initPanels();
+initSleep();
+initTraining();
+initMood();
+initIntelligenceSignal();
+initJourney();
 </script>
 <script src="/assets/js/nav.js"></script>
 </body>
