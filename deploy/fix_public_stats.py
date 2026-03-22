@@ -346,6 +346,16 @@ def main():
             "tier0_streak":       tier0_streak,
             "days_in":            days_in,
         },
+        # D10: Day 1 baseline — from profile fields or fallback to known journey-start values.
+        # These are historical constants (true Day 1 readings) stored in PROFILE#v1.
+        # Fallback values are the actual readings from journey start (Feb 22, 2026).
+        "baseline": {
+            "date":         profile.get("baseline_date") or start_date,
+            "weight_lbs":   float(profile.get("baseline_weight_lbs") or start_weight),
+            "hrv_ms":       float(profile.get("baseline_hrv_ms") or 45),
+            "rhr_bpm":      float(profile.get("baseline_rhr_bpm") or 62),
+            "recovery_pct": float(profile.get("baseline_recovery_pct") or 55),
+        },
     }
 
     print("\n[payload]")
