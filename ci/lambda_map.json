@@ -1,6 +1,6 @@
 {
   "_comment": "Lambda source file → AWS function name mapping for CI/CD. Used by .github/workflows/ci-cd.yml",
-  "_updated": "2026-03-17 v3.7.64",
+  "_updated": "2026-03-22 v3.8.7",
 
   "lambdas": {
     "lambdas/strava_lambda.py":              { "function": "strava-data-ingestion" },
@@ -48,7 +48,8 @@
     "lambdas/failure_pattern_compute_lambda.py": { "function": "failure-pattern-compute", "not_deployed": true },
     "lambdas/momentum_warning_compute_lambda.py": { "function": "momentum-warning-compute", "not_deployed": true },
     "lambdas/chronicle_email_sender_lambda.py": { "function": "chronicle-email-sender" },
-    "lambdas/chronicle_approve_lambda.py": { "function": "chronicle-approve" }
+    "lambdas/chronicle_approve_lambda.py": { "function": "chronicle-approve" },
+    "lambdas/site_api_lambda.py":              { "function": "life-platform-site-api" }
   },
 
   "mcp": {
@@ -167,7 +168,6 @@
       "lambdas/acwr_compute_lambda.py",
       "lambdas/circadian_compliance_lambda.py",
       "lambdas/sleep_reconciler_lambda.py",
-      "lambdas/site_api_lambda.py",
       "lambdas/email_subscriber_lambda.py"
     ]
   }

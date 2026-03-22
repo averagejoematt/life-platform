@@ -1,3 +1,27 @@
+## v3.8.7 — 2026-03-22: CI/CD pipeline activation
+
+### Summary
+The GitHub Actions CI/CD pipeline (ci-cd.yml) was fully built post-R13 but never activated.
+This version fixes the one outstanding gap (lambda_map.json) and activates the pipeline.
+The pipeline covers: lint → pytest (83+ tests) → plan (cdk diff + layer check) → deploy
+(manual approval gate) → smoke test → auto-rollback → SNS notify on failure.
+
+### Changes
+
+**ci/lambda_map.json** — site_api fix
+- Moved `lambdas/site_api_lambda.py` from `skip_deploy` → `lambdas` section
+  with `function: life-platform-site-api`. Was incorrectly skipped (it's a real
+  deployed Lambda in us-west-2, deployable via deploy_lambda.sh).
+- Bumped `_updated` to v3.8.7.
+
+**Activation steps (run manually):**
+1. `bash deploy/setup_github_oidc.sh` — creates OIDC provider + IAM role in AWS
+2. Create 'production' Environment in GitHub repo settings
+3. `git add -A && git commit -m "v3.8.7: activate CI/CD pipeline" && git push`
+4. Approve the deploy job in GitHub Actions UI (or skip if no Lambda changes)
+
+---
+
 ## v3.8.6 — 2026-03-22: Phase 2 /live/ + /character/ enhancements
 
 ### Summary
