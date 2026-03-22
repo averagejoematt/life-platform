@@ -1806,8 +1806,16 @@ def lambda_handler(event, context):
                 },
                 trends=_trends,
                 brief_excerpt=_brief_excerpt,
+                # D10: Day 1 baseline from profile — historical constants, not live data
+                baseline={
+                    "date":         profile.get("baseline_date") or profile.get("journey_start_date", "2026-02-22"),
+                    "weight_lbs":   float(profile.get("baseline_weight_lbs") or profile.get("journey_start_weight_lbs", 302.0)),
+                    "hrv_ms":       float(profile.get("baseline_hrv_ms", 45)),
+                    "rhr_bpm":      float(profile.get("baseline_rhr_bpm", 62)),
+                    "recovery_pct": float(profile.get("baseline_recovery_pct", 55)),
+                },
             )
-            print("[INFO] site_writer: public_stats.json written")
+            print("[INFO] site_writer: public_stats.json written with baseline")
         except Exception as _sw_e:
             print(f"[WARN] site_writer failed (non-fatal): {_sw_e}")
 
