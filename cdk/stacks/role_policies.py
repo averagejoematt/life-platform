@@ -11,15 +11,14 @@ Policy principle: least-privilege per Lambda. No shared roles.
 """
 
 from aws_cdk import aws_iam as iam
+from stacks.constants import ACCT, REGION, TABLE_NAME, S3_BUCKET, KMS_KEY_ID  # CONF-01, SEC-06
 
 # ── Constants ──────────────────────────────────────────────────────────────
-ACCT = "205930651321"
-REGION = "us-west-2"
-TABLE_ARN = f"arn:aws:dynamodb:{REGION}:{ACCT}:table/life-platform"
-BUCKET = "matthew-life-platform"
+TABLE_ARN = f"arn:aws:dynamodb:{REGION}:{ACCT}:table/{TABLE_NAME}"
+BUCKET = S3_BUCKET
 BUCKET_ARN = f"arn:aws:s3:::{BUCKET}"
 DLQ_ARN = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
-KMS_KEY_ARN = f"arn:aws:kms:{REGION}:{ACCT}:key/444438d1-a5e0-43b8-9391-3cd2d70dde4d"
+KMS_KEY_ARN = f"arn:aws:kms:{REGION}:{ACCT}:key/{KMS_KEY_ID}"
 SES_IDENTITY = f"arn:aws:ses:{REGION}:{ACCT}:identity/mattsusername.com"
 
 

@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="30 days of sleep intelligence — Eight Sleep score, Whoop quality, bed temperature optimization, and circadian consistency.">
+  <meta property="og:title" content="Sleep Intelligence — Matthew Walker">
+  <meta property="og:description" content="Eight Sleep × Whoop cross-referenced. What bed temperature actually does to sleep quality. Real data.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/sleep/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Sleep Intelligence — Matthew Walker">
+  <meta name="twitter:description" content="30 days of Eight Sleep + Whoop data. What temperature does to sleep quality, and the patterns that emerge.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>Sleep Intelligence — Matthew Walker</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .slp-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+    }
+    .slp-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .slp-header__title span { color: var(--accent); }
+    .slp-header__sub {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 540px;
+      line-height: var(--lh-body);
+    }
+
+    .slp-body {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+    }
+
+    /* ── Stat cards ── */
+    .slp-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-bottom: var(--space-10);
+    }
+    .slp-stat {
+      background: var(--surface);
+      padding: var(--space-6) var(--space-5);
+    }
+    .slp-stat__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      margin-bottom: var(--space-2);
+    }
+    .slp-stat__value {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: var(--space-1);
+    }
+    .slp-stat__sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+    .slp-stat__value.green  { color: var(--c-green-400); }
+    .slp-stat__value.yellow { color: var(--c-amber-400); }
+    .slp-stat__value.red    { color: var(--c-red-400); }
+
+    /* ── Trend chart ── */
+    .slp-chart-section {
+      margin-bottom: var(--space-10);
+    }
+    .slp-chart-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: var(--space-4);
+    }
+    .slp-chart-title {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+    }
+    .slp-chart-legend {
+      display: flex;
+      gap: var(--space-4);
+    }
+    .slp-legend-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    .slp-legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    canvas.slp-chart {
+      width: 100%;
+      height: 180px;
+      display: block;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    /* ── Two-up cards ── */
+    .slp-two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-6);
+      margin-bottom: var(--space-10);
+    }
+    .slp-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-6);
+    }
+    .slp-card__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      margin-bottom: var(--space-3);
+    }
+    .slp-card__headline {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .slp-card__body {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+
+    /* ── Temperature discovery block ── */
+    .slp-temp-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      padding: var(--space-6);
+      margin-bottom: var(--space-10);
+    }
+    .slp-temp-block__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--accent);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      margin-bottom: var(--space-3);
+    }
+    .slp-temp-block__headline {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .slp-temp-block__body {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      max-width: 640px;
+    }
+
+    /* ── Scatter: temp vs score ── */
+    canvas.slp-scatter {
+      width: 100%;
+      height: 220px;
+      display: block;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      margin-top: var(--space-4);
+    }
+
+    /* ── Method ── */
+    .slp-method {
+      border-top: 1px solid var(--border);
+      padding-top: var(--space-8);
+      margin-top: var(--space-2);
+    }
+    .slp-method__title {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      margin-bottom: var(--space-4);
+    }
+    .slp-method__grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+    }
+    .slp-method__item {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .slp-method__item strong {
+      display: block;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      margin-bottom: var(--space-1);
+    }
+
+    .slp-loading {
+      text-align: center;
+      padding: var(--space-16);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+    }
+
+    @media (max-width: 768px) {
+      .slp-stats { grid-template-columns: repeat(2, 1fr); }
+      .slp-two-col { grid-template-columns: 1fr; }
+      .slp-method__grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/live/" class="nav__link">Live</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/start/" class="nav__link">Explore</a>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+  </div>
+  <button class="nav__hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span id="nav-date"></span>
+  </div>
+</nav>
+
+<!-- Mobile overlay menu -->
+<div class="nav-overlay">
+  <div class="nav-overlay__panel">
+    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The journey</div>
+      <a href="/story/" class="nav-overlay__link">Story</a>
+      <a href="/live/" class="nav-overlay__link">Live</a>
+      <a href="/journal/" class="nav-overlay__link">Journal</a>
+      <a href="/week/" class="nav-overlay__link">This Week</a>
+      <a href="/about/" class="nav-overlay__link">About</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The data</div>
+      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/habits/" class="nav-overlay__link">Habits</a>
+      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/results/" class="nav-overlay__link">Results</a>
+      <a href="/progress/" class="nav-overlay__link">Progress</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
+      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The platform</div>
+      <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/data/" class="nav-overlay__link">Data</a>
+      <a href="/cost/" class="nav-overlay__link">Cost</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">Follow</div>
+      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+    </div>
+  </div>
+</div>
+
+
+<header class="slp-header reveal">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">
+    <span class="label label-accent">// Sleep Intelligence</span>
+  </div>
+  <h1 class="slp-header__title">Sleep <span>Observatory</span></h1>
+  <p class="slp-header__sub">
+    Eight Sleep and Whoop cross-referenced over 30 days. What bed temperature
+    actually does to sleep quality — and the circadian patterns the data reveals.
+  </p>
+</header>
+
+<div class="slp-body">
+  <div id="slp-loading" class="slp-loading">LOADING SLEEP DATA...</div>
+  <div id="slp-content" style="display:none">
+
+    <!-- Stat cards -->
+    <div class="slp-stats reveal">
+      <div class="slp-stat">
+        <div class="slp-stat__label">Sleep Score</div>
+        <div class="slp-stat__value" id="slp-score">—</div>
+        <div class="slp-stat__sub">Eight Sleep / 100</div>
+      </div>
+      <div class="slp-stat">
+        <div class="slp-stat__label">Efficiency</div>
+        <div class="slp-stat__value" id="slp-eff">—</div>
+        <div class="slp-stat__sub">% time actually asleep</div>
+      </div>
+      <div class="slp-stat">
+        <div class="slp-stat__label">Hours Slept</div>
+        <div class="slp-stat__value" id="slp-hours">—</div>
+        <div class="slp-stat__sub">Whoop measured</div>
+      </div>
+      <div class="slp-stat">
+        <div class="slp-stat__label">30d Avg Score</div>
+        <div class="slp-stat__value" id="slp-avg30">—</div>
+        <div class="slp-stat__sub">Eight Sleep average</div>
+      </div>
+    </div>
+
+    <!-- Sleep score trend -->
+    <div class="slp-chart-section reveal">
+      <div class="slp-chart-header">
+        <div class="slp-chart-title">30-Day Sleep Score Trend</div>
+        <div class="slp-chart-legend">
+          <div class="slp-legend-item">
+            <div class="slp-legend-dot" style="background:var(--accent)"></div>
+            Eight Sleep score
+          </div>
+          <div class="slp-legend-item">
+            <div class="slp-legend-dot" style="background:rgba(255,255,255,0.4)"></div>
+            Whoop quality
+          </div>
+        </div>
+      </div>
+      <canvas class="slp-chart" id="slp-trend-canvas"></canvas>
+    </div>
+
+    <!-- Temperature discovery -->
+    <div class="slp-temp-block reveal" id="slp-temp-block" style="display:none">
+      <div class="slp-temp-block__eyebrow">// Platform Discovery</div>
+      <div class="slp-temp-block__headline" id="slp-temp-headline">Optimal bed temperature: —°F</div>
+      <div class="slp-temp-block__body" id="slp-temp-body">
+        Analyzing Eight Sleep pod temperature vs. sleep score across 30 nights to find
+        the bed temperature range that produces the highest average sleep quality.
+        This is the kind of personalized correlation only continuous tracking reveals.
+      </div>
+    </div>
+
+    <!-- Scatter: temp vs score — hidden if no bed_temp_f data -->
+    <div class="slp-chart-section reveal" id="slp-scatter-section" style="display:none">
+      <div class="slp-chart-header">
+        <div class="slp-chart-title">Bed Temp vs Sleep Score — 30 Nights</div>
+      </div>
+      <canvas class="slp-chart slp-scatter" id="slp-scatter-canvas"></canvas>
+    </div>
+
+    <!-- Context cards -->
+    <div class="slp-two-col reveal">
+      <div class="slp-card">
+        <div class="slp-card__eyebrow">Eight Sleep × Whoop</div>
+        <div class="slp-card__headline">Two sensors, one picture</div>
+        <div class="slp-card__body">
+          Eight Sleep measures from the mattress: pod temperature, sleep stage
+          estimates, respiratory rate, HRV, and toss-and-turns. Whoop measures
+          from the wrist: sleep cycles, disturbances, and recovery impact.
+          Cross-referencing both eliminates sensor bias and surfaces the most
+          reliable sleep signal.
+        </div>
+      </div>
+      <div class="slp-card">
+        <div class="slp-card__eyebrow">Why temperature matters</div>
+        <div class="slp-card__headline">The thermoregulation protocol</div>
+        <div class="slp-card__body">
+          Core body temperature needs to drop 1–3°F to initiate and maintain
+          deep sleep. The Eight Sleep pod enables precise cooling on a schedule —
+          cooler during the first half of the night (deep sleep phase), slightly
+          warmer in the second half (REM phase). The optimal temperature is
+          individual. This data shows mine.
+        </div>
+      </div>
+    </div>
+
+    <!-- Methodology -->
+    <div class="slp-method reveal">
+      <div class="slp-method__title">Measurement Protocol</div>
+      <div class="slp-method__grid">
+        <div class="slp-method__item">
+          <strong>EIGHT SLEEP POD</strong>
+          Mattress-integrated sensor. Continuous tracking via active cooling/heating.
+          Sleep score 0–100. Bed temp in °F. Efficiency = total sleep ÷ time in bed.
+        </div>
+        <div class="slp-method__item">
+          <strong>WHOOP 4.0</strong>
+          Wrist-worn sensor. Sleep stages via actigraphy + optical HRV.
+          Quality score 0–100. Duration measured as actual sleep, not time in bed.
+          Both systems synced nightly to life-platform DynamoDB.
+        </div>
+        <div class="slp-method__item">
+          <strong>TEMPERATURE ANALYSIS</strong>
+          30-night pod temperature grouped into 2°F buckets. Average sleep score
+          computed per bucket. Highest-scoring bucket = empirical optimal range.
+          Minimum 7 days required for analysis. N=1 — individual results vary.
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /slp-content -->
+</div><!-- /slp-body -->
+
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <a href="/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span>Ask</span>
+  </a>
+  <a href="/character/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span>Score</span>
+  </a>
+  <a href="/journal/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+    <span>Journal</span>
+  </a>
+  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    <span>More</span>
+  </button>
+</nav>
+
+<footer class="footer-v2">
+  <div class="footer-v2__grid">
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The journey</div>
+      <a href="/story/" class="footer-v2__link">Story</a>
+      <a href="/live/" class="footer-v2__link">Live</a>
+      <a href="/journal/" class="footer-v2__link">Journal</a>
+      <a href="/week/" class="footer-v2__link">This Week</a>
+      <a href="/about/" class="footer-v2__link">About</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The data</div>
+      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/habits/" class="footer-v2__link">Habits</a>
+      <a href="/achievements/" class="footer-v2__link">Achievements</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/results/" class="footer-v2__link">Results</a>
+      <a href="/progress/" class="footer-v2__link">Progress</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The platform</div>
+      <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/data/" class="footer-v2__link">Data</a>
+      <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/tools/" class="footer-v2__link">Tools</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">Follow</div>
+      <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/rss.xml" class="footer-v2__link">RSS</a>
+      <a href="/privacy/" class="footer-v2__link">Privacy</a>
+    </div>
+  </div>
+  <div class="footer-v2__bottom">
+    <span class="footer-v2__brand">AMJ</span>
+    <span class="footer-v2__copy">// updated daily by life-platform</span>
+  </div>
+</footer>
+
+<script src="/assets/js/nav.js"></script>
+<script src="/assets/js/reveal.js"></script>
+<script>
+(async function() {
+  const API = 'https://averagejoematt.com';
+  const loading = document.getElementById('slp-loading');
+  const content = document.getElementById('slp-content');
+
+  const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  const colorClass = (el, cls) => {
+    if (!el) return;
+    el.classList.remove('green','yellow','red');
+    el.classList.add(cls);
+  };
+
+  try {
+    const resp = await fetch(API + '/api/sleep_detail');
+    if (!resp.ok) throw new Error('API error');
+    const data = await resp.json();
+    const s = data.sleep_detail;
+    const trend = data.sleep_trend || [];
+
+    if (!s) {
+      loading.textContent = 'No sleep data available yet.';
+      return;
+    }
+
+    // Stat cards
+    const scoreEl = document.getElementById('slp-score');
+    setText('slp-score', s.sleep_score != null ? s.sleep_score.toFixed(0) : '—');
+    if (scoreEl) colorClass(scoreEl, s.sleep_score >= 85 ? 'green' : s.sleep_score >= 70 ? 'yellow' : 'red');
+
+    const effEl = document.getElementById('slp-eff');
+    setText('slp-eff', s.sleep_efficiency != null ? s.sleep_efficiency.toFixed(1) + '%' : '—');
+    if (effEl) colorClass(effEl, s.sleep_efficiency >= 90 ? 'green' : s.sleep_efficiency >= 80 ? 'yellow' : 'red');
+
+    const hoursEl = document.getElementById('slp-hours');
+    const hours = s.whoop_hours || s.total_sleep_hours;
+    setText('slp-hours', hours != null ? hours.toFixed(1) + 'h' : '—');
+    if (hoursEl) colorClass(hoursEl, hours >= 7.5 ? 'green' : hours >= 6.5 ? 'yellow' : 'red');
+
+    const avg30El = document.getElementById('slp-avg30');
+    setText('slp-avg30', s['30d_avg_score'] != null ? s['30d_avg_score'].toFixed(0) : '—');
+    if (avg30El) colorClass(avg30El, s['30d_avg_score'] >= 85 ? 'green' : s['30d_avg_score'] >= 70 ? 'yellow' : 'red');
+
+    // Temperature discovery
+    const tempHeadEl = document.getElementById('slp-temp-headline');
+    const tempBodyEl = document.getElementById('slp-temp-body');
+    if (s.optimal_temp_f && tempHeadEl) {
+      document.getElementById('slp-temp-block').style.display = '';
+      tempHeadEl.textContent = `Optimal bed temperature: ~${s.optimal_temp_f}°F`;
+      if (tempBodyEl) {
+        tempBodyEl.textContent = `Over ${s.days_tracked} nights, ${s.optimal_temp_f}°F produced the highest average sleep scores. ` +
+          `Eight Sleep pod cooling allows precise temperature programming. ` +
+          `This is the kind of personalized correlation only continuous tracking can reveal — your optimal temperature will differ.`;
+      }
+    } else if (tempHeadEl) {
+      tempHeadEl.textContent = 'Temperature analysis building...';
+      if (tempBodyEl) tempBodyEl.textContent = `Tracking ${s.days_tracked} nights so far. Need 7+ nights to find your optimal temperature range.`;
+    }
+
+    // Sleep score trend chart
+    if (trend.length >= 3) {
+      const canvas = document.getElementById('slp-trend-canvas');
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width  = canvas.offsetWidth  * dpr;
+      canvas.height = canvas.offsetHeight * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      const W = canvas.offsetWidth;
+      const H = canvas.offsetHeight;
+      const pad = { t: 16, r: 16, b: 24, l: 42 };
+      const iW = W - pad.l - pad.r;
+      const iH = H - pad.t - pad.b;
+      const n = trend.length;
+
+      const scores = trend.map(d => d.sleep_score).filter(v => v != null);
+      const minS = Math.min(...scores, 40);
+      const maxS = Math.max(...scores, 100);
+
+      const xOf = i => pad.l + (i / (n - 1)) * iW;
+      const yOf = (v, mn, mx) => pad.t + iH - ((v - mn) / (mx - mn)) * iH;
+
+      // Background grid
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+      ctx.lineWidth = 1;
+      for (let r = 0; r <= 4; r++) {
+        const y = pad.t + (r / 4) * iH;
+        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+      }
+
+      // Target zone 85+ shaded green
+      const y85 = yOf(85, minS, maxS);
+      ctx.fillStyle = 'rgba(62,207,142,0.06)';
+      ctx.fillRect(pad.l, pad.t, iW, y85 - pad.t);
+
+      // Eight Sleep score line + area fill
+      const gradient = ctx.createLinearGradient(0, pad.t, 0, pad.t + iH);
+      gradient.addColorStop(0, 'rgba(62,207,142,0.18)');
+      gradient.addColorStop(1, 'rgba(62,207,142,0)');
+
+      ctx.beginPath();
+      let first = true;
+      trend.forEach((d, i) => {
+        if (d.sleep_score == null) return;
+        const x = xOf(i), y = yOf(d.sleep_score, minS, maxS);
+        if (first) { ctx.moveTo(x, y); first = false; }
+        else ctx.lineTo(x, y);
+      });
+      const lastWithScore = [...trend].reverse().find(d => d.sleep_score != null);
+      const firstWithScore = trend.find(d => d.sleep_score != null);
+      if (lastWithScore && firstWithScore) {
+        const li = trend.lastIndexOf(lastWithScore);
+        const fi = trend.indexOf(firstWithScore);
+        ctx.lineTo(xOf(li), pad.t + iH);
+        ctx.lineTo(xOf(fi), pad.t + iH);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
+      }
+
+      ctx.strokeStyle = 'rgba(62,207,142,0.9)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      first = true;
+      trend.forEach((d, i) => {
+        if (d.sleep_score == null) return;
+        const x = xOf(i), y = yOf(d.sleep_score, minS, maxS);
+        if (first) { ctx.moveTo(x, y); first = false; }
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      // Whoop quality dots
+      trend.forEach((d, i) => {
+        if (d.whoop_quality == null) return;
+        const x = xOf(i), y = yOf(d.whoop_quality, minS, maxS);
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+      });
+
+      // Y-axis labels
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'right';
+      [minS, Math.round((minS + maxS) / 2), maxS].forEach(v => {
+        ctx.fillText(v.toFixed(0), pad.l - 4, yOf(v, minS, maxS) + 4);
+      });
+    }
+
+    // Scatter: bed temp vs sleep score
+    const pairsRaw = trend.filter(d => d.bed_temp_f != null && d.sleep_score != null);
+    if (pairsRaw.length >= 3) {
+      document.getElementById('slp-scatter-section').style.display = '';
+      const canvas2 = document.getElementById('slp-scatter-canvas');
+      const dpr = window.devicePixelRatio || 1;
+      canvas2.width  = canvas2.offsetWidth  * dpr;
+      canvas2.height = canvas2.offsetHeight * dpr;
+      const ctx2 = canvas2.getContext('2d');
+      ctx2.scale(dpr, dpr);
+      const W = canvas2.offsetWidth;
+      const H = canvas2.offsetHeight;
+      const pad = { t: 16, r: 16, b: 32, l: 42 };
+      const iW = W - pad.l - pad.r;
+      const iH = H - pad.t - pad.b;
+
+      const temps  = pairsRaw.map(d => d.bed_temp_f);
+      const scores = pairsRaw.map(d => d.sleep_score);
+      const minT = Math.min(...temps) - 1, maxT = Math.max(...temps) + 1;
+      const minS2 = Math.min(...scores, 40), maxS2 = Math.max(...scores, 100);
+
+      const xOf2 = t => pad.l + ((t - minT) / (maxT - minT)) * iW;
+      const yOf2 = s => pad.t + iH - ((s - minS2) / (maxS2 - minS2)) * iH;
+
+      // Grid
+      ctx2.strokeStyle = 'rgba(255,255,255,0.04)';
+      ctx2.lineWidth = 1;
+      for (let r = 0; r <= 4; r++) {
+        const y = pad.t + (r / 4) * iH;
+        ctx2.beginPath(); ctx2.moveTo(pad.l, y); ctx2.lineTo(W - pad.r, y); ctx2.stroke();
+      }
+
+      // Optimal temp band highlight
+      if (s.optimal_temp_f) {
+        const ot = s.optimal_temp_f;
+        const x1 = xOf2(ot - 1), x2 = xOf2(ot + 1);
+        ctx2.fillStyle = 'rgba(62,207,142,0.08)';
+        ctx2.fillRect(x1, pad.t, x2 - x1, iH);
+      }
+
+      // Scatter dots coloured by score
+      pairsRaw.forEach(d => {
+        const x = xOf2(d.bed_temp_f), y = yOf2(d.sleep_score);
+        const sc = d.sleep_score;
+        ctx2.fillStyle = sc >= 85 ? 'rgba(62,207,142,0.85)' : sc >= 70 ? 'rgba(245,158,11,0.85)' : 'rgba(239,68,68,0.85)';
+        ctx2.beginPath(); ctx2.arc(x, y, 5, 0, Math.PI * 2); ctx2.fill();
+      });
+
+      // Axes labels
+      ctx2.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx2.font = '10px monospace';
+      ctx2.textAlign = 'center';
+      const tRange = maxT - minT;
+      const step = tRange > 10 ? 5 : 2;
+      for (let t = Math.ceil(minT); t <= maxT; t += step) {
+        ctx2.fillText(t + '°F', xOf2(t), H - 8);
+      }
+      ctx2.textAlign = 'right';
+      [minS2, Math.round((minS2 + maxS2) / 2), maxS2].forEach(v => {
+        ctx2.fillText(v.toFixed(0), pad.l - 4, yOf2(v) + 4);
+      });
+    }
+
+    loading.style.display = 'none';
+    content.style.display = 'block';
+
+  } catch (err) {
+    loading.textContent = 'Could not load sleep data.';
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>

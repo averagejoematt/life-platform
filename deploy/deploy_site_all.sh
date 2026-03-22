@@ -8,6 +8,11 @@ cd "$PROJ"
 echo "=== Full Website Enhancement Deploy ==="
 echo ""
 
+# ── Pre-deploy QA (catches HTML/CSS structure bugs before they go live) ───────
+echo "--- 0/6: Pre-deploy HTML QA ---"
+python3 deploy/qa_html.py --fail
+echo ""
+
 source .venv/bin/activate
 
 echo "--- 1/6: Fix OG tags + nav consistency ---"
@@ -28,10 +33,37 @@ python3 deploy/inline_stats.py --apply --from-s3
 echo ""
 echo "--- 5/6: Sync site to S3 ---"
 deactivate 2>/dev/null || true
+
+# HTML pages: short TTL so content updates propagate quickly
+echo "→ HTML files (max-age=300)..."
 aws s3 sync site/ s3://matthew-life-platform/site/ \
+  --exclude "*" \
+  --include "*.html" \
+  --cache-control "max-age=300, public" \
+  --content-type "text/html; charset=utf-8" \
+  --region us-west-2
+
+# CSS/JS assets: long TTL — CloudFront invalidation on every deploy ensures freshness
+echo "→ CSS/JS assets (max-age=86400)..."
+aws s3 sync site/assets/ s3://matthew-life-platform/site/assets/ \
+  --cache-control "max-age=86400, public" \
+  --region us-west-2
+
+# Data JSON: 1-day TTL (Lambda overwrites daily)
+echo "→ Data JSON (max-age=86400)..."
+aws s3 sync site/data/ s3://matthew-life-platform/site/data/ \
+  --cache-control "max-age=86400, public" \
+  --content-type "application/json" \
+  --region us-west-2
+
+# Everything else (sitemap, rss, etc.)
+echo "→ Other files (max-age=3600)..."
+aws s3 sync site/ s3://matthew-life-platform/site/ \
+  --exclude "*.html" \
+  --exclude "assets/*" \
   --exclude "data/*" \
   --exclude "DEPLOY.md" \
-  --cache-control "max-age=3600" \
+  --cache-control "max-age=3600, public" \
   --region us-west-2
 
 echo ""
@@ -40,6 +72,17 @@ aws cloudfront create-invalidation \
   --distribution-id E3S424OXQZ8NBE \
   --paths "/*" \
   --no-cli-pager
+
+echo ""
+echo "--- Post-deploy: smoke test (wait 30s for CloudFront) ---"
+sleep 30
+bash deploy/smoke_test_site.sh --quick
+
+echo ""
+echo "--- Post-deploy: Playwright QA ---"
+source .venv/bin/activate
+python3 deploy/playwright_qa.py --quick --fail-on-error
+deactivate 2>/dev/null || true
 
 echo ""
 echo "=== DEPLOY COMPLETE ==="

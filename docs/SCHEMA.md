@@ -1185,31 +1185,11 @@ Pearson correlations between 20 key metric pairs computed weekly over a 90-day r
 
 ---
 
-## Composite Scores Partition (R8-ST5, v3.7.20)
+## ~~Composite Scores Partition~~ (Removed v3.7.28 — ADR-025)
 
-**pk:** `USER#matthew#SOURCE#composite_scores`  
-**sk:** `DATE#YYYY-MM-DD`
+**Status: REMOVED.** This partition (`USER#matthew#SOURCE#composite_scores`) was consolidated into `computed_metrics` in v3.7.28 (CLEANUP-1 per ADR-025). No new data is written here. All fields previously in this partition now live in the `computed_metrics` partition. Existing historical records remain in DynamoDB but are not read by any Lambda or MCP tool.
 
-Denormalised daily snapshot of all key composite metrics. Written by `daily-metrics-compute` Lambda at 9:40 AM PT alongside `computed_metrics`. Enables MCP tools to do a single DDB read for common composite lookups instead of recomputing from raw sources. Also supports trend queries across dates.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `date` | string | YYYY-MM-DD |
-| `day_grade_score` | number | Weighted day grade 0-100 |
-| `day_grade_letter` | string | A+ through F |
-| `readiness_score` | number | 0-100 composite (recovery+sleep+hrv+tsb) |
-| `readiness_colour` | string | green / yellow / red / gray |
-| `tier0_streak` | number | Consecutive Tier-0 perfect days |
-| `tier01_streak` | number | Consecutive Tier-0+1 perfect days |
-| `tsb` | number | Training Stress Balance (CTL−ATL) |
-| `hrv_7d` | number | 7-day HRV average (ms) |
-| `hrv_30d` | number | 30-day HRV baseline (ms) |
-| `latest_weight` | number | Most recent Withings weight (lbs) |
-| `component_scores` | map | Per-component scores from scoring engine |
-| `computed_at` | string | ISO timestamp |
-| `algo_version` | string | Scoring algorithm version |
-
-**Durability:** Retained indefinitely. Non-critical path — write failures are logged but do not block Daily Brief delivery.
+**Migration:** `daily-metrics-compute` writes all composite fields directly to `computed_metrics`. MCP tools use `computed_metrics` for all lookups.
 
 ---
 

@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Matthew's public accountability board — every commitment tracked live. Tier 0 habits, pillar scores, weight progress. No hiding.">
+  <meta property="og:title" content="Accountability — Matthew Walker">
+  <meta property="og:description" content="Every commitment. Live compliance. No hiding. Public contract with daily data.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/accountability/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Accountability — Matthew Walker">
+  <meta name="twitter:description" content="Every commitment. Live compliance. No hiding.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>Accountability — Matthew Walker</title>
+    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .page-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .page-header__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+    }
+    .page-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+      line-height: var(--lh-heading);
+    }
+    .page-header__title span { color: var(--accent); }
+    .page-header__sub {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 560px;
+      line-height: var(--lh-body);
+    }
+
+    /* Core commitment stat cards */
+    .commitment-strip {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .commit-stat {
+      background: var(--bg);
+      padding: var(--space-8) var(--space-6);
+      text-align: center;
+    }
+    .commit-stat__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-3);
+    }
+    .commit-stat__value {
+      font-family: var(--font-display);
+      font-size: 48px;
+      line-height: 1;
+      color: var(--accent);
+      letter-spacing: var(--ls-display);
+    }
+    .commit-stat__sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      margin-top: var(--space-2);
+      letter-spacing: var(--ls-label);
+    }
+
+    /* Section layout */
+    .acct-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .acct-section__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .acct-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .acct-section__sub {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-8);
+      line-height: var(--lh-body);
+    }
+
+    /* Pillar grid */
+    .pillar-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+    }
+    .pillar-card {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: var(--space-6);
+      transition: border-color var(--dur-fast);
+    }
+    .pillar-card:hover { border-color: var(--accent); }
+    .pillar-card__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: var(--space-4);
+      gap: var(--space-3);
+    }
+    .pillar-card__name {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    .pillar-badge {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border: 1px solid;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .pillar-badge.green  { color: var(--accent); border-color: var(--c-green-100); background: var(--c-green-050); }
+    .pillar-badge.amber  { color: var(--c-amber-500); border-color: var(--c-amber-100); background: var(--c-amber-050); }
+    .pillar-badge.red    { color: var(--c-red-status); border-color: rgba(255,82,82,0.25); background: rgba(255,82,82,0.05); }
+
+    /* Score bar */
+    .score-bar-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-3);
+    }
+    .score-bar-track {
+      flex: 1;
+      height: 6px;
+      background: var(--surface-raised);
+      border: 1px solid var(--border-subtle);
+      overflow: hidden;
+    }
+    .score-bar-fill {
+      height: 100%;
+      transition: width 1.2s var(--ease-out);
+      width: 0%;
+    }
+    .score-bar-fill.green  { background: var(--accent); }
+    .score-bar-fill.amber  { background: var(--c-amber-500); }
+    .score-bar-fill.red    { background: var(--c-red-status); }
+    .score-bar-num {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      min-width: 2.5ch;
+      text-align: right;
+    }
+    .pillar-card__streak {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+    }
+
+    /* Non-negotiables list */
+    .nn-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-3);
+    }
+    .nn-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+      padding: var(--space-4) var(--space-5);
+      border: 1px solid var(--border-subtle);
+      background: var(--surface);
+    }
+    .nn-item__check {
+      font-family: var(--font-mono);
+      color: var(--accent);
+      font-size: var(--text-sm);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .nn-item__name {
+      font-size: var(--text-sm);
+      color: var(--text);
+      line-height: 1.4;
+    }
+    .nn-item__desc {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      margin-top: 2px;
+      letter-spacing: var(--ls-label);
+    }
+    .nn-reset-note {
+      margin-top: var(--space-5);
+      padding: var(--space-4) var(--space-5);
+      border-left: 3px solid var(--c-red-status);
+      background: rgba(255,82,82,0.04);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .nn-reset-note strong { color: var(--c-red-status); }
+
+    /* Public commitment blockquote */
+    .public-commitment {
+      max-width: var(--prose-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .public-commitment blockquote {
+      margin: 0;
+      padding: var(--space-8) var(--space-8);
+      border-left: 4px solid var(--accent);
+      background: var(--surface);
+      position: relative;
+    }
+    .public-commitment blockquote::before {
+      content: '"';
+      font-family: var(--font-display);
+      font-size: 96px;
+      line-height: 0.8;
+      color: var(--accent);
+      opacity: 0.15;
+      position: absolute;
+      top: var(--space-4);
+      left: var(--space-5);
+      pointer-events: none;
+    }
+    .public-commitment blockquote p {
+      font-size: var(--text-xl);
+      color: var(--text);
+      line-height: var(--lh-body);
+      margin: 0;
+      position: relative;
+      z-index: 1;
+    }
+    .public-commitment blockquote cite {
+      display: block;
+      margin-top: var(--space-5);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-style: normal;
+      letter-spacing: var(--ls-label);
+    }
+
+    /* CTA to results */
+    .acct-cta {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-6);
+      flex-wrap: wrap;
+    }
+    .acct-cta__text {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .acct-cta__text strong { color: var(--text); }
+    .acct-cta__link {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-6);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-label);
+      text-decoration: none;
+      text-transform: uppercase;
+      transition: background var(--dur-fast), color var(--dur-fast);
+      white-space: nowrap;
+    }
+    .acct-cta__link:hover {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    @media (max-width: 900px) {
+      .commitment-strip { grid-template-columns: repeat(2, 1fr); }
+      .pillar-grid { grid-template-columns: 1fr; }
+      .nn-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .commitment-strip { grid-template-columns: 1fr 1fr; }
+      .commit-stat__value { font-size: 36px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/live/" class="nav__link">Live</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/start/" class="nav__link">Explore</a>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+  </div>
+  <button class="nav__hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span id="nav-date"></span>
+  </div>
+</nav>
+<!-- Mobile overlay menu -->
+<div class="nav-overlay">
+  <div class="nav-overlay__panel">
+    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The journey</div>
+      <a href="/story/" class="nav-overlay__link">Story</a>
+      <a href="/live/" class="nav-overlay__link">Live</a>
+      <a href="/journal/" class="nav-overlay__link">Journal</a>
+      <a href="/week/" class="nav-overlay__link">This Week</a>
+      <a href="/about/" class="nav-overlay__link">About</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The data</div>
+      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/habits/" class="nav-overlay__link">Habits</a>
+      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/results/" class="nav-overlay__link">Results</a>
+      <a href="/progress/" class="nav-overlay__link">Progress</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
+      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The platform</div>
+      <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/data/" class="nav-overlay__link">Data</a>
+      <a href="/cost/" class="nav-overlay__link">Cost</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">Follow</div>
+      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+    </div>
+  </div>
+</div>
+
+
+<header class="page-header reveal">
+  <div class="page-header__eyebrow">// public contract</div>
+  <h1 class="page-header__title">The <span>Accountability</span> Board</h1>
+  <p class="page-header__sub">Every commitment. Live compliance. No hiding.</p>
+</header>
+
+<!-- Core commitment stat strip -->
+<div class="commitment-strip reveal">
+  <div class="commit-stat">
+    <div class="commit-stat__label">Tier 0 Habits Today</div>
+    <div class="commit-stat__value" id="stat-tier0">--</div>
+    <div class="commit-stat__sub">done / total</div>
+  </div>
+  <div class="commit-stat">
+    <div class="commit-stat__label">Current Streak</div>
+    <div class="commit-stat__value" id="stat-streak">--</div>
+    <div class="commit-stat__sub">consecutive days</div>
+  </div>
+  <div class="commit-stat">
+    <div class="commit-stat__label">Weight Progress</div>
+    <div class="commit-stat__value" id="stat-weight-pct">--</div>
+    <div class="commit-stat__sub">to goal</div>
+  </div>
+  <div class="commit-stat">
+    <div class="commit-stat__label">Character Level</div>
+    <div class="commit-stat__value" id="stat-level">--</div>
+    <div class="commit-stat__sub">overall tier</div>
+  </div>
+</div>
+
+<!-- The 7 Pillars section -->
+<div class="acct-section reveal">
+  <div class="acct-section__eyebrow">// live status</div>
+  <h2 class="acct-section__title">The 7 Pillars</h2>
+  <p class="acct-section__sub">
+    Seven domains of health. Each scored 0&ndash;100 from daily data. Tier and trend update every morning.
+  </p>
+  <div class="pillar-grid" id="pillar-grid">
+    <!-- Loading placeholders -->
+    <div class="pillar-card" id="pillar-loading">
+      <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);padding:var(--space-4)">
+        Loading pillar data&hellip;
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Non-Negotiables section -->
+<div class="acct-section reveal">
+  <div class="acct-section__eyebrow">// daily requirements</div>
+  <h2 class="acct-section__title">The Non-Negotiables (Tier 0)</h2>
+  <p class="acct-section__sub">
+    These are binary — done or not done. They form the floor. Everything else builds on top.
+  </p>
+  <div class="nn-grid">
+    <div class="nn-item">
+      <div class="nn-item__check">&#10003;</div>
+      <div>
+        <div class="nn-item__name">Log every meal</div>
+        <div class="nn-item__desc">// MacroFactor — complete daily log by midnight</div>
+      </div>
+    </div>
+    <div class="nn-item">
+      <div class="nn-item__check">&#10003;</div>
+      <div>
+        <div class="nn-item__name">Hit protein target</div>
+        <div class="nn-item__desc">// &ge;185g protein daily — no exceptions</div>
+      </div>
+    </div>
+    <div class="nn-item">
+      <div class="nn-item__check">&#10003;</div>
+      <div>
+        <div class="nn-item__name">Complete Zone 2 minimum</div>
+        <div class="nn-item__desc">// &ge;20 min at aerobic threshold, or strength session</div>
+      </div>
+    </div>
+    <div class="nn-item">
+      <div class="nn-item__check">&#10003;</div>
+      <div>
+        <div class="nn-item__name">Log weight</div>
+        <div class="nn-item__desc">// Withings scale — morning weigh-in daily</div>
+      </div>
+    </div>
+    <div class="nn-item">
+      <div class="nn-item__check">&#10003;</div>
+      <div>
+        <div class="nn-item__name">Sleep &ge;7 hours</div>
+        <div class="nn-item__desc">// Whoop tracked — lights out by 10:30 PM</div>
+      </div>
+    </div>
+    <div class="nn-item">
+      <div class="nn-item__check">&#10003;</div>
+      <div>
+        <div class="nn-item__name">No alcohol</div>
+        <div class="nn-item__desc">// Tracked manually — zero tolerance during cut</div>
+      </div>
+    </div>
+  </div>
+  <div class="nn-reset-note">
+    <strong>// streak reset rule:</strong> Miss any single Tier 0 item and the aggregate streak resets to zero. No partial credit. The system enforces the commitment so willpower doesn&rsquo;t have to.
+  </div>
+</div>
+
+<!-- Public commitment -->
+<div class="public-commitment reveal">
+  <blockquote>
+    <p>I&rsquo;m doing this in public because accountability without witnesses is just intention. Every number on this page updates daily. There&rsquo;s nowhere to hide.</p>
+    <cite>// Matthew Walker &mdash; started Feb 9, 2026</cite>
+  </blockquote>
+</div>
+
+<!-- CTA to results -->
+<div class="acct-cta reveal">
+  <div class="acct-cta__text">
+    <strong>Want to see the outcomes?</strong><br>
+    Weight lost, biometrics improved, what&rsquo;s working and what isn&rsquo;t &mdash; all published without filtering.
+  </div>
+  <a href="/results/" class="acct-cta__link">See transformation results &rarr;</a>
+</div>
+
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <a href="/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span>Ask</span>
+  </a>
+  <a href="/character/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span>Score</span>
+  </a>
+  <a href="/journal/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+    <span>Journal</span>
+  </a>
+  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    <span>More</span>
+  </button>
+</nav>
+
+<footer class="footer-v2">
+  <div class="footer-v2__grid">
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The journey</div>
+      <a href="/story/" class="footer-v2__link">Story</a>
+      <a href="/live/" class="footer-v2__link">Live</a>
+      <a href="/journal/" class="footer-v2__link">Journal</a>
+      <a href="/week/" class="footer-v2__link">This Week</a>
+      <a href="/about/" class="footer-v2__link">About</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The data</div>
+      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/habits/" class="footer-v2__link">Habits</a>
+      <a href="/achievements/" class="footer-v2__link">Achievements</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/results/" class="footer-v2__link">Results</a>
+      <a href="/progress/" class="footer-v2__link">Progress</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The platform</div>
+      <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/data/" class="footer-v2__link">Data</a>
+      <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/tools/" class="footer-v2__link">Tools</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">Follow</div>
+      <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/rss.xml" class="footer-v2__link">RSS</a>
+      <a href="/privacy/" class="footer-v2__link">Privacy</a>
+    </div>
+  </div>
+  <div class="footer-v2__bottom">
+    <span class="footer-v2__brand">AMJ</span>
+    <span class="footer-v2__copy">// updated daily by life-platform</span>
+  </div>
+</footer>
+
+<script src="/assets/js/reveal.js"></script>
+<script>
+const API = 'https://averagejoematt.com';
+
+// Map tier name to badge color class
+function tierColor(tier) {
+  if (!tier) return 'amber';
+  const t = tier.toLowerCase();
+  if (t === 'elite' || t === 'mastery' || t === 'discipline') return 'green';
+  if (t === 'momentum') return 'amber';
+  return 'red';
+}
+
+function tierLabel(tier) {
+  if (!tier) return '—';
+  return tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase();
+}
+
+// Pillar display name formatting
+function pillarDisplayName(key) {
+  const names = {
+    sleep: 'Sleep',
+    nutrition: 'Nutrition',
+    training: 'Training',
+    recovery: 'Recovery',
+    stress: 'Stress',
+    habits: 'Habits',
+    biomarkers: 'Biomarkers',
+    strength: 'Strength',
+    zone2: 'Zone 2',
+  };
+  return names[key] || key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+async function loadCharacter() {
+  try {
+    const res = await fetch(`${API}/api/character`);
+    if (!res.ok) throw new Error('character API error');
+    const json = await res.json();
+    const c = json.character || json;
+
+    // Character level
+    if (c.character_level) {
+      document.getElementById('stat-level').textContent = 'Lv ' + c.character_level;
+    }
+
+    // Pillars
+    const pillars = c.pillars || c.pillar_scores || {};
+    const pillarTiers = c.pillar_tiers || {};
+    const pillarStreaks = c.pillar_streaks || {};
+    const grid = document.getElementById('pillar-grid');
+
+    if (Object.keys(pillars).length === 0) {
+      grid.innerHTML = '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);padding:var(--space-4);grid-column:1/-1">No pillar data available.</div>';
+      return;
+    }
+
+    grid.innerHTML = '';
+    Object.entries(pillars).forEach(([key, score]) => {
+      const tier = pillarTiers[key] || '';
+      const streak = pillarStreaks[key] || 0;
+      const color = tierColor(tier);
+      const pct = Math.min(100, Math.max(0, score || 0));
+      const card = document.createElement('div');
+      card.className = 'pillar-card';
+      card.innerHTML = `
+        <div class="pillar-card__header">
+          <div class="pillar-card__name">${pillarDisplayName(key)}</div>
+          <div class="pillar-badge ${color}">${tierLabel(tier) || '—'}</div>
+        </div>
+        <div class="score-bar-row">
+          <div class="score-bar-track">
+            <div class="score-bar-fill ${color}" style="width:0%" data-target="${pct}"></div>
+          </div>
+          <div class="score-bar-num">${Math.round(pct)}</div>
+        </div>
+        <div class="pillar-card__streak">// ${streak} day${streak !== 1 ? 's' : ''} above tier threshold</div>
+      `;
+      grid.appendChild(card);
+    });
+
+    // Animate bars after paint
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.querySelectorAll('.score-bar-fill[data-target]').forEach(el => {
+          el.style.width = el.dataset.target + '%';
+        });
+      });
+    });
+
+  } catch(e) {
+    console.warn('[accountability] character load failed', e);
+    document.getElementById('stat-level').textContent = '—';
+  }
+}
+
+async function loadHabitStreaks() {
+  try {
+    const res = await fetch(`${API}/api/habit_streaks`);
+    if (!res.ok) throw new Error('habit_streaks API error');
+    const json = await res.json();
+    const h = json.habit_streaks || json;
+
+    // Tier 0 display: e.g. "8 / 9"
+    const done = h.tier0_done != null ? h.tier0_done : null;
+    const total = h.tier0_total != null ? h.tier0_total : null;
+    if (done !== null && total !== null) {
+      document.getElementById('stat-tier0').textContent = done + ' / ' + total;
+    }
+
+    // Aggregate streak
+    const streak = h.aggregate_streak;
+    if (streak != null) {
+      document.getElementById('stat-streak').textContent = streak;
+    }
+
+  } catch(e) {
+    console.warn('[accountability] habit_streaks load failed', e);
+  }
+}
+
+async function loadJourney() {
+  try {
+    const res = await fetch(`${API}/api/journey`);
+    if (!res.ok) throw new Error('journey API error');
+    const json = await res.json();
+    const j = json.journey || json;
+
+    const pct = j.progress_pct;
+    if (pct != null) {
+      document.getElementById('stat-weight-pct').textContent = pct.toFixed(1) + '%';
+    }
+
+  } catch(e) {
+    console.warn('[accountability] journey load failed', e);
+  }
+}
+
+// Set nav date
+(function() {
+  const el = document.getElementById('nav-date');
+  if (el) {
+    const d = new Date();
+    el.textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+})();
+
+// Boot all fetches in parallel
+Promise.allSettled([loadCharacter(), loadHabitStreaks(), loadJourney()]);
+</script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>

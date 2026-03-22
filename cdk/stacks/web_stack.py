@@ -44,10 +44,9 @@ from constructs import Construct
 
 from stacks.lambda_helpers import create_platform_lambda
 from stacks import role_policies as rp
+from stacks.constants import REGION, ACCT, S3_BUCKET as _CONSTANTS_BUCKET  # CONF-01
 
-REGION = "us-west-2"
-ACCT   = "205930651321"
-BUCKET = "matthew-life-platform"
+BUCKET = _CONSTANTS_BUCKET
 
 INGESTION_DLQ_ARN = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
 ALERTS_TOPIC_ARN  = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
@@ -235,6 +234,14 @@ class WebStack(Stack):
         # GET /api/subscribe?action=unsubscribe
         # Separate origin from site-api: needs POST forwarding + no cache.
         # ══════════════════════════════════════════════════════════════
+        # BUG-06: Subscriber DLQ must be us-east-1 (same region as Lambda).
+        # The main ingestion DLQ is us-west-2 — not usable here.
+        subscriber_dlq = sqs.Queue(
+            self, "EmailSubscriberDlq",
+            queue_name="life-platform-subscriber-dlq",
+            retention_period=Duration.days(14),
+        )
+
         subscriber_fn = create_platform_lambda(
             self, "EmailSubscriberLambda",
             function_name="email-subscriber",
@@ -242,7 +249,7 @@ class WebStack(Stack):
             handler="email_subscriber_lambda.lambda_handler",
             table=local_table,
             bucket=local_bucket,
-            dlq=None,          # DLQ omitted: web_stack deploys to us-east-1, DLQ is us-west-2
+            dlq=subscriber_dlq,
             alerts_topic=None,
             custom_policies=rp.operational_email_subscriber(),
             timeout_seconds=15,
@@ -332,6 +339,49 @@ class WebStack(Stack):
             # Phase 2 (R17-09 complete): Lambda is in LifePlatformOperational (us-west-2)
             fn_url_domain = _site_api_ctx_domain
             _site_api_fn_url_for_output = f"https://{_site_api_ctx_domain}/"
+
+        # ══════════════════════════════════════════════════════════════
+        # R17-15: Security headers via CloudFront ResponseHeadersPolicy.
+        # Defined here (before amj_dist) so .ref is available in distribution.
+        # ══════════════════════════════════════════════════════════════
+        amj_security_headers = cloudfront.CfnResponseHeadersPolicy(
+            self, "AmjSecurityHeadersPolicy",
+            response_headers_policy_config=cloudfront.CfnResponseHeadersPolicy.ResponseHeadersPolicyConfigProperty(
+                name="life-platform-amj-security-headers",
+                security_headers_config=cloudfront.CfnResponseHeadersPolicy.SecurityHeadersConfigProperty(
+                    content_security_policy=cloudfront.CfnResponseHeadersPolicy.ContentSecurityPolicyProperty(
+                        content_security_policy=(
+                            "default-src 'self'; "
+                            "script-src 'self' 'unsafe-inline'; "
+                            "style-src 'self' 'unsafe-inline'; "
+                            "img-src 'self' data: https:; "
+                            "connect-src 'self'; "
+                            "font-src 'self' data:; "
+                            "frame-ancestors 'none'; "
+                            "base-uri 'self'; "
+                            "form-action 'self'"
+                        ),
+                        override=True,
+                    ),
+                    frame_options=cloudfront.CfnResponseHeadersPolicy.FrameOptionsProperty(
+                        frame_option="DENY",
+                        override=True,
+                    ),
+                    content_type_options=cloudfront.CfnResponseHeadersPolicy.ContentTypeOptionsProperty(
+                        override=True,
+                    ),
+                    referrer_policy=cloudfront.CfnResponseHeadersPolicy.ReferrerPolicyProperty(
+                        referrer_policy="strict-origin-when-cross-origin",
+                        override=True,
+                    ),
+                    strict_transport_security=cloudfront.CfnResponseHeadersPolicy.StrictTransportSecurityProperty(
+                        access_control_max_age_sec=31536000,
+                        include_subdomains=True,
+                        override=True,
+                    ),
+                ),
+            ),
+        )
 
         # ══════════════════════════════════════════════════════════════
         # averagejoematt.com — main website
@@ -526,51 +576,6 @@ class WebStack(Stack):
         )
 
         # ══════════════════════════════════════════════════════════════
-        # R17-15: Security headers via CloudFront ResponseHeadersPolicy.
-        # Applied to default (S3 static) cache behavior on averagejoematt.com.
-        # Headers: CSP, X-Frame-Options, X-Content-Type-Options,
-        #          Referrer-Policy, Strict-Transport-Security.
-        # ══════════════════════════════════════════════════════════════
-        amj_security_headers = cloudfront.CfnResponseHeadersPolicy(
-            self, "AmjSecurityHeadersPolicy",
-            response_headers_policy_config=cloudfront.CfnResponseHeadersPolicy.ResponseHeadersPolicyConfigProperty(
-                name="life-platform-amj-security-headers",
-                security_headers_config=cloudfront.CfnResponseHeadersPolicy.SecurityHeadersConfigProperty(
-                    content_security_policy=cloudfront.CfnResponseHeadersPolicy.ContentSecurityPolicyProperty(
-                        content_security_policy=(
-                            "default-src 'self'; "
-                            "script-src 'self' 'unsafe-inline'; "
-                            "style-src 'self' 'unsafe-inline'; "
-                            "img-src 'self' data: https:; "
-                            "connect-src 'self'; "
-                            "font-src 'self' data:; "
-                            "frame-ancestors 'none'; "
-                            "base-uri 'self'; "
-                            "form-action 'self'"
-                        ),
-                        override=True,
-                    ),
-                    frame_options=cloudfront.CfnResponseHeadersPolicy.FrameOptionsProperty(
-                        frame_option="DENY",
-                        override=True,
-                    ),
-                    content_type_options=cloudfront.CfnResponseHeadersPolicy.ContentTypeOptionsProperty(
-                        override=True,
-                    ),
-                    referrer_policy=cloudfront.CfnResponseHeadersPolicy.ReferrerPolicyProperty(
-                        referrer_policy="strict-origin-when-cross-origin",
-                        override=True,
-                    ),
-                    strict_transport_security=cloudfront.CfnResponseHeadersPolicy.StrictTransportSecurityProperty(
-                        access_control_max_age_sec=31536000,
-                        include_subdomains=True,
-                        override=True,
-                    ),
-                ),
-            ),
-        )
-
-        # ══════════════════════════════════════════════════════════════
         # R17-01: WAF WebACL — rate-based rules for public API endpoints.
         # WebACL pre-existed in us-east-1 (id: 3d75472e-e18b-4d1c-b76b-8bbe63cb05e8).
         # Rules managed via AWS CLI (existing resource; CDK import not required).
@@ -707,4 +712,28 @@ class WebStack(Stack):
         cdk.CfnOutput(self, "SubscriberFunctionUrl",
             value=subscriber_url.url,
             description="Lambda Function URL for email-subscriber (CloudFront /api/subscribe* origin only)",
+        )
+        cdk.CfnOutput(self, "SubscriberDlqUrl",
+            value=subscriber_dlq.queue_url,
+            description="DLQ for email-subscriber Lambda (us-east-1) — BUG-06",
+        )
+
+        # ══════════════════════════════════════════════════════════════
+        # OBS-07: email-subscriber error alarm
+        # Silent conversion failures would lose subscribers without any alert.
+        # ══════════════════════════════════════════════════════════════
+        cloudwatch.Alarm(
+            self, "SubscriberErrors",
+            alarm_name="email-subscriber-errors",
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Errors",
+                dimensions_map={"FunctionName": "email-subscriber"},
+                period=Duration.minutes(5),
+                statistic="Sum",
+            ),
+            threshold=1,
+            evaluation_periods=1,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
         )

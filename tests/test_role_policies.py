@@ -25,8 +25,12 @@ import os
 import inspect
 import types
 
-# ── Add cdk/stacks/ to path ───────────────────────────────────────────────────
-CDK_STACKS = os.path.join(os.path.dirname(__file__), "..", "cdk", "stacks")
+# ── Add cdk/ and cdk/stacks/ to path ─────────────────────────────────────────
+# cdk/ is needed so `from stacks.constants import ...` resolves as a package.
+# cdk/stacks/ allows direct `import role_policies as rp` without package prefix.
+CDK_DIR = os.path.join(os.path.dirname(__file__), "..", "cdk")
+CDK_STACKS = os.path.join(CDK_DIR, "stacks")
+sys.path.insert(0, os.path.abspath(CDK_DIR))
 sys.path.insert(0, os.path.abspath(CDK_STACKS))
 
 # ── Stub aws_cdk so role_policies.py imports without CDK installed ────────────

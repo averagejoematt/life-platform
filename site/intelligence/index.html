@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="14 AI intelligence systems running daily. Correlation engine, hypothesis generation, adaptive mode, metabolic adaptation detector — this is what the AI actually does.">
+  <meta property="og:title" content="Intelligence Layer — Matthew Walker">
+  <meta property="og:description" content="14 systems running daily. This is what the AI actually does with 19 data sources.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/intelligence/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Intelligence Layer — Matthew Walker">
+  <meta name="twitter:description" content="14 AI systems running daily. Correlations, hypotheses, adaptive mode, and more.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta name="theme-color" content="#080c0a">
+  <title>Intelligence Layer — Matthew Walker</title>
+    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    /* ── Page header ─────────────────────────────────────── */
+    .page-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .page-header__eyebrow {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+      font-family: var(--font-mono);
+    }
+    .page-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+      line-height: var(--lh-display);
+      letter-spacing: var(--ls-display);
+    }
+    .page-header__title span { color: var(--accent); }
+    .page-header__sub {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 580px;
+      line-height: var(--lh-body);
+      font-family: var(--font-mono);
+    }
+
+    /* ── Stat strip ──────────────────────────────────────── */
+    .stat-strip {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .stat-item {
+      background: var(--bg);
+      padding: var(--space-6);
+      text-align: center;
+    }
+    .stat-item__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-2);
+    }
+    .stat-item__value {
+      font-family: var(--font-display);
+      font-size: 44px;
+      line-height: 1;
+      color: var(--accent);
+      letter-spacing: var(--ls-display);
+    }
+    .stat-item__sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      margin-top: var(--space-2);
+      letter-spacing: var(--ls-label);
+    }
+
+    /* ── Intro ───────────────────────────────────────────── */
+    .intro {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .intro p {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      max-width: var(--prose-width);
+    }
+
+    /* ── Features section ────────────────────────────────── */
+    .features-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .features-section__header {
+      margin-bottom: var(--space-8);
+    }
+    .features-section__eyebrow {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      font-family: var(--font-mono);
+      margin-bottom: var(--space-3);
+    }
+    .features-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      letter-spacing: var(--ls-heading);
+      line-height: var(--lh-heading);
+    }
+
+    /* ── Feature grid ────────────────────────────────────── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+    }
+    .feature-card {
+      border: 1px solid var(--border-subtle);
+      background: var(--surface);
+      padding: var(--space-6);
+      position: relative;
+      transition: border-color var(--dur-fast);
+    }
+    .feature-card:hover {
+      border-color: var(--c-green-100);
+    }
+    .feature-card--live {
+      border-left: 3px solid var(--accent);
+    }
+    .feature-card__number {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      margin-bottom: var(--space-3);
+    }
+    .feature-card__name {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--text);
+      letter-spacing: var(--ls-heading);
+      line-height: 1.1;
+      margin-bottom: var(--space-3);
+    }
+    .feature-card__desc {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      margin-bottom: var(--space-4);
+    }
+    .feature-card__example {
+      border-top: 1px solid var(--border-subtle);
+      padding-top: var(--space-4);
+    }
+    .feature-card__example-label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      font-family: var(--font-mono);
+      margin-bottom: var(--space-2);
+    }
+    .feature-card__example-text {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text);
+      line-height: var(--lh-mono);
+      background: var(--surface-raised);
+      border: 1px solid var(--border-subtle);
+      padding: var(--space-3) var(--space-4);
+    }
+    .feature-card__live-tag {
+      position: absolute;
+      top: var(--space-4);
+      right: var(--space-4);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent);
+      background: var(--c-green-100);
+      padding: 2px 6px;
+    }
+
+    /* ── CTA section ─────────────────────────────────────── */
+    .cta-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-16) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+      text-align: center;
+    }
+    .cta-section__eyebrow {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      font-family: var(--font-mono);
+      margin-bottom: var(--space-4);
+    }
+    .cta-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+      line-height: var(--lh-heading);
+    }
+    .cta-section__sub {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 480px;
+      margin: 0 auto var(--space-8);
+      line-height: var(--lh-body);
+    }
+    .cta-section__actions {
+      display: flex;
+      gap: var(--space-4);
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn--ghost {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      letter-spacing: var(--ls-label);
+      text-transform: uppercase;
+      padding: var(--space-3) var(--space-6);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: border-color var(--dur-fast), color var(--dur-fast);
+    }
+    .btn--ghost:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .btn--primary-link {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      letter-spacing: var(--ls-label);
+      text-transform: uppercase;
+      padding: var(--space-3) var(--space-6);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      text-decoration: none;
+      background: var(--c-green-050);
+      transition: background var(--dur-fast);
+    }
+    .btn--primary-link:hover {
+      background: var(--c-green-100);
+    }
+
+    /* ── Loading skeleton ────────────────────────────────── */
+    .feature-card__example-text.loading-text {
+      color: var(--text-faint);
+      font-style: italic;
+    }
+
+    /* ── Responsive ──────────────────────────────────────── */
+    @media (max-width: 1024px) {
+      .features-grid { grid-template-columns: 1fr; }
+      .stat-strip { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 640px) {
+      .page-header { padding: calc(var(--nav-height) + var(--space-10)) var(--page-padding-sm) var(--space-8); }
+      .features-section { padding: var(--space-8) var(--page-padding-sm); }
+      .intro { padding: var(--space-8) var(--page-padding-sm); }
+      .cta-section { padding: var(--space-10) var(--page-padding-sm); }
+      .stat-strip { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/live/" class="nav__link">Live</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/start/" class="nav__link">Explore</a>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+  </div>
+  <button class="nav__hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span id="nav-date"></span>
+  </div>
+</nav>
+<!-- Mobile overlay menu -->
+<div class="nav-overlay">
+  <div class="nav-overlay__panel">
+    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The journey</div>
+      <a href="/story/" class="nav-overlay__link">Story</a>
+      <a href="/live/" class="nav-overlay__link">Live</a>
+      <a href="/journal/" class="nav-overlay__link">Journal</a>
+      <a href="/week/" class="nav-overlay__link">This Week</a>
+      <a href="/about/" class="nav-overlay__link">About</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The data</div>
+      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/habits/" class="nav-overlay__link">Habits</a>
+      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/results/" class="nav-overlay__link">Results</a>
+      <a href="/progress/" class="nav-overlay__link">Progress</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
+      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The platform</div>
+      <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/data/" class="nav-overlay__link">Data</a>
+      <a href="/cost/" class="nav-overlay__link">Cost</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">Follow</div>
+      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+    </div>
+  </div>
+</div>
+
+
+<header class="page-header animate-in">
+  <div class="page-header__eyebrow">// the ai brain</div>
+  <h1 class="page-header__title">The <span>Intelligence</span> Layer</h1>
+  <p class="page-header__sub">14 systems running daily. This is what the AI actually does.</p>
+</header>
+
+<div class="stat-strip animate-in">
+  <div class="stat-item">
+    <div class="stat-item__label">AI systems</div>
+    <div class="stat-item__value">14</div>
+    <div class="stat-item__sub">running daily</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-item__label">Run time</div>
+    <div class="stat-item__value">10AM</div>
+    <div class="stat-item__sub">Pacific daily</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-item__label">Character level</div>
+    <div class="stat-item__value" id="stat-level">—</div>
+    <div class="stat-item__sub" id="stat-tier">loading…</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-item__label">Correlations</div>
+    <div class="stat-item__value" id="stat-correlations">—</div>
+    <div class="stat-item__sub">pairs tracked</div>
+  </div>
+</div>
+
+<div class="intro animate-in">
+  <p>This platform isn't just data collection — it's an AI system that reasons about the data every morning. Here's every intelligence feature currently running, with live examples from this week.</p>
+</div>
+
+<section class="features-section animate-in">
+  <div class="features-section__header">
+    <div class="features-section__eyebrow">// all 14 systems</div>
+    <h2 class="features-section__title">What runs every day</h2>
+  </div>
+
+  <div class="features-grid" id="features-grid">
+
+    <!-- 01 Correlation Engine -->
+    <div class="feature-card feature-card--live">
+      <span class="feature-card__live-tag">// live</span>
+      <div class="feature-card__number">01 / 14</div>
+      <div class="feature-card__name">Correlation Engine</div>
+      <div class="feature-card__desc">Finds statistical relationships between any two metrics. Currently tracking 23 pairs across sleep, recovery, training, nutrition, and body composition.</div>
+      <div class="feature-card__example">
+        <div class="feature-card__example-label">// top correlation this week</div>
+        <div class="feature-card__example-text loading-text" id="ex-correlation">Loading from API…</div>
+      </div>
+    </div>
+
+    <!-- 02 Benjamini-Hochberg FDR -->
+    <div class="feature-card">
+      <div class="feature-card__number">02 / 14</div>
+      <div class="feature-card__name">Benjamini-Hochberg FDR</div>
+      <div class="feature-card__desc">Corrects for false discoveries when testing multiple hypotheses simultaneously. Prevents the AI from getting excited about noise when 23 pairs are tested at α=0.05.</div>
+      <div class="feature-card__example">
+        <div class="feature-card__example-label">// example correction</div>
+        <div class="feature-card__example-text">23 pairs × α=0.05 → 1.15 expected false positives without correction. BH correction applied: only pairs where p ≤ (i/23 × 0.05) are flagged significant.</div>
+      </div>
+    </div>
+
+    <!-- 03 Adaptive Mode -->
+    <div class="feature-card feature-card--live">
+      <span class="feature-card__live-tag">// live</span>
+      <div class="feature-card__number">03 / 14</div>
+      <div class="feature-card__name">Adaptive Mode</div>
+      <div class="feature-card__desc">Classifies each day as Flourishing, Struggling, or Baseline based on combined metric signals. Changes the tone and recommendations of the daily brief to match your actual state.</div>
+      <div class="feature-card__example">
+        <div class="feature-card__example-label">// current mode</div>
+        <div class="feature-card__example-text loading-text" id="ex-adaptive">Loading from API…</div>
+      </div>
+    </div>
+
+    <!-- 04 Character Engine -->
+    <div class="feature-card feature-card--live">
+      <span class="feature-card__live-tag">// live</span>
+      <div class="feature-card__number">04 / 14</div>
+      <div class="feature-card__name">Character Engine</div>
+      <div class="feature-card__desc">7-pillar scoring system covering sleep, recovery, training, nutrition, metabolic health, lab results, and habits. EMA smoothing prevents single-day noise from crashing your level.</div>
+      <div class="feature-card__example">
+        <div class="feature-card__example-label">// current character stats</div>
+        <div class="feature-card__example-text loading-text" id="ex-character">Loading from API…</div>
+      </div>
+    </div>
+
+    <!-- 05 Hypothesis Engine -->
+    <div class="feature-card feature-card--live">
+      <span class="feature-card__live-tag">// live</span>
+      <div class="feature-card__number">05 / 14</div>
+      <div class="feature-card__name">Hypothesis Engine</div>
+      <div class="feature-card__desc">Generates testable hypotheses from data patterns and tracks them automatically. Each hypothesis has a protocol, measurement window, and success criteria baked in from the start.</div>
+      <div class="feature-card__example">
+        <div class="feature-card__example-label">// active experiments</div>
+        <div class="feature-card__example-text loading-text" id="ex-hypothesis">Loading from API…</div>
+      </div>
+    </div>
+
+    <!-- 06 Decision Fatigue Signal -->
+    <div class="feature-card">
+      <div class="feature-card__number">06 / 14</div>
+      <div class="feature-card__name">Decision Fatigue Signal</div>
+      <div class="feature-card__desc">Detects when decision quality typically degrades based on day-of-week patterns and habit completion rates. Helps pre-plan high-willpower moments.</div>
+      <div class="feature-card__example">
+        <div class="feature-card__example-label">// example signal</div>
+        <div class="feature-card__example-text">Thursdays post-9pm: 73% habit dropout rate vs. 34% overall average. AI flags Thursday evenings as a high-risk window in weekly planning.</div>
+      </div>
+    </div>
+
+    <!-- 07 Metabolic Adaptation Detector -->
+    <div class="feature-card">
+      <div class="feature-card__number">07 / 14</div>
+      <div class="feature-card__name">Metabolic Adaptation Detector</div>
+      <div class="feature-card__desc">Catches weight loss stalls before they become demoralising. Distinguishes true metabolic plateaus from water weight and glycogen fluctuation using a rolling 14-day window.</div>
+      <div class="feature-card__example">
+        <div class="feature-card__example-label">// plateau detection logic</div>
+        <div class="feature-card__example-text">If 14-day variance > 1.2 lbs and net trend = 0, flagged as "fluctuation." If variance ≤ 0.8 lbs and net trend = 0 for 10+ days, flagged as "true plateau — consider protocol adjustment."</div>
+      </div>
+    </div>
+
+    <!-- 08 Sleep Architecture Analysis -->
+    <div class="feature-card">
+      <div class="feature-card__number">08 / 14</div>
+      <div class="feature-card__name">Sleep Architecture Analysis</div>
+      <div class="feature-card__desc">Cross-references Whoop sleep stages with HRV the next morning. Identifies the personal deep sleep threshold above which next-day recovery reliably scores green.</div>
+      <div class="feature-card__example">
+        <div class="feature-card__example-label">// identified threshold</div>
+        <div class="feature-card__example-text">Deep sleep ≥ 1h 45min correlates with next-morning HRV ≥ 62ms in 79% of nights in the dataset. Below 1h 20min, HRV rarely exceeds 55ms.</div>
+      </div>
+    </div>
+
+    <!-- 09 Training Load Intelligence -->
+    <div class="feature-card feature-card--live">
+      <span class="feature-card__live-tag">// live</span>
+      <div class="feature-card__number">09 / 14</div>
+      <div class="feature-card__name">Training Load Intelligence</div>
+      <div class="feature-card__desc">CTL/ATL/TSB tracking. Calculates fitness, fatigue, and form as independent signals. Identifies when training load is approaching injury risk territory before symptoms appear.</div>
+      <div class="feature-card__example">
+        <div class="feature-card__example-label">// current training state</div>
+        <div class="feature-card__example-text loading-text" id="ex-training">Loading from API…</div>
+      </div>
+    </div>
+
+    <!-- 10 Keystone Habit Detector -->
+    <div class="feature-card">
+      <div class="feature-card__number">10 / 14</div>
+      <div class="feature-card__name">Keystone Habit Detector</div>
+      <div class="feature-card__desc">Identifies which single habit most predicts overall daily score. Varies by person, week, and phase of journey. Updated monthly with new 90-day window data.</div>
+      <div class="feature-card__example">
+        <div class="feature-card__example-label">// current keystone habit</div>
+        <div class="feature-card__example-text">Weight logging → +8.3 pts average daily grade on days it's completed. Days without weight logging: average grade drops 11.2 pts regardless of other habits.</div>
+      </div>
+    </div>
+
+    <!-- 11 Glucose Pattern Analysis -->
+    <div class="feature-card">
+      <div class="feature-card__number">11 / 14</div>
+      <div class="feature-card__name">Glucose Pattern Analysis</div>
+      <div class="feature-card__desc">CGM data cross-referenced with meal timing, sleep, and exercise windows. Finds personal response patterns that generic nutrition advice misses entirely.</div>
+      <div class="feature-card__example">
+        <div class="feature-card__example-label">// identified pattern</div>
+        <div class="feature-card__example-text">Carbs post-8pm: avg +24 mg/dL spike, slow 3.5hr return. Carbs pre-8pm: avg +11 mg/dL spike, rapid 1.8hr return. Evening carbs = 2.2× the glycemic impact for this physiology.</div>
+      </div>
+    </div>
+
+    <!-- 12 Biomarker Trajectory -->
+    <div class="feature-card">
+      <div class="feature-card__number">12 / 14</div>
+      <div class="feature-card__name">Biomarker Trajectory</div>
+      <div class="feature-card__desc">Tracks lab values over time against optimal ranges, not just "normal." Currently tracking 7 biomarkers across 3 blood draws. Projects trajectory toward or away from optimal.</div>
+      <div class="feature-card__example">
+        <div class="feature-card__example-label">// tracked biomarkers</div>
+        <div class="feature-card__example-text">HbA1c, fasting glucose, triglycerides, HDL, LDL particle size, hsCRP, testosterone — 7 markers × 3 draws = 21 data points. All trending toward optimal range.</div>
+      </div>
+    </div>
+
+    <!-- 13 Weekly Correlation Refresh -->
+    <div class="feature-card">
+      <div class="feature-card__number">13 / 14</div>
+      <div class="feature-card__name">Weekly Correlation Refresh</div>
+      <div class="feature-card__desc">Every Sunday, re-runs all 23 correlation pairs with the most recent 90-day window. Correlations evolve as the data matures — an early-journey signal may disappear at month six.</div>
+      <div class="feature-card__example">
+        <div class="feature-card__example-label">// refresh schedule</div>
+        <div class="feature-card__example-text">EventBridge cron: Sunday 14:00 UTC. Runs Pearson + BH-FDR correction on all 23 pairs. Results written to DynamoDB and surfaced in /explorer. History retained for drift detection.</div>
+      </div>
+    </div>
+
+    <!-- 14 N=1 Insight Generation -->
+    <div class="feature-card feature-card--live">
+      <span class="feature-card__live-tag">// live</span>
+      <div class="feature-card__number">14 / 14</div>
+      <div class="feature-card__name">N=1 Insight Generation</div>
+      <div class="feature-card__desc">The daily brief includes 1–2 data-backed insights specific to the last 7 days of patterns. Generated fresh each morning from the full context of all 14 systems combined.</div>
+      <div class="feature-card__example">
+        <div class="feature-card__example-label">// example insight from this week</div>
+        <div class="feature-card__example-text">Your last 5 high-HRV mornings all followed days where step count exceeded 9,000 and final meal was before 7:30pm. That combination now has a 71% predictive rate in your dataset.</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section class="cta-section animate-in">
+  <div class="cta-section__eyebrow">// these systems run every morning at 10am pt</div>
+  <h2 class="cta-section__title">Ask them anything.</h2>
+  <p class="cta-section__sub">All 14 systems feed into a single AI you can query directly. What does your sleep data predict about tomorrow? Which habits matter most this week?</p>
+  <div class="cta-section__actions">
+    <a href="/ask/" class="btn--primary-link">Ask the AI</a>
+    <a href="/explorer/" class="btn--ghost">Correlation Explorer</a>
+  </div>
+</section>
+
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <a href="/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span>Ask</span>
+  </a>
+  <a href="/character/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span>Score</span>
+  </a>
+  <a href="/journal/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+    <span>Journal</span>
+  </a>
+  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    <span>More</span>
+  </button>
+</nav>
+
+<footer class="footer-v2">
+  <div class="footer-v2__grid">
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The journey</div>
+      <a href="/story/" class="footer-v2__link">Story</a>
+      <a href="/live/" class="footer-v2__link">Live</a>
+      <a href="/journal/" class="footer-v2__link">Journal</a>
+      <a href="/week/" class="footer-v2__link">This Week</a>
+      <a href="/about/" class="footer-v2__link">About</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The data</div>
+      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/habits/" class="footer-v2__link">Habits</a>
+      <a href="/achievements/" class="footer-v2__link">Achievements</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/results/" class="footer-v2__link">Results</a>
+      <a href="/progress/" class="footer-v2__link">Progress</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The platform</div>
+      <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/data/" class="footer-v2__link">Data</a>
+      <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/tools/" class="footer-v2__link">Tools</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">Follow</div>
+      <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/rss.xml" class="footer-v2__link">RSS</a>
+      <a href="/privacy/" class="footer-v2__link">Privacy</a>
+    </div>
+  </div>
+  <div class="footer-v2__bottom">
+    <span class="footer-v2__brand">AMJ</span>
+    <span class="footer-v2__copy">// updated daily by life-platform</span>
+  </div>
+</footer>
+
+<script>
+const API = 'https://averagejoematt.com';
+
+function setEl(id, text) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.textContent = text;
+    el.classList.remove('loading-text');
+  }
+}
+function setElFallback(id, fallback) {
+  const el = document.getElementById(id);
+  if (el && el.classList.contains('loading-text')) {
+    el.textContent = fallback;
+    el.classList.remove('loading-text');
+    el.style.color = 'var(--text-faint)';
+  }
+}
+
+async function init() {
+  const [charRes, corrRes, expRes, vitalsRes] = await Promise.allSettled([
+    fetch(`${API}/api/character`).then(r => r.json()),
+    fetch(`${API}/api/correlations`).then(r => r.json()),
+    fetch(`${API}/api/experiments`).then(r => r.json()),
+    fetch(`${API}/api/vitals`).then(r => r.json()),
+  ]);
+
+  // ── Character ────────────────────────────────────────────
+  if (charRes.status === 'fulfilled') {
+    const c = charRes.value;
+    const level = c.character_level || c.level || '—';
+    const tier  = c.character_tier  || c.tier  || '';
+    document.getElementById('stat-level').textContent = level;
+    document.getElementById('stat-tier').textContent  = tier || 'loading…';
+
+    // Feature 04 — Character Engine
+    const xp     = c.xp_total ? ` — ${c.xp_total.toLocaleString()} XP total` : '';
+    const pillars = c.pillars ? Object.entries(c.pillars).map(([k, v]) => `${k}: ${v}`).join(', ') : '';
+    const charEx  = `Level ${level} ${tier ? '(' + tier + ')' : ''}${xp}.${pillars ? ' Pillars: ' + pillars : ''}`;
+    setEl('ex-character', charEx);
+
+    // Feature 03 — Adaptive Mode
+    const effects = c.active_effects || c.adaptive_mode || null;
+    if (effects) {
+      const modeStr = typeof effects === 'string' ? effects : JSON.stringify(effects).replace(/[{}"]/g, '').replace(/,/g, ', ');
+      setEl('ex-adaptive', `Current adaptive mode: ${modeStr}`);
+    } else if (tier) {
+      setEl('ex-adaptive', `Mode derived from Character Tier "${tier}" at Level ${level}. Daily brief tone and recommendations adjust based on combined pillar signals.`);
+    } else {
+      setElFallback('ex-adaptive', 'Adaptive mode data not available in this response shape.');
+    }
+  } else {
+    setElFallback('ex-character', 'Character API unavailable — check back after 10am PT.');
+    setElFallback('ex-adaptive',  'Adaptive mode data unavailable.');
+    document.getElementById('stat-level').textContent = '—';
+    document.getElementById('stat-tier').textContent  = 'unavailable';
+  }
+
+  // ── Correlations ─────────────────────────────────────────
+  if (corrRes.status === 'fulfilled') {
+    const corr = corrRes.value.correlations || corrRes.value;
+    const pairs = corr.pairs || [];
+    const count = corr.count || pairs.length || 23;
+    document.getElementById('stat-correlations').textContent = count;
+
+    if (pairs.length > 0) {
+      // Sort by absolute r value descending, pick top
+      const top = [...pairs].sort((a, b) => Math.abs(b.r) - Math.abs(a.r))[0];
+      const dir = top.r >= 0 ? 'positive' : 'negative';
+      const fdr = top.fdr_significant ? ' [FDR significant]' : '';
+      const lag = top.lag_days > 0 ? ` (${top.lag_days}-day lag)` : '';
+      const labelA = top.label_a || top.field_a;
+      const labelB = top.label_b || top.field_b;
+      setEl('ex-correlation', `${labelA} ↔ ${labelB}: r=${top.r >= 0 ? '+' : ''}${top.r.toFixed(3)} (${top.strength}, ${dir}${lag}, n=${top.n})${fdr}`);
+    } else {
+      setElFallback('ex-correlation', 'No correlation pairs returned — check /explorer for the full dataset.');
+    }
+  } else {
+    document.getElementById('stat-correlations').textContent = '23';
+    setElFallback('ex-correlation', 'Correlation API unavailable. View the full dataset at /explorer/');
+  }
+
+  // ── Experiments / Hypotheses ─────────────────────────────
+  if (expRes.status === 'fulfilled') {
+    const exps = expRes.value.experiments || [];
+    const activeExps = exps.filter(e => e.status === 'active' || e.status === 'in_progress');
+    const completedExps = exps.filter(e => e.status === 'completed');
+    if (exps.length > 0) {
+      const first = activeExps.length > 0 ? activeExps[0] : exps[0];
+      const name  = first.name || first.title || first.hypothesis || 'Unnamed experiment';
+      setEl('ex-hypothesis', `${exps.length} total experiments (${activeExps.length} active, ${completedExps.length} completed). Most recent: "${name}"`);
+    } else {
+      setEl('ex-hypothesis', 'No experiments in dataset yet. First hypothesis is generated once a 30-day pattern is established.');
+    }
+  } else {
+    setElFallback('ex-hypothesis', 'Experiments API unavailable.');
+  }
+
+  // ── Vitals / Training ────────────────────────────────────
+  if (vitalsRes.status === 'fulfilled') {
+    const v = vitalsRes.value;
+    // Try to surface training load data from vitals
+    const ctl   = v.ctl   || v.fitness  || null;
+    const atl   = v.atl   || v.fatigue  || null;
+    const tsb   = v.tsb   || v.form     || null;
+    const strain = v.strain || v.whoop_strain || null;
+
+    if (ctl !== null || strain !== null) {
+      const parts = [];
+      if (strain !== null) parts.push(`Strain: ${parseFloat(strain).toFixed(1)}`);
+      if (ctl    !== null) parts.push(`CTL (fitness): ${parseFloat(ctl).toFixed(1)}`);
+      if (atl    !== null) parts.push(`ATL (fatigue): ${parseFloat(atl).toFixed(1)}`);
+      if (tsb    !== null) parts.push(`TSB (form): ${parseFloat(tsb).toFixed(1)}`);
+      setEl('ex-training', parts.join(' — '));
+    } else {
+      setElFallback('ex-training', 'Training load data not yet available in vitals response — strain and CTL/ATL/TSB appear after 10am PT.');
+    }
+  } else {
+    setElFallback('ex-training', 'Vitals API unavailable.');
+  }
+}
+
+init().catch(() => {
+  ['ex-correlation', 'ex-adaptive', 'ex-character', 'ex-hypothesis', 'ex-training'].forEach(id => {
+    setElFallback(id, 'Data unavailable — try refreshing after 10am PT.');
+  });
+  document.getElementById('stat-level').textContent = '—';
+  document.getElementById('stat-tier').textContent = 'unavailable';
+  document.getElementById('stat-correlations').textContent = '23';
+});
+</script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>

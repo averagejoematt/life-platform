@@ -1281,8 +1281,8 @@ def build_html(data, commentary, profile):
             if _acwr_alert:
                 bl_rows += row("⚠️ Alert",
                     f'<span style="color:#e74c3c;font-size:11px;">{str(_acwr_data.get("alert_reason",""))[:120]}</span>')
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("banister_section_build: %s", e)
     banister_section = section("Training Load — Banister", "📈", tbl(bl_rows))
 
     # ── Recovery ──

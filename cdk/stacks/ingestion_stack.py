@@ -19,12 +19,12 @@ from aws_cdk import (
 from constructs import Construct
 from stacks.lambda_helpers import create_platform_lambda
 from stacks import role_policies as rp
-from stacks.constants import SHARED_LAYER_ARN, ACCT, REGION  # single source of truth for layer version
+from stacks.constants import SHARED_LAYER_ARN, ACCT, REGION, TABLE_NAME, S3_BUCKET  # CONF-01
 
-INGESTION_DLQ_ARN  = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
-LIFE_PLATFORM_TABLE = "life-platform"
-LIFE_PLATFORM_BUCKET = "matthew-life-platform"
-ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
+INGESTION_DLQ_ARN    = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
+LIFE_PLATFORM_TABLE  = TABLE_NAME
+LIFE_PLATFORM_BUCKET = S3_BUCKET
+ALERTS_TOPIC_ARN     = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
 
 
 class IngestionStack(Stack):
@@ -204,7 +204,7 @@ class IngestionStack(Stack):
             hae_role.add_to_policy(stmt)
         # NOTE: HAE uses code=from_asset (entire lambdas/ dir), not source_file=.
         # Handler health_auto_export_lambda.lambda_handler → lambdas/health_auto_export_lambda.py  # noqa: CDK_HANDLER_ORPHAN
-        hae = _lambda.Function(self, "HaeWebhook", function_name="health-auto-export-webhook", runtime=_lambda.Runtime.PYTHON_3_12, handler="health_auto_export_lambda.lambda_handler", code=_lambda.Code.from_asset("../lambdas", exclude=_ASSET_EXCLUDES), role=hae_role, timeout=Duration.seconds(30), memory_size=256, environment={"TABLE_NAME": local_table.table_name, "S3_BUCKET": local_bucket.bucket_name, "USER_ID": self.node.try_get_context("user_id") or "matthew"})
+        hae = _lambda.Function(self, "HaeWebhook", function_name="health-auto-export-webhook", runtime=_lambda.Runtime.PYTHON_3_12, handler="health_auto_export_lambda.lambda_handler", code=_lambda.Code.from_asset("../lambdas", exclude=_ASSET_EXCLUDES), role=hae_role, timeout=Duration.seconds(60), memory_size=256, environment={"TABLE_NAME": local_table.table_name, "S3_BUCKET": local_bucket.bucket_name, "USER_ID": self.node.try_get_context("user_id") or "matthew"})  # BUG-07: large Apple Health exports need >30s
         hae.add_permission("ApiGatewayInvoke", principal=iam.ServicePrincipal("apigateway.amazonaws.com"), source_arn=f"arn:aws:execute-api:{self.region}:{self.account}:a76xwxt2wa/*/*/ingest")
 
         # ── 16. Google Calendar — RETIRED (ADR-030, v3.7.46)

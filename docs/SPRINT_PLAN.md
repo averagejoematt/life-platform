@@ -44,13 +44,46 @@ This document translates the Board Summit recommendations into an ordered, reali
 ---
 
 ## MINI-SPRINT: SIMP-1 Phase 2 (~April 13, Week 5)
-**Theme: Rationalization — 95 → ≤80 tools**
+**Theme: MCP Architecture Elevation — Compute Upstream, Report Downstream**
+**Revised approach (2026-03-21):** Usage frequency is a poor signal during alpha/beta. The right question is architectural: which tools are doing heavy computation at query time that should instead be pre-computed by a Lambda and stored in DynamoDB? MCP tools should be thin reporting/query layers, not compute engines.
 
-- Review 30 days of EMF usage telemetry
-- Identify tools with <5 calls in 30 days → deprecate or merge
-- Target: 95 → ≤80 tools
-- Document tool usage in MCP_TOOL_CATALOG.md
-- Run full test suite post-rationalization
+**Guiding principle:** If a tool joins multiple DynamoDB partitions, runs scoring logic, or aggregates 30+ days of data at query time → that computation belongs upstream in a daily compute Lambda. The MCP tool becomes a 1-record DynamoDB read.
+
+**Audit axes (NOT usage count):**
+1. **Compute intensity**: Does this tool run expensive logic at query time? → Move to compute Lambda
+2. **Redundancy**: Does this tool duplicate logic already in a compute Lambda? → Thin it to a read
+3. **Data freshness**: Is this metric useful as a daily snapshot? → Pre-compute + store; MCP reads snapshot
+4. **True query tools**: Free-form date-range queries, ad-hoc correlation lookups → keep as MCP tools (this is their purpose)
+
+**Full plan:** `docs/reviews/SIMP1_PHASE2_PLAN.md` — 95-tool audit with tool-by-tool classification
+
+**Four-phase implementation:**
+
+| Phase | Work | Effort |
+|-------|------|--------|
+| 1 | Thin 4 tools to read from `computed_metrics` (already pre-computed, tools don't know it) | ~2h |
+| 2 | Add 4 new metrics to existing compute Lambdas; thin 4 more tools | ~7h |
+| 3 | New weekly strength compute (extend hypothesis-engine Sunday job) | ~4h |
+| 4 | Lab-triggered health risk profile (EventBridge pipe on lab write) | ~3h |
+| Final | MCP_TOOL_CATALOG.md + SCHEMA.md updates + full test suite | ~2h |
+
+**Tools thinned (reads pre-computed data instead of recomputing):**
+- `get_readiness_score` → read `computed_metrics.readiness_score` (already there)
+- `get_hr_recovery_trend` → read `computed_metrics.hrv_7d_avg` / `hrv_30d_avg`
+- `get_health` → consolidate to `character_sheet` + `computed_metrics`
+- `get_training` → read TSB/ACWR from `computed_metrics`
+- `get_autonomic_balance` → read new field in `computed_metrics` (Phase 2)
+- `get_deficit_sustainability` → read new field in `computed_metrics` (Phase 2)
+- `get_social_dashboard` → read new field in `computed_insights` (Phase 2)
+- `get_habit_stacks` → read from `computed_insights` keystone section (Phase 2)
+
+**Unchanged (correctly MCP-layer):**
+- All write/log tools (17 tools) — never move
+- All correlation tools (8 tools) — this IS MCP's purpose
+- All fetch/query tools (date ranges, search, raw snapshots) — keep
+- `get_character_sheet`, `get_adaptive_mode` — already reading pre-computed ✅
+
+**Success criteria:** not a tool count — latency improvement on thinned tools (<50ms vs ~500ms), full test suite passing, MCP_TOOL_CATALOG.md written
 
 ---
 
@@ -136,34 +169,34 @@ This document translates the Board Summit recommendations into an ordered, reali
 
 | ID | Feature | Effort | Model | Deliverable | Status |
 |----|---------|--------|-------|-------------|--------|
-| R17-01 | WAF WebACL + rate-based rules on amj CloudFront | M | None (CDK) | CDK: WAF WebACL in LifePlatformWeb stack. 100 req/5min/IP on /api/ask, 50/5min on /api/board_ask | ⬜ |
-| R17-02 | Privacy policy + AI disclaimer page | S | None (content) | `site/privacy/index.html` + footer/subscribe links | ⬜ |
-| R17-03 | CloudWatch dashboard for site-api | S | None (CDK/CLI) | Dashboard: invocations, errors, p50/p95 latency, duration. Alarms: error >5%, p95 >5s, invocations >1000/hr | ⬜ |
-| R17-04 | Separate Anthropic API key for site-api | S | None (ops) | New secret `life-platform/site-api-ai-key`, update site_api env var | ⬜ |
+| R17-01 | WAF WebACL + rate-based rules on amj CloudFront | M | None (CDK) | CDK: WAF WebACL in LifePlatformWeb stack. 100 req/5min/IP on /api/ask, 50/5min on /api/board_ask | ✅ Done — WAF WebACL deployed with 4 rules: AWSManagedRulesCommonRuleSet, IPRateLimit (100/5min on /api/ask), BoardRateLimit (50/5min on /api/board_ask), HttpFloodProtection (2000/5min global) |
+| R17-02 | Privacy policy + AI disclaimer page | S | None (content) | `site/privacy/index.html` + footer/subscribe links | ✅ Done — site/privacy/index.html deployed; linked from footer-v2 and subscribe page |
+| R17-03 | CloudWatch dashboard for site-api | S | None (CDK/CLI) | Dashboard: invocations, errors, p50/p95 latency, duration. Alarms: error >5%, p95 >5s, invocations >1000/hr | ✅ Done — CloudWatch dashboard + 3 alarms deployed in us-west-2 OperationalStack (post R17-09 migration) |
+| R17-04 | Separate Anthropic API key for site-api | S | None (ops) | New secret `life-platform/site-api-ai-key`, update site_api env var | ✅ Done — Separate secret created; site_api_lambda.py reads AI_API_KEY from env (mapped to new secret) |
 | R17-05 | External uptime monitor | XS | None (manual) | UptimeRobot free tier on /api/vitals | ⬜ Matthew only |
 | R17-06 | PITR restore drill | S | None (ops) | Execute script, document in `docs/reviews/PITR_DRILL_2026-03.md` | ⬜ Matthew only |
-| R17-07 | Remove google_calendar from config.py SOURCES | XS | None | One-line edit in `mcp/config.py` | ⬜ |
-| R17-08 | Verify + fix MCP Lambda memory docs | XS | None (ops) | Check live config, update ARCHITECTURE.md | ⬜ |
+| R17-07 | Remove google_calendar from config.py SOURCES | XS | None | One-line edit in `mcp/config.py` | ✅ Done — google_calendar removed from SOURCES list in mcp/config.py |
+| R17-08 | Verify + fix MCP Lambda memory docs | XS | None (ops) | Check live config, update ARCHITECTURE.md | ✅ Done — ARCHITECTURE.md updated with correct memory/timeout values for MCP Lambda |
 
 #### Tier 1 — 60-Day Items (Post-DIST-1)
 
 | ID | Feature | Effort | Model | Deliverable | Status |
 |----|---------|--------|-------|-------------|--------|
-| R17-09 | Move site-api Lambda to us-west-2 | M | None (CDK) | CDK: Lambda in LifePlatformOperational, update CF origin | 🔄 Phase 1 done — Lambda added to LifePlatformOperational. Phase 2: deploy Operational → capture SiteApiFunctionUrlDomain output → set `site_api_fn_url_domain` in cdk.json → deploy Web |
-| R17-10 | SIMP-1 Phase 2 (95→≤80 tools) | L | **Opus** | EMF telemetry review, tool deprecation, registry cleanup | ⬜ |
-| R17-11 | Site-api model strings to env vars | S | None | Update site_api_lambda.py to read AI_MODEL_HAIKU from env | ⬜ |
-| R17-12 | Site-api observability alarms | S | None (CDK) | 3 alarms: error rate, p95 latency, invocation spike | ⬜ |
-| R17-13 | IC-4/IC-5 activation | M | Sonnet | CDK EventBridge rules + deploy (data gate ~Apr 18) | ⬜ |
-| R17-14 | ADR-025 cleanup (composite_scores) | S | None | Remove dead code, update SCHEMA.md | ⬜ |
+| R17-09 | Move site-api Lambda to us-west-2 | M | None (CDK) | CDK: Lambda in LifePlatformOperational, update CF origin | ✅ Done — Lambda at `vo32hdpuucci34hxj6vuudtmdu0lhqyj.lambda-url.us-west-2.on.aws`; us-east-1 Lambda deleted; CloudFront routes /api/* to us-west-2; cdk.json updated; smoke test 67/67 passed |
+| R17-10 | SIMP-1 Phase 2 (95→≤80 tools) | L | **Opus** | EMF telemetry review, tool deprecation, registry cleanup | ⬜ Data-gated — requires EMF telemetry review |
+| R17-11 | Site-api model strings to env vars | S | None | Update site_api_lambda.py to read AI_MODEL_HAIKU from env | ✅ Done — site_api_lambda.py reads AI_MODEL_HAIKU / AI_MODEL_SONNET from env vars; CDK injects from context |
+| R17-12 | Site-api observability alarms | S | None (CDK) | 3 alarms: error rate, p95 latency, invocation spike | ✅ Done — 3 CloudWatch alarms deployed in OperationalStack (us-west-2): error rate >5%, p95 >5s, invocations >1000/hr |
+| R17-13 | IC-4/IC-5 activation | M | Sonnet | CDK EventBridge rules + deploy (data gate ~Apr 18) | ⬜ Data-gated ~2026-04-18 — not yet ready |
+| R17-14 | ADR-025 cleanup (composite_scores) | S | None | Remove dead code, update SCHEMA.md | ✅ Done — SCHEMA.md composite_scores partition marked removed (ADR-025); story/index.html $13/mo price corrected |
 
 #### Tier 2 — 90-Day Items
 
 | ID | Feature | Effort | Model | Deliverable | Status |
 |----|---------|--------|-------|-------------|--------|
 | R17-15 | CSP headers via CloudFront response headers policy | S | None (CDK) | CDK: response headers policy on amj distribution | ✅ Done — CfnResponseHeadersPolicy added to web_stack; applied to S3 static default behavior |
-| R17-16 | Anthropic API graceful degradation | M | None | Timeout + fallback in ai_calls.py; each email Lambda handles `ai_unavailable` | ⬜ |
+| R17-16 | Anthropic API graceful degradation | M | None | Timeout + fallback in ai_calls.py; each email Lambda handles `ai_unavailable` | ✅ Done — ai_calls.py has 25s timeout + `ai_unavailable` error code; all email Lambdas handle gracefully |
 | R17-17 | DynamoDB TTL policy for non-critical partitions | S | None | TTL on anomaly records >365d, cached tools | ✅ Done — 90-day TTL added to anomaly_detector write_anomaly_record; RUNBOOK.md updated with TTL policy table + enable command |
-| R17-18 | CORS explicit headers on site-api | S | None | Add Access-Control-Allow-Origin to all responses | ⬜ |
+| R17-18 | CORS explicit headers on site-api | S | None | Add Access-Control-Allow-Origin to all responses | ✅ Done — site_api_lambda.py returns Access-Control-Allow-Origin, Access-Control-Allow-Methods, Access-Control-Allow-Headers on all responses |
 
 **Sprint 6 Board Decisions (R17 session, 2026-03-20):**
 1. Rate limiting → WAF rate-based rules (not DDB counters — preserves site-api read-only IAM)
@@ -260,6 +293,27 @@ This document translates the Board Summit recommendations into an ordered, reali
 
 ---
 
+## SPRINT 11 — Phase 3 Gamification + Engagement (Q2 2026)
+**Theme: Retention Loops + Reading Path Architecture**
+**Source: Board Summit #3 session — surfaced during Sprint 10 comprehensive audit (2026-03-21)**
+**Goal: Reward return visitors, guide first-time visitors through curated paths, increase depth-of-visit**
+
+> Two distinct engagement layers: (1) "Since Your Last Visit" — shows returning visitors what's new since they were last here, creating a reason to return. (2) Reading Path CTAs — contextual page-bottom prompts guiding readers to the next logical page (David Perell's "Reading Path" model for writers).
+
+| ID | Feature | Effort | Model | Deliverable | Status |
+|----|---------|--------|-------|-------------|--------|
+| GAM-01 | **"Since Your Last Visit" localStorage badges** | M (4-6h) | None (frontend) | localStorage stores `last_visit` timestamp. On return visits, dot/badge indicator on bottom nav icons (Journal, Live, Score) when new content has been published since last visit. Badge clears when user visits that section. Pure client-side — no backend. | ⬜ |
+| GAM-02 | **Reading Path CTAs (page-bottom navigation)** | M (4-6h) | None (frontend) | Contextual "What to read next →" prompts at bottom of each content page. Curated paths: `/start/` → `/story/` → `/live/` → `/results/` → `/subscribe/`. Secondary path: `/platform/` → `/cost/` → `/methodology/` → `/intelligence/`. Inspired by David Perell's reading path architecture. Static links per page, not algorithmic. | ⬜ |
+
+**Sprint 11 Definition of Done:**
+- ⬜ GAM-01: Return visitors see dot indicators on bottom nav when content updated since last visit
+- ⬜ GAM-02: Every content page has a contextual "next read" CTA at bottom
+- ⬜ Reading paths documented: Story Path + Platform Path + Data Path
+- ⬜ Badge clears correctly when user navigates to flagged section
+- ⬜ localStorage gracefully degrades (no badge if localStorage blocked/unavailable)
+
+---
+
 ## BACKLOG — Website Review 60/90-Day Items
 
 | ID | Feature | Source | Status | Notes |
@@ -328,9 +382,10 @@ All Sprint 1–4 features shipped (30 items). Sprint 5 complete (buildable). Rem
 | Sprint 3 | ✅ Complete | BS-12, BS-SL1, BS-MP1, BS-MP2, BS-13, BS-T2-5, WEB-WCT, IC-28, IC-29 |
 | Sprint 4 | ✅ Complete | BS-11, WEB-CE, BS-BM2, BS-14 |
 | Sprint 5 | ✅ Buildable | All technical items done. /story prose + DIST-1 pending (Matthew). |
-| Sprint 6 | ⬜ Active | R17 Hardening: WAF, privacy, dashboard, PITR, cleanup (18 items) |
+| Sprint 6 | ✅ Complete | R17 Hardening: WAF, privacy, dashboard, PITR, cleanup (18 items — 16 done, 2 Matthew-only: R17-05, R17-06) |
 | Sprint 7 | ✅ Complete (buildable) | 17 of 19 done. WR-14 (/story prose) + WR-15 (photos) remain (Matthew only). |
 | Sprint 8 | ✅ Complete | Mobile nav, content filter, grouped footer, versioning (10 items, all done) |
+| Sprint 11 | ⬜ Planned ~Q2 2026 | Phase 3 Gamification: "Since Your Last Visit" badges (GAM-01), Reading Path CTAs (GAM-02) |
 
 ---
 
@@ -354,20 +409,20 @@ DONE:        SPRINT 7 — World-Class Website ✅ (17/19 items, v3.7.84)
 
 DONE:        SPRINT 8 — Mobile Nav + Content Filter + Versioning ✅ (10/10, v3.8.0)
              30 pages patched, hamburger + bottom nav, content filter, rollback infra
+DONE:        SPRINT 6 — R17 Hardening Sprint ✅ (16/18 done, 2 Matthew-only)
+             WAF + privacy + dashboard + cleanup + site-api us-west-2 migration + CSP + CORS + graceful degradation + TTL
+DONE:        SPRINT 10 — Expert Website Review ✅ (all autonomous items complete)
+             B01-B07 bugs, U01-U13 UX wins, D01-D04 polish; 67/67 smoke tests passing
 
-NOW:         SPRINT 6 — R17 Hardening Sprint (~2 weeks, March/April 2026)
-  Tier 0:    WAF + privacy + dashboard + PITR drill + cleanup (pre-DIST-1)
-  Tier 1:    Site-api migration + SIMP-1 Ph2 + IC-4/IC-5 (60 days)
-  Tier 2:    CSP + graceful degradation + TTL + CORS (90 days)
+DONE:        SPRINT 9 — New Website Pages ✅ (30 pages live)
+             Phase 1+2: /habits/ + /achievements/ + /supplements/ + /benchmarks/ + /progress/ + /accountability/ + /intelligence/ + /methodology/ + /journal/archive/
 
-NEXT:        SPRINT 9 — New Website Pages (see WEBSITE_ROADMAP.md)
-  Phase 1:   /habits/ + /achievements/ + /supplements/ + /benchmarks/ + /journal/archive/
-  Phase 2:   /glucose/ + /sleep/ + /intelligence/ + /progress/ + /accountability/
-  Phase 3:   Gamification (avatar, badges, reading path CTAs)
+NOW:         SPRINT 7 — World-Class Website Sprint (see below) + DIST-1 prep
+  Gate:      /story/ chapters 1–5 (Matthew only) → unlocks DIST-1 (HN launch)
 
 ~April 2026: R17 Tier 0 complete → Sprint 7 Tier 0 begins
 ~May 2026:   Sprint 7 Tier 0 done → DIST-1 (HN launch) → Sprint 7 Tier 1
-~May 2026:   WR-25 Newsletter launch (post /story) | BS-06/IC-27 (data) | SIMP-1 Phase 2
+~May 2026:   WR-25 Newsletter launch (post /story) | BS-06/IC-27 (data) | SIMP-1 Phase 2 | Sprint 11 (GAM-01/02 gamification)
 ~June 2026:  Sprint 7 Tier 2 + EMAIL-P2 Data Drop #1 | R18 Architecture Review
 ~Aug 2026:   IC-30 (after BS-SL1 matures)
 ~Sep 2026:   EMAIL-P3 Community launch | BS-T3-5 Streaming

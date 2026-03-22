@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The statistical and scientific framework behind the life-platform — N=1 methodology, correlation engine, and data sources.">
+  <meta property="og:title" content="Methodology — Matthew Walker">
+  <meta property="og:description" content="Pearson r, Benjamini-Hochberg FDR, 19 data sources. The statistical framework behind the experiment.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/methodology/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Methodology — Matthew Walker">
+  <meta name="twitter:description" content="N=1 science. Pearson r, FDR correction, 19 data sources. The framework behind the life-platform.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>Methodology — Matthew Walker</title>
+    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    /* ── Page layout ───────────────────────────────────────── */
+    .method-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .method-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      letter-spacing: var(--ls-display);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .method-header__title span { color: var(--accent); }
+    .method-header__sub {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 560px;
+      line-height: var(--lh-body);
+    }
+
+    .method-body {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 var(--page-padding) var(--space-20);
+    }
+
+    /* ── Section titles ──────────────────────────────────── */
+    .method-section {
+      padding: var(--space-12) 0;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .method-section:last-of-type { border-bottom: none; }
+    .method-section__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .method-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      line-height: var(--lh-heading);
+      letter-spacing: var(--ls-heading);
+      color: var(--text);
+      margin-bottom: var(--space-6);
+    }
+    .method-section__body {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      max-width: var(--prose-width);
+    }
+    .method-section__body + .method-section__body {
+      margin-top: var(--space-4);
+    }
+
+    /* ── Stat row ────────────────────────────────────────── */
+    .method-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: var(--space-4);
+      margin-top: var(--space-8);
+    }
+    .method-stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-5) var(--space-6);
+    }
+    .method-stat__value {
+      font-family: var(--font-display);
+      font-size: 36px;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: var(--space-2);
+    }
+    .method-stat__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+
+    /* ── Detail table ────────────────────────────────────── */
+    .method-detail-grid {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: var(--space-3) var(--space-6);
+      margin-top: var(--space-8);
+      font-size: var(--text-xs);
+    }
+    .method-detail-grid__label {
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+      color: var(--text-faint);
+    }
+    .method-detail-grid__value {
+      color: var(--text-muted);
+    }
+    .method-detail-grid__value strong { color: var(--text); }
+    .method-detail-grid__value code {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--accent);
+      background: var(--accent-bg);
+      padding: 2px 6px;
+    }
+
+    /* ── Data source grid ────────────────────────────────── */
+    .source-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: var(--space-4);
+      margin-top: var(--space-8);
+    }
+    .source-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-5) var(--space-6);
+    }
+    .source-card__name {
+      font-family: var(--font-display);
+      font-size: 18px;
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .source-card__metrics {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.04em;
+      color: var(--text-faint);
+      line-height: 1.6;
+    }
+    .source-card__tag {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      border: 1px solid var(--border);
+      padding: 2px 6px;
+      margin-bottom: var(--space-3);
+    }
+
+    /* ── Limitations list ────────────────────────────────── */
+    .limitation-list {
+      margin-top: var(--space-8);
+      display: grid;
+      gap: var(--space-4);
+    }
+    .limitation-item {
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      gap: var(--space-4);
+      align-items: start;
+    }
+    .limitation-item__num {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--accent-dim);
+      padding-top: 2px;
+    }
+    .limitation-item__text {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .limitation-item__text strong { color: var(--text); }
+
+    /* ── Blockquote ──────────────────────────────────────── */
+    .method-quote {
+      border-left: 2px solid var(--accent);
+      padding: var(--space-6) var(--space-8);
+      background: var(--accent-bg);
+      margin-top: var(--space-8);
+      max-width: var(--prose-width);
+    }
+    .method-quote__text {
+      font-family: var(--font-serif);
+      font-size: 20px;
+      font-style: italic;
+      color: var(--text);
+      line-height: 1.75;
+      margin-bottom: var(--space-4);
+    }
+    .method-quote__attribution {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+    }
+
+    /* ── CTA strip ───────────────────────────────────────── */
+    .method-cta {
+      margin-top: var(--space-12);
+      padding: var(--space-8) var(--space-8);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-6);
+      flex-wrap: wrap;
+    }
+    .method-cta__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .method-cta__label strong { color: var(--accent); }
+
+    @media (max-width: 768px) {
+      .method-detail-grid { grid-template-columns: 1fr; }
+      .method-cta { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/live/" class="nav__link">Live</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/start/" class="nav__link">Explore</a>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+  </div>
+  <button class="nav__hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span id="nav-date"></span>
+  </div>
+</nav>
+<!-- Mobile overlay menu -->
+<div class="nav-overlay">
+  <div class="nav-overlay__panel">
+    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The journey</div>
+      <a href="/story/" class="nav-overlay__link">Story</a>
+      <a href="/live/" class="nav-overlay__link">Live</a>
+      <a href="/journal/" class="nav-overlay__link">Journal</a>
+      <a href="/week/" class="nav-overlay__link">This Week</a>
+      <a href="/about/" class="nav-overlay__link">About</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The data</div>
+      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/habits/" class="nav-overlay__link">Habits</a>
+      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/results/" class="nav-overlay__link">Results</a>
+      <a href="/progress/" class="nav-overlay__link">Progress</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
+      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The platform</div>
+      <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/data/" class="nav-overlay__link">Data</a>
+      <a href="/cost/" class="nav-overlay__link">Cost</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">Follow</div>
+      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+    </div>
+  </div>
+</div>
+
+
+<header class="method-header reveal">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">// statistical framework</div>
+  <h1 class="method-header__title">The <span>Methodology</span></h1>
+  <p class="method-header__sub">
+    One subject. Full data transparency. A reproducible framework for N=1 science &mdash;
+    because the right experiment on the right person can still tell you something true.
+  </p>
+</header>
+
+<div class="method-body">
+
+  <!-- ── Why N=1? ──────────────────────────────────────────── -->
+  <div class="method-section reveal">
+    <div class="method-section__eyebrow">// 01 — foundation</div>
+    <h2 class="method-section__title">Why N=1?</h2>
+    <p class="method-section__body">
+      Population studies are built to find average effects across groups. The signal they surface
+      is real &mdash; but it describes a statistical composite that may not resemble you. Average
+      protein recommendations were derived from people who are not you. Average sleep targets
+      were measured on people with different chronotypes, genetics, and stress loads.
+    </p>
+    <p class="method-section__body">
+      The N=1 approach accepts this limitation and turns it into a feature. One subject means
+      every measurement is directly relevant. One subject means no between-person variance to
+      average out. One subject means you can run interventions and observe effects on a body
+      you actually have to live in.
+    </p>
+    <p class="method-section__body">
+      The trade-off is external validity &mdash; you cannot generalize my results to you.
+      That&rsquo;s honest, and it&rsquo;s fine. The value is the framework, not the conclusions.
+    </p>
+    <div class="method-stats">
+      <div class="method-stat">
+        <div class="method-stat__value">1</div>
+        <div class="method-stat__label">Subject</div>
+      </div>
+      <div class="method-stat">
+        <div class="method-stat__value">19</div>
+        <div class="method-stat__label">Data Sources</div>
+      </div>
+      <div class="method-stat">
+        <div class="method-stat__value">100+</div>
+        <div class="method-stat__label">Daily Metrics</div>
+      </div>
+      <div class="method-stat">
+        <div class="method-stat__value">365+</div>
+        <div class="method-stat__label">Days Tracked</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Correlation Engine ─────────────────────────────────── -->
+  <div class="method-section reveal">
+    <div class="method-section__eyebrow">// 02 — analysis engine</div>
+    <h2 class="method-section__title">Correlation Engine</h2>
+    <p class="method-section__body">
+      The core analytical layer is a rolling correlation engine that continuously calculates
+      Pearson r coefficients across metric pairs. Rather than reporting static relationships,
+      every correlation is recalculated over a 90-day sliding window &mdash; capturing how
+      relationships evolve as the body and behaviors change.
+    </p>
+    <p class="method-section__body">
+      Running 23 metric pairs simultaneously creates a multiple comparisons problem: the more
+      tests you run, the more likely one produces a spurious positive by chance alone. The engine
+      applies Benjamini-Hochberg false discovery rate correction to every batch &mdash; a method
+      that controls the expected proportion of false positives among all reported discoveries,
+      rather than protecting against any single false positive as Bonferroni does. It is less
+      conservative and more statistically appropriate for exploratory research.
+    </p>
+    <div class="method-detail-grid">
+      <div class="method-detail-grid__label">Window</div>
+      <div class="method-detail-grid__value"><strong>90-day rolling</strong> — recalculated nightly</div>
+
+      <div class="method-detail-grid__label">Metric pairs</div>
+      <div class="method-detail-grid__value"><strong>23 pairs</strong> across sleep, recovery, nutrition, training, glucose</div>
+
+      <div class="method-detail-grid__label">Correction method</div>
+      <div class="method-detail-grid__value"><strong>Benjamini-Hochberg FDR</strong> &mdash; controls false discovery rate across all simultaneous comparisons</div>
+
+      <div class="method-detail-grid__label">Minimum observations</div>
+      <div class="method-detail-grid__value"><strong>10 paired data points</strong> required before a correlation is reported</div>
+
+      <div class="method-detail-grid__label">Signal threshold</div>
+      <div class="method-detail-grid__value"><code>|r| &gt; 0.4</code> = meaningful signal worth surfacing to the user</div>
+
+      <div class="method-detail-grid__label">Significance</div>
+      <div class="method-detail-grid__value">p-value reported alongside r; FDR-adjusted q-value used for filtering</div>
+
+      <div class="method-detail-grid__label">Storage</div>
+      <div class="method-detail-grid__value">Results written nightly to DynamoDB; served via <code>/explorer/</code></div>
+    </div>
+  </div>
+
+  <!-- ── What We Track ─────────────────────────────────────── -->
+  <div class="method-section reveal">
+    <div class="method-section__eyebrow">// 03 — data sources</div>
+    <h2 class="method-section__title">What We Track</h2>
+    <p class="method-section__body">
+      Nineteen data sources. Each ingested daily by a dedicated AWS Lambda function on a
+      fixed UTC cron schedule. Raw JSON archived to S3 permanently; normalized metrics
+      written to DynamoDB single-table with gap-aware backfill.
+    </p>
+    <div class="source-grid">
+      <div class="source-card">
+        <div class="source-card__tag">Wearable</div>
+        <div class="source-card__name">Whoop</div>
+        <div class="source-card__metrics">Recovery score · HRV · Resting HR · Sleep score · Sleep stages · Strain</div>
+      </div>
+      <div class="source-card">
+        <div class="source-card__tag">Scale</div>
+        <div class="source-card__name">Withings</div>
+        <div class="source-card__metrics">Weight · Body fat % · Lean mass · Fat mass · Bone mass · Blood pressure</div>
+      </div>
+      <div class="source-card">
+        <div class="source-card__tag">Wearable</div>
+        <div class="source-card__name">Oura</div>
+        <div class="source-card__metrics">Supplemental sleep · Readiness · Temperature deviation · Respiratory rate</div>
+      </div>
+      <div class="source-card">
+        <div class="source-card__tag">Habits</div>
+        <div class="source-card__name">Habitify</div>
+        <div class="source-card__metrics">65 habits across 5 pillars · Tier 0&ndash;2 streaks · Vice resistance rate · P40 score</div>
+      </div>
+      <div class="source-card">
+        <div class="source-card__tag">Nutrition</div>
+        <div class="source-card__name">MacroFactor</div>
+        <div class="source-card__metrics">Calories · Protein · Carbs · Fat · Adaptive TDEE · Deficit sustainability</div>
+      </div>
+      <div class="source-card">
+        <div class="source-card__tag">Training</div>
+        <div class="source-card__name">Garmin</div>
+        <div class="source-card__metrics">Training load · Zone 2 minutes · ACWR · VO2max estimate · Steps · Active calories</div>
+      </div>
+      <div class="source-card">
+        <div class="source-card__tag">Sleep</div>
+        <div class="source-card__name">Eight Sleep</div>
+        <div class="source-card__metrics">Bed temperature · Sleep timing · Sleep stages (supplemental) · HRV (supplemental)</div>
+      </div>
+      <div class="source-card">
+        <div class="source-card__tag">CGM</div>
+        <div class="source-card__name">Stelo (CGM)</div>
+        <div class="source-card__metrics">Continuous glucose · Postprandial spikes · Fasting levels · Time in range</div>
+      </div>
+      <div class="source-card">
+        <div class="source-card__tag">Phone</div>
+        <div class="source-card__name">Apple Health</div>
+        <div class="source-card__metrics">Steps · Active energy · Stand hours · HRV (secondary) · Mindful minutes</div>
+      </div>
+      <div class="source-card">
+        <div class="source-card__tag">Manual</div>
+        <div class="source-card__name">Labs</div>
+        <div class="source-card__metrics">Lipids · Metabolic panel · Inflammation · Hormones · 40+ biomarkers per draw</div>
+      </div>
+      <div class="source-card">
+        <div class="source-card__tag">Manual</div>
+        <div class="source-card__name">Genome</div>
+        <div class="source-card__metrics">110 SNPs analysed · Methylation variants · Vitamin metabolism · Absorption predispositions</div>
+      </div>
+      <div class="source-card">
+        <div class="source-card__tag">Manual</div>
+        <div class="source-card__name">Supplements</div>
+        <div class="source-card__metrics">Daily stack log · Genome-informed decisions · Compliance streak · Timing notes</div>
+      </div>
+      <div class="source-card">
+        <div class="source-card__tag">Manual</div>
+        <div class="source-card__name">Mood &amp; Journal</div>
+        <div class="source-card__metrics">Morning + evening entries · AI mood classification · Avoidance flags · Stress scores</div>
+      </div>
+      <div class="source-card">
+        <div class="source-card__tag">Manual</div>
+        <div class="source-card__name">Decisions</div>
+        <div class="source-card__metrics">Protocol adherence decisions · Subjective ratings · Narrative context for anomalies</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Honest Limitations ─────────────────────────────────── -->
+  <div class="method-section reveal">
+    <div class="method-section__eyebrow">// 04 — limitations</div>
+    <h2 class="method-section__title">Honest Limitations</h2>
+    <p class="method-section__body">
+      Every framework has edges. These are the places where this one is weakest,
+      stated plainly rather than footnoted away.
+    </p>
+    <div class="limitation-list">
+      <div class="limitation-item">
+        <div class="limitation-item__num">01</div>
+        <div class="limitation-item__text">
+          <strong>Sample size of one.</strong> No findings here are statistically
+          generalizable. Correlation patterns that hold in this data may not hold for
+          any other human body. Report conclusions accordingly.
+        </div>
+      </div>
+      <div class="limitation-item">
+        <div class="limitation-item__num">02</div>
+        <div class="limitation-item__text">
+          <strong>Correlation is not causation.</strong> The engine surfaces relationships,
+          not mechanisms. A r=0.6 between sleep and recovery tells you these move together.
+          It does not tell you which drives which, or whether both are driven by a third
+          variable not yet in the model.
+        </div>
+      </div>
+      <div class="limitation-item">
+        <div class="limitation-item__num">03</div>
+        <div class="limitation-item__text">
+          <strong>Observer effect.</strong> Tracking a behaviour changes it. The act of
+          monitoring sleep quality, logging food, and scoring habits introduces feedback loops
+          that make it difficult to establish true baselines. The experiment cannot be
+          cleanly isolated from the experimenter.
+        </div>
+      </div>
+      <div class="limitation-item">
+        <div class="limitation-item__num">04</div>
+        <div class="limitation-item__text">
+          <strong>Regression to the mean.</strong> An extreme value (very poor sleep, very
+          high stress) is statistically likely to be followed by a more average value regardless
+          of any intervention. Any metric tracked immediately after a bad stretch will appear
+          to improve. This platform attempts to account for this by using rolling windows rather
+          than point-to-point comparisons.
+        </div>
+      </div>
+      <div class="limitation-item">
+        <div class="limitation-item__num">05</div>
+        <div class="limitation-item__text">
+          <strong>Hawthorne effect.</strong> Behavior changes when it is observed and reported
+          publicly. The existence of this website, the weekly journal, and the subscriber
+          audience creates performance pressure that may not reflect how the subject would
+          behave absent an audience.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── The Value ─────────────────────────────────────────── -->
+  <div class="method-section reveal">
+    <div class="method-section__eyebrow">// 05 — the point</div>
+    <h2 class="method-section__title">The Value Isn&rsquo;t in the Conclusions</h2>
+    <p class="method-section__body">
+      If you&rsquo;re reading this hoping to find a protocol you can copy, you will be
+      disappointed &mdash; or at least you should be. My sleep responses are not yours.
+      My glucose is not yours. My correlation between protein intake and HRV tells you
+      almost nothing about your own body.
+    </p>
+    <p class="method-section__body">
+      But the framework is portable. The question &ldquo;what does my data actually show
+      about my sleep?&rdquo; is one you can ask about yourself. The practice of tracking
+      something for 90 days before drawing conclusions, running FDR correction to avoid
+      over-interpreting noise, requiring a minimum observation count before reporting &mdash;
+      these habits of statistical hygiene cost nothing and apply universally.
+    </p>
+    <div class="method-quote">
+      <div class="method-quote__text">
+        &ldquo;The value isn&rsquo;t that my results apply to you &mdash; it&rsquo;s that
+        the methodology might inspire your own N=1 experiment.&rdquo;
+      </div>
+      <div class="method-quote__attribution">// Matthew Walker &middot; averagejoematt.com</div>
+    </div>
+
+    <div class="method-cta">
+      <div class="method-cta__label">
+        See the engine running live &mdash;&nbsp;<strong>live correlation data</strong>&nbsp;&mdash; updated nightly.
+      </div>
+      <a href="/explorer/" class="btn btn--primary">Open Explorer &rarr;</a>
+    </div>
+  </div>
+
+</div>
+
+<!-- N=1 disclaimer -->
+<aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle);">
+  <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label)">
+    <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
+    Nothing here is medical advice. This is one person&rsquo;s experiment, documented with
+    transparency and statistical honesty. Consult a qualified clinician before making health
+    decisions based on anything you read here.
+  </p>
+</aside>
+
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <a href="/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span>Ask</span>
+  </a>
+  <a href="/character/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span>Score</span>
+  </a>
+  <a href="/journal/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+    <span>Journal</span>
+  </a>
+  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    <span>More</span>
+  </button>
+</nav>
+<footer class="footer-v2">
+  <div class="footer-v2__grid">
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The journey</div>
+      <a href="/story/" class="footer-v2__link">Story</a>
+      <a href="/live/" class="footer-v2__link">Live</a>
+      <a href="/journal/" class="footer-v2__link">Journal</a>
+      <a href="/week/" class="footer-v2__link">This Week</a>
+      <a href="/about/" class="footer-v2__link">About</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The data</div>
+      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/habits/" class="footer-v2__link">Habits</a>
+      <a href="/achievements/" class="footer-v2__link">Achievements</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/results/" class="footer-v2__link">Results</a>
+      <a href="/progress/" class="footer-v2__link">Progress</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The platform</div>
+      <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/data/" class="footer-v2__link">Data</a>
+      <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/tools/" class="footer-v2__link">Tools</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">Follow</div>
+      <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/rss.xml" class="footer-v2__link">RSS</a>
+      <a href="/privacy/" class="footer-v2__link">Privacy</a>
+    </div>
+  </div>
+  <div class="footer-v2__bottom">
+    <span class="footer-v2__brand">AMJ</span>
+    <span class="footer-v2__copy">// updated daily by life-platform</span>
+  </div>
+</footer>
+<script src="/assets/js/reveal.js"></script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>
