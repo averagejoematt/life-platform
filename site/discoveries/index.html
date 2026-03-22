@@ -690,46 +690,103 @@ function pairToStory(p) {
   return `${lagNote}${b} ${dir}. This ${pct}% correlation was measured over ${p.n} days${p.fdr_significant ? ' and passed statistical significance testing' : ''}.`;
 }
 
+const JOURNEY_START = new Date('2026-02-09');
+const FULL_WINDOW   = 90; // days before rolling window is complete
+
+function daysSinceStart() {
+  return Math.floor((Date.now() - JOURNEY_START.getTime()) / 86400000);
+}
+
+function renderEmptyState() {
+  const days   = daysSinceStart();
+  const needed = Math.max(0, FULL_WINDOW - days);
+  const pct    = Math.min(100, Math.round(days / FULL_WINDOW * 100));
+
+  const banner = `
+    <div style="border:1px solid var(--border);border-left:4px solid var(--accent-dim);background:var(--surface);padding:var(--space-8);">
+      <div style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-4)">\/\/ data accumulating</div>
+      <div style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);margin-bottom:var(--space-4)">
+        <span style="color:var(--accent)">${days}</span> days of data collected
+      </div>
+      <p style="font-size:var(--text-sm);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);margin-bottom:var(--space-6)">
+        The correlation engine runs on a <strong style="color:var(--text)">90-day rolling window</strong>.
+        ${needed > 0
+          ? `${needed} more days of logging will unlock the full analysis &mdash; including FDR-corrected significance testing across all 23 variable pairs.`
+          : 'The full window is complete. Check back after the next Sunday engine run.'}
+      </p>
+      <div style="background:var(--bg);border:1px solid var(--border-subtle);height:6px;max-width:400px;margin-bottom:var(--space-3);">
+        <div style="background:var(--accent);height:100%;width:${pct}%;transition:width 0.6s ease;"></div>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">
+        ${pct}% of rolling window complete &nbsp;&middot;&nbsp; tracking: sleep, HRV, recovery, weight, glucose, habits, strain
+      </div>
+    </div>`;
+
+  document.getElementById('featured-card').innerHTML    = banner;
+  document.getElementById('spotlight-grid').innerHTML   = `<div style="grid-column:1/-1">${banner}</div>`;
+  document.getElementById('archive-body').innerHTML     = `<tr><td colspan="4"><div style="padding:var(--space-8);text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">${days} days tracked &mdash; pairs appear here after ${FULL_WINDOW}-day window fills</div></td></tr>`;
+  document.getElementById('stat-pairs').textContent     = '—';
+  document.getElementById('stat-sig').textContent       = '—';
+  document.getElementById('stat-week').textContent      = '—';
+}
+
 async function loadDiscoveries() {
   try {
     const res = await fetch(`${API}/api/correlations`);
-    const json = await res.json();
-    const c = json.correlations;
+
+    // 503 = no data yet
+    if (res.status === 503) {
+      renderEmptyState();
+      return;
+    }
+
+    const json  = await res.json();
+    const c     = json.correlations;
     const pairs = c.pairs || [];
-    const strong = pairs.filter(p => Math.abs(p.r) >= 0.35);
+
+    if (pairs.length === 0) {
+      renderEmptyState();
+      return;
+    }
+
     const sig = pairs.filter(p => p.fdr_significant);
 
     document.getElementById('stat-pairs').textContent = c.count;
-    document.getElementById('stat-sig').textContent = sig.length;
-    document.getElementById('stat-week').textContent = c.week || '—';
+    document.getElementById('stat-sig').textContent   = sig.length;
+    document.getElementById('stat-week').textContent  = c.week || '—';
+
+    // 'Last updated' note below stats strip
+    const statsStrip = document.querySelector('.stats-strip');
+    if (statsStrip && c.week && !document.getElementById('last-updated-note')) {
+      const note = document.createElement('div');
+      note.id = 'last-updated-note';
+      note.style.cssText = 'max-width:var(--max-width);margin:0 auto;padding:var(--space-3) var(--page-padding);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);border-bottom:1px solid var(--border-subtle)';
+      note.textContent = `// engine last ran: week of ${c.week}  ·  next run: Sunday  ·  ${daysSinceStart()} days tracked`;
+      statsStrip.insertAdjacentElement('afterend', note);
+    }
 
     // Featured card: strongest pair
     const top = pairs[0];
-    if (top) {
-      document.getElementById('featured-card').innerHTML = `
-        <div class="featured-card__finding">
-          ${(top.label_a || top.field_a)} <span>${top.r > 0 ? '↑ positively' : '↓ negatively'} predicts</span> ${(top.label_b || top.field_b)}
-        </div>
-        <div class="featured-card__story">
-          ${pairToStory(top)}
-          ${top.fdr_significant ? ' <strong style="color:var(--accent)">This finding survived multiple-testing correction — it&rsquo;s not noise.</strong>' : ''}
-        </div>
-        <div class="featured-card__data">
-          <span class="featured-card__datum">r = <strong>${rSign(top.r)}${top.r.toFixed(3)}</strong></span>
-          <span class="featured-card__datum">n = <strong>${top.n} days</strong></span>
-          <span class="featured-card__datum">Strength: <strong>${top.strength}</strong></span>
-          <span class="featured-card__datum">Sources: <strong>${top.source_a} × ${top.source_b}</strong></span>
-          ${top.lag_days > 0 ? `<span class="featured-card__datum">Lag: <strong>${top.lag_days}d (predictive)</strong></span>` : ''}
-        </div>`;
-    } else {
-      document.getElementById('featured-card').innerHTML = '<div class="loading-msg">No correlation data yet.</div>';
-    }
+    document.getElementById('featured-card').innerHTML = `
+      <div class="featured-card__finding">
+        ${(top.label_a || top.field_a)} <span>${top.r > 0 ? '↑ positively' : '↓ negatively'} predicts</span> ${(top.label_b || top.field_b)}
+      </div>
+      <div class="featured-card__story">
+        ${pairToStory(top)}
+        ${top.fdr_significant ? ' <strong style="color:var(--accent)">This finding survived multiple-testing correction — it&rsquo;s not noise.</strong>' : ''}
+      </div>
+      <div class="featured-card__data">
+        <span class="featured-card__datum">r = <strong>${rSign(top.r)}${top.r.toFixed(3)}</strong></span>
+        <span class="featured-card__datum">n = <strong>${top.n} days</strong></span>
+        <span class="featured-card__datum">Strength: <strong>${top.strength}</strong></span>
+        <span class="featured-card__datum">Sources: <strong>${top.source_a} × ${top.source_b}</strong></span>
+        ${top.lag_days > 0 ? `<span class="featured-card__datum">Lag: <strong>${top.lag_days}d (predictive)</strong></span>` : ''}
+      </div>`;
 
     // Spotlight: top 2 pairs
-    const spotlightPairs = pairs.slice(0, 2);
-    document.getElementById('spotlight-grid').innerHTML = spotlightPairs.map(p => `
+    document.getElementById('spotlight-grid').innerHTML = pairs.slice(0, 2).map(p => `
       <div class="spotlight-card">
-        <div class="spotlight-card__tag">${p.source_a} × ${p.source_b} ${p.lag_days > 0 ? '· predictive' : ''}</div>
+        <div class="spotlight-card__tag">${p.source_a} × ${p.source_b}${p.lag_days > 0 ? ' · predictive' : ''}</div>
         <div class="spotlight-card__r ${rClass(p.r)}">${rSign(p.r)}${p.r.toFixed(2)}${p.fdr_significant ? '<span class="fdr-badge">FDR ✓</span>' : ''}</div>
         <div class="spotlight-card__pair">${pairToEnglish(p)}</div>
         <div class="spotlight-card__story">${pairToStory(p)}</div>
@@ -746,9 +803,7 @@ async function loadDiscoveries() {
       </tr>`).join('');
 
   } catch(e) {
-    document.getElementById('featured-card').innerHTML = '<div class="loading-msg">Could not load correlation data.</div>';
-    document.getElementById('spotlight-grid').innerHTML = '<div class="loading-msg">Could not load data.</div>';
-    document.getElementById('archive-body').innerHTML = '<tr><td colspan="4" class="loading-msg">Could not load data.</td></tr>';
+    renderEmptyState();
   }
 }
 
