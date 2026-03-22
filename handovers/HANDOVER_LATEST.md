@@ -1,22 +1,30 @@
-→ See handovers/HANDOVER_v3.8.6.md
+→ See handovers/HANDOVER_v3.8.7.md
 
 This session (2026-03-22):
-- Phase 2 /live/: glucose snapshot panel (TIR %, 30d avg, variability, sparkline)
-- Phase 2 /character/: live state banner (Level · Tier · Days · Strongest → Bottleneck)
-- /character/: dynamic tier highlight — hardcoded Chisel removed, now data-driven
-- /discoveries/: empty state (task 47) — done earlier this session
+- Phase 2 complete: /discoveries/ empty state + /live/ glucose panel + /character/ live banner
+- CI/CD: pipeline was already built post-R13 — just needed activation
+- ci/lambda_map.json: site_api_lambda.py moved from skip_deploy → lambdas (life-platform-site-api)
 
-Next session entry point:
-1. Deploy all 3 files:
+PENDING DEPLOY (do these in order):
+1. Deploy Phase 2 site files:
    aws s3 cp site/live/index.html s3://matthew-life-platform/site/live/index.html
    aws s3 cp site/character/index.html s3://matthew-life-platform/site/character/index.html
    aws s3 cp site/discoveries/index.html s3://matthew-life-platform/site/discoveries/index.html
    aws cloudfront create-invalidation --distribution-id E3S424OXQZ8NBE --paths "/live/*" "/character/*" "/discoveries/*"
-2. git add -A && git commit -m "v3.8.6: Phase 2 live+character enhancements" && git push
-3. Phase 2 is now complete ✅ — next: CI/CD pipeline (R13 #1 finding) or SIMP-1 Phase 2
+
+2. Activate CI/CD pipeline:
+   bash deploy/setup_github_oidc.sh
+   → Then: create 'production' Environment at github.com/averagejoematt/life-platform/settings/environments
+   → Then: git add -A && git commit -m "v3.8.7: activate CI/CD pipeline" && git push
+   → Then: watch Actions tab — approve deploy job if Lambda changes detected
+
+Next session entry point:
+- After CI/CD activated and first run passes: F02 integration tests (3-5 tests against live AWS)
+- F05 OAuth fail-open fix (30 min, mcp/handler.py)
+- SIMP-1 Phase 2 remains on ~April 13 schedule
 
 Key context:
-- Phase 2 status: habits ✅ experiments ✅ discoveries ✅ live ✅ character ✅ — COMPLETE
-- glucose section on /live/ hides gracefully if /api/glucose returns 503 or no data
-- character tier map: Foundation/Momentum/Chisel/Elite IDs added for JS targeting
-- tierIdMap includes Discipline→chisel and Mastery→elite as aliases
+- Pipeline already handles: lint → pytest → cdk diff → layer check → deploy → smoke → rollback → SNS notify
+- Manual approval gate via GitHub 'production' Environment (required before deploy job runs)
+- email_subscriber_lambda.py stays in skip_deploy (us-east-1, needs region override)
+- acwr/circadian/sleep_reconciler stay in skip_deploy (skeleton/not-yet-deployed)
