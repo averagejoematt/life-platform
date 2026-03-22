@@ -755,11 +755,52 @@ def handle_habits() -> dict:
         last_item = _decimal_to_float(items[-1])
         latest_streak = int(last_item.get("t0_perfect_streak") or last_item.get("t0_aggregate_streak") or 0)
 
+    # ── Day-of-week analysis (0=Mon ... 6=Sun)
+    dow_sums = [0.0] * 7
+    dow_counts = [0] * 7
+    for day in history:
+        try:
+            d = datetime.strptime(day["date"], "%Y-%m-%d")
+            dow = d.weekday()  # 0=Mon ... 6=Sun
+            dow_sums[dow] += day.get("tier0_pct", 0) or 0
+            dow_counts[dow] += 1
+        except Exception:
+            pass
+    dow_avgs = [
+        round(dow_sums[i] / dow_counts[i]) if dow_counts[i] else None
+        for i in range(7)
+    ]
+    valid_dow = [(i, v) for i, v in enumerate(dow_avgs) if v is not None]
+    best_dow  = max(valid_dow, key=lambda x: x[1])[0] if valid_dow else None
+    worst_dow = min(valid_dow, key=lambda x: x[1])[0] if valid_dow else None
+
+    # ── 90-day per-group averages + keystone identification
+    group_90d_sums: dict = {}
+    group_90d_counts: dict = {}
+    for day in history:
+        for gname, gpct in (day.get("groups") or {}).items():
+            if isinstance(gpct, (int, float)):
+                group_90d_sums[gname] = group_90d_sums.get(gname, 0) + gpct
+                group_90d_counts[gname] = group_90d_counts.get(gname, 0) + 1
+    group_90d_avgs = {
+        g: round(group_90d_sums[g] / group_90d_counts[g])
+        for g in group_90d_sums
+        if group_90d_counts.get(g, 0) > 0
+    }
+    keystone_group = max(group_90d_avgs, key=group_90d_avgs.get) if group_90d_avgs else None
+    keystone_group_pct = group_90d_avgs.get(keystone_group) if keystone_group else None
+
     return _ok({
-        "as_of_date":    today,
-        "days_tracked":  len(history),
-        "current_streak": latest_streak,
-        "history":       history,
+        "as_of_date":         today,
+        "days_tracked":       len(history),
+        "current_streak":     latest_streak,
+        "history":            history,
+        "day_of_week_avgs":   dow_avgs,        # [Mon, Tue, Wed, Thu, Fri, Sat, Sun] — None if no data
+        "best_day":           best_dow,         # 0=Mon...6=Sun
+        "worst_day":          worst_dow,
+        "group_90d_avgs":     group_90d_avgs,  # {"Nutrition": 87, "Recovery": 72, ...}
+        "keystone_group":     keystone_group,
+        "keystone_group_pct": keystone_group_pct,
     }, cache_seconds=3600)
 
 

@@ -31,7 +31,9 @@ python3 deploy/fix_public_stats.py --write
 # ── Step 3: Deploy daily-brief Lambda (picks up site_writer.py baseline fix) ──
 echo ""
 echo "[3/5] Deploying daily-brief Lambda..."
-bash deploy/deploy_lambda.sh daily-brief
+bash deploy/deploy_lambda.sh daily-brief lambdas/daily_brief_lambda.py \
+    --extra-files lambdas/html_builder.py lambdas/ai_calls.py lambdas/output_writers.py \
+                  lambdas/board_loader.py lambdas/site_writer.py
 
 # ── Step 4: Sync site/ to S3 ──────────────────────────────────────────────────
 echo ""

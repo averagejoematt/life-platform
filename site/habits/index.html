@@ -523,6 +523,114 @@
       left: 0;
       color: var(--accent-dim);
     }
+
+    /* ── Keystone spotlight ── */
+    .keystone-section { margin-bottom: var(--space-10); }
+    .keystone-card {
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      padding: var(--space-8);
+      display: flex;
+      align-items: center;
+      gap: var(--space-8);
+    }
+    .keystone-card__meta {
+      min-width: 140px;
+    }
+    .keystone-card__meta-label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      margin-bottom: var(--space-2);
+    }
+    .keystone-card__group {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--accent);
+      line-height: 1.1;
+    }
+    .keystone-card__pct {
+      font-family: var(--font-display);
+      font-size: 64px;
+      color: var(--text);
+      line-height: 1;
+      min-width: 100px;
+    }
+    .keystone-card__desc {
+      flex: 1;
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .keystone-badge {
+      display: inline-block;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent);
+      font-family: var(--font-mono);
+      border: 1px solid var(--accent);
+      padding: 2px var(--space-3);
+      margin-bottom: var(--space-3);
+    }
+
+    /* ── Day-of-week pattern ── */
+    .dow-section { margin-bottom: var(--space-10); }
+    .dow-bars {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: var(--space-2);
+      align-items: flex-end;
+      height: 100px;
+      margin-top: var(--space-5);
+    }
+    .dow-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      gap: var(--space-2);
+      height: 100%;
+    }
+    .dow-bar {
+      width: 100%;
+      border-radius: 2px 2px 0 0;
+      transition: height 0.8s var(--ease-out);
+      min-height: 2px;
+    }
+    .dow-bar.best  { background: var(--accent); }
+    .dow-bar.worst { background: rgba(255,82,82,0.55); }
+    .dow-bar.mid   { background: rgba(200,132,58,0.5); }
+    .dow-label {
+      font-size: var(--text-2xs);
+      font-family: var(--font-mono);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+    }
+    .dow-pct {
+      font-size: 9px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      letter-spacing: 0;
+    }
+    .dow-insight {
+      margin-top: var(--space-4);
+      padding: var(--space-3) var(--space-4);
+      border-left: 2px solid var(--accent-dim);
+      font-size: var(--text-xs);
+      font-family: var(--font-mono);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      line-height: var(--lh-mono);
+    }
+
+    @media (max-width: 768px) {
+      .keystone-card { flex-direction: column; align-items: flex-start; gap: var(--space-5); }
+      .keystone-card__pct { font-size: 48px; }
+      .keystone-card__meta { min-width: unset; }
+    }
   </style>
 </head>
 <body>
@@ -772,12 +880,38 @@
       </div>
     </div>
 
+    <!-- Keystone Group Spotlight -->
+    <div class="keystone-section hab-section reveal" id="keystone-section" style="display:none">
+      <div class="hab-section__heading">Keystone <span>Spotlight</span></div>
+      <div class="hab-section__sub">// strongest habit group — 90-day adherence average</div>
+      <div class="keystone-card">
+        <div class="keystone-card__meta">
+          <div class="keystone-badge"># 1 group</div>
+          <div class="keystone-card__meta-label">Leading category</div>
+          <div class="keystone-card__group" id="keystone-group-name">—</div>
+        </div>
+        <div class="keystone-card__meta" style="min-width:90px">
+          <div class="keystone-card__meta-label">90-day avg</div>
+          <div class="keystone-card__pct" id="keystone-group-pct">—</div>
+        </div>
+        <div class="keystone-card__desc" id="keystone-group-desc"></div>
+      </div>
+    </div>
+
     <!-- Completion trend -->
     <div class="trend-section hab-section reveal">
       <div class="hab-section__heading">Weekly <span>Completion Trend</span></div>
       <div class="hab-section__sub">// weekly average tier 0 completion % over last 13 weeks</div>
       <div class="trend-bars" id="trend-bars"></div>
       <div class="trend-axis" id="trend-axis"></div>
+    </div>
+
+    <!-- Day-of-Week Pattern -->
+    <div class="dow-section hab-section reveal" id="dow-section" style="display:none">
+      <div class="hab-section__heading">Day of Week <span>Pattern</span></div>
+      <div class="hab-section__sub">// average Tier 0 completion by day — last 90 days</div>
+      <div class="dow-bars" id="dow-bars"></div>
+      <div class="dow-insight" id="dow-insight"></div>
     </div>
 
     <!-- Section 4: Streak Records -->
@@ -1427,7 +1561,107 @@
     }).join('');
   }
 
-  // ── Main hydrate ──────────────────────────────────────────────────────────
+  // ── Keystone Group Spotlight ───────────────────────────────────────────
+  var KEYSTONE_DESCRIPTIONS = {
+    'Nutrition':   'Fueling consistency is driving everything else. Caloric discipline and protein targets are the metabolic anchor that makes the rest of the system work.',
+    'Recovery':    'Your recovery habits are the structural foundation. Sleep quality and active rest drive every downstream adaptation — strength, fat loss, and HRV all trace back here.',
+    'Performance': 'Zone 2 and strength training consistency is compounding. These adaptations are slow but permanent — your strongest group is your long-term moat.',
+    'Discipline':  'The hard stops are holding. No-alcohol, screen curfews, and commitment habits define the identity layer that makes everything else easier to maintain.',
+    'Supplements': 'Consistent supplement timing signals systemic discipline. Micronutrient and creatine targets are being hit reliably — this supports the physical work.',
+    'Data':        'Data collection habits are the nervous system of the platform. No signal in = no intelligence out. Strong data discipline enables everything downstream.',
+    'Wellbeing':   'Mindfulness, social connection, and sunlight exposure are often the first to go when life gets hard. Keeping these high signals resilience in the system.',
+    'Growth':      'Learning, weekly review, and structured reflection are compounding beyond the physical. These habits build the meta-skill of self-optimization.',
+    'Hygiene':     'Foundational health hygiene — the invisible habits that protect the base. Consistently high here removes friction from the more demanding protocols.',
+  };
+
+  function buildKeystone(data) {
+    var section = document.getElementById('keystone-section');
+    if (!section) return;
+
+    var groupName = data.keystone_group;
+    var groupPct  = data.keystone_group_pct;
+
+    // Fallback: compute from group_90d_avgs if direct fields missing
+    if (!groupName) {
+      var avgs = data.group_90d_avgs || {};
+      var bestName = null, bestPct = -1;
+      Object.keys(avgs).forEach(function(g) {
+        if (avgs[g] > bestPct) { bestPct = avgs[g]; bestName = g; }
+      });
+      if (!bestName) return;
+      groupName = bestName;
+      groupPct  = bestPct;
+    }
+    if (groupPct == null) return;
+
+    var nameEl = document.getElementById('keystone-group-name');
+    var pctEl  = document.getElementById('keystone-group-pct');
+    var descEl = document.getElementById('keystone-group-desc');
+
+    if (nameEl) nameEl.textContent = groupName;
+    if (pctEl)  pctEl.textContent  = groupPct + '%';
+    if (descEl) {
+      descEl.textContent = KEYSTONE_DESCRIPTIONS[groupName] ||
+        'This habit group has the strongest 90-day consistency in the system — the foundation everything else is built on.';
+    }
+    section.style.display = '';
+  }
+
+  // ── Day-of-week pattern ─────────────────────────────────────────
+  var DOW_DISPLAY = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  function buildDOW(data) {
+    var section   = document.getElementById('dow-section');
+    var barsEl    = document.getElementById('dow-bars');
+    var insightEl = document.getElementById('dow-insight');
+    if (!section || !barsEl) return;
+
+    var avgs = data.day_of_week_avgs;
+    if (!avgs || !avgs.length) return;
+
+    var bestIdx  = data.best_day  != null ? data.best_day  : null;
+    var worstIdx = data.worst_day != null ? data.worst_day : null;
+
+    // Compute locally if API didn't provide
+    if (bestIdx === null) {
+      var valid = avgs.map(function(v, i) { return { i: i, v: v }; }).filter(function(x) { return x.v != null; });
+      if (valid.length) {
+        bestIdx  = valid.reduce(function(a, b) { return a.v > b.v ? a : b; }).i;
+        worstIdx = valid.reduce(function(a, b) { return a.v < b.v ? a : b; }).i;
+      }
+    }
+
+    barsEl.innerHTML = avgs.map(function(pct, i) {
+      if (pct == null) {
+        return [
+          '<div class="dow-col">',
+            '<div class="dow-bar mid" style="height:4px;opacity:0.25"></div>',
+            '<div class="dow-label">' + DOW_DISPLAY[i] + '</div>',
+            '<div class="dow-pct">—</div>',
+          '</div>',
+        ].join('');
+      }
+      var h   = Math.max(4, Math.round((pct / 100) * 82));
+      var cls = i === bestIdx ? 'best' : (i === worstIdx ? 'worst' : 'mid');
+      return [
+        '<div class="dow-col">',
+          '<div class="dow-bar ' + cls + '" style="height:' + h + 'px"></div>',
+          '<div class="dow-label">' + DOW_DISPLAY[i] + '</div>',
+          '<div class="dow-pct">' + pct + '%</div>',
+        '</div>',
+      ].join('');
+    }).join('');
+
+    if (insightEl && bestIdx !== null && worstIdx !== null) {
+      insightEl.textContent =
+        '// peak day: ' + DOW_DISPLAY[bestIdx] + ' (' + (avgs[bestIdx] || 0) + '%)  —  ' +
+        'most vulnerable: ' + DOW_DISPLAY[worstIdx] + ' (' + (avgs[worstIdx] || 0) + '%)';
+    }
+
+    section.style.display = '';
+  }
+
+  // ── Main hydrate ──────────────────────────────────────────────
   function hydrate(data) {
     var history = data.history || [];
 
@@ -1443,6 +1677,8 @@
     buildInsights(data);
     buildHeatmap(history);
     buildTrend(history);
+    buildKeystone(data);
+    buildDOW(data);
     buildGroupBars(data);
   }
 

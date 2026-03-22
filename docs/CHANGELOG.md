@@ -1,3 +1,33 @@
+## v3.8.3 — 2026-03-22: Phase 2 /habits/ page — Keystone Spotlight + Day-of-Week Pattern
+
+### Summary
+First Phase 2 content-depth item. `/habits/` page gains two new intelligence sections
+powered by new fields added to `handle_habits()` in `site_api_lambda.py`. Both sections
+are gracefully hidden when group/DOW data is absent from DynamoDB — no empty states.
+
+### Changes
+
+**lambdas/site_api_lambda.py** — handle_habits() extended
+- `day_of_week_avgs`: [Mon–Sun] average Tier 0 completion % over 90 days.
+- `best_day` / `worst_day`: index (0=Mon, 6=Sun) of peak and most vulnerable day.
+- `group_90d_avgs`: dict of per-group 90-day adherence averages.
+- `keystone_group` / `keystone_group_pct`: strongest habit group by 90-day avg.
+- All new fields are additive — backwards compatible with existing page JS.
+
+**site/habits/index.html** — two new sections added
+- Keystone Spotlight: accent-bordered card showing #1 group name, 90-day %, and
+  contextual description. Position: between Tier 0 streak block and Weekly Trend.
+- Day of Week Pattern: 7-bar chart (green=best, red=worst) with insight line.
+  Position: between Weekly Trend and Streak Records.
+- Both sections hidden by default (`display:none`); shown only when API returns data.
+- All 9 group descriptions pre-coded in `KEYSTONE_DESCRIPTIONS` map.
+
+### Deploy
+- `lambdas/site_api_lambda.py` → deployed to `life-platform-site-api` (us-west-2) manually.
+- `site/habits/` synced to S3 + CloudFront invalidated `/habits/*` + `/api/habits`.
+
+---
+
 ## v3.8.2 — 2026-03-22: D10 baseline + Phase 1 Task 20 reading path CTAs
 
 ### Summary

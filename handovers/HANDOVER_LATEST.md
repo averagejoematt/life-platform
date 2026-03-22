@@ -1,24 +1,23 @@
-→ See handovers/HANDOVER_v3.8.2.md
+→ See handovers/HANDOVER_v3.8.3.md
 
 This session (2026-03-22):
-- D10: site_writer.py v1.3.0 — added baseline param, daily_brief_lambda.py wired to pass it
-- T20: deploy/add_reading_path_ctas.py — reading path CTAs on 7 pages (story→…→ask)
-- deploy/deploy_d10_phase1.sh — one-command deploy for both changes
-- Phase 0 COMPLETE, Phase 1 COMPLETE
+- Bug fix: deploy_d10_phase1.sh step 3 — Lambda deploy command missing source file + extra files
+- Phase 2 /habits/ page: Keystone Spotlight + Day-of-Week Pattern sections
+- site_api_lambda.py handle_habits() extended: day_of_week_avgs, best_day, worst_day, group_90d_avgs, keystone_group
+- Confirmed: life-platform-site-api is in us-west-2 (not us-east-1)
+- All deployed: Lambda (us-west-2) + S3 sync + CloudFront invalidation
 
 Next session entry point:
-1. Run: bash deploy/deploy_d10_phase1.sh  ← THIS FIRST (not yet deployed)
-2. Verify: curl public_stats.json | grep -A6 '"baseline"'  and visit /story/ for CTA
-3. Phase 2 begins: /habits/ page (heatmap + tier breakdown + streaks)
-4. Check if Withings has resumed syncing (last weigh-in 2026-03-07)
+1. Verify: curl -s 'https://averagejoematt.com/api/habits' | python3 -m json.tool | grep -E '"keystone|best_day|day_of_week'
+2. Check /habits/ live — Keystone + DOW sections (may not show if group_* fields absent from habit_scores DynamoDB)
+3. Withings check: still no weigh-ins since Mar 7
+4. Phase 2 next: /experiments/ page depth OR investigate habit_scores group_* field presence
 
 Key context:
-- D10 fix is code-complete but NOT YET DEPLOYED — deploy_d10_phase1.sh does it
-- baseline{} fallback values: 302.0 lbs / 45 HRV / 62 RHR / 55% recovery (Feb 22 actuals)
-- Profile can override with: baseline_date, baseline_weight_lbs, baseline_hrv_ms,
-  baseline_rhr_bpm, baseline_recovery_pct fields on PROFILE#v1
-- Phase 1 Task 20 reading path: /story/→/live/→/character/→/habits/→/experiments/
-  →/discoveries/→/intelligence/→/ask/
-- site_writer.py cache tightened 24h→1h (so public_stats updates propagate faster)
-- Phase 2 first target: /habits/ page — heatmap + tier breakdown + streaks + keystone spotlight
-  Endpoint needed: /api/habits (new, in site_api_lambda.py)
+- Phase 0: COMPLETE | Phase 1: COMPLETE | Phase 2: IN PROGRESS (habits done)
+- Keystone/DOW sections hidden by default — only appear when API returns group data
+- If sections aren't showing: check if habit_scores DynamoDB records have group_* fields
+  (habitify ingestion Lambda may not be writing them)
+- site-api deploy command: zip -j /tmp/site_api_deploy.zip lambdas/site_api_lambda.py &&
+  aws lambda update-function-code --function-name life-platform-site-api
+  --zip-file fileb:///tmp/site_api_deploy.zip --region us-west-2 --no-cli-pager
