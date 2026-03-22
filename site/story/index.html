@@ -515,7 +515,7 @@
       </div>
 
       <p>
-        Every week, an AI journalist named Elena Voss reads 19 data sources and writes a chronicle of what the numbers say.
+        Every week, an AI journalist named Elena Voss reads <span id="story-data-sources-1">19</span> data sources and writes a chronicle of what the numbers say.
         She doesn't soften bad weeks. She doesn't celebrate plateaus as progress.
         The point is that the data tells the truth, even when I don't want it to.
       </p>
@@ -535,7 +535,7 @@
   <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
   <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Follow the experiment.</h3>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
-    Real numbers from 19 data sources. Every Wednesday, in your inbox. No highlight reel — every failure included.
+    Real numbers from <span id="story-data-sources-2">19</span> data sources. Every Wednesday, in your inbox. No highlight reel — every failure included.
   </p>
   <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
     <input id="story-email" type="email" placeholder="your@email.com" style="
@@ -640,6 +640,13 @@
     const d = await r.json();
     const w = (d.vitals || {}).weight_lbs || (d.hero || {}).current_weight_lbs;
     if (w) document.getElementById('story-weight').textContent = (Math.round(w * 10) / 10).toFixed(1);
+    // D6: update data_sources prose spans
+    const ds = (d.platform || {}).data_sources;
+    if (ds != null) {
+      ['story-data-sources-1','story-data-sources-2'].forEach(function(id) {
+        var el = document.getElementById(id); if (el) el.textContent = ds;
+      });
+    }
   } catch(e) {}
 })();
 
