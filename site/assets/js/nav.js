@@ -2,7 +2,7 @@
  * nav.js — Shared navigation component for averagejoematt.com
  * Handles: hamburger menu, bottom nav active state, theme toggle,
  *          GAM-01 "Since Your Last Visit" badges, GAM-02 Reading Path CTAs
- * v1.1.0 — 2026-03-21
+ * v1.2.0 — 2026-03-21 — Phase 1 IA: 5-section nav, /chronicle/
  */
 (function() {
   'use strict';
@@ -73,6 +73,25 @@
     }
   });
 
+  // ── Desktop dropdown click support ────────────────────────
+  // Hover handles desktop; click handles keyboard nav + touch fallback
+  var dropdowns = document.querySelectorAll('.nav__dropdown');
+  dropdowns.forEach(function(dd) {
+    var btn = dd.querySelector('.nav__dropdown-btn');
+    if (!btn) return;
+    btn.addEventListener('click', function(e) {
+      var isOpen = dd.classList.contains('is-open');
+      // Close all dropdowns first
+      dropdowns.forEach(function(d) { d.classList.remove('is-open'); });
+      if (!isOpen) dd.classList.add('is-open');
+      e.stopPropagation();
+    });
+  });
+  // Close dropdowns when clicking outside
+  document.addEventListener('click', function() {
+    dropdowns.forEach(function(d) { d.classList.remove('is-open'); });
+  });
+
   // ── Theme toggle ──────────────────────────────────────────
   var themeToggle = document.querySelector('.theme-toggle');
   if (themeToggle) {
@@ -96,7 +115,7 @@
   var btt = document.createElement('button');
   btt.className = 'back-to-top';
   btt.setAttribute('aria-label', 'Back to top');
-  btt.innerHTML = '↑';
+  btt.textContent = '↑';
   btt.addEventListener('click', function() { window.scrollTo({ top: 0, behavior: 'smooth' }); });
   document.body.appendChild(btt);
   window.addEventListener('scroll', function() {
@@ -115,20 +134,20 @@
   // Maps section root paths to their last-updated deploy date.
   // Update these dates when content in that section changes.
   var SECTION_LAST_UPDATED = {
-    '/journal/':         '2026-03-21',
-    '/journal/archive/': '2026-03-21',
-    '/week/':            '2026-03-21',
-    '/live/':            '2026-03-21',
-    '/character/':       '2026-03-21',
-    '/habits/':          '2026-03-21',
-    '/discoveries/':     '2026-03-21',
-    '/sleep/':           '2026-03-21',
-    '/glucose/':         '2026-03-21',
+    '/chronicle/':         '2026-03-21',
+    '/chronicle/archive/': '2026-03-21',
+    '/week/':              '2026-03-21',
+    '/live/':              '2026-03-21',
+    '/character/':         '2026-03-21',
+    '/habits/':            '2026-03-21',
+    '/discoveries/':       '2026-03-21',
+    '/sleep/':             '2026-03-21',
+    '/glucose/':           '2026-03-21',
   };
 
   // Bottom nav item → which section paths it represents
   var BADGE_MAP = {
-    '/journal/': ['/journal/', '/journal/archive/', '/week/'],
+    '/chronicle/': ['/chronicle/', '/chronicle/archive/', '/week/'],
     '/character/': ['/character/'],
     '/live/': ['/live/', '/habits/', '/discoveries/'],
   };
@@ -169,32 +188,30 @@
   // ── GAM-02: Reading Path CTAs ─────────────────────────────
   // Maps current page path → next recommended read.
   var READING_PATHS = {
-    '/story/':            { href: '/results/',        title: 'The Numbers →',           sub: 'See the transformation data' },
-    '/results/':          { href: '/live/',           title: 'Today\'s Data →',          sub: 'What the sensors say right now' },
-    '/live/':             { href: '/character/',      title: 'The Score →',              sub: 'How it all adds up' },
-    '/character/':        { href: '/subscribe/',      title: 'Get the Weekly Brief →',   sub: 'See it delivered to your inbox' },
-    '/start/':            { href: '/story/',          title: 'The Story →',              sub: 'Start with why this exists' },
-    '/about/':            { href: '/story/',          title: 'The Story →',              sub: 'Read the full transformation narrative' },
-    '/platform/':         { href: '/cost/',           title: 'The Real Cost →',          sub: '$13/month for a full health OS' },
-    '/cost/':             { href: '/methodology/',    title: 'The Methodology →',        sub: 'How the science works' },
-    '/methodology/':      { href: '/intelligence/',   title: 'The Intelligence Layer →', sub: 'What the AI actually does' },
-    '/intelligence/':     { href: '/discoveries/',    title: 'Discoveries →',            sub: 'What the data revealed' },
-    '/discoveries/':      { href: '/subscribe/',      title: 'Get Discoveries Weekly →', sub: 'New correlations every week' },
-    '/habits/':           { href: '/sleep/',          title: 'Sleep Data →',             sub: 'Eight Sleep × Whoop cross-referenced' },
-    '/sleep/':            { href: '/glucose/',        title: 'Glucose Data →',           sub: '30-day CGM time-in-range' },
-    '/glucose/':          { href: '/progress/',       title: 'Progress →',               sub: 'The full transformation timeline' },
-    '/progress/':         { href: '/benchmarks/',     title: 'Benchmarks →',             sub: 'How Matthew compares to population norms' },
-    '/benchmarks/':       { href: '/subscribe/',      title: 'Get Weekly Updates →',     sub: 'New data every week' },
-    '/accountability/':   { href: '/methodology/',    title: 'The Methodology →',        sub: 'How the science works' },
-    '/supplements/':      { href: '/protocols/',      title: 'All Protocols →',          sub: 'Sleep, training, nutrition, supplements' },
-    '/protocols/':        { href: '/results/',        title: 'The Results →',            sub: 'What these protocols produced' },
-    '/achievements/':     { href: '/character/',      title: 'The Character Sheet →',    sub: 'Full score breakdown' },
-    '/week/':             { href: '/subscribe/',      title: 'Get This Weekly →',        sub: 'Every week, in your inbox' },
-    '/journal/':          { href: '/journal/archive/', title: 'All Entries →',           sub: 'The full journal archive' },
-    '/journal/archive/':  { href: '/subscribe/',      title: 'Get the Weekly Brief →',   sub: 'Delivered every week' },
-    '/ask/':              { href: '/platform/',       title: 'How This Works →',         sub: 'The platform behind the AI' },
-    '/board/':            { href: '/platform/',       title: 'How This Works →',         sub: 'The full platform architecture' },
-    '/data/':             { href: '/methodology/',    title: 'The Methodology →',        sub: 'How the data is processed' },
+    '/story/':              { href: '/live/',            title: 'See Today\'s Data →',      sub: 'What the sensors say right now' },
+    '/about/':              { href: '/story/',           title: 'The Story →',              sub: 'Read the full transformation narrative' },
+    '/live/':               { href: '/character/',       title: 'The Score →',              sub: 'How it all adds up' },
+    '/character/':          { href: '/habits/',          title: 'The Habits →',             sub: 'The inputs that drive the score' },
+    '/habits/':             { href: '/experiments/',     title: 'Experiments →',            sub: 'What\'s being actively tested' },
+    '/accountability/':     { href: '/methodology/',     title: 'The Methodology →',        sub: 'How the science works' },
+    '/protocols/':          { href: '/live/',            title: 'The Results →',            sub: 'What these protocols produced' },
+    '/experiments/':        { href: '/discoveries/',     title: 'Discoveries →',            sub: 'What the data proved' },
+    '/discoveries/':        { href: '/intelligence/',    title: 'The Intelligence Layer →', sub: 'How the AI finds these patterns' },
+    '/sleep/':              { href: '/glucose/',         title: 'Glucose Data →',           sub: '30-day CGM time-in-range' },
+    '/glucose/':            { href: '/benchmarks/',      title: 'Benchmarks →',             sub: 'How Matthew compares to population norms' },
+    '/benchmarks/':         { href: '/subscribe/',       title: 'Get Weekly Updates →',     sub: 'New data every week' },
+    '/supplements/':        { href: '/protocols/',       title: 'All Protocols →',          sub: 'Sleep, training, nutrition, supplements' },
+    '/platform/':           { href: '/cost/',            title: 'The Real Cost →',          sub: 'Running a full health OS for ~$13/month' },
+    '/cost/':               { href: '/methodology/',     title: 'The Methodology →',        sub: 'How the science works' },
+    '/methodology/':        { href: '/intelligence/',    title: 'The Intelligence Layer →', sub: 'What the AI actually does' },
+    '/intelligence/':       { href: '/discoveries/',     title: 'Discoveries →',            sub: 'What the data revealed' },
+    '/board/':              { href: '/platform/',        title: 'How This Works →',         sub: 'The full platform architecture' },
+    '/data/':               { href: '/methodology/',     title: 'The Methodology →',        sub: 'How the data is processed' },
+    '/tools/':              { href: '/ask/',             title: 'Ask the Data →',           sub: 'Query 19 sources of live data' },
+    '/week/':               { href: '/subscribe/',       title: 'Get This Weekly →',        sub: 'Every week, in your inbox' },
+    '/chronicle/':          { href: '/chronicle/archive/', title: 'All Entries →',          sub: 'The full chronicle archive' },
+    '/chronicle/archive/':  { href: '/subscribe/',       title: 'Get the Weekly Brief →',   sub: 'Delivered every week' },
+    '/ask/':                { href: '/platform/',        title: 'How This Works →',         sub: 'The platform behind the AI' },
   };
 
   var nextRead = READING_PATHS[path];

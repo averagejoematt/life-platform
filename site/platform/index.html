@@ -4,16 +4,16 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="The Platform — a custom AWS AI system built on Claude.">
+  <meta name="description" content="The Platform — a single-person health intelligence system built entirely on AWS serverless. 48 Lambda functions, 95 AI tools, 19 data sources, ~$13/month.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="The Platform — Matthew Walker">
-  <meta name="twitter:description" content="48 Lambda functions. 95 AI tools. 19 data sources. $13/month. Built by a non-engineer with Claude.">
+  <meta name="twitter:description" content="48 Lambda functions. 95 AI tools. 19 data sources. $13/month. A single-person health intelligence system on AWS serverless.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:title" content="The Platform — Matthew Walker">
-  <meta property="og:description" content="48 Lambda functions. 95 AI tools. 19 data sources. $13/month. Built by a non-engineer with Claude.">
+  <meta property="og:description" content="48 Lambda functions. 95 AI tools. 19 data sources. $13/month. A single-person health intelligence system on AWS serverless.">
   <meta property="og:type" content="website">
   <title>The Platform — Matthew Walker</title>
     <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
@@ -263,12 +263,55 @@
 <nav class="nav">
   <a href="/" class="nav__brand">AMJ</a>
   <div class="nav__links">
-    <a href="/story/" class="nav__link">Story</a>
-    <a href="/live/" class="nav__link">Live</a>
-    <a href="/journal/" class="nav__link">Journal</a>
-    <a href="/platform/" class="nav__link active">Platform</a>
-    <a href="/start/" class="nav__link">Explore</a>
-    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Story</button>
+      <div class="nav__dropdown-menu">
+        <a href="/" class="nav__dropdown-item">Home</a>
+        <a href="/story/" class="nav__dropdown-item">My Story</a>
+        <a href="/about/" class="nav__dropdown-item">About</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Data</button>
+      <div class="nav__dropdown-menu">
+        <a href="/live/" class="nav__dropdown-item">Live</a>
+        <a href="/character/" class="nav__dropdown-item">Character</a>
+        <a href="/habits/" class="nav__dropdown-item">Habits</a>
+        <a href="/accountability/" class="nav__dropdown-item">Accountability</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Science</button>
+      <div class="nav__dropdown-menu">
+        <a href="/protocols/" class="nav__dropdown-item">Protocols</a>
+        <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
+        <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
+        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
+        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
+        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
+        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
+      </div>
+    </div>
+    <div class="nav__dropdown is-active">
+      <button class="nav__dropdown-btn">The Build</button>
+      <div class="nav__dropdown-menu">
+        <a href="/platform/" class="nav__dropdown-item active">Platform</a>
+        <a href="/intelligence/" class="nav__dropdown-item">Intelligence</a>
+        <a href="/board/" class="nav__dropdown-item">Board</a>
+        <a href="/cost/" class="nav__dropdown-item">Cost</a>
+        <a href="/methodology/" class="nav__dropdown-item">Methodology</a>
+        <a href="/tools/" class="nav__dropdown-item">Tools</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">Follow</button>
+      <div class="nav__dropdown-menu">
+        <a href="/chronicle/" class="nav__dropdown-item">Chronicle</a>
+        <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
+        <a href="/ask/" class="nav__dropdown-item">Ask</a>
+      </div>
+    </div>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>
   </div>
   <button class="nav__hamburger" aria-label="Open menu">
     <span></span><span></span><span></span>
@@ -283,53 +326,59 @@
   <div class="nav-overlay__panel">
     <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The journey</div>
-      <a href="/story/" class="nav-overlay__link">Story</a>
-      <a href="/live/" class="nav-overlay__link">Live</a>
-      <a href="/journal/" class="nav-overlay__link">Journal</a>
-      <a href="/week/" class="nav-overlay__link">This Week</a>
+      <div class="nav-overlay__heading">The Story</div>
+      <a href="/" class="nav-overlay__link">Home</a>
+      <a href="/story/" class="nav-overlay__link">My Story</a>
       <a href="/about/" class="nav-overlay__link">About</a>
     </div>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The data</div>
+      <div class="nav-overlay__heading">The Data</div>
+      <a href="/live/" class="nav-overlay__link">Live</a>
       <a href="/character/" class="nav-overlay__link">Character</a>
       <a href="/habits/" class="nav-overlay__link">Habits</a>
-      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
-      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
-      <a href="/results/" class="nav-overlay__link">Results</a>
-      <a href="/progress/" class="nav-overlay__link">Progress</a>
-      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
-      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
-      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
-      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
-      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
-      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
     </div>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The platform</div>
+      <div class="nav-overlay__heading">The Science</div>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Build</div>
       <a href="/platform/" class="nav-overlay__link">Platform</a>
       <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
-      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
-      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
-      <a href="/ask/" class="nav-overlay__link">Ask</a>
       <a href="/board/" class="nav-overlay__link">Board</a>
-      <a href="/data/" class="nav-overlay__link">Data</a>
       <a href="/cost/" class="nav-overlay__link">Cost</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
+      <a href="/tools/" class="nav-overlay__link">Tools</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">Follow</div>
+      <a href="/chronicle/" class="nav-overlay__link">Chronicle</a>
       <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
       <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+      <a href="/privacy/" class="nav-overlay__link">Privacy</a>
     </div>
   </div>
 </div>
 
 
+
+
+
+
+<!-- Page header -->
 <div class="page-header">
   <div>
-    <div class="eyebrow">Architecture</div>
+    <div class="eyebrow">The Build</div>
     <h1 class="page-header__title">The<br><span>Platform</span></h1>
+    <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);margin-top:var(--space-5);max-width:420px">A single-person health intelligence system, built entirely on AWS serverless.</p>
   </div>
   <div class="page-header__meta">
     <div class="meta-stat">
@@ -351,155 +400,11 @@
   </div>
 </div>
 
-<!-- Feature hub -->
-<section class="hub-section reveal">
-  <div class="eyebrow" style="margin-bottom:var(--space-6)">Everything on this site</div>
-  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-10)">The full platform</h2>
-
-  <div class="hub-category">
-    <div class="hub-category__label">The Journey</div>
-    <div class="hub-grid">
-      <a href="/story/" class="hub-card">
-        <div class="hub-card__icon">📖</div>
-        <div class="hub-card__title">STORY</div>
-        <div class="hub-card__desc">302 lbs. January 2026. The decision to stop optimizing in the dark.</div>
-      </a>
-      <a href="/live/" class="hub-card">
-        <div class="hub-card__icon">📡</div>
-        <div class="hub-card__title">LIVE</div>
-        <div class="hub-card__desc">Every weigh-in, experiment, and milestone. Interactive timeline.</div>
-      </a>
-      <a href="/journal/" class="hub-card">
-        <div class="hub-card__icon">📝</div>
-        <div class="hub-card__title">JOURNAL</div>
-        <div class="hub-card__desc">Weekly chronicles from 19 data sources. Every number, every failure.</div>
-      </a>
-      <a href="/week/" class="hub-card">
-        <div class="hub-card__icon">📅</div>
-        <div class="hub-card__title">THIS WEEK</div>
-        <div class="hub-card__desc">Current week's data snapshot. The most shareable artifact on the site.</div>
-      </a>
-      <a href="/accountability/" class="hub-card">
-        <div class="hub-card__icon">👥</div>
-        <div class="hub-card__title">ACCOUNTABILITY</div>
-        <div class="hub-card__desc">Public commitments. Accountability without witnesses is just intention.</div>
-      </a>
-      <a href="/start/" class="hub-card">
-        <div class="hub-card__icon">🗺️</div>
-        <div class="hub-card__title">START HERE</div>
-        <div class="hub-card__desc">New to the site? This is your routing hub.</div>
-      </a>
-    </div>
-  </div>
-
-  <div class="hub-category">
-    <div class="hub-category__label">The Data</div>
-    <div class="hub-grid">
-      <a href="/habits/" class="hub-card">
-        <div class="hub-card__icon">📊</div>
-        <div class="hub-card__title">HABITS</div>
-        <div class="hub-card__desc">52-week heatmap. Every habit tracked daily.</div>
-      </a>
-      <a href="/character/" class="hub-card">
-        <div class="hub-card__icon">🧙</div>
-        <div class="hub-card__title">CHARACTER</div>
-        <div class="hub-card__desc">7-pillar RPG scoring system. Sleep, movement, nutrition, and more.</div>
-      </a>
-      <a href="/achievements/" class="hub-card">
-        <div class="hub-card__icon">🏆</div>
-        <div class="hub-card__title">ACHIEVEMENTS</div>
-        <div class="hub-card__desc">Milestone badges earned from real data. No participation trophies.</div>
-      </a>
-      <a href="/benchmarks/" class="hub-card">
-        <div class="hub-card__icon">📐</div>
-        <div class="hub-card__title">BENCHMARKS</div>
-        <div class="hub-card__desc">My numbers vs. population norms. Interactive calculator.</div>
-      </a>
-      <a href="/progress/" class="hub-card">
-        <div class="hub-card__icon">📈</div>
-        <div class="hub-card__title">PROGRESS</div>
-        <div class="hub-card__desc">Long-arc trend lines across all 19 sources.</div>
-      </a>
-      <a href="/discoveries/" class="hub-card">
-        <div class="hub-card__icon">🔬</div>
-        <div class="hub-card__title">DISCOVERIES</div>
-        <div class="hub-card__desc">What the AI found. Correlations and patterns a human would miss.</div>
-      </a>
-      <a href="/intelligence/" class="hub-card">
-        <div class="hub-card__icon">🤖</div>
-        <div class="hub-card__title">INTELLIGENCE</div>
-        <div class="hub-card__desc">Daily AI coaching brief. What Claude reads, predicts, recommends.</div>
-      </a>
-      <a href="/explorer/" class="hub-card">
-        <div class="hub-card__icon">🔭</div>
-        <div class="hub-card__title">EXPLORER</div>
-        <div class="hub-card__desc">23 cross-source correlations. FDR-corrected. What predicts what.</div>
-      </a>
-      <a href="/experiments/" class="hub-card">
-        <div class="hub-card__icon">⚗️</div>
-        <div class="hub-card__title">EXPERIMENTS</div>
-        <div class="hub-card__desc">N=1 self-experiments with data. Hypothesis → protocol → result.</div>
-      </a>
-      <a href="/supplements/" class="hub-card">
-        <div class="hub-card__icon">💊</div>
-        <div class="hub-card__title">SUPPLEMENTS</div>
-        <div class="hub-card__desc">What I take, why, and what the data says about it.</div>
-      </a>
-      <a href="/glucose/" class="hub-card">
-        <div class="hub-card__icon">🩸</div>
-        <div class="hub-card__title">GLUCOSE</div>
-        <div class="hub-card__desc">30-day CGM data. Time-in-range, variability, metabolic patterns.</div>
-      </a>
-      <a href="/sleep/" class="hub-card">
-        <div class="hub-card__icon">🌙</div>
-        <div class="hub-card__title">SLEEP</div>
-        <div class="hub-card__desc">Eight Sleep × Whoop cross-referenced. Bed temp vs. sleep quality.</div>
-      </a>
-    </div>
-  </div>
-
-  <div class="hub-category" style="margin-bottom:0;">
-    <div class="hub-category__label">The Platform</div>
-    <div class="hub-grid">
-      <a href="/cost/" class="hub-card">
-        <div class="hub-card__icon">💰</div>
-        <div class="hub-card__title">COST</div>
-        <div class="hub-card__desc">Full AWS bill breakdown. $13/month AI health OS.</div>
-      </a>
-      <a href="/tools/" class="hub-card">
-        <div class="hub-card__icon">🔧</div>
-        <div class="hub-card__title">TOOLS</div>
-        <div class="hub-card__desc">Every app, device, and service in the stack.</div>
-      </a>
-      <a href="/methodology/" class="hub-card">
-        <div class="hub-card__icon">📏</div>
-        <div class="hub-card__title">METHODOLOGY</div>
-        <div class="hub-card__desc">How the scoring works. Statistics, FDR correction, scoring rules.</div>
-      </a>
-      <a href="/ask/" class="hub-card">
-        <div class="hub-card__icon">💬</div>
-        <div class="hub-card__title">ASK</div>
-        <div class="hub-card__desc">Ask Claude anything about my health data. Subscribers get full access.</div>
-      </a>
-      <a href="/board/" class="hub-card">
-        <div class="hub-card__icon">🎯</div>
-        <div class="hub-card__title">BOARD</div>
-        <div class="hub-card__desc">My AI advisory board. 6 expert personas, always available.</div>
-      </a>
-      <a href="/results/" class="hub-card">
-        <div class="hub-card__icon">📋</div>
-        <div class="hub-card__title">RESULTS</div>
-        <div class="hub-card__desc">Lab work, DEXA scans, and clinical measurements over time.</div>
-      </a>
-    </div>
-  </div>
-</section>
-
 <!-- WR-34: Animated data flow diagram -->
 <section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);overflow:hidden;">
   <div class="eyebrow">Data flow</div>
   <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">How data moves through the system</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">Every morning at 5 AM, data flows from 19 sources into a single DynamoDB table, gets processed by Lambda compute functions, and feeds Claude’s daily intelligence brief.</p>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">Every morning, 19 data sources are ingested by Lambda functions on EventBridge cron schedules. Raw JSON lands in S3, normalized metrics go to DynamoDB, and compute Lambdas pre-calculate intelligence results before the 11 AM daily brief fires.</p>
   <div id="data-flow" style="position:relative;border:1px solid var(--border);background:var(--surface);padding:var(--space-6);overflow-x:auto;">
     <svg viewBox="0 0 900 200" style="width:100%;min-width:700px;height:200px;display:block;" xmlns="http://www.w3.org/2000/svg">
       <!-- Nodes -->
@@ -552,7 +457,7 @@
       <text x="720" y="192" text-anchor="middle" fill="#4a6050" font-size="8" font-family="JetBrains Mono,monospace" letter-spacing="1">EMAILS · WEBSITE · /ASK</text>
 
       <!-- Schedule label -->
-      <text x="300" y="30" text-anchor="middle" fill="#4a6050" font-size="8" font-family="JetBrains Mono,monospace" letter-spacing="1.5">EVERY DAY AT 5:00 AM PST</text>
+      <text x="300" y="30" text-anchor="middle" fill="#4a6050" font-size="8" font-family="JetBrains Mono,monospace" letter-spacing="1.5">EVERY DAY AT 6:45 AM–11:00 AM PDT</text>
       <line x1="200" y1="35" x2="400" y2="35" stroke="rgba(0,229,160,0.08)" stroke-width="1"/>
     </svg>
   </div>
@@ -561,8 +466,8 @@
 <!-- Architecture layers -->
 <section class="arch-section reveal">
   <div class="eyebrow">System design</div>
-  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Three-layer architecture</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body)">Everything flows inward to a single DynamoDB table, then outward through Claude. The design philosophy: get data in automatically, store it cheaply, make it queryable without a data engineering background.</p>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Five-layer architecture</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body)">All data converges to a single DynamoDB table (no GSIs, PK+SK only). Compute Lambdas pre-calculate intelligence results before the email delivery window. The MCP server exposes 95 tools to Claude over OAuth 2.1 — queries stay in natural language, not SQL.</p>
 
   <div class="arch-layers">
     <div class="arch-layer">
@@ -614,24 +519,6 @@
     </div>
     <div class="arch-layer">
       <div class="arch-layer__label">
-        <div class="arch-layer__name">SERVE</div>
-        <div class="arch-layer__sub">95 MCP tools → Claude</div>
-      </div>
-      <div class="arch-layer__content">
-        <div class="arch-chips">
-          <span class="chip active">Remote MCP (OAuth 2.1)</span>
-          <span class="chip active">Claude Desktop (local)</span>
-          <span class="chip active">claude.ai + mobile</span>
-          <span class="chip active">Lambda Function URL</span>
-          <span class="chip active">HMAC Bearer auth</span>
-          <span class="chip active">26h TTL cache</span>
-          <span class="chip active">Nightly warmer (13 tools)</span>
-          <span class="chip">1024MB / 300s timeout</span>
-        </div>
-      </div>
-    </div>
-    <div class="arch-layer">
-      <div class="arch-layer__label">
         <div class="arch-layer__name">COMPUTE</div>
         <div class="arch-layer__sub">Pre-brief intelligence</div>
       </div>
@@ -645,6 +532,24 @@
           <span class="chip active">weekly-correlation-compute</span>
           <span class="chip">IC-4 failure patterns (May)</span>
           <span class="chip">IC-5 momentum warning (May)</span>
+        </div>
+      </div>
+    </div>
+    <div class="arch-layer">
+      <div class="arch-layer__label">
+        <div class="arch-layer__name">SERVE</div>
+        <div class="arch-layer__sub">95 MCP tools → Claude</div>
+      </div>
+      <div class="arch-layer__content">
+        <div class="arch-chips">
+          <span class="chip active">Remote MCP (OAuth 2.1)</span>
+          <span class="chip active">Claude Desktop (local)</span>
+          <span class="chip active">claude.ai + mobile</span>
+          <span class="chip active">Lambda Function URL</span>
+          <span class="chip active">HMAC Bearer auth</span>
+          <span class="chip active">26h TTL cache</span>
+          <span class="chip active">Nightly warmer (13 tools)</span>
+          <span class="chip">1024MB / 300s timeout</span>
         </div>
       </div>
     </div>
@@ -669,41 +574,16 @@
   </div>
 </section>
 
-<!-- Tech stack -->
-<section class="stack-section reveal">
-  <div class="eyebrow">Tech stack</div>
-  <h2 class="text-h3" style="color:var(--text)">What it's built on</h2>
-  <div class="stack-grid">
-    <div class="stack-card">
-      <div class="stack-card__category">Infrastructure</div>
-      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">AWS Lambda + CDK</div><div class="stack-item__desc">48 functions across 8 CDK stacks. All IAM roles dedicated and least-privilege. EventBridge scheduling.</div></div></div>
-      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">DynamoDB + S3</div><div class="stack-item__desc">Single-table design. On-demand billing. PITR. KMS CMK encryption. Static site on CloudFront.</div></div></div>
-      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">SES + SNS + SQS</div><div class="stack-item__desc">Email delivery, alert routing, dead-letter queue for failed Lambdas.</div></div></div>
-    </div>
-    <div class="stack-card">
-      <div class="stack-card__category">AI / Intelligence</div>
-      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Claude (Anthropic)</div><div class="stack-item__desc">Sonnet for coaching, Haiku for classification. ~$3/month API cost. MCP protocol for tool calls.</div></div></div>
-      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">MCP Server (custom)</div><div class="stack-item__desc">95-tool Lambda backed by DynamoDB. OAuth 2.1 + HMAC auth. 31-module package. Nightly cache warmer.</div></div></div>
-      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Hypothesis Engine</div><div class="stack-item__desc">Weekly Pearson correlation matrix (23 pairs, BH FDR correction) feeds AI hypothesis generation.</div></div></div>
-    </div>
-    <div class="stack-card">
-      <div class="stack-card__category">Quality + CI/CD</div>
-      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">853 automated tests</div><div class="stack-item__desc">CDK handler consistency, S3 path linting, IAM/secrets cross-check, MCP registry integrity, DynamoDB patterns.</div></div></div>
-      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">GitHub Actions CI</div><div class="stack-item__desc">Lint → test → plan → deploy (manual approval gate). OIDC federation. Auto-rollback on smoke failure.</div></div></div>
-      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Synthetic canary</div><div class="stack-item__desc">Every 4 hours: DynamoDB round-trip, S3 round-trip, MCP endpoint health. SES alert on failure.</div></div></div>
-    </div>
-  </div>
-</section>
-
-<!-- AI tools sample -->
+<!-- Intelligence Layer -->
 <section class="ai-section reveal">
   <div>
     <div class="eyebrow">Intelligence layer</div>
-    <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-4)">95 tools that know your body</h2>
+    <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-4)">95 tools across 31 domain modules</h2>
     <div class="ai-section__body">
-      <p>The MCP server gives Claude direct access to every data point. Natural language queries across 18 months of longitudinal health data — no SQL, no dashboards, no context switching.</p>
-      <p><strong>Ask anything.</strong> "Did my HRV drop the week after I increased Zone 2 training?" "What's the correlation between my sleep onset time and next-day recovery?" "Which habits most predict a good P40 score?"</p>
-      <p>The platform answers these questions because it has the data, the statistical methods, and 95 purpose-built tools to surface them.</p>
+      <p>The MCP server is a Lambda-backed tool registry exposing direct read access to every metric in DynamoDB. Claude calls tools in natural language; the server handles query composition, DynamoDB projection expressions, and result formatting.</p>
+      <p><strong>Domain modules</strong> cover sleep, training, nutrition, CGM, labs, journal, correlation, character, board, lifestyle, and strength — each with dedicated tools purpose-built for their data shapes.</p>
+      <p><strong>Daily brief pipeline:</strong> compute Lambdas run first (character-sheet, adaptive-mode, insight, hypothesis-engine), pre-calculating scores and hypotheses. The email Lambda reads these cached results rather than re-querying live data, keeping latency under 2 seconds.</p>
+      <p><strong>Weekly hypothesis engine</strong> runs a Pearson correlation matrix across 23 metric pairs with Benjamini-Hochberg FDR correction, then feeds statistically significant findings to Claude for biological hypothesis generation.</p>
     </div>
   </div>
   <div>
@@ -725,7 +605,7 @@
 <section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
   <div class="eyebrow">Tool spotlight</div>
   <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Tool of the week</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">One of 95 MCP tools that Claude uses to understand my health data. Here&rsquo;s what it actually does.</p>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">One of 95 MCP tools that Claude uses to query health data. Inputs, outputs, and a representative finding.</p>
   <div style="border:1px solid var(--border);background:var(--surface);">
     <div style="padding:var(--space-4) var(--space-6);border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;">
       <span style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--accent)">get_sleep_environment_analysis</span>
@@ -743,11 +623,106 @@
   <p style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-label);margin-top:var(--space-4)">// Tool spotlight rotates periodically. <a href="/ask/" style="color:var(--accent-dim);text-decoration:none">Ask the platform anything →</a></p>
 </section>
 
-<!-- Review history -->
+<!-- Tech stack -->
+<section class="stack-section reveal">
+  <div class="eyebrow">Tech stack</div>
+  <h2 class="text-h3" style="color:var(--text)">What it's built on</h2>
+  <div class="stack-grid">
+    <div class="stack-card">
+      <div class="stack-card__category">Infrastructure</div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">AWS Lambda + CDK</div><div class="stack-item__desc">48 functions across 8 CDK stacks. All IAM roles dedicated and least-privilege. EventBridge scheduling on fixed UTC crons (no DST drift).</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">DynamoDB + S3</div><div class="stack-item__desc">Single-table design. On-demand billing. PITR 35-day. KMS CMK encryption. Raw JSON archived to S3 at <code>raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json</code>.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">SES + SNS + SQS</div><div class="stack-item__desc">Email delivery via SES, alert routing through SNS, dead-letter queues for failed Lambda invocations.</div></div></div>
+    </div>
+    <div class="stack-card">
+      <div class="stack-card__category">AI / Intelligence</div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Claude (Anthropic)</div><div class="stack-item__desc">Sonnet for coaching and analysis, Haiku for classification. ~$3/month API cost. MCP protocol for tool calls.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">MCP Server (custom)</div><div class="stack-item__desc">95-tool Lambda backed by DynamoDB. OAuth 2.1 + HMAC auth. 31-module package. 26h TTL cache with nightly warmer across 13 high-cost tools.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Hypothesis Engine</div><div class="stack-item__desc">Weekly Pearson correlation matrix (23 pairs, BH FDR correction) feeds Claude for biological hypothesis generation.</div></div></div>
+    </div>
+    <div class="stack-card">
+      <div class="stack-card__category">Quality + CI/CD</div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">853 automated tests</div><div class="stack-item__desc">CDK handler consistency, S3 path linting, IAM/secrets cross-check, MCP registry integrity, DynamoDB key pattern validation.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">GitHub Actions CI</div><div class="stack-item__desc">Lint → test → plan → deploy (manual approval gate). OIDC federation — no long-lived AWS keys. Auto-rollback on smoke test failure.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Synthetic canary</div><div class="stack-item__desc">Every 4 hours: DynamoDB round-trip, S3 round-trip, MCP endpoint health check. SES alert on any failure.</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Security posture -->
+<section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
+  <div class="eyebrow">Security posture</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Hardened by default</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">Every architectural decision includes a security dimension. The site-facing API is read-only by design; the data layer is air-gapped from public writes.</p>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
+    <div style="background:var(--surface);padding:var(--space-6);">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-4)">Access control</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.7;">
+        <div style="margin-bottom:var(--space-2);">— One IAM role per Lambda (least-privilege)</div>
+        <div style="margin-bottom:var(--space-2);">— Secrets Manager only — no .env files</div>
+        <div style="margin-bottom:var(--space-2);">— OIDC federation for CI/CD (no static keys)</div>
+        <div style="margin-bottom:var(--space-2);">— OAuth 2.1 + HMAC auth on MCP endpoint</div>
+        <div>— Rate limiting: 3 anon / 20 subscriber per hour on /ask</div>
+      </div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6);">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-4)">Data protection</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.7;">
+        <div style="margin-bottom:var(--space-2);">— KMS CMK encryption on DynamoDB + S3</div>
+        <div style="margin-bottom:var(--space-2);">— DynamoDB deletion protection enabled</div>
+        <div style="margin-bottom:var(--space-2);">— S3 bucket policy blocks DeleteObject on <code>raw/*</code></div>
+        <div style="margin-bottom:var(--space-2);">— PITR 35-day point-in-time recovery</div>
+        <div>— Site API Lambda: read-only, never writes to DynamoDB</div>
+      </div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6);">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-4)">Observability</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.7;">
+        <div style="margin-bottom:var(--space-2);">— X-Ray tracing on all Lambdas</div>
+        <div style="margin-bottom:var(--space-2);">— CloudWatch alarms on error rate + latency</div>
+        <div style="margin-bottom:var(--space-2);">— Dead-letter queues on all async invocations</div>
+        <div style="margin-bottom:var(--space-2);">— Synthetic canary every 4 hours</div>
+        <div>— SES alert on any canary failure</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WR-35: Cost transparency section -->
+<section class="arch-section reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
+  <div class="eyebrow">FinOps</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">What it costs to run</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">48 Lambda functions, DynamoDB on-demand, S3, CloudFront, SES, 7 AI-generated digests per week, and a public site with live data. All serverless — no EC2, no containers, no reserved capacity.</p>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
+    <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">Total monthly</div>
+      <div style="font-family:var(--font-display);font-size:42px;color:var(--accent);line-height:1;">$13</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">/month</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">Claude API</div>
+      <div style="font-family:var(--font-display);font-size:42px;color:var(--text);line-height:1;">$3</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Sonnet + Haiku</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">AWS infra</div>
+      <div style="font-family:var(--font-display);font-size:42px;color:var(--text);line-height:1;">$10</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Lambda + DDB + S3</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">Engineers on team</div>
+      <div style="font-family:var(--font-display);font-size:42px;color:var(--c-amber-500);line-height:1;">0</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Built with Claude</div>
+    </div>
+  </div>
+  <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);margin-top:var(--space-4);letter-spacing:var(--ls-label)">// Pay only for what runs. Full breakdown at <a href="/cost/" style="color:var(--accent-dim);text-decoration:none">/cost/ →</a></p>
+</section>
+
+<!-- Architecture reviews -->
 <section class="reviews-section reveal">
   <div class="eyebrow">Architecture reviews</div>
   <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Reviewed 16 times by a 12-member AI board</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-4)">Every major change triggers a full architecture review. 14 expert AI personas — cloud architect, security lead, statistician, product architect, adversarial reviewer — vote, score, and issue findings.</p>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-4)">Every major change triggers a structured architecture review. 14 expert AI personas — cloud architect, security lead, statistician, product architect, adversarial reviewer — vote, score, and issue findings against a fixed rubric.</p>
   <p style="margin-bottom:var(--space-8)"><a href="/platform/reviews/" class="btn btn--ghost" style="font-size:var(--text-xs)">Read the latest review (R17: A-) →</a></p>
   <div class="review-grid">
     <div class="review-card">
@@ -777,34 +752,118 @@
   </div>
 </section>
 
-<!-- WR-35: Cost transparency section -->
-<section class="arch-section reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
-  <div class="eyebrow">FinOps</div>
-  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">What this costs to run</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">The entire platform — 49 Lambda functions, DynamoDB, S3, CloudFront, SES, 7 AI-generated email digests per week, and a public website with live data — runs on AWS for less than the cost of a single lunch.</p>
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
-    <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
-      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">Total monthly</div>
-      <div style="font-family:var(--font-display);font-size:42px;color:var(--accent);line-height:1;">$13</div>
-      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">/month</div>
-    </div>
-    <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
-      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">Claude API</div>
-      <div style="font-family:var(--font-display);font-size:42px;color:var(--text);line-height:1;">$3</div>
-      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Sonnet + Haiku</div>
-    </div>
-    <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
-      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">AWS infra</div>
-      <div style="font-family:var(--font-display);font-size:42px;color:var(--text);line-height:1;">$10</div>
-      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Lambda + DDB + S3</div>
-    </div>
-    <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
-      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">Engineers on team</div>
-      <div style="font-family:var(--font-display);font-size:42px;color:var(--c-amber-500);line-height:1;">0</div>
-      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Built with Claude</div>
+<!-- Feature hub -->
+<section class="hub-section reveal">
+  <div class="eyebrow" style="margin-bottom:var(--space-6)">Everything on this site</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-10)">All platform surfaces</h2>
+
+  <div class="hub-category">
+    <div class="hub-category__label">The Build</div>
+    <div class="hub-grid">
+      <a href="/intelligence/" class="hub-card">
+        <div class="hub-card__icon">🤖</div>
+        <div class="hub-card__title">INTELLIGENCE</div>
+        <div class="hub-card__desc">Daily AI coaching brief. What Claude reads, predicts, and recommends from 19 sources.</div>
+      </a>
+      <a href="/cost/" class="hub-card">
+        <div class="hub-card__icon">💰</div>
+        <div class="hub-card__title">COST</div>
+        <div class="hub-card__desc">Full AWS bill breakdown. $13/month AI health OS — every line item.</div>
+      </a>
+      <a href="/methodology/" class="hub-card">
+        <div class="hub-card__icon">📏</div>
+        <div class="hub-card__title">METHODOLOGY</div>
+        <div class="hub-card__desc">How the scoring works. Statistics, FDR correction, character sheet scoring rules.</div>
+      </a>
+      <a href="/tools/" class="hub-card">
+        <div class="hub-card__icon">🔧</div>
+        <div class="hub-card__title">TOOLS</div>
+        <div class="hub-card__desc">Every device, app, and service in the stack with integration method.</div>
+      </a>
+      <a href="/board/" class="hub-card">
+        <div class="hub-card__icon">🎯</div>
+        <div class="hub-card__title">BOARD</div>
+        <div class="hub-card__desc">AI advisory board. 6 expert personas reviewing architecture and decisions.</div>
+      </a>
+      <a href="/ask/" class="hub-card">
+        <div class="hub-card__icon">💬</div>
+        <div class="hub-card__title">ASK</div>
+        <div class="hub-card__desc">Natural language queries against live health data. Subscribers get full access.</div>
+      </a>
     </div>
   </div>
-  <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);margin-top:var(--space-4);letter-spacing:var(--ls-label)">// All serverless. No EC2 instances. No containers. Pay only for what runs.</p>
+
+  <div class="hub-category">
+    <div class="hub-category__label">The Data</div>
+    <div class="hub-grid">
+      <a href="/habits/" class="hub-card">
+        <div class="hub-card__icon">📊</div>
+        <div class="hub-card__title">HABITS</div>
+        <div class="hub-card__desc">52-week heatmap. Every habit tracked daily.</div>
+      </a>
+      <a href="/character/" class="hub-card">
+        <div class="hub-card__icon">🧙</div>
+        <div class="hub-card__title">CHARACTER</div>
+        <div class="hub-card__desc">7-pillar RPG scoring system. Sleep, movement, nutrition, and more.</div>
+      </a>
+      <a href="/benchmarks/" class="hub-card">
+        <div class="hub-card__icon">📐</div>
+        <div class="hub-card__title">BENCHMARKS</div>
+        <div class="hub-card__desc">Current numbers vs. population norms and centenarian targets.</div>
+      </a>
+      <a href="/discoveries/" class="hub-card">
+        <div class="hub-card__icon">🔬</div>
+        <div class="hub-card__title">DISCOVERIES</div>
+        <div class="hub-card__desc">What the AI found. Correlations and patterns surfaced from longitudinal data.</div>
+      </a>
+      <a href="/explorer/" class="hub-card">
+        <div class="hub-card__icon">🔭</div>
+        <div class="hub-card__title">EXPLORER</div>
+        <div class="hub-card__desc">23 cross-source correlations. FDR-corrected. What predicts what.</div>
+      </a>
+      <a href="/experiments/" class="hub-card">
+        <div class="hub-card__icon">⚗️</div>
+        <div class="hub-card__title">EXPERIMENTS</div>
+        <div class="hub-card__desc">N=1 self-experiments with data. Hypothesis → protocol → result.</div>
+      </a>
+      <a href="/glucose/" class="hub-card">
+        <div class="hub-card__icon">🩸</div>
+        <div class="hub-card__title">GLUCOSE</div>
+        <div class="hub-card__desc">30-day CGM data. Time-in-range, variability, metabolic patterns.</div>
+      </a>
+      <a href="/sleep/" class="hub-card">
+        <div class="hub-card__icon">🌙</div>
+        <div class="hub-card__title">SLEEP</div>
+        <div class="hub-card__desc">Eight Sleep × Whoop cross-referenced. Bed temp vs. sleep quality.</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="hub-category" style="margin-bottom:0;">
+    <div class="hub-category__label">The Live Feed</div>
+    <div class="hub-grid">
+      <a href="/live/" class="hub-card">
+        <div class="hub-card__icon">📡</div>
+        <div class="hub-card__title">LIVE</div>
+        <div class="hub-card__desc">Real-time snapshot and long-arc trend lines across all 19 sources.</div>
+      </a>
+      <a href="/chronicle/" class="hub-card">
+        <div class="hub-card__icon">📝</div>
+        <div class="hub-card__title">CHRONICLE</div>
+        <div class="hub-card__desc">Weekly chronicles from 19 data sources. Every number, every week.</div>
+      </a>
+      <a href="/week/" class="hub-card">
+        <div class="hub-card__icon">📅</div>
+        <div class="hub-card__title">THIS WEEK</div>
+        <div class="hub-card__desc">Current week's data snapshot across all tracked metrics.</div>
+      </a>
+      <a href="/accountability/" class="hub-card">
+        <div class="hub-card__icon">👥</div>
+        <div class="hub-card__title">ACCOUNTABILITY</div>
+        <div class="hub-card__desc">Public commitments. Tracked, verified, and reported by the platform.</div>
+      </a>
+    </div>
+  </div>
 </section>
 
 <!-- S2-T1-8: Email CTA footer — injected by add_email_cta.py -->
@@ -819,7 +878,7 @@
   <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
     Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.<br>
-    <a href="/journal/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue →</a>
+    <a href="/chronicle/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue →</a>
   </p>
   <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
     <input id="cta-email-platform" type="email" placeholder="your@email.com" style="
@@ -879,66 +938,71 @@
 <!-- Mobile bottom nav -->
 <nav class="bottom-nav" aria-label="Mobile navigation">
   <a href="/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     <span>Home</span>
   </a>
-  <a href="/ask/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-    <span>Ask</span>
+  <a href="/live/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/></svg>
+    <span>Live</span>
   </a>
   <a href="/character/" class="bottom-nav__link">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-    <span>Score</span>
+    <span>Character</span>
   </a>
-  <a href="/journal/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
-    <span>Journal</span>
+  <a href="/chronicle/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+    <span>Chronicle</span>
   </a>
-  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-    <span>More</span>
-  </button>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>Ask</span>
+  </a>
 </nav>
+
+<section class="reading-path" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
+  <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>
+  <a href="/cost/" style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-display);">What this costs to run →</a>
+  <p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Full AWS infrastructure cost breakdown — down to the cent</p>
+</section>
 <footer class="footer-v2">
   <div class="footer-v2__grid">
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The journey</div>
-      <a href="/story/" class="footer-v2__link">Story</a>
-      <a href="/live/" class="footer-v2__link">Live</a>
-      <a href="/journal/" class="footer-v2__link">Journal</a>
-      <a href="/week/" class="footer-v2__link">This Week</a>
+      <div class="footer-v2__heading">The Story</div>
+      <a href="/" class="footer-v2__link">Home</a>
+      <a href="/story/" class="footer-v2__link">My Story</a>
       <a href="/about/" class="footer-v2__link">About</a>
     </div>
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The data</div>
+      <div class="footer-v2__heading">The Data</div>
+      <a href="/live/" class="footer-v2__link">Live</a>
       <a href="/character/" class="footer-v2__link">Character</a>
       <a href="/habits/" class="footer-v2__link">Habits</a>
-      <a href="/achievements/" class="footer-v2__link">Achievements</a>
-      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
-      <a href="/results/" class="footer-v2__link">Results</a>
-      <a href="/progress/" class="footer-v2__link">Progress</a>
-      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
-      <a href="/supplements/" class="footer-v2__link">Supplements</a>
-      <a href="/glucose/" class="footer-v2__link">Glucose</a>
-      <a href="/sleep/" class="footer-v2__link">Sleep</a>
-      <a href="/experiments/" class="footer-v2__link">Experiments</a>
-      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
     </div>
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The platform</div>
+      <div class="footer-v2__heading">The Science</div>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The Build</div>
       <a href="/platform/" class="footer-v2__link">Platform</a>
       <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
-      <a href="/accountability/" class="footer-v2__link">Accountability</a>
-      <a href="/methodology/" class="footer-v2__link">Methodology</a>
-      <a href="/ask/" class="footer-v2__link">Ask</a>
       <a href="/board/" class="footer-v2__link">Board</a>
-      <a href="/data/" class="footer-v2__link">Data</a>
       <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
       <a href="/tools/" class="footer-v2__link">Tools</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">Follow</div>
+      <a href="/chronicle/" class="footer-v2__link">Chronicle</a>
       <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
       <a href="/rss.xml" class="footer-v2__link">RSS</a>
       <a href="/privacy/" class="footer-v2__link">Privacy</a>
     </div>

@@ -1,0 +1,35 @@
+{
+  "posts": [
+    {
+      "week": 3,
+      "title": "The DoorDash Chronicle",
+      "date": "2026-03-11",
+      "stats_line": "Weight: tracking paused \u00b7 Grade: sick days logged",
+      "url": "/journal/posts/week-03/",
+      "excerpt": "He has nineteen data sources. He has a platform that generates a daily briefing, tracks his HRV to two decimal places, and maintains a gamified character sheet scoring seven dimensions of his health. He has, in other words, built an extraordinarily sophisticated apparatus for listening to his body.",
+      "word_count": 1070,
+      "has_board_interview": false
+    },
+    {
+      "week": 2,
+      "title": "The Empty Journal",
+      "date": "2026-03-03",
+      "stats_line": "Week 2 \u00b7 February 25 \u2013 March 3, 2026 \u00b7 Seattle, WA",
+      "url": "/journal/posts/week-02/",
+      "excerpt": "Here is something I did not expect to find two weeks into this assignment: a man who has built twenty-seven automated programs to monitor his sleep, his blood glucose, his heart rate recovery, his gait symmetry, and whether he remembered to take his apigenin before bed \u2014 who has not written a single",
+      "word_count": 1421,
+      "has_board_interview": false
+    },
+    {
+      "week": 0,
+      "title": "Before the Numbers",
+      "date": "2026-02-22",
+      "stats_line": "Prologue \u00b7 February 2026 \u00b7 Seattle, WA",
+      "url": "/journal/posts/week-00/",
+      "excerpt": "The first thing you notice about Matthew's apartment is the charging cables.\n\nThere's one snaking from the nightstand \u2014 that's the Whoop strap, a fitness tracker that monitors his heart rate variability while he sleeps. Another on the bathroom counter feeds a Garmin Epix watch that measures his stre",
+      "word_count": 1240,
+      "has_board_interview": false
+    }
+  ],
+  "updated_at": "2026-03-16T03:12:58.928914+00:00"
+}

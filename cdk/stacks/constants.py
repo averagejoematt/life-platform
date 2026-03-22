@@ -26,6 +26,9 @@ KMS_KEY_ID = os.environ.get("KMS_KEY_ID", "444438d1-a5e0-43b8-9391-3cd2d70dde4d"
 # Anthropic model versions (CONF-04: env-overridable to avoid code changes on model upgrades)
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
+# SEC-08: SES sender domain — parameterized so staging can use a different verified identity.
+SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
+
 # Shared utils layer — update on every layer rebuild (bash deploy/build_layer.sh)
 SHARED_LAYER_VERSION = 10  # ADR-027: v10 adds stable mcp/ core modules
 

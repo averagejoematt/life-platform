@@ -302,15 +302,35 @@ This document translates the Board Summit recommendations into an ordered, reali
 
 | ID | Feature | Effort | Model | Deliverable | Status |
 |----|---------|--------|-------|-------------|--------|
-| GAM-01 | **"Since Your Last Visit" localStorage badges** | M (4-6h) | None (frontend) | localStorage stores `last_visit` timestamp. On return visits, dot/badge indicator on bottom nav icons (Journal, Live, Score) when new content has been published since last visit. Badge clears when user visits that section. Pure client-side — no backend. | ⬜ |
-| GAM-02 | **Reading Path CTAs (page-bottom navigation)** | M (4-6h) | None (frontend) | Contextual "What to read next →" prompts at bottom of each content page. Curated paths: `/start/` → `/story/` → `/live/` → `/results/` → `/subscribe/`. Secondary path: `/platform/` → `/cost/` → `/methodology/` → `/intelligence/`. Inspired by David Perell's reading path architecture. Static links per page, not algorithmic. | ⬜ |
+| GAM-01 | **"Since Your Last Visit" localStorage badges** | M (4-6h) | None (frontend) | localStorage stores `last_visit` timestamp. On return visits, dot/badge indicator on bottom nav icons (Journal, Live, Score) when new content has been published since last visit. Badge clears when user visits that section. Pure client-side — no backend. | ✅ Done (nav.js v1.2.0) |
+| GAM-02 | **Reading Path CTAs (page-bottom navigation)** | M (4-6h) | None (frontend) | Contextual "What to read next →" prompts at bottom of each content page. Curated paths: Story → Live → Character → Habits → Experiments → Discoveries → Intelligence. Platform path: Platform → Cost → Methodology → Intelligence. DOM-injected before footer via nav.js. | ✅ Done (nav.js v1.2.0) |
 
-**Sprint 11 Definition of Done:**
-- ⬜ GAM-01: Return visitors see dot indicators on bottom nav when content updated since last visit
-- ⬜ GAM-02: Every content page has a contextual "next read" CTA at bottom
-- ⬜ Reading paths documented: Story Path + Platform Path + Data Path
-- ⬜ Badge clears correctly when user navigates to flagged section
-- ⬜ localStorage gracefully degrades (no badge if localStorage blocked/unavailable)
+**Sprint 11 Phase 1 Definition of Done:**
+- ✅ GAM-01: Return visitors see dot indicators on bottom nav when content updated since last visit
+- ✅ GAM-02: Every content page has a contextual "next read" CTA at bottom
+- ✅ Reading paths documented: Story Path + Platform Path + Data Path
+- ✅ Badge clears correctly when user navigates to flagged section
+- ✅ localStorage gracefully degrades (no badge if localStorage blocked/unavailable)
+
+---
+
+## SPRINT 11 — Phase 2 — Page Depth Upgrades (2026-03-22)
+**Theme: Replace static/broken placeholders with real API-driven substance**
+**Source: CEO audit finding — 5 pages delivering less than promised**
+
+| Page | Problem | Fix | Status |
+|------|---------|-----|--------|
+| **Habits** | "65 habits" claimed, never shown. Groups had no historical context. | Insights strip (best/at-risk chips), 4-week group mini-trends, 65-habit accordion (T0/T1/T2) | ✅ Done |
+| **Live** | Panel 5 (Intelligence Signal) missing — page stopped at 4 panels | Added Panel 5 from `public_stats.json` `brief_excerpt`; links to `/board/` | ✅ Done |
+| **Accountability** | Tier 0 list static text, no compliance calendar, no milestone tracker | 30-day compliance calendar (green/amber/red grid), streak milestone tracker, T0 count badge | ✅ Done |
+| **Character** | `/api/achievements` existed (14 badges) but page never called it | Badge section wired to `/api/achievements` with earned state + unlock hints + fallback | ✅ Done |
+| **Supplements** | Adherence "Loading…" never resolves; 3 signals falsely "Positive" | Adherence → "via habit group"; Berberine/Zinc/Ashwagandha → "Monitoring"; genome section expanded | ✅ Done |
+
+**Sprint 11 Phase 2 Definition of Done:**
+- ✅ All 5 pages pass `python3 deploy/qa_html.py --fail` (1241 checks)
+- ✅ Deployed to S3 + CloudFront invalidated
+- ✅ 104/105 smoke test checks pass (1 timing-only: `/api/character` pre-compute)
+- ✅ Committed: `5ae160a`
 
 ---
 
@@ -385,7 +405,8 @@ All Sprint 1–4 features shipped (30 items). Sprint 5 complete (buildable). Rem
 | Sprint 6 | ✅ Complete | R17 Hardening: WAF, privacy, dashboard, PITR, cleanup (18 items — 16 done, 2 Matthew-only: R17-05, R17-06) |
 | Sprint 7 | ✅ Complete (buildable) | 17 of 19 done. WR-14 (/story prose) + WR-15 (photos) remain (Matthew only). |
 | Sprint 8 | ✅ Complete | Mobile nav, content filter, grouped footer, versioning (10 items, all done) |
-| Sprint 11 | ⬜ Planned ~Q2 2026 | Phase 3 Gamification: "Since Your Last Visit" badges (GAM-01), Reading Path CTAs (GAM-02) |
+| Sprint 11 Ph1 | ✅ Complete | Phase 3 Gamification: "Since Your Last Visit" badges (GAM-01), Reading Path CTAs (GAM-02) — nav.js v1.2.0 |
+| Sprint 11 Ph2 | ✅ Complete | Page Depth Upgrades: Habits/Live/Accountability/Character/Supplements — all 5 pages upgraded with real API data (2026-03-22) |
 
 ---
 

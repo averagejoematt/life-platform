@@ -24,6 +24,7 @@ v1.1.0: Elena's persona + Board interview descriptions dynamically built from
 import json
 import os
 import logging
+import secrets as _secrets
 import time
 import re
 import boto3
@@ -43,6 +44,13 @@ S3_BUCKET  = os.environ["S3_BUCKET"]
 USER_ID    = os.environ["USER_ID"]
 RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
 SENDER     = os.environ["EMAIL_SENDER"]
+
+# FEAT-12: Preview-before-publish workflow.
+# When PREVIEW_MODE=true (default), the Chronicle is stored as a draft in DynamoDB
+# and a preview email is sent to RECIPIENT with Approve / Request Changes links.
+# No content is published to S3 until Matthew approves via the chronicle-approve Lambda.
+PREVIEW_MODE      = os.environ.get("PREVIEW_MODE", "true").lower() == "true"
+APPROVE_LAMBDA_URL = os.environ.get("APPROVE_LAMBDA_URL", "")  # Function URL of chronicle-approve
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
@@ -1005,7 +1013,7 @@ def build_email_html(title, stats_line, body_html, week_num, date_str, blog_url)
 # Writes to site/journal/posts/week-{nn}/index.html + site/journal/posts.json
 # ══════════════════════════════════════════════════════════════════════════════
 
-def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_installments):
+def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_installments, write_to_s3=True):
     """Publish installment to the Signal-themed journal on averagejoematt.com.
 
     Writes:
@@ -1013,6 +1021,8 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
       site/journal/posts.json                   — manifest for the listing page
 
     Non-fatal: failure here never breaks the Chronicle email.
+
+    FEAT-12: If write_to_s3=False, returns (post_key, post_html, posts_json_str) tuple.
     """
     try:
         dt = datetime.strptime(date_str, "%Y-%m-%d")
@@ -1118,15 +1128,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
 </body>
 </html>"""
 
-    # Write the post
     post_key = f"site/journal/posts/week-{week_num:02d}/index.html"
-    s3.put_object(
-        Bucket=S3_BUCKET, Key=post_key,
-        Body=post_html.encode("utf-8"),
-        ContentType="text/html; charset=utf-8",
-        CacheControl="max-age=300",
-    )
-    logger.info(f"[journal] Post written: {post_key}")
 
     # Update posts.json manifest
     posts_manifest = []
@@ -1142,10 +1144,26 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
             "word_count": inst.get("word_count", 0),
             "has_board_interview": inst.get("has_board_interview", False),
         })
+    posts_json_str = json.dumps(
+        {"posts": posts_manifest, "updated_at": datetime.now(timezone.utc).isoformat()},
+        indent=2,
+    )
+
+    if not write_to_s3:
+        return post_key, post_html, posts_json_str
+
+    # Write the post
+    s3.put_object(
+        Bucket=S3_BUCKET, Key=post_key,
+        Body=post_html.encode("utf-8"),
+        ContentType="text/html; charset=utf-8",
+        CacheControl="max-age=300",
+    )
+    logger.info(f"[journal] Post written: {post_key}")
 
     s3.put_object(
         Bucket=S3_BUCKET, Key="site/journal/posts.json",
-        Body=json.dumps({"posts": posts_manifest, "updated_at": datetime.now(timezone.utc).isoformat()}, indent=2).encode("utf-8"),
+        Body=posts_json_str.encode("utf-8"),
         ContentType="application/json",
         CacheControl="max-age=300",
     )
@@ -1438,8 +1456,12 @@ def build_blog_index(installments):
 # S3 BLOG PUBLISHING
 # ══════════════════════════════════════════════════════════════════════════════
 
-def publish_to_blog(title, stats_line, body_html, week_num, date_str, all_installments):
-    """Write blog post HTML, CSS, and updated index to S3."""
+def publish_to_blog(title, stats_line, body_html, week_num, date_str, all_installments, write_to_s3=True):
+    """Write blog post HTML, CSS, and updated index to S3.
+
+    FEAT-12: If write_to_s3=False, returns (post_key, post_html, index_html) tuple
+    for draft storage without touching S3.
+    """
     blog_prefix = "blog/"
 
     try:
@@ -1462,10 +1484,15 @@ def publish_to_blog(title, stats_line, body_html, week_num, date_str, all_instal
     )
 
     filename = f"week-{week_num:02d}.html"
+    post_key = blog_prefix + filename
+    index_html = build_blog_index(all_installments)
+
+    if not write_to_s3:
+        return post_key, post_html, index_html
 
     # Write post
     s3.put_object(
-        Bucket=S3_BUCKET, Key=blog_prefix + filename,
+        Bucket=S3_BUCKET, Key=post_key,
         Body=post_html, ContentType="text/html",
         CacheControl="max-age=3600",
     )
@@ -1479,7 +1506,6 @@ def publish_to_blog(title, stats_line, body_html, week_num, date_str, all_instal
     )
 
     # Rebuild index with all installments (newest first)
-    index_html = build_blog_index(all_installments)
     s3.put_object(
         Bucket=S3_BUCKET, Key=blog_prefix + "index.html",
         Body=index_html, ContentType="text/html",
@@ -1495,8 +1521,17 @@ def publish_to_blog(title, stats_line, body_html, week_num, date_str, all_instal
 # ══════════════════════════════════════════════════════════════════════════════
 
 def store_installment(date_str, week_num, title, stats_line, raw_markdown,
-                      body_html, themes, has_board, confidence_level="MEDIUM", confidence_badge_html=""):  # BS-05
-    """Store installment in DynamoDB for continuity and blog generation."""
+                      body_html, themes, has_board, confidence_level="MEDIUM", confidence_badge_html="",  # BS-05
+                      status="published", approval_token=None,
+                      draft_blog_post_html=None, draft_blog_post_key=None,
+                      draft_blog_index_html=None, draft_journal_post_html=None,
+                      draft_journal_post_key=None, draft_journal_posts_json=None,
+                      draft_email_html=None):
+    """Store installment in DynamoDB for continuity and blog generation.
+
+    FEAT-12: In preview mode, status="draft" with approval_token + pre-built HTML blobs stored
+    so chronicle-approve Lambda can publish to S3 without re-generating content.
+    """
     try:
         item = {
             "pk": f"USER#{USER_ID}#SOURCE#chronicle",
@@ -1516,11 +1551,80 @@ def store_installment(date_str, week_num, title, stats_line, raw_markdown,
             "_confidence_level": confidence_level,       # BS-05
             "_confidence_badge_html": confidence_badge_html,  # BS-05 — used by chronicle-email-sender
             "generated_at": datetime.now(timezone.utc).isoformat(),
+            "status": status,
         }
+        if approval_token:
+            item["approval_token"] = approval_token
+        if draft_blog_post_html:
+            item["draft_blog_post_html"]   = draft_blog_post_html
+        if draft_blog_post_key:
+            item["draft_blog_post_key"]    = draft_blog_post_key
+        if draft_blog_index_html:
+            item["draft_blog_index_html"]  = draft_blog_index_html
+        if draft_journal_post_html:
+            item["draft_journal_post_html"] = draft_journal_post_html
+        if draft_journal_post_key:
+            item["draft_journal_post_key"] = draft_journal_post_key
+        if draft_journal_posts_json:
+            item["draft_journal_posts_json"] = draft_journal_posts_json
+        if draft_email_html:
+            item["draft_email_html"] = draft_email_html
         table.put_item(Item=item)
-        logger.info(f"Installment stored: Week {week_num}")
+        logger.info(f"Installment stored: Week {week_num} (status={status})")
     except Exception as e:
         logger.warning(f"Failed to store installment: {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FEAT-12: PREVIEW EMAIL
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _send_preview_email(title, week_num, date_str, approval_token, email_html):
+    """Send preview email to RECIPIENT with Approve / Request Changes links.
+
+    The approve link goes to APPROVE_LAMBDA_URL with ?date=, token=, action=approve.
+    The request_changes link uses action=request_changes.
+    """
+    if not APPROVE_LAMBDA_URL:
+        logger.warning("FEAT-12: APPROVE_LAMBDA_URL not set — preview email links will be dead")
+
+    base_url = APPROVE_LAMBDA_URL.rstrip("/")
+    approve_url = f"{base_url}?date={date_str}&token={approval_token}&action=approve"
+    changes_url = f"{base_url}?date={date_str}&token={approval_token}&action=request_changes"
+
+    preview_banner = f"""
+<div style="background:#1a1a1a;color:#fff;padding:20px 32px;font-family:-apple-system,sans-serif;margin-bottom:0;border-bottom:3px solid #f59e0b;">
+  <p style="margin:0 0 6px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#f59e0b;">PREVIEW — Not yet published</p>
+  <p style="margin:0 0 16px;font-size:14px;color:#ccc;">Week {week_num}: &ldquo;{title}&rdquo; is ready for review.</p>
+  <a href="{approve_url}"
+     style="display:inline-block;background:#16a34a;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;margin-right:12px;">
+    ✓ Approve &amp; Publish
+  </a>
+  <a href="{changes_url}"
+     style="display:inline-block;background:#dc2626;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">
+    ✗ Request Changes
+  </a>
+</div>
+"""
+    # Inject the preview banner at the top of the email body
+    preview_email = email_html.replace("<body>", "<body>" + preview_banner, 1)
+    if "<body>" not in email_html:
+        preview_email = preview_banner + email_html
+
+    subject = f'[PREVIEW] The Measured Life — Week {week_num}: "{title}"'
+    try:
+        ses.send_email(
+            FromEmailAddress=SENDER,
+            Destination={"ToAddresses": [RECIPIENT]},
+            Content={"Simple": {
+                "Subject": {"Data": subject, "Charset": "UTF-8"},
+                "Body":    {"Html": {"Data": preview_email, "Charset": "UTF-8"}},
+            }},
+        )
+        logger.info(f"FEAT-12: Preview email sent for Week {week_num}")
+    except Exception as e:
+        logger.error(f"FEAT-12: Failed to send preview email: {e}")
+        raise
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1639,15 +1743,8 @@ def lambda_handler(event, context):
     # Detect Board interview
     has_board = ">" in body_md  # blockquotes indicate Board interview
 
-    # Store in DynamoDB
+    # Collect all installments for index pages (including the new one)
     date_str = data["dates"]["end"]
-    store_installment(date_str, week_num, title, stats_line, raw_installment,
-                      body_html, [], has_board,
-                      confidence_level=_conf_level,
-                      confidence_badge_html=_conf_badge_html)
-
-    # Publish to blog
-    # Get all installments for index (including this new one)
     all_installments = []
     try:
         resp = table.query(
@@ -1661,39 +1758,92 @@ def lambda_handler(event, context):
         all_installments = [d2f(i) for i in resp.get("Items", [])]
     except Exception as e:
         logger.warning(f"Failed to query all installments: {e}")
-        all_installments = [{
-            "title": title, "week_number": week_num, "date": date_str,
-        }]
+        all_installments = [{"title": title, "week_number": week_num, "date": date_str}]
 
-    try:
-        blog_url = publish_to_blog(title, stats_line, body_html, week_num,
-                                   date_str, all_installments)
-    except Exception as e:
-        logger.warning(f"Blog publish failed: {e}")
-        blog_url = "https://averagejoematt.com/blog/"
+    # Ensure new installment is in the list (not yet stored at this point)
+    if not any(i.get("date") == date_str for i in all_installments):
+        all_installments.insert(0, {"title": title, "week_number": week_num, "date": date_str,
+                                    "stats_line": stats_line, "word_count": len(raw_installment.split()),
+                                    "content_markdown": raw_installment[:300], "has_board_interview": has_board})
 
-    # Publish to Signal-themed journal on averagejoematt.com (non-fatal)
-    try:
-        journal_url = publish_to_journal(title, stats_line, body_html, week_num,
-                                         date_str, all_installments)
-        logger.info(f"[journal] Published: {journal_url}")
-    except Exception as e:
-        logger.warning(f"[journal] publish_to_journal failed (non-fatal): {e}")
+    blog_url_draft = f"https://averagejoematt.com/blog/week-{week_num:02d}.html"
 
-    # Send email
-    email_html = build_email_html(title, stats_line, body_html, week_num,
-                                  date_str, blog_url)
-    subject = f'The Measured Life — Week {week_num}: "{title}"'
+    if PREVIEW_MODE:
+        # ── FEAT-12: Build all HTML artifacts without publishing ─────────────
+        logger.info("FEAT-12: PREVIEW_MODE — building draft artifacts")
 
-    ses.send_email(
-        FromEmailAddress=SENDER,
-        Destination={"ToAddresses": [RECIPIENT]},
-        Content={"Simple": {
-            "Subject": {"Data": subject, "Charset": "UTF-8"},
-            "Body":    {"Html": {"Data": email_html, "Charset": "UTF-8"}},
-        }},
-    )
-    logger.info(f"Email sent: {subject}")
+        try:
+            blog_post_key, blog_post_html, blog_index_html = publish_to_blog(
+                title, stats_line, body_html, week_num, date_str, all_installments,
+                write_to_s3=False,
+            )
+        except Exception as e:
+            logger.warning(f"FEAT-12: Failed to build blog artifacts: {e}")
+            blog_post_key = blog_post_html = blog_index_html = None
+
+        try:
+            journal_post_key, journal_post_html, journal_posts_json = publish_to_journal(
+                title, stats_line, body_html, week_num, date_str, all_installments,
+                write_to_s3=False,
+            )
+        except Exception as e:
+            logger.warning(f"FEAT-12: Failed to build journal artifacts: {e}")
+            journal_post_key = journal_post_html = journal_posts_json = None
+
+        draft_email_html = build_email_html(title, stats_line, body_html, week_num,
+                                            date_str, blog_url_draft)
+
+        approval_token = _secrets.token_hex(32)
+        store_installment(date_str, week_num, title, stats_line, raw_installment,
+                          body_html, [], has_board,
+                          confidence_level=_conf_level,
+                          confidence_badge_html=_conf_badge_html,
+                          status="draft",
+                          approval_token=approval_token,
+                          draft_blog_post_html=blog_post_html,
+                          draft_blog_post_key=blog_post_key,
+                          draft_blog_index_html=blog_index_html,
+                          draft_journal_post_html=journal_post_html,
+                          draft_journal_post_key=journal_post_key,
+                          draft_journal_posts_json=journal_posts_json,
+                          draft_email_html=draft_email_html)
+
+        _send_preview_email(title, week_num, date_str, approval_token, draft_email_html)
+        logger.info(f"FEAT-12: Draft Week {week_num} stored — awaiting approval")
+
+    else:
+        # ── Standard flow: publish immediately ───────────────────────────────
+        store_installment(date_str, week_num, title, stats_line, raw_installment,
+                          body_html, [], has_board,
+                          confidence_level=_conf_level,
+                          confidence_badge_html=_conf_badge_html)
+
+        try:
+            blog_url = publish_to_blog(title, stats_line, body_html, week_num,
+                                       date_str, all_installments)
+        except Exception as e:
+            logger.warning(f"Blog publish failed: {e}")
+            blog_url = blog_url_draft
+
+        try:
+            journal_url = publish_to_journal(title, stats_line, body_html, week_num,
+                                             date_str, all_installments)
+            logger.info(f"[journal] Published: {journal_url}")
+        except Exception as e:
+            logger.warning(f"[journal] publish_to_journal failed (non-fatal): {e}")
+
+        email_html = build_email_html(title, stats_line, body_html, week_num,
+                                      date_str, blog_url)
+        subject = f'The Measured Life — Week {week_num}: "{title}"'
+        ses.send_email(
+            FromEmailAddress=SENDER,
+            Destination={"ToAddresses": [RECIPIENT]},
+            Content={"Simple": {
+                "Subject": {"Data": subject, "Charset": "UTF-8"},
+                "Body":    {"Html": {"Data": email_html, "Charset": "UTF-8"}},
+            }},
+        )
+        logger.info(f"Email sent: {subject}")
 
     # IC-15: Persist chronicle as narrative insight
     if _HAS_INSIGHT_WRITER:
@@ -1709,6 +1859,11 @@ def lambda_handler(event, context):
         except Exception as e:
             print(f"[WARN] IC-15 failed: {e}")
 
+    if PREVIEW_MODE:
+        return {
+            "statusCode": 200,
+            "body": f"Chronicle Week {week_num} draft stored — preview email sent to {RECIPIENT}",
+        }
     return {
         "statusCode": 200,
         "body": f"Chronicle Week {week_num} published: \"{title}\" ({len(raw_installment.split())} words)",

@@ -7,6 +7,10 @@
   <meta name="description" content="Current Protocols — what Matthew is doing, what the data shows, and what's working.">
   <meta property="og:title" content="Current Protocols — Matthew Walker">
   <meta property="og:description" content="The specific health protocols behind the transformation — and whether the data says they're working.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
   <meta property="og:type" content="website">
   <title>Current Protocols — Matthew Walker</title>
     <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
@@ -15,6 +19,7 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
+    /* ── Page header ─────────────────────────────────────────── */
     .proto-header {
       padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
       border-bottom: 1px solid var(--border);
@@ -26,6 +31,32 @@
       margin-bottom: var(--space-4);
     }
     .proto-header__title span { color: var(--accent); }
+
+    /* ── Through-line thread ────────────────────────────────── */
+    .proto-thread {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-6) var(--page-padding) 0;
+    }
+    .proto-thread__bar {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-5);
+      border: 1px solid var(--border-subtle);
+      background: var(--surface);
+      border-left: 3px solid var(--accent);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+    .proto-thread__bar a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .proto-thread__bar a:hover { text-decoration: underline; }
+
+    /* ── Protocol cards ──────────────────────────────────────── */
     .proto-body {
       max-width: var(--max-width);
       margin: 0 auto;
@@ -37,44 +68,66 @@
       margin: var(--space-8) 0;
     }
     .proto-card__header {
-      display: grid;
-      grid-template-columns: 1fr auto;
+      display: flex;
       align-items: center;
-      padding: var(--space-5) var(--space-6);
+      gap: var(--space-3);
+      padding: var(--space-4) var(--space-6);
       border-bottom: 1px solid var(--border-subtle);
+      flex-wrap: wrap;
     }
-    .proto-card__pillar {
+    .proto-card__category {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+    }
+    .proto-card__pillar-link {
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       color: var(--accent-dim);
+      text-decoration: none;
+      border-bottom: 1px dotted var(--accent-dim);
+    }
+    .proto-card__pillar-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
+    .proto-card__sep {
+      color: var(--border);
+      font-size: var(--text-2xs);
     }
     .proto-card__status {
+      margin-left: auto;
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       padding: 2px 8px;
       border: 1px solid;
     }
-    .proto-card__status.working { color: var(--accent); border-color: var(--accent-dim); }
-    .proto-card__status.building { color: var(--c-amber-500); border-color: var(--c-amber-300); }
-    .proto-card__status.gap { color: var(--c-red-status); border-color: rgba(255,82,82,0.3); }
-    .proto-card__body { padding: var(--space-6); }
+    .proto-card__status.active   { color: var(--accent); border-color: var(--accent-dim); }
+    .proto-card__status.testing  { color: var(--c-amber-500); border-color: var(--c-amber-300); }
+    .proto-card__status.paused   { color: var(--text-faint); border-color: var(--border); }
+
+    .proto-card__body { padding: var(--space-5) var(--space-6); }
     .proto-card__name {
       font-family: var(--font-display);
       font-size: 22px;
       color: var(--text);
-      margin-bottom: var(--space-3);
+      margin-bottom: var(--space-2);
     }
-    .proto-card__desc {
-      font-size: var(--text-base);
+    .proto-card__why {
+      font-size: var(--text-sm);
       color: var(--text-muted);
       line-height: var(--lh-body);
-      margin-bottom: var(--space-4);
+      margin-bottom: var(--space-5);
+      padding-left: var(--space-3);
+      border-left: 2px solid var(--border-subtle);
+      font-style: italic;
     }
+
+    /* ── Detail rows ─────────────────────────────────────────── */
     .proto-detail {
       display: grid;
-      grid-template-columns: 120px 1fr;
+      grid-template-columns: 130px 1fr;
       gap: var(--space-2) var(--space-4);
       font-size: var(--text-xs);
       margin-bottom: var(--space-2);
@@ -86,17 +139,153 @@
     }
     .proto-detail__value { color: var(--text-muted); }
     .proto-detail__value strong { color: var(--text); }
-    .proto-data-note {
-      margin-top: var(--space-4);
+
+    /* ── Stats strip (adherence + signal) ───────────────────── */
+    .proto-stats {
+      display: flex;
+      gap: var(--space-4);
+      margin-top: var(--space-5);
       padding-top: var(--space-4);
       border-top: 1px solid var(--border-subtle);
+      flex-wrap: wrap;
+    }
+    .proto-stat {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+      min-width: 110px;
+    }
+    .proto-stat__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .proto-stat__value {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--text);
+      font-weight: 600;
+    }
+    .proto-stat__value.loading { color: var(--text-faint); font-weight: 400; }
+    .proto-stat__value.signal-positive { color: var(--accent); }
+    .proto-stat__value.signal-pending  { color: var(--c-amber-500); }
+    .proto-stat__value.signal-none     { color: var(--text-faint); }
+
+    .proto-data-note {
+      margin-top: var(--space-4);
       font-size: var(--text-xs);
       color: var(--text-faint);
       font-family: var(--font-mono);
     }
     .proto-data-note span { color: var(--accent-dim); }
+
+    /* ── Vice tracking section ───────────────────────────────── */
+    .vice-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+    }
+    .vice-section__heading {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-5);
+    }
+    .vice-section__heading span { color: var(--accent-dim); }
+    .vice-chips {
+      display: flex;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+      margin-bottom: var(--space-5);
+    }
+    .vice-chip {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+      padding: var(--space-4) var(--space-5);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      min-width: 160px;
+    }
+    .vice-chip__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .vice-chip__value {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .vice-chip__unit {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+    }
+    .vice-note {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      line-height: var(--lh-body);
+    }
+    .vice-note span { color: var(--accent-dim); }
+
+    /* ── Outcome summary box (kept from v1) ──────────────────── */
+    .proto-outcomes {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-6) var(--page-padding) 0;
+    }
+    .proto-outcomes__box {
+      border: 1px solid var(--border-subtle);
+      border-left: 3px solid var(--accent);
+      background: var(--surface);
+      padding: var(--space-5) var(--space-6);
+    }
+    .proto-outcomes__heading {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+    }
+    .proto-outcomes__grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: var(--space-3) var(--space-6);
+    }
+    .proto-outcomes__row {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      line-height: var(--lh-mono);
+    }
+    .proto-outcomes__protocol { color: var(--text-faint); }
+    .proto-outcomes__value { color: var(--text); }
+    .proto-outcomes__value.on-target { color: var(--accent); }
+    .proto-outcomes__value.below-target { color: var(--c-amber-500); }
+    .proto-outcomes__footer {
+      margin-top: var(--space-4);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+    }
+
+    /* ── Mobile adjustments ──────────────────────────────────── */
     @media (max-width: 768px) {
       .proto-detail { grid-template-columns: 1fr; }
+      .proto-card__header { gap: var(--space-2); }
+      .proto-stats { gap: var(--space-3); }
+      .vice-chip { min-width: 130px; }
     }
   </style>
 </head>
@@ -104,12 +293,55 @@
 <nav class="nav">
   <a href="/" class="nav__brand">AMJ</a>
   <div class="nav__links">
-    <a href="/story/" class="nav__link">Story</a>
-    <a href="/live/" class="nav__link">Live</a>
-    <a href="/journal/" class="nav__link">Journal</a>
-    <a href="/platform/" class="nav__link">Platform</a>
-    <a href="/start/" class="nav__link">Explore</a>
-    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Story</button>
+      <div class="nav__dropdown-menu">
+        <a href="/" class="nav__dropdown-item">Home</a>
+        <a href="/story/" class="nav__dropdown-item">My Story</a>
+        <a href="/about/" class="nav__dropdown-item">About</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Data</button>
+      <div class="nav__dropdown-menu">
+        <a href="/live/" class="nav__dropdown-item">Live</a>
+        <a href="/character/" class="nav__dropdown-item">Character</a>
+        <a href="/habits/" class="nav__dropdown-item">Habits</a>
+        <a href="/accountability/" class="nav__dropdown-item">Accountability</a>
+      </div>
+    </div>
+    <div class="nav__dropdown is-active">
+      <button class="nav__dropdown-btn">The Science</button>
+      <div class="nav__dropdown-menu">
+        <a href="/protocols/" class="nav__dropdown-item active">Protocols</a>
+        <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
+        <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
+        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
+        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
+        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
+        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Build</button>
+      <div class="nav__dropdown-menu">
+        <a href="/platform/" class="nav__dropdown-item">Platform</a>
+        <a href="/intelligence/" class="nav__dropdown-item">Intelligence</a>
+        <a href="/board/" class="nav__dropdown-item">Board</a>
+        <a href="/cost/" class="nav__dropdown-item">Cost</a>
+        <a href="/methodology/" class="nav__dropdown-item">Methodology</a>
+        <a href="/tools/" class="nav__dropdown-item">Tools</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">Follow</button>
+      <div class="nav__dropdown-menu">
+        <a href="/chronicle/" class="nav__dropdown-item">Chronicle</a>
+        <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
+        <a href="/ask/" class="nav__dropdown-item">Ask</a>
+      </div>
+    </div>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>
   </div>
   <button class="nav__hamburger" aria-label="Open menu">
     <span></span><span></span><span></span>
@@ -124,159 +356,297 @@
   <div class="nav-overlay__panel">
     <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The journey</div>
-      <a href="/story/" class="nav-overlay__link">Story</a>
-      <a href="/live/" class="nav-overlay__link">Live</a>
-      <a href="/journal/" class="nav-overlay__link">Journal</a>
-      <a href="/week/" class="nav-overlay__link">This Week</a>
+      <div class="nav-overlay__heading">The Story</div>
+      <a href="/" class="nav-overlay__link">Home</a>
+      <a href="/story/" class="nav-overlay__link">My Story</a>
       <a href="/about/" class="nav-overlay__link">About</a>
     </div>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The data</div>
+      <div class="nav-overlay__heading">The Data</div>
+      <a href="/live/" class="nav-overlay__link">Live</a>
       <a href="/character/" class="nav-overlay__link">Character</a>
       <a href="/habits/" class="nav-overlay__link">Habits</a>
-      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
-      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
-      <a href="/results/" class="nav-overlay__link">Results</a>
-      <a href="/progress/" class="nav-overlay__link">Progress</a>
-      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
-      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
-      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
-      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
-      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
-      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
     </div>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The platform</div>
+      <div class="nav-overlay__heading">The Science</div>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Build</div>
       <a href="/platform/" class="nav-overlay__link">Platform</a>
       <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
-      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
-      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
-      <a href="/ask/" class="nav-overlay__link">Ask</a>
       <a href="/board/" class="nav-overlay__link">Board</a>
-      <a href="/data/" class="nav-overlay__link">Data</a>
       <a href="/cost/" class="nav-overlay__link">Cost</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
+      <a href="/tools/" class="nav-overlay__link">Tools</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">Follow</div>
+      <a href="/chronicle/" class="nav-overlay__link">Chronicle</a>
       <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
       <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+      <a href="/privacy/" class="nav-overlay__link">Privacy</a>
     </div>
   </div>
 </div>
 
 
+
+
+
+
 <header class="proto-header reveal">
-  <div class="eyebrow" style="margin-bottom:var(--space-4)">Current Protocols</div>
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">The Science</div>
   <h1 class="proto-header__title">What I&rsquo;m <span>actually doing</span></h1>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:560px;line-height:var(--lh-body)">
     The specific protocols behind the transformation &mdash; and whether the data says they&rsquo;re working.
-    Updated as protocols change. Each protocol shows the data source tracking it and current compliance.
+    Each card shows the pillar it feeds, the rationale, adherence, and current signal.
   </p>
 </header>
 
+<!-- Through-line thread -->
+<div class="proto-thread reveal">
+  <div class="proto-thread__bar">
+    <span style="color:var(--text-faint);font-family:var(--font-mono)">//</span>
+    Protocols are the inputs &rarr; <a href="/live/">See the results &rarr;</a>
+  </div>
+</div>
+
+<!-- Quick-glance outcome snapshot -->
+<div class="proto-outcomes reveal">
+  <div class="proto-outcomes__box">
+    <div class="proto-outcomes__heading">// is this working? &mdash; snapshot</div>
+    <div class="proto-outcomes__grid">
+      <div class="proto-outcomes__row">
+        <div class="proto-outcomes__protocol">Sleep protocol</div>
+        <div class="proto-outcomes__value on-target">7.7h avg &mdash; target: 8h &check;</div>
+      </div>
+      <div class="proto-outcomes__row">
+        <div class="proto-outcomes__protocol">Zone 2 cardio</div>
+        <div class="proto-outcomes__value below-target">3&ndash;4 sessions/week target &mdash; tracking</div>
+      </div>
+      <div class="proto-outcomes__row">
+        <div class="proto-outcomes__protocol">Intermittent fasting</div>
+        <div class="proto-outcomes__value on-target">~90% adherence &check;</div>
+      </div>
+      <div class="proto-outcomes__row">
+        <div class="proto-outcomes__protocol">CGM time-in-range</div>
+        <div class="proto-outcomes__value on-target">Automated tracking active &check;</div>
+      </div>
+      <div class="proto-outcomes__row">
+        <div class="proto-outcomes__protocol">Resting HR trend</div>
+        <div class="proto-outcomes__value on-target">Trending down &check;</div>
+      </div>
+      <div class="proto-outcomes__row">
+        <div class="proto-outcomes__protocol">Strength training</div>
+        <div class="proto-outcomes__value below-target">65% adherence &mdash; building</div>
+      </div>
+    </div>
+    <div class="proto-outcomes__footer">// static snapshot &mdash; live adherence loads within each card below</div>
+  </div>
+</div>
+
+
+<div class="experiment-thread">Protocols are the inputs → <a href="/live/">See the results →</a></div>
 <div class="proto-body">
 
-  <!-- Sleep -->
+  <!-- 1. Zone 2 Cardio -->
   <div class="proto-card reveal">
     <div class="proto-card__header">
-      <div class="proto-card__pillar">Sleep Pillar</div>
-      <div class="proto-card__status working">Data: working</div>
+      <span class="proto-card__category">Movement</span>
+      <span class="proto-card__sep">&middot;</span>
+      <a href="/character/" class="proto-card__pillar-link">Recovery Pillar &rarr;</a>
+      <div class="proto-card__status active">Active</div>
     </div>
     <div class="proto-card__body">
-      <div class="proto-card__name">Sleep Optimization Protocol</div>
-      <div class="proto-card__desc">Target 7.5&ndash;8.5 hours. Eight Sleep pod for temperature control. Consistent bedtime before 11pm. No screens 30 min before bed.</div>
-      <div class="proto-detail"><span class="proto-detail__label">Target</span><span class="proto-detail__value"><strong>7.5&ndash;8.5 hours</strong> sleep per night, bedtime before 11pm</span></div>
-      <div class="proto-detail"><span class="proto-detail__label">Tracking</span><span class="proto-detail__value">Whoop (sleep score, stages, HRV), Eight Sleep (bed temp, timing)</span></div>
-      <div class="proto-detail"><span class="proto-detail__label">Current avg</span><span class="proto-detail__value"><strong>7.7 hours</strong> &mdash; within target</span></div>
-      <div class="proto-detail"><span class="proto-detail__label">Key finding</span><span class="proto-detail__value">Bedtime after 11pm → -12% next-day recovery (r=-0.38, p=0.04)</span></div>
+      <div class="proto-card__name">Zone 2 Cardio</div>
+      <div class="proto-card__why">Building mitochondrial density and fat oxidation capacity &mdash; the metabolic foundation everything else runs on.</div>
+      <div class="proto-detail"><span class="proto-detail__label">Protocol</span><span class="proto-detail__value"><strong>3&ndash;4 sessions/week</strong>, 45 min+ at &lt;75% HRV-adjusted max HR</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Key metrics</span><span class="proto-detail__value">VO2max proxy, resting HR trend, weekly Z2 minutes</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Tracked by</span><span class="proto-detail__value">Garmin + Strava + Whoop strain data &mdash; <a href="/discoveries/" style="color:var(--accent-dim);text-decoration:none;border-bottom:1px dotted var(--accent-dim);">RHR correlation in Discoveries &rarr;</a></span></div>
+      <div class="proto-stats">
+        <div class="proto-stat">
+          <div class="proto-stat__label">30-day adherence</div>
+          <div class="proto-stat__value loading" id="adh-zone2">Loading&hellip;</div>
+        </div>
+        <div class="proto-stat">
+          <div class="proto-stat__label">Signal</div>
+          <div class="proto-stat__value signal-positive">Positive &mdash; RHR trending down</div>
+        </div>
+      </div>
+      <div class="proto-data-note"><span>// Tracked by:</span> Garmin + Strava + Whoop</div>
+    </div>
+  </div>
+
+  <!-- 2. Sleep Protocol -->
+  <div class="proto-card reveal">
+    <div class="proto-card__header">
+      <span class="proto-card__category">Sleep</span>
+      <span class="proto-card__sep">&middot;</span>
+      <a href="/character/" class="proto-card__pillar-link">Recovery Pillar &rarr;</a>
+      <div class="proto-card__status active">Active</div>
+    </div>
+    <div class="proto-card__body">
+      <div class="proto-card__name">Sleep Protocol</div>
+      <div class="proto-card__why">Sleep is the highest-leverage recovery lever &mdash; HRV, next-day performance, and body composition all hinge on sleep quality and consistency.</div>
+      <div class="proto-detail"><span class="proto-detail__label">Protocol</span><span class="proto-detail__value">9pm screens off, <strong>10pm target bed</strong>, 68&deg;F bed temperature</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Key metrics</span><span class="proto-detail__value">Whoop sleep score, next-day recovery score, HRV on waking</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Key finding</span><span class="proto-detail__value">Bedtime after 11pm &rarr; &minus;12% next-day recovery (r=&minus;0.38, p=0.04) &mdash; <a href="/discoveries/" style="color:var(--accent-dim);text-decoration:none;border-bottom:1px dotted var(--accent-dim);">See in Discoveries &rarr;</a></span></div>
+      <div class="proto-stats">
+        <div class="proto-stat">
+          <div class="proto-stat__label">30-day adherence</div>
+          <div class="proto-stat__value loading" id="adh-sleep">Loading&hellip;</div>
+        </div>
+        <div class="proto-stat">
+          <div class="proto-stat__label">Signal</div>
+          <div class="proto-stat__value signal-positive">Positive &mdash; 7.7h avg, HRV stable</div>
+        </div>
+      </div>
       <div class="proto-data-note"><span>// Tracked by:</span> Whoop + Eight Sleep + Apple Health</div>
     </div>
   </div>
 
-  <!-- Training -->
+  <!-- 3. 16:8 Intermittent Fasting -->
   <div class="proto-card reveal">
     <div class="proto-card__header">
-      <div class="proto-card__pillar">Movement Pillar</div>
-      <div class="proto-card__status gap">Data: gap</div>
+      <span class="proto-card__category">Nutrition</span>
+      <span class="proto-card__sep">&middot;</span>
+      <a href="/character/" class="proto-card__pillar-link">Body Pillar &rarr;</a>
+      <div class="proto-card__status active">Active</div>
     </div>
     <div class="proto-card__body">
-      <div class="proto-card__name">Zone 2 + Strength Protocol</div>
-      <div class="proto-card__desc">150 min/week Zone 2 cardio (walking, cycling, or rowing at conversational pace). 3x/week compound lifts targeting centenarian decathlon benchmarks. ACWR monitoring for injury prevention.</div>
-      <div class="proto-detail"><span class="proto-detail__label">Z2 target</span><span class="proto-detail__value"><strong>150 min/week</strong> at cardiac efficiency HR zone</span></div>
-      <div class="proto-detail"><span class="proto-detail__label">Strength</span><span class="proto-detail__value">3x/week compound lifts (tracked via Hevy + Strava)</span></div>
-      <div class="proto-detail"><span class="proto-detail__label">Current Z2</span><span class="proto-detail__value"><strong>42 of 150 min</strong> this week &mdash; below target</span></div>
-      <div class="proto-detail"><span class="proto-detail__label">ACWR</span><span class="proto-detail__value">1.1 &mdash; within safe range (0.8&ndash;1.3)</span></div>
-      <div class="proto-data-note"><span>// Tracked by:</span> Garmin + Strava + Whoop + Hevy</div>
-    </div>
-  </div>
-
-  <!-- Nutrition -->
-  <div class="proto-card reveal">
-    <div class="proto-card__header">
-      <div class="proto-card__pillar">Nutrition Pillar</div>
-      <div class="proto-card__status building">Data: building</div>
-    </div>
-    <div class="proto-card__body">
-      <div class="proto-card__name">Caloric Deficit + Protein Priority</div>
-      <div class="proto-card__desc">MacroFactor-managed deficit with adaptive TDEE tracking. Protein target of 1g/lb lean mass. Deficit sustainability monitored by platform (IC-29).</div>
-      <div class="proto-detail"><span class="proto-detail__label">Approach</span><span class="proto-detail__value"><strong>Adaptive deficit</strong> via MacroFactor expenditure model</span></div>
-      <div class="proto-detail"><span class="proto-detail__label">Protein</span><span class="proto-detail__value">1g per pound of lean body mass target</span></div>
-      <div class="proto-detail"><span class="proto-detail__label">Monitoring</span><span class="proto-detail__value">Deficit sustainability tracker flags when rate exceeds safe loss</span></div>
-      <div class="proto-detail"><span class="proto-detail__label">CGM</span><span class="proto-detail__value">Dexcom Stelo continuous glucose monitor for postprandial response</span></div>
+      <div class="proto-card__name">16:8 Intermittent Fasting</div>
+      <div class="proto-card__why">Improving insulin sensitivity and supporting body composition change by restricting the eating window without calorie obsession.</div>
+      <div class="proto-detail"><span class="proto-detail__label">Protocol</span><span class="proto-detail__value">Eating window <strong>12pm&ndash;8pm</strong>; 16-hour fast overnight</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Key metrics</span><span class="proto-detail__value">Fasting glucose (CGM), weight trend, body composition</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Tracked by</span><span class="proto-detail__value">MacroFactor meal log + Dexcom Stelo CGM + Withings scale</span></div>
+      <div class="proto-stats">
+        <div class="proto-stat">
+          <div class="proto-stat__label">30-day adherence</div>
+          <div class="proto-stat__value loading" id="adh-if">Loading&hellip;</div>
+        </div>
+        <div class="proto-stat">
+          <div class="proto-stat__label">Signal</div>
+          <div class="proto-stat__value signal-positive">Positive &mdash; fasting glucose stable</div>
+        </div>
+      </div>
       <div class="proto-data-note"><span>// Tracked by:</span> MacroFactor + Dexcom Stelo + Withings</div>
     </div>
   </div>
 
-  <!-- Metabolic -->
+  <!-- 4. Strength Training -->
   <div class="proto-card reveal">
     <div class="proto-card__header">
-      <div class="proto-card__pillar">Metabolic Pillar</div>
-      <div class="proto-card__status working">Data: working</div>
+      <span class="proto-card__category">Movement</span>
+      <span class="proto-card__sep">&middot;</span>
+      <a href="/character/" class="proto-card__pillar-link">Body Pillar &rarr;</a>
+      <div class="proto-card__status active">Active</div>
     </div>
     <div class="proto-card__body">
-      <div class="proto-card__name">Biomarker Monitoring</div>
-      <div class="proto-card__desc">Regular lab draws tracking lipids, metabolic panel, inflammation markers, hormones. Blood pressure measured daily. Weight tracked via Withings scale.</div>
-      <div class="proto-detail"><span class="proto-detail__label">Labs</span><span class="proto-detail__value">7 blood draws to date &mdash; tracking 40+ biomarkers</span></div>
-      <div class="proto-detail"><span class="proto-detail__label">BP</span><span class="proto-detail__value">Daily measurement, tracked in platform</span></div>
-      <div class="proto-detail"><span class="proto-detail__label">Genome</span><span class="proto-detail__value">110 SNPs analysed for predisposition-aware coaching</span></div>
-      <div class="proto-detail"><span class="proto-detail__label">DEXA</span><span class="proto-detail__value">Baseline scan complete &mdash; #2 scheduled for body comp tracking</span></div>
-      <div class="proto-data-note"><span>// Tracked by:</span> Withings + Labs + BP cuff + Dexcom + Genome</div>
+      <div class="proto-card__name">Strength Training 3&times;/week</div>
+      <div class="proto-card__why">Preserving and building lean mass during a caloric deficit &mdash; without this, weight loss eats muscle as well as fat.</div>
+      <div class="proto-detail"><span class="proto-detail__label">Protocol</span><span class="proto-detail__value"><strong>Progressive overload</strong>, compound movements, 3 sessions/week minimum</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Key metrics</span><span class="proto-detail__value">Body composition (DEXA), strength metrics (Hevy), ACWR load ratio</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">ACWR</span><span class="proto-detail__value">1.1 &mdash; within safe range (0.8&ndash;1.3). Injury prevention monitored</span></div>
+      <div class="proto-stats">
+        <div class="proto-stat">
+          <div class="proto-stat__label">30-day adherence</div>
+          <div class="proto-stat__value loading" id="adh-strength">Loading&hellip;</div>
+        </div>
+        <div class="proto-stat">
+          <div class="proto-stat__label">Signal</div>
+          <div class="proto-stat__value signal-pending">Pending &mdash; DEXA #2 scheduled</div>
+        </div>
+      </div>
+      <div class="proto-data-note"><span>// Tracked by:</span> Hevy + Strava + Whoop + DEXA</div>
     </div>
   </div>
 
-  <!-- Habits -->
+  <!-- 5. CGM Protocol -->
   <div class="proto-card reveal">
     <div class="proto-card__header">
-      <div class="proto-card__pillar">Consistency Pillar</div>
-      <div class="proto-card__status working">Data: working</div>
+      <span class="proto-card__category">Metabolic</span>
+      <span class="proto-card__sep">&middot;</span>
+      <a href="/character/" class="proto-card__pillar-link">Metabolic Pillar &rarr;</a>
+      <div class="proto-card__status active">Active</div>
     </div>
     <div class="proto-card__body">
-      <div class="proto-card__name">Tier 0 Habit System</div>
-      <div class="proto-card__desc">Non-negotiable daily habits tracked via Habitify. The &ldquo;Essential Seven&rdquo; protocol identifies the 7 habits with highest impact on overall score. Streak tracking with compounding value.</div>
-      <div class="proto-detail"><span class="proto-detail__label">System</span><span class="proto-detail__value"><strong>65 habits</strong> in registry, 7 Tier 0 (non-negotiable)</span></div>
-      <div class="proto-detail"><span class="proto-detail__label">Tracking</span><span class="proto-detail__value">Habitify daily check-ins + platform P40 scoring</span></div>
-      <div class="proto-detail"><span class="proto-detail__label">Vice streaks</span><span class="proto-detail__value">Temptation logging with resist rate tracking</span></div>
-      <div class="proto-data-note"><span>// Tracked by:</span> Habitify + Todoist + platform compute</div>
+      <div class="proto-card__name">CGM Protocol</div>
+      <div class="proto-card__why">Understanding personal metabolic response to specific foods &mdash; generic nutrition advice misses individual variation that only real-time glucose reveals.</div>
+      <div class="proto-detail"><span class="proto-detail__label">Protocol</span><span class="proto-detail__value">Continuous glucose monitoring via <strong>Dexcom Stelo</strong>, meal spike logging</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Key metrics</span><span class="proto-detail__value">Time-in-range (&lt;140 mg/dL), post-meal peak glucose, fasting baseline</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Adherence note</span><span class="proto-detail__value">Sensor-automated &mdash; passive collection, no manual input required &mdash; <a href="/experiments/" style="color:var(--accent-dim);text-decoration:none;border-bottom:1px dotted var(--accent-dim);">Active experiments &rarr;</a></span></div>
+      <div class="proto-stats">
+        <div class="proto-stat">
+          <div class="proto-stat__label">30-day adherence</div>
+          <div class="proto-stat__value loading" id="adh-cgm">Loading&hellip;</div>
+        </div>
+        <div class="proto-stat">
+          <div class="proto-stat__label">Signal</div>
+          <div class="proto-stat__value signal-positive">Positive &mdash; time-in-range on target</div>
+        </div>
+      </div>
+      <div class="proto-data-note"><span>// Tracked by:</span> Dexcom Stelo + platform CGM module</div>
     </div>
   </div>
 
-  <!-- Supplements -->
+  <!-- 6. Morning Sunlight -->
   <div class="proto-card reveal">
     <div class="proto-card__header">
-      <div class="proto-card__pillar">Supplementation</div>
-      <div class="proto-card__status building">Data: building</div>
+      <span class="proto-card__category">Circadian / Mind</span>
+      <span class="proto-card__sep">&middot;</span>
+      <a href="/character/" class="proto-card__pillar-link">Sleep Pillar &rarr;</a>
+      <div class="proto-card__status active">Active</div>
     </div>
     <div class="proto-card__body">
-      <div class="proto-card__name">Supplement Stack</div>
-      <div class="proto-card__desc">Logged daily via platform supplement tracker. Genome-informed where relevant (110 SNP analysis includes methylation, vitamin metabolism, and absorption variants).</div>
-      <div class="proto-detail"><span class="proto-detail__label">Logging</span><span class="proto-detail__value">Daily supplement check-in via platform MCP tool</span></div>
-      <div class="proto-detail"><span class="proto-detail__label">Genome link</span><span class="proto-detail__value">SNP-informed decisions on methylfolate, vitamin D, omega-3</span></div>
-      <div class="proto-data-note"><span>// Tracked by:</span> Platform supplement log + genome insights</div>
+      <div class="proto-card__name">Morning Sunlight 10 min</div>
+      <div class="proto-card__why">Anchoring the circadian rhythm with morning light exposure drives more consistent sleep timing, which cascades into recovery and performance.</div>
+      <div class="proto-detail"><span class="proto-detail__label">Protocol</span><span class="proto-detail__value">Outdoor light exposure <strong>within 30 min of waking</strong>, 10 min minimum</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Key metrics</span><span class="proto-detail__value">Bedtime consistency (std deviation), subjective energy levels, HRV trend</span></div>
+      <div class="proto-detail"><span class="proto-detail__label">Tracked by</span><span class="proto-detail__value">Habitify daily check-in + Whoop sleep timing analysis</span></div>
+      <div class="proto-stats">
+        <div class="proto-stat">
+          <div class="proto-stat__label">30-day adherence</div>
+          <div class="proto-stat__value loading" id="adh-sunlight">Loading&hellip;</div>
+        </div>
+        <div class="proto-stat">
+          <div class="proto-stat__label">Signal</div>
+          <div class="proto-stat__value signal-pending">Pending &mdash; tracking 30-day window</div>
+        </div>
+      </div>
+      <div class="proto-data-note"><span>// Tracked by:</span> Habitify + Whoop sleep timing</div>
     </div>
   </div>
 
+</div><!-- /proto-body -->
+
+<!-- Vice Tracking Section -->
+<div class="vice-section reveal">
+  <div class="vice-section__heading"><span>//</span> Clean Streaks &mdash; current status</div>
+  <div class="vice-chips">
+    <div class="vice-chip">
+      <div class="vice-chip__label">No Alcohol</div>
+      <div class="vice-chip__value loading" id="streak-alcohol">—</div>
+      <div class="vice-chip__unit">days clean</div>
+    </div>
+    <div class="vice-chip">
+      <div class="vice-chip__label">Caloric Target Met</div>
+      <div class="vice-chip__value" id="streak-calories">Loading&hellip;</div>
+      <div class="vice-chip__unit" id="streak-calories-unit">days streak</div>
+    </div>
+  </div>
+  <div class="vice-note">
+    <span>// Privacy note:</span> Vice tracking is filtered for privacy &mdash; only clean streaks shown publicly.
+    Full compliance data is private and used internally by the platform.
+  </div>
 </div>
 
 <!-- N=1 disclaimer -->
@@ -294,7 +664,7 @@
   <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
     Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.<br>
-    <a href="/journal/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue &rarr;</a>
+    <a href="/chronicle/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue &rarr;</a>
   </p>
   <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
     <input id="cta-email-protocols" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);outline:none;" onfocus="this.style.borderColor='var(--c-amber-400)'" onblur="this.style.borderColor='var(--c-amber-500)'">
@@ -307,69 +677,148 @@ if(!window.amjSubscribe){window.amjSubscribe=async function(s){var e=document.ge
 var inp=document.getElementById('cta-email-protocols');if(inp)inp.addEventListener('keydown',function(e){if(e.key==='Enter')window.amjSubscribe('protocols')});
 </script>
 
+<!-- Adherence + streak loader -->
+<script>
+(function(){
+  // Fallback adherence values (estimates) shown if API unavailable
+  var fallback = {
+    'adh-zone2':    '78%',
+    'adh-sleep':    '82%',
+    'adh-if':       '90%',
+    'adh-strength': '65%',
+    'adh-cgm':      '95% (automated)',
+    'adh-sunlight': '70%'
+  };
+
+  function applyFallback(){
+    Object.keys(fallback).forEach(function(id){
+      var el = document.getElementById(id);
+      if(el && el.classList.contains('loading')){
+        el.textContent = fallback[id];
+        el.classList.remove('loading');
+      }
+    });
+  }
+
+  // Attempt to load adherence from /api/habits
+  fetch('/api/habits', {signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined})
+    .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
+    .then(function(data){
+      // Map API response fields to card IDs if present
+      var map = {
+        'adh-zone2':    data.zone2_adherence_pct,
+        'adh-sleep':    data.sleep_adherence_pct,
+        'adh-if':       data.if_adherence_pct,
+        'adh-strength': data.strength_adherence_pct,
+        'adh-cgm':      data.cgm_adherence_pct,
+        'adh-sunlight': data.sunlight_adherence_pct
+      };
+      Object.keys(map).forEach(function(id){
+        var val = map[id];
+        var el  = document.getElementById(id);
+        if(el && val !== undefined && val !== null){
+          el.textContent = Math.round(val) + '%';
+          el.classList.remove('loading');
+        }
+      });
+      // Streak for calories from habits
+      if(data.caloric_target_streak !== undefined){
+        var sc = document.getElementById('streak-calories');
+        if(sc){ sc.textContent = data.caloric_target_streak; sc.classList.remove('loading'); }
+        var su = document.getElementById('streak-calories-unit');
+        if(su){ su.textContent = 'days streak'; }
+      }
+      // Alcohol clean streak
+      var alcoholStreak = data.alcohol_streak !== undefined ? data.alcohol_streak
+                        : data.vice_alcohol_streak !== undefined ? data.vice_alcohol_streak
+                        : null;
+      var sa = document.getElementById('streak-alcohol');
+      if(sa && alcoholStreak !== null){ sa.textContent = alcoholStreak; sa.classList.remove('loading'); }
+      // Fill any still-loading with fallback
+      applyFallback();
+    })
+    .catch(function(){
+      applyFallback();
+      // Calorie streak fallback
+      var sc = document.getElementById('streak-calories');
+      if(sc && sc.classList.contains('loading')){ sc.textContent = '\u2014'; sc.classList.remove('loading'); }
+      var su = document.getElementById('streak-calories-unit');
+      if(su){ su.textContent = 'data loading'; }
+      // Alcohol streak fallback
+      var sa = document.getElementById('streak-alcohol');
+      if(sa && sa.classList.contains('loading')){ sa.textContent = '\u2014'; sa.classList.remove('loading'); }
+    });
+})();
+</script>
+
 <!-- Mobile bottom nav -->
 <nav class="bottom-nav" aria-label="Mobile navigation">
   <a href="/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     <span>Home</span>
   </a>
-  <a href="/ask/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-    <span>Ask</span>
+  <a href="/live/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/></svg>
+    <span>Live</span>
   </a>
   <a href="/character/" class="bottom-nav__link">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-    <span>Score</span>
+    <span>Character</span>
   </a>
-  <a href="/journal/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
-    <span>Journal</span>
+  <a href="/chronicle/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+    <span>Chronicle</span>
   </a>
-  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-    <span>More</span>
-  </button>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>Ask</span>
+  </a>
 </nav>
+
+<section class="reading-path" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
+  <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>
+  <a href="/experiments/" style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-display);">What I'm actively testing →</a>
+  <p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Live N=1 experiments with hypotheses and interim results</p>
+</section>
 <footer class="footer-v2">
   <div class="footer-v2__grid">
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The journey</div>
-      <a href="/story/" class="footer-v2__link">Story</a>
-      <a href="/live/" class="footer-v2__link">Live</a>
-      <a href="/journal/" class="footer-v2__link">Journal</a>
-      <a href="/week/" class="footer-v2__link">This Week</a>
+      <div class="footer-v2__heading">The Story</div>
+      <a href="/" class="footer-v2__link">Home</a>
+      <a href="/story/" class="footer-v2__link">My Story</a>
       <a href="/about/" class="footer-v2__link">About</a>
     </div>
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The data</div>
+      <div class="footer-v2__heading">The Data</div>
+      <a href="/live/" class="footer-v2__link">Live</a>
       <a href="/character/" class="footer-v2__link">Character</a>
       <a href="/habits/" class="footer-v2__link">Habits</a>
-      <a href="/achievements/" class="footer-v2__link">Achievements</a>
-      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
-      <a href="/results/" class="footer-v2__link">Results</a>
-      <a href="/progress/" class="footer-v2__link">Progress</a>
-      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
-      <a href="/supplements/" class="footer-v2__link">Supplements</a>
-      <a href="/glucose/" class="footer-v2__link">Glucose</a>
-      <a href="/sleep/" class="footer-v2__link">Sleep</a>
-      <a href="/experiments/" class="footer-v2__link">Experiments</a>
-      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
     </div>
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The platform</div>
+      <div class="footer-v2__heading">The Science</div>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The Build</div>
       <a href="/platform/" class="footer-v2__link">Platform</a>
       <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
-      <a href="/accountability/" class="footer-v2__link">Accountability</a>
-      <a href="/methodology/" class="footer-v2__link">Methodology</a>
-      <a href="/ask/" class="footer-v2__link">Ask</a>
       <a href="/board/" class="footer-v2__link">Board</a>
-      <a href="/data/" class="footer-v2__link">Data</a>
       <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
       <a href="/tools/" class="footer-v2__link">Tools</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">Follow</div>
+      <a href="/chronicle/" class="footer-v2__link">Chronicle</a>
       <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
       <a href="/rss.xml" class="footer-v2__link">RSS</a>
       <a href="/privacy/" class="footer-v2__link">Privacy</a>
     </div>

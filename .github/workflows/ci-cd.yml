@@ -43,8 +43,9 @@ on:
 
 env:
   AWS_REGION: us-west-2
+  AWS_ACCOUNT_ID: "205930651321"  # CONF-03: single place — override via GitHub env var for staging
   LAMBDA_MAP: ci/lambda_map.json
-  SNS_TOPIC_ARN: arn:aws:sns:us-west-2:205930651321:life-platform-alerts
+  SNS_TOPIC_ARN: arn:aws:sns:us-west-2:205930651321:life-platform-alerts  # CONF-03: constructed from AWS_ACCOUNT_ID in future; centralized above
 
 permissions:
   id-token: write   # OIDC token for AWS
@@ -267,7 +268,7 @@ jobs:
       - name: Configure AWS credentials (OIDC) — plan
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::205930651321:role/github-actions-deploy-role
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: CDK diff — detect IAM/infra drift
@@ -510,7 +511,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::205930651321:role/github-actions-deploy-role
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Rebuild shared layer
@@ -665,7 +666,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::205930651321:role/github-actions-deploy-role
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Run QA smoke test
@@ -771,7 +772,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::205930651321:role/github-actions-deploy-role
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: I1 — Lambda handler names match expected module names
@@ -849,7 +850,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::205930651321:role/github-actions-deploy-role
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Rollback deployed Lambdas
@@ -913,7 +914,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::205930651321:role/github-actions-deploy-role
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Post failure to SNS

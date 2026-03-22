@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+
+  <!-- THE STORY -->
   <url>
     <loc>https://averagejoematt.com/</loc>
     <changefreq>daily</changefreq>
@@ -11,14 +13,16 @@
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://averagejoematt.com/journal/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/platform/</loc>
+    <loc>https://averagejoematt.com/about/</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.6</priority>
+  </url>
+
+  <!-- THE DATA -->
+  <url>
+    <loc>https://averagejoematt.com/live/</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
   </url>
   <url>
     <loc>https://averagejoematt.com/character/</loc>
@@ -26,12 +30,19 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://averagejoematt.com/live/</loc>
+    <loc>https://averagejoematt.com/habits/</loc>
     <changefreq>daily</changefreq>
-    <priority>0.7</priority>
+    <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://averagejoematt.com/explorer/</loc>
+    <loc>https://averagejoematt.com/accountability/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- THE SCIENCE -->
+  <url>
+    <loc>https://averagejoematt.com/protocols/</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -41,17 +52,39 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://averagejoematt.com/biology/</loc>
+    <loc>https://averagejoematt.com/discoveries/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://averagejoematt.com/sleep/</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://averagejoematt.com/glucose/</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://averagejoematt.com/supplements/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://averagejoematt.com/about/</loc>
+    <loc>https://averagejoematt.com/benchmarks/</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- THE BUILD -->
+  <url>
+    <loc>https://averagejoematt.com/platform/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://averagejoematt.com/ask/</loc>
+    <loc>https://averagejoematt.com/intelligence/</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -61,83 +94,13 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://averagejoematt.com/journal/sample/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/subscribe/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/protocols/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/platform/reviews/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/rss.xml</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/data/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/privacy/</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/results/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/habits/</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/achievements/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/intelligence/</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/discoveries/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://averagejoematt.com/cost/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://averagejoematt.com/progress/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/benchmarks/</loc>
+    <loc>https://averagejoematt.com/methodology/</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/accountability/</loc>
-    <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
@@ -146,38 +109,66 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://averagejoematt.com/platform/reviews/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://averagejoematt.com/data/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <!-- FOLLOW -->
+  <url>
+    <loc>https://averagejoematt.com/chronicle/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://averagejoematt.com/chronicle/archive/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://averagejoematt.com/chronicle/sample/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://averagejoematt.com/subscribe/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://averagejoematt.com/ask/</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://averagejoematt.com/week/</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://averagejoematt.com/supplements/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
+    <loc>https://averagejoematt.com/privacy/</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://averagejoematt.com/start/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/journal/archive/</loc>
+    <loc>https://averagejoematt.com/rss.xml</loc>
     <changefreq>weekly</changefreq>
-    <priority>0.6</priority>
+    <priority>0.4</priority>
   </url>
+
+  <!-- EXPLORER (standalone tool) -->
   <url>
-    <loc>https://averagejoematt.com/methodology/</loc>
-    <changefreq>monthly</changefreq>
+    <loc>https://averagejoematt.com/explorer/</loc>
+    <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
-  <url>
-    <loc>https://averagejoematt.com/glucose/</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://averagejoematt.com/sleep/</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.7</priority>
-  </url>
+
+  <!-- BIOLOGY (noindex — genome data, private) -->
+  <!-- excluded from sitemap intentionally -->
+
 </urlset>
