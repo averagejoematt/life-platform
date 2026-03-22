@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="The Platform — a custom AWS AI system built on Claude.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
@@ -9,12 +10,13 @@
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="The Platform — Matthew Walker">
-  <meta name="twitter:description" content="48 Lambda functions. 95 AI tools. 19 data sources. $10/month. Built by a non-engineer with Claude.">
+  <meta name="twitter:description" content="48 Lambda functions. 95 AI tools. 19 data sources. $13/month. Built by a non-engineer with Claude.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:title" content="The Platform — Matthew Walker">
-  <meta property="og:description" content="48 Lambda functions. 95 AI tools. 19 data sources. $10/month. Built by a non-engineer with Claude.">
+  <meta property="og:description" content="48 Lambda functions. 95 AI tools. 19 data sources. $13/month. Built by a non-engineer with Claude.">
   <meta property="og:type" content="website">
   <title>The Platform — Matthew Walker</title>
+    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
@@ -198,6 +200,50 @@
     .review-card__date { font-size: var(--text-xs); color: var(--text-muted); letter-spacing: var(--ls-tag); text-transform: uppercase; margin-bottom: var(--space-3); }
     .review-card__note { font-size: var(--text-xs); color: var(--text-muted); line-height: 1.5; }
 
+    /* Feature hub */
+    .hub-section {
+      border-top: 1px solid var(--border);
+      padding: var(--space-16) var(--page-padding);
+    }
+    .hub-category {
+      margin-bottom: var(--space-10);
+    }
+    .hub-category__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+    }
+    .hub-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+    .hub-card {
+      background: var(--surface);
+      padding: var(--space-5) var(--space-5);
+      text-decoration: none;
+      display: block;
+      transition: background var(--dur-fast);
+    }
+    .hub-card:hover { background: var(--surface-raised); }
+    .hub-card__icon { font-size: 20px; margin-bottom: var(--space-2); }
+    .hub-card__title {
+      font-family: var(--font-display);
+      font-size: 15px;
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-1);
+    }
+    .hub-card__desc {
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
     @media (max-width: 900px) {
       .page-header { grid-template-columns: 1fr; }
       .arch-layer { grid-template-columns: 1fr; }
@@ -205,6 +251,10 @@
       .stack-grid { grid-template-columns: 1fr; }
       .ai-section { grid-template-columns: 1fr; }
       .review-grid { grid-template-columns: 1fr 1fr; }
+      .hub-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 480px) {
+      .hub-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -217,7 +267,7 @@
     <a href="/live/" class="nav__link">Live</a>
     <a href="/journal/" class="nav__link">Journal</a>
     <a href="/platform/" class="nav__link active">Platform</a>
-    <a href="/about/" class="nav__link">About</a>
+    <a href="/start/" class="nav__link">Explore</a>
     <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
   </div>
   <button class="nav__hamburger" aria-label="Open menu">
@@ -237,22 +287,35 @@
       <a href="/story/" class="nav-overlay__link">Story</a>
       <a href="/live/" class="nav-overlay__link">Live</a>
       <a href="/journal/" class="nav-overlay__link">Journal</a>
+      <a href="/week/" class="nav-overlay__link">This Week</a>
       <a href="/about/" class="nav-overlay__link">About</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The data</div>
       <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/habits/" class="nav-overlay__link">Habits</a>
+      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/results/" class="nav-overlay__link">Results</a>
+      <a href="/progress/" class="nav-overlay__link">Progress</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
       <a href="/explorer/" class="nav-overlay__link">Explorer</a>
       <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/biology/" class="nav-overlay__link">Biology</a>
       <a href="/protocols/" class="nav-overlay__link">Protocols</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The platform</div>
       <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
       <a href="/ask/" class="nav-overlay__link">Ask</a>
       <a href="/board/" class="nav-overlay__link">Board</a>
       <a href="/data/" class="nav-overlay__link">Data</a>
+      <a href="/cost/" class="nav-overlay__link">Cost</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">Follow</div>
@@ -261,6 +324,7 @@
     </div>
   </div>
 </div>
+
 
 <div class="page-header">
   <div>
@@ -286,6 +350,150 @@
     </div>
   </div>
 </div>
+
+<!-- Feature hub -->
+<section class="hub-section reveal">
+  <div class="eyebrow" style="margin-bottom:var(--space-6)">Everything on this site</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-10)">The full platform</h2>
+
+  <div class="hub-category">
+    <div class="hub-category__label">The Journey</div>
+    <div class="hub-grid">
+      <a href="/story/" class="hub-card">
+        <div class="hub-card__icon">📖</div>
+        <div class="hub-card__title">STORY</div>
+        <div class="hub-card__desc">302 lbs. January 2026. The decision to stop optimizing in the dark.</div>
+      </a>
+      <a href="/live/" class="hub-card">
+        <div class="hub-card__icon">📡</div>
+        <div class="hub-card__title">LIVE</div>
+        <div class="hub-card__desc">Every weigh-in, experiment, and milestone. Interactive timeline.</div>
+      </a>
+      <a href="/journal/" class="hub-card">
+        <div class="hub-card__icon">📝</div>
+        <div class="hub-card__title">JOURNAL</div>
+        <div class="hub-card__desc">Weekly chronicles from 19 data sources. Every number, every failure.</div>
+      </a>
+      <a href="/week/" class="hub-card">
+        <div class="hub-card__icon">📅</div>
+        <div class="hub-card__title">THIS WEEK</div>
+        <div class="hub-card__desc">Current week's data snapshot. The most shareable artifact on the site.</div>
+      </a>
+      <a href="/accountability/" class="hub-card">
+        <div class="hub-card__icon">👥</div>
+        <div class="hub-card__title">ACCOUNTABILITY</div>
+        <div class="hub-card__desc">Public commitments. Accountability without witnesses is just intention.</div>
+      </a>
+      <a href="/start/" class="hub-card">
+        <div class="hub-card__icon">🗺️</div>
+        <div class="hub-card__title">START HERE</div>
+        <div class="hub-card__desc">New to the site? This is your routing hub.</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="hub-category">
+    <div class="hub-category__label">The Data</div>
+    <div class="hub-grid">
+      <a href="/habits/" class="hub-card">
+        <div class="hub-card__icon">📊</div>
+        <div class="hub-card__title">HABITS</div>
+        <div class="hub-card__desc">52-week heatmap. Every habit tracked daily.</div>
+      </a>
+      <a href="/character/" class="hub-card">
+        <div class="hub-card__icon">🧙</div>
+        <div class="hub-card__title">CHARACTER</div>
+        <div class="hub-card__desc">7-pillar RPG scoring system. Sleep, movement, nutrition, and more.</div>
+      </a>
+      <a href="/achievements/" class="hub-card">
+        <div class="hub-card__icon">🏆</div>
+        <div class="hub-card__title">ACHIEVEMENTS</div>
+        <div class="hub-card__desc">Milestone badges earned from real data. No participation trophies.</div>
+      </a>
+      <a href="/benchmarks/" class="hub-card">
+        <div class="hub-card__icon">📐</div>
+        <div class="hub-card__title">BENCHMARKS</div>
+        <div class="hub-card__desc">My numbers vs. population norms. Interactive calculator.</div>
+      </a>
+      <a href="/progress/" class="hub-card">
+        <div class="hub-card__icon">📈</div>
+        <div class="hub-card__title">PROGRESS</div>
+        <div class="hub-card__desc">Long-arc trend lines across all 19 sources.</div>
+      </a>
+      <a href="/discoveries/" class="hub-card">
+        <div class="hub-card__icon">🔬</div>
+        <div class="hub-card__title">DISCOVERIES</div>
+        <div class="hub-card__desc">What the AI found. Correlations and patterns a human would miss.</div>
+      </a>
+      <a href="/intelligence/" class="hub-card">
+        <div class="hub-card__icon">🤖</div>
+        <div class="hub-card__title">INTELLIGENCE</div>
+        <div class="hub-card__desc">Daily AI coaching brief. What Claude reads, predicts, recommends.</div>
+      </a>
+      <a href="/explorer/" class="hub-card">
+        <div class="hub-card__icon">🔭</div>
+        <div class="hub-card__title">EXPLORER</div>
+        <div class="hub-card__desc">23 cross-source correlations. FDR-corrected. What predicts what.</div>
+      </a>
+      <a href="/experiments/" class="hub-card">
+        <div class="hub-card__icon">⚗️</div>
+        <div class="hub-card__title">EXPERIMENTS</div>
+        <div class="hub-card__desc">N=1 self-experiments with data. Hypothesis → protocol → result.</div>
+      </a>
+      <a href="/supplements/" class="hub-card">
+        <div class="hub-card__icon">💊</div>
+        <div class="hub-card__title">SUPPLEMENTS</div>
+        <div class="hub-card__desc">What I take, why, and what the data says about it.</div>
+      </a>
+      <a href="/glucose/" class="hub-card">
+        <div class="hub-card__icon">🩸</div>
+        <div class="hub-card__title">GLUCOSE</div>
+        <div class="hub-card__desc">30-day CGM data. Time-in-range, variability, metabolic patterns.</div>
+      </a>
+      <a href="/sleep/" class="hub-card">
+        <div class="hub-card__icon">🌙</div>
+        <div class="hub-card__title">SLEEP</div>
+        <div class="hub-card__desc">Eight Sleep × Whoop cross-referenced. Bed temp vs. sleep quality.</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="hub-category" style="margin-bottom:0;">
+    <div class="hub-category__label">The Platform</div>
+    <div class="hub-grid">
+      <a href="/cost/" class="hub-card">
+        <div class="hub-card__icon">💰</div>
+        <div class="hub-card__title">COST</div>
+        <div class="hub-card__desc">Full AWS bill breakdown. $13/month AI health OS.</div>
+      </a>
+      <a href="/tools/" class="hub-card">
+        <div class="hub-card__icon">🔧</div>
+        <div class="hub-card__title">TOOLS</div>
+        <div class="hub-card__desc">Every app, device, and service in the stack.</div>
+      </a>
+      <a href="/methodology/" class="hub-card">
+        <div class="hub-card__icon">📏</div>
+        <div class="hub-card__title">METHODOLOGY</div>
+        <div class="hub-card__desc">How the scoring works. Statistics, FDR correction, scoring rules.</div>
+      </a>
+      <a href="/ask/" class="hub-card">
+        <div class="hub-card__icon">💬</div>
+        <div class="hub-card__title">ASK</div>
+        <div class="hub-card__desc">Ask Claude anything about my health data. Subscribers get full access.</div>
+      </a>
+      <a href="/board/" class="hub-card">
+        <div class="hub-card__icon">🎯</div>
+        <div class="hub-card__title">BOARD</div>
+        <div class="hub-card__desc">My AI advisory board. 6 expert personas, always available.</div>
+      </a>
+      <a href="/results/" class="hub-card">
+        <div class="hub-card__icon">📋</div>
+        <div class="hub-card__title">RESULTS</div>
+        <div class="hub-card__desc">Lab work, DEXA scans, and clinical measurements over time.</div>
+      </a>
+    </div>
+  </div>
+</section>
 
 <!-- WR-34: Animated data flow diagram -->
 <section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);overflow:hidden;">
@@ -698,22 +906,35 @@
       <a href="/story/" class="footer-v2__link">Story</a>
       <a href="/live/" class="footer-v2__link">Live</a>
       <a href="/journal/" class="footer-v2__link">Journal</a>
+      <a href="/week/" class="footer-v2__link">This Week</a>
       <a href="/about/" class="footer-v2__link">About</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The data</div>
       <a href="/character/" class="footer-v2__link">Character</a>
-      <a href="/explorer/" class="footer-v2__link">Explorer</a>
+      <a href="/habits/" class="footer-v2__link">Habits</a>
+      <a href="/achievements/" class="footer-v2__link">Achievements</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/results/" class="footer-v2__link">Results</a>
+      <a href="/progress/" class="footer-v2__link">Progress</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
       <a href="/experiments/" class="footer-v2__link">Experiments</a>
-      <a href="/biology/" class="footer-v2__link">Biology</a>
       <a href="/protocols/" class="footer-v2__link">Protocols</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The platform</div>
       <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
       <a href="/ask/" class="footer-v2__link">Ask</a>
       <a href="/board/" class="footer-v2__link">Board</a>
       <a href="/data/" class="footer-v2__link">Data</a>
+      <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/tools/" class="footer-v2__link">Tools</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">Follow</div>
@@ -739,7 +960,7 @@
 </div>
 <script>
 (function(){
-  const API = 'https://lxhjl2qvq2ystwp47464uhs2jti0hpdcq.lambda-url.us-east-1.on.aws/api/current_challenge';
+  const API = '/api/current_challenge';
   fetch(API).then(r=>r.ok?r.json():null).then(data=>{
     if(!data||!data.current_challenge) return;
     const c = data.current_challenge;

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# sync_site_to_s3.sh — Sync averagejoematt-site/ to S3 and invalidate CloudFront
+# sync_site_to_s3.sh — Sync site/ to S3 and invalidate CloudFront
 #
 # Handles three categories of files with appropriate cache-control headers:
 #   - HTML pages:     max-age=300   (5 min — allows quick content updates)
-#   - CSS/JS assets:  max-age=31536000 (1 yr — fingerprint these when stable)
+#   - CSS/JS assets:  max-age=86400 (1 day — invalidate on deploy)
 #   - Data JSON:      max-age=86400 (1 day — Lambda overwrites daily anyway)
 #   - Everything else: max-age=3600
 #
@@ -18,7 +18,7 @@
 set -euo pipefail
 
 BUCKET="matthew-life-platform"
-SITE_DIR="/Users/matthewwalker/Documents/Claude/averagejoematt-site"
+SITE_DIR="/Users/matthewwalker/Documents/Claude/life-platform/site"
 S3_PREFIX="site"
 REGION="us-west-2"
 DRY_RUN="${1:-}"

@@ -167,9 +167,19 @@ def tool_get_readiness_score(args):
     def _clamp(v, lo=0.0, hi=100.0):
         return max(lo, min(hi, v))
 
+    # ── Pre-computed metrics (SIMP-1 Ph1): single read replaces 30d Whoop +
+    #    264d Strava Banister model. Falls back to live calculation if absent. ──
+    _cm = {}
+    try:
+        cm_recs = query_source("computed_metrics", d7_start, end_date)
+        cm_recs_sorted = sorted(cm_recs, key=lambda r: r.get("date", ""), reverse=True)
+        _cm = next((r for r in cm_recs_sorted if r.get("date") == end_date), cm_recs_sorted[0] if cm_recs_sorted else {})
+    except Exception as _e:
+        logger.warning(f"get_readiness_score: computed_metrics read failed — {_e}")
+
     components = {}
 
-    # ── 1. Whoop recovery score (40%) ─────────────────────────────────────────
+    # ── 1. Whoop recovery score (35%) ─────────────────────────────────────────
     whoop_recent = query_source("whoop", d7_start, end_date)
     whoop_sorted = sorted(whoop_recent, key=lambda x: x.get("date", ""), reverse=True)
     whoop_today  = next((w for w in whoop_sorted if w.get("recovery_score") is not None), None)
@@ -189,8 +199,8 @@ def tool_get_readiness_score(args):
         }
 
     # ── 2. Sleep quality score (25%) ─ Whoop SOT v2.55.0 ────────────────────────
-    sleep_raw    = query_source("whoop", d7_start, end_date)
-    sleep_recent = [normalize_whoop_sleep(i) for i in sleep_raw]
+    # Reuse whoop_recent (already fetched above) — avoids duplicate 7d Whoop query
+    sleep_recent = [normalize_whoop_sleep(i) for i in whoop_recent]
     sleep_sorted = sorted(sleep_recent, key=lambda x: x.get("date", ""), reverse=True)
     sleep_today  = next((s for s in sleep_sorted
                          if s.get("sleep_score") is not None or s.get("sleep_efficiency_pct") is not None), None)
@@ -221,52 +231,92 @@ def tool_get_readiness_score(args):
         }
 
     # ── 3. HRV 7-day trend vs 30-day baseline (20%) ───────────────────────────
-    whoop_30d = query_source("whoop", d30_start, end_date)
-    hrv_30d   = [float(w["hrv"]) for w in whoop_30d if w.get("hrv") is not None]
-    hrv_7d    = [float(w["hrv"]) for w in whoop_recent if w.get("hrv") is not None]
+    # SIMP-1 Ph1: read hrv_7d / hrv_30d from computed_metrics (single record)
+    # instead of re-querying 30 days of Whoop at call time.
+    hrv_7d_avg  = float(_cm["hrv_7d"])  if _cm.get("hrv_7d")  is not None else None
+    hrv_30d_avg = float(_cm["hrv_30d"]) if _cm.get("hrv_30d") is not None else None
 
-    if len(hrv_30d) >= 7 and hrv_7d:
-        baseline  = sum(hrv_30d) / len(hrv_30d)
-        recent7   = sum(hrv_7d) / len(hrv_7d)
-        ratio     = recent7 / baseline if baseline > 0 else 1.0
+    if hrv_7d_avg is not None and hrv_30d_avg is not None and hrv_30d_avg > 0:
+        ratio     = hrv_7d_avg / hrv_30d_avg
         trend_pct = round((ratio - 1.0) * 100, 1)
-        # ratio=1.0 → 60, +10% → 80, -10% → 40
         hrv_score = _clamp(60.0 + (ratio - 1.0) * 200.0)
-
         components["hrv_trend"] = {
             "score":  round(hrv_score, 1),
             "weight": 0.20,
             "raw": {
-                "hrv_7d_avg_ms":      round(recent7, 1),
-                "hrv_30d_baseline_ms": round(baseline, 1),
-                "trend_pct":          trend_pct,
-                "trend_direction":    "above_baseline" if trend_pct > 3 else ("below_baseline" if trend_pct < -3 else "at_baseline"),
-                "n_days_30d":         len(hrv_30d),
-                "n_days_7d":          len(hrv_7d),
+                "hrv_7d_avg_ms":       round(hrv_7d_avg, 1),
+                "hrv_30d_baseline_ms": round(hrv_30d_avg, 1),
+                "trend_pct":           trend_pct,
+                "trend_direction":     "above_baseline" if trend_pct > 3 else ("below_baseline" if trend_pct < -3 else "at_baseline"),
+                "source":              "pre_computed_metrics",
             },
         }
-
-    # ── 4. TSB training form (10%) ────────────────────────────────────────────
-    try:
-        load_result = tool_get_training_load({"end_date": end_date})
-        if "current_state" in load_result:
-            cs  = load_result["current_state"]
-            tsb = cs.get("tsb_form", 0.0)
-            # TSB=0 → 70, +5 → 82.5, +10 → 95, -10 → 45, -20 → 20
-            tsb_score = _clamp(70.0 + float(tsb) * 2.5)
-            components["training_form"] = {
-                "score":  round(tsb_score, 1),
-                "weight": 0.10,
+    else:
+        # Fallback: live 30-day Whoop query (pre-compute record missing)
+        whoop_30d = query_source("whoop", d30_start, end_date)
+        hrv_30d_vals = [float(w["hrv"]) for w in whoop_30d if w.get("hrv") is not None]
+        hrv_7d_vals  = [float(w["hrv"]) for w in whoop_recent if w.get("hrv") is not None]
+        if len(hrv_30d_vals) >= 7 and hrv_7d_vals:
+            baseline  = sum(hrv_30d_vals) / len(hrv_30d_vals)
+            recent7   = sum(hrv_7d_vals)  / len(hrv_7d_vals)
+            ratio     = recent7 / baseline if baseline > 0 else 1.0
+            trend_pct = round((ratio - 1.0) * 100, 1)
+            hrv_score = _clamp(60.0 + (ratio - 1.0) * 200.0)
+            components["hrv_trend"] = {
+                "score":  round(hrv_score, 1),
+                "weight": 0.20,
                 "raw": {
-                    "tsb_form":    cs.get("tsb_form"),
-                    "ctl_fitness": cs.get("ctl_fitness"),
-                    "atl_fatigue": cs.get("atl_fatigue"),
-                    "acwr":        cs.get("acwr"),
-                    "form_status": cs.get("form_status"),
+                    "hrv_7d_avg_ms":       round(recent7, 1),
+                    "hrv_30d_baseline_ms": round(baseline, 1),
+                    "trend_pct":           trend_pct,
+                    "trend_direction":     "above_baseline" if trend_pct > 3 else ("below_baseline" if trend_pct < -3 else "at_baseline"),
+                    "n_days_30d":          len(hrv_30d_vals),
+                    "n_days_7d":           len(hrv_7d_vals),
+                    "source":              "live_whoop_query",
                 },
             }
-    except Exception as e:
-        logger.warning(f"get_readiness_score: TSB failed — {e}")
+
+    # ── 4. TSB training form (10%) ────────────────────────────────────────────
+    # SIMP-1 Ph1: read tsb from computed_metrics instead of calling
+    # tool_get_training_load (which queries 264 days of Strava + runs Banister model).
+    tsb_cm = float(_cm["tsb"]) if _cm.get("tsb") is not None else None
+    if tsb_cm is not None:
+        tsb_score = _clamp(70.0 + tsb_cm * 2.5)
+        form = ("fresh — good for key sessions or race" if tsb_cm > 5
+                else "fatigued — accumulated training stress is high" if tsb_cm < -10
+                else "very fatigued — recovery priority" if tsb_cm < -25
+                else "neutral")
+        components["training_form"] = {
+            "score":  round(tsb_score, 1),
+            "weight": 0.10,
+            "raw": {
+                "tsb_form":    round(tsb_cm, 2),
+                "form_status": form,
+                "source":      "pre_computed_metrics",
+            },
+        }
+    else:
+        # Fallback: live Banister model (264d Strava query — only runs if pre-compute missing)
+        try:
+            load_result = tool_get_training_load({"end_date": end_date})
+            if "current_state" in load_result:
+                cs  = load_result["current_state"]
+                tsb = cs.get("tsb_form", 0.0)
+                tsb_score = _clamp(70.0 + float(tsb) * 2.5)
+                components["training_form"] = {
+                    "score":  round(tsb_score, 1),
+                    "weight": 0.10,
+                    "raw": {
+                        "tsb_form":    cs.get("tsb_form"),
+                        "ctl_fitness": cs.get("ctl_fitness"),
+                        "atl_fatigue": cs.get("atl_fatigue"),
+                        "acwr":        cs.get("acwr"),
+                        "form_status": cs.get("form_status"),
+                        "source":      "live_banister_model",
+                    },
+                }
+        except Exception as e:
+            logger.warning(f"get_readiness_score: TSB fallback failed — {e}")
 
     # ── 5. Garmin Body Battery (10%) ──────────────────────────────────────────
     garmin_recent = query_source("garmin", d7_start, end_date)
@@ -379,7 +429,7 @@ def tool_get_readiness_score(args):
 
     recommendation = " ".join(rec_parts)
 
-    return {
+    result = {
         "date":             end_date,
         "readiness_score":  readiness_score,
         "label":            label,
@@ -395,6 +445,16 @@ def tool_get_readiness_score(args):
         # R13-F09: Medical disclaimer on all health-assessment tool responses
         "_disclaimer": "For personal health tracking only. Not medical advice. Consult a qualified healthcare provider before making health decisions based on this data.",
     }
+    # Cross-check: show pre-computed readiness if available (computed by daily-metrics-compute
+    # with slightly different weights — useful to spot drift between models)
+    if _cm.get("readiness_score") is not None:
+        result["_precomputed_cross_check"] = {
+            "readiness_score": float(_cm["readiness_score"]),
+            "label":           _cm.get("readiness_colour", ""),
+            "source":          "daily-metrics-compute (9:40 AM)",
+            "note":            "Pre-computed with Whoop recovery 35% + HRV trend 25% + TSB 20% + Body Battery 15% + sleep debt 5%. Minor weight difference from live tool.",
+        }
+    return result
 
 
 def tool_get_weight_loss_progress(args):

@@ -50,9 +50,12 @@ IAM ROLE:
 v1.0.0 — 2026-03-16
 """
 
+import hashlib
 import json
 import logging
 import os
+import re
+import urllib.request
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
@@ -70,6 +73,8 @@ USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 # DynamoDB is always us-west-2 even when this Lambda runs in us-east-1 (web stack).
 # DYNAMODB_REGION env var injected by CDK; defaults to us-west-2.
 DDB_REGION = os.environ.get("DYNAMODB_REGION", "us-west-2")
+# SEC-03: S3 bucket is us-west-2; separate from DDB_REGION so each can be changed independently.
+S3_REGION = os.environ.get("S3_REGION", "us-west-2")
 
 # ── AWS clients (module-level for warm container reuse) ─────
 dynamodb = boto3.resource("dynamodb", region_name=DDB_REGION)
@@ -84,7 +89,7 @@ def _load_content_filter():
         return _content_filter_cache
     try:
         S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
-        s3 = boto3.client("s3", region_name="us-west-2")
+        s3 = boto3.client("s3", region_name=S3_REGION)
         resp = s3.get_object(Bucket=S3_BUCKET, Key="config/content_filter.json")
         _content_filter_cache = json.loads(resp["Body"].read())
         logger.info(f"[content_filter] Loaded: {len(_content_filter_cache.get('blocked_vice_keywords', []))} blocked terms")
@@ -94,6 +99,15 @@ def _load_content_filter():
             "blocked_vices": ["No porn", "No marijuana"],
             "blocked_vice_keywords": ["porn", "pornography", "marijuana", "cannabis", "weed", "thc"],
         }
+        # BUG-05: Emit metric so we know when the fallback is active
+        try:
+            import time as _t, json as _j
+            print(_j.dumps({"_aws": {"Timestamp": int(_t.time() * 1000),
+                "CloudWatchMetrics": [{"Namespace": "LifePlatform/SiteApi",
+                    "Dimensions": [[]], "Metrics": [{"Name": "ContentFilterFallback", "Unit": "Count"}]}]},
+                "ContentFilterFallback": 1}))
+        except Exception:
+            pass
     return _content_filter_cache
 
 
@@ -128,8 +142,10 @@ def _is_blocked_vice(name: str) -> bool:
 
 
 # ── CORS headers ────────────────────────────────────────────
+# SEC-07: CORS_ORIGIN is env-configurable so staging/dev can override.
+CORS_ORIGIN = os.environ.get("CORS_ORIGIN", "https://averagejoematt.com")
 CORS_HEADERS = {
-    "Access-Control-Allow-Origin":  "https://averagejoematt.com",
+    "Access-Control-Allow-Origin":  CORS_ORIGIN,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-Subscriber-Token",
     "Content-Type":                 "application/json",
@@ -625,6 +641,123 @@ def handle_timeline() -> dict:
     }, cache_seconds=3600)
 
 
+# ── Sprint 9: Supplements + Habits public endpoints ─────────────
+
+def handle_supplements() -> dict:
+    """
+    GET /api/supplements
+    Returns current supplement stack with dosage, timing, category.
+    Excludes medications and personal notes for privacy.
+    Cache: 3600s (1 hr).
+    """
+    today     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    pk = f"{USER_PREFIX}supplements"
+    # Try today first, fall back to yesterday
+    for date in (today, yesterday):
+        resp = table.get_item(Key={"pk": pk, "sk": f"DATE#{date}"})
+        item = _decimal_to_float(resp.get("Item"))
+        if item:
+            break
+
+    if not item:
+        # Scan last 7 days for latest record
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(pk),
+            ScanIndexForward=False,
+            Limit=7,
+        )
+        items = _decimal_to_float(resp.get("Items", []))
+        item = items[0] if items else None
+
+    if not item:
+        return _error(503, "Supplement data not available")
+
+    raw_sups = item.get("supplements", [])
+    public_sups = []
+    for s in raw_sups:
+        category = s.get("category", "supplement")
+        if category == "medication":
+            continue  # never expose medications publicly
+        public_sups.append({
+            "name":     s.get("name", ""),
+            "dose":     s.get("dose"),
+            "unit":     s.get("unit", ""),
+            "timing":   s.get("timing", ""),
+            "category": category,
+        })
+
+    return _ok({
+        "as_of_date":   item.get("date", yesterday),
+        "supplements":  public_sups,
+        "total_count":  len(public_sups),
+    }, cache_seconds=3600)
+
+
+def handle_habits() -> dict:
+    """
+    GET /api/habits
+    Returns 90-day daily habit completion history (aggregate only — no habit names).
+    Used by /habits/ page for the heatmap and group adherence bars.
+    Cache: 3600s (1 hr).
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    ninety_days_ago = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
+
+    pk = f"{USER_PREFIX}habit_scores"
+    resp = table.query(
+        KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(
+            f"DATE#{ninety_days_ago}", f"DATE#{today}"
+        ),
+        ScanIndexForward=True,
+    )
+    items = _decimal_to_float(resp.get("Items", []))
+
+    history = []
+    for item in items:
+        date_str = item.get("date") or item.get("sk", "").replace("DATE#", "")
+        t0_done  = int(item.get("tier0_done", 0) or 0)
+        t0_total = int(item.get("tier0_total", 1) or 1)
+        t01_done  = int(item.get("tier01_done", t0_done) or t0_done)
+        t01_total = int(item.get("tier01_total", t0_total) or t0_total)
+        t0_pct   = round(t0_done / t0_total * 100) if t0_total else 0
+        t01_pct  = round(t01_done / t01_total * 100) if t01_total else 0
+        streak   = int(item.get("t0_perfect_streak") or item.get("t0_aggregate_streak") or 0)
+
+        # Per-group breakdown if present (stored by habit ingestion Lambda)
+        group_data = {}
+        for key, val in item.items():
+            if key.startswith("group_") and isinstance(val, (int, float)):
+                group_data[key.replace("group_", "")] = val
+
+        day = {
+            "date":      date_str,
+            "tier0_pct": t0_pct,
+            "tier01_pct": t01_pct,
+            "t0_done":   t0_done,
+            "t0_total":  t0_total,
+            "perfect":   t0_pct == 100,
+        }
+        if group_data:
+            day["groups"] = group_data
+        history.append(day)
+
+    # Latest record for current streak
+    latest = history[-1] if history else {}
+    latest_streak = 0
+    if items:
+        last_item = _decimal_to_float(items[-1])
+        latest_streak = int(last_item.get("t0_perfect_streak") or last_item.get("t0_aggregate_streak") or 0)
+
+    return _ok({
+        "as_of_date":    today,
+        "days_tracked":  len(history),
+        "current_streak": latest_streak,
+        "history":       history,
+    }, cache_seconds=3600)
+
+
 # ── WEB-CE: Correlation data ────────────────────────────────────
 
 def handle_correlations() -> dict:
@@ -913,6 +1046,7 @@ def _handle_board_ask(event: dict) -> dict:
     hour_ago = now - 3600
     board_ts = [t for t in _board_rate_store.get(ip_hash, []) if t > hour_ago]
     if len(board_ts) >= BOARD_RATE_LIMIT:
+        _emit_rate_limit_metric("board_ask")
         return {
             "statusCode": 429,
             "headers": {**CORS_HEADERS, "Retry-After": "3600"},
@@ -974,10 +1108,6 @@ def _handle_board_ask(event: dict) -> dict:
 
 # ── Ask the Platform (AI Q&A) ─────────────────────────────────────
 
-import re
-import hashlib
-import urllib.request
-
 _anthropic_key_cache = None
 
 # In-memory rate limit stores (warm container state — resets on cold start, acceptable for rate limiting)
@@ -1004,6 +1134,28 @@ def _get_anthropic_key():
     except Exception as e:
         logger.error(f"[ask] Failed to fetch API key from {AI_SECRET_NAME}: {e}")
         return None
+
+
+def _emit_rate_limit_metric(endpoint: str) -> None:
+    """OBS-03: EMF metric emitted when a rate limit is hit. Zero-config via stdout."""
+    import time as _t
+    import json as _json
+    try:
+        emf = {
+            "_aws": {
+                "Timestamp": int(_t.time() * 1000),
+                "CloudWatchMetrics": [{
+                    "Namespace": "LifePlatform/SiteApi",
+                    "Dimensions": [["Endpoint"]],
+                    "Metrics": [{"Name": "RateLimitHit", "Unit": "Count"}],
+                }],
+            },
+            "Endpoint": endpoint,
+            "RateLimitHit": 1,
+        }
+        print(_json.dumps(emf))
+    except Exception:
+        pass
 
 
 def _ask_rate_check(ip_hash: str, limit: int = 3) -> tuple:
@@ -1116,6 +1268,165 @@ def handle_ask() -> dict:
     return _error(405, "Use POST method")
 
 
+def handle_glucose() -> dict:
+    """
+    GET /api/glucose
+    Returns: 30-day CGM stats — time-in-range, variability, daily trend.
+    Source: apple_health DynamoDB records.
+    Cache: 3600s (1h).
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+
+    records = _query_source("apple_health", d30, today)
+    cgm_days = [
+        r for r in records
+        if r.get("blood_glucose_avg") is not None
+    ]
+    cgm_days.sort(key=lambda x: x.get("sk", ""))
+
+    if not cgm_days:
+        return _ok({"glucose": None, "glucose_trend": []}, cache_seconds=3600)
+
+    latest = cgm_days[-1]
+
+    # 30-day averages
+    avg_vals = [float(r["blood_glucose_avg"]) for r in cgm_days if r.get("blood_glucose_avg")]
+    tir_vals = [float(r["blood_glucose_time_in_range_pct"]) for r in cgm_days if r.get("blood_glucose_time_in_range_pct")]
+    opt_vals = [float(r["blood_glucose_time_in_optimal_pct"]) for r in cgm_days if r.get("blood_glucose_time_in_optimal_pct")]
+    std_vals = [float(r["blood_glucose_std_dev"]) for r in cgm_days if r.get("blood_glucose_std_dev")]
+
+    def avg(lst):
+        return round(sum(lst) / len(lst), 1) if lst else None
+
+    # Daily trend array for chart
+    trend = [
+        {
+            "date": r.get("sk", "").replace("DATE#", ""),
+            "avg": round(float(r["blood_glucose_avg"]), 1) if r.get("blood_glucose_avg") else None,
+            "tir": round(float(r["blood_glucose_time_in_range_pct"]), 1) if r.get("blood_glucose_time_in_range_pct") else None,
+            "std": round(float(r["blood_glucose_std_dev"]), 1) if r.get("blood_glucose_std_dev") else None,
+        }
+        for r in cgm_days
+    ]
+
+    tir_today = float(latest.get("blood_glucose_time_in_range_pct", 0))
+    tir_status = "excellent" if tir_today >= 90 else ("good" if tir_today >= 70 else "needs_attention")
+    std_today = float(latest.get("blood_glucose_std_dev", 99))
+    variability_status = "low" if std_today < 15 else ("moderate" if std_today < 25 else "high")
+
+    return _ok({
+        "glucose": {
+            "avg_mg_dl":          round(float(latest.get("blood_glucose_avg", 0)), 1) if latest.get("blood_glucose_avg") else None,
+            "std_dev":            round(float(latest.get("blood_glucose_std_dev", 0)), 1) if latest.get("blood_glucose_std_dev") else None,
+            "time_in_range_pct":  round(tir_today, 1),
+            "time_in_optimal_pct": round(float(latest.get("blood_glucose_time_in_optimal_pct", 0)), 1) if latest.get("blood_glucose_time_in_optimal_pct") else None,
+            "time_above_140_pct": round(float(latest.get("blood_glucose_time_above_140_pct", 0)), 1) if latest.get("blood_glucose_time_above_140_pct") else None,
+            "cgm_source":         latest.get("cgm_source", "unknown"),
+            "tir_status":         tir_status,
+            "variability_status": variability_status,
+            "30d_avg_mg_dl":      avg(avg_vals),
+            "30d_avg_tir":        avg(tir_vals),
+            "30d_avg_optimal":    avg(opt_vals),
+            "30d_avg_std":        avg(std_vals),
+            "days_tracked":       len(cgm_days),
+            "as_of_date":         latest.get("sk", "").replace("DATE#", ""),
+        },
+        "glucose_trend": trend,
+    }, cache_seconds=3600)
+
+
+def handle_sleep_detail() -> dict:
+    """
+    GET /api/sleep_detail
+    Returns: 30-day sleep stats from Eight Sleep + Whoop cross-referenced.
+    Shows sleep score, efficiency, bed temp, quality, and daily trend.
+    Cache: 3600s (1h).
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+
+    eight_days = _query_source("eightsleep", d30, today)
+    whoop_days = _query_source("whoop", d30, today)
+
+    # Index whoop by date for cross-referencing
+    whoop_by_date = {
+        r.get("sk", "").replace("DATE#", ""): r
+        for r in whoop_days
+        if r.get("sk")
+    }
+
+    eight_days.sort(key=lambda x: x.get("sk", ""))
+    eight_with_data = [r for r in eight_days if r.get("sleep_score") is not None]
+
+    if not eight_with_data:
+        return _ok({"sleep_detail": None, "sleep_trend": []}, cache_seconds=3600)
+
+    latest = eight_with_data[-1]
+    latest_date = latest.get("sk", "").replace("DATE#", "")
+    whoop_latest = whoop_by_date.get(latest_date, {})
+
+    # 30-day averages (actual field names: sleep_efficiency_pct, sleep_duration_hours)
+    score_vals = [float(r["sleep_score"]) for r in eight_with_data if r.get("sleep_score")]
+    eff_vals   = [float(r["sleep_efficiency_pct"]) for r in eight_with_data if r.get("sleep_efficiency_pct")]
+    temp_vals  = [float(r["bed_temp_f"]) for r in eight_with_data if r.get("bed_temp_f")]
+
+    # Find best-performing temp range by pairing temp with sleep score
+    temp_score_pairs = [
+        (float(r["bed_temp_f"]), float(r["sleep_score"]))
+        for r in eight_with_data
+        if r.get("bed_temp_f") and r.get("sleep_score")
+    ]
+    optimal_temp = None
+    if len(temp_score_pairs) >= 7:
+        # Group by 2°F buckets, find highest average score bucket
+        buckets = {}
+        for temp, score in temp_score_pairs:
+            bucket = round(temp / 2) * 2  # nearest 2°F
+            buckets.setdefault(bucket, []).append(score)
+        best_bucket = max(buckets, key=lambda b: sum(buckets[b]) / len(buckets[b]))
+        optimal_temp = best_bucket
+
+    def avg(lst):
+        return round(sum(lst) / len(lst), 1) if lst else None
+
+    # Daily trend
+    trend = []
+    for r in eight_with_data:
+        date = r.get("sk", "").replace("DATE#", "")
+        w = whoop_by_date.get(date, {})
+        trend.append({
+            "date":          date,
+            "sleep_score":   round(float(r["sleep_score"]), 0) if r.get("sleep_score") else None,
+            "efficiency":    round(float(r["sleep_efficiency_pct"]), 1) if r.get("sleep_efficiency_pct") else None,
+            "bed_temp_f":    round(float(r["bed_temp_f"]), 1) if r.get("bed_temp_f") else None,
+            "hours":         round(float(w["sleep_duration_hours"]), 1) if w.get("sleep_duration_hours") else None,
+            "whoop_quality": round(float(w["sleep_quality_score"]), 0) if w.get("sleep_quality_score") else None,
+        })
+
+    score_today = float(latest.get("sleep_score", 0))
+    score_status = "excellent" if score_today >= 85 else ("good" if score_today >= 70 else "needs_attention")
+
+    return _ok({
+        "sleep_detail": {
+            "sleep_score":       round(score_today, 0),
+            "sleep_efficiency":  round(float(latest.get("sleep_efficiency_pct", 0)), 1) if latest.get("sleep_efficiency_pct") else None,
+            "bed_temp_f":        round(float(latest.get("bed_temp_f", 0)), 1) if latest.get("bed_temp_f") else None,
+            "total_sleep_hours": round(float(latest.get("sleep_duration_hours", 0)), 1) if latest.get("sleep_duration_hours") else None,
+            "whoop_quality":     round(float(whoop_latest.get("sleep_quality_score", 0)), 0) if whoop_latest.get("sleep_quality_score") else None,
+            "whoop_hours":       round(float(whoop_latest.get("sleep_duration_hours", 0)), 1) if whoop_latest.get("sleep_duration_hours") else None,
+            "score_status":      score_status,
+            "optimal_temp_f":    optimal_temp,
+            "30d_avg_score":     avg(score_vals),
+            "30d_avg_efficiency": avg(eff_vals),  # from sleep_efficiency_pct field
+            "30d_avg_temp":      avg(temp_vals),
+            "days_tracked":      len(eight_with_data),
+            "as_of_date":        latest_date,
+        },
+        "sleep_trend": trend,
+    }, cache_seconds=3600)
+
+
 # ── Router ──────────────────────────────────────────────────
 
 ROUTES = {
@@ -1133,6 +1444,12 @@ ROUTES = {
     "/api/timeline":           handle_timeline,
     "/api/correlations":       handle_correlations,
     "/api/genome_risks":       handle_genome_risks,
+    # Sprint 9: new public endpoints
+    "/api/supplements":        handle_supplements,
+    "/api/habits":             handle_habits,
+    # Sprint 11: glucose + sleep intelligence pages
+    "/api/glucose":            handle_glucose,
+    "/api/sleep_detail":       handle_sleep_detail,
     # Website Review: Ask the Platform
     "/api/ask":                handle_ask,
     # WR-24 + S2-T2-2: handled specially in lambda_handler (POST routes)
@@ -1197,6 +1514,7 @@ def lambda_handler(event, context):
             allowed, remaining = _ask_rate_check(ip_hash, limit=rate_limit)
             if not allowed:
                 limit_msg = "20" if is_subscriber else "3"
+                _emit_rate_limit_metric("ask")
                 return {
                     "statusCode": 429,
                     "headers": {**CORS_HEADERS, "Retry-After": "3600"},

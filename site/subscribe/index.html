@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Follow the experiment. Weekly data, real numbers, no filtered highlight reel.">
+  <title>Subscribe — Matthew Walker / Signal</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .subscribe-layout {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-bottom: 1px solid var(--border);
+    }
+    .subscribe-left {
+      padding: calc(var(--nav-height) + var(--space-20)) var(--page-padding) var(--space-20);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .subscribe-right {
+      padding: calc(var(--nav-height) + var(--space-20)) var(--page-padding) var(--space-20);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .subscribe-title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      letter-spacing: var(--ls-display);
+      color: var(--text);
+      margin-bottom: var(--space-6);
+    }
+    .subscribe-title span { color: var(--accent); }
+    .subscribe-desc {
+      font-size: var(--text-lg);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      max-width: 420px;
+      margin-bottom: var(--space-10);
+    }
+    .what-you-get {
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .wyg-header {
+      padding: var(--space-4) var(--space-6);
+      border-bottom: 1px solid var(--border);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+    }
+    .wyg-row {
+      display: flex;
+      gap: var(--space-4);
+      padding: var(--space-4) var(--space-6);
+      border-bottom: 1px solid var(--border-subtle);
+      align-items: flex-start;
+    }
+    .wyg-row:last-child { border-bottom: none; }
+    .wyg-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+    .wyg-text { font-size: var(--text-base); color: var(--text-muted); line-height: var(--lh-body); }
+    .wyg-text strong { color: var(--text); font-weight: 500; }
+
+    .form-block { border: 1px solid var(--border); background: var(--surface); }
+    .form-block__header {
+      padding: var(--space-5) var(--space-6);
+      border-bottom: 1px solid var(--border);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+    }
+    .form-block__body {
+      padding: var(--space-8) var(--space-6);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-5);
+    }
+    .form-field { display: flex; flex-direction: column; gap: var(--space-2); }
+    .form-label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .form-input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: var(--text-base);
+      padding: var(--space-3) var(--space-4);
+      outline: none;
+      transition: border-color var(--dur-fast);
+      width: 100%;
+    }
+    .form-input::placeholder { color: var(--text-faint); }
+    .form-input:focus { border-color: var(--accent); }
+    .form-note {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      color: var(--text-faint);
+      line-height: 1.6;
+    }
+    .form-submit { width: 100%; padding: var(--space-4); text-align: center; }
+    .form-status {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      text-align: center;
+      min-height: 20px;
+    }
+    .success-block {
+      display: none;
+      border: 1px solid var(--border-strong);
+      background: var(--accent-bg-subtle);
+      padding: var(--space-8) var(--space-6);
+      text-align: center;
+    }
+    .success-block__icon { font-size: 32px; margin-bottom: var(--space-4); }
+    .success-block__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--accent);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-3);
+    }
+    .success-block__body {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+
+    @media (max-width: 900px) {
+      .subscribe-layout { grid-template-columns: 1fr; }
+      .subscribe-left { border-right: none; border-bottom: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/live/" class="nav__link">Live</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/start/" class="nav__link">Explore</a>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+  </div>
+  <button class="nav__hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span id="nav-date"></span>
+  </div>
+</nav>
+<!-- Mobile overlay menu -->
+<div class="nav-overlay">
+  <div class="nav-overlay__panel">
+    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The journey</div>
+      <a href="/story/" class="nav-overlay__link">Story</a>
+      <a href="/live/" class="nav-overlay__link">Live</a>
+      <a href="/journal/" class="nav-overlay__link">Journal</a>
+      <a href="/week/" class="nav-overlay__link">This Week</a>
+      <a href="/about/" class="nav-overlay__link">About</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The data</div>
+      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/habits/" class="nav-overlay__link">Habits</a>
+      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/results/" class="nav-overlay__link">Results</a>
+      <a href="/progress/" class="nav-overlay__link">Progress</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
+      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The platform</div>
+      <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/data/" class="nav-overlay__link">Data</a>
+      <a href="/cost/" class="nav-overlay__link">Cost</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">Follow</div>
+      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+    </div>
+  </div>
+</div>
+
+
+<div class="subscribe-layout">
+  <div class="subscribe-left animate-in">
+    <div class="eyebrow" style="margin-bottom:var(--space-6)">Follow the experiment</div>
+    <h1 class="subscribe-title">The<br>weekly<br><span>signal</span></h1>
+    <p class="subscribe-desc">Real numbers from someone actually doing the work. Not a curated highlight reel — the full data, including the bad weeks.</p>
+    <div class="what-you-get">
+      <div class="wyg-header">// what you get</div>
+      <div class="wyg-row">
+        <div class="wyg-icon">📊</div>
+        <div class="wyg-text"><strong>Weekly data report.</strong> Weight, HRV, recovery, sleep, glucose, habits — with AI coaching commentary from 6 advisors.</div>
+      </div>
+      <div class="wyg-row">
+        <div class="wyg-icon">📝</div>
+        <div class="wyg-text"><strong>The Wednesday Chronicle.</strong> Elena Voss's narrative journalism installment — what actually happened that week.</div>
+      </div>
+      <div class="wyg-row">
+        <div class="wyg-icon">🔔</div>
+        <div class="wyg-text"><strong>Anomaly alerts.</strong> When something genuinely interesting happens in the data, you'll hear about it.</div>
+      </div>
+      <div class="wyg-row">
+        <div class="wyg-icon">⚡</div>
+        <div class="wyg-text"><strong>No noise.</strong> No affiliate links, no product pitches, no ads. Just the experiment.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="subscribe-right animate-in">
+    <div class="form-block" id="form-block">
+      <div class="form-block__header">// join the experiment</div>
+      <div class="form-block__body">
+        <div class="form-field">
+          <label class="form-label" for="email">Email address</label>
+          <input type="email" class="form-input" id="email" placeholder="your@email.com" autocomplete="email">
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="why">What brings you here? <span style="color:var(--text-faint)">(optional)</span></label>
+          <input type="text" class="form-input" id="why" placeholder="Health goals, curiosity, similar journey...">
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="source-field">How'd you find this? <span style="color:var(--text-faint)">(optional)</span></label>
+          <input type="text" class="form-input" id="source-field" placeholder="Twitter, friend, search...">
+        </div>
+        <div class="form-note">You'll get a confirmation email. Double opt-in — no surprises. Unsubscribe anytime, no questions asked. <a href="/privacy/" style="color:var(--text-muted);text-decoration:underline;">Privacy policy →</a></div>
+        <button class="btn btn--primary form-submit" id="submit-btn">Follow the journey →</button>
+        <div class="form-status" id="form-status"></div>
+      </div>
+    </div>
+    <div class="success-block" id="success-block">
+      <div class="success-block__icon">✓</div>
+      <div class="success-block__title">Check your inbox</div>
+      <div class="success-block__body">
+        Confirmation email sent. Click the link to confirm and you're in.<br><br>
+        <a href="/" style="color:var(--accent);font-size:var(--text-xs);letter-spacing:var(--ls-label);text-transform:uppercase;">← Back to the experiment</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <a href="/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span>Ask</span>
+  </a>
+  <a href="/character/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span>Score</span>
+  </a>
+  <a href="/journal/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+    <span>Journal</span>
+  </a>
+  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    <span>More</span>
+  </button>
+</nav>
+<footer class="footer-v2">
+  <div class="footer-v2__grid">
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The journey</div>
+      <a href="/story/" class="footer-v2__link">Story</a>
+      <a href="/live/" class="footer-v2__link">Live</a>
+      <a href="/journal/" class="footer-v2__link">Journal</a>
+      <a href="/week/" class="footer-v2__link">This Week</a>
+      <a href="/about/" class="footer-v2__link">About</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The data</div>
+      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/habits/" class="footer-v2__link">Habits</a>
+      <a href="/achievements/" class="footer-v2__link">Achievements</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/results/" class="footer-v2__link">Results</a>
+      <a href="/progress/" class="footer-v2__link">Progress</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The platform</div>
+      <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/data/" class="footer-v2__link">Data</a>
+      <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/tools/" class="footer-v2__link">Tools</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">Follow</div>
+      <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/rss.xml" class="footer-v2__link">RSS</a>
+      <a href="/privacy/" class="footer-v2__link">Privacy</a>
+    </div>
+  </div>
+  <div class="footer-v2__bottom">
+    <span class="footer-v2__brand">AMJ</span>
+    <span class="footer-v2__copy">// updated daily by life-platform</span>
+  </div>
+</footer>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const action = params.get('action');
+  const token = params.get('token');
+
+  if (action === 'confirmed') {
+    document.getElementById('form-block').style.display = 'none';
+    const sb = document.getElementById('success-block');
+    sb.style.display = 'block';
+    sb.querySelector('.success-block__title').textContent = "You're in.";
+    sb.querySelector('.success-block__body').innerHTML = 'Subscription confirmed. You\'ll get the next weekly signal when it drops.<br><br><a href="/" style="color:var(--accent);font-size:var(--text-xs);letter-spacing:var(--ls-label);text-transform:uppercase;">← Back to the experiment</a>';
+  }
+  if (action === 'unsubscribed') {
+    document.getElementById('form-block').style.display = 'none';
+    const sb = document.getElementById('success-block');
+    sb.style.display = 'block';
+    sb.querySelector('.success-block__title').textContent = 'Unsubscribed.';
+    sb.querySelector('.success-block__body').innerHTML = 'You\'ve been removed. No hard feelings.<br><br><a href="/" style="color:var(--accent);font-size:var(--text-xs);letter-spacing:var(--ls-label);text-transform:uppercase;">← Back to the experiment</a>';
+  }
+  if (action === 'confirm' && token) {
+    fetch('/api/subscribe?action=confirm&token=' + encodeURIComponent(token))
+      .then(r => r.json()).then(() => { window.location.search = '?action=confirmed'; })
+      .catch(() => { document.getElementById('form-status').textContent = 'Confirmation failed — try the link again.'; });
+  }
+  if (action === 'unsubscribe' && token) {
+    fetch('/api/subscribe?action=unsubscribe&token=' + encodeURIComponent(token))
+      .then(r => r.json()).then(() => { window.location.search = '?action=unsubscribed'; })
+      .catch(() => { document.getElementById('form-status').textContent = 'Error — try again.'; });
+  }
+
+  document.getElementById('submit-btn').addEventListener('click', async () => {
+    const email = document.getElementById('email').value.trim();
+    const why = document.getElementById('why').value.trim();
+    const src = document.getElementById('source-field').value.trim();
+    const status = document.getElementById('form-status');
+    if (!email || !email.includes('@')) {
+      status.textContent = 'Enter a valid email address.';
+      status.style.color = 'var(--c-yellow-status)';
+      return;
+    }
+    status.textContent = 'Sending...';
+    status.style.color = 'var(--text-muted)';
+    try {
+      const res = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, why, source: src || 'subscribe-page' }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        document.getElementById('form-block').style.display = 'none';
+        document.getElementById('success-block').style.display = 'block';
+      } else {
+        status.textContent = data.error || 'Something went wrong — try again.';
+        status.style.color = 'var(--c-yellow-status)';
+      }
+    } catch { status.textContent = 'Network error — try again.'; status.style.color = 'var(--c-yellow-status)'; }
+  });
+  document.getElementById('email').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('submit-btn').click();
+  });
+</script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>

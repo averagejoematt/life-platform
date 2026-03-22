@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="This week by the numbers — weight, HRV, recovery, sleep, streak. Live data from Matthew's personal health OS.">
   <meta property="og:title" content="This Week — Matthew Walker">
@@ -16,6 +17,7 @@
   <meta name="twitter:description" content="Weekly snapshot: every metric that moved, every pillar scored.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <title>This Week — Matthew Walker</title>
+    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
@@ -252,7 +254,7 @@
     <a href="/live/" class="nav__link">Live</a>
     <a href="/journal/" class="nav__link">Journal</a>
     <a href="/platform/" class="nav__link">Platform</a>
-    <a href="/about/" class="nav__link">About</a>
+    <a href="/start/" class="nav__link">Explore</a>
     <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
   </div>
   <button class="nav__hamburger" aria-label="Open menu">
@@ -272,22 +274,35 @@
       <a href="/story/" class="nav-overlay__link">Story</a>
       <a href="/live/" class="nav-overlay__link">Live</a>
       <a href="/journal/" class="nav-overlay__link">Journal</a>
+      <a href="/week/" class="nav-overlay__link">This Week</a>
       <a href="/about/" class="nav-overlay__link">About</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The data</div>
       <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/habits/" class="nav-overlay__link">Habits</a>
+      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/results/" class="nav-overlay__link">Results</a>
+      <a href="/progress/" class="nav-overlay__link">Progress</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
       <a href="/explorer/" class="nav-overlay__link">Explorer</a>
       <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/biology/" class="nav-overlay__link">Biology</a>
       <a href="/protocols/" class="nav-overlay__link">Protocols</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The platform</div>
       <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
       <a href="/ask/" class="nav-overlay__link">Ask</a>
       <a href="/board/" class="nav-overlay__link">Board</a>
       <a href="/data/" class="nav-overlay__link">Data</a>
+      <a href="/cost/" class="nav-overlay__link">Cost</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">Follow</div>
@@ -296,6 +311,7 @@
     </div>
   </div>
 </div>
+
 
 <header class="week-header reveal">
   <div>
@@ -385,6 +401,31 @@
     <a href="/results/" style="color:var(--accent-dim);text-decoration:none">Full results page &rarr;</a> &nbsp;&middot;&nbsp;
     <a href="/" style="color:var(--accent-dim);text-decoration:none">Live dashboard &rarr;</a>
   </p>
+  <!-- U08: Share this week button -->
+  <div style="margin-top:var(--space-8);padding-top:var(--space-6);border-top:1px solid var(--border-subtle);">
+    <a id="share-tweet-btn" href="https://twitter.com/intent/tweet?text=This+week+by+the+numbers+%E2%80%94+tracking+302+%E2%86%92+185+lbs+with+19+data+sources+and+an+AI+health+OS.+Every+number+public%2C+no+filter.+%F0%9F%93%8A+averagejoematt.com%2Fweek%2F" target="_blank" rel="noopener" class="btn btn--ghost" style="display:inline-flex;align-items:center;gap:var(--space-2);">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.738l7.726-8.84L2.25 2.25h7.36l4.257 5.63 5.377-5.63Zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+      Share this week &rarr;
+    </a>
+    <script>
+    (function() {
+      var btn = document.getElementById('share-tweet-btn');
+      if (!btn) return;
+      // Populate tweet with live data if available
+      function updateShareLink() {
+        var weight = document.getElementById('wk-weight');
+        var wLabel = document.getElementById('week-label');
+        if (weight && weight.textContent && weight.textContent !== '—') {
+          var wText = weight.textContent.replace(/[^0-9.]/g,'');
+          var weekText = wLabel ? wLabel.textContent : '';
+          var tweet = weekText + ': ' + wText + ' lbs, tracking 302→185 with 19 data sources + AI health OS. Every number public. averagejoematt.com/week/';
+          btn.href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(tweet);
+        }
+      }
+      setTimeout(updateShareLink, 2000);
+    })();
+    </script>
+  </div>
 </div>
 
 <!-- N=1 disclaimer -->
@@ -445,22 +486,35 @@ var inp=document.getElementById('cta-email-week');if(inp)inp.addEventListener('k
       <a href="/story/" class="footer-v2__link">Story</a>
       <a href="/live/" class="footer-v2__link">Live</a>
       <a href="/journal/" class="footer-v2__link">Journal</a>
+      <a href="/week/" class="footer-v2__link">This Week</a>
       <a href="/about/" class="footer-v2__link">About</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The data</div>
       <a href="/character/" class="footer-v2__link">Character</a>
-      <a href="/explorer/" class="footer-v2__link">Explorer</a>
+      <a href="/habits/" class="footer-v2__link">Habits</a>
+      <a href="/achievements/" class="footer-v2__link">Achievements</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/results/" class="footer-v2__link">Results</a>
+      <a href="/progress/" class="footer-v2__link">Progress</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
       <a href="/experiments/" class="footer-v2__link">Experiments</a>
-      <a href="/biology/" class="footer-v2__link">Biology</a>
       <a href="/protocols/" class="footer-v2__link">Protocols</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The platform</div>
       <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
       <a href="/ask/" class="footer-v2__link">Ask</a>
       <a href="/board/" class="footer-v2__link">Board</a>
       <a href="/data/" class="footer-v2__link">Data</a>
+      <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/tools/" class="footer-v2__link">Tools</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">Follow</div>
@@ -501,12 +555,12 @@ async function loadWeek() {
   document.getElementById('week-date').textContent = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
   try {
-    const [vRes, jRes] = await Promise.all([
-      fetch(`${API}/api/vitals`),
-      fetch(`${API}/api/journey`),
+    const [_vResult, _jResult] = await Promise.allSettled([
+      fetch(`${API}/api/vitals`).then(r => r.json()),
+      fetch(`${API}/api/journey`).then(r => r.json()),
     ]);
-    const vData = await vRes.json();
-    const jData = await jRes.json();
+    const vData = _vResult.status === 'fulfilled' ? _vResult.value : {};
+    const jData = _jResult.status === 'fulfilled' ? _jResult.value : {};
     const v = vData.vitals;
     const j = jData.journey;
 

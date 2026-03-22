@@ -494,8 +494,8 @@ def save_cgm_readings_to_s3(date_str, readings):
         existing = json.loads(resp["Body"].read())
     except s3_client.exceptions.NoSuchKey:
         pass
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("s3_read_cgm_readings %s: %s", s3_key, e)
 
     # Deduplicate by timestamp
     existing_times = {r["time"] for r in existing}
@@ -523,8 +523,8 @@ def save_bp_readings_to_s3(date_str, readings):
         existing = json.loads(resp["Body"].read())
     except s3_client.exceptions.NoSuchKey:
         pass
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("s3_read_bp_readings %s: %s", s3_key, e)
 
     existing_times = {r["time"] for r in existing}
     new_readings = [r for r in readings if r["time"] not in existing_times]
@@ -551,8 +551,8 @@ def save_state_of_mind_to_s3(date_str, entries):
         existing = json.loads(resp["Body"].read())
     except s3_client.exceptions.NoSuchKey:
         pass
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("s3_read_state_of_mind %s: %s", s3_key, e)
 
     # Deduplicate by timestamp
     existing_times = {e.get("time") for e in existing}
@@ -898,8 +898,8 @@ def save_workouts_to_s3(date_str, workouts_list):
         existing = json.loads(resp["Body"].read())
     except s3_client.exceptions.NoSuchKey:
         pass
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("s3_read_workouts %s: %s", s3_key, e)
 
     # Deduplicate by workout id
     existing_ids = {w.get("id") for w in existing if w.get("id")}

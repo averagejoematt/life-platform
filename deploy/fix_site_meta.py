@@ -53,18 +53,23 @@ PAGE_META = {
     },
 }
 
-# Standard nav HTML
+# Standard nav HTML (Sprint 8+ — Story/Live/Journal/Platform/About/Subscribe + hamburger)
 STANDARD_NAV = '''<nav class="nav">
   <a href="/" class="nav__brand">AMJ</a>
   <div class="nav__links">
-    <a href="/#experiment" class="nav__link">The experiment</a>
-    <a href="/platform/" class="nav__link">The platform</a>
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/live/" class="nav__link">Live</a>
     <a href="/journal/" class="nav__link">Journal</a>
-    <a href="/character/" class="nav__link">Character</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/about/" class="nav__link">About</a>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
   </div>
+  <button class="nav__hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
   <div class="nav__status">
     <div class="pulse"></div>
-    <span>Live</span>
+    <span id="nav-date"></span>
   </div>
 </nav>'''
 
@@ -133,8 +138,8 @@ def fix_nav(html: str) -> tuple[str, int]:
     if 'id="experiment"' in html and 'hero' in html:
         return html, 0
 
-    # Check if nav already matches standard
-    if 'class="nav__brand">AMJ</a>' in old_nav and '/#experiment' in old_nav:
+    # Check if nav already matches the correct standard
+    if 'href="/story/" class="nav__link">Story' in old_nav and 'nav__hamburger' in old_nav:
         return html, 0
 
     html = html[:match.start()] + STANDARD_NAV + html[match.end():]

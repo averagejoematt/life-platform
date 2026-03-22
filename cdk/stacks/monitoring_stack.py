@@ -27,12 +27,12 @@ from aws_cdk import (
     Duration,
     aws_cloudwatch as cloudwatch,
     aws_cloudwatch_actions as cw_actions,
+    aws_logs as logs,
     aws_sns as sns,
 )
 from constructs import Construct
+from stacks.constants import REGION, ACCT, S3_BUCKET, TABLE_NAME  # CONF-01
 
-REGION = "us-west-2"
-ACCT   = "205930651321"
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
 
 GTE = cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
@@ -114,7 +114,107 @@ class MonitoringStack(Stack):
                "LifePlatform/AI", "AnthropicOutputTokens", 86400, "Sum", 33333, GTE)
 
         # ══════════════════════════════════════════════════════════════
+        # OBS-01: DynamoDB throttling alarm
+        # Any throttled requests means data is silently dropped.
+        # ══════════════════════════════════════════════════════════════
+        _alarm("DdbThrottledRequests",    "life-platform-ddb-throttled-requests",
+               "AWS/DynamoDB", "ThrottledRequests", 300, "Sum", 1, GTE,
+               {"TableName": "life-platform", "Operation": "PutItem"})
+
+        # ══════════════════════════════════════════════════════════════
         # DynamoDB item-size warning
         # ══════════════════════════════════════════════════════════════
         _alarm("DdbItemSizeWarning",      "life-platform-ddb-item-size-warning",
                "LifePlatform/DynamoDB", "ItemSizeBytes", 300, "Maximum", 307200, GTE)
+
+        # ══════════════════════════════════════════════════════════════
+        # OBS-09: SQS DLQ message count alarm
+        # Any message in the DLQ means an ingestion Lambda failed all retries.
+        # ══════════════════════════════════════════════════════════════
+        _alarm("IngestionDlqMessages",    "life-platform-ingestion-dlq-messages",
+               "AWS/SQS", "ApproximateNumberOfMessagesVisible", 300, "Maximum", 1, GTE,
+               {"QueueName": "life-platform-ingestion-dlq"})
+
+        # ══════════════════════════════════════════════════════════════
+        # OBS-02: Lambda memory utilization > 90% of limit
+        # Extracted from Lambda REPORT log lines via CloudWatch Logs Metric Filter.
+        # daily-brief: 512 MB limit → alarm at 460 MB
+        # site-api:    256 MB limit → alarm at 230 MB
+        # REPORT line format: REPORT RequestId: X Duration: X ms Billed Duration: X ms
+        #   Memory Size: X MB Max Memory Used: X MB [Init Duration: X ms]
+        # Fields [0-indexed]: 0=REPORT 17=max_memory_used_mb
+        # ══════════════════════════════════════════════════════════════
+        _report_pattern = (
+            "[w0=\"REPORT\", w1, w2, w3, w4, w5, w6, w7, w8, w9, "
+            "w10, w11, w12, w13, w14, w15, w16, maxMem, ...]"
+        )
+        for fn_name, limit_mb in [("daily-brief", 512), ("site-api", 256)]:
+            log_group = logs.LogGroup.from_log_group_name(
+                self, f"MemFilerLg{fn_name.replace('-', '')}",
+                f"/aws/lambda/{fn_name}"
+            )
+            mf = logs.MetricFilter(
+                self, f"MemFilter{fn_name.replace('-', '')}",
+                log_group=log_group,
+                filter_pattern=logs.FilterPattern.literal(_report_pattern),
+                metric_name="MaxMemoryUsedMB",
+                metric_namespace="LifePlatform/Lambda",
+                metric_value="$maxMem",
+                default_value=0,
+                dimensions_map={"FunctionName": fn_name},
+            )
+            mem_alarm = cloudwatch.Alarm(
+                self, f"MemoryHigh{fn_name.replace('-', '')}",
+                alarm_name=f"life-platform-{fn_name}-memory-high",
+                metric=mf.metric(period=Duration.seconds(300), statistic="Maximum"),
+                evaluation_periods=1,
+                threshold=int(limit_mb * 0.9),
+                comparison_operator=GTE,
+                treat_missing_data=NB,
+            )
+            mem_alarm.add_alarm_action(cw_actions.SnsAction(topic))
+
+        # ══════════════════════════════════════════════════════════════
+        # OBS-08: S3 bucket storage size alarm
+        # BucketSizeBytes is a daily metric — period must be 86400s.
+        # Alerts if raw/ accumulation exceeds 50 GB unexpectedly.
+        # ══════════════════════════════════════════════════════════════
+        _alarm("S3BucketSizeHigh",        "life-platform-s3-bucket-size-high",
+               "AWS/S3", "BucketSizeBytes", 86400, "Maximum", 50 * 1024 ** 3, GTE,
+               {"BucketName": S3_BUCKET, "StorageType": "StandardStorage"})
+
+        # ══════════════════════════════════════════════════════════════
+        # OBS-04: site-api cold start alarm
+        # InitDuration only appears in REPORT lines on cold starts.
+        # Pattern: field[19]="Init" ensures only cold-start REPORT lines match.
+        # field[21] = initDur (the numeric ms value after "Init Duration:")
+        # Threshold: 5000ms — cold starts > 5s indicate oversized dependencies.
+        # ══════════════════════════════════════════════════════════════
+        _cold_start_pattern = (
+            "[w0=\"REPORT\", w1, w2, w3, w4, w5, w6, w7, w8, w9, "
+            "w10, w11, w12, w13, w14, w15, w16, w17, w18, "
+            "w19=\"Init\", w20, initDur, ...]"
+        )
+        site_api_lg = logs.LogGroup.from_log_group_name(
+            self, "SiteApiLogGroup", "/aws/lambda/site-api"
+        )
+        cold_start_mf = logs.MetricFilter(
+            self, "SiteApiColdStartFilter",
+            log_group=site_api_lg,
+            filter_pattern=logs.FilterPattern.literal(_cold_start_pattern),
+            metric_name="ColdStartDurationMs",
+            metric_namespace="LifePlatform/Lambda",
+            metric_value="$initDur",
+            default_value=0,
+            dimensions_map={"FunctionName": "site-api"},
+        )
+        cold_start_alarm = cloudwatch.Alarm(
+            self, "SiteApiColdStartHigh",
+            alarm_name="life-platform-site-api-cold-start-high",
+            metric=cold_start_mf.metric(period=Duration.seconds(300), statistic="Maximum"),
+            evaluation_periods=1,
+            threshold=5000,
+            comparison_operator=GTE,
+            treat_missing_data=NB,
+        )
+        cold_start_alarm.add_alarm_action(cw_actions.SnsAction(topic))

@@ -25,9 +25,12 @@ import re
 import json
 import pytest
 
-# ── Add cdk/stacks/ to path ───────────────────────────────────────────────────
+# ── Add cdk/ and cdk/stacks/ to path ─────────────────────────────────────────
+# cdk/ is needed so `from stacks.constants import ...` resolves as a package.
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-CDK_STACKS = os.path.join(ROOT, "cdk", "stacks")
+CDK_DIR = os.path.join(ROOT, "cdk")
+CDK_STACKS = os.path.join(CDK_DIR, "stacks")
+sys.path.insert(0, os.path.abspath(CDK_DIR))
 sys.path.insert(0, os.path.abspath(CDK_STACKS))
 
 # ── Stub aws_cdk so role_policies.py imports without CDK installed ────────────

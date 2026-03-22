@@ -247,9 +247,10 @@ body { padding-bottom: 36px; }
 }
 
 /* ── Live pulse indicator ────────────────────────────────── */
+/* D01: Lock to teal — never inherits --accent (which turns amber on journal pages) */
 .pulse {
   width: 7px; height: 7px;
-  background: var(--accent);
+  background: var(--c-green-500);
   border-radius: 50%;
   flex-shrink: 0;
   animation: pulse 2.5s ease-in-out infinite;
@@ -504,6 +505,7 @@ body { padding-bottom: 36px; }
 
 /* ── Full-page overlay menu ──────────────────────────────── */
 .nav-overlay {
+  display: none; /* FOUC guard: hidden before external CSS loads */
   position: fixed;
   inset: 0;
   z-index: calc(var(--z-nav) + 10);
@@ -515,6 +517,7 @@ body { padding-bottom: 36px; }
   transition: opacity 0.25s var(--ease-out);
 }
 .nav-overlay.is-open {
+  display: flex;
   opacity: 1;
   pointer-events: auto;
 }
@@ -613,6 +616,73 @@ body { padding-bottom: 36px; }
   stroke: var(--accent);
 }
 
+/* ── GAM-01: "Since Your Last Visit" badge dot ───────────── */
+.bottom-nav__link {
+  position: relative;
+}
+.bottom-nav__link.has-badge::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c-green-500, #22c55e);
+  border: 1.5px solid rgba(8, 12, 10, 0.95);
+}
+
+/* ── GAM-02: Reading Path CTA ────────────────────────────── */
+.reading-path {
+  border-top: 1px solid var(--border);
+  padding: var(--space-8) var(--page-padding);
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+.reading-path__label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--ls-tag);
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.reading-path__link {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  text-decoration: none;
+  flex: 1;
+}
+.reading-path__title {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  color: var(--accent);
+  letter-spacing: var(--ls-tag);
+  text-transform: uppercase;
+  transition: color 0.15s;
+}
+.reading-path__link:hover .reading-path__title {
+  color: var(--c-green-400, #4ade80);
+}
+.reading-path__sub {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+}
+@media (max-width: 480px) {
+  .reading-path {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .reading-path__link {
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+}
+
 /* ── Grouped footer v2 ───────────────────────────────────── */
 .footer-v2 {
   border-top: 1px solid var(--border);
@@ -677,4 +747,33 @@ body { padding-bottom: 36px; }
   .footer-v2__bottom { flex-direction: column; gap: var(--space-3); text-align: center; }
   /* Hide old footer if present */
   .footer { display: none; }
+}
+
+/* ── Back to top button (U07) ────────────────────────────── */
+.back-to-top {
+  position: fixed;
+  bottom: calc(var(--space-12) + 36px); /* above challenge bar */
+  right: var(--page-padding);
+  z-index: calc(var(--z-nav) - 2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s var(--ease-out), background 0.15s, color 0.15s;
+}
+.back-to-top.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.back-to-top:hover { background: var(--surface-raised); color: var(--accent); }
+@media (max-width: 768px) {
+  .back-to-top { bottom: calc(60px + 36px + var(--space-4)); }
 }

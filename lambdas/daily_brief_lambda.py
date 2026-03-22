@@ -56,11 +56,24 @@ from decimal import Decimal
 # -- Configuration from environment variables (with backwards-compatible defaults) --
 _REGION    = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-S3_BUCKET  = os.environ["S3_BUCKET"]
-USER_ID    = os.environ["USER_ID"]
-RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
-SENDER     = os.environ["EMAIL_SENDER"]
+S3_BUCKET  = os.environ.get("S3_BUCKET", "")
+USER_ID    = os.environ.get("USER_ID", "")
+RECIPIENT  = os.environ.get("EMAIL_RECIPIENT", "")
+SENDER     = os.environ.get("EMAIL_SENDER", "")
 ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
+
+# BUG-11: Validate required env vars at startup with descriptive errors
+_MISSING = [k for k, v in [("S3_BUCKET", S3_BUCKET), ("USER_ID", USER_ID),
+                             ("EMAIL_RECIPIENT", RECIPIENT), ("EMAIL_SENDER", SENDER)] if not v]
+if _MISSING:
+    raise RuntimeError(f"daily-brief Lambda misconfigured — missing required env vars: {_MISSING}")
+
+# BUG-10: Validate email format for recipient and sender
+import re as _re
+_EMAIL_RE = _re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+for _var, _addr in [("EMAIL_RECIPIENT", RECIPIENT), ("EMAIL_SENDER", SENDER)]:
+    if not _EMAIL_RE.match(_addr):
+        raise RuntimeError(f"daily-brief Lambda misconfigured — {_var}={_addr!r} is not a valid email address")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 PROFILE_PK  = f"USER#{USER_ID}"
@@ -72,6 +85,18 @@ ses      = boto3.client("sesv2", region_name=_REGION)
 s3       = boto3.client("s3", region_name=_REGION)
 secrets  = boto3.client("secretsmanager", region_name=_REGION)
 
+# BUG-08: Emit EMF metric when optional layer module fails to import.
+def _emit_module_load_failure(module_name: str) -> None:
+    try:
+        print(json.dumps({"_aws": {"Timestamp": int(time.time() * 1000),
+            "CloudWatchMetrics": [{"Namespace": "LifePlatform/DailyBrief",
+                "Dimensions": [["Module"]],
+                "Metrics": [{"Name": "ModuleLoadFailure", "Unit": "Count"}]}]},
+            "Module": module_name, "ModuleLoadFailure": 1}))
+    except Exception:
+        pass
+
+
 # Board of Directors config loader
 try:
     import board_loader
@@ -80,6 +105,7 @@ except ImportError:
     _HAS_BOARD_LOADER = False
     import logging as _log
     _log.getLogger().warning("[daily] board_loader not available — using fallback prompts")
+    _emit_module_load_failure("board_loader")
 
 # Insight Ledger (IC-15)
 try:
@@ -89,6 +115,7 @@ try:
 except ImportError:
     _HAS_INSIGHT_WRITER = False
     print("[WARN] insight_writer not available — insights will not be persisted")
+    _emit_module_load_failure("insight_writer")
 
 # AI-3: Output Validator — validates coaching text before delivery
 try:
@@ -97,6 +124,7 @@ try:
 except ImportError:
     _HAS_AI_VALIDATOR = False
     print("[WARN] ai_output_validator not available — AI output validation skipped")
+    _emit_module_load_failure("ai_output_validator")
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -235,6 +263,20 @@ def get_current_phase(profile, current_weight_lbs):
 # DATA GATHERING
 # ==============================================================================
 
+def _emit_source_fetch_metrics(sources: dict) -> None:
+    """OBS-06: Per-source DataPresent metric via EMF stdout. Zero-config CloudWatch."""
+    ts = int(time.time() * 1000)
+    for source, data in sources.items():
+        try:
+            print(json.dumps({"_aws": {"Timestamp": ts,
+                "CloudWatchMetrics": [{"Namespace": "LifePlatform/DailyBrief",
+                    "Dimensions": [["Source"]],
+                    "Metrics": [{"Name": "DataPresent", "Unit": "Count"}]}]},
+                "Source": source, "DataPresent": 1 if data else 0}))
+        except Exception:
+            pass
+
+
 def gather_daily_data(profile, yesterday):
     today = datetime.now(timezone.utc).date()
 
@@ -344,8 +386,8 @@ def gather_daily_data(profile, yesterday):
                     "start_date": start,
                 }
                 break
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("trip_data_parse: %s", e)
 
     # Blood pressure — from apple_health record (v2.40.0)
     bp_data = None
@@ -385,6 +427,14 @@ def gather_daily_data(profile, yesterday):
               " (" + _acwr_zone + ")" + (" \u26a0 ALERT" if _acwr_alert else ""))
     else:
         print("[INFO] No computed_metrics/ACWR for " + yesterday + " — acwr-compute may not have run yet")
+
+    # OBS-06: Emit per-source data presence metrics to CloudWatch via EMF
+    _emit_source_fetch_metrics({
+        "whoop": whoop, "apple_health": apple, "macrofactor": macrofactor,
+        "strava": strava, "garmin": garmin, "habitify": habitify,
+        "withings": latest_weight, "supplements": supplements_today,
+        "todoist": todoist_yesterday, "weather": weather_yesterday,
+    })
 
     return {
         "date": yesterday,
@@ -1703,8 +1753,8 @@ def lambda_handler(event, context):
                     _brief_excerpt = _tldr
                     if _guidance_items and len(_guidance_items) > 0:
                         _brief_excerpt += " " + _guidance_items[0]
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("tldr_guidance_excerpt: %s", e)
 
             write_public_stats(
                 s3_client=s3,

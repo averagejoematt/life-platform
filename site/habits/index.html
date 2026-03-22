@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="90 days of daily habit completion — GitHub-style heatmap, streaks, and adherence data.">
+  <meta property="og:title" content="Habit Observatory — Matthew Walker">
+  <meta property="og:description" content="90 days of habit completion. No excuses in the data.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/habits/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Habit Observatory — Matthew Walker">
+  <meta name="twitter:description" content="90 days of daily habits. No filters. GitHub-style heatmap of consistency data.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>Habit Observatory — Matthew Walker</title>
+    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    /* ── Page header ── */
+    .hab-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+    }
+    .hab-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .hab-header__title span { color: var(--accent); }
+    .hab-header__sub {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 520px;
+      line-height: var(--lh-body);
+    }
+
+    /* ── Body wrapper ── */
+    .hab-body {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+    }
+
+    /* ── Stats row ── */
+    .hab-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-bottom: var(--space-10);
+    }
+    .hab-stat {
+      background: var(--surface);
+      padding: var(--space-6) var(--space-6);
+    }
+    .hab-stat__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-2);
+      font-family: var(--font-mono);
+    }
+    .hab-stat__value {
+      font-family: var(--font-display);
+      font-size: 48px;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: var(--space-1);
+    }
+    .hab-stat__sub {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      font-family: var(--font-mono);
+    }
+
+    /* ── Section heading ── */
+    .hab-section {
+      margin-bottom: var(--space-10);
+    }
+    .hab-section__heading {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .hab-section__heading span { color: var(--accent); }
+    .hab-section__sub {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      font-family: var(--font-mono);
+      margin-bottom: var(--space-6);
+    }
+
+    /* ── Heatmap wrapper ── */
+    .heatmap-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-8);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .heatmap-month-labels {
+      display: flex;
+      margin-bottom: var(--space-2);
+      padding-left: 28px; /* align with grid */
+    }
+    .heatmap-month-label {
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .heatmap-layout {
+      display: flex;
+      gap: var(--space-2);
+      align-items: flex-start;
+    }
+    .heatmap-day-labels {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding-top: 0;
+    }
+    .heatmap-day-label {
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      font-family: var(--font-mono);
+      width: 24px;
+      height: 12px;
+      line-height: 12px;
+      text-align: right;
+    }
+    .heatmap-grid {
+      display: flex;
+      gap: 2px;
+      align-items: flex-start;
+    }
+    .heatmap-week {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .heatmap-cell {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: transform var(--dur-fast), outline var(--dur-fast);
+      position: relative;
+    }
+    .heatmap-cell:hover {
+      transform: scale(1.4);
+      outline: 1px solid var(--accent);
+      z-index: 5;
+    }
+    .heatmap-cell.empty {
+      background: transparent;
+      cursor: default;
+    }
+    .heatmap-cell.empty:hover { transform: none; outline: none; }
+
+    /* Color scale */
+    .cell-none    { background: var(--surface-raised); }
+    .cell-low     { background: rgba(200,132,58,0.25); }
+    .cell-mid     { background: rgba(200,132,58,0.65); }
+    .cell-high    { background: rgba(0,229,160,0.40); }
+    .cell-perfect { background: var(--accent); }
+
+    /* Legend */
+    .heatmap-legend {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-top: var(--space-5);
+      flex-wrap: wrap;
+    }
+    .heatmap-legend__label {
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+    }
+    .legend-swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+    .heatmap-legend__item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+    }
+
+    /* ── Tooltip ── */
+    #hm-tooltip {
+      position: fixed;
+      background: var(--surface-high);
+      border: 1px solid var(--border-strong);
+      padding: var(--space-2) var(--space-3);
+      font-size: var(--text-xs);
+      font-family: var(--font-mono);
+      color: var(--text);
+      letter-spacing: var(--ls-label);
+      pointer-events: none;
+      z-index: var(--z-toast);
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity var(--dur-fast);
+    }
+    #hm-tooltip.visible { opacity: 1; }
+    .tt-date    { color: var(--text-muted); margin-bottom: 2px; }
+    .tt-pct     { color: var(--accent); font-size: var(--text-sm); }
+    .tt-perfect { color: var(--accent); font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; margin-top: 2px; }
+
+    /* ── Tier 0 section ── */
+    .tier0-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-8);
+      margin-bottom: var(--space-10);
+    }
+    .tier0-section__heading {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .tier0-section__heading span { color: var(--accent); }
+    .tier0-section__body {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      max-width: 640px;
+      margin-bottom: var(--space-6);
+    }
+    .streak-display {
+      display: inline-flex;
+      align-items: baseline;
+      gap: var(--space-2);
+      border: 1px solid var(--border-strong);
+      background: var(--accent-bg-subtle);
+      padding: var(--space-3) var(--space-6);
+    }
+    .streak-display__num {
+      font-family: var(--font-display);
+      font-size: 64px;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .streak-display__label {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-label);
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+    }
+
+    /* ── Trend bars ── */
+    .trend-section {
+      margin-bottom: var(--space-10);
+    }
+    .trend-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      height: 80px;
+      margin-top: var(--space-5);
+    }
+    .trend-bar-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      height: 100%;
+      justify-content: flex-end;
+    }
+    .trend-bar {
+      width: 100%;
+      background: var(--accent);
+      opacity: 0.6;
+      min-height: 2px;
+      transition: height 0.8s var(--ease-out), opacity var(--dur-fast);
+      border-radius: 2px 2px 0 0;
+      cursor: pointer;
+    }
+    .trend-bar:hover { opacity: 1; }
+    .trend-bar-label {
+      font-size: 9px;
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      letter-spacing: 0.05em;
+      text-align: center;
+    }
+    .trend-axis {
+      display: flex;
+      justify-content: space-between;
+      margin-top: var(--space-2);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+    }
+
+    /* ── Skeleton ── */
+    .skeleton-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-bottom: var(--space-10);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .skeleton-stat {
+      background: var(--surface);
+      padding: var(--space-6);
+    }
+    .skeleton-line {
+      height: 12px;
+      background: var(--surface-raised);
+      border-radius: 2px;
+      margin-bottom: var(--space-3);
+    }
+    .skeleton-line.wide  { width: 70%; }
+    .skeleton-line.mid   { width: 45%; }
+    .skeleton-big {
+      height: 40px;
+      width: 60%;
+      background: var(--surface-raised);
+      border-radius: 2px;
+      margin-bottom: var(--space-3);
+    }
+    .skeleton-heatmap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-8);
+      height: 140px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; }
+      50%       { opacity: 1; }
+    }
+
+    /* ── Footer note ── */
+    .hab-footnote {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+      line-height: var(--lh-mono);
+      margin-top: var(--space-6);
+    }
+    .hab-footnote span { color: var(--accent-dim); }
+
+    @media (max-width: 768px) {
+      .hab-stats { grid-template-columns: repeat(2, 1fr); }
+      .hab-body  { padding: var(--space-8) var(--page-padding-sm); }
+      .hab-header { padding: calc(var(--nav-height) + var(--space-10)) var(--page-padding-sm) var(--space-8); }
+      .skeleton-stats { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/live/" class="nav__link">Live</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/start/" class="nav__link">Explore</a>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+  </div>
+  <button class="nav__hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span id="nav-date"></span>
+  </div>
+</nav>
+
+<!-- Mobile overlay menu -->
+<div class="nav-overlay">
+  <div class="nav-overlay__panel">
+    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The journey</div>
+      <a href="/story/" class="nav-overlay__link">Story</a>
+      <a href="/live/" class="nav-overlay__link">Live</a>
+      <a href="/journal/" class="nav-overlay__link">Journal</a>
+      <a href="/week/" class="nav-overlay__link">This Week</a>
+      <a href="/about/" class="nav-overlay__link">About</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The data</div>
+      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/habits/" class="nav-overlay__link">Habits</a>
+      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/results/" class="nav-overlay__link">Results</a>
+      <a href="/progress/" class="nav-overlay__link">Progress</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
+      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The platform</div>
+      <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/data/" class="nav-overlay__link">Data</a>
+      <a href="/cost/" class="nav-overlay__link">Cost</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">Follow</div>
+      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+    </div>
+  </div>
+</div>
+
+
+<!-- Hero header -->
+<header class="hab-header reveal">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">// habit observatory</div>
+  <h1 class="hab-header__title">The Daily <span>Discipline</span></h1>
+  <p class="hab-header__sub">90 days of habit completion. No excuses in the data.</p>
+</header>
+
+<!-- Tooltip -->
+<div id="hm-tooltip">
+  <div class="tt-date" id="tt-date"></div>
+  <div class="tt-pct"  id="tt-pct"></div>
+  <div class="tt-perfect" id="tt-perfect"></div>
+</div>
+
+<!-- Main body -->
+<div class="hab-body">
+
+  <!-- Loading skeleton -->
+  <div id="hab-skeleton">
+    <div class="skeleton-stats">
+      <div class="skeleton-stat"><div class="skeleton-line mid"></div><div class="skeleton-big"></div></div>
+      <div class="skeleton-stat"><div class="skeleton-line mid"></div><div class="skeleton-big"></div></div>
+      <div class="skeleton-stat"><div class="skeleton-line mid"></div><div class="skeleton-big"></div></div>
+      <div class="skeleton-stat"><div class="skeleton-line mid"></div><div class="skeleton-big"></div></div>
+    </div>
+    <div class="skeleton-heatmap"></div>
+  </div>
+
+  <!-- Content (populated by JS) -->
+  <div id="hab-content" style="display:none">
+
+    <!-- Stats row -->
+    <div class="hab-stats reveal">
+      <div class="hab-stat">
+        <div class="hab-stat__label">Current streak</div>
+        <div class="hab-stat__value" id="stat-streak">—</div>
+        <div class="hab-stat__sub">days perfect Tier 0</div>
+      </div>
+      <div class="hab-stat">
+        <div class="hab-stat__label">Days tracked</div>
+        <div class="hab-stat__value" id="stat-days">—</div>
+        <div class="hab-stat__sub">total logged</div>
+      </div>
+      <div class="hab-stat">
+        <div class="hab-stat__label">Avg completion</div>
+        <div class="hab-stat__value" id="stat-avg">—</div>
+        <div class="hab-stat__sub">% across all days</div>
+      </div>
+      <div class="hab-stat">
+        <div class="hab-stat__label">Perfect days</div>
+        <div class="hab-stat__value" id="stat-perfect">—</div>
+        <div class="hab-stat__sub">100% Tier 0</div>
+      </div>
+    </div>
+
+    <!-- Heatmap -->
+    <div class="hab-section reveal">
+      <div class="hab-section__heading">Completion <span>Heatmap</span></div>
+      <div class="hab-section__sub">// last 13 weeks — tier 0 completion % per day</div>
+      <!-- U05: Mobile scroll hint -->
+      <p style="display:none;font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-align:center;margin-bottom:var(--space-3);" id="hm-scroll-hint">&larr; scroll to see all 13 weeks &rarr;</p>
+      <div class="heatmap-wrap">
+        <div class="heatmap-month-labels" id="hm-month-labels"></div>
+        <div class="heatmap-layout">
+          <div class="heatmap-day-labels" id="hm-day-labels"></div>
+          <div class="heatmap-grid" id="hm-grid"></div>
+        </div>
+        <div class="heatmap-legend">
+          <span class="heatmap-legend__label">Less</span>
+          <div class="heatmap-legend__item"><span class="legend-swatch cell-none"></span>0%</div>
+          <div class="heatmap-legend__item"><span class="legend-swatch cell-low"></span>1&ndash;49%</div>
+          <div class="heatmap-legend__item"><span class="legend-swatch cell-mid"></span>50&ndash;79%</div>
+          <div class="heatmap-legend__item"><span class="legend-swatch cell-high"></span>80&ndash;99%</div>
+          <div class="heatmap-legend__item"><span class="legend-swatch cell-perfect"></span>Perfect</div>
+          <span class="heatmap-legend__label">More</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tier 0 -->
+    <div class="tier0-section reveal">
+      <div class="tier0-section__heading">Tier 0: The <span>Non-Negotiables</span></div>
+      <p class="tier0-section__body">
+        Tier 0 habits are the non-negotiables. Miss one and the streak resets to zero. These are the
+        foundation every other protocol is built on. Every protocol, every recovery metric, every
+        performance variable traces back to whether these five habits were completed that day.
+      </p>
+      <div class="streak-display">
+        <div class="streak-display__num" id="streak-big">—</div>
+        <div class="streak-display__label">day streak<br>current run</div>
+      </div>
+    </div>
+
+    <!-- Completion trend -->
+    <div class="trend-section hab-section reveal">
+      <div class="hab-section__heading">Weekly <span>Completion Trend</span></div>
+      <div class="hab-section__sub">// weekly average tier 0 completion % over last 13 weeks</div>
+      <div class="trend-bars" id="trend-bars"></div>
+      <div class="trend-axis" id="trend-axis"></div>
+    </div>
+
+    <!-- Footnote -->
+    <p class="hab-footnote">
+      <span>// habit registry:</span> 65 habits tracked total across 9 groups.
+      Tier 0 shown here are the non-negotiable foundation.
+      Data via Habitify + platform compute layer.
+    </p>
+
+  </div>
+
+  <!-- Empty state -->
+  <div id="hab-empty" style="display:none">
+    <div style="padding:var(--space-16) var(--space-8);border:1px solid var(--border);background:var(--surface);text-align:center;">
+      <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);letter-spacing:var(--ls-label);margin-bottom:var(--space-4)">
+        <span style="color:var(--accent-dim)">// habits api</span> &mdash; no data returned
+      </div>
+      <div style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body)">
+        Habit data loading &mdash; check back after 10am PT.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Email CTA -->
+<section class="email-cta-footer reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface);text-align:center;">
+  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
+  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
+    Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.<br>
+    <a href="/journal/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue &rarr;</a>
+  </p>
+  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
+    <input id="cta-email-habits" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);outline:none;transition:border-color var(--dur-fast);" onfocus="this.style.borderColor='var(--c-amber-400)'" onblur="this.style.borderColor='var(--c-amber-500)'">
+    <button onclick="amjSubscribe('habits')" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">Subscribe</button>
+  </div>
+  <p id="cta-msg-habits" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
+</section>
+<script>
+(function() {
+  if (!window.amjSubscribe) {
+    window.amjSubscribe = async function(slug) {
+      var email = document.getElementById('cta-email-' + slug).value.trim();
+      var msg   = document.getElementById('cta-msg-'   + slug);
+      if (!email || !email.includes('@')) { msg.textContent = 'Enter a valid email address.'; msg.style.color = 'var(--c-yellow-status)'; return; }
+      msg.textContent = 'Subscribing\u2026'; msg.style.color = 'var(--text-muted)';
+      try {
+        var res  = await fetch('/api/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, source: slug + '_cta' }) });
+        var data = await res.json();
+        if (res.ok) { msg.textContent = '\u2713 Check your inbox to confirm.'; msg.style.color = 'var(--c-amber-500)'; document.getElementById('cta-email-' + slug).value = ''; }
+        else         { msg.textContent = data.error || 'Something went wrong.';  msg.style.color = 'var(--c-yellow-status)'; }
+      } catch(e) { msg.textContent = 'Network error \u2014 try again.'; msg.style.color = 'var(--c-yellow-status)'; }
+    };
+  }
+  var inp = document.getElementById('cta-email-habits');
+  if (inp) inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') window.amjSubscribe('habits'); });
+})();
+</script>
+
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <a href="/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span>Ask</span>
+  </a>
+  <a href="/character/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span>Score</span>
+  </a>
+  <a href="/journal/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+    <span>Journal</span>
+  </a>
+  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    <span>More</span>
+  </button>
+</nav>
+
+<footer class="footer-v2">
+  <div class="footer-v2__grid">
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The journey</div>
+      <a href="/story/" class="footer-v2__link">Story</a>
+      <a href="/live/" class="footer-v2__link">Live</a>
+      <a href="/journal/" class="footer-v2__link">Journal</a>
+      <a href="/week/" class="footer-v2__link">This Week</a>
+      <a href="/about/" class="footer-v2__link">About</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The data</div>
+      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/habits/" class="footer-v2__link">Habits</a>
+      <a href="/achievements/" class="footer-v2__link">Achievements</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/results/" class="footer-v2__link">Results</a>
+      <a href="/progress/" class="footer-v2__link">Progress</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The platform</div>
+      <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/data/" class="footer-v2__link">Data</a>
+      <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/tools/" class="footer-v2__link">Tools</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">Follow</div>
+      <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/rss.xml" class="footer-v2__link">RSS</a>
+      <a href="/privacy/" class="footer-v2__link">Privacy</a>
+    </div>
+  </div>
+  <div class="footer-v2__bottom">
+    <span class="footer-v2__brand">AMJ</span>
+    <span class="footer-v2__copy">// updated daily by life-platform</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  var WEEKS = 13;
+  var DAY_LABELS = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
+  var MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // ── Tooltip ───────────────────────────────────────────────────────────────
+  var tooltip = document.getElementById('hm-tooltip');
+  var ttDate  = document.getElementById('tt-date');
+  var ttPct   = document.getElementById('tt-pct');
+  var ttPerf  = document.getElementById('tt-perfect');
+
+  function showTooltip(e, day) {
+    ttDate.textContent  = formatDateDisp(day.date);
+    ttPct.textContent   = day.tier0_pct + '%';
+    ttPerf.textContent  = day.perfect ? 'PERFECT' : '';
+    tooltip.classList.add('visible');
+    moveTooltip(e);
+  }
+  function moveTooltip(e) {
+    var x = e.clientX + 14, y = e.clientY - 36;
+    // clamp to viewport
+    var tw = tooltip.offsetWidth || 100;
+    var th = tooltip.offsetHeight || 50;
+    if (x + tw > window.innerWidth - 8)  x = e.clientX - tw - 8;
+    if (y < 8) y = e.clientY + 14;
+    if (y + th > window.innerHeight - 8) y = window.innerHeight - th - 8;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top  = y + 'px';
+  }
+  function hideTooltip() {
+    tooltip.classList.remove('visible');
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function formatDateDisp(str) {
+    var d = new Date(str + 'T12:00:00');
+    return MONTH_NAMES[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  }
+
+  function cellClass(pct) {
+    if (pct === null || pct === undefined) return 'cell-none';
+    if (pct === 0)   return 'cell-none';
+    if (pct < 50)    return 'cell-low';
+    if (pct < 80)    return 'cell-mid';
+    if (pct < 100)   return 'cell-high';
+    return 'cell-perfect';
+  }
+
+  // ── Build heatmap grid ────────────────────────────────────────────────────
+  // We build a 7-row (Mon-Sun) x 13-col (week) grid.
+  // The grid is anchored to TODAY and goes back 13*7 = 91 days.
+
+  function buildHeatmap(history) {
+    var byDate = {};
+    history.forEach(function(d) { byDate[d.date] = d; });
+
+    // Find the most recent Sunday (end of last complete week)
+    var today = new Date();
+    // day 0 = Sun, 1 = Mon ... 6 = Sat
+    // We want the grid to end on today
+    var endDate = new Date(today);
+    // Snap to end of this week (Saturday)
+    // Actually: end on today, fill backwards
+    // We build columns week by week, last col = this week
+    // each col: Mon..Sun. Current partial week fills top of last col.
+
+    // Walk back WEEKS*7 days from today
+    // Grid: columns = weeks, rows = day of week (0=Mon ... 6=Sun)
+    // Today's day-of-week (JS: 0=Sun → remap to 0=Mon)
+    var todayJS = today.getDay(); // 0 Sun..6 Sat
+    var todayMon = (todayJS + 6) % 7; // 0 Mon..6 Sun
+
+    // The last column ends on Sunday (or today if we haven't reached Sunday yet)
+    // Column index goes 0 (oldest) → WEEKS-1 (newest)
+    // For each column c (0-based from left), and row r (0=Mon..6=Sun):
+    // offset from today = (WEEKS-1 - c)*7 + (todayMon - r)
+    // if offset < 0 (future) → empty cell
+    // date = today - offset days
+
+    function offsetDate(d, days) {
+      var r = new Date(d);
+      r.setDate(r.getDate() - days);
+      return r;
+    }
+    function toISO(d) {
+      var mm = String(d.getMonth()+1).padStart(2,'0');
+      var dd = String(d.getDate()).padStart(2,'0');
+      return d.getFullYear() + '-' + mm + '-' + dd;
+    }
+
+    // Build columns
+    var columns = [];
+    for (var c = 0; c < WEEKS; c++) {
+      var col = [];
+      for (var r = 0; r < 7; r++) {
+        var daysBack = (WEEKS - 1 - c) * 7 + (todayMon - r);
+        if (daysBack < 0) {
+          col.push(null); // future
+        } else {
+          var dt  = offsetDate(today, daysBack);
+          var iso = toISO(dt);
+          col.push(byDate[iso] || { date: iso, tier0_pct: null, perfect: false, _nodata: true });
+        }
+      }
+      columns.push(col);
+    }
+
+    // Month labels: for each column, check the Monday's month
+    var monthLabels = [];
+    var lastMonth = null;
+    var cellW = 12 + 2; // width + gap
+    columns.forEach(function(col, ci) {
+      var mondayEntry = col[0];
+      if (!mondayEntry) { monthLabels.push(null); return; }
+      var d = new Date(mondayEntry.date + 'T12:00:00');
+      var m = d.getMonth();
+      if (m !== lastMonth) {
+        monthLabels.push(MONTH_NAMES[m]);
+        lastMonth = m;
+      } else {
+        monthLabels.push(null);
+      }
+    });
+
+    // Render month labels
+    var mlEl = document.getElementById('hm-month-labels');
+    var mlHtml = '';
+    columns.forEach(function(col, ci) {
+      var lbl = monthLabels[ci] || '';
+      mlHtml += '<span class="heatmap-month-label" style="width:' + cellW + 'px">' + lbl + '</span>';
+    });
+    mlEl.innerHTML = mlHtml;
+
+    // Render day labels
+    var dlEl = document.getElementById('hm-day-labels');
+    dlEl.innerHTML = DAY_LABELS.map(function(l) {
+      return '<div class="heatmap-day-label">' + l + '</div>';
+    }).join('');
+
+    // Render grid columns
+    var gridEl = document.getElementById('hm-grid');
+    gridEl.innerHTML = '';
+    columns.forEach(function(col) {
+      var weekDiv = document.createElement('div');
+      weekDiv.className = 'heatmap-week';
+      col.forEach(function(day) {
+        var cell = document.createElement('div');
+        if (!day) {
+          cell.className = 'heatmap-cell empty';
+        } else if (day._nodata || day.tier0_pct === null || day.tier0_pct === undefined) {
+          cell.className = 'heatmap-cell cell-none';
+          cell.setAttribute('data-date', day.date);
+          cell.setAttribute('data-pct', '0');
+          cell.setAttribute('data-perfect', 'false');
+        } else {
+          cell.className = 'heatmap-cell ' + cellClass(day.tier0_pct);
+          cell.setAttribute('data-date', day.date);
+          cell.setAttribute('data-pct', day.tier0_pct);
+          cell.setAttribute('data-perfect', day.perfect ? 'true' : 'false');
+
+          cell.addEventListener('mouseenter', function(e) {
+            showTooltip(e, { date: day.date, tier0_pct: day.tier0_pct, perfect: day.perfect });
+          });
+          cell.addEventListener('mousemove', moveTooltip);
+          cell.addEventListener('mouseleave', hideTooltip);
+        }
+        weekDiv.appendChild(cell);
+      });
+      gridEl.appendChild(weekDiv);
+    });
+  }
+
+  // ── Weekly trend bars ─────────────────────────────────────────────────────
+  function buildTrend(history) {
+    if (!history.length) return;
+
+    // Group by ISO week (Mon-Sun)
+    // Simple approach: chunk history (sorted by date) into groups of 7
+    // sorted ascending
+    var sorted = history.slice().sort(function(a,b) { return a.date < b.date ? -1 : 1; });
+
+    // Get last WEEKS * 7 days
+    var cutoff = sorted.length - WEEKS * 7;
+    var slice  = sorted.slice(Math.max(0, cutoff));
+
+    // Group into weeks of 7 from the back
+    var weeks = [];
+    for (var i = slice.length; i > 0; i -= 7) {
+      var chunk = slice.slice(Math.max(0, i-7), i);
+      var avg   = chunk.reduce(function(s,d) { return s + (d.tier0_pct || 0); }, 0) / chunk.length;
+      var startDate = chunk[0].date;
+      weeks.unshift({ avg: Math.round(avg), label: startDate.slice(5) }); // MM-DD
+    }
+
+    // Render
+    var barsEl = document.getElementById('trend-bars');
+    var axisEl = document.getElementById('trend-axis');
+    var maxAvg = Math.max.apply(null, weeks.map(function(w) { return w.avg; })) || 100;
+
+    barsEl.innerHTML = weeks.map(function(w) {
+      var h = Math.round((w.avg / 100) * 80); // max 80px
+      h = Math.max(h, 2);
+      var color = w.avg >= 80 ? 'var(--accent)' : w.avg >= 50 ? 'var(--c-amber-400)' : 'rgba(255,82,82,0.6)';
+      return [
+        '<div class="trend-bar-col">',
+          '<div class="trend-bar" style="height:' + h + 'px;background:' + color + ';opacity:0.7"',
+               ' title="' + w.avg + '% avg">&nbsp;</div>',
+          '<div class="trend-bar-label">' + w.avg + '%</div>',
+        '</div>',
+      ].join('');
+    }).join('');
+
+    if (weeks.length > 0) {
+      axisEl.innerHTML = '<span>' + weeks[0].label + '</span><span>' + weeks[weeks.length-1].label + '</span>';
+    }
+  }
+
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  function computeStats(data) {
+    var history = data.history || [];
+    var avgPct  = history.length
+      ? Math.round(history.reduce(function(s,d) { return s + (d.tier0_pct || 0); }, 0) / history.length)
+      : 0;
+    var perfect = history.filter(function(d) { return d.perfect; }).length;
+
+    document.getElementById('stat-streak').textContent  = data.current_streak  || 0;
+    document.getElementById('stat-days').textContent    = data.days_tracked     || history.length || 0;
+    document.getElementById('stat-avg').textContent     = avgPct + '%';
+    document.getElementById('stat-perfect').textContent = perfect;
+    document.getElementById('streak-big').textContent   = data.current_streak  || 0;
+  }
+
+  // ── Main hydrate ──────────────────────────────────────────────────────────
+  function hydrate(data) {
+    var history = data.history || [];
+
+    document.getElementById('hab-skeleton').style.display = 'none';
+
+    if (!history.length) {
+      document.getElementById('hab-empty').style.display = 'block';
+      return;
+    }
+
+    document.getElementById('hab-content').style.display = 'block';
+    computeStats(data);
+    buildHeatmap(history);
+    buildTrend(history);
+  }
+
+  // ── Load ──────────────────────────────────────────────────────────────────
+  async function load() {
+    try {
+      var res = await fetch('/api/habits');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var data = await res.json();
+      hydrate(data);
+    } catch(e) {
+      console.warn('[habits] API error:', e);
+      document.getElementById('hab-skeleton').style.display = 'none';
+      document.getElementById('hab-empty').style.display = 'block';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', load);
+
+  // U05: Show scroll hint on mobile
+  if (window.innerWidth < 768) {
+    var hint = document.getElementById('hm-scroll-hint');
+    if (hint) hint.style.display = 'block';
+  }
+})();
+</script>
+
+<script src="/assets/js/reveal.js"></script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>

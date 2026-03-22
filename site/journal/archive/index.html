@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Complete archive of The Measured Life — a weekly chronicle by Elena Voss following Matthew Walker's N=1 health experiment.">
+  <meta property="og:title" content="Chronicle Archive — Matthew Walker">
+  <meta property="og:description" content="Every installment of The Measured Life, in order. One subject. Full transparency.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/journal/archive/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Chronicle Archive — Matthew Walker">
+  <meta name="twitter:description" content="Every weekly chronicle installment in order. The Measured Life by Elena Voss.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <title>Chronicle Archive — Matthew Walker</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    /* Journal amber accent override */
+    :root {
+      --accent:           var(--c-amber-500);
+      --accent-dim:       var(--c-amber-300);
+      --accent-bg:        var(--c-amber-100);
+      --accent-bg-subtle: var(--c-amber-050);
+    }
+
+    /* ── Header ──────────────────────────────────────────── */
+    .archive-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-10);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .archive-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      letter-spacing: var(--ls-display);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .archive-header__sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      max-width: 560px;
+    }
+    .archive-header__back {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      text-decoration: none;
+      margin-bottom: var(--space-6);
+      transition: color var(--dur-fast);
+    }
+    .archive-header__back:hover { color: var(--accent); }
+
+    /* ── List ────────────────────────────────────────────── */
+    .archive-list {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding) var(--space-20);
+    }
+
+    /* ── Coming placeholder ──────────────────────────────── */
+    .archive-coming {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: var(--space-8);
+      padding: var(--space-8) 0;
+      border-bottom: 1px solid var(--border-subtle);
+      opacity: 0.5;
+    }
+    .archive-coming__date {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      padding-top: 3px;
+    }
+    .archive-coming__tag {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-2);
+    }
+    .archive-coming__title {
+      font-family: var(--font-display);
+      font-size: 28px;
+      letter-spacing: var(--ls-display);
+      color: var(--text-faint);
+      line-height: 1.1;
+      margin-bottom: var(--space-2);
+    }
+    .archive-coming__note {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border: 1px dashed var(--border);
+      display: inline-block;
+      padding: 2px 8px;
+    }
+
+    /* ── Post entry ──────────────────────────────────────── */
+    .archive-post {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: var(--space-8);
+      padding: var(--space-8) 0;
+      border-bottom: 1px solid var(--border-subtle);
+      text-decoration: none;
+      transition: all var(--dur-fast);
+    }
+    .archive-post:hover {
+      background: var(--accent-bg-subtle);
+      padding-left: var(--space-3);
+    }
+    .archive-post:hover .archive-post__title { color: var(--accent); }
+    .archive-post:last-of-type { border-bottom: none; }
+
+    .archive-post__date {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding-top: 3px;
+    }
+    .archive-post__week {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-2);
+    }
+    .archive-post__title {
+      font-family: var(--font-display);
+      font-size: 28px;
+      letter-spacing: var(--ls-display);
+      color: var(--text);
+      line-height: 1.1;
+      margin-bottom: var(--space-2);
+      transition: color var(--dur-fast);
+    }
+    .archive-post__desc {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-mono);
+      letter-spacing: 0.01em;
+    }
+
+    /* ── Count strip ─────────────────────────────────────── */
+    .archive-meta {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      padding: var(--space-5) 0 var(--space-6);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: var(--space-6);
+    }
+    .archive-meta__count { color: var(--accent); }
+
+    @media (max-width: 768px) {
+      .archive-coming { grid-template-columns: 1fr; gap: var(--space-2); }
+      .archive-post { grid-template-columns: 1fr; gap: var(--space-2); }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/live/" class="nav__link">Live</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/start/" class="nav__link">Explore</a>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+  </div>
+  <button class="nav__hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span id="nav-date"></span>
+  </div>
+</nav>
+<!-- Mobile overlay menu -->
+<div class="nav-overlay">
+  <div class="nav-overlay__panel">
+    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The journey</div>
+      <a href="/story/" class="nav-overlay__link">Story</a>
+      <a href="/live/" class="nav-overlay__link">Live</a>
+      <a href="/journal/" class="nav-overlay__link">Journal</a>
+      <a href="/week/" class="nav-overlay__link">This Week</a>
+      <a href="/about/" class="nav-overlay__link">About</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The data</div>
+      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/habits/" class="nav-overlay__link">Habits</a>
+      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/results/" class="nav-overlay__link">Results</a>
+      <a href="/progress/" class="nav-overlay__link">Progress</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
+      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The platform</div>
+      <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/data/" class="nav-overlay__link">Data</a>
+      <a href="/cost/" class="nav-overlay__link">Cost</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">Follow</div>
+      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+    </div>
+  </div>
+</div>
+
+
+<header class="archive-header reveal">
+  <a href="/journal/" class="archive-header__back">&larr; Back to Journal</a>
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">// full archive</div>
+  <h1 class="archive-header__title">The Chronicle</h1>
+  <p class="archive-header__sub">
+    Every installment of The Measured Life &mdash; a weekly journal by Elena Voss following
+    one man&rsquo;s N=1 health experiment from the inside. Published every Wednesday.
+  </p>
+</header>
+
+<div class="archive-list">
+
+  <div class="archive-meta">
+    <span><span class="archive-meta__count">4</span>&nbsp;installments published</span>
+    <span>Est. Feb 2026</span>
+    <span>By Elena Voss</span>
+  </div>
+
+  <!-- ── Coming next (placeholder) ─────────────────────── -->
+  <div class="archive-coming">
+    <div class="archive-coming__date">Coming soon</div>
+    <div>
+      <div class="archive-coming__tag">The Measured Life &middot; Week 4+</div>
+      <div class="archive-coming__title">More weeks coming</div>
+      <div class="archive-coming__note">// published every wednesday</div>
+    </div>
+  </div>
+
+  <!-- ── Week 3 ──────────────────────────────────────────── -->
+  <a href="/journal/posts/week-03/" class="archive-post reveal">
+    <div class="archive-post__date">Mar 11, 2026</div>
+    <div>
+      <div class="archive-post__week">The Measured Life &middot; Week 3</div>
+      <div class="archive-post__title">&ldquo;The DoorDash Chronicle&rdquo;</div>
+      <div class="archive-post__desc">
+        Nineteen data sources. One missing signal. When Matthew got sick, his body spoke
+        in a dialect the platform couldn&rsquo;t read &mdash; and he kept going anyway.
+      </div>
+    </div>
+  </a>
+
+  <!-- ── Week 2 ──────────────────────────────────────────── -->
+  <a href="/journal/posts/week-02/" class="archive-post reveal">
+    <div class="archive-post__date">Mar 3, 2026</div>
+    <div>
+      <div class="archive-post__week">The Measured Life &middot; Week 2</div>
+      <div class="archive-post__title">&ldquo;The Empty Journal&rdquo;</div>
+      <div class="archive-post__desc">
+        Twenty-seven automated programs tracking every metric imaginable. Not a single
+        journal entry written since day one. The infrastructure is immaculate. The page is blank.
+      </div>
+    </div>
+  </a>
+
+  <!-- ── Week 1 ──────────────────────────────────────────── -->
+  <a href="/journal/posts/week-01/" class="archive-post reveal">
+    <div class="archive-post__date">Feb 28, 2026</div>
+    <div>
+      <div class="archive-post__week">The Measured Life &middot; Week 1</div>
+      <div class="archive-post__title">&ldquo;First Contact&rdquo;</div>
+      <div class="archive-post__desc">
+        The experiment begins. Sensors syncing, platform live, protocol locked.
+        What happens in the first week when the system meets real life.
+      </div>
+    </div>
+  </a>
+
+  <!-- ── Week 0 (Prologue) ───────────────────────────────── -->
+  <a href="/journal/posts/week-00/" class="archive-post reveal">
+    <div class="archive-post__date">Feb 22, 2026</div>
+    <div>
+      <div class="archive-post__week">The Measured Life &middot; Week 0 &middot; Prologue</div>
+      <div class="archive-post__title">&ldquo;Before the Numbers&rdquo;</div>
+      <div class="archive-post__desc">
+        Nineteen data sources. Over a hundred daily metrics. A system of extraordinary
+        sophistication built to answer one question every morning: how did you do yesterday,
+        and what should you do today? Elena Voss arrives in Seattle to find out if it&rsquo;s working.
+      </div>
+    </div>
+  </a>
+
+</div>
+
+<!-- Email CTA -->
+<section class="email-cta-footer reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface);text-align:center;">
+  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
+  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
+    Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.
+  </p>
+  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
+    <input id="cta-email-archive" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);outline:none;" onfocus="this.style.borderColor='var(--c-amber-400)'" onblur="this.style.borderColor='var(--c-amber-500)'">
+    <button onclick="amjSubscribe('archive')" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">Subscribe</button>
+  </div>
+  <p id="cta-msg-archive" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
+</section>
+<script>
+(function() {
+  if (!window.amjSubscribe) {
+    window.amjSubscribe = async function(slug) {
+      var email = document.getElementById('cta-email-' + slug).value.trim();
+      var msg   = document.getElementById('cta-msg-'   + slug);
+      if (!email || !email.includes('@')) {
+        msg.textContent = 'Enter a valid email address.';
+        msg.style.color = 'var(--c-yellow-status)';
+        return;
+      }
+      msg.textContent = 'Subscribing\u2026';
+      msg.style.color = 'var(--text-muted)';
+      try {
+        var res  = await fetch('/api/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email, source: slug + '_cta' }),
+        });
+        var data = await res.json();
+        if (res.ok) {
+          msg.textContent = '\u2713 Check your inbox to confirm.';
+          msg.style.color = 'var(--c-amber-500)';
+          document.getElementById('cta-email-' + slug).value = '';
+        } else {
+          msg.textContent = data.error || 'Something went wrong.';
+          msg.style.color = 'var(--c-yellow-status)';
+        }
+      } catch(e) {
+        msg.textContent = 'Network error \u2014 try again.';
+        msg.style.color = 'var(--c-yellow-status)';
+      }
+    };
+  }
+  var inp = document.getElementById('cta-email-archive');
+  if (inp) inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') window.amjSubscribe('archive'); });
+})();
+</script>
+
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <a href="/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span>Ask</span>
+  </a>
+  <a href="/character/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span>Score</span>
+  </a>
+  <a href="/journal/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+    <span>Journal</span>
+  </a>
+  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    <span>More</span>
+  </button>
+</nav>
+<footer class="footer-v2">
+  <div class="footer-v2__grid">
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The journey</div>
+      <a href="/story/" class="footer-v2__link">Story</a>
+      <a href="/live/" class="footer-v2__link">Live</a>
+      <a href="/journal/" class="footer-v2__link">Journal</a>
+      <a href="/week/" class="footer-v2__link">This Week</a>
+      <a href="/about/" class="footer-v2__link">About</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The data</div>
+      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/habits/" class="footer-v2__link">Habits</a>
+      <a href="/achievements/" class="footer-v2__link">Achievements</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/results/" class="footer-v2__link">Results</a>
+      <a href="/progress/" class="footer-v2__link">Progress</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The platform</div>
+      <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/data/" class="footer-v2__link">Data</a>
+      <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/tools/" class="footer-v2__link">Tools</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">Follow</div>
+      <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/rss.xml" class="footer-v2__link">RSS</a>
+      <a href="/privacy/" class="footer-v2__link">Privacy</a>
+    </div>
+  </div>
+  <div class="footer-v2__bottom">
+    <span class="footer-v2__brand">AMJ</span>
+    <span class="footer-v2__copy">// updated daily by life-platform</span>
+  </div>
+</footer>
+<script src="/assets/js/reveal.js"></script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>

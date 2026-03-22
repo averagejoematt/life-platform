@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Matthew's current supplement stack — evidence-based, genome-informed, and tracked daily.">
+  <meta property="og:title" content="Supplements — Matthew Walker">
+  <meta property="og:description" content="Current supplement protocol with dosage, timing, adherence, and genome rationale.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/supplements/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Supplements — Matthew Walker">
+  <meta name="twitter:description" content="Evidence-based supplement stack. Genome-informed, tracked daily.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>Supplements — Matthew Walker</title>
+    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    /* ── Page header ── */
+    .supp-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+    }
+    .supp-header__eyebrow { margin-bottom: var(--space-4); }
+    .supp-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .supp-header__title span { color: var(--accent); }
+    .supp-header__sub {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 520px;
+      line-height: var(--lh-body);
+    }
+
+    /* ── Stats row ── */
+    .supp-stats {
+      display: flex;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin: var(--space-8) var(--page-padding) 0;
+    }
+    .supp-stat {
+      flex: 1;
+      background: var(--surface);
+      padding: var(--space-5) var(--space-6);
+    }
+    .supp-stat__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-2);
+      font-family: var(--font-mono);
+    }
+    .supp-stat__value {
+      font-family: var(--font-display);
+      font-size: 36px;
+      color: var(--text);
+      line-height: 1;
+    }
+    .supp-stat__value.accent { color: var(--accent); }
+    .supp-stat__sub {
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      margin-top: var(--space-1);
+    }
+
+    /* ── Body layout ── */
+    .supp-body {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+    }
+
+    /* ── Timing group ── */
+    .timing-group {
+      margin-bottom: var(--space-10);
+    }
+    .timing-group__heading {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-5);
+      padding-bottom: var(--space-3);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .timing-group__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      font-family: var(--font-mono);
+    }
+    .timing-group__count {
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      font-family: var(--font-mono);
+    }
+    .timing-group__cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--space-3);
+    }
+
+    /* ── Supplement card ── */
+    .supp-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-5) var(--space-6);
+      transition: background var(--dur-fast), border-color var(--dur-fast);
+    }
+    .supp-card:hover {
+      background: var(--surface-raised);
+      border-color: var(--border-strong);
+    }
+    .supp-card__name {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--text);
+      margin-bottom: var(--space-3);
+      line-height: 1.1;
+    }
+    .supp-card__dose {
+      font-size: var(--text-xl);
+      color: var(--accent);
+      font-family: var(--font-mono);
+      margin-bottom: var(--space-3);
+      letter-spacing: -0.02em;
+    }
+    .supp-card__dose span {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      letter-spacing: 0;
+    }
+    .supp-card__badges {
+      display: flex;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+      margin-bottom: var(--space-3);
+    }
+    .badge {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border: 1px solid;
+    }
+    .badge--timing {
+      color: var(--accent-dim);
+      border-color: var(--border);
+      background: var(--accent-bg-subtle);
+    }
+    .badge--supplement { color: var(--c-text-secondary); border-color: var(--c-border-neutral); }
+    .badge--vitamin    { color: var(--c-amber-400);     border-color: var(--c-amber-100); }
+    .badge--mineral    { color: #8b9bdc;                border-color: rgba(139,155,220,0.2); }
+    .supp-card__note {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      line-height: var(--lh-mono);
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--border-subtle);
+      letter-spacing: var(--ls-label);
+    }
+    .supp-card__note::before {
+      content: '// ';
+      color: var(--accent-dim);
+    }
+
+    /* ── Skeleton ── */
+    .skeleton-group { margin-bottom: var(--space-10); }
+    .skeleton-label {
+      width: 120px; height: 12px;
+      background: var(--surface-raised);
+      margin-bottom: var(--space-5);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .skeleton-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--space-3);
+    }
+    .skeleton-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-5) var(--space-6);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .skeleton-line {
+      height: 12px;
+      background: var(--surface-raised);
+      border-radius: 2px;
+      margin-bottom: var(--space-3);
+    }
+    .skeleton-line.wide  { width: 70%; }
+    .skeleton-line.mid   { width: 45%; }
+    .skeleton-line.short { width: 30%; }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; }
+      50%       { opacity: 1; }
+    }
+
+    /* ── Genome section ── */
+    .genome-section {
+      margin-bottom: var(--space-10);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-8);
+    }
+    .genome-section__heading {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .genome-section__heading span { color: var(--accent); }
+    .genome-section__body {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      max-width: 680px;
+      margin-bottom: var(--space-4);
+    }
+    .genome-section__link {
+      font-size: var(--text-xs);
+      color: var(--accent-dim);
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+      text-decoration: none;
+    }
+    .genome-section__link:hover { color: var(--accent); }
+
+    /* ── Empty state ── */
+    .supp-empty {
+      padding: var(--space-16) var(--space-8);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      text-align: center;
+    }
+    .supp-empty__code {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      margin-bottom: var(--space-4);
+    }
+    .supp-empty__code span { color: var(--accent-dim); }
+    .supp-empty__msg {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+
+    @media (max-width: 768px) {
+      .supp-stats { flex-direction: column; }
+      .supp-body  { padding: var(--space-8) var(--page-padding-sm); }
+      .supp-header { padding: calc(var(--nav-height) + var(--space-10)) var(--page-padding-sm) var(--space-8); }
+      .supp-stats { margin: var(--space-6) var(--page-padding-sm) 0; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/live/" class="nav__link">Live</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/start/" class="nav__link">Explore</a>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+  </div>
+  <button class="nav__hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span id="nav-date"></span>
+  </div>
+</nav>
+
+<!-- Mobile overlay menu -->
+<div class="nav-overlay">
+  <div class="nav-overlay__panel">
+    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The journey</div>
+      <a href="/story/" class="nav-overlay__link">Story</a>
+      <a href="/live/" class="nav-overlay__link">Live</a>
+      <a href="/journal/" class="nav-overlay__link">Journal</a>
+      <a href="/week/" class="nav-overlay__link">This Week</a>
+      <a href="/about/" class="nav-overlay__link">About</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The data</div>
+      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/habits/" class="nav-overlay__link">Habits</a>
+      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/results/" class="nav-overlay__link">Results</a>
+      <a href="/progress/" class="nav-overlay__link">Progress</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
+      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The platform</div>
+      <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/data/" class="nav-overlay__link">Data</a>
+      <a href="/cost/" class="nav-overlay__link">Cost</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">Follow</div>
+      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+    </div>
+  </div>
+</div>
+
+
+<!-- Hero header -->
+<header class="supp-header reveal">
+  <div class="eyebrow supp-header__eyebrow">// the stack</div>
+  <h1 class="supp-header__title">Supplement <span>Protocol</span></h1>
+  <p class="supp-header__sub">Evidence-based. Genome-informed. Tracked daily.</p>
+</header>
+
+<!-- Stats row -->
+<div class="supp-stats reveal" id="supp-stats">
+  <div class="supp-stat">
+    <div class="supp-stat__label">Total supplements</div>
+    <div class="supp-stat__value accent" id="stat-total">—</div>
+    <div class="supp-stat__sub">in active stack</div>
+  </div>
+  <div class="supp-stat">
+    <div class="supp-stat__label">Adherence tracking</div>
+    <div class="supp-stat__value accent" style="font-size:22px;padding-top:6px">Logged Daily</div>
+    <div class="supp-stat__sub">via platform supplement log</div>
+  </div>
+  <div class="supp-stat">
+    <div class="supp-stat__label">Genome-informed</div>
+    <div class="supp-stat__value accent">3</div>
+    <div class="supp-stat__sub">SNP-adjusted doses</div>
+  </div>
+  <div class="supp-stat">
+    <div class="supp-stat__label">Last updated</div>
+    <div class="supp-stat__value" style="font-size:16px;padding-top:8px;font-family:var(--font-mono)" id="stat-date">—</div>
+    <div class="supp-stat__sub">data as of</div>
+  </div>
+</div>
+
+<!-- Main body -->
+<div class="supp-body">
+
+  <!-- Loading skeleton -->
+  <div id="supp-skeleton">
+    <div class="skeleton-group">
+      <div class="skeleton-label"></div>
+      <div class="skeleton-cards">
+        <div class="skeleton-card"><div class="skeleton-line wide"></div><div class="skeleton-line mid"></div><div class="skeleton-line short"></div></div>
+        <div class="skeleton-card"><div class="skeleton-line wide"></div><div class="skeleton-line mid"></div><div class="skeleton-line short"></div></div>
+        <div class="skeleton-card"><div class="skeleton-line wide"></div><div class="skeleton-line mid"></div><div class="skeleton-line short"></div></div>
+      </div>
+    </div>
+    <div class="skeleton-group">
+      <div class="skeleton-label"></div>
+      <div class="skeleton-cards">
+        <div class="skeleton-card"><div class="skeleton-line wide"></div><div class="skeleton-line mid"></div><div class="skeleton-line short"></div></div>
+        <div class="skeleton-card"><div class="skeleton-line wide"></div><div class="skeleton-line mid"></div><div class="skeleton-line short"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content container (populated by JS) -->
+  <div id="supp-content" style="display:none"></div>
+
+  <!-- Genome explainer -->
+  <div class="genome-section reveal" id="genome-section" style="display:none">
+    <div class="genome-section__heading">Why <span>Genome-Informed</span>?</div>
+    <p class="genome-section__body">
+      Genetic variants affect how you absorb, convert, and utilise nutrients. A 110-SNP analysis
+      identified three variants in Matthew's genome that directly influence supplementation decisions:
+      the <strong style="color:var(--text)">TRPM6</strong> variant affecting magnesium transport,
+      <strong style="color:var(--text)">VDR Bsm1</strong> reducing Vitamin D receptor binding
+      efficiency (requiring higher-than-standard D3 dosing), and
+      <strong style="color:var(--text)">FADS2 rs1535</strong> which impairs ALA-to-EPA/DHA
+      conversion — making pre-formed Omega-3 (fish oil rather than flaxseed) the correct choice.
+      Standard supplement advice ignores these differences. The genome analysis doesn't replace
+      clinical lab work — both are required to dial in the protocol.
+    </p>
+    <a href="/biology/" class="genome-section__link">// see full genome data &rarr;</a>
+  </div>
+
+  <!-- N=1 disclaimer -->
+  <aside style="padding:var(--space-8) 0;border-top:1px solid var(--border-subtle)">
+    <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label);max-width:var(--prose-width)">
+      <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
+      This is Matthew's personal protocol. Nothing here is medical advice. Supplement needs are
+      individual and depend on diet, genetics, existing conditions, and lab results. Consult a
+      qualified clinician before starting or modifying any supplement protocol.
+      <a href="/biology/" style="color:var(--accent-dim);text-decoration:none"> Genome data context &rarr;</a>
+    </p>
+  </aside>
+
+</div>
+
+<!-- Email CTA -->
+<section class="email-cta-footer reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface);text-align:center;">
+  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
+  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
+    Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.<br>
+    <a href="/journal/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue &rarr;</a>
+  </p>
+  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
+    <input id="cta-email-supplements" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);outline:none;transition:border-color var(--dur-fast);" onfocus="this.style.borderColor='var(--c-amber-400)'" onblur="this.style.borderColor='var(--c-amber-500)'">
+    <button onclick="amjSubscribe('supplements')" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">Subscribe</button>
+  </div>
+  <p id="cta-msg-supplements" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
+</section>
+<script>
+(function() {
+  if (!window.amjSubscribe) {
+    window.amjSubscribe = async function(slug) {
+      var email = document.getElementById('cta-email-' + slug).value.trim();
+      var msg   = document.getElementById('cta-msg-'   + slug);
+      if (!email || !email.includes('@')) { msg.textContent = 'Enter a valid email address.'; msg.style.color = 'var(--c-yellow-status)'; return; }
+      msg.textContent = 'Subscribing\u2026'; msg.style.color = 'var(--text-muted)';
+      try {
+        var res  = await fetch('/api/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, source: slug + '_cta' }) });
+        var data = await res.json();
+        if (res.ok) { msg.textContent = '\u2713 Check your inbox to confirm.'; msg.style.color = 'var(--c-amber-500)'; document.getElementById('cta-email-' + slug).value = ''; }
+        else         { msg.textContent = data.error || 'Something went wrong.';  msg.style.color = 'var(--c-yellow-status)'; }
+      } catch(e) { msg.textContent = 'Network error \u2014 try again.'; msg.style.color = 'var(--c-yellow-status)'; }
+    };
+  }
+  var inp = document.getElementById('cta-email-supplements');
+  if (inp) inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') window.amjSubscribe('supplements'); });
+})();
+</script>
+
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <a href="/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span>Ask</span>
+  </a>
+  <a href="/character/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span>Score</span>
+  </a>
+  <a href="/journal/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+    <span>Journal</span>
+  </a>
+  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    <span>More</span>
+  </button>
+</nav>
+
+<footer class="footer-v2">
+  <div class="footer-v2__grid">
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The journey</div>
+      <a href="/story/" class="footer-v2__link">Story</a>
+      <a href="/live/" class="footer-v2__link">Live</a>
+      <a href="/journal/" class="footer-v2__link">Journal</a>
+      <a href="/week/" class="footer-v2__link">This Week</a>
+      <a href="/about/" class="footer-v2__link">About</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The data</div>
+      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/habits/" class="footer-v2__link">Habits</a>
+      <a href="/achievements/" class="footer-v2__link">Achievements</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/results/" class="footer-v2__link">Results</a>
+      <a href="/progress/" class="footer-v2__link">Progress</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The platform</div>
+      <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/data/" class="footer-v2__link">Data</a>
+      <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/tools/" class="footer-v2__link">Tools</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">Follow</div>
+      <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/rss.xml" class="footer-v2__link">RSS</a>
+      <a href="/privacy/" class="footer-v2__link">Privacy</a>
+    </div>
+  </div>
+  <div class="footer-v2__bottom">
+    <span class="footer-v2__brand">AMJ</span>
+    <span class="footer-v2__copy">// updated daily by life-platform</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Rationale notes keyed by supplement name (lowercase) ──────────────────
+  var NOTES = {
+    'magnesium glycinate': 'Sleep quality + muscle relaxation. Genome: TRPM6 variant',
+    'vitamin d3':          'Latitude-corrected. Genome: VDR Bsm1 variant (reduced absorption)',
+    'omega-3':             'Anti-inflammatory. Genome: FADS2 rs1535 (poor ALA conversion)',
+    'creatine':            'Strength + cognitive. No individual genome flag \u2014 universal benefit',
+  };
+
+  // ── Timing display labels + sort order ────────────────────────────────────
+  var TIMING_LABELS = {
+    morning:      'Morning',
+    with_meal:    'With Meals',
+    post_workout: 'Post-Workout',
+    afternoon:    'Afternoon',
+    evening:      'Evening',
+    before_bed:   'Before Bed',
+  };
+  var TIMING_ORDER = ['morning', 'with_meal', 'post_workout', 'afternoon', 'evening', 'before_bed'];
+
+  function formatDate(str) {
+    if (!str) return '—';
+    var d = new Date(str + 'T12:00:00');
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function timingLabel(t) {
+    return TIMING_LABELS[t] || t.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+  }
+
+  function noteForName(name) {
+    return NOTES[(name || '').toLowerCase()] || null;
+  }
+
+  function renderBadge(cls, text) {
+    return '<span class="badge ' + cls + '">' + text + '</span>';
+  }
+
+  function renderCard(s) {
+    var note = noteForName(s.name);
+    var timingDisp = timingLabel(s.timing);
+    var catClass = 'badge--' + (s.category || 'supplement');
+    return [
+      '<div class="supp-card">',
+        '<div class="supp-card__name">', s.name, '</div>',
+        '<div class="supp-card__dose">', s.dose, '<span> ', s.unit, '</span></div>',
+        '<div class="supp-card__badges">',
+          renderBadge('badge--timing', timingDisp),
+          renderBadge(catClass, s.category || 'supplement'),
+        '</div>',
+        note ? '<div class="supp-card__note">' + note + '</div>' : '',
+      '</div>',
+    ].join('');
+  }
+
+  function renderGroups(supplements) {
+    // Group by timing
+    var groups = {};
+    supplements.forEach(function(s) {
+      var t = s.timing || 'other';
+      if (!groups[t]) groups[t] = [];
+      groups[t].push(s);
+    });
+
+    // Sort timing keys by canonical order
+    var keys = TIMING_ORDER.filter(function(k) { return groups[k]; });
+    // Append any unlisted timings
+    Object.keys(groups).forEach(function(k) {
+      if (keys.indexOf(k) === -1) keys.push(k);
+    });
+
+    return keys.map(function(t) {
+      var items = groups[t];
+      return [
+        '<div class="timing-group reveal">',
+          '<div class="timing-group__heading">',
+            '<span class="timing-group__label">// ' + timingLabel(t) + '</span>',
+            '<span class="timing-group__count">' + items.length + ' item' + (items.length !== 1 ? 's' : '') + '</span>',
+          '</div>',
+          '<div class="timing-group__cards">',
+            items.map(renderCard).join(''),
+          '</div>',
+        '</div>',
+      ].join('');
+    }).join('');
+  }
+
+  function showEmpty() {
+    document.getElementById('supp-skeleton').style.display = 'none';
+    document.getElementById('supp-content').style.display  = 'block';
+    document.getElementById('supp-content').innerHTML = [
+      '<div class="supp-empty">',
+        '<div class="supp-empty__code"><span>// supplements api</span> &mdash; no data returned</div>',
+        '<div class="supp-empty__msg">Protocol data loading &mdash; check back after 10am PT.</div>',
+      '</div>',
+    ].join('');
+    document.getElementById('genome-section').style.display = 'block';
+  }
+
+  function hydrate(data) {
+    // Stats
+    document.getElementById('stat-total').textContent = data.total_count || (data.supplements && data.supplements.length) || '—';
+    document.getElementById('stat-date').textContent  = formatDate(data.as_of_date);
+
+    var supps = data.supplements || [];
+    if (!supps.length) { showEmpty(); return; }
+
+    // Render groups
+    document.getElementById('supp-skeleton').style.display = 'none';
+    document.getElementById('supp-content').style.display  = 'block';
+    document.getElementById('supp-content').innerHTML = renderGroups(supps);
+    document.getElementById('genome-section').style.display = 'block';
+
+    // Trigger reveal on newly injected elements
+    if (window.AMJReveal && typeof window.AMJReveal.refresh === 'function') {
+      window.AMJReveal.refresh();
+    }
+  }
+
+  async function load() {
+    try {
+      var res  = await fetch('/api/supplements');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var data = await res.json();
+      hydrate(data);
+    } catch (e) {
+      console.warn('[supplements] API error:', e);
+      showEmpty();
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', load);
+})();
+</script>
+
+<script src="/assets/js/reveal.js"></script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>

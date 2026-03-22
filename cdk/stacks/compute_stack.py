@@ -31,13 +31,11 @@ from constructs import Construct
 
 from stacks.lambda_helpers import create_platform_lambda
 from stacks import role_policies as rp
-
-REGION = "us-west-2"
-ACCT = "205930651321"
+from stacks.constants import ACCT, REGION, TABLE_NAME, S3_BUCKET, AI_MODEL_HAIKU  # CONF-01, CONF-04
 
 INGESTION_DLQ_ARN    = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
-LIFE_PLATFORM_TABLE  = "life-platform"
-LIFE_PLATFORM_BUCKET = "matthew-life-platform"
+LIFE_PLATFORM_TABLE  = TABLE_NAME
+LIFE_PLATFORM_BUCKET = S3_BUCKET
 ALERTS_TOPIC_ARN     = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
 
 
@@ -208,7 +206,7 @@ class ComputeStack(Stack):
             timeout_seconds=300, memory_mb=256,
             environment={
                 "ANTHROPIC_SECRET": "life-platform/ai-keys",
-                "AI_MODEL_HAIKU": "claude-haiku-4-5-20251001",
+                "AI_MODEL_HAIKU": AI_MODEL_HAIKU,
             },
             custom_policies=rp.compute_failure_pattern(),
             **shared,

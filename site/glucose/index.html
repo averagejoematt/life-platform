@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="30 days of continuous glucose monitoring data — time-in-range, variability, and metabolic intelligence from Dexcom Stelo.">
+  <meta property="og:title" content="Glucose Intelligence — Matthew Walker">
+  <meta property="og:description" content="Real CGM data: time-in-range, glucose variability, and what my metabolic patterns actually look like.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/glucose/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Glucose Intelligence — Matthew Walker">
+  <meta name="twitter:description" content="30 days of CGM data. Time-in-range, variability, and what keeping glucose stable actually requires.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>Glucose Intelligence — Matthew Walker</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .glc-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+    }
+    .glc-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .glc-header__title span { color: var(--accent); }
+    .glc-header__sub {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 540px;
+      line-height: var(--lh-body);
+    }
+
+    .glc-body {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+    }
+
+    /* ── Stat cards ── */
+    .glc-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-bottom: var(--space-10);
+    }
+    .glc-stat {
+      background: var(--surface);
+      padding: var(--space-6) var(--space-5);
+    }
+    .glc-stat__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      margin-bottom: var(--space-2);
+    }
+    .glc-stat__value {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: var(--space-1);
+    }
+    .glc-stat__sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+    .glc-stat__value.green { color: var(--c-green-400); }
+    .glc-stat__value.yellow { color: var(--c-amber-400); }
+    .glc-stat__value.red { color: var(--c-red-400); }
+
+    /* ── TIR gauge section ── */
+    .glc-gauge-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-6);
+      margin-bottom: var(--space-10);
+    }
+    .glc-gauge-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-6);
+    }
+    .glc-gauge-card__title {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      margin-bottom: var(--space-4);
+    }
+    .glc-bar-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+    .glc-bar-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+    .glc-bar-label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      width: 110px;
+      flex-shrink: 0;
+    }
+    .glc-bar-track {
+      flex: 1;
+      height: 8px;
+      background: var(--surface-raised);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .glc-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.6s ease;
+    }
+    .glc-bar-fill.green  { background: var(--c-green-500); }
+    .glc-bar-fill.yellow { background: var(--c-amber-500); }
+    .glc-bar-fill.red    { background: var(--c-red-500); }
+    .glc-bar-pct {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      width: 38px;
+      text-align: right;
+    }
+
+    /* ── Trend chart ── */
+    .glc-chart-section {
+      margin-bottom: var(--space-10);
+    }
+    .glc-chart-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: var(--space-4);
+    }
+    .glc-chart-title {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+    }
+    .glc-chart-legend {
+      display: flex;
+      gap: var(--space-4);
+    }
+    .glc-legend-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    .glc-legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    canvas.glc-chart {
+      width: 100%;
+      height: 180px;
+      display: block;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    /* ── Variability section ── */
+    .glc-var-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-6);
+      margin-bottom: var(--space-10);
+    }
+    .glc-info-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-6);
+    }
+    .glc-info-card__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      margin-bottom: var(--space-3);
+    }
+    .glc-info-card__headline {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .glc-info-card__body {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+
+    /* ── Methodology ── */
+    .glc-method {
+      border-top: 1px solid var(--border);
+      padding-top: var(--space-8);
+      margin-top: var(--space-2);
+    }
+    .glc-method__title {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      margin-bottom: var(--space-4);
+    }
+    .glc-method__grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+    }
+    .glc-method__item {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .glc-method__item strong {
+      display: block;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      margin-bottom: var(--space-1);
+    }
+
+    /* ── Loading ── */
+    .glc-loading {
+      text-align: center;
+      padding: var(--space-16);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+    }
+
+    @media (max-width: 768px) {
+      .glc-stats { grid-template-columns: repeat(2, 1fr); }
+      .glc-gauge-row { grid-template-columns: 1fr; }
+      .glc-var-section { grid-template-columns: 1fr; }
+      .glc-method__grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AMJ</a>
+  <div class="nav__links">
+    <a href="/story/" class="nav__link">Story</a>
+    <a href="/live/" class="nav__link">Live</a>
+    <a href="/journal/" class="nav__link">Journal</a>
+    <a href="/platform/" class="nav__link">Platform</a>
+    <a href="/start/" class="nav__link">Explore</a>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+  </div>
+  <button class="nav__hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span id="nav-date"></span>
+  </div>
+</nav>
+
+<!-- Mobile overlay menu -->
+<div class="nav-overlay">
+  <div class="nav-overlay__panel">
+    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The journey</div>
+      <a href="/story/" class="nav-overlay__link">Story</a>
+      <a href="/live/" class="nav-overlay__link">Live</a>
+      <a href="/journal/" class="nav-overlay__link">Journal</a>
+      <a href="/week/" class="nav-overlay__link">This Week</a>
+      <a href="/about/" class="nav-overlay__link">About</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The data</div>
+      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/habits/" class="nav-overlay__link">Habits</a>
+      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/results/" class="nav-overlay__link">Results</a>
+      <a href="/progress/" class="nav-overlay__link">Progress</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
+      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The platform</div>
+      <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/data/" class="nav-overlay__link">Data</a>
+      <a href="/cost/" class="nav-overlay__link">Cost</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">Follow</div>
+      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+    </div>
+  </div>
+</div>
+
+
+<header class="glc-header reveal">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">
+    <span class="label label-accent">// Metabolic Intelligence</span>
+  </div>
+  <h1 class="glc-header__title">Glucose <span>Observatory</span></h1>
+  <p class="glc-header__sub">
+    30 days of continuous glucose monitoring. Time-in-range, variability, and what
+    keeping blood sugar stable actually requires day-to-day.
+  </p>
+</header>
+
+<div class="glc-body">
+  <div id="glc-loading" class="glc-loading">LOADING METABOLIC DATA...</div>
+  <div id="glc-content" style="display:none">
+
+    <!-- Stat cards -->
+    <div class="glc-stats reveal">
+      <div class="glc-stat">
+        <div class="glc-stat__label">Time in Range</div>
+        <div class="glc-stat__value" id="glc-tir">—</div>
+        <div class="glc-stat__sub">Target &gt;90%</div>
+      </div>
+      <div class="glc-stat">
+        <div class="glc-stat__label">Avg Glucose</div>
+        <div class="glc-stat__value" id="glc-avg">—</div>
+        <div class="glc-stat__sub">mg/dL today</div>
+      </div>
+      <div class="glc-stat">
+        <div class="glc-stat__label">Variability (SD)</div>
+        <div class="glc-stat__value" id="glc-std">—</div>
+        <div class="glc-stat__sub">Target &lt;20 mg/dL</div>
+      </div>
+      <div class="glc-stat">
+        <div class="glc-stat__label">30d Avg TIR</div>
+        <div class="glc-stat__value" id="glc-tir30">—</div>
+        <div class="glc-stat__sub">30-day average</div>
+      </div>
+    </div>
+
+    <!-- TIR breakdown -->
+    <div class="glc-gauge-row reveal">
+      <div class="glc-gauge-card">
+        <div class="glc-gauge-card__title">Today — Range Breakdown</div>
+        <div class="glc-bar-wrap">
+          <div class="glc-bar-row">
+            <div class="glc-bar-label">Optimal 70–120</div>
+            <div class="glc-bar-track">
+              <div class="glc-bar-fill green" id="bar-optimal" style="width:0%"></div>
+            </div>
+            <div class="glc-bar-pct" id="pct-optimal">—</div>
+          </div>
+          <div class="glc-bar-row">
+            <div class="glc-bar-label">In Range 70–180</div>
+            <div class="glc-bar-track">
+              <div class="glc-bar-fill yellow" id="bar-tir" style="width:0%"></div>
+            </div>
+            <div class="glc-bar-pct" id="pct-tir">—</div>
+          </div>
+          <div class="glc-bar-row">
+            <div class="glc-bar-label">Elevated &gt;140</div>
+            <div class="glc-bar-track">
+              <div class="glc-bar-fill red" id="bar-high" style="width:0%"></div>
+            </div>
+            <div class="glc-bar-pct" id="pct-high">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="glc-gauge-card">
+        <div class="glc-gauge-card__title">30-Day Averages</div>
+        <div class="glc-bar-wrap">
+          <div class="glc-bar-row">
+            <div class="glc-bar-label">Avg glucose</div>
+            <div class="glc-bar-track">
+              <div class="glc-bar-fill green" id="bar-avg30" style="width:0%"></div>
+            </div>
+            <div class="glc-bar-pct" id="pct-avg30">—</div>
+          </div>
+          <div class="glc-bar-row">
+            <div class="glc-bar-label">Optimal %</div>
+            <div class="glc-bar-track">
+              <div class="glc-bar-fill green" id="bar-opt30" style="width:0%"></div>
+            </div>
+            <div class="glc-bar-pct" id="pct-opt30">—</div>
+          </div>
+          <div class="glc-bar-row">
+            <div class="glc-bar-label">Variability SD</div>
+            <div class="glc-bar-track">
+              <div class="glc-bar-fill yellow" id="bar-std30" style="width:0%"></div>
+            </div>
+            <div class="glc-bar-pct" id="pct-std30">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trend chart -->
+    <div class="glc-chart-section reveal">
+      <div class="glc-chart-header">
+        <div class="glc-chart-title">30-Day Glucose Trend</div>
+        <div class="glc-chart-legend">
+          <div class="glc-legend-item">
+            <div class="glc-legend-dot" style="background:var(--c-green-500)"></div>
+            Avg glucose
+          </div>
+          <div class="glc-legend-item">
+            <div class="glc-legend-dot" style="background:var(--accent)"></div>
+            Time in range %
+          </div>
+        </div>
+      </div>
+      <canvas class="glc-chart" id="glc-trend-canvas"></canvas>
+    </div>
+
+    <!-- Variability + context -->
+    <div class="glc-var-section reveal">
+      <div class="glc-info-card">
+        <div class="glc-info-card__eyebrow">Why variability matters</div>
+        <div class="glc-info-card__headline" id="glc-var-headline">Glucose variability</div>
+        <div class="glc-info-card__body">
+          Standard deviation (SD) measures how much glucose swings day-to-day.
+          Even with a normal average, high variability indicates metabolic stress —
+          large spikes and crashes that don't show up in HbA1c.
+          Target: SD &lt; 20 mg/dL (Attia / Levels protocol).
+          Lower is better. Stable glucose = stable energy, mood, and cognition.
+        </div>
+      </div>
+      <div class="glc-info-card">
+        <div class="glc-info-card__eyebrow">Data source</div>
+        <div class="glc-info-card__headline" id="glc-source-headline">Dexcom Stelo CGM</div>
+        <div class="glc-info-card__body" id="glc-source-body">
+          Continuous glucose monitoring via Dexcom Stelo — a reading every 5 minutes,
+          288 data points per day. Synced to Apple Health, ingested nightly into
+          life-platform DynamoDB. Daily aggregates computed: avg, min, max, SD,
+          time-in-range (70–180 mg/dL), and Attia optimal range (70–120 mg/dL).
+        </div>
+      </div>
+    </div>
+
+    <!-- Methodology -->
+    <div class="glc-method reveal">
+      <div class="glc-method__title">Measurement Protocol</div>
+      <div class="glc-method__grid">
+        <div class="glc-method__item">
+          <strong>SENSOR</strong>
+          Dexcom Stelo OTC CGM. 15-day wear cycle. 5-minute reading interval.
+          No calibration required.
+        </div>
+        <div class="glc-method__item">
+          <strong>TIME IN RANGE (TIR)</strong>
+          Standard: 70–180 mg/dL (ADA guideline for non-diabetic).
+          Optimal: 70–120 mg/dL (Attia longevity target, stricter).
+          Target: &gt;90% standard, &gt;70% optimal.
+        </div>
+        <div class="glc-method__item">
+          <strong>VARIABILITY (SD)</strong>
+          Standard deviation of all 5-min readings in a 24-hour period.
+          SD &lt;15: excellent. 15–20: good. &gt;20: elevated metabolic stress.
+          N=1 data — individual baselines vary.
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /glc-content -->
+</div><!-- /glc-body -->
+
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <a href="/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span>Ask</span>
+  </a>
+  <a href="/character/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span>Score</span>
+  </a>
+  <a href="/journal/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+    <span>Journal</span>
+  </a>
+  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    <span>More</span>
+  </button>
+</nav>
+
+<footer class="footer-v2">
+  <div class="footer-v2__grid">
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The journey</div>
+      <a href="/story/" class="footer-v2__link">Story</a>
+      <a href="/live/" class="footer-v2__link">Live</a>
+      <a href="/journal/" class="footer-v2__link">Journal</a>
+      <a href="/week/" class="footer-v2__link">This Week</a>
+      <a href="/about/" class="footer-v2__link">About</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The data</div>
+      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/habits/" class="footer-v2__link">Habits</a>
+      <a href="/achievements/" class="footer-v2__link">Achievements</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/results/" class="footer-v2__link">Results</a>
+      <a href="/progress/" class="footer-v2__link">Progress</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The platform</div>
+      <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/data/" class="footer-v2__link">Data</a>
+      <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/tools/" class="footer-v2__link">Tools</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">Follow</div>
+      <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/rss.xml" class="footer-v2__link">RSS</a>
+      <a href="/privacy/" class="footer-v2__link">Privacy</a>
+    </div>
+  </div>
+  <div class="footer-v2__bottom">
+    <span class="footer-v2__brand">AMJ</span>
+    <span class="footer-v2__copy">// updated daily by life-platform</span>
+  </div>
+</footer>
+
+<script src="/assets/js/nav.js"></script>
+<script src="/assets/js/reveal.js"></script>
+<script>
+(async function() {
+  const API = 'https://averagejoematt.com';
+  const loading = document.getElementById('glc-loading');
+  const content = document.getElementById('glc-content');
+
+  const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  const setWidth = (id, pct) => {
+    const el = document.getElementById(id);
+    if (el) el.style.width = Math.min(100, Math.max(0, pct)) + '%';
+  };
+  const colorClass = (el, cls) => {
+    if (!el) return;
+    el.classList.remove('green','yellow','red');
+    el.classList.add(cls);
+  };
+
+  try {
+    const resp = await fetch(API + '/api/glucose');
+    if (!resp.ok) throw new Error('API error');
+    const data = await resp.json();
+    const g = data.glucose;
+    const trend = data.glucose_trend || [];
+
+    if (!g) {
+      loading.textContent = 'No CGM data available yet.';
+      return;
+    }
+
+    // Stat cards
+    const tir = g.time_in_range_pct;
+    const tirEl = document.getElementById('glc-tir');
+    setText('glc-tir', tir != null ? tir.toFixed(1) + '%' : '—');
+    if (tirEl) colorClass(tirEl, tir >= 90 ? 'green' : tir >= 70 ? 'yellow' : 'red');
+
+    const avgEl = document.getElementById('glc-avg');
+    setText('glc-avg', g.avg_mg_dl != null ? g.avg_mg_dl.toFixed(0) : '—');
+    if (avgEl && g.avg_mg_dl) colorClass(avgEl, g.avg_mg_dl <= 100 ? 'green' : g.avg_mg_dl <= 120 ? 'yellow' : 'red');
+
+    const stdEl = document.getElementById('glc-std');
+    setText('glc-std', g.std_dev != null ? g.std_dev.toFixed(1) : '—');
+    if (stdEl && g.std_dev) colorClass(stdEl, g.std_dev < 15 ? 'green' : g.std_dev < 20 ? 'yellow' : 'red');
+
+    setText('glc-tir30', g['30d_avg_tir'] != null ? g['30d_avg_tir'].toFixed(1) + '%' : '—');
+
+    // TIR bars — today
+    const opt = g.time_in_optimal_pct || 0;
+    const hi  = g.time_above_140_pct  || 0;
+    setWidth('bar-optimal', opt);
+    setText('pct-optimal', opt.toFixed(1) + '%');
+    setWidth('bar-tir', tir || 0);
+    setText('pct-tir', (tir || 0).toFixed(1) + '%');
+    setWidth('bar-high', hi);
+    setText('pct-high', hi.toFixed(1) + '%');
+
+    // 30d bars — scale avg 60–160 → 0–100%
+    const avg30 = g['30d_avg_mg_dl'] || 0;
+    const opt30 = g['30d_avg_optimal'] || 0;
+    const std30 = g['30d_avg_std'] || 0;
+    setWidth('bar-avg30', Math.max(0, ((avg30 - 60) / 100) * 100));
+    setText('pct-avg30', avg30 ? avg30.toFixed(0) + ' mg/dL' : '—');
+    setWidth('bar-opt30', opt30);
+    setText('pct-opt30', opt30 ? opt30.toFixed(1) + '%' : '—');
+    setWidth('bar-std30', Math.min(100, (std30 / 40) * 100));
+    setText('pct-std30', std30 ? std30.toFixed(1) : '—');
+
+    // Variability headline
+    const varHeadEl = document.getElementById('glc-var-headline');
+    if (varHeadEl && g.variability_status) {
+      varHeadEl.textContent = {
+        low: 'Low variability — excellent',
+        moderate: 'Moderate variability — room to improve',
+        high: 'High variability — needs attention'
+      }[g.variability_status] || 'Glucose variability';
+    }
+
+    // Source headline
+    const srcEl = document.getElementById('glc-source-headline');
+    if (srcEl) {
+      srcEl.textContent = g.cgm_source === 'dexcom_stelo' ? 'Dexcom Stelo CGM' : 'Manual Glucose Log';
+    }
+    const srcBodyEl = document.getElementById('glc-source-body');
+    if (srcBodyEl && g.days_tracked) {
+      srcBodyEl.textContent = `${g.days_tracked} days tracked this month. ` + srcBodyEl.textContent;
+    }
+
+    // Trend chart
+    if (trend.length >= 3) {
+      const canvas = document.getElementById('glc-trend-canvas');
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width  = canvas.offsetWidth  * dpr;
+      canvas.height = canvas.offsetHeight * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      const W = canvas.offsetWidth;
+      const H = canvas.offsetHeight;
+      const pad = { t: 16, r: 16, b: 24, l: 42 };
+      const iW = W - pad.l - pad.r;
+      const iH = H - pad.t - pad.b;
+
+      const avgPts  = trend.map(d => d.avg).filter(v => v != null);
+      const tirPts  = trend.map(d => d.tir).filter(v => v != null);
+      const minAvg  = Math.min(...avgPts, 70);
+      const maxAvg  = Math.max(...avgPts, 130);
+      const n = trend.length;
+
+      const xOf = i => pad.l + (i / (n - 1)) * iW;
+      const yOf = (v, mn, mx) => pad.t + iH - ((v - mn) / (mx - mn)) * iH;
+
+      // Background grid
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+      ctx.lineWidth = 1;
+      for (let r = 0; r <= 4; r++) {
+        const y = pad.t + (r / 4) * iH;
+        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+      }
+
+      // Target zone 70–120 shaded
+      const y70  = yOf(70, minAvg, maxAvg);
+      const y120 = yOf(120, minAvg, maxAvg);
+      ctx.fillStyle = 'rgba(62,207,142,0.06)';
+      ctx.fillRect(pad.l, y120, iW, y70 - y120);
+
+      // Avg glucose line
+      ctx.strokeStyle = 'rgba(62,207,142,0.9)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      trend.forEach((d, i) => {
+        if (d.avg == null) return;
+        const x = xOf(i), y = yOf(d.avg, minAvg, maxAvg);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      // TIR % as dots on secondary axis (0–100 → bottom third of chart)
+      trend.forEach((d, i) => {
+        if (d.tir == null) return;
+        const x = xOf(i);
+        const y = pad.t + iH - (d.tir / 100) * iH;
+        ctx.fillStyle = d.tir >= 90 ? 'rgba(62,207,142,0.7)' : d.tir >= 70 ? 'rgba(245,158,11,0.7)' : 'rgba(239,68,68,0.7)';
+        ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+      });
+
+      // Y-axis labels
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'right';
+      [minAvg, Math.round((minAvg + maxAvg) / 2), maxAvg].forEach(v => {
+        ctx.fillText(v.toFixed(0), pad.l - 4, yOf(v, minAvg, maxAvg) + 4);
+      });
+    }
+
+    loading.style.display = 'none';
+    content.style.display = 'block';
+
+  } catch (err) {
+    loading.textContent = 'Could not load glucose data.';
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,3 +1,3 @@
-**[HANDOVER_v3.7.57.md](../handovers/HANDOVER_v3.7.57.md)**
+**[HANDOVER_v3.8.1.md](../handovers/HANDOVER_v3.8.1.md)**
 
-v3.7.57 | 2026-03-16 | P1 Incident Recovery — S3 bucket wipe (35,188 objects), full recovery via versioning, post-incident hardening (ADR-032 bucket policy, ADR-033 safe_sync wrapper)
+v3.8.1 | 2026-03-21 | Sprint 11 Nav + Platform Deep Audit (Security, Bugs, Cost, CI/CD, Observability) — 38 of 45 audit issues resolved; 7 deferred to Matthew; pre-DIST-1 hardening complete

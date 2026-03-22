@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="I built an AI operating system for my body. 19 data sources. Real numbers. One hypothesis: compounding data changes everything.">
   <meta property="og:title" content="Matthew Walker — Signal / Human Systems">
@@ -439,7 +440,7 @@
     <a href="/live/" class="nav__link">Live</a>
     <a href="/journal/" class="nav__link">Journal</a>
     <a href="/platform/" class="nav__link">Platform</a>
-    <a href="/about/" class="nav__link">About</a>
+    <a href="/start/" class="nav__link">Explore</a>
     <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
   </div>
   <button class="nav__hamburger" aria-label="Open menu">
@@ -459,22 +460,35 @@
       <a href="/story/" class="nav-overlay__link">Story</a>
       <a href="/live/" class="nav-overlay__link">Live</a>
       <a href="/journal/" class="nav-overlay__link">Journal</a>
+      <a href="/week/" class="nav-overlay__link">This Week</a>
       <a href="/about/" class="nav-overlay__link">About</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The data</div>
       <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/habits/" class="nav-overlay__link">Habits</a>
+      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/results/" class="nav-overlay__link">Results</a>
+      <a href="/progress/" class="nav-overlay__link">Progress</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
       <a href="/explorer/" class="nav-overlay__link">Explorer</a>
       <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/biology/" class="nav-overlay__link">Biology</a>
       <a href="/protocols/" class="nav-overlay__link">Protocols</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The platform</div>
       <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
       <a href="/ask/" class="nav-overlay__link">Ask</a>
       <a href="/board/" class="nav-overlay__link">Board</a>
       <a href="/data/" class="nav-overlay__link">Data</a>
+      <a href="/cost/" class="nav-overlay__link">Cost</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">Follow</div>
@@ -483,6 +497,7 @@
     </div>
   </div>
 </div>
+
 
 <!-- Ticker -->
 <div class="ticker" style="margin-top:var(--nav-height)">
@@ -591,7 +606,7 @@
     <span class="teaser-title" id="chronicle-teaser-title"></span>
   </a>
 
-  <!-- WR-31: "Start here" CTA for new visitors -->
+  <!-- WR-31: "Start here" CTA for new visitors — U01: now routes to /start/ -->
   <div style="
     max-width: 500px;
     margin: 0 0 var(--space-6);
@@ -603,13 +618,13 @@
     opacity: 0;
     animation: fadeUp 0.6s ease forwards 0.55s;
   ">
-    <a href="/story/" style="
+    <a href="/start/" style="
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--ls-tag);
       color: var(--c-amber-400);
       text-decoration: none;
-    ">New here? Start with the story &rarr;</a>
+    ">New here? Find your way in &rarr;</a>
   </div>
 
   <!-- WR-16: Dual-path navigation CTAs -->
@@ -1002,6 +1017,118 @@ function drawSparkline(svgId, values, opts = {}) {
   </div>
 </section>
 
+<!-- D04: Accountability quote -->
+<section class="reveal" style="border-bottom:1px solid var(--border);padding:var(--space-10) var(--page-padding);background:var(--surface);">
+  <blockquote style="
+    max-width:640px;margin:0 auto;
+    font-family:var(--font-serif);font-size:var(--text-lg);font-style:italic;
+    color:var(--text);line-height:1.7;text-align:center;
+    border-left:none;padding:0;
+  ">
+    &ldquo;I&rsquo;m doing this in public because accountability without witnesses is just intention.&rdquo;
+    <footer style="margin-top:var(--space-4);font-family:var(--font-mono);font-size:var(--text-xs);font-style:normal;color:var(--accent-dim);letter-spacing:var(--ls-tag);">
+      &mdash; <a href="/accountability/" style="color:var(--accent-dim);text-decoration:none;transition:color var(--dur-fast);" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--accent-dim)'">Matthew Walker</a>
+    </footer>
+  </blockquote>
+</section>
+
+<!-- Feature discovery cards -->
+<section class="reveal" style="border-bottom:1px solid var(--border);">
+  <div style="padding:var(--space-10) var(--page-padding) var(--space-6);border-bottom:1px solid var(--border);">
+    <div class="eyebrow" style="margin-bottom:var(--space-3)">Explore the platform</div>
+    <h2 class="text-h3" style="color:var(--text)">What's inside</h2>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);">
+
+    <a href="/habits/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:28px;margin-bottom:var(--space-3);">📊</div>
+      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">HABITS</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;margin-bottom:var(--space-4);">52-week heatmap. Every habit tracked daily across 19 sources.</div>
+      <div style="font-size:var(--text-xs);font-family:var(--font-mono);color:var(--accent-dim);">Current streak: <span id="feat-streak">—</span> days</div>
+    </a>
+
+    <a href="/character/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:28px;margin-bottom:var(--space-3);">🧙</div>
+      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">CHARACTER</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;margin-bottom:var(--space-4);">RPG-style 7-pillar scoring: sleep, movement, nutrition, metabolic, mind, relationships, consistency.</div>
+      <div style="font-size:var(--text-xs);font-family:var(--font-mono);color:var(--accent-dim);">Score: <span id="feat-char-score">—</span> / 100</div>
+    </a>
+
+    <a href="/benchmarks/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:28px;margin-bottom:var(--space-3);">📐</div>
+      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">BENCHMARKS</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">Where my numbers sit vs. population norms. Interactive calculator.</div>
+    </a>
+
+    <a href="/discoveries/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:28px;margin-bottom:var(--space-3);">🔬</div>
+      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">DISCOVERIES</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">What the AI found in my data. Correlations, anomalies, patterns a human would miss.</div>
+    </a>
+
+    <a href="/intelligence/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:28px;margin-bottom:var(--space-3);">🤖</div>
+      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">INTELLIGENCE</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">AI coaching brief. What Claude is reading, predicting, and recommending each day.</div>
+    </a>
+
+    <a href="/achievements/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:28px;margin-bottom:var(--space-3);">🏆</div>
+      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">ACHIEVEMENTS</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">Milestone badges earned from real data. No participation trophies.</div>
+    </a>
+
+    <a href="/glucose/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:28px;margin-bottom:var(--space-3);">🩸</div>
+      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">GLUCOSE</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">30-day CGM. Time-in-range, variability SD, Dexcom Stelo data.</div>
+    </a>
+
+    <a href="/sleep/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:28px;margin-bottom:var(--space-3);">🌙</div>
+      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">SLEEP</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">Eight Sleep × Whoop cross-referenced. What bed temp actually does to sleep quality.</div>
+    </a>
+
+  </div>
+  <div style="padding:var(--space-5) var(--page-padding);border-top:1px solid var(--border);text-align:right;">
+    <a href="/start/" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);letter-spacing:var(--ls-tag);text-transform:uppercase;text-decoration:none;">→ See all 36 pages</a>
+  </div>
+  <style>
+    @media (max-width: 768px) {
+      #feat-grid { grid-template-columns: repeat(2,1fr) !important; }
+    }
+    @media (max-width: 480px) {
+      #feat-grid { grid-template-columns: 1fr !important; }
+    }
+  </style>
+  <script>
+  (function() {
+    // Populate live data from window.__amjStats if available (set by main data loader)
+    function populate(stats) {
+      var ch = (stats && stats.character) || {};
+      var streak = ch.consistency_streak || ch.streak_days;
+      var score = ch.total_score || ch.score;
+      var el;
+      el = document.getElementById('feat-streak');
+      if (el && streak != null) el.textContent = streak;
+      el = document.getElementById('feat-char-score');
+      if (el && score != null) el.textContent = Math.round(score);
+    }
+    // Try immediately (main loader may have already run)
+    if (window.__amjStats) { populate(window.__amjStats); return; }
+    // Otherwise wait a moment then try API
+    setTimeout(function() {
+      if (window.__amjStats) { populate(window.__amjStats); return; }
+      fetch('/public_stats.json', { cache: 'force-cache' })
+        .then(function(r) { return r.json(); })
+        .then(populate)
+        .catch(function() {});
+    }, 800);
+  })();
+  </script>
+</section>
+
 <section class="about-section reveal" id="about">
   <div class="about-left">
     <div class="eyebrow" style="margin-bottom:var(--space-6)">The experiment</div>
@@ -1048,7 +1175,7 @@ function drawSparkline(svgId, values, opts = {}) {
   </div>
 </section>
 
-<!-- S2-T1-8: Email CTA footer — injected by add_email_cta.py -->
+<!-- U13: Subscribe CTA — simplified to single clear action, nav Subscribe is primary -->
 <section class="email-cta-footer reveal" style="
   padding: var(--space-16) var(--page-padding);
   border-top: 1px solid var(--border);
@@ -1059,65 +1186,12 @@ function drawSparkline(svgId, values, opts = {}) {
   <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
   <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:520px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
-    Every Wednesday: the real weight, one chart, one AI insight, one honest reflection.<br>
+    Every Wednesday: the real weight, one chart, one AI insight, one honest reflection.
     A 3-minute read from 19 data sources. No highlight reel — every failure included.<br>
     <a href="/journal/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue →</a>
   </p>
-  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
-    <input id="cta-email-home" type="email" placeholder="your@email.com" style="
-      flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);
-      font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);
-      outline:none;transition:border-color var(--dur-fast);
-    " onfocus="this.style.borderColor='var(--c-amber-400)'" onblur="this.style.borderColor='var(--c-amber-500)'">
-    <button
-      onclick="amjSubscribe('home')"
-      class="btn btn--primary"
-      style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">
-      Subscribe
-    </button>
-  </div>
-  <p id="cta-msg-home" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
+  <a href="/subscribe/" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);color:var(--bg);font-size:var(--text-base);padding:var(--space-4) var(--space-8);">Follow the journey →</a>
 </section>
-<script>
-(function() {
-  // S2-T1-8: Shared subscribe helper (idempotent — safe to include multiple times)
-  if (!window.amjSubscribe) {
-    window.amjSubscribe = async function(slug) {
-      var email = document.getElementById('cta-email-' + slug).value.trim();
-      var msg   = document.getElementById('cta-msg-'   + slug);
-      if (!email || !email.includes('@')) {
-        msg.textContent = 'Enter a valid email address.';
-        msg.style.color = 'var(--c-yellow-status)';
-        return;
-      }
-      msg.textContent = 'Subscribing…';
-      msg.style.color = 'var(--text-muted)';
-      try {
-        var res  = await fetch('/api/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email, source: slug + '_cta' }),
-        });
-        var data = await res.json();
-        if (res.ok) {
-          msg.textContent = '✓ Check your inbox to confirm.';
-          msg.style.color = 'var(--c-amber-500)';
-          document.getElementById('cta-email-' + slug).value = '';
-        } else {
-          msg.textContent = data.error || 'Something went wrong.';
-          msg.style.color = 'var(--c-yellow-status)';
-        }
-      } catch(e) {
-        msg.textContent = 'Network error — try again.';
-        msg.style.color = 'var(--c-yellow-status)';
-      }
-    };
-  }
-  // Enter key support for this page's input
-  var inp = document.getElementById('cta-email-home');
-  if (inp) inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') window.amjSubscribe('home'); });
-})();
-</script>
 <!-- Mobile bottom nav -->
 <nav class="bottom-nav" aria-label="Mobile navigation">
   <a href="/" class="bottom-nav__link">
@@ -1148,22 +1222,35 @@ function drawSparkline(svgId, values, opts = {}) {
       <a href="/story/" class="footer-v2__link">Story</a>
       <a href="/live/" class="footer-v2__link">Live</a>
       <a href="/journal/" class="footer-v2__link">Journal</a>
+      <a href="/week/" class="footer-v2__link">This Week</a>
       <a href="/about/" class="footer-v2__link">About</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The data</div>
       <a href="/character/" class="footer-v2__link">Character</a>
-      <a href="/explorer/" class="footer-v2__link">Explorer</a>
+      <a href="/habits/" class="footer-v2__link">Habits</a>
+      <a href="/achievements/" class="footer-v2__link">Achievements</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/results/" class="footer-v2__link">Results</a>
+      <a href="/progress/" class="footer-v2__link">Progress</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
       <a href="/experiments/" class="footer-v2__link">Experiments</a>
-      <a href="/biology/" class="footer-v2__link">Biology</a>
       <a href="/protocols/" class="footer-v2__link">Protocols</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The platform</div>
       <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
       <a href="/ask/" class="footer-v2__link">Ask</a>
       <a href="/board/" class="footer-v2__link">Board</a>
       <a href="/data/" class="footer-v2__link">Data</a>
+      <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/tools/" class="footer-v2__link">Tools</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">Follow</div>
@@ -1189,6 +1276,7 @@ function drawSparkline(svgId, values, opts = {}) {
     const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
     if (!r.ok) throw new Error('no data');
     const raw = await r.json();
+    window.__amjStats = raw;
 
     const v    = raw.vitals   || {};
     const j    = raw.journey  || {};
@@ -1302,7 +1390,7 @@ function drawSparkline(svgId, values, opts = {}) {
 </div>
 <script>
 (function(){
-  const API = 'https://lxhjl2qvq2ystwp47464uhs2jti0hpdcq.lambda-url.us-east-1.on.aws/api/current_challenge';
+  const API = '/api/current_challenge';
   fetch(API).then(r=>r.ok?r.json():null).then(data=>{
     if(!data||!data.current_challenge) return;
     const c = data.current_challenge;
