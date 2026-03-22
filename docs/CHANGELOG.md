@@ -1,3 +1,42 @@
+## v3.8.2 — 2026-03-22: D10 baseline + Phase 1 Task 20 reading path CTAs
+
+### Summary
+Completes Phase 0 (D10 — last remaining data fix) and Phase 1 Task 20 (reading path CTAs).
+D10: the compare card Day 1 column now pulls from `public_stats.json` baseline object
+instead of hardcoded HTML values. Baseline flows: profile → daily_brief Lambda → site_writer
+→ public_stats.json. Phase 1 Tasks 13-19 + 21 were already done by Claude Code sessions;
+Task 20 (reading path CTAs) is the final Phase 1 item.
+
+### Changes
+
+**lambdas/site_writer.py** — v1.3.0
+- Added `baseline: dict = None` parameter to `write_public_stats()`.
+- Passes baseline into `public_stats.json` payload as top-level `"baseline"` key.
+- Tightened `CacheControl` from 24h to 1h for more responsive updates.
+- Version bumped: v1.2.0 → v1.3.0.
+
+**lambdas/daily_brief_lambda.py** — v2.82.2
+- Extended `write_public_stats()` call to pass `baseline={}` dict.
+- Reads `baseline_date`, `baseline_weight_lbs`, `baseline_hrv_ms`, `baseline_rhr_bpm`,
+  `baseline_recovery_pct` from PROFILE#v1; falls back to Feb 22 actuals (302.0 / 45 / 62 / 55%).
+
+**deploy/add_reading_path_ctas.py** — new script
+- Injects "Continue the story" reading-path CTAs before `<!-- Mobile bottom nav -->` on
+  7 pages: /story/ /live/ /character/ /habits/ /experiments/ /discoveries/ /intelligence/
+- Each CTA links to the next logical page in the story loop.
+- Idempotent: skips pages that already have reading-path markup.
+
+**deploy/deploy_d10_phase1.sh** — new script
+- Orchestrates full deploy: inject CTAs → fix_public_stats --write → Lambda deploy →
+  S3 sync → CloudFront invalidation.
+
+### Website Strategy Status
+- Phase 0: ✅ COMPLETE (D1–D10 all resolved)
+- Phase 1: ✅ COMPLETE (Tasks 13–21 all done)
+- Next: Phase 2 — content depth (habits page, character expansion, accountability rethink)
+
+---
+
 ## v3.8.1 — 2026-03-22: Phase 0 Data Fixes — D1 weight null, hardcoded platform stats removed
 
 ### Summary

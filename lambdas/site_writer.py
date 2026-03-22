@@ -24,6 +24,9 @@ v1.1.0 — 2026-03-17 (BS-02): hero section added to public_stats.json.
   Contains narrative copy, live counter values, and Chronicle headline for
   the averagejoematt.com homepage transformation story hero.
 v1.1.1 — 2026-03-17: Hero paragraph finalised, placeholder flag set to False.
+v1.3.0 — 2026-03-22 (D10): baseline param added. Day 1 historical constants
+  (weight, HRV, RHR, recovery) now included in public_stats.json so the
+  compare card is fully dynamic with no hardcoded fallback values in HTML.
 """
 
 import json
@@ -138,7 +141,8 @@ def _get_latest_chronicle_headline(table_client, user_id: str) -> dict | None:
 
 def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
                        platform: dict = None, table_client=None, user_id: str = "matthew",
-                       trends: dict = None, brief_excerpt: str = None) -> bool:
+                       trends: dict = None, brief_excerpt: str = None,
+                       baseline: dict = None) -> bool:
     """
     Write public_stats.json to S3 from daily-brief-lambda data.
 
@@ -162,6 +166,9 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
                       last_review_grade (defaults used if None)
         table_client: optional DynamoDB table resource for Chronicle headline fetch
         user_id:      user ID for Chronicle headline query (default: 'matthew')
+        baseline:     optional dict with Day 1 historical constants:
+                      { date, weight_lbs, hrv_ms, rhr_bpm, recovery_pct }
+                      Populated from profile fields or known journey-start readings.
 
     Returns:
         True on success, False on failure (non-fatal — never raise)
@@ -197,6 +204,8 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
             "trends": _json_safe(trends or {}),
             # v1.2.0: AI brief excerpt for "What Claude Sees" homepage widget
             "brief_excerpt": brief_excerpt,
+            # D10: Day 1 baseline for compare card — historical constants, not live data
+            "baseline": _json_safe(baseline) if baseline else None,
         }
 
         s3_client.put_object(
@@ -204,9 +213,9 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
             Key=PUBLIC_STATS_KEY,
             Body=json.dumps(payload, indent=2),
             ContentType="application/json",
-            CacheControl="max-age=86400",  # CloudFront caches for 24h
+            CacheControl="max-age=3600",
         )
-        logger.info("[site_writer] public_stats.json written to S3 (hero + chronicle included)")
+        logger.info("[site_writer] public_stats.json written to S3 (hero + chronicle + baseline)")
         return True
 
     except Exception as e:
