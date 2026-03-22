@@ -1,3 +1,63 @@
+## v3.8.1 — 2026-03-22: Phase 0 Data Fixes — D1 weight null, hardcoded platform stats removed
+
+### Summary
+Diagnosed and fixed the root cause of `public_stats.json` being frozen since March 16.
+Root cause: the sick day Lambda early-return path skipped `write_public_stats`, so every
+sick day left the S3 file unchanged. Withings data stops at 2026-03-07 (last weigh-in
+before illness). Fixed with a 30-day lookback that correctly surfaces the last known weight.
+All hardcoded platform stats removed from both the Lambda and the rebuild script —
+everything now sourced from profile, DynamoDB computed_metrics, or auto-discovered from
+source files (registry.py, CDK stacks, CHANGELOG).
+
+### Changes
+
+**lambdas/daily_brief_lambda.py** — v2.82.1
+- **D1-FIX**: Added `write_public_stats` call to sick day early-return path — website
+  no longer goes stale during multi-day illness periods. Uses `gather_daily_data` data
+  already in memory (30-day Withings lookback) — zero extra DynamoDB cost.
+- **Hardcodes removed**: `mcp_tools`, `data_sources`, `lambdas`, `last_review_grade`
+  now pulled from `profile.get("platform_meta", {})` in both sick day and normal paths.
+- **Hardcodes removed**: `zone2_target_min` now pulled from profile (`zone2_weekly_target_min`
+  or `zone2_target_min_weekly`), with 150 as last-resort fallback only.
+
+**deploy/fix_public_stats.py** — new script
+- One-shot script to rebuild and push `public_stats.json` to S3 from live DynamoDB data.
+- Zero hardcoded values: weight from Withings (30-day lookback), vitals from Whoop,
+  training from `computed_metrics`, platform counts auto-discovered from registry.py +
+  CDK stacks + CHANGELOG.md.
+- Runs CloudFront invalidation automatically on `--write`.
+- Usage: `python3 deploy/fix_public_stats.py` (dry run) / `--write` (push live).
+
+**deploy/deploy_daily_brief_fix.sh** — new script
+- Packages and deploys `daily-brief` Lambda with all required layer files.
+
+### Data fixes applied (live on averagejoematt.com)
+| Field | Before | After |
+|-------|--------|-------|
+| `vitals.weight_lbs` | null | 287.7 lbs |
+| `journey.current_weight_lbs` | 0.0 | 287.69 lbs |
+| `journey.lost_lbs` | 0 | 14.3 lbs |
+| `journey.progress_pct` | 0% | 12.2% |
+| `journey.weekly_rate_lbs` | 287.69 (broken) | -2.45 lbs/wk |
+| `journey.days_in` | missing | 28 |
+| `journey.projected_goal_date` | null | 2027-03-07 |
+| `training.total_miles_30d` | 0 | 34.6 |
+| `training.activity_count_30d` | 0 | 18 |
+| `training.zone2_this_week_min` | 42 | 42 (now live) |
+| `platform.mcp_tools` | 87 (stale) | 95 (from registry.py) |
+| `platform.lambdas` | 42 (stale) | 50 (from CDK stacks) |
+| `platform.last_review_grade` | A (stale) | A- (from CHANGELOG) |
+
+### DynamoDB changes
+- `USER#matthew / PROFILE#v1`: added `platform_meta` map field
+  (`mcp_tools`, `data_sources`, `lambdas`, `last_review_grade`)
+
+### Deploys
+- Lambda `daily-brief` (us-west-2): ✅ 2026-03-22
+- S3 `site/public_stats.json`: ✅ 2026-03-22 (CloudFront invalidation I35NKA9GH69M27BAVXM1U6L4XH + ID90AC5Z3GENXGHAPXKGQ0UEP)
+
+---
+
 ## v3.8.0 — 2026-03-21: Sprint 8 — Mobile Navigation, Content Safety Filter, Grouped Footer
 
 ### Summary
