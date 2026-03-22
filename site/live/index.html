@@ -16,33 +16,65 @@
   <meta property="og:description" content="Real-time metrics from 19 data sources. Weight, HRV, recovery, habits, and the full transformation timeline.">
   <meta property="og:type" content="website">
   <title>Live — Matthew Walker</title>
-    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    .page-header { padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12); border-bottom: 1px solid var(--border); max-width: var(--max-width); margin: 0 auto; }
-    .page-header__title { font-family: var(--font-display); font-size: var(--text-h1); line-height: var(--lh-display); letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-4); }
-    .page-header__title span { color: var(--accent); }
-    .page-header__sub { font-family: var(--font-mono); font-size: var(--text-base); color: var(--text-muted); max-width: 560px; line-height: var(--lh-body); }
-    .page-header__meta { margin-top: var(--space-8); display: flex; gap: var(--space-8); flex-wrap: wrap; }
+    /* ─── Cockpit Layout ─── */
+    .cpit-statusbar-wrap { padding-top: var(--nav-height); border-bottom: 1px solid var(--border); background: var(--surface); }
+    .cpit-statusbar { max-width: var(--max-width); margin: 0 auto; padding: var(--space-3) var(--page-padding); display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+    .cpit-statusbar__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c-green-500); flex-shrink: 0; animation: pulse-dot 2s infinite; }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .cpit-statusbar__text { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
+    .cpit-statusbar__text strong { color: var(--text); }
+
+    .cpit-wrap { max-width: var(--max-width); margin: 0 auto; padding: var(--space-8) var(--page-padding); }
+    .cpit-main { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); }
+    .cpit-group--wide { grid-column: 1 / -1; }
+
+    .cpit-group { background: var(--surface); border: 1px solid var(--border); padding: var(--space-5) var(--space-6); }
+    .cpit-group__header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: var(--space-4); }
+    .cpit-group__heading { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--accent-dim); }
+    .cpit-group__link { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); text-decoration: none; letter-spacing: var(--ls-tag); }
+    .cpit-group__link:hover { color: var(--accent); }
+
+    .cpit-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
+    .cpit-tiles--4 { grid-template-columns: repeat(4, 1fr); }
+
+    .cpit-tile { background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--border); padding: var(--space-4) var(--space-5); transition: border-left-color var(--dur-fast); }
+    .cpit-tile--green { border-left-color: var(--c-green-500); }
+    .cpit-tile--amber { border-left-color: var(--c-amber-500); }
+    .cpit-tile--red   { border-left-color: var(--c-red-status); }
+    .cpit-tile--gray  { border-left-color: var(--border); opacity: 0.7; }
+
+    .cpit-tile__name  { font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--ls-tag); color: var(--text-muted); margin-bottom: var(--space-2); }
+    .cpit-tile__hero  { display: flex; align-items: baseline; gap: var(--space-1); line-height: 1; }
+    .cpit-tile__value { font-family: var(--font-display); font-size: 26px; letter-spacing: var(--ls-display); color: var(--text); }
+    .cpit-tile__unit  { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
+    .cpit-tile__delta { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted); margin-top: var(--space-2); }
+    .cpit-tile__signal { font-size: var(--text-base); color: var(--text-muted); line-height: var(--lh-body); margin-top: var(--space-2); max-width: 640px; }
+
+    /* ─── Weight chart section ─── */
+    .cpit-chart-section { border-top: 1px solid var(--border); }
+    .cpit-chart-inner { max-width: var(--max-width); margin: 0 auto; padding: var(--space-10) var(--page-padding); }
+    .cpit-chart-title { font-family: var(--font-display); font-size: var(--text-h2); letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-4); }
+    .cpit-chart-title span { color: var(--accent); }
+    .cpit-chart-sub { font-size: var(--text-sm); color: var(--text-muted); font-family: var(--font-mono); margin-bottom: var(--space-6); }
+    .cpit-chart-meta { display: flex; gap: var(--space-8); flex-wrap: wrap; margin-bottom: var(--space-6); }
     .meta-stat { border-left: 2px solid var(--accent); padding-left: var(--space-4); }
     .meta-stat__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-1); }
     .meta-stat__value { font-family: var(--font-display); font-size: 28px; color: var(--text); letter-spacing: var(--ls-display); }
 
-    .timeline-container { max-width: var(--max-width); margin: 0 auto; padding: var(--space-10) var(--page-padding); }
     .chart-wrapper { position: relative; width: 100%; overflow-x: auto; border: 1px solid var(--border); background: var(--surface); }
     .chart-wrapper svg { display: block; min-width: 900px; }
     .chart-wrapper svg text { font-family: var(--font-mono); }
-
     .tooltip { position: fixed; background: var(--surface-raised); border: 1px solid var(--accent); padding: var(--space-3) var(--space-4); font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text); pointer-events: none; z-index: var(--z-modal); display: none; max-width: 240px; }
     .tooltip__date { color: var(--accent); font-weight: 700; }
     .tooltip__value { margin-top: 2px; }
-
     .legend { display: flex; gap: var(--space-6); flex-wrap: wrap; margin-top: var(--space-6); }
     .legend__item { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--text-muted); }
     .legend__dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-
     .events-list { max-width: var(--max-width); margin: 0 auto; padding: var(--space-10) var(--page-padding); }
     .events-list h2 { font-family: var(--font-display); font-size: var(--text-h3); color: var(--text); margin-bottom: var(--space-6); }
     .event-row { display: grid; grid-template-columns: 100px 12px 1fr; gap: var(--space-4); align-items: start; padding: var(--space-4) 0; border-bottom: 1px solid var(--border-subtle); }
@@ -52,92 +84,11 @@
     .event-row__type { font-size: var(--text-2xs); color: var(--text-faint); text-transform: uppercase; letter-spacing: var(--ls-tag); margin-top: 2px; }
     .loading { text-align: center; padding: var(--space-16); color: var(--text-muted); font-size: var(--text-sm); }
 
-    /* Live Snapshot */
-    .live-snapshot { border-bottom: 1px solid var(--border); background: var(--surface); }
-    .live-snapshot__inner { max-width: var(--max-width); margin: 0 auto; padding: var(--space-8) var(--page-padding); }
-    .snap-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); }
-    .snap-card { background: var(--bg); border: 1px solid var(--border); padding: var(--space-5) var(--space-6); }
-    .snap-card__label { font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--ls-tag); color: var(--text-muted); margin-bottom: var(--space-2); }
-    .snap-card__value { font-family: var(--font-display); font-size: 28px; letter-spacing: var(--ls-display); color: var(--text); line-height: 1; }
-    .snap-card__unit { font-size: var(--text-xs); color: var(--text-muted); font-family: var(--font-mono); }
-    .snap-card__delta { font-size: var(--text-xs); color: var(--text-muted); margin-top: var(--space-2); font-family: var(--font-mono); }
-    .snap-card__delta--pos { color: var(--c-green-500); }
-    .snap-card__delta--neg { color: var(--c-red-status); }
-    .snap-card__delta--green { color: var(--c-green-500); }
-    .snap-card__delta--yellow { color: var(--c-amber-500); }
-    .snap-card__delta--red { color: var(--c-red-status); }
-
-    /* Dashboard panels */
-    .panel-section { border-bottom: 1px solid var(--border); }
-    .panel-section__inner { max-width: var(--max-width); margin: 0 auto; padding: var(--space-8) var(--page-padding); }
-    .panel-label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--accent-dim); margin-bottom: var(--space-6); }
-    .panel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
-    .panel-card { background: var(--bg); border: 1px solid var(--border); padding: var(--space-5) var(--space-6); }
-    .panel-card--full { width: 100%; box-sizing: border-box; }
-    .panel-card__heading { font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--ls-tag); color: var(--text-muted); margin-bottom: var(--space-3); }
-    .panel-card__hero { display: flex; align-items: baseline; gap: var(--space-2); }
-    .panel-card__big { font-family: var(--font-display); font-size: 28px; letter-spacing: var(--ls-display); color: var(--text); line-height: 1; }
-    .panel-card__big--muted { color: var(--text-muted); }
-    .panel-card__unit { font-size: var(--text-xs); color: var(--text-muted); font-family: var(--font-mono); }
-    .panel-card__sub { font-size: var(--text-sm); color: var(--text-muted); font-family: var(--font-mono); margin-left: var(--space-2); }
-    .panel-card__foot { font-size: var(--text-xs); color: var(--text-muted); font-family: var(--font-mono); margin-top: var(--space-3); }
-    .panel-card__signal-body { font-size: var(--text-base); color: var(--text-muted); line-height: var(--lh-body); margin-top: var(--space-4); max-width: 640px; }
-    .panel-progress { margin-top: var(--space-4); }
-    .panel-progress__track { height: 3px; background: var(--surface-raised); overflow: hidden; }
-    .panel-progress__fill { height: 100%; transition: width 1s var(--ease-out); }
-    .panel-progress__fill--green { background: var(--c-green-500); }
-    .panel-progress__fill--accent { background: var(--accent); }
-    .load-indicator { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-    .load-indicator--green  { background: var(--c-green-500); }
-    .load-indicator--yellow { background: var(--c-amber-500); }
-    .load-indicator--red    { background: var(--c-red-status); }
-
-    /* ── Sleep snapshot ── */
-    .sleep-bar { display: flex; height: 18px; overflow: hidden; border-radius: 2px; margin: var(--space-4) 0; }
-    .sleep-bar__seg { height: 100%; transition: width 1.2s var(--ease-out); }
-    .sleep-bar__seg--deep  { background: var(--accent); }
-    .sleep-bar__seg--rem   { background: rgba(0,229,160,0.45); }
-    .sleep-bar__seg--light { background: rgba(0,229,160,0.2); }
-    .sleep-bar__seg--awake { background: var(--surface-raised); }
-    .sleep-legend { display: flex; gap: var(--space-5); flex-wrap: wrap; margin-top: var(--space-2); }
-    .sleep-legend__item { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-2xs); color: var(--text-muted); font-family: var(--font-mono); }
-    .sleep-legend__dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-
-    /* ── Zone 2 ring ── */
-    .z2-ring-wrap { display: flex; align-items: center; gap: var(--space-6); }
-    .z2-ring { flex-shrink: 0; }
-    .z2-ring__track { fill: none; stroke: var(--surface-raised); stroke-width: 7; }
-    .z2-ring__fill  { fill: none; stroke: var(--c-green-500); stroke-width: 7; stroke-linecap: round;
-                      transform: rotate(-90deg); transform-origin: 50% 50%;
-                      transition: stroke-dashoffset 1.2s var(--ease-out); }
-
-    /* ── Mood display ── */
-    .mood-scale { display: flex; gap: var(--space-3); margin-top: var(--space-3); }
-    .mood-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
-                justify-content: center; font-family: var(--font-mono); font-size: var(--text-xs);
-                border: 1px solid var(--border); color: var(--text-faint); transition: all var(--dur-fast); }
-    .mood-dot--active { border-color: var(--accent); color: var(--text); background: rgba(0,229,160,0.12); }
-
-    /* ── Journey comparison ── */
-    .journey-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr; border: 1px solid var(--border); }
-    .journey-row { display: contents; }
-    .journey-cell { padding: var(--space-3) var(--space-5); border-bottom: 1px solid var(--border-subtle); border-right: 1px solid var(--border-subtle); background: var(--bg); }
-    .journey-cell:last-child { border-right: none; }
-    .journey-cell--header { background: var(--surface); font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); font-family: var(--font-mono); }
-    .journey-cell__metric { font-size: var(--text-2xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: var(--ls-tag); margin-bottom: var(--space-1); font-family: var(--font-mono); }
-    .journey-val { font-family: var(--font-display); font-size: 22px; color: var(--text); letter-spacing: var(--ls-display); }
-    .journey-val--better { color: var(--c-green-500); }
-    .journey-val--worse  { color: var(--c-red-status); }
-    .journey-delta { font-size: var(--text-2xs); color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px; }
-
     @media (max-width: 768px) {
-      .page-header__meta { gap: var(--space-4); }
+      .cpit-main { grid-template-columns: 1fr; }
+      .cpit-group--wide { grid-column: 1; }
+      .cpit-tiles--4 { grid-template-columns: repeat(2, 1fr); }
       .event-row { grid-template-columns: 80px 10px 1fr; }
-      .snap-grid { grid-template-columns: repeat(2, 1fr); }
-      .panel-grid { grid-template-columns: 1fr; }
-      .journey-grid { grid-template-columns: 1fr; }
-      .journey-cell--header:not(:first-child) { display: none; }
-      .z2-ring-wrap { flex-direction: column; align-items: flex-start; }
     }
   </style>
 </head>
@@ -252,54 +203,174 @@
   </div>
 </div>
 
+<!-- Status bar -->
+<div class="cpit-statusbar-wrap">
+  <div class="cpit-statusbar">
+    <div class="cpit-statusbar__dot"></div>
+    <span class="cpit-statusbar__text"><strong id="cpit-systems">—</strong> of 7 systems reporting · as of <span id="cpit-timestamp">—</span></span>
+  </div>
+</div>
 
+<!-- Cockpit groups -->
+<div class="cpit-wrap">
+  <div class="cpit-main">
 
-
-
-
-
-  <!-- Live Snapshot -->
-  <section class="live-snapshot animate-in">
-    <div class="live-snapshot__inner">
-      <div class="snap-grid">
-        <div class="snap-card">
-          <div class="snap-card__label">Weight</div>
-          <div class="snap-card__value"><span id="snap-weight">—</span> <span class="snap-card__unit">lbs</span></div>
-          <div class="snap-card__delta" id="snap-weight-delta">loading…</div>
+    <!-- 1. Body -->
+    <div class="cpit-group">
+      <div class="cpit-group__header">
+        <div class="cpit-group__heading">// body</div>
+        <a href="#timeline" class="cpit-group__link">weight chart ↓</a>
+      </div>
+      <div class="cpit-tiles">
+        <div class="cpit-tile cpit-tile--gray" id="tile-weight">
+          <div class="cpit-tile__name">Weight</div>
+          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-weight">—</span><span class="cpit-tile__unit">lbs</span></div>
+          <div class="cpit-tile__delta" id="td-weight">loading…</div>
         </div>
-        <div class="snap-card">
-          <div class="snap-card__label">HRV</div>
-          <div class="snap-card__value"><span id="snap-hrv">—</span> <span class="snap-card__unit">ms</span></div>
-          <div class="snap-card__delta" id="snap-hrv-delta">loading…</div>
-        </div>
-        <div class="snap-card">
-          <div class="snap-card__label">Recovery</div>
-          <div class="snap-card__value"><span id="snap-recovery">—</span><span class="snap-card__unit">%</span></div>
-          <div class="snap-card__delta" id="snap-recovery-status">loading…</div>
-        </div>
-        <div class="snap-card">
-          <div class="snap-card__label">Habit Streak</div>
-          <div class="snap-card__value"><span id="snap-streak">—</span> <span class="snap-card__unit">days</span></div>
-          <div class="snap-card__delta" id="snap-streak-sub">loading…</div>
+        <div class="cpit-tile cpit-tile--gray" id="tile-journey">
+          <div class="cpit-tile__name">Journey Progress</div>
+          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-journey">—</span><span class="cpit-tile__unit">%</span></div>
+          <div class="cpit-tile__delta" id="td-journey">302 → 185 lbs</div>
         </div>
       </div>
     </div>
-  </section>
 
-  <!-- Header -->
-  <header class="page-header animate-in">
+    <!-- 2. Recovery + Sleep -->
+    <div class="cpit-group">
+      <div class="cpit-group__header">
+        <div class="cpit-group__heading">// recovery + sleep</div>
+        <a href="/sleep/" class="cpit-group__link">sleep deep-dive →</a>
+      </div>
+      <div class="cpit-tiles cpit-tiles--4">
+        <div class="cpit-tile cpit-tile--gray" id="tile-hrv">
+          <div class="cpit-tile__name">HRV</div>
+          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-hrv">—</span><span class="cpit-tile__unit">ms</span></div>
+          <div class="cpit-tile__delta" id="td-hrv">—</div>
+        </div>
+        <div class="cpit-tile cpit-tile--gray" id="tile-recovery">
+          <div class="cpit-tile__name">Recovery</div>
+          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-recovery">—</span><span class="cpit-tile__unit">%</span></div>
+          <div class="cpit-tile__delta" id="td-recovery">—</div>
+        </div>
+        <div class="cpit-tile cpit-tile--gray" id="tile-rhr">
+          <div class="cpit-tile__name">Resting HR</div>
+          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-rhr">—</span><span class="cpit-tile__unit">bpm</span></div>
+          <div class="cpit-tile__delta" id="td-rhr">—</div>
+        </div>
+        <div class="cpit-tile cpit-tile--gray" id="tile-sleep">
+          <div class="cpit-tile__name">Sleep</div>
+          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-sleep">—</span><span class="cpit-tile__unit">hrs</span></div>
+          <div class="cpit-tile__delta" id="td-sleep">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Activity + Training -->
+    <div class="cpit-group">
+      <div class="cpit-group__header">
+        <div class="cpit-group__heading">// activity + training</div>
+        <a href="/protocols/" class="cpit-group__link">protocols →</a>
+      </div>
+      <div class="cpit-tiles">
+        <div class="cpit-tile cpit-tile--gray" id="tile-zone2">
+          <div class="cpit-tile__name">Zone 2 (7d)</div>
+          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-zone2">—</span><span class="cpit-tile__unit">/ 150 min</span></div>
+          <div class="cpit-tile__delta" id="td-zone2">weekly target</div>
+        </div>
+        <div class="cpit-tile cpit-tile--gray" id="tile-strain">
+          <div class="cpit-tile__name">Today's Activity</div>
+          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-strain" style="font-size:20px">—</span></div>
+          <div class="cpit-tile__delta" id="td-strain">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Nutrition + Glucose -->
+    <div class="cpit-group">
+      <div class="cpit-group__header">
+        <div class="cpit-group__heading">// nutrition + glucose</div>
+        <a href="/glucose/" class="cpit-group__link">glucose deep-dive →</a>
+      </div>
+      <div class="cpit-tiles">
+        <div class="cpit-tile cpit-tile--gray" id="tile-tir">
+          <div class="cpit-tile__name">Time In Range (today)</div>
+          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-tir">—</span><span class="cpit-tile__unit">%</span></div>
+          <div class="cpit-tile__delta" id="td-tir">70–140 mg/dL</div>
+        </div>
+        <div class="cpit-tile cpit-tile--gray" id="tile-tir30">
+          <div class="cpit-tile__name">30d Avg TIR</div>
+          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-tir30">—</span><span class="cpit-tile__unit">%</span></div>
+          <div class="cpit-tile__delta" id="td-tir30">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Habits + Behavior -->
+    <div class="cpit-group">
+      <div class="cpit-group__header">
+        <div class="cpit-group__heading">// habits + behavior</div>
+        <a href="/habits/" class="cpit-group__link">habits →</a>
+      </div>
+      <div class="cpit-tiles">
+        <div class="cpit-tile cpit-tile--gray" id="tile-t0pct">
+          <div class="cpit-tile__name">Tier 0 Today</div>
+          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-t0pct">—</span><span class="cpit-tile__unit">%</span></div>
+          <div class="cpit-tile__delta" id="td-t0pct">—</div>
+        </div>
+        <div class="cpit-tile cpit-tile--gray" id="tile-streak">
+          <div class="cpit-tile__name">T0 Streak</div>
+          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-streak">—</span><span class="cpit-tile__unit">days</span></div>
+          <div class="cpit-tile__delta" id="td-streak">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. Mind + Character -->
+    <div class="cpit-group">
+      <div class="cpit-group__header">
+        <div class="cpit-group__heading">// mind + character</div>
+        <a href="/character/" class="cpit-group__link">character →</a>
+      </div>
+      <div class="cpit-tiles">
+        <div class="cpit-tile cpit-tile--gray" id="tile-mood">
+          <div class="cpit-tile__name">State of Mind</div>
+          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-mood">—</span><span class="cpit-tile__unit">/ 5</span></div>
+          <div class="cpit-tile__delta" id="td-mood">—</div>
+        </div>
+        <div class="cpit-tile cpit-tile--gray" id="tile-char">
+          <div class="cpit-tile__name">Character Level</div>
+          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-char">—</span></div>
+          <div class="cpit-tile__delta" id="td-char">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. Platform + Intelligence (full width) -->
+    <div class="cpit-group cpit-group--wide">
+      <div class="cpit-group__header">
+        <div class="cpit-group__heading">// platform + intelligence</div>
+        <a href="/board/" class="cpit-group__link">full AI brief →</a>
+      </div>
+      <div class="cpit-tile cpit-tile--gray" id="tile-signal">
+        <div class="cpit-tile__name">Today's Intelligence Signal</div>
+        <div class="cpit-tile__signal" id="tv-signal">Brief generates at 11 AM PT — check back after that for today's AI analysis.</div>
+      </div>
+    </div>
+
+  </div><!-- /.cpit-main -->
+</div><!-- /.cpit-wrap -->
+
+<!-- Weight timeline chart -->
+<section class="cpit-chart-section animate-in" id="timeline">
+  <div class="cpit-chart-inner">
     <div class="eyebrow">The Data</div>
-    <h1 class="page-header__title"><span id="start-weight">302</span> → <span id="current-weight">…</span> → <span id="goal-weight">185</span></h1>
-    <p class="page-header__sub">Every weigh-in, every experiment, every milestone — from day one to today. Click any point to see what was happening that day.</p>
-    <div class="page-header__meta">
+    <h2 class="cpit-chart-title"><span id="start-weight">302</span> → <span id="current-weight">…</span> → <span id="goal-weight">185</span></h2>
+    <p class="cpit-chart-sub">Every weigh-in, every experiment, every milestone — from day one to today. Click any point to see what was happening that day.</p>
+    <div class="cpit-chart-meta">
       <div class="meta-stat"><div class="meta-stat__label">Days on journey</div><div class="meta-stat__value" id="days-count">—</div></div>
       <div class="meta-stat"><div class="meta-stat__label">Lbs lost</div><div class="meta-stat__value" id="lbs-lost">—</div></div>
       <div class="meta-stat"><div class="meta-stat__label">Data points</div><div class="meta-stat__value" id="data-points">—</div></div>
     </div>
-  </header>
-
-  <!-- Chart -->
-  <section class="timeline-container animate-in">
     <div class="chart-wrapper" id="chart-wrapper">
       <div class="loading" id="chart-loading">Loading timeline data…</div>
     </div>
@@ -309,235 +380,14 @@
       <div class="legend__item"><span class="legend__dot" style="background: #7c3aed;"></span> Experiment</div>
       <div class="legend__item"><span class="legend__dot" style="background: #3b82f6;"></span> Level up</div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- Events list -->
-  <section class="events-list animate-in" id="events-section" style="display:none;">
-    <h2>Journey Events</h2>
-    <div id="events-list"></div>
-  </section>
-
-  <!-- Section 4 — Sleep Snapshot -->
-  <section class="panel-section animate-in" id="sleep-section">
-    <div class="panel-section__inner">
-      <div class="panel-label">// sleep snapshot</div>
-      <div class="panel-grid">
-        <div class="panel-card">
-          <div class="panel-card__heading">Last Night</div>
-          <div class="panel-card__hero">
-            <span id="sleep-hours" class="panel-card__big">—</span>
-            <span class="panel-card__unit">hrs</span>
-            <span class="panel-card__sub" id="sleep-score-label"></span>
-          </div>
-          <div class="sleep-bar">
-            <div class="sleep-bar__seg sleep-bar__seg--deep"  id="sleep-seg-deep"  style="width:0%"></div>
-            <div class="sleep-bar__seg sleep-bar__seg--rem"   id="sleep-seg-rem"   style="width:0%"></div>
-            <div class="sleep-bar__seg sleep-bar__seg--light" id="sleep-seg-light" style="width:0%"></div>
-            <div class="sleep-bar__seg sleep-bar__seg--awake" id="sleep-seg-awake" style="width:100%"></div>
-          </div>
-          <div class="sleep-legend">
-            <div class="sleep-legend__item"><span class="sleep-legend__dot" style="background:var(--accent)"></span>Deep <span id="sleep-pct-deep" style="margin-left:2px">—%</span></div>
-            <div class="sleep-legend__item"><span class="sleep-legend__dot" style="background:rgba(0,229,160,0.45)"></span>REM <span id="sleep-pct-rem" style="margin-left:2px">—%</span></div>
-            <div class="sleep-legend__item"><span class="sleep-legend__dot" style="background:rgba(0,229,160,0.2)"></span>Light <span id="sleep-pct-light" style="margin-left:2px">—%</span></div>
-          </div>
-        </div>
-        <div class="panel-card">
-          <div class="panel-card__heading">7-Day Average</div>
-          <div class="panel-card__hero">
-            <span id="sleep-7d-avg" class="panel-card__big">—</span>
-            <span class="panel-card__unit">hrs</span>
-          </div>
-          <div class="panel-card__foot" id="sleep-efficiency-foot">Efficiency: —</div>
-          <div class="panel-card__foot" style="margin-top:var(--space-2)" id="sleep-trend-foot"></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Glucose Snapshot -->
-  <section class="panel-section animate-in" id="glucose-section">
-    <div class="panel-section__inner">
-      <div class="panel-label">// glucose snapshot</div>
-      <div class="panel-grid">
-        <div class="panel-card">
-          <div class="panel-card__heading">Time In Range — Today</div>
-          <div class="panel-card__hero">
-            <span id="glucose-tir" class="panel-card__big">—</span><span class="panel-card__unit">%</span>
-            <span class="panel-card__sub" id="glucose-tir-status"></span>
-          </div>
-          <div class="panel-progress" style="margin-top:var(--space-4)">
-            <div class="panel-progress__track">
-              <div class="panel-progress__fill panel-progress__fill--green" id="glucose-tir-bar" style="width:0%"></div>
-            </div>
-          </div>
-          <div class="panel-card__foot" id="glucose-avg-foot">Avg: — mg/dL</div>
-        </div>
-        <div class="panel-card">
-          <div class="panel-card__heading">30-Day Average TIR</div>
-          <div class="panel-card__hero">
-            <span id="glucose-30d-tir" class="panel-card__big">—</span><span class="panel-card__unit">%</span>
-          </div>
-          <div class="panel-card__foot" id="glucose-variability">Variability: —</div>
-          <div class="panel-card__foot" style="margin-top:var(--space-2)" id="glucose-days-foot"></div>
-          <div id="glucose-sparkline" style="margin-top:var(--space-4);overflow:hidden;"></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Panel 2 — Habit Status -->
-  <section class="panel-section animate-in">
-    <div class="panel-section__inner">
-      <div class="panel-label">// habit status</div>
-      <div class="panel-grid">
-        <div class="panel-card">
-          <div class="panel-card__heading">Tier 0 Today</div>
-          <div class="panel-card__hero">
-            <span id="p2-t0-pct" class="panel-card__big">—</span><span class="panel-card__unit">%</span>
-            <span class="panel-card__sub" id="p2-t0-count">(—/—)</span>
-          </div>
-          <div class="panel-progress">
-            <div class="panel-progress__track">
-              <div class="panel-progress__fill panel-progress__fill--green" id="p2-t0-bar" style="width:0%"></div>
-            </div>
-          </div>
-          <div class="panel-card__foot" id="p2-streak-foot">Loading…</div>
-        </div>
-        <div class="panel-card">
-          <div class="panel-card__heading">T0 Streak</div>
-          <div class="panel-card__hero">
-            <span id="p2-streak" class="panel-card__big">—</span>
-            <span class="panel-card__unit">days</span>
-          </div>
-          <div class="panel-card__foot" id="p2-best-streak">Best: — days</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Panel 3 — Training Load -->
-  <section class="panel-section animate-in">
-    <div class="panel-section__inner">
-      <div class="panel-label">// training load</div>
-      <div class="panel-grid">
-        <div class="panel-card">
-          <div class="panel-card__heading">Today's Activity</div>
-          <div class="panel-card__hero">
-            <span class="panel-card__big" id="p3-activity">—</span>
-          </div>
-          <div class="panel-card__foot" id="p3-strain">Strain: —</div>
-          <div class="panel-card__foot" style="margin-top:var(--space-2)" id="p3-duration">Duration: —</div>
-        </div>
-        <div class="panel-card">
-          <div class="panel-card__heading">Zone 2 — Weekly Target</div>
-          <div class="z2-ring-wrap" style="margin-top:var(--space-4)">
-            <svg class="z2-ring" width="72" height="72" viewBox="0 0 72 72" aria-hidden="true">
-              <circle class="z2-ring__track" cx="36" cy="36" r="30"/>
-              <circle class="z2-ring__fill" id="z2-ring-fill" cx="36" cy="36" r="30" stroke-dasharray="188.5" stroke-dashoffset="188.5"/>
-            </svg>
-            <div>
-              <div style="font-family:var(--font-display);font-size:22px;letter-spacing:var(--ls-display);color:var(--text)">
-                <span id="z2-actual">—</span><span style="font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono)"> / 150 min</span>
-              </div>
-              <div class="panel-card__foot" id="z2-label" style="margin-top:var(--space-2)">Loading…</div>
-              <div class="panel-card__foot" style="margin-top:var(--space-1)" id="p3-load-label">7d load: —</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Section 7 — State of Mind -->
-  <section class="panel-section animate-in">
-    <div class="panel-section__inner">
-      <div class="panel-label">// state of mind</div>
-      <div class="panel-card panel-card--full">
-        <div class="panel-card__heading">Most Recent Check-in</div>
-        <div class="mood-scale">
-          <div class="mood-dot" id="mood-1">1</div>
-          <div class="mood-dot" id="mood-2">2</div>
-          <div class="mood-dot" id="mood-3">3</div>
-          <div class="mood-dot" id="mood-4">4</div>
-          <div class="mood-dot" id="mood-5">5</div>
-        </div>
-        <div class="panel-card__foot" id="mood-label" style="margin-top:var(--space-3)">No check-in logged recently</div>
-        <div class="panel-card__foot" id="mood-note" style="margin-top:var(--space-2);color:var(--text-faint)"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Panel 4 — Character Snapshot -->
-  <section class="panel-section animate-in">
-    <div class="panel-section__inner">
-      <div class="panel-label">// character snapshot</div>
-      <div class="panel-grid">
-        <div class="panel-card">
-          <div class="panel-card__heading">Level &amp; Tier</div>
-          <div class="panel-card__hero">
-            <span class="panel-card__big">Level <span id="p4-level">—</span></span>
-          </div>
-          <div class="panel-card__foot" id="p4-tier">— tier</div>
-        </div>
-        <div class="panel-card">
-          <div class="panel-card__heading">XP Progress</div>
-          <div class="panel-progress" style="margin-top:var(--space-3)">
-            <div class="panel-progress__track">
-              <div class="panel-progress__fill panel-progress__fill--accent" id="p4-xp-bar" style="width:0%"></div>
-            </div>
-          </div>
-          <div class="panel-card__foot" id="p4-xp-foot">Loading…</div>
-          <div class="panel-card__foot" style="margin-top:var(--space-2)" id="p4-weak">Weakest Pillar: Loading…</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Panel 5 — Intelligence Signal -->
-  <section class="panel-section animate-in">
-    <div class="panel-section__inner">
-      <div class="panel-label">// intelligence signal</div>
-      <div class="panel-card panel-card--full">
-        <div class="panel-card__heading">Today's Signal</div>
-        <div class="panel-card__signal-body" id="p5-signal">
-          Brief generates at 11 AM PT — check back after that for today's AI analysis.
-        </div>
-        <div class="panel-card__foot" style="margin-top:var(--space-4)">
-          <a href="/board/" style="color:var(--accent-dim);text-decoration:none;font-size:var(--text-xs);letter-spacing:var(--ls-tag)">Full AI brief →</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Section 9 — Since Journey Start -->
-  <section class="panel-section animate-in" id="journey-compare-section">
-    <div class="panel-section__inner">
-      <div class="panel-label">// since journey start</div>
-      <div class="journey-grid">
-        <!-- Header row -->
-        <div class="journey-cell journey-cell--header">Metric</div>
-        <div class="journey-cell journey-cell--header">Day 1</div>
-        <div class="journey-cell journey-cell--header">Today</div>
-        <!-- Weight -->
-        <div class="journey-cell"><div class="journey-cell__metric">Weight</div></div>
-        <div class="journey-cell"><div class="journey-val" id="jc-w-start">—</div></div>
-        <div class="journey-cell"><div class="journey-val" id="jc-w-now">—</div><div class="journey-delta" id="jc-w-delta"></div></div>
-        <!-- Recovery -->
-        <div class="journey-cell"><div class="journey-cell__metric">Recovery</div></div>
-        <div class="journey-cell"><div class="journey-val" id="jc-r-start">—</div></div>
-        <div class="journey-cell"><div class="journey-val" id="jc-r-now">—</div></div>
-        <!-- HRV -->
-        <div class="journey-cell"><div class="journey-cell__metric">HRV</div></div>
-        <div class="journey-cell"><div class="journey-val" id="jc-hrv-start">—</div></div>
-        <div class="journey-cell"><div class="journey-val" id="jc-hrv-now">—</div></div>
-        <!-- RHR -->
-        <div class="journey-cell"><div class="journey-cell__metric">Resting HR</div></div>
-        <div class="journey-cell"><div class="journey-val" id="jc-rhr-start">—</div></div>
-        <div class="journey-cell"><div class="journey-val" id="jc-rhr-now">—</div></div>
-      </div>
-      <div class="panel-card__foot" id="journey-days-note" style="margin-top:var(--space-4)">Loading…</div>
-    </div>
-  </section>
+<!-- Events list -->
+<section class="events-list animate-in" id="events-section" style="display:none;">
+  <h2>Journey Events</h2>
+  <div id="events-list"></div>
+</section>
 
   <!-- Tooltip -->
   <div class="tooltip" id="tooltip"><div class="tooltip__date"></div><div class="tooltip__value"></div></div>
@@ -638,7 +488,7 @@
 <section class="reading-path" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
   <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>
   <a href="/character/" style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-display);">How the score is computed →</a>
-  <p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">The RPG system that turns raw data into a single progression score</p>
+  <p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">The 7-pillar character system behind the numbers</p>
 </section>
 <footer class="footer-v2">
   <div class="footer-v2__grid">
@@ -702,6 +552,25 @@ const API = 'https://averagejoematt.com';
 const CHART_H = 400, PAD_T = 40, PAD_B = 50, PAD_L = 60, PAD_R = 30;
 const tooltip = document.getElementById('tooltip');
 
+// ── Status helpers ──────────────────────────────────────────────────────────
+function setStatus(tileId, cls) {
+  var el = document.getElementById(tileId);
+  if (!el) return;
+  el.classList.remove('cpit-tile--green','cpit-tile--amber','cpit-tile--red','cpit-tile--gray');
+  el.classList.add('cpit-tile--' + cls);
+}
+function statusHRV(v)      { return v >= 55 ? 'green' : v >= 35 ? 'amber' : 'red'; }
+function statusRecovery(v) { return v >= 67 ? 'green' : v >= 33 ? 'amber' : 'red'; }
+function statusRHR(v)      { return v <= 55 ? 'green' : v <= 70 ? 'amber' : 'red'; }
+function statusSleep(v)    { return v >= 7  ? 'green' : v >= 6  ? 'amber' : 'red'; }
+function statusT0(v)       { return v >= 90 ? 'green' : v >= 70 ? 'amber' : 'red'; }
+function statusStreak(v)   { return v >= 7  ? 'green' : v >= 1  ? 'amber' : 'red'; }
+function statusTIR(v)      { return v >= 70 ? 'green' : v >= 50 ? 'amber' : 'red'; }
+function statusZ2(min) { var pct = min / 150 * 100; return pct >= 80 ? 'green' : pct >= 50 ? 'amber' : 'red'; }
+function statusMood(v)     { return v >= 4  ? 'green' : v >= 3  ? 'amber' : 'red'; }
+function setText(id, val) { var el = document.getElementById(id); if (el && val != null) el.textContent = val; }
+
+// ── Timeline chart ──────────────────────────────────────────────────────────
 async function init() {
   try {
     const res = await fetch(`${API}/api/timeline`);
@@ -709,19 +578,18 @@ async function init() {
     const tl = json.timeline;
     render(tl);
     renderEvents(tl);
-    // Header stats
     const wts = tl.weights;
     if (wts.length) {
       const curr = wts[wts.length - 1].lbs;
-      document.getElementById('current-weight').textContent = curr;
-      document.getElementById('lbs-lost').textContent = Math.round(tl.start_weight - curr);
-      document.getElementById('data-points').textContent = wts.length;
+      setText('current-weight', curr);
+      setText('lbs-lost', Math.round(tl.start_weight - curr));
+      setText('data-points', wts.length);
     }
-    const d0 = new Date(tl.journey_start);
-    const days = Math.floor((Date.now() - d0) / 86400000);
-    document.getElementById('days-count').textContent = days;
+    setText('days-count', Math.floor((Date.now() - new Date(tl.journey_start)) / 86400000));
+    if (tl.goal_weight)  setText('goal-weight',  tl.goal_weight);
+    if (tl.start_weight) setText('start-weight', tl.start_weight);
   } catch (e) {
-    document.getElementById('chart-loading').textContent = 'Could not load timeline data.';
+    setText('chart-loading', 'Could not load timeline data.');
   }
   // Challenge bar
   try {
@@ -729,7 +597,7 @@ async function init() {
     const cj = await cr.json();
     const ch = cj.current_challenge;
     if (ch && ch.challenge) {
-      document.getElementById('cbar-label').textContent = `Week ${ch.week_num || '?'}`;
+      setText('cbar-label', `Week ${ch.week_num || '?'}`);
       document.getElementById('cbar-text').innerHTML = `<strong>${ch.challenge}</strong>`;
       document.getElementById('challenge-bar').style.display = 'flex';
     }
@@ -860,373 +728,207 @@ function renderEvents(tl) {
   document.getElementById('events-section').style.display = 'block';
 }
 
-async function initSnapshot() {
-  try {
-    const [vRes, hRes] = await Promise.all([
-      fetch(`${API}/api/vitals`),
-      fetch(`${API}/api/habit_streaks`)
-    ]);
-    const vData = await vRes.json();
-    const hData = await hRes.json();
-    const v  = vData.vitals        || {};
-    const hs = hData.habit_streaks || {};
+// ── Cockpit loader (LIVE-1 + LIVE-2: all fetches consolidated) ──────────────
+async function initCockpit() {
+  const now = new Date();
+  setText('cpit-timestamp', now.toLocaleTimeString('en', {hour:'2-digit', minute:'2-digit', hour12:true}));
 
-    // Weight
-    if (v.weight_lbs) {
-      document.getElementById('snap-weight').textContent = v.weight_lbs;
-      const deltaEl = document.getElementById('snap-weight-delta');
-      if (v.weight_delta_30d != null) {
-        const sign = v.weight_delta_30d > 0 ? '+' : '';
-        deltaEl.textContent = sign + v.weight_delta_30d + ' lbs (30d)';
-        // Weight loss is good — negative delta = green
-        deltaEl.className = 'snap-card__delta ' + (v.weight_delta_30d <= 0 ? 'snap-card__delta--pos' : 'snap-card__delta--neg');
+  // Fetch all 6 data sources in parallel
+  const [vRes, hRes, cRes, gRes, psRes, jRes] = await Promise.allSettled([
+    fetch(`${API}/api/vitals`),
+    fetch(`${API}/api/habit_streaks`),
+    fetch(`${API}/api/character`),
+    fetch(`${API}/api/glucose`),
+    fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' }),
+    fetch(`${API}/api/journey`),
+  ]);
+
+  var reporting = 0;
+
+  // 1. Vitals (HRV, Recovery, RHR, Weight)
+  if (vRes.status === 'fulfilled' && vRes.value.ok) {
+    try {
+      const vData = await vRes.value.json();
+      const v = vData.vitals || {};
+      reporting++;
+
+      // Weight
+      if (v.weight_lbs != null) {
+        setText('tv-weight', v.weight_lbs);
+        setStatus('tile-weight', 'gray');
+        if (v.weight_delta_30d != null) {
+          setText('td-weight', (v.weight_delta_30d > 0 ? '+' : '') + v.weight_delta_30d + ' lbs (30d)');
+        } else if (v.weight_as_of) {
+          const parts = v.weight_as_of.split('-');
+          const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+          const daysAgo = Math.floor((Date.now() - new Date(v.weight_as_of)) / 86400000);
+          setText('td-weight', daysAgo > 3 ? 'as of ' + MONTHS[parseInt(parts[1])-1] + ' ' + parseInt(parts[2]) : '');
+        }
+      }
+
+      // HRV
+      if (v.hrv_ms != null) {
+        setText('tv-hrv', v.hrv_ms);
+        setStatus('tile-hrv', statusHRV(v.hrv_ms));
+        setText('td-hrv', v.hrv_30d_avg ? v.hrv_30d_avg + ' ms 30d avg' : '');
+      }
+
+      // Recovery
+      if (v.recovery_pct != null) {
+        setText('tv-recovery', v.recovery_pct);
+        setStatus('tile-recovery', statusRecovery(v.recovery_pct));
+        var recovMap = { green: 'Optimal', yellow: 'Moderate', red: 'Needs rest' };
+        setText('td-recovery', recovMap[v.recovery_status] || '');
+      }
+
+      // RHR
+      if (v.resting_heart_rate != null) {
+        setText('tv-rhr', v.resting_heart_rate);
+        setStatus('tile-rhr', statusRHR(v.resting_heart_rate));
+      }
+    } catch(_) {}
+  }
+
+  // 2. Habit streaks
+  if (hRes.status === 'fulfilled' && hRes.value.ok) {
+    try {
+      const hData = await hRes.value.json();
+      const hs = hData.habit_streaks || {};
+      reporting++;
+      if (hs.tier0_pct != null) {
+        setText('tv-t0pct', hs.tier0_pct);
+        setStatus('tile-t0pct', statusT0(hs.tier0_pct));
+        if (hs.tier0_done != null && hs.tier0_total != null) {
+          setText('td-t0pct', hs.tier0_done + '/' + hs.tier0_total + ' habits');
+        }
+      }
+      if (hs.aggregate_streak != null) {
+        setText('tv-streak', hs.aggregate_streak);
+        setStatus('tile-streak', statusStreak(hs.aggregate_streak));
+        setText('td-streak', hs.best_streak != null ? 'Best: ' + hs.best_streak + 'd' : '');
+      }
+    } catch(_) {}
+  }
+
+  // 3. Character
+  if (cRes.status === 'fulfilled' && cRes.value.ok) {
+    try {
+      const cData = await cRes.value.json();
+      const ch = cData.character || {};
+      reporting++;
+      if (ch.level != null) {
+        setText('tv-char', 'Lv ' + ch.level);
+        setStatus('tile-char', 'green');
+        var tierLabel = ch.tier ? ((ch.tier_emoji || '') + ' ' + ch.tier).trim() : '';
+        setText('td-char', tierLabel);
+      }
+    } catch(_) {}
+  }
+
+  // 4. Glucose
+  if (gRes.status === 'fulfilled' && gRes.value.ok) {
+    try {
+      const gData = await gRes.value.json();
+      const g = gData.glucose || {};
+      reporting++;
+      if (g.time_in_range_pct != null) {
+        setText('tv-tir', Math.round(g.time_in_range_pct));
+        setStatus('tile-tir', statusTIR(g.time_in_range_pct));
+        setText('td-tir', g.avg_mg_dl ? 'Avg: ' + g.avg_mg_dl + ' mg/dL' : '70–140 mg/dL');
+      }
+      var tir30 = g['30d_avg_tir'];
+      if (tir30 != null) {
+        setText('tv-tir30', Math.round(tir30));
+        setStatus('tile-tir30', statusTIR(tir30));
+        setText('td-tir30', g.days_tracked ? g.days_tracked + 'd tracked' : '');
+      }
+    } catch(_) {}
+  }
+
+  // 5. public_stats.json — sleep, training, mood, brief
+  if (psRes.status === 'fulfilled' && psRes.value.ok) {
+    try {
+      const ps = await psRes.value.json();
+      const vitals = ps.vitals || {};
+      const training = ps.training || {};
+      const mood = ps.mood || ps.state_of_mind || {};
+      reporting++;
+
+      // Sleep
+      var sleepHrs = vitals.sleep_duration_hours != null ? vitals.sleep_duration_hours : vitals.sleep_hours;
+      if (sleepHrs != null) {
+        var sh = parseFloat(sleepHrs);
+        setText('tv-sleep', sh.toFixed(1));
+        setStatus('tile-sleep', statusSleep(sh));
+        var sleepScore = vitals.sleep_score != null ? vitals.sleep_score : vitals.sleep_quality_score;
+        if (sleepScore != null) {
+          setText('td-sleep', 'Score: ' + sleepScore + '%');
+        } else {
+          setText('td-sleep', vitals.sleep_trend === 'up' ? '↑ improving' : vitals.sleep_trend === 'down' ? '↓ declining' : '');
+        }
+      }
+
+      // Zone 2
+      var z2 = training.zone2_minutes_7d != null ? training.zone2_minutes_7d : training.zone2_weekly_min;
+      if (z2 != null) {
+        setText('tv-zone2', z2);
+        setStatus('tile-zone2', statusZ2(z2));
+        var z2pct = Math.round((z2 / 150) * 100);
+        setText('td-zone2', z2pct + '% of weekly target' + (z2 >= 150 ? ' ✓' : ''));
+      }
+
+      // Today's activity
+      var activity = training.today_activity != null ? training.today_activity : vitals.last_activity_type;
+      if (activity) {
+        setText('tv-strain', activity);
+        setStatus('tile-strain', 'green');
+        var strain = training.today_strain != null ? training.today_strain : vitals.strain_score;
+        setText('td-strain', strain != null ? 'Strain: ' + parseFloat(strain).toFixed(1) + '/21' : '');
       } else {
-        deltaEl.textContent = '';
+        setText('tv-strain', 'Rest');
+        setStatus('tile-strain', 'gray');
       }
-    } else {
-      document.getElementById('snap-weight-delta').textContent = '';
-    }
 
-    // HRV
-    if (v.hrv_ms) {
-      document.getElementById('snap-hrv').textContent = v.hrv_ms;
-      const deltaEl = document.getElementById('snap-hrv-delta');
-      const avg = v.hrv_30d_avg ? v.hrv_30d_avg + ' ms 30d avg' : '';
-      deltaEl.textContent = avg;
-      if (v.hrv_trend === 'up')   deltaEl.className = 'snap-card__delta snap-card__delta--pos';
-      else if (v.hrv_trend === 'down') deltaEl.className = 'snap-card__delta snap-card__delta--neg';
-      else deltaEl.className = 'snap-card__delta';
-    } else {
-      document.getElementById('snap-hrv-delta').textContent = '';
-    }
+      // Mood
+      var moodScore = mood.score != null ? mood.score : mood.value;
+      if (moodScore != null) {
+        var ms = Math.round(moodScore);
+        setText('tv-mood', ms);
+        setStatus('tile-mood', statusMood(ms));
+        var moodLabels = ['', 'Low', 'Below avg', 'Average', 'Good', 'Excellent'];
+        setText('td-mood', (moodLabels[ms] || '') + (mood.date ? ' · ' + mood.date : ''));
+      }
 
-    // Recovery
-    if (v.recovery_pct != null) {
-      document.getElementById('snap-recovery').textContent = v.recovery_pct;
-      const statusEl = document.getElementById('snap-recovery-status');
-      const statusMap = { green: ['Optimal', 'snap-card__delta--green'], yellow: ['Moderate', 'snap-card__delta--yellow'], red: ['Needs rest', 'snap-card__delta--red'] };
-      const [label, cls] = statusMap[v.recovery_status] || ['—', ''];
-      statusEl.textContent = label;
-      statusEl.className = 'snap-card__delta ' + cls;
-    } else {
-      document.getElementById('snap-recovery-status').textContent = '';
-    }
-
-    // Streak
-    if (hs.aggregate_streak != null) {
-      document.getElementById('snap-streak').textContent = hs.aggregate_streak;
-      const subEl = document.getElementById('snap-streak-sub');
-      subEl.textContent = hs.tier0_pct != null ? hs.tier0_pct + '% T0 habits today' : '';
-    } else {
-      document.getElementById('snap-streak-sub').textContent = '';
-    }
-  } catch(_) {
-    ['snap-weight-delta','snap-hrv-delta','snap-recovery-status','snap-streak-sub'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = '';
-    });
+      // AI brief excerpt
+      var excerpt = ps.brief_excerpt
+        || (ps.intelligence && ps.intelligence.brief_excerpt)
+        || (ps.daily_brief && ps.daily_brief.excerpt);
+      if (excerpt && excerpt.trim()) {
+        setText('tv-signal', excerpt);
+        setStatus('tile-signal', 'green');
+      }
+    } catch(_) {}
   }
-}
 
-async function initPanels() {
-  // Panel 2 — Habit Status (from /api/habit_streaks)
-  try {
-    const hRes = await fetch(`${API}/api/habit_streaks`);
-    const hData = await hRes.json();
-    const hs = hData.habit_streaks || {};
-    if (hs.tier0_pct != null) {
-      document.getElementById('p2-t0-pct').textContent = hs.tier0_pct;
-      document.getElementById('p2-t0-bar').style.width = Math.min(hs.tier0_pct, 100) + '%';
-    }
-    if (hs.tier0_done != null && hs.tier0_total != null) {
-      document.getElementById('p2-t0-count').textContent = `(${hs.tier0_done}/${hs.tier0_total})`;
-    }
-    if (hs.aggregate_streak != null) {
-      document.getElementById('p2-streak').textContent = hs.aggregate_streak;
-      document.getElementById('p2-streak-foot').textContent = `Current T0 Streak: ${hs.aggregate_streak} days`;
-    }
-    if (hs.best_streak != null) {
-      document.getElementById('p2-best-streak').textContent = `Best: ${hs.best_streak} days`;
-    }
-  } catch(_) {}
-
-  // Panel 4 — Character Snapshot (from /api/character)
-  try {
-    const cRes = await fetch(`${API}/api/character`);
-    const cData = await cRes.json();
-    const ch = cData.character || {};
-    const pillars = cData.pillars || [];
-    if (ch.level != null) {
-      document.getElementById('p4-level').textContent = ch.level;
-    }
-    if (ch.tier) {
-      document.getElementById('p4-tier').textContent = `${ch.tier_emoji || ''} ${ch.tier} tier`.trim();
-    }
-    // XP progress within current tier
-    if (ch.next_tier_level && ch.level) {
-      const tierStart = ch.current_tier_min_level || 1;
-      const tierEnd = ch.next_tier_level;
-      const pct = Math.min(((ch.level - tierStart) / (tierEnd - tierStart)) * 100, 100);
-      document.getElementById('p4-xp-bar').style.width = pct + '%';
-      document.getElementById('p4-xp-foot').textContent = `${ch.xp_total || '—'} XP total — Next tier: Lv ${ch.next_tier_level}`;
-    }
-    // Weakest pillar
-    if (pillars.length) {
-      const weakest = [...pillars].sort((a, b) => a.raw_score - b.raw_score)[0];
-      if (weakest) {
-        document.getElementById('p4-weak').textContent = `Weakest Pillar: ${weakest.emoji || ''} ${weakest.name} (${weakest.raw_score.toFixed(1)})`;
+  // 6. Journey progress
+  if (jRes.status === 'fulfilled' && jRes.value.ok) {
+    try {
+      const jData = await jRes.value.json();
+      const j = jData.journey || {};
+      if (j.progress_pct != null) {
+        var pct = parseFloat(j.progress_pct);
+        setText('tv-journey', pct.toFixed(1));
+        setStatus('tile-journey', pct >= 30 ? 'green' : pct >= 10 ? 'amber' : 'red');
+        setText('td-journey', j.lbs_lost != null ? j.lbs_lost + ' lbs lost' : '302 → 185 lbs');
       }
-    }
-  } catch(_) {}
-}
-
-// ── Sleep Snapshot ────────────────────────────────────────────────────────
-async function initSleep() {
-  try {
-    const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
-    if (!r.ok) return;
-    const d = await r.json();
-    const v = d.vitals || {};
-
-    // Last night duration
-    const hrs = v.sleep_duration_hours || v.sleep_hours;
-    if (hrs != null) {
-      document.getElementById('sleep-hours').textContent = parseFloat(hrs).toFixed(1);
-    }
-    // Sleep score label
-    const score = v.sleep_score || v.sleep_quality_score;
-    if (score != null) {
-      const scoreEl = document.getElementById('sleep-score-label');
-      const label = score >= 85 ? 'Excellent' : score >= 70 ? 'Good' : score >= 50 ? 'Fair' : 'Poor';
-      scoreEl.textContent = `(${score}% — ${label})`;
-    }
-    // Sleep stage breakdown (% of time)
-    const deep  = v.sleep_deep_pct  ?? v.deep_sleep_pct;
-    const rem   = v.sleep_rem_pct   ?? v.rem_sleep_pct;
-    const light = v.sleep_light_pct ?? v.light_sleep_pct;
-    if (deep != null && rem != null && light != null) {
-      const awake = Math.max(0, 100 - deep - rem - light);
-      document.getElementById('sleep-seg-deep').style.width  = deep  + '%';
-      document.getElementById('sleep-seg-rem').style.width   = rem   + '%';
-      document.getElementById('sleep-seg-light').style.width = light + '%';
-      document.getElementById('sleep-seg-awake').style.width = awake + '%';
-      document.getElementById('sleep-pct-deep').textContent  = Math.round(deep)  + '%';
-      document.getElementById('sleep-pct-rem').textContent   = Math.round(rem)   + '%';
-      document.getElementById('sleep-pct-light').textContent = Math.round(light) + '%';
-    }
-    // 7-day average
-    const avg7 = v.sleep_7d_avg || v.sleep_avg_7d;
-    if (avg7 != null) {
-      document.getElementById('sleep-7d-avg').textContent = parseFloat(avg7).toFixed(1);
-    }
-    // Efficiency
-    const eff = v.sleep_efficiency_pct || v.sleep_efficiency;
-    if (eff != null) {
-      document.getElementById('sleep-efficiency-foot').textContent = `Efficiency: ${eff}%`;
-    }
-    // Trend note
-    const trend = v.sleep_trend;
-    if (trend) {
-      document.getElementById('sleep-trend-foot').textContent =
-        trend === 'up' ? '↑ Improving vs prior week' :
-        trend === 'down' ? '↓ Declining vs prior week' : 'Stable vs prior week';
-    }
-  } catch(_) {}
-}
-
-// ── Training Load ─────────────────────────────────────────────────────────
-async function initTraining() {
-  try {
-    const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
-    if (!r.ok) return;
-    const d = await r.json();
-    const t = d.training || {};
-    const v = d.vitals || {};
-
-    // Today's activity
-    const actEl = document.getElementById('p3-activity');
-    const activity = t.today_activity || v.last_activity_type;
-    actEl.textContent = activity || 'Rest Day';
-    if (!activity) actEl.classList.add('panel-card__big--muted');
-
-    const strain = t.today_strain ?? v.strain_score;
-    if (strain != null) {
-      document.getElementById('p3-strain').textContent = `Strain: ${parseFloat(strain).toFixed(1)}/21`;
-    } else {
-      document.getElementById('p3-strain').textContent = 'Strain: —';
-    }
-    const dur = t.today_duration_min ?? v.activity_duration_min;
-    if (dur != null) {
-      document.getElementById('p3-duration').textContent = `Duration: ${dur} min`;
-    } else {
-      document.getElementById('p3-duration').textContent = '';
-    }
-
-    // Zone 2 ring (weekly target: 150 min)
-    const z2 = t.zone2_minutes_7d ?? t.zone2_weekly_min;
-    const Z2_TARGET = 150;
-    const circumference = 188.5; // 2π × 30
-    const z2Min = z2 != null ? Math.min(z2, Z2_TARGET) : 0;
-    const offset = circumference - (z2Min / Z2_TARGET) * circumference;
-    document.getElementById('z2-ring-fill').style.strokeDashoffset = offset;
-    document.getElementById('z2-actual').textContent = z2 != null ? z2 : '—';
-    const z2Pct = z2 != null ? Math.round((z2 / Z2_TARGET) * 100) : null;
-    document.getElementById('z2-label').textContent =
-      z2Pct != null ? `${z2Pct}% of weekly target${z2 >= Z2_TARGET ? ' ✓' : ''}` : 'Zone 2 data loading…';
-
-    // 7-day load label
-    const load = t.load_status || t.acwr_status;
-    const loadMap = { optimal: 'Optimal load', high: 'High load', low: 'Low load', moderate: 'Moderate load' };
-    if (load) {
-      document.getElementById('p3-load-label').textContent = `7d load: ${loadMap[load] || load}`;
-    }
-  } catch(_) {}
-}
-
-// ── State of Mind ─────────────────────────────────────────────────────────
-async function initMood() {
-  try {
-    const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
-    if (!r.ok) return;
-    const d = await r.json();
-    const m = d.mood || d.state_of_mind || {};
-    const score = m.score ?? m.value;
-    if (score != null) {
-      const s = Math.round(score);
-      for (let i = 1; i <= 5; i++) {
-        const el = document.getElementById('mood-' + i);
-        if (el && i <= s) el.classList.add('mood-dot--active');
-      }
-      const labels = ['', 'Low', 'Below average', 'Average', 'Good', 'Excellent'];
-      document.getElementById('mood-label').textContent = `${s}/5 — ${labels[s] || ''}`;
-      if (m.date) {
-        document.getElementById('mood-note').textContent = `Logged: ${m.date}`;
-      }
-    }
-  } catch(_) {}
-}
-
-// ── Intelligence Signal ────────────────────────────────────────────────────
-async function initIntelligenceSignal() {
-  try {
-    const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
-    if (!r.ok) return;
-    const d = await r.json();
-    const excerpt = d.brief_excerpt
-      || (d.intelligence && d.intelligence.brief_excerpt)
-      || (d.daily_brief && d.daily_brief.excerpt);
-    if (excerpt && excerpt.trim()) {
-      document.getElementById('p5-signal').textContent = excerpt;
-    }
-  } catch(_) {}
-}
-
-// ── Journey Comparison ────────────────────────────────────────────────────
-async function initJourney() {
-  try {
-    const [tlRes, vRes] = await Promise.all([
-      fetch(`${API}/api/timeline`),
-      fetch(`${API}/api/vitals`),
-    ]);
-    const tl = (await tlRes.json()).timeline || {};
-    const v  = (await vRes.json()).vitals   || {};
-
-    const startW = tl.start_weight;
-    const nowW   = v.weight_lbs;
-    const setVal = (id, val, unit) => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = val != null ? val + (unit || '') : '—';
-    };
-
-    setVal('jc-w-start', startW, ' lbs');
-    setVal('jc-w-now',   nowW,   ' lbs');
-    if (startW != null && nowW != null) {
-      const delta = (nowW - startW).toFixed(1);
-      const deltaEl = document.getElementById('jc-w-delta');
-      if (deltaEl) {
-        deltaEl.textContent = (delta > 0 ? '+' : '') + delta + ' lbs';
-        deltaEl.classList.add(delta <= 0 ? 'journey-val--better' : 'journey-val--worse');
-      }
-      // Populate goal weight from timeline if available
-      if (tl.goal_weight) document.getElementById('goal-weight').textContent = tl.goal_weight;
-      if (tl.start_weight) document.getElementById('start-weight').textContent = tl.start_weight;
-    }
-
-    setVal('jc-r-start', tl.start_recovery,    '%');
-    setVal('jc-r-now',   v.recovery_pct,        '%');
-    setVal('jc-hrv-start', tl.start_hrv,        ' ms');
-    setVal('jc-hrv-now',   v.hrv_ms,            ' ms');
-    setVal('jc-rhr-start', tl.start_rhr,        ' bpm');
-    setVal('jc-rhr-now',   v.resting_heart_rate, ' bpm');
-
-    // Days on journey note
-    if (tl.journey_start) {
-      const days = Math.floor((Date.now() - new Date(tl.journey_start)) / 86400000);
-      document.getElementById('journey-days-note').textContent =
-        `${days} days since ${tl.journey_start} — all values from first available reading vs. most recent.`;
-    }
-  } catch(_) {
-    document.getElementById('journey-days-note').textContent = '';
+    } catch(_) {}
   }
-}
 
-// ── Glucose Snapshot ─────────────────────────────────────────────
-async function initGlucose() {
-  try {
-    const r = await fetch(`${API}/api/glucose`);
-    if (!r.ok) { document.getElementById('glucose-section').style.display = 'none'; return; }
-    const d = await r.json();
-    const g = d.glucose;
-    if (!g) { document.getElementById('glucose-section').style.display = 'none'; return; }
-
-    const tir = g.time_in_range_pct;
-    if (tir != null) {
-      document.getElementById('glucose-tir').textContent = tir.toFixed(0);
-      document.getElementById('glucose-tir-bar').style.width = Math.min(tir, 100) + '%';
-      const statusMap = { excellent: '✓ Excellent', good: 'Good', needs_attention: '⚠ Needs attention' };
-      const statusEl = document.getElementById('glucose-tir-status');
-      if (statusEl) statusEl.textContent = statusMap[g.tir_status] || '';
-    }
-    if (g.avg_mg_dl) document.getElementById('glucose-avg-foot').textContent = `Avg: ${g.avg_mg_dl} mg/dL  ·  Target: 70–140`;
-    const tirKey = '30d_avg_tir';
-    if (g[tirKey] != null) document.getElementById('glucose-30d-tir').textContent = g[tirKey].toFixed(0);
-    const varMap = { low: 'Variability: Low ✓', moderate: 'Variability: Moderate', high: 'Variability: High ⚠' };
-    if (g.variability_status) document.getElementById('glucose-variability').textContent = varMap[g.variability_status] || '';
-    if (g.days_tracked) document.getElementById('glucose-days-foot').textContent = `${g.days_tracked} days tracked`;
-
-    // Mini TIR sparkline
-    const trend = d.glucose_trend || [];
-    const vals = trend.map(t => t.tir).filter(v => v != null && v > 0);
-    if (vals.length > 3) {
-      const latest = vals.slice(-20);
-      const minV = Math.min(...latest), maxV = Math.max(...latest);
-      const range = maxV - minV || 1;
-      const W = 220, H = 28;
-      const pts = latest.map((v, i, arr) => {
-        const px = (i / Math.max(arr.length - 1, 1)) * W;
-        const py = H - ((v - minV) / range) * (H - 6) - 3;
-        return `${px.toFixed(1)},${py.toFixed(1)}`;
-      }).join(' ');
-      document.getElementById('glucose-sparkline').innerHTML =
-        `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`+
-        `<polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round" opacity="0.7"/>`+
-        `</svg>`;
-    }
-  } catch(_) {
-    const s = document.getElementById('glucose-section');
-    if (s) s.style.display = 'none';
-  }
+  setText('cpit-systems', reporting);
 }
 
 init();
-initSnapshot();
-initPanels();
-initSleep();
-initGlucose();
-initTraining();
-initMood();
-initIntelligenceSignal();
-initJourney();
+initCockpit();
 </script>
 <section class="reading-path" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
   <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>
