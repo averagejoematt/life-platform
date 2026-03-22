@@ -1352,13 +1352,36 @@ function drawSparkline(svgId, values, opts = {}) {
 
     // Ticker
     const streak = p.tier0_streak != null ? p.tier0_streak : 0;
+
+    // G-3: Weight with staleness display — fall back to /api/vitals when public_stats has no weight.
+    let _wLbs = v.weight_lbs, _wAsOf = v.weight_as_of || null;
+    if (!_wLbs) {
+      try {
+        const _vr = await fetch('/api/vitals', {
+          signal: AbortSignal.timeout ? AbortSignal.timeout(3000) : undefined
+        });
+        if (_vr.ok) { const _vd = await _vr.json(); const _vv = (_vd.vitals || {}); _wLbs = _vv.weight_lbs; _wAsOf = _vv.weight_as_of; }
+      } catch (_e) { /* graceful degradation */ }
+    }
+    const _MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    function _fmtWeight(lbs, asOf) {
+      if (!lbs) return '—';
+      const base = lbs.toFixed(1) + ' LBS';
+      if (!asOf) return base;
+      const daysAgo = Math.floor((Date.now() - new Date(asOf)) / 86400000);
+      if (daysAgo <= 3) return base;
+      const parts = asOf.split('-');
+      return base + ' (' + _MONTHS[parseInt(parts[1]) - 1] + ' ' + parseInt(parts[2]) + ')';
+    }
+    const _weightDisplay = _fmtWeight(_wLbs, _wAsOf);
+
     [
-      ['tk-weight',    v.weight_lbs   ? v.weight_lbs.toFixed(1) + ' LBS'                : '—'],
+      ['tk-weight',    _weightDisplay],
       ['tk-hrv',       v.hrv_ms       ? Math.round(v.hrv_ms) + ' MS'                    : '—'],
       ['tk-recovery',  v.recovery_pct ? Math.round(v.recovery_pct) + '%'                : '—'],
       ['tk-streak',    streak + 'D STREAK'],
       ['tk-journey',   j.progress_pct != null ? j.progress_pct.toFixed(1) + '% TO GOAL' : '—'],
-      ['tk-weight-2',  v.weight_lbs   ? v.weight_lbs.toFixed(1) + ' LBS'                : '—'],
+      ['tk-weight-2',  _weightDisplay],
       ['tk-hrv-2',     v.hrv_ms       ? Math.round(v.hrv_ms) + ' MS'                    : '—'],
       ['tk-recovery-2',v.recovery_pct ? Math.round(v.recovery_pct) + '%'                : '—'],
       ['tk-streak-2',  streak + 'D STREAK'],

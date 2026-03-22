@@ -446,9 +446,9 @@
 
       <div class="data-moment">
         <div class="data-moment__label">// current build stats</div>
-        <span class="highlight">48</span> Lambda functions &nbsp;·&nbsp;
-        <span class="highlight">19</span> data sources &nbsp;·&nbsp;
-        <span class="highlight">95</span> intelligence tools &nbsp;·&nbsp;
+        <span class="highlight" id="story-lambda-count">48</span> Lambda functions &nbsp;·&nbsp;
+        <span class="highlight" id="story-data-sources-stat">19</span> data sources &nbsp;·&nbsp;
+        <span class="highlight" id="story-tools-count">95</span> intelligence tools &nbsp;·&nbsp;
         <span class="highlight">853/853</span> tests passing &nbsp;·&nbsp;
         <span class="highlight">~$13/mo</span> on AWS
       </div>
@@ -641,12 +641,16 @@
     const w = (d.vitals || {}).weight_lbs || (d.hero || {}).current_weight_lbs;
     if (w) document.getElementById('story-weight').textContent = (Math.round(w * 10) / 10).toFixed(1);
     // D6: update data_sources prose spans
-    const ds = (d.platform || {}).data_sources;
+    const plat = d.platform || {};
+    // STORY-1: Wire data-moment stats to public_stats.json
+    const ds = plat.data_sources;
     if (ds != null) {
-      ['story-data-sources-1','story-data-sources-2'].forEach(function(id) {
+      ['story-data-sources-1','story-data-sources-2','story-data-sources-stat'].forEach(function(id) {
         var el = document.getElementById(id); if (el) el.textContent = ds;
       });
     }
+    if (plat.lambdas != null) { var el = document.getElementById('story-lambda-count'); if (el) el.textContent = plat.lambdas; }
+    if (plat.mcp_tools != null) { var el = document.getElementById('story-tools-count'); if (el) el.textContent = plat.mcp_tools; }
   } catch(e) {}
 })();
 

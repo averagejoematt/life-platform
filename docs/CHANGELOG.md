@@ -1,3 +1,48 @@
+## v3.8.8 — 2026-03-22: Phase 0 website data fixes
+
+### Summary
+Surgical data fixes across the live site per WEBSITE_REDESIGN_SPEC.md Phase 0 task list.
+No page redesigns — these are correctness fixes only.
+
+### Changes
+
+**lambdas/site_api_lambda.py**
+- G-3: `handle_vitals()` — always return last known weight via `_latest_item("withings")` regardless
+  of date window; add `weight_as_of` field to response; fix `if current_weight` to `is not None`
+- G-4: `handle_journey()` — remove `_error(503)` fallback when no 120d weight data;
+  fall back to `_latest_item("withings")` for last known weight; if no weight at all,
+  use journey start (302 lbs) so progress_pct always computes
+
+**site/index.html**
+- G-3: Ticker weight display — secondary fetch to `/api/vitals` when public_stats has null weight;
+  shows "287.7 LBS (MAR 7)" format when `weight_as_of` is >3 days old
+
+**site/story/index.html** — STORY-1
+- Add IDs `story-lambda-count`, `story-data-sources-stat`, `story-tools-count` to data-moment spans
+- Wire to `platform.lambdas`, `platform.data_sources`, `platform.mcp_tools` in existing loader
+- test_count and monthly_cost left static (not in public_stats.json yet)
+
+**site/platform/index.html** — PLAT-1
+- Add IDs `plat-mcp-tools`, `plat-data-sources`, `plat-lambdas` to header stat cards
+- New JS loader reads public_stats.json and updates all three values on page load
+
+**site/protocols/index.html** — PROTO-1
+- Remove hardcoded fallback adherence values (78%, 82%, 90%, etc.)
+- `applyFallback()` now shows "—" (em dash) when API is unavailable
+
+### Investigated (no code change needed)
+- CHRON-1: All post navs (week-00, 01, 02, 03) already have current 5-section structure ✓
+- CHRON-2: `site/journal/posts/week-01/` exists but has no content ("See S3" placeholder);
+  added to backlog for Elena Voss content generation session
+- G-5: Streak already defaults to 0 in unified loader (line 1354, `!= null` check) ✓
+- G-7: `/api/subscribe` routes to `email_subscriber_lambda.py` via CloudFront; code looks correct;
+  suspect SES verification issue — check `lifeplatform@mattsusername.com` verified in us-west-2
+
+### Pending (requires Matthew input)
+- G-8: Privacy page contact email `matt@averagejoematt.com` — confirm correct address
+
+---
+
 ## v3.8.7 — 2026-03-22: CI/CD pipeline activation
 
 ### Summary

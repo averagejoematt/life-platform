@@ -680,21 +680,12 @@ var inp=document.getElementById('cta-email-protocols');if(inp)inp.addEventListen
 <!-- Adherence + streak loader -->
 <script>
 (function(){
-  // Fallback adherence values (estimates) shown if API unavailable
-  var fallback = {
-    'adh-zone2':    '78%',
-    'adh-sleep':    '82%',
-    'adh-if':       '90%',
-    'adh-strength': '65%',
-    'adh-cgm':      '95% (automated)',
-    'adh-sunlight': '70%'
-  };
-
+  // PROTO-1: When API unavailable show "—" — no stale estimates
   function applyFallback(){
-    Object.keys(fallback).forEach(function(id){
+    ['adh-zone2','adh-sleep','adh-if','adh-strength','adh-cgm','adh-sunlight'].forEach(function(id){
       var el = document.getElementById(id);
       if(el && el.classList.contains('loading')){
-        el.textContent = fallback[id];
+        el.textContent = '\u2014';  // em dash — no data
         el.classList.remove('loading');
       }
     });

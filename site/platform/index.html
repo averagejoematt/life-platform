@@ -383,15 +383,15 @@
   <div class="page-header__meta">
     <div class="meta-stat">
       <div class="meta-stat__label">MCP tools</div>
-      <div class="meta-stat__value">95</div>
+      <div class="meta-stat__value" id="plat-mcp-tools">95</div>
     </div>
     <div class="meta-stat">
       <div class="meta-stat__label">Data sources</div>
-      <div class="meta-stat__value">19</div>
+      <div class="meta-stat__value" id="plat-data-sources">19</div>
     </div>
     <div class="meta-stat">
       <div class="meta-stat__label">AWS Lambdas</div>
-      <div class="meta-stat__value">48</div>
+      <div class="meta-stat__value" id="plat-lambdas">48</div>
     </div>
     <div class="meta-stat">
       <div class="meta-stat__label">Arch grade</div>
@@ -895,6 +895,20 @@
   </div>
   <p id="cta-msg-platform" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
 </section>
+<script>
+// PLAT-1: Wire header stat cards to public_stats.json
+(async function() {
+  try {
+    const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    const plat = d.platform || {};
+    if (plat.mcp_tools  != null) { var el = document.getElementById('plat-mcp-tools');   if (el) el.textContent = plat.mcp_tools; }
+    if (plat.data_sources != null) { var el = document.getElementById('plat-data-sources'); if (el) el.textContent = plat.data_sources; }
+    if (plat.lambdas    != null) { var el = document.getElementById('plat-lambdas');      if (el) el.textContent = plat.lambdas; }
+  } catch(e) {}
+})();
+</script>
 <script>
 (function() {
   // S2-T1-8: Shared subscribe helper (idempotent — safe to include multiple times)
