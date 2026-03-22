@@ -253,9 +253,17 @@ def handle_vitals() -> dict:
         if second_avg < first_avg * 0.97: return "declining"
         return "stable"
 
-    # Latest weight from Withings
-    withings = _latest_item("withings")
-    current_weight = float(withings.get("weight_lbs", 0)) if withings else None
+    # G-3: Latest weight from Withings — always use most-recent record regardless of date window.
+    # _latest_item queries with no date filter so it always returns something even if weeks old.
+    withings_latest = _latest_item("withings")
+    current_weight = None
+    weight_as_of = None
+    if withings_latest:
+        wv = withings_latest.get("weight_lbs")
+        if wv is not None:
+            current_weight = float(wv)
+            weight_as_of = (withings_latest.get("sk", "").replace("DATE#", "")
+                            or withings_latest.get("date"))
 
     withings_30d = _query_source("withings", d30, today)
     weight_vals = [float(w["weight_lbs"]) for w in withings_30d if w.get("weight_lbs")]
@@ -266,7 +274,8 @@ def handle_vitals() -> dict:
 
     return _ok({
         "vitals": {
-            "weight_lbs":       round(current_weight, 1) if current_weight else None,
+            "weight_lbs":       round(current_weight, 1) if current_weight is not None else None,
+            "weight_as_of":     weight_as_of,
             "weight_delta_30d": weight_delta_30d,
             "hrv_ms":           round(float(latest.get("hrv", 0)), 1) if latest.get("hrv") else None,
             "hrv_30d_avg":      round(sum(hrv_vals) / len(hrv_vals), 1) if hrv_vals else None,
@@ -298,7 +307,14 @@ def handle_journey() -> dict:
     )
 
     if not weight_series:
-        return _error(503, "No weight data available")
+        # G-4: Fall back to last known weight — never return 503 for missing recent data.
+        withings_latest = _latest_item("withings")
+        if withings_latest and withings_latest.get("weight_lbs") is not None:
+            last_date = (withings_latest.get("sk", "").replace("DATE#", "")
+                         or withings_latest.get("date", today))
+            weight_series = [(last_date, float(withings_latest["weight_lbs"]))]
+        else:
+            weight_series = [("2026-02-09", 302.0)]  # No data at all — show journey start
 
     start_weight = 302.0   # Journey start (from profile)
     goal_weight  = 185.0
