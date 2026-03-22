@@ -516,18 +516,60 @@ def handle_experiments() -> dict:
     )
     items = _decimal_to_float(resp.get("Items", []))
 
-    experiments = [
-        {
-            "name":       item.get("name", "Unnamed"),
-            "status":     item.get("status", "unknown"),
-            "start_date": item.get("start_date", ""),
-            "end_date":   item.get("end_date"),
-            "hypothesis": item.get("hypothesis", ""),
-            "tags":       item.get("tags", []),
-        }
-        for item in items
-        if item.get("sk", "").startswith("EXP#")
-    ]
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    experiments = []
+    for item in items:
+        if not item.get("sk", "").startswith("EXP#"):
+            continue
+        start = item.get("start_date", "")
+        end   = item.get("end_date")
+        status = item.get("status", "unknown")
+
+        # Compute duration in days
+        duration_days = None
+        try:
+            end_d  = datetime.strptime(end, "%Y-%m-%d") if end else datetime.now(timezone.utc).replace(tzinfo=None)
+            start_d = datetime.strptime(start, "%Y-%m-%d")
+            duration_days = max(0, (end_d - start_d).days)
+        except Exception:
+            pass
+
+        # Days remaining (for active experiments)
+        days_in = None
+        planned_duration = item.get("planned_duration_days")
+        if status == "active" and start:
+            try:
+                days_in = (datetime.now(timezone.utc).replace(tzinfo=None) - datetime.strptime(start, "%Y-%m-%d")).days
+            except Exception:
+                pass
+
+        # Progress pct for active
+        progress_pct = None
+        if status == "active" and days_in is not None and planned_duration:
+            progress_pct = min(100, round(days_in / int(planned_duration) * 100))
+
+        experiments.append({
+            "name":              item.get("name", "Unnamed"),
+            "status":            status,
+            "start_date":        start,
+            "end_date":          end,
+            "hypothesis":        item.get("hypothesis", ""),
+            "tags":              item.get("tags", []),
+            # Phase 2 additions
+            "outcome":           item.get("outcome") or item.get("result_summary"),
+            "result_summary":    item.get("result_summary") or item.get("outcome"),
+            "primary_metric":    item.get("primary_metric"),
+            "baseline_value":    item.get("baseline_value"),
+            "result_value":      item.get("result_value"),
+            "metrics_tracked":   item.get("metrics_tracked", []),
+            "planned_duration_days": planned_duration,
+            "duration_days":     duration_days,
+            "days_in":           days_in,
+            "progress_pct":      progress_pct,
+            "confirmed":         item.get("confirmed", False),
+            "hypothesis_confirmed": item.get("hypothesis_confirmed"),
+        })
     experiments.sort(key=lambda x: x["start_date"], reverse=True)
 
     return _ok({"experiments": experiments}, cache_seconds=3600)
@@ -719,6 +761,27 @@ def handle_habits() -> dict:
     )
     items = _decimal_to_float(resp.get("Items", []))
 
+    # ── Also pull by_group from habitify partition (group data lives there, not in habit_scores)
+    hab_pk = f"{USER_PREFIX}habitify"
+    hab_resp = table.query(
+        KeyConditionExpression=Key("pk").eq(hab_pk) & Key("sk").between(
+            f"DATE#{ninety_days_ago}", f"DATE#{today}"
+        ),
+        ScanIndexForward=True,
+    )
+    habitify_by_date = {}
+    for hi in _decimal_to_float(hab_resp.get("Items", [])):
+        date_key = hi.get("date") or hi.get("sk", "").replace("DATE#", "")
+        by_group = hi.get("by_group", {})
+        if by_group and isinstance(by_group, dict):
+            # by_group[Group] = {completed, possible, pct, habits_done}
+            # pct is 0.0–1.0, convert to 0–100
+            habitify_by_date[date_key] = {
+                g: round(float(v.get("pct", 0) or 0) * 100)
+                for g, v in by_group.items()
+                if isinstance(v, dict)
+            }
+
     history = []
     for item in items:
         date_str = item.get("date") or item.get("sk", "").replace("DATE#", "")
@@ -730,11 +793,14 @@ def handle_habits() -> dict:
         t01_pct  = round(t01_done / t01_total * 100) if t01_total else 0
         streak   = int(item.get("t0_perfect_streak") or item.get("t0_aggregate_streak") or 0)
 
-        # Per-group breakdown if present (stored by habit ingestion Lambda)
+        # Per-group breakdown: prefer flat group_* fields on habit_scores;
+        # fall back to habitify by_group data if present
         group_data = {}
         for key, val in item.items():
             if key.startswith("group_") and isinstance(val, (int, float)):
                 group_data[key.replace("group_", "")] = val
+        if not group_data and date_str in habitify_by_date:
+            group_data = habitify_by_date[date_str]
 
         day = {
             "date":      date_str,

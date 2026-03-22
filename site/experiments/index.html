@@ -103,6 +103,157 @@
       line-height: var(--lh-mono);
     }
 
+    /* ── Active Experiment Spotlight ── */
+    .active-spotlight {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding) 0;
+    }
+    .spotlight-heading {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent);
+      font-family: var(--font-mono);
+      margin-bottom: var(--space-5);
+    }
+    .spotlight-card {
+      border: 1px solid var(--accent);
+      background: var(--surface);
+      position: relative;
+      overflow: hidden;
+    }
+    .spotlight-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--accent) 0%, var(--accent-dim) 60%, transparent 100%);
+    }
+    .spotlight-card__top {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: var(--space-6);
+      align-items: start;
+      padding: var(--space-6) var(--space-8);
+      border-bottom: 1px solid var(--border);
+    }
+    .spotlight-card__name {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-2);
+    }
+    .spotlight-card__hypothesis {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-mono);
+      max-width: 580px;
+    }
+    .spotlight-card__hypothesis em { color: var(--text); font-style: normal; }
+    .spotlight-counter {
+      text-align: right;
+    }
+    .spotlight-counter__num {
+      font-family: var(--font-display);
+      font-size: 48px;
+      color: var(--accent);
+      line-height: 1;
+      letter-spacing: var(--ls-display);
+    }
+    .spotlight-counter__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+    .spotlight-card__progress {
+      padding: var(--space-5) var(--space-8);
+      border-bottom: 1px solid var(--border);
+    }
+    .spotlight-progress-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+    .spotlight-progress-track {
+      flex: 1;
+      height: 4px;
+      background: var(--surface-raised);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .spotlight-progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width 1s var(--ease-out);
+    }
+    .spotlight-progress-label {
+      font-size: var(--text-2xs);
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-label);
+      white-space: nowrap;
+    }
+    .spotlight-card__metrics {
+      display: flex;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+      padding: var(--space-4) var(--space-8);
+    }
+    .metric-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 2px var(--space-3);
+      border: 1px solid var(--border);
+      background: var(--surface-raised);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-label);
+    }
+    .metric-chip.primary {
+      border-color: var(--accent-dim);
+      color: var(--accent);
+      background: var(--accent-bg-subtle);
+    }
+
+    /* ── Before/After delta on completed cards ── */
+    .exp-delta {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 2px var(--space-3);
+      border-radius: 2px;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-weight: 600;
+      letter-spacing: var(--ls-label);
+      margin-left: var(--space-3);
+    }
+    .exp-delta.positive { background: rgba(0,229,160,0.1); color: var(--accent); border: 1px solid var(--accent-dim); }
+    .exp-delta.negative { background: rgba(255,82,82,0.08); color: #FF5252; border: 1px solid rgba(255,82,82,0.3); }
+    .exp-delta.neutral  { background: var(--surface-raised); color: var(--text-muted); border: 1px solid var(--border); }
+    .exp-confirmed {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 2px var(--space-3);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: #2EA98F;
+      border: 1px solid rgba(46,169,143,0.3);
+      background: rgba(46,169,143,0.06);
+      font-family: var(--font-mono);
+      margin-top: var(--space-3);
+      display: inline-block;
+    }
+
     /* Experiment list */
     .experiments-section {
       max-width: var(--max-width);
@@ -592,6 +743,32 @@
   </div>
 </div>
 
+<!-- Active Experiment Spotlight (hidden until data loads) -->
+<div class="active-spotlight" id="active-spotlight" style="display:none">
+  <div class="spotlight-heading">// currently running</div>
+  <div class="spotlight-card">
+    <div class="spotlight-card__top">
+      <div>
+        <div class="spotlight-card__name" id="sp-name">—</div>
+        <div class="spotlight-card__hypothesis" id="sp-hypothesis"></div>
+      </div>
+      <div class="spotlight-counter">
+        <div class="spotlight-counter__num" id="sp-days">—</div>
+        <div class="spotlight-counter__label">days in</div>
+      </div>
+    </div>
+    <div class="spotlight-card__progress" id="sp-progress-section" style="display:none">
+      <div class="spotlight-progress-row">
+        <div class="spotlight-progress-track">
+          <div class="spotlight-progress-fill" id="sp-progress-fill" style="width:0%"></div>
+        </div>
+        <div class="spotlight-progress-label" id="sp-progress-label"></div>
+      </div>
+    </div>
+    <div class="spotlight-card__metrics" id="sp-metrics"></div>
+  </div>
+</div>
+
 <div class="experiments-section animate-in reveal">
   <div class="experiments-filter">
     <button class="filter-btn active" data-filter="all">All</button>
@@ -800,15 +977,82 @@
     return `<span class="exp-status exp-status--${status}"><span class="exp-status__dot"></span>${labels[status]||status}</span>`;
   }
 
+  // ── Active Spotlight ─────────────────────────────────────────────────────
+  function renderSpotlight(exp) {
+    var el = document.getElementById('active-spotlight');
+    if (!el) return;
+    var nameEl      = document.getElementById('sp-name');
+    var hypoEl      = document.getElementById('sp-hypothesis');
+    var daysEl      = document.getElementById('sp-days');
+    var progSection = document.getElementById('sp-progress-section');
+    var progFill    = document.getElementById('sp-progress-fill');
+    var progLabel   = document.getElementById('sp-progress-label');
+    var metricsEl   = document.getElementById('sp-metrics');
+
+    if (nameEl)  nameEl.textContent = exp.name;
+    if (hypoEl)  hypoEl.innerHTML   = '<em>Hypothesis:</em> ' + (exp.hypothesis || 'Not specified');
+    if (daysEl)  daysEl.textContent = exp.days_in != null ? exp.days_in : daysBetween(exp.start_date, null);
+
+    if (exp.progress_pct != null && progSection && progFill && progLabel) {
+      progFill.style.width  = exp.progress_pct + '%';
+      progLabel.textContent = exp.progress_pct + '% through planned duration';
+      progSection.style.display = '';
+    }
+
+    if (metricsEl) {
+      var chips = [];
+      if (exp.primary_metric) chips.push('<span class="metric-chip primary">● ' + exp.primary_metric + '</span>');
+      (exp.metrics_tracked || []).forEach(function(m) {
+        if (m !== exp.primary_metric) chips.push('<span class="metric-chip">' + m + '</span>');
+      });
+      (exp.tags || []).forEach(function(t) {
+        chips.push('<span class="metric-chip">' + t + '</span>');
+      });
+      if (chips.length) metricsEl.innerHTML = chips.join('');
+    }
+    el.style.display = '';
+  }
+
+  // ── Delta chip for completed cards ──────────────────────────────────────
+  function deltaChip(exp) {
+    if (exp.baseline_value == null || exp.result_value == null) return '';
+    var baseline = parseFloat(exp.baseline_value);
+    var result   = parseFloat(exp.result_value);
+    if (isNaN(baseline) || isNaN(result)) return '';
+    var diff  = result - baseline;
+    var arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '→';
+    var sign  = diff > 0 ? '+' : '';
+    var cls   = diff > 0 ? 'positive' : diff < 0 ? 'negative' : 'neutral';
+    var lowerIsBetter = /weight|rhr|glucose|resting/i.test(exp.primary_metric || '');
+    if (lowerIsBetter) cls = diff < 0 ? 'positive' : diff > 0 ? 'negative' : 'neutral';
+    var label = exp.primary_metric
+      ? (sign + diff.toFixed(1) + ' ' + exp.primary_metric)
+      : (sign + Math.round(diff / Math.abs(baseline) * 100) + '%');
+    return '<span class="exp-delta ' + cls + '">' + arrow + ' ' + label + '</span>';
+  }
+
   function renderCard(exp) {
     const isActive = exp.status === 'active';
-    const days = daysBetween(exp.start_date, isActive ? null : exp.end_date);
+    const days = exp.duration_days != null ? exp.duration_days
+      : daysBetween(exp.start_date, isActive ? null : exp.end_date);
     const tags = (exp.tags||[]).map(t=>`<span class="exp-tag">${t}</span>`).join('');
+
+    const delta = !isActive ? deltaChip(exp) : '';
+    const confirmedBadge = exp.hypothesis_confirmed === true
+      ? '<div class="exp-confirmed">✓ Hypothesis confirmed</div>'
+      : exp.hypothesis_confirmed === false
+      ? '<div class="exp-confirmed" style="color:var(--c-amber-400);border-color:rgba(200,132,58,0.3);background:rgba(200,132,58,0.06)">× Hypothesis not supported</div>'
+      : '';
+
     const outcomeHtml = exp.outcome
-      ? `<div class="exp-card__outcome"><div class="exp-card__outcome-label">Outcome</div><div class="exp-card__outcome-text">${exp.outcome}</div></div>`
+      ? `<div class="exp-card__outcome"><div class="exp-card__outcome-label">Outcome ${delta}</div><div class="exp-card__outcome-text">${exp.outcome}${confirmedBadge}</div></div>`
       : isActive
       ? `<div class="exp-card__outcome"><div class="exp-card__outcome-label">Status</div><div class="exp-card__outcome-text">Experiment in progress — results published on completion.</div></div>`
       : '';
+
+    const metricField = exp.primary_metric
+      ? `<div class="exp-card__field"><div class="exp-card__field-label">Primary Metric</div><div class="exp-card__field-value">${exp.primary_metric}</div></div>`
+      : `<div class="exp-card__field"><div class="exp-card__field-label">Category</div><div class="exp-card__field-value">${(exp.tags||[]).join(', ')||'—'}</div></div>`;
 
     return `<div class="exp-card exp-card--${exp.status}" data-status="${exp.status}">
       <div class="exp-card__header">
@@ -825,7 +1069,7 @@
       <div class="exp-card__body">
         <div class="exp-card__field"><div class="exp-card__field-label">Started</div><div class="exp-card__field-value">${formatDate(exp.start_date)}</div></div>
         <div class="exp-card__field"><div class="exp-card__field-label">${isActive ? 'Running' : 'Ended'}</div><div class="exp-card__field-value">${isActive ? 'Ongoing' : formatDate(exp.end_date)}</div></div>
-        <div class="exp-card__field"><div class="exp-card__field-label">Category</div><div class="exp-card__field-value">${(exp.tags||[]).join(', ')||'—'}</div></div>
+        ${metricField}
         <div class="exp-card__field"><div class="exp-card__field-label">Result</div><div class="exp-card__field-value">${exp.status==='completed'?'Published':exp.status==='active'?'Pending':'Abandoned'}</div></div>
       </div>
       ${outcomeHtml}
@@ -868,6 +1112,11 @@
       document.getElementById('stat-total').textContent     = exps.length;
       document.getElementById('stat-active').textContent    = exps.filter(e=>e.status==='active').length;
       document.getElementById('stat-completed').textContent = exps.filter(e=>e.status==='completed').length;
+
+      // Show Active Spotlight for the most recently started active experiment
+      const activeExp = exps.find(e => e.status === 'active');
+      if (activeExp) renderSpotlight(activeExp);
+
       applyFilter('all');
     })
     .catch(() => {

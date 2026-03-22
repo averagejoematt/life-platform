@@ -1,3 +1,39 @@
+## v3.8.4 — 2026-03-22: Phase 2 /experiments/ depth + Keystone group fix
+
+### Summary
+Two items: /experiments/ page gets Active Experiment Spotlight + delta chips on completed cards.
+Keystone Spotlight group data fix — `handle_habits()` was reading `SOURCE#habit_scores` for
+group data but groups live in `SOURCE#habitify` as `by_group`. Added second DynamoDB query
+to cross-join. Verified live: `keystone_group: "Nutrition"` at 63% 90-day avg.
+
+### Changes
+
+**lambdas/site_api_lambda.py** — two endpoints updated
+- `handle_experiments()`: returns `outcome`, `result_summary`, `primary_metric`,
+  `baseline_value`, `result_value`, `metrics_tracked`, `duration_days`, `days_in`,
+  `progress_pct`, `confirmed`, `hypothesis_confirmed`. All previously dropped silently.
+- `handle_habits()`: added second DynamoDB query against `SOURCE#habitify` to pull
+  `by_group` data. Cross-joined into history `groups` field when `habit_scores` has
+  no flat `group_*` fields. `pct` (0.0–1.0) converted to 0–100 integer.
+  `group_90d_avgs` and `keystone_group` now populate correctly.
+
+**site/experiments/index.html** — Phase 2 content depth
+- Active Experiment Spotlight: accent-bordered card above filter list showing name,
+  hypothesis, day counter, progress bar (if `planned_duration_days` set), metric chips.
+  Hidden when no active experiment.
+- Delta chips on completed cards: `↑ +8.2 HRV` / `↓ -4.1 weight` in green/red.
+  Lower-is-better metrics (weight, rhr, glucose) auto-flip color logic.
+- Confirmed/refuted badges from `hypothesis_confirmed` field.
+- Primary metric replaces generic Category field when available.
+
+### Verification
+- `keystone_group: "Nutrition"`, `keystone_group_pct: 63` — confirmed live
+- `by_group` has all 9 groups: Nutrition, Growth, Wellbeing, Data, Performance,
+  Discipline, Recovery, Hygiene, Supplements
+- `best_day: 6` (Sunday is strongest day)
+
+---
+
 ## v3.8.3 — 2026-03-22: Phase 2 /habits/ page — Keystone Spotlight + Day-of-Week Pattern
 
 ### Summary
