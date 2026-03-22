@@ -354,6 +354,37 @@
     </div>
   </section>
 
+  <!-- Glucose Snapshot -->
+  <section class="panel-section animate-in" id="glucose-section">
+    <div class="panel-section__inner">
+      <div class="panel-label">// glucose snapshot</div>
+      <div class="panel-grid">
+        <div class="panel-card">
+          <div class="panel-card__heading">Time In Range — Today</div>
+          <div class="panel-card__hero">
+            <span id="glucose-tir" class="panel-card__big">—</span><span class="panel-card__unit">%</span>
+            <span class="panel-card__sub" id="glucose-tir-status"></span>
+          </div>
+          <div class="panel-progress" style="margin-top:var(--space-4)">
+            <div class="panel-progress__track">
+              <div class="panel-progress__fill panel-progress__fill--green" id="glucose-tir-bar" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="panel-card__foot" id="glucose-avg-foot">Avg: — mg/dL</div>
+        </div>
+        <div class="panel-card">
+          <div class="panel-card__heading">30-Day Average TIR</div>
+          <div class="panel-card__hero">
+            <span id="glucose-30d-tir" class="panel-card__big">—</span><span class="panel-card__unit">%</span>
+          </div>
+          <div class="panel-card__foot" id="glucose-variability">Variability: —</div>
+          <div class="panel-card__foot" style="margin-top:var(--space-2)" id="glucose-days-foot"></div>
+          <div id="glucose-sparkline" style="margin-top:var(--space-4);overflow:hidden;"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Panel 2 — Habit Status -->
   <section class="panel-section animate-in">
     <div class="panel-section__inner">
@@ -1139,10 +1170,59 @@ async function initJourney() {
   }
 }
 
+// ── Glucose Snapshot ─────────────────────────────────────────────
+async function initGlucose() {
+  try {
+    const r = await fetch(`${API}/api/glucose`);
+    if (!r.ok) { document.getElementById('glucose-section').style.display = 'none'; return; }
+    const d = await r.json();
+    const g = d.glucose;
+    if (!g) { document.getElementById('glucose-section').style.display = 'none'; return; }
+
+    const tir = g.time_in_range_pct;
+    if (tir != null) {
+      document.getElementById('glucose-tir').textContent = tir.toFixed(0);
+      document.getElementById('glucose-tir-bar').style.width = Math.min(tir, 100) + '%';
+      const statusMap = { excellent: '✓ Excellent', good: 'Good', needs_attention: '⚠ Needs attention' };
+      const statusEl = document.getElementById('glucose-tir-status');
+      if (statusEl) statusEl.textContent = statusMap[g.tir_status] || '';
+    }
+    if (g.avg_mg_dl) document.getElementById('glucose-avg-foot').textContent = `Avg: ${g.avg_mg_dl} mg/dL  ·  Target: 70–140`;
+    const tirKey = '30d_avg_tir';
+    if (g[tirKey] != null) document.getElementById('glucose-30d-tir').textContent = g[tirKey].toFixed(0);
+    const varMap = { low: 'Variability: Low ✓', moderate: 'Variability: Moderate', high: 'Variability: High ⚠' };
+    if (g.variability_status) document.getElementById('glucose-variability').textContent = varMap[g.variability_status] || '';
+    if (g.days_tracked) document.getElementById('glucose-days-foot').textContent = `${g.days_tracked} days tracked`;
+
+    // Mini TIR sparkline
+    const trend = d.glucose_trend || [];
+    const vals = trend.map(t => t.tir).filter(v => v != null && v > 0);
+    if (vals.length > 3) {
+      const latest = vals.slice(-20);
+      const minV = Math.min(...latest), maxV = Math.max(...latest);
+      const range = maxV - minV || 1;
+      const W = 220, H = 28;
+      const pts = latest.map((v, i, arr) => {
+        const px = (i / Math.max(arr.length - 1, 1)) * W;
+        const py = H - ((v - minV) / range) * (H - 6) - 3;
+        return `${px.toFixed(1)},${py.toFixed(1)}`;
+      }).join(' ');
+      document.getElementById('glucose-sparkline').innerHTML =
+        `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`+
+        `<polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round" opacity="0.7"/>`+
+        `</svg>`;
+    }
+  } catch(_) {
+    const s = document.getElementById('glucose-section');
+    if (s) s.style.display = 'none';
+  }
+}
+
 init();
 initSnapshot();
 initPanels();
 initSleep();
+initGlucose();
 initTraining();
 initMood();
 initIntelligenceSignal();

@@ -1,3 +1,54 @@
+## v3.8.6 — 2026-03-22: Phase 2 /live/ + /character/ enhancements
+
+### Summary
+Phase 2 completes its first three targets. /live/ gets a glucose snapshot panel (new data
+not previously shown). /character/ gets a live state banner and dynamic tier highlighting.
+
+### Changes
+
+**site/live/index.html** — Glucose snapshot panel
+- New `<!-- Glucose Snapshot -->` panel-section inserted after sleep section.
+  Shows: Time In Range % (today) with progress bar and status label, 30-day TIR avg,
+  variability status, days tracked, and a 20-point TIR sparkline SVG.
+- New `initGlucose()` async function fetches `/api/glucose` (endpoint exists; was unused on live page).
+  Gracefully hides the section on 503 or missing data.
+- Added `initGlucose()` call in init sequence (after sleep, before training).
+
+**site/character/index.html** — Live state banner + dynamic tier
+- New `#char-state-banner` div inserted between page-header and intro narrative.
+  Two rows: Level · Tier · Days active | Strongest pillar → Bottleneck pillar.
+  All fields populated by `hydrate()` from live character data.
+- `hydrate()` extended: populates banner fields (cbs-level, cbs-tier, cbs-days,
+  cbs-strongest, cbs-bottleneck). Tier highlight logic resets all 4 tier rows to
+  `text-faint` then marks the current tier in `accent` with `← current` label.
+- Tier description rows now have IDs (td-foundation, td-momentum, td-chisel, td-elite)
+  and `.td-name` / `.td-desc` classes for JS targeting.
+- Removed hardcoded `color:var(--accent)` on Chisel row; tier is now data-driven.
+
+---
+
+## v3.8.5 — 2026-03-22: Phase 2 /discoveries/ empty state
+
+### Summary
+Task 47: /discoveries/ no longer shows a blank page when correlation data is absent.
+Replaced bare "No correlation data yet." messages with a rich empty state showing
+days collected, a progress bar toward the 90-day rolling window, and a clear unlock
+condition. When data IS present, adds a "last updated" note below the stats strip.
+
+### Changes
+
+**site/discoveries/index.html** — JS rewrite
+- `renderEmptyState()`: calculates days since journey start (2026-02-09), pct toward
+  90-day window, needed days remaining. Renders consistent banner in featured card,
+  spotlight grid, and archive table.
+- `loadDiscoveries()`: early-exit to `renderEmptyState()` on 503, empty pairs, or fetch
+  error. Removes now-dead `strong` variable and the `if (top)` branch.
+- Last-updated note injected below stats strip when data loads: week of last run,
+  next run day (Sunday), days tracked count.
+- Minor: spotlight tag spacing fix (space before `·`).
+
+---
+
 ## v3.8.4 — 2026-03-22: Phase 2 /experiments/ depth + Keystone group fix
 
 ### Summary

@@ -581,6 +581,22 @@
   <p class="page-header__sub">Life optimization tracked across 7 pillars. Scores are computed nightly from real wearable, habit, and biometric data — not self-reported.</p>
 </div>
 
+<!-- Live state banner — populated by hydrate() -->
+<div id="char-state-banner" style="max-width:var(--max-width);margin:0 auto;padding:var(--space-4) var(--page-padding);border-bottom:1px solid var(--border);background:var(--surface);display:flex;flex-wrap:wrap;gap:var(--space-6);align-items:center;">
+  <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">
+    <span style="color:var(--accent)" id="cbs-level">Level —</span>
+    <span style="color:var(--border-subtle)">&nbsp;·&nbsp;</span>
+    <span id="cbs-tier">—</span>
+    <span style="color:var(--border-subtle)">&nbsp;·&nbsp;</span>
+    <span id="cbs-days">— days active</span>
+  </div>
+  <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">
+    Strongest:&nbsp;<span id="cbs-strongest" style="color:var(--c-green-500)">—</span>
+    <span style="color:var(--border-subtle)">&nbsp;→&nbsp;</span>
+    Bottleneck:&nbsp;<span id="cbs-bottleneck" style="color:var(--c-yellow-status)">—</span>
+  </div>
+</div>
+
 <!-- Intro narrative -->
 <section class="reveal" style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border);">
   <div class="intro-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-12);align-items:start;">
@@ -594,21 +610,21 @@
       <div style="border:1px solid var(--border);background:var(--surface);padding:var(--space-6);">
         <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-5)">// what each tier means</div>
         <div style="display:flex;flex-direction:column;gap:var(--space-4);">
-          <div style="display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
-            <span style="color:var(--text-muted);font-family:var(--font-mono)">Foundation</span>
-            <span style="color:var(--text-muted)">Building consistent habits. Weeks 1–4. Most people live here permanently.</span>
+          <div id="td-foundation" style="display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
+            <span style="font-family:var(--font-mono)" class="td-name">Foundation</span>
+            <span class="td-desc">Building consistent habits. Weeks 1–4. Most people live here permanently.</span>
           </div>
-          <div style="display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
-            <span style="color:var(--text-muted);font-family:var(--font-mono)">Momentum</span>
-            <span style="color:var(--text-muted)">Habits are automated. Progress is measurable. The compound curve starts.</span>
+          <div id="td-momentum" style="display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
+            <span style="font-family:var(--font-mono)" class="td-name">Momentum</span>
+            <span class="td-desc">Habits are automated. Progress is measurable. The compound curve starts.</span>
           </div>
-          <div style="display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
-            <span style="color:var(--accent);font-family:var(--font-mono)">Chisel</span>
-            <span style="color:var(--accent)">Current tier — optimizing from a stable base. Active experiments running.</span>
+          <div id="td-chisel" style="display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
+            <span style="font-family:var(--font-mono)" class="td-name">Chisel</span>
+            <span class="td-desc">Optimizing from a stable base. Active experiments running.</span>
           </div>
-          <div style="display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
-            <span style="color:var(--text-faint);font-family:var(--font-mono)">Elite</span>
-            <span style="color:var(--text-faint)">All 7 pillars performing simultaneously. The rarest state.</span>
+          <div id="td-elite" style="display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
+            <span style="font-family:var(--font-mono)" class="td-name">Elite</span>
+            <span class="td-desc">All 7 pillars performing simultaneously. The rarest state.</span>
           </div>
         </div>
       </div>
@@ -1058,6 +1074,40 @@
     document.getElementById('cc-days').textContent  = character.days_active;
     document.getElementById('cc-events').textContent = character.level_events_count;
     document.getElementById('cc-next').textContent  = `Lv ${character.next_tier_level}`;
+
+    // Live state banner
+    const sortedForBanner = [...pillars].sort((a, b) => b.raw_score - a.raw_score);
+    const strongest = sortedForBanner[0];
+    const weakest   = sortedForBanner[sortedForBanner.length - 1];
+    const cbLevel = document.getElementById('cbs-level');
+    const cbTier  = document.getElementById('cbs-tier');
+    const cbDays  = document.getElementById('cbs-days');
+    const cbS     = document.getElementById('cbs-strongest');
+    const cbB     = document.getElementById('cbs-bottleneck');
+    if (cbLevel) cbLevel.textContent = `Level ${character.level}`;
+    if (cbTier)  cbTier.textContent  = `${character.tier_emoji || ''} ${character.tier}`.trim();
+    if (cbDays)  cbDays.textContent  = `${character.days_active} days active`;
+    if (cbS && strongest) cbS.textContent = `${strongest.emoji || ''} ${strongest.name} (${strongest.raw_score.toFixed(0)})`.trim();
+    if (cbB && weakest)   cbB.textContent = `${weakest.emoji   || ''} ${weakest.name  } (${weakest.raw_score.toFixed(0)})`.trim();
+
+    // Tier description highlight
+    const tierIdMap = { Foundation:'td-foundation', Momentum:'td-momentum', Discipline:'td-chisel', Chisel:'td-chisel', Elite:'td-elite', Mastery:'td-elite' };
+    ['td-foundation','td-momentum','td-chisel','td-elite'].forEach(id => {
+      const row = document.getElementById(id);
+      if (!row) return;
+      row.querySelectorAll('.td-name,.td-desc').forEach(el => el.style.color = 'var(--text-faint)');
+    });
+    const currentId = tierIdMap[character.tier];
+    if (currentId) {
+      const row = document.getElementById(currentId);
+      if (row) {
+        row.querySelectorAll('.td-name,.td-desc').forEach(el => el.style.color = 'var(--accent)');
+        const note = row.querySelector('.td-desc');
+        if (note) note.textContent = note.textContent.replace('Current tier — ', '') ;
+        const first = row.querySelector('.td-name');
+        if (first) { const span = document.createElement('span'); span.style.cssText='font-size:var(--text-2xs);color:var(--accent-dim);margin-left:4px;font-family:var(--font-sans)'; span.textContent=' ← current'; first.parentNode.insertBefore(span,first.nextSibling); }
+      }
+    }
 
     // Avatar — composite score + mood state
     const scores = pillars.map(p => p.raw_score);
