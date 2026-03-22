@@ -366,6 +366,44 @@
       50%       { opacity: 1; }
     }
 
+    /* ── Streak records ── */
+    .streak-records {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-bottom: var(--space-10);
+    }
+    .streak-record {
+      background: var(--bg);
+      padding: var(--space-6) var(--space-8);
+    }
+    .streak-record__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: var(--space-2); }
+    .streak-record__val   { font-family: var(--font-display); font-size: 48px; color: var(--accent); line-height: 1; margin-bottom: var(--space-1); }
+    .streak-record__sub   { font-size: var(--text-xs); color: var(--text-faint); font-family: var(--font-mono); }
+
+    /* ── Group adherence bars ── */
+    .group-bars { display: flex; flex-direction: column; gap: var(--space-3); }
+    .group-bar-row { display: grid; grid-template-columns: 120px 1fr 36px; align-items: center; gap: var(--space-4); }
+    .group-bar-label { font-size: var(--text-2xs); color: var(--text-muted); font-family: var(--font-mono); letter-spacing: var(--ls-label); text-transform: uppercase; text-align: right; }
+    .group-bar-track { height: 8px; background: var(--surface-raised); border-radius: 2px; overflow: hidden; }
+    .group-bar-fill  { height: 100%; border-radius: 2px; transition: width 1s var(--ease-out); }
+    .group-bar-pct   { font-size: var(--text-xs); font-family: var(--font-mono); color: var(--text-muted); text-align: right; }
+
+    /* ── Streak definition ── */
+    .streak-def {
+      padding: var(--space-4) var(--space-5);
+      border: 1px solid var(--border-subtle);
+      background: var(--surface);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      line-height: var(--lh-mono);
+      max-width: 580px;
+      margin-top: var(--space-8);
+    }
+
     /* ── Footer note ── */
     .hab-footnote {
       font-size: var(--text-xs);
@@ -383,6 +421,108 @@
       .hab-header { padding: calc(var(--nav-height) + var(--space-10)) var(--page-padding-sm) var(--space-8); }
       .skeleton-stats { grid-template-columns: repeat(2, 1fr); }
     }
+
+    /* ── Insights strip ── */
+    .insights-strip {
+      display: flex;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+      margin-bottom: var(--space-8);
+    }
+    .insight-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-4);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-label);
+    }
+    .insight-chip.best  { border-color: var(--c-green-100); color: var(--accent); background: var(--c-green-050); }
+    .insight-chip.risk  { border-color: var(--c-amber-100); color: var(--c-amber-400); background: var(--c-amber-050); }
+    .insight-chip.info  { border-color: var(--border); color: var(--text-muted); }
+
+    /* ── Mini-trend bars (group adherence) ── */
+    .group-mini-trend {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 24px;
+      margin-left: var(--space-3);
+    }
+    .mini-bar {
+      width: 6px;
+      border-radius: 1px 1px 0 0;
+      min-height: 2px;
+    }
+
+    /* ── Habit accordion ── */
+    .hab-accordion {
+      margin-top: var(--space-10);
+    }
+    .hab-accordion__toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-4) var(--space-5);
+      cursor: pointer;
+      font-family: var(--font-display);
+      font-size: var(--text-base);
+      color: var(--text);
+      text-align: left;
+      transition: background var(--dur-fast);
+    }
+    .hab-accordion__toggle:hover { background: var(--surface-raised); }
+    .hab-accordion__arrow { font-size: var(--text-sm); color: var(--accent-dim); transition: transform var(--dur-fast); }
+    .hab-accordion__toggle[aria-expanded="true"] .hab-accordion__arrow { transform: rotate(90deg); }
+    .hab-accordion__body {
+      display: none;
+      border: 1px solid var(--border);
+      border-top: none;
+      background: var(--bg);
+      padding: var(--space-6);
+    }
+    .hab-accordion__body.open { display: block; }
+    .hab-tier-block { margin-bottom: var(--space-6); }
+    .hab-tier-block:last-child { margin-bottom: 0; }
+    .hab-tier-label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      font-family: var(--font-mono);
+      margin-bottom: var(--space-3);
+      padding-bottom: var(--space-2);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .hab-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: var(--space-2);
+    }
+    .hab-list li {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+      padding-left: var(--space-4);
+      position: relative;
+    }
+    .hab-list li::before {
+      content: '—';
+      position: absolute;
+      left: 0;
+      color: var(--accent-dim);
+    }
   </style>
 </head>
 <body>
@@ -390,12 +530,55 @@
 <nav class="nav">
   <a href="/" class="nav__brand">AMJ</a>
   <div class="nav__links">
-    <a href="/story/" class="nav__link">Story</a>
-    <a href="/live/" class="nav__link">Live</a>
-    <a href="/journal/" class="nav__link">Journal</a>
-    <a href="/platform/" class="nav__link">Platform</a>
-    <a href="/start/" class="nav__link">Explore</a>
-    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Story</button>
+      <div class="nav__dropdown-menu">
+        <a href="/" class="nav__dropdown-item">Home</a>
+        <a href="/story/" class="nav__dropdown-item">My Story</a>
+        <a href="/about/" class="nav__dropdown-item">About</a>
+      </div>
+    </div>
+    <div class="nav__dropdown is-active">
+      <button class="nav__dropdown-btn">The Data</button>
+      <div class="nav__dropdown-menu">
+        <a href="/live/" class="nav__dropdown-item">Live</a>
+        <a href="/character/" class="nav__dropdown-item">Character</a>
+        <a href="/habits/" class="nav__dropdown-item active">Habits</a>
+        <a href="/accountability/" class="nav__dropdown-item">Accountability</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Science</button>
+      <div class="nav__dropdown-menu">
+        <a href="/protocols/" class="nav__dropdown-item">Protocols</a>
+        <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
+        <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
+        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
+        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
+        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
+        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Build</button>
+      <div class="nav__dropdown-menu">
+        <a href="/platform/" class="nav__dropdown-item">Platform</a>
+        <a href="/intelligence/" class="nav__dropdown-item">Intelligence</a>
+        <a href="/board/" class="nav__dropdown-item">Board</a>
+        <a href="/cost/" class="nav__dropdown-item">Cost</a>
+        <a href="/methodology/" class="nav__dropdown-item">Methodology</a>
+        <a href="/tools/" class="nav__dropdown-item">Tools</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">Follow</button>
+      <div class="nav__dropdown-menu">
+        <a href="/chronicle/" class="nav__dropdown-item">Chronicle</a>
+        <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
+        <a href="/ask/" class="nav__dropdown-item">Ask</a>
+      </div>
+    </div>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>
   </div>
   <button class="nav__hamburger" aria-label="Open menu">
     <span></span><span></span><span></span>
@@ -411,55 +594,92 @@
   <div class="nav-overlay__panel">
     <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The journey</div>
-      <a href="/story/" class="nav-overlay__link">Story</a>
-      <a href="/live/" class="nav-overlay__link">Live</a>
-      <a href="/journal/" class="nav-overlay__link">Journal</a>
-      <a href="/week/" class="nav-overlay__link">This Week</a>
+      <div class="nav-overlay__heading">The Story</div>
+      <a href="/" class="nav-overlay__link">Home</a>
+      <a href="/story/" class="nav-overlay__link">My Story</a>
       <a href="/about/" class="nav-overlay__link">About</a>
     </div>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The data</div>
+      <div class="nav-overlay__heading">The Data</div>
+      <a href="/live/" class="nav-overlay__link">Live</a>
       <a href="/character/" class="nav-overlay__link">Character</a>
       <a href="/habits/" class="nav-overlay__link">Habits</a>
-      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
-      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
-      <a href="/results/" class="nav-overlay__link">Results</a>
-      <a href="/progress/" class="nav-overlay__link">Progress</a>
-      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
-      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
-      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
-      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
-      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
-      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
     </div>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The platform</div>
+      <div class="nav-overlay__heading">The Science</div>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Build</div>
       <a href="/platform/" class="nav-overlay__link">Platform</a>
       <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
-      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
-      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
-      <a href="/ask/" class="nav-overlay__link">Ask</a>
       <a href="/board/" class="nav-overlay__link">Board</a>
-      <a href="/data/" class="nav-overlay__link">Data</a>
       <a href="/cost/" class="nav-overlay__link">Cost</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
+      <a href="/tools/" class="nav-overlay__link">Tools</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">Follow</div>
+      <a href="/chronicle/" class="nav-overlay__link">Chronicle</a>
       <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
       <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+      <a href="/privacy/" class="nav-overlay__link">Privacy</a>
     </div>
   </div>
 </div>
 
 
+
+
+
+
+
 <!-- Hero header -->
+
+<div class="experiment-thread">Daily habits feed the Consistency pillar → <a href="/character/">Character →</a></div>
 <header class="hab-header reveal">
-  <div class="eyebrow" style="margin-bottom:var(--space-4)">// habit observatory</div>
-  <h1 class="hab-header__title">The Daily <span>Discipline</span></h1>
-  <p class="hab-header__sub">90 days of habit completion. No excuses in the data.</p>
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">The Data</div>
+  <h1 class="hab-header__title"><span id="hab-count">65</span> Habits. <span>Daily.</span></h1>
+  <p class="hab-header__sub">Every tracked habit, every day — no excuses in the data.</p>
+  <div class="page-header__meta" style="margin-top:var(--space-8);display:flex;gap:var(--space-8);flex-wrap:wrap;">
+    <div class="meta-stat" style="border-left:2px solid var(--accent);padding-left:var(--space-4);">
+      <div class="meta-stat__label" style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-1);">T0 Streak</div>
+      <div class="meta-stat__value" id="hab-hero-streak" style="font-family:var(--font-display);font-size:28px;color:var(--text);">—</div>
+    </div>
+    <div class="meta-stat" style="border-left:2px solid var(--border);padding-left:var(--space-4);">
+      <div class="meta-stat__label" style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-1);">Avg Completion</div>
+      <div class="meta-stat__value" id="hab-hero-avg" style="font-family:var(--font-display);font-size:28px;color:var(--text);">—</div>
+    </div>
+    <div class="meta-stat" style="border-left:2px solid var(--border);padding-left:var(--space-4);">
+      <div class="meta-stat__label" style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-1);">Days Tracked</div>
+      <div class="meta-stat__value" id="hab-hero-days" style="font-family:var(--font-display);font-size:28px;color:var(--text);">—</div>
+    </div>
+  </div>
 </header>
+
+<!-- Tier system context -->
+<div class="reveal" style="max-width:var(--max-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-6);">
+  <div style="border-left:2px solid var(--accent);padding-left:var(--space-4);">
+    <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent);font-family:var(--font-mono);margin-bottom:var(--space-2)">Tier 0 — Non-Negotiables</div>
+    <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body)">5 habits. Miss one and the streak resets. Sleep, protein, steps, no alcohol, journaling. Everything else is built on these.</p>
+  </div>
+  <div style="border-left:2px solid var(--border);padding-left:var(--space-4);">
+    <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:var(--space-2)">Tier 1 — Daily Practice</div>
+    <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body)">25+ habits tracked but not streak-critical. Zone 2, supplements, mindfulness, strength training, social. High completion feeds Character Score.</p>
+  </div>
+  <div style="border-left:2px solid var(--border);padding-left:var(--space-4);">
+    <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:var(--space-2)">Tier 2 — Aspirational</div>
+    <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body)">Habits in the system but not yet in active rotation. Cold exposure, sauna, specific training milestones. Added when Tier 0 and 1 are stable.</p>
+  </div>
+</div>
 
 <!-- Tooltip -->
 <div id="hm-tooltip">
@@ -484,6 +704,11 @@
 
   <!-- Content (populated by JS) -->
   <div id="hab-content" style="display:none">
+
+    <!-- Insights strip -->
+    <div class="insights-strip" id="insights-strip" style="display:none">
+      <!-- Populated by JS -->
+    </div>
 
     <!-- Stats row -->
     <div class="hab-stats reveal">
@@ -512,7 +737,7 @@
     <!-- Heatmap -->
     <div class="hab-section reveal">
       <div class="hab-section__heading">Completion <span>Heatmap</span></div>
-      <div class="hab-section__sub">// last 13 weeks — tier 0 completion % per day</div>
+      <div class="hab-section__sub">// last 52 weeks — tier 0 completion % per day</div>
       <!-- U05: Mobile scroll hint -->
       <p style="display:none;font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-align:center;margin-bottom:var(--space-3);" id="hm-scroll-hint">&larr; scroll to see all 13 weeks &rarr;</p>
       <div class="heatmap-wrap">
@@ -555,9 +780,135 @@
       <div class="trend-axis" id="trend-axis"></div>
     </div>
 
+    <!-- Section 4: Streak Records -->
+    <div class="hab-section reveal">
+      <div class="hab-section__heading">Streak <span>Records</span></div>
+      <div class="hab-section__sub">// consecutive days with all Tier 0 habits completed</div>
+      <div class="streak-records">
+        <div class="streak-record">
+          <div class="streak-record__label">Current streak</div>
+          <div class="streak-record__val" id="rec-current">—</div>
+          <div class="streak-record__sub">days active</div>
+        </div>
+        <div class="streak-record">
+          <div class="streak-record__label">Best streak ever</div>
+          <div class="streak-record__val" id="rec-best">—</div>
+          <div class="streak-record__sub" id="rec-best-note">days</div>
+        </div>
+      </div>
+      <div class="streak-def">
+        // streak definition: a streak increments when ALL Tier 0 habits are marked complete
+        before midnight. Missing any single Tier 0 habit resets the counter to zero.
+        Tier 0 habits are: daily protein target, 7h+ sleep, 8k+ steps, no alcohol, journal entry.
+      </div>
+    </div>
+
+    <!-- Section 5: Group Adherence -->
+    <div class="hab-section reveal">
+      <div class="hab-section__heading">Group <span>Adherence</span></div>
+      <div class="hab-section__sub">// this month — % completion per habit group</div>
+      <div class="group-bars" id="group-bars">
+        <!-- Populated by JS or shows loading state -->
+        <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);padding:var(--space-6) 0;">
+          Loading group data…
+        </div>
+      </div>
+    </div>
+
+    <!-- What are the 65 habits? accordion -->
+    <div class="hab-accordion reveal">
+      <button class="hab-accordion__toggle" id="hab-acc-toggle" aria-expanded="false" onclick="(function(btn){var body=document.getElementById('hab-acc-body');var open=btn.getAttribute('aria-expanded')==='true';btn.setAttribute('aria-expanded',!open);body.classList.toggle('open',!open);})(this)">
+        <span>What are the <span id="hab-acc-count">65</span> habits?</span>
+        <span class="hab-accordion__arrow">&#9654;</span>
+      </button>
+      <div class="hab-accordion__body" id="hab-acc-body">
+        <div class="hab-tier-block">
+          <div class="hab-tier-label">// Tier 0 — Non-Negotiables (5 habits) — miss one, streak resets</div>
+          <ul class="hab-list">
+            <li>Log calories in MacroFactor (complete daily log)</li>
+            <li>Hit protein target (&ge;185g/day)</li>
+            <li>Sleep &ge;7 hours (Whoop tracked)</li>
+            <li>Minimum movement (Zone 2 or strength session)</li>
+            <li>No alcohol</li>
+          </ul>
+        </div>
+        <div class="hab-tier-block">
+          <div class="hab-tier-label">// Tier 1 — Daily Practice (25+ habits) — tracked, not streak-critical</div>
+          <ul class="hab-list">
+            <li>Morning weigh-in (Withings)</li>
+            <li>Supplement stack (morning)</li>
+            <li>Supplement stack (evening)</li>
+            <li>Zone 2 cardio (&ge;20 min)</li>
+            <li>Strength training session</li>
+            <li>10,000+ steps</li>
+            <li>CGM sensor wear</li>
+            <li>Journal entry (Notion)</li>
+            <li>Mindfulness / breathwork</li>
+            <li>Morning sunlight exposure</li>
+            <li>Evening screen curfew (10 PM)</li>
+            <li>Caloric deficit target (MacroFactor)</li>
+            <li>Hydration target (&ge;3L water)</li>
+            <li>Creatine timing (with food)</li>
+            <li>Glucose log review</li>
+            <li>Strength session logged (Strava)</li>
+            <li>Social interaction logged</li>
+            <li>Weekly review (Sunday)</li>
+            <li>Lab result review (when available)</li>
+            <li>Cold exposure (face wash / shower)</li>
+            <li>Whoop wear overnight</li>
+            <li>Eight Sleep pod active</li>
+            <li>Steps logged by midnight</li>
+            <li>No meal after 8 PM</li>
+            <li>Berberine with largest meal</li>
+          </ul>
+        </div>
+        <div class="hab-tier-block">
+          <div class="hab-tier-label">// Tier 2 — Aspirational (35 habits) — in the system, not yet in rotation</div>
+          <ul class="hab-list">
+            <li>Sauna (3&times;/week target)</li>
+            <li>Cold plunge protocol</li>
+            <li>VO2 max interval session</li>
+            <li>Blood pressure log</li>
+            <li>Peptide protocol (when cycling)</li>
+            <li>Continuous HRV trend review</li>
+            <li>Body composition scan (monthly)</li>
+            <li>Grip strength test</li>
+            <li>Flexibility / mobility session</li>
+            <li>CGM calibration check</li>
+            <li>Red light therapy session</li>
+            <li>Electrolyte supplement</li>
+            <li>Weekly fasted bloodwork</li>
+            <li>Posture correction session</li>
+            <li>Reading (non-screen, &ge;30 min)</li>
+            <li>Language practice (Duolingo)</li>
+            <li>Gratitude log</li>
+            <li>Meal prep (Sunday batch)</li>
+            <li>Social media time limit (&le;30 min)</li>
+            <li>Experiment hypothesis log</li>
+            <li>Data correlation review (weekly)</li>
+            <li>Breathing exercise (4-7-8)</li>
+            <li>Nature walk (&ge;20 min outside)</li>
+            <li>Digital detox (1hr screen-free)</li>
+            <li>Alcohol-free week checkpoint</li>
+            <li>Sleep room temperature check</li>
+            <li>Protein source variety log</li>
+            <li>Foam rolling / recovery work</li>
+            <li>Monthly progress photo</li>
+            <li>Biofeedback session</li>
+            <li>Accountability check-in post</li>
+            <li>Weekly data export review</li>
+            <li>Biomarker trending note</li>
+            <li>Experiment result logging</li>
+            <li>Supplement protocol review (monthly)</li>
+          </ul>
+        </div>
+        <p style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);margin-top:var(--space-4);letter-spacing:var(--ls-label)">// Total: 65 habits across 3 tiers. Tier 0 and Tier 1 are actively tracked daily via Habitify. Tier 2 habits are in the system and will be activated progressively as Tier 0/1 consistency exceeds 90%.</p>
+      </div>
+    </div>
+
     <!-- Footnote -->
     <p class="hab-footnote">
-      <span>// habit registry:</span> 65 habits tracked total across 9 groups.
+      <span>// habit registry:</span> <span id="footnote-count">65</span> habits tracked total across 9 groups.
       Tier 0 shown here are the non-negotiable foundation.
       Data via Habitify + platform compute layer.
     </p>
@@ -584,7 +935,7 @@
   <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
     Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.<br>
-    <a href="/journal/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue &rarr;</a>
+    <a href="/chronicle/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue &rarr;</a>
   </p>
   <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
     <input id="cta-email-habits" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);outline:none;transition:border-color var(--dur-fast);" onfocus="this.style.borderColor='var(--c-amber-400)'" onblur="this.style.borderColor='var(--c-amber-500)'">
@@ -616,67 +967,72 @@
 <!-- Mobile bottom nav -->
 <nav class="bottom-nav" aria-label="Mobile navigation">
   <a href="/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     <span>Home</span>
   </a>
-  <a href="/ask/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-    <span>Ask</span>
+  <a href="/live/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/></svg>
+    <span>Live</span>
   </a>
   <a href="/character/" class="bottom-nav__link">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-    <span>Score</span>
+    <span>Character</span>
   </a>
-  <a href="/journal/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
-    <span>Journal</span>
+  <a href="/chronicle/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+    <span>Chronicle</span>
   </a>
-  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-    <span>More</span>
-  </button>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>Ask</span>
+  </a>
 </nav>
 
+
+<section class="reading-path" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
+  <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>
+  <a href="/protocols/" style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-display);">The protocols behind the habits →</a>
+  <p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Structured frameworks that make the habits consistent</p>
+</section>
 <footer class="footer-v2">
   <div class="footer-v2__grid">
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The journey</div>
-      <a href="/story/" class="footer-v2__link">Story</a>
-      <a href="/live/" class="footer-v2__link">Live</a>
-      <a href="/journal/" class="footer-v2__link">Journal</a>
-      <a href="/week/" class="footer-v2__link">This Week</a>
+      <div class="footer-v2__heading">The Story</div>
+      <a href="/" class="footer-v2__link">Home</a>
+      <a href="/story/" class="footer-v2__link">My Story</a>
       <a href="/about/" class="footer-v2__link">About</a>
     </div>
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The data</div>
+      <div class="footer-v2__heading">The Data</div>
+      <a href="/live/" class="footer-v2__link">Live</a>
       <a href="/character/" class="footer-v2__link">Character</a>
       <a href="/habits/" class="footer-v2__link">Habits</a>
-      <a href="/achievements/" class="footer-v2__link">Achievements</a>
-      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
-      <a href="/results/" class="footer-v2__link">Results</a>
-      <a href="/progress/" class="footer-v2__link">Progress</a>
-      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
-      <a href="/supplements/" class="footer-v2__link">Supplements</a>
-      <a href="/glucose/" class="footer-v2__link">Glucose</a>
-      <a href="/sleep/" class="footer-v2__link">Sleep</a>
-      <a href="/experiments/" class="footer-v2__link">Experiments</a>
-      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
     </div>
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The platform</div>
+      <div class="footer-v2__heading">The Science</div>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The Build</div>
       <a href="/platform/" class="footer-v2__link">Platform</a>
       <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
-      <a href="/accountability/" class="footer-v2__link">Accountability</a>
-      <a href="/methodology/" class="footer-v2__link">Methodology</a>
-      <a href="/ask/" class="footer-v2__link">Ask</a>
       <a href="/board/" class="footer-v2__link">Board</a>
-      <a href="/data/" class="footer-v2__link">Data</a>
       <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
       <a href="/tools/" class="footer-v2__link">Tools</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">Follow</div>
+      <a href="/chronicle/" class="footer-v2__link">Chronicle</a>
       <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
       <a href="/rss.xml" class="footer-v2__link">RSS</a>
       <a href="/privacy/" class="footer-v2__link">Privacy</a>
     </div>
@@ -691,8 +1047,16 @@
 (function () {
   'use strict';
 
-  var WEEKS = 13;
+  var WEEKS = 52;
   var DAY_LABELS = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
+
+  // ── G6: Content filter ────────────────────────────────────────────────────
+  var BLOCKED_KEYWORDS = ['porn', 'pornography', 'marijuana', 'cannabis', 'weed', 'thc'];
+  function isBlocked(text) {
+    if (!text) return false;
+    var lower = String(text).toLowerCase();
+    return BLOCKED_KEYWORDS.some(function(k) { return lower.indexOf(k) !== -1; });
+  }
   var MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   // ── Tooltip ───────────────────────────────────────────────────────────────
@@ -914,12 +1278,153 @@
       ? Math.round(history.reduce(function(s,d) { return s + (d.tier0_pct || 0); }, 0) / history.length)
       : 0;
     var perfect = history.filter(function(d) { return d.perfect; }).length;
+    var streak  = data.current_streak || 0;
+    var days    = data.days_tracked   || history.length || 0;
+    var total   = data.total_habits   || data.habit_count || 65;
 
-    document.getElementById('stat-streak').textContent  = data.current_streak  || 0;
-    document.getElementById('stat-days').textContent    = data.days_tracked     || history.length || 0;
+    // Main stats row
+    document.getElementById('stat-streak').textContent  = streak;
+    document.getElementById('stat-days').textContent    = days;
     document.getElementById('stat-avg').textContent     = avgPct + '%';
     document.getElementById('stat-perfect').textContent = perfect;
-    document.getElementById('streak-big').textContent   = data.current_streak  || 0;
+    document.getElementById('streak-big').textContent   = streak;
+
+    // Hero chips
+    var heroStreak = document.getElementById('hab-hero-streak');
+    var heroAvg    = document.getElementById('hab-hero-avg');
+    var heroDays   = document.getElementById('hab-hero-days');
+    var habCount   = document.getElementById('hab-count');
+    var footCount  = document.getElementById('footnote-count');
+    if (heroStreak) heroStreak.textContent = streak + ' days';
+    if (heroAvg)    heroAvg.textContent    = avgPct + '%';
+    if (heroDays)   heroDays.textContent   = days;
+    if (habCount && total)  habCount.textContent  = total;
+    if (footCount && total) footCount.textContent = total;
+    var accCount = document.getElementById('hab-acc-count');
+    if (accCount && total) accCount.textContent = total;
+
+    // Streak records
+    var recCurrent = document.getElementById('rec-current');
+    var recBest    = document.getElementById('rec-best');
+    var recNote    = document.getElementById('rec-best-note');
+    if (recCurrent) recCurrent.textContent = streak;
+    var best = data.best_streak || data.longest_streak;
+    if (recBest) recBest.textContent = best != null ? best : '—';
+    if (recNote && data.best_streak_start && data.best_streak_end) {
+      recNote.textContent = data.best_streak_start + ' → ' + data.best_streak_end;
+    }
+  }
+
+  // ── Insights strip ────────────────────────────────────────────────────────
+  function buildInsights(data) {
+    var strip = document.getElementById('insights-strip');
+    if (!strip) return;
+    var history = data.history || [];
+    var groups = data.groups || data.group_adherence || {};
+    var perfect = history.filter(function(d) { return d.perfect; }).length;
+    var chips = [];
+
+    // Best group this week (from last 7 days of group data)
+    var last7 = history.slice(-7);
+    var groupSums = {}, groupCounts = {};
+    last7.forEach(function(day) {
+      var g = day.groups || {};
+      Object.keys(g).forEach(function(name) {
+        groupSums[name]  = (groupSums[name]  || 0) + (g[name] || 0);
+        groupCounts[name] = (groupCounts[name] || 0) + 1;
+      });
+    });
+    // Also use today's groups as fallback
+    Object.keys(groups).forEach(function(name) {
+      if (!groupSums[name]) { groupSums[name] = groups[name]; groupCounts[name] = 1; }
+    });
+
+    var bestGroup = null, bestPct = 0, riskGroup = null, riskPct = 100;
+    Object.keys(groupSums).forEach(function(name) {
+      var avg = Math.round(groupSums[name] / (groupCounts[name] || 1));
+      if (avg > bestPct) { bestPct = avg; bestGroup = name; }
+      if (avg < riskPct) { riskPct = avg; riskGroup = name; }
+    });
+
+    if (bestGroup) chips.push('<div class="insight-chip best">&#9650; Best this week: ' + bestGroup + ' (' + bestPct + '%)</div>');
+    if (riskGroup && riskPct < 70) chips.push('<div class="insight-chip risk">&#9660; At risk: ' + riskGroup + ' (' + riskPct + '%)</div>');
+    if (perfect > 0) chips.push('<div class="insight-chip info">&#9733; ' + perfect + ' perfect day' + (perfect === 1 ? '' : 's') + ' in history</div>');
+
+    if (chips.length) {
+      strip.innerHTML = chips.join('');
+      strip.style.display = 'flex';
+    }
+  }
+
+  // ── Group adherence bars ───────────────────────────────────────────────────
+  var GROUP_NAMES = ['Data', 'Discipline', 'Growth', 'Hygiene', 'Nutrition', 'Performance', 'Recovery', 'Supplements', 'Wellbeing'];
+
+  function buildGroupBars(data) {
+    var groups = data.groups || data.group_adherence || {};
+    var history = data.history || [];
+    var container = document.getElementById('group-bars');
+    if (!container) return;
+
+    // Build 4-week per-group averages from last 28 days
+    var last28 = history.slice(-28);
+    var weeklyGroupData = {}; // { groupName: [w1avg, w2avg, w3avg, w4avg] }
+    GROUP_NAMES.forEach(function(name) {
+      var weeks = [];
+      for (var w = 0; w < 4; w++) {
+        var chunk = last28.slice(w * 7, (w + 1) * 7);
+        if (!chunk.length) { weeks.push(null); continue; }
+        var vals = chunk.map(function(d) {
+          var g = d.groups || {};
+          return g[name] != null ? g[name] : g[name.toLowerCase()];
+        }).filter(function(v) { return v != null; });
+        weeks.push(vals.length ? Math.round(vals.reduce(function(a,b){ return a+b; }, 0) / vals.length) : null);
+      }
+      weeklyGroupData[name] = weeks;
+    });
+
+    // Filter any blocked group names (G6)
+    var entries = GROUP_NAMES.map(function(name) {
+      if (isBlocked(name)) return null;
+      var pct = groups[name] != null ? groups[name] : groups[name.toLowerCase()];
+      return { name: name, pct: pct != null ? Math.round(pct) : null, weeks: weeklyGroupData[name] || [] };
+    }).filter(Boolean);
+
+    if (entries.every(function(e) { return e.pct === null; })) {
+      container.innerHTML = '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);padding:var(--space-4) 0;">Group adherence data available after full habit sync.</div>';
+      return;
+    }
+
+    container.innerHTML = entries.map(function(e) {
+      var pct   = e.pct != null ? e.pct : 0;
+      var color = pct >= 80 ? 'var(--accent)' : pct >= 50 ? 'var(--c-amber-400)' : 'rgba(255,82,82,0.6)';
+      var shown = e.pct != null ? (e.pct + '%') : '—';
+
+      // 4-week mini-trend bars
+      var miniHtml = '';
+      if (e.weeks.some(function(v) { return v !== null; })) {
+        miniHtml = '<div class="group-mini-trend">';
+        e.weeks.forEach(function(w) {
+          var h = w != null ? Math.max(2, Math.round((w / 100) * 22)) : 2;
+          var c = w == null ? 'var(--surface-raised)'
+                : w >= 80 ? 'var(--accent)' : w >= 50 ? 'var(--c-amber-400)' : 'rgba(255,82,82,0.6)';
+          var tip = w != null ? 'w: ' + w + '%' : 'no data';
+          miniHtml += '<div class="mini-bar" style="height:' + h + 'px;background:' + c + ';opacity:0.8" title="' + tip + '"></div>';
+        });
+        miniHtml += '</div>';
+      }
+
+      return [
+        '<div class="group-bar-row">',
+          '<div class="group-bar-label">' + e.name + '</div>',
+          '<div class="group-bar-track">',
+            e.pct != null
+              ? '<div class="group-bar-fill" style="width:' + pct + '%;background:' + color + '"></div>'
+              : '<div class="group-bar-fill" style="width:0%"></div>',
+          '</div>',
+          '<div class="group-bar-pct" style="display:flex;align-items:center">' + shown + miniHtml + '</div>',
+        '</div>',
+      ].join('');
+    }).join('');
   }
 
   // ── Main hydrate ──────────────────────────────────────────────────────────
@@ -935,16 +1440,35 @@
 
     document.getElementById('hab-content').style.display = 'block';
     computeStats(data);
+    buildInsights(data);
     buildHeatmap(history);
     buildTrend(history);
+    buildGroupBars(data);
   }
 
   // ── Load ──────────────────────────────────────────────────────────────────
   async function load() {
     try {
-      var res = await fetch('/api/habits');
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      var data = await res.json();
+      // Fetch habit history + streaks in parallel
+      var [habRes, streakRes] = await Promise.all([
+        fetch('/api/habits'),
+        fetch('/api/habit_streaks'),
+      ]);
+      if (!habRes.ok) throw new Error('HTTP ' + habRes.status);
+      var data = await habRes.json();
+
+      // Merge best_streak from habit_streaks if available
+      if (streakRes.ok) {
+        var sData = await streakRes.json();
+        var hs = sData.habit_streaks || {};
+        if (hs.best_streak != null && data.best_streak == null) {
+          data.best_streak = hs.best_streak;
+        }
+        if (hs.aggregate_streak != null && data.current_streak == null) {
+          data.current_streak = hs.aggregate_streak;
+        }
+      }
+
       hydrate(data);
     } catch(e) {
       console.warn('[habits] API error:', e);
