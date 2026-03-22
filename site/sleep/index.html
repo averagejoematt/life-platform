@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="30 days of sleep intelligence — Eight Sleep score, Whoop quality, bed temperature optimization, and circadian consistency.">
+  <meta name="description" content="30+ weeks of sleep intelligence — Eight Sleep score, Whoop quality, bed temperature optimization, and circadian consistency.">
   <meta property="og:title" content="Sleep Intelligence — Matthew Walker">
   <meta property="og:description" content="Eight Sleep × Whoop cross-referenced. What bed temperature actually does to sleep quality. Real data.">
   <meta property="og:type" content="website">
@@ -14,7 +14,7 @@
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Sleep Intelligence — Matthew Walker">
-  <meta name="twitter:description" content="30 days of Eight Sleep + Whoop data. What temperature does to sleep quality, and the patterns that emerge.">
+  <meta name="twitter:description" content="30+ weeks of Eight Sleep + Whoop data. What temperature does to sleep quality, and the patterns that emerge.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <title>Sleep Intelligence — Matthew Walker</title>
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
@@ -44,13 +44,49 @@
       line-height: var(--lh-body);
     }
 
+    /* ── Through-line thread ── */
+    .slp-thread {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-6) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .slp-thread__inner {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      padding: var(--space-4) var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+    }
+    .slp-thread__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--accent);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .slp-thread__text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .slp-thread__text a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .slp-thread__text a:hover { text-decoration: underline; }
+
     .slp-body {
       max-width: var(--max-width);
       margin: 0 auto;
       padding: var(--space-10) var(--page-padding);
     }
 
-    /* ── Stat cards ── */
+    /* ── Stat cards — 2 rows of 4 ── */
     .slp-stats {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -200,6 +236,111 @@
       margin-top: var(--space-4);
     }
 
+    /* ── Sleep rules section ── */
+    .slp-rules {
+      margin-bottom: var(--space-10);
+    }
+    .slp-rules__header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: var(--space-6);
+      flex-wrap: wrap;
+      gap: var(--space-3);
+    }
+    .slp-rules__title {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+    }
+    .slp-rules__sub {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+    }
+    .slp-rules__grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+    }
+    .slp-rule {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top: 2px solid var(--accent);
+      padding: var(--space-5) var(--space-5);
+    }
+    .slp-rule__num {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--accent);
+      letter-spacing: var(--ls-tag);
+      margin-bottom: var(--space-3);
+    }
+    .slp-rule__finding {
+      font-family: var(--font-display);
+      font-size: var(--text-base);
+      color: var(--text);
+      line-height: var(--lh-heading);
+      margin-bottom: var(--space-3);
+    }
+    .slp-rule__stat {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--c-green-400);
+      margin-bottom: var(--space-3);
+    }
+    .slp-rule__xref {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+    .slp-rule__xref a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .slp-rule__xref a:hover { text-decoration: underline; }
+
+    /* ── Correlation grid ── */
+    .slp-corr-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-bottom: var(--space-10);
+    }
+    .slp-corr-cell {
+      background: var(--surface);
+      padding: var(--space-5) var(--space-5);
+      text-decoration: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      transition: background var(--dur-fast);
+    }
+    .slp-corr-cell:hover { background: var(--surface-raised); }
+    .slp-corr-cell__pair {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      font-family: var(--font-mono);
+    }
+    .slp-corr-cell__label {
+      font-family: var(--font-display);
+      font-size: var(--text-base);
+      color: var(--text);
+    }
+    .slp-corr-cell__cta {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+    }
+    @media (max-width: 600px) {
+      .slp-corr-grid { grid-template-columns: 1fr; }
+    }
+
     /* ── Method ── */
     .slp-method {
       border-top: 1px solid var(--border);
@@ -241,10 +382,83 @@
       letter-spacing: var(--ls-tag);
     }
 
+    /* ── Narrative section ── */
+    .slp-narrative {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-10);
+      align-items: start;
+    }
+    .slp-narrative__left {}
+    .slp-narrative__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+    }
+    .slp-narrative__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      margin-bottom: var(--space-5);
+      line-height: var(--lh-heading);
+    }
+    .slp-narrative__title span { color: var(--accent); }
+    .slp-narrative__body {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .slp-narrative__body p { margin: 0 0 var(--space-4); }
+    .slp-narrative__body p:last-child { margin-bottom: 0; }
+    .slp-narrative__body strong { color: var(--text); }
+    .slp-protocol-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      padding: var(--space-6);
+    }
+    .slp-protocol-box__heading {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-5);
+    }
+    .slp-protocol-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+    }
+    .slp-protocol-item:last-child { margin-bottom: 0; }
+    .slp-protocol-item__bullet {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--accent);
+      flex-shrink: 0;
+      padding-top: 2px;
+    }
+    .slp-protocol-item__text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .slp-protocol-item__text strong { color: var(--text); }
+
     @media (max-width: 768px) {
       .slp-stats { grid-template-columns: repeat(2, 1fr); }
       .slp-two-col { grid-template-columns: 1fr; }
       .slp-method__grid { grid-template-columns: 1fr; }
+      .slp-narrative { grid-template-columns: 1fr; gap: var(--space-6); }
+      .slp-rules__grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -253,12 +467,55 @@
 <nav class="nav">
   <a href="/" class="nav__brand">AMJ</a>
   <div class="nav__links">
-    <a href="/story/" class="nav__link">Story</a>
-    <a href="/live/" class="nav__link">Live</a>
-    <a href="/journal/" class="nav__link">Journal</a>
-    <a href="/platform/" class="nav__link">Platform</a>
-    <a href="/start/" class="nav__link">Explore</a>
-    <a href="/subscribe/" class="nav__link nav__cta">Subscribe</a>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Story</button>
+      <div class="nav__dropdown-menu">
+        <a href="/" class="nav__dropdown-item">Home</a>
+        <a href="/story/" class="nav__dropdown-item">My Story</a>
+        <a href="/about/" class="nav__dropdown-item">About</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Data</button>
+      <div class="nav__dropdown-menu">
+        <a href="/live/" class="nav__dropdown-item">Live</a>
+        <a href="/character/" class="nav__dropdown-item">Character</a>
+        <a href="/habits/" class="nav__dropdown-item">Habits</a>
+        <a href="/accountability/" class="nav__dropdown-item">Accountability</a>
+      </div>
+    </div>
+    <div class="nav__dropdown is-active">
+      <button class="nav__dropdown-btn">The Science</button>
+      <div class="nav__dropdown-menu">
+        <a href="/protocols/" class="nav__dropdown-item">Protocols</a>
+        <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
+        <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
+        <a href="/sleep/" class="nav__dropdown-item active">Sleep</a>
+        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
+        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
+        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Build</button>
+      <div class="nav__dropdown-menu">
+        <a href="/platform/" class="nav__dropdown-item">Platform</a>
+        <a href="/intelligence/" class="nav__dropdown-item">Intelligence</a>
+        <a href="/board/" class="nav__dropdown-item">Board</a>
+        <a href="/cost/" class="nav__dropdown-item">Cost</a>
+        <a href="/methodology/" class="nav__dropdown-item">Methodology</a>
+        <a href="/tools/" class="nav__dropdown-item">Tools</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">Follow</button>
+      <div class="nav__dropdown-menu">
+        <a href="/chronicle/" class="nav__dropdown-item">Chronicle</a>
+        <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
+        <a href="/ask/" class="nav__dropdown-item">Ask</a>
+      </div>
+    </div>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>
   </div>
   <button class="nav__hamburger" aria-label="Open menu">
     <span></span><span></span><span></span>
@@ -274,85 +531,180 @@
   <div class="nav-overlay__panel">
     <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The journey</div>
-      <a href="/story/" class="nav-overlay__link">Story</a>
-      <a href="/live/" class="nav-overlay__link">Live</a>
-      <a href="/journal/" class="nav-overlay__link">Journal</a>
-      <a href="/week/" class="nav-overlay__link">This Week</a>
+      <div class="nav-overlay__heading">The Story</div>
+      <a href="/" class="nav-overlay__link">Home</a>
+      <a href="/story/" class="nav-overlay__link">My Story</a>
       <a href="/about/" class="nav-overlay__link">About</a>
     </div>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The data</div>
+      <div class="nav-overlay__heading">The Data</div>
+      <a href="/live/" class="nav-overlay__link">Live</a>
       <a href="/character/" class="nav-overlay__link">Character</a>
       <a href="/habits/" class="nav-overlay__link">Habits</a>
-      <a href="/achievements/" class="nav-overlay__link">Achievements</a>
-      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
-      <a href="/results/" class="nav-overlay__link">Results</a>
-      <a href="/progress/" class="nav-overlay__link">Progress</a>
-      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
-      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
-      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
-      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
-      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
-      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
     </div>
     <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The platform</div>
+      <div class="nav-overlay__heading">The Science</div>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Build</div>
       <a href="/platform/" class="nav-overlay__link">Platform</a>
       <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
-      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
-      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
-      <a href="/ask/" class="nav-overlay__link">Ask</a>
       <a href="/board/" class="nav-overlay__link">Board</a>
-      <a href="/data/" class="nav-overlay__link">Data</a>
       <a href="/cost/" class="nav-overlay__link">Cost</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
+      <a href="/tools/" class="nav-overlay__link">Tools</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">Follow</div>
+      <a href="/chronicle/" class="nav-overlay__link">Chronicle</a>
       <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/ask/" class="nav-overlay__link">Ask</a>
       <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+      <a href="/privacy/" class="nav-overlay__link">Privacy</a>
     </div>
   </div>
 </div>
 
 
+
+
+
+
 <header class="slp-header reveal">
-  <div class="eyebrow" style="margin-bottom:var(--space-4)">
-    <span class="label label-accent">// Sleep Intelligence</span>
-  </div>
+  <div class="eyebrow page-header__kicker" style="margin-bottom:var(--space-4)">The Science</div>
   <h1 class="slp-header__title">Sleep <span>Observatory</span></h1>
   <p class="slp-header__sub">
-    Eight Sleep and Whoop cross-referenced over 30 days. What bed temperature
-    actually does to sleep quality — and the circadian patterns the data reveals.
+    Sleep is Matthew's highest-leverage recovery input. After 30+ weeks of data,
+    the patterns are clear.
   </p>
 </header>
+
+<!-- Through-line thread -->
+<div class="slp-thread">
+  <div class="slp-thread__inner">
+    <div class="slp-thread__label">// upstream effect</div>
+    <div class="slp-thread__text">
+      Sleep drives 35% of your Recovery score &rarr; <a href="/character/">Character &rarr;</a>
+    </div>
+  </div>
+</div>
+
+<!-- What the data shows — narrative section -->
+<div class="slp-narrative reveal">
+  <div class="slp-narrative__left">
+    <div class="slp-narrative__eyebrow">// why it matters</div>
+    <h2 class="slp-narrative__title">Sleep is the <span>master lever</span></h2>
+    <div class="slp-narrative__body">
+      <p>
+        Every other pillar depends on sleep. <strong>HRV recovery, the primary signal Whoop uses to
+        score readiness, is built during deep sleep</strong> — specifically during the slow-wave stages
+        that dominate the first half of the night. Cut sleep short and HRV drops, training adaptations
+        stall, and appetite hormones shift toward hunger.
+      </p>
+      <p>
+        The seven-pillar framework scores sleep as its own domain, but it also flows upstream into
+        every other score: low sleep directly suppresses recovery, impairs glucose regulation, reduces
+        strength output, and degrades stress resilience. <strong>One bad night costs across all
+        seven categories.</strong>
+      </p>
+      <p>
+        That's why this page exists. The data doesn't just track sleep duration — it cross-references
+        Eight Sleep's mattress sensor with Whoop's wrist data to find the conditions that
+        reliably produce quality sleep, not just hours in bed.
+      </p>
+    </div>
+  </div>
+  <div class="slp-narrative__right">
+    <div class="slp-protocol-box">
+      <div class="slp-protocol-box__heading">// Matthew's sleep protocol</div>
+      <div class="slp-protocol-item">
+        <div class="slp-protocol-item__bullet">01</div>
+        <div class="slp-protocol-item__text"><strong>Target 8 hours</strong> in bed — not 7.
+          Buffer for sleep onset and one wake cycle still lands above 7h of actual sleep.</div>
+      </div>
+      <div class="slp-protocol-item">
+        <div class="slp-protocol-item__bullet">02</div>
+        <div class="slp-protocol-item__text"><strong>Bed temperature 68&deg;F</strong> via Eight Sleep
+          pod. Core body temp must drop 1&ndash;3&deg;F to initiate deep sleep. Active cooling
+          accelerates that drop.</div>
+      </div>
+      <div class="slp-protocol-item">
+        <div class="slp-protocol-item__bullet">03</div>
+        <div class="slp-protocol-item__text"><strong>No screens 1 hour before bed.</strong>
+          Blue light suppresses melatonin onset. Replaced with reading or audio.</div>
+      </div>
+      <div class="slp-protocol-item">
+        <div class="slp-protocol-item__bullet">04</div>
+        <div class="slp-protocol-item__text"><strong>Consistent 10pm window.</strong>
+          Circadian timing matters as much as duration. Irregular sleep schedules
+          fragment slow-wave regardless of total hours.</div>
+      </div>
+      <div class="slp-protocol-item">
+        <div class="slp-protocol-item__bullet">05</div>
+        <div class="slp-protocol-item__text"><strong>Magnesium glycinate before bed</strong>
+          (genome-adjusted dose). Supports GABA pathways and muscle relaxation
+          without the morning grogginess of sleep aids.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <div class="slp-body">
   <div id="slp-loading" class="slp-loading">LOADING SLEEP DATA...</div>
   <div id="slp-content" style="display:none">
 
-    <!-- Stat cards -->
+    <!-- Stat cards — 2 rows of 4 -->
     <div class="slp-stats reveal">
+      <!-- Row 1 -->
       <div class="slp-stat">
-        <div class="slp-stat__label">Sleep Score</div>
-        <div class="slp-stat__value" id="slp-score">—</div>
+        <div class="slp-stat__label">Avg Sleep Duration</div>
+        <div class="slp-stat__value" id="slp-avg-duration">—</div>
+        <div class="slp-stat__sub">30-day average</div>
+      </div>
+      <div class="slp-stat">
+        <div class="slp-stat__label">Avg Sleep Score</div>
+        <div class="slp-stat__value" id="slp-avg-score">—</div>
         <div class="slp-stat__sub">Eight Sleep / 100</div>
       </div>
       <div class="slp-stat">
-        <div class="slp-stat__label">Efficiency</div>
-        <div class="slp-stat__value" id="slp-eff">—</div>
-        <div class="slp-stat__sub">% time actually asleep</div>
+        <div class="slp-stat__label">Avg Bed Time</div>
+        <div class="slp-stat__value" id="slp-avg-bedtime">—</div>
+        <div class="slp-stat__sub">30-day average</div>
       </div>
       <div class="slp-stat">
-        <div class="slp-stat__label">Hours Slept</div>
-        <div class="slp-stat__value" id="slp-hours">—</div>
-        <div class="slp-stat__sub">Whoop measured</div>
+        <div class="slp-stat__label">Bed Time Consistency</div>
+        <div class="slp-stat__value" id="slp-consistency">—</div>
+        <div class="slp-stat__sub">std dev in minutes</div>
+      </div>
+      <!-- Row 2 -->
+      <div class="slp-stat">
+        <div class="slp-stat__label">Deep Sleep %</div>
+        <div class="slp-stat__value" id="slp-deep">—</div>
+        <div class="slp-stat__sub">Target &gt;20%</div>
       </div>
       <div class="slp-stat">
-        <div class="slp-stat__label">30d Avg Score</div>
-        <div class="slp-stat__value" id="slp-avg30">—</div>
-        <div class="slp-stat__sub">Eight Sleep average</div>
+        <div class="slp-stat__label">REM %</div>
+        <div class="slp-stat__value" id="slp-rem">—</div>
+        <div class="slp-stat__sub">Target &gt;20%</div>
+      </div>
+      <div class="slp-stat">
+        <div class="slp-stat__label">Latest HRV</div>
+        <div class="slp-stat__value" id="slp-hrv">—</div>
+        <div class="slp-stat__sub">ms (Whoop)</div>
+      </div>
+      <div class="slp-stat">
+        <div class="slp-stat__label">Next-Day Recovery</div>
+        <div class="slp-stat__value" id="slp-recovery-avg">—</div>
+        <div class="slp-stat__sub">30-day avg / 100</div>
       </div>
     </div>
 
@@ -377,7 +729,7 @@
     <!-- Temperature discovery -->
     <div class="slp-temp-block reveal" id="slp-temp-block" style="display:none">
       <div class="slp-temp-block__eyebrow">// Platform Discovery</div>
-      <div class="slp-temp-block__headline" id="slp-temp-headline">Optimal bed temperature: —°F</div>
+      <div class="slp-temp-block__headline" id="slp-temp-headline">Optimal bed temperature: —&deg;F</div>
       <div class="slp-temp-block__body" id="slp-temp-body">
         Analyzing Eight Sleep pod temperature vs. sleep score across 30 nights to find
         the bed temperature range that produces the highest average sleep quality.
@@ -410,12 +762,71 @@
         <div class="slp-card__eyebrow">Why temperature matters</div>
         <div class="slp-card__headline">The thermoregulation protocol</div>
         <div class="slp-card__body">
-          Core body temperature needs to drop 1–3°F to initiate and maintain
+          Core body temperature needs to drop 1–3&deg;F to initiate and maintain
           deep sleep. The Eight Sleep pod enables precise cooling on a schedule —
           cooler during the first half of the night (deep sleep phase), slightly
           warmer in the second half (REM phase). The optimal temperature is
           individual. This data shows mine.
         </div>
+      </div>
+    </div>
+
+    <!-- Personal sleep rules -->
+    <div class="slp-rules reveal">
+      <div class="slp-rules__header">
+        <div class="slp-rules__title">// N=1 Sleep Rules</div>
+        <div class="slp-rules__sub">Rules derived from 30+ weeks of N=1 data</div>
+      </div>
+      <div class="slp-rules__grid">
+        <div class="slp-rule">
+          <div class="slp-rule__num">RULE 01</div>
+          <div class="slp-rule__finding">9pm screen-off drives measurable HRV improvement</div>
+          <div class="slp-rule__stat">+12% next-day HRV &nbsp;&bull;&nbsp; r=0.61 &nbsp;&bull;&nbsp; 90-day window</div>
+          <div class="slp-rule__xref">&rarr; <a href="/discoveries/">See in Discoveries</a></div>
+        </div>
+        <div class="slp-rule">
+          <div class="slp-rule__num">RULE 02</div>
+          <div class="slp-rule__finding">Bed temp 68&deg;F is the personal peak — below 66&deg;F or above 70&deg;F both decline</div>
+          <div class="slp-rule__stat">Sleep score peaks at 68&deg;F &nbsp;&bull;&nbsp; confirmed across 90+ nights</div>
+          <div class="slp-rule__xref">&rarr; <a href="/discoveries/">See in Discoveries</a></div>
+        </div>
+        <div class="slp-rule">
+          <div class="slp-rule__num">RULE 03</div>
+          <div class="slp-rule__finding">Any alcohol — even one drink — tanks sleep quality the following night</div>
+          <div class="slp-rule__stat">&minus;18 pts avg sleep score &nbsp;&bull;&nbsp; consistent across all amounts</div>
+          <div class="slp-rule__xref">&rarr; <a href="/discoveries/">See in Discoveries</a></div>
+        </div>
+        <div class="slp-rule">
+          <div class="slp-rule__num">RULE 04</div>
+          <div class="slp-rule__finding">Consistent bed time (within &plusmn;30 min) outperforms high-variance weeks</div>
+          <div class="slp-rule__stat">+8% recovery &nbsp;&bull;&nbsp; low-variance vs high-variance weeks</div>
+          <div class="slp-rule__xref">&rarr; <a href="/discoveries/">See in Discoveries</a></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mini correlation grid -->
+    <div class="slp-rules reveal" style="margin-bottom:var(--space-8)">
+      <div class="slp-rules__header">
+        <div class="slp-rules__title">// How sleep connects to everything else</div>
+        <div class="slp-rules__sub">Explore correlations in the Data Explorer →</div>
+      </div>
+      <div class="slp-corr-grid">
+        <a href="/explorer/" class="slp-corr-cell">
+          <div class="slp-corr-cell__pair">Sleep &times; Recovery</div>
+          <div class="slp-corr-cell__label">Whoop sleep quality predicts next-day recovery score</div>
+          <div class="slp-corr-cell__cta">// explore correlation →</div>
+        </a>
+        <a href="/explorer/" class="slp-corr-cell">
+          <div class="slp-corr-cell__pair">Sleep &times; Weight</div>
+          <div class="slp-corr-cell__label">Short sleep nights correlate with next-day scale variance</div>
+          <div class="slp-corr-cell__cta">// explore correlation →</div>
+        </a>
+        <a href="/explorer/" class="slp-corr-cell">
+          <div class="slp-corr-cell__pair">Sleep &times; Training</div>
+          <div class="slp-corr-cell__label">Recovery score below 34% triggers training load reduction</div>
+          <div class="slp-corr-cell__cta">// explore correlation →</div>
+        </a>
       </div>
     </div>
 
@@ -426,7 +837,7 @@
         <div class="slp-method__item">
           <strong>EIGHT SLEEP POD</strong>
           Mattress-integrated sensor. Continuous tracking via active cooling/heating.
-          Sleep score 0–100. Bed temp in °F. Efficiency = total sleep ÷ time in bed.
+          Sleep score 0–100. Bed temp in &deg;F. Efficiency = total sleep &divide; time in bed.
         </div>
         <div class="slp-method__item">
           <strong>WHOOP 4.0</strong>
@@ -436,7 +847,7 @@
         </div>
         <div class="slp-method__item">
           <strong>TEMPERATURE ANALYSIS</strong>
-          30-night pod temperature grouped into 2°F buckets. Average sleep score
+          30-night pod temperature grouped into 2&deg;F buckets. Average sleep score
           computed per bucket. Highest-scoring bucket = empirical optimal range.
           Minimum 7 days required for analysis. N=1 — individual results vary.
         </div>
@@ -449,67 +860,72 @@
 <!-- Mobile bottom nav -->
 <nav class="bottom-nav" aria-label="Mobile navigation">
   <a href="/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     <span>Home</span>
   </a>
-  <a href="/ask/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-    <span>Ask</span>
+  <a href="/live/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/></svg>
+    <span>Live</span>
   </a>
   <a href="/character/" class="bottom-nav__link">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-    <span>Score</span>
+    <span>Character</span>
   </a>
-  <a href="/journal/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
-    <span>Journal</span>
+  <a href="/chronicle/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+    <span>Chronicle</span>
   </a>
-  <button class="bottom-nav__link bottom-nav__more" onclick="document.querySelector('.nav__hamburger').click()">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-    <span>More</span>
-  </button>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>Ask</span>
+  </a>
 </nav>
 
+
+<section class="reading-path" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
+  <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>
+  <a href="/glucose/" style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-display);">Another deep-dive: glucose →</a>
+  <p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">CGM data, meal responses, and metabolic trend analysis</p>
+</section>
 <footer class="footer-v2">
   <div class="footer-v2__grid">
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The journey</div>
-      <a href="/story/" class="footer-v2__link">Story</a>
-      <a href="/live/" class="footer-v2__link">Live</a>
-      <a href="/journal/" class="footer-v2__link">Journal</a>
-      <a href="/week/" class="footer-v2__link">This Week</a>
+      <div class="footer-v2__heading">The Story</div>
+      <a href="/" class="footer-v2__link">Home</a>
+      <a href="/story/" class="footer-v2__link">My Story</a>
       <a href="/about/" class="footer-v2__link">About</a>
     </div>
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The data</div>
+      <div class="footer-v2__heading">The Data</div>
+      <a href="/live/" class="footer-v2__link">Live</a>
       <a href="/character/" class="footer-v2__link">Character</a>
       <a href="/habits/" class="footer-v2__link">Habits</a>
-      <a href="/achievements/" class="footer-v2__link">Achievements</a>
-      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
-      <a href="/results/" class="footer-v2__link">Results</a>
-      <a href="/progress/" class="footer-v2__link">Progress</a>
-      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
-      <a href="/supplements/" class="footer-v2__link">Supplements</a>
-      <a href="/glucose/" class="footer-v2__link">Glucose</a>
-      <a href="/sleep/" class="footer-v2__link">Sleep</a>
-      <a href="/experiments/" class="footer-v2__link">Experiments</a>
-      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+      <a href="/accountability/" class="footer-v2__link">Accountability</a>
     </div>
     <div class="footer-v2__col">
-      <div class="footer-v2__heading">The platform</div>
+      <div class="footer-v2__heading">The Science</div>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The Build</div>
       <a href="/platform/" class="footer-v2__link">Platform</a>
       <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
-      <a href="/accountability/" class="footer-v2__link">Accountability</a>
-      <a href="/methodology/" class="footer-v2__link">Methodology</a>
-      <a href="/ask/" class="footer-v2__link">Ask</a>
       <a href="/board/" class="footer-v2__link">Board</a>
-      <a href="/data/" class="footer-v2__link">Data</a>
       <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
       <a href="/tools/" class="footer-v2__link">Tools</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">Follow</div>
+      <a href="/chronicle/" class="footer-v2__link">Chronicle</a>
       <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/ask/" class="footer-v2__link">Ask</a>
       <a href="/rss.xml" class="footer-v2__link">RSS</a>
       <a href="/privacy/" class="footer-v2__link">Privacy</a>
     </div>
@@ -547,34 +963,79 @@
       return;
     }
 
-    // Stat cards
-    const scoreEl = document.getElementById('slp-score');
-    setText('slp-score', s.sleep_score != null ? s.sleep_score.toFixed(0) : '—');
-    if (scoreEl) colorClass(scoreEl, s.sleep_score >= 85 ? 'green' : s.sleep_score >= 70 ? 'yellow' : 'red');
-
-    const effEl = document.getElementById('slp-eff');
-    setText('slp-eff', s.sleep_efficiency != null ? s.sleep_efficiency.toFixed(1) + '%' : '—');
-    if (effEl) colorClass(effEl, s.sleep_efficiency >= 90 ? 'green' : s.sleep_efficiency >= 80 ? 'yellow' : 'red');
-
-    const hoursEl = document.getElementById('slp-hours');
+    // ── Row 1: Avg Sleep Duration, Avg Sleep Score, Avg Bed Time, Bed Time Consistency ──
     const hours = s.whoop_hours || s.total_sleep_hours;
-    setText('slp-hours', hours != null ? hours.toFixed(1) + 'h' : '—');
-    if (hoursEl) colorClass(hoursEl, hours >= 7.5 ? 'green' : hours >= 6.5 ? 'yellow' : 'red');
+    const avgDurEl = document.getElementById('slp-avg-duration');
+    setText('slp-avg-duration', hours != null ? hours.toFixed(1) + 'h' : '—');
+    if (avgDurEl) colorClass(avgDurEl, hours >= 7.5 ? 'green' : hours >= 6.5 ? 'yellow' : 'red');
 
-    const avg30El = document.getElementById('slp-avg30');
-    setText('slp-avg30', s['30d_avg_score'] != null ? s['30d_avg_score'].toFixed(0) : '—');
-    if (avg30El) colorClass(avg30El, s['30d_avg_score'] >= 85 ? 'green' : s['30d_avg_score'] >= 70 ? 'yellow' : 'red');
+    const avgScoreEl = document.getElementById('slp-avg-score');
+    const avg30 = s['30d_avg_score'];
+    setText('slp-avg-score', avg30 != null ? avg30.toFixed(0) : '—');
+    if (avgScoreEl) colorClass(avgScoreEl, avg30 >= 85 ? 'green' : avg30 >= 70 ? 'yellow' : 'red');
+
+    // Avg bed time — show if available, else loading placeholder
+    const bedtimeEl = document.getElementById('slp-avg-bedtime');
+    if (s.avg_bedtime) {
+      setText('slp-avg-bedtime', s.avg_bedtime);
+    } else {
+      if (bedtimeEl) bedtimeEl.textContent = '--';
+    }
+
+    // Bed time consistency (std dev in minutes)
+    const consistEl = document.getElementById('slp-consistency');
+    if (s.bedtime_std_min != null) {
+      setText('slp-consistency', s.bedtime_std_min.toFixed(0) + 'm');
+      if (consistEl) colorClass(consistEl, s.bedtime_std_min <= 20 ? 'green' : s.bedtime_std_min <= 40 ? 'yellow' : 'red');
+    } else {
+      if (consistEl) consistEl.textContent = '--';
+    }
+
+    // ── Row 2: Deep Sleep %, REM %, Latest HRV, Next-Day Recovery Avg ──
+    const deepEl = document.getElementById('slp-deep');
+    if (s.deep_pct != null) {
+      setText('slp-deep', s.deep_pct.toFixed(1) + '%');
+      if (deepEl) colorClass(deepEl, s.deep_pct >= 20 ? 'green' : s.deep_pct >= 13 ? 'yellow' : 'red');
+    } else {
+      if (deepEl) deepEl.textContent = '--';
+    }
+
+    const remEl = document.getElementById('slp-rem');
+    if (s.rem_pct != null) {
+      setText('slp-rem', s.rem_pct.toFixed(1) + '%');
+      if (remEl) colorClass(remEl, s.rem_pct >= 20 ? 'green' : s.rem_pct >= 15 ? 'yellow' : 'red');
+    } else {
+      if (remEl) remEl.textContent = '--';
+    }
+
+    const hrvEl = document.getElementById('slp-hrv');
+    const hrv = s.hrv_ms || s.hrv;
+    if (hrv != null) {
+      setText('slp-hrv', hrv.toFixed(0) + 'ms');
+      if (hrvEl) colorClass(hrvEl, hrv >= 60 ? 'green' : hrv >= 40 ? 'yellow' : 'red');
+    } else {
+      if (hrvEl) hrvEl.textContent = '--';
+    }
+
+    const recovEl = document.getElementById('slp-recovery-avg');
+    const recov = s['30d_avg_recovery'] || s.recovery_score;
+    if (recov != null) {
+      setText('slp-recovery-avg', recov.toFixed(0));
+      if (recovEl) colorClass(recovEl, recov >= 67 ? 'green' : recov >= 34 ? 'yellow' : 'red');
+    } else {
+      if (recovEl) recovEl.textContent = '--';
+    }
 
     // Temperature discovery
     const tempHeadEl = document.getElementById('slp-temp-headline');
     const tempBodyEl = document.getElementById('slp-temp-body');
     if (s.optimal_temp_f && tempHeadEl) {
       document.getElementById('slp-temp-block').style.display = '';
-      tempHeadEl.textContent = `Optimal bed temperature: ~${s.optimal_temp_f}°F`;
+      tempHeadEl.textContent = `Optimal bed temperature: ~${s.optimal_temp_f}\u00B0F`;
       if (tempBodyEl) {
-        tempBodyEl.textContent = `Over ${s.days_tracked} nights, ${s.optimal_temp_f}°F produced the highest average sleep scores. ` +
+        tempBodyEl.textContent = `Over ${s.days_tracked} nights, ${s.optimal_temp_f}\u00B0F produced the highest average sleep scores. ` +
           `Eight Sleep pod cooling allows precise temperature programming. ` +
-          `This is the kind of personalized correlation only continuous tracking can reveal — your optimal temperature will differ.`;
+          `This is the kind of personalized correlation only continuous tracking can reveal \u2014 your optimal temperature will differ.`;
       }
     } else if (tempHeadEl) {
       tempHeadEl.textContent = 'Temperature analysis building...';
@@ -725,7 +1186,7 @@
       const tRange = maxT - minT;
       const step = tRange > 10 ? 5 : 2;
       for (let t = Math.ceil(minT); t <= maxT; t += step) {
-        ctx2.fillText(t + '°F', xOf2(t), H - 8);
+        ctx2.fillText(t + '\u00B0F', xOf2(t), H - 8);
       }
       ctx2.textAlign = 'right';
       [minS2, Math.round((minS2 + maxS2) / 2), maxS2].forEach(v => {

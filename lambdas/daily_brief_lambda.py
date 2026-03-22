@@ -93,8 +93,8 @@ def _emit_module_load_failure(module_name: str) -> None:
                 "Dimensions": [["Module"]],
                 "Metrics": [{"Name": "ModuleLoadFailure", "Unit": "Count"}]}]},
             "Module": module_name, "ModuleLoadFailure": 1}))
-    except Exception:
-        pass
+    except Exception as _e:
+        logger.warning("[_emit_module_load_failure] metric emit failed: %s", _e)
 
 
 # Board of Directors config loader
@@ -273,8 +273,8 @@ def _emit_source_fetch_metrics(sources: dict) -> None:
                     "Dimensions": [["Source"]],
                     "Metrics": [{"Name": "DataPresent", "Unit": "Count"}]}]},
                 "Source": source, "DataPresent": 1 if data else 0}))
-        except Exception:
-            pass
+        except Exception as _e:
+            logger.warning("[_emit_source_fetch_metrics] metric emit failed for %s: %s", source, _e)
 
 
 def gather_daily_data(profile, yesterday):
@@ -306,7 +306,8 @@ def gather_daily_data(profile, yesterday):
     strava_7d = [r for r in strava_60d if r.get("sk", "").replace("DATE#", "") >= strava_7d_cutoff]
 
     # Weight: latest + 7-day ago for weekly delta
-    withings_recent = fetch_range("withings", (today - timedelta(days=7)).isoformat(), yesterday)
+    # 30-day lookback so a few days without weighing doesn't null out the homepage
+    withings_recent = fetch_range("withings", (today - timedelta(days=30)).isoformat(), yesterday)
     latest_weight = None
     for w in reversed(withings_recent):
         wt = safe_float(w, "weight_lbs")
@@ -1234,8 +1235,8 @@ def lambda_handler(event, context):
     # OBS-1: Set correlation_id so all structured logs tie to this execution date
     try:
         logger.set_date(yesterday)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[WARN] logger.set_date failed (correlation_id missing for this execution): {e}")
 
     data = gather_daily_data(profile, yesterday)
     print("[INFO] Date: " + yesterday + " | sources: " +
@@ -1684,7 +1685,8 @@ def lambda_handler(event, context):
             # Journey calc from profile
             _start_wt = float(profile.get("journey_start_weight_lbs", 302))
             _goal_wt  = float(profile.get("goal_weight_lbs", 185))
-            _curr_wt  = float(data.get("latest_weight") or 0)
+            # Task 1: keep None as None — don't coerce to 0.0 (0.0 is falsy, breaks null checks)
+            _curr_wt  = data.get("latest_weight")  # float or None
             _lost     = round(_start_wt - _curr_wt, 1) if _curr_wt else 0
             _remain   = round(_curr_wt - _goal_wt, 1) if _curr_wt else 0
             _prog_pct = round(_lost / (_start_wt - _goal_wt) * 100, 1) if _lost and _start_wt != _goal_wt else 0

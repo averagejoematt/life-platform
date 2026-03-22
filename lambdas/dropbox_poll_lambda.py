@@ -210,15 +210,48 @@ def cleanup_processed(access_token, folder_path="/life-platform/processed", keep
 # TRACKING
 # ══════════════════════════════════════════════════════════════════════════════
 
-def get_processed_hashes():
-    """Get set of processed file content hashes from DynamoDB."""
+def get_tracker_item() -> dict:
+    """Fetch the full tracker DynamoDB item (hashes + last check metadata)."""
     try:
         resp = table.get_item(Key={"pk": PK_TRACKER, "sk": "PROCESSED_FILES"})
-        item = resp.get("Item", {})
-        return set(item.get("file_hashes", []))
+        return resp.get("Item", {})
     except Exception as e:
         logger.warning(f"Failed to read tracker: {e}")
-        return set()
+        return {}
+
+
+def get_processed_hashes():
+    """Get set of processed file content hashes from DynamoDB."""
+    return set(get_tracker_item().get("file_hashes", []))
+
+
+def _is_recently_empty(item: dict, window_seconds: int = 1500) -> bool:
+    """
+    COST-03: Short-circuit guard.
+    Returns True if the last Dropbox poll found no new files AND was within `window_seconds`.
+    Default 1500s = 25 min (cron runs every 30 min — avoids double-polling same window).
+    """
+    last_empty = item.get("last_empty_poll_at", "")
+    if not last_empty:
+        return False
+    try:
+        last_dt = datetime.fromisoformat(last_empty.replace("Z", "+00:00"))
+        age = (datetime.now(timezone.utc) - last_dt).total_seconds()
+        return age < window_seconds
+    except Exception:
+        return False
+
+
+def _mark_empty_poll() -> None:
+    """Record that Dropbox returned no new files this invocation (COST-03)."""
+    try:
+        table.update_item(
+            Key={"pk": PK_TRACKER, "sk": "PROCESSED_FILES"},
+            UpdateExpression="SET last_empty_poll_at = :t",
+            ExpressionAttributeValues={":t": datetime.now(timezone.utc).isoformat()},
+        )
+    except Exception as e:
+        logger.warning(f"Failed to mark empty poll: {e}")
 
 
 def mark_file_processed(filename, file_hash, file_size):
@@ -284,6 +317,14 @@ def lambda_handler(event, context):
         logger.info("Dropbox poll starting...")
         force = event.get("force", False)
 
+        # COST-03: Short-circuit if we polled recently and found nothing.
+        # Saves Dropbox API calls when no files have appeared in the last ~25 min.
+        if not force:
+            tracker = get_tracker_item()
+            if _is_recently_empty(tracker):
+                logger.info("COST-03: Dropbox was empty at last poll (<25 min ago) — skipping")
+                return {"statusCode": 200, "body": "Skipped — recently checked, no new files"}
+
         # ── Auth ──
         secret_data = get_dropbox_secret()
         access_token = refresh_access_token(
@@ -298,6 +339,7 @@ def lambda_handler(event, context):
         logger.info(f"Found {len(files)} files in app folder")
 
         if not files:
+            _mark_empty_poll()
             return {"statusCode": 200, "body": "No files found"}
 
         # ── Filter to MacroFactor CSVs ──
@@ -324,6 +366,7 @@ def lambda_handler(event, context):
 
         if not csv_files:
             logger.info("No new MacroFactor CSVs to process")
+            _mark_empty_poll()
             return {"statusCode": 200, "body": "No MacroFactor CSVs found"}
 
         # ── Check which are new ──

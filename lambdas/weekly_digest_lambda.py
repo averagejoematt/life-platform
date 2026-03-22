@@ -1039,7 +1039,7 @@ def build_html(data, commentary, profile):
             gc = grade_colour(d["grade"])
             day_name = ""
             try: day_name = datetime.strptime(d["date"], "%Y-%m-%d").strftime("%a")[0]
-            except Exception: pass
+            except Exception as e: logger.warning("day_name parse failed for %s: %s", d.get("date"), e)
             bars_html += (f'<div style="flex:1;text-align:center;">'
                           f'<div style="font-size:9px;color:{gc};font-weight:700;margin-bottom:2px;">{d["score"]}</div>'
                           f'<div style="height:{h}px;background:{gc};border-radius:3px 3px 0 0;margin:0 auto;width:80%;"></div>'

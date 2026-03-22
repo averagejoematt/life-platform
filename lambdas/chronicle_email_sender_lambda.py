@@ -91,7 +91,12 @@ def _get_this_weeks_installment() -> dict | None:
         if not items:
             logger.info("No Chronicle installment found within last 7 days — no-op")
             return None
-        return _d2f(items[0])
+        installment = _d2f(items[0])
+        # FEAT-12: Skip drafts — only send published installments to subscribers.
+        if installment.get("status") == "draft":
+            logger.info("Most recent Chronicle installment is still a draft — no-op (awaiting approval)")
+            return None
+        return installment
     except Exception as exc:
         logger.error("Failed to query Chronicle DDB: %s", exc)
         return None

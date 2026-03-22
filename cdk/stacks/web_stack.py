@@ -261,6 +261,7 @@ class WebStack(Stack):
                 "EMAIL_SENDER":     "lifeplatform@mattsusername.com",
                 "SITE_URL":         "https://averagejoematt.com",
                 "DYNAMODB_REGION":  "us-west-2",  # DDB table is in us-west-2; Lambda runs in us-east-1
+                "SES_REGION":       "us-west-2",  # SES verified identity is in us-west-2
             },
         )
 
@@ -351,6 +352,11 @@ class WebStack(Stack):
                 security_headers_config=cloudfront.CfnResponseHeadersPolicy.SecurityHeadersConfigProperty(
                     content_security_policy=cloudfront.CfnResponseHeadersPolicy.ContentSecurityPolicyProperty(
                         content_security_policy=(
+                            # SEC-05: 'unsafe-inline' kept intentionally — all JS/CSS is
+                            # first-party and server-rendered with no user-controlled content.
+                            # Nonce-based CSP would require per-request Lambda changes for a
+                            # static S3 site. Risk: low (no XSS vectors today). Revisit if
+                            # user-generated content is ever added.
                             "default-src 'self'; "
                             "script-src 'self' 'unsafe-inline'; "
                             "style-src 'self' 'unsafe-inline'; "
@@ -384,6 +390,16 @@ class WebStack(Stack):
         )
 
         # ══════════════════════════════════════════════════════════════
+        # SEC-02: WAF WebACL ARN — defined here (before amj_dist) so CDK
+        # tracks the association and a cdk deploy cannot accidentally
+        # disassociate the WAF from the CloudFront distribution.
+        # WebACL pre-existed in us-east-1 (id: 3d75472e-e18b-4d1c-b76b-8bbe63cb05e8).
+        # Rules: SubscribeRateLimit (60/5min), GlobalRateLimit (1000/5min),
+        #        RateLimitAsk (100/5min), RateLimitBoardAsk (100/5min).
+        # ══════════════════════════════════════════════════════════════
+        WAF_WEB_ACL_ARN = f"arn:aws:wafv2:us-east-1:{ACCT}:global/webacl/life-platform-amj-waf/3d75472e-e18b-4d1c-b76b-8bbe63cb05e8"
+
+        # ══════════════════════════════════════════════════════════════
         # averagejoematt.com — main website
         # Two origins:
         #   1. S3 /site  → static pages (default behaviour)
@@ -398,6 +414,7 @@ class WebStack(Stack):
                 aliases=["averagejoematt.com", "www.averagejoematt.com"],
                 price_class="PriceClass_100",
                 default_root_object="index.html",
+                web_acl_id=WAF_WEB_ACL_ARN,  # SEC-02: CDK now owns WAF association — prevents accidental disassociation on cdk deploy
                 viewer_certificate=cloudfront.CfnDistribution.ViewerCertificateProperty(
                     acm_certificate_arn=CERT_ARN_AMJ,
                     ssl_support_method="sni-only",
@@ -575,19 +592,10 @@ class WebStack(Stack):
             ),
         )
 
-        # ══════════════════════════════════════════════════════════════
-        # R17-01: WAF WebACL — rate-based rules for public API endpoints.
-        # WebACL pre-existed in us-east-1 (id: 3d75472e-e18b-4d1c-b76b-8bbe63cb05e8).
-        # Rules managed via AWS CLI (existing resource; CDK import not required).
-        # Rules: SubscribeRateLimit (60/5min), GlobalRateLimit (1000/5min),
-        #        RateLimitAsk (100/5min), RateLimitBoardAsk (100/5min).
-        # Association with E3S424OXQZ8NBE set via CloudFront update-distribution 2026-03-20.
-        # ══════════════════════════════════════════════════════════════
-        WAF_WEB_ACL_ARN = "arn:aws:wafv2:us-east-1:205930651321:global/webacl/life-platform-amj-waf/3d75472e-e18b-4d1c-b76b-8bbe63cb05e8"
-
+        # WAF WebACL ARN output (WAF_WEB_ACL_ARN defined above, before amj_dist — SEC-02)
         cdk.CfnOutput(self, "AmjWafWebAclArn",
             value=WAF_WEB_ACL_ARN,
-            description="WAF WebACL ARN for averagejoematt.com CloudFront distribution (R17-01)",
+            description="WAF WebACL ARN for averagejoematt.com CloudFront distribution (R17-01/SEC-02)",
         )
 
         # ══════════════════════════════════════════════════════════════

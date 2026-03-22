@@ -160,7 +160,8 @@ class IngestionStack(Stack):
             custom_policies=rp.ingestion_macrofactor(), **shared)
         macrofactor.add_permission("S3InvokeMacrofactor",
             principal=iam.ServicePrincipal("s3.amazonaws.com"),
-            source_arn=f"arn:aws:s3:::matthew-life-platform")
+            source_arn=f"arn:aws:s3:::{S3_BUCKET}",  # SEC-01: IAM level is bucket-scoped; prefix filtering enforced via S3 event notification filter on uploads/macrofactor/ prefix
+            source_account=self.account)
 
         # ── 12. Weather — 5:45 AM PT daily
         create_platform_lambda(self, "WeatherIngestion",
@@ -195,7 +196,8 @@ class IngestionStack(Stack):
             custom_policies=rp.ingestion_apple_health(), **shared)
         apple_health.add_permission("S3InvokeAppleHealth",
             principal=iam.ServicePrincipal("s3.amazonaws.com"),
-            source_arn=f"arn:aws:s3:::matthew-life-platform")
+            source_arn=f"arn:aws:s3:::{S3_BUCKET}",  # SEC-01: IAM level is bucket-scoped; prefix filtering enforced via S3 event notification filter on uploads/apple-health/ prefix
+            source_account=self.account)
 
         # ── 15. Health Auto Export Webhook — API Gateway trigger
         _ASSET_EXCLUDES = ["__pycache__", "**/__pycache__/**", "*.pyc", "**/*.pyc", "*.md", ".DS_Store", "dashboard", "dashboard/**", "buddy", "buddy/**", "cf-auth", "cf-auth/**", "requirements", "requirements/**"]

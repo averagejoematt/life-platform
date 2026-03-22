@@ -5,11 +5,12 @@ v2.0 (v3.4.0): CDK-managed IAM roles replace existing_role_arn references.
   All 8 Lambdas get dedicated CDK-owned roles with least-privilege policies.
 
 v2.1 (v3.7.62): BS-03 Chronicle Email Sender added.
+v2.2 (FEAT-12): chronicle-approve Lambda + preview-before-publish workflow.
 
-Lambdas (9):
+Lambdas (10):
   daily-brief, weekly-digest, monthly-digest, nutrition-review,
   wednesday-chronicle, weekly-plate, monday-compass, brittany-weekly-email,
-  evening-nudge, chronicle-email-sender (BS-03)
+  evening-nudge, chronicle-email-sender (BS-03), chronicle-approve (FEAT-12)
 
 """
 
@@ -27,7 +28,7 @@ from constructs import Construct
 
 from stacks.lambda_helpers import create_platform_lambda
 from stacks import role_policies as rp
-from stacks.constants import SHARED_LAYER_ARN, ACCT, REGION  # single source of truth for layer version
+from stacks.constants import SHARED_LAYER_ARN, ACCT, REGION, CF_DIST_ID  # single source of truth for layer version
 
 INGESTION_DLQ_ARN    = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
 LIFE_PLATFORM_TABLE  = "life-platform"
@@ -64,7 +65,7 @@ class EmailStack(Stack):
 
         create_platform_lambda(self, "NutritionReview", function_name="nutrition-review", handler="nutrition_review_lambda.lambda_handler", source_file="lambdas/nutrition_review_lambda.py", schedule="cron(0 17 ? * SAT *)", timeout_seconds=120, memory_mb=256, environment=_email_env, custom_policies=rp.email_nutrition_review(), **shared)
 
-        create_platform_lambda(self, "WednesdayChronicle", function_name="wednesday-chronicle", handler="wednesday_chronicle_lambda.lambda_handler", source_file="lambdas/wednesday_chronicle_lambda.py", schedule="cron(0 15 ? * WED *)", timeout_seconds=120, memory_mb=256, environment=_email_env, custom_policies=rp.email_wednesday_chronicle(), **shared)
+        wednesday_chronicle = create_platform_lambda(self, "WednesdayChronicle", function_name="wednesday-chronicle", handler="wednesday_chronicle_lambda.lambda_handler", source_file="lambdas/wednesday_chronicle_lambda.py", schedule="cron(0 15 ? * WED *)", timeout_seconds=120, memory_mb=256, environment=_email_env, custom_policies=rp.email_wednesday_chronicle(), **shared)
 
         create_platform_lambda(self, "WeeklyPlate", function_name="weekly-plate", handler="weekly_plate_lambda.lambda_handler", source_file="lambdas/weekly_plate_lambda.py", schedule="cron(0 2 ? * SAT *)", timeout_seconds=120, memory_mb=512, environment=_email_env, custom_policies=rp.email_weekly_plate(), **shared)
 
@@ -83,7 +84,7 @@ class EmailStack(Stack):
         # Independent DLQ + alarm from wednesday-chronicle.
         # timeout_seconds=300: headroom for ~300 subs at 1/sec rate limit.
         # Bump SEND_RATE_PER_SEC env var after SES production access is granted.
-        create_platform_lambda(
+        chronicle_sender = create_platform_lambda(
             self, "ChronicleEmailSender",
             function_name="chronicle-email-sender",
             handler="chronicle_email_sender_lambda.lambda_handler",
@@ -98,3 +99,36 @@ class EmailStack(Stack):
             custom_policies=rp.email_chronicle_sender(),
             **shared,
         )
+
+        # FEAT-12: Chronicle Approve Lambda — one-click approve/reject for Chronicle drafts.
+        # Invoked via Lambda Function URL embedded in the preview email.
+        # No EventBridge schedule — triggered only by Matthew clicking the preview email link.
+        # approve → writes pre-built S3 artifacts, invalidates CF, invokes chronicle-email-sender.
+        # request_changes → marks DDB status, no publish.
+        chronicle_approve = create_platform_lambda(
+            self, "ChronicleApprove",
+            function_name="chronicle-approve",
+            handler="chronicle_approve_lambda.lambda_handler",
+            source_file="lambdas/chronicle_approve_lambda.py",
+            timeout_seconds=30,
+            memory_mb=256,
+            environment={
+                "CF_DIST_ID":                   CF_DIST_ID,
+                "CHRONICLE_EMAIL_SENDER_ARN":    chronicle_sender.function_arn,
+            },
+            custom_policies=rp.email_chronicle_approve(),
+            **shared,
+        )
+        approve_url_obj = chronicle_approve.add_function_url(
+            auth_type=_lambda.FunctionUrlAuthType.NONE,
+        )
+        cdk.CfnOutput(self, "ChronicleApproveFunctionUrl",
+            value=approve_url_obj.url,
+            description="Lambda Function URL for chronicle-approve (FEAT-12 preview workflow)",
+        )
+
+        # Update wednesday-chronicle to know the approve Lambda URL.
+        # PREVIEW_MODE defaults to 'true'; set to 'false' in CDK context to disable preview.
+        _preview_mode = self.node.try_get_context("chronicle_preview_mode") or "true"
+        wednesday_chronicle.add_environment("PREVIEW_MODE",       _preview_mode)
+        wednesday_chronicle.add_environment("APPROVE_LAMBDA_URL", approve_url_obj.url)

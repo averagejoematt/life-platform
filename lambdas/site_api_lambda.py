@@ -144,6 +144,11 @@ def _is_blocked_vice(name: str) -> bool:
 # ── CORS headers ────────────────────────────────────────────
 # SEC-07: CORS_ORIGIN is env-configurable so staging/dev can override.
 CORS_ORIGIN = os.environ.get("CORS_ORIGIN", "https://averagejoematt.com")
+
+# SEC-04: CloudFront injects X-AMJ-Origin header on every origin request.
+# When SITE_API_ORIGIN_SECRET is set, requests missing this header are rejected with 403.
+# Leave unset in local/test environments to disable the check.
+SITE_API_ORIGIN_SECRET = os.environ.get("SITE_API_ORIGIN_SECRET", "")
 CORS_HEADERS = {
     "Access-Control-Allow-Origin":  CORS_ORIGIN,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -960,24 +965,26 @@ def _handle_verify_subscriber(event: dict) -> dict:
 # ── S2-T2-2: Board Ask ────────────────────────────────────────────────────────
 
 PERSONA_PROMPTS = {
-    "attia": {
-        "name": "Peter Attia",
-        "title": "Longevity & Performance Medicine",
+    "vasquez": {
+        "name": "Dr. Elena Vasquez",
+        "title": "Metabolic Medicine & Longevity",
         "system": (
-            "You are Peter Attia, MD, longevity physician and author of Outlive. "
-            "Focus on: VO2max, Zone 2 training, strength, metabolic health, and the four horsemen of chronic disease. "
+            "You are Dr. Elena Vasquez, MD, a metabolic medicine physician specializing in longevity. "
+            "Focus on: VO2max, Zone 2 training, strength, metabolic health, and the major drivers of chronic disease. "
             "Evidence-based and nuanced. Distinguish strong evidence from speculation. "
+            "Your perspective is informed by current peer-reviewed research. Do not reference specific researchers by name. "
             "Use first person. 3-5 sentences. Note N=1 for any comparative claim. "
             "Never give medical advice — reference a physician only if clinically urgent."
         ),
     },
-    "huberman": {
-        "name": "Andrew Huberman",
-        "title": "Neuroscience & Sleep",
+    "okafor": {
+        "name": "Dr. James Okafor",
+        "title": "Performance Neuroscience",
         "system": (
-            "You are Andrew Huberman PhD, Stanford neuroscientist. "
-            "Focus on: sleep, light exposure, stress resilience, dopamine, and performance neuroscience. "
+            "You are Dr. James Okafor PhD, a performance neuroscientist. "
+            "Focus on: sleep architecture, light exposure, stress resilience, neuroplasticity, and dopamine. "
             "Explain the mechanism first, then the protocol. "
+            "Your perspective is informed by current peer-reviewed research. Do not reference specific researchers by name. "
             "Use phrases like 'the data are clear' and 'the mechanism here is'. "
             "3-5 sentences. Actionable and specific."
         ),
@@ -1031,8 +1038,8 @@ BOARD_RATE_LIMIT = 5  # per IP per hour
 def _handle_board_ask(event: dict) -> dict:
     """
     POST /api/board_ask
-    Body: {"question": str, "personas": ["attia", ...]}
-    Returns: {"responses": {"attia": "...", ...}}
+    Body: {"question": str, "personas": ["vasquez", ...]}
+    Returns: {"responses": {"vasquez": "...", ...}}
     S2-T2-2: Lead magnet — each board member answers in their own voice.
     """
     source_ip = (
@@ -1067,7 +1074,7 @@ def _handle_board_ask(event: dict) -> dict:
     requested = body.get("personas") or list(PERSONA_PROMPTS.keys())
     personas = [p for p in requested if p in PERSONA_PROMPTS][:6]
     if not personas:
-        personas = ["attia", "huberman", "clear"]
+        personas = ["vasquez", "okafor", "clear"]
 
     api_key = _get_anthropic_key()
     if not api_key:
@@ -1427,6 +1434,199 @@ def handle_sleep_detail() -> dict:
     }, cache_seconds=3600)
 
 
+# ── ARCH-03: Achievements endpoint ──────────────────────────
+
+def handle_achievements() -> dict:
+    """
+    GET /api/achievements
+    Computes earned/locked achievement badges from DynamoDB.
+    Sources: habit_scores (streaks), character_sheet (level), withings (weight milestones),
+             experiments (first experiment), habits (days tracked).
+    Cache: 3600s (1 hr) — achievements update nightly.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d365 = (datetime.now(timezone.utc) - timedelta(days=365)).strftime("%Y-%m-%d")
+
+    # ── Streak data
+    habit_pk = f"{USER_PREFIX}habit_scores"
+    habit_resp = table.query(
+        KeyConditionExpression=Key("pk").eq(habit_pk),
+        ScanIndexForward=False,
+        Limit=1,
+    )
+    habit_items = _decimal_to_float(habit_resp.get("Items", []))
+    latest_habit = habit_items[0] if habit_items else {}
+    current_streak = int(latest_habit.get("t0_perfect_streak") or latest_habit.get("t0_aggregate_streak") or 0)
+
+    # Days tracked = count of habit_score records in last 365 days
+    all_habits_resp = table.query(
+        KeyConditionExpression=Key("pk").eq(habit_pk) & Key("sk").between(
+            f"DATE#{d365}", f"DATE#{today}"
+        ),
+    )
+    days_tracked = len(all_habits_resp.get("Items", []))
+
+    # ── Character level
+    char_pk = f"{USER_PREFIX}character_sheet"
+    char_resp = table.query(
+        KeyConditionExpression=Key("pk").eq(char_pk),
+        ScanIndexForward=False,
+        Limit=1,
+    )
+    char_items = _decimal_to_float(char_resp.get("Items", []))
+    current_level = int(float((char_items[0] if char_items else {}).get("character_level", 1)))
+
+    # ── Weight milestones
+    withings = _latest_item("withings")
+    current_weight = float(withings.get("weight_lbs", 999)) if withings else 999.0
+    start_weight = 302.0
+    lost_lbs = round(start_weight - current_weight, 1) if current_weight < start_weight else 0
+
+    # ── First experiment
+    exp_pk = f"{USER_PREFIX}experiments"
+    exp_resp = table.query(
+        KeyConditionExpression=Key("pk").eq(exp_pk),
+        ScanIndexForward=False,
+        Limit=5,
+    )
+    completed_exps = [
+        i for i in _decimal_to_float(exp_resp.get("Items", []))
+        if i.get("sk", "").startswith("EXP#") and i.get("status") in ("completed", "confirmed")
+    ]
+
+    def badge(id_, label, category, desc, earned, earned_date=None, unlock_hint=None):
+        return {
+            "id": id_, "label": label, "category": category, "description": desc,
+            "earned": earned, "earned_date": earned_date, "unlock_hint": unlock_hint,
+        }
+
+    achievements = [
+        # ── Streak
+        badge("week_warrior", "Week Warrior", "streak",
+              "7-day Tier 0 habit streak",
+              earned=current_streak >= 7,
+              earned_date=today if current_streak >= 7 else None,
+              unlock_hint=f"{max(0, 7 - current_streak)} days to unlock" if current_streak < 7 else None),
+        badge("monthly_grind", "Monthly Grind", "streak",
+              "30-day Tier 0 habit streak",
+              earned=current_streak >= 30,
+              earned_date=today if current_streak >= 30 else None,
+              unlock_hint=f"{max(0, 30 - current_streak)} days to unlock" if current_streak < 30 else None),
+        badge("quarterly", "Quarterly", "streak",
+              "90-day Tier 0 habit streak",
+              earned=current_streak >= 90,
+              unlock_hint=f"{max(0, 90 - current_streak)} days to unlock" if current_streak < 90 else None),
+
+        # ── Level
+        badge("first_level_up", "First Level Up", "level",
+              "Reached Character Level 2",
+              earned=current_level >= 2,
+              earned_date=today if current_level >= 2 else None),
+        badge("apprentice", "Apprentice", "level",
+              "Reached Character Level 5",
+              earned=current_level >= 5,
+              unlock_hint=f"Level {current_level} → Level 5 needed" if current_level < 5 else None),
+        badge("journeyman", "Journeyman", "level",
+              "Reached Character Level 10",
+              earned=current_level >= 10,
+              unlock_hint=f"Level {current_level} → Level 10 needed" if current_level < 10 else None),
+
+        # ── Weight milestones
+        badge("lost_20", "−20 lbs", "milestone",
+              "Lost first 20 lbs",
+              earned=lost_lbs >= 20,
+              earned_date=today if lost_lbs >= 20 else None),
+        badge("sub_280", "Sub-280", "milestone",
+              "Weight under 280 lbs",
+              earned=current_weight < 280,
+              earned_date=today if current_weight < 280 else None,
+              unlock_hint=f"{round(current_weight - 280, 1)} lbs to unlock" if current_weight >= 280 else None),
+        badge("sub_260", "Sub-260", "milestone",
+              "Weight under 260 lbs",
+              earned=current_weight < 260,
+              unlock_hint=f"{round(current_weight - 260, 1)} lbs to unlock" if current_weight >= 260 else None),
+
+        # ── Data
+        badge("100_days", "100 Days Tracked", "data",
+              "100+ days of habit logging",
+              earned=days_tracked >= 100,
+              earned_date=today if days_tracked >= 100 else None,
+              unlock_hint=f"{max(0, 100 - days_tracked)} days to unlock" if days_tracked < 100 else None),
+        badge("365_days", "Year of Data", "data",
+              "365 days of habit logging",
+              earned=days_tracked >= 365,
+              unlock_hint=f"{max(0, 365 - days_tracked)} days to unlock" if days_tracked < 365 else None),
+
+        # ── Experiment
+        badge("first_experiment", "First Experiment", "science",
+              "Completed first N=1 experiment",
+              earned=len(completed_exps) >= 1,
+              earned_date=today if completed_exps else None),
+        badge("hypothesis_confirmed", "Hypothesis Confirmed", "science",
+              "N=1 result statistically validated",
+              earned=False,  # requires manual confirmation
+              unlock_hint="Complete a tracked experiment to unlock"),
+    ]
+
+    earned_count = sum(1 for a in achievements if a["earned"])
+
+    return _ok({
+        "achievements": achievements,
+        "summary": {
+            "earned": earned_count,
+            "total":  len(achievements),
+            "current_streak": current_streak,
+            "days_tracked":   days_tracked,
+            "current_level":  current_level,
+            "current_weight": round(current_weight, 1),
+        },
+    }, cache_seconds=3600)
+
+
+# ── ARCH-02: Snapshot endpoint ──────────────────────────────
+
+def handle_snapshot() -> dict:
+    """
+    GET /api/snapshot
+    Combined response: vitals + journey + character in one call.
+    Reduces client-side roundtrips for pages that need all three (e.g. /live/, homepage).
+    On partial failure any sub-object is null; callers must handle gracefully.
+    """
+    vitals_result = journey_result = character_result = None
+    try:
+        vitals_result = handle_vitals()
+        vitals_body = json.loads(vitals_result.get("body", "{}"))
+    except Exception as _e:
+        logger.warning("[snapshot] vitals failed: %s", _e)
+        vitals_body = None
+
+    try:
+        journey_result = handle_journey()
+        journey_body = json.loads(journey_result.get("body", "{}"))
+    except Exception as _e:
+        logger.warning("[snapshot] journey failed: %s", _e)
+        journey_body = None
+
+    try:
+        character_result = handle_character()
+        character_body = json.loads(character_result.get("body", "{}"))
+    except Exception as _e:
+        logger.warning("[snapshot] character failed: %s", _e)
+        character_body = None
+
+    payload = {
+        "vitals":    vitals_body,
+        "journey":   journey_body,
+        "character": character_body,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    return {
+        "statusCode": 200,
+        "headers":    {**CORS_HEADERS, "Cache-Control": "public, max-age=60"},
+        "body":       json.dumps(payload, default=str),
+    }
+
+
 # ── Router ──────────────────────────────────────────────────
 
 ROUTES = {
@@ -1450,6 +1650,10 @@ ROUTES = {
     # Sprint 11: glucose + sleep intelligence pages
     "/api/glucose":            handle_glucose,
     "/api/sleep_detail":       handle_sleep_detail,
+    # ARCH-03: Achievement badges
+    "/api/achievements":       handle_achievements,
+    # ARCH-02: Combined snapshot — single-call summary for pages that need vitals + journey + character
+    "/api/snapshot":           handle_snapshot,
     # Website Review: Ask the Platform
     "/api/ask":                handle_ask,
     # WR-24 + S2-T2-2: handled specially in lambda_handler (POST routes)
@@ -1469,6 +1673,14 @@ def lambda_handler(event, context):
     # CORS preflight
     if method == "OPTIONS":
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
+
+    # SEC-04: Reject requests that didn't come through CloudFront (when secret is configured).
+    if SITE_API_ORIGIN_SECRET:
+        req_headers = event.get("headers") or {}
+        incoming = req_headers.get("x-amj-origin") or req_headers.get("X-AMJ-Origin") or ""
+        import hmac as _hmac
+        if not _hmac.compare_digest(incoming, SITE_API_ORIGIN_SECRET):
+            return _error(403, "Forbidden")
 
     # WR-24: Subscriber verification (GET)
     if path == "/api/verify_subscriber":

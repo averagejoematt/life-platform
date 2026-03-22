@@ -138,8 +138,12 @@ def fix_nav(html: str) -> tuple[str, int]:
     if 'id="experiment"' in html and 'hero' in html:
         return html, 0
 
-    # Check if nav already matches the correct standard
+    # Check if nav already matches the correct standard (flat Sprint 8 nav)
     if 'href="/story/" class="nav__link">Story' in old_nav and 'nav__hamburger' in old_nav:
+        return html, 0
+
+    # Don't overwrite v2 dropdown nav (Sprint 11+)
+    if 'nav__dropdown' in old_nav:
         return html, 0
 
     html = html[:match.start()] + STANDARD_NAV + html[match.end():]

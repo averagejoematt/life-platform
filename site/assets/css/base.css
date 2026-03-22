@@ -237,6 +237,69 @@ body { padding-bottom: 36px; }
   color: var(--accent);
 }
 
+/* ── Dropdown nav ────────────────────────────────────────── */
+.nav__dropdown {
+  position: relative;
+}
+.nav__dropdown-btn {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: color var(--dur-fast) var(--ease-out);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.nav__dropdown-btn::after {
+  content: '▾';
+  font-size: 9px;
+  opacity: 0.5;
+}
+.nav__dropdown-btn:hover,
+.nav__dropdown.is-active .nav__dropdown-btn { color: var(--accent); }
+.nav__dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  min-width: 154px;
+  z-index: calc(var(--z-nav) + 10);
+  padding: var(--space-2) 0;
+}
+/* Bridge the 10px gap so mouse can travel from button to menu without hover dropping */
+.nav__dropdown-menu::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: 0;
+  right: 0;
+  height: 12px;
+}
+.nav__dropdown:hover .nav__dropdown-menu,
+.nav__dropdown.is-open .nav__dropdown-menu { display: block; }
+.nav__dropdown-item {
+  display: block;
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--ls-tag);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: color var(--dur-fast), background var(--dur-fast);
+}
+.nav__dropdown-item:hover,
+.nav__dropdown-item.active { color: var(--accent); background: var(--surface); }
+
 .nav__status {
   display: flex;
   align-items: center;
@@ -774,6 +837,38 @@ body { padding-bottom: 36px; }
   pointer-events: auto;
 }
 .back-to-top:hover { background: var(--surface-raised); color: var(--accent); }
+/* ── ARCH-01: Experiment Thread component ────────────────── */
+/* Single-line anchor showing how this page's data feeds the experiment's causal chain. */
+/* Usage: <div class="experiment-thread">This data feeds your <a href="/character/">Recovery Pillar → Character Score</a></div> */
+.experiment-thread {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--page-padding);
+  background: var(--accent-bg-subtle);
+  border-bottom: 1px solid var(--accent-bg);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: var(--ls-label);
+}
+.experiment-thread::before {
+  content: '⟶';
+  color: var(--accent-dim);
+  flex-shrink: 0;
+}
+.experiment-thread a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 700;
+}
+.experiment-thread a:hover {
+  text-decoration: underline;
+}
+@media (max-width: 768px) {
+  .experiment-thread { font-size: 11px; }
+}
+
 @media (max-width: 768px) {
   .back-to-top { bottom: calc(60px + 36px + var(--space-4)); }
 }

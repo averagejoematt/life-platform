@@ -58,6 +58,12 @@ def check_page(html_path: Path):
         error(rel, f"Cannot read file: {e}")
         return
 
+    # Skip deep checks on redirect-only pages (meta http-equiv refresh)
+    # They intentionally have no nav, OG tags, RSS, etc.
+    if 'http-equiv="refresh"' in content or "http-equiv='refresh'" in content:
+        ok()  # count as pass
+        return
+
     # ── 1. DOCTYPE and basic structure
     if "<!DOCTYPE html>" not in content and "<!doctype html>" not in content:
         error(rel, "Missing DOCTYPE")
@@ -133,14 +139,14 @@ def check_page(html_path: Path):
         error(rel, "Old nav links detected (/#experiment) — nav not updated to Sprint 8 Story/Live/Journal/Platform")
     else:
         ok()
-    if not re.search(r'href="/story/" class="nav__link[^"]*">Story', content):
-        error(rel, "Nav missing Story link — nav is wrong version")
+    # Phase 1 IA: top nav must use 5-section dropdown (nav__dropdown-btn)
+    if 'nav__dropdown-btn' not in content:
+        error(rel, "Nav missing dropdown buttons — not Phase 1 IA nav")
     else:
         ok()
-    # Sprint 11: top nav must have Explore (→/start/), not About
-    if 'href="/start/" class="nav__link">Explore' not in content and \
-       '>Explore<' not in content:
-        warn(rel, "Nav may be missing Explore link (Sprint 11) — check if About was replaced")
+    # Phase 1 IA: Chronicle must be in nav (replaced Journal)
+    if 'href="/chronicle/"' not in content:
+        warn(rel, "Nav/footer missing /chronicle/ link — check Phase 1 IA nav deploy")
     else:
         ok()
 
@@ -293,12 +299,30 @@ def check_consistency():
     all_titles = {}
     all_pages = list(SITE_DIR.rglob("index.html"))
 
+    # Pages where duplicate titles are expected and acceptable:
+    # - redirect pages (meta http-equiv refresh) — intentionally share generic titles
+    # - journal/posts mirror chronicle/posts (same content at two URLs during transition)
+    SKIP_DUPLICATE_CHECK = {
+        "journal/index.html",
+        "journal/archive/index.html",
+        "journal/sample/index.html",
+        "results/index.html",
+        "progress/index.html",
+        "achievements/index.html",
+        "start/index.html",
+    }
+    # Also skip all journal/posts/* (they mirror chronicle/posts/*)
     for page in all_pages:
+        rel = str(page.relative_to(SITE_DIR))
+        if rel in SKIP_DUPLICATE_CHECK or rel.startswith("journal/posts/"):
+            continue
         content = page.read_text(encoding="utf-8", errors="ignore")
+        # Skip redirect pages (any page with meta http-equiv refresh)
+        if 'http-equiv="refresh"' in content or "http-equiv='refresh'" in content:
+            continue
         title_match = re.search(r'<title>([^<]+)</title>', content)
         if title_match:
             title = title_match.group(1).strip()
-            rel = str(page.relative_to(SITE_DIR))
             if title in all_titles:
                 warn(rel, f"Duplicate <title> with {all_titles[title]!r}: {title!r}")
             else:

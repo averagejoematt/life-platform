@@ -19,6 +19,9 @@ Covers:
 
   DynamoDB item-size warning (1):
     life-platform-ddb-item-size-warning  LifePlatform/DynamoDB ItemSizeBytes Max >= 307200, 300s
+
+  S3 storage size alarm (1):  OBS-08
+    life-platform-s3-bucket-size-high  BucketSizeBytes Max >= 50GB, 86400s
 """
 
 import aws_cdk as cdk
@@ -137,42 +140,38 @@ class MonitoringStack(Stack):
 
         # ══════════════════════════════════════════════════════════════
         # OBS-02: Lambda memory utilization > 90% of limit
-        # Extracted from Lambda REPORT log lines via CloudWatch Logs Metric Filter.
-        # daily-brief: 512 MB limit → alarm at 460 MB
-        # site-api:    256 MB limit → alarm at 230 MB
+        # Only daily-brief (us-west-2) can be filtered here.
+        # site-api log group is in us-east-1 — cross-region not supported.
         # REPORT line format: REPORT RequestId: X Duration: X ms Billed Duration: X ms
         #   Memory Size: X MB Max Memory Used: X MB [Init Duration: X ms]
         # Fields [0-indexed]: 0=REPORT 17=max_memory_used_mb
+        # NOTE: dimensions and default_value are mutually exclusive in CWL MetricFilter.
         # ══════════════════════════════════════════════════════════════
         _report_pattern = (
             "[w0=\"REPORT\", w1, w2, w3, w4, w5, w6, w7, w8, w9, "
             "w10, w11, w12, w13, w14, w15, w16, maxMem, ...]"
         )
-        for fn_name, limit_mb in [("daily-brief", 512), ("site-api", 256)]:
-            log_group = logs.LogGroup.from_log_group_name(
-                self, f"MemFilerLg{fn_name.replace('-', '')}",
-                f"/aws/lambda/{fn_name}"
-            )
-            mf = logs.MetricFilter(
-                self, f"MemFilter{fn_name.replace('-', '')}",
-                log_group=log_group,
-                filter_pattern=logs.FilterPattern.literal(_report_pattern),
-                metric_name="MaxMemoryUsedMB",
-                metric_namespace="LifePlatform/Lambda",
-                metric_value="$maxMem",
-                default_value=0,
-                dimensions_map={"FunctionName": fn_name},
-            )
-            mem_alarm = cloudwatch.Alarm(
-                self, f"MemoryHigh{fn_name.replace('-', '')}",
-                alarm_name=f"life-platform-{fn_name}-memory-high",
-                metric=mf.metric(period=Duration.seconds(300), statistic="Maximum"),
-                evaluation_periods=1,
-                threshold=int(limit_mb * 0.9),
-                comparison_operator=GTE,
-                treat_missing_data=NB,
-            )
-            mem_alarm.add_alarm_action(cw_actions.SnsAction(topic))
+        db_log_group = logs.LogGroup.from_log_group_name(
+            self, "MemFilerLgdailybrief", "/aws/lambda/daily-brief"
+        )
+        db_mf = logs.MetricFilter(
+            self, "MemFilterdailybrief",
+            log_group=db_log_group,
+            filter_pattern=logs.FilterPattern.literal(_report_pattern),
+            metric_name="DailyBriefMaxMemoryMB",
+            metric_namespace="LifePlatform/Lambda",
+            metric_value="$maxMem",
+        )
+        mem_alarm_db = cloudwatch.Alarm(
+            self, "MemoryHighdailybrief",
+            alarm_name="life-platform-daily-brief-memory-high",
+            metric=db_mf.metric(period=Duration.seconds(300), statistic="Maximum"),
+            evaluation_periods=1,
+            threshold=int(512 * 0.9),
+            comparison_operator=GTE,
+            treat_missing_data=NB,
+        )
+        mem_alarm_db.add_alarm_action(cw_actions.SnsAction(topic))
 
         # ══════════════════════════════════════════════════════════════
         # OBS-08: S3 bucket storage size alarm
@@ -183,38 +182,11 @@ class MonitoringStack(Stack):
                "AWS/S3", "BucketSizeBytes", 86400, "Maximum", 50 * 1024 ** 3, GTE,
                {"BucketName": S3_BUCKET, "StorageType": "StandardStorage"})
 
-        # ══════════════════════════════════════════════════════════════
-        # OBS-04: site-api cold start alarm
-        # InitDuration only appears in REPORT lines on cold starts.
-        # Pattern: field[19]="Init" ensures only cold-start REPORT lines match.
-        # field[21] = initDur (the numeric ms value after "Init Duration:")
-        # Threshold: 5000ms — cold starts > 5s indicate oversized dependencies.
-        # ══════════════════════════════════════════════════════════════
-        _cold_start_pattern = (
-            "[w0=\"REPORT\", w1, w2, w3, w4, w5, w6, w7, w8, w9, "
-            "w10, w11, w12, w13, w14, w15, w16, w17, w18, "
-            "w19=\"Init\", w20, initDur, ...]"
-        )
-        site_api_lg = logs.LogGroup.from_log_group_name(
-            self, "SiteApiLogGroup", "/aws/lambda/site-api"
-        )
-        cold_start_mf = logs.MetricFilter(
-            self, "SiteApiColdStartFilter",
-            log_group=site_api_lg,
-            filter_pattern=logs.FilterPattern.literal(_cold_start_pattern),
-            metric_name="ColdStartDurationMs",
-            metric_namespace="LifePlatform/Lambda",
-            metric_value="$initDur",
-            default_value=0,
-            dimensions_map={"FunctionName": "site-api"},
-        )
-        cold_start_alarm = cloudwatch.Alarm(
-            self, "SiteApiColdStartHigh",
-            alarm_name="life-platform-site-api-cold-start-high",
-            metric=cold_start_mf.metric(period=Duration.seconds(300), statistic="Maximum"),
-            evaluation_periods=1,
-            threshold=5000,
-            comparison_operator=GTE,
-            treat_missing_data=NB,
-        )
-        cold_start_alarm.add_alarm_action(cw_actions.SnsAction(topic))
+        # NOTE: OBS-07 email-subscriber alarm lives in web_stack.py (us-east-1).
+        # email-subscriber Lambda runs in us-east-1; Lambda metrics are regional.
+        # Cross-region alarm would never fire. See web_stack.py SubscriberErrors alarm.
+
+        # OBS-04: site-api cold start alarm deferred — site-api Lambda and its
+        # log group (/aws/lambda/site-api) are in us-east-1; MonitoringStack is
+        # in us-west-2. Cross-region MetricFilter is not supported.
+        # Implement in a separate us-east-1 monitoring construct when needed.

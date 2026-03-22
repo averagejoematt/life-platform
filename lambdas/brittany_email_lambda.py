@@ -136,7 +136,7 @@ def _normalize_whoop_sleep(item):
             val = item.get(src_field)
             if val is not None and pct_field not in item:
                 try: out[pct_field] = round(float(val) / dur * 100, 1)
-                except Exception: pass
+                except Exception as e: logger.warning("sleep_pct calc failed for %s: %s", pct_field, e)
     return out
 
 
