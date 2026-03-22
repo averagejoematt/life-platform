@@ -17,7 +17,7 @@
   <meta name="twitter:description" content="Every commitment. Live compliance. No hiding.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <title>Accountability — Matthew Walker</title>
-    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
@@ -25,52 +25,93 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    .page-header {
-      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+    /* ─── State Hero (ACCT-1) ─── */
+    .state-hero {
+      padding-top: var(--nav-height);
       border-bottom: 1px solid var(--border);
+    }
+    .state-hero__inner {
       max-width: var(--max-width);
       margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-10);
     }
-    .page-header__eyebrow {
+    .state-hero__ring {
+      flex-shrink: 0;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: 3px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+    }
+    .state-hero__ring--thriving { border-color: var(--c-green-500); box-shadow: 0 0 20px rgba(0,229,160,0.2); }
+    .state-hero__ring--grinding { border-color: var(--c-amber-500); box-shadow: 0 0 20px rgba(186,117,23,0.2); }
+    .state-hero__ring--slipping { border-color: var(--c-red-status); box-shadow: 0 0 20px rgba(226,75,74,0.2); }
+    .state-hero__ring--dormant  { border-color: var(--border); border-style: dashed; opacity: 0.6; }
+    .state-hero__ring-dot {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: background var(--dur-fast);
+    }
+    .state-hero__ring--thriving .state-hero__ring-dot { background: var(--c-green-500); animation: pulse-dot 2s infinite; }
+    .state-hero__ring--grinding .state-hero__ring-dot { background: var(--c-amber-500); }
+    .state-hero__ring--slipping .state-hero__ring-dot { background: var(--c-red-status); }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+    .state-hero__body { flex: 1; }
+    .state-hero__eyebrow {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       color: var(--accent-dim);
-      margin-bottom: var(--space-4);
+      margin-bottom: var(--space-3);
     }
-    .page-header__title {
+    .state-hero__state {
       font-family: var(--font-display);
       font-size: var(--text-h1);
-      color: var(--text);
-      margin-bottom: var(--space-4);
       line-height: var(--lh-heading);
+      letter-spacing: var(--ls-display);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+      transition: color var(--dur-fast);
     }
-    .page-header__title span { color: var(--accent); }
-    .page-header__sub {
-      font-size: var(--text-base);
+    .state-hero__state--thriving { color: var(--c-green-500); }
+    .state-hero__state--grinding { color: var(--c-amber-500); }
+    .state-hero__state--slipping { color: var(--c-red-status); }
+    .state-hero__state--dormant  { color: var(--text-muted); }
+    .state-hero__detail {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
       color: var(--text-muted);
-      max-width: 560px;
       line-height: var(--lh-body);
     }
 
-    /* Core commitment stat cards */
-    .commitment-strip {
+    /* ─── 3-number snapshot (ACCT-3) ─── */
+    .snap3 {
       max-width: var(--max-width);
       margin: 0 auto;
-      padding: var(--space-8) var(--page-padding);
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 1px;
       background: var(--border);
       border-bottom: 1px solid var(--border);
     }
-    .commit-stat {
+    .snap3-card {
       background: var(--bg);
       padding: var(--space-8) var(--space-6);
-      text-align: center;
+      text-decoration: none;
+      display: block;
+      transition: background var(--dur-fast);
     }
-    .commit-stat__label {
+    .snap3-card:hover { background: var(--surface); }
+    .snap3-card__label {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
@@ -78,22 +119,28 @@
       color: var(--text-muted);
       margin-bottom: var(--space-3);
     }
-    .commit-stat__value {
+    .snap3-card__value {
       font-family: var(--font-display);
       font-size: 48px;
       line-height: 1;
       color: var(--accent);
       letter-spacing: var(--ls-display);
     }
-    .commit-stat__sub {
+    .snap3-card__sub {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
       color: var(--text-faint);
       margin-top: var(--space-2);
       letter-spacing: var(--ls-label);
     }
+    .snap3-card__arrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      margin-top: var(--space-3);
+    }
 
-    /* Section layout */
+    /* ─── Calendar section ─── */
     .acct-section {
       max-width: var(--max-width);
       margin: 0 auto;
@@ -119,306 +166,6 @@
       color: var(--text-muted);
       margin-bottom: var(--space-8);
       line-height: var(--lh-body);
-    }
-
-    /* Pillar grid */
-    .pillar-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-4);
-    }
-    .pillar-card {
-      border: 1px solid var(--border);
-      background: var(--surface);
-      padding: var(--space-6);
-      transition: border-color var(--dur-fast);
-    }
-    .pillar-card:hover { border-color: var(--accent); }
-    .pillar-card__header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: var(--space-4);
-      gap: var(--space-3);
-    }
-    .pillar-card__name {
-      font-family: var(--font-display);
-      font-size: 20px;
-      color: var(--text);
-      line-height: 1.2;
-    }
-    .pillar-badge {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      padding: 3px 8px;
-      border: 1px solid;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .pillar-badge.green  { color: var(--accent); border-color: var(--c-green-100); background: var(--c-green-050); }
-    .pillar-badge.amber  { color: var(--c-amber-500); border-color: var(--c-amber-100); background: var(--c-amber-050); }
-    .pillar-badge.red    { color: var(--c-red-status); border-color: rgba(255,82,82,0.25); background: rgba(255,82,82,0.05); }
-
-    /* Score bar */
-    .score-bar-row {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-      margin-bottom: var(--space-3);
-    }
-    .score-bar-track {
-      flex: 1;
-      height: 6px;
-      background: var(--surface-raised);
-      border: 1px solid var(--border-subtle);
-      overflow: hidden;
-    }
-    .score-bar-fill {
-      height: 100%;
-      transition: width 1.2s var(--ease-out);
-      width: 0%;
-    }
-    .score-bar-fill.green  { background: var(--accent); }
-    .score-bar-fill.amber  { background: var(--c-amber-500); }
-    .score-bar-fill.red    { background: var(--c-red-status); }
-    .score-bar-num {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      min-width: 2.5ch;
-      text-align: right;
-    }
-    .pillar-card__streak {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      letter-spacing: var(--ls-label);
-    }
-
-    /* Non-negotiables list */
-    .nn-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-3);
-    }
-    .nn-item {
-      display: flex;
-      align-items: flex-start;
-      gap: var(--space-3);
-      padding: var(--space-4) var(--space-5);
-      border: 1px solid var(--border-subtle);
-      background: var(--surface);
-    }
-    .nn-item__check {
-      font-family: var(--font-mono);
-      color: var(--accent);
-      font-size: var(--text-sm);
-      flex-shrink: 0;
-      margin-top: 1px;
-    }
-    .nn-item__name {
-      font-size: var(--text-sm);
-      color: var(--text);
-      line-height: 1.4;
-    }
-    .nn-item__desc {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      margin-top: 2px;
-      letter-spacing: var(--ls-label);
-    }
-    .nn-reset-note {
-      margin-top: var(--space-5);
-      padding: var(--space-4) var(--space-5);
-      border-left: 3px solid var(--c-red-status);
-      background: rgba(255,82,82,0.04);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-    }
-    .nn-reset-note strong { color: var(--c-red-status); }
-
-    /* Public commitment blockquote */
-    .public-commitment {
-      max-width: var(--prose-width);
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .public-commitment blockquote {
-      margin: 0;
-      padding: var(--space-8) var(--space-8);
-      border-left: 4px solid var(--accent);
-      background: var(--surface);
-      position: relative;
-    }
-    .public-commitment blockquote::before {
-      content: '"';
-      font-family: var(--font-display);
-      font-size: 96px;
-      line-height: 0.8;
-      color: var(--accent);
-      opacity: 0.15;
-      position: absolute;
-      top: var(--space-4);
-      left: var(--space-5);
-      pointer-events: none;
-    }
-    .public-commitment blockquote p {
-      font-size: var(--text-xl);
-      color: var(--text);
-      line-height: var(--lh-body);
-      margin: 0;
-      position: relative;
-      z-index: 1;
-    }
-    .public-commitment blockquote cite {
-      display: block;
-      margin-top: var(--space-5);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      font-style: normal;
-      letter-spacing: var(--ls-label);
-    }
-
-    /* CTA to results */
-    .acct-cta {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--space-6);
-      flex-wrap: wrap;
-    }
-    .acct-cta__text {
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-    }
-    .acct-cta__text strong { color: var(--text); }
-    .acct-cta__link {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2);
-      padding: var(--space-3) var(--space-6);
-      border: 1px solid var(--accent);
-      color: var(--accent);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--ls-label);
-      text-decoration: none;
-      text-transform: uppercase;
-      transition: background var(--dur-fast), color var(--dur-fast);
-      white-space: nowrap;
-    }
-    .acct-cta__link:hover {
-      background: var(--accent);
-      color: var(--bg);
-    }
-
-    /* Today's status strip */
-    .today-status {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-6) var(--page-padding) 0;
-    }
-    .today-status__eyebrow {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
-      margin-bottom: var(--space-4);
-    }
-    .today-strip {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1px;
-      background: var(--border);
-      border: 1px solid var(--border);
-      margin-bottom: var(--space-8);
-    }
-    .today-card {
-      background: var(--surface);
-      padding: var(--space-6) var(--space-6);
-    }
-    .today-card__label {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin-bottom: var(--space-3);
-    }
-    .today-card__value {
-      font-family: var(--font-display);
-      font-size: 40px;
-      line-height: 1;
-      color: var(--accent);
-      letter-spacing: var(--ls-display);
-      margin-bottom: var(--space-1);
-    }
-    .today-card__value.amber { color: var(--c-amber-400); }
-    .today-card__value.red   { color: var(--c-red-status); }
-    .today-card__sub {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: var(--ls-label);
-    }
-
-    /* State banner */
-    .state-banner {
-      padding: var(--space-5) var(--page-padding);
-      display: flex;
-      align-items: center;
-      gap: var(--space-4);
-      border-bottom: 1px solid var(--border);
-    }
-    .state-banner--green { background: rgba(29, 158, 117, 0.08); }
-    .state-banner--amber { background: rgba(186, 117, 23, 0.08); }
-    .state-banner--red   { background: rgba(226, 75, 74, 0.08); }
-    .state-banner__dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .state-banner--green .state-banner__dot { background: var(--c-green-500); box-shadow: 0 0 6px var(--c-green-500); }
-    .state-banner--amber .state-banner__dot { background: var(--c-amber-500); box-shadow: 0 0 6px var(--c-amber-500); }
-    .state-banner--red   .state-banner__dot { background: var(--c-red-status); box-shadow: 0 0 6px var(--c-red-status); }
-    .state-banner__status {
-      font-family: var(--font-display);
-      font-size: var(--text-base);
-      letter-spacing: var(--ls-label);
-    }
-    .state-banner--green .state-banner__status { color: var(--c-green-500); }
-    .state-banner--amber .state-banner__status { color: var(--c-amber-500); }
-    .state-banner--red   .state-banner__status { color: var(--c-red-status); }
-    .state-banner__detail {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      letter-spacing: var(--ls-label);
-    }
-
-    @media (max-width: 900px) {
-      .commitment-strip { grid-template-columns: repeat(2, 1fr); }
-      .pillar-grid { grid-template-columns: 1fr; }
-      .nn-grid { grid-template-columns: 1fr; }
-      .today-strip { grid-template-columns: repeat(3, 1fr); }
-    }
-    @media (max-width: 560px) {
-      .commitment-strip { grid-template-columns: 1fr 1fr; }
-      .commit-stat__value { font-size: 36px; }
-      .today-strip { grid-template-columns: 1fr; }
-      .today-card__value { font-size: 32px; }
     }
 
     /* 30-day compliance calendar */
@@ -497,23 +244,118 @@
     .milestone-row--reached .milestone-row__num { color: var(--c-green-500); }
     .milestone-row--reached .milestone-row__desc { color: var(--c-green-500); }
 
-    /* T0 live count badge */
-    .t0-count-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2);
+    /* ─── Nudge system (ACCT-2) ─── */
+    .nudge-panel {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .nudge-panel__eyebrow {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
-      padding: var(--space-2) var(--space-4);
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: var(--text-muted);
-      margin-bottom: var(--space-5);
+      color: var(--accent-dim);
+      margin-bottom: var(--space-3);
     }
-    .t0-count-badge.complete { border-color: var(--c-green-100); color: var(--accent); background: var(--c-green-050); }
-    .t0-count-badge.incomplete { border-color: rgba(255,82,82,0.3); color: var(--c-red-status); background: rgba(255,82,82,0.04); }
+    .nudge-panel__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .nudge-panel__sub {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-8);
+      max-width: 520px;
+      line-height: var(--lh-body);
+    }
+    .nudge-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-3);
+      max-width: 520px;
+    }
+    .nudge-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      padding: var(--space-4) var(--space-5);
+      text-align: left;
+      cursor: pointer;
+      transition: border-color var(--dur-fast), background var(--dur-fast);
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+    .nudge-btn:hover:not(:disabled) { border-color: var(--accent); background: var(--bg); }
+    .nudge-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .nudge-btn--sent { border-color: var(--c-green-500); background: rgba(0,229,160,0.06); color: var(--c-green-500); }
+    .nudge-btn--sent:disabled { opacity: 1; }
+    .nudge-panel__feedback {
+      margin-top: var(--space-5);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      min-height: 1.5em;
+    }
+
+    /* ─── Public commitment ─── */
+    .public-commitment {
+      max-width: var(--prose-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .public-commitment blockquote {
+      margin: 0;
+      padding: var(--space-8) var(--space-8);
+      border-left: 4px solid var(--accent);
+      background: var(--surface);
+      position: relative;
+    }
+    .public-commitment blockquote::before {
+      content: '"';
+      font-family: var(--font-display);
+      font-size: 96px;
+      line-height: 0.8;
+      color: var(--accent);
+      opacity: 0.15;
+      position: absolute;
+      top: var(--space-4);
+      left: var(--space-5);
+      pointer-events: none;
+    }
+    .public-commitment blockquote p {
+      font-size: var(--text-xl);
+      color: var(--text);
+      line-height: var(--lh-body);
+      margin: 0;
+      position: relative;
+      z-index: 1;
+    }
+    .public-commitment blockquote cite {
+      display: block;
+      margin-top: var(--space-5);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-style: normal;
+      letter-spacing: var(--ls-label);
+    }
+
+    @media (max-width: 768px) {
+      .state-hero__inner { flex-direction: column; gap: var(--space-6); }
+      .snap3 { grid-template-columns: 1fr 1fr; }
+      .nudge-buttons { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 480px) {
+      .snap3 { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -626,73 +468,44 @@
   </div>
 </div>
 
-
-
-
-
-
-
-<header class="page-header reveal">
-  <div class="page-header__eyebrow">The Data</div>
-  <h1 class="page-header__title">The <span>Accountability</span> Board</h1>
-  <p class="page-header__sub">Every commitment. Live compliance. No hiding.</p>
-</header>
-
-<!-- State banner — hydrated by loadHabitStreaks() -->
-<div class="state-banner state-banner--amber reveal" id="state-banner">
-  <div class="state-banner__dot"></div>
-  <span class="state-banner__status" id="state-status">LOADING</span>
-  <span class="state-banner__detail" id="state-detail">// fetching today&rsquo;s data</span>
-</div>
-
-<!-- Core commitment stat strip -->
-<div class="commitment-strip reveal">
-  <div class="commit-stat">
-    <div class="commit-stat__label">Tier 0 Habits Today</div>
-    <div class="commit-stat__value" id="stat-tier0">--</div>
-    <div class="commit-stat__sub">done / total</div>
-  </div>
-  <div class="commit-stat">
-    <div class="commit-stat__label">Current Streak</div>
-    <div class="commit-stat__value" id="stat-streak">--</div>
-    <div class="commit-stat__sub">consecutive days</div>
-  </div>
-  <div class="commit-stat">
-    <div class="commit-stat__label">Weight Progress</div>
-    <div class="commit-stat__value" id="stat-weight-pct">--</div>
-    <div class="commit-stat__sub">to goal</div>
-  </div>
-  <div class="commit-stat">
-    <div class="commit-stat__label">Character Level</div>
-    <div class="commit-stat__value" id="stat-level">--</div>
-    <div class="commit-stat__sub">overall tier</div>
-  </div>
-</div>
-
-<!-- Today's status strip -->
-<div class="today-status reveal">
-  <div class="today-status__eyebrow">// today's status</div>
-  <div class="today-strip">
-    <div class="today-card">
-      <div class="today-card__label">T0 Habit Completion</div>
-      <div class="today-card__value" id="ts-t0-pct">--</div>
-      <div class="today-card__sub" id="ts-t0-sub">done today</div>
+<!-- ACCT-1: State Hero -->
+<section class="state-hero">
+  <div class="state-hero__inner">
+    <div class="state-hero__ring" id="state-ring">
+      <div class="state-hero__ring-dot"></div>
     </div>
-    <div class="today-card">
-      <div class="today-card__label">Current Streak</div>
-      <div class="today-card__value" id="ts-streak">--</div>
-      <div class="today-card__sub">consecutive days</div>
-    </div>
-    <div class="today-card">
-      <div class="today-card__label">Recovery Score</div>
-      <div class="today-card__value" id="ts-recovery">--</div>
-      <div class="today-card__sub">Whoop / 100</div>
+    <div class="state-hero__body">
+      <div class="state-hero__eyebrow">// experiment health</div>
+      <div class="state-hero__state" id="state-label">Loading…</div>
+      <div class="state-hero__detail" id="state-detail">fetching live data</div>
     </div>
   </div>
+</section>
+
+<!-- ACCT-3: 3-number snapshot -->
+<div class="snap3">
+  <a href="/habits/" class="snap3-card">
+    <div class="snap3-card__label">T0 Streak</div>
+    <div class="snap3-card__value" id="snap-streak">—</div>
+    <div class="snap3-card__sub">consecutive days</div>
+    <div class="snap3-card__arrow">habits →</div>
+  </a>
+  <a href="/habits/" class="snap3-card">
+    <div class="snap3-card__label">Tier 0 Today</div>
+    <div class="snap3-card__value" id="snap-t0pct">—</div>
+    <div class="snap3-card__sub" id="snap-t0sub">done / total</div>
+    <div class="snap3-card__arrow">habits →</div>
+  </a>
+  <a href="/live/" class="snap3-card">
+    <div class="snap3-card__label">Journey Progress</div>
+    <div class="snap3-card__value" id="snap-journey">—</div>
+    <div class="snap3-card__sub">302 lbs → 185 lbs</div>
+    <div class="snap3-card__arrow">live data →</div>
+  </a>
 </div>
 
 <!-- 30-day compliance calendar + milestone tracker -->
-<div class="acct-section reveal" id="calendar-section">
+<div class="acct-section" id="calendar-section">
   <div class="acct-section__eyebrow">// last 30 days</div>
   <h2 class="acct-section__title">Compliance Calendar</h2>
   <p class="acct-section__sub">Every day for the past 30 days. Green&nbsp;=&nbsp;all T0 complete, amber&nbsp;=&nbsp;partial, red&nbsp;=&nbsp;missed. Grey&nbsp;=&nbsp;no data yet.</p>
@@ -707,95 +520,34 @@
   </div>
 </div>
 
-<!-- The 7 Pillars section -->
-<div class="acct-section reveal">
-  <div class="acct-section__eyebrow">// live status</div>
-  <h2 class="acct-section__title">The 7 Pillars</h2>
-  <p class="acct-section__sub">
-    Seven domains of health. Each scored 0&ndash;100 from daily data. Tier and trend update every morning.
-  </p>
-  <div class="pillar-grid" id="pillar-grid">
-    <!-- Loading placeholders -->
-    <div class="pillar-card" id="pillar-loading">
-      <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);padding:var(--space-4)">
-        Loading pillar data&hellip;
-      </div>
-    </div>
+<!-- ACCT-2: Nudge system -->
+<div class="nudge-panel">
+  <div class="nudge-panel__eyebrow">// send a reaction</div>
+  <h2 class="nudge-panel__title">Send Matthew a nudge</h2>
+  <p class="nudge-panel__sub">Anonymous. One per reaction per hour. He'll see it in his daily brief. No accounts required.</p>
+  <div class="nudge-buttons">
+    <button class="nudge-btn" data-category="back_on_it" onclick="sendNudge('back_on_it')">
+      <span>🔥</span> Get back on it
+    </button>
+    <button class="nudge-btn" data-category="watching" onclick="sendNudge('watching')">
+      <span>👀</span> We're watching
+    </button>
+    <button class="nudge-btn" data-category="take_your_time" onclick="sendNudge('take_your_time')">
+      <span>⏰</span> Take your time
+    </button>
+    <button class="nudge-btn" data-category="you_got_this" onclick="sendNudge('you_got_this')">
+      <span>💪</span> You've got this
+    </button>
   </div>
-</div>
-
-<!-- Non-Negotiables section -->
-<div class="acct-section reveal">
-  <div class="acct-section__eyebrow">// daily requirements</div>
-  <h2 class="acct-section__title">The Non-Negotiables (Tier 0)</h2>
-  <p class="acct-section__sub">
-    These are binary — done or not done. They form the floor. Everything else builds on top.
-  </p>
-  <div class="t0-count-badge" id="t0-count-badge">TODAY: — / 6</div>
-  <div class="nn-grid">
-    <div class="nn-item">
-      <div class="nn-item__check">&#10003;</div>
-      <div>
-        <div class="nn-item__name">Log every meal</div>
-        <div class="nn-item__desc">// MacroFactor — complete daily log by midnight</div>
-      </div>
-    </div>
-    <div class="nn-item">
-      <div class="nn-item__check">&#10003;</div>
-      <div>
-        <div class="nn-item__name">Hit protein target</div>
-        <div class="nn-item__desc">// &ge;185g protein daily — no exceptions</div>
-      </div>
-    </div>
-    <div class="nn-item">
-      <div class="nn-item__check">&#10003;</div>
-      <div>
-        <div class="nn-item__name">Complete Zone 2 minimum</div>
-        <div class="nn-item__desc">// &ge;20 min at aerobic threshold, or strength session</div>
-      </div>
-    </div>
-    <div class="nn-item">
-      <div class="nn-item__check">&#10003;</div>
-      <div>
-        <div class="nn-item__name">Log weight</div>
-        <div class="nn-item__desc">// Withings scale — morning weigh-in daily</div>
-      </div>
-    </div>
-    <div class="nn-item">
-      <div class="nn-item__check">&#10003;</div>
-      <div>
-        <div class="nn-item__name">Sleep &ge;7 hours</div>
-        <div class="nn-item__desc">// Whoop tracked — lights out by 10:30 PM</div>
-      </div>
-    </div>
-    <div class="nn-item">
-      <div class="nn-item__check">&#10003;</div>
-      <div>
-        <div class="nn-item__name">No alcohol</div>
-        <div class="nn-item__desc">// Tracked manually — zero tolerance during cut</div>
-      </div>
-    </div>
-  </div>
-  <div class="nn-reset-note">
-    <strong>// streak reset rule:</strong> Miss any single Tier 0 item and the aggregate streak resets to zero. No partial credit. The system enforces the commitment so willpower doesn&rsquo;t have to.
-  </div>
+  <div class="nudge-panel__feedback" id="nudge-feedback"></div>
 </div>
 
 <!-- Public commitment -->
-<div class="public-commitment reveal">
+<div class="public-commitment">
   <blockquote>
     <p>I&rsquo;m doing this in public because accountability without witnesses is just intention. Every number on this page updates daily. There&rsquo;s nowhere to hide.</p>
     <cite>// Matthew Walker &mdash; started Feb 9, 2026</cite>
   </blockquote>
-</div>
-
-<!-- CTA to results -->
-<div class="acct-cta reveal">
-  <div class="acct-cta__text">
-    <strong>Want to see the outcomes?</strong><br>
-    Weight lost, biometrics improved, what&rsquo;s working and what isn&rsquo;t &mdash; all published without filtering.
-  </div>
-  <a href="/live/" class="acct-cta__link">See live data →</a>
 </div>
 
 <!-- Mobile bottom nav -->
@@ -821,7 +573,6 @@
     <span>Ask</span>
   </a>
 </nav>
-
 
 <section class="reading-path" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
   <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>
@@ -881,217 +632,98 @@
 <script>
 const API = 'https://averagejoematt.com';
 
-// Map tier name to badge color class
-function tierColor(tier) {
-  if (!tier) return 'amber';
-  const t = tier.toLowerCase();
-  if (t === 'elite' || t === 'mastery' || t === 'discipline') return 'green';
-  if (t === 'momentum') return 'amber';
-  return 'red';
+// ── State hero (ACCT-1) ──────────────────────────────────────
+// Compute state client-side from live data (no backend state field yet).
+// Thriving: streak ≥7 AND T0% ≥90
+// Grinding: streak ≥3 AND T0% ≥70  (or in progress today)
+// Slipping: streak ≥1 AND T0% < 70
+// Dormant:  streak = 0 or no data
+function computeState(streak, t0pct) {
+  if (streak == null) return 'dormant';
+  if (streak === 0) return 'dormant';
+  if (streak >= 7 && t0pct >= 90) return 'thriving';
+  if (streak >= 3 && t0pct >= 70) return 'grinding';
+  if (streak >= 1) return 'slipping';
+  return 'dormant';
 }
 
-function tierLabel(tier) {
-  if (!tier) return '—';
-  return tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase();
+const STATE_LABELS = {
+  thriving: 'Thriving',
+  grinding: 'Grinding',
+  slipping: 'Slipping',
+  dormant:  'Dormant',
+};
+
+const STATE_DETAILS = {
+  thriving: '// streak intact · all systems go · keep the standard high',
+  grinding: '// making progress · momentum building · don\'t break now',
+  slipping: '// habits slipping · time to re-engage · one day at a time',
+  dormant:  '// streak broken or no recent data · reset and restart',
+};
+
+function applyState(state) {
+  var ring = document.getElementById('state-ring');
+  var label = document.getElementById('state-label');
+  var detail = document.getElementById('state-detail');
+  if (!ring || !label) return;
+  ring.className = 'state-hero__ring state-hero__ring--' + state;
+  label.className = 'state-hero__state state-hero__state--' + state;
+  label.textContent = STATE_LABELS[state] || state;
+  if (detail) detail.textContent = STATE_DETAILS[state] || '';
 }
 
-// Pillar display name formatting
-function pillarDisplayName(key) {
-  const names = {
-    sleep: 'Sleep',
-    nutrition: 'Nutrition',
-    training: 'Training',
-    recovery: 'Recovery',
-    stress: 'Stress',
-    habits: 'Habits',
-    biomarkers: 'Biomarkers',
-    strength: 'Strength',
-    zone2: 'Zone 2',
-  };
-  return names[key] || key.charAt(0).toUpperCase() + key.slice(1);
-}
-
-async function loadCharacter() {
-  try {
-    const res = await fetch(`${API}/api/character`);
-    if (!res.ok) throw new Error('character API error');
-    const json = await res.json();
-    const c = json.character || json;
-
-    // Character level
-    if (c.character_level) {
-      document.getElementById('stat-level').textContent = 'Lv ' + c.character_level;
-    }
-
-    // Pillars
-    const pillars = c.pillars || c.pillar_scores || {};
-    const pillarTiers = c.pillar_tiers || {};
-    const pillarStreaks = c.pillar_streaks || {};
-    const grid = document.getElementById('pillar-grid');
-
-    if (Object.keys(pillars).length === 0) {
-      grid.innerHTML = '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);padding:var(--space-4);grid-column:1/-1">No pillar data available.</div>';
-      return;
-    }
-
-    grid.innerHTML = '';
-    Object.entries(pillars).forEach(([key, score]) => {
-      const tier = pillarTiers[key] || '';
-      const streak = pillarStreaks[key] || 0;
-      const color = tierColor(tier);
-      const pct = Math.min(100, Math.max(0, score || 0));
-      const card = document.createElement('div');
-      card.className = 'pillar-card';
-      card.innerHTML = `
-        <div class="pillar-card__header">
-          <div class="pillar-card__name">${pillarDisplayName(key)}</div>
-          <div class="pillar-badge ${color}">${tierLabel(tier) || '—'}</div>
-        </div>
-        <div class="score-bar-row">
-          <div class="score-bar-track">
-            <div class="score-bar-fill ${color}" style="width:0%" data-target="${pct}"></div>
-          </div>
-          <div class="score-bar-num">${Math.round(pct)}</div>
-        </div>
-        <div class="pillar-card__streak">// ${streak} day${streak !== 1 ? 's' : ''} above tier threshold</div>
-      `;
-      grid.appendChild(card);
-    });
-
-    // Animate bars after paint
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        document.querySelectorAll('.score-bar-fill[data-target]').forEach(el => {
-          el.style.width = el.dataset.target + '%';
-        });
-      });
-    });
-
-  } catch(e) {
-    console.warn('[accountability] character load failed', e);
-    document.getElementById('stat-level').textContent = '—';
-  }
-}
-
-async function loadHabitStreaks() {
-  try {
-    const res = await fetch(`${API}/api/habit_streaks`);
-    if (!res.ok) throw new Error('habit_streaks API error');
-    const json = await res.json();
-    const h = json.habit_streaks || json;
-
-    // Tier 0 display: e.g. "8 / 9"
-    const done = h.tier0_done != null ? h.tier0_done : null;
-    const total = h.tier0_total != null ? h.tier0_total : null;
-    if (done !== null && total !== null) {
-      document.getElementById('stat-tier0').textContent = done + ' / ' + total;
-      // Today's status panel — completion %
-      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-      const pctEl = document.getElementById('ts-t0-pct');
-      const subEl = document.getElementById('ts-t0-sub');
-      pctEl.textContent = pct + '%';
-      if (pct === 100) { pctEl.className = 'today-card__value'; }
-      else if (pct >= 67) { pctEl.className = 'today-card__value amber'; }
-      else { pctEl.className = 'today-card__value red'; }
-      if (subEl) subEl.textContent = done + ' / ' + total + ' done today';
-    }
-
-    // Aggregate streak
-    const streak = h.aggregate_streak;
-    if (streak != null) {
-      document.getElementById('stat-streak').textContent = streak;
-      const tsStreak = document.getElementById('ts-streak');
-      if (tsStreak) tsStreak.textContent = streak;
-    }
-
-    // T0 count badge (above Tier 0 list)
-    const t0Badge = document.getElementById('t0-count-badge');
-    if (t0Badge && done !== null && total !== null) {
-      const isComplete = done >= total;
-      t0Badge.textContent = 'TODAY: ' + done + ' / ' + total + (isComplete ? ' CONFIRMED \u2713' : ' — IN PROGRESS');
-      t0Badge.className = 't0-count-badge ' + (isComplete ? 'complete' : 'incomplete');
-    }
-
-    // State banner
-    const banner = document.getElementById('state-banner');
-    const statusEl = document.getElementById('state-status');
-    const detailEl = document.getElementById('state-detail');
-    if (banner && statusEl && detailEl) {
-      const d = (done != null && total != null) ? done : null;
-      const t = (done != null && total != null) ? total : null;
-      const pct2 = (d !== null && t > 0) ? Math.round((d / t) * 100) : 0;
-      const str = streak != null ? streak : null;
-      let cls = 'amber', label = 'CAUTION', detail = '// T0 data pending';
-      if (str === 0) {
-        cls = 'red'; label = 'STREAK BROKEN';
-        detail = `// streak reset — ${d !== null ? d + ' / ' + t + ' T0 habits done' : 'check habit log'}`;
-      } else if (pct2 === 100) {
-        cls = 'green'; label = 'ON TRACK';
-        detail = `// all ${t} T0 habits done today${str != null ? ' · ' + str + '-day streak intact' : ''}`;
-      } else if (pct2 >= 50) {
-        cls = 'amber'; label = 'IN PROGRESS';
-        detail = `// ${d} / ${t} T0 habits done · ${100 - pct2}% remaining`;
-      } else if (d !== null) {
-        cls = 'red'; label = 'BEHIND';
-        detail = `// only ${d} / ${t} T0 habits done today`;
-      }
-      banner.className = 'state-banner state-banner--' + cls + ' reveal';
-      statusEl.textContent = label;
-      detailEl.innerHTML = detail;
-    }
-
-  } catch(e) {
-    console.warn('[accountability] habit_streaks load failed', e);
-  }
-}
-
-async function loadVitalsForStatus() {
-  try {
-    const res = await fetch(`${API}/api/vitals`);
-    if (!res.ok) throw new Error('vitals API error');
-    const json = await res.json();
-    const v = json.vitals || json;
-    const recovery = v.recovery_score != null ? v.recovery_score : null;
-    if (recovery !== null) {
-      const el = document.getElementById('ts-recovery');
-      if (el) {
-        el.textContent = Math.round(recovery);
-        if (recovery >= 67) { el.className = 'today-card__value'; }
-        else if (recovery >= 34) { el.className = 'today-card__value amber'; }
-        else { el.className = 'today-card__value red'; }
-      }
-    }
-  } catch(e) {
-    console.warn('[accountability] vitals load failed', e);
-  }
-}
-
-async function loadJourney() {
-  try {
-    const res = await fetch(`${API}/api/journey`);
-    if (!res.ok) throw new Error('journey API error');
-    const json = await res.json();
-    const j = json.journey || json;
-
-    const pct = j.progress_pct;
-    if (pct != null) {
-      document.getElementById('stat-weight-pct').textContent = pct.toFixed(1) + '%';
-    }
-
-  } catch(e) {
-    console.warn('[accountability] journey load failed', e);
-  }
-}
-
-// Set nav date
+// ── Nav date ─────────────────────────────────────────────────
 (function() {
-  const el = document.getElementById('nav-date');
+  var el = document.getElementById('nav-date');
   if (el) {
-    const d = new Date();
+    var d = new Date();
     el.textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 })();
 
+// ── Habit streaks + state + snapshot ────────────────────────
+async function loadHabitStreaks() {
+  try {
+    const res = await fetch(`${API}/api/habit_streaks`);
+    if (!res.ok) throw new Error('habit_streaks error');
+    const json = await res.json();
+    const h = json.habit_streaks || {};
+
+    var streak = h.aggregate_streak;
+    var t0pct  = h.tier0_pct;
+    var done   = h.tier0_done;
+    var total  = h.tier0_total;
+
+    if (streak != null) {
+      document.getElementById('snap-streak').textContent = streak;
+    }
+    if (t0pct != null) {
+      document.getElementById('snap-t0pct').textContent = t0pct + '%';
+    }
+    if (done != null && total != null) {
+      document.getElementById('snap-t0sub').textContent = done + ' / ' + total + ' done';
+    }
+
+    applyState(computeState(streak != null ? streak : null, t0pct != null ? t0pct : 0));
+  } catch(e) {
+    applyState('dormant');
+  }
+}
+
+// ── Journey progress ─────────────────────────────────────────
+async function loadJourney() {
+  try {
+    const res = await fetch(`${API}/api/journey`);
+    if (!res.ok) return;
+    const json = await res.json();
+    const j = json.journey || {};
+    if (j.progress_pct != null) {
+      document.getElementById('snap-journey').textContent = parseFloat(j.progress_pct).toFixed(1) + '%';
+    }
+  } catch(e) {}
+}
+
+// ── 30-day calendar ──────────────────────────────────────────
 async function loadComplianceCalendar() {
   try {
     const res = await fetch(`${API}/api/habits`);
@@ -1099,63 +731,99 @@ async function loadComplianceCalendar() {
     const json = await res.json();
     const history = json.history || [];
 
-    // Build 30-day calendar
     const grid = document.getElementById('calendar-grid');
     if (!grid) return;
     const byDate = {};
     history.forEach(function(d) { byDate[d.date] = d; });
     const today = new Date();
     const cells = [];
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(today);
+    var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    for (var i = 29; i >= 0; i--) {
+      var d = new Date(today);
       d.setDate(d.getDate() - i);
-      const iso = d.toISOString().slice(0, 10);
-      const day = byDate[iso];
-      const label = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
-      const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
-      let cls = 'cal-day--nodata', tip = `${mon} ${d.getDate()}: no data`;
+      var iso = d.toISOString().slice(0, 10);
+      var day = byDate[iso];
+      var mon = MONTHS[d.getMonth()];
+      var cls = 'cal-day--nodata', tip = mon + ' ' + d.getDate() + ': no data';
       if (day) {
-        const pct = day.tier0_pct != null ? day.tier0_pct : (day.perfect ? 100 : 0);
-        if (day.perfect || pct >= 100) { cls = 'cal-day--perfect'; tip = `${mon} ${d.getDate()}: PERFECT ✓`; }
-        else if (pct > 0) { cls = 'cal-day--partial'; tip = `${mon} ${d.getDate()}: ${pct}% T0`; }
-        else { cls = 'cal-day--missed'; tip = `${mon} ${d.getDate()}: missed`; }
+        var pct = day.tier0_pct != null ? day.tier0_pct : (day.perfect ? 100 : 0);
+        if (day.perfect || pct >= 100) { cls = 'cal-day--perfect'; tip = mon + ' ' + d.getDate() + ': PERFECT ✓'; }
+        else if (pct > 0) { cls = 'cal-day--partial'; tip = mon + ' ' + d.getDate() + ': ' + pct + '% T0'; }
+        else { cls = 'cal-day--missed'; tip = mon + ' ' + d.getDate() + ': missed'; }
       }
-      cells.push(`<div class="cal-day ${cls}" data-tip="${tip}" title="${tip}"></div>`);
+      cells.push('<div class="cal-day ' + cls + '" data-tip="' + tip + '" title="' + tip + '"></div>');
     }
     grid.innerHTML = cells.join('');
 
-    // Streak milestones
+    // Streak milestones — reuse streak from habit_streaks call (already loaded)
     const streakRes = await fetch(`${API}/api/habit_streaks`);
     const streakJson = streakRes.ok ? await streakRes.json() : {};
-    const hs = streakJson.habit_streaks || streakJson;
-    const streak = hs.aggregate_streak || 0;
-
-    const MILESTONES = [30, 60, 90, 180, 365];
-    const rowsEl = document.getElementById('milestone-rows');
+    var hs = streakJson.habit_streaks || {};
+    var streak = hs.aggregate_streak || 0;
+    var MILESTONES = [30, 60, 90, 180, 365];
+    var rowsEl = document.getElementById('milestone-rows');
     if (rowsEl) {
       rowsEl.innerHTML = MILESTONES.map(function(m) {
-        const reached = streak >= m;
-        const pct = Math.min(100, Math.round((streak / m) * 100));
-        const remaining = m - streak;
-        const desc = reached
-          ? `${m}-day milestone reached \u2713`
-          : `${remaining} days to go`;
-        const cls = reached ? 'milestone-row milestone-row--reached' : 'milestone-row';
-        const fillCls = reached ? 'milestone-row__fill milestone-row__fill--reached' : 'milestone-row__fill';
-        return `<div class="${cls}">
-          <div class="milestone-row__num">${m}d</div>
-          <div class="milestone-row__bar"><div class="${fillCls}" style="width:${pct}%"></div></div>
-          <div class="milestone-row__desc">${desc}</div>
-        </div>`;
+        var reached = streak >= m;
+        var pct = Math.min(100, Math.round((streak / m) * 100));
+        var remaining = m - streak;
+        var desc = reached ? (m + '-day milestone reached \u2713') : (remaining + ' days to go');
+        var cls = reached ? 'milestone-row milestone-row--reached' : 'milestone-row';
+        var fillCls = reached ? 'milestone-row__fill milestone-row__fill--reached' : 'milestone-row__fill';
+        return '<div class="' + cls + '">' +
+          '<div class="milestone-row__num">' + m + 'd</div>' +
+          '<div class="milestone-row__bar"><div class="' + fillCls + '" style="width:' + pct + '%"></div></div>' +
+          '<div class="milestone-row__desc">' + desc + '</div>' +
+          '</div>';
       }).join('');
     }
-  } catch(e) {
-    console.warn('[accountability] calendar load failed', e);
-  }
+  } catch(e) {}
 }
 
-// Boot all fetches in parallel
-Promise.allSettled([loadCharacter(), loadHabitStreaks(), loadJourney(), loadVitalsForStatus(), loadComplianceCalendar()]);
+// ── Nudge system (ACCT-2) ────────────────────────────────────
+var _nudgeSent = {};  // track which categories already sent this session
+
+async function sendNudge(category) {
+  var btn = document.querySelector('.nudge-btn[data-category="' + category + '"]');
+  var fb  = document.getElementById('nudge-feedback');
+  if (!btn || btn.disabled) return;
+
+  // Disable all buttons during request
+  document.querySelectorAll('.nudge-btn').forEach(function(b) { b.disabled = true; });
+  if (fb) fb.textContent = 'Sending…';
+
+  try {
+    var res = await fetch(API + '/api/nudge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: category }),
+    });
+    var data = await res.json();
+    if (res.ok) {
+      btn.classList.add('nudge-btn--sent');
+      btn.textContent = '✓ ' + data.label;
+      if (fb) fb.textContent = data.message || 'Reaction sent.';
+      _nudgeSent[category] = true;
+    } else {
+      if (fb) fb.textContent = data.error || 'Could not send. Try again later.';
+    }
+  } catch(e) {
+    if (fb) fb.textContent = 'Network error — try again.';
+  }
+
+  // Re-enable buttons that haven't been sent
+  document.querySelectorAll('.nudge-btn').forEach(function(b) {
+    var cat = b.dataset.category;
+    if (!_nudgeSent[cat]) b.disabled = false;
+  });
+}
+
+// ── Boot ─────────────────────────────────────────────────────
+Promise.allSettled([
+  loadHabitStreaks(),
+  loadJourney(),
+  loadComplianceCalendar(),
+]);
 </script>
 <script src="/assets/js/nav.js"></script>
 </body>

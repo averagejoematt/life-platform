@@ -1244,6 +1244,8 @@ _anthropic_key_cache = None
 # Maps ip_hash -> list of timestamps in the current hour
 _ask_rate_store: dict = {}
 _board_rate_store: dict = {}
+_nudge_rate_store: dict = {}   # ACCT-2: ip_hash+category -> list of timestamps
+_nudge_counts: dict = {}       # ACCT-2: category -> approximate count (warm container only)
 
 # R17-04: Separate Anthropic key for site-api — injected via CDK env var
 AI_SECRET_NAME  = os.environ.get("AI_SECRET_NAME",  "life-platform/site-api-ai-key")
@@ -1750,6 +1752,72 @@ def handle_snapshot() -> dict:
     }
 
 
+# ── ACCT-2: Nudge handler ───────────────────────────────────
+
+NUDGE_CATEGORIES = {"back_on_it", "watching", "take_your_time", "you_got_this"}
+NUDGE_LABELS = {
+    "back_on_it":    "Get back on it 🔥",
+    "watching":      "We're watching 👀",
+    "take_your_time": "Take your time ⏰",
+    "you_got_this":  "You've got this 💪",
+}
+
+
+def _handle_nudge(event: dict) -> dict:
+    """
+    POST /api/nudge
+    Body: {"category": "back_on_it" | "watching" | "take_your_time" | "you_got_this"}
+    Rate limit: 1 nudge per category per IP per hour (in-memory).
+    Counts are approximate — reset on Lambda cold start.
+    NOTE: Persisting counts to DynamoDB requires a CDK write-permission change (future work).
+    """
+    import time as _time
+    source_ip = (
+        event.get("requestContext", {}).get("http", {}).get("sourceIp")
+        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
+        or "unknown"
+    )
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except Exception:
+        return _error(400, "Invalid JSON body")
+
+    category = (body.get("category") or "").strip().lower()
+    if category not in NUDGE_CATEGORIES:
+        return _error(400, f"Invalid category. Must be one of: {sorted(NUDGE_CATEGORIES)}")
+
+    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    rate_key = f"{ip_hash}:{category}"
+    now = int(_time.time())
+    hour_ago = now - 3600
+
+    # Rate limit: 1 per IP per category per hour
+    recent = [t for t in _nudge_rate_store.get(rate_key, []) if t > hour_ago]
+    if recent:
+        return {
+            "statusCode": 429,
+            "headers": {**CORS_HEADERS, "Retry-After": "3600", "Cache-Control": "no-store"},
+            "body": json.dumps({"error": "Already sent this reaction recently. Come back later.", "category": category}),
+        }
+    recent.append(now)
+    _nudge_rate_store[rate_key] = recent[-10:]
+
+    # Increment in-memory count
+    _nudge_counts[category] = _nudge_counts.get(category, 0) + 1
+    logger.info(f"[nudge] category={category} ip_hash={ip_hash} total_this_session={_nudge_counts[category]}")
+
+    return {
+        "statusCode": 200,
+        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+        "body": json.dumps({
+            "success": True,
+            "category": category,
+            "label": NUDGE_LABELS[category],
+            "message": "Reaction sent. Matthew will see this in his daily brief.",
+        }),
+    }
+
+
 # ── Router ──────────────────────────────────────────────────
 
 ROUTES = {
@@ -1816,6 +1884,12 @@ def lambda_handler(event, context):
         if method != "POST":
             return _error(405, "Use POST method")
         return _handle_board_ask(event)
+
+    # ACCT-2: Nudge (POST)
+    if path == "/api/nudge":
+        if method != "POST":
+            return _error(405, "Use POST method")
+        return _handle_nudge(event)
 
     # Special handling: /api/ask accepts POST
     if path == "/api/ask":
