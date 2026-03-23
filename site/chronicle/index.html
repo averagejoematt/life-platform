@@ -116,31 +116,82 @@
       letter-spacing: var(--ls-tag);
     }
 
+    /* ── Series intro ────────────────────────────────────── */
+    .series-intro {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding) 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-6);
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: var(--space-8);
+    }
+    .series-intro__card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-6);
+    }
+    .series-intro__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .series-intro__heading {
+      font-family: var(--font-display);
+      font-size: var(--text-h4);
+      letter-spacing: var(--ls-display);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .series-intro__body {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-mono);
+    }
+    .series-intro__start {
+      display: inline-block;
+      margin-top: var(--space-4);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--accent);
+      text-decoration: none;
+      letter-spacing: var(--ls-tag);
+    }
+    .series-intro__start:hover { text-decoration: underline; }
     @media (max-width: 768px) {
       .journal-post { grid-template-columns: 1fr; gap: var(--space-2); }
+      .series-intro { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
 
 <nav class="nav">
-  <a href="/" class="nav__brand">AMJ</a>
+  <a href="/" class="nav__brand">AJM</a>
   <div class="nav__links">
     <div class="nav__dropdown">
       <button class="nav__dropdown-btn">The Story</button>
       <div class="nav__dropdown-menu">
-        <a href="/" class="nav__dropdown-item">Home</a>
         <a href="/story/" class="nav__dropdown-item">My Story</a>
-        <a href="/about/" class="nav__dropdown-item">About</a>
+        <a href="/about/" class="nav__dropdown-item">The Mission</a>
       </div>
     </div>
     <div class="nav__dropdown">
       <button class="nav__dropdown-btn">The Data</button>
       <div class="nav__dropdown-menu">
         <a href="/live/" class="nav__dropdown-item">Live</a>
-        <a href="/character/" class="nav__dropdown-item">Character</a>
+        <a href="/character/" class="nav__dropdown-item">Character Sheet</a>
         <a href="/habits/" class="nav__dropdown-item">Habits</a>
-        <a href="/accountability/" class="nav__dropdown-item">Accountability</a>
+        <a href="/accountability/" class="nav__dropdown-item">Progress</a>
+        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
+        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
+        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
+        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
       </div>
     </div>
     <div class="nav__dropdown">
@@ -149,10 +200,6 @@
         <a href="/protocols/" class="nav__dropdown-item">Protocols</a>
         <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
         <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
-        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
-        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
-        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
-        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
       </div>
     </div>
     <div class="nav__dropdown">
@@ -160,7 +207,7 @@
       <div class="nav__dropdown-menu">
         <a href="/platform/" class="nav__dropdown-item">Platform</a>
         <a href="/intelligence/" class="nav__dropdown-item">Intelligence</a>
-        <a href="/board/" class="nav__dropdown-item">Board</a>
+        <a href="/board/" class="nav__dropdown-item">AI Board</a>
         <a href="/cost/" class="nav__dropdown-item">Cost</a>
         <a href="/methodology/" class="nav__dropdown-item">Methodology</a>
         <a href="/tools/" class="nav__dropdown-item">Tools</a>
@@ -169,9 +216,9 @@
     <div class="nav__dropdown is-active">
       <button class="nav__dropdown-btn">Follow</button>
       <div class="nav__dropdown-menu">
-        <a href="/chronicle/" class="nav__dropdown-item active">Chronicle</a>
+        <a href="/chronicle/" class="nav__dropdown-item active">Weekly Journal</a>
         <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
-        <a href="/ask/" class="nav__dropdown-item">Ask</a>
+        <a href="/ask/" class="nav__dropdown-item">Ask the Data</a>
       </div>
     </div>
     <a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>
@@ -190,41 +237,40 @@
     <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Story</div>
-      <a href="/" class="nav-overlay__link">Home</a>
       <a href="/story/" class="nav-overlay__link">My Story</a>
-      <a href="/about/" class="nav-overlay__link">About</a>
+      <a href="/about/" class="nav-overlay__link">The Mission</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Data</div>
       <a href="/live/" class="nav-overlay__link">Live</a>
-      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/character/" class="nav-overlay__link">Character Sheet</a>
       <a href="/habits/" class="nav-overlay__link">Habits</a>
-      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
-    </div>
-    <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The Science</div>
-      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
-      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/accountability/" class="nav-overlay__link">Progress</a>
       <a href="/sleep/" class="nav-overlay__link">Sleep</a>
       <a href="/glucose/" class="nav-overlay__link">Glucose</a>
       <a href="/supplements/" class="nav-overlay__link">Supplements</a>
       <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
     </div>
     <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Science</div>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+    </div>
+    <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Build</div>
       <a href="/platform/" class="nav-overlay__link">Platform</a>
       <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
-      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/board/" class="nav-overlay__link">AI Board</a>
       <a href="/cost/" class="nav-overlay__link">Cost</a>
       <a href="/methodology/" class="nav-overlay__link">Methodology</a>
       <a href="/tools/" class="nav-overlay__link">Tools</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">Follow</div>
-      <a href="/chronicle/" class="nav-overlay__link">Chronicle</a>
+      <a href="/chronicle/" class="nav-overlay__link">Weekly Journal</a>
       <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
-      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/ask/" class="nav-overlay__link">Ask the Data</a>
       <a href="/rss.xml" class="nav-overlay__link">RSS</a>
       <a href="/privacy/" class="nav-overlay__link">Privacy</a>
     </div>
@@ -270,7 +316,22 @@
 <div class="journal-header animate-in reveal">
   <div class="eyebrow">The Story</div>
   <h1 class="journal-header__title">Chronicle</h1>
-  <p class="journal-header__sub">Elena Voss investigates the experiment, week by week. Data-backed, honest, updated when something interesting happens.</p>
+  <p class="journal-header__sub">Narrative journalism on a real transformation. Every week, a new dispatch.</p>
+</div>
+
+<div class="series-intro animate-in reveal">
+  <div class="series-intro__card">
+    <div class="series-intro__label">// The Series</div>
+    <div class="series-intro__heading">The Measured Life</div>
+    <div class="series-intro__body">Matthew Walker is attempting to transform his body and health using a custom-built platform that pulls data from 19 sources. He started at 302 lbs. The goal is 185. This is the weekly account of what the data actually shows — not a highlight reel.</div>
+    <a href="/journal/posts/week-00/" class="series-intro__start">Start from the beginning →</a>
+  </div>
+  <div class="series-intro__card">
+    <div class="series-intro__label">// The Reporter</div>
+    <div class="series-intro__heading">Elena Voss</div>
+    <div class="series-intro__body">A fictional journalist with embedded access to all of Matthew's data — recovery scores, sleep, glucose, weight, labs, journal entries. She writes each installment as narrative non-fiction: honest about the bad weeks, curious about the numbers, never cheerleading.</div>
+    <a href="/about/" class="series-intro__start">About the project →</a>
+  </div>
 </div>
 
 <div class="journal-list animate-in reveal" id="journal-list">
@@ -421,14 +482,14 @@
       <div class="footer-v2__heading">The Story</div>
       <a href="/" class="footer-v2__link">Home</a>
       <a href="/story/" class="footer-v2__link">My Story</a>
-      <a href="/about/" class="footer-v2__link">About</a>
+      <a href="/about/" class="footer-v2__link">The Mission</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The Data</div>
       <a href="/live/" class="footer-v2__link">Live</a>
-      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/character/" class="footer-v2__link">Character Sheet</a>
       <a href="/habits/" class="footer-v2__link">Habits</a>
-      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/accountability/" class="footer-v2__link">Progress</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The Science</div>
@@ -444,16 +505,16 @@
       <div class="footer-v2__heading">The Build</div>
       <a href="/platform/" class="footer-v2__link">Platform</a>
       <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
-      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/board/" class="footer-v2__link">AI Board</a>
       <a href="/cost/" class="footer-v2__link">Cost</a>
       <a href="/methodology/" class="footer-v2__link">Methodology</a>
       <a href="/tools/" class="footer-v2__link">Tools</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">Follow</div>
-      <a href="/chronicle/" class="footer-v2__link">Chronicle</a>
+      <a href="/chronicle/" class="footer-v2__link">Weekly Journal</a>
       <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
-      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/ask/" class="footer-v2__link">Ask the Data</a>
       <a href="/rss.xml" class="footer-v2__link">RSS</a>
       <a href="/privacy/" class="footer-v2__link">Privacy</a>
     </div>

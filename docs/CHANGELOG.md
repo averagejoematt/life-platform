@@ -1,3 +1,36 @@
+## v3.8.9 — 2026-03-22: Nav restructure — rename + reorganise
+
+### Summary
+Board-reviewed navigation restructure. Consulted all 6 AI board personas on clarity and
+throughline alignment. Applied renaming and structural changes across all 44 HTML files.
+Zero URL changes — only nav labels and groupings updated.
+
+### Changes
+
+**All `site/**/*.html` (44 files) — desktop nav + mobile overlay**
+- THE STORY: removed "Home" dropdown child (logo links home); renamed "About" → "The Mission"
+- THE DATA: renamed "Character" → "Character Sheet"; renamed "Accountability" → "Progress";
+  moved Sleep, Glucose, Supplements, Benchmarks from THE SCIENCE into THE DATA
+- THE SCIENCE: now only Protocols, Experiments, Discoveries (the methodology pipeline)
+- THE BUILD: renamed "Board" → "AI Board"
+- FOLLOW: renamed "Chronicle" → "Weekly Journal"; renamed "Ask" → "Ask the Data"
+- `is-active` parent-dropdown class correctly migrated for pages whose active item moved
+  from THE SCIENCE to THE DATA (sleep, glucose, supplements, benchmarks pages)
+
+**site/start/index.html**
+- Path card title "The Chronicle" → "Weekly Journal"; CTA "Read the chronicle →" → "Read the journal →"
+
+**docs/WEBSITE_ROADMAP.md**
+- Updated "Navigation Architecture" section to reflect 5-section dropdown structure
+
+### Board findings (condensed)
+- Unanimous: "My Story" vs "About" was the #1 friction point — two doors to the same room
+- "Chronicle" is opaque to new visitors; "Weekly Journal" is immediately legible
+- THE SCIENCE was bloated at 8 items; Sleep/Glucose/Supplements/Benchmarks are data views, not science
+- "Board" in THE BUILD reads as kanban/dashboard; "AI Board" disambiguates
+
+---
+
 ## v3.8.8 — 2026-03-22: Phase 0 website data fixes
 
 ### Summary

@@ -280,6 +280,71 @@
       letter-spacing: var(--ls-label);
     }
 
+    /* ── PROTO-4: Pipeline nav ───────────────────────────────── */
+    .pipeline-nav {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-4) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      overflow-x: auto;
+    }
+    .pipeline-nav__step {
+      color: var(--text-faint);
+      text-decoration: none;
+      text-transform: uppercase;
+      white-space: nowrap;
+      padding: var(--space-1) var(--space-3);
+      border: 1px solid transparent;
+    }
+    .pipeline-nav__step:hover { color: var(--text-muted); }
+    .pipeline-nav__step.active {
+      color: var(--accent);
+      border-color: var(--accent-dim);
+    }
+    .pipeline-nav__arrow { color: var(--border); }
+
+    /* ── PROTO-2: Experiment badge ───────────────────────────── */
+    .exp-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-1);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      color: var(--c-amber-500);
+      border: 1px solid var(--c-amber-300, #fbbf24);
+      padding: 2px var(--space-2);
+      text-decoration: none;
+    }
+    .exp-badge:hover { background: rgba(245,158,11,0.08); }
+    .exp-badge__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c-amber-500); animation: pulse 2s infinite; }
+
+    /* ── PROTO-3: Habit/supplement links ────────────────────── */
+    .proto-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-6);
+      border-top: 1px solid var(--border-subtle);
+      background: var(--bg);
+    }
+    .proto-links__group {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .proto-links__label { color: var(--text-faint); text-transform: uppercase; letter-spacing: var(--ls-tag); }
+    .proto-links__link { color: var(--accent-dim); text-decoration: none; border-bottom: 1px dotted var(--accent-dim); }
+    .proto-links__link:hover { color: var(--accent); }
+
     /* ── Mobile adjustments ──────────────────────────────────── */
     @media (max-width: 768px) {
       .proto-detail { grid-template-columns: 1fr; }
@@ -291,23 +356,26 @@
 </head>
 <body>
 <nav class="nav">
-  <a href="/" class="nav__brand">AMJ</a>
+  <a href="/" class="nav__brand">AJM</a>
   <div class="nav__links">
     <div class="nav__dropdown">
       <button class="nav__dropdown-btn">The Story</button>
       <div class="nav__dropdown-menu">
-        <a href="/" class="nav__dropdown-item">Home</a>
         <a href="/story/" class="nav__dropdown-item">My Story</a>
-        <a href="/about/" class="nav__dropdown-item">About</a>
+        <a href="/about/" class="nav__dropdown-item">The Mission</a>
       </div>
     </div>
     <div class="nav__dropdown">
       <button class="nav__dropdown-btn">The Data</button>
       <div class="nav__dropdown-menu">
         <a href="/live/" class="nav__dropdown-item">Live</a>
-        <a href="/character/" class="nav__dropdown-item">Character</a>
+        <a href="/character/" class="nav__dropdown-item">Character Sheet</a>
         <a href="/habits/" class="nav__dropdown-item">Habits</a>
-        <a href="/accountability/" class="nav__dropdown-item">Accountability</a>
+        <a href="/accountability/" class="nav__dropdown-item">Progress</a>
+        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
+        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
+        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
+        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
       </div>
     </div>
     <div class="nav__dropdown is-active">
@@ -316,10 +384,6 @@
         <a href="/protocols/" class="nav__dropdown-item active">Protocols</a>
         <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
         <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
-        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
-        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
-        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
-        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
       </div>
     </div>
     <div class="nav__dropdown">
@@ -327,7 +391,7 @@
       <div class="nav__dropdown-menu">
         <a href="/platform/" class="nav__dropdown-item">Platform</a>
         <a href="/intelligence/" class="nav__dropdown-item">Intelligence</a>
-        <a href="/board/" class="nav__dropdown-item">Board</a>
+        <a href="/board/" class="nav__dropdown-item">AI Board</a>
         <a href="/cost/" class="nav__dropdown-item">Cost</a>
         <a href="/methodology/" class="nav__dropdown-item">Methodology</a>
         <a href="/tools/" class="nav__dropdown-item">Tools</a>
@@ -336,9 +400,9 @@
     <div class="nav__dropdown">
       <button class="nav__dropdown-btn">Follow</button>
       <div class="nav__dropdown-menu">
-        <a href="/chronicle/" class="nav__dropdown-item">Chronicle</a>
+        <a href="/chronicle/" class="nav__dropdown-item">Weekly Journal</a>
         <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
-        <a href="/ask/" class="nav__dropdown-item">Ask</a>
+        <a href="/ask/" class="nav__dropdown-item">Ask the Data</a>
       </div>
     </div>
     <a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>
@@ -357,41 +421,40 @@
     <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Story</div>
-      <a href="/" class="nav-overlay__link">Home</a>
       <a href="/story/" class="nav-overlay__link">My Story</a>
-      <a href="/about/" class="nav-overlay__link">About</a>
+      <a href="/about/" class="nav-overlay__link">The Mission</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Data</div>
       <a href="/live/" class="nav-overlay__link">Live</a>
-      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/character/" class="nav-overlay__link">Character Sheet</a>
       <a href="/habits/" class="nav-overlay__link">Habits</a>
-      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
-    </div>
-    <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The Science</div>
-      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
-      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/accountability/" class="nav-overlay__link">Progress</a>
       <a href="/sleep/" class="nav-overlay__link">Sleep</a>
       <a href="/glucose/" class="nav-overlay__link">Glucose</a>
       <a href="/supplements/" class="nav-overlay__link">Supplements</a>
       <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
     </div>
     <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Science</div>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+    </div>
+    <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Build</div>
       <a href="/platform/" class="nav-overlay__link">Platform</a>
       <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
-      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/board/" class="nav-overlay__link">AI Board</a>
       <a href="/cost/" class="nav-overlay__link">Cost</a>
       <a href="/methodology/" class="nav-overlay__link">Methodology</a>
       <a href="/tools/" class="nav-overlay__link">Tools</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">Follow</div>
-      <a href="/chronicle/" class="nav-overlay__link">Chronicle</a>
+      <a href="/chronicle/" class="nav-overlay__link">Weekly Journal</a>
       <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
-      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/ask/" class="nav-overlay__link">Ask the Data</a>
       <a href="/rss.xml" class="nav-overlay__link">RSS</a>
       <a href="/privacy/" class="nav-overlay__link">Privacy</a>
     </div>
@@ -402,6 +465,15 @@
 
 
 
+
+<!-- PROTO-4: Pipeline nav -->
+<nav class="pipeline-nav">
+  <a href="/protocols/" class="pipeline-nav__step active">Protocols</a>
+  <span class="pipeline-nav__arrow">→</span>
+  <a href="/experiments/" class="pipeline-nav__step">Experiments</a>
+  <span class="pipeline-nav__arrow">→</span>
+  <a href="/discoveries/" class="pipeline-nav__step">Discoveries</a>
+</nav>
 
 <header class="proto-header reveal">
   <div class="eyebrow" style="margin-bottom:var(--space-4)">The Science</div>
@@ -435,7 +507,7 @@
       </div>
       <div class="proto-outcomes__row">
         <div class="proto-outcomes__protocol">Intermittent fasting</div>
-        <div class="proto-outcomes__value on-target">~90% adherence &check;</div>
+        <div class="proto-outcomes__value" id="outcomes-adh-if">&mdash;</div>
       </div>
       <div class="proto-outcomes__row">
         <div class="proto-outcomes__protocol">CGM time-in-range</div>
@@ -447,7 +519,7 @@
       </div>
       <div class="proto-outcomes__row">
         <div class="proto-outcomes__protocol">Strength training</div>
-        <div class="proto-outcomes__value below-target">65% adherence &mdash; building</div>
+        <div class="proto-outcomes__value" id="outcomes-adh-strength">&mdash;</div>
       </div>
     </div>
     <div class="proto-outcomes__footer">// static snapshot &mdash; live adherence loads within each card below</div>
@@ -459,7 +531,7 @@
 <div class="proto-body">
 
   <!-- 1. Zone 2 Cardio -->
-  <div class="proto-card reveal">
+  <div class="proto-card reveal" id="card-zone2" data-tags="zone2,movement,cardio">
     <div class="proto-card__header">
       <span class="proto-card__category">Movement</span>
       <span class="proto-card__sep">&middot;</span>
@@ -484,10 +556,13 @@
       </div>
       <div class="proto-data-note"><span>// Tracked by:</span> Garmin + Strava + Whoop</div>
     </div>
+    <div class="proto-links">
+      <div class="proto-links__group"><span class="proto-links__label">Habits</span> <a href="/habits/" class="proto-links__link">Consistency →</a></div>
+    </div>
   </div>
 
   <!-- 2. Sleep Protocol -->
-  <div class="proto-card reveal">
+  <div class="proto-card reveal" id="card-sleep" data-tags="sleep,recovery,circadian">
     <div class="proto-card__header">
       <span class="proto-card__category">Sleep</span>
       <span class="proto-card__sep">&middot;</span>
@@ -512,10 +587,14 @@
       </div>
       <div class="proto-data-note"><span>// Tracked by:</span> Whoop + Eight Sleep + Apple Health</div>
     </div>
+    <div class="proto-links">
+      <div class="proto-links__group"><span class="proto-links__label">Habits</span> <a href="/habits/" class="proto-links__link">Sleep Consistency, Morning Sunlight →</a></div>
+      <div class="proto-links__group"><span class="proto-links__label">Supplements</span> <a href="/supplements/" class="proto-links__link">Magnesium Glycinate, Melatonin →</a></div>
+    </div>
   </div>
 
   <!-- 3. 16:8 Intermittent Fasting -->
-  <div class="proto-card reveal">
+  <div class="proto-card reveal" id="card-if" data-tags="fasting,intermittent-fasting,nutrition">
     <div class="proto-card__header">
       <span class="proto-card__category">Nutrition</span>
       <span class="proto-card__sep">&middot;</span>
@@ -540,10 +619,14 @@
       </div>
       <div class="proto-data-note"><span>// Tracked by:</span> MacroFactor + Dexcom Stelo + Withings</div>
     </div>
+    <div class="proto-links">
+      <div class="proto-links__group"><span class="proto-links__label">Habits</span> <a href="/habits/" class="proto-links__link">IF Eating Window →</a></div>
+      <div class="proto-links__group"><span class="proto-links__label">Supplements</span> <a href="/supplements/" class="proto-links__link">Berberine →</a></div>
+    </div>
   </div>
 
   <!-- 4. Strength Training -->
-  <div class="proto-card reveal">
+  <div class="proto-card reveal" id="card-strength" data-tags="strength,body-composition,muscle">
     <div class="proto-card__header">
       <span class="proto-card__category">Movement</span>
       <span class="proto-card__sep">&middot;</span>
@@ -568,10 +651,14 @@
       </div>
       <div class="proto-data-note"><span>// Tracked by:</span> Hevy + Strava + Whoop + DEXA</div>
     </div>
+    <div class="proto-links">
+      <div class="proto-links__group"><span class="proto-links__label">Habits</span> <a href="/habits/" class="proto-links__link">Strength Training 3× →</a></div>
+      <div class="proto-links__group"><span class="proto-links__label">Supplements</span> <a href="/supplements/" class="proto-links__link">Creatine Monohydrate →</a></div>
+    </div>
   </div>
 
   <!-- 5. CGM Protocol -->
-  <div class="proto-card reveal">
+  <div class="proto-card reveal" id="card-cgm" data-tags="cgm,glucose,metabolic">
     <div class="proto-card__header">
       <span class="proto-card__category">Metabolic</span>
       <span class="proto-card__sep">&middot;</span>
@@ -596,10 +683,13 @@
       </div>
       <div class="proto-data-note"><span>// Tracked by:</span> Dexcom Stelo + platform CGM module</div>
     </div>
+    <div class="proto-links">
+      <div class="proto-links__group"><span class="proto-links__label">Supplements</span> <a href="/supplements/" class="proto-links__link">Berberine, Omega-3 →</a></div>
+    </div>
   </div>
 
   <!-- 6. Morning Sunlight -->
-  <div class="proto-card reveal">
+  <div class="proto-card reveal" id="card-sunlight" data-tags="sunlight,circadian,light">
     <div class="proto-card__header">
       <span class="proto-card__category">Circadian / Mind</span>
       <span class="proto-card__sep">&middot;</span>
@@ -623,6 +713,9 @@
         </div>
       </div>
       <div class="proto-data-note"><span>// Tracked by:</span> Habitify + Whoop sleep timing</div>
+    </div>
+    <div class="proto-links">
+      <div class="proto-links__group"><span class="proto-links__label">Habits</span> <a href="/habits/" class="proto-links__link">Morning Sunlight 10min →</a></div>
     </div>
   </div>
 
@@ -712,6 +805,21 @@ var inp=document.getElementById('cta-email-protocols');if(inp)inp.addEventListen
           el.classList.remove('loading');
         }
       });
+      // Outcomes strip — populate with same data + colour-code
+      var outMap = {
+        'outcomes-adh-if':       data.if_adherence_pct,
+        'outcomes-adh-strength': data.strength_adherence_pct
+      };
+      Object.keys(outMap).forEach(function(id){
+        var val = outMap[id];
+        var el  = document.getElementById(id);
+        if(el && val !== undefined && val !== null){
+          var pct = Math.round(val);
+          el.textContent = pct + '% adherence';
+          el.classList.remove('on-target','below-target');
+          el.classList.add(pct >= 80 ? 'on-target' : 'below-target');
+        }
+      });
       // Streak for calories from habits
       if(data.caloric_target_streak !== undefined){
         var sc = document.getElementById('streak-calories');
@@ -739,6 +847,59 @@ var inp=document.getElementById('cta-email-protocols');if(inp)inp.addEventListen
       var sa = document.getElementById('streak-alcohol');
       if(sa && sa.classList.contains('loading')){ sa.textContent = '\u2014'; sa.classList.remove('loading'); }
     });
+})();
+
+// PROTO-2: Active experiment badges
+(function() {
+  var API = 'https://averagejoematt.com';
+  // Map experiment tags to proto card IDs
+  var TAG_TO_CARD = {
+    'strength':           'card-strength',
+    'body-composition':   'card-strength',
+    'recovery':           'card-sleep',
+    'sleep':              'card-sleep',
+    'glucose':            'card-cgm',
+    'cgm':                'card-cgm',
+    'metabolic':          'card-cgm',
+    'zone2':              'card-zone2',
+    'fasting':            'card-if',
+    'intermittent-fasting': 'card-if',
+    'sunlight':           'card-sunlight',
+    'circadian':          'card-sunlight',
+  };
+  fetch(API + '/api/experiments')
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+    .then(function(d) {
+      var exps = (d.experiments || []).filter(function(e) { return e.status === 'active'; });
+      var cardBadges = {}; // cardId → [{name, id}]
+      exps.forEach(function(exp) {
+        var tags = exp.tags || [];
+        var matched = {};
+        tags.forEach(function(tag) {
+          var cardId = TAG_TO_CARD[tag];
+          if (cardId && !matched[cardId]) {
+            matched[cardId] = true;
+            if (!cardBadges[cardId]) cardBadges[cardId] = [];
+            cardBadges[cardId].push({ name: exp.name, id: exp.id });
+          }
+        });
+      });
+      Object.keys(cardBadges).forEach(function(cardId) {
+        var card = document.getElementById(cardId);
+        if (!card) return;
+        var header = card.querySelector('.proto-card__header');
+        if (!header) return;
+        cardBadges[cardId].forEach(function(exp) {
+          var badge = document.createElement('a');
+          badge.href = '/experiments/';
+          badge.className = 'exp-badge';
+          badge.title = exp.name;
+          badge.innerHTML = '<span class="exp-badge__dot"></span> Experiment running';
+          header.appendChild(badge);
+        });
+      });
+    })
+    .catch(function() {});
 })();
 </script>
 
@@ -777,14 +938,14 @@ var inp=document.getElementById('cta-email-protocols');if(inp)inp.addEventListen
       <div class="footer-v2__heading">The Story</div>
       <a href="/" class="footer-v2__link">Home</a>
       <a href="/story/" class="footer-v2__link">My Story</a>
-      <a href="/about/" class="footer-v2__link">About</a>
+      <a href="/about/" class="footer-v2__link">The Mission</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The Data</div>
       <a href="/live/" class="footer-v2__link">Live</a>
-      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/character/" class="footer-v2__link">Character Sheet</a>
       <a href="/habits/" class="footer-v2__link">Habits</a>
-      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/accountability/" class="footer-v2__link">Progress</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The Science</div>
@@ -800,16 +961,16 @@ var inp=document.getElementById('cta-email-protocols');if(inp)inp.addEventListen
       <div class="footer-v2__heading">The Build</div>
       <a href="/platform/" class="footer-v2__link">Platform</a>
       <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
-      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/board/" class="footer-v2__link">AI Board</a>
       <a href="/cost/" class="footer-v2__link">Cost</a>
       <a href="/methodology/" class="footer-v2__link">Methodology</a>
       <a href="/tools/" class="footer-v2__link">Tools</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">Follow</div>
-      <a href="/chronicle/" class="footer-v2__link">Chronicle</a>
+      <a href="/chronicle/" class="footer-v2__link">Weekly Journal</a>
       <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
-      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/ask/" class="footer-v2__link">Ask the Data</a>
       <a href="/rss.xml" class="footer-v2__link">RSS</a>
       <a href="/privacy/" class="footer-v2__link">Privacy</a>
     </div>

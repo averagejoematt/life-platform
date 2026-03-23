@@ -1,7 +1,7 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-21 (v3.8.0 — Unified Board Summit #3. Sprint 8 shipped: mobile nav (hamburger + bottom nav + grouped footer, 30 pages patched), content safety filter (3-layer: S3 config + prompt + response scrub), website versioning (rollback_site.sh + git tags). Comprehensive website roadmap at `docs/WEBSITE_ROADMAP.md`. 12 new page concepts identified with data already built.)
+> Last update: 2026-03-23 (v3.9.3 — Website Strategy Review #3. Expert panel audit of 10 pages → 50+ tasks → ~30 implemented via Claude Code. Data-driven supplements, vice streaks, nudge system, state hero, cockpit redesign, nav restructure (44 files). 4 new pages approved: Data Explorer, Weekly Snapshot, Milestones Gallery, Dark/Light Mode. Full spec: `docs/WEBSITE_REDESIGN_SPEC.md`)
 
 ---
 
@@ -64,6 +64,40 @@ All P0 items from Architecture Review #8 are resolved.
 | WR-44 | "Tool of the week" on /platform/ | Sprint 7 Tier 2 | ✅ Done (v3.7.84) |
 | WR-45 | Media kit + speaking page | Sprint 7 Tier 2 | ✅ Done (v3.7.84) |
 | WR-46 | Data export / open data page | Sprint 7 Tier 2 | ✅ Done (v3.7.84) |
+
+### Website Strategy Review #3 (2026-03-23, Expert Panel Redesign)
+
+> Full spec: `docs/WEBSITE_REDESIGN_SPEC.md`
+> Source: 6-persona expert panel (UX, CTO, CMO, Longevity, Product, Design) page-by-page audit of 10 pages
+> Implementation: ~30 of 50+ tasks completed same day via Claude Code (v3.8.8–v3.9.3)
+> Key achievement: Supplements (data-driven), Habits (vice streaks + WHY cards), Accountability (state hero + nudges), Nav restructure (44 files)
+
+**Phase 0 Data Fixes — ✅ COMPLETE. Phase 1 Major Redesigns — ✅ MOSTLY COMPLETE.**
+
+| ID | Item | Priority | Status |
+|----|------|----------|--------|
+| SUPP-1/2/3/4 | Supplements: data-driven, evidence tiers, genome tags, correlations | P1 | ✅ Done |
+| HAB-1/2/3 | Vice streaks, WHY cards, keystone correlations | P1 | ✅ Done |
+| ACCT-1/2/3 | State hero + nudge system + compact snapshot | P1 | ✅ Done |
+| LIVE-2 | NOC cockpit redesign | P1 | ✅ Done |
+| STORY-3/4/5 | Journey timeline + waveform + intersection cards | P1 | ✅ Done |
+| BOARD-1 | Huberman/Attia → fictional advisors | P1 | ✅ Done |
+| NAV | 5-section nav restructure (44 HTML files) | P1 | ✅ Done |
+| CHAR-1/2/3/6 | Thesis, interactive radar, tier path, calibrating state | P1 | ⬜ |
+| PLAT-2 | Hero architecture diagram (SVG) | P1 | ⬜ |
+| CHRON-3/4 | Chronicle generation fix + approval workflow | P1 | ⬜ |
+| PROTO-2/4 | Experiment badges on protocols + pipeline viz | P2 | ⬜ |
+
+**New Pages — Matthew Approved:**
+
+| ID | Item | Priority | Status |
+|----|------|----------|--------|
+| NEW-1 | **Data Explorer** — interactive correlation scatter plots + visitor "submit finding" | P1 | ⬜ |
+| NEW-2 | **Weekly Snapshot** — auto-generated weekly report cards, walkable archive | P1 | ⬜ |
+| NEW-3 | **Milestones Gallery** — gamification badges (weight/journal/running/streaks) faded→color | P1 | ⬜ |
+| NEW-4 | **Dark/Light Mode** — CSS toggle, localStorage persist | P2 | ⬜ |
+
+**Backlog (Panel Recommended):** For Builders page, Bloodwork/Labs, Body Composition, Longevity Scorecard, Segmented Subscriptions, Monthly Retrospective, System Status, API Docs, Mobile App Experience. See `WEBSITE_REDESIGN_SPEC.md` for full details.
 
 ---
 
@@ -217,8 +251,8 @@ Board Summit #3: 500 subscribers OR 90-day journey milestone (2026-05-22), which
 | Data sources | 19 | — | google_calendar retired (ADR-030) |
 | Architecture review grade | A- | A | R17 grade A-. R18 targeting post-DIST-1 (~June 2026). |
 | Email subscribers | 0 | 500 (6 months) | Subscribe backend live. Distribution is #1 priority. |
-| Website pages live | 15 | — | +protocols, +platform/reviews, +journal/sample (v3.7.84) |
-| HTML files patched | 30 | — | All pages have consistent nav architecture (v3.8.0) |
+| Website pages live | 30+ | — | All pages redesigned per panel spec (v3.9.3). 4 new pages approved (Data Explorer, Weekly Snapshot, Milestones, Dark Mode). |
+| HTML files patched | 44 | — | 5-section nav restructure across all files (v3.8.9). Supplements, Habits, Accountability fully redesigned. |
 | Mobile navigation | ✅ Hamburger + bottom nav | — | Shipped v3.8.0 (was: NONE) |
 | Content filter | ✅ 3-layer active | — | S3 config + system prompt + response scrub (v3.8.0) |
 | Git deploy tags | site-v3.8.0 | — | First tagged deploy with rollback capability |

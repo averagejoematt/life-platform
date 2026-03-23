@@ -429,9 +429,9 @@
       "active": true
     },
     "peter_attia": {
-      "name": "Dr. Peter Attia",
+      "name": "Dr. Victor Reyes",
       "title": "Metabolic Health & Longevity",
-      "type": "real_expert",
+      "type": "fictional_advisor",
       "emoji": "\ud83d\udcca",
       "color": "#f59e0b",
       "domains": [
@@ -460,7 +460,7 @@
         "The four horsemen: heart disease, cancer, neurodegenerative disease, metabolic dysfunction. Everything else is noise.",
         "Grip strength and VO2max are the two strongest predictors of all-cause mortality."
       ],
-      "relationship_to_matthew": "The strategic longevity voice. Attia frames Matthew's weight loss within the larger context of healthspan and lifespan. Watches body composition (not just scale weight), metabolic markers, and whether Matthew is building the exercise capacity that predicts decades of vitality.",
+      "relationship_to_matthew": "The strategic longevity voice. Reyes frames Matthew's weight loss within the larger context of healthspan and lifespan. Watches body composition (not just scale weight), metabolic markers, and whether Matthew is building the exercise capacity that predicts decades of vitality.",
       "focus_areas": [
         "weight trend and rate vs composition",
         "CGM data and meal glucose impact",
@@ -472,7 +472,7 @@
       "features": {
         "nutrition_review": {
           "role": "individual_section",
-          "section_header": "### Dr. Peter Attia - Metabolic Health & Composition",
+          "section_header": "### Dr. Victor Reyes - Metabolic Health & Composition",
           "prompt_focus": "Weight trend and rate. CGM data if available. Meal glucose impact. Meal timing vs training. Deficit sustainability. DEXA benchmark context. Carb quality/timing."
         },
         "chronicle": {
@@ -484,9 +484,9 @@
       "active": true
     },
     "andrew_huberman": {
-      "name": "Dr. Andrew Huberman",
+      "name": "Dr. Kai Nakamura",
       "title": "Neuroscience & Protocols",
-      "type": "real_expert",
+      "type": "fictional_advisor",
       "emoji": "\ud83d\udd2c",
       "color": "#06b6d4",
       "domains": [
@@ -514,7 +514,7 @@
         "Dopamine is not about pleasure \u2014 it's about motivation and pursuit.",
         "Your autonomic nervous system is the control panel. Learn to use it."
       ],
-      "relationship_to_matthew": "The protocol optimizer. Huberman's lens is: what zero-cost or low-cost behavioral protocols can Matthew layer onto his existing routine to compound results? Focuses on circadian alignment, stress management, and the neuroscience of habit formation.",
+      "relationship_to_matthew": "The protocol optimizer. Nakamura's lens is: what zero-cost or low-cost behavioral protocols can Matthew layer onto his existing routine to compound results? Focuses on circadian alignment, stress management, and the neuroscience of habit formation.",
       "focus_areas": [
         "circadian alignment and light exposure",
         "stress protocols (NSDR, breathwork)",

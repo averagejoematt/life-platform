@@ -14,120 +14,172 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
+    /* ── Layout ──────────────────────────────────────────── */
     .board-hero {
       text-align: center;
-      padding: 56px 24px 40px;
+      padding: var(--space-16) var(--page-padding) var(--space-10);
       max-width: 700px;
       margin: 0 auto;
     }
     .board-hero .eyebrow {
       font-family: var(--font-mono);
-      font-size: 0.72rem;
-      letter-spacing: 0.12em;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       color: var(--accent);
-      margin-bottom: 14px;
+      margin-bottom: var(--space-4);
     }
     .board-hero h1 {
-      font-size: clamp(1.8rem, 5vw, 2.8rem);
-      font-weight: 700;
-      line-height: 1.2;
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      font-weight: 400;
+      line-height: var(--lh-heading);
+      letter-spacing: var(--ls-display);
       color: var(--text);
-      margin: 0 0 16px;
+      margin: 0 0 var(--space-5);
     }
-    .board-hero p { color: var(--text-muted); font-size: 1rem; line-height: 1.65; max-width: 560px; margin: 0 auto 10px; }
+    .board-hero p { color: var(--text-muted); font-size: var(--text-base); line-height: var(--lh-body); max-width: 560px; margin: 0 auto var(--space-3); }
 
-    .board-selector { max-width: 800px; margin: 0 auto 32px; padding: 0 24px; }
-    .board-selector h2 { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 14px; }
-    .board-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
-    .board-member { background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; padding: 14px 14px 12px; cursor: pointer; transition: border-color 0.2s, background 0.2s; user-select: none; }
-    .board-member:hover { border-color: var(--border-hover, rgba(255,255,255,0.2)); }
+    /* ── Meet the Board grid ─────────────────────────────── */
+    .board-roster {
+      max-width: 800px;
+      margin: 0 auto var(--space-10);
+      padding: 0 var(--page-padding);
+    }
+    .board-roster__heading {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-5);
+    }
+    .board-roster__grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+    .roster-card {
+      background: var(--surface);
+      padding: var(--space-5);
+    }
+    .roster-card__icon { font-size: 1.25rem; margin-bottom: var(--space-2); display: block; }
+    .roster-card__name { font-size: var(--text-sm); font-weight: 600; color: var(--text); margin-bottom: var(--space-1); }
+    .roster-card__domain {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-label);
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: var(--space-2);
+    }
+    .roster-card__focus { font-size: var(--text-2xs); color: var(--text-faint); line-height: var(--lh-body); }
+
+    /* ── Board selector ──────────────────────────────────── */
+    .board-selector { max-width: 800px; margin: 0 auto var(--space-8); padding: 0 var(--page-padding); }
+    .board-selector h2 { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-4); }
+    .board-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: var(--space-3); }
+    .board-member { background: var(--surface); border: 1px solid var(--border); padding: var(--space-4) var(--space-4) var(--space-3); cursor: pointer; transition: border-color var(--dur-mid), background var(--dur-mid); user-select: none; }
+    .board-member:hover { border-color: rgba(255,255,255,0.15); }
     .board-member.selected { border-color: var(--accent); background: var(--accent-bg-subtle); }
-    .board-member .member-icon { font-size: 1.5rem; margin-bottom: 6px; display: block; }
-    .board-member .member-name { font-weight: 600; font-size: 0.88rem; color: var(--text); margin-bottom: 2px; }
-    .board-member .member-title { font-size: 0.72rem; color: var(--text-muted); line-height: 1.3; }
-    .select-controls { margin-top: 10px; display: flex; gap: 10px; align-items: center; }
-    .select-controls button { background: none; border: none; color: var(--text-muted); font-size: 0.78rem; cursor: pointer; padding: 0; text-decoration: underline; }
+    .board-member .member-icon { font-size: 1.4rem; margin-bottom: var(--space-2); display: block; }
+    .board-member .member-name { font-weight: 600; font-size: var(--text-sm); color: var(--text); margin-bottom: 2px; }
+    .board-member .member-title { font-size: var(--text-2xs); color: var(--text-muted); line-height: 1.3; }
+    .select-controls { margin-top: var(--space-3); display: flex; gap: var(--space-3); align-items: center; }
+    .select-controls button { background: none; border: none; color: var(--text-muted); font-size: var(--text-xs); cursor: pointer; padding: 0; text-decoration: underline; }
     .select-controls button:hover { color: var(--accent); }
-    .selected-count { font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent); margin-left: auto; }
+    .selected-count { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--accent); margin-left: auto; }
 
-    .question-area { max-width: 800px; margin: 0 auto 32px; padding: 0 24px; }
-    .question-area label { display: block; font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; }
+    /* ── Question area ───────────────────────────────────── */
+    .question-area { max-width: 800px; margin: 0 auto var(--space-8); padding: 0 var(--page-padding); }
+    .question-area label { display: block; font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-3); }
     .question-input-wrap { position: relative; }
-    .question-input-wrap textarea { width: 100%; background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; color: var(--text); font-family: var(--font-sans, sans-serif); font-size: 0.97rem; line-height: 1.55; padding: 16px 120px 16px 18px; resize: vertical; min-height: 90px; outline: none; transition: border-color 0.2s; box-sizing: border-box; }
+    .question-input-wrap textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-family: var(--font-sans, sans-serif); font-size: var(--text-base); line-height: var(--lh-body); padding: var(--space-4) 120px var(--space-4) var(--space-5); resize: vertical; min-height: 90px; outline: none; transition: border-color var(--dur-mid); box-sizing: border-box; }
     .question-input-wrap textarea:focus { border-color: var(--accent); }
     .question-input-wrap textarea::placeholder { color: var(--text-faint); }
-    .ask-btn { position: absolute; right: 14px; bottom: 14px; background: var(--accent); color: var(--bg); border: none; border-radius: 8px; padding: 10px 20px; font-weight: 700; font-size: 0.88rem; cursor: pointer; transition: opacity 0.2s; white-space: nowrap; }
+    .ask-btn { position: absolute; right: var(--space-4); bottom: var(--space-4); background: var(--accent); color: var(--bg); border: none; padding: var(--space-3) var(--space-5); font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; cursor: pointer; transition: opacity var(--dur-mid); white-space: nowrap; }
     .ask-btn:hover { opacity: 0.85; }
     .ask-btn:disabled { opacity: 0.4; cursor: default; }
 
-    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-    .chip { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 0.8rem; color: var(--text-muted); cursor: pointer; transition: all 0.15s; }
+    .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+    .chip { background: var(--surface); border: 1px solid var(--border); padding: var(--space-2) var(--space-4); font-size: var(--text-xs); color: var(--text-muted); cursor: pointer; transition: all var(--dur-fast); }
     .chip:hover { border-color: var(--accent); color: var(--accent); }
 
-    .rate-notice { text-align: center; font-size: 0.78rem; color: var(--text-muted); margin-top: 10px; }
+    .rate-notice { text-align: center; font-size: var(--text-xs); color: var(--text-muted); margin-top: var(--space-3); }
     .rate-notice span { color: var(--accent); }
 
-    .results-area { max-width: 800px; margin: 0 auto; padding: 0 24px 64px; }
-    .result-header { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 18px; }
+    /* ── Results ─────────────────────────────────────────── */
+    .results-area { max-width: 800px; margin: 0 auto; padding: 0 var(--page-padding) var(--space-16); }
+    .result-header { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-5); }
     .result-header span { color: var(--accent); }
 
-    .response-skeleton { border-radius: 12px; padding: 20px; background: var(--surface); border: 1px solid var(--border); margin-bottom: 14px; animation: pulse 1.4s ease-in-out infinite; }
+    .response-skeleton { padding: var(--space-5); background: var(--surface); border: 1px solid var(--border); margin-bottom: var(--space-3); animation: pulse 1.4s ease-in-out infinite; }
     @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
-    .skel-name { height: 14px; width: 120px; background: var(--border); border-radius: 4px; margin-bottom: 12px; }
-    .skel-line { height: 10px; background: var(--border-subtle, rgba(255,255,255,0.05)); border-radius: 4px; margin-bottom: 8px; }
+    .skel-name { height: 14px; width: 120px; background: var(--border); margin-bottom: var(--space-3); }
+    .skel-line { height: 10px; background: var(--border-subtle, rgba(255,255,255,0.05)); margin-bottom: var(--space-2); }
     .skel-line.short { width: 60%; }
 
-    .persona-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; margin-bottom: 14px; animation: fadeIn 0.4s ease; }
+    .persona-card { background: var(--surface); border: 1px solid var(--border); padding: var(--space-5) var(--space-6); margin-bottom: var(--space-3); animation: fadeIn var(--dur-slow) var(--ease-out); }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-    .persona-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-    .persona-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
-    .persona-meta .name { font-weight: 600; font-size: 0.95rem; color: var(--text); }
-    .persona-meta .title-tag { font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); }
-    .persona-body { color: var(--text-muted); font-size: 0.9rem; line-height: 1.7; }
+    .persona-header { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+    .persona-avatar { width: 36px; height: 36px; background: var(--accent); color: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+    .persona-meta .name { font-weight: 600; font-size: var(--text-base); color: var(--text); }
+    .persona-meta .title-tag { font-size: var(--text-2xs); color: var(--text-muted); font-family: var(--font-mono); letter-spacing: var(--ls-label); }
+    .persona-body { color: var(--text-muted); font-size: var(--text-sm); line-height: var(--lh-body); }
     .persona-body strong { color: var(--text); }
 
-    .error-msg { background: rgba(232,93,93,0.08); border: 1px solid rgba(232,93,93,0.3); border-radius: 10px; padding: 16px 20px; color: #E85D5D; font-size: 0.88rem; }
+    .error-msg { background: rgba(255,82,82,0.08); border: 1px solid rgba(255,82,82,0.3); padding: var(--space-4) var(--space-5); color: var(--c-red-status); font-size: var(--text-sm); }
 
-    .results-cta { margin-top: 32px; padding: 24px; background: var(--accent-bg-subtle); border: 1px solid var(--accent); border-radius: 12px; text-align: center; }
-    .results-cta p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px; }
-    .results-cta a.primary-cta { background: var(--accent); color: var(--bg); font-weight: 700; padding: 11px 24px; border-radius: 8px; text-decoration: none; font-size: 0.9rem; display: inline-block; transition: opacity 0.2s; }
+    .results-cta { margin-top: var(--space-8); padding: var(--space-6); background: var(--accent-bg-subtle); border: 1px solid var(--accent); text-align: center; }
+    .results-cta p { color: var(--text-muted); font-size: var(--text-sm); margin-bottom: var(--space-4); line-height: var(--lh-body); }
+    .results-cta a.primary-cta { background: var(--accent); color: var(--bg); font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; padding: var(--space-3) var(--space-6); text-decoration: none; display: inline-block; transition: opacity var(--dur-mid); }
     .results-cta a.primary-cta:hover { opacity: 0.85; }
-    .results-cta .secondary-link { display: block; margin-top: 10px; color: var(--text-muted); font-size: 0.8rem; text-decoration: underline; }
+    .results-cta .secondary-link { display: block; margin-top: var(--space-3); color: var(--text-muted); font-size: var(--text-xs); text-decoration: underline; }
 
-    .board-why { max-width: 800px; margin: 0 auto 28px; padding: 0 24px; }
-    .board-why p { color: var(--text-muted); font-size: 0.9rem; line-height: 1.7; }
-    .board-why p + p { margin-top: 10px; }
-
-    .ask-tips { max-width: 800px; margin: 24px auto 0; padding: 0 24px 48px; }
-    .ask-tips__heading { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 14px; }
-    .ask-tips__list { list-style: none; padding: 0; margin: 0; border: 1px solid var(--border); background: var(--surface); border-radius: 10px; overflow: hidden; }
-    .ask-tips__list li { padding: 14px 18px; border-bottom: 1px solid var(--border); font-size: 0.88rem; color: var(--text-muted); line-height: 1.6; display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: baseline; }
+    /* ── Tips ────────────────────────────────────────────── */
+    .ask-tips { max-width: 800px; margin: var(--space-6) auto 0; padding: 0 var(--page-padding) var(--space-12); }
+    .ask-tips__heading { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-4); }
+    .ask-tips__list { list-style: none; padding: 0; margin: 0; border: 1px solid var(--border); background: var(--surface); }
+    .ask-tips__list li { padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--border); font-size: var(--text-sm); color: var(--text-muted); line-height: var(--lh-body); display: grid; grid-template-columns: auto 1fr; gap: var(--space-3); align-items: baseline; }
     .ask-tips__list li:last-child { border-bottom: none; }
-    .ask-tips__num { font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent); flex-shrink: 0; }
+    .ask-tips__num { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--accent); flex-shrink: 0; letter-spacing: var(--ls-tag); }
+
+    @media (max-width: 720px) {
+      .board-roster__grid { grid-template-columns: repeat(2, 1fr); }
+      .board-hero { padding: var(--space-10) var(--page-padding-sm) var(--space-8); }
+      .board-selector, .question-area, .results-area, .ask-tips, .board-roster { padding: 0 var(--page-padding-sm); }
+    }
+    @media (max-width: 480px) {
+      .board-roster__grid { grid-template-columns: 1fr; }
+    }
   </style>
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
 </head>
 <body>
 
 <nav class="nav">
-  <a href="/" class="nav__brand">AMJ</a>
+  <a href="/" class="nav__brand">AJM</a>
   <div class="nav__links">
     <div class="nav__dropdown">
       <button class="nav__dropdown-btn">The Story</button>
       <div class="nav__dropdown-menu">
-        <a href="/" class="nav__dropdown-item">Home</a>
         <a href="/story/" class="nav__dropdown-item">My Story</a>
-        <a href="/about/" class="nav__dropdown-item">About</a>
+        <a href="/about/" class="nav__dropdown-item">The Mission</a>
       </div>
     </div>
     <div class="nav__dropdown">
       <button class="nav__dropdown-btn">The Data</button>
       <div class="nav__dropdown-menu">
         <a href="/live/" class="nav__dropdown-item">Live</a>
-        <a href="/character/" class="nav__dropdown-item">Character</a>
+        <a href="/character/" class="nav__dropdown-item">Character Sheet</a>
         <a href="/habits/" class="nav__dropdown-item">Habits</a>
-        <a href="/accountability/" class="nav__dropdown-item">Accountability</a>
+        <a href="/accountability/" class="nav__dropdown-item">Progress</a>
+        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
+        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
+        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
+        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
       </div>
     </div>
     <div class="nav__dropdown">
@@ -136,10 +188,6 @@
         <a href="/protocols/" class="nav__dropdown-item">Protocols</a>
         <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
         <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
-        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
-        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
-        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
-        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
       </div>
     </div>
     <div class="nav__dropdown is-active">
@@ -147,7 +195,7 @@
       <div class="nav__dropdown-menu">
         <a href="/platform/" class="nav__dropdown-item">Platform</a>
         <a href="/intelligence/" class="nav__dropdown-item">Intelligence</a>
-        <a href="/board/" class="nav__dropdown-item active">Board</a>
+        <a href="/board/" class="nav__dropdown-item active">AI Board</a>
         <a href="/cost/" class="nav__dropdown-item">Cost</a>
         <a href="/methodology/" class="nav__dropdown-item">Methodology</a>
         <a href="/tools/" class="nav__dropdown-item">Tools</a>
@@ -156,9 +204,9 @@
     <div class="nav__dropdown">
       <button class="nav__dropdown-btn">Follow</button>
       <div class="nav__dropdown-menu">
-        <a href="/chronicle/" class="nav__dropdown-item">Chronicle</a>
+        <a href="/chronicle/" class="nav__dropdown-item">Weekly Journal</a>
         <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
-        <a href="/ask/" class="nav__dropdown-item">Ask</a>
+        <a href="/ask/" class="nav__dropdown-item">Ask the Data</a>
       </div>
     </div>
     <a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>
@@ -177,41 +225,40 @@
     <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Story</div>
-      <a href="/" class="nav-overlay__link">Home</a>
       <a href="/story/" class="nav-overlay__link">My Story</a>
-      <a href="/about/" class="nav-overlay__link">About</a>
+      <a href="/about/" class="nav-overlay__link">The Mission</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Data</div>
       <a href="/live/" class="nav-overlay__link">Live</a>
-      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/character/" class="nav-overlay__link">Character Sheet</a>
       <a href="/habits/" class="nav-overlay__link">Habits</a>
-      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
-    </div>
-    <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The Science</div>
-      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
-      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/accountability/" class="nav-overlay__link">Progress</a>
       <a href="/sleep/" class="nav-overlay__link">Sleep</a>
       <a href="/glucose/" class="nav-overlay__link">Glucose</a>
       <a href="/supplements/" class="nav-overlay__link">Supplements</a>
       <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
     </div>
     <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Science</div>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+    </div>
+    <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Build</div>
       <a href="/platform/" class="nav-overlay__link">Platform</a>
       <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
-      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/board/" class="nav-overlay__link">AI Board</a>
       <a href="/cost/" class="nav-overlay__link">Cost</a>
       <a href="/methodology/" class="nav-overlay__link">Methodology</a>
       <a href="/tools/" class="nav-overlay__link">Tools</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">Follow</div>
-      <a href="/chronicle/" class="nav-overlay__link">Chronicle</a>
+      <a href="/chronicle/" class="nav-overlay__link">Weekly Journal</a>
       <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
-      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/ask/" class="nav-overlay__link">Ask the Data</a>
       <a href="/rss.xml" class="nav-overlay__link">RSS</a>
       <a href="/privacy/" class="nav-overlay__link">Privacy</a>
     </div>
@@ -225,17 +272,55 @@
 
 
 <div class="board-hero reveal">
-  <div class="eyebrow">The Build</div>
-  <h1>What Would My Health Board Say?</h1>
-  <p>I've assembled a panel of world-class experts as AI advisors for my transformation. Ask them anything — each responds in their unique voice and with their specific lens.</p>
-  <p style="font-size:0.82rem; color: var(--text-faint); margin-top:8px;">
-    AI personas inspired by real researchers. Not medical advice.
+  <div class="eyebrow">// The Build</div>
+  <h1>Ask My Health Board</h1>
+  <p>I've assembled six AI advisors — each with a distinct domain, a different lens, and genuinely different answers to the same question. The tension between them is the point.</p>
+  <p style="font-size:var(--text-xs); color: var(--text-faint); margin-top:var(--space-2);">
+    AI personas drawing on published research. Not medical advice.
   </p>
 </div>
 
-<div class="board-why reveal">
-  <p>The world's top performers don't make decisions alone — they have coaches, doctors, nutritionists, and mentors on speed dial. Most people don't have access to that. This is an attempt to change that.</p>
-  <p>Six expert perspectives are modelled here, each with a distinct domain, a different bias, and genuinely different answers to the same question. Dr. Rhonda Patrick will point you toward micronutrient gaps and cold exposure. Dr. Elena Vasquez will ask about your Zone 2 minutes and metabolic markers. Layne Norton will challenge the evidence base. David Goggins will not care about your excuses. That tension between perspectives is the point — the disagreements are where the insight lives.</p>
+<!-- BOARD-2: Meet the Board roster -->
+<div class="board-roster reveal">
+  <div class="board-roster__heading">// The advisors — six perspectives, one question</div>
+  <div class="board-roster__grid">
+    <div class="roster-card">
+      <span class="roster-card__icon">🩺</span>
+      <div class="roster-card__name">Dr. Elena Vasquez</div>
+      <div class="roster-card__domain">Metabolic Medicine</div>
+      <div class="roster-card__focus">VO2max, Zone 2, CGM patterns, metabolic health, longevity markers. Distinguishes strong evidence from speculation.</div>
+    </div>
+    <div class="roster-card">
+      <span class="roster-card__icon">🧠</span>
+      <div class="roster-card__name">Dr. James Okafor</div>
+      <div class="roster-card__domain">Performance Neuroscience</div>
+      <div class="roster-card__focus">Sleep architecture, light exposure, dopamine, stress resilience. Explains the mechanism before the protocol.</div>
+    </div>
+    <div class="roster-card">
+      <span class="roster-card__icon">🔬</span>
+      <div class="roster-card__name">Rhonda Patrick</div>
+      <div class="roster-card__domain">Cellular Biology</div>
+      <div class="roster-card__focus">Micronutrients, omega-3s, cold/heat exposure, inflammation markers. Thorough, never reductive.</div>
+    </div>
+    <div class="roster-card">
+      <span class="roster-card__icon">💪</span>
+      <div class="roster-card__name">Layne Norton</div>
+      <div class="roster-card__domain">Evidence-Based Nutrition</div>
+      <div class="roster-card__focus">Protein synthesis, body composition, muscle retention in deficit. Skeptical of broscience. Challenges weak evidence.</div>
+    </div>
+    <div class="roster-card">
+      <span class="roster-card__icon">⚡</span>
+      <div class="roster-card__name">James Clear</div>
+      <div class="roster-card__domain">Habit Architecture</div>
+      <div class="roster-card__focus">Identity-based change, the four laws of behavior, habit stacking. Makes the abstract specific.</div>
+    </div>
+    <div class="roster-card">
+      <span class="roster-card__icon">🔥</span>
+      <div class="roster-card__name">David Goggins</div>
+      <div class="roster-card__domain">Mental Toughness</div>
+      <div class="roster-card__focus">You quit at 40% capacity. The mind is the limit. Brutally honest, no coddling, no excuses accepted.</div>
+    </div>
+  </div>
 </div>
 
 <div class="board-selector reveal">
@@ -454,14 +539,14 @@
       <div class="footer-v2__heading">The Story</div>
       <a href="/" class="footer-v2__link">Home</a>
       <a href="/story/" class="footer-v2__link">My Story</a>
-      <a href="/about/" class="footer-v2__link">About</a>
+      <a href="/about/" class="footer-v2__link">The Mission</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The Data</div>
       <a href="/live/" class="footer-v2__link">Live</a>
-      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/character/" class="footer-v2__link">Character Sheet</a>
       <a href="/habits/" class="footer-v2__link">Habits</a>
-      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/accountability/" class="footer-v2__link">Progress</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The Science</div>
@@ -477,16 +562,16 @@
       <div class="footer-v2__heading">The Build</div>
       <a href="/platform/" class="footer-v2__link">Platform</a>
       <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
-      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/board/" class="footer-v2__link">AI Board</a>
       <a href="/cost/" class="footer-v2__link">Cost</a>
       <a href="/methodology/" class="footer-v2__link">Methodology</a>
       <a href="/tools/" class="footer-v2__link">Tools</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">Follow</div>
-      <a href="/chronicle/" class="footer-v2__link">Chronicle</a>
+      <a href="/chronicle/" class="footer-v2__link">Weekly Journal</a>
       <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
-      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/ask/" class="footer-v2__link">Ask the Data</a>
       <a href="/rss.xml" class="footer-v2__link">RSS</a>
       <a href="/privacy/" class="footer-v2__link">Privacy</a>
     </div>
