@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 S3_BUCKET = "matthew-life-platform"
 PUBLIC_STATS_KEY = "site/public_stats.json"
-CHARACTER_STATS_KEY = "site/character_stats.json"
+CHARACTER_STATS_KEY = "site/data/character_stats.json"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # BS-02: Hero narrative copy (finalised v3.7.67)
@@ -142,7 +142,7 @@ def _get_latest_chronicle_headline(table_client, user_id: str) -> dict | None:
 def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
                        platform: dict = None, table_client=None, user_id: str = "matthew",
                        trends: dict = None, brief_excerpt: str = None,
-                       baseline: dict = None) -> bool:
+                       baseline: dict = None, group_narratives: dict = None) -> bool:
     """
     Write public_stats.json to S3 from daily-brief-lambda data.
 
@@ -206,6 +206,8 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
             "brief_excerpt": brief_excerpt,
             # D10: Day 1 baseline for compare card — historical constants, not live data
             "baseline": _json_safe(baseline) if baseline else None,
+            # LIVE-2: One sentence per cockpit group for /live/ page narratives
+            "group_narratives": _json_safe(group_narratives or {}),
         }
 
         s3_client.put_object(
@@ -224,7 +226,8 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
         return False
 
 
-def write_character_stats(s3_client, character: dict, pillars: list, timeline: list, tiers: list = None) -> bool:
+def write_character_stats(s3_client, character: dict, pillars: list, timeline: list,
+                          tiers: list = None, pillar_history: list = None) -> bool:
     """
     Write character_stats.json to S3 from character-sheet-compute data.
 
@@ -263,6 +266,8 @@ def write_character_stats(s3_client, character: dict, pillars: list, timeline: l
             "pillars": _json_safe(pillars),
             "timeline": _json_safe(timeline[-20:]),  # Last 20 events only
             "tiers": _json_safe(tiers or default_tiers),
+            # CHAR-4: Weekly pillar history for independence heatmap
+            "pillar_history": _json_safe(pillar_history or []),
         }
 
         s3_client.put_object(

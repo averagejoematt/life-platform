@@ -119,21 +119,82 @@
 
     .cc-right { padding: var(--space-10); }
     .cc-tier-map { margin-bottom: var(--space-8); }
-    .tier-row {
-      display: grid;
-      grid-template-columns: 100px 1fr 80px;
-      align-items: center;
-      gap: var(--space-4);
-      padding: var(--space-3) 0;
-      border-bottom: 1px solid var(--border-subtle);
-      opacity: 0.4;
+
+    /* CHAR-3: Tier journey path */
+    .tier-path {
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding-top: var(--space-6);
     }
-    .tier-row.current { opacity: 1; }
-    .tier-row.current .tier-name { color: var(--accent); }
-    .tier-name { font-family: var(--font-display); font-size: 20px; color: var(--text-muted); }
-    .tier-bar { height: 2px; background: var(--surface-raised); }
-    .tier-bar__fill { height: 100%; background: var(--accent); transition: width 1s var(--ease-out); }
-    .tier-range { font-size: var(--text-xs); color: var(--text-muted); letter-spacing: var(--ls-tag); text-align: right; }
+    .tier-path__line {
+      position: absolute;
+      top: calc(var(--space-6) + 10px);
+      left: 10px;
+      right: 10px;
+      height: 2px;
+      background: var(--border);
+    }
+    .tier-path__line-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 1s var(--ease-out);
+    }
+    .tier-waypoint {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-2);
+      width: 68px;
+      z-index: 1;
+    }
+    .tier-waypoint__dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+    }
+    .tier-waypoint--done .tier-waypoint__dot {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .tier-waypoint--current .tier-waypoint__dot {
+      background: var(--bg);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0,229,160,0.2);
+      width: 24px;
+      height: 24px;
+    }
+    .tier-waypoint--current .tier-waypoint__dot::after {
+      content: '';
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .tier-waypoint__emoji { font-size: 14px; line-height: 1; margin-top: 2px; }
+    .tier-waypoint__name {
+      font-family: var(--font-display);
+      font-size: 11px;
+      color: var(--text-faint);
+      text-align: center;
+      letter-spacing: 0.04em;
+    }
+    .tier-waypoint--current .tier-waypoint__name { color: var(--accent); }
+    .tier-waypoint--done .tier-waypoint__name { color: var(--text-muted); }
+    .tier-waypoint__range {
+      font-size: 9px;
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      text-align: center;
+    }
 
     /* Radar chart */
     .radar-section {
@@ -142,7 +203,7 @@
     }
     .radar-layout {
       display: grid;
-      grid-template-columns: 320px 1fr;
+      grid-template-columns: 460px 1fr;
       gap: var(--space-12);
       align-items: start;
     }
@@ -333,6 +394,36 @@
     .event-text { font-size: var(--text-sm); color: var(--text); }
     .event-levels { font-size: var(--text-xs); color: var(--text-muted); letter-spacing: var(--ls-tag); white-space: nowrap; }
 
+    /* ── CHAR-4: Pillar independence heatmap ── */
+    .heatmap-section { padding: var(--space-12) var(--page-padding); border-top: 1px solid var(--border); }
+    .heatmap-section p { font-size: var(--text-sm); color: var(--text-muted); max-width: 560px; line-height: var(--lh-body); margin-top: var(--space-3); }
+    .hm-grid { margin-top: var(--space-6); overflow-x: auto; }
+    .hm-row { display: grid; grid-template-columns: 64px repeat(7, 1fr); gap: 3px; margin-bottom: 3px; }
+    .hm-header { margin-bottom: var(--space-2); }
+    .hm-week-label { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); display: flex; flex-direction: column; justify-content: center; padding-right: var(--space-2); }
+    .hm-week-label .hm-week-date { font-size: 9px; color: var(--text-faint); opacity: 0.6; }
+    .hm-col-head { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); text-align: center; letter-spacing: 0.04em; line-height: 1.3; text-transform: uppercase; padding: var(--space-1); }
+    .hm-col-head span { display: block; }
+    .hm-cell { height: 36px; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 10px; color: rgba(232,237,233,0.85); font-weight: 500; transition: opacity 0.15s; cursor: default; }
+    .hm-cell:hover { opacity: 0.8; }
+    .hm-legend { display: flex; gap: var(--space-6); flex-wrap: wrap; margin-top: var(--space-4); }
+    .hm-legend-item { display: flex; align-items: center; gap: var(--space-2); font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted); }
+    .hm-legend-swatch { width: 14px; height: 14px; border-radius: 2px; flex-shrink: 0; }
+
+    /* ── CHAR-5: Category-colored earned badges ── */
+    #badge-grid-streaks .badge-card.earned { border-color: var(--c-amber-500); box-shadow: 0 0 10px rgba(186,117,23,0.25); }
+    #badge-grid-levels  .badge-card.earned { border-color: var(--accent); box-shadow: 0 0 10px rgba(29,158,117,0.25); }
+    #badge-grid-weight  .badge-card.earned { border-color: var(--c-green-500); box-shadow: 0 0 10px rgba(29,158,117,0.25); }
+    #badge-grid-data    .badge-card.earned { border-color: var(--accent-dim); box-shadow: 0 0 10px rgba(0,229,160,0.15); }
+    .badge-card.earned .badge-card__status { color: var(--c-green-500); }
+    .badge-card.earned .badge-card__status::before { content: '✓ '; }
+    .badge-card:not(.earned) { opacity: 0.6; }
+    .badge-card:not(.earned):hover { opacity: 0.8; }
+
+    /* ── CHAR-6: Calibrating state ── */
+    .pillar-calibrating { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted); letter-spacing: 0.05em; animation: cal-pulse 1.8s ease-in-out infinite; }
+    @keyframes cal-pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+
     /* Achievement badges */
     .badges-section {
       padding: var(--space-12) var(--page-padding);
@@ -462,23 +553,26 @@
 <body>
 
 <nav class="nav">
-  <a href="/" class="nav__brand">AMJ</a>
+  <a href="/" class="nav__brand">AJM</a>
   <div class="nav__links">
     <div class="nav__dropdown">
       <button class="nav__dropdown-btn">The Story</button>
       <div class="nav__dropdown-menu">
-        <a href="/" class="nav__dropdown-item">Home</a>
         <a href="/story/" class="nav__dropdown-item">My Story</a>
-        <a href="/about/" class="nav__dropdown-item">About</a>
+        <a href="/about/" class="nav__dropdown-item">The Mission</a>
       </div>
     </div>
     <div class="nav__dropdown is-active">
       <button class="nav__dropdown-btn">The Data</button>
       <div class="nav__dropdown-menu">
         <a href="/live/" class="nav__dropdown-item">Live</a>
-        <a href="/character/" class="nav__dropdown-item active">Character</a>
+        <a href="/character/" class="nav__dropdown-item active">Character Sheet</a>
         <a href="/habits/" class="nav__dropdown-item">Habits</a>
-        <a href="/accountability/" class="nav__dropdown-item">Accountability</a>
+        <a href="/accountability/" class="nav__dropdown-item">Progress</a>
+        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
+        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
+        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
+        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
       </div>
     </div>
     <div class="nav__dropdown">
@@ -487,10 +581,6 @@
         <a href="/protocols/" class="nav__dropdown-item">Protocols</a>
         <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
         <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
-        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
-        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
-        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
-        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
       </div>
     </div>
     <div class="nav__dropdown">
@@ -498,7 +588,7 @@
       <div class="nav__dropdown-menu">
         <a href="/platform/" class="nav__dropdown-item">Platform</a>
         <a href="/intelligence/" class="nav__dropdown-item">Intelligence</a>
-        <a href="/board/" class="nav__dropdown-item">Board</a>
+        <a href="/board/" class="nav__dropdown-item">AI Board</a>
         <a href="/cost/" class="nav__dropdown-item">Cost</a>
         <a href="/methodology/" class="nav__dropdown-item">Methodology</a>
         <a href="/tools/" class="nav__dropdown-item">Tools</a>
@@ -507,9 +597,9 @@
     <div class="nav__dropdown">
       <button class="nav__dropdown-btn">Follow</button>
       <div class="nav__dropdown-menu">
-        <a href="/chronicle/" class="nav__dropdown-item">Chronicle</a>
+        <a href="/chronicle/" class="nav__dropdown-item">Weekly Journal</a>
         <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
-        <a href="/ask/" class="nav__dropdown-item">Ask</a>
+        <a href="/ask/" class="nav__dropdown-item">Ask the Data</a>
       </div>
     </div>
     <a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>
@@ -528,41 +618,40 @@
     <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Story</div>
-      <a href="/" class="nav-overlay__link">Home</a>
       <a href="/story/" class="nav-overlay__link">My Story</a>
-      <a href="/about/" class="nav-overlay__link">About</a>
+      <a href="/about/" class="nav-overlay__link">The Mission</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Data</div>
       <a href="/live/" class="nav-overlay__link">Live</a>
-      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/character/" class="nav-overlay__link">Character Sheet</a>
       <a href="/habits/" class="nav-overlay__link">Habits</a>
-      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
-    </div>
-    <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The Science</div>
-      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
-      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/accountability/" class="nav-overlay__link">Progress</a>
       <a href="/sleep/" class="nav-overlay__link">Sleep</a>
       <a href="/glucose/" class="nav-overlay__link">Glucose</a>
       <a href="/supplements/" class="nav-overlay__link">Supplements</a>
       <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
     </div>
     <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Science</div>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+    </div>
+    <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Build</div>
       <a href="/platform/" class="nav-overlay__link">Platform</a>
       <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
-      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/board/" class="nav-overlay__link">AI Board</a>
       <a href="/cost/" class="nav-overlay__link">Cost</a>
       <a href="/methodology/" class="nav-overlay__link">Methodology</a>
       <a href="/tools/" class="nav-overlay__link">Tools</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">Follow</div>
-      <a href="/chronicle/" class="nav-overlay__link">Chronicle</a>
+      <a href="/chronicle/" class="nav-overlay__link">Weekly Journal</a>
       <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
-      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/ask/" class="nav-overlay__link">Ask the Data</a>
       <a href="/rss.xml" class="nav-overlay__link">RSS</a>
       <a href="/privacy/" class="nav-overlay__link">Privacy</a>
     </div>
@@ -596,6 +685,14 @@
     Bottleneck:&nbsp;<span id="cbs-bottleneck" style="color:var(--c-yellow-status)">—</span>
   </div>
 </div>
+
+<!-- CHAR-1: Thesis opener -->
+<section class="reveal" style="padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border);background:var(--surface);">
+  <p style="font-size:var(--text-lg);color:var(--text);line-height:1.6;max-width:720px;font-family:var(--font-serif);font-style:italic;">
+    &ldquo;Weight is one number. This system measures whether I&rsquo;m actually becoming a happier, healthier, more connected human&nbsp;&mdash; and turns it into a game I can&rsquo;t cheat.&rdquo;
+  </p>
+  <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-tag);margin-top:var(--space-3)">// 7 pillars · scored from live data · no self-reporting</p>
+</section>
 
 <!-- Intro narrative -->
 <section class="reveal" style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border);">
@@ -687,7 +784,7 @@
   <div class="radar-layout">
     <div class="radar-container">
       <div class="radar-title">// seven pillars — live scores</div>
-      <svg id="radar-svg" viewBox="0 0 280 280" width="260" height="260" xmlns="http://www.w3.org/2000/svg"></svg>
+      <svg id="radar-svg" viewBox="0 0 400 400" width="400" height="400" xmlns="http://www.w3.org/2000/svg" style="cursor:pointer;max-width:100%;"></svg>
     </div>
     <div>
       <div class="label label-accent" style="margin-bottom:var(--space-5);">Score breakdown</div>
@@ -721,6 +818,20 @@
   <p style="font-size:var(--text-sm);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);margin-top:var(--space-3)">What needs to move to get to the next level. The bottleneck pillar is the weakest link — improving it has the highest leverage.</p>
   <div class="next-level-grid" id="next-level-grid">
     <!-- Injected by JS -->
+  </div>
+</section>
+
+<!-- CHAR-4: Pillar independence heatmap -->
+<section class="heatmap-section reveal" id="heatmap-section" style="display:none">
+  <div class="eyebrow">Pillar history</div>
+  <h2 class="text-h3" style="color:var(--text)">Weekly pillar heatmap</h2>
+  <p>Each row is a week. Color intensity shows how each pillar scored — pillars move independently, which is the point.</p>
+  <div class="hm-grid" id="hm-grid"></div>
+  <div class="hm-legend">
+    <div class="hm-legend-item"><div class="hm-legend-swatch" style="background:rgba(226,75,74,0.5)"></div> &lt;25 focus area</div>
+    <div class="hm-legend-item"><div class="hm-legend-swatch" style="background:rgba(186,117,23,0.55)"></div> 25–49 building</div>
+    <div class="hm-legend-item"><div class="hm-legend-swatch" style="background:rgba(29,158,117,0.55)"></div> 50–74 strong</div>
+    <div class="hm-legend-item"><div class="hm-legend-swatch" style="background:rgba(29,158,117,0.9)"></div> 75+ excellent</div>
   </div>
 </section>
 
@@ -1016,14 +1127,14 @@
       <div class="footer-v2__heading">The Story</div>
       <a href="/" class="footer-v2__link">Home</a>
       <a href="/story/" class="footer-v2__link">My Story</a>
-      <a href="/about/" class="footer-v2__link">About</a>
+      <a href="/about/" class="footer-v2__link">The Mission</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The Data</div>
       <a href="/live/" class="footer-v2__link">Live</a>
-      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/character/" class="footer-v2__link">Character Sheet</a>
       <a href="/habits/" class="footer-v2__link">Habits</a>
-      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/accountability/" class="footer-v2__link">Progress</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The Science</div>
@@ -1039,16 +1150,16 @@
       <div class="footer-v2__heading">The Build</div>
       <a href="/platform/" class="footer-v2__link">Platform</a>
       <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
-      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/board/" class="footer-v2__link">AI Board</a>
       <a href="/cost/" class="footer-v2__link">Cost</a>
       <a href="/methodology/" class="footer-v2__link">Methodology</a>
       <a href="/tools/" class="footer-v2__link">Tools</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">Follow</div>
-      <a href="/chronicle/" class="footer-v2__link">Chronicle</a>
+      <a href="/chronicle/" class="footer-v2__link">Weekly Journal</a>
       <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
-      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/ask/" class="footer-v2__link">Ask the Data</a>
       <a href="/rss.xml" class="footer-v2__link">RSS</a>
       <a href="/privacy/" class="footer-v2__link">Privacy</a>
     </div>
@@ -1132,18 +1243,38 @@
       `<circle cx="53" cy="32" r="4" fill="${moodColor}"/>` +
       mouthPath;
 
-    // Tier map
+    // Tier journey path (CHAR-3)
     const tierMap = document.getElementById('tier-map');
-    tierMap.innerHTML = tiers.map(t => {
-      const progress = t.status === 'current'
-        ? Math.min(((character.level - t.min_level) / (t.max_level - t.min_level)) * 100, 100)
-        : t.status === 'locked' ? 0 : 100;
-      return `<div class="tier-row ${t.status === 'current' ? 'current' : ''}">
-        <div class="tier-name">${t.emoji} ${t.name}</div>
-        <div class="tier-bar"><div class="tier-bar__fill" style="width:${progress}%"></div></div>
-        <div class="tier-range">${t.min_level}–${t.max_level}</div>
+    const doneCount = tiers.filter(t => t.status === 'unlocked').length;
+    const currentIdx = tiers.findIndex(t => t.status === 'current');
+    // Fill line % = portion of waypoints that are done + partial current progress
+    let fillPct = 0;
+    if (tiers.length > 1) {
+      const segWidth = 100 / (tiers.length - 1);
+      fillPct = doneCount * segWidth;
+      if (currentIdx >= 0) {
+        const t = tiers[currentIdx];
+        const segProgress = Math.min((character.level - t.min_level) / Math.max(t.max_level - t.min_level, 1), 1);
+        fillPct += segProgress * segWidth;
+      }
+    }
+    tierMap.innerHTML = `
+      <div class="tier-path">
+        <div class="tier-path__line"><div class="tier-path__line-fill" id="tier-line-fill" style="width:0%"></div></div>
+        ${tiers.map(t => {
+          const cls = t.status === 'current' ? 'tier-waypoint--current' : t.status === 'unlocked' ? 'tier-waypoint--done' : '';
+          return `<div class="tier-waypoint ${cls}">
+            <div class="tier-waypoint__dot"></div>
+            <div class="tier-waypoint__emoji">${t.emoji}</div>
+            <div class="tier-waypoint__name">${t.name}</div>
+            <div class="tier-waypoint__range">Lv ${t.min_level}–${t.max_level}</div>
+          </div>`;
+        }).join('')}
       </div>`;
-    }).join('');
+    setTimeout(() => {
+      const fill = document.getElementById('tier-line-fill');
+      if (fill) fill.style.width = Math.min(fillPct, 100) + '%';
+    }, 300);
 
     // Pillars
     const pg = document.getElementById('pillars-grid');
@@ -1152,13 +1283,15 @@
       const xpClass = p.xp_delta >= 0 ? '' : 'neg';
       const barW = Math.min(p.raw_score, 100);
       // FEAT-10: data confidence badge (shown when API provides readings count)
+      // CHAR-6: Calibrating state for pillars with no meaningful data
+      const isCalibrating = p.raw_score === 0 || (p.readings != null && p.readings < 3);
       let confidenceHtml = '';
-      if (p.readings != null) {
+      if (isCalibrating) {
+        confidenceHtml = `<div class="pillar-calibrating">// calibrating…</div>`;
+      } else if (p.readings != null) {
         const confClass = p.readings >= 30 ? 'pillar-confidence--high' : 'pillar-confidence--low';
         const confLabel = p.readings >= 30 ? '✓ High' : '⚠ Low';
         confidenceHtml = `<div class="pillar-confidence ${confClass}">${confLabel} (${p.readings} readings)</div>`;
-      } else if (p.raw_score === 0) {
-        confidenceHtml = `<div class="pillar-confidence pillar-confidence--low">⚠ Insufficient data</div>`;
       }
       return `<div class="pillar-card">
         <div class="pillar-card__header">
@@ -1234,7 +1367,7 @@
     svg.innerHTML = '';
 
     const N = pillars.length;
-    const cx = 140, cy = 140, R = 108, levels = 5;
+    const cx = 200, cy = 200, R = 156, levels = 5;
 
     function pt(angle, radius) {
       const a = angle - Math.PI / 2;
@@ -1290,23 +1423,40 @@
       svg.appendChild(dot);
       setTimeout(() => { dot.style.opacity = '1'; }, 150);
     });
-    // Emoji labels
+    // Emoji + name labels
     pillars.forEach((p, i) => {
-      const pos = pt((2*Math.PI*i)/N, R+18);
+      const pos = pt((2*Math.PI*i)/N, R+26);
       const t = svgEl('text', { x: pos.x, y: pos.y, 'text-anchor': 'middle',
-        'dominant-baseline': 'middle', 'font-size': '11', fill: '#7a9080' });
-      t.textContent = p.emoji || p.name.slice(0,2);
+        'dominant-baseline': 'middle', 'font-size': '13', fill: '#7a9080' });
+      t.textContent = (p.emoji || '') + ' ' + (p.name.slice(0,4));
       svg.appendChild(t);
     });
     // Centre level
-    const lvl = svgEl('text', { x: cx, y: cy-6, 'text-anchor': 'middle',
-      'font-size': '20', 'font-weight': '500', fill: '#e8ede9' });
+    const lvl = svgEl('text', { x: cx, y: cy-8, 'text-anchor': 'middle',
+      'font-size': '28', 'font-weight': '500', fill: '#e8ede9' });
     lvl.textContent = document.getElementById('cc-level')?.textContent || '2';
     svg.appendChild(lvl);
     const lvlLabel = svgEl('text', { x: cx, y: cy+10, 'text-anchor': 'middle',
-      'font-size': '8', fill: '#7a9080', 'letter-spacing': '0.08em' });
+      'font-size': '9', fill: '#7a9080', 'letter-spacing': '0.08em' });
     lvlLabel.textContent = 'LEVEL';
     svg.appendChild(lvlLabel);
+
+    // Click handlers: clicking dot or near axis highlights pillar bar
+    pillars.forEach((p, i) => {
+      const pos = pt((2*Math.PI*i)/N, R);
+      const hitArea = svgEl('circle', { cx: pos.x, cy: pos.y, r: '20',
+        fill: 'transparent', style: 'cursor:pointer' });
+      hitArea.addEventListener('click', function() {
+        const bars = barsEl.querySelectorAll('.radar-bar-row');
+        bars.forEach((bar, j) => {
+          bar.style.opacity = j === i ? '1' : '0.35';
+          bar.style.background = j === i ? 'var(--surface-raised)' : '';
+        });
+        // Reset after 2s
+        setTimeout(() => bars.forEach(bar => { bar.style.opacity = ''; bar.style.background = ''; }), 2000);
+      });
+      svg.appendChild(hitArea);
+    });
 
     // Bars
     barsEl.innerHTML = pillars.map(p => {
@@ -1327,9 +1477,54 @@
     }, 300);
   }
 
+  // CHAR-4: Pillar independence heatmap renderer
+  function renderHeatmap(pillarHistory) {
+    const section = document.getElementById('heatmap-section');
+    const grid    = document.getElementById('hm-grid');
+    if (!section || !grid || !pillarHistory || !pillarHistory.length) return;
+
+    const PILLARS = ['sleep','movement','nutrition','metabolic','mind','relationships','consistency'];
+    const EMOJIS  = {sleep:'😴',movement:'🏋️',nutrition:'🥗',metabolic:'📊',mind:'🧠',relationships:'💬',consistency:'🎯'};
+
+    function heatColor(score) {
+      if (!score || score <= 0) return 'var(--border)';
+      if (score < 25) return 'rgba(226,75,74,0.5)';
+      if (score < 50) return 'rgba(186,117,23,0.55)';
+      if (score < 75) return 'rgba(29,158,117,0.55)';
+      return 'rgba(29,158,117,0.9)';
+    }
+
+    // Header row
+    let html = '<div class="hm-row hm-header"><div class="hm-week-label"></div>';
+    PILLARS.forEach(p => {
+      html += `<div class="hm-col-head">${EMOJIS[p] || ''}<span>${p.slice(0,4)}</span></div>`;
+    });
+    html += '</div>';
+
+    // Data rows (oldest first)
+    pillarHistory.forEach(week => {
+      html += `<div class="hm-row"><div class="hm-week-label">${week.week_label}<span class="hm-week-date">${(week.week_end||'').slice(5)}</span></div>`;
+      PILLARS.forEach(p => {
+        const score = ((week.pillars || {})[p]) || 0;
+        html += `<div class="hm-cell" style="background:${heatColor(score)}" title="${p}: ${score}">${score > 0 ? Math.round(score) : '—'}</div>`;
+      });
+      html += '</div>';
+    });
+
+    grid.innerHTML = html;
+    section.style.display = '';
+    section.classList.add('is-visible');
+  }
+
   fetch('../data/character_stats.json')
     .then(r => r.json())
-    .then(data => { hydrate(data); renderRadar(data.pillars || DEFAULTS.pillars); })
+    .then(data => {
+      hydrate(data);
+      renderRadar(data.pillars || DEFAULTS.pillars);
+      if (data.pillar_history && data.pillar_history.length) {
+        renderHeatmap(data.pillar_history);
+      }
+    })
     .catch(() => { hydrate(DEFAULTS); renderRadar(DEFAULTS.pillars); });
 </script>
 

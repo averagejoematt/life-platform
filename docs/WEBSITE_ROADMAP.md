@@ -11,14 +11,23 @@
 
 **15 live pages** at averagejoematt.com. 30 HTML files total (including journal posts, templates, subpages).
 
-### Navigation Architecture (shipped v3.8.0)
+### Navigation Architecture (updated v3.8.9)
 
-| Tier | Location | Items | Purpose |
-|------|----------|-------|---------|
-| Top nav (desktop) | Fixed header | Story · Live · Journal · Platform · About · [Subscribe →] | First-visit discovery |
-| Bottom nav (mobile) | Fixed footer, 60px | Home · Ask · Score · Journal · More | Return-visitor engagement |
-| Hamburger (mobile) | Top-right ☰ | Full-page overlay, 4 grouped sections | Complete sitemap access |
-| Footer (all) | Page bottom | 4-column grid: Journey / Data / Platform / Follow | SEO + deep linking |
+5-section dropdown nav. Each parent is a dropdown button; children are the actual pages.
+
+| Parent | Children |
+|--------|----------|
+| **THE STORY** | My Story, The Mission |
+| **THE DATA** | Live, Character Sheet, Habits, Progress, Sleep, Glucose, Supplements, Benchmarks |
+| **THE SCIENCE** | Protocols, Experiments, Discoveries |
+| **THE BUILD** | Platform, Intelligence, AI Board, Cost, Methodology, Tools |
+| **FOLLOW** | Weekly Journal, Subscribe, Ask the Data |
+
+| Tier | Location | Notes |
+|------|----------|-------|
+| Top nav (desktop) | Fixed header | 5 dropdown parents + Subscribe → CTA |
+| Hamburger (mobile) | Top-right ☰ | Full-page overlay mirroring the 5 sections |
+| Footer (all) | Page bottom | Links to major pages across all 5 sections |
 
 ### Content Safety Filter (shipped v3.8.0)
 

@@ -82,6 +82,27 @@ table    = dynamodb.Table(TABLE_NAME)
 # ── Content safety filter (S3-cached) ───────────────────────
 _content_filter_cache = None
 
+# ── Supplement metadata (S3-cached) ─────────────────────────
+_supp_metadata_cache = None
+
+
+def _load_supp_metadata() -> dict:
+    """Load supplement metadata from S3 config/supplement_metadata.json. Cached after first call."""
+    global _supp_metadata_cache
+    if _supp_metadata_cache is not None:
+        return _supp_metadata_cache
+    try:
+        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+        s3 = boto3.client("s3", region_name=S3_REGION)
+        resp = s3.get_object(Bucket=S3_BUCKET, Key="site/config/supplement_metadata.json")
+        data = json.loads(resp["Body"].read())
+        _supp_metadata_cache = data.get("supplements", {})
+        logger.info(f"[supp_metadata] Loaded: {len(_supp_metadata_cache)} supplements")
+    except Exception as e:
+        logger.warning(f"[supp_metadata] Failed to load from S3: {e}")
+        _supp_metadata_cache = {}
+    return _supp_metadata_cache
+
 def _load_content_filter():
     """Load blocked terms from S3 config/content_filter.json. Cached after first call."""
     global _content_filter_cache
@@ -566,6 +587,7 @@ def handle_experiments() -> dict:
             progress_pct = min(100, round(days_in / int(planned_duration) * 100))
 
         experiments.append({
+            "id":                item.get("sk", "").replace("EXP#", ""),
             "name":              item.get("name", "Unnamed"),
             "status":            status,
             "start_date":        start,
@@ -585,6 +607,11 @@ def handle_experiments() -> dict:
             "progress_pct":      progress_pct,
             "confirmed":         item.get("confirmed", False),
             "hypothesis_confirmed": item.get("hypothesis_confirmed"),
+            # EXP-2: depth fields
+            "mechanism":         item.get("mechanism"),
+            "key_finding":       item.get("key_finding"),
+            "protocol":          item.get("protocol"),
+            "evidence_tier":     item.get("evidence_tier"),
         })
     experiments.sort(key=lambda x: x["start_date"], reverse=True)
 
@@ -710,13 +737,18 @@ def handle_supplements() -> dict:
     """
     GET /api/supplements
     Returns current supplement stack with dosage, timing, category.
+    Metadata is the authoritative source (all supplements); DynamoDB dose/timing
+    overrides metadata defaults when available.
     Excludes medications and personal notes for privacy.
     Cache: 3600s (1 hr).
     """
+    import re as _re
+
     today     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
     pk = f"{USER_PREFIX}supplements"
+    item = None
     # Try today first, fall back to yesterday
     for date in (today, yesterday):
         resp = table.get_item(Key={"pk": pk, "sk": f"DATE#{date}"})
@@ -725,36 +757,347 @@ def handle_supplements() -> dict:
             break
 
     if not item:
-        # Scan last 7 days for latest record
+        # Scan last 30 days for latest record
         resp = table.query(
             KeyConditionExpression=Key("pk").eq(pk),
             ScanIndexForward=False,
-            Limit=7,
+            Limit=30,
         )
         items = _decimal_to_float(resp.get("Items", []))
         item = items[0] if items else None
 
-    if not item:
+    metadata = _load_supp_metadata()
+    if not metadata:
         return _error(503, "Supplement data not available")
 
-    raw_sups = item.get("supplements", [])
+    def _normalize_key(name: str) -> str:
+        return _re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+
+    # Build a lookup from normalized name → DynamoDB supplement record
+    ddb_lookup = {}
+    if item:
+        for s in item.get("supplements", []):
+            if s.get("category") == "medication":
+                continue
+            ddb_lookup[_normalize_key(s.get("name", ""))] = s
+
+    as_of_date = item.get("date", yesterday) if item else yesterday
+
+    # SUPP-1: Iterate metadata as authoritative list; merge DynamoDB dose/timing
     public_sups = []
-    for s in raw_sups:
-        category = s.get("category", "supplement")
-        if category == "medication":
-            continue  # never expose medications publicly
-        public_sups.append({
-            "name":     s.get("name", ""),
-            "dose":     s.get("dose"),
-            "unit":     s.get("unit", ""),
-            "timing":   s.get("timing", ""),
+    for key, meta in metadata.items():
+        ddb = ddb_lookup.get(key, {})
+        category = ddb.get("category", "supplement")
+        pub = {
+            "key":     key,
+            "name":    meta.get("display_name", key),
+            "dose":    ddb.get("dose") if ddb.get("dose") is not None else meta.get("default_dose"),
+            "unit":    ddb.get("unit") or meta.get("default_unit", ""),
+            "timing":  ddb.get("timing") or meta.get("default_timing", ""),
             "category": category,
-        })
+            "adherence_pct": ddb.get("adherence_pct"),
+            "purpose_group":  meta.get("purpose_group"),
+            "evidence_tier":  meta.get("evidence_tier"),
+            "genome_snp":     meta.get("genome_snp"),
+            "rationale":      meta.get("rationale"),
+            "science_points": meta.get("science_points", []),
+            "watching":       meta.get("watching"),
+            "signal":         meta.get("signal"),
+            "linked_experiment_id": meta.get("linked_experiment_id"),
+        }
+        public_sups.append(pub)
 
     return _ok({
-        "as_of_date":   item.get("date", yesterday),
-        "supplements":  public_sups,
-        "total_count":  len(public_sups),
+        "as_of_date":  as_of_date,
+        "supplements": public_sups,
+        "total_count": len(public_sups),
+    }, cache_seconds=3600)
+
+
+def handle_vice_streaks() -> dict:
+    """
+    GET /api/vice_streaks
+    Returns content-filtered vice streak portfolio from habit_scores.vice_streaks.
+    Computes current streak, 90-day best, and relapse count per vice.
+    Blocked vices (per content_filter.json) are excluded from the response.
+    Cache: 3600s (1 hr).
+    """
+    today           = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    ninety_days_ago = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
+
+    content_filter = _load_content_filter()
+    blocked_set    = set(v.lower().strip() for v in content_filter.get("blocked_vices", []))
+
+    pk = f"{USER_PREFIX}habit_scores"
+    resp = table.query(
+        KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(
+            f"DATE#{ninety_days_ago}", f"DATE#{today}"
+        ),
+        ScanIndexForward=True,
+    )
+    items = _decimal_to_float(resp.get("Items", []))
+
+    if not items:
+        return _ok({"vices": [], "total_held": 0, "total_tracked": 0, "as_of_date": today}, cache_seconds=3600)
+
+    # Gather per-vice streak history (chronological)
+    vice_history: dict = {}
+    for item in items:
+        vs = item.get("vice_streaks") or {}
+        if not isinstance(vs, dict):
+            continue
+        for vice_name, streak_val in vs.items():
+            if vice_name.lower().strip() in blocked_set:
+                continue
+            if vice_name not in vice_history:
+                vice_history[vice_name] = []
+            vice_history[vice_name].append(int(streak_val or 0))
+
+    if not vice_history:
+        return _ok({"vices": [], "total_held": 0, "total_tracked": 0, "as_of_date": today}, cache_seconds=3600)
+
+    # Current state from latest record
+    latest    = items[-1]
+    latest_vs = {}
+    raw_vs    = latest.get("vice_streaks") or {}
+    if isinstance(raw_vs, dict):
+        latest_vs = {k: int(v or 0) for k, v in raw_vs.items() if k.lower().strip() not in blocked_set}
+
+    vices = []
+    for vice_name, history in vice_history.items():
+        current_streak = latest_vs.get(vice_name, history[-1] if history else 0)
+        best_streak    = max(history) if history else 0
+        # Relapse = streak dropped from >0 to 0
+        relapses = sum(1 for i in range(1, len(history)) if history[i - 1] > 0 and history[i] == 0)
+        vices.append({
+            "name":           vice_name,
+            "current_streak": current_streak,
+            "best_streak":    best_streak,
+            "relapses_90d":   relapses,
+            "holding":        current_streak > 0,
+        })
+
+    # Sort: holding first, then by streak descending
+    vices.sort(key=lambda v: (-int(v["holding"]), -v["current_streak"]))
+
+    total_held    = int(latest.get("vices_held", 0) or 0)
+    total_tracked = len(vices)
+
+    return _ok({
+        "as_of_date":    latest.get("date", today),
+        "vices":         vices,
+        "total_held":    total_held,
+        "total_tracked": total_tracked,
+    }, cache_seconds=3600)
+
+
+def handle_journey_timeline() -> dict:
+    """
+    GET /api/journey_timeline
+    Returns ordered timeline events for the Story page:
+    - Weight milestones (first crossing of 5-lb thresholds)
+    - Level-up events from character_sheet
+    - Experiment start/completion events
+    Cache: 3600s (1 hr).
+    """
+    today           = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    start_date      = "2026-01-01"
+    start_weight    = 302.0
+    goal_weight     = 185.0
+
+    events: list = []
+
+    # ── 1. Day 1 anchor ──────────────────────────────────────────────────────
+    events.append({
+        "date":  start_date,
+        "type":  "milestone",
+        "title": "Day 1 — The Experiment Begins",
+        "body":  "Started at 302 lbs. Built the platform from scratch. Committed publicly.",
+        "link":  "/story/",
+    })
+
+    # ── 2. Weight milestones (5-lb thresholds) ───────────────────────────────
+    thresholds = list(range(295, int(goal_weight) - 1, -5))  # 295, 290, 285, …, 190, 185
+    crossed: dict = {}  # threshold -> date string
+
+    wk_pk = f"{USER_PREFIX}withings"
+    try:
+        wk_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(wk_pk) & Key("sk").between(
+                f"DATE#{start_date}", f"DATE#{today}"
+            ),
+            ScanIndexForward=True,
+        )
+        for item in _decimal_to_float(wk_resp.get("Items", [])):
+            wt = item.get("weight_lbs")
+            if wt is None:
+                continue
+            wt = float(wt)
+            date_str = item.get("date") or item.get("sk", "").replace("DATE#", "")
+            for thr in thresholds:
+                if thr not in crossed and wt <= thr:
+                    crossed[thr] = date_str
+    except Exception:
+        pass
+
+    for thr in sorted(crossed.keys(), reverse=True):  # highest first = earliest
+        lbs_lost = start_weight - thr
+        events.append({
+            "date":  crossed[thr],
+            "type":  "weight",
+            "title": f"Crossed {thr} lbs — {int(lbs_lost)} lbs lost",
+            "body":  f"Down {int(lbs_lost)} lbs from 302. {round((lbs_lost / (start_weight - goal_weight)) * 100)}% of the way to goal.",
+            "link":  "/live/",
+        })
+
+    # ── 3. Level-up events from character_sheet ──────────────────────────────
+    cs_pk = f"{USER_PREFIX}character_sheet"
+    try:
+        cs_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(cs_pk) & Key("sk").between(
+                f"DATE#{start_date}", f"DATE#{today}"
+            ),
+            ScanIndexForward=True,
+        )
+        seen_levels: set = set()
+        for item in _decimal_to_float(cs_resp.get("Items", [])):
+            level = item.get("character_level")
+            date_str = item.get("date") or item.get("sk", "").replace("DATE#", "")
+            if level and level not in seen_levels:
+                seen_levels.add(level)
+                if level > 1:
+                    events.append({
+                        "date":  date_str,
+                        "type":  "level_up",
+                        "title": f"Reached Character Level {level}",
+                        "body":  f"Level {level} — {item.get('character_tier', '')}. Pillar scores converging.",
+                        "link":  "/character/",
+                    })
+    except Exception:
+        pass
+
+    # ── 4. Experiment starts ─────────────────────────────────────────────────
+    exp_pk = f"{USER_PREFIX}experiments"
+    try:
+        exp_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(exp_pk),
+            ScanIndexForward=False,
+            Limit=20,
+        )
+        for item in _decimal_to_float(exp_resp.get("Items", [])):
+            if not item.get("sk", "").startswith("EXP#"):
+                continue
+            start = item.get("start_date", "")
+            if not start or start < start_date:
+                continue
+            status = item.get("status", "")
+            if status == "active":
+                events.append({
+                    "date":  start,
+                    "type":  "experiment",
+                    "title": f"Experiment: {item.get('name', 'Unnamed')}",
+                    "body":  item.get("hypothesis", "")[:120] + ("…" if len(item.get("hypothesis", "")) > 120 else ""),
+                    "link":  "/experiments/",
+                })
+            elif status == "completed":
+                end = item.get("end_date", start)
+                outcome = (item.get("outcome") or item.get("result_summary") or "")[:80]
+                events.append({
+                    "date":  end,
+                    "type":  "discovery",
+                    "title": f"Experiment Complete: {item.get('name', 'Unnamed')}",
+                    "body":  outcome + ("…" if len(outcome) == 80 else ""),
+                    "link":  "/discoveries/",
+                })
+    except Exception:
+        pass
+
+    # Sort chronologically, deduplicate by date+title
+    events.sort(key=lambda e: e["date"])
+    seen: set = set()
+    deduped = []
+    for e in events:
+        key = (e["date"], e["title"])
+        if key not in seen:
+            seen.add(key)
+            deduped.append(e)
+
+    return _ok({
+        "as_of_date": today,
+        "events":     deduped,
+        "total":      len(deduped),
+    }, cache_seconds=3600)
+
+
+def handle_journey_waveform() -> dict:
+    """
+    GET /api/journey_waveform
+    Returns 42 days of daily pillar-sum scores for the Story page emotional waveform.
+    Score = sum of 7 pillar level_scores (0–700 range).
+    Color tiers: green (>=250), amber (>=150), red (<150), gray (no data).
+    Cache: 3600s (1 hr).
+    """
+    today      = datetime.now(timezone.utc).date()
+    start_date = (today - timedelta(days=41)).isoformat()
+    end_date   = today.isoformat()
+
+    PILLARS = [
+        "pillar_sleep", "pillar_nutrition", "pillar_movement",
+        "pillar_metabolic", "pillar_mind", "pillar_consistency", "pillar_relationships",
+    ]
+
+    cs_pk = f"{USER_PREFIX}character_sheet"
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(cs_pk) & Key("sk").between(
+                f"DATE#{start_date}", f"DATE#{end_date}"
+            ),
+            ScanIndexForward=True,
+        )
+        items = resp.get("Items", [])
+    except Exception:
+        items = []
+
+    # Index by date
+    by_date: dict = {}
+    for item in items:
+        date_str = item.get("date") or item.get("sk", "").replace("DATE#", "")
+        if not date_str:
+            continue
+        total = 0.0
+        for pillar in PILLARS:
+            pdata = item.get(pillar, {})
+            # boto3 Table resource returns already-deserialized Python values
+            if isinstance(pdata, dict):
+                ls = pdata.get("level_score")
+                if ls is not None:
+                    try:
+                        total += float(ls)
+                    except (TypeError, ValueError):
+                        pass
+        by_date[date_str] = round(total, 1)
+
+    # Build ordered 42-day series
+    days = []
+    for i in range(42):
+        d = (today - timedelta(days=41 - i)).isoformat()
+        score = by_date.get(d)
+        if score is None:
+            color = "gray"
+        elif score >= 250:
+            color = "green"
+        elif score >= 150:
+            color = "amber"
+        else:
+            color = "red"
+        days.append({"date": d, "score": score, "color": color})
+
+    max_score = max((d["score"] for d in days if d["score"] is not None), default=1)
+
+    return _ok({
+        "days":      days,
+        "max_score": max_score,
+        "window":    42,
     }, cache_seconds=3600)
 
 
@@ -872,17 +1215,94 @@ def handle_habits() -> dict:
     keystone_group = max(group_90d_avgs, key=group_90d_avgs.get) if group_90d_avgs else None
     keystone_group_pct = group_90d_avgs.get(keystone_group) if keystone_group else None
 
+    # ── HAB-3: Pearson correlation per habit group vs character score ──────────
+    keystone_correlations = []
+    try:
+        import math as _math
+
+        # Fetch character_sheet records for same window
+        cs_pk = f"{USER_PREFIX}character_sheet"
+        cs_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(cs_pk) & Key("sk").between(
+                f"DATE#{ninety_days_ago}", f"DATE#{today}"
+            ),
+            ScanIndexForward=True,
+        )
+        cs_items = _decimal_to_float(cs_resp.get("Items", []))
+
+        # Build date → pillar sum (character health proxy)
+        PILLARS_CS = ["pillar_sleep", "pillar_movement", "pillar_nutrition",
+                      "pillar_metabolic", "pillar_mind", "pillar_relationships", "pillar_consistency"]
+        char_by_date = {}
+        for ci in cs_items:
+            cs_date = ci.get("date") or ci.get("sk", "").replace("DATE#", "")
+            psum = 0.0
+            for pkey in PILLARS_CS:
+                pdata = ci.get(pkey) or {}
+                if isinstance(pdata, dict):
+                    ls = pdata.get("level_score")
+                    if ls is not None:
+                        psum += float(ls)
+            if psum > 0:
+                char_by_date[cs_date] = psum
+
+        # For each group, collect matched (char_score, group_pct) pairs
+        group_series: dict = {}
+        for day in history:
+            d = day.get("date")
+            if d not in char_by_date:
+                continue
+            cs_score = char_by_date[d]
+            for gname, gpct in (day.get("groups") or {}).items():
+                if isinstance(gpct, (int, float)):
+                    if gname not in group_series:
+                        group_series[gname] = []
+                    group_series[gname].append((float(gpct), cs_score))
+
+        # Pearson r helper
+        def _pearson(pairs):
+            n = len(pairs)
+            if n < 5:
+                return None
+            xs = [p[0] for p in pairs]
+            ys = [p[1] for p in pairs]
+            mx = sum(xs) / n
+            my = sum(ys) / n
+            num = sum((xs[i] - mx) * (ys[i] - my) for i in range(n))
+            dx  = _math.sqrt(sum((x - mx) ** 2 for x in xs))
+            dy  = _math.sqrt(sum((y - my) ** 2 for y in ys))
+            if dx == 0 or dy == 0:
+                return None
+            return round(num / (dx * dy), 3)
+
+        corr_list = []
+        for gname, pairs in group_series.items():
+            r = _pearson(pairs)
+            if r is not None:
+                corr_list.append({
+                    "group":         gname,
+                    "correlation_r": r,
+                    "avg_pct":       group_90d_avgs.get(gname),
+                    "n_days":        len(pairs),
+                })
+        corr_list.sort(key=lambda x: abs(x["correlation_r"]), reverse=True)
+        keystone_correlations = corr_list[:5]
+    except Exception as _hc_e:
+        logger.warning("[handle_habits] keystone_correlations failed (non-fatal): %s", _hc_e)
+
     return _ok({
-        "as_of_date":         today,
-        "days_tracked":       len(history),
-        "current_streak":     latest_streak,
-        "history":            history,
-        "day_of_week_avgs":   dow_avgs,        # [Mon, Tue, Wed, Thu, Fri, Sat, Sun] — None if no data
-        "best_day":           best_dow,         # 0=Mon...6=Sun
-        "worst_day":          worst_dow,
-        "group_90d_avgs":     group_90d_avgs,  # {"Nutrition": 87, "Recovery": 72, ...}
-        "keystone_group":     keystone_group,
-        "keystone_group_pct": keystone_group_pct,
+        "as_of_date":             today,
+        "days_tracked":           len(history),
+        "current_streak":         latest_streak,
+        "history":                history,
+        "day_of_week_avgs":       dow_avgs,
+        "best_day":               best_dow,
+        "worst_day":              worst_dow,
+        "group_90d_avgs":         group_90d_avgs,
+        "keystone_group":         keystone_group,
+        "keystone_group_pct":     keystone_group_pct,
+        # HAB-3: top 5 habit groups by |Pearson r| vs character score
+        "keystone_correlations":  keystone_correlations,
     }, cache_seconds=3600)
 
 
@@ -1838,6 +2258,9 @@ ROUTES = {
     # Sprint 9: new public endpoints
     "/api/supplements":        handle_supplements,
     "/api/habits":             handle_habits,
+    "/api/vice_streaks":       handle_vice_streaks,
+    "/api/journey_timeline":   handle_journey_timeline,
+    "/api/journey_waveform":   handle_journey_waveform,
     # Sprint 11: glucose + sleep intelligence pages
     "/api/glucose":            handle_glucose,
     "/api/sleep_detail":       handle_sleep_detail,

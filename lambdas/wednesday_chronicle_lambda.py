@@ -1128,12 +1128,13 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
 </body>
 </html>"""
 
+    week_num = int(week_num)  # guard: DynamoDB Decimal → float after d2f
     post_key = f"site/journal/posts/week-{week_num:02d}/index.html"
 
     # Update posts.json manifest
     posts_manifest = []
-    for inst in sorted(all_installments, key=lambda x: x.get("week_number", 0), reverse=True):
-        wn = inst.get("week_number", 0)
+    for inst in sorted(all_installments, key=lambda x: int(x.get("week_number", 0)), reverse=True):
+        wn = int(inst.get("week_number", 0))
         posts_manifest.append({
             "week": wn,
             "title": inst.get("title", ""),

@@ -1,43 +1,69 @@
-→ See handovers/HANDOVER_v3.8.8.md
+→ See handovers/HANDOVER_v3.9.3.md (prior session)
 
-This session (2026-03-22):
-- Phase 0 website data fixes per WEBSITE_REDESIGN_SPEC.md
-- G-3, G-4: site_api_lambda.py handle_vitals + handle_journey fixed
-- G-3 ticker: weight fallback to /api/vitals with stale date display
-- STORY-1, PLAT-1: public_stats.json wired to hardcoded stat spans
-- PROTO-1: removed fake fallback adherence values
-- CHRON-1/G-5: already done; CHRON-2: week-01 gap noted; G-7: investigated
+This session (2026-03-23, panel review + planning session in Claude.ai):
 
-PENDING DEPLOY (do these in order):
-1. Deploy Lambda (site_api_lambda.py changed):
-   bash deploy/deploy_lambda.sh life-platform-site-api lambdas/site_api_lambda.py
-   (wait 10s)
+## SESSION SUMMARY
+Expert panel website review session. 6-persona panel (Mara Chen/UX, James Okafor/CTO, Sofia Herrera/CMO, Dr. Lena Johansson/Longevity, Raj Mehta/Product, Tyrell Washington/Design) conducted page-by-page audit of 10 pages, produced implementation spec, then reviewed Claude Code implementation results.
 
-2. Deploy site files to S3:
-   aws s3 cp site/index.html s3://matthew-life-platform/site/index.html
-   aws s3 cp site/story/index.html s3://matthew-life-platform/site/story/index.html
-   aws s3 cp site/platform/index.html s3://matthew-life-platform/site/platform/index.html
-   aws s3 cp site/protocols/index.html s3://matthew-life-platform/site/protocols/index.html
+## COMPLETED THIS SESSION
 
-3. Invalidate CloudFront:
-   aws cloudfront create-invalidation --distribution-id E3S424OXQZ8NBE --paths "/" "/story/*" "/platform/*" "/protocols/*"
+### 1. Page-by-page expert panel audit (10 pages)
+- HOME: Identified data bugs (hardcoded 19, blank weight, 0% journey), designed 4-quadrant vital signs, AI headline, "what's new" pulse
+- STORY: Designed journey timeline, emotional waveform, tech↔life intersection cards
+- LIVE: Designed NOC cockpit with color-coded tiles, grouped systems, AI micro-narratives
+- CHRONICLE: Fixed Week 1 gap identification, designed approval workflow, special editions
+- PLATFORM: Designed hero architecture diagram, 3-zone restructure
+- CHARACTER: Designed thesis opener, interactive radar, tier journey path, pillar independence heatmap
+- SUPPLEMENTS: Found 6 phantom supplements + 17 missing. Designed data-driven rendering, purpose grouping, evidence tiers
+- HABITS: Designed vice streak portfolio, WHY cards, keystone correlations, decision fatigue signal
+- ACCOUNTABILITY: Redesigned from redundant dashboard to state hero + nudge system + compact snapshot
+- PROTOCOLS + EXPERIMENTS: Designed pipeline visualization, cross-linking, "trying this too" counter
 
-4. Answer: what is the correct contact email for /privacy/ page?
-   Current: matt@averagejoematt.com
-   Confirm or replace → then run: aws s3 cp site/privacy/index.html s3://...
+### 2. Implementation spec created
+- `docs/WEBSITE_REDESIGN_SPEC.md` — 50+ numbered tasks, exact file paths, phased execution order
+- Spec used successfully by Claude Code to implement ~30 of 50+ tasks in one day
 
-5. G-7 subscribe investigation:
-   Check if lifeplatform@mattsusername.com is verified in SES (us-west-2):
-   ! aws sesv2 list-email-identities --region us-west-2
-   Check CloudWatch logs: /aws/lambda/email-subscriber for errors
+### 3. Claude Code prompt created
+- Phase 0 data fixes prompt provided to Matthew
+- Claude Code completed Phase 0 + most of Phase 1 in multiple sessions (v3.8.8 → v3.9.3)
 
-Next session entry point:
-- Phase 1 redesigns (LIVE-2 Cockpit is highest impact)
-- G-8 once email confirmed
-- G-7 once SES verified
+### 4. Post-implementation panel review
+- Reviewed deployed Supplements (A-), Habits (A), Accountability (A-) pages
+- Nav restructure across 44 files confirmed clean
+- Overall panel score: B+ trending to A
+- Primary gap: data drought (no logging for 2 weeks means dynamic sections show zeros)
 
-Key context:
-- public_stats.json vitals.weight_lbs is null (bug in daily-brief Lambda, separate fix needed)
-- The ticker now falls back to /api/vitals when public_stats has null weight
-- Journey progress_pct=0 in public_stats.json is also a daily-brief Lambda bug
-- STORY-1 wires lambdas+data_sources+mcp_tools; test_count/monthly_cost not in public_stats yet
+### 5. New features approved by Matthew
+- **NEW-1: Data Explorer** [P1] — interactive correlation scatter plots, visitor "submit a finding" feature
+- **NEW-2: Weekly Snapshot** [P1] — auto-generated weekly report cards, walkable archive, empty weeks visible
+- **NEW-3: Milestones/Achievement Gallery** [P1] — gamification badge wall, faded→colored on achievement, weight/journal/running/streak/character/vice categories
+- **NEW-4: Dark/Light Mode** [P2] — CSS toggle, localStorage persist
+
+### 6. Backlog features identified (panel recommended, not yet approved)
+- For Builders page, Bloodwork/Labs page, Body Composition page, Longevity Scorecard, Segmented Subscriptions, Monthly Retrospective, System Status page, API Docs page, Mobile App Experience
+
+### 7. Documentation updated
+- `docs/WEBSITE_REDESIGN_SPEC.md` — updated with completion status for all tasks, added NEW-1 through NEW-4, added BACKLOG-1 through BACKLOG-9, updated throughline map
+
+## KEY DECISIONS
+- Data Explorer: visitors can submit interesting correlations for Matthew to review → promotes to Experiment or Discovery
+- Weekly Snapshot: empty/no-data weeks are visible and ARE the story — not hidden
+- Milestones: faded badges become full color on achievement, progress bars on locked badges
+- Board: Huberman/Attia replaced with fictional advisors (Dr. Victor Reyes, Dr. Kai Nakamura) — completed in v3.9.3
+
+## PENDING / CARRY FORWARD
+- G-7: Subscribe SES verification issue
+- G-8: Privacy page email (needs Matthew confirmation)
+- STORY-6: Chapter content from Matthew interview
+- CHRON-3: Chronicle Wednesday generation workflow broken
+- CHRON-4: Email preview/approval workflow for chronicle
+- public_stats.json hasn't regenerated since Mar 16 — daily brief needs to run
+- Remaining Phase 2 enhancements (CHAR-1-3+6, PROTO-2-4, EXP-1, PLAT-2, HAB-4)
+- Phase 3 new pages (NEW-1 through NEW-4)
+- Phase 4 backlog (BACKLOG-1 through BACKLOG-9)
+- Sleep, Glucose, Benchmarks, Progress, Results, Discoveries pages not yet audited by panel
+
+## NEXT SESSION ENTRY POINT
+- If building: pick from Phase 2 remaining or start Phase 3 (NEW-3 Milestones recommended first — most visual, gamification hook)
+- If auditing: continue panel review on remaining pages (Sleep, Glucose, Benchmarks, etc.)
+- If health: step on the scale, log a day of habits, restart the data pipeline — the system is ready

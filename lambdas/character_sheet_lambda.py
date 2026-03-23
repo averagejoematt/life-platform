@@ -488,6 +488,37 @@ def lambda_handler(event, context):
             for ev in (events or [])
         ]
 
+        # CHAR-4: Build weekly pillar history for heatmap
+        _pillar_history = []
+        try:
+            from collections import defaultdict as _dd
+            _hist_start = (datetime.strptime(yesterday_str, "%Y-%m-%d") - timedelta(days=49)).strftime("%Y-%m-%d")
+            _hist_recs = fetch_range("character_sheet", _hist_start, yesterday_str)
+            _weeks = _dd(list)
+            for _rec in _hist_recs:
+                _d = _rec.get("date") or _rec.get("sk", "").replace("DATE#", "")
+                if not _d:
+                    continue
+                _dt = datetime.strptime(_d, "%Y-%m-%d")
+                _wk = _dt.strftime("%G-W%V")   # ISO year-week
+                _weeks[_wk].append((_d, _rec))
+            for _wk in sorted(_weeks.keys()):
+                _last_date, _last_rec = _weeks[_wk][-1]
+                _scores = {}
+                for _p in PILLAR_ORDER:
+                    _pdata = _last_rec.get(f"pillar_{_p}") or {}
+                    _scores[_p] = round(float(_pdata.get("level_score") or _pdata.get("raw_score") or 0), 1)
+                _wk_dt = datetime.strptime(_last_date, "%Y-%m-%d")
+                _mon_dt = _wk_dt - timedelta(days=_wk_dt.weekday())
+                _pillar_history.append({
+                    "week_label": f"Wk {_wk.split('-W')[1]}",
+                    "week_end":   _last_date,
+                    "week_start": _mon_dt.strftime("%Y-%m-%d"),
+                    "pillars":    _scores,
+                })
+        except Exception as _phe:
+            logger.warning(f"[character] pillar_history build failed (non-fatal): {_phe}")
+
         write_character_stats(
             s3_client=boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2")),
             character={
@@ -503,6 +534,7 @@ def lambda_handler(event, context):
             },
             pillars=pillars_for_site,
             timeline=timeline_events,
+            pillar_history=_pillar_history,
         )
         logger.info("[character] site_writer: character_stats.json written")
     except Exception as _sw_e:

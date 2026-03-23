@@ -244,6 +244,39 @@
       line-height: 1.5;
     }
 
+    /* ── PLAT-3: Zone dividers ── */
+    .zone-divider {
+      display: flex;
+      align-items: center;
+      gap: var(--space-6);
+      padding: var(--space-6) var(--page-padding);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--surface);
+    }
+    .zone-divider__num {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--accent-dim);
+      letter-spacing: var(--ls-tag);
+      border: 1px solid var(--accent-dim);
+      padding: 2px var(--space-3);
+      flex-shrink: 0;
+    }
+    .zone-divider__label {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+    }
+    .zone-divider__sub {
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+      margin-left: auto;
+    }
+
     @media (max-width: 900px) {
       .page-header { grid-template-columns: 1fr; }
       .arch-layer { grid-template-columns: 1fr; }
@@ -252,6 +285,7 @@
       .ai-section { grid-template-columns: 1fr; }
       .review-grid { grid-template-columns: 1fr 1fr; }
       .hub-grid { grid-template-columns: repeat(2, 1fr); }
+      .zone-divider__sub { display: none; }
     }
     @media (max-width: 480px) {
       .hub-grid { grid-template-columns: 1fr; }
@@ -261,23 +295,26 @@
 <body>
 
 <nav class="nav">
-  <a href="/" class="nav__brand">AMJ</a>
+  <a href="/" class="nav__brand">AJM</a>
   <div class="nav__links">
     <div class="nav__dropdown">
       <button class="nav__dropdown-btn">The Story</button>
       <div class="nav__dropdown-menu">
-        <a href="/" class="nav__dropdown-item">Home</a>
         <a href="/story/" class="nav__dropdown-item">My Story</a>
-        <a href="/about/" class="nav__dropdown-item">About</a>
+        <a href="/about/" class="nav__dropdown-item">The Mission</a>
       </div>
     </div>
     <div class="nav__dropdown">
       <button class="nav__dropdown-btn">The Data</button>
       <div class="nav__dropdown-menu">
         <a href="/live/" class="nav__dropdown-item">Live</a>
-        <a href="/character/" class="nav__dropdown-item">Character</a>
+        <a href="/character/" class="nav__dropdown-item">Character Sheet</a>
         <a href="/habits/" class="nav__dropdown-item">Habits</a>
-        <a href="/accountability/" class="nav__dropdown-item">Accountability</a>
+        <a href="/accountability/" class="nav__dropdown-item">Progress</a>
+        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
+        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
+        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
+        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
       </div>
     </div>
     <div class="nav__dropdown">
@@ -286,10 +323,6 @@
         <a href="/protocols/" class="nav__dropdown-item">Protocols</a>
         <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
         <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
-        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
-        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
-        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
-        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
       </div>
     </div>
     <div class="nav__dropdown is-active">
@@ -297,7 +330,7 @@
       <div class="nav__dropdown-menu">
         <a href="/platform/" class="nav__dropdown-item active">Platform</a>
         <a href="/intelligence/" class="nav__dropdown-item">Intelligence</a>
-        <a href="/board/" class="nav__dropdown-item">Board</a>
+        <a href="/board/" class="nav__dropdown-item">AI Board</a>
         <a href="/cost/" class="nav__dropdown-item">Cost</a>
         <a href="/methodology/" class="nav__dropdown-item">Methodology</a>
         <a href="/tools/" class="nav__dropdown-item">Tools</a>
@@ -306,9 +339,9 @@
     <div class="nav__dropdown">
       <button class="nav__dropdown-btn">Follow</button>
       <div class="nav__dropdown-menu">
-        <a href="/chronicle/" class="nav__dropdown-item">Chronicle</a>
+        <a href="/chronicle/" class="nav__dropdown-item">Weekly Journal</a>
         <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
-        <a href="/ask/" class="nav__dropdown-item">Ask</a>
+        <a href="/ask/" class="nav__dropdown-item">Ask the Data</a>
       </div>
     </div>
     <a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>
@@ -327,41 +360,40 @@
     <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Story</div>
-      <a href="/" class="nav-overlay__link">Home</a>
       <a href="/story/" class="nav-overlay__link">My Story</a>
-      <a href="/about/" class="nav-overlay__link">About</a>
+      <a href="/about/" class="nav-overlay__link">The Mission</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Data</div>
       <a href="/live/" class="nav-overlay__link">Live</a>
-      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/character/" class="nav-overlay__link">Character Sheet</a>
       <a href="/habits/" class="nav-overlay__link">Habits</a>
-      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
-    </div>
-    <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The Science</div>
-      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
-      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/accountability/" class="nav-overlay__link">Progress</a>
       <a href="/sleep/" class="nav-overlay__link">Sleep</a>
       <a href="/glucose/" class="nav-overlay__link">Glucose</a>
       <a href="/supplements/" class="nav-overlay__link">Supplements</a>
       <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
     </div>
     <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Science</div>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+    </div>
+    <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Build</div>
       <a href="/platform/" class="nav-overlay__link">Platform</a>
       <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
-      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/board/" class="nav-overlay__link">AI Board</a>
       <a href="/cost/" class="nav-overlay__link">Cost</a>
       <a href="/methodology/" class="nav-overlay__link">Methodology</a>
       <a href="/tools/" class="nav-overlay__link">Tools</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">Follow</div>
-      <a href="/chronicle/" class="nav-overlay__link">Chronicle</a>
+      <a href="/chronicle/" class="nav-overlay__link">Weekly Journal</a>
       <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
-      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/ask/" class="nav-overlay__link">Ask the Data</a>
       <a href="/rss.xml" class="nav-overlay__link">RSS</a>
       <a href="/privacy/" class="nav-overlay__link">Privacy</a>
     </div>
@@ -400,66 +432,194 @@
   </div>
 </div>
 
-<!-- WR-34: Animated data flow diagram -->
+<!-- PLAT-3: Zone 1 divider -->
+<div class="zone-divider">
+  <span class="zone-divider__num">// ZONE 01</span>
+  <span class="zone-divider__label">The Pipeline</span>
+  <span class="zone-divider__sub">architecture · ingest · compute · intelligence · tech stack</span>
+</div>
+
+<!-- PLAT-2: Architecture diagram SVG -->
 <section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);overflow:hidden;">
-  <div class="eyebrow">Data flow</div>
-  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">How data moves through the system</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">Every morning, 19 data sources are ingested by Lambda functions on EventBridge cron schedules. Raw JSON lands in S3, normalized metrics go to DynamoDB, and compute Lambdas pre-calculate intelligence results before the 11 AM daily brief fires.</p>
-  <div id="data-flow" style="position:relative;border:1px solid var(--border);background:var(--surface);padding:var(--space-6);overflow-x:auto;">
-    <svg viewBox="0 0 900 200" style="width:100%;min-width:700px;height:200px;display:block;" xmlns="http://www.w3.org/2000/svg">
-      <!-- Nodes -->
-      <rect x="20" y="60" width="140" height="80" rx="4" fill="#0e1510" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
-      <text x="90" y="90" text-anchor="middle" fill="#00e5a0" font-size="11" font-family="JetBrains Mono,monospace" letter-spacing="1">19 SOURCES</text>
-      <text x="90" y="108" text-anchor="middle" fill="#7a9080" font-size="9" font-family="JetBrains Mono,monospace">Whoop · Garmin · CGM</text>
-      <text x="90" y="122" text-anchor="middle" fill="#4a6050" font-size="9" font-family="JetBrains Mono,monospace">+ 16 more</text>
+  <div class="eyebrow">Architecture</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">The system — every component</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">19 data sources → 13 ingest Lambdas → S3 + DynamoDB → 5 compute Lambdas → 4 output channels. All on AWS. Costs ~$13/month. Built by a non-engineer using AI assistance.</p>
+  <div style="border:1px solid var(--border);background:var(--surface);padding:var(--space-6);overflow-x:auto;">
+    <svg viewBox="0 0 1060 340" style="width:100%;min-width:900px;display:block;font-family:JetBrains Mono,monospace;" xmlns="http://www.w3.org/2000/svg">
 
-      <rect x="230" y="60" width="140" height="80" rx="4" fill="#0e1510" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
-      <text x="300" y="90" text-anchor="middle" fill="#00e5a0" font-size="11" font-family="JetBrains Mono,monospace" letter-spacing="1">INGEST</text>
-      <text x="300" y="108" text-anchor="middle" fill="#7a9080" font-size="9" font-family="JetBrains Mono,monospace">Lambda + EventBridge</text>
-      <text x="300" y="122" text-anchor="middle" fill="#4a6050" font-size="9" font-family="JetBrains Mono,monospace">webhooks + cron</text>
+      <!-- ── Zone headers ── -->
+      <!-- Sources -->
+      <text x="90" y="18" text-anchor="middle" fill="#4a6050" font-size="8" letter-spacing="2">DATA SOURCES</text>
+      <!-- Ingest -->
+      <text x="320" y="18" text-anchor="middle" fill="#4a6050" font-size="8" letter-spacing="2">INGEST</text>
+      <!-- Store -->
+      <text x="540" y="18" text-anchor="middle" fill="#4a6050" font-size="8" letter-spacing="2">STORE</text>
+      <!-- Compute -->
+      <text x="730" y="18" text-anchor="middle" fill="#4a6050" font-size="8" letter-spacing="2">COMPUTE</text>
+      <!-- Outputs -->
+      <text x="950" y="18" text-anchor="middle" fill="#4a6050" font-size="8" letter-spacing="2">OUTPUTS</text>
+      <!-- Vertical dividers -->
+      <line x1="210" y1="22" x2="210" y2="330" stroke="rgba(0,229,160,0.06)" stroke-width="1"/>
+      <line x1="435" y1="22" x2="435" y2="330" stroke="rgba(0,229,160,0.06)" stroke-width="1"/>
+      <line x1="640" y1="22" x2="640" y2="330" stroke="rgba(0,229,160,0.06)" stroke-width="1"/>
+      <line x1="840" y1="22" x2="840" y2="330" stroke="rgba(0,229,160,0.06)" stroke-width="1"/>
 
-      <rect x="440" y="60" width="140" height="80" rx="4" fill="#0e1510" stroke="rgba(240,180,41,0.25)" stroke-width="1"/>
-      <text x="510" y="90" text-anchor="middle" fill="#c8843a" font-size="11" font-family="JetBrains Mono,monospace" letter-spacing="1">STORE</text>
-      <text x="510" y="108" text-anchor="middle" fill="#7a9080" font-size="9" font-family="JetBrains Mono,monospace">DynamoDB single-table</text>
-      <text x="510" y="122" text-anchor="middle" fill="#4a6050" font-size="9" font-family="JetBrains Mono,monospace">S3 + KMS encryption</text>
+      <!-- ── Data source groups ── -->
+      <!-- Wearables group -->
+      <rect x="10" y="28" width="155" height="78" rx="3" fill="#080c0a" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+      <text x="87" y="42" text-anchor="middle" fill="#00e5a0" font-size="8" letter-spacing="1.5">WEARABLES</text>
+      <text x="87" y="57" text-anchor="middle" fill="#7a9080" font-size="9">Whoop · Eight Sleep</text>
+      <text x="87" y="71" text-anchor="middle" fill="#7a9080" font-size="9">Garmin · Apple Health</text>
+      <text x="87" y="85" text-anchor="middle" fill="#4a6050" font-size="8">HRV · Sleep · Steps · HR</text>
+      <!-- Nutrition group -->
+      <rect x="10" y="114" width="155" height="68" rx="3" fill="#080c0a" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+      <text x="87" y="128" text-anchor="middle" fill="#00e5a0" font-size="8" letter-spacing="1.5">NUTRITION + METABOLIC</text>
+      <text x="87" y="143" text-anchor="middle" fill="#7a9080" font-size="9">MacroFactor · Dexcom CGM</text>
+      <text x="87" y="157" text-anchor="middle" fill="#4a6050" font-size="8">Calories · Macros · Glucose</text>
+      <text x="87" y="172" text-anchor="middle" fill="#4a6050" font-size="8">Withings · Blood Pressure</text>
+      <!-- Behavioral group -->
+      <rect x="10" y="190" width="155" height="68" rx="3" fill="#080c0a" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+      <text x="87" y="204" text-anchor="middle" fill="#00e5a0" font-size="8" letter-spacing="1.5">BEHAVIORAL</text>
+      <text x="87" y="219" text-anchor="middle" fill="#7a9080" font-size="9">Habitify · Notion · Todoist</text>
+      <text x="87" y="233" text-anchor="middle" fill="#4a6050" font-size="8">Strava · State of Mind</text>
+      <text x="87" y="248" text-anchor="middle" fill="#4a6050" font-size="8">Weather · Supplements</text>
+      <!-- Manual group -->
+      <rect x="10" y="266" width="155" height="60" rx="3" fill="#080c0a" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+      <text x="87" y="280" text-anchor="middle" fill="#00e5a0" font-size="8" letter-spacing="1.5">LAB + CLINICAL</text>
+      <text x="87" y="295" text-anchor="middle" fill="#7a9080" font-size="9">Labs ×7 · DEXA Scans</text>
+      <text x="87" y="310" text-anchor="middle" fill="#4a6050" font-size="8">Genome 110 SNPs</text>
 
-      <rect x="650" y="60" width="140" height="80" rx="4" fill="#0e1510" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
-      <text x="720" y="90" text-anchor="middle" fill="#00e5a0" font-size="11" font-family="JetBrains Mono,monospace" letter-spacing="1">SERVE</text>
-      <text x="720" y="108" text-anchor="middle" fill="#7a9080" font-size="9" font-family="JetBrains Mono,monospace">95 MCP tools → Claude</text>
-      <text x="720" y="122" text-anchor="middle" fill="#4a6050" font-size="9" font-family="JetBrains Mono,monospace">daily brief + digests</text>
+      <!-- ── Arrows: sources → ingest ── -->
+      <line x1="165" y1="67" x2="218" y2="110" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+      <line x1="165" y1="148" x2="218" y2="148" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+      <line x1="165" y1="224" x2="218" y2="185" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+      <line x1="165" y1="296" x2="218" y2="222" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
 
-      <!-- Animated arrows -->
-      <line x1="160" y1="100" x2="230" y2="100" stroke="rgba(0,229,160,0.3)" stroke-width="1" stroke-dasharray="4,4">
-        <animate attributeName="stroke-dashoffset" from="8" to="0" dur="1s" repeatCount="indefinite"/>
-      </line>
-      <line x1="370" y1="100" x2="440" y2="100" stroke="rgba(0,229,160,0.3)" stroke-width="1" stroke-dasharray="4,4">
-        <animate attributeName="stroke-dashoffset" from="8" to="0" dur="1s" repeatCount="indefinite"/>
-      </line>
-      <line x1="580" y1="100" x2="650" y2="100" stroke="rgba(0,229,160,0.3)" stroke-width="1" stroke-dasharray="4,4">
-        <animate attributeName="stroke-dashoffset" from="8" to="0" dur="1s" repeatCount="indefinite"/>
-      </line>
+      <!-- ── Ingest layer ── -->
+      <!-- EventBridge -->
+      <rect x="218" y="32" width="155" height="48" rx="3" fill="#080c0a" stroke="rgba(240,165,0,0.3)" stroke-width="1"/>
+      <text x="295" y="48" text-anchor="middle" fill="#c8843a" font-size="9" letter-spacing="0.5">EventBridge cron</text>
+      <text x="295" y="62" text-anchor="middle" fill="#7a9080" font-size="8">06:45–11:00 AM PDT</text>
+      <text x="295" y="75" text-anchor="middle" fill="#4a6050" font-size="7">gap-aware backfill</text>
+      <!-- 13 Lambda ingest -->
+      <rect x="218" y="88" width="155" height="58" rx="3" fill="#080c0a" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
+      <text x="295" y="104" text-anchor="middle" fill="#00e5a0" font-size="9" letter-spacing="0.5">13 Ingest Lambdas</text>
+      <text x="295" y="118" text-anchor="middle" fill="#7a9080" font-size="8">Python 3.12 · stdlib only</text>
+      <text x="295" y="132" text-anchor="middle" fill="#4a6050" font-size="8">urllib · no external deps</text>
+      <text x="295" y="143" text-anchor="middle" fill="#4a6050" font-size="7">Secrets Manager auth</text>
+      <!-- Webhooks/manual -->
+      <rect x="218" y="155" width="155" height="44" rx="3" fill="#080c0a" stroke="rgba(0,229,160,0.15)" stroke-width="1"/>
+      <text x="295" y="171" text-anchor="middle" fill="#7a9080" font-size="9">Manual + Webhooks</text>
+      <text x="295" y="185" text-anchor="middle" fill="#4a6050" font-size="8">Labs · DEXA · Genome</text>
+      <text x="295" y="196" text-anchor="middle" fill="#4a6050" font-size="7">S3 upload → Lambda trigger</text>
 
-      <!-- Animated data dots -->
-      <circle r="3" fill="#00e5a0" opacity="0.8">
-        <animateMotion path="M160,100 L230,100" dur="2s" repeatCount="indefinite" begin="0s"/>
-      </circle>
-      <circle r="3" fill="#00e5a0" opacity="0.8">
-        <animateMotion path="M370,100 L440,100" dur="2s" repeatCount="indefinite" begin="0.7s"/>
-      </circle>
-      <circle r="3" fill="#00e5a0" opacity="0.8">
-        <animateMotion path="M580,100 L650,100" dur="2s" repeatCount="indefinite" begin="1.4s"/>
-      </circle>
+      <!-- ── Arrows: ingest → store ── -->
+      <line x1="373" y1="56" x2="443" y2="100" stroke="rgba(240,165,0,0.25)" stroke-width="1"/>
+      <line x1="373" y1="117" x2="443" y2="130" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
+      <line x1="373" y1="177" x2="443" y2="175" stroke="rgba(0,229,160,0.15)" stroke-width="1"/>
+      <text x="408" y="95" text-anchor="middle" fill="#4a6050" font-size="7">triggers</text>
 
-      <!-- Output arrows going down -->
-      <line x1="720" y1="140" x2="720" y2="175" stroke="rgba(0,229,160,0.2)" stroke-width="1" stroke-dasharray="4,4">
-        <animate attributeName="stroke-dashoffset" from="8" to="0" dur="1s" repeatCount="indefinite"/>
-      </line>
-      <text x="720" y="192" text-anchor="middle" fill="#4a6050" font-size="8" font-family="JetBrains Mono,monospace" letter-spacing="1">EMAILS · WEBSITE · /ASK</text>
+      <!-- ── Store layer ── -->
+      <!-- S3 -->
+      <rect x="443" y="32" width="155" height="58" rx="3" fill="#080c0a" stroke="rgba(240,165,0,0.3)" stroke-width="1"/>
+      <text x="520" y="48" text-anchor="middle" fill="#c8843a" font-size="9" letter-spacing="0.5">S3 Raw Store</text>
+      <text x="520" y="62" text-anchor="middle" fill="#7a9080" font-size="8">matthew-life-platform</text>
+      <text x="520" y="76" text-anchor="middle" fill="#4a6050" font-size="8">raw/{src}/{type}/{Y}/{M}/{D}</text>
+      <text x="520" y="87" text-anchor="middle" fill="#4a6050" font-size="7">KMS encrypted · delete-protected</text>
+      <!-- DynamoDB -->
+      <rect x="443" y="99" width="155" height="78" rx="3" fill="#080c0a" stroke="rgba(91,164,207,0.4)" stroke-width="1"/>
+      <text x="520" y="115" text-anchor="middle" fill="#5ba4cf" font-size="9" letter-spacing="0.5">DynamoDB</text>
+      <text x="520" y="129" text-anchor="middle" fill="#7a9080" font-size="8">life-platform table</text>
+      <text x="520" y="143" text-anchor="middle" fill="#4a6050" font-size="8">PK: USER#matthew#SOURCE#*</text>
+      <text x="520" y="157" text-anchor="middle" fill="#4a6050" font-size="8">SK: DATE#YYYY-MM-DD</text>
+      <text x="520" y="169" text-anchor="middle" fill="#4a6050" font-size="7">single-table · no GSIs · us-west-2</text>
+      <text x="520" y="174" text-anchor="middle" fill="#4a6050" font-size="7"> </text>
+      <!-- Lambda layer shared -->
+      <rect x="443" y="186" width="155" height="44" rx="3" fill="#080c0a" stroke="rgba(0,229,160,0.15)" stroke-width="1"/>
+      <text x="520" y="202" text-anchor="middle" fill="#7a9080" font-size="9">Lambda Layer</text>
+      <text x="520" y="216" text-anchor="middle" fill="#4a6050" font-size="8">ai_calls · scoring_engine</text>
+      <text x="520" y="227" text-anchor="middle" fill="#4a6050" font-size="7">board_loader · output_writers</text>
 
-      <!-- Schedule label -->
-      <text x="300" y="30" text-anchor="middle" fill="#4a6050" font-size="8" font-family="JetBrains Mono,monospace" letter-spacing="1.5">EVERY DAY AT 6:45 AM–11:00 AM PDT</text>
-      <line x1="200" y1="35" x2="400" y2="35" stroke="rgba(0,229,160,0.08)" stroke-width="1"/>
+      <!-- ── Arrows: store → compute ── -->
+      <line x1="598" y1="75" x2="648" y2="120" stroke="rgba(240,165,0,0.2)" stroke-width="1"/>
+      <line x1="598" y1="138" x2="648" y2="138" stroke="rgba(91,164,207,0.3)" stroke-width="1"/>
+      <line x1="598" y1="208" x2="648" y2="195" stroke="rgba(0,229,160,0.15)" stroke-width="1"/>
+
+      <!-- ── Compute layer ── -->
+      <!-- 5 compute lambdas -->
+      <rect x="648" y="32" width="155" height="78" rx="3" fill="#080c0a" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
+      <text x="725" y="48" text-anchor="middle" fill="#00e5a0" font-size="9" letter-spacing="0.5">5 Compute Lambdas</text>
+      <text x="725" y="62" text-anchor="middle" fill="#7a9080" font-size="8">character-sheet</text>
+      <text x="725" y="74" text-anchor="middle" fill="#7a9080" font-size="8">adaptive-mode · daily-metrics</text>
+      <text x="725" y="86" text-anchor="middle" fill="#4a6050" font-size="8">daily-insight · hypothesis-engine</text>
+      <text x="725" y="97" text-anchor="middle" fill="#4a6050" font-size="7">→ pre-computed before 11 AM</text>
+      <!-- MCP server -->
+      <rect x="648" y="119" width="155" height="64" rx="3" fill="#080c0a" stroke="rgba(109,186,109,0.4)" stroke-width="1"/>
+      <text x="725" y="135" text-anchor="middle" fill="#6dba6d" font-size="9" letter-spacing="0.5">MCP Lambda</text>
+      <text x="725" y="149" text-anchor="middle" fill="#7a9080" font-size="8">95 tools · 31 modules</text>
+      <text x="725" y="163" text-anchor="middle" fill="#4a6050" font-size="8">Claude Desktop + claude.ai</text>
+      <text x="725" y="174" text-anchor="middle" fill="#4a6050" font-size="7">OAuth 2.1 · natural language</text>
+      <!-- Email lambdas -->
+      <rect x="648" y="193" width="155" height="54" rx="3" fill="#080c0a" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+      <text x="725" y="209" text-anchor="middle" fill="#7a9080" font-size="9">7 Email Lambdas</text>
+      <text x="725" y="223" text-anchor="middle" fill="#4a6050" font-size="8">daily-brief fires at 11 AM</text>
+      <text x="725" y="235" text-anchor="middle" fill="#4a6050" font-size="8">Amazon SES · templates</text>
+      <text x="725" y="244" text-anchor="middle" fill="#4a6050" font-size="7">weekly chronicle · digests</text>
+
+      <!-- ── Arrows: compute → outputs ── -->
+      <line x1="803" y1="71" x2="848" y2="90" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
+      <line x1="803" y1="151" x2="848" y2="151" stroke="rgba(109,186,109,0.3)" stroke-width="1"/>
+      <line x1="803" y1="220" x2="848" y2="215" stroke="rgba(0,229,160,0.2)" stroke-width="1"/>
+
+      <!-- ── Outputs ── -->
+      <!-- Daily brief email -->
+      <rect x="848" y="30" width="155" height="48" rx="3" fill="#080c0a" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
+      <text x="925" y="47" text-anchor="middle" fill="#00e5a0" font-size="9" letter-spacing="0.5">Daily Brief Email</text>
+      <text x="925" y="61" text-anchor="middle" fill="#7a9080" font-size="8">11 AM · personal coaching</text>
+      <text x="925" y="70" text-anchor="middle" fill="#4a6050" font-size="7">19 sources → 1 insight</text>
+      <!-- Public website -->
+      <rect x="848" y="87" width="155" height="48" rx="3" fill="#080c0a" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
+      <text x="925" y="104" text-anchor="middle" fill="#00e5a0" font-size="9" letter-spacing="0.5">averagejoematt.com</text>
+      <text x="925" y="118" text-anchor="middle" fill="#7a9080" font-size="8">S3 + CloudFront CDN</text>
+      <text x="925" y="130" text-anchor="middle" fill="#4a6050" font-size="7">Site API Lambda us-east-1</text>
+      <!-- Claude MCP -->
+      <rect x="848" y="144" width="155" height="48" rx="3" fill="#080c0a" stroke="rgba(109,186,109,0.4)" stroke-width="1"/>
+      <text x="925" y="161" text-anchor="middle" fill="#6dba6d" font-size="9" letter-spacing="0.5">Claude Desktop / AI</text>
+      <text x="925" y="175" text-anchor="middle" fill="#7a9080" font-size="8">MCP protocol · 95 tools</text>
+      <text x="925" y="186" text-anchor="middle" fill="#4a6050" font-size="7">natural language queries</text>
+      <!-- Public API + subscribe -->
+      <rect x="848" y="201" width="155" height="48" rx="3" fill="#080c0a" stroke="rgba(0,229,160,0.15)" stroke-width="1"/>
+      <text x="925" y="218" text-anchor="middle" fill="#7a9080" font-size="9">/ask · /subscribe</text>
+      <text x="925" y="232" text-anchor="middle" fill="#4a6050" font-size="8">rate-limited public API</text>
+      <text x="925" y="244" text-anchor="middle" fill="#4a6050" font-size="7">anon 3/hr · subscriber 20/hr</text>
+
+      <!-- ── Cost annotation ── -->
+      <rect x="848" y="262" width="155" height="38" rx="3" fill="#080c0a" stroke="rgba(240,165,0,0.25)" stroke-width="1"/>
+      <text x="925" y="277" text-anchor="middle" fill="#c8843a" font-size="10" letter-spacing="0.5">~$13 / month</text>
+      <text x="925" y="293" text-anchor="middle" fill="#4a6050" font-size="8">DynamoDB + Lambda + S3 + CF</text>
+
+      <!-- ── Schedule annotation ── -->
+      <rect x="218" y="260" width="155" height="38" rx="3" fill="#080c0a" stroke="rgba(240,165,0,0.2)" stroke-width="1"/>
+      <text x="295" y="275" text-anchor="middle" fill="#c8843a" font-size="8" letter-spacing="1">DAILY SCHEDULE</text>
+      <text x="295" y="289" text-anchor="middle" fill="#4a6050" font-size="8">06:45–11:00 AM PDT</text>
+      <text x="295" y="298" text-anchor="middle" fill="#4a6050" font-size="7">EventBridge cron · UTC-fixed</text>
+
     </svg>
+  </div>
+  <div style="margin-top:var(--space-4);display:flex;gap:var(--space-6);flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);">
+      <div style="width:10px;height:2px;background:rgba(0,229,160,0.4)"></div> Python Lambda
+    </div>
+    <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);">
+      <div style="width:10px;height:2px;background:rgba(91,164,207,0.5)"></div> DynamoDB
+    </div>
+    <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);">
+      <div style="width:10px;height:2px;background:rgba(240,165,0,0.4)"></div> S3 / EventBridge
+    </div>
+    <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);">
+      <div style="width:10px;height:2px;background:rgba(109,186,109,0.5)"></div> MCP / Claude
+    </div>
+    <span style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);">// Region: us-west-2 (us-east-1 for Site API)</span>
   </div>
 </section>
 
@@ -649,6 +809,13 @@
   </div>
 </section>
 
+<!-- PLAT-3: Zone 2 divider -->
+<div class="zone-divider">
+  <span class="zone-divider__num">// ZONE 02</span>
+  <span class="zone-divider__label">The Guarantees</span>
+  <span class="zone-divider__sub">security · cost · architecture reviews</span>
+</div>
+
 <!-- Security posture -->
 <section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
   <div class="eyebrow">Security posture</div>
@@ -751,6 +918,13 @@
     </div>
   </div>
 </section>
+
+<!-- PLAT-3: Zone 3 divider -->
+<div class="zone-divider">
+  <span class="zone-divider__num">// ZONE 03</span>
+  <span class="zone-divider__label">The Surfaces</span>
+  <span class="zone-divider__sub">every page · every data stream · every tool</span>
+</div>
 
 <!-- Feature hub -->
 <section class="hub-section reveal">
@@ -984,14 +1158,14 @@
       <div class="footer-v2__heading">The Story</div>
       <a href="/" class="footer-v2__link">Home</a>
       <a href="/story/" class="footer-v2__link">My Story</a>
-      <a href="/about/" class="footer-v2__link">About</a>
+      <a href="/about/" class="footer-v2__link">The Mission</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The Data</div>
       <a href="/live/" class="footer-v2__link">Live</a>
-      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/character/" class="footer-v2__link">Character Sheet</a>
       <a href="/habits/" class="footer-v2__link">Habits</a>
-      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/accountability/" class="footer-v2__link">Progress</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The Science</div>
@@ -1007,16 +1181,16 @@
       <div class="footer-v2__heading">The Build</div>
       <a href="/platform/" class="footer-v2__link">Platform</a>
       <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
-      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/board/" class="footer-v2__link">AI Board</a>
       <a href="/cost/" class="footer-v2__link">Cost</a>
       <a href="/methodology/" class="footer-v2__link">Methodology</a>
       <a href="/tools/" class="footer-v2__link">Tools</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">Follow</div>
-      <a href="/chronicle/" class="footer-v2__link">Chronicle</a>
+      <a href="/chronicle/" class="footer-v2__link">Weekly Journal</a>
       <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
-      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/ask/" class="footer-v2__link">Ask the Data</a>
       <a href="/rss.xml" class="footer-v2__link">RSS</a>
       <a href="/privacy/" class="footer-v2__link">Privacy</a>
     </div>

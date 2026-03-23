@@ -314,6 +314,14 @@ def gather_daily_data(profile, yesterday):
         if wt:
             latest_weight = wt
             break
+    # G-3 FIX: extend to 90-day lookback if 30-day found nothing (e.g. scale not used for weeks)
+    if not latest_weight:
+        withings_90d_wt = fetch_range("withings", (today - timedelta(days=90)).isoformat(), yesterday)
+        for w in reversed(withings_90d_wt):
+            wt = safe_float(w, "weight_lbs")
+            if wt:
+                latest_weight = wt
+                break
 
     withings_14d = fetch_range("withings", (today - timedelta(days=14)).isoformat(), yesterday)
     week_ago_weight = None
@@ -1685,11 +1693,12 @@ def lambda_handler(event, context):
             # Journey calc from profile
             _start_wt = float(profile.get("journey_start_weight_lbs", 302))
             _goal_wt  = float(profile.get("goal_weight_lbs", 185))
-            # Task 1: keep None as None — don't coerce to 0.0 (0.0 is falsy, breaks null checks)
-            _curr_wt  = data.get("latest_weight")  # float or None
-            _lost     = round(_start_wt - _curr_wt, 1) if _curr_wt else 0
-            _remain   = round(_curr_wt - _goal_wt, 1) if _curr_wt else 0
-            _prog_pct = round(_lost / (_start_wt - _goal_wt) * 100, 1) if _lost and _start_wt != _goal_wt else 0
+            # G-3/G-4 FIX: fall back to avatar_weight (broader lookback) when latest_weight is None
+            _curr_wt  = data.get("latest_weight") or data.get("avatar_weight")  # float or None
+            _lost     = round(_start_wt - _curr_wt, 1) if _curr_wt else None
+            _remain   = round(_curr_wt - _goal_wt, 1) if _curr_wt else None
+            # G-4 FIX: always compute progress from constants; negative = gained back (honest)
+            _prog_pct = round((_start_wt - _curr_wt) / (_start_wt - _goal_wt) * 100, 1) if _curr_wt and _start_wt != _goal_wt else None
 
             # TSB/training from data
             _strava_7d = data.get("strava_7d") or []
@@ -1700,8 +1709,8 @@ def lambda_handler(event, context):
                     if any(z in _sport for z in ["run", "walk", "ride", "swim", "elliptical", "workout"]):
                         _z2_this_week += float(_act.get("moving_time_seconds") or 0) / 60
 
-            # Streak from streak_data (computed earlier in handler)
-            _tier0_streak = streak_data.get("tier0_streak", 0) if streak_data else 0
+            # G-5/tier0_streak FIX: mvp_streak is always set (from _computed OR streak_data above)
+            _tier0_streak = mvp_streak
 
             # Journey start date → days_in
             try:
@@ -1722,22 +1731,29 @@ def lambda_handler(event, context):
 
             # v1.2.0: Build trend arrays for homepage sparklines
             _trends = {}
+            _weight_as_of = None       # G-3: date of last known weight reading
+            _sleep_hours_30d_avg = None  # HOME-3: 30-day average sleep hours
             try:
                 # Weight trend (last 12 weeks of weekly averages)
                 _wt_90d = fetch_range("withings", (today - timedelta(days=84)).isoformat(), yesterday)
                 _wt_vals = [(w.get("sk", "").replace("DATE#", ""), safe_float(w, "weight_lbs")) for w in _wt_90d if safe_float(w, "weight_lbs")]
                 if _wt_vals:
                     _trends["weight_daily"] = [{"date": d, "lbs": round(v, 1)} for d, v in _wt_vals[-30:]]
+                    # G-3 FIX: track date of latest known weight for staleness display
+                    _weight_as_of = _wt_vals[-1][0] if _wt_vals else None
+                else:
+                    _weight_as_of = None
 
                 # HRV trend (last 30 days)
                 _hrv_vals = [(r.get("sk", "").replace("DATE#", ""), safe_float(r, "hrv")) for r in hrv_30d_recs if safe_float(r, "hrv")]
                 if _hrv_vals:
                     _trends["hrv_daily"] = [{"date": d, "ms": round(v, 1)} for d, v in _hrv_vals]
 
-                # Sleep trend (last 14 days)
+                # Sleep trend (last 14 days) + HOME-3: 30d average
                 _sleep_vals = [(r.get("sk", "").replace("DATE#", ""), safe_float(r, "sleep_duration_hours")) for r in hrv_30d_recs if safe_float(r, "sleep_duration_hours")]
                 if _sleep_vals:
                     _trends["sleep_daily"] = [{"date": d, "hrs": round(v, 1)} for d, v in _sleep_vals[-14:]]
+                _sleep_hours_30d_avg = round(sum(v for _, v in _sleep_vals) / len(_sleep_vals), 2) if _sleep_vals else None
 
                 # Recovery trend (last 14 days)
                 _rec_vals = [(r.get("sk", "").replace("DATE#", ""), safe_float(r, "recovery_score")) for r in hrv_30d_recs if safe_float(r, "recovery_score")]
@@ -1758,10 +1774,75 @@ def lambda_handler(event, context):
             except Exception as e:
                 logger.warning("tldr_guidance_excerpt: %s", e)
 
+            # LIVE-2: Build one-sentence narratives for each cockpit group on /live/
+            _group_narratives = {}
+            try:
+                # Body
+                if _curr_wt and _lost is not None:
+                    _group_narratives["body"] = (
+                        f"Currently at {round(_curr_wt, 1)} lbs — {abs(_lost)} lbs "
+                        f"{'down' if _lost > 0 else 'up'} from Day 1"
+                        + (f", {_prog_pct}% of goal." if _prog_pct else ".")
+                    )
+                # Recovery
+                _hrv_val = _hrv.get("hrv_yesterday") or _hrv.get("hrv_7d")
+                _sleep_val = safe_float(data.get("sleep"), "sleep_duration_hours")
+                if _hrv_val or _rec:
+                    _parts = []
+                    if _hrv_val:
+                        _parts.append(f"HRV {round(float(_hrv_val))} ms")
+                    if _rec:
+                        _parts.append(f"recovery {round(_rec)}%")
+                    if _sleep_val:
+                        _parts.append(f"sleep {round(float(_sleep_val), 1)} hrs")
+                    _group_narratives["recovery"] = " · ".join(_parts) + "."
+                # Activity
+                if _z2_this_week > 0:
+                    _z2pct = round(_z2_this_week / 150 * 100)
+                    _group_narratives["activity"] = (
+                        f"Zone 2 this week: {round(_z2_this_week)} / 150 min "
+                        f"({_z2pct}% of target){'  ✓' if _z2_this_week >= 150 else ''}."
+                    )
+                # Nutrition — CGM time-in-range if available
+                _cgm_data = data.get("cgm") or data.get("cgm_today") or {}
+                _tir = safe_float(_cgm_data, "time_in_range_pct") or safe_float(_cgm_data, "tir_pct")
+                if _tir:
+                    _group_narratives["nutrition"] = (
+                        f"Time in range (70–140 mg/dL): {round(_tir)}% today"
+                        + (" — on target." if _tir >= 70 else " — below target.")
+                    )
+                # Habits
+                _hab_pct = None
+                if streak_data:
+                    _hab_pct = streak_data.get("tier0_pct") or streak_data.get("tier0_completion_pct")
+                elif _computed:
+                    _hab_pct = _computed.get("tier0_pct")
+                if _tier0_streak is not None:
+                    _hab_msg = f"Tier 0 streak: {_tier0_streak} days"
+                    if _hab_pct is not None:
+                        _hab_msg += f" — {round(float(_hab_pct))}% completion today"
+                    _group_narratives["habits"] = _hab_msg + "."
+                # Mind — character level + tier
+                if character_sheet:
+                    _cs = character_sheet if isinstance(character_sheet, dict) else {}
+                    _cs_level = _cs.get("level") or _cs.get("character_level")
+                    _cs_tier  = _cs.get("tier") or _cs.get("tier_name")
+                    if _cs_level:
+                        _group_narratives["mind"] = (
+                            f"Character at Level {_cs_level}"
+                            + (f" — {_cs_tier} tier." if _cs_tier else ".")
+                        )
+                # Platform — use TL;DR if available, else systems count
+                if _brief_excerpt:
+                    _group_narratives["platform"] = _brief_excerpt[:160].rstrip() + ("…" if len(_brief_excerpt) > 160 else "")
+            except Exception as _gn_e:
+                logger.warning("group_narratives build failed (non-fatal): %s", _gn_e)
+
             write_public_stats(
                 s3_client=s3,
                 vitals={
                     "weight_lbs":       round(_curr_wt, 1) if _curr_wt else None,
+                    "weight_as_of":     _weight_as_of,  # G-3: date of reading for staleness display
                     "weight_delta_30d": round(_curr_wt - float(_week_ago), 1) if _week_ago and _curr_wt else None,
                     "hrv_ms":           round(float(_hrv.get("hrv_yesterday") or _hrv.get("hrv_7d") or 0), 1) or None,
                     "hrv_trend":        html_builder.hrv_trend_str(_hrv.get("hrv_7d"), _hrv.get("hrv_30d")),
@@ -1769,15 +1850,16 @@ def lambda_handler(event, context):
                     "rhr_trend":        "improving",
                     "recovery_pct":     round(_rec, 0) if _rec else None,
                     "recovery_status":  _rec_status,
-                    "sleep_hours":      safe_float(data.get("sleep"), "sleep_duration_hours"),
+                    "sleep_hours":         safe_float(data.get("sleep"), "sleep_duration_hours"),
+                    "sleep_hours_30d_avg": _sleep_hours_30d_avg,  # HOME-3
                 },
                 journey={
                     "start_weight_lbs":   _start_wt,
                     "goal_weight_lbs":    _goal_wt,
-                    "current_weight_lbs": _curr_wt if _curr_wt else None,
-                    "lost_lbs":           _lost if _curr_wt else None,
-                    "remaining_lbs":      _remain if _curr_wt else None,
-                    "progress_pct":       _prog_pct if _curr_wt else None,
+                    "current_weight_lbs": _curr_wt,
+                    "lost_lbs":           _lost,
+                    "remaining_lbs":      _remain,
+                    "progress_pct":       _prog_pct,
                     "weekly_rate_lbs":    _weekly_rate,
                     "projected_goal_date": profile.get("goal_date", "2026-07-31"),
                     "started_date":       profile.get("journey_start_date", "2026-02-09"),
@@ -1806,6 +1888,7 @@ def lambda_handler(event, context):
                 },
                 trends=_trends,
                 brief_excerpt=_brief_excerpt,
+                group_narratives=_group_narratives,
                 # D10: Day 1 baseline from profile — historical constants, not live data
                 baseline={
                     "date":         profile.get("baseline_date") or profile.get("journey_start_date", "2026-02-22"),

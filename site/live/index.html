@@ -38,6 +38,9 @@
     .cpit-group__heading { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--accent-dim); }
     .cpit-group__link { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); text-decoration: none; letter-spacing: var(--ls-tag); }
     .cpit-group__link:hover { color: var(--accent); }
+    .cpit-group__narrative { font-size: var(--text-sm); color: var(--text-muted); line-height: var(--lh-body); margin-bottom: var(--space-4); display: none; }
+    .cpit-group__narrative.is-visible { display: block; }
+    .cpit-tile__stale { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); margin-top: var(--space-1); }
 
     .cpit-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
     .cpit-tiles--4 { grid-template-columns: repeat(4, 1fr); }
@@ -96,23 +99,26 @@
 
   <!-- Nav -->
   <nav class="nav">
-  <a href="/" class="nav__brand">AMJ</a>
+  <a href="/" class="nav__brand">AJM</a>
   <div class="nav__links">
     <div class="nav__dropdown">
       <button class="nav__dropdown-btn">The Story</button>
       <div class="nav__dropdown-menu">
-        <a href="/" class="nav__dropdown-item">Home</a>
         <a href="/story/" class="nav__dropdown-item">My Story</a>
-        <a href="/about/" class="nav__dropdown-item">About</a>
+        <a href="/about/" class="nav__dropdown-item">The Mission</a>
       </div>
     </div>
     <div class="nav__dropdown is-active">
       <button class="nav__dropdown-btn">The Data</button>
       <div class="nav__dropdown-menu">
         <a href="/live/" class="nav__dropdown-item active">Live</a>
-        <a href="/character/" class="nav__dropdown-item">Character</a>
+        <a href="/character/" class="nav__dropdown-item">Character Sheet</a>
         <a href="/habits/" class="nav__dropdown-item">Habits</a>
-        <a href="/accountability/" class="nav__dropdown-item">Accountability</a>
+        <a href="/accountability/" class="nav__dropdown-item">Progress</a>
+        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
+        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
+        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
+        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
       </div>
     </div>
     <div class="nav__dropdown">
@@ -121,10 +127,6 @@
         <a href="/protocols/" class="nav__dropdown-item">Protocols</a>
         <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
         <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
-        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
-        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
-        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
-        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
       </div>
     </div>
     <div class="nav__dropdown">
@@ -132,7 +134,7 @@
       <div class="nav__dropdown-menu">
         <a href="/platform/" class="nav__dropdown-item">Platform</a>
         <a href="/intelligence/" class="nav__dropdown-item">Intelligence</a>
-        <a href="/board/" class="nav__dropdown-item">Board</a>
+        <a href="/board/" class="nav__dropdown-item">AI Board</a>
         <a href="/cost/" class="nav__dropdown-item">Cost</a>
         <a href="/methodology/" class="nav__dropdown-item">Methodology</a>
         <a href="/tools/" class="nav__dropdown-item">Tools</a>
@@ -141,9 +143,9 @@
     <div class="nav__dropdown">
       <button class="nav__dropdown-btn">Follow</button>
       <div class="nav__dropdown-menu">
-        <a href="/chronicle/" class="nav__dropdown-item">Chronicle</a>
+        <a href="/chronicle/" class="nav__dropdown-item">Weekly Journal</a>
         <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
-        <a href="/ask/" class="nav__dropdown-item">Ask</a>
+        <a href="/ask/" class="nav__dropdown-item">Ask the Data</a>
       </div>
     </div>
     <a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>
@@ -162,41 +164,40 @@
     <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Story</div>
-      <a href="/" class="nav-overlay__link">Home</a>
       <a href="/story/" class="nav-overlay__link">My Story</a>
-      <a href="/about/" class="nav-overlay__link">About</a>
+      <a href="/about/" class="nav-overlay__link">The Mission</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Data</div>
       <a href="/live/" class="nav-overlay__link">Live</a>
-      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/character/" class="nav-overlay__link">Character Sheet</a>
       <a href="/habits/" class="nav-overlay__link">Habits</a>
-      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
-    </div>
-    <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The Science</div>
-      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
-      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/accountability/" class="nav-overlay__link">Progress</a>
       <a href="/sleep/" class="nav-overlay__link">Sleep</a>
       <a href="/glucose/" class="nav-overlay__link">Glucose</a>
       <a href="/supplements/" class="nav-overlay__link">Supplements</a>
       <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
     </div>
     <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Science</div>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+    </div>
+    <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Build</div>
       <a href="/platform/" class="nav-overlay__link">Platform</a>
       <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
-      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/board/" class="nav-overlay__link">AI Board</a>
       <a href="/cost/" class="nav-overlay__link">Cost</a>
       <a href="/methodology/" class="nav-overlay__link">Methodology</a>
       <a href="/tools/" class="nav-overlay__link">Tools</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">Follow</div>
-      <a href="/chronicle/" class="nav-overlay__link">Chronicle</a>
+      <a href="/chronicle/" class="nav-overlay__link">Weekly Journal</a>
       <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
-      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/ask/" class="nav-overlay__link">Ask the Data</a>
       <a href="/rss.xml" class="nav-overlay__link">RSS</a>
       <a href="/privacy/" class="nav-overlay__link">Privacy</a>
     </div>
@@ -221,6 +222,7 @@
         <div class="cpit-group__heading">// body</div>
         <a href="#timeline" class="cpit-group__link">weight chart ↓</a>
       </div>
+      <div class="cpit-group__narrative" id="gnar-body"></div>
       <div class="cpit-tiles">
         <div class="cpit-tile cpit-tile--gray" id="tile-weight">
           <div class="cpit-tile__name">Weight</div>
@@ -241,6 +243,7 @@
         <div class="cpit-group__heading">// recovery + sleep</div>
         <a href="/sleep/" class="cpit-group__link">sleep deep-dive →</a>
       </div>
+      <div class="cpit-group__narrative" id="gnar-recovery"></div>
       <div class="cpit-tiles cpit-tiles--4">
         <div class="cpit-tile cpit-tile--gray" id="tile-hrv">
           <div class="cpit-tile__name">HRV</div>
@@ -271,6 +274,7 @@
         <div class="cpit-group__heading">// activity + training</div>
         <a href="/protocols/" class="cpit-group__link">protocols →</a>
       </div>
+      <div class="cpit-group__narrative" id="gnar-activity"></div>
       <div class="cpit-tiles">
         <div class="cpit-tile cpit-tile--gray" id="tile-zone2">
           <div class="cpit-tile__name">Zone 2 (7d)</div>
@@ -291,6 +295,7 @@
         <div class="cpit-group__heading">// nutrition + glucose</div>
         <a href="/glucose/" class="cpit-group__link">glucose deep-dive →</a>
       </div>
+      <div class="cpit-group__narrative" id="gnar-nutrition"></div>
       <div class="cpit-tiles">
         <div class="cpit-tile cpit-tile--gray" id="tile-tir">
           <div class="cpit-tile__name">Time In Range (today)</div>
@@ -311,6 +316,7 @@
         <div class="cpit-group__heading">// habits + behavior</div>
         <a href="/habits/" class="cpit-group__link">habits →</a>
       </div>
+      <div class="cpit-group__narrative" id="gnar-habits"></div>
       <div class="cpit-tiles">
         <div class="cpit-tile cpit-tile--gray" id="tile-t0pct">
           <div class="cpit-tile__name">Tier 0 Today</div>
@@ -331,6 +337,7 @@
         <div class="cpit-group__heading">// mind + character</div>
         <a href="/character/" class="cpit-group__link">character →</a>
       </div>
+      <div class="cpit-group__narrative" id="gnar-mind"></div>
       <div class="cpit-tiles">
         <div class="cpit-tile cpit-tile--gray" id="tile-mood">
           <div class="cpit-tile__name">State of Mind</div>
@@ -351,6 +358,7 @@
         <div class="cpit-group__heading">// platform + intelligence</div>
         <a href="/board/" class="cpit-group__link">full AI brief →</a>
       </div>
+      <div class="cpit-group__narrative" id="gnar-platform"></div>
       <div class="cpit-tile cpit-tile--gray" id="tile-signal">
         <div class="cpit-tile__name">Today's Intelligence Signal</div>
         <div class="cpit-tile__signal" id="tv-signal">Brief generates at 11 AM PT — check back after that for today's AI analysis.</div>
@@ -496,14 +504,14 @@
       <div class="footer-v2__heading">The Story</div>
       <a href="/" class="footer-v2__link">Home</a>
       <a href="/story/" class="footer-v2__link">My Story</a>
-      <a href="/about/" class="footer-v2__link">About</a>
+      <a href="/about/" class="footer-v2__link">The Mission</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The Data</div>
       <a href="/live/" class="footer-v2__link">Live</a>
-      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/character/" class="footer-v2__link">Character Sheet</a>
       <a href="/habits/" class="footer-v2__link">Habits</a>
-      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/accountability/" class="footer-v2__link">Progress</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The Science</div>
@@ -519,16 +527,16 @@
       <div class="footer-v2__heading">The Build</div>
       <a href="/platform/" class="footer-v2__link">Platform</a>
       <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
-      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/board/" class="footer-v2__link">AI Board</a>
       <a href="/cost/" class="footer-v2__link">Cost</a>
       <a href="/methodology/" class="footer-v2__link">Methodology</a>
       <a href="/tools/" class="footer-v2__link">Tools</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">Follow</div>
-      <a href="/chronicle/" class="footer-v2__link">Chronicle</a>
+      <a href="/chronicle/" class="footer-v2__link">Weekly Journal</a>
       <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
-      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/ask/" class="footer-v2__link">Ask the Data</a>
       <a href="/rss.xml" class="footer-v2__link">RSS</a>
       <a href="/privacy/" class="footer-v2__link">Privacy</a>
     </div>
@@ -728,6 +736,28 @@ function renderEvents(tl) {
   document.getElementById('events-section').style.display = 'block';
 }
 
+// ── LIVE-3: Staleness helpers (outer scope — used by all tile handlers) ──────
+var MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function staleLabel(dateStr) {
+  if (!dateStr) return null;
+  var d = new Date(dateStr), ago = Math.floor((Date.now() - d) / 86400000);
+  if (ago <= 1) return null;
+  return 'as of ' + MONTHS_SHORT[d.getUTCMonth()] + ' ' + d.getUTCDate();
+}
+function addStale(tileId, dateStr) {
+  var lbl = staleLabel(dateStr);
+  if (!lbl) return;
+  var tile = document.getElementById(tileId);
+  if (!tile) return;
+  var existing = tile.querySelector('.cpit-tile__stale');
+  var el = existing || document.createElement('div');
+  el.className = 'cpit-tile__stale';
+  el.textContent = lbl;
+  if (!existing) tile.appendChild(el);
+  var daysAgo = Math.floor((Date.now() - new Date(dateStr)) / 86400000);
+  if (daysAgo >= 7) setStatus(tileId, 'gray');
+}
+
 // ── Cockpit loader (LIVE-1 + LIVE-2: all fetches consolidated) ──────────────
 async function initCockpit() {
   const now = new Date();
@@ -766,11 +796,16 @@ async function initCockpit() {
         }
       }
 
+      // LIVE-3: staleness — apply to weight tile using weight_as_of
+      if (v.weight_as_of) addStale('tile-weight', v.weight_as_of);
+      var dataDate = v.data_date || v.as_of_date || v.date;
+
       // HRV
       if (v.hrv_ms != null) {
         setText('tv-hrv', v.hrv_ms);
         setStatus('tile-hrv', statusHRV(v.hrv_ms));
         setText('td-hrv', v.hrv_30d_avg ? v.hrv_30d_avg + ' ms 30d avg' : '');
+        addStale('tile-hrv', dataDate);
       }
 
       // Recovery
@@ -779,12 +814,14 @@ async function initCockpit() {
         setStatus('tile-recovery', statusRecovery(v.recovery_pct));
         var recovMap = { green: 'Optimal', yellow: 'Moderate', red: 'Needs rest' };
         setText('td-recovery', recovMap[v.recovery_status] || '');
+        addStale('tile-recovery', dataDate);
       }
 
       // RHR
       if (v.resting_heart_rate != null) {
         setText('tv-rhr', v.resting_heart_rate);
         setStatus('tile-rhr', statusRHR(v.resting_heart_rate));
+        addStale('tile-rhr', dataDate);
       }
     } catch(_) {}
   }
@@ -821,6 +858,7 @@ async function initCockpit() {
         setStatus('tile-char', 'green');
         var tierLabel = ch.tier ? ((ch.tier_emoji || '') + ' ' + ch.tier).trim() : '';
         setText('td-char', tierLabel);
+        addStale('tile-char', ch.as_of_date);
       }
     } catch(_) {}
   }
@@ -835,12 +873,14 @@ async function initCockpit() {
         setText('tv-tir', Math.round(g.time_in_range_pct));
         setStatus('tile-tir', statusTIR(g.time_in_range_pct));
         setText('td-tir', g.avg_mg_dl ? 'Avg: ' + g.avg_mg_dl + ' mg/dL' : '70–140 mg/dL');
+        addStale('tile-tir', g.as_of_date);
       }
       var tir30 = g['30d_avg_tir'];
       if (tir30 != null) {
         setText('tv-tir30', Math.round(tir30));
         setStatus('tile-tir30', statusTIR(tir30));
         setText('td-tir30', g.days_tracked ? g.days_tracked + 'd tracked' : '');
+        addStale('tile-tir30', g.as_of_date);
       }
     } catch(_) {}
   }
@@ -852,6 +892,7 @@ async function initCockpit() {
       const vitals = ps.vitals || {};
       const training = ps.training || {};
       const mood = ps.mood || ps.state_of_mind || {};
+      const psDate = (ps._meta || {}).generated_at;
       reporting++;
 
       // Sleep
@@ -866,6 +907,7 @@ async function initCockpit() {
         } else {
           setText('td-sleep', vitals.sleep_trend === 'up' ? '↑ improving' : vitals.sleep_trend === 'down' ? '↓ declining' : '');
         }
+        addStale('tile-sleep', psDate);
       }
 
       // Zone 2
@@ -875,6 +917,7 @@ async function initCockpit() {
         setStatus('tile-zone2', statusZ2(z2));
         var z2pct = Math.round((z2 / 150) * 100);
         setText('td-zone2', z2pct + '% of weekly target' + (z2 >= 150 ? ' ✓' : ''));
+        addStale('tile-zone2', psDate);
       }
 
       // Today's activity
@@ -888,6 +931,7 @@ async function initCockpit() {
         setText('tv-strain', 'Rest');
         setStatus('tile-strain', 'gray');
       }
+      addStale('tile-strain', psDate);
 
       // Mood
       var moodScore = mood.score != null ? mood.score : mood.value;
@@ -907,6 +951,26 @@ async function initCockpit() {
         setText('tv-signal', excerpt);
         setStatus('tile-signal', 'green');
       }
+
+      // Group narratives (LIVE-2)
+      var gnar = ps.group_narratives || {};
+      var gnarMap = {
+        'gnar-body':      gnar.body,
+        'gnar-recovery':  gnar.recovery,
+        'gnar-activity':  gnar.activity,
+        'gnar-nutrition': gnar.nutrition,
+        'gnar-habits':    gnar.habits,
+        'gnar-mind':      gnar.mind,
+        'gnar-platform':  gnar.platform
+      };
+      Object.keys(gnarMap).forEach(function(id) {
+        var text = gnarMap[id];
+        var el = document.getElementById(id);
+        if (el && text && text.trim()) {
+          el.textContent = text.trim();
+          el.classList.add('is-visible');
+        }
+      });
     } catch(_) {}
   }
 

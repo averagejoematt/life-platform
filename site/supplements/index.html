@@ -88,7 +88,7 @@
       padding: var(--space-10) var(--page-padding);
     }
 
-    /* ── Timing group ── */
+    /* ── Purpose group (replaces timing-group) ── */
     .timing-group {
       margin-bottom: var(--space-12);
     }
@@ -150,6 +150,37 @@
       color: var(--c-amber-400);
       border-color: var(--c-amber-100);
       background: var(--c-amber-050);
+    }
+    /* Evidence tier: strong (green) */
+    .badge--strong {
+      color: var(--accent);
+      border-color: var(--c-green-100);
+      background: var(--c-green-050);
+    }
+    /* Evidence tier: emerging (amber) */
+    .badge--emerging {
+      color: var(--c-amber-400);
+      border-color: var(--c-amber-100);
+      background: var(--c-amber-050);
+    }
+    /* Evidence tier: general (gray) */
+    .badge--general {
+      color: var(--text-faint);
+      border-color: var(--border);
+      background: var(--surface-raised);
+    }
+    /* Evidence tier: experimental (purple) */
+    .badge--experimental {
+      color: #a78bfa;
+      border-color: rgba(167,139,250,0.25);
+      background: rgba(167,139,250,0.06);
+    }
+    /* Genome SNP tag */
+    .badge--snp {
+      color: var(--accent);
+      border-color: var(--c-green-100);
+      background: var(--c-green-050);
+      font-style: italic;
     }
 
     /* ── Supplement card v2 ── */
@@ -413,31 +444,22 @@
 <body>
 
 <nav class="nav">
-  <a href="/" class="nav__brand">AMJ</a>
+  <a href="/" class="nav__brand">AJM</a>
   <div class="nav__links">
     <div class="nav__dropdown">
       <button class="nav__dropdown-btn">The Story</button>
       <div class="nav__dropdown-menu">
-        <a href="/" class="nav__dropdown-item">Home</a>
         <a href="/story/" class="nav__dropdown-item">My Story</a>
-        <a href="/about/" class="nav__dropdown-item">About</a>
-      </div>
-    </div>
-    <div class="nav__dropdown">
-      <button class="nav__dropdown-btn">The Data</button>
-      <div class="nav__dropdown-menu">
-        <a href="/live/" class="nav__dropdown-item">Live</a>
-        <a href="/character/" class="nav__dropdown-item">Character</a>
-        <a href="/habits/" class="nav__dropdown-item">Habits</a>
-        <a href="/accountability/" class="nav__dropdown-item">Accountability</a>
+        <a href="/about/" class="nav__dropdown-item">The Mission</a>
       </div>
     </div>
     <div class="nav__dropdown is-active">
-      <button class="nav__dropdown-btn">The Science</button>
+      <button class="nav__dropdown-btn">The Data</button>
       <div class="nav__dropdown-menu">
-        <a href="/protocols/" class="nav__dropdown-item">Protocols</a>
-        <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
-        <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
+        <a href="/live/" class="nav__dropdown-item">Live</a>
+        <a href="/character/" class="nav__dropdown-item">Character Sheet</a>
+        <a href="/habits/" class="nav__dropdown-item">Habits</a>
+        <a href="/accountability/" class="nav__dropdown-item">Progress</a>
         <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
         <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
         <a href="/supplements/" class="nav__dropdown-item active">Supplements</a>
@@ -445,11 +467,19 @@
       </div>
     </div>
     <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Science</button>
+      <div class="nav__dropdown-menu">
+        <a href="/protocols/" class="nav__dropdown-item">Protocols</a>
+        <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
+        <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
       <button class="nav__dropdown-btn">The Build</button>
       <div class="nav__dropdown-menu">
         <a href="/platform/" class="nav__dropdown-item">Platform</a>
         <a href="/intelligence/" class="nav__dropdown-item">Intelligence</a>
-        <a href="/board/" class="nav__dropdown-item">Board</a>
+        <a href="/board/" class="nav__dropdown-item">AI Board</a>
         <a href="/cost/" class="nav__dropdown-item">Cost</a>
         <a href="/methodology/" class="nav__dropdown-item">Methodology</a>
         <a href="/tools/" class="nav__dropdown-item">Tools</a>
@@ -458,9 +488,9 @@
     <div class="nav__dropdown">
       <button class="nav__dropdown-btn">Follow</button>
       <div class="nav__dropdown-menu">
-        <a href="/chronicle/" class="nav__dropdown-item">Chronicle</a>
+        <a href="/chronicle/" class="nav__dropdown-item">Weekly Journal</a>
         <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
-        <a href="/ask/" class="nav__dropdown-item">Ask</a>
+        <a href="/ask/" class="nav__dropdown-item">Ask the Data</a>
       </div>
     </div>
     <a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>
@@ -480,41 +510,40 @@
     <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Story</div>
-      <a href="/" class="nav-overlay__link">Home</a>
       <a href="/story/" class="nav-overlay__link">My Story</a>
-      <a href="/about/" class="nav-overlay__link">About</a>
+      <a href="/about/" class="nav-overlay__link">The Mission</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Data</div>
       <a href="/live/" class="nav-overlay__link">Live</a>
-      <a href="/character/" class="nav-overlay__link">Character</a>
+      <a href="/character/" class="nav-overlay__link">Character Sheet</a>
       <a href="/habits/" class="nav-overlay__link">Habits</a>
-      <a href="/accountability/" class="nav-overlay__link">Accountability</a>
-    </div>
-    <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The Science</div>
-      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
-      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+      <a href="/accountability/" class="nav-overlay__link">Progress</a>
       <a href="/sleep/" class="nav-overlay__link">Sleep</a>
       <a href="/glucose/" class="nav-overlay__link">Glucose</a>
       <a href="/supplements/" class="nav-overlay__link">Supplements</a>
       <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
     </div>
     <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Science</div>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+    </div>
+    <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Build</div>
       <a href="/platform/" class="nav-overlay__link">Platform</a>
       <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
-      <a href="/board/" class="nav-overlay__link">Board</a>
+      <a href="/board/" class="nav-overlay__link">AI Board</a>
       <a href="/cost/" class="nav-overlay__link">Cost</a>
       <a href="/methodology/" class="nav-overlay__link">Methodology</a>
       <a href="/tools/" class="nav-overlay__link">Tools</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">Follow</div>
-      <a href="/chronicle/" class="nav-overlay__link">Chronicle</a>
+      <a href="/chronicle/" class="nav-overlay__link">Weekly Journal</a>
       <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
-      <a href="/ask/" class="nav-overlay__link">Ask</a>
+      <a href="/ask/" class="nav-overlay__link">Ask the Data</a>
       <a href="/rss.xml" class="nav-overlay__link">RSS</a>
       <a href="/privacy/" class="nav-overlay__link">Privacy</a>
     </div>
@@ -537,23 +566,23 @@
 <div class="supp-stats reveal" id="supp-stats">
   <div class="supp-stat">
     <div class="supp-stat__label">Total supplements</div>
-    <div class="supp-stat__value accent" id="stat-total">10</div>
+    <div class="supp-stat__value accent" id="stat-total">—</div>
     <div class="supp-stat__sub">in active stack</div>
   </div>
   <div class="supp-stat">
-    <div class="supp-stat__label">Genome-justified</div>
-    <div class="supp-stat__value accent">2</div>
-    <div class="supp-stat__sub">SNP-adjusted doses</div>
+    <div class="supp-stat__label">Strong evidence</div>
+    <div class="supp-stat__value accent" id="stat-strong">—</div>
+    <div class="supp-stat__sub">peer-reviewed / genome</div>
   </div>
   <div class="supp-stat">
-    <div class="supp-stat__label">Peer-reviewed</div>
-    <div class="supp-stat__value accent">5</div>
-    <div class="supp-stat__sub">strong RCT evidence</div>
+    <div class="supp-stat__label">Emerging</div>
+    <div class="supp-stat__value accent" id="stat-emerging">—</div>
+    <div class="supp-stat__sub">promising RCT data</div>
   </div>
   <div class="supp-stat">
-    <div class="supp-stat__label">N=1 hypothesis</div>
-    <div class="supp-stat__value accent">3</div>
-    <div class="supp-stat__sub">personal experiments</div>
+    <div class="supp-stat__label">Experimental</div>
+    <div class="supp-stat__value accent" id="stat-exp">—</div>
+    <div class="supp-stat__sub">N=1 hypothesis</div>
   </div>
 </div>
 
@@ -564,533 +593,57 @@
   <div class="evidence-legend reveal">
     <span class="evidence-legend__label">Evidence tiers:</span>
     <div class="evidence-legend__item">
-      <span class="badge badge--genome">Genome-justified</span>
-      <span class="evidence-legend__label">SNP variant supports</span>
+      <span class="badge badge--strong">Strong</span>
+      <span class="evidence-legend__label">peer-reviewed / genome-justified</span>
     </div>
     <div class="evidence-legend__item">
-      <span class="badge badge--rct">Peer-reviewed consensus</span>
-      <span class="evidence-legend__label">strong RCT evidence</span>
+      <span class="badge badge--emerging">Emerging</span>
+      <span class="evidence-legend__label">promising RCT data</span>
     </div>
     <div class="evidence-legend__item">
-      <span class="badge badge--n1">N=1 hypothesis</span>
-      <span class="evidence-legend__label">personal experiment</span>
+      <span class="badge badge--experimental">Experimental</span>
+      <span class="evidence-legend__label">N=1 hypothesis</span>
     </div>
   </div>
 
-  <!-- Morning group -->
-  <div class="timing-group reveal">
-    <div class="timing-group__heading">
-      <span class="timing-group__label">// Morning</span>
-      <span class="timing-group__count">6 items</span>
+  <!-- Skeleton (shown while loading) -->
+  <div id="supp-skeleton">
+    <div class="skeleton-group">
+      <div class="skeleton-label"></div>
+      <div class="skeleton-cards">
+        <div class="skeleton-card"><div class="skeleton-line wide"></div><div class="skeleton-line mid"></div><div class="skeleton-line short"></div></div>
+        <div class="skeleton-card"><div class="skeleton-line wide"></div><div class="skeleton-line mid"></div><div class="skeleton-line short"></div></div>
+        <div class="skeleton-card"><div class="skeleton-line wide"></div><div class="skeleton-line mid"></div><div class="skeleton-line short"></div></div>
+      </div>
     </div>
-    <div class="timing-group__cards">
-
-      <!-- Vitamin D3 -->
-      <div class="supp-card">
-        <div class="supp-card__header">
-          <div class="supp-card__top">
-            <div class="supp-card__name">Vitamin D3</div>
-            <span class="supp-card__dose-badge" data-supp-dose="vitamin-d3">5000 IU</span>
-          </div>
-          <div class="supp-card__meta">
-            <span class="badge badge--timing" data-supp-timing="vitamin-d3">Morning</span>
-            <span class="badge badge--genome">Genome-justified</span>
-          </div>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">Why I'm taking it</div>
-          <p class="supp-card__rationale">VDR gene variant (Bsm1) reduces receptor binding efficiency, requiring higher-than-standard dosing to maintain adequate serum 25(OH)D levels.</p>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">What the science says</div>
-          <ul class="supp-card__science">
-            <li>VDR Bsm1 polymorphism is associated with reduced Vitamin D receptor transcriptional activity, necessitating higher circulating levels for equivalent downstream effect.</li>
-            <li>Serum 25(OH)D above 40 ng/mL is associated with improved immune function, mood regulation, and musculoskeletal health in RCTs.</li>
-            <li>At northern latitudes, endogenous synthesis is insufficient October–April regardless of sun exposure.</li>
-          </ul>
-        </div>
-        <div class="supp-card__data">
-          <div class="supp-card__section-label">My data</div>
-          <div class="supp-card__data-grid">
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Adherence</span>
-              <span class="supp-card__data-value loading" data-supp-adherence="vitamin-d3">Loading&hellip;</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Watching</span>
-              <span class="supp-card__data-value">Serum 25(OH)D</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Signal</span>
-              <span class="supp-card__data-value signal--positive">Positive</span>
-            </div>
-          </div>
-        </div>
-        <div class="supp-card__footer">
-          <a href="/discoveries/" class="supp-card__corr-link">See correlation &rarr;</a>
-        </div>
+    <div class="skeleton-group">
+      <div class="skeleton-label"></div>
+      <div class="skeleton-cards">
+        <div class="skeleton-card"><div class="skeleton-line wide"></div><div class="skeleton-line mid"></div><div class="skeleton-line short"></div></div>
+        <div class="skeleton-card"><div class="skeleton-line wide"></div><div class="skeleton-line mid"></div><div class="skeleton-line short"></div></div>
       </div>
-
-      <!-- Creatine Monohydrate -->
-      <div class="supp-card">
-        <div class="supp-card__header">
-          <div class="supp-card__top">
-            <div class="supp-card__name">Creatine Monohydrate</div>
-            <span class="supp-card__dose-badge" data-supp-dose="creatine">5g</span>
-          </div>
-          <div class="supp-card__meta">
-            <span class="badge badge--timing" data-supp-timing="creatine">Morning</span>
-            <span class="badge badge--rct">Peer-reviewed consensus</span>
-          </div>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">Why I'm taking it</div>
-          <p class="supp-card__rationale">Most well-studied ergogenic aid in existence — consistent strength and power output gains, with emerging cognitive benefit data.</p>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">What the science says</div>
-          <ul class="supp-card__science">
-            <li>Increases phosphocreatine stores in muscle, accelerating ATP resynthesis during high-intensity efforts; meta-analyses show ~8% strength gain over placebo.</li>
-            <li>Creatine supplementation increases brain creatine concentrations and is associated with improved working memory and processing speed in low-meat-intake populations.</li>
-            <li>5g/day is sufficient for maintenance after a loading phase; no kidney safety concerns in healthy individuals at this dose.</li>
-          </ul>
-        </div>
-        <div class="supp-card__data">
-          <div class="supp-card__section-label">My data</div>
-          <div class="supp-card__data-grid">
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Adherence</span>
-              <span class="supp-card__data-value loading" data-supp-adherence="creatine">Loading&hellip;</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Watching</span>
-              <span class="supp-card__data-value">Strength 1RM</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Signal</span>
-              <span class="supp-card__data-value signal--positive">Positive</span>
-            </div>
-          </div>
-        </div>
-        <div class="supp-card__footer">
-          <a href="/discoveries/" class="supp-card__corr-link">See correlation &rarr;</a>
-        </div>
-      </div>
-
-      <!-- Omega-3 Fish Oil -->
-      <div class="supp-card">
-        <div class="supp-card__header">
-          <div class="supp-card__top">
-            <div class="supp-card__name">Omega-3 Fish Oil</div>
-            <span class="supp-card__dose-badge" data-supp-dose="omega-3">3g EPA/DHA</span>
-          </div>
-          <div class="supp-card__meta">
-            <span class="badge badge--timing" data-supp-timing="omega-3">Morning</span>
-            <span class="badge badge--rct">Peer-reviewed consensus</span>
-          </div>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">Why I'm taking it</div>
-          <p class="supp-card__rationale">FADS2 rs1535 variant impairs conversion of ALA to EPA/DHA, making pre-formed fish oil essential rather than optional for anti-inflammatory benefit.</p>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">What the science says</div>
-          <ul class="supp-card__science">
-            <li>EPA and DHA are precursors to resolvins and protectins — pro-resolving lipid mediators that actively terminate inflammatory cascades rather than merely inhibiting initiation.</li>
-            <li>High-dose Omega-3 (2–4g/day EPA+DHA) significantly reduces triglycerides; cardiovascular mortality reduction seen in REDUCE-IT at 4g/day icosapentaenoic acid.</li>
-            <li>FADS2 rs1535 T-allele carriers show substantially lower ALA conversion; pre-formed EPA/DHA is the only reliable dietary source for this genotype.</li>
-          </ul>
-        </div>
-        <div class="supp-card__data">
-          <div class="supp-card__section-label">My data</div>
-          <div class="supp-card__data-grid">
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Adherence</span>
-              <span class="supp-card__data-value loading" data-supp-adherence="omega-3">Loading&hellip;</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Watching</span>
-              <span class="supp-card__data-value">HRV trend</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Signal</span>
-              <span class="supp-card__data-value signal--positive">Positive</span>
-            </div>
-          </div>
-        </div>
-        <div class="supp-card__footer">
-          <a href="/discoveries/" class="supp-card__corr-link">See correlation &rarr;</a>
-        </div>
-      </div>
-
-      <!-- Tongkat Ali -->
-      <div class="supp-card">
-        <div class="supp-card__header">
-          <div class="supp-card__top">
-            <div class="supp-card__name">Tongkat Ali</div>
-            <span class="supp-card__dose-badge" data-supp-dose="tongkat-ali">200mg</span>
-          </div>
-          <div class="supp-card__meta">
-            <span class="badge badge--timing" data-supp-timing="tongkat-ali">Morning</span>
-            <span class="badge badge--n1">N=1 hypothesis</span>
-          </div>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">Why I'm taking it</div>
-          <p class="supp-card__rationale">Testing whether Eurycoma longifolia supplementation produces measurable improvement in recovery metrics and WHOOP strain-to-recovery ratio.</p>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">What the science says</div>
-          <ul class="supp-card__science">
-            <li>Small RCTs (n=76, 300mg/day for 12 weeks) show statistically significant increases in free testosterone in late-middle-aged men; effect size modest.</li>
-            <li>Proposed mechanism: quassinoids inhibit SHBG binding, increasing bioavailable testosterone fraction rather than stimulating production directly.</li>
-            <li>Evidence base is thin — most trials are industry-funded, small, and short-duration; replication in independent labs is limited.</li>
-          </ul>
-        </div>
-        <div class="supp-card__data">
-          <div class="supp-card__section-label">My data</div>
-          <div class="supp-card__data-grid">
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Adherence</span>
-              <span class="supp-card__data-value loading" data-supp-adherence="tongkat-ali">Loading&hellip;</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Watching</span>
-              <span class="supp-card__data-value">Recovery %</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Signal</span>
-              <span class="supp-card__data-value signal--unclear">Unclear</span>
-            </div>
-          </div>
-        </div>
-        <div class="supp-card__footer">
-          <a href="/discoveries/" class="supp-card__corr-link">See correlation &rarr;</a>
-        </div>
-      </div>
-
-      <!-- NMN -->
-      <div class="supp-card">
-        <div class="supp-card__header">
-          <div class="supp-card__top">
-            <div class="supp-card__name">NMN</div>
-            <span class="supp-card__dose-badge" data-supp-dose="nmn">500mg</span>
-          </div>
-          <div class="supp-card__meta">
-            <span class="badge badge--timing" data-supp-timing="nmn">Morning</span>
-            <span class="badge badge--n1">N=1 hypothesis</span>
-          </div>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">Why I'm taking it</div>
-          <p class="supp-card__rationale">Testing NAD+ precursor supplementation as a strategy for maintaining mitochondrial function and metabolic flexibility as a longevity lever.</p>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">What the science says</div>
-          <ul class="supp-card__science">
-            <li>NAD+ declines ~50% between ages 40 and 60; NMN is efficiently converted to NAD+ in humans (Yoshino et al., 2021 — confirmed bioavailability and blood NAD+ elevation at 250mg/day).</li>
-            <li>Animal studies show substantial metabolic and longevity effects; human RCT data is promising but limited — largest trial (n=80) showed improved muscle insulin sensitivity.</li>
-            <li>Optimal dose, long-term safety profile, and disease-relevant outcomes in humans remain understudied; this is an informed speculative bet.</li>
-          </ul>
-        </div>
-        <div class="supp-card__data">
-          <div class="supp-card__section-label">My data</div>
-          <div class="supp-card__data-grid">
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Adherence</span>
-              <span class="supp-card__data-value loading" data-supp-adherence="nmn">Loading&hellip;</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Watching</span>
-              <span class="supp-card__data-value">HRV + energy</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Signal</span>
-              <span class="supp-card__data-value signal--none">None yet</span>
-            </div>
-          </div>
-        </div>
-        <div class="supp-card__footer">
-          <a href="/discoveries/" class="supp-card__corr-link">See correlation &rarr;</a>
-        </div>
-      </div>
-
-      <!-- CoQ10 Ubiquinol -->
-      <div class="supp-card">
-        <div class="supp-card__header">
-          <div class="supp-card__top">
-            <div class="supp-card__name">CoQ10 Ubiquinol</div>
-            <span class="supp-card__dose-badge" data-supp-dose="coq10">200mg</span>
-          </div>
-          <div class="supp-card__meta">
-            <span class="badge badge--timing" data-supp-timing="coq10">Morning</span>
-            <span class="badge badge--rct">Peer-reviewed consensus</span>
-          </div>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">Why I'm taking it</div>
-          <p class="supp-card__rationale">Mitochondrial electron transport chain cofactor; ubiquinol form selected for superior bioavailability vs. ubiquinone, particularly important given past statin use history.</p>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">What the science says</div>
-          <ul class="supp-card__science">
-            <li>Statins inhibit the mevalonate pathway, reducing endogenous CoQ10 synthesis by 40–50%; supplementation at 100–200mg/day restores serum levels to pre-statin baseline.</li>
-            <li>CoQ10 is the mobile electron carrier between Complex I/II and Complex III in the mitochondrial electron transport chain — essential for ATP synthesis efficiency.</li>
-            <li>Meta-analysis of 13 RCTs (Mortensen et al.) shows 200mg ubiquinol produces plasma CoQ10 concentrations approximately twice that of equivalent ubiquinone dose.</li>
-          </ul>
-        </div>
-        <div class="supp-card__data">
-          <div class="supp-card__section-label">My data</div>
-          <div class="supp-card__data-grid">
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Adherence</span>
-              <span class="supp-card__data-value loading" data-supp-adherence="coq10">Loading&hellip;</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Watching</span>
-              <span class="supp-card__data-value">HRV + fatigue</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Signal</span>
-              <span class="supp-card__data-value signal--positive">Positive</span>
-            </div>
-          </div>
-        </div>
-        <div class="supp-card__footer">
-          <a href="/discoveries/" class="supp-card__corr-link">See correlation &rarr;</a>
-        </div>
-      </div>
-
-    </div><!-- /morning cards -->
-  </div><!-- /morning group -->
-
-  <!-- With meals group -->
-  <div class="timing-group reveal">
-    <div class="timing-group__heading">
-      <span class="timing-group__label">// With Meals</span>
-      <span class="timing-group__count">1 item</span>
     </div>
-    <div class="timing-group__cards">
+  </div>
 
-      <!-- Berberine -->
-      <div class="supp-card">
-        <div class="supp-card__header">
-          <div class="supp-card__top">
-            <div class="supp-card__name">Berberine</div>
-            <span class="supp-card__dose-badge" data-supp-dose="berberine">500mg</span>
-          </div>
-          <div class="supp-card__meta">
-            <span class="badge badge--timing" data-supp-timing="berberine">With meals</span>
-            <span class="badge badge--n1">N=1 hypothesis</span>
-          </div>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">Why I'm taking it</div>
-          <p class="supp-card__rationale">Testing CGM-measurable postprandial glucose attenuation, particularly for high-carbohydrate meals where my response tends to spike above 140 mg/dL.</p>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">What the science says</div>
-          <ul class="supp-card__science">
-            <li>AMPK activator — mimics the downstream effects of metformin by increasing insulin sensitivity and reducing hepatic glucose output; several RCTs show HbA1c reduction comparable to metformin in T2D populations.</li>
-            <li>Inhibits intestinal alpha-glucosidase, slowing carbohydrate absorption and blunting postprandial glucose spikes; effect is dose- and timing-dependent (take 20–30 min before eating).</li>
-            <li>Short-term GI discomfort is common at doses above 500mg; bioavailability is low (~5%) but sufficient for AMPK activation at standard doses.</li>
-          </ul>
-        </div>
-        <div class="supp-card__data">
-          <div class="supp-card__section-label">My data</div>
-          <div class="supp-card__data-grid">
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Adherence</span>
-              <span class="supp-card__data-value loading" data-supp-adherence="berberine">Loading&hellip;</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Watching</span>
-              <span class="supp-card__data-value">CGM peak</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Signal</span>
-              <span class="supp-card__data-value signal--unclear">Monitoring</span>
-            </div>
-          </div>
-        </div>
-        <div class="supp-card__footer">
-          <a href="/discoveries/" class="supp-card__corr-link">See correlation &rarr;</a>
-        </div>
-      </div>
+  <!-- Dynamic groups rendered by JS -->
+  <div id="supp-groups" style="display:none"></div>
 
-    </div><!-- /with-meals cards -->
-  </div><!-- /with-meals group -->
-
-  <!-- Evening group -->
-  <div class="timing-group reveal">
-    <div class="timing-group__heading">
-      <span class="timing-group__label">// Evening</span>
-      <span class="timing-group__count">3 items</span>
+  <!-- Empty state (shown on error) -->
+  <div id="supp-error" style="display:none">
+    <div class="supp-empty">
+      <div class="supp-empty__code"><span>//</span> api/supplements · 503</div>
+      <p class="supp-empty__msg">Supplement data temporarily unavailable. Check back soon.</p>
     </div>
-    <div class="timing-group__cards">
+  </div>
 
-      <!-- Magnesium Glycinate -->
-      <div class="supp-card">
-        <div class="supp-card__header">
-          <div class="supp-card__top">
-            <div class="supp-card__name">Magnesium Glycinate</div>
-            <span class="supp-card__dose-badge" data-supp-dose="magnesium">400mg</span>
-          </div>
-          <div class="supp-card__meta">
-            <span class="badge badge--timing" data-supp-timing="magnesium">Evening</span>
-            <span class="badge badge--rct">Peer-reviewed consensus</span>
-          </div>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">Why I'm taking it</div>
-          <p class="supp-card__rationale">Magnesium is a cofactor in 300+ enzymatic reactions; glycinate chelate selected for superior bioavailability and minimal laxative effect compared to oxide or citrate forms.</p>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">What the science says</div>
-          <ul class="supp-card__science">
-            <li>Magnesium is required for NMDA receptor regulation and GABA-ergic signalling — both pathways involved in sleep induction and slow-wave sleep quality.</li>
-            <li>Meta-analysis of 8 RCTs shows magnesium supplementation significantly reduces subjective insomnia severity and improves sleep efficiency in adults with poor sleep quality.</li>
-            <li>Glycinate chelate bypasses intestinal magnesium transporters that become saturated at high doses, achieving higher serum levels with less GI disruption than inorganic salts.</li>
-          </ul>
-        </div>
-        <div class="supp-card__data">
-          <div class="supp-card__section-label">My data</div>
-          <div class="supp-card__data-grid">
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Adherence</span>
-              <span class="supp-card__data-value loading" data-supp-adherence="magnesium">Loading&hellip;</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Watching</span>
-              <span class="supp-card__data-value">Sleep quality</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Signal</span>
-              <span class="supp-card__data-value signal--positive">Positive</span>
-            </div>
-          </div>
-        </div>
-        <div class="supp-card__footer">
-          <a href="/discoveries/" class="supp-card__corr-link">See correlation &rarr;</a>
-        </div>
-      </div>
-
-      <!-- Zinc -->
-      <div class="supp-card">
-        <div class="supp-card__header">
-          <div class="supp-card__top">
-            <div class="supp-card__name">Zinc</div>
-            <span class="supp-card__dose-badge" data-supp-dose="zinc">30mg</span>
-          </div>
-          <div class="supp-card__meta">
-            <span class="badge badge--timing" data-supp-timing="zinc">Evening</span>
-            <span class="badge badge--genome">Genome-justified</span>
-          </div>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">Why I'm taking it</div>
-          <p class="supp-card__rationale">Zinc metabolism SNP reduces intestinal zinc absorption efficiency, requiring supplementation to maintain adequate serum zinc status for immune and hormonal function.</p>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">What the science says</div>
-          <ul class="supp-card__science">
-            <li>Zinc is a cofactor for over 300 enzymes and is essential for testosterone biosynthesis — clinical zinc deficiency is associated with hypogonadism that reverses with supplementation.</li>
-            <li>SLC39A4 (ZIP4) and SLC30A series transporter variants affect zinc homeostasis; impaired absorption variants may double dietary requirement to maintain serum adequacy.</li>
-            <li>Taken in the evening due to competitive absorption with copper (maintained separately at breakfast via diet); evening zinc avoids meal-time mineral interference.</li>
-          </ul>
-        </div>
-        <div class="supp-card__data">
-          <div class="supp-card__section-label">My data</div>
-          <div class="supp-card__data-grid">
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Adherence</span>
-              <span class="supp-card__data-value loading" data-supp-adherence="zinc">Loading&hellip;</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Watching</span>
-              <span class="supp-card__data-value">Serum zinc</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Signal</span>
-              <span class="supp-card__data-value signal--unclear">Monitoring</span>
-            </div>
-          </div>
-        </div>
-        <div class="supp-card__footer">
-          <a href="/discoveries/" class="supp-card__corr-link">See correlation &rarr;</a>
-        </div>
-      </div>
-
-      <!-- Ashwagandha -->
-      <div class="supp-card">
-        <div class="supp-card__header">
-          <div class="supp-card__top">
-            <div class="supp-card__name">Ashwagandha KSM-66</div>
-            <span class="supp-card__dose-badge" data-supp-dose="ashwagandha">600mg</span>
-          </div>
-          <div class="supp-card__meta">
-            <span class="badge badge--timing" data-supp-timing="ashwagandha">Evening</span>
-            <span class="badge badge--rct">Peer-reviewed consensus</span>
-          </div>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">Why I'm taking it</div>
-          <p class="supp-card__rationale">Cortisol modulation and stress-resilience support; KSM-66 extract selected as the most clinically studied form with the largest body of human RCT evidence.</p>
-        </div>
-        <div class="supp-card__section">
-          <div class="supp-card__section-label">What the science says</div>
-          <ul class="supp-card__science">
-            <li>Withania somnifera root extract at 600mg/day (KSM-66) reduces serum cortisol by ~25–28% vs. placebo in chronically stressed adults across multiple double-blind RCTs.</li>
-            <li>Randomized trial (Wankhede et al., 2015) showed significant improvements in muscle recovery, testosterone, and upper/lower body strength vs. placebo over 8 weeks of resistance training.</li>
-            <li>Evening dosing aligns with the goal of attenuating late-day cortisol elevation that impairs sleep onset; half-life is approximately 6–8 hours.</li>
-          </ul>
-        </div>
-        <div class="supp-card__data">
-          <div class="supp-card__section-label">My data</div>
-          <div class="supp-card__data-grid">
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Adherence</span>
-              <span class="supp-card__data-value loading" data-supp-adherence="ashwagandha">Loading&hellip;</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Watching</span>
-              <span class="supp-card__data-value">HRV + sleep</span>
-            </div>
-            <div class="supp-card__data-item">
-              <span class="supp-card__data-label">Signal</span>
-              <span class="supp-card__data-value signal--unclear">Monitoring</span>
-            </div>
-          </div>
-        </div>
-        <div class="supp-card__footer">
-          <a href="/discoveries/" class="supp-card__corr-link">See correlation &rarr;</a>
-        </div>
-      </div>
-
-    </div><!-- /evening cards -->
-  </div><!-- /evening group -->
-
-  <!-- Genome explainer -->
-  <div class="genome-section reveal">
+  <!-- Genome explainer (static — always shown) -->
+  <div class="genome-section reveal" id="supp-genome" style="display:none">
     <div class="genome-section__heading">Why <span>Genome-Informed</span>?</div>
     <p class="genome-section__body">
       Genetic variants affect how you absorb, convert, and utilise nutrients. A 110-SNP analysis
       identified variants in Matthew's genome that directly influence supplementation decisions.
     </p>
-    <div style="display:flex;flex-direction:column;gap:var(--space-4);margin-bottom:var(--space-6);">
-      <div style="display:grid;grid-template-columns:140px 1fr;gap:var(--space-4);font-size:var(--text-xs);border-left:2px solid var(--accent);padding-left:var(--space-4);">
-        <span style="color:var(--accent);font-family:var(--font-mono)">VDR Bsm1</span>
-        <span style="color:var(--text-muted)">Reduces Vitamin D receptor binding efficiency — requires 5,000 IU/day to maintain adequate 25(OH)D. Standard advice (600–2,000 IU) is insufficient for this genotype.</span>
-      </div>
-      <div style="display:grid;grid-template-columns:140px 1fr;gap:var(--space-4);font-size:var(--text-xs);border-left:2px solid var(--accent);padding-left:var(--space-4);">
-        <span style="color:var(--accent);font-family:var(--font-mono)">FADS2 rs1535</span>
-        <span style="color:var(--text-muted)">T-allele impairs conversion of ALA to EPA/DHA (delta-6 desaturase activity reduced ~30%). Pre-formed Omega-3 from fish oil is essential — ALA sources (flaxseed, walnuts) are ineffective for this genotype.</span>
-      </div>
-      <div style="display:grid;grid-template-columns:140px 1fr;gap:var(--space-4);font-size:var(--text-xs);border-left:2px solid var(--border);padding-left:var(--space-4);">
-        <span style="color:var(--accent);font-family:var(--font-mono)">SLC39A4 variant</span>
-        <span style="color:var(--text-muted)">ZIP4 transporter variant reduces intestinal zinc absorption — serum zinc runs low without supplementation despite adequate dietary intake. 30mg zinc gluconate restores serum levels to reference range.</span>
-      </div>
-    </div>
+    <div id="supp-genome-snps" style="display:flex;flex-direction:column;gap:var(--space-4);margin-bottom:var(--space-6);"></div>
     <a href="/biology/" class="genome-section__link">// see full genome data &rarr;</a>
   </div>
 
@@ -1178,14 +731,14 @@
       <div class="footer-v2__heading">The Story</div>
       <a href="/" class="footer-v2__link">Home</a>
       <a href="/story/" class="footer-v2__link">My Story</a>
-      <a href="/about/" class="footer-v2__link">About</a>
+      <a href="/about/" class="footer-v2__link">The Mission</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The Data</div>
       <a href="/live/" class="footer-v2__link">Live</a>
-      <a href="/character/" class="footer-v2__link">Character</a>
+      <a href="/character/" class="footer-v2__link">Character Sheet</a>
       <a href="/habits/" class="footer-v2__link">Habits</a>
-      <a href="/accountability/" class="footer-v2__link">Accountability</a>
+      <a href="/accountability/" class="footer-v2__link">Progress</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The Science</div>
@@ -1201,16 +754,16 @@
       <div class="footer-v2__heading">The Build</div>
       <a href="/platform/" class="footer-v2__link">Platform</a>
       <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
-      <a href="/board/" class="footer-v2__link">Board</a>
+      <a href="/board/" class="footer-v2__link">AI Board</a>
       <a href="/cost/" class="footer-v2__link">Cost</a>
       <a href="/methodology/" class="footer-v2__link">Methodology</a>
       <a href="/tools/" class="footer-v2__link">Tools</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">Follow</div>
-      <a href="/chronicle/" class="footer-v2__link">Chronicle</a>
+      <a href="/chronicle/" class="footer-v2__link">Weekly Journal</a>
       <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
-      <a href="/ask/" class="footer-v2__link">Ask</a>
+      <a href="/ask/" class="footer-v2__link">Ask the Data</a>
       <a href="/rss.xml" class="footer-v2__link">RSS</a>
       <a href="/privacy/" class="footer-v2__link">Privacy</a>
     </div>
@@ -1225,105 +778,207 @@
 (function () {
   'use strict';
 
-  // ── Key maps: data-supp-* attribute values → API supplement keys ───────────
-  // These should match whatever key the /api/supplements endpoint returns.
-  var SUPP_KEY_MAP = {
-    'vitamin-d3':   'vitamin_d3',
-    'creatine':     'creatine',
-    'omega-3':      'omega3',
-    'tongkat-ali':  'tongkat_ali',
-    'nmn':          'nmn',
-    'coq10':        'coq10',
-    'berberine':    'berberine',
-    'magnesium':    'magnesium_glycinate',
-    'zinc':         'zinc',
-    'ashwagandha':  'ashwagandha',
+  // ── Group display order and labels ──────────────────────────────────────────
+  var GROUP_ORDER  = ['Foundation', 'Sleep Stack', 'Recovery+Performance', 'Longevity+Metabolic', 'Nutrition+Glucose', 'Experimental'];
+  var GROUP_LABELS = {
+    'Foundation':          'Foundation',
+    'Sleep Stack':         'Sleep Stack',
+    'Recovery+Performance':'Recovery + Performance',
+    'Longevity+Metabolic': 'Longevity + Metabolic',
+    'Nutrition+Glucose':   'Nutrition + Glucose',
+    'Experimental':        'Experimental',
   };
 
-  function formatAdherence(pct) {
-    if (pct === null || pct === undefined) return '—';
+  // ── Evidence tier → badge class + label ────────────────────────────────────
+  var TIER_BADGE = {
+    'strong':       { cls: 'badge--strong',       label: 'Strong' },
+    'emerging':     { cls: 'badge--emerging',      label: 'Emerging' },
+    'general':      { cls: 'badge--general',       label: 'General' },
+    'experimental': { cls: 'badge--experimental',  label: 'Experimental' },
+  };
+
+  // ── Signal → CSS class + label ──────────────────────────────────────────────
+  var SIGNAL_MAP = {
+    'positive': { cls: 'signal--positive', label: 'Positive' },
+    'none':     { cls: 'signal--none',     label: 'None yet' },
+    'unclear':  { cls: 'signal--unclear',  label: 'Monitoring' },
+  };
+
+  function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function fmtTiming(t) {
+    return (t || '').replace(/_/g,' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+  }
+
+  function fmtAdherence(pct) {
+    if (pct === null || pct === undefined) return 'via habit group';
     return Math.round(pct) + '%';
   }
 
-  function hydrate(data) {
-    var supps = {};
-    // Support both array and object shapes from the API
-    if (Array.isArray(data.supplements)) {
-      data.supplements.forEach(function(s) {
-        var k = (s.key || s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
-        supps[k] = s;
-      });
-    } else if (data.supplements && typeof data.supplements === 'object') {
-      supps = data.supplements;
-    }
+  function renderCard(s) {
+    var dose      = s.dose ? esc(s.dose) + (s.unit ? ' ' + esc(s.unit) : '') : '—';
+    var timing    = fmtTiming(s.timing);
+    var tier      = TIER_BADGE[s.evidence_tier] || TIER_BADGE['general'];
+    var snpBadge  = s.genome_snp
+      ? '<span class="badge badge--snp">' + esc(s.genome_snp) + '</span>'
+      : '';
+    var adherence = fmtAdherence(s.adherence_pct !== undefined ? s.adherence_pct : s.adherence);
+    var sig       = SIGNAL_MAP[s.signal] || { cls: 'signal--unclear', label: '—' };
+    var sciItems  = (s.science_points || []).map(function(p){
+      return '<li>' + esc(p) + '</li>';
+    }).join('');
+    var corr = s.linked_experiment_id
+      ? '<a href="/experiments/?id=' + esc(s.linked_experiment_id) + '" class="supp-card__corr-link">See experiment &rarr;</a>'
+      : '<a href="/discoveries/" class="supp-card__corr-link">See correlation &rarr;</a>';
 
-    // Update stat-total if API returns count
-    if (data.total_count) {
-      var el = document.getElementById('stat-total');
-      if (el) el.textContent = data.total_count;
-    }
+    return [
+      '<div class="supp-card">',
+      '  <div class="supp-card__header">',
+      '    <div class="supp-card__top">',
+      '      <div class="supp-card__name">' + esc(s.name) + '</div>',
+      '      <span class="supp-card__dose-badge">' + dose + '</span>',
+      '    </div>',
+      '    <div class="supp-card__meta">',
+      '      <span class="badge badge--timing">' + esc(timing) + '</span>',
+      '      <span class="badge ' + tier.cls + '">' + tier.label + '</span>',
+      snpBadge,
+      '    </div>',
+      '  </div>',
+      '  <div class="supp-card__section">',
+      '    <div class="supp-card__section-label">Why I\'m taking it</div>',
+      '    <p class="supp-card__rationale">' + esc(s.rationale || '') + '</p>',
+      '  </div>',
+      '  <div class="supp-card__section">',
+      '    <div class="supp-card__section-label">What the science says</div>',
+      '    <ul class="supp-card__science">' + sciItems + '</ul>',
+      '  </div>',
+      '  <div class="supp-card__data">',
+      '    <div class="supp-card__section-label">My data</div>',
+      '    <div class="supp-card__data-grid">',
+      '      <div class="supp-card__data-item">',
+      '        <span class="supp-card__data-label">Adherence</span>',
+      '        <span class="supp-card__data-value">' + esc(adherence) + '</span>',
+      '      </div>',
+      '      <div class="supp-card__data-item">',
+      '        <span class="supp-card__data-label">Watching</span>',
+      '        <span class="supp-card__data-value">' + esc(s.watching || '—') + '</span>',
+      '      </div>',
+      '      <div class="supp-card__data-item">',
+      '        <span class="supp-card__data-label">Signal</span>',
+      '        <span class="supp-card__data-value ' + sig.cls + '">' + sig.label + '</span>',
+      '      </div>',
+      '    </div>',
+      '  </div>',
+      '  <div class="supp-card__footer">' + corr + '</div>',
+      '</div>',
+    ].join('\n');
+  }
 
-    // Update dose badges
-    document.querySelectorAll('[data-supp-dose]').forEach(function(el) {
-      var slug = el.getAttribute('data-supp-dose');
-      var key  = SUPP_KEY_MAP[slug];
-      var s    = key && supps[key];
-      if (s && s.dose) {
-        el.textContent = s.dose + (s.unit ? ' ' + s.unit : '');
-      }
+  function renderGroups(supps) {
+    // Group supplements by purpose_group
+    var groups = {};
+    supps.forEach(function(s) {
+      var g = s.purpose_group || 'Other';
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(s);
     });
 
-    // Update timing badges
-    document.querySelectorAll('[data-supp-timing]').forEach(function(el) {
-      var slug = el.getAttribute('data-supp-timing');
-      var key  = SUPP_KEY_MAP[slug];
-      var s    = key && supps[key];
-      if (s && s.timing) {
-        el.textContent = s.timing.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
-      }
+    // Render in GROUP_ORDER, appending any unseen groups at the end
+    var order = GROUP_ORDER.slice();
+    Object.keys(groups).forEach(function(g){ if (order.indexOf(g) === -1) order.push(g); });
+
+    var html = '';
+    order.forEach(function(g) {
+      var items = groups[g];
+      if (!items || items.length === 0) return;
+      var label = GROUP_LABELS[g] || g;
+      html += '<div class="timing-group reveal">';
+      html += '<div class="timing-group__heading">';
+      html += '<span class="timing-group__label">// ' + esc(label) + '</span>';
+      html += '<span class="timing-group__count">' + items.length + (items.length === 1 ? ' item' : ' items') + '</span>';
+      html += '</div>';
+      html += '<div class="timing-group__cards">';
+      items.forEach(function(s){ html += renderCard(s); });
+      html += '</div></div>';
+    });
+    return html;
+  }
+
+  function updateStats(supps) {
+    var total      = supps.length;
+    var strongCnt  = supps.filter(function(s){ return s.evidence_tier === 'strong'; }).length;
+    var emergCnt   = supps.filter(function(s){ return s.evidence_tier === 'emerging'; }).length;
+    var expCnt     = supps.filter(function(s){ return s.evidence_tier === 'experimental'; }).length;
+    var el;
+    if ((el = document.getElementById('stat-total')))   el.textContent = total;
+    if ((el = document.getElementById('stat-strong')))  el.textContent = strongCnt;
+    if ((el = document.getElementById('stat-emerging'))) el.textContent = emergCnt;
+    if ((el = document.getElementById('stat-exp')))     el.textContent = expCnt;
+  }
+
+  function renderGenomeSNPs(supps) {
+    // Build genome section dynamically from SNP-tagged supplements
+    var genomeSups = supps.filter(function(s){ return s.genome_snp; });
+    if (!genomeSups.length) return;
+
+    var SNP_NOTES = {
+      'VDR Bsm1':      'Reduces Vitamin D receptor binding efficiency — requires 5,000 IU/day to maintain adequate 25(OH)D. Standard advice (600–2,000 IU) is insufficient for this genotype.',
+      'FADS2 rs1535':  'T-allele impairs conversion of ALA to EPA/DHA (delta-6 desaturase activity reduced ~30%). Pre-formed Omega-3 from fish oil is essential — ALA sources (flaxseed, walnuts) are ineffective for this genotype.',
+      'SLC39A4 variant':'ZIP4 transporter variant reduces intestinal zinc absorption — serum zinc runs low without supplementation despite adequate dietary intake. 30mg zinc gluconate restores serum levels to reference range.',
+    };
+
+    var html = '';
+    genomeSups.forEach(function(s) {
+      var snp  = s.genome_snp;
+      var note = SNP_NOTES[snp] || ('Genome variant affecting ' + s.name + ' metabolism.');
+      var bdr  = snp === 'SLC39A4 variant' ? 'var(--border)' : 'var(--accent)';
+      html += '<div style="display:grid;grid-template-columns:140px 1fr;gap:var(--space-4);font-size:var(--text-xs);border-left:2px solid ' + bdr + ';padding-left:var(--space-4);">';
+      html += '<span style="color:var(--accent);font-family:var(--font-mono)">' + esc(snp) + '</span>';
+      html += '<span style="color:var(--text-muted)">' + esc(note) + '</span>';
+      html += '</div>';
     });
 
-    // Update adherence values
-    // Compute timing split counts for stats
-    var morningCount = 0, eveningCount = 0, withMealsCount = 0;
-    document.querySelectorAll('[data-supp-adherence]').forEach(function(el) {
-      var slug = el.getAttribute('data-supp-adherence');
-      var key  = SUPP_KEY_MAP[slug];
-      var s    = key && supps[key];
-      el.classList.remove('loading');
-      if (s && (s.adherence_pct !== undefined || s.adherence !== undefined)) {
-        el.textContent = formatAdherence(s.adherence_pct !== undefined ? s.adherence_pct : s.adherence);
-      } else {
-        // Adherence not tracked per-supplement — show honest message
-        el.textContent = 'via habit group';
-        el.style.fontStyle = 'normal';
-      }
-    });
-    // Compute timing split
-    document.querySelectorAll('[data-supp-timing]').forEach(function(el) {
-      var timing = el.textContent.toLowerCase();
-      if (timing.indexOf('morning') !== -1) morningCount++;
-      else if (timing.indexOf('evening') !== -1) eveningCount++;
-      else if (timing.indexOf('meal') !== -1) withMealsCount++;
-    });
-    // Update timing stat sub-text if element exists
-    var timingStatEl = document.getElementById('stat-timing-split');
-    if (timingStatEl) timingStatEl.textContent = morningCount + 'am / ' + withMealsCount + 'meals / ' + eveningCount + 'pm';
+    var container = document.getElementById('supp-genome-snps');
+    if (container) container.innerHTML = html;
+    var section = document.getElementById('supp-genome');
+    if (section) { section.style.display = ''; section.classList.add('is-visible'); }
   }
 
   async function load() {
     try {
-      var res  = await fetch('/api/supplements');
+      var API  = 'https://averagejoematt.com';
+      var res  = await fetch(API + '/api/supplements');
       if (!res.ok) throw new Error('HTTP ' + res.status);
       var data = await res.json();
-      hydrate(data);
+      var supps = Array.isArray(data.supplements) ? data.supplements : [];
+
+      // Update stats
+      updateStats(supps);
+
+      // Render grouped cards
+      var groupsEl = document.getElementById('supp-groups');
+      if (groupsEl) {
+        groupsEl.innerHTML = renderGroups(supps);
+        groupsEl.style.display = '';
+        // Reveal dynamically injected .reveal elements immediately
+        groupsEl.querySelectorAll('.reveal').forEach(function(el) { el.classList.add('is-visible'); });
+      }
+
+      // Render genome section
+      renderGenomeSNPs(supps);
+
+      // Hide skeleton
+      var skel = document.getElementById('supp-skeleton');
+      if (skel) skel.style.display = 'none';
+
     } catch (e) {
-      console.warn('[supplements] API error — showing static content:', e);
-      // Clear loading states gracefully
-      document.querySelectorAll('[data-supp-adherence]').forEach(function(el) {
-        el.classList.remove('loading');
-        el.textContent = 'via habit group';
-      });
+      console.warn('[supplements] API error:', e);
+      var skel = document.getElementById('supp-skeleton');
+      if (skel) skel.style.display = 'none';
+      var err = document.getElementById('supp-error');
+      if (err) err.style.display = '';
     }
   }
 
