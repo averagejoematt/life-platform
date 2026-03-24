@@ -116,7 +116,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install test dependencies
-        run: pip install pytest
+        run: pip install pytest boto3 botocore
 
       - name: Run unit tests
         run: |
