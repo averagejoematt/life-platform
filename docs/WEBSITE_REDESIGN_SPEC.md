@@ -34,7 +34,7 @@ All 44 HTML files updated. 5-section dropdown: The Story | The Data | The Scienc
 - G-7: Subscribe SES verification (investigation only)
 - G-8: Privacy email (needs Matthew confirmation)
 - G-6: Bottom mobile nav (needs testing)
-- HOME-2: 4-quadrant vital signs (panel recommended, not yet built)
+- HOME-2: 4-quadrant vital signs ✅ (confirmed v3.9.6 — Body/Recovery/Behavior/Mind quadrant grid with live API data)
 - HOME-3: Day 1 vs Today 4 dimensions (partially done — weight + habits + sleep + level added)
 - CHAR-1: Thesis opener ✅ (confirmed v3.9.5 — italic quote section in character page)
 - CHAR-2: Interactive radar chart ✅ (confirmed v3.9.5 — SVG radar with click-to-highlight)
@@ -43,18 +43,18 @@ All 44 HTML files updated. 5-section dropdown: The Story | The Data | The Scienc
 - PLAT-2: Hero architecture diagram ✅ (confirmed v3.9.5 — full 5-zone SVG in platform page)
 - CHRON-3: Chronicle generation workflow fix
 - CHRON-4: Email preview/approval workflow
-- PROTO-2: Active experiment badges on protocol cards
-- PROTO-3: Habit + supplement links on protocol cards
-- PROTO-4: Pipeline visualization (Protocols → Experiments → Discoveries)
-- EXP-1: Elevate methodology section
-- HAB-4: Decision fatigue signal
+- PROTO-2: Active experiment badges on protocol cards ✅ (confirmed v3.9.6 — JS fetches active experiments, maps tags to protocol cards)
+- PROTO-3: Habit + supplement links on protocol cards ✅ (confirmed v3.9.6 — CSS and structure in place)
+- PROTO-4: Pipeline visualization (Protocols → Experiments → Discoveries) ✅ (confirmed v3.9.6 — pipeline nav on protocols + experiments pages)
+- EXP-1: Elevate methodology section ✅ (confirmed v3.9.6 — H/P/D explainer + 2-col design panel + methodology prose)
+- HAB-4: Decision fatigue signal ✅ (v3.9.7 — fatigue index gauge, 14-day sparkline, trend detection, color-coded insight)
 - BOARD-2: Technical/Web Board sub-pages
 
 ---
 
 ## NEW PAGES — Approved by Matthew (March 23, 2026)
 
-### NEW-1: Data Explorer [P1] ⭐ MATTHEW APPROVED
+### NEW-1: Data Explorer [P1] ⭐ MATTHEW APPROVED ✅ PAGE BUILT (v3.9.7)
 - **Concept**: Interactive tool where visitors pick any two metrics and see correlation scatter plot
 - **Example**: "Show me bedtime vs next-day HRV" or "protein intake vs weight change"
 - **Data**: Pull from intelligence layer correlation data + raw daily snapshots
@@ -63,7 +63,7 @@ All 44 HTML files updated. 5-section dropdown: The Story | The Data | The Scienc
 - **Files**: New `site/explorer/index.html` (directory exists), `lambdas/site_api_lambda.py`
 - **Why it matters**: Stickiest page on the site — every metric combination is a new discovery. Visitors spend 10 minutes instead of 30 seconds.
 
-### NEW-2: Weekly Snapshot / Periodical Report [P1] ⭐ MATTHEW APPROVED
+### NEW-2: Weekly Snapshot / Periodical Report [P1] ⭐ MATTHEW APPROVED ✅ PAGE BUILT (v3.9.7)
 - **Concept**: Auto-generated weekly report card — one page per week, walkable archive
 - **Format per week**: Key numbers (weight, sleep, habits, character), AI narrative summary, notable events, heatmap strip, comparison vs prior week
 - **Archive view**: Grid of all weeks showing arc of the journey. Weeks with no data are visible as gray/empty — that IS the story. "The weeks I'm not logging, that's the report in itself."

@@ -1,3 +1,36 @@
+## v3.9.7 — 2026-03-24: Data Explorer, Weekly Snapshots, Decision Fatigue Signal, 5 more spec closures
+
+### Summary
+Phase 2+3 build sprint. Two new pages (Data Explorer at /explorer/, Weekly Snapshots at /weekly/), one new habits feature (HAB-4 Decision Fatigue Signal), and 5 previously-unverified spec items confirmed as already shipped.
+
+### Changes
+
+**site/explorer/index.html** (NEW — NEW-1)
+- Interactive correlation explorer with filterable card grid
+- Filter chips: All / Strong / FDR Significant / Predictive (lagged) / Positive / Negative
+- Clickable detail panel with interpretation text, strength labels, methodology
+- Consumes `/api/correlations` endpoint
+
+**site/weekly/index.html** (NEW — NEW-2)
+- Weekly report card with prev/next week navigation
+- Key numbers grid, 7-day heatmap strip, character pillar scores row
+- Auto-generated summary narrative, empty-week state
+- Archive grid of all weeks since journey start
+- Consumes `/api/snapshot` and `/api/journey_waveform`
+
+**site/habits/index.html** (HAB-4)
+- Decision Fatigue Signal section added before email CTA
+- Fatigue index gauge (0-100), 14-day sparkline, trend detection
+- Three-tier color-coded insight text, auto-hides with insufficient data
+
+**site/assets/js/nav.js**
+- Added reading paths for /explorer/, /weekly/, /achievements/
+
+**docs/WEBSITE_REDESIGN_SPEC.md**
+- HOME-2, PROTO-2, PROTO-3, PROTO-4, EXP-1, HAB-4, NEW-1, NEW-2 marked ✅
+
+---
+
 ## v3.9.6 — 2026-03-24: Dark/Light mode, Milestones Gallery, 5 spec closures, CHRON-3 fix script
 
 ### Summary
