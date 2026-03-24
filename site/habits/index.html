@@ -1370,6 +1370,39 @@
 
 </div>
 
+<!-- HAB-4: Decision Fatigue Signal -->
+<div id="fatigue-section" class="reveal" style="display:none;max-width:var(--max-width);margin:0 auto;padding:var(--space-10) var(--page-padding);">
+  <div style="border:1px solid var(--border);background:var(--surface);overflow:hidden;">
+    <div style="padding:var(--space-5) var(--space-6);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-family:var(--font-mono);font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-400);">// Decision Fatigue Signal</div>
+      <div id="fatigue-badge" style="font-family:var(--font-mono);font-size:var(--text-2xs);padding:2px var(--space-3);border:1px solid var(--border);color:var(--text-muted);letter-spacing:var(--ls-label);"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:var(--space-6);padding:var(--space-6);align-items:center;">
+      <!-- Fatigue gauge -->
+      <div style="text-align:center;">
+        <div id="fatigue-score" style="font-family:var(--font-display);font-size:48px;letter-spacing:var(--ls-display);line-height:1;color:var(--accent);">—</div>
+        <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-top:var(--space-2);">fatigue index</div>
+        <div style="margin-top:var(--space-3);height:4px;background:var(--surface-raised);overflow:hidden;">
+          <div id="fatigue-bar" style="height:100%;background:var(--accent);transition:width 1s var(--ease-out);width:0%;"></div>
+        </div>
+      </div>
+      <!-- Insight -->
+      <div>
+        <div id="fatigue-insight" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-mono);"></div>
+        <div id="fatigue-detail" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);margin-top:var(--space-3);line-height:var(--lh-mono);"></div>
+      </div>
+    </div>
+    <!-- 14-day fatigue sparkline -->
+    <div style="padding:0 var(--space-6) var(--space-5);">
+      <div id="fatigue-sparkline" style="display:flex;gap:2px;height:20px;align-items:flex-end;"></div>
+      <div style="display:flex;justify-content:space-between;margin-top:var(--space-1);">
+        <span style="font-size:9px;color:var(--text-faint);font-family:var(--font-mono);">14 days ago</span>
+        <span style="font-size:9px;color:var(--text-faint);font-family:var(--font-mono);">today</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Email CTA -->
 <section class="email-cta-footer reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface);text-align:center;">
   <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
@@ -2104,11 +2137,77 @@
       }
 
       hydrate(data);
+      buildFatigueSignal(data);
     } catch(e) {
       console.warn('[habits] API error:', e);
       document.getElementById('hab-skeleton').style.display = 'none';
       document.getElementById('hab-empty').style.display = 'block';
     }
+  }
+
+  // ── HAB-4: Decision Fatigue Signal ────────────────────────────────────────
+  function buildFatigueSignal(data) {
+    var section = document.getElementById('fatigue-section');
+    if (!section) return;
+    var history = data.history || [];
+    if (history.length < 7) return; // Need at least a week of data
+
+    // Take last 14 days
+    var recent = history.slice(-14);
+    var pcts = recent.map(function(d) { return d.tier0_pct || 0; });
+
+    // Fatigue index: inverse of recent consistency (100 = max fatigue)
+    // Low completion days (< 50%) count as fatigue days
+    var fatigueDays = pcts.filter(function(p) { return p < 50; }).length;
+    var avgPct = pcts.reduce(function(a, b) { return a + b; }, 0) / pcts.length;
+    var fatigueIndex = Math.round(100 - avgPct);
+
+    // Trend: compare first half vs second half
+    var mid = Math.floor(pcts.length / 2);
+    var firstHalf = pcts.slice(0, mid);
+    var secondHalf = pcts.slice(mid);
+    var firstAvg = firstHalf.reduce(function(a, b) { return a + b; }, 0) / firstHalf.length;
+    var secondAvg = secondHalf.reduce(function(a, b) { return a + b; }, 0) / secondHalf.length;
+    var trending = secondAvg > firstAvg + 5 ? 'improving' : secondAvg < firstAvg - 5 ? 'declining' : 'stable';
+
+    // Color based on fatigue level
+    var color = fatigueIndex <= 25 ? 'var(--accent)' : fatigueIndex <= 50 ? 'var(--c-amber-400)' : 'var(--c-red-status)';
+    var barColor = color;
+    var status = fatigueIndex <= 25 ? 'Low' : fatigueIndex <= 50 ? 'Moderate' : 'Elevated';
+
+    document.getElementById('fatigue-score').textContent = fatigueIndex;
+    document.getElementById('fatigue-score').style.color = color;
+    document.getElementById('fatigue-bar').style.width = fatigueIndex + '%';
+    document.getElementById('fatigue-bar').style.background = barColor;
+    document.getElementById('fatigue-badge').textContent = status + ' \u00b7 ' + trending;
+
+    // Insight text
+    var insight = '';
+    if (fatigueIndex <= 25) {
+      insight = '<strong style="color:var(--text)">Habits are holding strong.</strong> ' + Math.round(avgPct) + '% average T0 completion over 14 days. Low decision fatigue \u2014 the system is working.';
+    } else if (fatigueIndex <= 50) {
+      insight = '<strong style="color:var(--text)">Moderate fatigue detected.</strong> ' + fatigueDays + ' days below 50% completion in the last 14 days. Average: ' + Math.round(avgPct) + '%. Watch for cascading drops.';
+    } else {
+      insight = '<strong style="color:var(--text)">Decision fatigue is elevated.</strong> ' + fatigueDays + ' fatigue days in 14. Average completion: ' + Math.round(avgPct) + '%. Consider simplifying \u2014 drop to T0-only focus until the streak rebuilds.';
+    }
+    document.getElementById('fatigue-insight').innerHTML = insight;
+
+    // Trend detail
+    var trendText = trending === 'improving' ? '\u2191 Completion trending up \u2014 fatigue may be resolving.'
+      : trending === 'declining' ? '\u2193 Completion trending down \u2014 fatigue building. Intervene early.'
+      : '\u2192 Completion stable over the last 14 days.';
+    document.getElementById('fatigue-detail').textContent = trendText;
+
+    // Sparkline
+    var sparkline = document.getElementById('fatigue-sparkline');
+    var maxPct = 100;
+    sparkline.innerHTML = pcts.map(function(p, i) {
+      var h = Math.max(2, Math.round((p / maxPct) * 20));
+      var c = p >= 80 ? 'var(--accent)' : p >= 50 ? 'var(--c-amber-400)' : 'var(--c-red-status)';
+      return '<div style="flex:1;height:' + h + 'px;background:' + c + ';opacity:0.8;" title="' + (recent[i] ? recent[i].date : '') + ': ' + p + '%"></div>';
+    }).join('');
+
+    section.style.display = '';
   }
 
   document.addEventListener('DOMContentLoaded', load);

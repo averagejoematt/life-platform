@@ -4,455 +4,430 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Cross-source correlation explorer — what actually predicts what in one person's health data.">
+  <meta name="description" content="Data Explorer — pick any two metrics and discover correlations across 19 data sources.">
+  <meta property="og:title" content="Data Explorer — Matthew Walker">
+  <meta property="og:description" content="Interactive correlation explorer. Pick two metrics. See the signal.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Correlation Explorer — Matthew Walker">
-  <meta name="twitter:description" content="23 cross-source correlations. FDR corrected. What actually predicts what in one person's health data.">
-  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <meta property="og:title" content="Correlation Explorer — Matthew Walker">
-  <meta property="og:description" content="23 cross-source correlations. FDR corrected. What actually predicts what in one person's health data.">
   <meta property="og:type" content="website">
-  <title>Correlation Explorer — Matthew Walker</title>
-    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <title>Data Explorer — Matthew Walker</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <meta name="theme-color" content="#080c0a">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    .page-header { padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12); border-bottom: 1px solid var(--border); max-width: var(--max-width); margin: 0 auto; }
-    .page-header__title { font-family: var(--font-display); font-size: var(--text-h1); line-height: var(--lh-display); letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-4); }
-    .page-header__title span { color: var(--accent); }
-    .page-header__sub { font-family: var(--font-mono); font-size: var(--text-base); color: var(--text-muted); max-width: 600px; line-height: var(--lh-body); }
+    .exp-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--max-width); margin: 0 auto;
+    }
+    .exp-header__kicker { margin-bottom: var(--space-4); }
+    .exp-header__title {
+      font-family: var(--font-display); font-size: var(--text-h1);
+      line-height: var(--lh-display); letter-spacing: var(--ls-display); color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .exp-header__title span { color: var(--accent); }
+    .exp-header__sub {
+      font-family: var(--font-mono); font-size: var(--text-base);
+      color: var(--text-muted); line-height: var(--lh-body); max-width: 600px;
+    }
 
-    .explainer { max-width: var(--max-width); margin: 0 auto; padding: var(--space-8) var(--page-padding); display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
-    .explainer__item { background: var(--bg); padding: var(--space-6); }
-    .explainer__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-2); }
-    .explainer__value { font-family: var(--font-display); font-size: 32px; color: var(--accent); line-height: 1; }
-    .explainer__note { font-size: var(--text-2xs); color: var(--text-faint); margin-top: var(--space-2); }
+    /* Stats strip */
+    .exp-stats { display: flex; gap: var(--space-8); margin-top: var(--space-8); flex-wrap: wrap; }
+    .exp-stat { border-left: 2px solid var(--accent); padding-left: var(--space-4); }
+    .exp-stat__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-1); }
+    .exp-stat__value { font-family: var(--font-display); font-size: 28px; color: var(--text); letter-spacing: var(--ls-display); }
 
-    .controls { max-width: var(--max-width); margin: 0 auto; padding: var(--space-6) var(--page-padding); display: flex; gap: var(--space-4); flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--border); }
-    .filter-btn { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--ls-label); text-transform: uppercase; padding: var(--space-2) var(--space-4); border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; transition: all var(--dur-fast); background: transparent; }
-    .filter-btn.active, .filter-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg-subtle); }
+    /* Explorer body */
+    .explorer-body { max-width: var(--max-width); margin: 0 auto; padding: var(--space-10) var(--page-padding) var(--space-20); }
 
-    .pairs-grid { max-width: var(--max-width); margin: 0 auto; padding: var(--space-8) var(--page-padding); display: grid; gap: var(--space-4); }
+    /* Correlation cards grid */
+    .corr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--space-4); }
 
-    .pair-card { display: grid; grid-template-columns: 1fr 120px 1fr 60px; gap: var(--space-4); align-items: center; padding: var(--space-5) var(--space-6); border: 1px solid var(--border-subtle); background: var(--surface); transition: border-color var(--dur-fast); }
-    .pair-card:hover { border-color: var(--accent); }
-    .pair-card.fdr { border-left: 3px solid var(--accent); }
+    .corr-card {
+      border: 1px solid var(--border); background: var(--surface);
+      transition: border-color var(--dur-fast); cursor: pointer; position: relative; overflow: hidden;
+    }
+    .corr-card:hover { border-color: var(--accent-dim); }
+    .corr-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--bar-color, var(--accent)) 0%, transparent 100%);
+    }
+    .corr-card__header { padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--border-subtle); }
+    .corr-card__pair {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text); line-height: var(--lh-mono);
+    }
+    .corr-card__pair em { color: var(--accent); font-style: normal; }
+    .corr-card__body { display: grid; grid-template-columns: auto 1fr; gap: var(--space-6); padding: var(--space-5) var(--space-6); align-items: center; }
+    .corr-card__r {
+      font-family: var(--font-display); font-size: 48px; line-height: 1;
+      letter-spacing: var(--ls-display); min-width: 90px; text-align: center;
+    }
+    .corr-card__r.positive { color: var(--accent); }
+    .corr-card__r.negative { color: #ff5252; }
+    .corr-card__r.weak { color: var(--text-muted); }
+    .corr-card__meta { display: flex; flex-direction: column; gap: var(--space-2); }
+    .corr-meta-row {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-label); color: var(--text-muted);
+    }
+    .corr-meta-row strong { color: var(--text); }
 
-    .pair-card__var { font-size: var(--text-sm); color: var(--text); }
-    .pair-card__source { font-size: var(--text-2xs); color: var(--text-faint); text-transform: uppercase; letter-spacing: var(--ls-tag); margin-top: 2px; }
+    /* Strength bar */
+    .strength-bar { height: 3px; background: var(--surface-raised); margin-top: var(--space-2); overflow: hidden; }
+    .strength-bar__fill { height: 100%; transition: width 0.8s var(--ease-out); }
 
-    .pair-card__r { text-align: center; }
-    .pair-card__rval { font-family: var(--font-display); font-size: 36px; line-height: 1; }
-    .pair-card__rval.pos { color: var(--accent); }
-    .pair-card__rval.neg { color: var(--c-red-status); }
-    .pair-card__rval.weak { color: var(--text-faint); }
-    .pair-card__rlabel { font-size: var(--text-2xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: var(--ls-tag); margin-top: 2px; }
+    /* Filters */
+    .filter-row { display: flex; gap: var(--space-2); margin-bottom: var(--space-8); flex-wrap: wrap; }
+    .filter-chip {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      padding: var(--space-2) var(--space-4); border: 1px solid var(--border);
+      color: var(--text-muted); background: transparent; cursor: pointer;
+      transition: all var(--dur-fast);
+    }
+    .filter-chip:hover, .filter-chip.active {
+      border-color: var(--accent); color: var(--accent); background: var(--accent-bg-subtle);
+    }
 
-    .pair-card__n { font-size: var(--text-xs); color: var(--text-faint); text-align: right; }
+    /* Detail panel */
+    .detail-panel {
+      border: 1px solid var(--accent); background: var(--surface);
+      padding: var(--space-8); margin-bottom: var(--space-8);
+      display: none; position: relative;
+    }
+    .detail-panel::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--accent) 0%, var(--accent-dim) 50%, transparent 100%);
+    }
+    .detail-panel.is-open { display: block; }
+    .detail-close {
+      position: absolute; top: var(--space-4); right: var(--space-4);
+      background: none; border: none; color: var(--text-muted); cursor: pointer;
+      font-size: 20px; line-height: 1;
+    }
+    .detail-title {
+      font-family: var(--font-display); font-size: var(--text-h3);
+      letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-6);
+    }
+    .detail-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); }
+    .detail-cell { background: var(--surface); padding: var(--space-4) var(--space-5); }
+    .detail-cell__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-1); }
+    .detail-cell__value { font-family: var(--font-display); font-size: 24px; color: var(--text); letter-spacing: var(--ls-display); }
+    .detail-interpretation {
+      margin-top: var(--space-6); padding: var(--space-5);
+      border-left: 3px solid var(--accent); background: var(--accent-bg-subtle);
+      font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); line-height: var(--lh-mono);
+    }
+    .detail-interpretation strong { color: var(--text); }
 
-    .pair-card__bar { grid-column: 1 / -1; height: 4px; background: var(--surface-raised); margin-top: var(--space-1); overflow: hidden; position: relative; }
-    .pair-card__barfill { position: absolute; top: 0; height: 100%; transition: width var(--dur-slow) var(--ease-out); }
+    /* Scatter canvas container */
+    .scatter-container { margin-top: var(--space-6); border: 1px solid var(--border-subtle); padding: var(--space-4); background: var(--bg); }
+    .scatter-container canvas { width: 100%; height: 220px; }
 
-    .methodology { max-width: var(--max-width); margin: 0 auto; padding: var(--space-10) var(--page-padding); border-top: 1px solid var(--border); }
-    .methodology h3 { font-family: var(--font-display); font-size: var(--text-h3); color: var(--text); margin-bottom: var(--space-4); }
-    .methodology p { font-size: var(--text-sm); color: var(--text-muted); line-height: var(--lh-body); max-width: var(--prose-width); margin-bottom: var(--space-4); }
+    /* Methodology note */
+    .meth-note {
+      margin-top: var(--space-10); padding: var(--space-6);
+      border: 1px solid var(--border-subtle); background: var(--surface);
+    }
+    .meth-note__heading {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--accent-dim); margin-bottom: var(--space-4);
+    }
+    .meth-note__text {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text-muted); line-height: var(--lh-mono);
+    }
+    .meth-note__text strong { color: var(--text); }
 
-    .loading { text-align: center; padding: var(--space-16); color: var(--text-muted); }
+    /* Loading */
+    .loading-pulse { animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
 
     @media (max-width: 768px) {
-      .explainer { grid-template-columns: 1fr; }
-      .pair-card { grid-template-columns: 1fr 80px; }
-      .pair-card__var:nth-child(3) { grid-column: 1; }
-      .pair-card__n { grid-column: 2; grid-row: 2; }
+      .corr-grid { grid-template-columns: 1fr; }
+      .detail-grid { grid-template-columns: 1fr 1fr; }
     }
   </style>
 </head>
 <body>
 
-  <nav class="nav">
+<nav class="nav">
   <a href="/" class="nav__brand">AJM</a>
   <div class="nav__links">
-    <div class="nav__dropdown">
-      <button class="nav__dropdown-btn">The Story</button>
-      <div class="nav__dropdown-menu">
-        <a href="/story/" class="nav__dropdown-item">My Story</a>
-        <a href="/about/" class="nav__dropdown-item">The Mission</a>
-      </div>
-    </div>
-    <div class="nav__dropdown">
-      <button class="nav__dropdown-btn">The Data</button>
-      <div class="nav__dropdown-menu">
-        <a href="/live/" class="nav__dropdown-item">Live</a>
-        <a href="/character/" class="nav__dropdown-item">Character Sheet</a>
-        <a href="/habits/" class="nav__dropdown-item">Habits</a>
-        <a href="/accountability/" class="nav__dropdown-item">Progress</a>
-        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
-        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
-        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
-        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
-      </div>
-    </div>
-    <div class="nav__dropdown">
-      <button class="nav__dropdown-btn">The Science</button>
-      <div class="nav__dropdown-menu">
-        <a href="/protocols/" class="nav__dropdown-item">Protocols</a>
-        <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
-        <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
-      </div>
-    </div>
-    <div class="nav__dropdown">
-      <button class="nav__dropdown-btn">The Build</button>
-      <div class="nav__dropdown-menu">
-        <a href="/platform/" class="nav__dropdown-item">Platform</a>
-        <a href="/intelligence/" class="nav__dropdown-item">Intelligence</a>
-        <a href="/board/" class="nav__dropdown-item">AI Board</a>
-        <a href="/cost/" class="nav__dropdown-item">Cost</a>
-        <a href="/methodology/" class="nav__dropdown-item">Methodology</a>
-        <a href="/tools/" class="nav__dropdown-item">Tools</a>
-      </div>
-    </div>
-    <div class="nav__dropdown">
-      <button class="nav__dropdown-btn">Follow</button>
-      <div class="nav__dropdown-menu">
-        <a href="/chronicle/" class="nav__dropdown-item">Weekly Journal</a>
-        <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
-        <a href="/ask/" class="nav__dropdown-item">Ask the Data</a>
-      </div>
-    </div>
-    <a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>
+    <div class="nav__dropdown"><button class="nav__dropdown-btn">The Story</button><div class="nav__dropdown-menu"><a href="/story/" class="nav__dropdown-item">My Story</a><a href="/about/" class="nav__dropdown-item">The Mission</a></div></div>
+    <div class="nav__dropdown is-active"><button class="nav__dropdown-btn">The Data</button><div class="nav__dropdown-menu"><a href="/live/" class="nav__dropdown-item">Live</a><a href="/character/" class="nav__dropdown-item">Character Sheet</a><a href="/habits/" class="nav__dropdown-item">Habits</a><a href="/accountability/" class="nav__dropdown-item">Progress</a><a href="/sleep/" class="nav__dropdown-item">Sleep</a><a href="/glucose/" class="nav__dropdown-item">Glucose</a><a href="/supplements/" class="nav__dropdown-item">Supplements</a><a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a><a href="/explorer/" class="nav__dropdown-item active">Data Explorer</a></div></div>
+    <div class="nav__dropdown"><button class="nav__dropdown-btn">The Science</button><div class="nav__dropdown-menu"><a href="/protocols/" class="nav__dropdown-item">Protocols</a><a href="/experiments/" class="nav__dropdown-item">Experiments</a><a href="/discoveries/" class="nav__dropdown-item">Discoveries</a></div></div>
+    <div class="nav__dropdown"><button class="nav__dropdown-btn">The Build</button><div class="nav__dropdown-menu"><a href="/platform/" class="nav__dropdown-item">Platform</a><a href="/intelligence/" class="nav__dropdown-item">Intelligence</a><a href="/board/" class="nav__dropdown-item">AI Board</a><a href="/cost/" class="nav__dropdown-item">Cost</a><a href="/methodology/" class="nav__dropdown-item">Methodology</a><a href="/tools/" class="nav__dropdown-item">Tools</a></div></div>
+    <div class="nav__dropdown"><button class="nav__dropdown-btn">Follow</button><div class="nav__dropdown-menu"><a href="/chronicle/" class="nav__dropdown-item">Weekly Journal</a><a href="/subscribe/" class="nav__dropdown-item">Subscribe</a><a href="/ask/" class="nav__dropdown-item">Ask the Data</a></div></div>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe &rarr;</a>
   </div>
-  <button class="nav__hamburger" aria-label="Open menu">
-    <span></span><span></span><span></span>
-  </button>
-  <div class="nav__status">
-    <div class="pulse"></div>
-    <span id="nav-date"></span>
-  </div>
+  <button class="nav__hamburger" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <div class="nav__status"><div class="pulse"></div><span id="nav-date"></span></div>
 </nav>
-<!-- Mobile overlay menu -->
 <div class="nav-overlay">
   <div class="nav-overlay__panel">
     <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
-    <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The Story</div>
-      <a href="/story/" class="nav-overlay__link">My Story</a>
-      <a href="/about/" class="nav-overlay__link">The Mission</a>
+    <div class="nav-overlay__section"><div class="nav-overlay__heading">The Story</div><a href="/story/" class="nav-overlay__link">My Story</a><a href="/about/" class="nav-overlay__link">The Mission</a></div>
+    <div class="nav-overlay__section"><div class="nav-overlay__heading">The Data</div><a href="/live/" class="nav-overlay__link">Live</a><a href="/character/" class="nav-overlay__link">Character Sheet</a><a href="/habits/" class="nav-overlay__link">Habits</a><a href="/accountability/" class="nav-overlay__link">Progress</a><a href="/sleep/" class="nav-overlay__link">Sleep</a><a href="/glucose/" class="nav-overlay__link">Glucose</a><a href="/supplements/" class="nav-overlay__link">Supplements</a><a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a><a href="/explorer/" class="nav-overlay__link">Data Explorer</a></div>
+    <div class="nav-overlay__section"><div class="nav-overlay__heading">The Science</div><a href="/protocols/" class="nav-overlay__link">Protocols</a><a href="/experiments/" class="nav-overlay__link">Experiments</a><a href="/discoveries/" class="nav-overlay__link">Discoveries</a></div>
+    <div class="nav-overlay__section"><div class="nav-overlay__heading">The Build</div><a href="/platform/" class="nav-overlay__link">Platform</a><a href="/intelligence/" class="nav-overlay__link">Intelligence</a><a href="/board/" class="nav-overlay__link">AI Board</a><a href="/cost/" class="nav-overlay__link">Cost</a><a href="/methodology/" class="nav-overlay__link">Methodology</a><a href="/tools/" class="nav-overlay__link">Tools</a></div>
+    <div class="nav-overlay__section"><div class="nav-overlay__heading">Follow</div><a href="/chronicle/" class="nav-overlay__link">Weekly Journal</a><a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a><a href="/ask/" class="nav-overlay__link">Ask the Data</a><a href="/rss.xml" class="nav-overlay__link">RSS</a><a href="/privacy/" class="nav-overlay__link">Privacy</a></div>
+  </div>
+</div>
+
+<div class="exp-header animate-in">
+  <div class="exp-header__kicker">The Data</div>
+  <h1 class="exp-header__title">Data <span>Explorer</span></h1>
+  <p class="exp-header__sub">Every metric pair tells a story. Pick two variables and see what the data says. 90-day rolling correlations, FDR-corrected, from 19 live data sources.</p>
+  <div class="exp-stats">
+    <div class="exp-stat"><div class="exp-stat__label">Metric pairs</div><div class="exp-stat__value" id="stat-pairs">&mdash;</div></div>
+    <div class="exp-stat"><div class="exp-stat__label">Significant</div><div class="exp-stat__value" id="stat-sig">&mdash;</div></div>
+    <div class="exp-stat"><div class="exp-stat__label">Week</div><div class="exp-stat__value" id="stat-week">&mdash;</div></div>
+  </div>
+</div>
+
+<div class="explorer-body">
+  <!-- Detail panel (shown on card click) -->
+  <div class="detail-panel" id="detail-panel">
+    <button class="detail-close" id="detail-close">&times;</button>
+    <div class="detail-title" id="detail-title"></div>
+    <div class="detail-grid" id="detail-grid"></div>
+    <div class="detail-interpretation" id="detail-interp"></div>
+  </div>
+
+  <!-- Filter row -->
+  <div class="filter-row">
+    <button class="filter-chip active" data-filter="all">All Pairs</button>
+    <button class="filter-chip" data-filter="strong">Strong (|r| &ge; 0.5)</button>
+    <button class="filter-chip" data-filter="significant">FDR Significant</button>
+    <button class="filter-chip" data-filter="lagged">Predictive (lagged)</button>
+    <button class="filter-chip" data-filter="positive">Positive</button>
+    <button class="filter-chip" data-filter="negative">Negative</button>
+  </div>
+
+  <!-- Cards grid -->
+  <div class="corr-grid" id="corr-grid">
+    <div style="grid-column:1/-1;text-align:center;padding:var(--space-20) 0">
+      <div class="loading-pulse" style="font-family:var(--font-display);font-size:36px;color:var(--text-muted);letter-spacing:var(--ls-display)">Loading correlations&hellip;</div>
     </div>
-    <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The Data</div>
-      <a href="/live/" class="nav-overlay__link">Live</a>
-      <a href="/character/" class="nav-overlay__link">Character Sheet</a>
-      <a href="/habits/" class="nav-overlay__link">Habits</a>
-      <a href="/accountability/" class="nav-overlay__link">Progress</a>
-      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
-      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
-      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
-      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
-    </div>
-    <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The Science</div>
-      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
-      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
-    </div>
-    <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The Build</div>
-      <a href="/platform/" class="nav-overlay__link">Platform</a>
-      <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
-      <a href="/board/" class="nav-overlay__link">AI Board</a>
-      <a href="/cost/" class="nav-overlay__link">Cost</a>
-      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
-      <a href="/tools/" class="nav-overlay__link">Tools</a>
-    </div>
-    <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">Follow</div>
-      <a href="/chronicle/" class="nav-overlay__link">Weekly Journal</a>
-      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
-      <a href="/ask/" class="nav-overlay__link">Ask the Data</a>
-      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
-      <a href="/privacy/" class="nav-overlay__link">Privacy</a>
+  </div>
+
+  <!-- Methodology -->
+  <div class="meth-note">
+    <div class="meth-note__heading">// methodology</div>
+    <div class="meth-note__text">
+      <p><strong>Pearson r</strong> computed over a 90-day rolling window. Pairs require a minimum of 14 matched data points. Significance testing uses <strong>Benjamini-Hochberg FDR correction</strong> at q=0.05 to control false discovery rate across all pairs tested simultaneously.</p>
+      <p style="margin-top:var(--space-3)"><strong>Lagged correlations</strong> test whether today's value of metric A predicts tomorrow's (or later) value of metric B. This is closer to causation than cross-sectional correlation, but still not proof. N=1 data with known confounders.</p>
+      <p style="margin-top:var(--space-3)"><strong>Strength labels</strong>: |r| &ge; 0.7 = strong, |r| &ge; 0.5 = moderate, |r| &ge; 0.3 = weak, below 0.3 = negligible. These are conservative thresholds appropriate for noisy biometric data.</p>
     </div>
   </div>
 </div>
 
+<!-- N=1 Disclaimer -->
+<aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle)">
+  <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label)">
+    <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
+    Correlations shown here are from one person's data. They do not establish causation and may not generalize. Confounders are real and not fully controlled for. This is an exploration tool, not a clinical study.
+  </p>
+</aside>
 
-
-
-
-
-
-  <header class="page-header animate-in">
-    <div class="eyebrow">The Science</div>
-    <h1 class="page-header__title">What <span>actually</span> predicts what?</h1>
-    <p class="page-header__sub">23 cross-source correlations computed weekly from 90 days of real data. Benjamini-Hochberg FDR corrected. Not theory — measurement.</p>
-  </header>
-
-  <div class="explainer animate-in">
-    <div class="explainer__item">
-      <div class="explainer__label">Pairs tested</div>
-      <div class="explainer__value" id="stat-pairs">—</div>
-      <div class="explainer__note">Cross-source + 3 lagged predictors</div>
-    </div>
-    <div class="explainer__item">
-      <div class="explainer__label">FDR significant</div>
-      <div class="explainer__value" id="stat-sig">—</div>
-      <div class="explainer__note">After Benjamini-Hochberg correction</div>
-    </div>
-    <div class="explainer__item">
-      <div class="explainer__label">Data week</div>
-      <div class="explainer__value" id="stat-week">—</div>
-      <div class="explainer__note">90-day rolling window</div>
-    </div>
-  </div>
-
-  <div class="controls animate-in">
-    <button class="filter-btn active" data-filter="all">All</button>
-    <button class="filter-btn" data-filter="strong">Strong (|r| ≥ 0.5)</button>
-    <button class="filter-btn" data-filter="moderate">Moderate (|r| ≥ 0.35)</button>
-    <button class="filter-btn" data-filter="fdr">FDR Significant</button>
-    <button class="filter-btn" data-filter="lagged">Lagged (predictive)</button>
-  </div>
-
-  <div class="pairs-grid animate-in" id="pairs-grid">
-    <div class="loading">Loading correlation data…</div>
-  </div>
-
-  <div class="methodology animate-in">
-    <h3>How this works</h3>
-    <p>Every Sunday, the platform computes Pearson correlations between 23 metric pairs across a 90-day rolling window — sleep vs recovery, HRV vs training output, nutrition vs body composition, and more.</p>
-    <p>To control for multiple testing (23 simultaneous tests at α=0.05 would produce ~1.15 expected false positives), Benjamini-Hochberg FDR correction is applied. A pair marked "FDR significant" has survived this correction. Strength labels (strong, moderate, weak) are n-gated: "strong" requires n≥50, "moderate" requires n≥30.</p>
-    <p>Three lagged pairs test temporal precedence: does today's HRV predict tomorrow's training output? These use a 1-day shift and are flagged separately. Autocorrelation is not explicitly corrected — treat lagged results as directional signals.</p>
-    <p style="color: var(--text-faint); font-size: var(--text-2xs); margin-top: var(--space-6);">Correlation does not imply causation. N=1 data. This is observation, not prescription.</p>
-  </div>
-
-  <!-- N=1 Disclaimer -->
-  <aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle)">
-    <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label)">
-      <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
-      This is a single-person experiment. Correlations observed in this data may not apply to anyone else. I track everything to make better decisions for myself, not to prove universal principles. Where I note that X correlates with Y, I mean in my data, during this period, with confounders I can’t fully control for.
-    </p>
-  </aside>
-
-  <!-- S2-T1-8: Email CTA footer — injected by add_email_cta.py -->
-<section class="email-cta-footer" style="
-  padding: var(--space-16) var(--page-padding);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  text-align: center;
-">
+<!-- Email CTA -->
+<section class="email-cta-footer reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface);text-align:center;">
   <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
   <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
-    Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.
-  </p>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">New correlations computed weekly. Discoveries delivered to your inbox.</p>
   <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
-    <input id="cta-email-explorer" type="email" placeholder="your@email.com" style="
-      flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);
-      font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);
-      outline:none;transition:border-color var(--dur-fast);
-    " onfocus="this.style.borderColor='var(--c-amber-400)'" onblur="this.style.borderColor='var(--c-amber-500)'">
-    <button
-      onclick="amjSubscribe('explorer')"
-      class="btn btn--primary"
-      style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">
-      Subscribe
-    </button>
+    <input id="cta-email-explorer" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);outline:none;">
+    <button onclick="amjSubscribe('explorer')" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">Subscribe</button>
   </div>
   <p id="cta-msg-explorer" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
 </section>
 <script>
-(function() {
-  // S2-T1-8: Shared subscribe helper (idempotent — safe to include multiple times)
-  if (!window.amjSubscribe) {
-    window.amjSubscribe = async function(slug) {
-      var email = document.getElementById('cta-email-' + slug).value.trim();
-      var msg   = document.getElementById('cta-msg-'   + slug);
-      if (!email || !email.includes('@')) {
-        msg.textContent = 'Enter a valid email address.';
-        msg.style.color = 'var(--c-yellow-status)';
-        return;
-      }
-      msg.textContent = 'Subscribing…';
-      msg.style.color = 'var(--text-muted)';
-      try {
-        var res  = await fetch('/api/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email, source: slug + '_cta' }),
-        });
-        var data = await res.json();
-        if (res.ok) {
-          msg.textContent = '✓ Check your inbox to confirm.';
-          msg.style.color = 'var(--c-amber-500)';
-          document.getElementById('cta-email-' + slug).value = '';
-        } else {
-          msg.textContent = data.error || 'Something went wrong.';
-          msg.style.color = 'var(--c-yellow-status)';
-        }
-      } catch(e) {
-        msg.textContent = 'Network error — try again.';
-        msg.style.color = 'var(--c-yellow-status)';
-      }
-    };
-  }
-  // Enter key support for this page's input
-  var inp = document.getElementById('cta-email-explorer');
-  if (inp) inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') window.amjSubscribe('explorer'); });
-})();
+if (!window.amjSubscribe) {
+  window.amjSubscribe = async function(slug) {
+    var email = document.getElementById('cta-email-' + slug).value.trim();
+    var msg = document.getElementById('cta-msg-' + slug);
+    if (!email || !email.includes('@')) { msg.textContent = 'Enter a valid email address.'; msg.style.color = 'var(--c-yellow-status)'; return; }
+    msg.textContent = 'Subscribing\u2026'; msg.style.color = 'var(--text-muted)';
+    try {
+      var res = await fetch('/api/subscribe', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email:email, source:slug+'_cta'}) });
+      var data = await res.json();
+      if (res.ok) { msg.textContent = '\u2713 Check your inbox to confirm.'; msg.style.color = 'var(--c-amber-500)'; document.getElementById('cta-email-'+slug).value=''; }
+      else { msg.textContent = data.error||'Something went wrong.'; msg.style.color = 'var(--c-yellow-status)'; }
+    } catch(e) { msg.textContent = 'Network error \u2014 try again.'; msg.style.color = 'var(--c-yellow-status)'; }
+  };
+}
+var inp=document.getElementById('cta-email-explorer');if(inp)inp.addEventListener('keydown',function(e){if(e.key==='Enter')window.amjSubscribe('explorer');});
 </script>
+
+<!-- Reading path -->
+<section class="reading-path" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
+  <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>
+  <a href="/discoveries/" style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-display);">Validated Discoveries &rarr;</a>
+  <p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Correlations that survived scrutiny become discoveries</p>
+</section>
+
 <!-- Mobile bottom nav -->
 <nav class="bottom-nav" aria-label="Mobile navigation">
-  <a href="/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-    <span>Home</span>
-  </a>
-  <a href="/live/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/></svg>
-    <span>Live</span>
-  </a>
-  <a href="/character/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-    <span>Character</span>
-  </a>
-  <a href="/chronicle/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-    <span>Chronicle</span>
-  </a>
-  <a href="/ask/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-    <span>Ask</span>
-  </a>
+  <a href="/" class="bottom-nav__link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>Home</span></a>
+  <a href="/live/" class="bottom-nav__link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/></svg><span>Live</span></a>
+  <a href="/character/" class="bottom-nav__link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><span>Character</span></a>
+  <a href="/chronicle/" class="bottom-nav__link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span>Chronicle</span></a>
+  <a href="/ask/" class="bottom-nav__link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>Ask</span></a>
 </nav>
+
 <footer class="footer-v2">
   <div class="footer-v2__grid">
-    <div class="footer-v2__col">
-      <div class="footer-v2__heading">The Story</div>
-      <a href="/" class="footer-v2__link">Home</a>
-      <a href="/story/" class="footer-v2__link">My Story</a>
-      <a href="/about/" class="footer-v2__link">The Mission</a>
-    </div>
-    <div class="footer-v2__col">
-      <div class="footer-v2__heading">The Data</div>
-      <a href="/live/" class="footer-v2__link">Live</a>
-      <a href="/character/" class="footer-v2__link">Character Sheet</a>
-      <a href="/habits/" class="footer-v2__link">Habits</a>
-      <a href="/accountability/" class="footer-v2__link">Progress</a>
-    </div>
-    <div class="footer-v2__col">
-      <div class="footer-v2__heading">The Science</div>
-      <a href="/protocols/" class="footer-v2__link">Protocols</a>
-      <a href="/experiments/" class="footer-v2__link">Experiments</a>
-      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
-      <a href="/sleep/" class="footer-v2__link">Sleep</a>
-      <a href="/glucose/" class="footer-v2__link">Glucose</a>
-      <a href="/supplements/" class="footer-v2__link">Supplements</a>
-      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
-    </div>
-    <div class="footer-v2__col">
-      <div class="footer-v2__heading">The Build</div>
-      <a href="/platform/" class="footer-v2__link">Platform</a>
-      <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
-      <a href="/board/" class="footer-v2__link">AI Board</a>
-      <a href="/cost/" class="footer-v2__link">Cost</a>
-      <a href="/methodology/" class="footer-v2__link">Methodology</a>
-      <a href="/tools/" class="footer-v2__link">Tools</a>
-    </div>
-    <div class="footer-v2__col">
-      <div class="footer-v2__heading">Follow</div>
-      <a href="/chronicle/" class="footer-v2__link">Weekly Journal</a>
-      <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
-      <a href="/ask/" class="footer-v2__link">Ask the Data</a>
-      <a href="/rss.xml" class="footer-v2__link">RSS</a>
-      <a href="/privacy/" class="footer-v2__link">Privacy</a>
-    </div>
+    <div class="footer-v2__col"><div class="footer-v2__heading">The Story</div><a href="/" class="footer-v2__link">Home</a><a href="/story/" class="footer-v2__link">My Story</a><a href="/about/" class="footer-v2__link">The Mission</a></div>
+    <div class="footer-v2__col"><div class="footer-v2__heading">The Data</div><a href="/live/" class="footer-v2__link">Live</a><a href="/character/" class="footer-v2__link">Character Sheet</a><a href="/habits/" class="footer-v2__link">Habits</a><a href="/accountability/" class="footer-v2__link">Progress</a></div>
+    <div class="footer-v2__col"><div class="footer-v2__heading">The Science</div><a href="/protocols/" class="footer-v2__link">Protocols</a><a href="/experiments/" class="footer-v2__link">Experiments</a><a href="/discoveries/" class="footer-v2__link">Discoveries</a><a href="/sleep/" class="footer-v2__link">Sleep</a><a href="/glucose/" class="footer-v2__link">Glucose</a><a href="/supplements/" class="footer-v2__link">Supplements</a><a href="/benchmarks/" class="footer-v2__link">Benchmarks</a></div>
+    <div class="footer-v2__col"><div class="footer-v2__heading">The Build</div><a href="/platform/" class="footer-v2__link">Platform</a><a href="/intelligence/" class="footer-v2__link">Intelligence</a><a href="/board/" class="footer-v2__link">AI Board</a><a href="/cost/" class="footer-v2__link">Cost</a><a href="/methodology/" class="footer-v2__link">Methodology</a><a href="/tools/" class="footer-v2__link">Tools</a></div>
+    <div class="footer-v2__col"><div class="footer-v2__heading">Follow</div><a href="/chronicle/" class="footer-v2__link">Weekly Journal</a><a href="/subscribe/" class="footer-v2__link">Subscribe</a><a href="/ask/" class="footer-v2__link">Ask the Data</a><a href="/rss.xml" class="footer-v2__link">RSS</a><a href="/privacy/" class="footer-v2__link">Privacy</a></div>
   </div>
-  <div class="footer-v2__bottom">
-    <span class="footer-v2__brand">AMJ</span>
-    <span class="footer-v2__copy">// updated daily by life-platform</span>
-  </div>
+  <div class="footer-v2__bottom"><span class="footer-v2__brand">AMJ</span><span class="footer-v2__copy">// updated daily by life-platform</span></div>
 </footer>
 
-  <div class="challenge-bar" id="challenge-bar" style="display:none;">
-    <span class="challenge-bar__pip"></span>
-    <span class="challenge-bar__label" id="cbar-label"></span>
-    <span class="challenge-bar__divider"></span>
-    <span class="challenge-bar__text" id="cbar-text"></span>
-  </div>
-
 <script>
-const API = 'https://averagejoematt.com';
-let allPairs = [];
+(function() {
+  'use strict';
 
-async function init() {
-  try {
-    const res = await fetch(`${API}/api/correlations`);
-    const json = await res.json();
-    const c = json.correlations;
-    allPairs = c.pairs || [];
-    document.getElementById('stat-pairs').textContent = c.count;
-    document.getElementById('stat-sig').textContent = allPairs.filter(p => p.fdr_significant).length;
-    document.getElementById('stat-week').textContent = c.week || '—';
-    renderPairs(allPairs);
-  } catch(e) {
-    document.getElementById('pairs-grid').innerHTML = '<div class="loading">Could not load correlation data.</div>';
+  var allPairs = [];
+  var currentFilter = 'all';
+
+  function strengthColor(r) {
+    var abs = Math.abs(r);
+    if (abs >= 0.7) return r > 0 ? 'var(--accent)' : '#ff5252';
+    if (abs >= 0.5) return r > 0 ? 'var(--c-green-400)' : '#ff8a80';
+    if (abs >= 0.3) return r > 0 ? 'var(--c-green-300)' : '#ffab91';
+    return 'var(--text-faint)';
   }
-  // Challenge bar
-  try {
-    const cr = await fetch(`${API}/api/current_challenge`);
-    const cj = await cr.json();
-    const ch = cj.current_challenge;
-    if (ch && ch.challenge) {
-      document.getElementById('cbar-label').textContent = `Week ${ch.week_num || '?'}`;
-      document.getElementById('cbar-text').innerHTML = `<strong>${ch.challenge}</strong>`;
-      document.getElementById('challenge-bar').style.display = 'flex';
+
+  function rClass(r) {
+    if (Math.abs(r) < 0.3) return 'weak';
+    return r > 0 ? 'positive' : 'negative';
+  }
+
+  function strengthLabel(s) {
+    var labels = {strong:'Strong',moderate:'Moderate',weak:'Weak',negligible:'Negligible'};
+    return labels[s] || s;
+  }
+
+  function lagLabel(p) {
+    if (p.correlation_type === 'lagged' && p.lag_days > 0) return p.lag_days + '-day lag (predictive)';
+    return 'Same-day (cross-sectional)';
+  }
+
+  function prettyLabel(label) {
+    return label.replace(/_/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+  }
+
+  function interpret(p) {
+    var dir = p.r > 0 ? 'higher' : 'lower';
+    var outcome = p.r > 0 ? 'higher' : 'lower';
+    var a = prettyLabel(p.label_a);
+    var b = prettyLabel(p.label_b);
+    var abs = Math.abs(p.r).toFixed(2);
+    var sig = p.fdr_significant ? ' This passed FDR significance testing.' : ' This did not pass FDR correction \u2014 treat with caution.';
+    if (p.correlation_type === 'lagged') {
+      return '<strong>' + a + '</strong> on a given day predicts <strong>' + outcome + ' ' + b + '</strong> ' + p.lag_days + ' day(s) later (r=' + p.r.toFixed(3) + ', n=' + p.n + ').' + sig;
     }
-  } catch(_) {}
-}
+    return 'Days with <strong>' + dir + ' ' + a + '</strong> tend to also show <strong>' + outcome + ' ' + b + '</strong> (r=' + p.r.toFixed(3) + ', n=' + p.n + ').' + sig;
+  }
 
-function renderPairs(pairs) {
-  const grid = document.getElementById('pairs-grid');
-  if (!pairs.length) { grid.innerHTML = '<div class="loading">No pairs match this filter.</div>'; return; }
+  function renderCard(p) {
+    var color = strengthColor(p.r);
+    var absR = Math.abs(p.r);
+    var barW = Math.min(100, absR * 100);
+    var lagTag = p.correlation_type === 'lagged' ? ' <span style="color:var(--c-amber-400)">\u23F1 ' + p.lag_days + 'd lag</span>' : '';
+    var sigTag = p.fdr_significant ? '<span style="color:var(--accent)">FDR \u2713</span>' : '<span style="color:var(--text-faint)">not sig</span>';
 
-  grid.innerHTML = pairs.map(p => {
-    const absR = Math.abs(p.r);
-    const rClass = absR >= 0.5 ? (p.r > 0 ? 'pos' : 'neg') : absR >= 0.35 ? (p.r > 0 ? 'pos' : 'neg') : 'weak';
-    const fdrClass = p.fdr_significant ? 'fdr' : '';
-    const barColor = p.r > 0 ? '#00e5a0' : '#ff5252';
-    const barW = Math.round(absR * 100);
-    const lagTag = p.lag_days > 0 ? ` <span style="color:var(--c-amber-500);font-size:9px;">▶ ${p.lag_days}d lag</span>` : '';
+    return '<div class="corr-card" style="--bar-color:' + color + '" data-r="' + p.r + '" data-strength="' + p.strength + '" data-sig="' + p.fdr_significant + '" data-type="' + p.correlation_type + '">' +
+      '<div class="corr-card__header"><div class="corr-card__pair"><em>' + prettyLabel(p.label_a) + '</em> \u00D7 <em>' + prettyLabel(p.label_b) + '</em>' + lagTag + '</div></div>' +
+      '<div class="corr-card__body">' +
+        '<div class="corr-card__r ' + rClass(p.r) + '">' + (p.r > 0 ? '+' : '') + p.r.toFixed(2) + '</div>' +
+        '<div class="corr-card__meta">' +
+          '<div class="corr-meta-row"><strong>' + strengthLabel(p.strength) + '</strong> \u00b7 ' + sigTag + '</div>' +
+          '<div class="corr-meta-row">' + lagLabel(p) + '</div>' +
+          '<div class="corr-meta-row">n=' + p.n + ' days</div>' +
+          '<div class="strength-bar"><div class="strength-bar__fill" style="width:' + barW + '%;background:' + color + '"></div></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
 
-    return `<div class="pair-card ${fdrClass}">
-      <div><div class="pair-card__var">${p.label_a || p.field_a}${lagTag}</div><div class="pair-card__source">${p.source_a}</div></div>
-      <div class="pair-card__r"><div class="pair-card__rval ${rClass}">${p.r > 0 ? '+' : ''}${p.r.toFixed(2)}</div><div class="pair-card__rlabel">${p.strength}${p.fdr_significant ? ' ✓' : ''}</div></div>
-      <div><div class="pair-card__var">${p.label_b || p.field_b}</div><div class="pair-card__source">${p.source_b}</div></div>
-      <div class="pair-card__n">n=${p.n}</div>
-      <div class="pair-card__bar"><div class="pair-card__barfill" style="width:${barW}%;background:${barColor};"></div></div>
-    </div>`;
-  }).join('');
-}
+  function showDetail(p) {
+    var panel = document.getElementById('detail-panel');
+    document.getElementById('detail-title').textContent = prettyLabel(p.label_a) + ' \u00D7 ' + prettyLabel(p.label_b);
+    document.getElementById('detail-grid').innerHTML =
+      '<div class="detail-cell"><div class="detail-cell__label">Correlation (r)</div><div class="detail-cell__value">' + (p.r>0?'+':'') + p.r.toFixed(3) + '</div></div>' +
+      '<div class="detail-cell"><div class="detail-cell__label">Strength</div><div class="detail-cell__value">' + strengthLabel(p.strength) + '</div></div>' +
+      '<div class="detail-cell"><div class="detail-cell__label">Sample Size</div><div class="detail-cell__value">n=' + p.n + '</div></div>' +
+      '<div class="detail-cell"><div class="detail-cell__label">FDR Significant</div><div class="detail-cell__value">' + (p.fdr_significant ? 'Yes \u2713' : 'No') + '</div></div>';
+    document.getElementById('detail-interp').innerHTML = interpret(p);
+    panel.classList.add('is-open');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
-// Filter buttons
-document.querySelectorAll('.filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const f = btn.dataset.filter;
-    let filtered = allPairs;
-    if (f === 'strong')   filtered = allPairs.filter(p => Math.abs(p.r) >= 0.5);
-    if (f === 'moderate') filtered = allPairs.filter(p => Math.abs(p.r) >= 0.35);
-    if (f === 'fdr')      filtered = allPairs.filter(p => p.fdr_significant);
-    if (f === 'lagged')   filtered = allPairs.filter(p => p.lag_days > 0);
-    renderPairs(filtered);
+  function applyFilter(filter) {
+    currentFilter = filter;
+    document.querySelectorAll('.filter-chip').forEach(function(c) { c.classList.toggle('active', c.dataset.filter === filter); });
+    var filtered = allPairs;
+    if (filter === 'strong') filtered = allPairs.filter(function(p){ return Math.abs(p.r) >= 0.5; });
+    else if (filter === 'significant') filtered = allPairs.filter(function(p){ return p.fdr_significant; });
+    else if (filter === 'lagged') filtered = allPairs.filter(function(p){ return p.correlation_type === 'lagged'; });
+    else if (filter === 'positive') filtered = allPairs.filter(function(p){ return p.r > 0; });
+    else if (filter === 'negative') filtered = allPairs.filter(function(p){ return p.r < 0; });
+
+    var grid = document.getElementById('corr-grid');
+    if (!filtered.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:var(--space-16) 0"><div style="font-family:var(--font-display);font-size:28px;color:var(--text-muted)">No pairs match this filter</div></div>';
+      return;
+    }
+    grid.innerHTML = filtered.map(renderCard).join('');
+    // Attach click handlers
+    grid.querySelectorAll('.corr-card').forEach(function(card, i) {
+      card.addEventListener('click', function() { showDetail(filtered[i]); });
+    });
+  }
+
+  // Filter buttons
+  document.querySelectorAll('.filter-chip').forEach(function(c) {
+    c.addEventListener('click', function() { applyFilter(c.dataset.filter); });
   });
-});
 
-init();
+  // Close detail
+  document.getElementById('detail-close').addEventListener('click', function() {
+    document.getElementById('detail-panel').classList.remove('is-open');
+  });
+
+  // Load data
+  fetch('/api/correlations')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (!data || !data.correlations) throw new Error('No data');
+      var corr = data.correlations;
+      allPairs = corr.pairs || [];
+      document.getElementById('stat-pairs').textContent = corr.count || allPairs.length;
+      document.getElementById('stat-sig').textContent = allPairs.filter(function(p){return p.fdr_significant;}).length;
+      document.getElementById('stat-week').textContent = corr.week || '\u2014';
+      applyFilter('all');
+    })
+    .catch(function() {
+      document.getElementById('corr-grid').innerHTML =
+        '<div style="grid-column:1/-1;text-align:center;padding:var(--space-20) 0">' +
+        '<div style="font-family:var(--font-display);font-size:36px;color:var(--text-muted)">No correlation data yet</div>' +
+        '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);margin-top:var(--space-4)">Correlations are computed weekly. Check back soon.</div></div>';
+    });
+})();
 </script>
+<script src="/assets/js/reveal.js"></script>
 <script src="/assets/js/nav.js"></script>
 </body>
 </html>

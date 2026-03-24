@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Weekly Snapshots — walk the entire journey, one week at a time. Empty weeks tell the story too.">
+  <meta property="og:title" content="Weekly Snapshots — Matthew Walker">
+  <meta property="og:description" content="One page per week. The arc of a transformation, including the gaps.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta property="og:type" content="website">
+  <title>Weekly Snapshots — Matthew Walker</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .snap-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border); max-width: var(--max-width); margin: 0 auto;
+    }
+    .snap-header__kicker { margin-bottom: var(--space-4); }
+    .snap-header__title { font-family: var(--font-display); font-size: var(--text-h1); line-height: var(--lh-display); letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-4); }
+    .snap-header__title span { color: var(--accent); }
+    .snap-header__sub { font-family: var(--font-mono); font-size: var(--text-base); color: var(--text-muted); line-height: var(--lh-body); max-width: 600px; }
+
+    /* Week navigation */
+    .week-nav { max-width: var(--max-width); margin: 0 auto; padding: var(--space-6) var(--page-padding); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+    .week-nav__btn { background: none; border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); padding: var(--space-2) var(--space-4); cursor: pointer; transition: all var(--dur-fast); letter-spacing: var(--ls-label); }
+    .week-nav__btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .week-nav__btn:disabled { opacity: 0.3; cursor: default; }
+    .week-nav__current { font-family: var(--font-display); font-size: 28px; color: var(--text); letter-spacing: var(--ls-display); text-align: center; }
+    .week-nav__dates { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted); letter-spacing: var(--ls-label); text-align: center; margin-top: var(--space-1); }
+
+    /* Snapshot body */
+    .snap-body { max-width: var(--max-width); margin: 0 auto; padding: var(--space-10) var(--page-padding) var(--space-20); }
+
+    /* Key numbers grid */
+    .key-nums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: var(--space-8); }
+    .key-num { background: var(--surface); padding: var(--space-6); text-align: center; }
+    .key-num__value { font-family: var(--font-display); font-size: 40px; color: var(--text); letter-spacing: var(--ls-display); line-height: 1; }
+    .key-num__value.accent { color: var(--accent); }
+    .key-num__delta { font-family: var(--font-mono); font-size: var(--text-xs); margin-top: var(--space-2); }
+    .key-num__delta.up { color: var(--accent); }
+    .key-num__delta.down { color: #ff5252; }
+    .key-num__delta.neutral { color: var(--text-muted); }
+    .key-num__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-top: var(--space-2); }
+
+    /* Heatmap strip */
+    .heat-strip { display: flex; gap: 2px; margin-bottom: var(--space-8); }
+    .heat-day { flex: 1; height: 28px; position: relative; transition: transform var(--dur-fast); }
+    .heat-day:hover { transform: scaleY(1.3); }
+    .heat-day.green { background: var(--accent); opacity: 0.9; }
+    .heat-day.amber { background: var(--c-yellow-status); opacity: 0.8; }
+    .heat-day.red { background: var(--c-red-status); opacity: 0.7; }
+    .heat-day.gray { background: var(--surface-raised); }
+    .heat-day__label { position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--text-faint); font-family: var(--font-mono); letter-spacing: 0.05em; }
+
+    /* Sections */
+    .snap-section { border: 1px solid var(--border); background: var(--surface); margin-bottom: var(--space-6); }
+    .snap-section__header { padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .snap-section__title { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--accent-dim); }
+    .snap-section__badge { font-family: var(--font-mono); font-size: var(--text-2xs); padding: 2px var(--space-3); border: 1px solid var(--border); color: var(--text-muted); }
+    .snap-section__body { padding: var(--space-6); }
+    .snap-section__body p { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); line-height: var(--lh-mono); }
+    .snap-section__body p + p { margin-top: var(--space-3); }
+    .snap-section__body strong { color: var(--text); }
+
+    /* Pillar scores row */
+    .pillars-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); }
+    .pillar-cell { background: var(--surface); padding: var(--space-4); text-align: center; }
+    .pillar-cell__emoji { font-size: 20px; margin-bottom: var(--space-1); }
+    .pillar-cell__score { font-family: var(--font-display); font-size: 20px; color: var(--text); letter-spacing: var(--ls-display); }
+    .pillar-cell__name { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-top: var(--space-1); }
+
+    /* Empty week */
+    .empty-week { text-align: center; padding: var(--space-20) 0; }
+    .empty-week__title { font-family: var(--font-display); font-size: var(--text-h2); color: var(--text-muted); letter-spacing: var(--ls-display); margin-bottom: var(--space-4); }
+    .empty-week__sub { font-family: var(--font-mono); font-size: var(--text-base); color: var(--text-faint); line-height: var(--lh-body); max-width: 480px; margin: 0 auto; }
+    .empty-week__quote { font-family: var(--font-serif); font-size: var(--text-lg); font-style: italic; color: var(--c-amber-400); margin-top: var(--space-8); max-width: 500px; margin-left: auto; margin-right: auto; line-height: var(--lh-body); }
+
+    /* Archive grid */
+    .archive-heading { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--accent-dim); margin-bottom: var(--space-5); margin-top: var(--space-12); }
+    .archive-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 3px; }
+    .archive-cell {
+      aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--ls-label);
+      border: 1px solid var(--border-subtle); cursor: pointer; transition: all var(--dur-fast);
+    }
+    .archive-cell:hover { border-color: var(--accent); color: var(--accent); }
+    .archive-cell.active { border-color: var(--accent); background: var(--accent-bg-subtle); color: var(--accent); }
+    .archive-cell.has-data { color: var(--text); background: var(--surface); }
+    .archive-cell.no-data { color: var(--text-faint); background: var(--bg); }
+
+    @media (max-width: 768px) {
+      .key-nums { grid-template-columns: 1fr 1fr; }
+      .pillars-row { grid-template-columns: repeat(4, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AJM</a>
+  <div class="nav__links">
+    <div class="nav__dropdown"><button class="nav__dropdown-btn">The Story</button><div class="nav__dropdown-menu"><a href="/story/" class="nav__dropdown-item">My Story</a><a href="/about/" class="nav__dropdown-item">The Mission</a></div></div>
+    <div class="nav__dropdown is-active"><button class="nav__dropdown-btn">The Data</button><div class="nav__dropdown-menu"><a href="/live/" class="nav__dropdown-item">Live</a><a href="/character/" class="nav__dropdown-item">Character Sheet</a><a href="/habits/" class="nav__dropdown-item">Habits</a><a href="/accountability/" class="nav__dropdown-item">Progress</a><a href="/sleep/" class="nav__dropdown-item">Sleep</a><a href="/glucose/" class="nav__dropdown-item">Glucose</a><a href="/supplements/" class="nav__dropdown-item">Supplements</a><a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a><a href="/explorer/" class="nav__dropdown-item">Data Explorer</a><a href="/weekly/" class="nav__dropdown-item active">Weekly Snapshots</a></div></div>
+    <div class="nav__dropdown"><button class="nav__dropdown-btn">The Science</button><div class="nav__dropdown-menu"><a href="/protocols/" class="nav__dropdown-item">Protocols</a><a href="/experiments/" class="nav__dropdown-item">Experiments</a><a href="/discoveries/" class="nav__dropdown-item">Discoveries</a></div></div>
+    <div class="nav__dropdown"><button class="nav__dropdown-btn">The Build</button><div class="nav__dropdown-menu"><a href="/platform/" class="nav__dropdown-item">Platform</a><a href="/intelligence/" class="nav__dropdown-item">Intelligence</a><a href="/board/" class="nav__dropdown-item">AI Board</a><a href="/cost/" class="nav__dropdown-item">Cost</a><a href="/methodology/" class="nav__dropdown-item">Methodology</a><a href="/tools/" class="nav__dropdown-item">Tools</a></div></div>
+    <div class="nav__dropdown"><button class="nav__dropdown-btn">Follow</button><div class="nav__dropdown-menu"><a href="/chronicle/" class="nav__dropdown-item">Weekly Journal</a><a href="/subscribe/" class="nav__dropdown-item">Subscribe</a><a href="/ask/" class="nav__dropdown-item">Ask the Data</a></div></div>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe &rarr;</a>
+  </div>
+  <button class="nav__hamburger" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <div class="nav__status"><div class="pulse"></div><span id="nav-date"></span></div>
+</nav>
+<div class="nav-overlay">
+  <div class="nav-overlay__panel">
+    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
+    <div class="nav-overlay__section"><div class="nav-overlay__heading">The Story</div><a href="/story/" class="nav-overlay__link">My Story</a><a href="/about/" class="nav-overlay__link">The Mission</a></div>
+    <div class="nav-overlay__section"><div class="nav-overlay__heading">The Data</div><a href="/live/" class="nav-overlay__link">Live</a><a href="/character/" class="nav-overlay__link">Character Sheet</a><a href="/habits/" class="nav-overlay__link">Habits</a><a href="/accountability/" class="nav-overlay__link">Progress</a><a href="/sleep/" class="nav-overlay__link">Sleep</a><a href="/glucose/" class="nav-overlay__link">Glucose</a><a href="/supplements/" class="nav-overlay__link">Supplements</a><a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a><a href="/explorer/" class="nav-overlay__link">Data Explorer</a><a href="/weekly/" class="nav-overlay__link">Weekly Snapshots</a></div>
+    <div class="nav-overlay__section"><div class="nav-overlay__heading">The Science</div><a href="/protocols/" class="nav-overlay__link">Protocols</a><a href="/experiments/" class="nav-overlay__link">Experiments</a><a href="/discoveries/" class="nav-overlay__link">Discoveries</a></div>
+    <div class="nav-overlay__section"><div class="nav-overlay__heading">The Build</div><a href="/platform/" class="nav-overlay__link">Platform</a><a href="/intelligence/" class="nav-overlay__link">Intelligence</a><a href="/board/" class="nav-overlay__link">AI Board</a><a href="/cost/" class="nav-overlay__link">Cost</a><a href="/methodology/" class="nav-overlay__link">Methodology</a><a href="/tools/" class="nav-overlay__link">Tools</a></div>
+    <div class="nav-overlay__section"><div class="nav-overlay__heading">Follow</div><a href="/chronicle/" class="nav-overlay__link">Weekly Journal</a><a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a><a href="/ask/" class="nav-overlay__link">Ask the Data</a><a href="/rss.xml" class="nav-overlay__link">RSS</a><a href="/privacy/" class="nav-overlay__link">Privacy</a></div>
+  </div>
+</div>
+
+<div class="snap-header animate-in">
+  <div class="snap-header__kicker">The Data</div>
+  <h1 class="snap-header__title">Weekly <span>Snapshots</span></h1>
+  <p class="snap-header__sub">Walk the entire journey, one week at a time. The empty weeks tell the story as much as the full ones.</p>
+</div>
+
+<div class="week-nav" id="week-nav">
+  <button class="week-nav__btn" id="btn-prev">&larr; Previous</button>
+  <div>
+    <div class="week-nav__current" id="week-label">Loading&hellip;</div>
+    <div class="week-nav__dates" id="week-dates"></div>
+  </div>
+  <button class="week-nav__btn" id="btn-next">Next &rarr;</button>
+</div>
+
+<div class="snap-body">
+  <!-- Key numbers -->
+  <div class="key-nums" id="key-nums" style="display:none"></div>
+
+  <!-- 7-day heatmap strip -->
+  <div class="heat-strip" id="heat-strip" style="display:none"></div>
+
+  <!-- Pillar scores -->
+  <div class="snap-section" id="pillars-section" style="display:none">
+    <div class="snap-section__header">
+      <div class="snap-section__title">Character Pillars</div>
+      <div class="snap-section__badge" id="char-level"></div>
+    </div>
+    <div class="pillars-row" id="pillars-row"></div>
+  </div>
+
+  <!-- Summary narrative -->
+  <div class="snap-section" id="summary-section" style="display:none">
+    <div class="snap-section__header"><div class="snap-section__title">Week Summary</div></div>
+    <div class="snap-section__body" id="summary-body"></div>
+  </div>
+
+  <!-- Notable events -->
+  <div class="snap-section" id="events-section" style="display:none">
+    <div class="snap-section__header"><div class="snap-section__title">Notable Events</div></div>
+    <div class="snap-section__body" id="events-body"></div>
+  </div>
+
+  <!-- Empty week state -->
+  <div class="empty-week" id="empty-week" style="display:none">
+    <div class="empty-week__title">Silence</div>
+    <div class="empty-week__sub">No data this week. The gap is the story. Not every week gets logged, and that's honest.</div>
+    <div class="empty-week__quote">"The weeks I'm not logging, that's the report in itself."</div>
+  </div>
+
+  <!-- Archive grid -->
+  <div class="archive-heading">// all weeks</div>
+  <div class="archive-grid" id="archive-grid"></div>
+</div>
+
+<!-- Email CTA -->
+<section class="email-cta-footer reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface);text-align:center;">
+  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
+  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get this snapshot delivered.</h3>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">Every week's data, straight to your inbox.</p>
+  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
+    <input id="cta-email-weekly" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);outline:none;">
+    <button onclick="amjSubscribe('weekly')" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">Subscribe</button>
+  </div>
+  <p id="cta-msg-weekly" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
+</section>
+<script>
+if(!window.amjSubscribe){window.amjSubscribe=async function(s){var e=document.getElementById('cta-email-'+s).value.trim(),m=document.getElementById('cta-msg-'+s);if(!e||!e.includes('@')){m.textContent='Enter a valid email.';m.style.color='var(--c-yellow-status)';return;}m.textContent='Subscribing\u2026';m.style.color='var(--text-muted)';try{var r=await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:e,source:s+'_cta'})});var d=await r.json();if(r.ok){m.textContent='\u2713 Check your inbox.';m.style.color='var(--c-amber-500)';document.getElementById('cta-email-'+s).value='';}else{m.textContent=d.error||'Error.';m.style.color='var(--c-yellow-status)';}}catch(x){m.textContent='Network error.';m.style.color='var(--c-yellow-status)';}};};
+var inp=document.getElementById('cta-email-weekly');if(inp)inp.addEventListener('keydown',function(e){if(e.key==='Enter')window.amjSubscribe('weekly');});
+</script>
+
+<!-- Reading path -->
+<section class="reading-path" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
+  <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>
+  <a href="/explorer/" style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-display);">Explore the Data &rarr;</a>
+  <p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Pick any two metrics and discover correlations</p>
+</section>
+
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <a href="/" class="bottom-nav__link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>Home</span></a>
+  <a href="/live/" class="bottom-nav__link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/></svg><span>Live</span></a>
+  <a href="/character/" class="bottom-nav__link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><span>Character</span></a>
+  <a href="/chronicle/" class="bottom-nav__link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span>Chronicle</span></a>
+  <a href="/ask/" class="bottom-nav__link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>Ask</span></a>
+</nav>
+
+<footer class="footer-v2">
+  <div class="footer-v2__grid">
+    <div class="footer-v2__col"><div class="footer-v2__heading">The Story</div><a href="/" class="footer-v2__link">Home</a><a href="/story/" class="footer-v2__link">My Story</a><a href="/about/" class="footer-v2__link">The Mission</a></div>
+    <div class="footer-v2__col"><div class="footer-v2__heading">The Data</div><a href="/live/" class="footer-v2__link">Live</a><a href="/character/" class="footer-v2__link">Character Sheet</a><a href="/habits/" class="footer-v2__link">Habits</a><a href="/accountability/" class="footer-v2__link">Progress</a></div>
+    <div class="footer-v2__col"><div class="footer-v2__heading">The Science</div><a href="/protocols/" class="footer-v2__link">Protocols</a><a href="/experiments/" class="footer-v2__link">Experiments</a><a href="/discoveries/" class="footer-v2__link">Discoveries</a><a href="/sleep/" class="footer-v2__link">Sleep</a><a href="/glucose/" class="footer-v2__link">Glucose</a><a href="/supplements/" class="footer-v2__link">Supplements</a><a href="/benchmarks/" class="footer-v2__link">Benchmarks</a></div>
+    <div class="footer-v2__col"><div class="footer-v2__heading">The Build</div><a href="/platform/" class="footer-v2__link">Platform</a><a href="/intelligence/" class="footer-v2__link">Intelligence</a><a href="/board/" class="footer-v2__link">AI Board</a><a href="/cost/" class="footer-v2__link">Cost</a><a href="/methodology/" class="footer-v2__link">Methodology</a><a href="/tools/" class="footer-v2__link">Tools</a></div>
+    <div class="footer-v2__col"><div class="footer-v2__heading">Follow</div><a href="/chronicle/" class="footer-v2__link">Weekly Journal</a><a href="/subscribe/" class="footer-v2__link">Subscribe</a><a href="/ask/" class="footer-v2__link">Ask the Data</a><a href="/rss.xml" class="footer-v2__link">RSS</a><a href="/privacy/" class="footer-v2__link">Privacy</a></div>
+  </div>
+  <div class="footer-v2__bottom"><span class="footer-v2__brand">AMJ</span><span class="footer-v2__copy">// updated daily by life-platform</span></div>
+</footer>
+
+<script>
+(function() {
+  'use strict';
+
+  var JOURNEY_START = '2026-02-09';
+  var DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  var PILLAR_EMOJI = {sleep:'\uD83D\uDE34',movement:'\uD83C\uDFCB\uFE0F',nutrition:'\uD83E\uDD57',metabolic:'\uD83D\uDCCA',mind:'\uD83E\uDDE0',relationships:'\uD83D\uDCAC',consistency:'\uD83C\uDFAF'};
+
+  // Week helpers
+  function getISOWeek(d) {
+    var dt = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    dt.setDate(dt.getDate() + 3 - (dt.getDay() + 6) % 7);
+    var yearStart = new Date(dt.getFullYear(), 0, 4);
+    var weekNum = 1 + Math.round(((dt - yearStart) / 86400000 - 3 + (yearStart.getDay() + 6) % 7) / 7);
+    return dt.getFullYear() + '-W' + String(weekNum).padStart(2,'0');
+  }
+
+  function weekStartEnd(weekStr) {
+    var parts = weekStr.split('-W');
+    var year = parseInt(parts[0]);
+    var week = parseInt(parts[1]);
+    var jan4 = new Date(year, 0, 4);
+    var d = new Date(jan4);
+    d.setDate(jan4.getDate() - (jan4.getDay() || 7) + 1 + (week - 1) * 7);
+    var start = new Date(d);
+    var end = new Date(d); end.setDate(end.getDate() + 6);
+    return { start: start, end: end };
+  }
+
+  function fmtDate(d) {
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  function allWeeks() {
+    var weeks = [];
+    var start = new Date(JOURNEY_START + 'T12:00:00');
+    var now = new Date();
+    var current = start;
+    while (current <= now) {
+      weeks.push(getISOWeek(current));
+      current = new Date(current); current.setDate(current.getDate() + 7);
+    }
+    // Deduplicate
+    return [...new Set(weeks)];
+  }
+
+  var weeks = allWeeks();
+  var currentIdx = weeks.length - 1;
+
+  // UI refs
+  var weekLabel = document.getElementById('week-label');
+  var weekDates = document.getElementById('week-dates');
+  var btnPrev = document.getElementById('btn-prev');
+  var btnNext = document.getElementById('btn-next');
+
+  function updateNav() {
+    var w = weeks[currentIdx];
+    var se = weekStartEnd(w);
+    var weekNum = currentIdx + 1;
+    weekLabel.textContent = 'Week ' + weekNum;
+    weekDates.textContent = fmtDate(se.start) + ' \u2013 ' + fmtDate(se.end) + ', ' + se.start.getFullYear();
+    btnPrev.disabled = currentIdx === 0;
+    btnNext.disabled = currentIdx === weeks.length - 1;
+
+    // Highlight archive cell
+    document.querySelectorAll('.archive-cell').forEach(function(c) {
+      c.classList.toggle('active', parseInt(c.dataset.idx) === currentIdx);
+    });
+
+    loadWeek(w);
+  }
+
+  btnPrev.addEventListener('click', function() { if (currentIdx > 0) { currentIdx--; updateNav(); } });
+  btnNext.addEventListener('click', function() { if (currentIdx < weeks.length - 1) { currentIdx++; updateNav(); } });
+
+  // Build archive grid
+  var archiveGrid = document.getElementById('archive-grid');
+  weeks.forEach(function(w, i) {
+    var cell = document.createElement('div');
+    cell.className = 'archive-cell has-data';
+    cell.dataset.idx = i;
+    cell.textContent = 'W' + (i + 1);
+    cell.addEventListener('click', function() { currentIdx = i; updateNav(); window.scrollTo({top: 0, behavior: 'smooth'}); });
+    archiveGrid.appendChild(cell);
+  });
+
+  function loadWeek(weekStr) {
+    // Use snapshot endpoint. Falls back to composing from vitals+character+habits
+    var se = weekStartEnd(weekStr);
+    var startStr = se.start.toISOString().split('T')[0];
+    var endStr = se.end.toISOString().split('T')[0];
+
+    // Fetch snapshot, vitals, character, habits, and waveform for this week
+    Promise.all([
+      fetch('/api/snapshot').then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; }),
+      fetch('/api/journey_waveform').then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; }),
+    ]).then(function(results) {
+      var snap = results[0];
+      var wave = results[1];
+
+      // Determine if we have data for this week
+      var hasData = false;
+
+      // Key numbers from snapshot
+      var keyNums = document.getElementById('key-nums');
+      var vitals = (snap && snap.vitals) ? (snap.vitals.vitals || {}) : {};
+      var journey = (snap && snap.journey) ? (snap.journey.journey || {}) : {};
+      var character = (snap && snap.character) ? {} : {};
+      var charData = (snap && snap.character) ? (snap.character.character || {}) : {};
+      var pillarsData = (snap && snap.character) ? (snap.character.pillars || []) : [];
+
+      // For the current week, show data. For past weeks, show what we have
+      var weight = vitals.weight_lbs || (journey.current_weight_lbs);
+      var hrv = vitals.hrv_ms;
+      var sleep = vitals.sleep_hours;
+      var recovery = vitals.recovery_pct;
+
+      if (weight || hrv || sleep || recovery) hasData = true;
+
+      if (hasData) {
+        keyNums.innerHTML =
+          '<div class="key-num"><div class="key-num__value accent">' + (weight ? weight.toFixed(1) : '\u2014') + '</div><div class="key-num__label">Weight (lbs)</div></div>' +
+          '<div class="key-num"><div class="key-num__value">' + (hrv ? hrv.toFixed(0) : '\u2014') + '</div><div class="key-num__label">HRV (ms)</div></div>' +
+          '<div class="key-num"><div class="key-num__value">' + (sleep ? sleep.toFixed(1) : '\u2014') + '</div><div class="key-num__label">Sleep (hrs)</div></div>' +
+          '<div class="key-num"><div class="key-num__value">' + (recovery ? recovery.toFixed(0) + '%' : '\u2014') + '</div><div class="key-num__label">Recovery</div></div>';
+        keyNums.style.display = '';
+      } else {
+        keyNums.style.display = 'none';
+      }
+
+      // Heatmap strip from waveform data (filter to this week's dates)
+      var heatStrip = document.getElementById('heat-strip');
+      if (wave && wave.days) {
+        var weekDays = wave.days.filter(function(d) { return d.date >= startStr && d.date <= endStr; });
+        if (weekDays.length > 0) {
+          hasData = true;
+          heatStrip.innerHTML = weekDays.map(function(d, i) {
+            var dayLabel = DAYS[i] || '';
+            return '<div class="heat-day ' + d.color + '" title="' + d.date + ': ' + (d.score != null ? d.score : 'no data') + '"><div class="heat-day__label">' + dayLabel + '</div></div>';
+          }).join('');
+          heatStrip.style.display = '';
+        } else {
+          heatStrip.style.display = 'none';
+        }
+      } else {
+        heatStrip.style.display = 'none';
+      }
+
+      // Pillar scores
+      var pillarsSection = document.getElementById('pillars-section');
+      if (pillarsData.length && charData.level) {
+        hasData = true;
+        document.getElementById('char-level').textContent = 'Level ' + Math.floor(charData.level) + ' \u00b7 ' + (charData.tier || 'Foundation');
+        document.getElementById('pillars-row').innerHTML = pillarsData.map(function(p) {
+          return '<div class="pillar-cell"><div class="pillar-cell__emoji">' + (PILLAR_EMOJI[p.name] || '') + '</div><div class="pillar-cell__score">' + p.raw_score.toFixed(0) + '</div><div class="pillar-cell__name">' + p.name + '</div></div>';
+        }).join('');
+        pillarsSection.style.display = '';
+      } else {
+        pillarsSection.style.display = 'none';
+      }
+
+      // Summary section (auto-generated narrative)
+      var summarySection = document.getElementById('summary-section');
+      if (hasData && weight) {
+        var progressPct = journey.progress_pct ? journey.progress_pct.toFixed(1) : '?';
+        var weeklyRate = journey.weekly_rate_lbs ? journey.weekly_rate_lbs.toFixed(1) : '?';
+        var summaryText = '<p><strong>Weight:</strong> ' + (weight ? weight.toFixed(1) + ' lbs' : 'No reading') +
+          ' (' + progressPct + '% to goal). Weekly rate: ' + weeklyRate + ' lbs/week.</p>';
+        if (hrv) summaryText += '<p><strong>Recovery:</strong> HRV ' + hrv.toFixed(0) + 'ms, recovery ' + (recovery||0).toFixed(0) + '%, sleep ' + (sleep||0).toFixed(1) + 'h.</p>';
+        if (charData.level) summaryText += '<p><strong>Character:</strong> Level ' + Math.floor(charData.level) + ' (' + (charData.tier||'Foundation') + ').</p>';
+        document.getElementById('summary-body').innerHTML = summaryText;
+        summarySection.style.display = '';
+      } else {
+        summarySection.style.display = 'none';
+      }
+
+      // Events section (placeholder)
+      document.getElementById('events-section').style.display = 'none';
+
+      // Empty week
+      document.getElementById('empty-week').style.display = hasData ? 'none' : '';
+    });
+  }
+
+  // Initial load
+  updateNav();
+})();
+</script>
+<script src="/assets/js/reveal.js"></script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>

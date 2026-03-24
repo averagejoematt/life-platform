@@ -232,6 +232,9 @@
     '/chronicle/':          { href: '/chronicle/archive/', title: 'All Entries →',          sub: 'The full chronicle archive' },
     '/chronicle/archive/':  { href: '/subscribe/',       title: 'Get the Weekly Brief →',   sub: 'Delivered every week' },
     '/ask/':                { href: '/platform/',        title: 'How This Works →',         sub: 'The platform behind the AI' },
+    '/explorer/':           { href: '/discoveries/',     title: 'Validated Discoveries →',  sub: 'Correlations that survived scrutiny' },
+    '/weekly/':             { href: '/explorer/',        title: 'Explore the Data →',       sub: 'Pick any two metrics and discover correlations' },
+    '/achievements/':       { href: '/character/',       title: 'The Character Sheet →',    sub: 'How it all adds up into one score' },
   };
 
   var nextRead = READING_PATHS[path];
