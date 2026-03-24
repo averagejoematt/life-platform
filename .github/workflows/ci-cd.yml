@@ -379,7 +379,7 @@ jobs:
             ATTACHED_ARN=$(aws lambda get-function-configuration \
               --function-name "$consumer" \
               --region ${{ env.AWS_REGION }} \
-              --query "Layers[?contains(LayerArn, '$LAYER_NAME')].LayerArn | [0]" \
+              --query "Layers[?contains(Arn, '$LAYER_NAME')].Arn | [0]" \
               --output text 2>/dev/null || echo "")
 
             if [ -z "$ATTACHED_ARN" ] || [ "$ATTACHED_ARN" = "None" ]; then
@@ -542,7 +542,7 @@ jobs:
             ATTACHED_ARN=$(aws lambda get-function-configuration \
               --function-name "$consumer" \
               --region ${{ env.AWS_REGION }} \
-              --query 'Layers[?contains(LayerArn, `life-platform-shared-utils`)].LayerArn | [0]' \
+              --query 'Layers[?contains(Arn, `life-platform-shared-utils`)].Arn | [0]' \
               --output text 2>/dev/null)
             ATTACHED_VER=$(echo "$ATTACHED_ARN" | awk -F: '{print $NF}')
             if [ "$ATTACHED_VER" != "$LATEST_VER" ]; then

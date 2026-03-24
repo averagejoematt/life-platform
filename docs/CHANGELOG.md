@@ -1,3 +1,49 @@
+## v3.9.4 — 2026-03-23: CI/CD pipeline activation — 3 blockers resolved
+
+### Summary
+Activated the dormant CI/CD pipeline (GitHub Actions + OIDC). The pipeline was fully designed
+(7 jobs, auto-rollback, 9 integration checks) but had never passed. Three sequential blockers
+resolved: F821 lint errors, missing boto3 CI dependency, bash pipefail crash in deprecated
+secrets scan. Shared layer (v10) attached to all 15 consumer Lambdas. Pipeline now passing
+lint + unit tests + plan (pending final verification). Draft `ask_endpoint.py` archived.
+
+### Changes
+
+**lambdas/daily_brief_lambda.py**
+- Fix F821: `hrv_30d_recs` undefined in `lambda_handler` trend-building section
+- Added local `_whoop_30d = fetch_range("whoop", ...)` call (was referencing variable
+  from `gather_daily_data()` scope which doesn't exist in `lambda_handler`)
+- All 3 trend arrays (HRV, sleep, recovery) now use `_whoop_30d` instead of `hrv_30d_recs`
+
+**lambdas/ask_endpoint.py → deploy/archive/ask_endpoint.py**
+- Archived draft integration file (7 F821 errors: `_error`, `CORS_HEADERS` undefined)
+- Was never deployed — functionality already merged into `site_api_lambda.py`
+
+**.github/workflows/ci-cd.yml**
+- Add `boto3 botocore` to test job dependencies (was only installing `pytest`)
+- Remove unsupported `--quiet` flag from `python3 -m venv` in CDK diff step
+- Fix deprecated secrets scan: add `|| true` to grep pipeline to prevent
+  `bash -eo pipefail` crash when zero matches found (false positive failure)
+- Fix layer version check: JMESPath used `LayerArn` but AWS API returns `Arn`
+  (both Plan and Deploy jobs had same bug — layers were attached but query found nothing)
+
+**AWS infrastructure**
+- Attached `life-platform-shared-utils:10` layer to all 15 consumer Lambdas
+  (daily-brief, weekly-digest, monthly-digest, nutrition-review, wednesday-chronicle,
+  weekly-plate, monday-compass, anomaly-detector, character-sheet-compute,
+  daily-metrics-compute, daily-insight-compute, adaptive-mode-compute,
+  hypothesis-engine, dashboard-refresh, weekly-correlation-compute)
+
+### CI/CD pipeline status
+- OIDC role: ✅ exists (`github-actions-deploy-role`)
+- Lint + Syntax: ✅ passing
+- Unit Tests (8 linters + deprecated secrets scan): ✅ passing
+- Plan (CDK diff + AWS checks + layer verify): ✅ in progress / pending verification
+- Deploy → Smoke → Rollback → Notify: not yet reached (blocked by Plan until this session)
+- GitHub `production` Environment: needs verification (manual approval gate for deploys)
+
+---
+
 ## v3.8.9 — 2026-03-22: Nav restructure — rename + reorganise
 
 ### Summary

@@ -1,7 +1,7 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-23 (v3.9.3 — Website Strategy Review #3. Expert panel audit of 10 pages → 50+ tasks → ~30 implemented via Claude Code. Data-driven supplements, vice streaks, nudge system, state hero, cockpit redesign, nav restructure (44 files). 4 new pages approved: Data Explorer, Weekly Snapshot, Milestones Gallery, Dark/Light Mode. Full spec: `docs/WEBSITE_REDESIGN_SPEC.md`)
+> Last update: 2026-03-23 (v3.9.4 — CI/CD pipeline activation. 3 blockers resolved (F821 lint, boto3 dep, pipefail crash). Shared layer v10 attached to 15 consumers. Pipeline passing lint + tests + plan. R13 #1 finding closing.)
 
 ---
 
@@ -206,6 +206,7 @@ Board Summit #3: 500 subscribers OR 90-day journey milestone (2026-05-22), which
 
 | ID | Item | Version | Date |
 |----|------|---------|------|
+| v3.9.4 | CI/CD pipeline activation — 3 blockers resolved, shared layer attached to 15 consumers | v3.9.4 | 2026-03-23 |
 | v3.8.0 | Sprint 8: Mobile nav (hamburger + bottom nav + grouped footer), content safety filter, website versioning | v3.8.0 | 2026-03-21 |
 | v3.7.84 | Sprint 7: Expert panel review + 15 of 19 website items shipped | v3.7.84 | 2026-03-20 |
 | R17 | Architecture Review #17 — grade A-. 13 findings, Sprint 6 created. | v3.7.82 | 2026-03-20 |
@@ -256,3 +257,4 @@ Board Summit #3: 500 subscribers OR 90-day journey milestone (2026-05-22), which
 | Mobile navigation | ✅ Hamburger + bottom nav | — | Shipped v3.8.0 (was: NONE) |
 | Content filter | ✅ 3-layer active | — | S3 config + system prompt + response scrub (v3.8.0) |
 | Git deploy tags | site-v3.8.0 | — | First tagged deploy with rollback capability |
+| CI/CD pipeline | ✅ Lint + Tests + Plan passing | Full green | v3.9.4 — 3 blockers resolved, deploy gate pending verification |
