@@ -110,6 +110,21 @@ EXPECTED_HANDLERS = {
 }
 
 
+def _load_not_deployed_functions():
+    """Load function names flagged as not_deployed in lambda_map.json."""
+    map_path = os.path.join(ROOT, "ci", "lambda_map.json")
+    try:
+        with open(map_path) as f:
+            lmap = json.load(f)
+        return {
+            v["function"]
+            for v in lmap.get("lambdas", {}).values()
+            if isinstance(v, dict) and v.get("not_deployed")
+        }
+    except Exception:
+        return set()
+
+
 def test_i1_lambda_handlers_match_expected():
     """I1: Lambda handlers in AWS must match expected module names.
 
@@ -117,14 +132,19 @@ def test_i1_lambda_handlers_match_expected():
     handler config with wrong module name → Lambda silently fails on every
     invocation until the alarm fires hours later.
 
+    Skips functions flagged as not_deployed in lambda_map.json.
+
     Fix: aws lambda update-function-configuration --function-name <fn>
          --handler <module>.lambda_handler --region us-west-2
     """
     boto3 = _get_boto3()
     lc = boto3.client("lambda", region_name=REGION)
+    not_deployed = _load_not_deployed_functions()
 
     failures = []
     for fn_name, expected_module in EXPECTED_HANDLERS.items():
+        if fn_name in not_deployed:
+            continue
         try:
             config = lc.get_function_configuration(FunctionName=fn_name)
             actual_handler = config["Handler"]
