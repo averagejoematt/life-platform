@@ -1745,18 +1745,19 @@ def lambda_handler(event, context):
                     _weight_as_of = None
 
                 # HRV trend (last 30 days)
-                _hrv_vals = [(r.get("sk", "").replace("DATE#", ""), safe_float(r, "hrv")) for r in hrv_30d_recs if safe_float(r, "hrv")]
+                _whoop_30d = fetch_range("whoop", (today - timedelta(days=30)).isoformat(), yesterday)
+                _hrv_vals = [(r.get("sk", "").replace("DATE#", ""), safe_float(r, "hrv")) for r in _whoop_30d if safe_float(r, "hrv")]
                 if _hrv_vals:
                     _trends["hrv_daily"] = [{"date": d, "ms": round(v, 1)} for d, v in _hrv_vals]
 
                 # Sleep trend (last 14 days) + HOME-3: 30d average
-                _sleep_vals = [(r.get("sk", "").replace("DATE#", ""), safe_float(r, "sleep_duration_hours")) for r in hrv_30d_recs if safe_float(r, "sleep_duration_hours")]
+                _sleep_vals = [(r.get("sk", "").replace("DATE#", ""), safe_float(r, "sleep_duration_hours")) for r in _whoop_30d if safe_float(r, "sleep_duration_hours")]
                 if _sleep_vals:
                     _trends["sleep_daily"] = [{"date": d, "hrs": round(v, 1)} for d, v in _sleep_vals[-14:]]
                 _sleep_hours_30d_avg = round(sum(v for _, v in _sleep_vals) / len(_sleep_vals), 2) if _sleep_vals else None
 
                 # Recovery trend (last 14 days)
-                _rec_vals = [(r.get("sk", "").replace("DATE#", ""), safe_float(r, "recovery_score")) for r in hrv_30d_recs if safe_float(r, "recovery_score")]
+                _rec_vals = [(r.get("sk", "").replace("DATE#", ""), safe_float(r, "recovery_score")) for r in _whoop_30d if safe_float(r, "recovery_score")]
                 if _rec_vals:
                     _trends["recovery_daily"] = [{"date": d, "pct": round(v, 0)} for d, v in _rec_vals[-14:]]
             except Exception as _te:
