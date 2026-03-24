@@ -180,7 +180,7 @@ jobs:
             MATCHES=$(grep -rn --include='*.py' --include='*.json' --include='*.yml' --include='*.yaml' --include='*.sh' "$secret" \
               lambdas/ mcp/ cdk/ .github/ ci/ \
               --exclude-dir='.venv' --exclude-dir='cdk.out' \
-              2>/dev/null | grep -v 'deprecated_secrets.txt' | grep -v '^Binary')
+              2>/dev/null | grep -v 'deprecated_secrets.txt' | grep -v '^Binary' || true)
 
             if [ -n "$MATCHES" ]; then
               echo "::error::Deprecated secret '$secret' still referenced:"
