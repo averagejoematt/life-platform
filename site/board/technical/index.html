@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Technical Board of Directors | Average Joe Matt</title>
+  <meta name="description" content="12 AI personas review architecture, security, code quality, data models, cost, and operational reliability for the Life Platform.">
+  <meta property="og:title" content="Technical Board of Directors — Average Joe Matt">
+  <meta property="og:description" content="12 expert personas — from cloud architecture to adversarial review — keeping a solo-built platform honest.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="canonical" href="https://averagejoematt.com/board/technical/">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .tb-hero {
+      text-align: center;
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-10);
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .tb-hero .eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: var(--space-4);
+    }
+    .tb-hero h1 {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      font-weight: 400;
+      line-height: var(--lh-heading);
+      letter-spacing: var(--ls-display);
+      color: var(--text);
+      margin: 0 0 var(--space-5);
+    }
+    .tb-hero p { color: var(--text-muted); font-size: var(--text-base); line-height: var(--lh-body); max-width: 560px; margin: 0 auto var(--space-3); }
+
+    /* ── Board nav ────────────────────────────────────── */
+    .board-tabs {
+      max-width: 800px;
+      margin: 0 auto var(--space-8);
+      padding: 0 var(--page-padding);
+      display: flex;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+    .board-tab {
+      flex: 1;
+      text-align: center;
+      padding: var(--space-4) var(--space-3);
+      background: var(--surface);
+      text-decoration: none;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      transition: all var(--dur-mid);
+    }
+    .board-tab:hover { color: var(--accent); }
+    .board-tab.active { color: var(--accent); background: var(--accent-bg-subtle); }
+
+    /* ── Roster grid ──────────────────────────────────── */
+    .roster {
+      max-width: 800px;
+      margin: 0 auto var(--space-10);
+      padding: 0 var(--page-padding);
+    }
+    .roster__heading {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-5);
+    }
+    .roster__grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+    .member {
+      background: var(--surface);
+      padding: var(--space-6);
+      display: grid;
+      grid-template-columns: 48px 1fr;
+      gap: var(--space-5);
+      align-items: start;
+    }
+    .member__avatar {
+      width: 48px;
+      height: 48px;
+      background: var(--accent-bg-subtle);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      flex-shrink: 0;
+    }
+    .member__name {
+      font-size: var(--text-base);
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+    .member__title {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-label);
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: var(--space-3);
+    }
+    .member__question {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      font-style: italic;
+      margin-bottom: var(--space-3);
+      line-height: var(--lh-body);
+    }
+    .member__bio {
+      font-size: var(--text-sm);
+      color: var(--text-faint);
+      line-height: var(--lh-body);
+    }
+
+    /* ── Sub-boards ───────────────────────────────────── */
+    .sub-boards {
+      max-width: 800px;
+      margin: 0 auto var(--space-10);
+      padding: 0 var(--page-padding);
+    }
+    .sub-boards__heading {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-5);
+    }
+    .sub-board-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-5) var(--space-6);
+      margin-bottom: var(--space-3);
+    }
+    .sub-board-card__name {
+      font-weight: 600;
+      font-size: var(--text-sm);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .sub-board-card__members {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--accent-dim);
+      letter-spacing: var(--ls-label);
+      margin-bottom: var(--space-2);
+    }
+    .sub-board-card__desc {
+      font-size: var(--text-sm);
+      color: var(--text-faint);
+      line-height: var(--lh-body);
+    }
+
+    /* ── How it works ─────────────────────────────────── */
+    .how-it-works {
+      max-width: 800px;
+      margin: 0 auto var(--space-12);
+      padding: 0 var(--page-padding);
+    }
+    .how-it-works__heading {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-5);
+    }
+    .how-it-works__content {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-6);
+    }
+    .how-it-works__content p {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      margin-bottom: var(--space-4);
+    }
+    .how-it-works__content p:last-child { margin-bottom: 0; }
+    .how-it-works__content strong { color: var(--text); }
+
+    /* ── Review history ───────────────────────────────── */
+    .review-history {
+      max-width: 800px;
+      margin: 0 auto var(--space-10);
+      padding: 0 var(--page-padding);
+    }
+    .review-history__heading {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-5);
+    }
+    .review-stat {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-bottom: var(--space-4);
+    }
+    .review-stat__cell {
+      background: var(--surface);
+      padding: var(--space-5);
+      text-align: center;
+    }
+    .review-stat__value {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--accent);
+      letter-spacing: var(--ls-display);
+    }
+    .review-stat__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      margin-top: var(--space-2);
+    }
+
+    @media (max-width: 720px) {
+      .tb-hero { padding: calc(var(--nav-height) + var(--space-10)) var(--page-padding-sm) var(--space-8); }
+      .roster, .sub-boards, .how-it-works, .review-history, .board-tabs { padding-left: var(--page-padding-sm); padding-right: var(--page-padding-sm); }
+      .member { grid-template-columns: 1fr; }
+      .member__avatar { width: 36px; height: 36px; font-size: 1.1rem; }
+      .review-stat { grid-template-columns: 1fr; }
+      .board-tabs { flex-direction: column; }
+    }
+  </style>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AJM</a>
+  <div class="nav__links">
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Story</button>
+      <div class="nav__dropdown-menu">
+        <a href="/story/" class="nav__dropdown-item">My Story</a>
+        <a href="/about/" class="nav__dropdown-item">The Mission</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Data</button>
+      <div class="nav__dropdown-menu">
+        <a href="/live/" class="nav__dropdown-item">Live</a>
+        <a href="/character/" class="nav__dropdown-item">Character Sheet</a>
+        <a href="/habits/" class="nav__dropdown-item">Habits</a>
+        <a href="/accountability/" class="nav__dropdown-item">Progress</a>
+        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
+        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
+        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
+        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
+        <a href="/explorer/" class="nav__dropdown-item">Explorer</a>
+        <a href="/achievements/" class="nav__dropdown-item">Milestones</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Science</button>
+      <div class="nav__dropdown-menu">
+        <a href="/protocols/" class="nav__dropdown-item">Protocols</a>
+        <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
+        <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
+      </div>
+    </div>
+    <div class="nav__dropdown is-active">
+      <button class="nav__dropdown-btn">The Build</button>
+      <div class="nav__dropdown-menu">
+        <a href="/platform/" class="nav__dropdown-item">Platform</a>
+        <a href="/intelligence/" class="nav__dropdown-item">Intelligence</a>
+        <a href="/board/" class="nav__dropdown-item active">AI Board</a>
+        <a href="/cost/" class="nav__dropdown-item">Cost</a>
+        <a href="/methodology/" class="nav__dropdown-item">Methodology</a>
+        <a href="/tools/" class="nav__dropdown-item">Tools</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">Follow</button>
+      <div class="nav__dropdown-menu">
+        <a href="/chronicle/" class="nav__dropdown-item">Weekly Journal</a>
+        <a href="/weekly/" class="nav__dropdown-item">Weekly Snapshots</a>
+        <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
+        <a href="/ask/" class="nav__dropdown-item">Ask the Data</a>
+      </div>
+    </div>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>
+  </div>
+  <button class="nav__hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span id="nav-date"></span>
+  </div>
+</nav>
+<div class="nav-overlay">
+  <div class="nav-overlay__panel">
+    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Story</div>
+      <a href="/story/" class="nav-overlay__link">My Story</a>
+      <a href="/about/" class="nav-overlay__link">The Mission</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Data</div>
+      <a href="/live/" class="nav-overlay__link">Live</a>
+      <a href="/character/" class="nav-overlay__link">Character Sheet</a>
+      <a href="/habits/" class="nav-overlay__link">Habits</a>
+      <a href="/accountability/" class="nav-overlay__link">Progress</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
+      <a href="/achievements/" class="nav-overlay__link">Milestones</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Science</div>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Build</div>
+      <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
+      <a href="/board/" class="nav-overlay__link">AI Board</a>
+      <a href="/cost/" class="nav-overlay__link">Cost</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
+      <a href="/tools/" class="nav-overlay__link">Tools</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">Follow</div>
+      <a href="/chronicle/" class="nav-overlay__link">Weekly Journal</a>
+      <a href="/weekly/" class="nav-overlay__link">Weekly Snapshots</a>
+      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/ask/" class="nav-overlay__link">Ask the Data</a>
+      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+      <a href="/privacy/" class="nav-overlay__link">Privacy</a>
+    </div>
+  </div>
+</div>
+
+<div class="tb-hero reveal">
+  <div class="eyebrow">// The Build</div>
+  <h1>Technical Board of Directors</h1>
+  <p>Twelve AI personas review every architecture decision, deploy, and data model change. They disagree by design — the friction is the quality control.</p>
+  <p style="font-size:var(--text-xs); color: var(--text-faint); margin-top:var(--space-2);">
+    Built by one person. Reviewed by twelve.
+  </p>
+</div>
+
+<div class="board-tabs reveal">
+  <a href="/board/" class="board-tab">Health Board</a>
+  <a href="/board/technical/" class="board-tab active">Technical Board</a>
+  <a href="/board/product/" class="board-tab">Product Board</a>
+</div>
+
+<div class="review-history reveal">
+  <div class="review-history__heading">// Architecture review track record</div>
+  <div class="review-stat">
+    <div class="review-stat__cell">
+      <div class="review-stat__value">13</div>
+      <div class="review-stat__label">Reviews completed</div>
+    </div>
+    <div class="review-stat__cell">
+      <div class="review-stat__value">A−</div>
+      <div class="review-stat__label">Current grade</div>
+    </div>
+    <div class="review-stat__cell">
+      <div class="review-stat__value">3</div>
+      <div class="review-stat__label">Open findings</div>
+    </div>
+  </div>
+  <div style="text-align:right;">
+    <a href="/platform/reviews/" style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);color:var(--accent);text-decoration:none;text-transform:uppercase;">View all reviews →</a>
+  </div>
+</div>
+
+<div class="roster reveal">
+  <div class="roster__heading">// 12 personas, 12 lenses</div>
+  <div class="roster__grid">
+
+    <div class="member">
+      <div class="member__avatar">🏗️</div>
+      <div>
+        <div class="member__name">Dr. Priya Nakamura</div>
+        <div class="member__title">Principal Cloud Architect</div>
+        <div class="member__question">"Is the system shape right?"</div>
+        <div class="member__bio">Netflix/Stripe distributed systems background. Reviews overall architecture patterns, service boundaries, and system evolution. Ensures the platform can grow without rewrites.</div>
+      </div>
+    </div>
+
+    <div class="member">
+      <div class="member__avatar">☁️</div>
+      <div>
+        <div class="member__name">Marcus Webb</div>
+        <div class="member__title">AWS Serverless Architect</div>
+        <div class="member__question">"Is this the right AWS implementation?"</div>
+        <div class="member__bio">Lambda team alum, fintech background. Validates every AWS service choice, IAM policy, and serverless pattern. Knows when to use DynamoDB vs S3, when Lambda@Edge makes sense, and when you're over-engineering.</div>
+      </div>
+    </div>
+
+    <div class="member">
+      <div class="member__avatar">🔒</div>
+      <div>
+        <div class="member__name">Yael Cohen</div>
+        <div class="member__title">Cloud Security + IAM</div>
+        <div class="member__question">"How could this fail or be exploited?"</div>
+        <div class="member__bio">NSA → Google Cloud → CISO. Reviews IAM roles, secret management, encryption at rest/transit, and attack surface. The person who asks what happens when someone finds your Lambda URL.</div>
+      </div>
+    </div>
+
+    <div class="member">
+      <div class="member__avatar">🚨</div>
+      <div>
+        <div class="member__name">James "Jin" Park</div>
+        <div class="member__title">SRE / Production Operations</div>
+        <div class="member__question">"What breaks at 2 AM?"</div>
+        <div class="member__bio">Google SRE lead. Reviews observability, alerting, incident response, and operational resilience. Thinks about what happens when EventBridge stops firing and nobody notices for three days.</div>
+      </div>
+    </div>
+
+    <div class="member">
+      <div class="member__avatar">💻</div>
+      <div>
+        <div class="member__name">Dr. Elena Reyes</div>
+        <div class="member__title">Staff Software Engineer</div>
+        <div class="member__question">"Could another team own this?"</div>
+        <div class="member__bio">Principal at GitHub. Reviews code quality, naming conventions, test coverage, and maintainability. The standard: could a stranger read this codebase in a weekend and ship a feature on Monday?</div>
+      </div>
+    </div>
+
+    <div class="member">
+      <div class="member__avatar">🗃️</div>
+      <div>
+        <div class="member__name">Omar Khalil</div>
+        <div class="member__title">Data Architect</div>
+        <div class="member__question">"Is the data model coherent?"</div>
+        <div class="member__bio">Databricks and Epic health data background. Reviews single-table DynamoDB design, partition key strategy, data lifecycle, and query patterns. Ensures the data model serves the intelligence layer, not the other way around.</div>
+      </div>
+    </div>
+
+    <div class="member">
+      <div class="member__avatar">🤖</div>
+      <div>
+        <div class="member__name">Dr. Anika Patel</div>
+        <div class="member__title">AI/LLM Systems Architect</div>
+        <div class="member__question">"Is the intelligence layer trustworthy?"</div>
+        <div class="member__bio">LLM research and AI platform background. Reviews prompt engineering, LLM integration patterns, hallucination guardrails, and the boundary between computed intelligence and AI-generated content.</div>
+      </div>
+    </div>
+
+    <div class="member">
+      <div class="member__avatar">📊</div>
+      <div>
+        <div class="member__name">Dr. Henning Brandt</div>
+        <div class="member__title">Statistician</div>
+        <div class="member__question">"Are the conclusions actually valid?"</div>
+        <div class="member__bio">Cochrane Collaboration biostatistician. Reviews every correlation, every p-value, every claim the platform makes. Enforces FDR correction, confidence intervals, and the N=1 methodology disclaimer. The reason the platform says "correlates with" and never "causes."</div>
+      </div>
+    </div>
+
+    <div class="member">
+      <div class="member__avatar">📋</div>
+      <div>
+        <div class="member__name">Sarah Chen</div>
+        <div class="member__title">Product Architect / PM</div>
+        <div class="member__question">"Is this solving the right problem?"</div>
+        <div class="member__bio">VP Product at Stripe. Asks whether a feature is actually needed before reviewing how it's built. Prevents scope creep, feature bloat, and building tools that look impressive but don't move the needle.</div>
+      </div>
+    </div>
+
+    <div class="member">
+      <div class="member__avatar">🚀</div>
+      <div>
+        <div class="member__name">Raj Srinivasan</div>
+        <div class="member__title">Technical Founder / CTO</div>
+        <div class="member__question">"What's the wedge? Where are you fooling yourself?"</div>
+        <div class="member__bio">Serial founder, health data background. Brings the founder lens — is this platform building toward something real, or is it a hobby project with enterprise architecture? Asks the uncomfortable questions.</div>
+      </div>
+    </div>
+
+    <div class="member">
+      <div class="member__avatar">🛑</div>
+      <div>
+        <div class="member__name">Viktor Sorokin</div>
+        <div class="member__title">Adversarial Reviewer</div>
+        <div class="member__question">"Is this actually necessary?"</div>
+        <div class="member__bio">Amazon's "Principal of No." Challenges every addition with: does this earn its complexity? The reason unused features get removed and ADRs require justification, not just documentation.</div>
+      </div>
+    </div>
+
+    <div class="member">
+      <div class="member__avatar">💰</div>
+      <div>
+        <div class="member__name">Dana Torres</div>
+        <div class="member__title">FinOps / Cloud Cost</div>
+        <div class="member__question">"What does this cost at scale?"</div>
+        <div class="member__bio">AWS cost optimization specialist. Reviews every new Lambda, every DynamoDB capacity decision, every S3 lifecycle policy. The reason the platform runs on ~$10/month instead of ~$100/month.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="sub-boards reveal">
+  <div class="sub-boards__heading">// Standing sub-boards</div>
+
+  <div class="sub-board-card">
+    <div class="sub-board-card__name">Architecture Review Board</div>
+    <div class="sub-board-card__members">Priya · Marcus · Yael · Jin · Elena · Omar</div>
+    <div class="sub-board-card__desc">Convenes for formal architecture reviews (13 completed). Reviews system shape, AWS implementation, security posture, operational readiness, code quality, and data model coherence. Produces graded findings with 30-60-90 day remediation timelines.</div>
+  </div>
+
+  <div class="sub-board-card">
+    <div class="sub-board-card__name">Intelligence &amp; Data Board</div>
+    <div class="sub-board-card__members">Anika · Henning · Omar · Elena</div>
+    <div class="sub-board-card__desc">Reviews the intelligence layer — correlations, IC features, LLM prompt quality, statistical methodology. Ensures every insight the platform surfaces is defensible and properly caveated.</div>
+  </div>
+
+  <div class="sub-board-card">
+    <div class="sub-board-card__name">Productization Board</div>
+    <div class="sub-board-card__members">Raj · Sarah · Viktor · Dana · Priya</div>
+    <div class="sub-board-card__desc">Evaluates commercialization readiness, feature-market fit, and whether the platform is building toward a real product or just accumulating complexity.</div>
+  </div>
+</div>
+
+<div class="how-it-works reveal">
+  <div class="how-it-works__heading">// How the technical board works</div>
+  <div class="how-it-works__content">
+    <p><strong>Architecture reviews</strong> happen on a regular cadence. Before each review, a bundle generator compiles the full codebase, infrastructure, and documentation into a single reviewable artifact. The board grades the platform on a letter scale and produces specific findings with severity ratings.</p>
+    <p><strong>Design reviews</strong> happen for any significant change — new data models, new Lambda functions, new MCP tools, new CDK stacks. The relevant sub-board convenes, and each persona evaluates the change through their specific lens.</p>
+    <p><strong>Incident response</strong> happens when something breaks. Jin leads triage, Yael checks for security implications, and the full board contributes to the root cause analysis.</p>
+    <p><strong>The disagreement is intentional.</strong> Viktor will say "don't build this" while Raj says "build it faster." Priya will push for architectural purity while Dana pushes for cost efficiency. The tension between them produces better decisions than any single perspective could.</p>
+  </div>
+</div>
+
+<section class="reading-path" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
+  <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>
+  <a href="/platform/" style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-display);">The Platform →</a>
+  <p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">See what this board reviews — 43 Lambdas, 8 CDK stacks, 87 MCP tools</p>
+</section>
+
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <a href="/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="/live/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/></svg>
+    <span>Live</span>
+  </a>
+  <a href="/character/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span>Character</span>
+  </a>
+  <a href="/chronicle/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+    <span>Chronicle</span>
+  </a>
+  <a href="/ask/" class="bottom-nav__link">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>Ask</span>
+  </a>
+</nav>
+
+<footer class="footer-v2">
+  <div class="footer-v2__grid">
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The Story</div>
+      <a href="/" class="footer-v2__link">Home</a>
+      <a href="/story/" class="footer-v2__link">My Story</a>
+      <a href="/about/" class="footer-v2__link">The Mission</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The Data</div>
+      <a href="/live/" class="footer-v2__link">Live</a>
+      <a href="/character/" class="footer-v2__link">Character Sheet</a>
+      <a href="/habits/" class="footer-v2__link">Habits</a>
+      <a href="/accountability/" class="footer-v2__link">Progress</a>
+      <a href="/explorer/" class="footer-v2__link">Explorer</a>
+      <a href="/achievements/" class="footer-v2__link">Milestones</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The Science</div>
+      <a href="/protocols/" class="footer-v2__link">Protocols</a>
+      <a href="/experiments/" class="footer-v2__link">Experiments</a>
+      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
+      <a href="/sleep/" class="footer-v2__link">Sleep</a>
+      <a href="/glucose/" class="footer-v2__link">Glucose</a>
+      <a href="/supplements/" class="footer-v2__link">Supplements</a>
+      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">The Build</div>
+      <a href="/platform/" class="footer-v2__link">Platform</a>
+      <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
+      <a href="/board/" class="footer-v2__link">AI Board</a>
+      <a href="/cost/" class="footer-v2__link">Cost</a>
+      <a href="/methodology/" class="footer-v2__link">Methodology</a>
+      <a href="/tools/" class="footer-v2__link">Tools</a>
+    </div>
+    <div class="footer-v2__col">
+      <div class="footer-v2__heading">Follow</div>
+      <a href="/chronicle/" class="footer-v2__link">Weekly Journal</a>
+      <a href="/weekly/" class="footer-v2__link">Weekly Snapshots</a>
+      <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
+      <a href="/ask/" class="footer-v2__link">Ask the Data</a>
+      <a href="/rss.xml" class="footer-v2__link">RSS</a>
+      <a href="/privacy/" class="footer-v2__link">Privacy</a>
+    </div>
+  </div>
+  <div class="footer-v2__bottom">
+    <span class="footer-v2__brand">AMJ</span>
+    <span class="footer-v2__copy">// updated daily by life-platform</span>
+  </div>
+</footer>
+
+<script src="/assets/js/reveal.js"></script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>

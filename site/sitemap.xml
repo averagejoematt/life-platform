@@ -94,6 +94,16 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://averagejoematt.com/board/technical/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://averagejoematt.com/board/product/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://averagejoematt.com/cost/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
@@ -161,9 +171,19 @@
     <priority>0.4</priority>
   </url>
 
-  <!-- EXPLORER (standalone tool) -->
+  <!-- NEW PAGES -->
   <url>
     <loc>https://averagejoematt.com/explorer/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://averagejoematt.com/weekly/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://averagejoematt.com/achievements/</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
