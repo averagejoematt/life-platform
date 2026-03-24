@@ -1,5 +1,6 @@
 """
 canary_lambda.py — REL-4: Synthetic End-to-End Health Check Canary
+CI/CD Pipeline Version: v3.9.4 — first automated deploy test
 
 Runs every 4 hours. Verifies the platform's three critical data paths:
   1. DynamoDB write → read round-trip (STORE layer)
