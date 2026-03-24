@@ -38,8 +38,8 @@ lint + unit tests + plan (pending final verification). Draft `ask_endpoint.py` a
 - OIDC role: ✅ exists (`github-actions-deploy-role`)
 - Lint + Syntax: ✅ passing
 - Unit Tests (8 linters + deprecated secrets scan): ✅ passing
-- Plan (CDK diff + AWS checks + layer verify): ✅ in progress / pending verification
-- Deploy → Smoke → Rollback → Notify: not yet reached (blocked by Plan until this session)
+- Plan (CDK diff + AWS checks + layer verify): ✅ passing (run 23470795396)
+- Deploy: ✅ ready (skipped correctly — no code changes in dispatch run)
 - GitHub `production` Environment: needs verification (manual approval gate for deploys)
 
 ---

@@ -3,7 +3,7 @@
 This session (2026-03-23, CI/CD pipeline activation in Claude.ai):
 
 ## SESSION SUMMARY
-Activated the dormant CI/CD pipeline. The full pipeline (7 jobs, OIDC auth, auto-rollback, 9 integration checks, SNS notifications) was already written but had never successfully run. Three sequential blockers resolved across 4 CI runs. Shared layer infrastructure gap fixed. Pipeline now passing lint + unit tests; Plan job in progress on final verification run.
+Activated the dormant CI/CD pipeline. The full pipeline (7 jobs, OIDC auth, auto-rollback, 9 integration checks, SNS notifications) was already written but had never successfully run. Three sequential blockers resolved across 4 CI runs. Shared layer infrastructure gap fixed. Pipeline now fully passing lint + unit tests + plan. 5 blockers resolved across 6 CI runs. R13 #1 finding (no CI/CD) is CLOSED.
 
 ## COMPLETED THIS SESSION
 
@@ -45,9 +45,9 @@ Activated the dormant CI/CD pipeline. The full pipeline (7 jobs, OIDC auth, auto
 ## CI/CD PIPELINE STATUS (end of session)
 - Lint + Syntax Check: ✅ passing
 - Unit Tests (8 linters + deprecated secrets scan): ✅ passing
-- Plan (CDK diff + AWS checks + layer verify): ⏳ final verification run in progress (run 23470628420)
-- Deploy: not yet reached (requires Plan pass + `production` Environment approval gate)
-- Smoke test + Auto-rollback + Post-deploy checks: not yet reached
+- Plan (CDK diff + AWS checks + layer verify): ✅ passing (run 23470795396)
+- Deploy: ✅ ready (skipped correctly — no code changes in dispatch run). Requires `production` Environment approval gate.
+- Smoke test + Auto-rollback + Post-deploy checks: ready (will fire after first real deploy)
 - SNS failure notifications: ✅ working (fires on failures)
 
 ## KEY DECISIONS
@@ -84,7 +84,7 @@ Activated the dormant CI/CD pipeline. The full pipeline (7 jobs, OIDC auth, auto
 - R18: Next architecture review (timely given v3.8–3.9 changes)
 
 ## NEXT SESSION ENTRY POINT
-1. Check CI/CD run result: `gh run view 23470628420 --json jobs --jq '.jobs[] | {name: .name, conclusion: .conclusion}'`
-2. If Plan passed: test a full deploy cycle (make a small code change, push, watch pipeline end-to-end)
-3. If Plan failed: check `gh run view <id> --log-failed` and fix next blocker
-4. Once CI/CD is green end-to-end: move to CHRON-3/4 or NEW-4 (Dark Mode)
+1. CI/CD pipeline is GREEN (Lint ✅ Tests ✅ Plan ✅). R13 #1 finding closed.
+2. First real deploy test: make a small Lambda code change, push, watch full pipeline end-to-end including Deploy + Smoke
+3. Verify GitHub `production` Environment exists (manual approval gate for deploys)
+4. Once confirmed: move to technical work queue (CHRON-3/4, NEW-4 Dark Mode, etc.)

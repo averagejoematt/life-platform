@@ -257,4 +257,4 @@ Board Summit #3: 500 subscribers OR 90-day journey milestone (2026-05-22), which
 | Mobile navigation | ✅ Hamburger + bottom nav | — | Shipped v3.8.0 (was: NONE) |
 | Content filter | ✅ 3-layer active | — | S3 config + system prompt + response scrub (v3.8.0) |
 | Git deploy tags | site-v3.8.0 | — | First tagged deploy with rollback capability |
-| CI/CD pipeline | ✅ Lint + Tests + Plan passing | Full green | v3.9.4 — 3 blockers resolved, deploy gate pending verification |
+| CI/CD pipeline | ✅ Lint + Tests + Plan passing | Full green | v3.9.4 — 5 blockers resolved, R13 #1 finding CLOSED |
