@@ -1,3 +1,41 @@
+## v3.9.6 — 2026-03-24: Dark/Light mode, Milestones Gallery, 5 spec closures, CHRON-3 fix script
+
+### Summary
+NEW-4 dark/light mode toggle implemented across all pages via CSS custom properties + nav.js injection.
+NEW-3 Milestones Gallery page built at /achievements/ pulling from /api/achievements endpoint.
+CHAR-1, CHAR-2, CHAR-3, CHAR-6, PLAT-2 confirmed already shipped and marked in spec.
+CHRON-3 root cause diagnosed (handler mismatch) and fix script written.
+
+### Changes
+
+**site/assets/css/tokens.css**
+- Added `:root[data-theme="light"]` block with warm off-white palette, darker greens for legibility
+
+**site/assets/js/nav.js**
+- Theme toggle button auto-injected into nav on all pages (sun/moon SVG icons)
+- Reads/writes localStorage for persistence, defaults to dark
+
+**site/assets/css/base.css**
+- Added `.theme-toggle` button styles + light mode nav backdrop override
+
+**site/achievements/index.html** (NEW)
+- Full Milestones Gallery page: progress ring, summary strip, category-grouped badge grid
+- Pulls live data from `/api/achievements` endpoint
+- Category colors: streak (amber), level (green), milestone (blue), data (purple), science (red)
+- Earned badges show date chips + glow; locked badges show unlock hints
+
+**deploy/fix_chronicle_handler.sh** (NEW)
+- CHRON-3 fix: updates Lambda handler from `lambda_function.lambda_handler` to `wednesday_chronicle_lambda.lambda_handler`
+- Also checks chronicle-approve and chronicle-email-sender handlers
+- Verifies EventBridge schedule rule
+
+**docs/WEBSITE_REDESIGN_SPEC.md**
+- CHAR-1, CHAR-2, CHAR-3, CHAR-6, PLAT-2: marked ✅ confirmed shipped
+- NEW-3: marked ✅ page built
+- NEW-4: marked ✅ implemented
+
+---
+
 ## v3.9.5 — 2026-03-24: CI/CD first deploy test + smoke/I1 fixes
 
 ### Summary

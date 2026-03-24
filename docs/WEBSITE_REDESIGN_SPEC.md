@@ -2,7 +2,7 @@
 
 ## averagejoematt.com — Panel Audit Results → Actionable Tasks
 
-### Generated: March 22, 2026 | Updated: March 23, 2026
+### Generated: March 22, 2026 | Updated: March 24, 2026
 
 > **Source**: Page-by-page expert panel review (Mara Chen/UX, James Okafor/CTO, Sofia Herrera/CMO, Dr. Lena Johansson/Longevity, Raj Mehta/Product, Tyrell Washington/Design)
 > **Usage**: Claude Code works through tasks by priority. Each page section is a standalone session.
@@ -36,11 +36,11 @@ All 44 HTML files updated. 5-section dropdown: The Story | The Data | The Scienc
 - G-6: Bottom mobile nav (needs testing)
 - HOME-2: 4-quadrant vital signs (panel recommended, not yet built)
 - HOME-3: Day 1 vs Today 4 dimensions (partially done — weight + habits + sleep + level added)
-- CHAR-1: Thesis opener (not confirmed shipped)
-- CHAR-2: Interactive radar chart (not confirmed)
-- CHAR-3: Tier journey path (not confirmed)
-- CHAR-6: Calibrating state for low-data pillars (not confirmed)
-- PLAT-2: Hero architecture diagram (not confirmed)
+- CHAR-1: Thesis opener ✅ (confirmed v3.9.5 — italic quote section in character page)
+- CHAR-2: Interactive radar chart ✅ (confirmed v3.9.5 — SVG radar with click-to-highlight)
+- CHAR-3: Tier journey path ✅ (confirmed v3.9.5 — animated progress line with waypoints)
+- CHAR-6: Calibrating state for low-data pillars ✅ (confirmed v3.9.5 — pulsing label + confidence badge)
+- PLAT-2: Hero architecture diagram ✅ (confirmed v3.9.5 — full 5-zone SVG in platform page)
 - CHRON-3: Chronicle generation workflow fix
 - CHRON-4: Email preview/approval workflow
 - PROTO-2: Active experiment badges on protocol cards
@@ -73,7 +73,7 @@ All 44 HTML files updated. 5-section dropdown: The Story | The Data | The Scienc
 - **Files**: New `site/weekly/index.html`, `lambdas/site_api_lambda.py`
 - **Why it matters**: Lets visitors walk the entire journey chronologically. The empty weeks tell the story as much as the full ones.
 
-### NEW-3: Milestones / Achievement Gallery [P1] ⭐ MATTHEW APPROVED
+### NEW-3: Milestones / Achievement Gallery [P1] ⭐ MATTHEW APPROVED ✅ PAGE BUILT (v3.9.6)
 - **Concept**: Gamification badge wall with faded/locked badges that become full-color once achieved
 - **Badge categories**:
   - **Weight**: 10-lb milestone badges (290, 280, 270... down to 185). Faded until hit.
@@ -89,7 +89,7 @@ All 44 HTML files updated. 5-section dropdown: The Story | The Data | The Scienc
 - **Files**: Enhance existing `site/achievements/index.html` or rebuild, `lambdas/site_api_lambda.py`
 - **Why it matters**: Audience can see what's achievable and root for specific badges. Creates return visits ("did he hit 270 yet?").
 
-### NEW-4: Dark Mode / Light Mode Toggle [P2] ⭐ MATTHEW APPROVED
+### NEW-4: Dark Mode / Light Mode Toggle [P2] ⭐ MATTHEW APPROVED ✅ IMPLEMENTED (v3.9.6)
 - **Concept**: Toggle in nav bar, persist via localStorage, default to dark
 - **Implementation**: CSS custom properties already in tokens.css — add `:root[data-theme="light"]` overrides. Toggle button in nav. JS reads/writes `data-theme` attribute + localStorage.
 - **Files**: `site/assets/css/tokens.css`, all page nav HTML (or global nav.js)

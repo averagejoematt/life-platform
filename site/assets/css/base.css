@@ -237,6 +237,33 @@ body { padding-bottom: 36px; }
   color: var(--accent);
 }
 
+/* ── Theme toggle button ─────────────────────────────── */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  transition: color var(--dur-fast), border-color var(--dur-fast), background var(--dur-fast);
+  flex-shrink: 0;
+}
+.theme-toggle:hover {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+  background: var(--accent-bg-subtle);
+}
+.theme-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+/* Light mode nav backdrop override */
+:root[data-theme="light"] .nav {
+  background: rgba(244, 247, 245, 0.92);
+}
+
 /* ── Dropdown nav ────────────────────────────────────────── */
 .nav__dropdown {
   position: relative;
