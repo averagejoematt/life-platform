@@ -1,3 +1,30 @@
+## v3.9.5 — 2026-03-24: CI/CD first deploy test + smoke/I1 fixes
+
+### Summary
+First end-to-end CI/CD deploy test completed. Pipeline deployed canary Lambda to AWS successfully.
+Two post-deploy test failures fixed: qa-smoke Lambda not yet created (graceful skip added),
+I1 handler check not respecting `not_deployed` flag (filter added). Pipeline confirmed fully
+green on re-run. Production environment approval gate verified.
+
+### Changes
+
+**lambdas/canary_lambda.py**
+- Added CI/CD pipeline version marker (docstring comment — deploy trigger)
+
+**.github/workflows/ci-cd.yml**
+- Smoke test: check if qa-smoke Lambda exists before invoking; warn and skip if missing
+- Prevents false failure when qa-smoke CDK skeleton not yet deployed
+
+**tests/test_integration_aws.py**
+- I1 test: added `_load_not_deployed_functions()` helper
+- Skips Lambdas flagged `not_deployed` in lambda_map.json (google-calendar, dlq-consumer)
+- Prevents false failures for deliberately undeployed CDK skeletons
+
+**ci/lambda_map.json**
+- Marked `dlq-consumer` as `not_deployed: true` (Lambda not yet created in AWS)
+
+---
+
 ## v3.9.4 — 2026-03-23: CI/CD pipeline activation — 3 blockers resolved
 
 ### Summary
