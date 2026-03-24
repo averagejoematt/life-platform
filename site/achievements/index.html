@@ -2,16 +2,688 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="0; url=/character/">
-  <link rel="canonical" href="https://averagejoematt.com/character/">
-  <title>Redirecting…</title>
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Milestones — achievement badges earned through sustained effort. Weight milestones, habit streaks, character levels, and experiments.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Milestones — Matthew Walker">
+  <meta name="twitter:description" content="Achievement badges from a real body transformation. Earned through data, not declarations.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:title" content="Milestones — Matthew Walker">
+  <meta property="og:description" content="Achievement badges from a real body transformation. Earned through data, not declarations.">
+  <meta property="og:type" content="website">
+  <title>Milestones — Matthew Walker</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    /* ── Page header ────────────────────────────────────── */
+    .page-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+    }
+    .page-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .page-header__title span { color: var(--accent); }
+    .page-header__sub {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 560px;
+      line-height: var(--lh-body);
+    }
+
+    /* ── Summary strip ──────────────────────────────────── */
+    .summary-strip {
+      display: flex;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin: var(--space-8) var(--page-padding);
+    }
+    .summary-card {
+      flex: 1;
+      background: var(--surface);
+      padding: var(--space-6) var(--space-5);
+      text-align: center;
+    }
+    .summary-card__value {
+      font-family: var(--font-display);
+      font-size: 44px;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: var(--space-2);
+    }
+    .summary-card__value--muted { color: var(--text); }
+    .summary-card__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    /* ── Progress ring ──────────────────────────────────── */
+    .progress-ring {
+      display: flex;
+      justify-content: center;
+      padding: var(--space-10) var(--page-padding) var(--space-6);
+    }
+    .progress-ring svg { width: 160px; height: 160px; }
+    .progress-ring__bg { fill: none; stroke: var(--surface-raised); stroke-width: 8; }
+    .progress-ring__fill {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 8;
+      stroke-linecap: round;
+      transform: rotate(-90deg);
+      transform-origin: center;
+      transition: stroke-dashoffset 1.5s var(--ease-out);
+    }
+    .progress-ring__text {
+      font-family: var(--font-display);
+      font-size: 36px;
+      fill: var(--text);
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+    .progress-ring__sub {
+      font-size: 9px;
+      fill: var(--text-muted);
+      text-anchor: middle;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    /* ── Category section ───────────────────────────────── */
+    .badge-section {
+      padding: var(--space-10) var(--page-padding);
+      border-top: 1px solid var(--border);
+    }
+    .badge-section__header {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-4);
+      margin-bottom: var(--space-8);
+    }
+    .badge-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+    }
+    .badge-section__count {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    /* ── Badge grid ─────────────────────────────────────── */
+    .badge-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: var(--space-4);
+    }
+
+    /* ── Badge card ─────────────────────────────────────── */
+    .badge {
+      position: relative;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-6);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: var(--space-3);
+      transition: all var(--dur-mid) var(--ease-out);
+    }
+    .badge:hover { background: var(--surface-raised); }
+
+    /* Locked state */
+    .badge--locked { opacity: 0.45; }
+    .badge--locked:hover { opacity: 0.65; }
+
+    /* Earned state — category-colored glow */
+    .badge--earned {
+      border-color: var(--badge-color, var(--accent));
+      box-shadow: 0 0 20px color-mix(in srgb, var(--badge-color, var(--accent)) 25%, transparent);
+    }
+    .badge--earned .badge__ring-fill { stroke: var(--badge-color, var(--accent)); }
+
+    /* Badge icon ring */
+    .badge__ring {
+      width: 72px;
+      height: 72px;
+      position: relative;
+    }
+    .badge__ring svg {
+      width: 72px;
+      height: 72px;
+    }
+    .badge__ring-bg { fill: none; stroke: var(--surface-high); stroke-width: 3; }
+    .badge__ring-fill {
+      fill: none;
+      stroke: var(--text-faint);
+      stroke-width: 3;
+      stroke-linecap: round;
+      transform: rotate(-90deg);
+      transform-origin: center;
+      transition: stroke-dashoffset 1.2s var(--ease-out);
+    }
+    .badge__icon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 24px;
+      line-height: 1;
+    }
+    .badge--locked .badge__icon { filter: grayscale(1) opacity(0.5); }
+
+    .badge__name {
+      font-family: var(--font-display);
+      font-size: 18px;
+      letter-spacing: var(--ls-display);
+      color: var(--text);
+    }
+    .badge--earned .badge__name { color: var(--badge-color, var(--accent)); }
+
+    .badge__desc {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-mono);
+    }
+
+    .badge__status {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      margin-top: var(--space-1);
+    }
+    .badge--earned .badge__status { color: var(--badge-color, var(--accent)); }
+    .badge--locked .badge__status { color: var(--text-faint); }
+
+    .badge__date {
+      display: inline-block;
+      background: var(--bg);
+      border: 1px solid var(--badge-color, var(--accent));
+      color: var(--badge-color, var(--accent));
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-label);
+      padding: 2px var(--space-2);
+    }
+
+    /* Category colors */
+    .badge-section--streak  { --badge-color: #c8843a; }
+    .badge-section--level   { --badge-color: #00e5a0; }
+    .badge-section--milestone { --badge-color: #5ba4cf; }
+    .badge-section--data    { --badge-color: #8b6cc1; }
+    .badge-section--science { --badge-color: #e06060; }
+
+    /* ── Loading / error ───────────────────────────────── */
+    .badge-loading {
+      padding: var(--space-20) 0;
+      text-align: center;
+    }
+    .badge-loading__text {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-tag);
+      animation: pulse-load 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse-load { 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+    /* ── Responsive ────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .summary-strip { flex-wrap: wrap; }
+      .summary-card { min-width: calc(50% - 1px); }
+      .badge-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 480px) {
+      .badge-grid { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
-<body style="display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;">
-  <div>
-    <p style="color:var(--text-muted);font-size:var(--text-sm)">This page has moved.</p>
-    <a href="/character/" style="color:var(--accent);font-size:var(--text-base)">Go to Character →</a>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav__brand">AJM</a>
+  <div class="nav__links">
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Story</button>
+      <div class="nav__dropdown-menu">
+        <a href="/story/" class="nav__dropdown-item">My Story</a>
+        <a href="/about/" class="nav__dropdown-item">The Mission</a>
+      </div>
+    </div>
+    <div class="nav__dropdown is-active">
+      <button class="nav__dropdown-btn">The Data</button>
+      <div class="nav__dropdown-menu">
+        <a href="/live/" class="nav__dropdown-item">Live</a>
+        <a href="/character/" class="nav__dropdown-item">Character Sheet</a>
+        <a href="/habits/" class="nav__dropdown-item">Habits</a>
+        <a href="/accountability/" class="nav__dropdown-item">Progress</a>
+        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
+        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
+        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
+        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Science</button>
+      <div class="nav__dropdown-menu">
+        <a href="/protocols/" class="nav__dropdown-item">Protocols</a>
+        <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
+        <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">The Build</button>
+      <div class="nav__dropdown-menu">
+        <a href="/platform/" class="nav__dropdown-item">Platform</a>
+        <a href="/intelligence/" class="nav__dropdown-item">Intelligence</a>
+        <a href="/board/" class="nav__dropdown-item">AI Board</a>
+        <a href="/cost/" class="nav__dropdown-item">Cost</a>
+        <a href="/methodology/" class="nav__dropdown-item">Methodology</a>
+        <a href="/tools/" class="nav__dropdown-item">Tools</a>
+      </div>
+    </div>
+    <div class="nav__dropdown">
+      <button class="nav__dropdown-btn">Follow</button>
+      <div class="nav__dropdown-menu">
+        <a href="/chronicle/" class="nav__dropdown-item">Weekly Journal</a>
+        <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
+        <a href="/ask/" class="nav__dropdown-item">Ask the Data</a>
+      </div>
+    </div>
+    <a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>
   </div>
+  <button class="nav__hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="nav__status">
+    <div class="pulse"></div>
+    <span id="nav-date"></span>
+  </div>
+</nav>
+<!-- Mobile overlay menu -->
+<div class="nav-overlay">
+  <div class="nav-overlay__panel">
+    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Story</div>
+      <a href="/story/" class="nav-overlay__link">My Story</a>
+      <a href="/about/" class="nav-overlay__link">The Mission</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Data</div>
+      <a href="/live/" class="nav-overlay__link">Live</a>
+      <a href="/character/" class="nav-overlay__link">Character Sheet</a>
+      <a href="/habits/" class="nav-overlay__link">Habits</a>
+      <a href="/accountability/" class="nav-overlay__link">Progress</a>
+      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
+      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
+      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
+      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Science</div>
+      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
+      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
+      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">The Build</div>
+      <a href="/platform/" class="nav-overlay__link">Platform</a>
+      <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
+      <a href="/board/" class="nav-overlay__link">AI Board</a>
+      <a href="/cost/" class="nav-overlay__link">Cost</a>
+      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
+      <a href="/tools/" class="nav-overlay__link">Tools</a>
+    </div>
+    <div class="nav-overlay__section">
+      <div class="nav-overlay__heading">Follow</div>
+      <a href="/chronicle/" class="nav-overlay__link">Weekly Journal</a>
+      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
+      <a href="/ask/" class="nav-overlay__link">Ask the Data</a>
+      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
+      <a href="/privacy/" class="nav-overlay__link">Privacy</a>
+    </div>
+  </div>
+</div>
+
+<!-- Ticker -->
+<div class="ticker" style="margin-top:var(--nav-height)">
+  <div class="ticker__inner">
+    <span class="ticker__item">THE MEASURED LIFE</span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">WEIGHT <strong id="tk-weight">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">HRV <strong id="tk-hrv">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">RECOVERY <strong id="tk-recovery">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">STREAK <strong id="tk-streak">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">JOURNEY <strong id="tk-journey">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">THE MEASURED LIFE</span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">WEIGHT <strong id="tk-weight-2">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">HRV <strong id="tk-hrv-2">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">RECOVERY <strong id="tk-recovery-2">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">STREAK <strong id="tk-streak-2">—</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item">JOURNEY <strong id="tk-journey-2">—</strong></span>
+    <span class="ticker__item">⬥</span>
+  </div>
+</div>
+
+<!-- Header -->
+<div class="page-header reveal">
+  <div class="eyebrow">The Data</div>
+  <h1 class="page-header__title"><span id="h-earned">—</span> of <span id="h-total">—</span> <span>Unlocked</span></h1>
+  <p class="page-header__sub">Badges are computed from live data — weight milestones, habit streaks, character levels, experiments completed. You can't fake these. They unlock when the numbers say so.</p>
+</div>
+
+<!-- Progress ring + summary -->
+<div class="progress-ring reveal" id="progress-ring">
+  <svg viewBox="0 0 160 160">
+    <circle class="progress-ring__bg" cx="80" cy="80" r="68"/>
+    <circle class="progress-ring__fill" id="ring-fill" cx="80" cy="80" r="68"
+      stroke-dasharray="427.3" stroke-dashoffset="427.3"/>
+    <text class="progress-ring__text" x="80" y="74" id="ring-pct">—</text>
+    <text class="progress-ring__sub" x="80" y="96">COMPLETE</text>
+  </svg>
+</div>
+
+<div class="summary-strip reveal" id="summary-strip">
+  <div class="summary-card">
+    <div class="summary-card__value" id="sum-streak">—</div>
+    <div class="summary-card__label">Current streak</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-card__value summary-card__value--muted" id="sum-days">—</div>
+    <div class="summary-card__label">Days tracked</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-card__value summary-card__value--muted" id="sum-level">—</div>
+    <div class="summary-card__label">Character level</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-card__value summary-card__value--muted" id="sum-weight">—</div>
+    <div class="summary-card__label">Current lbs</div>
+  </div>
+</div>
+
+<!-- Badge sections (populated by JS) -->
+<div id="badge-sections">
+  <div class="badge-loading">
+    <div class="badge-loading__text">// loading achievements from live data…</div>
+  </div>
+</div>
+
+<!-- N=1 Disclaimer -->
+<aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle);">
+  <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label);">
+    <span style="color:var(--accent-dim)">// ABOUT THESE BADGES</span><br>
+    Every badge is computed from real data — Withings scale readings, Habitify streaks,
+    DynamoDB character records, experiment completions. No self-reporting, no manual overrides.
+    If a badge says "earned," the data confirmed it. If it says "locked," the number hasn't been hit yet.
+  </p>
+</aside>
+
+<!-- Email CTA -->
+<section class="email-cta-footer reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface);text-align:center;">
+  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
+  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get notified when badges unlock.</h3>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
+    Real numbers from 19 data sources. Every Wednesday, in your inbox.
+  </p>
+  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
+    <input id="cta-email-milestones" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);outline:none;transition:border-color var(--dur-fast);" onfocus="this.style.borderColor='var(--c-amber-400)'" onblur="this.style.borderColor='var(--c-amber-500)'">
+    <button onclick="amjSubscribe('milestones')" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">Subscribe</button>
+  </div>
+  <p id="cta-msg-milestones" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
+</section>
+<script>
+(function() {
+  if (!window.amjSubscribe) {
+    window.amjSubscribe = async function(slug) {
+      var email = document.getElementById('cta-email-' + slug).value.trim();
+      var msg = document.getElementById('cta-msg-' + slug);
+      if (!email || !email.includes('@')) { msg.textContent = 'Enter a valid email address.'; msg.style.color = 'var(--c-yellow-status)'; return; }
+      msg.textContent = 'Subscribing…'; msg.style.color = 'var(--text-muted)';
+      try {
+        var res = await fetch('/api/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, source: slug + '_cta' }) });
+        var data = await res.json();
+        if (res.ok) { msg.textContent = '✓ Check your inbox to confirm.'; msg.style.color = 'var(--c-amber-500)'; document.getElementById('cta-email-' + slug).value = ''; }
+        else { msg.textContent = data.error || 'Something went wrong.'; msg.style.color = 'var(--c-yellow-status)'; }
+      } catch(e) { msg.textContent = 'Network error — try again.'; msg.style.color = 'var(--c-yellow-status)'; }
+    };
+  }
+  var inp = document.getElementById('cta-email-milestones');
+  if (inp) inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') window.amjSubscribe('milestones'); });
+})();
+</script>
+
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <a href="/" class="bottom-nav__link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>Home</span></a>
+  <a href="/live/" class="bottom-nav__link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/></svg><span>Live</span></a>
+  <a href="/character/" class="bottom-nav__link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><span>Character</span></a>
+  <a href="/chronicle/" class="bottom-nav__link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span>Chronicle</span></a>
+  <a href="/ask/" class="bottom-nav__link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>Ask</span></a>
+</nav>
+
+<section class="reading-path" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
+  <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>
+  <a href="/character/" style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-display);">See the full Character Sheet →</a>
+  <p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">7-pillar scoring system driving these badges</p>
+</section>
+
+<footer class="footer-v2">
+  <div class="footer-v2__grid">
+    <div class="footer-v2__col"><div class="footer-v2__heading">The Story</div><a href="/" class="footer-v2__link">Home</a><a href="/story/" class="footer-v2__link">My Story</a><a href="/about/" class="footer-v2__link">The Mission</a></div>
+    <div class="footer-v2__col"><div class="footer-v2__heading">The Data</div><a href="/live/" class="footer-v2__link">Live</a><a href="/character/" class="footer-v2__link">Character Sheet</a><a href="/habits/" class="footer-v2__link">Habits</a><a href="/accountability/" class="footer-v2__link">Progress</a></div>
+    <div class="footer-v2__col"><div class="footer-v2__heading">The Science</div><a href="/protocols/" class="footer-v2__link">Protocols</a><a href="/experiments/" class="footer-v2__link">Experiments</a><a href="/discoveries/" class="footer-v2__link">Discoveries</a><a href="/sleep/" class="footer-v2__link">Sleep</a><a href="/glucose/" class="footer-v2__link">Glucose</a><a href="/supplements/" class="footer-v2__link">Supplements</a><a href="/benchmarks/" class="footer-v2__link">Benchmarks</a></div>
+    <div class="footer-v2__col"><div class="footer-v2__heading">The Build</div><a href="/platform/" class="footer-v2__link">Platform</a><a href="/intelligence/" class="footer-v2__link">Intelligence</a><a href="/board/" class="footer-v2__link">AI Board</a><a href="/cost/" class="footer-v2__link">Cost</a><a href="/methodology/" class="footer-v2__link">Methodology</a><a href="/tools/" class="footer-v2__link">Tools</a></div>
+    <div class="footer-v2__col"><div class="footer-v2__heading">Follow</div><a href="/chronicle/" class="footer-v2__link">Weekly Journal</a><a href="/subscribe/" class="footer-v2__link">Subscribe</a><a href="/ask/" class="footer-v2__link">Ask the Data</a><a href="/rss.xml" class="footer-v2__link">RSS</a><a href="/privacy/" class="footer-v2__link">Privacy</a></div>
+  </div>
+  <div class="footer-v2__bottom">
+    <span class="footer-v2__brand">AMJ</span>
+    <span class="footer-v2__copy">// updated daily by life-platform</span>
+  </div>
+</footer>
+
+<script>
+(function() {
+  'use strict';
+
+  var CATEGORY_META = {
+    streak:    { label: 'Streaks',          emoji: '🔥', order: 1 },
+    level:     { label: 'Level Milestones', emoji: '⬡',  order: 2 },
+    milestone: { label: 'Weight Milestones',emoji: '⚖️', order: 3 },
+    data:      { label: 'Data Consistency', emoji: '📊', order: 4 },
+    science:   { label: 'Experiments',      emoji: '🔬', order: 5 },
+  };
+
+  var BADGE_ICONS = {
+    week_warrior:          '🔥',
+    monthly_grind:         '🔥',
+    quarterly:             '🔥',
+    first_level_up:        '⬡',
+    apprentice:            '⬡',
+    journeyman:            '⬡',
+    lost_20:               '⚖️',
+    sub_280:               '⚖️',
+    sub_260:               '⚖️',
+    '100_days':            '📊',
+    '365_days':            '📊',
+    first_experiment:      '🔬',
+    hypothesis_confirmed:  '🔬',
+  };
+
+  // Circumference of badge ring (r=30)
+  var CIRC = 2 * Math.PI * 30;
+
+  function renderBadgeRing(earned) {
+    var pct = earned ? 100 : 0;
+    var offset = CIRC - (pct / 100) * CIRC;
+    return '<svg viewBox="0 0 72 72">' +
+      '<circle class="badge__ring-bg" cx="36" cy="36" r="30"/>' +
+      '<circle class="badge__ring-fill" cx="36" cy="36" r="30" ' +
+        'stroke-dasharray="' + CIRC.toFixed(1) + '" ' +
+        'stroke-dashoffset="' + offset.toFixed(1) + '"/>' +
+      '</svg>';
+  }
+
+  function renderBadge(badge) {
+    var cls = badge.earned ? 'badge badge--earned' : 'badge badge--locked';
+    var icon = BADGE_ICONS[badge.id] || '🏅';
+    var statusText = '';
+    if (badge.earned) {
+      statusText = '✓ Earned';
+    } else if (badge.unlock_hint) {
+      statusText = badge.unlock_hint;
+    } else {
+      statusText = 'Locked';
+    }
+    var dateHtml = '';
+    if (badge.earned && badge.earned_date) {
+      try {
+        var d = new Date(badge.earned_date + 'T12:00:00');
+        dateHtml = '<div class="badge__date">' +
+          d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase() +
+          '</div>';
+      } catch(e) {}
+    }
+
+    return '<div class="' + cls + '">' +
+      '<div class="badge__ring">' + renderBadgeRing(badge.earned) +
+        '<div class="badge__icon">' + icon + '</div>' +
+      '</div>' +
+      '<div class="badge__name">' + badge.label + '</div>' +
+      '<div class="badge__desc">' + badge.description + '</div>' +
+      dateHtml +
+      '<div class="badge__status">' + statusText + '</div>' +
+    '</div>';
+  }
+
+  function render(data) {
+    var badges = data.achievements || [];
+    var summary = data.summary || {};
+
+    // Header
+    document.getElementById('h-earned').textContent = summary.earned || 0;
+    document.getElementById('h-total').textContent = summary.total || badges.length;
+
+    // Progress ring
+    var pct = summary.total > 0 ? Math.round((summary.earned / summary.total) * 100) : 0;
+    document.getElementById('ring-pct').textContent = pct + '%';
+    var ringCirc = 2 * Math.PI * 68;
+    var ringOffset = ringCirc - (pct / 100) * ringCirc;
+    setTimeout(function() {
+      document.getElementById('ring-fill').style.strokeDashoffset = ringOffset;
+    }, 300);
+
+    // Summary cards
+    document.getElementById('sum-streak').textContent = summary.current_streak || 0;
+    document.getElementById('sum-days').textContent = summary.days_tracked || 0;
+    document.getElementById('sum-level').textContent = summary.current_level || 0;
+    document.getElementById('sum-weight').textContent = summary.current_weight ? summary.current_weight.toFixed(1) : '—';
+
+    // Group by category
+    var groups = {};
+    badges.forEach(function(b) {
+      var cat = b.category || 'other';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(b);
+    });
+
+    // Sort categories by defined order
+    var catKeys = Object.keys(groups).sort(function(a, b) {
+      return ((CATEGORY_META[a] || {}).order || 99) - ((CATEGORY_META[b] || {}).order || 99);
+    });
+
+    var html = '';
+    catKeys.forEach(function(cat) {
+      var meta = CATEGORY_META[cat] || { label: cat, emoji: '🏅' };
+      var catBadges = groups[cat];
+      var earned = catBadges.filter(function(b) { return b.earned; }).length;
+      html += '<section class="badge-section badge-section--' + cat + ' reveal">' +
+        '<div class="badge-section__header">' +
+          '<div class="eyebrow">' + meta.emoji + '</div>' +
+          '<h2 class="badge-section__title">' + meta.label + '</h2>' +
+          '<div class="badge-section__count">' + earned + ' / ' + catBadges.length + '</div>' +
+        '</div>' +
+        '<div class="badge-grid">';
+      catBadges.forEach(function(b) { html += renderBadge(b); });
+      html += '</div></section>';
+    });
+
+    document.getElementById('badge-sections').innerHTML = html;
+
+    // Trigger reveal animations
+    document.querySelectorAll('.reveal').forEach(function(el) {
+      el.classList.add('is-visible');
+    });
+  }
+
+  // Fetch from API
+  fetch('/api/achievements')
+    .then(function(r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
+    .then(render)
+    .catch(function(err) {
+      console.warn('[milestones] API error:', err);
+      document.getElementById('badge-sections').innerHTML =
+        '<div class="badge-loading">' +
+          '<div class="badge-loading__text">// could not load achievements — try refreshing</div>' +
+        '</div>';
+    });
+
+  // Ticker
+  fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(raw) {
+      if (!raw) return;
+      var v = raw.vitals || {}, j = raw.journey || {}, p = raw.platform || {};
+      var setText = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; };
+      setText('nav-date', new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+      var streak = p.tier0_streak != null ? p.tier0_streak : 0;
+      [
+        ['tk-weight', v.weight_lbs ? v.weight_lbs.toFixed(1) + ' LBS' : '—'],
+        ['tk-hrv', v.hrv_ms ? Math.round(v.hrv_ms) + ' MS' : '—'],
+        ['tk-recovery', v.recovery_pct ? Math.round(v.recovery_pct) + '%' : '—'],
+        ['tk-streak', streak + 'D STREAK'],
+        ['tk-journey', j.progress_pct != null ? j.progress_pct.toFixed(1) + '% TO GOAL' : '—'],
+        ['tk-weight-2', v.weight_lbs ? v.weight_lbs.toFixed(1) + ' LBS' : '—'],
+        ['tk-hrv-2', v.hrv_ms ? Math.round(v.hrv_ms) + ' MS' : '—'],
+        ['tk-recovery-2', v.recovery_pct ? Math.round(v.recovery_pct) + '%' : '—'],
+        ['tk-streak-2', streak + 'D STREAK'],
+        ['tk-journey-2', j.progress_pct != null ? j.progress_pct.toFixed(1) + '% TO GOAL' : '—'],
+      ].forEach(function(pair) { setText(pair[0], pair[1]); });
+    })
+    .catch(function() {});
+})();
+</script>
+
+<script src="/assets/js/reveal.js"></script>
+<script src="/assets/js/nav.js"></script>
 </body>
 </html>

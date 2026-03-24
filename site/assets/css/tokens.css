@@ -85,6 +85,46 @@
   --border-subtle:    var(--c-border-subtle);
 }
 
+/* ── 2b. Light mode overrides ─────────────────────────────── */
+:root[data-theme="light"] {
+  /* Base surfaces — warm off-white with green undertone */
+  --c-black:          #f4f7f5;
+  --c-surface-1:      #eaf0ec;
+  --c-surface-2:      #dfe8e2;
+  --c-surface-3:      #d4ddd7;
+
+  /* Signal green — darker for legibility on light bg */
+  --c-green-500:      #00855e;
+  --c-green-400:      #006e4e;
+  --c-green-300:      #005a3f;
+  --c-green-100:      rgba(0, 133, 94, 0.10);
+  --c-green-050:      rgba(0, 133, 94, 0.05);
+
+  /* Journal amber — richer for light mode */
+  --c-amber-500:      #a06820;
+  --c-amber-400:      #c8843a;
+  --c-amber-300:      #7a5018;
+  --c-amber-100:      rgba(160, 104, 32, 0.10);
+  --c-amber-050:      rgba(160, 104, 32, 0.05);
+
+  /* Text — dark greens on light */
+  --c-text-primary:   #1a2c1e;
+  --c-text-secondary: #4a6050;
+  --c-text-muted:     #7a9080;
+  --c-text-disabled:  #b0c0b5;
+
+  /* Borders — darker for contrast */
+  --c-border-strong:  rgba(0, 133, 94, 0.30);
+  --c-border-mid:     rgba(0, 133, 94, 0.15);
+  --c-border-subtle:  rgba(0, 133, 94, 0.08);
+  --c-border-neutral: rgba(0, 0, 0, 0.08);
+
+  /* Status — adjusted for light bg readability */
+  --c-green-status:   #00855e;
+  --c-yellow-status:  #c47d10;
+  --c-red-status:     #d43030;
+}
+
 /* ── 3. Typography ───────────────────────────────────────── */
 :root {
   /* Fonts */
