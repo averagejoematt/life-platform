@@ -150,6 +150,60 @@
     .loading-pulse { animation: pulse 1.5s ease-in-out infinite; }
     @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
 
+    /* Submit Finding */
+    .finding-section {
+      margin-top: var(--space-10); padding: var(--space-8);
+      border: 1px solid var(--border); background: var(--surface); position: relative;
+    }
+    .finding-section::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--c-amber-500) 0%, var(--accent-dim) 50%, transparent 100%);
+    }
+    .finding-section__heading {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--c-amber-500); margin-bottom: var(--space-2);
+    }
+    .finding-section__title {
+      font-family: var(--font-display); font-size: var(--text-h3);
+      letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-2);
+    }
+    .finding-section__sub {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text-muted); line-height: var(--lh-mono); margin-bottom: var(--space-6);
+    }
+    .finding-form { display: grid; gap: var(--space-4); max-width: 560px; }
+    .finding-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+    .finding-input, .finding-textarea {
+      background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      font-family: var(--font-mono); font-size: var(--text-xs); padding: var(--space-3) var(--space-4);
+      outline: none; transition: border-color var(--dur-fast); width: 100%; box-sizing: border-box;
+    }
+    .finding-input:focus, .finding-textarea:focus { border-color: var(--accent); }
+    .finding-input::placeholder, .finding-textarea::placeholder { color: var(--text-faint); }
+    .finding-textarea { min-height: 80px; resize: vertical; }
+    .finding-label {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--text-muted); margin-bottom: var(--space-1); display: block;
+    }
+    .finding-submit {
+      background: var(--c-amber-500); border: 1px solid var(--c-amber-500);
+      color: var(--bg); font-family: var(--font-mono); font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      padding: var(--space-3) var(--space-6); cursor: pointer; transition: all var(--dur-fast);
+      justify-self: start;
+    }
+    .finding-submit:hover { background: transparent; color: var(--c-amber-500); }
+    .finding-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+    .finding-msg {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-label); min-height: 1.2em;
+    }
+    .finding-success { color: var(--accent); }
+    .finding-error { color: #ff5252; }
+    @media (max-width: 768px) { .finding-row { grid-template-columns: 1fr; } }
+
     @media (max-width: 768px) {
       .corr-grid { grid-template-columns: 1fr; }
       .detail-grid { grid-template-columns: 1fr 1fr; }
@@ -163,8 +217,8 @@
   <div class="nav__links">
     <div class="nav__dropdown"><button class="nav__dropdown-btn">The Story</button><div class="nav__dropdown-menu"><a href="/story/" class="nav__dropdown-item">My Story</a><a href="/about/" class="nav__dropdown-item">The Mission</a></div></div>
     <div class="nav__dropdown is-active"><button class="nav__dropdown-btn">The Data</button><div class="nav__dropdown-menu"><a href="/live/" class="nav__dropdown-item">Live</a><a href="/character/" class="nav__dropdown-item">Character Sheet</a><a href="/habits/" class="nav__dropdown-item">Habits</a><a href="/accountability/" class="nav__dropdown-item">Progress</a><a href="/sleep/" class="nav__dropdown-item">Sleep</a><a href="/glucose/" class="nav__dropdown-item">Glucose</a><a href="/supplements/" class="nav__dropdown-item">Supplements</a><a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
-        <a href="/explorer/" class="nav__dropdown-item">Explorer</a>
-        <a href="/achievements/" class="nav__dropdown-item">Milestones</a><a href="/explorer/" class="nav__dropdown-item active">Data Explorer</a></div></div>
+        <a href="/explorer/" class="nav__dropdown-item active">Data Explorer</a>
+        <a href="/achievements/" class="nav__dropdown-item">Milestones</a></div></div>
     <div class="nav__dropdown"><button class="nav__dropdown-btn">The Science</button><div class="nav__dropdown-menu"><a href="/protocols/" class="nav__dropdown-item">Protocols</a><a href="/experiments/" class="nav__dropdown-item">Experiments</a><a href="/discoveries/" class="nav__dropdown-item">Discoveries</a></div></div>
     <div class="nav__dropdown"><button class="nav__dropdown-btn">The Build</button><div class="nav__dropdown-menu"><a href="/platform/" class="nav__dropdown-item">Platform</a><a href="/intelligence/" class="nav__dropdown-item">Intelligence</a><a href="/board/" class="nav__dropdown-item">AI Board</a><a href="/cost/" class="nav__dropdown-item">Cost</a><a href="/methodology/" class="nav__dropdown-item">Methodology</a><a href="/tools/" class="nav__dropdown-item">Tools</a></div></div>
     <div class="nav__dropdown"><button class="nav__dropdown-btn">Follow</button><div class="nav__dropdown-menu"><a href="/chronicle/" class="nav__dropdown-item">Weekly Journal</a>
@@ -220,6 +274,23 @@
   <div class="corr-grid" id="corr-grid">
     <div style="grid-column:1/-1;text-align:center;padding:var(--space-20) 0">
       <div class="loading-pulse" style="font-family:var(--font-display);font-size:36px;color:var(--text-muted);letter-spacing:var(--ls-display)">Loading correlations&hellip;</div>
+    </div>
+  </div>
+
+  <!-- Submit a Finding -->
+  <div class="finding-section" id="finding-section">
+    <div class="finding-section__heading">// community</div>
+    <div class="finding-section__title">Submit a Finding</div>
+    <p class="finding-section__sub">Spotted an interesting correlation? Submit it for review. If validated, it could become a Discovery or seed a new Experiment.</p>
+    <div class="finding-form" id="finding-form">
+      <div class="finding-row">
+        <div><label class="finding-label" for="f-metric-a">Metric A</label><input id="f-metric-a" class="finding-input" placeholder="e.g. Sleep Hours" maxlength="100"></div>
+        <div><label class="finding-label" for="f-metric-b">Metric B</label><input id="f-metric-b" class="finding-input" placeholder="e.g. Next-day HRV" maxlength="100"></div>
+      </div>
+      <div><label class="finding-label" for="f-finding">What did you find?</label><textarea id="f-finding" class="finding-textarea" placeholder="Describe the pattern you noticed…" maxlength="500"></textarea></div>
+      <div><label class="finding-label" for="f-email">Email (optional — get notified if promoted)</label><input id="f-email" class="finding-input" type="email" placeholder="your@email.com" maxlength="254"></div>
+      <button class="finding-submit" id="f-submit" onclick="submitFinding()">Submit Finding</button>
+      <div class="finding-msg" id="f-msg"></div>
     </div>
   </div>
 
@@ -377,7 +448,8 @@ var inp=document.getElementById('cta-email-explorer');if(inp)inp.addEventListene
       '<div class="detail-cell"><div class="detail-cell__label">Strength</div><div class="detail-cell__value">' + strengthLabel(p.strength) + '</div></div>' +
       '<div class="detail-cell"><div class="detail-cell__label">Sample Size</div><div class="detail-cell__value">n=' + p.n + '</div></div>' +
       '<div class="detail-cell"><div class="detail-cell__label">FDR Significant</div><div class="detail-cell__value">' + (p.fdr_significant ? 'Yes \u2713' : 'No') + '</div></div>';
-    document.getElementById('detail-interp').innerHTML = interpret(p);
+    document.getElementById('detail-interp').innerHTML = interpret(p) +
+      '<div style="margin-top:var(--space-4)"><button style="background:none;border:1px solid var(--c-amber-500);color:var(--c-amber-500);font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;padding:var(--space-2) var(--space-4);cursor:pointer" onclick="prefillFinding(\'' + p.label_a.replace(/'/g,"") + '\',\'' + p.label_b.replace(/'/g,"") + '\')">Submit a finding about this pair &rarr;</button></div>';
     panel.classList.add('is-open');
     panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -433,6 +505,60 @@ var inp=document.getElementById('cta-email-explorer');if(inp)inp.addEventListene
         '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);margin-top:var(--space-4)">Correlations are computed weekly. Check back soon.</div></div>';
     });
 })();
+</script>
+<script>
+function prefillFinding(a, b) {
+  document.getElementById('f-metric-a').value = a.replace(/_/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+  document.getElementById('f-metric-b').value = b.replace(/_/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+  document.getElementById('finding-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(function(){ document.getElementById('f-finding').focus(); }, 400);
+}
+function submitFinding() {
+  var btn = document.getElementById('f-submit');
+  var msg = document.getElementById('f-msg');
+  var metricA = document.getElementById('f-metric-a').value.trim();
+  var metricB = document.getElementById('f-metric-b').value.trim();
+  var finding = document.getElementById('f-finding').value.trim();
+  var email   = document.getElementById('f-email').value.trim();
+
+  msg.textContent = ''; msg.className = 'finding-msg';
+
+  if (!metricA || !metricB) { msg.textContent = 'Both metrics are required.'; msg.classList.add('finding-error'); return; }
+  if (!finding || finding.length < 10) { msg.textContent = 'Please describe your finding (at least 10 characters).'; msg.classList.add('finding-error'); return; }
+  if (email && !email.includes('@')) { msg.textContent = 'Enter a valid email or leave blank.'; msg.classList.add('finding-error'); return; }
+
+  btn.disabled = true;
+  msg.textContent = 'Submitting\u2026'; msg.style.color = 'var(--text-muted)';
+
+  fetch('/api/submit_finding', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ metric_a: metricA, metric_b: metricB, finding: finding, email: email || undefined })
+  })
+  .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, status: r.status, data: d }; }); })
+  .then(function(res) {
+    btn.disabled = false;
+    if (res.ok && res.data.success) {
+      msg.textContent = '\u2713 ' + res.data.message;
+      msg.className = 'finding-msg finding-success';
+      document.getElementById('f-metric-a').value = '';
+      document.getElementById('f-metric-b').value = '';
+      document.getElementById('f-finding').value = '';
+      document.getElementById('f-email').value = '';
+      if (res.data.remaining !== undefined) {
+        msg.textContent += ' (' + res.data.remaining + ' submissions remaining this hour)';
+      }
+    } else {
+      msg.textContent = res.data.error || 'Something went wrong.';
+      msg.className = 'finding-msg finding-error';
+    }
+  })
+  .catch(function() {
+    btn.disabled = false;
+    msg.textContent = 'Network error \u2014 try again.';
+    msg.className = 'finding-msg finding-error';
+  });
+}
 </script>
 <script src="/assets/js/reveal.js"></script>
 <script src="/assets/js/nav.js"></script>
