@@ -58,12 +58,7 @@ Nav dropdown update across all 45+ HTML files (3 new page links). Built BOARD-2 
 ### From prior sessions (unchanged)
 - CHRON-3: Run `bash deploy/fix_chronicle_handler.sh`, test, verify EventBridge
 - CHRON-4: Chronicle email preview/approval test (needs CHRON-3 fix deployed first)
-- G-7: Subscribe SES verification — run diagnostic commands:
-  ```
-  aws sesv2 get-account --region us-west-2 --query 'ProductionAccessEnabled'
-  aws sesv2 list-email-identities --region us-west-2 --query 'EmailIdentities[].{Identity:IdentityName,Type:IdentityType,Status:SendingEnabled}'
-  aws lambda get-function-configuration --function-name life-platform-email-subscriber --region us-east-1 --query 'Environment.Variables.EMAIL_SENDER' --no-cli-pager
-  ```
+- G-7: ✅ CLOSED — SES production mode, domain verified, Lambda logs confirm emails sending successfully (last confirmed 2026-03-22). Function name is `email-subscriber` in us-east-1 (not `life-platform-email-subscriber`).
 - G-8: Privacy page email (needs Matthew confirmation)
 - G-6: Mobile bottom nav test (manual device testing)
 - STORY-6: Chapter content from Matthew interview
