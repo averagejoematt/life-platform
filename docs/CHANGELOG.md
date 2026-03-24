@@ -1,3 +1,78 @@
+## v3.9.9 — 2026-03-24: Content consistency architecture (ADR-034), doc sync, public_stats fix
+
+### Summary
+Joint Product + Technical Board session on website content consistency. Built a 3-layer content architecture: `site_constants.js` (single source of truth for factual values), `components.js` (shared nav/footer/CTA/bottom-nav), `content_manifest.json` (prose inventory for journey reframes), `data_sources.json` (source registry). Created migration tooling + CI linter. Also: doc sync (17 tasks flipped ⬜→✅ in PROJECT_PLAN), REDESIGN_SPEC backend endpoints marked done, public_stats.json staleness root-caused and fixed (site_writer.py added to shared Lambda layer v11), OE-09 doc consolidation, CI/CD p3 scripts restored from archive.
+
+### Changes
+
+**site/assets/js/site_constants.js** (NEW — ADR-034)
+- Single source of truth: journey constants (302, 185, dates, phase), platform counts, bios, OG meta descriptions, reading path definitions
+- Auto-injects values into `data-const="key.path"` HTML attributes at page load
+
+**site/assets/js/components.js** (NEW — ADR-034)
+- Shared structural components: nav, mobile overlay, footer, bottom-nav, subscribe CTA, reading path
+- Pages use mount-point `<div id="amj-nav">` etc. — edit once, 54 pages update
+- Contains nav section definitions, footer column layout, subscribe helper function
+
+**site/data/content_manifest.json** (NEW — ADR-034)
+- Prose inventory: every journey-sensitive paragraph catalogued per-page
+- Categories: constant / api_driven / prose_with_facts / narrative / archive
+- `fragile_strings` list for CI lint: "302", "185", dates, tool counts
+- Explicitly notes methodology/source grid lists "Oura" which is a factual error
+
+**site/data/data_sources.json** (NEW — ADR-034)
+- 19-source registry with id, name, category, metrics, ingestion method
+- Replaces per-page hardcoded source lists (methodology/, platform/, about/)
+
+**deploy/lint_site_content.py** (NEW — ADR-034)
+- CI-ready validator: data-const refs resolve, fragile strings not hardcoded in migrated pages, source count consistency
+
+**deploy/migrate_page_to_components.py** (NEW — ADR-034)
+- Mechanical migration: strips inline nav/footer/CTA, replaces with mount-point divs
+- `--all --dry-run` mode tested: 50 of 50 pages eligible, avg 30% size reduction
+- Handles: nav+overlay, bottom-nav, footer, subscribe CTA, reading path, duplicate amjSubscribe removal
+
+**docs/DECISIONS.md** (ADR-034 added)
+- Full architecture decision record documenting the 3-layer approach, alternatives considered (Hugo, SSI, CMS, find-and-replace), and rationale
+
+**docs/PROJECT_PLAN.md** (major sync)
+- 17 task IDs flipped ⬜→✅: CHAR-1/2/3/6, PLAT-2, PROTO-2/3/4, EXP-1, HAB-4, BOARD-2, NEW-1/2/3/4, HOME-2/3
+- Phase 1 summary updated, OE-09 marked done
+
+**docs/WEBSITE_REDESIGN_SPEC.md** (sync)
+- 4 "still needed" backend endpoints marked ✅ with actual function names + line numbers
+- Phase 2 + Phase 3 status updated
+
+**deploy/build_layer.sh** (ENHANCED)
+- Added `site_writer.py` to shared layer module list
+
+**ci/lambda_map.json** (ENHANCED)
+- `site_writer.py` moved from skip_deploy to shared_layer.modules
+
+**deploy/p3_build_shared_utils_layer.sh** (RESTORED from archive)
+- Was in `deploy/archive/20260311/` but CI/CD pipeline references `deploy/`
+- Updated module list includes `site_writer.py`, `sick_day_checker.py`, `digest_utils.py`
+
+**deploy/p3_attach_shared_utils_layer.sh** (RESTORED from archive)
+- Updated consumer list matches ci/lambda_map.json (15 consumers)
+
+**docs/ONBOARDING.md** (sync)
+- Dead `USER_GUIDE.md` ref → `PLATFORM_GUIDE.md`; sources 20→19; tools 88→95; Lambdas 42→49; Google Calendar removed
+
+**docs/PLATFORM_GUIDE.md** (sync)
+- Sources 20→19; Google Calendar retired in data sources + auto-sync + NL query section
+
+**docs/MCP_TOOL_CATALOG.md** (sync)
+- Dead `USER_GUIDE.md` ref → ARCHITECTURE.md + SCHEMA.md
+
+### Deployed
+- `python3 deploy/fix_public_stats.py --write` — fresh public_stats.json from live DynamoDB
+- `npx cdk deploy LifePlatformCore` — shared layer v11 published with site_writer.py
+- `bash deploy/p3_attach_shared_utils_layer.sh` — all 15 consumers on layer v11
+- Tomorrow's daily brief will auto-refresh public_stats.json via site_writer in the layer
+
+---
+
 ## v3.9.8 — 2026-03-24: Nav update (3 new pages), Board sub-pages, sitemap expansion
 
 ### Summary
