@@ -149,11 +149,11 @@ All 44 HTML files updated. 5-section dropdown: The Story | The Data | The Scienc
 7. ✅ `handle_journey_waveform()` — emotional waveform data
 8. ✅ `handle_habits()` — enhanced with registry metadata + keystone correlations
 
-### site_api_lambda.py — still needed:
-1. `handle_weekly_snapshot()` — weekly report data [NEW-2]
-2. `handle_correlations_explorer()` — interactive metric pair explorer [NEW-1]
-3. `handle_submit_finding()` — POST for visitor-submitted correlations [NEW-1]
-4. `handle_achievements_full()` — badge gallery with progress [NEW-3]
+### site_api_lambda.py — ✅ all endpoints implemented:
+1. ✅ `handle_snapshot()` — weekly report data [NEW-2] (line 2134)
+2. ✅ `handle_correlations()` — interactive metric pair explorer [NEW-1] (line 1311)
+3. ✅ `_handle_submit_finding()` — POST for visitor-submitted correlations [NEW-1] (line 2247)
+4. ✅ `handle_achievements()` — badge gallery with progress [NEW-3] (line 1985)
 
 ### New S3 config files needed:
 1. `config/achievement_badges.json` — badge definitions, unlock criteria, categories [NEW-3]
@@ -164,14 +164,15 @@ All 44 HTML files updated. 5-section dropdown: The Story | The Data | The Scienc
 
 ### Phase 0: Data Fixes — ✅ COMPLETE
 ### Phase 1: Major Redesigns — ✅ MOSTLY COMPLETE
-### Phase 2: Remaining Enhancements
-HOME-2, CHAR-1-3+6, CHRON-3-4, PROTO-2-4, EXP-1, HAB-4, PLAT-2, G-7, G-8
+### Phase 2: Remaining Enhancements — ✅ MOSTLY COMPLETE
+HOME-2 ✅, HOME-3 ✅, CHAR-1/2/3/6 ✅, PROTO-2/3/4 ✅, EXP-1 ✅, HAB-4 ✅, PLAT-2 ✅, BOARD-2 ✅
+**Still open:** CHRON-3/4 (chronicle generation fix + approval workflow), G-7 (SES verification), G-8 (privacy email)
 
-### Phase 3: New Pages (Matthew-approved)
-1. NEW-3 (Milestones/Achievement Gallery) — most visual, gamification hook
-2. NEW-2 (Weekly Snapshot) — periodical walkback, the empty weeks ARE the story
-3. NEW-1 (Data Explorer) — stickiest interactive page, community feature
-4. NEW-4 (Dark/Light mode) — quick CSS win
+### Phase 3: New Pages (Matthew-approved) — ✅ ALL BUILT
+1. ✅ NEW-3 (Milestones/Achievement Gallery) — v3.9.6
+2. ✅ NEW-2 (Weekly Snapshot) — v3.9.7
+3. ✅ NEW-1 (Data Explorer) — v3.9.7
+4. ✅ NEW-4 (Dark/Light mode) — v3.9.6
 
 ### Phase 4: Backlog
 BACKLOG-1 through BACKLOG-9 as time/priority allows

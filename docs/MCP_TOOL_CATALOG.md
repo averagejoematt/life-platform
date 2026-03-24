@@ -4,7 +4,7 @@
 
 > SIMP-1 Phase 1 complete (v3.7.17–19): 116 → 86 tools via 13 view-dispatchers. ADR-030 (v3.7.46): `get_calendar_events` + `get_schedule_load` retired (Google Calendar integration blocked by IT policy). 88 → 87 tools.
 > Many previously standalone tools are now `view=` parameters of a parent dispatcher.
-> For usage examples and natural language queries, see USER_GUIDE.md.
+> For architecture and schema details, see ARCHITECTURE.md and SCHEMA.md.
 
 ---
 

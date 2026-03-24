@@ -1,7 +1,7 @@
 # Life Platform — Onboarding Guide
 
 > Start here. Everything else is reference material.
-> Last updated: 2026-03-15 (v3.7.30)
+> Last updated: 2026-03-24 (v3.9.8)
 
 ---
 
@@ -23,8 +23,8 @@ The end result: ask Claude a natural-language question about your health, and it
 | `SCHEMA.md` | Every DynamoDB field per source |
 | `PROJECT_PLAN.md` | Active roadmap and backlog |
 | `CHANGELOG.md` | Version history (current 30 days) |
-| `USER_GUIDE.md` | How to use the MCP tools in conversation with Claude |
-| `MCP_TOOL_CATALOG.md` | Full catalog of all 88 tools |
+| `PLATFORM_GUIDE.md` | How to use the platform + all MCP tools in conversation with Claude |
+| `MCP_TOOL_CATALOG.md` | Full catalog of all 95 tools |
 | `deploy/README.md` | Guide to the deploy scripts |
 | `DATA_FLOW_DIAGRAM.md` | Visual data flow (Mermaid diagrams) |
 
@@ -33,20 +33,20 @@ The end result: ask Claude a natural-language question about your health, and it
 ## System at a Glance
 
 ```
-20 data sources
+19 data sources
     ↓
 13 ingestion Lambdas (scheduled + webhook)
     ↓
 DynamoDB (single table) + S3 (raw backup)
     ↓
-MCP Lambda (88 tools) ← Claude queries this
+MCP Lambda (95 tools) ← Claude queries this
     ↓
-42 compute/email/operational Lambdas
+49 compute/email/operational Lambdas
     ↓
-Daily Brief email + Dashboard + Weekly emails
+Daily Brief email + Dashboard + Weekly emails + averagejoematt.com
 ```
 
-All infrastructure is AWS, us-west-2. CDK manages all 8 stacks. Monthly cost: ~$10.
+All infrastructure is AWS, us-west-2. CDK manages all 8 stacks. Monthly cost: ~$13.
 
 ---
 
@@ -85,11 +85,11 @@ Never create Lambda roles, EventBridge rules, or alarms manually. Everything goe
 
 ### 5. Secrets are in Secrets Manager
 
-No credentials in code or environment variables. All secrets live under prefix `life-platform/` in Secrets Manager. 11 active secrets as of v3.7.29.
+No credentials in code or environment variables. All secrets live under prefix `life-platform/` in Secrets Manager. 10 active secrets as of v3.9.4.
 
 ---
 
-## The Data Sources (20)
+## The Data Sources (19)
 
 | Category | Sources |
 |----------|---------|
@@ -101,7 +101,6 @@ No credentials in code or environment variables. All secrets live under prefix `
 | Lifestyle | Habitify (habits), Weather (Open-Meteo) |
 | Manual/periodic | Labs (blood work), DEXA (body comp scan), Genome (SNPs), Supplements |
 | Derived | Day grade, Habit scores, Character sheet, Computed metrics |
-| Calendar | Google Calendar (events, meeting load) |
 
 ---
 
@@ -184,4 +183,4 @@ Handovers live at `handovers/YYYY-MM-DD-session<N>-<slug>.md`. The latest is alw
 
 ## Architecture Review Schedule
 
-Architecture reviews happen periodically. Run `python3 deploy/generate_review_bundle.py` first — it creates the bundle Claude needs to conduct the review. Reviews are stored in `docs/reviews/`. The platform is currently at review R13 (next: ~2026-04-13).
+Architecture reviews happen periodically. Run `python3 deploy/generate_review_bundle.py` first — it creates the bundle Claude needs to conduct the review. Reviews are stored in `docs/reviews/`. The platform is at review R17 (grade A-). CI/CD pipeline active (v3.9.4).

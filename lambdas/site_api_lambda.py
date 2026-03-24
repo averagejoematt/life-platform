@@ -1666,6 +1666,7 @@ _ask_rate_store: dict = {}
 _board_rate_store: dict = {}
 _nudge_rate_store: dict = {}   # ACCT-2: ip_hash+category -> list of timestamps
 _nudge_counts: dict = {}       # ACCT-2: category -> approximate count (warm container only)
+_finding_rate_store: dict = {} # NEW-1: ip_hash -> list of timestamps for submit_finding
 
 # R17-04: Separate Anthropic key for site-api — injected via CDK env var
 AI_SECRET_NAME  = os.environ.get("AI_SECRET_NAME",  "life-platform/site-api-ai-key")
@@ -2238,6 +2239,101 @@ def _handle_nudge(event: dict) -> dict:
     }
 
 
+# ── NEW-1: Submit Finding ────────────────────────────────────
+
+FINDING_RATE_LIMIT = 3  # per IP per hour
+
+
+def _handle_submit_finding(event: dict) -> dict:
+    """
+    POST /api/submit_finding
+    Body: {"metric_a": str, "metric_b": str, "finding": str, "email": str (optional)}
+    Stores visitor-discovered correlation findings in S3 for Matthew's review.
+    Rate limit: 3 per IP per hour.
+    """
+    import time as _time
+    source_ip = (
+        event.get("requestContext", {}).get("http", {}).get("sourceIp")
+        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
+        or "unknown"
+    )
+    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    now = int(_time.time())
+    hour_ago = now - 3600
+
+    # Rate limit
+    recent = [t for t in _finding_rate_store.get(ip_hash, []) if t > hour_ago]
+    if len(recent) >= FINDING_RATE_LIMIT:
+        _emit_rate_limit_metric("submit_finding")
+        return {
+            "statusCode": 429,
+            "headers": {**CORS_HEADERS, "Retry-After": "3600"},
+            "body": json.dumps({"error": "Rate limit reached. 3 submissions per hour."}),
+        }
+    recent.append(now)
+    _finding_rate_store[ip_hash] = recent[-10:]
+
+    # Parse body
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except Exception:
+        return _error(400, "Invalid JSON")
+
+    metric_a = re.sub(r"<[^>]+>", "", (body.get("metric_a") or "").strip())[:100]
+    metric_b = re.sub(r"<[^>]+>", "", (body.get("metric_b") or "").strip())[:100]
+    finding  = re.sub(r"<[^>]+>", "", (body.get("finding") or "").strip())[:500]
+    email    = re.sub(r"<[^>]+>", "", (body.get("email") or "").strip())[:254]
+
+    if not metric_a or not metric_b:
+        return _error(400, "Both metric_a and metric_b are required.")
+    if not finding or len(finding) < 10:
+        return _error(400, "Finding description must be at least 10 characters.")
+    if email and "@" not in email:
+        return _error(400, "Invalid email format.")
+
+    # Build finding record
+    timestamp = datetime.now(timezone.utc).isoformat()
+    finding_id = hashlib.sha256(f"{ip_hash}:{timestamp}:{metric_a}:{metric_b}".encode()).hexdigest()[:12]
+    record = {
+        "id":        finding_id,
+        "metric_a":  metric_a,
+        "metric_b":  metric_b,
+        "finding":   finding,
+        "email":     email if email else None,
+        "submitted_at": timestamp,
+        "ip_hash":   ip_hash,
+        "status":    "pending",
+    }
+
+    # Write to S3
+    S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+    s3_key = f"site/findings/{datetime.now(timezone.utc).strftime('%Y-%m-%d')}_{finding_id}.json"
+    try:
+        s3_client = boto3.client("s3", region_name=S3_REGION)
+        s3_client.put_object(
+            Bucket=S3_BUCKET,
+            Key=s3_key,
+            Body=json.dumps(record, indent=2),
+            ContentType="application/json",
+        )
+        logger.info(f"[submit_finding] Stored: {s3_key} metric_a={metric_a} metric_b={metric_b}")
+    except Exception as e:
+        logger.error(f"[submit_finding] S3 write failed: {e}")
+        return _error(503, "Unable to store finding. Try again later.")
+
+    remaining = FINDING_RATE_LIMIT - len(recent)
+    return {
+        "statusCode": 200,
+        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+        "body": json.dumps({
+            "success": True,
+            "finding_id": finding_id,
+            "message": "Finding submitted! Matthew will review it and may promote it to a Discovery or seed an Experiment.",
+            "remaining": remaining,
+        }),
+    }
+
+
 # ── Router ──────────────────────────────────────────────────
 
 ROUTES = {
@@ -2273,6 +2369,7 @@ ROUTES = {
     # WR-24 + S2-T2-2: handled specially in lambda_handler (POST routes)
     "/api/verify_subscriber":  None,
     "/api/board_ask":          None,
+    "/api/submit_finding":     None,  # NEW-1: POST handler in lambda_handler
 }
 
 
@@ -2313,6 +2410,12 @@ def lambda_handler(event, context):
         if method != "POST":
             return _error(405, "Use POST method")
         return _handle_nudge(event)
+
+    # NEW-1: Submit Finding (POST)
+    if path == "/api/submit_finding":
+        if method != "POST":
+            return _error(405, "Use POST method")
+        return _handle_submit_finding(event)
 
     # Special handling: /api/ask accepts POST
     if path == "/api/ask":

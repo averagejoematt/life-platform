@@ -1,6 +1,6 @@
 # Life Platform — Platform Guide
 
-**Version:** v3.7.32 | **Last updated:** 2026-03-15
+**Version:** v3.9.8 | **Last updated:** 2026-03-24
 
 > Combined guide replacing FEATURES.md and USER_GUIDE.md.
 > For system architecture and infrastructure, see ARCHITECTURE.md and INFRASTRUCTURE.md.
@@ -11,7 +11,7 @@
 
 ## What This Is
 
-The Life Platform is a personal health intelligence system that aggregates data from 20 sources (wearables, apps, lab work, DNA, a continuous glucose monitor, and a daily journal), unifies it in a single DynamoDB table, and makes it queryable through natural language conversation with Claude and automated daily email coaching.
+The Life Platform is a personal health intelligence system that aggregates data from 19 sources (wearables, apps, lab work, DNA, a continuous glucose monitor, and a daily journal), unifies it in a single DynamoDB table, and makes it queryable through natural language conversation with Claude and automated daily email coaching.
 
 You ask questions like *"Am I ready for a hard workout?"* or *"Does alcohol affect my sleep?"* and get answers grounded in your actual data — not generics. The platform also reaches out proactively on a schedule: a morning brief every day, a planning email every Monday, and weekly/monthly digests.
 
@@ -19,7 +19,7 @@ Web dashboard: `https://dash.averagejoematt.com/`
 
 ---
 
-## Data Sources (20)
+## Data Sources (19)
 
 | Source | What It Tracks | Update Method |
 |--------|---------------|---------------|
@@ -41,7 +41,7 @@ Web dashboard: `https://dash.averagejoematt.com/`
 | Weather (Open-Meteo) | Temperature, daylight, pressure, humidity | Daily Lambda (5:45 AM PT) |
 | Supplements | Supplement/medication doses, timing, adherence | Manual via `log_supplement` MCP tool |
 | State of Mind (How We Feel) | Mood valence, emotions, life area associations | Via Apple Health webhook |
-| Google Calendar | Calendar events, meeting load, focus blocks | Daily Lambda (6:30 AM PT) |
+| ~~Google Calendar~~ | ~~Retired (ADR-030) — employer data governance~~ | — |
 
 ---
 
@@ -272,17 +272,16 @@ The fastest way to use the platform. Claude calls the appropriate tool automatic
 - *"How did I recover from my trip?"* → `get_jet_lag_recovery`
 - *"Does barometric pressure affect my recovery?"* → `get_weather_correlation`
 
-### Calendar & Productivity
-- *"What's on my calendar today?"* → `get_calendar_events`
-- *"Do I have a heavy week?"* → `get_schedule_load`
+### Productivity
 - *"Which tasks did I complete yesterday?"* → `get_todoist_snapshot` (today)
+- *"What's my task load this week?"* → `get_todoist_snapshot` (load)
 
 ---
 
 ## Updating Data
 
 ### Automatic (no action needed)
-Whoop, Withings, Strava, Eight Sleep, Todoist, Garmin, Habitify, Notion, Apple Health (CGM, gait, energy), Google Calendar, and Weather all sync automatically. All data is typically available by 8 AM PT.
+Whoop, Withings, Strava, Eight Sleep, Todoist, Garmin, Habitify, Notion, Apple Health (CGM, gait, energy), and Weather all sync automatically. All data is typically available by 8 AM PT.
 
 ### MacroFactor (Dropbox zero-touch)
 1. MacroFactor app → More → Data Management → Data Export → Granular Export → Food diary → All time → Export

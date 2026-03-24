@@ -72,7 +72,7 @@ All P0 items from Architecture Review #8 are resolved.
 > Implementation: ~30 of 50+ tasks completed same day via Claude Code (v3.8.8–v3.9.3)
 > Key achievement: Supplements (data-driven), Habits (vice streaks + WHY cards), Accountability (state hero + nudges), Nav restructure (44 files)
 
-**Phase 0 Data Fixes — ✅ COMPLETE. Phase 1 Major Redesigns — ✅ MOSTLY COMPLETE.**
+**Phase 0 Data Fixes — ✅ COMPLETE. Phase 1 Major Redesigns — ✅ COMPLETE (except CHRON-3/4). New Pages — ✅ ALL 4 BUILT.**
 
 | ID | Item | Priority | Status |
 |----|------|----------|--------|
@@ -83,19 +83,19 @@ All P0 items from Architecture Review #8 are resolved.
 | STORY-3/4/5 | Journey timeline + waveform + intersection cards | P1 | ✅ Done |
 | BOARD-1 | Huberman/Attia → fictional advisors | P1 | ✅ Done |
 | NAV | 5-section nav restructure (44 HTML files) | P1 | ✅ Done |
-| CHAR-1/2/3/6 | Thesis, interactive radar, tier path, calibrating state | P1 | ⬜ |
-| PLAT-2 | Hero architecture diagram (SVG) | P1 | ⬜ |
+| CHAR-1/2/3/6 | Thesis, interactive radar, tier path, calibrating state | P1 | ✅ Done (v3.9.5) |
+| PLAT-2 | Hero architecture diagram (SVG) | P1 | ✅ Done (v3.9.5) |
 | CHRON-3/4 | Chronicle generation fix + approval workflow | P1 | ⬜ |
-| PROTO-2/4 | Experiment badges on protocols + pipeline viz | P2 | ⬜ |
+| PROTO-2/4 | Experiment badges on protocols + pipeline viz | P2 | ✅ Done (v3.9.6) |
 
 **New Pages — Matthew Approved:**
 
 | ID | Item | Priority | Status |
 |----|------|----------|--------|
-| NEW-1 | **Data Explorer** — interactive correlation scatter plots + visitor "submit finding" | P1 | ⬜ |
-| NEW-2 | **Weekly Snapshot** — auto-generated weekly report cards, walkable archive | P1 | ⬜ |
-| NEW-3 | **Milestones Gallery** — gamification badges (weight/journal/running/streaks) faded→color | P1 | ⬜ |
-| NEW-4 | **Dark/Light Mode** — CSS toggle, localStorage persist | P2 | ⬜ |
+| NEW-1 | **Data Explorer** — interactive correlation scatter plots + visitor "submit finding" | P1 | ✅ Done (v3.9.7) |
+| NEW-2 | **Weekly Snapshot** — auto-generated weekly report cards, walkable archive | P1 | ✅ Done (v3.9.7) |
+| NEW-3 | **Milestones Gallery** — gamification badges (weight/journal/running/streaks) faded→color | P1 | ✅ Done (v3.9.6) |
+| NEW-4 | **Dark/Light Mode** — CSS toggle, localStorage persist | P2 | ✅ Done (v3.9.6) |
 
 **Backlog (Panel Recommended):** For Builders page, Bloodwork/Labs, Body Composition, Longevity Scorecard, Segmented Subscriptions, Monthly Retrospective, System Status, API Docs, Mobile App Experience. See `WEBSITE_REDESIGN_SPEC.md` for full details.
 
@@ -116,7 +116,7 @@ All P0 items from Architecture Review #8 are resolved.
 | 6 | OE-06 | **Local test-before-deploy discipline** — `make test` before every `make deploy`. Catch missing modules, bad imports, broken signatures pre-production. | Ongoing | ⬜ |
 | 7 | OE-07 | **Expand operational memory** — commit anti-patterns to memory proactively on first encounter (not after 2nd/3rd). Focus on "things that break every few weeks." | Ongoing | ⬜ |
 | 8 | OE-08 | **Use Deep Research for technical decisions** — complement Board of Directors (qualitative judgment) with Deep Research (quantitative data, benchmarks, current best practices) | Per-decision | ⬜ |
-| 9 | OE-09 | **Consolidate session-end documentation** — audit FEATURES.md, USER_GUIDE.md, MCP_TOOL_CATALOG.md for overlap. Reduce 8+ doc updates to essential 3-4. | 1hr | ⬜ |
+| 9 | OE-09 | **Consolidate session-end documentation** — audit FEATURES.md, USER_GUIDE.md, MCP_TOOL_CATALOG.md for overlap. Reduce 8+ doc updates to essential 3-4. | 1hr | ✅ Done — FEATURES.md + USER_GUIDE.md already removed; replaced by PLATFORM_GUIDE.md. Dead refs cleaned from MCP_TOOL_CATALOG, ONBOARDING. Google Calendar refs retired across all docs. |
 | 10 | OE-10 | **Local dev environment standardization** — pinned Python venv with `requirements-dev.txt`, consistent `pip install` without `--break-system-packages`. Consider Docker dev container. | 1hr | ✅ Done — `requirements-dev.txt` created with pinned pytest, flake8, boto3, botocore, aws-cdk-lib |
 
 ---

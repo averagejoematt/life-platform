@@ -77,7 +77,8 @@
       "lambdas/ingestion_framework.py",
       "lambdas/ingestion_validator.py",
       "lambdas/item_size_guard.py",
-      "lambdas/digest_utils.py"
+      "lambdas/digest_utils.py",
+      "lambdas/site_writer.py"
     ],
     "consumers": [
       "daily-brief", "weekly-digest", "monthly-digest",
@@ -158,7 +159,6 @@
       "lambdas/item_size_guard.py",
       "lambdas/sick_day_checker.py",
       "lambdas/digest_utils.py",
-      "lambdas/site_writer.py",
       "lambdas/output_writers.py",
       "lambdas/html_builder.py",
       "lambdas/ai_calls.py",
