@@ -1,3 +1,45 @@
+## v3.9.8 — 2026-03-24: Nav update (3 new pages), Board sub-pages, sitemap expansion
+
+### Summary
+Nav dropdown update across all 45+ HTML files adding Explorer, Milestones, and Weekly Snapshots links. Built BOARD-2 Technical Board and Product Board sub-pages with cross-linked tab navigation. Updated sitemap.xml. Confirmed HOME-3 complete.
+
+### Changes
+
+**deploy/update_nav_links.py** (NEW)
+- Idempotent batch nav updater — adds /explorer/, /achievements/, /weekly/ to desktop dropdown, mobile overlay, and footer across all site HTML files
+
+**site/board/technical/index.html** (NEW — BOARD-2)
+- 12 technical persona roster with bios, standing questions, archetype descriptions
+- Architecture review stats (13 reviews, A− grade, 3 open findings)
+- 3 standing sub-board cards (Architecture Review, Intelligence & Data, Productization)
+- "How it works" section explaining review cadence and intentional disagreement
+
+**site/board/product/index.html** (NEW — BOARD-2)
+- 8 product persona roster with bios, standing questions
+- 4 designed tension pair visualizations (Simplify vs Features, Marketing vs Rigor, etc.)
+- Decision framework section with throughline tiebreaker rule
+
+**site/board/index.html** (ENHANCED)
+- Added 3-tab board navigation (Health / Technical / Product)
+- Board tabs CSS with responsive stacking
+
+**site/assets/js/nav.js** (ENHANCED)
+- Reading paths updated: /board/ → /board/technical/ → /board/product/ → /platform/
+
+**site/sitemap.xml** (ENHANCED)
+- Added /board/technical/, /board/product/, /weekly/, /achievements/
+
+**45 site HTML files** (BATCH UPDATE)
+- Desktop dropdown "The Data": +Explorer, +Milestones after Benchmarks
+- Desktop dropdown "Follow": +Weekly Snapshots after Weekly Journal
+- Mobile overlay: same additions
+- Footer: same additions
+
+**docs/WEBSITE_REDESIGN_SPEC.md** (UPDATED)
+- BOARD-2 marked ✅, HOME-3 confirmed ✅
+
+---
+
 ## v3.9.7 — 2026-03-24: Data Explorer, Weekly Snapshots, Decision Fatigue Signal, 5 more spec closures
 
 ### Summary

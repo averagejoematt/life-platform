@@ -40,6 +40,32 @@
     }
     .board-hero p { color: var(--text-muted); font-size: var(--text-base); line-height: var(--lh-body); max-width: 560px; margin: 0 auto var(--space-3); }
 
+    /* ── Board tabs ────────────────────────────────── */
+    .board-tabs {
+      max-width: 800px;
+      margin: 0 auto var(--space-8);
+      padding: 0 var(--page-padding);
+      display: flex;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+    .board-tab {
+      flex: 1;
+      text-align: center;
+      padding: var(--space-4) var(--space-3);
+      background: var(--surface);
+      text-decoration: none;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      transition: all var(--dur-mid);
+    }
+    .board-tab:hover { color: var(--accent); }
+    .board-tab.active { color: var(--accent); background: var(--accent-bg-subtle); }
+
     /* ── Meet the Board grid ─────────────────────────────── */
     .board-roster {
       max-width: 800px;
@@ -148,6 +174,7 @@
 
     @media (max-width: 720px) {
       .board-roster__grid { grid-template-columns: repeat(2, 1fr); }
+      .board-tabs { flex-direction: column; }
       .board-hero { padding: var(--space-10) var(--page-padding-sm) var(--space-8); }
       .board-selector, .question-area, .results-area, .ask-tips, .board-roster { padding: 0 var(--page-padding-sm); }
     }
@@ -180,6 +207,8 @@
         <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
         <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
         <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
+        <a href="/explorer/" class="nav__dropdown-item">Explorer</a>
+        <a href="/achievements/" class="nav__dropdown-item">Milestones</a>
       </div>
     </div>
     <div class="nav__dropdown">
@@ -205,6 +234,7 @@
       <button class="nav__dropdown-btn">Follow</button>
       <div class="nav__dropdown-menu">
         <a href="/chronicle/" class="nav__dropdown-item">Weekly Journal</a>
+        <a href="/weekly/" class="nav__dropdown-item">Weekly Snapshots</a>
         <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
         <a href="/ask/" class="nav__dropdown-item">Ask the Data</a>
       </div>
@@ -238,6 +268,8 @@
       <a href="/glucose/" class="nav-overlay__link">Glucose</a>
       <a href="/supplements/" class="nav-overlay__link">Supplements</a>
       <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
+      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
+      <a href="/achievements/" class="nav-overlay__link">Milestones</a>
     </div>
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">The Science</div>
@@ -257,6 +289,7 @@
     <div class="nav-overlay__section">
       <div class="nav-overlay__heading">Follow</div>
       <a href="/chronicle/" class="nav-overlay__link">Weekly Journal</a>
+      <a href="/weekly/" class="nav-overlay__link">Weekly Snapshots</a>
       <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
       <a href="/ask/" class="nav-overlay__link">Ask the Data</a>
       <a href="/rss.xml" class="nav-overlay__link">RSS</a>
@@ -278,6 +311,12 @@
   <p style="font-size:var(--text-xs); color: var(--text-faint); margin-top:var(--space-2);">
     AI personas drawing on published research. Not medical advice.
   </p>
+</div>
+
+<div class="board-tabs reveal">
+  <a href="/board/" class="board-tab active">Health Board</a>
+  <a href="/board/technical/" class="board-tab">Technical Board</a>
+  <a href="/board/product/" class="board-tab">Product Board</a>
 </div>
 
 <!-- BOARD-2: Meet the Board roster -->
@@ -547,6 +586,8 @@
       <a href="/character/" class="footer-v2__link">Character Sheet</a>
       <a href="/habits/" class="footer-v2__link">Habits</a>
       <a href="/accountability/" class="footer-v2__link">Progress</a>
+      <a href="/explorer/" class="footer-v2__link">Explorer</a>
+      <a href="/achievements/" class="footer-v2__link">Milestones</a>
     </div>
     <div class="footer-v2__col">
       <div class="footer-v2__heading">The Science</div>
@@ -570,6 +611,7 @@
     <div class="footer-v2__col">
       <div class="footer-v2__heading">Follow</div>
       <a href="/chronicle/" class="footer-v2__link">Weekly Journal</a>
+      <a href="/weekly/" class="footer-v2__link">Weekly Snapshots</a>
       <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
       <a href="/ask/" class="footer-v2__link">Ask the Data</a>
       <a href="/rss.xml" class="footer-v2__link">RSS</a>

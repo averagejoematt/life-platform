@@ -35,7 +35,7 @@ All 44 HTML files updated. 5-section dropdown: The Story | The Data | The Scienc
 - G-8: Privacy email (needs Matthew confirmation)
 - G-6: Bottom mobile nav (needs testing)
 - HOME-2: 4-quadrant vital signs ✅ (confirmed v3.9.6 — Body/Recovery/Behavior/Mind quadrant grid with live API data)
-- HOME-3: Day 1 vs Today 4 dimensions (partially done — weight + habits + sleep + level added)
+- HOME-3: Day 1 vs Today 4 dimensions ✅ (confirmed v3.9.8 — all 4 dimensions live with API data, Day 1 baseline + today comparison)
 - CHAR-1: Thesis opener ✅ (confirmed v3.9.5 — italic quote section in character page)
 - CHAR-2: Interactive radar chart ✅ (confirmed v3.9.5 — SVG radar with click-to-highlight)
 - CHAR-3: Tier journey path ✅ (confirmed v3.9.5 — animated progress line with waypoints)
@@ -48,7 +48,7 @@ All 44 HTML files updated. 5-section dropdown: The Story | The Data | The Scienc
 - PROTO-4: Pipeline visualization (Protocols → Experiments → Discoveries) ✅ (confirmed v3.9.6 — pipeline nav on protocols + experiments pages)
 - EXP-1: Elevate methodology section ✅ (confirmed v3.9.6 — H/P/D explainer + 2-col design panel + methodology prose)
 - HAB-4: Decision fatigue signal ✅ (v3.9.7 — fatigue index gauge, 14-day sparkline, trend detection, color-coded insight)
-- BOARD-2: Technical/Web Board sub-pages
+- BOARD-2: Technical/Web Board sub-pages ✅ (v3.9.8 — /board/technical/ + /board/product/ + board tabs on main page)
 
 ---
 
