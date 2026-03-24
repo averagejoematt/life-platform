@@ -1,6 +1,16 @@
 {
   "posts": [
     {
+      "week": 4,
+      "title": "The Silence in the Data",
+      "date": "2026-03-17",
+      "stats_line": "Weight: 287.7 lbs \u00b7 Week Grade: avg 70/100 \u00b7 T0 Streak: \u2014",
+      "url": "/journal/posts/week-04/",
+      "excerpt": "There\u2019s a particular kind of story that\u2019s hard to write, and it\u2019s the one where nothing happens. Not nothing in the dramatic sense \u2014 no injury, no crisis, no spectacular collapse. Just a week that arrives and departs without leaving much of a mark.",
+      "word_count": 1650,
+      "has_board_interview": false
+    },
+    {
       "week": 3,
       "title": "The DoorDash Chronicle",
       "date": "2026-03-11",
@@ -31,5 +41,5 @@
       "has_board_interview": false
     }
   ],
-  "updated_at": "2026-03-16T03:12:58.928914+00:00"
+  "updated_at": "2026-03-24T03:55:00.000000+00:00"
 }
