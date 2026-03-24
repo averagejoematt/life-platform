@@ -1,0 +1,28 @@
+{
+  "_meta": {
+    "purpose": "Single source of truth for all data sources. Consumed by methodology/, platform/, and about/ pages. When a source is added or removed, edit this file only.",
+    "updated": "2026-03-24",
+    "count": 19
+  },
+  "sources": [
+    { "id": "whoop",         "name": "Whoop",              "category": "wearable",   "metrics": "Recovery score, HRV, resting HR, sleep staging, strain",    "method": "Daily Lambda (6:00 AM PT)" },
+    { "id": "eightsleep",    "name": "Eight Sleep",         "category": "sleep",      "metrics": "Sleep score, efficiency, bed environment, RHR",              "method": "Daily Lambda (7:00 AM PT)" },
+    { "id": "garmin",        "name": "Garmin",              "category": "wearable",   "metrics": "Body Battery, stress, HR zones, training load, VO2 max",    "method": "Daily Lambda (6:00 AM PT)" },
+    { "id": "strava",        "name": "Strava",              "category": "training",   "metrics": "Running, cycling, hiking, walking + GPS data",              "method": "Daily Lambda (6:30 AM PT)" },
+    { "id": "withings",      "name": "Withings",            "category": "scale",      "metrics": "Weight, body fat %, lean mass, fat mass",                   "method": "Daily Lambda (6:15 AM PT)" },
+    { "id": "macrofactor",   "name": "MacroFactor",         "category": "nutrition",  "metrics": "Calories, macros, micronutrients, meal timing",             "method": "Phone export → Dropbox → Lambda" },
+    { "id": "habitify",      "name": "Habitify",            "category": "habits",     "metrics": "65 habits across 9 groups, P40 score, vice streaks",        "method": "Daily Lambda (6:15 AM PT)" },
+    { "id": "notion",        "name": "Notion Journal",      "category": "journal",    "metrics": "Daily journal entries (5 templates) + AI enrichment",       "method": "Daily Lambda (6:00 AM PT)" },
+    { "id": "applehealth",   "name": "Apple Health",        "category": "phone",      "metrics": "Steps, gait, active calories, caffeine, water",             "method": "HAE webhook (hourly iOS push)" },
+    { "id": "dexcom",        "name": "Dexcom Stelo (CGM)",  "category": "cgm",        "metrics": "Continuous glucose (5-min readings), time in range",        "method": "Via Apple Health webhook" },
+    { "id": "todoist",       "name": "Todoist",             "category": "productivity","metrics": "Tasks completed, overdue, project breakdown",              "method": "Daily Lambda (6:45 AM PT)" },
+    { "id": "labs",          "name": "Function Health + GP", "category": "manual",    "metrics": "Blood work (107 biomarkers, 7 draws 2019–2025)",            "method": "Manual seed" },
+    { "id": "dexa",          "name": "DEXA",                "category": "manual",     "metrics": "Body composition scan (visceral fat, FFMI, BMD)",           "method": "Manual seed" },
+    { "id": "genome",        "name": "Genome",              "category": "manual",     "metrics": "110 SNP clinical interpretations",                          "method": "Manual seed" },
+    { "id": "mf_workouts",   "name": "MacroFactor Workouts","category": "training",   "metrics": "Strength training (sets/reps/weight)",                      "method": "Phone export → Dropbox pipeline" },
+    { "id": "weather",       "name": "Weather (Open-Meteo)", "category": "environment","metrics": "Temperature, daylight, pressure, humidity",                "method": "Daily Lambda (5:45 AM PT)" },
+    { "id": "supplements",   "name": "Supplements",         "category": "manual",     "metrics": "Supplement/medication doses, timing, adherence",            "method": "Manual via MCP tool" },
+    { "id": "stateofmind",   "name": "State of Mind (HWF)", "category": "mood",       "metrics": "Mood valence, emotions, life area associations",            "method": "Via Apple Health webhook" },
+    { "id": "bloodpressure", "name": "Blood Pressure",      "category": "manual",     "metrics": "Systolic, diastolic, pulse, AHA classification",            "method": "Via Apple Health webhook" }
+  ]
+}

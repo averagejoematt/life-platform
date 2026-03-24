@@ -683,3 +683,28 @@ aws s3api put-bucket-policy --bucket matthew-life-platform --policy file:///tmp/
 - CI/CD pipeline only: the platform doesn't have a full CI/CD pipeline for deploys yet.
 
 **Outcome:** `deploy/lib/safe_sync.sh` committed. Combined with ADR-032 (bucket policy) and S3 versioning, the platform now has three independent layers of protection against accidental S3 data deletion.
+
+---
+
+## ADR-034 — Website Content Consistency Architecture (Component System + Constants)
+
+**Status:** Active
+**Date:** 2026-03-24 (v3.9.8)
+**Context:** With 54 HTML pages and 30+ pages containing hardcoded journey/platform values (302, 185, dates, tool counts), any narrative reframe or factual update requires manual spot-checking across all files. The nav/footer restructure across 44 files (v3.8.9) proved this is unsustainable. A content consistency system is needed that allows "change once, propagate everywhere" without migrating to a full static site generator.
+
+**Decision:** Implement a 3-layer content architecture:
+1. **`site_constants.js`** — single source of truth for all factual values (journey weights/dates, platform counts, bios, meta descriptions, reading paths). Pages reference values via `data-const="key.path"` attributes; JS injects values at page load.
+2. **`components.js`** — shared structural components (nav, footer, bottom-nav, subscribe CTA, reading path) injected at runtime into mount-point `<div>` elements. Eliminates 54-file duplication.
+3. **Content manifest** (`content_manifest.json`) — inventory of all journey-sensitive prose across the site, categorized as constant/api_driven/prose_with_facts/narrative/archive. Used by humans and CI to find all locations needing review when the narrative changes.
+
+Supporting files: `data_sources.json` (source registry), `lint_site_content.py` (CI validator), `migrate_page_to_components.py` (mechanical migration tool).
+
+**Reasoning:** A full SSG (Hugo, Eleventy) was considered but adds build dependencies, a templating language, and deploy pipeline changes for a solo project. The JS injection approach preserves the zero-build-step static HTML deploy model while solving 90%+ of the consistency problem. Narrative prose is deliberately excluded from auto-replacement — the content manifest makes it findable, but rewriting is an editorial act.
+
+**Alternatives considered:**
+- **Hugo/Eleventy SSG:** Full templating but requires Node/Go build step, partials, frontmatter. Overhead exceeds benefit for solo operator.
+- **Server-side includes (SSI):** CloudFront doesn't support SSI without Lambda@Edge processing every request.
+- **Full CMS (Notion/Contentful):** Adds external dependency, API calls on page load, and per-request latency. Overkill.
+- **Find-and-replace scripts:** Brittle, doesn't handle prose context, no CI validation.
+
+**Outcome:** Foundation files committed. Pages migrate incrementally — each conversion replaces ~200 lines of duplicated nav/footer HTML with 5 mount-point divs. OG meta tags require a build-time sync step (JS can't modify meta tags for crawlers). Published archive content (chronicle/journal posts) is explicitly excluded from auto-updates per Dr. Lena Johansson's recommendation.
