@@ -191,7 +191,7 @@
 
   <div class="start-kicker">// new here?</div>
   <h1 class="start-heading">Choose Your Path</h1>
-  <p class="start-sub">I'm Matthew Walker. In February 2026 I started at 302 lbs and built a platform to track everything. Here's where to begin, depending on what brought you here.</p>
+  <p class="start-sub">I'm Matthew Walker. In February 2026 I started at <span data-const="journey.start_weight">302</span> lbs and built a platform to track everything. Here's where to begin, depending on what brought you here.</p>
 
   <!-- Live snapshot -->
   <div class="start-snapshot">
@@ -209,7 +209,7 @@
     </div>
     <div class="snapshot-stat">
       <div class="snapshot-stat__label">Goal</div>
-      <div class="snapshot-stat__value faint">185 lbs</div>
+      <div class="snapshot-stat__value faint"><span data-const="journey.goal_weight">185</span> lbs</div>
     </div>
   </div>
 
@@ -252,7 +252,7 @@
     <a href="/platform/" class="path-card">
       <div class="path-card__num">// 05</div>
       <div class="path-card__title">The Platform</div>
-      <p class="path-card__body">How is this built? 49 Lambda functions, 19 data sources, a CDK stack, and Claude as the intelligence layer. Technical architecture for the curious.</p>
+      <p class="path-card__body">How is this built? <span data-const="platform.lambdas">50</span> Lambda functions, <span data-const="platform.data_sources">19</span> data sources, a CDK stack, and Claude as the intelligence layer. Technical architecture for the curious.</p>
       <div class="path-card__cta">See the build →</div>
     </a>
 
@@ -296,7 +296,7 @@
       }
 
       if (dEl) {
-        var startDate = new Date('2026-02-09');
+        var startDate = new Date('2026-02-22');
         var days = Math.floor((Date.now() - startDate.getTime()) / 86400000);
         dEl.textContent = 'Day ' + days;
         dEl.className = 'snapshot-stat__value faint';
@@ -306,7 +306,7 @@
       // Stats just stay as dashes
       var dEl = document.getElementById('snap-days');
       if (dEl) {
-        var startDate = new Date('2026-02-09');
+        var startDate = new Date('2026-02-22');
         var days = Math.floor((Date.now() - startDate.getTime()) / 86400000);
         dEl.textContent = 'Day ' + days;
         dEl.className = 'snapshot-stat__value faint';
@@ -315,5 +315,8 @@
 })();
 </script>
 
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
 </body>
 </html>

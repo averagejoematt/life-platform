@@ -16,7 +16,8 @@
  *
  * WHY: Editing nav/footer/CTA structure requires changing 1 file instead of 54.
  *
- * v1.0.0 — 2026-03-24
+ * v2.0.0 — 2026-03-24 — Board-approved 6-section restructure
+ *   Story | Pulse | Evidence | Method | Build | Follow
  */
 (function() {
   'use strict';
@@ -24,50 +25,74 @@
   var path = window.location.pathname;
 
   // ── Section mapping — which dropdown owns which paths ──────
+  // Items can be plain { href, text } or grouped with { heading, items }
   var SECTIONS = [
-    { label: 'The Story', items: [
-      { href: '/story/',  text: 'My Story' },
-      { href: '/about/',  text: 'The Mission' },
+    { label: 'Story', items: [
+      { href: '/',       text: 'Home' },
+      { href: '/story/', text: 'My Story' },
+      { href: '/about/', text: 'The Mission' },
     ]},
-    { label: 'The Data', items: [
-      { href: '/live/',           text: 'Live' },
-      { href: '/character/',      text: 'Character Sheet' },
+    { label: 'Pulse', items: [
+      { href: '/live/',           text: 'Today' },
+      { href: '/character/',      text: 'Character' },
       { href: '/habits/',         text: 'Habits' },
-      { href: '/accountability/', text: 'Progress' },
-      { href: '/sleep/',          text: 'Sleep' },
-      { href: '/glucose/',        text: 'Glucose' },
-      { href: '/supplements/',    text: 'Supplements' },
-      { href: '/benchmarks/',     text: 'Benchmarks' },
-      { href: '/explorer/',       text: 'Explorer' },
+      { href: '/accountability/', text: 'Accountability' },
       { href: '/achievements/',   text: 'Milestones' },
     ]},
-    { label: 'The Science', items: [
-      { href: '/protocols/',    text: 'Protocols' },
-      { href: '/experiments/',  text: 'Experiments' },
-      { href: '/discoveries/',  text: 'Discoveries' },
+    { label: 'Evidence', items: [
+      { href: '/sleep/',     text: 'Sleep' },
+      { href: '/glucose/',   text: 'Glucose' },
+      { href: '/benchmarks/',text: 'Benchmarks' },
+      { href: '/explorer/',  text: 'Data Explorer' },
     ]},
-    { label: 'The Build', items: [
+    { label: 'Method', groups: [
+      { heading: 'What I Do', items: [
+        { href: '/protocols/',   text: 'Protocols' },
+        { href: '/supplements/', text: 'Supplements' },
+      ]},
+      { heading: 'What I Tested', items: [
+        { href: '/experiments/', text: 'Active Tests' },
+        { href: '/discoveries/', text: 'Discoveries' },
+      ]},
+    ]},
+    { label: 'Build', items: [
       { href: '/platform/',     text: 'Platform' },
-      { href: '/intelligence/', text: 'Intelligence' },
+      { href: '/intelligence/', text: 'The AI' },
       { href: '/board/',        text: 'AI Board' },
       { href: '/cost/',         text: 'Cost' },
       { href: '/methodology/',  text: 'Methodology' },
       { href: '/tools/',        text: 'Tools' },
     ]},
     { label: 'Follow', items: [
-      { href: '/chronicle/', text: 'Weekly Journal' },
+      { href: '/chronicle/', text: 'Chronicle' },
       { href: '/weekly/',    text: 'Weekly Snapshots' },
       { href: '/subscribe/', text: 'Subscribe' },
       { href: '/ask/',       text: 'Ask the Data' },
     ]},
   ];
 
-  // Home path also belongs to The Story for active-state purposes
+  // ── Helper: get all link items from a section (flat or grouped) ──
+  function getSectionItems(sec) {
+    if (sec.items) return sec.items;
+    if (sec.groups) {
+      var all = [];
+      sec.groups.forEach(function(g) { all = all.concat(g.items); });
+      return all;
+    }
+    return [];
+  }
+
+  // Home path also belongs to Story for active-state purposes
   function sectionOwnsPath(section, p) {
-    if (section.label === 'The Story' && p === '/') return true;
-    return section.items.some(function(item) {
+    if (section.label === 'Story' && p === '/') return true;
+    return getSectionItems(section).some(function(item) {
       return p === item.href || p.startsWith(item.href);
     });
+  }
+
+  // ── Helper: check if item is active ──
+  function isItemActive(href, p) {
+    return (p === href || (href !== '/' && p.startsWith(href)));
   }
 
   // ── NAV ────────────────────────────────────────────────────
@@ -81,10 +106,25 @@
       html += '<div class="nav__dropdown' + isActive + '">';
       html += '<button class="nav__dropdown-btn">' + sec.label + '</button>';
       html += '<div class="nav__dropdown-menu">';
-      sec.items.forEach(function(item) {
-        var itemActive = (path === item.href || (item.href !== '/' && path.startsWith(item.href))) ? ' active' : '';
-        html += '<a href="' + item.href + '" class="nav__dropdown-item' + itemActive + '">' + item.text + '</a>';
-      });
+
+      if (sec.groups) {
+        // Grouped dropdown with sub-headers
+        sec.groups.forEach(function(group, gi) {
+          if (gi > 0) html += '<div class="nav__dropdown-divider"></div>';
+          html += '<div class="nav__dropdown-heading">' + group.heading + '</div>';
+          group.items.forEach(function(item) {
+            var itemActive = isItemActive(item.href, path) ? ' active' : '';
+            html += '<a href="' + item.href + '" class="nav__dropdown-item' + itemActive + '">' + item.text + '</a>';
+          });
+        });
+      } else {
+        // Flat dropdown
+        sec.items.forEach(function(item) {
+          var itemActive = isItemActive(item.href, path) ? ' active' : '';
+          html += '<a href="' + item.href + '" class="nav__dropdown-item' + itemActive + '">' + item.text + '</a>';
+        });
+      }
+
       html += '</div></div>';
     });
 
@@ -100,17 +140,32 @@
     SECTIONS.forEach(function(sec) {
       html += '<div class="nav-overlay__section">';
       html += '<div class="nav-overlay__heading">' + sec.label + '</div>';
-      sec.items.forEach(function(item) {
-        var cls = 'nav-overlay__link';
-        if (item.href === '/subscribe/') cls += ' nav-overlay__link--cta';
-        if (path === item.href || (item.href !== '/' && path.startsWith(item.href))) cls += ' active';
-        html += '<a href="' + item.href + '" class="' + cls + '">' + item.text + '</a>';
-      });
+
+      if (sec.groups) {
+        sec.groups.forEach(function(group) {
+          html += '<div class="nav-overlay__subheading">' + group.heading + '</div>';
+          group.items.forEach(function(item) {
+            var cls = 'nav-overlay__link';
+            if (item.href === '/subscribe/') cls += ' nav-overlay__link--cta';
+            if (isItemActive(item.href, path)) cls += ' active';
+            html += '<a href="' + item.href + '" class="' + cls + '">' + item.text + '</a>';
+          });
+        });
+      } else {
+        sec.items.forEach(function(item) {
+          var cls = 'nav-overlay__link';
+          if (item.href === '/subscribe/') cls += ' nav-overlay__link--cta';
+          if (isItemActive(item.href, path)) cls += ' active';
+          html += '<a href="' + item.href + '" class="' + cls + '">' + item.text + '</a>';
+        });
+      }
+
       // Add extra links in Follow section
       if (sec.label === 'Follow') {
         html += '<a href="/rss.xml" class="nav-overlay__link">RSS</a>';
         html += '<a href="/privacy/" class="nav-overlay__link">Privacy</a>';
       }
+      html += '</div>';
     });
     html += '</div></div>';
 
@@ -121,40 +176,41 @@
   function buildFooter() {
     var html = '<footer class="footer-v2"><div class="footer-v2__grid">';
 
-    // Footer columns match sections but with some additions
     var footerCols = [
-      { heading: 'The Story', links: [
+      { heading: 'Story', links: [
         { href: '/', text: 'Home' },
         { href: '/story/', text: 'My Story' },
         { href: '/about/', text: 'The Mission' },
       ]},
-      { heading: 'The Data', links: [
-        { href: '/live/', text: 'Live' },
-        { href: '/character/', text: 'Character Sheet' },
+      { heading: 'Pulse', links: [
+        { href: '/live/', text: 'Today' },
+        { href: '/character/', text: 'Character' },
         { href: '/habits/', text: 'Habits' },
-        { href: '/accountability/', text: 'Progress' },
-        { href: '/explorer/', text: 'Explorer' },
+        { href: '/accountability/', text: 'Accountability' },
         { href: '/achievements/', text: 'Milestones' },
       ]},
-      { heading: 'The Science', links: [
-        { href: '/protocols/', text: 'Protocols' },
-        { href: '/experiments/', text: 'Experiments' },
-        { href: '/discoveries/', text: 'Discoveries' },
+      { heading: 'Evidence', links: [
         { href: '/sleep/', text: 'Sleep' },
         { href: '/glucose/', text: 'Glucose' },
-        { href: '/supplements/', text: 'Supplements' },
         { href: '/benchmarks/', text: 'Benchmarks' },
+        { href: '/explorer/', text: 'Data Explorer' },
       ]},
-      { heading: 'The Build', links: [
+      { heading: 'Method', links: [
+        { href: '/protocols/', text: 'Protocols' },
+        { href: '/supplements/', text: 'Supplements' },
+        { href: '/experiments/', text: 'Active Tests' },
+        { href: '/discoveries/', text: 'Discoveries' },
+      ]},
+      { heading: 'Build', links: [
         { href: '/platform/', text: 'Platform' },
-        { href: '/intelligence/', text: 'Intelligence' },
+        { href: '/intelligence/', text: 'The AI' },
         { href: '/board/', text: 'AI Board' },
         { href: '/cost/', text: 'Cost' },
         { href: '/methodology/', text: 'Methodology' },
         { href: '/tools/', text: 'Tools' },
       ]},
       { heading: 'Follow', links: [
-        { href: '/chronicle/', text: 'Weekly Journal' },
+        { href: '/chronicle/', text: 'Chronicle' },
         { href: '/weekly/', text: 'Weekly Snapshots' },
         { href: '/subscribe/', text: 'Subscribe' },
         { href: '/ask/', text: 'Ask the Data' },
@@ -185,7 +241,7 @@
   function buildBottomNav() {
     var items = [
       { href: '/',           label: 'Home',      icon: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>' },
-      { href: '/live/',      label: 'Live',      icon: '<circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/>' },
+      { href: '/live/',      label: 'Today',     icon: '<circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/>' },
       { href: '/character/', label: 'Character', icon: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>' },
       { href: '/chronicle/', label: 'Chronicle', icon: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>' },
       { href: '/ask/',       label: 'Ask',       icon: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>' },
@@ -215,20 +271,6 @@
     html += '<button onclick="amjSubscribe(\'' + slug + '\')" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">Subscribe</button>';
     html += '</div>';
     html += '<p id="cta-msg-' + slug + '" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>';
-    html += '</section>';
-    return html;
-  }
-
-  // ── READING PATH CTA ──────────────────────────────────────
-  function buildReadingPath() {
-    var paths = (window.AMJ && window.AMJ.reading_paths) || {};
-    var next = paths[path];
-    if (!next) return '';
-
-    var html = '<section class="reading-path" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">';
-    html += '<span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>';
-    html += '<a href="' + next.href + '" style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-display);">' + next.title + '</a>';
-    html += '<p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">' + next.sub + '</p>';
     html += '</section>';
     return html;
   }
@@ -272,11 +314,9 @@
   var footerMount    = document.getElementById('amj-footer');
   var bottomNavMount = document.getElementById('amj-bottom-nav');
   var subscribeMount = document.getElementById('amj-subscribe');
-  var readingMount   = document.getElementById('amj-reading-path');
 
   if (navMount)       navMount.innerHTML = buildNav();
   if (subscribeMount) subscribeMount.innerHTML = buildSubscribeCTA();
-  if (readingMount)   readingMount.innerHTML = buildReadingPath();
   if (bottomNavMount) bottomNavMount.innerHTML = buildBottomNav();
   if (footerMount)    footerMount.innerHTML = buildFooter();
 

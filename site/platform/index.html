@@ -4,16 +4,16 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="The Platform — a single-person health intelligence system built entirely on AWS serverless. 48 Lambda functions, 95 AI tools, 19 data sources, ~$13/month.">
+  <meta name="description" content="The Platform — a single-person health intelligence system built entirely on AWS serverless. 50 Lambda functions, 95 AI tools, 19 data sources, ~$13/month.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="The Platform — Matthew Walker">
-  <meta name="twitter:description" content="48 Lambda functions. 95 AI tools. 19 data sources. $13/month. A single-person health intelligence system on AWS serverless.">
+  <meta name="twitter:description" content="50 Lambda functions. 95 AI tools. 19 data sources. $13/month. A single-person health intelligence system on AWS serverless.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:title" content="The Platform — Matthew Walker">
-  <meta property="og:description" content="48 Lambda functions. 95 AI tools. 19 data sources. $13/month. A single-person health intelligence system on AWS serverless.">
+  <meta property="og:description" content="50 Lambda functions. 95 AI tools. 19 data sources. $13/month. A single-person health intelligence system on AWS serverless.">
   <meta property="og:type" content="website">
   <title>The Platform — Matthew Walker</title>
     <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
@@ -294,116 +294,7 @@
 </head>
 <body>
 
-<nav class="nav">
-  <a href="/" class="nav__brand">AJM</a>
-  <div class="nav__links">
-    <div class="nav__dropdown">
-      <button class="nav__dropdown-btn">The Story</button>
-      <div class="nav__dropdown-menu">
-        <a href="/story/" class="nav__dropdown-item">My Story</a>
-        <a href="/about/" class="nav__dropdown-item">The Mission</a>
-      </div>
-    </div>
-    <div class="nav__dropdown">
-      <button class="nav__dropdown-btn">The Data</button>
-      <div class="nav__dropdown-menu">
-        <a href="/live/" class="nav__dropdown-item">Live</a>
-        <a href="/character/" class="nav__dropdown-item">Character Sheet</a>
-        <a href="/habits/" class="nav__dropdown-item">Habits</a>
-        <a href="/accountability/" class="nav__dropdown-item">Progress</a>
-        <a href="/sleep/" class="nav__dropdown-item">Sleep</a>
-        <a href="/glucose/" class="nav__dropdown-item">Glucose</a>
-        <a href="/supplements/" class="nav__dropdown-item">Supplements</a>
-        <a href="/benchmarks/" class="nav__dropdown-item">Benchmarks</a>
-        <a href="/explorer/" class="nav__dropdown-item">Explorer</a>
-        <a href="/achievements/" class="nav__dropdown-item">Milestones</a>
-      </div>
-    </div>
-    <div class="nav__dropdown">
-      <button class="nav__dropdown-btn">The Science</button>
-      <div class="nav__dropdown-menu">
-        <a href="/protocols/" class="nav__dropdown-item">Protocols</a>
-        <a href="/experiments/" class="nav__dropdown-item">Experiments</a>
-        <a href="/discoveries/" class="nav__dropdown-item">Discoveries</a>
-      </div>
-    </div>
-    <div class="nav__dropdown is-active">
-      <button class="nav__dropdown-btn">The Build</button>
-      <div class="nav__dropdown-menu">
-        <a href="/platform/" class="nav__dropdown-item active">Platform</a>
-        <a href="/intelligence/" class="nav__dropdown-item">Intelligence</a>
-        <a href="/board/" class="nav__dropdown-item">AI Board</a>
-        <a href="/cost/" class="nav__dropdown-item">Cost</a>
-        <a href="/methodology/" class="nav__dropdown-item">Methodology</a>
-        <a href="/tools/" class="nav__dropdown-item">Tools</a>
-      </div>
-    </div>
-    <div class="nav__dropdown">
-      <button class="nav__dropdown-btn">Follow</button>
-      <div class="nav__dropdown-menu">
-        <a href="/chronicle/" class="nav__dropdown-item">Weekly Journal</a>
-        <a href="/weekly/" class="nav__dropdown-item">Weekly Snapshots</a>
-        <a href="/subscribe/" class="nav__dropdown-item">Subscribe</a>
-        <a href="/ask/" class="nav__dropdown-item">Ask the Data</a>
-      </div>
-    </div>
-    <a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>
-  </div>
-  <button class="nav__hamburger" aria-label="Open menu">
-    <span></span><span></span><span></span>
-  </button>
-  <div class="nav__status">
-    <div class="pulse"></div>
-    <span id="nav-date"></span>
-  </div>
-</nav>
-<!-- Mobile overlay menu -->
-<div class="nav-overlay">
-  <div class="nav-overlay__panel">
-    <button class="nav-overlay__close" aria-label="Close menu">&times;</button>
-    <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The Story</div>
-      <a href="/story/" class="nav-overlay__link">My Story</a>
-      <a href="/about/" class="nav-overlay__link">The Mission</a>
-    </div>
-    <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The Data</div>
-      <a href="/live/" class="nav-overlay__link">Live</a>
-      <a href="/character/" class="nav-overlay__link">Character Sheet</a>
-      <a href="/habits/" class="nav-overlay__link">Habits</a>
-      <a href="/accountability/" class="nav-overlay__link">Progress</a>
-      <a href="/sleep/" class="nav-overlay__link">Sleep</a>
-      <a href="/glucose/" class="nav-overlay__link">Glucose</a>
-      <a href="/supplements/" class="nav-overlay__link">Supplements</a>
-      <a href="/benchmarks/" class="nav-overlay__link">Benchmarks</a>
-      <a href="/explorer/" class="nav-overlay__link">Explorer</a>
-      <a href="/achievements/" class="nav-overlay__link">Milestones</a>
-    </div>
-    <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The Science</div>
-      <a href="/protocols/" class="nav-overlay__link">Protocols</a>
-      <a href="/experiments/" class="nav-overlay__link">Experiments</a>
-      <a href="/discoveries/" class="nav-overlay__link">Discoveries</a>
-    </div>
-    <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">The Build</div>
-      <a href="/platform/" class="nav-overlay__link">Platform</a>
-      <a href="/intelligence/" class="nav-overlay__link">Intelligence</a>
-      <a href="/board/" class="nav-overlay__link">AI Board</a>
-      <a href="/cost/" class="nav-overlay__link">Cost</a>
-      <a href="/methodology/" class="nav-overlay__link">Methodology</a>
-      <a href="/tools/" class="nav-overlay__link">Tools</a>
-    </div>
-    <div class="nav-overlay__section">
-      <div class="nav-overlay__heading">Follow</div>
-      <a href="/chronicle/" class="nav-overlay__link">Weekly Journal</a>
-      <a href="/weekly/" class="nav-overlay__link">Weekly Snapshots</a>
-      <a href="/subscribe/" class="nav-overlay__link nav-overlay__link--cta">Subscribe</a>
-      <a href="/ask/" class="nav-overlay__link">Ask the Data</a>
-      <a href="/rss.xml" class="nav-overlay__link">RSS</a>
-      <a href="/privacy/" class="nav-overlay__link">Privacy</a>
-    </div>
-  </div>
+<div id="amj-nav"></div>
 </div>
 
 
@@ -421,19 +312,19 @@
   <div class="page-header__meta">
     <div class="meta-stat">
       <div class="meta-stat__label">MCP tools</div>
-      <div class="meta-stat__value" id="plat-mcp-tools">95</div>
+      <div class="meta-stat__value" id="plat-mcp-tools" data-const="platform.mcp_tools">95</div>
     </div>
     <div class="meta-stat">
       <div class="meta-stat__label">Data sources</div>
-      <div class="meta-stat__value" id="plat-data-sources">19</div>
+      <div class="meta-stat__value" id="plat-data-sources" data-const="platform.data_sources">19</div>
     </div>
     <div class="meta-stat">
       <div class="meta-stat__label">AWS Lambdas</div>
-      <div class="meta-stat__value" id="plat-lambdas">48</div>
+      <div class="meta-stat__value" id="plat-lambdas" data-const="platform.lambdas">50</div>
     </div>
     <div class="meta-stat">
       <div class="meta-stat__label">Arch grade</div>
-      <div class="meta-stat__value">A</div>
+      <div class="meta-stat__value" data-const="platform.review_grade">A-</div>
     </div>
   </div>
 </div>
@@ -796,7 +687,7 @@
   <div class="stack-grid">
     <div class="stack-card">
       <div class="stack-card__category">Infrastructure</div>
-      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">AWS Lambda + CDK</div><div class="stack-item__desc">48 functions across 8 CDK stacks. All IAM roles dedicated and least-privilege. EventBridge scheduling on fixed UTC crons (no DST drift).</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">AWS Lambda + CDK</div><div class="stack-item__desc"><span data-const="platform.lambdas">50</span> functions across <span data-const="platform.cdk_stacks">8</span> CDK stacks. All IAM roles dedicated and least-privilege. EventBridge scheduling on fixed UTC crons (no DST drift).</div></div></div>
       <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">DynamoDB + S3</div><div class="stack-item__desc">Single-table design. On-demand billing. PITR 35-day. KMS CMK encryption. Raw JSON archived to S3 at <code>raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json</code>.</div></div></div>
       <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">SES + SNS + SQS</div><div class="stack-item__desc">Email delivery via SES, alert routing through SNS, dead-letter queues for failed Lambda invocations.</div></div></div>
     </div>
@@ -865,7 +756,7 @@
 <section class="arch-section reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
   <div class="eyebrow">FinOps</div>
   <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">What it costs to run</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">48 Lambda functions, DynamoDB on-demand, S3, CloudFront, SES, 7 AI-generated digests per week, and a public site with live data. All serverless — no EC2, no containers, no reserved capacity.</p>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)"><span data-const="platform.lambdas">50</span> Lambda functions, DynamoDB on-demand, S3, CloudFront, SES, 7 AI-generated digests per week, and a public site with live data. All serverless — no EC2, no containers, no reserved capacity.</p>
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
     <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
       <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">Total monthly</div>
@@ -894,7 +785,7 @@
 <!-- Architecture reviews -->
 <section class="reviews-section reveal">
   <div class="eyebrow">Architecture reviews</div>
-  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Reviewed 16 times by a 12-member AI board</h2>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Reviewed <span data-const="platform.review_count">17</span> times by a 12-member AI board</h2>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-4)">Every major change triggers a structured architecture review. 14 expert AI personas — cloud architect, security lead, statistician, product architect, adversarial reviewer — vote, score, and issue findings against a fixed rubric.</p>
   <p style="margin-bottom:var(--space-8)"><a href="/platform/reviews/" class="btn btn--ghost" style="font-size:var(--text-xs)">Read the latest review (R17: A-) →</a></p>
   <div class="review-grid">
@@ -1047,168 +938,13 @@
 </section>
 
 <!-- S2-T1-8: Email CTA footer — injected by add_email_cta.py -->
-<section class="email-cta-footer reveal" style="
-  padding: var(--space-16) var(--page-padding);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  text-align: center;
-">
-  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
-  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
-    Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.<br>
-    <a href="/chronicle/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue →</a>
-  </p>
-  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
-    <input id="cta-email-platform" type="email" placeholder="your@email.com" style="
-      flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);
-      font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);
-      outline:none;transition:border-color var(--dur-fast);
-    " onfocus="this.style.borderColor='var(--c-amber-400)'" onblur="this.style.borderColor='var(--c-amber-500)'">
-    <button
-      onclick="amjSubscribe('platform')"
-      class="btn btn--primary"
-      style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">
-      Subscribe
-    </button>
-  </div>
-  <p id="cta-msg-platform" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
-</section>
-<script>
-// PLAT-1: Wire header stat cards to public_stats.json
-(async function() {
-  try {
-    const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
-    if (!r.ok) return;
-    const d = await r.json();
-    const plat = d.platform || {};
-    if (plat.mcp_tools  != null) { var el = document.getElementById('plat-mcp-tools');   if (el) el.textContent = plat.mcp_tools; }
-    if (plat.data_sources != null) { var el = document.getElementById('plat-data-sources'); if (el) el.textContent = plat.data_sources; }
-    if (plat.lambdas    != null) { var el = document.getElementById('plat-lambdas');      if (el) el.textContent = plat.lambdas; }
-  } catch(e) {}
-})();
-</script>
-<script>
-(function() {
-  // S2-T1-8: Shared subscribe helper (idempotent — safe to include multiple times)
-  if (!window.amjSubscribe) {
-    window.amjSubscribe = async function(slug) {
-      var email = document.getElementById('cta-email-' + slug).value.trim();
-      var msg   = document.getElementById('cta-msg-'   + slug);
-      if (!email || !email.includes('@')) {
-        msg.textContent = 'Enter a valid email address.';
-        msg.style.color = 'var(--c-yellow-status)';
-        return;
-      }
-      msg.textContent = 'Subscribing…';
-      msg.style.color = 'var(--text-muted)';
-      try {
-        var res  = await fetch('/api/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email, source: slug + '_cta' }),
-        });
-        var data = await res.json();
-        if (res.ok) {
-          msg.textContent = '✓ Check your inbox to confirm.';
-          msg.style.color = 'var(--c-amber-500)';
-          document.getElementById('cta-email-' + slug).value = '';
-        } else {
-          msg.textContent = data.error || 'Something went wrong.';
-          msg.style.color = 'var(--c-yellow-status)';
-        }
-      } catch(e) {
-        msg.textContent = 'Network error — try again.';
-        msg.style.color = 'var(--c-yellow-status)';
-      }
-    };
-  }
-  // Enter key support for this page's input
-  var inp = document.getElementById('cta-email-platform');
-  if (inp) inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') window.amjSubscribe('platform'); });
-})();
-</script>
-<!-- Mobile bottom nav -->
-<nav class="bottom-nav" aria-label="Mobile navigation">
-  <a href="/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-    <span>Home</span>
-  </a>
-  <a href="/live/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/></svg>
-    <span>Live</span>
-  </a>
-  <a href="/character/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-    <span>Character</span>
-  </a>
-  <a href="/chronicle/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-    <span>Chronicle</span>
-  </a>
-  <a href="/ask/" class="bottom-nav__link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-    <span>Ask</span>
-  </a>
-</nav>
+<div id="amj-subscribe"></div>
 
-<section class="reading-path" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
-  <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>
-  <a href="/cost/" style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-display);">What this costs to run →</a>
-  <p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">Full AWS infrastructure cost breakdown — down to the cent</p>
-</section>
-<footer class="footer-v2">
-  <div class="footer-v2__grid">
-    <div class="footer-v2__col">
-      <div class="footer-v2__heading">The Story</div>
-      <a href="/" class="footer-v2__link">Home</a>
-      <a href="/story/" class="footer-v2__link">My Story</a>
-      <a href="/about/" class="footer-v2__link">The Mission</a>
-    </div>
-    <div class="footer-v2__col">
-      <div class="footer-v2__heading">The Data</div>
-      <a href="/live/" class="footer-v2__link">Live</a>
-      <a href="/character/" class="footer-v2__link">Character Sheet</a>
-      <a href="/habits/" class="footer-v2__link">Habits</a>
-      <a href="/accountability/" class="footer-v2__link">Progress</a>
-      <a href="/explorer/" class="footer-v2__link">Explorer</a>
-      <a href="/achievements/" class="footer-v2__link">Milestones</a>
-    </div>
-    <div class="footer-v2__col">
-      <div class="footer-v2__heading">The Science</div>
-      <a href="/protocols/" class="footer-v2__link">Protocols</a>
-      <a href="/experiments/" class="footer-v2__link">Experiments</a>
-      <a href="/discoveries/" class="footer-v2__link">Discoveries</a>
-      <a href="/sleep/" class="footer-v2__link">Sleep</a>
-      <a href="/glucose/" class="footer-v2__link">Glucose</a>
-      <a href="/supplements/" class="footer-v2__link">Supplements</a>
-      <a href="/benchmarks/" class="footer-v2__link">Benchmarks</a>
-    </div>
-    <div class="footer-v2__col">
-      <div class="footer-v2__heading">The Build</div>
-      <a href="/platform/" class="footer-v2__link">Platform</a>
-      <a href="/intelligence/" class="footer-v2__link">Intelligence</a>
-      <a href="/board/" class="footer-v2__link">AI Board</a>
-      <a href="/cost/" class="footer-v2__link">Cost</a>
-      <a href="/methodology/" class="footer-v2__link">Methodology</a>
-      <a href="/tools/" class="footer-v2__link">Tools</a>
-    </div>
-    <div class="footer-v2__col">
-      <div class="footer-v2__heading">Follow</div>
-      <a href="/chronicle/" class="footer-v2__link">Weekly Journal</a>
-      <a href="/weekly/" class="footer-v2__link">Weekly Snapshots</a>
-      <a href="/subscribe/" class="footer-v2__link">Subscribe</a>
-      <a href="/ask/" class="footer-v2__link">Ask the Data</a>
-      <a href="/rss.xml" class="footer-v2__link">RSS</a>
-      <a href="/privacy/" class="footer-v2__link">Privacy</a>
-    </div>
-  </div>
-  <div class="footer-v2__bottom">
-    <span class="footer-v2__brand">AMJ</span>
-    <span class="footer-v2__copy">// updated daily by life-platform</span>
-  </div>
-</footer>
+<!-- Mobile bottom nav -->
+<div id="amj-bottom-nav"></div>
+
+<div id="amj-reading-path"></div>
+<div id="amj-footer"></div>
 
 <!-- WEB-WCT: Weekly Challenge Ticker -->
 <div class="challenge-bar" id="challenge-bar" style="display:none">
@@ -1235,6 +971,8 @@
 </script>
 
 <script src="/assets/js/reveal.js"></script>
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
 <script src="/assets/js/nav.js"></script>
 </body>
 </html>

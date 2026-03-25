@@ -1,3 +1,46 @@
+## v3.9.10 — 2026-03-24: Navigation restructure — 6-section board-approved IA
+
+### Summary
+Joint Product Board (8 personas) × Personal Board (14 personas) navigation architecture review across 4 rounds. Unanimous vote (20-0-1) on a 6-section restructure replacing the previous 5-section layout. New sections: Story | Pulse | Evidence | Method | Build | Follow. Multiple page renames for visitor clarity. Grouped dropdown sub-headers in Method section. Footer updated to 6 columns. All changes in `components.js` (single file, 54 pages update automatically).
+
+### Changes
+
+**site/assets/js/components.js** (v2.0.0 — REWRITTEN)
+- 6-section nav replacing 5-section: Story, Pulse, Evidence, Method, Build, Follow
+- "The" prefix dropped from all section labels (board vote: tighter, more modern)
+- Page renames: Live→Today, Character Sheet→Character, Explorer→Data Explorer, Intelligence→The AI, Experiments→Active Tests, Weekly Journal→Chronicle
+- New `groups` data structure for Method dropdown with sub-headers ("What I Do" / "What I Tested")
+- Supplements moved from Evidence to Method (board consensus: supplements are interventions, not measurements)
+- Milestones moved to Pulse (board consensus: milestones are journey/progress, not evidence)
+- Sleep, Glucose, Benchmarks grouped as Evidence (case study pages proving the experiment works)
+- Footer columns updated to match 6-section structure
+- Bottom nav updated: Home, Today, Character, Chronicle, Ask
+- Mobile overlay uses same section grouping with sub-headings
+- Removed old reading-path builder (now in nav.js)
+
+**site/assets/css/base.css** (3 additions)
+- `.nav__dropdown-heading` — sub-header styling in desktop dropdown menus
+- `.nav__dropdown-divider` — divider line between dropdown groups
+- `.nav-overlay__subheading` — sub-header styling in mobile overlay
+- Footer grid: `repeat(4, 1fr)` → `repeat(6, 1fr)` for 6-column layout
+
+### Board Review Summary
+- 4 rounds of structured debate across Product Board + Personal Board
+- Key decisions: 6 sections (not 5 or 7), intent-based grouping, editorial naming voice
+- Attia's trust framework adopted: Story=trust the person, Pulse=trust the commitment, Evidence=trust the results, Method=trust the approach
+- Rhonda Patrick broke the tie on Supplements placement (intervention ≠ measurement)
+- Huberman solved "Experiment within The Experiment" echo by proposing "The Method"
+- Conti's 30-day time-box: ship now, watch visitor behavior, rename if needed
+
+### Not deployed
+- Files committed but not synced to S3. Deploy with:
+  ```bash
+  aws s3 sync site/ s3://matthew-life-platform/site/ --delete
+  aws cloudfront create-invalidation --distribution-id E3S424OXQZ8NBE --paths "/assets/js/components.js" "/assets/css/base.css"
+  ```
+
+---
+
 ## v3.9.9 — 2026-03-24: Content consistency architecture (ADR-034), doc sync, public_stats fix
 
 ### Summary

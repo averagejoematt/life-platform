@@ -93,10 +93,10 @@
   --c-surface-2:      #dfe8e2;
   --c-surface-3:      #d4ddd7;
 
-  /* Signal green — darker for legibility on light bg */
-  --c-green-500:      #00855e;
-  --c-green-400:      #006e4e;
-  --c-green-300:      #005a3f;
+  /* Signal green — darker for legibility on light bg (AA contrast ≥4.5:1 on #f4f7f5) */
+  --c-green-500:      #006c4a;  /* 6.00:1 on bg — was #00855e (4.31:1, failed AA) */
+  --c-green-400:      #006040;
+  --c-green-300:      #005035;
   --c-green-100:      rgba(0, 133, 94, 0.10);
   --c-green-050:      rgba(0, 133, 94, 0.05);
 
@@ -108,19 +108,19 @@
   --c-amber-050:      rgba(160, 104, 32, 0.05);
 
   /* Text — dark greens on light */
-  --c-text-primary:   #1a2c1e;
-  --c-text-secondary: #4a6050;
-  --c-text-muted:     #7a9080;
+  --c-text-primary:   #1a2c1e;   /* 13.68:1 ✅ */
+  --c-text-secondary: #4a6050;   /* 5.86:1 ✅ */
+  --c-text-muted:     #556a62;   /* 5.37:1 — was #7a9080 (3.18:1, failed AA) */
   --c-text-disabled:  #b0c0b5;
 
-  /* Borders — darker for contrast */
-  --c-border-strong:  rgba(0, 133, 94, 0.30);
-  --c-border-mid:     rgba(0, 133, 94, 0.15);
-  --c-border-subtle:  rgba(0, 133, 94, 0.08);
-  --c-border-neutral: rgba(0, 0, 0, 0.08);
+  /* Borders — stronger for card/surface visibility on light bg */
+  --c-border-strong:  rgba(0, 108, 74, 0.40);   /* was 0.30 */
+  --c-border-mid:     rgba(0, 108, 74, 0.22);   /* was 0.15 — surface cards now visible */
+  --c-border-subtle:  rgba(0, 108, 74, 0.10);   /* was 0.08 */
+  --c-border-neutral: rgba(0, 0, 0, 0.10);      /* was 0.08 */
 
   /* Status — adjusted for light bg readability */
-  --c-green-status:   #00855e;
+  --c-green-status:   #006c4a;
   --c-yellow-status:  #c47d10;
   --c-red-status:     #d43030;
 }

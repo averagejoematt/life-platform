@@ -72,7 +72,7 @@ All P0 items from Architecture Review #8 are resolved.
 > Implementation: ~30 of 50+ tasks completed same day via Claude Code (v3.8.8–v3.9.3)
 > Key achievement: Supplements (data-driven), Habits (vice streaks + WHY cards), Accountability (state hero + nudges), Nav restructure (44 files)
 
-**Phase 0 Data Fixes — ✅ COMPLETE. Phase 1 Major Redesigns — ✅ COMPLETE (except CHRON-3/4). New Pages — ✅ ALL 4 BUILT.**
+**Phase 0 Data Fixes — ✅ COMPLETE. Phase 1 Major Redesigns — ✅ COMPLETE. New Pages — ✅ ALL 4 BUILT.**
 
 | ID | Item | Priority | Status |
 |----|------|----------|--------|
@@ -85,7 +85,7 @@ All P0 items from Architecture Review #8 are resolved.
 | NAV | 5-section nav restructure (44 HTML files) | P1 | ✅ Done |
 | CHAR-1/2/3/6 | Thesis, interactive radar, tier path, calibrating state | P1 | ✅ Done (v3.9.5) |
 | PLAT-2 | Hero architecture diagram (SVG) | P1 | ✅ Done (v3.9.5) |
-| CHRON-3/4 | Chronicle generation fix + approval workflow | P1 | ⬜ |
+| CHRON-3/4 | Chronicle generation fix + approval workflow | P1 | ✅ |
 | PROTO-2/4 | Experiment badges on protocols + pipeline viz | P2 | ✅ Done (v3.9.6) |
 
 **New Pages — Matthew Approved:**
