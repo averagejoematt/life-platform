@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="N=1 Experiment — evidence-based self-experiment with hypothesis, protocol, and data.">
+  <meta property="og:title" content="N=1 Experiment — Matthew Walker" id="og-title">
+  <meta property="og:description" content="Evidence-based self-experiment with real data." id="og-desc">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://averagejoematt.com/experiments/detail/" id="og-url">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <title id="page-title">N=1 Experiment — Matthew Walker</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .detail-wrap { max-width:var(--max-width); margin:0 auto; padding:0 var(--page-padding); }
+
+    .detail-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-10);
+      max-width: var(--max-width);
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+    .detail-header__back {
+      font-family:var(--font-mono); font-size:var(--text-2xs); color:var(--text-muted);
+      text-decoration:none; letter-spacing:var(--ls-tag); text-transform:uppercase;
+      display:inline-block; margin-bottom:var(--space-6);
+    }
+    .detail-header__back:hover { color:var(--accent); }
+    .detail-header__pillar {
+      display:inline-flex; align-items:center; gap:var(--space-2);
+      font-family:var(--font-mono); font-size:var(--text-2xs); color:var(--accent);
+      letter-spacing:var(--ls-tag); text-transform:uppercase;
+      margin-bottom:var(--space-4);
+    }
+    .detail-header__name {
+      font-family:var(--font-display); font-size:var(--text-h1);
+      line-height:var(--lh-display); letter-spacing:var(--ls-display);
+      color:var(--text); margin-bottom:var(--space-4);
+    }
+    .detail-header__desc {
+      font-family:var(--font-mono); font-size:var(--text-base); color:var(--text-muted);
+      line-height:var(--lh-body); max-width:640px; margin-bottom:var(--space-6);
+    }
+    .detail-chips { display:flex; gap:var(--space-3); flex-wrap:wrap; margin-bottom:var(--space-6); }
+    .d-chip {
+      padding:var(--space-1) var(--space-3);
+      border:1px solid var(--border);
+      font-family:var(--font-mono); font-size:var(--text-2xs);
+      color:var(--text-muted); letter-spacing:var(--ls-tag); text-transform:uppercase;
+    }
+    .d-chip--accent { border-color:var(--accent-dim); color:var(--accent); background:var(--accent-bg-subtle); }
+    .detail-stats {
+      display:flex; gap:var(--space-8); flex-wrap:wrap;
+    }
+    .d-stat { border-left:2px solid var(--accent); padding-left:var(--space-4); }
+    .d-stat__label { font-size:var(--text-2xs); letter-spacing:var(--ls-tag); text-transform:uppercase; color:var(--text-muted); margin-bottom:var(--space-1); }
+    .d-stat__value { font-family:var(--font-display); font-size:24px; color:var(--text); }
+
+    /* Sections */
+    .detail-section {
+      padding:var(--space-10) 0;
+      border-bottom:1px solid var(--border);
+    }
+    .detail-section__heading {
+      font-family:var(--font-mono); font-size:var(--text-2xs);
+      letter-spacing:var(--ls-tag); text-transform:uppercase;
+      color:var(--accent); margin-bottom:var(--space-5);
+    }
+
+    /* Evidence box */
+    .evidence-box {
+      border:1px solid var(--border); background:var(--surface); padding:var(--space-6);
+    }
+    .evidence-box__tier {
+      font-family:var(--font-display); font-size:20px; color:var(--text); margin-bottom:var(--space-3);
+    }
+    .evidence-box__summary {
+      font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-muted);
+      line-height:var(--lh-mono); margin-bottom:var(--space-3);
+    }
+    .evidence-box__citation {
+      font-family:var(--font-mono); font-size:var(--text-2xs); color:var(--text-faint);
+      font-style:italic;
+    }
+
+    /* Protocol box */
+    .protocol-box {
+      border:1px solid var(--border); background:var(--surface); padding:var(--space-6);
+    }
+    .protocol-box__hypo {
+      font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text);
+      line-height:var(--lh-mono); margin-bottom:var(--space-4);
+      padding-bottom:var(--space-4); border-bottom:1px solid var(--border);
+    }
+    .protocol-box__text {
+      font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-muted);
+      line-height:var(--lh-mono);
+    }
+
+    /* Why it matters */
+    .why-box {
+      border-left:2px solid var(--accent); padding-left:var(--space-6);
+      font-family:var(--font-mono); font-size:var(--text-sm); color:var(--text-muted);
+      line-height:var(--lh-body); font-style:italic;
+    }
+
+    /* Runs (past experiment history) */
+    .run-card {
+      border:1px solid var(--border); background:var(--surface); margin-bottom:var(--space-4);
+    }
+    .run-card__header {
+      display:grid; grid-template-columns:1fr auto; gap:var(--space-4);
+      padding:var(--space-5) var(--space-6); border-bottom:1px solid var(--border);
+    }
+    .run-card__title { font-family:var(--font-display); font-size:18px; color:var(--text); }
+    .run-card__dates { font-family:var(--font-mono); font-size:var(--text-2xs); color:var(--text-muted); }
+    .run-card__body { padding:var(--space-5) var(--space-6); }
+    .run-card__outcome {
+      font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-muted); line-height:var(--lh-mono);
+    }
+    .run-card__grade {
+      display:inline-flex; align-items:center; gap:var(--space-2);
+      padding:var(--space-1) var(--space-3);
+      font-family:var(--font-mono); font-size:var(--text-2xs); text-transform:uppercase;
+      letter-spacing:var(--ls-tag);
+    }
+    .run-card__grade--completed { color:#2EA98F; border:1px solid rgba(46,169,143,0.3); }
+    .run-card__grade--partial { color:var(--c-amber-400); border:1px solid var(--c-amber-300); }
+    .run-card__grade--failed { color:var(--text-muted); border:1px solid var(--border); }
+    .run-card__grade--active { color:var(--accent); border:1px solid var(--accent-dim); }
+
+    /* Follow + Try It With Me */
+    .action-row {
+      display:flex; gap:var(--space-4); flex-wrap:wrap; align-items:center;
+    }
+    .follow-form {
+      display:flex; gap:var(--space-2); align-items:center;
+    }
+    .follow-form input {
+      background:var(--bg); border:1px solid var(--border); color:var(--text);
+      font-family:var(--font-mono); font-size:var(--text-xs);
+      padding:var(--space-2) var(--space-4); outline:none; width:200px;
+    }
+    .follow-form input:focus { border-color:var(--accent); }
+    .follow-form button {
+      background:var(--accent); border:1px solid var(--accent); color:var(--bg);
+      font-family:var(--font-mono); font-size:var(--text-2xs); text-transform:uppercase;
+      letter-spacing:var(--ls-tag); padding:var(--space-2) var(--space-4); cursor:pointer;
+    }
+    .follow-msg { font-family:var(--font-mono); font-size:var(--text-2xs); color:var(--accent); }
+
+    .try-it-cta {
+      border:1px dashed var(--accent-dim); padding:var(--space-6);
+      background:var(--accent-bg-subtle);
+    }
+    .try-it-cta__title {
+      font-family:var(--font-display); font-size:18px; color:var(--text); margin-bottom:var(--space-2);
+    }
+    .try-it-cta__text {
+      font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-muted); line-height:var(--lh-mono);
+    }
+
+    /* Share card */
+    .share-row {
+      display:flex; gap:var(--space-3); align-items:center;
+    }
+    .share-btn {
+      padding:var(--space-2) var(--space-4);
+      border:1px solid var(--border); background:transparent;
+      font-family:var(--font-mono); font-size:var(--text-2xs); color:var(--text-muted);
+      cursor:pointer; text-transform:uppercase; letter-spacing:var(--ls-tag);
+    }
+    .share-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+    .loading { padding:var(--space-20) 0; text-align:center; }
+    .loading__title { font-family:var(--font-display); font-size:28px; color:var(--text-muted); }
+
+    @media (max-width:768px) {
+      .run-card__header { grid-template-columns:1fr; }
+      .follow-form input { width:160px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="amj-nav"></div>
+
+<div id="detail-content">
+  <div class="loading"><div class="loading__title">Loading experiment…</div></div>
+</div>
+
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+<div id="amj-reading-path"></div>
+<div id="amj-footer"></div>
+
+<script>
+(function() {
+  'use strict';
+  var API = 'https://averagejoematt.com/api';
+  var EVIDENCE_DOTS = {strong:'●●●',moderate:'●●',emerging:'●'};
+  var EVIDENCE_LABEL = {strong:'Strong evidence',moderate:'Moderate evidence',emerging:'Emerging evidence'};
+  var PILLAR_ICONS = {sleep:'☾',movement:'◎',nutrition:'⚘',supplements:'⬡',mental:'◈',social:'◇',discipline:'▣'};
+
+  // Get experiment ID from URL
+  var params = new URLSearchParams(window.location.search);
+  var expId = params.get('id');
+
+  if (!expId) {
+    document.getElementById('detail-content').innerHTML = '<div class="detail-header"><a href="/experiments/" class="detail-header__back">← Back to experiments</a><h1 class="detail-header__name">Experiment not found</h1><p class="detail-header__desc">No experiment ID provided. <a href="/experiments/" style="color:var(--accent)">Browse the library →</a></p></div>';
+    return;
+  }
+
+  function formatDate(s) {
+    if (!s) return '—';
+    try { return new Date(s+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}).toUpperCase(); }
+    catch(e) { return s; }
+  }
+
+  fetch(API + '/experiment_detail?id=' + encodeURIComponent(expId))
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (!data || !data.name) {
+        document.getElementById('detail-content').innerHTML = '<div class="detail-header"><a href="/experiments/" class="detail-header__back">← Back to experiments</a><h1 class="detail-header__name">Experiment not found</h1><p class="detail-header__desc">Could not find "' + expId + '" in the library. <a href="/experiments/" style="color:var(--accent)">Browse the library →</a></p></div>';
+        return;
+      }
+      renderDetail(data);
+    })
+    .catch(function() {
+      document.getElementById('detail-content').innerHTML = '<div class="detail-header"><a href="/experiments/" class="detail-header__back">← Back to experiments</a><h1 class="detail-header__name">Error loading experiment</h1></div>';
+    });
+
+  function renderDetail(d) {
+    // EL-F3: Update og:meta for shareable cards
+    document.getElementById('og-title').setAttribute('content', d.name + ' — N=1 Experiment');
+    document.getElementById('og-desc').setAttribute('content', d.description + ' | ' + (EVIDENCE_LABEL[d.evidence_tier] || '') + ' | ' + d.suggested_duration_days + ' days');
+    document.getElementById('og-url').setAttribute('content', 'https://averagejoematt.com/experiments/detail/?id=' + d.id);
+    document.getElementById('page-title').textContent = d.name + ' — N=1 Experiment';
+
+    var icon = PILLAR_ICONS[d.pillar] || '◆';
+    var evidDots = EVIDENCE_DOTS[d.evidence_tier] || '●';
+    var evidLabel = EVIDENCE_LABEL[d.evidence_tier] || d.evidence_tier;
+    var statusLabel = d.status === 'active' ? 'Active' : d.status === 'completed' ? 'Completed' : d.status === 'backlog' ? 'In Library' : d.status;
+    var activeRun = d.active_run;
+
+    var html = '';
+
+    // Header
+    html += '<div class="detail-header">';
+    html += '<a href="/experiments/" class="detail-header__back">← Back to the lab</a>';
+    html += '<div class="detail-header__pillar">' + icon + ' ' + (d.pillar_label || d.pillar) + '</div>';
+    html += '<h1 class="detail-header__name">' + d.name + '</h1>';
+    html += '<p class="detail-header__desc">' + d.description + '</p>';
+
+    // Chips
+    html += '<div class="detail-chips">';
+    html += '<span class="d-chip d-chip--accent">' + evidDots + ' ' + evidLabel + '</span>';
+    html += '<span class="d-chip">' + d.suggested_duration_days + ' days</span>';
+    html += '<span class="d-chip">' + (d.difficulty || 'medium') + '</span>';
+    html += '<span class="d-chip">' + (d.experiment_type === 'behavioral' ? 'Behavioral' : 'Measurable') + '</span>';
+    html += '<span class="d-chip">' + statusLabel + '</span>';
+    html += '</div>';
+
+    // Stats
+    html += '<div class="detail-stats">';
+    html += '<div class="d-stat"><div class="d-stat__label">Votes</div><div class="d-stat__value">' + (d.votes || 0) + '</div></div>';
+    html += '<div class="d-stat"><div class="d-stat__label">Followers</div><div class="d-stat__value">' + (d.follower_count || 0) + '</div></div>';
+    html += '<div class="d-stat"><div class="d-stat__label">Times run</div><div class="d-stat__value">' + (d.total_runs || 0) + '</div></div>';
+    if (activeRun) {
+      html += '<div class="d-stat"><div class="d-stat__label">Current run</div><div class="d-stat__value">Day ' + (activeRun.days || '?') + '</div></div>';
+    }
+    html += '</div>';
+    html += '</div>';
+
+    html += '<div class="detail-wrap">';
+
+    // Evidence section
+    html += '<div class="detail-section">';
+    html += '<div class="detail-section__heading">// research evidence</div>';
+    html += '<div class="evidence-box">';
+    html += '<div class="evidence-box__tier">' + evidDots + ' ' + evidLabel + '</div>';
+    html += '<div class="evidence-box__summary">' + (d.evidence_summary || 'No summary available.') + '</div>';
+    if (d.evidence_citation) html += '<div class="evidence-box__citation">' + d.evidence_citation + '</div>';
+    html += '</div>';
+    html += '</div>';
+
+    // Protocol section
+    html += '<div class="detail-section">';
+    html += '<div class="detail-section__heading">// hypothesis & protocol</div>';
+    html += '<div class="protocol-box">';
+    html += '<div class="protocol-box__hypo"><strong>Hypothesis:</strong> ' + (d.hypothesis_template || 'Not specified') + '</div>';
+    html += '<div class="protocol-box__text">' + (d.protocol_template || 'Protocol not yet defined.') + '</div>';
+    html += '</div>';
+    if (d.metrics_measurable && d.metrics_measurable.length) {
+      html += '<div style="margin-top:var(--space-4);display:flex;gap:var(--space-2);flex-wrap:wrap">';
+      html += '<span class="d-chip" style="border-color:var(--accent-dim);color:var(--accent)">Metrics tracked:</span>';
+      d.metrics_measurable.forEach(function(m) { html += '<span class="d-chip">' + m + '</span>'; });
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // Why it matters
+    if (d.why_it_matters) {
+      html += '<div class="detail-section">';
+      html += '<div class="detail-section__heading">// why it matters</div>';
+      html += '<div class="why-box">' + d.why_it_matters + '</div>';
+      html += '</div>';
+    }
+
+    // EL-F4: Try It With Me CTA
+    html += '<div class="detail-section">';
+    html += '<div class="detail-section__heading">// try it yourself</div>';
+    html += '<div class="try-it-cta">';
+    if (activeRun) {
+      html += '<div class="try-it-cta__title">I\'m running this right now — try it with me</div>';
+      html += '<div class="try-it-cta__text">No app needed. No tracking required. Run your own ' + d.suggested_duration_days + '-day version using the protocol above. Come back when it\'s done and tell me how it went.</div>';
+    } else {
+      html += '<div class="try-it-cta__title">Try your own ' + d.suggested_duration_days + '-day version</div>';
+      html += '<div class="try-it-cta__text">Use the protocol above. Track it however you want — paper, app, nothing at all. The intervention is what matters, not the tracking. If you run it, I want to hear about it.</div>';
+    }
+    html += '</div>';
+    html += '</div>';
+
+    // EL-F1: Follow + Share
+    html += '<div class="detail-section">';
+    html += '<div class="detail-section__heading">// follow this experiment</div>';
+    html += '<div class="action-row">';
+    html += '<div class="follow-form" id="follow-form">';
+    html += '<input type="email" id="follow-email" placeholder="your@email.com">';
+    html += '<button onclick="handleFollow()">Notify me</button>';
+    html += '</div>';
+    html += '<span class="follow-msg" id="follow-msg"></span>';
+    html += '</div>';
+    html += '<div style="margin-top:var(--space-4);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">Get an email when this experiment completes with the full results.</div>';
+
+    // EL-F3: Share buttons
+    html += '<div class="share-row" style="margin-top:var(--space-6)">';
+    html += '<button class="share-btn" onclick="copyLink()">Copy link</button>';
+    html += '<button class="share-btn" onclick="shareTwitter()">Share on X</button>';
+    html += '<span class="follow-msg" id="share-msg"></span>';
+    html += '</div>';
+    html += '</div>';
+
+    // Past runs
+    if (d.runs && d.runs.length) {
+      html += '<div class="detail-section">';
+      html += '<div class="detail-section__heading">// run history (' + d.runs.length + ' run' + (d.runs.length > 1 ? 's' : '') + ')</div>';
+      d.runs.forEach(function(run, i) {
+        var gradeClass = run.grade === 'partial' ? 'partial' : run.status === 'abandoned' ? 'failed' : run.status === 'active' ? 'active' : 'completed';
+        var gradeLabel = run.grade === 'partial' ? '~ Partial' : run.status === 'abandoned' ? '✗ Shelved' : run.status === 'active' ? '● Running' : '✓ Completed';
+        html += '<div class="run-card">';
+        html += '<div class="run-card__header">';
+        html += '<div><span class="run-card__title">Run #' + (run.iteration || (i + 1)) + '</span> <span class="run-card__grade run-card__grade--' + gradeClass + '">' + gradeLabel + '</span></div>';
+        html += '<div class="run-card__dates">' + formatDate(run.start_date) + ' → ' + (run.status === 'active' ? 'ongoing' : formatDate(run.end_date)) + (run.days != null ? ' (' + run.days + ' days)' : '') + '</div>';
+        html += '</div>';
+        if (run.outcome || run.key_finding || run.reflection) {
+          html += '<div class="run-card__body">';
+          if (run.outcome) html += '<div class="run-card__outcome"><strong>Outcome:</strong> ' + run.outcome + '</div>';
+          if (run.key_finding) html += '<div class="run-card__outcome" style="margin-top:var(--space-3)"><strong>Key finding:</strong> ' + run.key_finding + '</div>';
+          if (run.reflection) html += '<div class="run-card__outcome" style="margin-top:var(--space-3);font-style:italic"><strong>Reflection:</strong> ' + run.reflection + '</div>';
+          if (run.compliance_pct != null) html += '<div class="run-card__outcome" style="margin-top:var(--space-3)"><strong>Compliance:</strong> ' + run.compliance_pct + '%</div>';
+          html += '</div>';
+        }
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+
+    html += '</div>'; // close detail-wrap
+
+    document.getElementById('detail-content').innerHTML = html;
+  }
+
+  // Follow handler
+  window.handleFollow = function() {
+    var email = document.getElementById('follow-email').value.trim();
+    var msg = document.getElementById('follow-msg');
+    if (!email || !email.includes('@')) { msg.textContent = 'Enter a valid email.'; return; }
+    msg.textContent = 'Saving…';
+    fetch(API + '/experiment_follow', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email: email, library_id: expId})
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.already_following) msg.textContent = 'You\'re already following this one!';
+      else if (data.followed) { msg.textContent = 'You\'ll be notified when results are in.'; document.getElementById('follow-email').value = ''; }
+      else msg.textContent = data.error || 'Something went wrong.';
+    }).catch(function() { msg.textContent = 'Failed — try again.'; });
+  };
+
+  // Share handlers
+  window.copyLink = function() {
+    var url = window.location.href;
+    navigator.clipboard.writeText(url).then(function() {
+      document.getElementById('share-msg').textContent = 'Link copied!';
+      setTimeout(function() { document.getElementById('share-msg').textContent = ''; }, 2000);
+    });
+  };
+  window.shareTwitter = function() {
+    var text = encodeURIComponent('Check out this N=1 experiment: ' + document.getElementById('page-title').textContent);
+    var url = encodeURIComponent(window.location.href);
+    window.open('https://twitter.com/intent/tweet?text=' + text + '&url=' + url, '_blank');
+  };
+})();
+</script>
+<script src="/assets/js/reveal.js"></script>
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>

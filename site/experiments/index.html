@@ -811,6 +811,7 @@
           '<div>' +
             '<div class="mc-card__name">' + exp.name + '</div>' +
             '<div class="mc-card__hypo"><em>Hypothesis:</em> ' + (exp.hypothesis || 'Not specified') + '</div>' +
+            '<div style="margin-top:var(--space-3);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent-dim)">Running now — try it yourself. No app needed, just the protocol.</div>' +
           '</div>' +
           '<div class="progress-ring">' +
             '<svg width="80" height="80" viewBox="0 0 80 80">' +
@@ -895,9 +896,12 @@
         html += '</div>';
         html += '<div class="lib-tile__bottom">';
         html += '<span class="lib-status lib-status--' + statusClass + '"><span class="lib-status__dot"></span>' + statusLabel + '</span>';
+        html += '<span style="display:flex;gap:var(--space-2);align-items:center">';
+        html += '<a href="/experiments/detail/?id=' + exp.id + '" class="vote-btn" style="text-decoration:none">Details</a>';
         html += '<button class="vote-btn' + (isVoted ? ' voted' : '') + '" data-lib-id="' + exp.id + '" onclick="handleVote(this)">';
         html += '<span class="vote-btn__arrow">▲</span> ' + (exp.votes || 0);
         html += '</button>';
+        html += '</span>';
         html += '</div>';
         html += '</div>';
       });
