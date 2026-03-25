@@ -2514,6 +2514,14 @@ def tool_list_experiments(args):
             "tags":          item.get("tags", []),
             "notes":         item.get("notes", ""),
             "outcome":       item.get("outcome", ""),
+            # EL-22/23: Evolution fields
+            "library_id":      item.get("library_id"),
+            "grade":           item.get("grade"),
+            "compliance_pct":  item.get("compliance_pct"),
+            "duration_tier":   item.get("duration_tier"),
+            "experiment_type": item.get("experiment_type"),
+            "iteration":       item.get("iteration", 1),
+            "reflection":      item.get("reflection"),
         })
 
     active = sum(1 for r in results if r["status"] == "active")

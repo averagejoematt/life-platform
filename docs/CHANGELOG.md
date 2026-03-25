@@ -1,3 +1,47 @@
+## v3.9.15 — 2026-03-25: Experiments Evolution Phase 2 — Record zone polish, detail page, follow buttons, achievement badges
+
+### Summary
+Completed remaining Experiments Evolution tasks: Record zone enhancements (grade badges, compliance bars, reflection field, duration vs planned, iteration indicators), library follow buttons (F1), experiment detail page (F2), og:meta shareable cards (F3), "Try It With Me" protocol CTAs (F4), MCP tool updates (F5), and 5 new experiment achievement badges (EL-21). Removed 108-line dead duplicate function from site API Lambda.
+
+### Changes
+
+**lambdas/site_api_lambda.py**
+- Removed dead `_REMOVED_handle_experiment_detail` duplicate function (108 lines)
+- Added 7 evolution fields to `/api/experiments` response: `grade`, `compliance_pct`, `reflection`, `library_id`, `duration_tier`, `experiment_type`, `iteration`
+- EL-21: Added 5 experiment achievement badges to `handle_achievements()`: Lab Rat (3 completed), Research Fellow (5), Principal Investigator (10), Hot Streak (3 consecutive without fails), Renaissance Man (all 7 pillars covered)
+- Streak detection: sorted finished experiments by end_date, checks last 3 for consecutive completions
+- Pillar coverage: scans completed experiment tags against 7-pillar set
+- Bumped experiment query limit from 5 to 50 for proper badge counting
+
+**mcp/tools_lifestyle.py** (F5)
+- `list_experiments` now returns: `library_id`, `grade`, `compliance_pct`, `duration_tier`, `experiment_type`, `iteration`, `reflection`
+
+**site/experiments/index.html** (EL-16 through EL-20, F1, F4)
+- EL-20: Record zone filters: All | Completed | Partial | Failed/Shelved (partial filters by `grade === 'partial'`)
+- EL-19: Compliance % bar with color tiers (green ≥80%, amber ≥50%, gray <50%)
+- EL-17: "What I'd do differently" reflection section with italic quoted text
+- EL-18: Duration planned vs actual display ("X of Y planned days"), iteration badge ("Run #N")
+- F1: Follow buttons on library tiles — email prompt → POST `/api/experiment_follow`
+- F4: "Here's the protocol. Run your own version" CTA on completed Record cards with protocol data
+- CSS: 7 new component styles (compliance-bar, reflection, duration-compare, follow-btn, cta)
+
+**site/experiments/detail/index.html** (NEW — F2 + F3)
+- Full experiment detail page consuming `/api/experiment_detail?id=slug`
+- Sections: pillar header, description, evidence + citation, protocol template, hypothesis template, metrics tracked, past runs with metrics grid
+- Each run shows: status + grade, dates, primary metric, baseline/result values, compliance %, iteration, outcome, mechanism, finding, reflection
+- Vote + follow buttons wired to existing POST endpoints
+- F3: Dynamic `document.title` and og:meta updates from API response
+- "Try it yourself" CTA with suggested duration
+- Responsive design (3-col → 2-col metrics grid on mobile)
+
+### Deployed
+- Site API Lambda: `bash deploy/deploy_lambda.sh life-platform-site-api lambdas/site_api_lambda.py`
+- MCP Lambda: full zip build → `aws lambda update-function-code`
+- S3: `site/experiments/index.html`, `site/experiments/detail/index.html`
+- CloudFront invalidation: `/experiments/*`
+
+---
+
 ## v3.9.14 — 2026-03-25: Experiments page evolution — 52-experiment library, voting, 3-zone redesign
 
 ### Summary
