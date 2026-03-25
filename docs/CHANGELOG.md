@@ -1,3 +1,37 @@
+## v3.9.11 — 2026-03-24: Character page RPG overhaul — Product Board Phase A/B/C
+
+### Summary
+Complete Character page rewrite implementing all three phases from a Product Board review session. The page transforms from a data dashboard into a full RPG-style character sheet with tier-based visual theming, trading card hero layout, chunky stat bars, tier emblems, sparklines, visual timeline, collapsible badges, and a level-up notification CTA. The page now evolves visually as Matthew progresses through tiers (Foundation → Elite), with every accent color, glow, and emblem shape shifting automatically.
+
+### Changes
+
+**site/character/index.html** (COMPLETE REWRITE)
+
+Phase A — Visual identity:
+- Tier-based CSS theming via `data-tier` attribute on `<body>` (5 palettes: Foundation/green, Momentum/amber, Discipline/steel, Mastery/gold, Elite/royal)
+- All `--tier-accent`, `--tier-glow`, `--tier-emblem-bg` custom properties shift per tier
+- RPG-style chunky stat bars (14px tall, notch marks at 25/50/75) replacing 2px lines
+- 5 tier-specific SVG emblems: hexagon → hexagon+flame → shield → ornate shield → crown+shield
+- "Level up imminent" animated banner when XP ≥ 80% of next level
+- Section reorder: Trading Card hero → Next Level → Intro → Radar → Pillars → Timeline → Heatmap → Badges → Methodology
+
+Phase B — Storytelling:
+- 30-day sparkline SVGs on each pillar card (8-week trend from `pillar_history`)
+- Visual vertical timeline replacing flat text event log (glowing dots for level-ups)
+- RPG flavor text for each tier ("The proving ground. Most people never leave this tier.")
+- Trading card layout: screenshot-ready hero with emblem, all 7 pillar mini-bars, footer stats, tier dots
+- XP progress bar showing exact progress to next level
+
+Phase C — Growth:
+- "Notify me on level-up" micro-subscription CTA (`source: levelup_alert`)
+- SEO-optimized meta tags targeting "gamify health", "RPG character sheet", "level up life"
+- Collapsible badge groups with earned/total counts (reduces mobile scroll ~40%)
+
+### Deployed
+- `aws s3 sync site/ s3://matthew-life-platform/site/ --delete`
+- CloudFront invalidation `/character/*`
+
+
 ## v3.9.10 — 2026-03-24: Navigation restructure — 6-section board-approved IA
 
 ### Summary

@@ -6,7 +6,7 @@ v2.1 (v3.4.0): CDK-managed IAM roles + CDK-managed EventBridge rules.
   EventBridge rules created via schedule= (no more add_permission workaround).
   Freshness-checker and insight-email-parser added (previously unmanaged).
 
-Lambdas (9):
+Lambdas (10):
   life-platform-freshness-checker   cron(45 16 * * ? *)     — 9:45 AM PT daily
   life-platform-dlq-consumer        rate(6 hours)
   life-platform-canary              rate(4 hours)
@@ -16,6 +16,7 @@ Lambdas (9):
   life-platform-data-export         (on-demand only)
   life-platform-data-reconciliation cron(30 7 ? * MON *)    — Monday 12:30 AM PT
   insight-email-parser              (SES inbound trigger only)
+  site-stats-refresh                4x/day (15:00, 19:00, 23:00, 03:00 UTC) — no AI calls
 """
 
 import aws_cdk as cdk
@@ -24,6 +25,7 @@ from aws_cdk import (
     aws_lambda as _lambda, aws_iam as iam, aws_sqs as sqs,
     aws_dynamodb as dynamodb, aws_s3 as s3, aws_sns as sns,
     aws_cloudwatch as cloudwatch, aws_cloudwatch_actions as cw_actions,
+    aws_events as events, aws_events_targets as targets,
 )
 from constructs import Construct
 from stacks.lambda_helpers import create_platform_lambda
@@ -270,6 +272,29 @@ class OperationalStack(Stack):
                 cloudwatch.GraphWidget(title="Errors", left=[site_api_errors], width=8),
                 cloudwatch.GraphWidget(title="Duration (p50 / p95)", left=[site_api_duration_p50, site_api_duration_p95], width=8),
             ]])
+
+        # ── 11. Site Stats Refresh — 4x/day: 8am, 12pm, 4pm, 8pm PT (15:00, 19:00, 23:00, 03:00 UTC)
+        # Invokes ingestion Lambdas synchronously, reads fresh DynamoDB, updates vitals in
+        # public_stats.json in-place without any AI calls. Zero incremental cost.
+        site_stats_fn = create_platform_lambda(self, "SiteStatsRefresh",
+            function_name="site-stats-refresh",
+            source_file="lambdas/site_stats_refresh_lambda.py",
+            handler="site_stats_refresh_lambda.lambda_handler",
+            timeout_seconds=300, memory_mb=256,
+            environment={
+                "TABLE_NAME":  "life-platform",
+                "S3_BUCKET":   "matthew-life-platform",
+                "USER_ID":     "matthew",
+            },
+            custom_policies=rp.operational_site_stats_refresh(),
+            table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None,
+        )
+        # Four EventBridge cron rules — UTC equivalents of 8am/12pm/4pm/8pm Pacific (no DST drift)
+        for utc_hour, label in [(15, "8amPT"), (19, "12pmPT"), (23, "4pmPT"), (3, "8pmPT")]:
+            rule = events.Rule(self, f"SiteStatsRefresh{label}",
+                schedule=events.Schedule.cron(hour=str(utc_hour), minute="0"),
+            )
+            rule.add_target(targets.LambdaFunction(site_stats_fn))
 
         cdk.CfnOutput(self, "FreshnessCheckerArn", value=freshness.function_arn, description="Freshness checker Lambda ARN")
         cdk.CfnOutput(self, "CanaryArn", value=canary.function_arn, description="Canary Lambda ARN")
