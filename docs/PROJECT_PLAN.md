@@ -1,7 +1,8 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-23 (v3.9.4 — CI/CD pipeline activation. 3 blockers resolved (F821 lint, boto3 dep, pipefail crash). Shared layer v10 attached to 15 consumers. Pipeline passing lint + tests + plan. R13 #1 finding closing.)
+> Last update: 2026-03-25 (v3.9.14 — Experiments page evolution: 52-experiment library, community voting, 3-zone page redesign. Spec: docs/EXPERIMENTS_EVOLUTION_SPEC.md).
+> Prior update: 2026-03-23 (v3.9.4 — CI/CD pipeline activation. 3 blockers resolved (F821 lint, boto3 dep, pipefail crash). Shared layer v10 attached to 15 consumers. Pipeline passing lint + tests + plan. R13 #1 finding closing.)
 
 ---
 
@@ -96,6 +97,21 @@ All P0 items from Architecture Review #8 are resolved.
 | NEW-2 | **Weekly Snapshot** — auto-generated weekly report cards, walkable archive | P1 | ✅ Done (v3.9.7) |
 | NEW-3 | **Milestones Gallery** — gamification badges (weight/journal/running/streaks) faded→color | P1 | ✅ Done (v3.9.6) |
 | NEW-4 | **Dark/Light Mode** — CSS toggle, localStorage persist | P2 | ✅ Done (v3.9.6) |
+
+**Experiments Evolution (v3.9.14):**
+
+| ID | Item | Priority | Status |
+|----|------|----------|--------|
+| EL-1 | Experiment library config (52 experiments, 7 pillars) | P1 | ✅ Done |
+| EL-2 | `/api/experiment_library` endpoint (S3 + DynamoDB merge) | P1 | ✅ Done |
+| EL-3 | `/api/experiment_vote` POST endpoint (atomic counter + rate limit) | P1 | ✅ Done |
+| EL-4 | DynamoDB vote records with TTL rate limiting | P1 | ✅ Done |
+| EL-5 | Lambda deploy | P1 | ✅ Done |
+| EL-6–9 | Mission Control zone (progress rings, tier badges, evidence chips) | P1 | ✅ Done |
+| EL-10–15 | Library zone (pillar grid, voting, filters, responsive) | P1 | ✅ Done |
+| EL-16–20 | Record zone enhancements (grade badges, compliance bars) | P2 | ⬜ Pending |
+| EL-21–23 | Achievement integration + MCP tool updates | P2 | ⬜ Pending |
+| EL-F1–F5 | Future: per-experiment email subscribe, individual pages, og:image, co-experiments, iteration tracking | P3 | ⬜ Backlog |
 
 **Backlog (Panel Recommended):** For Builders page, Bloodwork/Labs, Body Composition, Longevity Scorecard, Segmented Subscriptions, Monthly Retrospective, System Status, API Docs, Mobile App Experience. See `WEBSITE_REDESIGN_SPEC.md` for full details.
 
@@ -206,6 +222,7 @@ Board Summit #3: 500 subscribers OR 90-day journey milestone (2026-05-22), which
 
 | ID | Item | Version | Date |
 |----|------|---------|------|
+| v3.9.14 | Experiments page evolution — 52-experiment library, voting, 3-zone redesign | v3.9.14 | 2026-03-25 |
 | v3.9.4 | CI/CD pipeline activation — 3 blockers resolved, shared layer attached to 15 consumers | v3.9.4 | 2026-03-23 |
 | v3.8.0 | Sprint 8: Mobile nav (hamburger + bottom nav + grouped footer), content safety filter, website versioning | v3.8.0 | 2026-03-21 |
 | v3.7.84 | Sprint 7: Expert panel review + 15 of 19 website items shipped | v3.7.84 | 2026-03-20 |

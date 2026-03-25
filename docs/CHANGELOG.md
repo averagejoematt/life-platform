@@ -1,3 +1,44 @@
+## v3.9.14 — 2026-03-25: Experiments page evolution — 52-experiment library, voting, 3-zone redesign
+
+### Summary
+Product Board convened to reimagine the Experiments page from a static lab notebook into a living experiment library. Built a 52-experiment evidence-based library across 7 pillars (Sleep, Movement, Nutrition, Supplements, Mental, Social, Discipline), each with evidence tiers, research citations, and protocol templates. New 3-zone page architecture: Mission Control (active experiments with SVG progress rings), The Library (browsable/votable experiment grid), The Record (graded completed experiments). Community voting system with DynamoDB atomic counters and IP-based 24hr rate limiting via TTL. Full implementation spec written and approved by all 8 Product Board members.
+
+### Changes
+
+**config/experiment_library.json** (NEW — EL-1)
+- 52 experiment ideas with full metadata: name, description, pillar, evidence_tier (strong/moderate/emerging), evidence_citation, suggested_duration, difficulty, metrics_measurable/behavioral, hypothesis_template, protocol_template, why_it_matters
+- Stored at `s3://matthew-life-platform/site/config/experiment_library.json`
+- 4 experiments pre-linked to active DynamoDB experiments (Tongkat Ali, NMN, Creatine, Berberine)
+
+**lambdas/site_api_lambda.py** (EL-2/3/4)
+- `handle_experiment_library()` — GET `/api/experiment_library`: reads S3 config, merges DynamoDB vote counts + active experiment status, groups by pillar with stats, sorts by votes
+- `_handle_experiment_vote()` — POST `/api/experiment_vote`: atomic DynamoDB counter increment, IP-based rate limiting via conditional put with 24hr TTL, cookie dedup on client side
+- Routes registered: `/api/experiment_library` (GET), `/api/experiment_vote` (POST in lambda_handler)
+- S3 key path: `site/config/experiment_library.json` (within site-api IAM read scope)
+
+**site/experiments/index.html** (EL-6 through EL-15 — COMPLETE REWRITE)
+- **Zone 1: Mission Control** — active experiments with animated SVG progress rings (stroke-dashoffset animation), progress bars, duration tier badges, evidence type chips, metric chips
+- **Zone 2: The Library** — 7 pillar sections with collapsible headers, 3-column responsive grid (→2→1), evidence tier dots (●●●/●●/●), difficulty + duration metadata, anonymous voting with optimistic UI + localStorage dedup, pillar filter buttons, sort by most voted/recently active/alphabetical
+- **Zone 3: The Record** — completed/abandoned experiments with grade badges (✓ Completed / ~ Partial / ✗ Shelved), full card design retained (hypothesis, metrics, outcome, mechanism, key findings)
+- Retained: H/P/D explainer, N=1 methodology section, pipeline nav, N=1 disclaimer
+- Header stats: library count, active count, completed count, community votes
+
+**docs/EXPERIMENTS_EVOLUTION_SPEC.md** (NEW)
+- Full implementation spec: 12 sections, 26 tasks across 6 phases, Product Board sign-off
+- Covers: concept overview, page architecture, seed data, data model, API endpoints, visual design spec, community features, achievement integration, MCP tool changes, implementation tasks
+
+### DynamoDB schema additions
+- `VOTES#experiment_library / LIB#{library_id}` — vote counts (atomic counter)
+- `VOTES#rate_limit / IP#{hash}#LIB#{library_id}` — rate limit records with 24hr TTL
+
+### Deployed
+- S3 config: `site/config/experiment_library.json`
+- Lambda: `life-platform-site-api` (2 deploys — initial + S3 key path fix)
+- DynamoDB TTL: already enabled (confirmed)
+- Site: `site/experiments/index.html` — pending S3 deploy
+
+---
+
 ## v3.9.13 — 2026-03-25: Benchmarks → "The Standards" — 6-domain research reference redesign
 
 ### Summary
