@@ -4,19 +4,19 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Matthew's current supplement stack — evidence-based, genome-informed, and tracked daily.">
-  <meta property="og:title" content="Supplements — Matthew Walker">
-  <meta property="og:description" content="Current supplement protocol with dosage, timing, adherence, and genome rationale.">
+  <meta name="description" content="21 supplements. Evidence-rated. Genome-informed. No affiliate links. No sponsorships. Just the data behind every pill.">
+  <meta property="og:title" content="The Pharmacy — Matthew Walker">
+  <meta property="og:description" content="21 supplements rated by evidence strength. No affiliate links. No sponsorships. Genome-informed, N=1 tracked.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com/supplements/">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Supplements — Matthew Walker">
-  <meta name="twitter:description" content="Evidence-based supplement stack. Genome-informed, tracked daily.">
-  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <title>Supplements — Matthew Walker</title>
+  <meta name="twitter:title" content="The Pharmacy — Matthew Walker">
+  <meta name="twitter:description" content="21 supplements. Evidence-rated. No affiliate links. Just data.">
+  <meta name="keywords" content="supplement stack, evidence-based supplements, supplement review no affiliate, genome supplement, longevity supplements, sleep supplements">
+  <title>The Pharmacy — Matthew Walker</title>
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
@@ -25,756 +25,606 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    /* ── Page header ── */
-    .supp-header {
-      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
-      border-bottom: 1px solid var(--border);
-    }
-    .supp-header__eyebrow { margin-bottom: var(--space-4); }
-    .supp-header__title {
-      font-family: var(--font-display);
-      font-size: var(--text-h1);
-      line-height: var(--lh-display);
-      color: var(--text);
-      margin-bottom: var(--space-4);
-    }
-    .supp-header__title span { color: var(--accent); }
-    .supp-header__sub {
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      max-width: 520px;
-      line-height: var(--lh-body);
-    }
+/* ═══════════════════════════════════════════════════════
+   THE PHARMACY — Supplements Page
+   Design: Clinical data terminal meets apothecary catalog
+   Evidence-first visual hierarchy
+   ═══════════════════════════════════════════════════════ */
 
-    /* ── Stats row ── */
-    .supp-stats {
-      display: flex;
-      gap: 1px;
-      background: var(--border);
-      border: 1px solid var(--border);
-      margin: var(--space-8) var(--page-padding) 0;
-    }
-    .supp-stat {
-      flex: 1;
-      background: var(--surface);
-      padding: var(--space-5) var(--space-6);
-    }
-    .supp-stat__label {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin-bottom: var(--space-2);
-      font-family: var(--font-mono);
-    }
-    .supp-stat__value {
-      font-family: var(--font-display);
-      font-size: 36px;
-      color: var(--text);
-      line-height: 1;
-    }
-    .supp-stat__value.accent { color: var(--accent); }
-    .supp-stat__sub {
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: var(--ls-label);
-      margin-top: var(--space-1);
-    }
+/* ── Hero ── */
+.rx-hero {
+  padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+  border-bottom: 1px solid var(--border);
+  position: relative; overflow: hidden;
+}
+.rx-hero::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at 70% 80%, rgba(0,229,160,0.05) 0%, transparent 60%);
+  pointer-events: none;
+}
+.rx-hero__eyebrow {
+  font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
+  text-transform: uppercase; color: var(--accent-dim);
+  font-family: var(--font-mono); margin-bottom: var(--space-4);
+}
+.rx-hero__title {
+  font-family: var(--font-display); font-size: clamp(32px, 5vw, 56px);
+  line-height: 1.1; color: var(--text); margin-bottom: var(--space-3);
+}
+.rx-hero__title em { color: var(--accent); font-style: normal; }
+.rx-hero__sub {
+  font-size: var(--text-base); color: var(--text-muted);
+  max-width: 580px; line-height: var(--lh-body); margin-bottom: var(--space-6);
+}
 
-    /* ── Body layout ── */
-    .supp-body {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
-    }
+/* No-affiliate banner */
+.rx-integrity {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  border: 1px solid var(--accent); background: rgba(0,229,160,0.04);
+  padding: var(--space-3) var(--space-5); margin-bottom: var(--space-8);
+}
+.rx-integrity__icon { font-size: 18px; }
+.rx-integrity__text {
+  font-family: var(--font-mono); font-size: var(--text-xs);
+  color: var(--accent); letter-spacing: var(--ls-label);
+}
 
-    /* ── Purpose group (replaces timing-group) ── */
-    .timing-group {
-      margin-bottom: var(--space-12);
-    }
-    .timing-group__heading {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-      margin-bottom: var(--space-5);
-      padding-bottom: var(--space-3);
-      border-bottom: 1px solid var(--border-subtle);
-    }
-    .timing-group__label {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
-      font-family: var(--font-mono);
-    }
-    .timing-group__count {
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: var(--ls-label);
-      font-family: var(--font-mono);
-    }
-    .timing-group__cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: var(--space-4);
-    }
+/* Hero stats */
+.rx-hero__stats { display: flex; gap: var(--space-8); flex-wrap: wrap; }
+.rx-stat { border-left: 2px solid var(--border); padding-left: var(--space-4); }
+.rx-stat:first-child { border-left-color: var(--accent); }
+.rx-stat__label {
+  font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
+  text-transform: uppercase; color: var(--text-muted);
+  font-family: var(--font-mono); margin-bottom: 2px;
+}
+.rx-stat__val { font-family: var(--font-display); font-size: 28px; color: var(--text); line-height: 1; }
+.rx-stat:first-child .rx-stat__val { color: var(--accent); }
 
-    /* ── Evidence tier badges ── */
-    .badge {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      padding: 2px 8px;
-      border: 1px solid;
-      font-family: var(--font-mono);
-    }
-    .badge--timing {
-      color: var(--accent-dim);
-      border-color: var(--border);
-      background: var(--accent-bg-subtle);
-    }
-    /* Green — genome-justified */
-    .badge--genome {
-      color: var(--accent);
-      border-color: var(--c-green-100);
-      background: var(--c-green-050);
-    }
-    /* Blue — peer-reviewed consensus */
-    .badge--rct {
-      color: #5ba4cf;
-      border-color: rgba(91,164,207,0.25);
-      background: rgba(91,164,207,0.06);
-    }
-    /* Amber — N=1 hypothesis */
-    .badge--n1 {
-      color: var(--c-amber-400);
-      border-color: var(--c-amber-100);
-      background: var(--c-amber-050);
-    }
-    /* Evidence tier: strong (green) */
-    .badge--strong {
-      color: var(--accent);
-      border-color: var(--c-green-100);
-      background: var(--c-green-050);
-    }
-    /* Evidence tier: emerging (amber) */
-    .badge--emerging {
-      color: var(--c-amber-400);
-      border-color: var(--c-amber-100);
-      background: var(--c-amber-050);
-    }
-    /* Evidence tier: general (gray) */
-    .badge--general {
-      color: var(--text-faint);
-      border-color: var(--border);
-      background: var(--surface-raised);
-    }
-    /* Evidence tier: experimental (purple) */
-    .badge--experimental {
-      color: #a78bfa;
-      border-color: rgba(167,139,250,0.25);
-      background: rgba(167,139,250,0.06);
-    }
-    /* Genome SNP tag */
-    .badge--snp {
-      color: var(--accent);
-      border-color: var(--c-green-100);
-      background: var(--c-green-050);
-      font-style: italic;
-    }
+/* ── Evidence Legend ── */
+.ev-legend {
+  max-width: var(--max-width); margin: 0 auto;
+  padding: var(--space-6) var(--page-padding);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: var(--space-6); flex-wrap: wrap;
+}
+.ev-legend__label {
+  font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
+  text-transform: uppercase; color: var(--text-faint);
+  font-family: var(--font-mono);
+}
+.ev-legend__item { display: flex; align-items: center; gap: var(--space-2); }
+.ev-ring-mini { width: 20px; height: 20px; }
+.ev-ring-mini circle.bg { fill: none; stroke: var(--surface-raised); stroke-width: 2.5; }
+.ev-ring-mini circle.fill { fill: none; stroke-width: 2.5; stroke-linecap: round; }
+.ev-legend__text {
+  font-size: var(--text-2xs); color: var(--text-muted);
+  font-family: var(--font-mono); letter-spacing: var(--ls-label);
+}
 
-    /* ── Supplement card v2 ── */
-    .supp-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      transition: background var(--dur-fast), border-color var(--dur-fast);
-    }
-    .supp-card:hover {
-      background: var(--surface-raised);
-      border-color: var(--border-strong);
-    }
+/* ── Body ── */
+.rx-body {
+  max-width: var(--max-width); margin: 0 auto;
+  padding: var(--space-10) var(--page-padding);
+}
 
-    /* Card header */
-    .supp-card__header {
-      padding: var(--space-5) var(--space-6) var(--space-4);
-      border-bottom: 1px solid var(--border-subtle);
-    }
-    .supp-card__top {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: var(--space-3);
-      margin-bottom: var(--space-3);
-    }
-    .supp-card__name {
-      font-family: var(--font-display);
-      font-size: 20px;
-      color: var(--text);
-      line-height: 1.15;
-    }
-    .supp-card__dose-badge {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--accent);
-      background: var(--accent-bg-subtle);
-      border: 1px solid var(--c-green-100);
-      padding: 3px 8px;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .supp-card__meta {
-      display: flex;
-      gap: var(--space-2);
-      flex-wrap: wrap;
-    }
+/* ── Purpose Group ── */
+.rx-group { margin-bottom: var(--space-12); }
+.rx-group__header {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin-bottom: var(--space-6); padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.rx-group__icon { font-size: 20px; }
+.rx-group__name {
+  font-family: var(--font-display); font-size: 22px; color: var(--text);
+}
+.rx-group__name em { color: var(--accent); font-style: normal; }
+.rx-group__count {
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  color: var(--text-faint); letter-spacing: var(--ls-label);
+  margin-left: auto;
+}
+.rx-group__desc {
+  font-size: var(--text-xs); color: var(--text-faint);
+  line-height: var(--lh-body); margin-bottom: var(--space-5);
+  padding-left: var(--space-4); border-left: 2px solid var(--border);
+  max-width: 640px;
+}
+.rx-group__grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: var(--space-4);
+}
 
-    /* Card sections */
-    .supp-card__section {
-      padding: var(--space-4) var(--space-6);
-      border-bottom: 1px solid var(--border-subtle);
-    }
-    .supp-card__section:last-child {
-      border-bottom: none;
-    }
-    .supp-card__section-label {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      font-family: var(--font-mono);
-      margin-bottom: var(--space-2);
-    }
-    .supp-card__rationale {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-    }
-    .supp-card__science {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    .supp-card__science li {
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-      padding-left: var(--space-4);
-      position: relative;
-      margin-bottom: var(--space-1);
-    }
-    .supp-card__science li:last-child { margin-bottom: 0; }
-    .supp-card__science li::before {
-      content: '—';
-      position: absolute;
-      left: 0;
-      color: var(--accent-dim);
-      font-family: var(--font-mono);
-    }
+/* ═══════ SUPPLEMENT CARD ═══════ */
+.rx-card {
+  background: var(--surface); border: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+  position: relative;
+}
+.rx-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+}
+/* Evidence strength left accent */
+.rx-card--strong  { border-left: 3px solid var(--accent); }
+.rx-card--moderate { border-left: 3px solid var(--c-amber-400); }
+.rx-card--emerging { border-left: 3px solid var(--text-faint); }
 
-    /* MY DATA section */
-    .supp-card__data {
-      padding: var(--space-4) var(--space-6);
-      background: rgba(0,0,0,0.15);
-      border-bottom: none;
-    }
-    .supp-card__data-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-3);
-      margin-top: var(--space-2);
-    }
-    .supp-card__data-item {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .supp-card__data-label {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      font-family: var(--font-mono);
-    }
-    .supp-card__data-value {
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-    }
-    .supp-card__data-value.loading {
-      color: var(--text-faint);
-      font-style: italic;
-    }
-    .signal--positive { color: var(--accent); }
-    .signal--none     { color: var(--text-faint); }
-    .signal--unclear  { color: var(--c-amber-400); }
+/* Card header */
+.rx-card__head {
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  display: flex; gap: var(--space-4); align-items: flex-start;
+}
+/* Evidence confidence ring */
+.rx-ring { width: 48px; height: 48px; flex-shrink: 0; }
+.rx-ring__bg { fill: none; stroke: var(--surface-raised); stroke-width: 3.5; }
+.rx-ring__fill { fill: none; stroke-width: 3.5; stroke-linecap: round; }
+.rx-ring__label {
+  font-family: var(--font-mono); font-size: 9px;
+  text-anchor: middle; dominant-baseline: central;
+}
+.rx-card__info { flex: 1; min-width: 0; }
+.rx-card__name {
+  font-family: var(--font-display); font-size: 18px;
+  color: var(--text); line-height: 1.2; margin-bottom: 4px;
+}
+.rx-card__dose {
+  font-family: var(--font-mono); font-size: var(--text-xs);
+  color: var(--accent); background: var(--accent-bg-subtle);
+  border: 1px solid rgba(0,229,160,0.15);
+  padding: 1px 6px; display: inline-block;
+}
 
-    /* Card footer link */
-    .supp-card__footer {
-      padding: var(--space-3) var(--space-6);
-      border-top: 1px solid var(--border-subtle);
-    }
-    .supp-card__corr-link {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-label);
-      color: var(--accent-dim);
-      font-family: var(--font-mono);
-      text-decoration: none;
-      transition: color var(--dur-fast);
-    }
-    .supp-card__corr-link:hover { color: var(--accent); }
+/* Purpose + meta badges row */
+.rx-card__badges {
+  display: flex; gap: var(--space-2); flex-wrap: wrap;
+  padding: 0 var(--space-5) var(--space-3);
+}
+.rx-badge {
+  font-size: 9px; font-family: var(--font-mono);
+  letter-spacing: 0.04em; padding: 2px 6px;
+  border: 1px solid var(--border); color: var(--text-faint);
+  display: inline-flex; align-items: center; gap: 3px;
+}
+.rx-badge--purpose { }
+.rx-badge--timing { color: var(--accent-dim); border-color: rgba(0,229,160,0.12); }
+.rx-badge--advisor { color: var(--text-muted); border-color: var(--border); background: rgba(255,255,255,0.02); }
+.rx-badge--genome { color: var(--accent); border-color: rgba(0,229,160,0.2); background: rgba(0,229,160,0.04); }
+.rx-badge--synergy { color: var(--c-amber-400); border-color: rgba(200,132,58,0.15); }
+.rx-badge--experiment { color: #a78bfa; border-color: rgba(167,139,250,0.25); background: rgba(167,139,250,0.04); }
 
-    /* ── Genome explainer ── */
-    .genome-section {
-      margin-bottom: var(--space-10);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: var(--space-8);
-    }
-    .genome-section__heading {
-      font-family: var(--font-display);
-      font-size: 28px;
-      color: var(--text);
-      margin-bottom: var(--space-4);
-    }
-    .genome-section__heading span { color: var(--accent); }
-    .genome-section__body {
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-      max-width: 680px;
-      margin-bottom: var(--space-4);
-    }
-    .genome-section__link {
-      font-size: var(--text-xs);
-      color: var(--accent-dim);
-      font-family: var(--font-mono);
-      letter-spacing: var(--ls-label);
-      text-decoration: none;
-    }
-    .genome-section__link:hover { color: var(--accent); }
+/* Expandable sections */
+.rx-card__section {
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+.rx-card__section-label {
+  font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
+  text-transform: uppercase; color: var(--text-faint);
+  font-family: var(--font-mono); margin-bottom: var(--space-2);
+  cursor: pointer; display: flex; align-items: center; gap: var(--space-2);
+}
+.rx-card__section-label .arrow {
+  font-size: 8px; color: var(--accent-dim);
+  transition: transform var(--dur-fast);
+}
+.rx-card__section-label[aria-expanded="true"] .arrow { transform: rotate(90deg); }
+.rx-card__section-body {
+  font-size: var(--text-xs); color: var(--text-muted);
+  line-height: 1.6;
+}
+.rx-card__section-body.collapsed { display: none; }
 
-    /* ── Legend ── */
-    .evidence-legend {
-      display: flex;
-      gap: var(--space-4);
-      flex-wrap: wrap;
-      align-items: center;
-      padding: var(--space-4) 0 var(--space-8);
-    }
-    .evidence-legend__item {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-    }
-    .evidence-legend__label {
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      font-family: var(--font-mono);
-      letter-spacing: var(--ls-label);
-    }
+/* Why quote */
+.rx-card__why {
+  font-style: italic;
+  border-left: 2px solid rgba(0,229,160,0.15);
+  padding-left: var(--space-3);
+}
+/* Science points */
+.rx-card__sci-point {
+  padding-left: var(--space-3); position: relative;
+  margin-bottom: var(--space-1);
+}
+.rx-card__sci-point::before {
+  content: '—'; position: absolute; left: 0;
+  color: var(--accent-dim); font-family: var(--font-mono);
+}
 
-    /* ── Skeleton ── */
-    .skeleton-group { margin-bottom: var(--space-10); }
-    .skeleton-label {
-      width: 120px; height: 12px;
-      background: var(--surface-raised);
-      margin-bottom: var(--space-5);
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-    .skeleton-cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: var(--space-4);
-    }
-    .skeleton-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: var(--space-5) var(--space-6);
-      height: 240px;
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-    .skeleton-line {
-      height: 12px;
-      background: var(--surface-raised);
-      border-radius: 2px;
-      margin-bottom: var(--space-3);
-    }
-    .skeleton-line.wide  { width: 70%; }
-    .skeleton-line.mid   { width: 45%; }
-    .skeleton-line.short { width: 30%; }
-    @keyframes pulse {
-      0%, 100% { opacity: 0.5; }
-      50%       { opacity: 1; }
-    }
+/* What I'm watching */
+.rx-card__watch {
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2);
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  background: rgba(0,0,0,0.1);
+}
+.rx-card__watch-item { }
+.rx-card__watch-label {
+  font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
+  text-transform: uppercase; color: var(--text-faint);
+  font-family: var(--font-mono); margin-bottom: 2px;
+}
+.rx-card__watch-val {
+  font-size: var(--text-xs); color: var(--text-muted);
+  font-family: var(--font-mono);
+}
 
-    /* ── Empty state ── */
-    .supp-empty {
-      padding: var(--space-16) var(--space-8);
-      border: 1px solid var(--border);
-      background: var(--surface);
-      text-align: center;
-    }
-    .supp-empty__code {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      letter-spacing: var(--ls-label);
-      margin-bottom: var(--space-4);
-    }
-    .supp-empty__code span { color: var(--accent-dim); }
-    .supp-empty__msg {
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-    }
+/* ═══════ GENOME SECTION ═══════ */
+.rx-genome {
+  border: 1px solid var(--accent); background: rgba(0,229,160,0.02);
+  padding: var(--space-8); margin-bottom: var(--space-10);
+  position: relative; overflow: hidden;
+}
+.rx-genome::after {
+  content: '🧬'; position: absolute; right: var(--space-6); top: var(--space-6);
+  font-size: 48px; opacity: 0.08; pointer-events: none;
+}
+.rx-genome__title {
+  font-family: var(--font-display); font-size: 24px; color: var(--text);
+  margin-bottom: var(--space-3);
+}
+.rx-genome__title em { color: var(--accent); font-style: normal; }
+.rx-genome__body {
+  font-size: var(--text-sm); color: var(--text-muted);
+  line-height: var(--lh-body); max-width: 640px; margin-bottom: var(--space-6);
+}
+.rx-genome__snp {
+  display: grid; grid-template-columns: 140px 1fr; gap: var(--space-3);
+  padding: var(--space-3) 0; border-bottom: 1px solid rgba(0,229,160,0.1);
+  font-size: var(--text-xs);
+}
+.rx-genome__snp:last-child { border-bottom: none; }
+.rx-genome__snp-id { color: var(--accent); font-family: var(--font-mono); }
+.rx-genome__snp-note { color: var(--text-muted); line-height: 1.5; }
 
-    @media (max-width: 768px) {
-      .supp-stats { flex-direction: column; }
-      .supp-body  { padding: var(--space-8) var(--page-padding-sm); }
-      .supp-header { padding: calc(var(--nav-height) + var(--space-10)) var(--page-padding-sm) var(--space-8); }
-      .supp-stats { margin: var(--space-6) var(--page-padding-sm) 0; }
-      .timing-group__cards { grid-template-columns: 1fr; }
-      .supp-card__data-grid { grid-template-columns: repeat(3, 1fr); }
-      .evidence-legend { gap: var(--space-3); }
-    }
+/* ═══════ HONEST ASSESSMENT ═══════ */
+.rx-honest {
+  border: 1px solid var(--c-amber-100); background: rgba(200,132,58,0.02);
+  padding: var(--space-6); margin-bottom: var(--space-8);
+}
+.rx-honest__title {
+  font-family: var(--font-display); font-size: 20px; color: var(--text);
+  margin-bottom: var(--space-2);
+}
+.rx-honest__title em { color: var(--c-amber-400); font-style: normal; }
+.rx-honest__sub {
+  font-size: var(--text-xs); color: var(--text-faint);
+  font-family: var(--font-mono); margin-bottom: var(--space-5);
+}
+.rx-honest__item {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  padding: var(--space-3) 0; border-bottom: 1px solid rgba(200,132,58,0.08);
+}
+.rx-honest__item:last-child { border-bottom: none; }
+.rx-honest__icon { color: var(--c-amber-400); font-size: 14px; flex-shrink: 0; margin-top: 2px; }
+.rx-honest__name { font-size: var(--text-sm); color: var(--text); min-width: 120px; }
+.rx-honest__reason { font-size: var(--text-xs); color: var(--text-faint); line-height: 1.5; }
+
+/* ── Skeleton ── */
+.skel { animation: pulse 1.5s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+
+/* ── Responsive ── */
+@media(max-width:768px) {
+  .rx-hero { padding: calc(var(--nav-height) + var(--space-10)) var(--page-padding-sm) var(--space-8); }
+  .rx-body { padding: var(--space-8) var(--page-padding-sm); }
+  .rx-group__grid { grid-template-columns: 1fr; }
+  .ev-legend { padding: var(--space-4) var(--page-padding-sm); gap: var(--space-3); }
+  .rx-card__watch { grid-template-columns: 1fr; }
+  .rx-genome__snp { grid-template-columns: 1fr; }
+}
+
+/* ── Reveal ── */
+.reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.reveal.is-visible { opacity: 1; transform: none; }
   </style>
 </head>
 <body>
 
 <div id="amj-nav"></div>
-</div>
-
-
-
-
-<!-- Hero header -->
 
 <div class="experiment-thread">Supplement adherence feeds the Nutrition pillar → <a href="/character/">Character →</a></div>
-<header class="supp-header reveal">
-  <div class="eyebrow supp-header__eyebrow">The Science</div>
-  <h1 class="supp-header__title">Supplement <span>Protocol</span></h1>
-  <p class="supp-header__sub">Evidence-based. Genome-informed. N=1 tracked. Each card shows the science and my live data.</p>
+
+<!-- ═══════ HERO ═══════ -->
+<header class="rx-hero reveal">
+  <div class="rx-hero__eyebrow">The Evidence</div>
+  <h1 class="rx-hero__title"><em>The</em> Pharmacy</h1>
+  <p class="rx-hero__sub">Every supplement rated by evidence strength, justified by purpose, and tracked against real data. Some have 30 years of RCTs. Some are honest experiments. You'll see which is which.</p>
+
+  <div class="rx-integrity">
+    <span class="rx-integrity__icon">🚫</span>
+    <span class="rx-integrity__text">No affiliate links · No sponsorships · No brand promotions · Just the data</span>
+  </div>
+
+  <div class="rx-hero__stats">
+    <div class="rx-stat">
+      <div class="rx-stat__label">Active Stack</div>
+      <div class="rx-stat__val" id="stat-total">—</div>
+    </div>
+    <div class="rx-stat">
+      <div class="rx-stat__label">Strong Evidence</div>
+      <div class="rx-stat__val" id="stat-strong">—</div>
+    </div>
+    <div class="rx-stat">
+      <div class="rx-stat__label">Moderate</div>
+      <div class="rx-stat__val" id="stat-moderate">—</div>
+    </div>
+    <div class="rx-stat">
+      <div class="rx-stat__label">Emerging</div>
+      <div class="rx-stat__val" id="stat-emerging">—</div>
+    </div>
+    <div class="rx-stat">
+      <div class="rx-stat__label">Genome-Linked</div>
+      <div class="rx-stat__val" id="stat-genome">—</div>
+    </div>
+  </div>
 </header>
 
-<!-- Stats row -->
-<div class="supp-stats reveal" id="supp-stats">
-  <div class="supp-stat">
-    <div class="supp-stat__label">Total supplements</div>
-    <div class="supp-stat__value accent" id="stat-total">—</div>
-    <div class="supp-stat__sub">in active stack</div>
+<!-- ═══════ EVIDENCE LEGEND ═══════ -->
+<div class="ev-legend reveal">
+  <span class="ev-legend__label">Evidence rating:</span>
+  <div class="ev-legend__item">
+    <svg class="ev-ring-mini" viewBox="0 0 20 20"><circle class="bg" cx="10" cy="10" r="7.5"/><circle class="fill" cx="10" cy="10" r="7.5" stroke="var(--accent)" stroke-dasharray="47.1" stroke-dashoffset="0" transform="rotate(-90 10 10)"/></svg>
+    <span class="ev-legend__text">Strong — peer-reviewed, meta-analyses</span>
   </div>
-  <div class="supp-stat">
-    <div class="supp-stat__label">Strong evidence</div>
-    <div class="supp-stat__value accent" id="stat-strong">—</div>
-    <div class="supp-stat__sub">peer-reviewed / genome</div>
+  <div class="ev-legend__item">
+    <svg class="ev-ring-mini" viewBox="0 0 20 20"><circle class="bg" cx="10" cy="10" r="7.5"/><circle class="fill" cx="10" cy="10" r="7.5" stroke="var(--c-amber-400)" stroke-dasharray="47.1" stroke-dashoffset="15.7" transform="rotate(-90 10 10)"/></svg>
+    <span class="ev-legend__text">Moderate — promising RCTs, mechanistic</span>
   </div>
-  <div class="supp-stat">
-    <div class="supp-stat__label">Emerging</div>
-    <div class="supp-stat__value accent" id="stat-emerging">—</div>
-    <div class="supp-stat__sub">promising RCT data</div>
-  </div>
-  <div class="supp-stat">
-    <div class="supp-stat__label">Experimental</div>
-    <div class="supp-stat__value accent" id="stat-exp">—</div>
-    <div class="supp-stat__sub">N=1 hypothesis</div>
+  <div class="ev-legend__item">
+    <svg class="ev-ring-mini" viewBox="0 0 20 20"><circle class="bg" cx="10" cy="10" r="7.5"/><circle class="fill" cx="10" cy="10" r="7.5" stroke="var(--text-faint)" stroke-dasharray="47.1" stroke-dashoffset="35.3" transform="rotate(-90 10 10)"/></svg>
+    <span class="ev-legend__text">Emerging — early data, N=1 hypothesis</span>
   </div>
 </div>
 
-<!-- Main body -->
-<div class="supp-body">
+<!-- ═══════ MAIN BODY ═══════ -->
+<div class="rx-body">
 
-  <!-- Evidence tier legend -->
-  <div class="evidence-legend reveal">
-    <span class="evidence-legend__label">Evidence tiers:</span>
-    <div class="evidence-legend__item">
-      <span class="badge badge--strong">Strong</span>
-      <span class="evidence-legend__label">peer-reviewed / genome-justified</span>
-    </div>
-    <div class="evidence-legend__item">
-      <span class="badge badge--emerging">Emerging</span>
-      <span class="evidence-legend__label">promising RCT data</span>
-    </div>
-    <div class="evidence-legend__item">
-      <span class="badge badge--experimental">Experimental</span>
-      <span class="evidence-legend__label">N=1 hypothesis</span>
+  <!-- Skeleton -->
+  <div id="rx-skeleton">
+    <div class="skel" style="height:300px;border:1px solid var(--border);background:var(--surface);margin-bottom:var(--space-6)"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4)">
+      <div class="skel" style="height:250px;border:1px solid var(--border);background:var(--surface)"></div>
+      <div class="skel" style="height:250px;border:1px solid var(--border);background:var(--surface)"></div>
     </div>
   </div>
 
-  <!-- Skeleton (shown while loading) -->
-  <div id="supp-skeleton">
-    <div class="skeleton-group">
-      <div class="skeleton-label"></div>
-      <div class="skeleton-cards">
-        <div class="skeleton-card"><div class="skeleton-line wide"></div><div class="skeleton-line mid"></div><div class="skeleton-line short"></div></div>
-        <div class="skeleton-card"><div class="skeleton-line wide"></div><div class="skeleton-line mid"></div><div class="skeleton-line short"></div></div>
-        <div class="skeleton-card"><div class="skeleton-line wide"></div><div class="skeleton-line mid"></div><div class="skeleton-line short"></div></div>
-      </div>
-    </div>
-    <div class="skeleton-group">
-      <div class="skeleton-label"></div>
-      <div class="skeleton-cards">
-        <div class="skeleton-card"><div class="skeleton-line wide"></div><div class="skeleton-line mid"></div><div class="skeleton-line short"></div></div>
-        <div class="skeleton-card"><div class="skeleton-line wide"></div><div class="skeleton-line mid"></div><div class="skeleton-line short"></div></div>
-      </div>
-    </div>
+  <!-- Dynamic content -->
+  <div id="rx-content" style="display:none"></div>
+
+  <!-- Genome section -->
+  <div class="rx-genome reveal" id="rx-genome" style="display:none">
+    <div class="rx-genome__title">Why <em>Genome-Informed</em>?</div>
+    <p class="rx-genome__body">Genetic variants affect how you absorb, convert, and utilize nutrients. A 110-SNP analysis identified variants that directly influence supplementation decisions — these aren't generic recommendations.</p>
+    <div id="rx-genome-snps"></div>
+    <a href="/biology/" style="font-size:var(--text-xs);color:var(--accent-dim);font-family:var(--font-mono);text-decoration:none;margin-top:var(--space-4);display:inline-block">// see full genome data →</a>
   </div>
 
-  <!-- Dynamic groups rendered by JS -->
-  <div id="supp-groups" style="display:none"></div>
-
-  <!-- Empty state (shown on error) -->
-  <div id="supp-error" style="display:none">
-    <div class="supp-empty">
-      <div class="supp-empty__code"><span>//</span> api/supplements · 503</div>
-      <p class="supp-empty__msg">Supplement data temporarily unavailable. Check back soon.</p>
-    </div>
-  </div>
-
-  <!-- Genome explainer (static — always shown) -->
-  <div class="genome-section reveal" id="supp-genome" style="display:none">
-    <div class="genome-section__heading">Why <span>Genome-Informed</span>?</div>
-    <p class="genome-section__body">
-      Genetic variants affect how you absorb, convert, and utilise nutrients. A 110-SNP analysis
-      identified variants in Matthew's genome that directly influence supplementation decisions.
-    </p>
-    <div id="supp-genome-snps" style="display:flex;flex-direction:column;gap:var(--space-4);margin-bottom:var(--space-6);"></div>
-    <a href="/biology/" class="genome-section__link">// see full genome data &rarr;</a>
+  <!-- Honest Assessment -->
+  <div class="rx-honest" id="rx-honest" style="display:none">
+    <div class="rx-honest__title">Supplements I'm <em>Questioning</em></div>
+    <div class="rx-honest__sub">// transparency most supplement sites will never show you</div>
+    <div id="rx-honest-list"></div>
   </div>
 
   <!-- N=1 disclaimer -->
   <aside style="padding:var(--space-8) 0;border-top:1px solid var(--border-subtle)">
     <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label);max-width:var(--prose-width)">
       <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
-      This is Matthew's personal protocol. Nothing here is medical advice. Supplement needs are
-      individual and depend on diet, genetics, existing conditions, and lab results. Consult a
-      qualified clinician before starting or modifying any supplement protocol.
-      <a href="/biology/" style="color:var(--accent-dim);text-decoration:none"> Genome data context &rarr;</a>
+      This is one person's protocol. Nothing here is medical advice. Supplement needs depend on diet, genetics, existing conditions, and lab results. Consult a clinician before starting any supplement protocol.
     </p>
   </aside>
-
 </div>
 
-<!-- Email CTA -->
 <div id="amj-subscribe"></div>
-
-<!-- Mobile bottom nav -->
 <div id="amj-bottom-nav"></div>
-
-
 <div id="amj-reading-path"></div>
 <div id="amj-footer"></div>
 
 <script>
-(function () {
-  'use strict';
+(function(){
+'use strict';
 
-  // ── Group display order and labels ──────────────────────────────────────────
-  var GROUP_ORDER  = ['Foundation', 'Sleep Stack', 'Recovery+Performance', 'Longevity+Metabolic', 'Nutrition+Glucose', 'Experimental'];
-  var GROUP_LABELS = {
-    'Foundation':          'Foundation',
-    'Sleep Stack':         'Sleep Stack',
-    'Recovery+Performance':'Recovery + Performance',
-    'Longevity+Metabolic': 'Longevity + Metabolic',
-    'Nutrition+Glucose':   'Nutrition + Glucose',
-    'Experimental':        'Experimental',
-  };
-
-  // ── Evidence tier → badge class + label ────────────────────────────────────
-  var TIER_BADGE = {
-    'strong':       { cls: 'badge--strong',       label: 'Strong' },
-    'emerging':     { cls: 'badge--emerging',      label: 'Emerging' },
-    'general':      { cls: 'badge--general',       label: 'General' },
-    'experimental': { cls: 'badge--experimental',  label: 'Experimental' },
-  };
-
-  // ── Signal → CSS class + label ──────────────────────────────────────────────
-  var SIGNAL_MAP = {
-    'positive': { cls: 'signal--positive', label: 'Positive' },
-    'none':     { cls: 'signal--none',     label: 'None yet' },
-    'unclear':  { cls: 'signal--unclear',  label: 'Monitoring' },
-  };
-
-  function esc(s) {
-    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+// ── Supplement registry with full metadata ──
+// Organized by purpose groups, evidence-rated
+var SUPP_REGISTRY = {
+  'sleep': {
+    name: 'Sleep Architecture', icon: '😴', desc: 'The compounds that protect the master variable. Circadian support, GABA modulation, and core temperature regulation.',
+    items: [
+      {key:'l_threonate',name:'Magnesium L-Threonate',dose:'144mg elemental',timing:'PM',ev:'moderate',evPct:66,board:'Huberman',why:'Sleep stack anchor. Combined with Apigenin and Glycine, this is the exact recommended pre-sleep protocol. At your training volume, magnesium depletion through sweat is real.',science:['Only magnesium form shown to cross the blood-brain barrier effectively','Supports GABA signaling, reduces sleep onset latency','80% of Americans are magnesium deficient'],impact:'Sleep onset latency, deep sleep %, cognitive clarity',watching:'Eight Sleep score on adherent vs non-adherent nights',synergy:'sleep_supps'},
+      {key:'glycine',name:'Glycine',dose:'2-3g',timing:'PM',ev:'moderate',evPct:66,board:'Huberman',why:'Beautiful synergy with Eight Sleep — both work by lowering core temperature. Collagen synthesis bonus for joint health during heavy training.',science:['2-3g before bed lowers core body temperature','Primary physiological trigger for sleep onset','Synergistic with Eight Sleep cooling'],impact:'Core temp drop, sleep onset latency, deep sleep %',watching:'Eight Sleep temp data correlation',synergy:'sleep_supps'},
+      {key:'apigenin',name:'Apigenin',dose:'50mg',timing:'PM',ev:'moderate',evPct:66,board:'Huberman',why:'Gentlest member of the sleep stack — best risk/reward ratio. If you take one sleep supplement, this is it.',science:['Flavonoid that modulates GABA-A receptors','Reduces sleep onset latency and anxiety without grogginess','No tolerance, no dependence'],impact:'Sleep onset latency, subjective sleep quality',watching:'Sleep quality trend',synergy:'sleep_supps'},
+      {key:'theanine',name:'L-Theanine',dose:'100-200mg',timing:'PM',ev:'moderate',evPct:66,board:'Huberman',why:'Monitor your response — if Eight Sleep shows no difference or worse sleep on Theanine nights, candidate for removal.',science:['Promotes alpha brain waves, reduces anxiety without sedation','Synergistic with caffeine during the day','Some people get disruptive vivid dreams — individual response varies'],impact:'Subjective anxiety, sleep onset',watching:'Vivid dream reports in journal',synergy:'sleep_supps',questioning:true,questionReason:'Individual response varies — vivid dreams may disrupt sleep for some'},
+    ]
+  },
+  'muscle': {
+    name: 'Muscle & Performance', icon: '💪', desc: 'Protecting lean mass during a 1500 kcal deficit. Every gram of muscle preserved is metabolic insurance.',
+    items: [
+      {key:'creatine',name:'Creatine Monohydrate',dose:'5g',timing:'AM with food',ev:'strong',evPct:95,board:'Attia',why:'During deficit, creatine is protective — helps preserve the muscle you\'re working to keep. 5g/day, no loading, no cycling.',science:['Most studied sports supplement in history','Increases phosphocreatine stores for high-intensity performance','Emerging cognitive benefits — neuroprotective properties','Supports lean mass retention during caloric deficit'],impact:'Strength performance, lean mass on DEXA, cognitive clarity',watching:'DEXA lean mass trend'},
+      {key:'protein',name:'Protein Supplement',dose:'30g whey/casein',timing:'Post-training',ev:'strong',evPct:90,board:'Galpin',why:'At 1800 cal with 190g protein target, you need ~42% calories from protein. A shake is often the only way to close the gap.',science:['Whey/casein supports 190g daily target','Most calorie-efficient protein source (120-150 cal for 30g)','Critical for lean mass preservation during deficit'],impact:'MacroFactor protein hit rate, lean mass retention',watching:'Daily protein completion in MacroFactor'},
+      {key:'electrolytes',name:'Electrolytes',dose:'Full spectrum',timing:'AM + intra-workout',ev:'strong',evPct:85,board:'Galpin',why:'Deficit + hard training + 3L water + sweating = quadruple depletion vector. Fatigue and headaches may be electrolyte-driven, not calorie-driven.',science:['Sodium, potassium, magnesium depleted through sweat and restriction','Most people training in deficit are electrolyte depleted','Symptoms: fatigue, cramps, headaches, reduced performance'],impact:'Training performance, energy, cramp frequency',watching:'Pre/post workout energy levels'},
+      {key:'collagen',name:'Collagen Peptides',dose:'10-15g',timing:'Pre-training + Vitamin C',ev:'moderate',evPct:60,board:'Galpin',why:'Losing 117 lbs means significant skin adaptation. Joint protection during high training volume is secondary benefit.',science:['15g + vitamin C 30-60 min before exercise increases collagen synthesis','Supports joint cartilage, tendon health, skin elasticity','Baar research on tendon/ligament collagen synthesis'],impact:'Joint comfort, skin elasticity during weight loss',watching:'Joint pain reports in journal'},
+      {key:'glutamine',name:'L-Glutamine',dose:'5g',timing:'Post-training',ev:'moderate',evPct:50,board:'Galpin',why:'At 190g protein/day, supplemental benefit is likely marginal. Keep if GI comfort is noticeably better.',science:['Supports gut barrier integrity and immune function','Most abundant amino acid','At high protein intake, likely getting adequate from food'],impact:'GI comfort, immune function',watching:'GI comfort changes',questioning:true,questionReason:'At 190g protein/day, likely redundant — candidate for "do I need this?"'},
+    ]
+  },
+  'cognitive': {
+    name: 'Cognitive Support', icon: '🧠', desc: 'Neuroplasticity, focus, and the cognitive infrastructure for a Senior Director role.',
+    items: [
+      {key:'lions_mane',name:'Lion\'s Mane',dose:'500-1000mg',timing:'AM',ev:'emerging',evPct:35,board:'Huberman',why:'Cognitive performance matters for your Senior Director role. Emerging evidence — don\'t stress if missed.',science:['Stimulates nerve growth factor (NGF) synthesis','Supports neuroplasticity and cognitive function','Not yet confirmed in large RCTs'],impact:'Subjective cognitive clarity, focus during deep work',watching:'Journal focus reports',questioning:true,questionReason:'Emerging evidence only — good N=1 candidate'},
+      {key:'cordyceps',name:'Cordyceps',dose:'500mg',timing:'AM',ev:'emerging',evPct:30,board:'Galpin',why:'Theoretically supports the aerobic engine during Zone 2. Evidence is thin. Good N=1 candidate.',science:['May improve oxygen utilization and aerobic performance','Supports ATP production','Adaptogenic properties — evidence promising but limited'],impact:'Aerobic performance, HR recovery, Zone 2 efficiency',watching:'HR recovery trend on vs off weeks',questioning:true,questionReason:'Evidence is thin — track HR recovery as validation metric'},
+      {key:'reishi',name:'Reishi',dose:'500mg',timing:'PM',ev:'emerging',evPct:20,board:'Attia',why:'Lowest-evidence mushroom supplement. Consider whether cost and pill burden is justified.',science:['Adaptogenic mushroom with immunomodulatory properties','Traditional use for sleep and stress','Limited clinical evidence'],impact:'Subjective calm, sleep quality',watching:'No clear signal yet',questioning:true,questionReason:'Lowest evidence in the stack — candidate for pausing'},
+    ]
+  },
+  'longevity': {
+    name: 'Longevity Foundation', icon: '❤️', desc: 'The long-game supplements. Cardiovascular protection, immune resilience, and micronutrient insurance.',
+    items: [
+      {key:'omega3',name:'Omega-3 (EPA/DHA)',dose:'2-4g combined',timing:'With fat-containing meal',ev:'strong',evPct:90,board:'Attia',why:'Genome shows cardiovascular risk markers. Omega-3 is most likely to move your TG/HDL ratio over time.',science:['Reduces systemic inflammation, improves TG/HDL ratio','Supports cell membrane fluidity, cardioprotective','EPA specifically has antidepressant effects at 1g+ doses'],impact:'Triglycerides, TG/HDL ratio, hs-CRP, mood stability',watching:'Lipid panel trends across lab draws',genome:'FADS2 rs1535'},
+      {key:'vitamin_d',name:'Vitamin D3 + K2',dose:'5000 IU',timing:'AM with fat',ev:'strong',evPct:90,board:'Attia',why:'Living in Seattle makes this non-optional. Lab trends track 25-OH Vitamin D to confirm range.',science:['Essential for calcium metabolism, immune function, mood','Deficiency 40-50% at northern latitudes','Seattle (47°N) produces zero cutaneous vitamin D Oct–Mar','Target: 40-60 ng/mL'],impact:'25-OH Vitamin D lab levels, immune function, mood',watching:'25-OH-D lab trend — currently in range?',genome:'VDR Bsm1'},
+      {key:'zinc',name:'Zinc Picolinate',dose:'30mg',timing:'With meal',ev:'moderate',evPct:60,board:'Attia',why:'During deficit + heavy training, zinc depletion through sweat is real. Supports immune resilience.',science:['Supports immune function, testosterone production','Athletes lose zinc through sweat','Picolinate has superior bioavailability','Excess (>40mg) can deplete copper'],impact:'Immune resilience, testosterone, zinc lab levels',watching:'Serum zinc levels',genome:'SLC39A4 variant'},
+      {key:'nac',name:'NAC (N-Acetyl Cysteine)',dose:'600-1200mg',timing:'AM',ev:'moderate',evPct:60,board:'Attia',why:'Glutathione support during deficit and high training load. Behavioral benefit (reducing rumination) may support discipline stack.',science:['Glutathione precursor — body\'s master antioxidant','Supports liver detoxification, reduces oxidative stress','Evidence for reducing rumination/compulsive behavior'],impact:'Liver function markers (AST, ALT), oxidative stress',watching:'AST/ALT liver panel trend'},
+      {key:'multivitamin',name:'Multivitamin',dose:'1 daily',timing:'AM with food',ev:'moderate',evPct:50,board:'Attia',why:'At 1800 cal/day, eating significantly less food than your body is sized for. Insurance policy.',science:['During restriction, micronutrient gaps more likely','Fills selenium, manganese, trace mineral gaps','Evidence in well-nourished populations is weak','During 1500 kcal deficit the insurance argument is stronger'],impact:'Micronutrient sufficiency',watching:'General health markers'},
+      {key:'b_complex',name:'B Complex',dose:'1 daily',timing:'AM',ev:'moderate',evPct:55,board:'Attia',why:'Genome includes MTHFR variants — check whether you need methylated forms. Homocysteine is the validation metric.',science:['Cofactors in energy metabolism, methylation, neurotransmitter synthesis','Depletion risk increases during caloric restriction','B12 and folate important for homocysteine management'],impact:'Homocysteine levels, energy, cognitive clarity',watching:'Homocysteine lab trend'},
+    ]
+  },
+  'metabolic': {
+    name: 'Metabolic & Body Comp', icon: '🔬', desc: 'Supporting the deficit engine. Glucose management, fat oxidation, and gut health.',
+    items: [
+      {key:'inositol',name:'Myo-Inositol',dose:'2-4g',timing:'PM',ev:'moderate',evPct:55,board:'Huberman',why:'During metabolic transformation, insulin sensitivity is a key lever. CGM data should validate.',science:['Supports insulin signaling and serotonin receptor sensitivity','Anxiolytic properties','Evidence for metabolic benefit in insulin-resistant populations'],impact:'Glucose variability, insulin sensitivity via CGM',watching:'CGM glucose disposal post-meals'},
+      {key:'green_tea',name:'Green Tea Phytosome (EGCG)',dose:'250mg',timing:'AM',ev:'moderate',evPct:45,board:'Attia',why:'Marginal fat oxidation support. Insurance, not primary lever. Weight trend won\'t show it.',science:['EGCG supports fat oxidation and thermogenesis','Antioxidant properties','Modest effect on fat loss (1-2 lbs over 12 weeks)'],impact:'Marginal fat oxidation, antioxidant status',watching:'No clear signal expected',questioning:true,questionReason:'Effect size too small to measure — pure insurance play'},
+      {key:'probiotics',name:'Probiotics',dose:'Multi-strain',timing:'AM empty stomach',ev:'moderate',evPct:45,board:'Huberman',why:'During high-protein deficit, GI comfort matters for adherence. Consider fermented foods instead.',science:['Gut microbiome correlates with metabolic health and mood','Evidence is strain-specific and mixed','Fermented foods may be superior for diversity'],impact:'GI comfort, digestion quality',watching:'GI comfort changes on vs off',questioning:true,questionReason:'Candidate for reassessment — fermented foods may be food-first approach'},
+    ]
   }
+};
 
-  function fmtTiming(t) {
-    return (t || '').replace(/_/g,' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
-  }
+// ── SNP data for genome section ──
+var GENOME_SNPS = [
+  {id:'VDR Bsm1', supp:'Vitamin D3', note:'Reduces Vitamin D receptor binding efficiency — requires 5,000 IU/day. Standard 600–2,000 IU is insufficient for this genotype.'},
+  {id:'FADS2 rs1535', supp:'Omega-3', note:'Impairs ALA→EPA/DHA conversion (delta-6 desaturase reduced ~30%). Pre-formed fish oil is essential — plant ALA sources are ineffective.'},
+  {id:'SLC39A4 variant', supp:'Zinc', note:'ZIP4 transporter variant reduces intestinal zinc absorption. Serum zinc runs low without supplementation despite adequate dietary intake.'},
+];
 
-  function fmtAdherence(pct) {
-    if (pct === null || pct === undefined) return 'via habit group';
-    return Math.round(pct) + '%';
-  }
+// ── Helpers ──
+function evColor(ev) {
+  if(ev==='strong') return 'var(--accent)';
+  if(ev==='moderate') return 'var(--c-amber-400)';
+  return 'var(--text-faint)';
+}
 
-  function renderCard(s) {
-    var dose      = s.dose ? esc(s.dose) + (s.unit ? ' ' + esc(s.unit) : '') : '—';
-    var timing    = fmtTiming(s.timing);
-    var tier      = TIER_BADGE[s.evidence_tier] || TIER_BADGE['general'];
-    var snpBadge  = s.genome_snp
-      ? '<span class="badge badge--snp">' + esc(s.genome_snp) + '</span>'
-      : '';
-    var adherence = fmtAdherence(s.adherence_pct !== undefined ? s.adherence_pct : s.adherence);
-    var sig       = SIGNAL_MAP[s.signal] || { cls: 'signal--unclear', label: '—' };
-    var sciItems  = (s.science_points || []).map(function(p){
-      return '<li>' + esc(p) + '</li>';
+function ringSVG(pct, ev, size) {
+  var r = (size-8)/2, c = 2*Math.PI*r;
+  var offset = c - (pct/100)*c;
+  var color = evColor(ev);
+  var label = ev==='strong'?'A':ev==='moderate'?'B':'C';
+  return '<svg class="rx-ring" viewBox="0 0 '+size+' '+size+'" width="'+size+'" height="'+size+'">' +
+    '<circle class="rx-ring__bg" cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'"/>' +
+    '<circle class="rx-ring__fill" cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'" stroke="'+color+'" ' +
+      'stroke-dasharray="'+c+'" stroke-dashoffset="'+offset+'" transform="rotate(-90 '+(size/2)+' '+(size/2)+')"/>' +
+    '<text class="rx-ring__label" x="'+(size/2)+'" y="'+(size/2)+'" fill="'+color+'">'+label+'</text></svg>';
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function toggleSection(btn) {
+  var body = btn.nextElementSibling;
+  var open = !body.classList.contains('collapsed');
+  body.classList.toggle('collapsed', !open ? false : true);
+  btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+}
+
+// ── Build Card ──
+function buildCard(s) {
+  var purposeIcons = {sleep:'😴',muscle:'💪',cognitive:'🧠',longevity:'❤️',metabolic:'🔬'};
+  var sciHTML = (s.science||[]).map(function(p){
+    return '<div class="rx-card__sci-point">'+esc(p)+'</div>';
+  }).join('');
+
+  var badges = '';
+  badges += '<span class="rx-badge rx-badge--timing">'+esc(s.timing)+'</span>';
+  badges += '<span class="rx-badge rx-badge--advisor">'+esc(s.board)+'</span>';
+  if(s.synergy) badges += '<span class="rx-badge rx-badge--synergy">'+esc(s.synergy.replace(/_/g,' '))+'</span>';
+  if(s.genome) badges += '<span class="rx-badge rx-badge--genome">🧬 '+esc(s.genome)+'</span>';
+
+  return '<div class="rx-card rx-card--'+s.ev+'">' +
+    '<div class="rx-card__head">' +
+      ringSVG(s.evPct, s.ev, 48) +
+      '<div class="rx-card__info">' +
+        '<div class="rx-card__name">'+esc(s.name)+'</div>' +
+        '<span class="rx-card__dose">'+esc(s.dose)+'</span>' +
+      '</div>' +
+    '</div>' +
+    '<div class="rx-card__badges">'+badges+'</div>' +
+    '<div class="rx-card__section">' +
+      '<div class="rx-card__section-label" aria-expanded="true" onclick="(function(b){var body=b.nextElementSibling;body.classList.toggle(\'collapsed\');b.setAttribute(\'aria-expanded\',body.classList.contains(\'collapsed\')?\'false\':\'true\')})(this)"><span class="arrow">▼</span> Why I take it</div>' +
+      '<div class="rx-card__section-body rx-card__why">"'+esc(s.why)+'"</div>' +
+    '</div>' +
+    '<div class="rx-card__section">' +
+      '<div class="rx-card__section-label" aria-expanded="false" onclick="(function(b){var body=b.nextElementSibling;body.classList.toggle(\'collapsed\');b.setAttribute(\'aria-expanded\',body.classList.contains(\'collapsed\')?\'false\':\'true\')})(this)"><span class="arrow">▶</span> What the science says</div>' +
+      '<div class="rx-card__section-body collapsed">'+sciHTML+'</div>' +
+    '</div>' +
+    '<div class="rx-card__watch">' +
+      '<div class="rx-card__watch-item">' +
+        '<div class="rx-card__watch-label">Expected impact</div>' +
+        '<div class="rx-card__watch-val">'+esc(s.impact)+'</div>' +
+      '</div>' +
+      '<div class="rx-card__watch-item">' +
+        '<div class="rx-card__watch-label">What I\'m watching</div>' +
+        '<div class="rx-card__watch-val">'+esc(s.watching)+'</div>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+// ── Build Page ──
+function buildPage() {
+  var content = document.getElementById('rx-content');
+  var html = '';
+  var totalCount = 0, strongCount = 0, moderateCount = 0, emergingCount = 0, genomeCount = 0;
+  var questioning = [];
+
+  ['longevity','muscle','metabolic','sleep','cognitive'].forEach(function(gKey) {
+    var g = SUPP_REGISTRY[gKey];
+    var items = g.items;
+    totalCount += items.length;
+    items.forEach(function(s){
+      if(s.ev==='strong') strongCount++;
+      else if(s.ev==='moderate') moderateCount++;
+      else emergingCount++;
+      if(s.genome) genomeCount++;
+      if(s.questioning) questioning.push({name:s.name, reason:s.questionReason});
+    });
+
+    html += '<div class="rx-group">';
+    html += '<div class="rx-group__header">';
+    html += '<span class="rx-group__icon">'+g.icon+'</span>';
+    html += '<div class="rx-group__name">'+g.name+'</div>';
+    html += '<span class="rx-group__count">'+items.length+' supplement'+(items.length===1?'':'s')+'</span>';
+    html += '</div>';
+    html += '<div class="rx-group__desc">'+g.desc+'</div>';
+    html += '<div class="rx-group__grid">';
+    items.forEach(function(s){ html += buildCard(s); });
+    html += '</div></div>';
+  });
+
+  content.innerHTML = html;
+  content.style.display = '';
+  document.getElementById('rx-skeleton').style.display = 'none';
+
+  // Stats
+  document.getElementById('stat-total').textContent = totalCount;
+  document.getElementById('stat-strong').textContent = strongCount;
+  document.getElementById('stat-moderate').textContent = moderateCount;
+  document.getElementById('stat-emerging').textContent = emergingCount;
+  document.getElementById('stat-genome').textContent = genomeCount;
+
+  // Genome section
+  if(genomeCount > 0) {
+    var snpHTML = GENOME_SNPS.map(function(s){
+      return '<div class="rx-genome__snp">' +
+        '<div class="rx-genome__snp-id">'+esc(s.id)+'</div>' +
+        '<div class="rx-genome__snp-note">'+esc(s.note)+'</div>' +
+      '</div>';
     }).join('');
-    var corr = s.linked_experiment_id
-      ? '<a href="/experiments/?id=' + esc(s.linked_experiment_id) + '" class="supp-card__corr-link">See experiment &rarr;</a>'
-      : '<a href="/discoveries/" class="supp-card__corr-link">See correlation &rarr;</a>';
-
-    return [
-      '<div class="supp-card">',
-      '  <div class="supp-card__header">',
-      '    <div class="supp-card__top">',
-      '      <div class="supp-card__name">' + esc(s.name) + '</div>',
-      '      <span class="supp-card__dose-badge">' + dose + '</span>',
-      '    </div>',
-      '    <div class="supp-card__meta">',
-      '      <span class="badge badge--timing">' + esc(timing) + '</span>',
-      '      <span class="badge ' + tier.cls + '">' + tier.label + '</span>',
-      snpBadge,
-      '    </div>',
-      '  </div>',
-      '  <div class="supp-card__section">',
-      '    <div class="supp-card__section-label">Why I\'m taking it</div>',
-      '    <p class="supp-card__rationale">' + esc(s.rationale || '') + '</p>',
-      '  </div>',
-      '  <div class="supp-card__section">',
-      '    <div class="supp-card__section-label">What the science says</div>',
-      '    <ul class="supp-card__science">' + sciItems + '</ul>',
-      '  </div>',
-      '  <div class="supp-card__data">',
-      '    <div class="supp-card__section-label">My data</div>',
-      '    <div class="supp-card__data-grid">',
-      '      <div class="supp-card__data-item">',
-      '        <span class="supp-card__data-label">Adherence</span>',
-      '        <span class="supp-card__data-value">' + esc(adherence) + '</span>',
-      '      </div>',
-      '      <div class="supp-card__data-item">',
-      '        <span class="supp-card__data-label">Watching</span>',
-      '        <span class="supp-card__data-value">' + esc(s.watching || '—') + '</span>',
-      '      </div>',
-      '      <div class="supp-card__data-item">',
-      '        <span class="supp-card__data-label">Signal</span>',
-      '        <span class="supp-card__data-value ' + sig.cls + '">' + sig.label + '</span>',
-      '      </div>',
-      '    </div>',
-      '  </div>',
-      '  <div class="supp-card__footer">' + corr + '</div>',
-      '</div>',
-    ].join('\n');
+    document.getElementById('rx-genome-snps').innerHTML = snpHTML;
+    document.getElementById('rx-genome').style.display = '';
   }
 
-  function renderGroups(supps) {
-    // Group supplements by purpose_group
-    var groups = {};
-    supps.forEach(function(s) {
-      var g = s.purpose_group || 'Other';
-      if (!groups[g]) groups[g] = [];
-      groups[g].push(s);
-    });
-
-    // Render in GROUP_ORDER, appending any unseen groups at the end
-    var order = GROUP_ORDER.slice();
-    Object.keys(groups).forEach(function(g){ if (order.indexOf(g) === -1) order.push(g); });
-
-    var html = '';
-    order.forEach(function(g) {
-      var items = groups[g];
-      if (!items || items.length === 0) return;
-      var label = GROUP_LABELS[g] || g;
-      html += '<div class="timing-group reveal">';
-      html += '<div class="timing-group__heading">';
-      html += '<span class="timing-group__label">// ' + esc(label) + '</span>';
-      html += '<span class="timing-group__count">' + items.length + (items.length === 1 ? ' item' : ' items') + '</span>';
-      html += '</div>';
-      html += '<div class="timing-group__cards">';
-      items.forEach(function(s){ html += renderCard(s); });
-      html += '</div></div>';
-    });
-    return html;
+  // Honest assessment
+  if(questioning.length > 0) {
+    document.getElementById('rx-honest-list').innerHTML = questioning.map(function(q){
+      return '<div class="rx-honest__item">' +
+        '<span class="rx-honest__icon">⚠️</span>' +
+        '<span class="rx-honest__name">'+esc(q.name)+'</span>' +
+        '<span class="rx-honest__reason">'+esc(q.reason)+'</span>' +
+      '</div>';
+    }).join('');
+    document.getElementById('rx-honest').style.display = '';
   }
+}
 
-  function updateStats(supps) {
-    var total      = supps.length;
-    var strongCnt  = supps.filter(function(s){ return s.evidence_tier === 'strong'; }).length;
-    var emergCnt   = supps.filter(function(s){ return s.evidence_tier === 'emerging'; }).length;
-    var expCnt     = supps.filter(function(s){ return s.evidence_tier === 'experimental'; }).length;
-    var el;
-    if ((el = document.getElementById('stat-total')))   el.textContent = total;
-    if ((el = document.getElementById('stat-strong')))  el.textContent = strongCnt;
-    if ((el = document.getElementById('stat-emerging'))) el.textContent = emergCnt;
-    if ((el = document.getElementById('stat-exp')))     el.textContent = expCnt;
-  }
-
-  function renderGenomeSNPs(supps) {
-    // Build genome section dynamically from SNP-tagged supplements
-    var genomeSups = supps.filter(function(s){ return s.genome_snp; });
-    if (!genomeSups.length) return;
-
-    var SNP_NOTES = {
-      'VDR Bsm1':      'Reduces Vitamin D receptor binding efficiency — requires 5,000 IU/day to maintain adequate 25(OH)D. Standard advice (600–2,000 IU) is insufficient for this genotype.',
-      'FADS2 rs1535':  'T-allele impairs conversion of ALA to EPA/DHA (delta-6 desaturase activity reduced ~30%). Pre-formed Omega-3 from fish oil is essential — ALA sources (flaxseed, walnuts) are ineffective for this genotype.',
-      'SLC39A4 variant':'ZIP4 transporter variant reduces intestinal zinc absorption — serum zinc runs low without supplementation despite adequate dietary intake. 30mg zinc gluconate restores serum levels to reference range.',
-    };
-
-    var html = '';
-    genomeSups.forEach(function(s) {
-      var snp  = s.genome_snp;
-      var note = SNP_NOTES[snp] || ('Genome variant affecting ' + s.name + ' metabolism.');
-      var bdr  = snp === 'SLC39A4 variant' ? 'var(--border)' : 'var(--accent)';
-      html += '<div style="display:grid;grid-template-columns:140px 1fr;gap:var(--space-4);font-size:var(--text-xs);border-left:2px solid ' + bdr + ';padding-left:var(--space-4);">';
-      html += '<span style="color:var(--accent);font-family:var(--font-mono)">' + esc(snp) + '</span>';
-      html += '<span style="color:var(--text-muted)">' + esc(note) + '</span>';
-      html += '</div>';
-    });
-
-    var container = document.getElementById('supp-genome-snps');
-    if (container) container.innerHTML = html;
-    var section = document.getElementById('supp-genome');
-    if (section) { section.style.display = ''; section.classList.add('is-visible'); }
-  }
-
-  async function load() {
-    try {
-      var API  = 'https://averagejoematt.com';
-      var res  = await fetch(API + '/api/supplements');
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      var data = await res.json();
-      var supps = Array.isArray(data.supplements) ? data.supplements : [];
-
-      // Update stats
-      updateStats(supps);
-
-      // Render grouped cards
-      var groupsEl = document.getElementById('supp-groups');
-      if (groupsEl) {
-        groupsEl.innerHTML = renderGroups(supps);
-        groupsEl.style.display = '';
-        // Reveal dynamically injected .reveal elements immediately
-        groupsEl.querySelectorAll('.reveal').forEach(function(el) { el.classList.add('is-visible'); });
-      }
-
-      // Render genome section
-      renderGenomeSNPs(supps);
-
-      // Hide skeleton
-      var skel = document.getElementById('supp-skeleton');
-      if (skel) skel.style.display = 'none';
-
-    } catch (e) {
-      console.warn('[supplements] API error:', e);
-      var skel = document.getElementById('supp-skeleton');
-      if (skel) skel.style.display = 'none';
-      var err = document.getElementById('supp-error');
-      if (err) err.style.display = '';
-    }
-  }
-
-  document.addEventListener('DOMContentLoaded', load);
+document.addEventListener('DOMContentLoaded', buildPage);
 })();
 </script>
 
