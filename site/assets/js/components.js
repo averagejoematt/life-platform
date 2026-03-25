@@ -47,6 +47,7 @@
     ]},
     { label: 'Method', groups: [
       { heading: 'What I Do', items: [
+        { href: '/stack/',       text: 'The Stack' },
         { href: '/protocols/',   text: 'Protocols' },
         { href: '/supplements/', text: 'Supplements' },
       ]},
@@ -196,6 +197,7 @@
         { href: '/explorer/', text: 'Data Explorer' },
       ]},
       { heading: 'Method', links: [
+        { href: '/stack/', text: 'The Stack' },
         { href: '/protocols/', text: 'Protocols' },
         { href: '/supplements/', text: 'Supplements' },
         { href: '/experiments/', text: 'Active Tests' },
@@ -310,12 +312,62 @@
   }
 
   // ── INJECT ─────────────────────────────────────────────────
+  // ── HIERARCHY NAV (replaces pipeline nav on method pages) ──────
+  var HIER_ITEMS = [
+    { href: '/stack/',       label: 'The Stack',    sub: 'the map',      rel: '' },
+    { href: '/protocols/',   label: 'Protocols',    sub: 'strategy',     rel: 'contains' },
+    { href: '/habits/',      label: 'Habits',       sub: 'daily actions',rel: '·' },
+    { href: '/experiments/', label: 'Experiments',   sub: 'tests',        rel: '·' },
+    { href: '/discoveries/', label: 'Discoveries',  sub: 'evidence',     rel: '→' },
+    { href: '/supplements/', label: 'Supplements',  sub: 'the stack',    rel: '·' },
+    { href: '/achievements/',label: 'Milestones',   sub: 'outcomes',     rel: '·' },
+  ];
+
+  var HIER_CONTEXT = {
+    '/stack/':        'The complete picture — every protocol, habit, experiment, and supplement organized by domain.',
+    '/protocols/':    'Protocols are the <strong>strategy layer</strong>. Each one contains <a href="/habits/">daily habits</a> that execute it, and may spawn <a href="/experiments/">experiments</a> to test variations.',
+    '/habits/':       'Habits are the <strong>daily execution layer</strong> of each <a href="/protocols/">protocol</a>. Sustained habits unlock <a href="/achievements/">milestones</a> and feed your <a href="/character/">character score</a>.',
+    '/experiments/':  'Experiments are <strong>time-bounded tests</strong> of <a href="/protocols/">protocol</a> variations. Each has a hypothesis, defined duration, and produces data that becomes a <a href="/discoveries/">discovery</a>.',
+    '/discoveries/':  'Discoveries are <strong>validated insights</strong> from completed <a href="/experiments/">experiments</a>. Confirmed findings feed back into <a href="/protocols/">protocols</a>.',
+    '/supplements/':  'Supplements <strong>support the protocols</strong>. Each one has a rationale, evidence tier, and links to the <a href="/protocols/">protocol</a> it serves.',
+    '/achievements/': 'Milestones are <strong>thresholds unlocked</strong> by sustained <a href="/habits/">habit</a> execution, <a href="/experiments/">experiment</a> completion, and <a href="/character/">character</a> growth. Computed from live data.',
+  };
+
+  function buildHierarchyNav() {
+    var html = '<nav style="display:flex;align-items:stretch;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:var(--text-2xs);overflow-x:auto;-webkit-overflow-scrolling:touch;">';
+    HIER_ITEMS.forEach(function(item, i) {
+      if (i > 0 && item.rel) {
+        html += '<span style="display:flex;align-items:center;padding:0 4px;color:var(--text-faint);font-size:9px;background:var(--surface);white-space:nowrap;">' + item.rel + '</span>';
+      }
+      var isActive = (path === item.href || (item.href !== '/' && path.startsWith(item.href)));
+      var bg = isActive ? 'var(--bg)' : 'var(--surface)';
+      var color = isActive ? 'var(--accent)' : 'var(--text-faint)';
+      var border = isActive ? 'border-bottom:2px solid var(--accent);' : '';
+      html += '<a href="' + item.href + '" style="padding:8px 10px;display:flex;flex-direction:column;align-items:center;gap:1px;text-decoration:none;color:' + color + ';background:' + bg + ';white-space:nowrap;min-width:70px;' + border + '">';
+      html += '<span style="font-weight:500;font-size:11px;letter-spacing:var(--ls-tag);">' + item.label + '</span>';
+      html += '<span style="font-size:9px;opacity:0.7;">' + item.sub + '</span>';
+      html += '</a>';
+    });
+    html += '</nav>';
+
+    var contextText = HIER_CONTEXT[path];
+    if (contextText) {
+      html += '<div style="margin:12px var(--page-padding);padding:10px 14px;border-left:2px solid var(--accent);background:var(--surface);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body);">';
+      html += '<span style="font-size:var(--text-2xs);font-weight:500;color:var(--accent);letter-spacing:0.04em;text-transform:uppercase;">Where this fits</span><br>';
+      html += contextText;
+      html += '</div>';
+    }
+    return html;
+  }
+
   var navMount       = document.getElementById('amj-nav');
   var footerMount    = document.getElementById('amj-footer');
   var bottomNavMount = document.getElementById('amj-bottom-nav');
   var subscribeMount = document.getElementById('amj-subscribe');
+  var hierNavMount   = document.getElementById('amj-hierarchy-nav');
 
   if (navMount)       navMount.innerHTML = buildNav();
+  if (hierNavMount)   hierNavMount.innerHTML = buildHierarchyNav();
   if (subscribeMount) subscribeMount.innerHTML = buildSubscribeCTA();
   if (bottomNavMount) bottomNavMount.innerHTML = buildBottomNav();
   if (footerMount)    footerMount.innerHTML = buildFooter();

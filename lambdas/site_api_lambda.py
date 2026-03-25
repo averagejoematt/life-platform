@@ -2795,6 +2795,68 @@ def _handle_experiment_detail(event: dict) -> dict:
 
 # ── Router ──────────────────────────────────────────────────
 
+# ── S3 config caches for data-driven pages ─────────────────
+_protocols_cache = None
+_challenges_cache = None
+_domains_cache = None
+
+def _load_s3_json(key, cache_name):
+    """Load a JSON file from S3. Returns parsed dict. Cached per Lambda container."""
+    try:
+        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+        s3 = boto3.client("s3", region_name=S3_REGION)
+        resp = s3.get_object(Bucket=S3_BUCKET, Key=key)
+        data = json.loads(resp["Body"].read())
+        logger.info(f"[{cache_name}] Loaded from S3: {key}")
+        return data
+    except Exception as e:
+        logger.warning(f"[{cache_name}] Failed to load {key}: {e}")
+        return {}
+
+def handle_protocols() -> dict:
+    """GET /api/protocols — Return protocol definitions from S3 config."""
+    global _protocols_cache
+    if _protocols_cache is None:
+        _protocols_cache = _load_s3_json("site/config/protocols.json", "protocols")
+    protocols = _protocols_cache.get("protocols", [])
+    return _ok({"protocols": protocols, "count": len(protocols)}, cache_seconds=3600)
+
+def handle_challenges() -> dict:
+    """GET /api/challenges — Return challenge definitions from S3 config."""
+    global _challenges_cache
+    if _challenges_cache is None:
+        _challenges_cache = _load_s3_json("site/config/challenges.json", "challenges")
+    challenges = _challenges_cache.get("challenges", [])
+    return _ok({"challenges": challenges, "count": len(challenges)}, cache_seconds=3600)
+
+def handle_domains() -> dict:
+    """GET /api/domains — Return domain groupings from S3 config."""
+    global _domains_cache
+    if _domains_cache is None:
+        _domains_cache = _load_s3_json("site/config/domains.json", "domains")
+    domains = _domains_cache.get("domains", [])
+    return _ok({"domains": domains, "count": len(domains)}, cache_seconds=3600)
+
+def handle_habit_registry() -> dict:
+    """GET /api/habit_registry — Return habit registry from DynamoDB PROFILE#v1."""
+    try:
+        resp = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
+        profile = resp.get("Item", {})
+        registry = profile.get("habit_registry", {})
+        habits = []
+        for name, meta in registry.items():
+            h = {"name": name}
+            for k, v in meta.items():
+                h[k] = float(v) if isinstance(v, Decimal) else v
+            habits.append(h)
+        tier_order = {"T0": 0, "T1": 1, "T2": 2}
+        habits.sort(key=lambda x: (tier_order.get(x.get("tier", "T2"), 9), x.get("name", "")))
+        return _ok({"habits": habits, "count": len(habits)}, cache_seconds=3600)
+    except Exception as e:
+        logger.error(f"[habit_registry] Error: {e}")
+        return _error(500, "Failed to load habit registry")
+
+
 ROUTES = {
     "/api/vitals":          handle_vitals,
     "/api/journey":         handle_journey,
@@ -2834,6 +2896,11 @@ ROUTES = {
     "/api/experiment_vote":     None,  # POST handler in lambda_handler
     "/api/experiment_follow":   None,  # EL-F1: POST handler in lambda_handler
     "/api/experiment_detail":   None,  # EL-F2: GET with query params
+    # DATA-DRIVEN: S3 config + DynamoDB source-of-truth endpoints
+    "/api/protocols":          handle_protocols,
+    "/api/challenges":         handle_challenges,
+    "/api/domains":            handle_domains,
+    "/api/habit_registry":     handle_habit_registry,
 }
 
 

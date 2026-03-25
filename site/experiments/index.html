@@ -671,14 +671,7 @@
 
 <div id="amj-nav"></div>
 
-<!-- Pipeline Nav -->
-<nav class="pipeline-nav">
-  <a href="/protocols/" class="pipeline-nav__step">Protocols</a>
-  <span class="pipeline-nav__arrow">→</span>
-  <a href="/experiments/" class="pipeline-nav__step active">Experiments</a>
-  <span class="pipeline-nav__arrow">→</span>
-  <a href="/discoveries/" class="pipeline-nav__step">Discoveries</a>
-</nav>
+<div id="amj-hierarchy-nav"></div>
 
 <!-- Page Header -->
 <div class="page-header animate-in">
@@ -747,6 +740,51 @@
     <div class="empty-state"><div class="empty-state__title">Loading library…</div></div>
   </div>
 </div>
+
+<!-- Zone 2.5: Challenges — Try It Yourself (data-driven from /api/challenges) -->
+<div class="library" id="challenges" style="border-bottom:1px solid var(--border);">
+  <div style="display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-6);">
+    <div class="zone-heading" style="margin-bottom:0;">// try it yourself</div>
+    <div style="flex:1;height:1px;background:var(--c-amber-300);opacity:0.3;"></div>
+  </div>
+  <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-mono);max-width:600px;margin-bottom:var(--space-8);">
+    Challenges are <strong style="color:var(--text)">participation invitations</strong>, not experiments.
+    No hypothesis required. Pick a protocol, commit to the duration, see what happens.
+    Experiments are science &mdash; challenges are action.
+  </p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--space-4);" id="challenges-grid">
+    <div style="text-align:center;padding:var(--space-8);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">// loading challenges&hellip;</div>
+  </div>
+  <p style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-label);margin-top:var(--space-6);">// challenges are participation invitations with self-reported outcomes &mdash; distinct from experiments which have hypotheses, controlled durations, and published data.</p>
+</div>
+<script>
+(function() {
+  fetch('/api/challenges')
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+    .then(function(data) {
+      var challenges = data.challenges || [];
+      var grid = document.getElementById('challenges-grid');
+      if (!challenges.length) { grid.innerHTML = '<div style="color:var(--text-faint);font-family:var(--font-mono);font-size:var(--text-xs)">// no challenges yet</div>'; return; }
+      grid.innerHTML = challenges.map(function(c) {
+        var diff = (c.difficulty || 'easy').charAt(0).toUpperCase() + (c.difficulty || 'easy').slice(1);
+        return '<div style="border:1px solid var(--c-amber-300);background:var(--surface);padding:var(--space-6);position:relative;">' +
+          '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--c-amber-500);"></div>' +
+          '<div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-3);">' + c.duration_tier + '</div>' +
+          '<div style="font-family:var(--font-display);font-size:18px;color:var(--text);margin-bottom:var(--space-2);">' + c.name + '</div>' +
+          '<p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-mono);margin-bottom:var(--space-4);">' + c.description + '</p>' +
+          '<div style="display:flex;gap:var(--space-3);flex-wrap:wrap;">' +
+            '<span style="font-family:var(--font-mono);font-size:var(--text-2xs);padding:2px 8px;border:1px solid var(--border);color:var(--text-muted);">' + diff + '</span>' +
+            '<span style="font-family:var(--font-mono);font-size:var(--text-2xs);padding:2px 8px;border:1px solid var(--border);color:var(--text-muted);">' + c.domain + '</span>' +
+            '<span style="font-family:var(--font-mono);font-size:var(--text-2xs);padding:2px 8px;border:1px solid var(--border);color:var(--text-muted);">' + c.duration_days + ' days</span>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    })
+    .catch(function() {
+      document.getElementById('challenges-grid').innerHTML = '<div style="color:var(--text-faint);font-family:var(--font-mono);font-size:var(--text-xs)">// could not load challenges</div>';
+    });
+})();
+</script>
 
 <!-- Methodology -->
 <div class="methodology reveal">

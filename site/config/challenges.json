@@ -1,0 +1,112 @@
+{
+  "_version": "1.0.0",
+  "_updated": "2026-03-25",
+  "_description": "Source of truth for visitor challenges. Distinct from experiments (which have hypotheses and data). Read by site-api (/api/challenges).",
+  "challenges": [
+    {
+      "id": "sleep_stack_7d",
+      "name": "Sleep Stack Challenge",
+      "slug": "sleep-stack-7d",
+      "domain": "sleep",
+      "protocol_id": "sleep",
+      "duration_days": 7,
+      "duration_tier": "7-day sprint",
+      "difficulty": "easy",
+      "description": "Screens off by 9pm, bed by 10pm, morning light within 30 min of waking. Seven days. No app needed \u2014 just a clock and a window.",
+      "protocol_steps": [
+        "Set a 9pm alarm for screens off",
+        "Bed by 10pm \u2014 set the environment (dark, cool, quiet)",
+        "Morning: outdoor light within 30 min of waking, 10 min minimum",
+        "Track your bedtime and wake time (paper or phone notes)"
+      ],
+      "what_to_watch": "Sleep quality, energy on waking, bedtime consistency",
+      "tags": ["sleep", "circadian", "beginner"],
+      "status": "active",
+      "created_at": "2026-03-25"
+    },
+    {
+      "id": "no_alcohol_14d",
+      "name": "No Alcohol, No Excuses",
+      "slug": "no-alcohol-14d",
+      "domain": "discipline",
+      "protocol_id": null,
+      "duration_days": 14,
+      "duration_tier": "14-day trial",
+      "difficulty": "moderate",
+      "description": "Two weeks completely dry. Track how your sleep, HRV, and energy change. Most people notice by day 4. The data doesn\u2019t lie.",
+      "protocol_steps": [
+        "Zero alcohol for 14 consecutive days",
+        "Note your sleep quality each morning (1-5 scale)",
+        "If you have a wearable, compare HRV and RHR before vs during",
+        "Journal the social situations where you\u2019d normally drink"
+      ],
+      "what_to_watch": "REM sleep improvement, RHR drop, morning energy, social pressure patterns",
+      "tags": ["discipline", "sleep", "recovery"],
+      "status": "active",
+      "created_at": "2026-03-25"
+    },
+    {
+      "id": "walk_5k_30d",
+      "name": "Walk 5k Every Day",
+      "slug": "walk-5k-30d",
+      "domain": "movement",
+      "protocol_id": "zone2",
+      "duration_days": 30,
+      "duration_tier": "30-day commitment",
+      "difficulty": "easy",
+      "description": "The lowest-barrier, highest-ROI habit in the stack. 250\u2013400 calories burned per walk with zero recovery cost. Rain or shine, 30 straight days.",
+      "protocol_steps": [
+        "Walk 5 kilometers (3.1 miles) every day for 30 days",
+        "Any pace counts \u2014 the goal is consistency, not speed",
+        "Rain, snow, or shine \u2014 no skip days",
+        "Track with phone GPS, smartwatch, or estimate by time (~45-60 min)"
+      ],
+      "what_to_watch": "Daily step count trend, weight trajectory, energy levels, mood",
+      "tags": ["movement", "beginner", "weight-loss"],
+      "status": "active",
+      "created_at": "2026-03-25"
+    },
+    {
+      "id": "journal_7d",
+      "name": "7-Day Journal Sprint",
+      "slug": "journal-7d",
+      "domain": "mind",
+      "protocol_id": null,
+      "duration_days": 7,
+      "duration_tier": "7-day sprint",
+      "difficulty": "easy",
+      "description": "Morning and evening journal for 7 days. Morning: intention + energy level. Evening: win of the day + what drained you. 5 minutes each.",
+      "protocol_steps": [
+        "Morning (within 30 min of waking): write your intention for the day + rate energy 1-5",
+        "Evening (within 1 hour of bed): note your win of the day + what drained you",
+        "Keep it to 5 minutes max \u2014 brevity is the point",
+        "Paper, phone notes, or any app \u2014 the medium doesn\u2019t matter"
+      ],
+      "what_to_watch": "Sleep onset (does writing before bed help?), morning clarity, pattern recognition",
+      "tags": ["mind", "beginner", "journaling"],
+      "status": "active",
+      "created_at": "2026-03-25"
+    },
+    {
+      "id": "no_sugar_14d",
+      "name": "14-Day Sugar Reset",
+      "slug": "no-sugar-14d",
+      "domain": "nutrition",
+      "protocol_id": "intermittent_fasting",
+      "duration_days": 14,
+      "duration_tier": "14-day trial",
+      "difficulty": "hard",
+      "description": "No added sugar, no sweets, no desserts for 14 days. Fruit is fine. The first 3 days are the hardest \u2014 after that, cravings drop dramatically.",
+      "protocol_steps": [
+        "Eliminate all added sugar, sweets, candy, desserts, sugary drinks",
+        "Whole fruit is allowed \u2014 the fiber changes the glycemic response",
+        "Read labels: sugar hides in sauces, bread, yogurt, granola",
+        "When a craving hits, eat protein or fat instead \u2014 it passes in 15 min"
+      ],
+      "what_to_watch": "Craving intensity (days 1-3 vs days 10-14), energy stability, CGM readings if available",
+      "tags": ["nutrition", "discipline", "glucose"],
+      "status": "active",
+      "created_at": "2026-03-25"
+    }
+  ]
+}
