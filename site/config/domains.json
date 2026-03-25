@@ -1,0 +1,62 @@
+{
+  "_version": "1.0.0",
+  "_updated": "2026-03-25",
+  "_description": "Source of truth for domain groupings. Maps protocols to habits, supplements, and data sources. Read by site-api (/api/domains) and The Stack page.",
+  "domains": [
+    {
+      "id": "sleep",
+      "name": "Sleep & Recovery",
+      "icon": "\u263e",
+      "protocols": ["sleep", "morning_sunlight"],
+      "habit_names": ["Morning Sunlight / Luminette Glasses", "Nighttime Red Light Blocking Glasses", "No Phone 30 Mins Before Bed"],
+      "supplement_names": ["Magnesium Glycinate", "Melatonin"],
+      "data_sources": ["Whoop", "Eight Sleep", "Apple Health"],
+      "experiment_tags": ["sleep", "recovery", "circadian", "sunlight", "light"],
+      "order": 1
+    },
+    {
+      "id": "movement",
+      "name": "Movement & Training",
+      "icon": "\u25ce",
+      "protocols": ["zone2", "strength"],
+      "habit_names": ["Primary Exercise", "Walk 5k", "Mobility"],
+      "supplement_names": ["Creatine Monohydrate"],
+      "data_sources": ["Garmin", "Strava", "Whoop", "Hevy"],
+      "experiment_tags": ["zone2", "strength", "body-composition", "movement", "muscle", "cardio"],
+      "order": 2
+    },
+    {
+      "id": "nutrition",
+      "name": "Nutrition & Metabolic",
+      "icon": "\u2698",
+      "protocols": ["intermittent_fasting", "cgm"],
+      "habit_names": ["Calorie Goal", "Food Journal", "Hydrate 3L", "Intermittent Fast 16:8"],
+      "supplement_names": ["Berberine", "Omega-3"],
+      "data_sources": ["MacroFactor", "Dexcom Stelo", "Withings"],
+      "experiment_tags": ["glucose", "cgm", "metabolic", "fasting", "intermittent-fasting", "nutrition"],
+      "order": 3
+    },
+    {
+      "id": "mind",
+      "name": "Mind & Growth",
+      "icon": "\u25c8",
+      "protocols": [],
+      "habit_names": ["Morning Journal", "Evening Journal", "Deep Work Block", "Out Of Bed Before 5am"],
+      "supplement_names": [],
+      "data_sources": ["Habitify", "Notion journal"],
+      "experiment_tags": ["mental", "journal", "cognitive"],
+      "order": 4
+    },
+    {
+      "id": "discipline",
+      "name": "Discipline & Vice Gates",
+      "icon": "\u25a5",
+      "protocols": [],
+      "habit_names": ["No alcohol", "No mindless scrolling", "No solo takeout", "No sweets"],
+      "supplement_names": [],
+      "data_sources": ["Habitify"],
+      "experiment_tags": ["discipline"],
+      "order": 5
+    }
+  ]
+}

@@ -1,3 +1,58 @@
+## v3.9.16 — 2026-03-25: Data-Driven Architecture Pivot — S3 configs, 4 new API endpoints, all pages wired
+
+### Summary
+Joint Product Board + Technical Board session identified hardcoded website content as architectural debt. Built complete data-driven foundation: 3 S3 config files (protocols, challenges, domains), 4 new API endpoints (`/api/protocols`, `/api/challenges`, `/api/domains`, `/api/habit_registry`), and wired all 4 affected pages to consume APIs instead of hardcoded HTML/JS. Also shipped "The Stack" page, hierarchy nav on 5 pages, and challenges zone on experiments page.
+
+### Changes
+
+**New: S3 config files (source of truth)**
+- `site/config/protocols.json` — 6 protocols with id, name, slug, domain, category, pillar, status, description, why, key_metrics, key_finding, tracked_by, related_habits, related_supplements, experiment_tags, adherence_target, signal_status, signal_note
+- `site/config/challenges.json` — 5 visitor challenges with protocol_steps, what_to_watch, duration_days, difficulty, domain mapping
+- `site/config/domains.json` — 5 domain groupings mapping protocols → habits → supplements → data_sources → experiment_tags
+
+**lambdas/site_api_lambda.py** (4 new endpoints)
+- `GET /api/protocols` — serves from S3 config, 3600s cache
+- `GET /api/challenges` — serves from S3 config, 3600s cache
+- `GET /api/domains` — serves from S3 config, 3600s cache
+- `GET /api/habit_registry` — serves from DynamoDB PROFILE#v1, sorts by tier, 3600s cache
+- Added `_load_s3_json()` helper with module-level caching for S3 config files
+- Bug fix: initial deploy used `ttl=3600` (wrong kwarg) → fixed to `cache_seconds=3600`
+
+**site/protocols/index.html** (fully data-driven)
+- Removed 6 hardcoded protocol cards (~190 lines of HTML)
+- New: dynamic renderer fetches `/api/protocols`, builds cards from API data
+- Adherence data loads from `/api/habits` after cards render
+- Experiment badges load from `/api/experiments` using protocol's `experiment_tags`
+
+**site/experiments/index.html** (challenges wired)
+- Replaced 3 hardcoded challenge cards with dynamic render from `/api/challenges` (now shows all 5)
+- Same amber border treatment, preserves "try it yourself" heading and disclaimer
+
+**site/habits/index.html** (fully data-driven)
+- Removed hardcoded `T0_HABITS` (6 items), `PURPOSE_GROUPS` (6 groups, 15 habits), `T2_HABITS` (15 items) — ~100 lines of JS arrays
+- New: `transformRegistry()` fetches `/api/habit_registry`, transforms DynamoDB habit_registry into same shapes render functions expect
+- `GROUP_META` maps synergy_group keys to display names/icons/descriptions
+- `freqLabel()` converts target_frequency number to "daily"/"5×/week" display string
+- Hero count updates dynamically from actual registry data
+
+**site/stack/index.html** (new page, fully data-driven)
+- New "The Stack" page — domain-organized map of all protocols with nested habits, experiments, supplements
+- Fetches `/api/domains` + `/api/protocols` + `/api/experiments` + `/api/vice_streaks` in parallel
+- Renders domain cards with protocol rows, experiment badges, habit/supplement/data source chips
+- Discipline domain shows vice streak holding count
+
+**site/assets/js/components.js**
+- "The Stack" added to Method dropdown nav and footer
+- `buildHierarchyNav()` function with 7 items and page-specific "Where this fits" context bars
+
+**site/achievements/index.html** — hierarchy nav added
+
+### Board Decisions
+- Product Board: "The Stack" page (5-2-1 vote), hierarchy nav, challenges concept, keep deep pages
+- Technical Board: Tiered SOT architecture — S3 config for protocols/challenges/domains, DynamoDB for habit registry
+
+---
+
 ## v3.9.15 — 2026-03-25: Experiments Evolution Phase 2 — Record zone polish, detail page, follow buttons, achievement badges
 
 ### Summary

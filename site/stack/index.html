@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The complete health stack — every protocol, habit, experiment, and supplement organized by domain.">
+  <meta property="og:title" content="The Stack — Matthew Walker">
+  <meta property="og:description" content="The complete health stack — protocols, habits, experiments, and supplements. One page. Every domain.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta property="og:type" content="website">
+  <title>The Stack — Matthew Walker</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .stack-hero {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    .stack-hero__title {
+      font-family: var(--font-display);
+      font-size: clamp(32px, 5vw, 56px);
+      line-height: 1.1;
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .stack-hero__title em { color: var(--accent); font-style: normal; }
+    .stack-hero__sub {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 560px;
+      line-height: var(--lh-body);
+      margin-bottom: var(--space-8);
+    }
+    .stack-hero__stats {
+      display: flex; gap: var(--space-8); flex-wrap: wrap;
+    }
+    .stack-stat {
+      border-left: 2px solid var(--border);
+      padding-left: var(--space-4);
+    }
+    .stack-stat:first-child { border-left-color: var(--accent); }
+    .stack-stat__label {
+      font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
+      text-transform: uppercase; color: var(--text-muted);
+      font-family: var(--font-mono); margin-bottom: 2px;
+    }
+    .stack-stat__val {
+      font-family: var(--font-display); font-size: 28px;
+      color: var(--text); line-height: 1;
+    }
+    .stack-stat:first-child .stack-stat__val { color: var(--accent); }
+
+    .stack-body {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+    }
+
+    .domain {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      margin-bottom: var(--space-6);
+      transition: border-color var(--dur-fast);
+    }
+    .domain:hover { border-color: var(--accent-dim); }
+
+    .domain__header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      padding: var(--space-5) var(--space-6);
+      border-bottom: 1px solid var(--border-subtle);
+      cursor: pointer;
+    }
+    .domain__icon {
+      width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      background: rgba(0,229,160,0.06);
+      border: 1px solid var(--accent-dim);
+    }
+    .domain__info { flex: 1; min-width: 0; }
+    .domain__name {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+    }
+    .domain__counts {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      margin-top: 2px;
+    }
+    .domain__signal {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border: 1px solid;
+    }
+    .domain__signal.positive { color: var(--accent); border-color: var(--accent-dim); }
+    .domain__signal.pending { color: var(--c-amber-500); border-color: var(--c-amber-300); }
+    .domain__chevron {
+      font-family: var(--font-mono);
+      color: var(--text-faint);
+      transition: transform var(--dur-fast);
+    }
+    .domain.collapsed .domain__chevron { transform: rotate(-90deg); }
+    .domain.collapsed .domain__body { display: none; }
+
+    .domain__body {
+      padding: var(--space-4) var(--space-6) var(--space-5);
+    }
+
+    .proto-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: var(--space-3);
+      align-items: center;
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .proto-row:last-child { border-bottom: none; }
+    .proto-row__name {
+      font-size: var(--text-sm);
+      color: var(--text);
+      font-weight: 500;
+    }
+    .proto-row__desc {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      margin-top: 2px;
+    }
+    .proto-row__links {
+      display: flex; gap: var(--space-3); align-items: center;
+    }
+    .proto-row__link {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--accent-dim);
+      text-decoration: none;
+      border-bottom: 1px dotted var(--accent-dim);
+    }
+    .proto-row__link:hover { color: var(--accent); }
+
+    .domain__footer {
+      display: flex;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--border-subtle);
+      margin-top: var(--space-3);
+    }
+    .domain__chip {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+    }
+    .domain__chip a {
+      color: var(--accent-dim);
+      text-decoration: none;
+    }
+    .domain__chip a:hover { color: var(--accent); text-decoration: underline; }
+
+    .exp-badge-sm {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-1);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--c-amber-500);
+      border: 1px solid var(--c-amber-300);
+      padding: 1px var(--space-2);
+      text-decoration: none;
+    }
+    .exp-badge-sm:hover { background: rgba(245,158,11,0.08); }
+    .exp-badge-sm__dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--c-amber-500);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .stack-reading-order {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-top: 1px solid var(--border);
+    }
+    .reading-order__heading {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-5);
+    }
+    .reading-order__grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: var(--space-3);
+    }
+    .reading-order__card {
+      border: 1px solid var(--border);
+      padding: var(--space-4);
+      text-decoration: none;
+      transition: border-color var(--dur-fast);
+    }
+    .reading-order__card:hover { border-color: var(--accent-dim); }
+    .reading-order__card-name {
+      font-family: var(--font-display);
+      font-size: var(--text-sm);
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+    .reading-order__card-sub {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+    }
+
+    @media (max-width: 768px) {
+      .domain__header { flex-wrap: wrap; }
+      .domain__signal { order: 3; }
+      .reading-order__grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div id="amj-nav"></div>
+
+<div id="amj-hierarchy-nav"></div>
+
+<header class="stack-hero reveal">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">The Method</div>
+  <h1 class="stack-hero__title">The <em>Stack</em></h1>
+  <p class="stack-hero__sub">
+    Everything I do &mdash; every protocol, daily habit, experiment, and supplement &mdash;
+    organized by domain. The complete picture in one place.
+    Tap any card to go deeper.
+  </p>
+  <div class="stack-hero__stats">
+    <div class="stack-stat">
+      <div class="stack-stat__label">Protocols</div>
+      <div class="stack-stat__val">6</div>
+    </div>
+    <div class="stack-stat">
+      <div class="stack-stat__label">Daily Habits</div>
+      <div class="stack-stat__val" id="stat-habits">37</div>
+    </div>
+    <div class="stack-stat">
+      <div class="stack-stat__label">Experiments Run</div>
+      <div class="stack-stat__val" id="stat-experiments">&mdash;</div>
+    </div>
+    <div class="stack-stat">
+      <div class="stack-stat__label">Data Sources</div>
+      <div class="stack-stat__val">19</div>
+    </div>
+  </div>
+</header>
+
+<div class="stack-body" id="domains-container">
+  <div style="padding:var(--space-12);text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);letter-spacing:var(--ls-tag);animation:pulse 1.5s ease-in-out infinite">// loading domains from API…</div>
+</div>
+
+<!-- Reading order / deep dive links -->
+<div class="stack-reading-order reveal">
+  <div class="reading-order__heading">// go deeper</div>
+  <div class="reading-order__grid">
+    <a href="/habits/" class="reading-order__card">
+      <div class="reading-order__card-name">The Operating System</div>
+      <div class="reading-order__card-sub">37 habits &middot; RPG tier system &middot; heatmap</div>
+    </a>
+    <a href="/experiments/" class="reading-order__card">
+      <div class="reading-order__card-name">The Lab</div>
+      <div class="reading-order__card-sub">52 experiments &middot; vote &middot; challenges</div>
+    </a>
+    <a href="/supplements/" class="reading-order__card">
+      <div class="reading-order__card-name">Supplements</div>
+      <div class="reading-order__card-sub">Full stack with data + rationale</div>
+    </a>
+    <a href="/achievements/" class="reading-order__card">
+      <div class="reading-order__card-name">Milestones</div>
+      <div class="reading-order__card-sub">Badge wall &middot; weight &middot; streaks &middot; levels</div>
+    </a>
+    <a href="/explorer/" class="reading-order__card">
+      <div class="reading-order__card-name">Data Explorer</div>
+      <div class="reading-order__card-sub">Pick any two metrics &middot; scatter plot</div>
+    </a>
+    <a href="/discoveries/" class="reading-order__card">
+      <div class="reading-order__card-name">Discoveries</div>
+      <div class="reading-order__card-sub">What the experiments proved</div>
+    </a>
+  </div>
+</div>
+
+<!-- N=1 disclaimer -->
+<aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle);">
+  <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label)">
+    <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
+    This is one person&rsquo;s stack, informed by one person&rsquo;s data. Nothing here is medical advice.
+    The value is the methodology &mdash; tracking everything, letting data drive decisions, and being honest about what&rsquo;s working and what isn&rsquo;t.
+  </p>
+</aside>
+
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+<div id="amj-reading-path"></div>
+<div id="amj-footer"></div>
+
+<script>
+(function(){
+  'use strict';
+  var API = 'https://averagejoematt.com/api';
+  var BLOCKED_KW = ['porn','pornography','marijuana','cannabis','weed','thc'];
+  function isBlocked(t){ if(!t)return false; var l=t.toLowerCase(); return BLOCKED_KW.some(function(k){return l.indexOf(k)!==-1}); }
+
+  // Data-driven: fetch domains + protocols + experiments + vice streaks
+  Promise.all([
+    fetch(API + '/domains').then(function(r){ return r.ok ? r.json() : {domains:[]}; }),
+    fetch(API + '/protocols').then(function(r){ return r.ok ? r.json() : {protocols:[]}; }),
+    fetch(API + '/experiments').then(function(r){ return r.ok ? r.json() : {experiments:[]}; }),
+    fetch(API + '/vice_streaks').then(function(r){ return r.ok ? r.json() : {vices:[]}; }),
+  ]).then(function(results){
+    var domains = (results[0].domains || []).sort(function(a,b){ return (a.order||99)-(b.order||99); });
+    var protocols = results[1].protocols || [];
+    var experiments = results[2].experiments || [];
+    var vices = (results[3].vices || []).filter(function(v){ return !isBlocked(v.name); });
+
+    var protoById = {};
+    protocols.forEach(function(p){ protoById[p.id] = p; });
+
+    var activeExps = experiments.filter(function(e){ return e.status === 'active'; });
+    var domainExps = {};
+    activeExps.forEach(function(exp){
+      var tags = exp.tags || [];
+      domains.forEach(function(d){
+        var dtags = d.experiment_tags || [];
+        if(tags.some(function(t){ return dtags.indexOf(t) !== -1; })){
+          if(!domainExps[d.id]) domainExps[d.id] = [];
+          domainExps[d.id].push(exp);
+        }
+      });
+    });
+
+    // Hero stats
+    var statProto = document.querySelector('.stack-stat__val');
+    if(statProto) statProto.textContent = protocols.length;
+    var completed = experiments.filter(function(e){ return e.status === 'completed'; }).length;
+    var statExp = document.getElementById('stat-experiments');
+    if(statExp) statExp.textContent = completed + (activeExps.length ? ' + ' + activeExps.length + ' running' : '');
+
+    var holding = vices.filter(function(v){ return v.holding; }).length;
+
+    var container = document.getElementById('domains-container');
+    container.innerHTML = domains.map(function(d){
+      var dProtos = (d.protocols || []).map(function(pid){ return protoById[pid]; }).filter(Boolean);
+      var habits = (d.habit_names || []).filter(function(h){ return !isBlocked(h); });
+      var supps = d.supplement_names || [];
+      var sources = d.data_sources || [];
+      var exps = domainExps[d.id] || [];
+
+      var signal = '';
+      if(d.id === 'discipline'){
+        if(holding === vices.length) signal = '<div class="domain__signal positive">All holding</div>';
+        else signal = '<div class="domain__signal pending">' + holding + '/' + vices.length + '</div>';
+      } else if(dProtos.length){
+        var cls = dProtos[0].signal_status === 'positive' ? 'positive' : 'pending';
+        signal = '<div class="domain__signal ' + cls + '">' + (dProtos[0].signal_status === 'positive' ? 'Positive' : 'Pending') + '</div>';
+      }
+
+      var parts = [];
+      if(dProtos.length) parts.push(dProtos.length + ' protocol' + (dProtos.length > 1 ? 's' : ''));
+      if(habits.length) parts.push(habits.length + ' habit' + (habits.length > 1 ? 's' : ''));
+      if(supps.length) parts.push(supps.length + ' supplement' + (supps.length > 1 ? 's' : ''));
+      var countsStr = parts.join(' \u00b7 ');
+      if(d.id === 'discipline') countsStr = holding + ' of ' + vices.length + ' holding \u00b7 the habits of not doing';
+
+      var html = '<div class="domain reveal is-visible" id="domain-' + d.id + '">';
+      html += '<div class="domain__header" onclick="this.parentElement.classList.toggle(\'collapsed\')">';
+      html += '<div class="domain__icon">' + (d.icon || '\u25c6') + '</div>';
+      html += '<div class="domain__info"><div class="domain__name">' + d.name + '</div>';
+      html += '<div class="domain__counts">' + countsStr + '</div></div>';
+      html += signal;
+      html += '<div class="domain__chevron">\u25be</div></div>';
+      html += '<div class="domain__body">';
+      dProtos.forEach(function(p){
+        html += '<div class="proto-row"><div><div class="proto-row__name">' + p.name + '</div>';
+        html += '<div class="proto-row__desc">' + p.description + '</div></div>';
+        html += '<div class="proto-row__links"><a href="/protocols/" class="proto-row__link">Details \u2192</a></div></div>';
+      });
+      if(exps.length){
+        html += '<div style="padding:var(--space-3) 0;display:flex;gap:var(--space-2);flex-wrap:wrap;">';
+        exps.forEach(function(exp){ html += '<a href="/experiments/" class="exp-badge-sm"><span class="exp-badge-sm__dot"></span> ' + exp.name + '</a>'; });
+        html += '</div>';
+      }
+      html += '<div class="domain__footer">';
+      if(habits.length) html += '<div class="domain__chip">\ud83c\udfaf ' + habits.length + ' habits \u2014 <a href="/habits/">View \u2192</a></div>';
+      if(supps.length) html += '<div class="domain__chip">\ud83d\udc8a ' + supps.join(', ') + ' \u2014 <a href="/supplements/">Stack \u2192</a></div>';
+      if(sources.length) html += '<div class="domain__chip">\ud83d\udcca ' + sources.join(', ') + '</div>';
+      html += '</div></div></div>';
+      return html;
+    }).join('');
+  }).catch(function(){
+    document.getElementById('domains-container').innerHTML = '<div style="padding:var(--space-12);text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">// could not load domains</div>';
+  });
+})();
+</script>
+
+<script src="/assets/js/reveal.js"></script>
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>
