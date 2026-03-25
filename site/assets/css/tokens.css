@@ -53,6 +53,10 @@
   --c-border-subtle:  rgba(0, 229, 160, 0.06);
   --c-border-neutral: rgba(255, 255, 255, 0.06);
 
+  /* RGB triplets for rgba() usage */
+  --accent-rgb:       0, 229, 160;
+  --amber-rgb:        200, 132, 58;
+
   /* Status */
   --c-green-status:   #00e5a0;
   --c-yellow-status:  #f5a623;
@@ -118,6 +122,10 @@
   --c-border-mid:     rgba(0, 108, 74, 0.22);   /* was 0.15 — surface cards now visible */
   --c-border-subtle:  rgba(0, 108, 74, 0.10);   /* was 0.08 */
   --c-border-neutral: rgba(0, 0, 0, 0.10);      /* was 0.08 */
+
+  /* RGB triplets — light mode */
+  --accent-rgb:       0, 108, 74;
+  --amber-rgb:        160, 104, 32;
 
   /* Status — adjusted for light bg readability */
   --c-green-status:   #006c4a;
