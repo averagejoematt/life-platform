@@ -1,3 +1,31 @@
+## v3.9.20 — 2026-03-25: HP-09 — Section consolidation (9→7), backend deploys for HP-06/HP-12/HP-14
+
+### Summary
+HP-09 section consolidation shipped: homepage restructured from 9 sections to 7. Day 1 vs Today moved up (immediately after hero for impact), What's New merged into Discoveries as "What the Data Found" with embedded pulse bar, standalone Quote section eliminated and embedded in About. Backend deploys completed: site-api Lambda redeployed (HP-06 dynamic correlations now live), shared layer v15 published and attached to all 15 consumers (HP-12 elena_hero_line + HP-14 chronicle_recent in write_public_stats pipeline).
+
+### Changes
+
+**site/index.html** (HP-09)
+- Section order: Hero → Day 1 vs Today → Signals/Brief → What the Data Found → Chronicles → Features → About+Quote
+- Merged "What's New" standalone section into Discoveries header as compact "// Live" pulse bar
+- Renamed Discoveries heading to "What the Data Found"
+- Moved Day 1 vs Today from position 6 to position 2 (immediately after hero)
+- Eliminated standalone Quote section — embedded as border-left blockquote in About section
+- Net: 1587 lines (was 1593), 2 sections removed, ~30% less mobile scroll depth
+- All JS data loaders, share buttons, SVG glyphs, and fallback cards preserved
+
+### Deployed
+- site/index.html synced to S3 + CloudFront invalidated
+- site-api Lambda deployed (HP-06 `?featured=true` live)
+- Shared layer v15 published + attached to 15 consumers (HP-12/HP-14 pipeline ready)
+
+### Notes
+- HP-06: Dynamic discoveries will replace fallback cards once weekly_correlations data exists in DynamoDB
+- HP-12: Elena hero one-liner will appear once daily brief passes `elena_hero_line` to write_public_stats — requires daily_brief_lambda.py edit (future session)
+- HP-14: Chronicle cards will populate on next daily brief run (chronicle_recent already computed by _get_recent_chronicles)
+
+---
+
 ## v3.9.19 — 2026-03-25: HP-06/HP-12/HP-14 backend + frontend — dynamic discoveries, Elena hero line, chronicle cards
 
 ### Summary
