@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+"""
+site_stats_refresh_lambda.py — Lightweight stats refresh for averagejoematt.com
+
+Runs 4x/day (8am, 12pm, 4pm, 8pm Pacific) to keep public_stats.json fresh
+without making any AI/Claude calls. Invokes whoop + withings + habitify
+ingestion Lambdas to pull fresh API data, then reads DynamoDB and updates
+the vitals section of public_stats.json in-place.
+
+Preserves: journey, platform counts, trends, baseline, brief_excerpt from
+the morning daily-brief run. Only overwrites: vitals (recovery, HRV, weight,
+sleep), tier0_streak, and _meta timestamp.
+
+Cost: ~$0/month (well within Lambda free tier).
+"""
+import boto3
+import json
+import os
+from datetime import datetime, timezone, date, timedelta
+
+REGION       = os.environ.get("AWS_REGION", "us-west-2")
+TABLE_NAME   = os.environ.get("TABLE_NAME", "life-platform")
+S3_BUCKET    = os.environ.get("S3_BUCKET", "matthew-life-platform")
+USER_ID      = os.environ.get("USER_ID", "matthew")
+STATS_KEY    = "site/public_stats.json"
+
+# Ingestion Lambdas to re-invoke before reading DynamoDB
+INGESTION_LAMBDAS = [
+    "whoop-data-ingestion",
+    "withings-data-ingestion",
+    "habitify-data-ingestion",
+]
+
+_lambda = boto3.client("lambda", region_name=REGION)
+_dynamo = boto3.resource("dynamodb", region_name=REGION)
+_s3     = boto3.client("s3", region_name=REGION)
+
+
+def _safe_float(d, key):
+    try:
+        v = d.get(key)
+        if v is None:
+            return None
+        f = float(v)
+        return f if f != 0.0 else None
+    except Exception:
+        return None
+
+
+def _get_latest(table, source, days_back=2):
+    """Return most recent DynamoDB record for source, or {}."""
+    today = date.today().isoformat()
+    start = (date.today() - timedelta(days=days_back)).isoformat()
+    try:
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
+            ExpressionAttributeValues={
+                ":pk": f"USER#{USER_ID}#SOURCE#{source}",
+                ":s":  f"DATE#{start}",
+                ":e":  f"DATE#{today}",
+            },
+            ScanIndexForward=False,
+            Limit=1,
+        )
+        items = resp.get("Items", [])
+        return dict(items[0]) if items else {}
+    except Exception as e:
+        print(f"[WARN] DynamoDB read failed ({source}): {e}")
+        return {}
+
+
+def lambda_handler(event, context):
+    print("[INFO] site-stats-refresh starting...")
+
+    # ── 1. Re-invoke ingestion Lambdas to pull fresh source API data ─────────
+    for fn in INGESTION_LAMBDAS:
+        try:
+            resp = _lambda.invoke(
+                FunctionName=fn,
+                InvocationType="RequestResponse",   # synchronous — wait for data
+                Payload=json.dumps({}),
+            )
+            print(f"[INFO] {fn}: HTTP {resp['StatusCode']}")
+        except Exception as e:
+            print(f"[WARN] {fn} invoke failed (non-fatal): {e}")
+
+    # ── 2. Read fresh records from DynamoDB ───────────────────────────────────
+    table    = _dynamo.Table(TABLE_NAME)
+    whoop    = _get_latest(table, "whoop")
+    withings = _get_latest(table, "withings")
+    habitify = _get_latest(table, "habitify")
+
+    # ── 3. Read existing public_stats.json to preserve non-vitals sections ───
+    try:
+        existing = json.loads(
+            _s3.get_object(Bucket=S3_BUCKET, Key=STATS_KEY)["Body"].read()
+        )
+    except Exception as e:
+        print(f"[WARN] Could not read existing public_stats.json: {e}")
+        existing = {}
+
+    ev = existing.get("vitals", {})
+
+    # ── 4. Build fresh vitals ────────────────────────────────────────────────
+    recovery = _safe_float(whoop, "recovery_score")
+    hrv      = _safe_float(whoop, "hrv")
+    rhr      = _safe_float(whoop, "resting_heart_rate")
+    sleep    = _safe_float(whoop, "sleep_duration_hours")
+    weight   = _safe_float(withings, "weight_lbs")
+
+    weight_as_of = withings.get("sk", "").replace("DATE#", "") or None
+    if not weight:                         # scale not stepped on — keep last known
+        weight       = ev.get("weight_lbs")
+        weight_as_of = ev.get("weight_as_of")
+
+    rec_status = (
+        "green"  if (recovery or 0) >= 67 else
+        "yellow" if (recovery or 0) >= 34 else
+        "red"
+    )
+
+    fresh_vitals = {
+        "weight_lbs":          round(weight, 1) if weight else None,
+        "weight_as_of":        weight_as_of,
+        "weight_delta_30d":    ev.get("weight_delta_30d"),   # preserved from morning
+        "hrv_ms":              round(hrv, 1)  if hrv      else ev.get("hrv_ms"),
+        "hrv_trend":           ev.get("hrv_trend"),
+        "rhr_bpm":             round(rhr, 1)  if rhr      else ev.get("rhr_bpm"),
+        "rhr_trend":           ev.get("rhr_trend"),
+        "recovery_pct":        round(recovery, 0) if recovery else None,
+        "recovery_status":     rec_status if recovery else ev.get("recovery_status"),
+        "sleep_hours":         round(sleep, 1) if sleep   else ev.get("sleep_hours"),
+        "sleep_hours_30d_avg": ev.get("sleep_hours_30d_avg"),
+    }
+
+    # ── 5. Update tier0_streak from habitify if available ────────────────────
+    ep = existing.get("platform", {})
+    fresh_streak = _safe_float(habitify, "tier0_streak")
+    fresh_streak = int(fresh_streak) if fresh_streak is not None else ep.get("tier0_streak")
+
+    # ── 6. Merge — preserve everything except vitals + streak + _meta ────────
+    payload = {
+        **existing,
+        "_meta": {
+            **existing.get("_meta", {}),
+            "generated_at":  existing.get("_meta", {}).get("generated_at"),  # keep morning time
+            "refreshed_at":  datetime.now(timezone.utc).isoformat(),
+            "generated_by":  "daily-brief-lambda",
+        },
+        "vitals":   fresh_vitals,
+        "platform": {**ep, "tier0_streak": fresh_streak},
+    }
+
+    # ── 7. Write back ─────────────────────────────────────────────────────────
+    _s3.put_object(
+        Bucket=S3_BUCKET,
+        Key=STATS_KEY,
+        Body=json.dumps(payload, indent=2, default=str),
+        ContentType="application/json",
+        CacheControl="max-age=3600",
+    )
+    print("[INFO] public_stats.json refreshed (vitals only — no AI calls)")
+    return {"statusCode": 200, "body": "refreshed"}

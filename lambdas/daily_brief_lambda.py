@@ -1882,8 +1882,8 @@ def lambda_handler(event, context):
                 platform={
                     "mcp_tools":          95,
                     "data_sources":       19,
-                    "lambdas":            48,
-                    "last_review_grade":  "A",
+                    "lambdas":            50,
+                    "last_review_grade":  "A-",
                     "tier0_streak":       _tier0_streak,
                     "days_in":            _days_in,
                 },

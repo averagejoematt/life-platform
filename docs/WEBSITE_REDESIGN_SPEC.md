@@ -27,8 +27,10 @@ G-3 ✅, G-4 ✅, G-5 ✅ (confirmed working), G-7 ⚠️ (SES issue identified)
 - PLAT-3 ✅ (3-zone restructure)
 - BOARD-1 ✅ (Huberman/Attia → fictional advisors)
 
-### Nav Restructure — ✅ COMPLETE (v3.8.9)
-All 44 HTML files updated. 5-section dropdown: The Story | The Data | The Science | The Build | Follow.
+### Nav Restructure — ✅ COMPLETE (v3.9.10, prev v3.8.9)
+All pages via components.js. 6-section dropdown: Story | Pulse | Evidence | Method | Build | Follow.
+Renames: Live→Today, Character Sheet→Character, Explorer→Data Explorer, Intelligence→The AI, Experiments→Active Tests.
+Method dropdown uses sub-headers ("What I Do" / "What I Tested").
 
 ### Remaining from original spec:
 - G-7: Subscribe SES verification (investigation only)

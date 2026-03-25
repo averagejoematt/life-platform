@@ -50,7 +50,7 @@ HERO_WHY_PARAGRAPH = (
 )
 
 # Journey start date — used for "X days on journey" counter
-JOURNEY_START_DATE = "2026-02-09"
+JOURNEY_START_DATE = "2026-02-22"
 JOURNEY_START_WEIGHT = 302.0
 GOAL_WEIGHT = 185.0
 
@@ -197,8 +197,8 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
             "platform": _json_safe(platform or {
                 "mcp_tools": 95,
                 "data_sources": 19,
-                "lambdas": 48,
-                "last_review_grade": "A",
+                "lambdas": 50,
+                "last_review_grade": "A-",
             }),
             # v1.2.0: Trend arrays for homepage sparkline charts
             "trends": _json_safe(trends or {}),
