@@ -1,3 +1,30 @@
+## v3.9.21 — 2026-03-25: Accountability page evolution — Product Board Review #4
+
+### Summary
+Product Board convened to review the Accountability page. All 8 personas provided findings. Six evolution tasks shipped in a single session: state hero enrichment with contextual explanation, 90-day accountability arc sparkline (SVG, color-coded dots, gradient fill, running average), nudge system evolved (emoji→SVG icons, live session counter, animated nudge feed), milestone tracker replaced with compact link to /achievements/, subscribe CTA with email capture, and public commitment enhanced with additional "the rule" paragraph.
+
+### Changes
+
+**site/accountability/index.html** — Full evolution
+- State hero: new `state-hero__context` element with dynamic contextual sentence explaining WHY the state is what it is (streak + T0% + done/total + tailored message per state)
+- NEW: 90-day Accountability Arc section — SVG sparkline of T0 compliance from /api/habits history, color-coded dots (green=perfect, amber=partial, red=missed), gradient fill, 100%/50% threshold lines, running average display
+- Nudge system: emoji replaced with inline SVGs (fire, eye, clock, heart), live nudge counter ("N sent this visit"), animated nudge feed showing recent activity with timestamps
+- Milestone tracker: removed 5-row duplicate (was redundant with /achievements/), replaced with single-line compact strip showing current streak + next milestone + link to badge gallery
+- NEW: Subscribe CTA section — email input → SubscriberFunctionUrl POST, Enter key support, success/error feedback states
+- Public commitment: enhanced blockquote styling (120px quote mark, more padding), added "the rule" paragraph below
+- Calendar grid: responsive breakpoint added for 480px (6-col instead of 10-col)
+- All API calls now use shared cached data pattern (single /api/habits fetch serves both arc + calendar)
+
+### Deployed
+- site/accountability/index.html synced to S3 + CloudFront invalidated
+
+### Notes
+- Nudge counter is session-only (in-memory on Lambda + client-side). Persistent DDB counter is a future backend task (requires CDK write-permission change).
+- Subscribe CTA posts to existing SubscriberFunctionUrl (us-east-1) — no new backend needed.
+- Product Board review documented: Mara (thin page, no return loop), Sofia (nudge buried, no social proof), Raj (no engagement loop, milestone duplication), Tyrell (visual sparsity, emoji inconsistency), Jordan (email capture missing, nudge goldmine), Ava (no content layer).
+
+---
+
 ## v3.9.20 — 2026-03-25: HP-09 — Section consolidation (9→7), backend deploys for HP-06/HP-12/HP-14
 
 ### Summary
