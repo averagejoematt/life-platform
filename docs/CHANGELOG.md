@@ -1,3 +1,47 @@
+## v3.9.19 — 2026-03-25: HP-06/HP-12/HP-14 backend + frontend — dynamic discoveries, Elena hero line, chronicle cards
+
+### Summary
+Three home page evolution tasks completed (from HOME_EVOLUTION_SPEC.md Product Board sprint). HP-06 adds `?featured=true&limit=3` support to `/api/correlations` so the homepage dynamic discoveries JS (deployed in v3.9.18) pulls live data instead of showing fallback cards. HP-12 adds `elena_hero_line` field to `public_stats.json` pipeline so Elena Voss's weekly one-liner appears in the hero section. HP-14 adds `chronicle_recent` array to `public_stats.json` and a new "Recent Chronicles" section on the homepage with 3 dynamically-loaded entry cards.
+
+### Changes
+
+**lambdas/site_api_lambda.py**
+- `handle_correlations()` now accepts `event` param for query string parsing
+- `?featured=true` returns flat array of top significant correlations (p<0.05 or FDR-significant), sorted by |r|
+- `?limit=N` controls result count (1-20, default 3)
+- Added `p`, `description`, `direction`, `metric_a`, `metric_b` fields to correlation responses
+- Auto-generates description for correlations missing one
+- Early-routed in `lambda_handler` before generic GET router so event is passed
+
+**lambdas/site_writer.py** (shared layer v13)
+- `write_public_stats()` accepts new `elena_hero_line` param (HP-12)
+- New `_get_recent_chronicles()` helper queries last 3 chronicles from DynamoDB (HP-14)
+- `chronicle_recent` array added to `public_stats.json` payload
+- `elena_hero_line` field added to `public_stats.json` payload
+
+**site/index.html**
+- New `<section id="chronicle-cards">` between Discoveries and Day 1 vs Today
+- JS loader reads `window.__amjStats.chronicle_recent` with fallback to direct fetch
+- Responsive: stacks to 1-column on mobile (<768px)
+- Graceful degradation: shows "Chronicles publish every Wednesday" fallback if no data
+
+### Deployed
+- site_api_lambda deployed
+- Shared layer v13 published + attached to 15 consumers
+- Site HTML synced + CloudFront invalidated
+
+### Task status (HOME_EVOLUTION_SPEC.md)
+- HP-06 ✅ (backend complete — frontend was already deployed in v3.9.18)
+- HP-12 ✅ (backend complete — frontend was already deployed in v3.9.18)
+- HP-14 ✅ (backend + frontend complete)
+
+### Notes
+- HP-12 `elena_hero_line` will be null until a caller (e.g. wednesday-chronicle Lambda) passes the value to `write_public_stats()`
+- HP-14 `chronicle_recent` will populate automatically on next daily-brief run (reads from DynamoDB chronicle partition)
+- HP-06 dynamic discoveries will show real data on next page load (replaces fallback cards)
+
+---
+
 ## v3.9.13 — 2026-03-25: Benchmarks → "The Standards" — 6-domain research reference redesign
 
 ### Summary

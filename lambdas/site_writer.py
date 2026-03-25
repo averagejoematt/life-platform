@@ -140,10 +140,62 @@ def _get_latest_chronicle_headline(table_client, user_id: str) -> dict | None:
     return None
 
 
+def _get_recent_chronicles(table_client, user_id: str, count: int = 3) -> list:
+    """
+    HP-14: Fetch the N most recent Chronicle entries for homepage cards.
+    Returns list of {title, week_num, date, url, excerpt}.
+    Non-fatal — returns [] if unavailable.
+    """
+    if table_client is None:
+        return []
+    try:
+        from datetime import timedelta
+        today = datetime.now(timezone.utc).date()
+        d90 = (today - timedelta(days=90)).isoformat()
+        resp = table_client.query(
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
+            ExpressionAttributeValues={
+                ":pk": f"USER#{user_id}#SOURCE#chronicle",
+                ":s":  f"DATE#{d90}",
+                ":e":  f"DATE#{today.isoformat()}",
+            },
+            ScanIndexForward=False,
+            Limit=count,
+        )
+        items = resp.get("Items", [])
+        entries = []
+        for item in items:
+            week_num = int(item.get("week_number", 0))
+            title = item.get("title", "")
+            date = item.get("date", "")
+            # Build excerpt from opening paragraph or stats_line
+            excerpt = item.get("stats_line") or item.get("opening_line", "")
+            if not excerpt:
+                body = item.get("body", "")
+                if body:
+                    # Take first sentence (up to 120 chars)
+                    first_sentence = body.split(".")[0][:120]
+                    excerpt = first_sentence + ("." if len(first_sentence) < 120 else "…")
+            # URL: /chronicle/week-N/ pattern
+            url = f"/chronicle/week-{week_num}/" if week_num else "/chronicle/"
+            entries.append({
+                "title":    title,
+                "week_num": week_num,
+                "date":     date,
+                "url":      url,
+                "excerpt":  (excerpt or "")[:150],
+            })
+        return entries
+    except Exception as exc:
+        logger.warning("[site_writer] Recent chronicles fetch failed: %s", exc)
+    return []
+
+
 def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
                        platform: dict = None, table_client=None, user_id: str = "matthew",
                        trends: dict = None, brief_excerpt: str = None,
-                       baseline: dict = None, group_narratives: dict = None) -> bool:
+                       baseline: dict = None, group_narratives: dict = None,
+                       elena_hero_line: str = None) -> bool:
     """
     Write public_stats.json to S3 from daily-brief-lambda data.
 
@@ -170,6 +222,8 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
         baseline:     optional dict with Day 1 historical constants:
                       { date, weight_lbs, hrv_ms, rhr_bpm, recovery_pct }
                       Populated from profile fields or known journey-start readings.
+        elena_hero_line: optional one-sentence Elena Voss observation for homepage
+                      hero section. Updated weekly when Chronicle publishes.
 
     Returns:
         True on success, False on failure (non-fatal — never raise)
@@ -181,6 +235,9 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
         chronicle_headline = None
         if table_client is not None:
             chronicle_headline = _get_latest_chronicle_headline(table_client, user_id)
+
+        # HP-14: Fetch 3 most recent Chronicle entries for homepage cards
+        chronicle_recent = _get_recent_chronicles(table_client, user_id, count=3)
 
         payload = {
             "_meta": {
@@ -209,6 +266,10 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
             "baseline": _json_safe(baseline) if baseline else None,
             # LIVE-2: One sentence per cockpit group for /live/ page narratives
             "group_narratives": _json_safe(group_narratives or {}),
+            # HP-12: Elena Voss hero one-liner (updated weekly by chronicle/digest)
+            "elena_hero_line": elena_hero_line,
+            # HP-14: Recent Chronicle entries for homepage cards
+            "chronicle_recent": _json_safe(chronicle_recent) if chronicle_recent else [],
         }
 
         s3_client.put_object(
@@ -218,7 +279,7 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
             ContentType="application/json",
             CacheControl="max-age=3600",
         )
-        logger.info("[site_writer] public_stats.json written to S3 (hero + chronicle + baseline)")
+        logger.info("[site_writer] public_stats.json written to S3 (hero + chronicle + baseline + elena + chronicle_recent)")
         return True
 
     except Exception as e:
