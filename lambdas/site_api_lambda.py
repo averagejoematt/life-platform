@@ -2543,6 +2543,311 @@ def _handle_experiment_vote(event: dict) -> dict:
     }
 
 
+# ── EL-F1: Per-experiment follow (email interest) ─────────
+
+def _handle_experiment_follow(event: dict) -> dict:
+    """
+    POST /api/experiment_follow
+    Body: {"email": "user@example.com", "library_id": "post-dinner-walk"}
+    Stores interest so we can notify when experiment completes.
+    Rate limit: 10 follows per IP per hour.
+    """
+    source_ip = (
+        event.get("requestContext", {}).get("http", {}).get("sourceIp")
+        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
+        or "unknown"
+    )
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except Exception:
+        return _error(400, "Invalid JSON body")
+
+    email = (body.get("email") or "").strip().lower()
+    library_id = (body.get("library_id") or "").strip().lower()
+
+    if not email or "@" not in email or len(email) > 200:
+        return _error(400, "Valid email is required")
+    if not library_id or len(library_id) > 80:
+        return _error(400, "library_id is required")
+
+    email_hash = hashlib.sha256(email.encode()).hexdigest()[:16]
+    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    now_epoch = int(datetime.now(timezone.utc).timestamp())
+
+    # Rate limit: 10 follows per IP per hour
+    rate_pk = "VOTES#rate_limit"
+    rate_sk = f"FOLLOW#{ip_hash}#{now_epoch // 3600}"
+    try:
+        result = table.update_item(
+            Key={"pk": rate_pk, "sk": rate_sk},
+            UpdateExpression="ADD follow_count :one SET #ttl = :ttl",
+            ExpressionAttributeNames={"#ttl": "ttl"},
+            ExpressionAttributeValues={
+                ":one": 1,
+                ":ttl": now_epoch + 7200,
+            },
+            ReturnValues="UPDATED_NEW",
+        )
+        count = int(result.get("Attributes", {}).get("follow_count", 1))
+        if count > 10:
+            return {
+                "statusCode": 429,
+                "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+                "body": json.dumps({"error": "Too many follow requests. Try again later."}),
+            }
+    except Exception as e:
+        logger.warning(f"[experiment_follow] Rate limit check failed (non-fatal): {e}")
+
+    # Store the follow interest
+    follow_pk = "EXPERIMENT_FOLLOWS"
+    follow_sk = f"EMAIL#{email_hash}#EXP#{library_id}"
+    try:
+        table.put_item(
+            Item={
+                "pk": follow_pk,
+                "sk": follow_sk,
+                "email": email,
+                "library_id": library_id,
+                "followed_at": now_epoch,
+                "notified": False,
+            },
+            ConditionExpression="attribute_not_exists(pk)",
+        )
+    except Exception as e:
+        if "ConditionalCheckFailedException" in str(e):
+            return {
+                "statusCode": 200,
+                "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+                "body": json.dumps({"already_following": True, "library_id": library_id}),
+            }
+        logger.error(f"[experiment_follow] DDB put failed: {e}")
+        return _error(500, "Failed to save follow")
+
+    return {
+        "statusCode": 200,
+        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+        "body": json.dumps({"followed": True, "library_id": library_id}),
+    }
+
+
+# ── EL-F2: Single experiment detail endpoint ────────────────
+
+def _handle_experiment_detail(event: dict) -> dict:
+    """
+    GET /api/experiment_detail?id=post-dinner-walk
+    Returns full detail for a single experiment from the library,
+    merged with any active/completed DynamoDB experiment data + votes + followers.
+    Cache: 900s.
+    """
+    params = event.get("queryStringParameters") or {}
+    lib_id = (params.get("id") or "").strip().lower()
+    if not lib_id:
+        return _error(400, "id query parameter is required")
+
+    S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+    try:
+        s3_client = boto3.client("s3", region_name=S3_REGION)
+        resp = s3_client.get_object(Bucket=S3_BUCKET, Key="site/config/experiment_library.json")
+        library = json.loads(resp["Body"].read().decode("utf-8"))
+    except Exception as e:
+        logger.error(f"[experiment_detail] S3 read failed: {e}")
+        return _error(503, "Experiment library not available")
+
+    lib_exp = None
+    for exp in library.get("experiments", []):
+        if exp.get("id") == lib_id:
+            lib_exp = exp
+            break
+    if not lib_exp:
+        return _error(404, f"Experiment '{lib_id}' not found in library")
+
+    pillar_meta = library.get("pillars", {}).get(lib_exp.get("pillar", ""), {})
+    lib_exp["pillar_label"] = pillar_meta.get("label", lib_exp.get("pillar", "").title())
+    lib_exp["pillar_icon"] = pillar_meta.get("icon", "circle")
+
+    # Vote count
+    try:
+        vote_resp = table.get_item(Key={"pk": "VOTES#experiment_library", "sk": f"LIB#{lib_id}"})
+        vote_item = _decimal_to_float(vote_resp.get("Item"))
+        lib_exp["votes"] = int(vote_item.get("vote_count", 0)) if vote_item else 0
+    except Exception:
+        lib_exp["votes"] = 0
+
+    # Follower count
+    try:
+        follow_resp = table.query(
+            KeyConditionExpression=Key("pk").eq("EXPERIMENT_FOLLOWS"),
+            FilterExpression="library_id = :lid",
+            ExpressionAttributeValues={":lid": lib_id},
+            Select="COUNT",
+        )
+        lib_exp["follower_count"] = follow_resp.get("Count", 0)
+    except Exception:
+        lib_exp["follower_count"] = 0
+
+    # Past runs from DynamoDB
+    runs = []
+    try:
+        exp_pk = f"{USER_PREFIX}experiments"
+        exp_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(exp_pk),
+            ScanIndexForward=False,
+            Limit=100,
+        )
+        for item in _decimal_to_float(exp_resp.get("Items", [])):
+            if not item.get("sk", "").startswith("EXP#"):
+                continue
+            item_lib_id = item.get("library_id", "")
+            name_slug = re.sub(r"[^a-z0-9]+", "-", item.get("name", "").lower()).strip("-")[:40]
+            if item_lib_id == lib_id or name_slug == lib_id:
+                start = item.get("start_date", "")
+                end = item.get("end_date")
+                status = item.get("status", "unknown")
+                days = None
+                try:
+                    end_d = datetime.strptime(end, "%Y-%m-%d") if end else datetime.now(timezone.utc).replace(tzinfo=None)
+                    days = max(0, (end_d - datetime.strptime(start, "%Y-%m-%d")).days)
+                except Exception:
+                    pass
+                runs.append({
+                    "experiment_id": item.get("sk", "").replace("EXP#", ""),
+                    "status": status,
+                    "start_date": start,
+                    "end_date": end,
+                    "days": days,
+                    "hypothesis": item.get("hypothesis"),
+                    "outcome": item.get("outcome") or item.get("result_summary"),
+                    "primary_metric": item.get("primary_metric"),
+                    "baseline_value": item.get("baseline_value"),
+                    "result_value": item.get("result_value"),
+                    "grade": item.get("grade"),
+                    "compliance_pct": item.get("compliance_pct"),
+                    "reflection": item.get("reflection"),
+                    "mechanism": item.get("mechanism"),
+                    "key_finding": item.get("key_finding"),
+                    "hypothesis_confirmed": item.get("hypothesis_confirmed"),
+                    "iteration": item.get("iteration", 1),
+                })
+    except Exception as e:
+        logger.warning(f"[experiment_detail] Experiment query failed: {e}")
+
+    lib_exp["runs"] = runs
+    lib_exp["total_runs"] = len(runs)
+    lib_exp["active_run"] = next((r for r in runs if r["status"] == "active"), None)
+    lib_exp["completed_runs_count"] = sum(1 for r in runs if r["status"] == "completed")
+
+    return _ok(lib_exp, cache_seconds=900)
+
+
+# (Duplicate removed — authoritative definitions are above)
+
+def _REMOVED_handle_experiment_detail(event: dict) -> dict:
+    """
+    GET /api/experiment_detail?id=post-dinner-walk
+    Returns full detail for a single experiment from the library,
+    merged with any active/completed DynamoDB experiment data.
+    Cache: 900s.
+    """
+    params = event.get("queryStringParameters") or {}
+    lib_id = (params.get("id") or "").strip().lower()
+    if not lib_id:
+        return _error(400, "id query parameter is required")
+
+    S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+    try:
+        s3_client = boto3.client("s3", region_name=S3_REGION)
+        resp = s3_client.get_object(Bucket=S3_BUCKET, Key="site/config/experiment_library.json")
+        library = json.loads(resp["Body"].read().decode("utf-8"))
+    except Exception as e:
+        logger.error(f"[experiment_detail] S3 read failed: {e}")
+        return _error(503, "Experiment library not available")
+
+    lib_exp = None
+    for exp in library.get("experiments", []):
+        if exp.get("id") == lib_id:
+            lib_exp = exp
+            break
+    if not lib_exp:
+        return _error(404, f"Experiment '{lib_id}' not found in library")
+
+    pillar_meta = library.get("pillars", {}).get(lib_exp.get("pillar", ""), {})
+    lib_exp["pillar_label"] = pillar_meta.get("label", lib_exp.get("pillar", "").title())
+    lib_exp["pillar_icon"] = pillar_meta.get("icon", "circle")
+
+    # Vote count
+    try:
+        vote_resp = table.get_item(Key={"pk": "VOTES#experiment_library", "sk": f"LIB#{lib_id}"})
+        vote_item = _decimal_to_float(vote_resp.get("Item"))
+        lib_exp["votes"] = int(vote_item.get("vote_count", 0)) if vote_item else 0
+    except Exception:
+        lib_exp["votes"] = 0
+
+    # Follower count
+    try:
+        follow_resp = table.query(
+            KeyConditionExpression=Key("pk").eq("EXPERIMENT_FOLLOWS") & Key("sk").begins_with("EMAIL#"),
+            FilterExpression="library_id = :lid",
+            ExpressionAttributeValues={":lid": lib_id},
+            Select="COUNT",
+        )
+        lib_exp["follower_count"] = follow_resp.get("Count", 0)
+    except Exception:
+        lib_exp["follower_count"] = 0
+
+    # Past runs from DynamoDB
+    runs = []
+    try:
+        exp_pk = f"{USER_PREFIX}experiments"
+        exp_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(exp_pk),
+            ScanIndexForward=False,
+            Limit=100,
+        )
+        for item in _decimal_to_float(exp_resp.get("Items", [])):
+            if not item.get("sk", "").startswith("EXP#"):
+                continue
+            item_lib_id = item.get("library_id")
+            name_slug = re.sub(r"[^a-z0-9]+", "-", item.get("name", "").lower()).strip("-")[:40]
+            if item_lib_id == lib_id or name_slug == lib_id or lib_id in (item_lib_id or ""):
+                start = item.get("start_date", "")
+                end = item.get("end_date")
+                status = item.get("status", "unknown")
+                days = None
+                try:
+                    end_d = datetime.strptime(end, "%Y-%m-%d") if end else datetime.now(timezone.utc).replace(tzinfo=None)
+                    start_d = datetime.strptime(start, "%Y-%m-%d")
+                    days = max(0, (end_d - start_d).days)
+                except Exception:
+                    pass
+                runs.append({
+                    "experiment_id": item.get("sk", "").replace("EXP#", ""),
+                    "status": status,
+                    "start_date": start,
+                    "end_date": end,
+                    "days": days,
+                    "hypothesis": item.get("hypothesis"),
+                    "outcome": item.get("outcome") or item.get("result_summary"),
+                    "primary_metric": item.get("primary_metric"),
+                    "baseline_value": item.get("baseline_value"),
+                    "result_value": item.get("result_value"),
+                    "grade": item.get("grade"),
+                    "compliance_pct": item.get("compliance_pct"),
+                    "reflection": item.get("reflection"),
+                    "mechanism": item.get("mechanism"),
+                    "key_finding": item.get("key_finding"),
+                    "hypothesis_confirmed": item.get("hypothesis_confirmed"),
+                })
+    except Exception as e:
+        logger.warning(f"[experiment_detail] Experiment query failed: {e}")
+
+    lib_exp["runs"] = runs
+    lib_exp["total_runs"] = len(runs)
+    lib_exp["active_run"] = next((r for r in runs if r["status"] == "active"), None)
+    lib_exp["completed_runs_count"] = sum(1 for r in runs if r["status"] == "completed")
+
+    return _ok(lib_exp, cache_seconds=900)
+
+
 # ── Router ──────────────────────────────────────────────────
 
 ROUTES = {
@@ -2582,6 +2887,8 @@ ROUTES = {
     # EL-2: Experiment library (GET) + EL-3: Experiment vote (POST)
     "/api/experiment_library":  handle_experiment_library,
     "/api/experiment_vote":     None,  # POST handler in lambda_handler
+    "/api/experiment_follow":   None,  # EL-F1: POST handler in lambda_handler
+    "/api/experiment_detail":   None,  # EL-F2: GET with query params
 }
 
 
@@ -2634,6 +2941,16 @@ def lambda_handler(event, context):
         if method != "POST":
             return _error(405, "Use POST method")
         return _handle_experiment_vote(event)
+
+    # EL-F1: Experiment Follow (POST)
+    if path == "/api/experiment_follow":
+        if method != "POST":
+            return _error(405, "Use POST method")
+        return _handle_experiment_follow(event)
+
+    # EL-F2: Experiment Detail (GET with query params)
+    if path == "/api/experiment_detail":
+        return _handle_experiment_detail(event)
 
     # Special handling: /api/ask accepts POST
     if path == "/api/ask":

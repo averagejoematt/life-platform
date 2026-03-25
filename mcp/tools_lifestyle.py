@@ -2389,6 +2389,10 @@ def tool_create_experiment(args):
     start_date = (args.get("start_date") or "").strip()
     tags       = args.get("tags") or []
     notes      = (args.get("notes") or "").strip()
+    library_id = (args.get("library_id") or "").strip()
+    duration_tier = (args.get("duration_tier") or "").strip()
+    experiment_type = (args.get("experiment_type") or "").strip()
+    planned_duration_days = args.get("planned_duration_days")
 
     if not name:
         raise ValueError("name is required (e.g. 'Creatine 5g daily', 'No caffeine after 10am')")
@@ -2409,6 +2413,21 @@ def tool_create_experiment(args):
     if existing:
         raise ValueError(f"Experiment '{exp_id}' already exists. Choose a different name or start date.")
 
+    # EL-F5: Auto-detect iteration count from past experiments with same library_id or slug
+    iteration = 1
+    try:
+        past_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(EXPERIMENTS_PK) & Key("sk").begins_with("EXP#"),
+            ScanIndexForward=False,
+        )
+        for past in past_resp.get("Items", []):
+            past_lib = past.get("library_id", "")
+            past_slug = re.sub(r"[^a-z0-9]+", "-", past.get("name", "").lower()).strip("-")[:40]
+            if (library_id and past_lib == library_id) or past_slug == slug:
+                iteration += 1
+    except Exception:
+        pass
+
     item = {
         "pk":           EXPERIMENTS_PK,
         "sk":           sk,
@@ -2422,12 +2441,18 @@ def tool_create_experiment(args):
         "notes":        notes,
         "outcome":      "",
         "created_at":   now.strftime("%Y-%m-%dT%H:%M:%S"),
+        # EL-F5: New fields
+        "library_id":   library_id or None,
+        "duration_tier": duration_tier or None,
+        "experiment_type": experiment_type or None,
+        "planned_duration_days": int(planned_duration_days) if planned_duration_days else None,
+        "iteration":    iteration,
     }
 
     # Clean None values for DynamoDB
     clean_item = {k: v for k, v in item.items() if v is not None}
     table.put_item(Item=clean_item)
-    logger.info(f"create_experiment: created {exp_id}")
+    logger.info(f"create_experiment: created {exp_id} (iteration {iteration})")
 
     return {
         "created":       True,
@@ -2437,6 +2462,10 @@ def tool_create_experiment(args):
         "start_date":    start_date,
         "status":        "active",
         "tags":          tags,
+        "library_id":    library_id or None,
+        "duration_tier": duration_tier or None,
+        "experiment_type": experiment_type or None,
+        "iteration":     iteration,
         "board_of_directors": {
             "Huberman": "One variable at a time. Track for at least 2 weeks before drawing conclusions. Control for confounders: sleep timing, stress, travel.",
             "Attia":    "Define your primary endpoint now. What number would convince you this worked? Statistical noise requires \u226514 days of data.",
@@ -2730,16 +2759,24 @@ def tool_end_experiment(args):
 
     Marks the experiment as 'completed' or 'abandoned' with outcome notes.
     Run get_experiment_results first to see the data before closing.
+
+    EL-F5 additions: grade (completed/partial/failed), compliance_pct (0-100),
+    reflection ("what I'd do differently").
     """
     exp_id  = (args.get("experiment_id") or "").strip()
     outcome = (args.get("outcome") or "").strip()
     status  = (args.get("status") or "completed").strip()
     end_date = (args.get("end_date") or "").strip()
+    grade = (args.get("grade") or "").strip()
+    compliance_pct = args.get("compliance_pct")
+    reflection = (args.get("reflection") or "").strip()
 
     if not exp_id:
         raise ValueError("experiment_id is required")
     if status not in ("completed", "abandoned"):
         raise ValueError("status must be 'completed' or 'abandoned'")
+    if grade and grade not in ("completed", "partial", "failed"):
+        raise ValueError("grade must be 'completed', 'partial', or 'failed'")
 
     sk = f"EXP#{exp_id}"
     existing = table.get_item(Key={"pk": EXPERIMENTS_PK, "sk": sk}).get("Item")
@@ -2751,18 +2788,32 @@ def tool_end_experiment(args):
     if not end_date:
         end_date = datetime.utcnow().strftime("%Y-%m-%d")
 
+    # Auto-infer grade if not provided
+    if not grade:
+        grade = "failed" if status == "abandoned" else "completed"
+
+    update_expr = "SET #s = :s, outcome = :o, end_date = :e, ended_at = :ea, grade = :g"
+    expr_values = {
+        ":s":  status,
+        ":o":  outcome,
+        ":e":  end_date,
+        ":ea": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"),
+        ":g":  grade,
+    }
+    if compliance_pct is not None:
+        update_expr += ", compliance_pct = :cp"
+        expr_values[":cp"] = int(compliance_pct)
+    if reflection:
+        update_expr += ", reflection = :ref"
+        expr_values[":ref"] = reflection
+
     table.update_item(
         Key={"pk": EXPERIMENTS_PK, "sk": sk},
-        UpdateExpression="SET #s = :s, outcome = :o, end_date = :e, ended_at = :ea",
+        UpdateExpression=update_expr,
         ExpressionAttributeNames={"#s": "status"},
-        ExpressionAttributeValues={
-            ":s":  status,
-            ":o":  outcome,
-            ":e":  end_date,
-            ":ea": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"),
-        },
+        ExpressionAttributeValues=expr_values,
     )
-    logger.info(f"end_experiment: {exp_id} \u2192 {status}")
+    logger.info(f"end_experiment: {exp_id} \u2192 {status} (grade={grade})")
 
     start_date = existing.get("start_date", "")
     try:
@@ -2775,10 +2826,14 @@ def tool_end_experiment(args):
         "experiment_id": exp_id,
         "name":          existing.get("name", ""),
         "status":        status,
+        "grade":         grade,
         "start_date":    start_date,
         "end_date":      end_date,
         "days_run":      days,
         "outcome":       outcome,
+        "compliance_pct": int(compliance_pct) if compliance_pct is not None else None,
+        "reflection":    reflection or None,
+        "iteration":     existing.get("iteration", 1),
         "tip":           "Run get_experiment_results to see the full before/after comparison.",
     }
 
