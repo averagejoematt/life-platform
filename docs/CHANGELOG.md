@@ -1,3 +1,51 @@
+## v3.9.12 — 2026-03-25: Habits + Supplements page overhauls — Product Board Phase A/B/C
+
+### Summary
+Product Board convened for two complete page rewrites. Habits page ("The Operating System") restructured from a 65-item flat list to a 3-zone behavioral architecture: Foundation (T0, 7 habits) → System (T1, 15 purpose-grouped habits) → Horizon (T2, 15 locked aspirational). 21 supplement habits and 7 hygiene habits removed — supplements now live on their own page. Supplements page ("The Pharmacy") rebuilt with evidence-first visual hierarchy: confidence rings, purpose icons, board member attribution, genome SNP badges, and an "honest assessment" transparency section. Both pages are entirely client-side rendered from embedded registry data — no new API endpoints.
+
+### Changes
+
+**site/habits/index.html** (COMPLETE REWRITE)
+- Renamed "Habit Observatory" → "The Operating System"
+- Three-zone architecture: Foundation (T0) → System (T1 by purpose) → Horizon (T2)
+- 21 supplement habits removed (belong on /supplements/)
+- 7 hygiene habits removed (maintenance, not transformation)
+- Visible behavioral habit count: 65 → ~37
+- SVG circular progress rings on T0 cards
+- 30-day sparklines on T0 cards
+- "The Why" quotes from `why_matthew` registry field
+- Science rationale + evidence badges (strong/moderate/emerging) per habit
+- Tier-based color banners with glowing status dots
+- Purpose-grouped Tier 1 accordions: Sleep Architecture, Training Engine, Fuel & Metabolic, Mind & Growth, Discipline Gates, Data Signals
+- Faded/locked T2 horizon cards
+- Vice Discipline Gates elevated to dedicated section
+- Daily Pipeline visualization (morning → evening stack flow)
+- Heatmap, keystone correlations, DOW pattern, decision fatigue — all retained in Intelligence section
+- SEO meta tags for "habit system", "gamify health"
+
+**site/supplements/index.html** (COMPLETE REWRITE)
+- Renamed "Supplement Protocol" → "The Pharmacy"
+- "No affiliate links · No sponsorships · No brand promotions · Just the data" integrity banner
+- Purpose-grouped: Longevity Foundation (6) → Muscle & Performance (5) → Metabolic (3) → Sleep (4) → Cognitive (3)
+- Evidence confidence rings per card (A/B/C rating, proportional fill, tier-colored)
+- Left border accent by evidence strength (green/amber/gray)
+- Per-card badges: timing, board member attribution, synergy group, genome SNP
+- Expandable "Why I take it" (default open) + collapsible "What the science says"
+- "What I'm watching" footer per card (expected impact + validation metric)
+- Genome-Informed section with 3 SNPs (VDR Bsm1, FADS2 rs1535, SLC39A4)
+- "Supplements I'm Questioning" honest assessment section (7 items)
+- Client-side rendering from embedded registry data (no API dependency)
+
+### Deployed
+- Habits: `aws s3 cp` to S3 + CloudFront invalidation `/habits/*`
+- Supplements: download from Claude outputs → `aws s3 cp` + CloudFront invalidation `/supplements/*`
+
+### Bugs fixed
+- `reveal` class on JS-injected T0 cards caused invisible cards (IntersectionObserver timing)
+- `create_file` tool writes to Claude container, not user Mac — use `Filesystem:write_file` or download
+
+---
+
 ## v3.9.11 — 2026-03-24: Character page RPG overhaul — Product Board Phase A/B/C
 
 ### Summary
