@@ -74,7 +74,7 @@ echo "  Zip size: $(du -h "$ZIP_FILE" | cut -f1)"
 echo "Publishing layer..."
 LAYER_VERSION_ARN=$(aws lambda publish-layer-version \
     --layer-name "$LAYER_NAME" \
-    --description "Shared utils: $(echo "${SHARED_MODULES[@]}" | tr ' ' ', ' | sed 's/\.py//g') (Python 3.12)" \
+    --description "Shared utils v12: 16 modules incl pulse (Python 3.12)" \
     --zip-file "fileb://$ZIP_FILE" \
     --compatible-runtimes python3.12 \
     --compatible-architectures x86_64 \

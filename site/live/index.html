@@ -4,762 +4,623 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Live metrics from 19 data sources: weight, HRV, recovery, habits, and the full transformation timeline from 302 lbs to goal.">
+  <meta name="description" content="The Pulse — daily glanceable state from 19 data sources. Scale, water, movement, lift, recovery, sleep, journal, mind.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
+  <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Live Data — Matthew Walker">
-  <meta name="twitter:description" content="Real-time metrics from 19 data sources. Weight, HRV, recovery, habits, and the full transformation timeline.">
-  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <meta property="og:title" content="Live Data — Matthew Walker">
-  <meta property="og:description" content="Real-time metrics from 19 data sources. Weight, HRV, recovery, habits, and the full transformation timeline.">
-  <meta property="og:type" content="website">
-  <title>Live — Matthew Walker</title>
+  <meta property="og:title" content="The Pulse — Matthew Walker">
+  <meta property="og:description" content="Am I having a good day or a bad day? 8 signals, one glance.">
+  <title>The Pulse — Matthew Walker</title>
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    /* ─── Cockpit Layout ─── */
-    .cpit-statusbar-wrap { padding-top: var(--nav-height); border-bottom: 1px solid var(--border); background: var(--surface); }
-    .cpit-statusbar { max-width: var(--max-width); margin: 0 auto; padding: var(--space-3) var(--page-padding); display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
-    .cpit-statusbar__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c-green-500); flex-shrink: 0; animation: pulse-dot 2s infinite; }
-    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
-    .cpit-statusbar__text { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
-    .cpit-statusbar__text strong { color: var(--text); }
+    /* ─── PULSE: Layer 1 — Headline ─── */
+    .pulse-hero {
+      padding-top: var(--nav-height);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .pulse-hero__inner {
+      max-width: var(--content-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding) var(--space-8);
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: var(--space-8);
+      align-items: start;
+    }
+    .pulse-day {
+      text-align: center;
+      min-width: 80px;
+    }
+    .pulse-day__number {
+      font-family: var(--font-display);
+      font-size: clamp(56px, 8vw, 96px);
+      line-height: 0.85;
+      letter-spacing: var(--ls-display);
+      color: var(--text);
+    }
+    .pulse-day__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-top: var(--space-1);
+    }
+    .pulse-state {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+    .pulse-status {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+    .pulse-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      animation: pulse-breathe 3s ease-in-out infinite;
+    }
+    .pulse-dot--strong { background: var(--c-green-500); }
+    .pulse-dot--mixed  { background: var(--c-yellow-status); animation-duration: 2s; }
+    .pulse-dot--quiet  { background: #3a5a48; animation-duration: 5s; }
+    @keyframes pulse-breathe { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-    .cpit-wrap { max-width: var(--max-width); margin: 0 auto; padding: var(--space-8) var(--page-padding); }
-    .cpit-main { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); }
-    .cpit-group--wide { grid-column: 1 / -1; }
+    .pulse-word {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      letter-spacing: var(--ls-heading);
+      text-transform: uppercase;
+    }
+    .pulse-word--strong { color: var(--c-green-500); }
+    .pulse-word--mixed  { color: var(--c-yellow-status); }
+    .pulse-word--quiet  { color: #3a5a48; }
 
-    .cpit-group { background: var(--surface); border: 1px solid var(--border); padding: var(--space-5) var(--space-6); }
-    .cpit-group__header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: var(--space-4); }
-    .cpit-group__heading { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--accent-dim); }
-    .cpit-group__link { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); text-decoration: none; letter-spacing: var(--ls-tag); }
-    .cpit-group__link:hover { color: var(--accent); }
-    .cpit-group__narrative { font-size: var(--text-sm); color: var(--text-muted); line-height: var(--lh-body); margin-bottom: var(--space-4); display: none; }
-    .cpit-group__narrative.is-visible { display: block; }
-    .cpit-tile__stale { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); margin-top: var(--space-1); }
+    .pulse-narrative {
+      font-family: var(--font-serif);
+      font-size: var(--text-lg);
+      line-height: var(--lh-body);
+      color: var(--text-muted);
+      max-width: var(--prose-width);
+    }
+    .pulse-date {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      color: var(--text-faint);
+      text-transform: uppercase;
+    }
+    .pulse-nav {
+      display: flex; gap: var(--space-4); margin-top: var(--space-2);
+    }
+    .pulse-nav__btn {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      text-decoration: none;
+      letter-spacing: var(--ls-tag);
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .pulse-nav__btn.is-active { opacity: 1; cursor: pointer; color: var(--accent-dim); }
+    .pulse-nav__btn.is-active:hover { color: var(--accent); }
 
-    .cpit-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
-    .cpit-tiles--4 { grid-template-columns: repeat(4, 1fr); }
+    /* ─── PULSE: Layer 2 — Glyph Strip ─── */
+    .glyph-strip {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .glyph-strip__inner {
+      max-width: var(--content-width);
+      margin: 0 auto;
+      padding: var(--space-6) var(--page-padding);
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-4);
+      min-width: 600px;
+    }
+    .glyph {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-2);
+      cursor: pointer;
+      transition: transform var(--dur-fast) var(--ease-out);
+      flex: 1;
+      max-width: 80px;
+    }
+    .glyph:hover { transform: translateY(-2px); }
+    .glyph.is-selected .glyph__ring { box-shadow: 0 0 0 2px var(--accent); }
 
-    .cpit-tile { background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--border); padding: var(--space-4) var(--space-5); transition: border-left-color var(--dur-fast); }
-    .cpit-tile--green { border-left-color: var(--c-green-500); }
-    .cpit-tile--amber { border-left-color: var(--c-amber-500); }
-    .cpit-tile--red   { border-left-color: var(--c-red-status); }
-    .cpit-tile--gray  { border-left-color: var(--border); opacity: 0.7; }
+    .glyph__ring {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color var(--dur-mid), box-shadow var(--dur-mid);
+      background: var(--bg);
+    }
+    .glyph__ring--green { border-color: var(--c-green-500); }
+    .glyph__ring--amber { border-color: var(--c-yellow-status); border-style: dashed; }
+    .glyph__ring--red   { border-color: var(--c-red-status); animation: ring-pulse 2s infinite; }
+    .glyph__ring--gray  { border-color: var(--border); opacity: 0.5; }
+    @keyframes ring-pulse { 0%,100%{border-color:var(--c-red-status)} 50%{border-color:rgba(255,82,82,0.3)} }
 
-    .cpit-tile__name  { font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--ls-tag); color: var(--text-muted); margin-bottom: var(--space-2); }
-    .cpit-tile__hero  { display: flex; align-items: baseline; gap: var(--space-1); line-height: 1; }
-    .cpit-tile__value { font-family: var(--font-display); font-size: 26px; letter-spacing: var(--ls-display); color: var(--text); }
-    .cpit-tile__unit  { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
-    .cpit-tile__delta { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted); margin-top: var(--space-2); }
-    .cpit-tile__signal { font-size: var(--text-base); color: var(--text-muted); line-height: var(--lh-body); margin-top: var(--space-2); max-width: 640px; }
+    .glyph__icon { width: 24px; height: 24px; }
+    .glyph__icon--green { color: var(--c-green-500); }
+    .glyph__icon--amber { color: var(--c-yellow-status); }
+    .glyph__icon--red   { color: var(--c-red-status); }
+    .glyph__icon--gray  { color: var(--text-faint); opacity: 0.4; }
 
-    /* ─── Weight chart section ─── */
-    .cpit-chart-section { border-top: 1px solid var(--border); }
-    .cpit-chart-inner { max-width: var(--max-width); margin: 0 auto; padding: var(--space-10) var(--page-padding); }
-    .cpit-chart-title { font-family: var(--font-display); font-size: var(--text-h2); letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-4); }
-    .cpit-chart-title span { color: var(--accent); }
-    .cpit-chart-sub { font-size: var(--text-sm); color: var(--text-muted); font-family: var(--font-mono); margin-bottom: var(--space-6); }
-    .cpit-chart-meta { display: flex; gap: var(--space-8); flex-wrap: wrap; margin-bottom: var(--space-6); }
-    .meta-stat { border-left: 2px solid var(--accent); padding-left: var(--space-4); }
-    .meta-stat__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-1); }
-    .meta-stat__value { font-family: var(--font-display); font-size: 28px; color: var(--text); letter-spacing: var(--ls-display); }
+    .glyph__name {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      text-align: center;
+    }
 
-    .chart-wrapper { position: relative; width: 100%; overflow-x: auto; border: 1px solid var(--border); background: var(--surface); }
-    .chart-wrapper svg { display: block; min-width: 900px; }
-    .chart-wrapper svg text { font-family: var(--font-mono); }
-    .tooltip { position: fixed; background: var(--surface-raised); border: 1px solid var(--accent); padding: var(--space-3) var(--space-4); font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text); pointer-events: none; z-index: var(--z-modal); display: none; max-width: 240px; }
-    .tooltip__date { color: var(--accent); font-weight: 700; }
-    .tooltip__value { margin-top: 2px; }
-    .legend { display: flex; gap: var(--space-6); flex-wrap: wrap; margin-top: var(--space-6); }
-    .legend__item { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--text-muted); }
-    .legend__dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .events-list { max-width: var(--max-width); margin: 0 auto; padding: var(--space-10) var(--page-padding); }
-    .events-list h2 { font-family: var(--font-display); font-size: var(--text-h3); color: var(--text); margin-bottom: var(--space-6); }
-    .event-row { display: grid; grid-template-columns: 100px 12px 1fr; gap: var(--space-4); align-items: start; padding: var(--space-4) 0; border-bottom: 1px solid var(--border-subtle); }
-    .event-row__date { font-size: var(--text-xs); color: var(--text-muted); font-family: var(--font-mono); letter-spacing: var(--ls-tag); }
-    .event-row__dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 3px; }
-    .event-row__text { font-size: var(--text-sm); color: var(--text); }
-    .event-row__type { font-size: var(--text-2xs); color: var(--text-faint); text-transform: uppercase; letter-spacing: var(--ls-tag); margin-top: 2px; }
-    .loading { text-align: center; padding: var(--space-16); color: var(--text-muted); font-size: var(--text-sm); }
+    /* ─── PULSE: Layer 3 — Detail Cards ─── */
+    .detail-section {
+      max-width: var(--content-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: var(--space-4);
+    }
+    .detail-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--border);
+      padding: var(--space-5) var(--space-6);
+      transition: border-left-color var(--dur-fast), opacity var(--dur-mid);
+    }
+    .detail-card--green { border-left-color: var(--c-green-500); }
+    .detail-card--amber { border-left-color: var(--c-yellow-status); }
+    .detail-card--red   { border-left-color: var(--c-red-status); }
+    .detail-card--gray  { border-left-color: var(--border); opacity: 0.6; }
+    .detail-card.is-hidden { display: none; }
 
-    @media (max-width: 768px) {
-      .cpit-main { grid-template-columns: 1fr; }
-      .cpit-group--wide { grid-column: 1; }
-      .cpit-tiles--4 { grid-template-columns: repeat(2, 1fr); }
-      .event-row { grid-template-columns: 80px 10px 1fr; }
+    .detail-card__header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: var(--space-3);
+    }
+    .detail-card__name {
+      font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
+      text-transform: uppercase; color: var(--text-muted);
+    }
+    .detail-card__state {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+    }
+    .detail-card__state--green { color: var(--c-green-500); }
+    .detail-card__state--amber { color: var(--c-yellow-status); }
+    .detail-card__state--red   { color: var(--c-red-status); }
+    .detail-card__state--gray  { color: var(--text-faint); }
+
+    .detail-card__hero {
+      display: flex; align-items: baseline; gap: var(--space-2);
+      margin-bottom: var(--space-2);
+    }
+    .detail-card__value {
+      font-family: var(--font-display); font-size: 32px;
+      letter-spacing: var(--ls-display); color: var(--text); line-height: 1;
+    }
+    .detail-card__unit {
+      font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted);
+    }
+    .detail-card__sub {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      color: var(--text-faint); margin-bottom: var(--space-3);
+    }
+    .detail-card__sparkline {
+      display: flex; align-items: flex-end; gap: 2px; height: 28px;
+    }
+    .spark-bar {
+      flex: 1; background: var(--accent); opacity: 0.4; border-radius: 1px 1px 0 0;
+      min-width: 4px; transition: opacity var(--dur-fast);
+    }
+    .spark-bar:last-child { opacity: 1; }
+
+    /* ─── JOURNEY: Below fold ─── */
+    .journey-section {
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .journey-inner {
+      max-width: var(--content-width);
+      margin: 0 auto;
+      padding: var(--space-16) var(--page-padding) var(--space-12);
+    }
+    .journey-title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      letter-spacing: var(--ls-display);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .journey-title span { color: var(--accent); }
+    .journey-sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-8);
+    }
+    .journey-stats {
+      display: flex; gap: var(--space-8); flex-wrap: wrap; margin-bottom: var(--space-8);
+    }
+    .j-stat { border-left: 2px solid var(--accent); padding-left: var(--space-4); }
+    .j-stat__label {
+      font-size: var(--text-2xs); letter-spacing: var(--ls-tag);
+      text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-1);
+    }
+    .j-stat__value {
+      font-family: var(--font-display); font-size: 28px;
+      color: var(--text); letter-spacing: var(--ls-display);
+    }
+
+    /* ─── Loading state ─── */
+    .pulse-loading {
+      text-align: center; padding: var(--space-12);
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text-faint); letter-spacing: var(--ls-tag);
+    }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 640px) {
+      .pulse-hero__inner { grid-template-columns: 1fr; gap: var(--space-4); text-align: center; }
+      .pulse-day { display: flex; align-items: baseline; gap: var(--space-3); justify-content: center; }
+      .pulse-day__number { font-size: 48px; }
+      .pulse-status { justify-content: center; }
+      .pulse-narrative { margin: 0 auto; text-align: center; }
+      .pulse-date, .pulse-nav { justify-content: center; }
+      .glyph-strip__inner { min-width: 520px; padding: var(--space-4) var(--space-3); gap: var(--space-2); }
+      .glyph__ring { width: 44px; height: 44px; }
+      .detail-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-
-  <!-- Nav -->
   <div id="amj-nav"></div>
-</div>
 
-<!-- Status bar -->
-<div class="cpit-statusbar-wrap">
-  <div class="cpit-statusbar">
-    <div class="cpit-statusbar__dot"></div>
-    <span class="cpit-statusbar__text"><strong id="cpit-systems">—</strong> of 7 systems reporting · as of <span id="cpit-timestamp">—</span></span>
-  </div>
-</div>
-
-<!-- Cockpit groups -->
-<div class="cpit-wrap">
-  <div class="cpit-main">
-
-    <!-- 1. Body -->
-    <div class="cpit-group">
-      <div class="cpit-group__header">
-        <div class="cpit-group__heading">// body</div>
-        <a href="#timeline" class="cpit-group__link">weight chart ↓</a>
+  <!-- ═══ LAYER 1: THE PULSE HEADLINE ═══ -->
+  <section class="pulse-hero" id="pulse-hero">
+    <div class="pulse-hero__inner">
+      <div class="pulse-day">
+        <div class="pulse-day__number" id="p-day">—</div>
+        <div class="pulse-day__label">days</div>
       </div>
-      <div class="cpit-group__narrative" id="gnar-body"></div>
-      <div class="cpit-tiles">
-        <div class="cpit-tile cpit-tile--gray" id="tile-weight">
-          <div class="cpit-tile__name">Weight</div>
-          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-weight">—</span><span class="cpit-tile__unit">lbs</span></div>
-          <div class="cpit-tile__delta" id="td-weight">loading…</div>
+      <div class="pulse-state">
+        <div class="pulse-status">
+          <div class="pulse-dot pulse-dot--quiet" id="p-dot"></div>
+          <div class="pulse-word pulse-word--quiet" id="p-word">Loading</div>
         </div>
-        <div class="cpit-tile cpit-tile--gray" id="tile-journey">
-          <div class="cpit-tile__name">Journey Progress</div>
-          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-journey">—</span><span class="cpit-tile__unit">%</span></div>
-          <div class="cpit-tile__delta" id="td-journey">302 → 185 lbs</div>
+        <div class="pulse-narrative" id="p-narrative">Fetching today's signal…</div>
+        <div class="pulse-date" id="p-date"></div>
+        <div class="pulse-nav">
+          <span class="pulse-nav__btn" id="p-prev">← Yesterday</span>
+          <span class="pulse-nav__btn" id="p-next">Tomorrow →</span>
         </div>
       </div>
     </div>
+  </section>
 
-    <!-- 2. Recovery + Sleep -->
-    <div class="cpit-group">
-      <div class="cpit-group__header">
-        <div class="cpit-group__heading">// recovery + sleep</div>
-        <a href="/sleep/" class="cpit-group__link">sleep deep-dive →</a>
-      </div>
-      <div class="cpit-group__narrative" id="gnar-recovery"></div>
-      <div class="cpit-tiles cpit-tiles--4">
-        <div class="cpit-tile cpit-tile--gray" id="tile-hrv">
-          <div class="cpit-tile__name">HRV</div>
-          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-hrv">—</span><span class="cpit-tile__unit">ms</span></div>
-          <div class="cpit-tile__delta" id="td-hrv">—</div>
-        </div>
-        <div class="cpit-tile cpit-tile--gray" id="tile-recovery">
-          <div class="cpit-tile__name">Recovery</div>
-          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-recovery">—</span><span class="cpit-tile__unit">%</span></div>
-          <div class="cpit-tile__delta" id="td-recovery">—</div>
-        </div>
-        <div class="cpit-tile cpit-tile--gray" id="tile-rhr">
-          <div class="cpit-tile__name">Resting HR</div>
-          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-rhr">—</span><span class="cpit-tile__unit">bpm</span></div>
-          <div class="cpit-tile__delta" id="td-rhr">—</div>
-        </div>
-        <div class="cpit-tile cpit-tile--gray" id="tile-sleep">
-          <div class="cpit-tile__name">Sleep</div>
-          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-sleep">—</span><span class="cpit-tile__unit">hrs</span></div>
-          <div class="cpit-tile__delta" id="td-sleep">—</div>
-        </div>
-      </div>
+  <!-- ═══ LAYER 2: THE GLYPH STRIP ═══ -->
+  <section class="glyph-strip" id="glyph-strip">
+    <div class="glyph-strip__inner" id="glyph-container"></div>
+  </section>
+
+  <!-- ═══ LAYER 3: DETAIL CARDS ═══ -->
+  <section class="detail-section" id="detail-section">
+    <div class="detail-grid" id="detail-grid"></div>
+  </section>
+
+  <!-- ═══ THE JOURNEY (below fold) ═══ -->
+  <section class="journey-section" id="journey-section">
+    <div class="journey-inner">
+      <div class="journey-title">THE <span>JOURNEY</span> SO FAR</div>
+      <div class="journey-sub" id="j-sub">Loading journey data…</div>
+      <div class="journey-stats" id="j-stats"></div>
     </div>
+  </section>
 
-    <!-- 3. Activity + Training -->
-    <div class="cpit-group">
-      <div class="cpit-group__header">
-        <div class="cpit-group__heading">// activity + training</div>
-        <a href="/protocols/" class="cpit-group__link">protocols →</a>
-      </div>
-      <div class="cpit-group__narrative" id="gnar-activity"></div>
-      <div class="cpit-tiles">
-        <div class="cpit-tile cpit-tile--gray" id="tile-zone2">
-          <div class="cpit-tile__name">Zone 2 (7d)</div>
-          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-zone2">—</span><span class="cpit-tile__unit">/ 150 min</span></div>
-          <div class="cpit-tile__delta" id="td-zone2">weekly target</div>
-        </div>
-        <div class="cpit-tile cpit-tile--gray" id="tile-strain">
-          <div class="cpit-tile__name">Today's Activity</div>
-          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-strain" style="font-size:20px">—</span></div>
-          <div class="cpit-tile__delta" id="td-strain">—</div>
-        </div>
-      </div>
-    </div>
+  <div id="amj-subscribe"></div>
+  <div id="amj-bottom-nav"></div>
+  <div id="amj-footer"></div>
 
-    <!-- 4. Nutrition + Glucose -->
-    <div class="cpit-group">
-      <div class="cpit-group__header">
-        <div class="cpit-group__heading">// nutrition + glucose</div>
-        <a href="/glucose/" class="cpit-group__link">glucose deep-dive →</a>
-      </div>
-      <div class="cpit-group__narrative" id="gnar-nutrition"></div>
-      <div class="cpit-tiles">
-        <div class="cpit-tile cpit-tile--gray" id="tile-tir">
-          <div class="cpit-tile__name">Time In Range (today)</div>
-          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-tir">—</span><span class="cpit-tile__unit">%</span></div>
-          <div class="cpit-tile__delta" id="td-tir">70–140 mg/dL</div>
-        </div>
-        <div class="cpit-tile cpit-tile--gray" id="tile-tir30">
-          <div class="cpit-tile__name">30d Avg TIR</div>
-          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-tir30">—</span><span class="cpit-tile__unit">%</span></div>
-          <div class="cpit-tile__delta" id="td-tir30">—</div>
-        </div>
-      </div>
-    </div>
+  <script src="/assets/js/site_constants.js"></script>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/nav.js"></script>
+  <script>
+  (function() {
+    'use strict';
 
-    <!-- 5. Habits + Behavior -->
-    <div class="cpit-group">
-      <div class="cpit-group__header">
-        <div class="cpit-group__heading">// habits + behavior</div>
-        <a href="/habits/" class="cpit-group__link">habits →</a>
-      </div>
-      <div class="cpit-group__narrative" id="gnar-habits"></div>
-      <div class="cpit-tiles">
-        <div class="cpit-tile cpit-tile--gray" id="tile-t0pct">
-          <div class="cpit-tile__name">Tier 0 Today</div>
-          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-t0pct">—</span><span class="cpit-tile__unit">%</span></div>
-          <div class="cpit-tile__delta" id="td-t0pct">—</div>
-        </div>
-        <div class="cpit-tile cpit-tile--gray" id="tile-streak">
-          <div class="cpit-tile__name">T0 Streak</div>
-          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-streak">—</span><span class="cpit-tile__unit">days</span></div>
-          <div class="cpit-tile__delta" id="td-streak">—</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 6. Mind + Character -->
-    <div class="cpit-group">
-      <div class="cpit-group__header">
-        <div class="cpit-group__heading">// mind + character</div>
-        <a href="/character/" class="cpit-group__link">character →</a>
-      </div>
-      <div class="cpit-group__narrative" id="gnar-mind"></div>
-      <div class="cpit-tiles">
-        <div class="cpit-tile cpit-tile--gray" id="tile-mood">
-          <div class="cpit-tile__name">State of Mind</div>
-          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-mood">—</span><span class="cpit-tile__unit">/ 5</span></div>
-          <div class="cpit-tile__delta" id="td-mood">—</div>
-        </div>
-        <div class="cpit-tile cpit-tile--gray" id="tile-char">
-          <div class="cpit-tile__name">Character Level</div>
-          <div class="cpit-tile__hero"><span class="cpit-tile__value" id="tv-char">—</span></div>
-          <div class="cpit-tile__delta" id="td-char">—</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 7. Platform + Intelligence (full width) -->
-    <div class="cpit-group cpit-group--wide">
-      <div class="cpit-group__header">
-        <div class="cpit-group__heading">// platform + intelligence</div>
-        <a href="/board/" class="cpit-group__link">full AI brief →</a>
-      </div>
-      <div class="cpit-group__narrative" id="gnar-platform"></div>
-      <div class="cpit-tile cpit-tile--gray" id="tile-signal">
-        <div class="cpit-tile__name">Today's Intelligence Signal</div>
-        <div class="cpit-tile__signal" id="tv-signal">Brief generates at 11 AM PT — check back after that for today's AI analysis.</div>
-      </div>
-    </div>
-
-  </div><!-- /.cpit-main -->
-</div><!-- /.cpit-wrap -->
-
-<!-- Weight timeline chart -->
-<section class="cpit-chart-section animate-in" id="timeline">
-  <div class="cpit-chart-inner">
-    <div class="eyebrow">The Data</div>
-    <h2 class="cpit-chart-title"><span id="start-weight" data-const="journey.start_weight">302</span> → <span id="current-weight">…</span> → <span id="goal-weight" data-const="journey.goal_weight">185</span></h2>
-    <p class="cpit-chart-sub">Every weigh-in, every experiment, every milestone — from day one to today. Click any point to see what was happening that day.</p>
-    <div class="cpit-chart-meta">
-      <div class="meta-stat"><div class="meta-stat__label">Days on journey</div><div class="meta-stat__value" id="days-count">—</div></div>
-      <div class="meta-stat"><div class="meta-stat__label">Lbs lost</div><div class="meta-stat__value" id="lbs-lost">—</div></div>
-      <div class="meta-stat"><div class="meta-stat__label">Data points</div><div class="meta-stat__value" id="data-points">—</div></div>
-    </div>
-    <div class="chart-wrapper" id="chart-wrapper">
-      <div class="loading" id="chart-loading">Loading timeline data…</div>
-    </div>
-    <div class="legend">
-      <div class="legend__item"><span class="legend__dot" style="background: var(--accent);"></span> Weight</div>
-      <div class="legend__item"><span class="legend__dot" style="background: #f5a623;"></span> Life event</div>
-      <div class="legend__item"><span class="legend__dot" style="background: #7c3aed;"></span> Experiment</div>
-      <div class="legend__item"><span class="legend__dot" style="background: #3b82f6;"></span> Level up</div>
-    </div>
-  </div>
-</section>
-
-<!-- Events list -->
-<section class="events-list animate-in" id="events-section" style="display:none;">
-  <h2>Journey Events</h2>
-  <div id="events-list"></div>
-</section>
-
-  <!-- Tooltip -->
-  <div class="tooltip" id="tooltip"><div class="tooltip__date"></div><div class="tooltip__value"></div></div>
-
-  <!-- Footer -->
-  <!-- S2-T1-8: Email CTA footer — injected by add_email_cta.py -->
-<div id="amj-subscribe"></div>
-<!-- Mobile bottom nav -->
-<div id="amj-bottom-nav"></div>
-
-<div id="amj-reading-path"></div>
-<div id="amj-footer"></div>
-
-  <!-- Challenge bar -->
-  <div class="challenge-bar" id="challenge-bar" style="display:none;">
-    <span class="challenge-bar__pip"></span>
-    <span class="challenge-bar__label" id="cbar-label"></span>
-    <span class="challenge-bar__divider"></span>
-    <span class="challenge-bar__text" id="cbar-text"></span>
-  </div>
-
-<script>
-const API = 'https://averagejoematt.com';
-const CHART_H = 400, PAD_T = 40, PAD_B = 50, PAD_L = 60, PAD_R = 30;
-const tooltip = document.getElementById('tooltip');
-
-// ── Status helpers ──────────────────────────────────────────────────────────
-function setStatus(tileId, cls) {
-  var el = document.getElementById(tileId);
-  if (!el) return;
-  el.classList.remove('cpit-tile--green','cpit-tile--amber','cpit-tile--red','cpit-tile--gray');
-  el.classList.add('cpit-tile--' + cls);
-}
-function statusHRV(v)      { return v >= 55 ? 'green' : v >= 35 ? 'amber' : 'red'; }
-function statusRecovery(v) { return v >= 67 ? 'green' : v >= 33 ? 'amber' : 'red'; }
-function statusRHR(v)      { return v <= 55 ? 'green' : v <= 70 ? 'amber' : 'red'; }
-function statusSleep(v)    { return v >= 7  ? 'green' : v >= 6  ? 'amber' : 'red'; }
-function statusT0(v)       { return v >= 90 ? 'green' : v >= 70 ? 'amber' : 'red'; }
-function statusStreak(v)   { return v >= 7  ? 'green' : v >= 1  ? 'amber' : 'red'; }
-function statusTIR(v)      { return v >= 70 ? 'green' : v >= 50 ? 'amber' : 'red'; }
-function statusZ2(min) { var pct = min / 150 * 100; return pct >= 80 ? 'green' : pct >= 50 ? 'amber' : 'red'; }
-function statusMood(v)     { return v >= 4  ? 'green' : v >= 3  ? 'amber' : 'red'; }
-function setText(id, val) { var el = document.getElementById(id); if (el && val != null) el.textContent = val; }
-
-// ── Timeline chart ──────────────────────────────────────────────────────────
-async function init() {
-  try {
-    const res = await fetch(`${API}/api/timeline`);
-    const json = await res.json();
-    const tl = json.timeline;
-    render(tl);
-    renderEvents(tl);
-    const wts = tl.weights;
-    if (wts.length) {
-      const curr = wts[wts.length - 1].lbs;
-      setText('current-weight', curr);
-      setText('lbs-lost', Math.round(tl.start_weight - curr));
-      setText('data-points', wts.length);
-    }
-    setText('days-count', Math.floor((Date.now() - new Date(tl.journey_start)) / 86400000));
-    if (tl.goal_weight)  setText('goal-weight',  tl.goal_weight);
-    if (tl.start_weight) setText('start-weight', tl.start_weight);
-  } catch (e) {
-    setText('chart-loading', 'Could not load timeline data.');
-  }
-  // Challenge bar
-  try {
-    const cr = await fetch(`${API}/api/current_challenge`);
-    const cj = await cr.json();
-    const ch = cj.current_challenge;
-    if (ch && ch.challenge) {
-      setText('cbar-label', `Week ${ch.week_num || '?'}`);
-      document.getElementById('cbar-text').innerHTML = `<strong>${ch.challenge}</strong>`;
-      document.getElementById('challenge-bar').style.display = 'flex';
-    }
-  } catch(_) {}
-}
-
-function render(tl) {
-  const wts = tl.weights;
-  if (!wts.length) return;
-  const wrapper = document.getElementById('chart-wrapper');
-  const W = Math.max(wrapper.clientWidth, 900);
-  const plotW = W - PAD_L - PAD_R, plotH = CHART_H - PAD_T - PAD_B;
-
-  const dates = wts.map(w => new Date(w.date));
-  const minDate = dates[0], maxDate = dates[dates.length - 1];
-  const dateRange = maxDate - minDate || 1;
-  const lbsVals = wts.map(w => w.lbs);
-  const minLbs = Math.min(...lbsVals, tl.goal_weight) - 5;
-  const maxLbs = Math.max(...lbsVals, tl.start_weight) + 5;
-  const lbsRange = maxLbs - minLbs || 1;
-
-  const x = d => PAD_L + ((new Date(d) - minDate) / dateRange) * plotW;
-  const y = v => PAD_T + (1 - (v - minLbs) / lbsRange) * plotH;
-
-  // Build SVG
-  let svg = `<svg viewBox="0 0 ${W} ${CHART_H}" xmlns="http://www.w3.org/2000/svg">`;
-  // Grid lines
-  for (let lb = Math.ceil(minLbs / 10) * 10; lb <= maxLbs; lb += 10) {
-    const yy = y(lb);
-    svg += `<line x1="${PAD_L}" y1="${yy}" x2="${W - PAD_R}" y2="${yy}" stroke="rgba(0,229,160,0.06)" stroke-width="1"/>`;
-    svg += `<text x="${PAD_L - 8}" y="${yy + 4}" fill="#4a6050" font-size="10" text-anchor="end">${lb}</text>`;
-  }
-  // Goal line
-  svg += `<line x1="${PAD_L}" y1="${y(tl.goal_weight)}" x2="${W - PAD_R}" y2="${y(tl.goal_weight)}" stroke="#00e5a0" stroke-width="1" stroke-dasharray="4 4" opacity="0.4"/>`;
-  svg += `<text x="${W - PAD_R + 4}" y="${y(tl.goal_weight) + 4}" fill="#00e5a0" font-size="9" opacity="0.6">GOAL ${tl.goal_weight}</text>`;
-  // Start line
-  svg += `<line x1="${PAD_L}" y1="${y(tl.start_weight)}" x2="${W - PAD_R}" y2="${y(tl.start_weight)}" stroke="#ff5252" stroke-width="1" stroke-dasharray="4 4" opacity="0.3"/>`;
-
-  // Experiment bands
-  (tl.experiments || []).forEach(exp => {
-    if (!exp.start) return;
-    const x1 = x(exp.start), x2 = exp.end ? x(exp.end) : x(maxDate);
-    svg += `<rect x="${x1}" y="${PAD_T}" width="${Math.max(x2 - x1, 2)}" height="${plotH}" fill="rgba(124,58,237,0.08)"/>`;
-  });
-
-  // Weight line
-  let path = '';
-  wts.forEach((w, i) => {
-    const px = x(w.date), py = y(w.lbs);
-    path += (i === 0 ? 'M' : 'L') + `${px},${py}`;
-  });
-  svg += `<path d="${path}" fill="none" stroke="#00e5a0" stroke-width="2" stroke-linejoin="round"/>`;
-
-  // Weight dots (interactive)
-  wts.forEach(w => {
-    const px = x(w.date), py = y(w.lbs);
-    svg += `<circle cx="${px}" cy="${py}" r="3" fill="#00e5a0" opacity="0.7" data-date="${w.date}" data-lbs="${w.lbs}" class="wt-dot" style="cursor:pointer"/>`;
-  });
-
-  // Life event markers
-  (tl.life_events || []).forEach(e => {
-    if (!e.date) return;
-    const px = x(e.date);
-    svg += `<line x1="${px}" y1="${PAD_T}" x2="${px}" y2="${PAD_T + plotH}" stroke="#f5a623" stroke-width="1" opacity="0.4"/>`;
-    svg += `<circle cx="${px}" cy="${PAD_T + 8}" r="5" fill="#f5a623" data-date="${e.date}" data-title="${e.title}" class="ev-dot" style="cursor:pointer"/>`;
-  });
-
-  // Level-up markers
-  (tl.level_ups || []).forEach(l => {
-    if (!l.date) return;
-    const px = x(l.date);
-    svg += `<circle cx="${px}" cy="${PAD_T + plotH - 8}" r="5" fill="#3b82f6" data-date="${l.date}" data-level="${l.level}" data-tier="${l.tier}" class="lvl-dot" style="cursor:pointer"/>`;
-  });
-
-  // X-axis month labels
-  const mo = new Date(minDate);
-  mo.setDate(1);
-  while (mo <= maxDate) {
-    const px = x(mo.toISOString().slice(0, 10));
-    if (px >= PAD_L && px <= W - PAD_R) {
-      svg += `<text x="${px}" y="${CHART_H - 8}" fill="#4a6050" font-size="10" text-anchor="middle">${mo.toLocaleString('en', {month:'short', year:'2-digit'})}</text>`;
-    }
-    mo.setMonth(mo.getMonth() + 1);
-  }
-
-  svg += '</svg>';
-  wrapper.innerHTML = svg;
-
-  // Tooltip handlers
-  wrapper.querySelectorAll('.wt-dot').forEach(dot => {
-    dot.addEventListener('mouseenter', e => showTip(e, dot.dataset.date, `${dot.dataset.lbs} lbs`));
-    dot.addEventListener('mouseleave', hideTip);
-  });
-  wrapper.querySelectorAll('.ev-dot').forEach(dot => {
-    dot.addEventListener('mouseenter', e => showTip(e, dot.dataset.date, dot.dataset.title));
-    dot.addEventListener('mouseleave', hideTip);
-  });
-  wrapper.querySelectorAll('.lvl-dot').forEach(dot => {
-    dot.addEventListener('mouseenter', e => showTip(e, dot.dataset.date, `Level ${dot.dataset.level} (${dot.dataset.tier})`));
-    dot.addEventListener('mouseleave', hideTip);
-  });
-}
-
-function showTip(e, date, text) {
-  tooltip.querySelector('.tooltip__date').textContent = date;
-  tooltip.querySelector('.tooltip__value').textContent = text;
-  tooltip.style.display = 'block';
-  tooltip.style.left = (e.clientX + 12) + 'px';
-  tooltip.style.top = (e.clientY - 30) + 'px';
-}
-function hideTip() { tooltip.style.display = 'none'; }
-
-function renderEvents(tl) {
-  const all = [];
-  (tl.life_events || []).forEach(e => all.push({date: e.date, text: e.title, type: 'Life Event', color: '#f5a623'}));
-  (tl.experiments || []).forEach(e => all.push({date: e.start, text: `${e.name} (${e.status})`, type: 'Experiment', color: '#7c3aed'}));
-  (tl.level_ups || []).forEach(e => all.push({date: e.date, text: `Reached Level ${e.level} — ${e.tier}`, type: 'Level Up', color: '#3b82f6'}));
-  if (!all.length) return;
-  all.sort((a, b) => b.date.localeCompare(a.date));
-
-  const container = document.getElementById('events-list');
-  container.innerHTML = all.map(e => `
-    <div class="event-row">
-      <div class="event-row__date">${e.date}</div>
-      <div class="event-row__dot" style="background:${e.color};"></div>
-      <div><div class="event-row__text">${e.text}</div><div class="event-row__type">${e.type}</div></div>
-    </div>`).join('');
-  document.getElementById('events-section').style.display = 'block';
-}
-
-// ── LIVE-3: Staleness helpers (outer scope — used by all tile handlers) ──────
-var MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-function staleLabel(dateStr) {
-  if (!dateStr) return null;
-  var d = new Date(dateStr), ago = Math.floor((Date.now() - d) / 86400000);
-  if (ago <= 1) return null;
-  return 'as of ' + MONTHS_SHORT[d.getUTCMonth()] + ' ' + d.getUTCDate();
-}
-function addStale(tileId, dateStr) {
-  var lbl = staleLabel(dateStr);
-  if (!lbl) return;
-  var tile = document.getElementById(tileId);
-  if (!tile) return;
-  var existing = tile.querySelector('.cpit-tile__stale');
-  var el = existing || document.createElement('div');
-  el.className = 'cpit-tile__stale';
-  el.textContent = lbl;
-  if (!existing) tile.appendChild(el);
-  var daysAgo = Math.floor((Date.now() - new Date(dateStr)) / 86400000);
-  if (daysAgo >= 7) setStatus(tileId, 'gray');
-}
-
-// ── Cockpit loader (LIVE-1 + LIVE-2: all fetches consolidated) ──────────────
-async function initCockpit() {
-  const now = new Date();
-  setText('cpit-timestamp', now.toLocaleTimeString('en', {hour:'2-digit', minute:'2-digit', hour12:true}));
-
-  // Fetch all 6 data sources in parallel
-  const [vRes, hRes, cRes, gRes, psRes, jRes] = await Promise.allSettled([
-    fetch(`${API}/api/vitals`),
-    fetch(`${API}/api/habit_streaks`),
-    fetch(`${API}/api/character`),
-    fetch(`${API}/api/glucose`),
-    fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' }),
-    fetch(`${API}/api/journey`),
-  ]);
-
-  var reporting = 0;
-
-  // 1. Vitals (HRV, Recovery, RHR, Weight)
-  if (vRes.status === 'fulfilled' && vRes.value.ok) {
-    try {
-      const vData = await vRes.value.json();
-      const v = vData.vitals || {};
-      reporting++;
-
-      // Weight
-      if (v.weight_lbs != null) {
-        setText('tv-weight', v.weight_lbs);
-        setStatus('tile-weight', 'gray');
-        if (v.weight_delta_30d != null) {
-          setText('td-weight', (v.weight_delta_30d > 0 ? '+' : '') + v.weight_delta_30d + ' lbs (30d)');
-        } else if (v.weight_as_of) {
-          const parts = v.weight_as_of.split('-');
-          const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-          const daysAgo = Math.floor((Date.now() - new Date(v.weight_as_of)) / 86400000);
-          setText('td-weight', daysAgo > 3 ? 'as of ' + MONTHS[parseInt(parts[1])-1] + ' ' + parseInt(parts[2]) : '');
-        }
+    // ─── SVG Glyph Icons (symbolic, not literal) ────────────────
+    var GLYPH_ICONS = {
+      scale: function(color) {
+        return '<svg viewBox="0 0 24 24" fill="none" stroke="'+color+'" stroke-width="1.5" class="glyph__icon glyph__icon--'+color+'">'
+          + '<path d="M12 3L4 10l3 8h10l3-8L12 3z" fill="none"/>'
+          + '<path d="M12 3v7" stroke-linecap="round"/>'
+          + '<path d="M8 18l4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/>'
+          + '</svg>';
+      },
+      water: function(color) {
+        return '<svg viewBox="0 0 24 24" fill="none" stroke="'+color+'" stroke-width="1.5">'
+          + '<path d="M12 2C12 2 6 10 6 14a6 6 0 0012 0c0-4-6-12-6-12z"/>'
+          + '<line x1="8" y1="14" x2="16" y2="14" opacity="0.3"/>'
+          + '<line x1="9" y1="17" x2="15" y2="17" opacity="0.3"/>'
+          + '</svg>';
+      },
+      movement: function(color) {
+        return '<svg viewBox="0 0 24 24" fill="none" stroke="'+color+'" stroke-width="1.5">'
+          + '<circle cx="4" cy="18" r="2" fill="'+color+'"/>'
+          + '<path d="M6 18c2-4 4-6 7-8s5-3 8-7" stroke-linecap="round"/>'
+          + '</svg>';
+      },
+      lift: function(color) {
+        return '<svg viewBox="0 0 24 24" fill="none" stroke="'+color+'" stroke-width="1.5">'
+          + '<rect x="9" y="14" width="6" height="7" rx="1" fill="'+color+'" opacity="0.15"/>'
+          + '<rect x="9" y="8" width="6" height="5" rx="1" fill="'+color+'" opacity="0.25"/>'
+          + '<rect x="9" y="3" width="6" height="4" rx="1" fill="'+color+'" opacity="0.4"/>'
+          + '<line x1="12" y1="3" x2="12" y2="21" opacity="0.2"/>'
+          + '</svg>';
+      },
+      recovery: function(color) {
+        return '<svg viewBox="0 0 24 24" fill="none" stroke="'+color+'" stroke-width="1.5">'
+          + '<polyline points="2,13 6,13 8,8 10,18 12,6 14,16 16,11 18,13 22,13" stroke-linecap="round" stroke-linejoin="round"/>'
+          + '</svg>';
+      },
+      sleep: function(color) {
+        return '<svg viewBox="0 0 24 24" fill="none" stroke="'+color+'" stroke-width="1.5">'
+          + '<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>'
+          + '<circle cx="17" cy="5" r="0.7" fill="'+color+'"/>'
+          + '<circle cx="20" cy="8" r="0.5" fill="'+color+'"/>'
+          + '</svg>';
+      },
+      journal: function(color) {
+        return '<svg viewBox="0 0 24 24" fill="none" stroke="'+color+'" stroke-width="1.5">'
+          + '<path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>'
+          + '<path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>'
+          + '<line x1="8" y1="7" x2="16" y2="7" opacity="0.5"/>'
+          + '<line x1="8" y1="11" x2="14" y2="11" opacity="0.5"/>'
+          + '</svg>';
+      },
+      mind: function(color) {
+        return '<svg viewBox="0 0 24 24" fill="none" stroke="'+color+'" stroke-width="1.5">'
+          + '<path d="M12 22c-1-3-4-6-4-10a4 4 0 018 0c0 4-3 7-4 10z" fill="'+color+'" opacity="0.15"/>'
+          + '<path d="M12 22c-1-3-4-6-4-10a4 4 0 018 0c0 4-3 7-4 10z"/>'
+          + '<circle cx="12" cy="11" r="1.5" fill="'+color+'" opacity="0.6"/>'
+          + '</svg>';
       }
+    };
 
-      // LIVE-3: staleness — apply to weight tile using weight_as_of
-      if (v.weight_as_of) addStale('tile-weight', v.weight_as_of);
-      var dataDate = v.data_date || v.as_of_date || v.date;
+    var GLYPH_ORDER = ['scale','water','movement','lift','recovery','sleep','journal','mind'];
+    var GLYPH_LABELS = {scale:'Scale',water:'Water',movement:'Move',lift:'Lift',recovery:'Recovery',sleep:'Sleep',journal:'Journal',mind:'Mind'};
 
-      // HRV
-      if (v.hrv_ms != null) {
-        setText('tv-hrv', v.hrv_ms);
-        setStatus('tile-hrv', statusHRV(v.hrv_ms));
-        setText('td-hrv', v.hrv_30d_avg ? v.hrv_30d_avg + ' ms 30d avg' : '');
-        addStale('tile-hrv', dataDate);
-      }
+    var STATE_COLORS = {
+      green: 'var(--c-green-500)',
+      amber: 'var(--c-yellow-status)',
+      red:   'var(--c-red-status)',
+      gray:  'var(--text-faint)'
+    };
 
-      // Recovery
-      if (v.recovery_pct != null) {
-        setText('tv-recovery', v.recovery_pct);
-        setStatus('tile-recovery', statusRecovery(v.recovery_pct));
-        var recovMap = { green: 'Optimal', yellow: 'Moderate', red: 'Needs rest' };
-        setText('td-recovery', recovMap[v.recovery_status] || '');
-        addStale('tile-recovery', dataDate);
-      }
-
-      // RHR
-      if (v.resting_heart_rate != null) {
-        setText('tv-rhr', v.resting_heart_rate);
-        setStatus('tile-rhr', statusRHR(v.resting_heart_rate));
-        addStale('tile-rhr', dataDate);
-      }
-    } catch(_) {}
-  }
-
-  // 2. Habit streaks
-  if (hRes.status === 'fulfilled' && hRes.value.ok) {
-    try {
-      const hData = await hRes.value.json();
-      const hs = hData.habit_streaks || {};
-      reporting++;
-      if (hs.tier0_pct != null) {
-        setText('tv-t0pct', hs.tier0_pct);
-        setStatus('tile-t0pct', statusT0(hs.tier0_pct));
-        if (hs.tier0_done != null && hs.tier0_total != null) {
-          setText('td-t0pct', hs.tier0_done + '/' + hs.tier0_total + ' habits');
-        }
-      }
-      if (hs.aggregate_streak != null) {
-        setText('tv-streak', hs.aggregate_streak);
-        setStatus('tile-streak', statusStreak(hs.aggregate_streak));
-        setText('td-streak', hs.best_streak != null ? 'Best: ' + hs.best_streak + 'd' : '');
-      }
-    } catch(_) {}
-  }
-
-  // 3. Character
-  if (cRes.status === 'fulfilled' && cRes.value.ok) {
-    try {
-      const cData = await cRes.value.json();
-      const ch = cData.character || {};
-      reporting++;
-      if (ch.level != null) {
-        setText('tv-char', 'Lv ' + ch.level);
-        setStatus('tile-char', 'green');
-        var tierLabel = ch.tier ? ((ch.tier_emoji || '') + ' ' + ch.tier).trim() : '';
-        setText('td-char', tierLabel);
-        addStale('tile-char', ch.as_of_date);
-      }
-    } catch(_) {}
-  }
-
-  // 4. Glucose
-  if (gRes.status === 'fulfilled' && gRes.value.ok) {
-    try {
-      const gData = await gRes.value.json();
-      const g = gData.glucose || {};
-      reporting++;
-      if (g.time_in_range_pct != null) {
-        setText('tv-tir', Math.round(g.time_in_range_pct));
-        setStatus('tile-tir', statusTIR(g.time_in_range_pct));
-        setText('td-tir', g.avg_mg_dl ? 'Avg: ' + g.avg_mg_dl + ' mg/dL' : '70–140 mg/dL');
-        addStale('tile-tir', g.as_of_date);
-      }
-      var tir30 = g['30d_avg_tir'];
-      if (tir30 != null) {
-        setText('tv-tir30', Math.round(tir30));
-        setStatus('tile-tir30', statusTIR(tir30));
-        setText('td-tir30', g.days_tracked ? g.days_tracked + 'd tracked' : '');
-        addStale('tile-tir30', g.as_of_date);
-      }
-    } catch(_) {}
-  }
-
-  // 5. public_stats.json — sleep, training, mood, brief
-  if (psRes.status === 'fulfilled' && psRes.value.ok) {
-    try {
-      const ps = await psRes.value.json();
-      const vitals = ps.vitals || {};
-      const training = ps.training || {};
-      const mood = ps.mood || ps.state_of_mind || {};
-      const psDate = (ps._meta || {}).generated_at;
-      reporting++;
-
-      // Sleep
-      var sleepHrs = vitals.sleep_duration_hours != null ? vitals.sleep_duration_hours : vitals.sleep_hours;
-      if (sleepHrs != null) {
-        var sh = parseFloat(sleepHrs);
-        setText('tv-sleep', sh.toFixed(1));
-        setStatus('tile-sleep', statusSleep(sh));
-        var sleepScore = vitals.sleep_score != null ? vitals.sleep_score : vitals.sleep_quality_score;
-        if (sleepScore != null) {
-          setText('td-sleep', 'Score: ' + sleepScore + '%');
-        } else {
-          setText('td-sleep', vitals.sleep_trend === 'up' ? '↑ improving' : vitals.sleep_trend === 'down' ? '↓ declining' : '');
-        }
-        addStale('tile-sleep', psDate);
-      }
-
-      // Zone 2
-      var z2 = training.zone2_minutes_7d != null ? training.zone2_minutes_7d : training.zone2_weekly_min;
-      if (z2 != null) {
-        setText('tv-zone2', z2);
-        setStatus('tile-zone2', statusZ2(z2));
-        var z2pct = Math.round((z2 / 150) * 100);
-        setText('td-zone2', z2pct + '% of weekly target' + (z2 >= 150 ? ' ✓' : ''));
-        addStale('tile-zone2', psDate);
-      }
-
-      // Today's activity
-      var activity = training.today_activity != null ? training.today_activity : vitals.last_activity_type;
-      if (activity) {
-        setText('tv-strain', activity);
-        setStatus('tile-strain', 'green');
-        var strain = training.today_strain != null ? training.today_strain : vitals.strain_score;
-        setText('td-strain', strain != null ? 'Strain: ' + parseFloat(strain).toFixed(1) + '/21' : '');
-      } else {
-        setText('tv-strain', 'Rest');
-        setStatus('tile-strain', 'gray');
-      }
-      addStale('tile-strain', psDate);
-
-      // Mood
-      var moodScore = mood.score != null ? mood.score : mood.value;
-      if (moodScore != null) {
-        var ms = Math.round(moodScore);
-        setText('tv-mood', ms);
-        setStatus('tile-mood', statusMood(ms));
-        var moodLabels = ['', 'Low', 'Below avg', 'Average', 'Good', 'Excellent'];
-        setText('td-mood', (moodLabels[ms] || '') + (mood.date ? ' · ' + mood.date : ''));
-      }
-
-      // AI brief excerpt
-      var excerpt = ps.brief_excerpt
-        || (ps.intelligence && ps.intelligence.brief_excerpt)
-        || (ps.daily_brief && ps.daily_brief.excerpt);
-      if (excerpt && excerpt.trim()) {
-        setText('tv-signal', excerpt);
-        setStatus('tile-signal', 'green');
-      }
-
-      // Group narratives (LIVE-2)
-      var gnar = ps.group_narratives || {};
-      var gnarMap = {
-        'gnar-body':      gnar.body,
-        'gnar-recovery':  gnar.recovery,
-        'gnar-activity':  gnar.activity,
-        'gnar-nutrition': gnar.nutrition,
-        'gnar-habits':    gnar.habits,
-        'gnar-mind':      gnar.mind,
-        'gnar-platform':  gnar.platform
-      };
-      Object.keys(gnarMap).forEach(function(id) {
-        var text = gnarMap[id];
-        var el = document.getElementById(id);
-        if (el && text && text.trim()) {
-          el.textContent = text.trim();
-          el.classList.add('is-visible');
-        }
+    // ─── Sparkline renderer ─────────────────────────────────────
+    function renderSparkline(values, state) {
+      if (!values || values.length === 0) return '';
+      var clean = values.filter(function(v) { return v !== null && v !== undefined; });
+      if (clean.length === 0) return '';
+      var max = Math.max.apply(null, clean);
+      var min = Math.min.apply(null, clean);
+      var range = max - min || 1;
+      var html = '<div class="detail-card__sparkline">';
+      clean.forEach(function(v, i) {
+        var pct = Math.max(8, ((v - min) / range) * 100);
+        var isLast = i === clean.length - 1;
+        html += '<div class="spark-bar" style="height:' + pct + '%;opacity:' + (isLast ? '1' : '0.35') + ';background:' + (STATE_COLORS[state] || 'var(--accent)') + '"></div>';
       });
-    } catch(_) {}
-  }
+      html += '</div>';
+      return html;
+    }
 
-  // 6. Journey progress
-  if (jRes.status === 'fulfilled' && jRes.value.ok) {
-    try {
-      const jData = await jRes.value.json();
-      const j = jData.journey || {};
-      if (j.progress_pct != null) {
-        var pct = parseFloat(j.progress_pct);
-        setText('tv-journey', pct.toFixed(1));
-        setStatus('tile-journey', pct >= 30 ? 'green' : pct >= 10 ? 'amber' : 'red');
-        setText('td-journey', j.lbs_lost != null ? j.lbs_lost + ' lbs lost' : '302 → 185 lbs');
+    // ─── Detail card content builders ───────────────────────────
+    var DETAIL_BUILDERS = {
+      scale: function(g) {
+        var v = g.value ? g.value.toFixed(1) : '—';
+        var u = g.value ? 'lbs' : '';
+        var sub = g.delta_label || g.journey_summary || 'No weigh-in data';
+        return { value: v, unit: u, sub: sub, sparkline: g.sparkline_7d };
+      },
+      water: function(g) {
+        return { value: g.liters ? g.liters.toFixed(1) : '—', unit: g.liters ? 'L' : '', sub: g.label || 'Not yet tracked', sparkline: g.sparkline_7d };
+      },
+      movement: function(g) {
+        var v = g.steps ? g.steps.toLocaleString() : (g.zone2_week_min > 0 ? g.zone2_week_min : '—');
+        var u = g.steps ? 'steps' : (g.zone2_week_min > 0 ? 'min Z2' : '');
+        var sub = g.activity_type || ('Z2 this week: ' + (g.zone2_week_min || 0) + '/150 min');
+        return { value: v, unit: u, sub: sub, sparkline: g.sparkline_7d };
+      },
+      lift: function(g) {
+        return { value: g.trained_today ? '✓' : 'Rest', unit: '', sub: g.workout_type || 'Rest day', sparkline: [] };
+      },
+      recovery: function(g) {
+        var v = g.recovery_pct ? g.recovery_pct + '' : '—';
+        var sub = [];
+        if (g.hrv_ms) sub.push('HRV ' + g.hrv_ms + 'ms');
+        if (g.rhr_bpm) sub.push('RHR ' + Math.round(g.rhr_bpm));
+        if (g.status_label) sub.push(g.status_label);
+        return { value: v, unit: g.recovery_pct ? '%' : '', sub: sub.join(' · ') || 'No Whoop data', sparkline: g.sparkline_7d };
+      },
+      sleep: function(g) {
+        return { value: g.hours ? g.hours.toFixed(1) : '—', unit: g.hours ? 'hrs' : '', sub: g.score ? 'Score: ' + g.score : 'Duration only', sparkline: g.sparkline_7d };
+      },
+      journal: function(g) {
+        var v = g.written_today ? 'Open' : 'Closed';
+        var sub = g.themes && g.themes.length > 0 ? g.themes.join(', ') : (g.written_today ? 'Entry logged' : 'No entry today');
+        return { value: v, unit: '', sub: sub, sparkline: [] };
+      },
+      mind: function(g) {
+        return { value: g.score ? g.score + '' : '—', unit: g.score ? '/ 5' : '', sub: g.label || 'Not tracked today', sparkline: g.sparkline_7d };
       }
-    } catch(_) {}
-  }
+    };
 
-  setText('cpit-systems', reporting);
-}
+    // ─── Render Layer 2: Glyph Strip ────────────────────────────
+    function renderGlyphs(glyphs) {
+      var container = document.getElementById('glyph-container');
+      container.innerHTML = '';
+      GLYPH_ORDER.forEach(function(key) {
+        var g = glyphs[key] || { state: 'gray' };
+        var state = g.state || 'gray';
+        var color = STATE_COLORS[state] || STATE_COLORS.gray;
+        var iconFn = GLYPH_ICONS[key];
+        var iconSvg = iconFn ? iconFn(color) : '';
 
-init();
-initCockpit();
-</script>
-<section class="reading-path" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
-  <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>
-  <a href="/character/" style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-display);">How the score is computed →</a>
-  <p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">The 7-pillar character system behind the numbers</p>
-</section>
-<script src="/assets/js/site_constants.js"></script>
-<script src="/assets/js/components.js"></script>
-<script src="/assets/js/nav.js"></script>
+        var el = document.createElement('div');
+        el.className = 'glyph';
+        el.setAttribute('data-glyph', key);
+        el.innerHTML =
+          '<div class="glyph__ring glyph__ring--' + state + '">' + iconSvg + '</div>' +
+          '<div class="glyph__name">' + GLYPH_LABELS[key] + '</div>';
+        el.addEventListener('click', function() { toggleDetail(key); });
+        container.appendChild(el);
+      });
+    }
+
+    // ─── Render Layer 3: Detail Cards ───────────────────────────
+    function renderDetails(glyphs) {
+      var grid = document.getElementById('detail-grid');
+      grid.innerHTML = '';
+      GLYPH_ORDER.forEach(function(key) {
+        var g = glyphs[key] || { state: 'gray' };
+        var state = g.state || 'gray';
+        var builder = DETAIL_BUILDERS[key];
+        var d = builder ? builder(g) : { value: '—', unit: '', sub: '', sparkline: [] };
+
+        var stateLabel = state.charAt(0).toUpperCase() + state.slice(1);
+        var card = document.createElement('div');
+        card.className = 'detail-card detail-card--' + state;
+        card.setAttribute('data-detail', key);
+        card.innerHTML =
+          '<div class="detail-card__header">' +
+            '<div class="detail-card__name">' + GLYPH_LABELS[key] + '</div>' +
+            '<div class="detail-card__state detail-card__state--' + state + '">' + stateLabel + '</div>' +
+          '</div>' +
+          '<div class="detail-card__hero">' +
+            '<div class="detail-card__value">' + d.value + '</div>' +
+            '<div class="detail-card__unit">' + d.unit + '</div>' +
+          '</div>' +
+          '<div class="detail-card__sub">' + d.sub + '</div>' +
+          renderSparkline(d.sparkline, state);
+
+        grid.appendChild(card);
+      });
+    }
+
+    // ─── Toggle detail card (glyph click) ───────────────────────
+    var selectedGlyph = null;
+    function toggleDetail(key) {
+      var glyphs = document.querySelectorAll('.glyph');
+      var cards = document.querySelectorAll('.detail-card');
+
+      if (selectedGlyph === key) {
+        // Deselect — show all
+        selectedGlyph = null;
+        glyphs.forEach(function(g) { g.classList.remove('is-selected'); });
+        cards.forEach(function(c) { c.classList.remove('is-hidden'); });
+        return;
+      }
+
+      selectedGlyph = key;
+      glyphs.forEach(function(g) {
+        g.classList.toggle('is-selected', g.getAttribute('data-glyph') === key);
+      });
+      cards.forEach(function(c) {
+        c.classList.toggle('is-hidden', c.getAttribute('data-detail') !== key);
+      });
+
+      // Scroll card into view
+      var card = document.querySelector('[data-detail="' + key + '"]');
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // ─── Format date nicely ─────────────────────────────────────
+    function formatDate(dateStr) {
+      try {
+        var d = new Date(dateStr + 'T12:00:00');
+        return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      } catch(e) { return dateStr; }
+    }
+
+    // ─── Render Layer 1: Headline ───────────────────────────────
+    function renderHeadline(pulse) {
+      document.getElementById('p-day').textContent = pulse.day_number || '—';
+      document.getElementById('p-date').textContent = formatDate(pulse.date);
+
+      var status = pulse.status || 'quiet';
+      var dot = document.getElementById('p-dot');
+      dot.className = 'pulse-dot pulse-dot--' + status;
+      var word = document.getElementById('p-word');
+      word.className = 'pulse-word pulse-word--' + status;
+      word.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+
+      document.getElementById('p-narrative').textContent = pulse.narrative || 'No signal yet.';
+    }
+
+    // ─── Render Journey Stats (below fold) ──────────────────────
+    function renderJourney(pulse) {
+      var scale = (pulse.glyphs || {}).scale || {};
+      if (!scale.value) {
+        document.getElementById('j-sub').textContent = 'Weight data populates after first weigh-in.';
+        return;
+      }
+      var lost = scale.journey_summary || '';
+      document.getElementById('j-sub').textContent = 'From 302 lbs · Goal: 185 lbs · ' + (lost || 'In progress');
+
+      var stats = document.getElementById('j-stats');
+      var items = [
+        { label: 'Current', value: scale.value ? scale.value.toFixed(1) + ' lbs' : '—' },
+        { label: 'Day', value: pulse.day_number || '—' },
+        { label: 'Signals', value: (pulse.signals_reporting || 0) + ' / ' + (pulse.signals_total || 8) },
+      ];
+      stats.innerHTML = '';
+      items.forEach(function(item) {
+        stats.innerHTML +=
+          '<div class="j-stat">' +
+            '<div class="j-stat__label">' + item.label + '</div>' +
+            '<div class="j-stat__value">' + item.value + '</div>' +
+          '</div>';
+      });
+    }
+
+    // ─── Fetch and render ───────────────────────────────────────
+    var API_BASE = (typeof AMJ !== 'undefined' && AMJ.API_BASE) ? AMJ.API_BASE : '';
+
+    fetch(API_BASE + '/api/pulse')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var pulse = data.pulse || data;
+        renderHeadline(pulse);
+        renderGlyphs(pulse.glyphs || {});
+        renderDetails(pulse.glyphs || {});
+        renderJourney(pulse);
+      })
+      .catch(function(err) {
+        console.error('[pulse] fetch failed:', err);
+        document.getElementById('p-narrative').textContent = 'Could not load today\'s pulse. Refresh to try again.';
+      });
+  })();
+  </script>
 </body>
 </html>

@@ -2813,6 +2813,42 @@ def _load_s3_json(key, cache_name):
         logger.warning(f"[{cache_name}] Failed to load {key}: {e}")
         return {}
 
+# ── PULSE-A4: Pulse endpoint ───────────────────────────────────────────────
+
+def handle_pulse() -> dict:
+    """
+    GET /api/pulse
+    Returns the Pulse daily state: 8 glyph signals, status word, narrative.
+    Today: reads from S3 pulse.json (pre-computed by daily brief).
+    Cache: 300s (5 min).
+    """
+    S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+    try:
+        s3_client = boto3.client("s3", region_name=S3_REGION)
+        resp = s3_client.get_object(Bucket=S3_BUCKET, Key="site/pulse.json")
+        pulse_data = json.loads(resp["Body"].read())
+        logger.info("[pulse] Loaded pulse.json from S3")
+        return _ok(pulse_data, cache_seconds=300)
+    except Exception as e:
+        if "NoSuchKey" in str(e):
+            logger.warning("[pulse] pulse.json not found — not yet generated")
+            return _ok({
+                "pulse": {
+                    "day_number": 0,
+                    "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                    "status": "quiet",
+                    "status_color": "#3a5a48",
+                    "narrative": "Today's pulse generates at 11 AM PT.",
+                    "signals_reporting": 0,
+                    "signals_total": 8,
+                    "glyphs": {},
+                    "generated_at": None,
+                }
+            }, cache_seconds=60)
+        logger.error(f"[pulse] Failed: {e}")
+        return _error(503, "Pulse data not available")
+
+
 def handle_protocols() -> dict:
     """GET /api/protocols — Return protocol definitions from S3 config."""
     global _protocols_cache
@@ -2901,6 +2937,8 @@ ROUTES = {
     "/api/challenges":         handle_challenges,
     "/api/domains":            handle_domains,
     "/api/habit_registry":     handle_habit_registry,
+    # PULSE-A4: Daily pulse endpoint
+    "/api/pulse":              handle_pulse,
 }
 
 
