@@ -5,19 +5,19 @@
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="I built an AI operating system for my body. 19 data sources. Real numbers. One hypothesis: compounding data changes everything.">
-  <meta property="og:title" content="Matthew Walker — 19 Data Sources, Real Results">
-  <meta property="og:description" content="302 → 185. 19 data sources. 95 AI tools. Every number public. Built by a non-engineer with Claude.">
+  <meta property="og:title" content="Quantified Self Experiment — AI-Powered Health Tracking with Real Data">
+  <meta property="og:description" content="One person. 19 data sources. An AI operating system for the body. Tracking a 302→185 lb transformation — every number public, every failure included.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Matthew Walker — 19 Data Sources, Real Results">
-  <meta name="twitter:description" content="302 → 185. 19 data sources. Every number public. Built with Claude.">
+  <meta name="twitter:title" content="Quantified Self Experiment — AI Health Tracking, Every Number Public">
+  <meta name="twitter:description" content="One person. 19 data sources. Tracking a 302→185 lb transformation with AI — every number public.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
-  <title>Matthew Walker — 19 Data Sources, Real Results</title>
+  <title>Quantified Self Weight Loss Experiment — AI Health Tracking with 19 Data Sources | averagejoematt.com</title>
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
@@ -25,136 +25,6 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    .hero {
-      min-height: 100vh;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      border-bottom: 1px solid var(--border);
-    }
-    .hero-left {
-      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-16);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
-    .hero-name {
-      font-family: var(--font-display);
-      font-size: var(--text-hero);
-      line-height: var(--lh-display);
-      letter-spacing: var(--ls-display);
-      color: var(--text);
-    }
-    .hero-name span { color: var(--accent); }
-    .hero-body {
-      font-family: var(--font-mono);
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-      max-width: 420px;
-      margin: var(--space-8) 0 var(--space-10);
-      border-left: 2px solid var(--border-strong);
-      padding-left: var(--space-5);
-    }
-    .hero-actions { display: flex; gap: var(--space-3); flex-wrap: wrap; }
-    .hero-subscribe {
-      margin-top: var(--space-12);
-      padding-top: var(--space-8);
-      border-top: 1px solid var(--border-subtle);
-    }
-    .hero-subscribe-label {
-      font-size: var(--text-xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin-bottom: var(--space-3);
-    }
-    .subscribe-row { display: flex; gap: var(--space-2); }
-    .subscribe-input {
-      flex: 1;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      padding: var(--space-3) var(--space-4);
-      outline: none;
-      transition: border-color var(--dur-fast);
-    }
-    .subscribe-input::placeholder { color: var(--text-faint); }
-    .subscribe-input:focus { border-color: var(--accent); }
-    .hero-subscribe-note {
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: var(--ls-tag);
-      margin-top: var(--space-2);
-    }
-
-    /* Right panel */
-    .hero-right {
-      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-16);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: var(--space-8);
-    }
-    .vitals-date {
-      font-size: var(--text-xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
-    }
-    .vitals-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1px;
-      background: var(--border);
-      border: 1px solid var(--border);
-    }
-    .journey-section {
-      border: 1px solid var(--border);
-      background: var(--surface);
-    }
-    .journey-row {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      align-items: center;
-      gap: var(--space-4);
-      padding: var(--space-4) var(--space-6);
-      border-bottom: 1px solid var(--border-subtle);
-    }
-    .journey-row:last-child { border-bottom: none; }
-    .journey-row__label {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin-bottom: var(--space-1);
-    }
-    .journey-row__bar-track {
-      height: 2px;
-      background: var(--surface-raised);
-      overflow: hidden;
-      margin-top: var(--space-1);
-    }
-    .journey-row__bar-fill {
-      height: 100%;
-      background: var(--accent);
-      transition: width 1.2s var(--ease-out);
-    }
-    .journey-row__value {
-      font-family: var(--font-display);
-      font-size: 22px;
-      color: var(--text);
-      white-space: nowrap;
-      letter-spacing: var(--ls-display);
-    }
-    .journey-row__value span {
-      font-size: var(--text-xs);
-      color: var(--accent-dim);
-      letter-spacing: var(--ls-tag);
-    }
-
     /* About */
     .about-section {
       display: grid;
@@ -187,9 +57,6 @@
     .source-pill:hover { background: var(--surface-raised); color: var(--accent); }
 
     @media (max-width: 900px) {
-      .hero { grid-template-columns: 1fr; min-height: auto; }
-      .hero-left { border-right: none; border-bottom: 1px solid var(--border); padding-top: calc(var(--nav-height) + var(--space-12)); }
-      .hero-right { padding-top: var(--space-12); }
       .about-section { grid-template-columns: 1fr; }
       .about-left { border-right: none; border-bottom: 1px solid var(--border); }
       .sources-grid { grid-template-columns: repeat(2, 1fr); }
@@ -219,7 +86,7 @@
     transform: translateX(-50%);
     width: 600px;
     height: 600px;
-    background: radial-gradient(circle, rgba(46, 169, 143, 0.06) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(var(--accent-rgb), 0.06) 0%, transparent 70%);
     pointer-events: none;
   }
   .hero-label {
@@ -429,6 +296,26 @@
     from { opacity: 0; transform: translateY(16px); }
     to   { opacity: 1; transform: translateY(0); }
   }
+
+  /* GR-02: Share buttons */
+  .disc-share {
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-subtle);
+  }
+  .disc-share-btn {
+    background: none;
+    border: none;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--ls-tag);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    cursor: pointer;
+    padding: var(--space-1) 0;
+    transition: color var(--dur-fast);
+  }
+  .disc-share-btn:hover { color: var(--accent); }
   </style>
 </head>
 <body>
@@ -475,6 +362,10 @@
 <!-- BS-02: Transformation Story Hero -->
 <section class="hero" id="experiment">
 
+  <h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">
+    Matthew Walker — Quantified Self Health Experiment: 302 to 185 lbs with AI and 19 Data Sources
+  </h1>
+
   <p class="hero-label">The Weekly Signal</p>
 
   <!-- Live weight counter: 302 → current → 185 -->
@@ -507,6 +398,25 @@
     </div>
   </div>
 
+
+  <!-- HP-12: Elena Voss hero one-liner -->
+  <div id="elena-hero-line" style="
+    max-width:500px;
+    margin:var(--space-4) 0 var(--space-2);
+    padding:var(--space-3) var(--space-5);
+    border-left:2px solid var(--c-amber-300);
+    font-family:var(--font-serif);
+    font-size:var(--text-sm);
+    font-style:italic;
+    color:var(--text-muted);
+    line-height:1.6;
+    opacity:0;
+    display:none;
+  ">
+    <span id="elena-line-text"></span>
+    <span style="font-family:var(--font-mono);font-size:var(--text-2xs);font-style:normal;color:var(--c-amber-500);margin-left:var(--space-2);">— Elena Voss</span>
+  </div>
+
   <!-- Narrative paragraph (BS-02 TODO: set HERO_WHY_PARAGRAPH + paragraph_is_placeholder=False in site_writer.py) -->
   <p class="hero-why" id="hero-why">
     Most people optimize in the dark — gut feelings, Instagram advice, someone's podcast take.
@@ -530,17 +440,17 @@
     </div>
   </div>
 
-  <!-- WR-43: Animated heartbeat/biometric signature -->
+  <!-- HP-11: Heartbeat as ambient hero background -->
   <div id="heartbeat-wrap" style="
-    width:100%;max-width:460px;
-    margin:var(--space-4) 0 var(--space-2);
-    opacity:0;animation:fadeUp 0.6s ease forwards 0.55s;
+    position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+    width:100%;max-width:900px;height:80px;
+    opacity:0.15;pointer-events:none;
+    z-index:0;
   ">
-    <canvas id="heartbeat-canvas" style="width:100%;height:54px;display:block;"></canvas>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;">
-      <span id="hb-status" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#00e5a0">● LIVE</span>
-      <span id="hb-label" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1px;color:#484f58">HRV — · RHR — · RECOVERY —</span>
-    </div>
+    <canvas id="heartbeat-canvas" style="width:100%;height:80px;display:block;"></canvas>
+    <!-- Hidden status spans for JS updateHeartbeat compatibility -->
+    <span id="hb-status" style="display:none"></span>
+    <span id="hb-label" style="display:none"></span>
   </div>
 
   <!-- Latest Chronicle headline -->
@@ -554,8 +464,8 @@
     max-width: 500px;
     margin: 0 0 var(--space-6);
     padding: var(--space-4) var(--space-5);
-    background: rgba(240,180,41,0.06);
-    border: 1px solid rgba(240,180,41,0.15);
+    background: rgba(var(--amber-rgb), 0.06);
+    border: 1px solid rgba(var(--amber-rgb), 0.15);
     border-radius: 8px;
     text-align: center;
     opacity: 0;
@@ -568,6 +478,17 @@
       color: var(--c-amber-400);
       text-decoration: none;
     ">New here? Read the story first &rarr;</a>
+  </div>
+
+
+  <!-- HP-03: Hero subscribe input -->
+  <div class="hero-subscribe" style="max-width:500px;opacity:0;animation:fadeUp 0.6s ease forwards 0.58s;">
+    <div class="hero-subscribe-label">Get the weekly signal</div>
+    <div class="subscribe-row">
+      <input type="email" id="hero-email" class="subscribe-input" placeholder="your@email.com" autocomplete="email">
+      <button id="hero-subscribe-btn" class="btn btn--primary" style="font-size:var(--text-xs);white-space:nowrap;padding:var(--space-3) var(--space-5);">Subscribe</button>
+    </div>
+    <div id="subscribe-msg" class="hero-subscribe-note"></div>
   </div>
 
   <!-- WR-16: Dual-path navigation CTAs -->
@@ -624,7 +545,11 @@
   }
 
   function getColor() {
-    return recoveryPct >= 67 ? '#00e5a0' : recoveryPct >= 34 ? '#c8843a' : '#ff5252';
+    var s = getComputedStyle(document.documentElement);
+    var green = s.getPropertyValue('--c-green-status').trim() || '#00e5a0';
+    var amber = s.getPropertyValue('--c-yellow-status').trim() || '#c8843a';
+    var red = s.getPropertyValue('--c-red-status').trim() || '#ff5252';
+    return recoveryPct >= 67 ? green : recoveryPct >= 34 ? amber : red;
   }
 
   function frame(ts) {
@@ -984,23 +909,74 @@
   <div class="eyebrow" style="margin-bottom:var(--space-6)">What the data says</div>
   <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-3)">Discoveries</h2>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);margin-bottom:var(--space-8)">The platform runs weekly Pearson correlation analysis across 23 metric pairs with Benjamini-Hochberg FDR correction. These are real patterns from my data — not universal truths.</p>
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
-    <div style="background:var(--surface);padding:var(--space-6);">
+  <div id="discoveries-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
+    <!-- HP-06: Dynamically loaded from /api/correlations?featured=true&limit=3 -->
+    <!-- Fallback cards shown until JS loads or if fetch fails -->
+    <div class="disc-fallback" style="background:var(--surface);padding:var(--space-6);">
       <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">Sleep onset → Recovery</div>
       <p style="font-size:var(--text-sm);color:var(--text);line-height:var(--lh-body);margin-bottom:var(--space-3)">Bedtime after 11pm correlates with <strong style="color:var(--c-red-status)">-12% next-day recovery</strong></p>
       <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">r = -0.38 · p = 0.04 · n = 28d</div>
+      <div class="disc-share"><button class="disc-share-btn" onclick="shareDiscovery('Sleep → Recovery','Bedtime after 11pm correlates with -12% next-day recovery (r=-0.38).')">Share ↗</button></div>
     </div>
-    <div style="background:var(--surface);padding:var(--space-6);">
+    <div class="disc-fallback" style="background:var(--surface);padding:var(--space-6);">
       <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">Bed temp → Deep sleep</div>
       <p style="font-size:var(--text-sm);color:var(--text);line-height:var(--lh-body);margin-bottom:var(--space-3)">Lowering Eight Sleep by 2° added <strong style="color:var(--accent)">+18 min deep sleep</strong>/night</p>
       <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">N=1 experiment · 14d window</div>
+      <div class="disc-share"><button class="disc-share-btn" onclick="shareDiscovery('Bed Temp → Deep Sleep','Lowering Eight Sleep by 2° added +18 min deep sleep/night.')">Share ↗</button></div>
     </div>
-    <div style="background:var(--surface);padding:var(--space-6);">
+    <div class="disc-fallback" style="background:var(--surface);padding:var(--space-6);">
       <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">Zone 2 → HRV trend</div>
       <p style="font-size:var(--text-sm);color:var(--text);line-height:var(--lh-body);margin-bottom:var(--space-3)">Weeks with 150+ min Zone 2 show <strong style="color:var(--accent)">+8% HRV improvement</strong></p>
-      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">r = 0.31 · p = 0.08 · 4 weeks</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">r = 0.31 · p = 0.08 (trending, not significant) · 4 weeks</div>
+      <div class="disc-share"><button class="disc-share-btn" onclick="shareDiscovery('Zone 2 → HRV','Weeks with 150+ min Zone 2 show +8% HRV improvement (trending).')">Share ↗</button></div>
     </div>
   </div>
+  <script>
+  // HP-06: Dynamic discoveries loader
+  (async function(){
+    try {
+      var r = await fetch('/api/correlations?featured=true&limit=3');
+      if (!r.ok) return; // keep fallback
+      var d = await r.json();
+      var corrs = d.correlations || d.featured || [];
+      if (!corrs.length) return; // keep fallback
+      var grid = document.getElementById('discoveries-grid');
+      if (!grid) return;
+      // Remove fallback cards
+      grid.querySelectorAll('.disc-fallback').forEach(function(el){ el.remove(); });
+      corrs.forEach(function(c){
+        var sigLabel = c.p > 0.05 ? ' (trending, not significant)' : '';
+        var strongColor = c.r < 0 ? 'var(--c-red-status)' : 'var(--accent)';
+        var card = document.createElement('div');
+        card.style.cssText = 'background:var(--surface);padding:var(--space-6);';
+        var shareText = (c.description || c.summary || '');
+        card.innerHTML =
+          '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">' + (c.metric_a || c.label || '') + ' → ' + (c.metric_b || '') + '</div>' +
+          '<p style="font-size:var(--text-sm);color:var(--text);line-height:var(--lh-body);margin-bottom:var(--space-3)">' + (c.description || c.summary || '') + '</p>' +
+          '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">r = ' + (c.r ? c.r.toFixed(2) : '?') + ' · p = ' + (c.p ? c.p.toFixed(2) : '?') + sigLabel + (c.n ? ' · n = ' + c.n : '') + '</div>' +
+          '<div class="disc-share"><button class="disc-share-btn" onclick="shareDiscovery(\'' + ((c.metric_a||'') + ' → ' + (c.metric_b||'')).replace(/'/g,'') + '\',\'' + shareText.replace(/'/g,'') + '\')">Share ↗</button></div>';
+        grid.appendChild(card);
+      });
+    } catch(e) { /* keep fallback cards */ }
+  })();
+  </script>
+
+  <script>
+  // GR-02: Share utility
+  window.shareDiscovery = function(title, text) {
+    var fullText = text + ' From @averagejoematt\'s N=1 experiment: https://averagejoematt.com/explorer/';
+    if (navigator.share) {
+      navigator.share({title: title, text: fullText, url: 'https://averagejoematt.com/explorer/'}).catch(function(){});
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(fullText).then(function(){
+        var btn = event.target;
+        var orig = btn.textContent;
+        btn.textContent = '✓ Copied';
+        setTimeout(function(){ btn.textContent = orig; }, 2000);
+      });
+    }
+  };
+  </script>
   <div style="margin-top:var(--space-4);display:flex;gap:var(--space-4);">
     <a href="/explorer/" class="btn btn--ghost" style="font-size:var(--text-xs);">All correlations →</a>
     <a href="/experiments/" class="btn btn--ghost" style="font-size:var(--text-xs);">N=1 experiments →</a>
@@ -1107,51 +1083,46 @@
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);">
 
     <a href="/habits/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
-      <div style="font-size:28px;margin-bottom:var(--space-3);">📊</div>
+      <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="4" y="14" width="4" height="10" rx="1"/><rect x="12" y="8" width="4" height="16" rx="1"/><rect x="20" y="4" width="4" height="20" rx="1"/></svg></div>
       <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">HABITS</div>
       <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;margin-bottom:var(--space-4);">52-week heatmap. Every habit tracked daily across <span id="prose-data-sources-2">19</span> sources.</div>
       <div style="font-size:var(--text-xs);font-family:var(--font-mono);color:var(--accent-dim);">Current streak: <span id="feat-streak">0</span> days</div>
     </a>
 
     <a href="/character/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
-      <div style="font-size:28px;margin-bottom:var(--space-3);">🧙</div>
+      <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3L17 11H22L18 16L20 24L14 20L8 24L10 16L6 11H11Z"/></svg></div>
       <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">CHARACTER</div>
       <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;margin-bottom:var(--space-4);">RPG-style 7-pillar scoring: sleep, movement, nutrition, metabolic, mind, relationships, consistency.</div>
       <div style="font-size:var(--text-xs);font-family:var(--font-mono);color:var(--accent-dim);">Score: <span id="feat-char-score">—</span> / 100</div>
     </a>
 
     <a href="/benchmarks/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
-      <div style="font-size:28px;margin-bottom:var(--space-3);">📐</div>
+      <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="14" cy="14" r="10"/><circle cx="14" cy="14" r="4"/><line x1="14" y1="4" x2="14" y2="10"/><line x1="14" y1="18" x2="14" y2="24"/></svg></div>
       <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">BENCHMARKS</div>
       <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">Where my numbers sit vs. population norms. Interactive calculator.</div>
     </a>
 
     <a href="/discoveries/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
-      <div style="font-size:28px;margin-bottom:var(--space-3);">🔬</div>
+      <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="14" cy="10" r="6"/><path d="M14 16V24"/><path d="M10 20H18"/><path d="M11 4L17 4"/></svg></div>
       <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">DISCOVERIES</div>
       <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">What the AI found in my data. Correlations, anomalies, patterns a human would miss.</div>
     </a>
 
     <a href="/intelligence/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
-      <div style="font-size:28px;margin-bottom:var(--space-3);">🤖</div>
+      <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="8" width="16" height="14" rx="3"/><circle cx="11" cy="15" r="1.5"/><circle cx="17" cy="15" r="1.5"/><path d="M14 3V8"/><circle cx="14" cy="3" r="1.5"/><path d="M6 18H3"/><path d="M22 18H25"/></svg></div>
       <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">INTELLIGENCE</div>
       <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">AI coaching brief. What Claude is reading, predicting, and recommending each day.</div>
     </a>
 
-    <a href="/character/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
-      <div style="font-size:28px;margin-bottom:var(--space-3);">🏆</div>
-      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">CHARACTER</div>
-      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">7-pillar scoring system. Level, tier, milestone badges earned from real data.</div>
-    </a>
 
     <a href="/glucose/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
-      <div style="font-size:28px;margin-bottom:var(--space-3);">🩸</div>
+      <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 18C4 18 8 14 10 10S14 4 14 4"/><path d="M14 4C14 4 16 8 18 10S24 18 24 18"/><path d="M4 18L24 18"/><path d="M4 22L24 22"/></svg></div>
       <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">GLUCOSE</div>
       <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">30-day CGM. Time-in-range, variability SD, Dexcom Stelo data.</div>
     </a>
 
     <a href="/sleep/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
-      <div style="font-size:28px;margin-bottom:var(--space-3);">🌙</div>
+      <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 16A9 9 0 1 1 12 7C12 7 12 16 21 16Z"/></svg></div>
       <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">SLEEP</div>
       <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">Eight Sleep × Whoop cross-referenced. What bed temp actually does to sleep quality.</div>
     </a>
@@ -1395,6 +1366,20 @@
     // Today: Level + Tier (populated by character_stats loader above if available)
     // If already set by the quadrant loader, skip — otherwise mark as loading
 
+
+    // HP-12: Elena Voss hero one-liner
+    const elenaLine = raw.elena_hero_line || (hero && hero.elena_line);
+    if (elenaLine) {
+      const elEl = document.getElementById('elena-line-text');
+      const elWrap = document.getElementById('elena-hero-line');
+      if (elEl && elWrap) {
+        elEl.textContent = elenaLine;
+        elWrap.style.display = 'block';
+        elWrap.style.opacity = '1';
+        elWrap.style.animation = 'fadeUp 0.6s ease forwards 0.35s';
+      }
+    }
+
     // BS-02 Hero: Chronicle teaser
     const cl = raw.chronicle_latest;
     if (cl && cl.title) {
@@ -1440,6 +1425,63 @@
       if (e.key === 'Enter') subBtn.click();
     });
   }
+})();
+</script>
+
+
+<!-- GR-01b: Sticky subscribe bar (shows after scrolling past hero) -->
+<div id="sticky-subscribe" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:99;
+  background:var(--surface);border-top:1px solid var(--border);padding:var(--space-3) var(--page-padding);
+  align-items:center;justify-content:center;gap:var(--space-3);transition:transform 0.3s ease;">
+  <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);white-space:nowrap;">Get the Weekly Signal</span>
+  <input type="email" id="sticky-email" class="subscribe-input" placeholder="your@email.com" style="max-width:220px;padding:var(--space-2) var(--space-3);">
+  <button id="sticky-sub-btn" class="btn btn--primary" style="font-size:var(--text-2xs);padding:var(--space-2) var(--space-4);white-space:nowrap;">Subscribe</button>
+  <button id="sticky-dismiss" style="background:none;border:none;color:var(--text-faint);font-size:16px;cursor:pointer;padding:var(--space-1);" aria-label="Dismiss">&times;</button>
+</div>
+<script>
+(function(){
+  var bar = document.getElementById('sticky-subscribe');
+  if (!bar) return;
+  var hero = document.getElementById('experiment');
+  var dismissed = localStorage.getItem('sticky-sub-dismissed');
+  var subscribed = localStorage.getItem('amj-subscribed');
+  if (dismissed && Date.now() - parseInt(dismissed) < 7*86400000) return;
+  if (subscribed) return;
+
+  function checkScroll() {
+    if (!hero) return;
+    var rect = hero.getBoundingClientRect();
+    if (rect.bottom < 0) {
+      bar.style.display = 'flex';
+    } else {
+      bar.style.display = 'none';
+    }
+  }
+  window.addEventListener('scroll', checkScroll, {passive:true});
+
+  document.getElementById('sticky-dismiss').addEventListener('click', function(){
+    bar.style.display = 'none';
+    localStorage.setItem('sticky-sub-dismissed', Date.now().toString());
+  });
+
+  document.getElementById('sticky-sub-btn').addEventListener('click', async function(){
+    var email = document.getElementById('sticky-email').value.trim();
+    if (!email || !email.includes('@')) return;
+    try {
+      var res = await fetch('/api/subscribe', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({email:email, source:'sticky_bar'})
+      });
+      if (res.ok) {
+        bar.innerHTML = '<span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);">\u2713 Check your inbox to confirm.</span>';
+        localStorage.setItem('amj-subscribed','1');
+        setTimeout(function(){ bar.style.display='none'; }, 3000);
+      }
+    } catch(e) {}
+  });
+  document.getElementById('sticky-email').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') document.getElementById('sticky-sub-btn').click();
+  });
 })();
 </script>
 
