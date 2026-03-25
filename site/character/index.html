@@ -4,19 +4,20 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Character Sheet — tracking life optimization across 7 pillars in real time.">
+  <meta name="description" content="A real-life RPG character sheet — gamifying health optimization across 7 pillars with live wearable data. Watch one man level up his life, publicly.">
+  <meta name="keywords" content="gamify health, RPG character sheet, life optimization, health tracking, quantified self, level up life">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Character Sheet — Matthew Walker">
-  <meta name="twitter:description" content="7-pillar scoring system tracking sleep, movement, nutrition, metabolic, mind, relationships, consistency.">
+  <meta name="twitter:title" content="Character Sheet — Level Up Your Life, Publicly">
+  <meta name="twitter:description" content="7-pillar RPG scoring system. 19 data sources. No self-reporting. One man gamifying his entire health transformation.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <meta property="og:title" content="Character Sheet — Matthew Walker">
-  <meta property="og:description" content="7-pillar scoring system tracking sleep, movement, nutrition, metabolic, mind, relationships, consistency.">
+  <meta property="og:title" content="Character Sheet — Level Up Your Life, Publicly">
+  <meta property="og:description" content="7-pillar RPG scoring system. 19 data sources. No self-reporting. One man gamifying his entire health transformation.">
   <meta property="og:type" content="website">
   <title>Character Sheet — Matthew Walker</title>
-    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
@@ -24,241 +25,508 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    /* Character page uses teal accent (same as Signal) */
-    .page-header {
-      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
-      border-bottom: 1px solid var(--border);
-    }
-    .page-header__kicker { margin-bottom: var(--space-4); }
-    .page-header__title {
-      font-family: var(--font-display);
-      font-size: var(--text-h1);
-      line-height: var(--lh-display);
-      color: var(--text);
-      margin-bottom: var(--space-4);
-    }
-    .page-header__title span { color: var(--accent); }
-    .page-header__sub {
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      max-width: 500px;
-      line-height: var(--lh-body);
+    /* ═══════════════════════════════════════════════════════════
+       CHARACTER PAGE — RPG GAME SHEET
+       Phase A: Visual identity + tier theming
+       Phase B: Sparklines + visual timeline + trading card
+       Phase C: Growth hooks + SEO
+       ═══════════════════════════════════════════════════════════ */
+
+    /* ── TIER-BASED THEMING ──────────────────────────────────── */
+    /* Each tier shifts the entire page's visual feel */
+    :root {
+      --tier-accent: var(--accent);
+      --tier-glow: rgba(0,229,160,0.12);
+      --tier-glow-strong: rgba(0,229,160,0.25);
+      --tier-emblem-bg: rgba(0,229,160,0.06);
+      --tier-bar-height: 14px;
+      --tier-bar-radius: 2px;
     }
 
-    /* Character card */
-    .character-card {
-      margin: var(--space-12) var(--page-padding);
+    [data-tier="foundation"] {
+      --tier-accent: #00e5a0;
+      --tier-glow: rgba(0,229,160,0.10);
+      --tier-glow-strong: rgba(0,229,160,0.20);
+      --tier-emblem-bg: rgba(0,229,160,0.04);
+    }
+    [data-tier="momentum"] {
+      --tier-accent: #f5a623;
+      --tier-glow: rgba(245,166,35,0.12);
+      --tier-glow-strong: rgba(245,166,35,0.25);
+      --tier-emblem-bg: rgba(245,166,35,0.06);
+    }
+    [data-tier="discipline"] {
+      --tier-accent: #8bb0c0;
+      --tier-glow: rgba(139,176,192,0.12);
+      --tier-glow-strong: rgba(139,176,192,0.25);
+      --tier-emblem-bg: rgba(139,176,192,0.06);
+    }
+    [data-tier="mastery"] {
+      --tier-accent: #d4a520;
+      --tier-glow: rgba(212,165,32,0.15);
+      --tier-glow-strong: rgba(212,165,32,0.30);
+      --tier-emblem-bg: rgba(212,165,32,0.08);
+    }
+    [data-tier="elite"] {
+      --tier-accent: #ffd700;
+      --tier-glow: rgba(255,215,0,0.15);
+      --tier-glow-strong: rgba(255,215,0,0.35);
+      --tier-emblem-bg: rgba(255,215,0,0.10);
+    }
+
+    /* ── HERO: TRADING CARD ──────────────────────────────────── */
+    .hero-card {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: calc(var(--nav-height) + var(--space-12)) var(--page-padding) var(--space-10);
+    }
+    .trading-card {
       background: var(--surface);
-      border: 1px solid var(--border);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-    }
-    .cc-left {
-      padding: var(--space-10);
-      border-right: 1px solid var(--border);
-    }
-    .cc-level-ring {
-      width: 120px; height: 120px;
-      border: 2px solid var(--accent);
-      border-radius: 50%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: var(--space-6);
+      border: 1px solid var(--tier-accent);
+      box-shadow: 0 0 40px var(--tier-glow), 0 0 80px var(--tier-glow), inset 0 1px 0 rgba(255,255,255,0.03);
       position: relative;
+      overflow: hidden;
     }
-    .cc-level-ring::before {
+    .trading-card::before {
       content: '';
       position: absolute;
-      inset: 4px;
-      border-radius: 50%;
-      border: 1px solid var(--border);
+      inset: 0;
+      background: radial-gradient(ellipse at 30% 20%, var(--tier-glow) 0%, transparent 60%);
+      pointer-events: none;
     }
-    .cc-level-num {
+    .tc-top {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: var(--space-6);
+      align-items: center;
+      padding: var(--space-8) var(--space-8) var(--space-6);
+      border-bottom: 1px solid var(--border-subtle);
+      position: relative;
+    }
+    .tc-emblem {
+      width: 110px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .tc-emblem svg { width: 100%; height: 100%; }
+    .tc-identity { min-width: 0; }
+    .tc-name {
+      font-family: var(--font-display);
+      font-size: clamp(32px, 5vw, 48px);
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: var(--space-2);
+    }
+    .tc-class {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--tier-accent);
+      margin-bottom: var(--space-1);
+    }
+    .tc-subtitle {
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+    }
+    .tc-composite {
+      text-align: center;
+      padding: var(--space-4) var(--space-6);
+      border-left: 1px solid var(--border-subtle);
+    }
+    .tc-composite__num {
       font-family: var(--font-display);
       font-size: 56px;
-      color: var(--accent);
+      color: var(--tier-accent);
       line-height: 1;
     }
-    .cc-level-label {
+    .tc-composite__label {
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
-      color: var(--text-muted);
+      color: var(--text-faint);
+      margin-top: 2px;
     }
-    .cc-title {
+
+    /* Pillar mini-bars inside trading card */
+    .tc-pillars {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 1px;
+      background: var(--border-subtle);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .tc-pillar {
+      background: var(--surface);
+      padding: var(--space-4) var(--space-3);
+      text-align: center;
+    }
+    .tc-pillar__icon { font-size: 18px; line-height: 1; margin-bottom: var(--space-2); }
+    .tc-pillar__name {
+      font-size: 9px;
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-2);
+    }
+    .tc-pillar__level {
       font-family: var(--font-display);
-      font-size: 36px;
+      font-size: 28px;
+      line-height: 1;
       color: var(--text);
       margin-bottom: var(--space-2);
     }
-    .cc-tier {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2);
-      font-size: var(--text-xs);
-      letter-spacing: var(--ls-label);
-      text-transform: uppercase;
-      color: var(--accent-dim);
-      border: 1px solid var(--border);
-      padding: var(--space-1) var(--space-3);
-      margin-bottom: var(--space-6);
-    }
-    .cc-stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-4);
-    }
-    .cc-stat {
-      border-left: 1px solid var(--border);
-      padding-left: var(--space-3);
-    }
-    .cc-stat__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-1); }
-    .cc-stat__value { font-family: var(--font-display); font-size: 28px; color: var(--text); }
-
-    .cc-right { padding: var(--space-10); }
-    .cc-tier-map { margin-bottom: var(--space-8); }
-
-    /* CHAR-3: Tier journey path */
-    .tier-path {
+    .tc-pillar__bar {
+      height: var(--tier-bar-height);
+      background: var(--surface-high);
+      border-radius: var(--tier-bar-radius);
+      overflow: hidden;
       position: relative;
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      padding-top: var(--space-6);
     }
-    .tier-path__line {
-      position: absolute;
-      top: calc(var(--space-6) + 10px);
-      left: 10px;
-      right: 10px;
-      height: 2px;
-      background: var(--border);
-    }
-    .tier-path__line-fill {
+    .tc-pillar__bar-fill {
       height: 100%;
-      background: var(--accent);
-      transition: width 1s var(--ease-out);
+      border-radius: var(--tier-bar-radius);
+      transition: width 1.2s var(--ease-out);
     }
-    .tier-waypoint {
+    /* Notch marks at 25/50/75 */
+    .tc-pillar__bar::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, transparent 24.5%, var(--bg) 24.5%, var(--bg) 25.5%, transparent 25.5%),
+        linear-gradient(90deg, transparent 49.5%, var(--bg) 49.5%, var(--bg) 50.5%, transparent 50.5%),
+        linear-gradient(90deg, transparent 74.5%, var(--bg) 74.5%, var(--bg) 75.5%, transparent 75.5%);
+      pointer-events: none;
+    }
+    .tc-pillar__score {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-muted);
+      margin-top: var(--space-1);
+    }
+    .tc-pillar__xp {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      margin-top: 2px;
+    }
+    .tc-pillar__xp.pos { color: var(--c-green-500); }
+    .tc-pillar__xp.neg { color: var(--c-yellow-status); }
+
+    /* Card footer stats */
+    .tc-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-4) var(--space-8);
       position: relative;
+    }
+    .tc-footer__stats {
+      display: flex;
+      gap: var(--space-8);
+    }
+    .tc-stat {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      gap: var(--space-2);
-      width: 68px;
-      z-index: 1;
     }
-    .tier-waypoint__dot {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      border: 2px solid var(--border);
-      background: var(--bg);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .tc-stat__label {
       font-size: 9px;
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
     }
-    .tier-waypoint--done .tier-waypoint__dot {
-      background: var(--accent);
-      border-color: var(--accent);
+    .tc-stat__value {
+      font-family: var(--font-display);
+      font-size: 24px;
+      color: var(--text);
+      line-height: 1.1;
     }
-    .tier-waypoint--current .tier-waypoint__dot {
-      background: var(--bg);
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(0,229,160,0.2);
-      width: 24px;
-      height: 24px;
+    .tc-footer__tier-path {
+      display: flex;
+      gap: 6px;
+      align-items: center;
     }
-    .tier-waypoint--current .tier-waypoint__dot::after {
-      content: '';
+    .tc-tier-dot {
       width: 10px;
       height: 10px;
       border-radius: 50%;
-      background: var(--accent);
+      border: 1.5px solid var(--border);
+      background: var(--bg);
     }
-    .tier-waypoint__emoji { font-size: 14px; line-height: 1; margin-top: 2px; }
-    .tier-waypoint__name {
-      font-family: var(--font-display);
-      font-size: 11px;
-      color: var(--text-faint);
-      text-align: center;
-      letter-spacing: 0.04em;
+    .tc-tier-dot--done { background: var(--tier-accent); border-color: var(--tier-accent); }
+    .tc-tier-dot--current {
+      border-color: var(--tier-accent);
+      box-shadow: 0 0 6px var(--tier-glow-strong);
+      position: relative;
     }
-    .tier-waypoint--current .tier-waypoint__name { color: var(--accent); }
-    .tier-waypoint--done .tier-waypoint__name { color: var(--text-muted); }
-    .tier-waypoint__range {
-      font-size: 9px;
-      color: var(--text-faint);
-      font-family: var(--font-mono);
-      text-align: center;
+    .tc-tier-dot--current::after {
+      content: '';
+      position: absolute;
+      inset: 2px;
+      border-radius: 50%;
+      background: var(--tier-accent);
     }
 
-    /* Radar chart */
+    /* ── LEVEL UP IMMINENT BANNER ────────────────────────────── */
+    .levelup-banner {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--page-padding);
+      background: linear-gradient(90deg, transparent, var(--tier-glow), transparent);
+      border-bottom: 1px solid var(--tier-accent);
+      animation: levelup-pulse 2s ease-in-out infinite;
+    }
+    .levelup-banner.show { display: flex; }
+    .levelup-banner__icon { font-size: 18px; }
+    .levelup-banner__text {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      color: var(--tier-accent);
+      letter-spacing: var(--ls-label);
+      text-transform: uppercase;
+    }
+    .levelup-banner__sub {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+    @keyframes levelup-pulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+
+    /* ── NEXT LEVEL REQUIREMENTS (moved up) ──────────────────── */
+    .next-section {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .next-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+      margin-top: var(--space-6);
+    }
+    .next-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-5);
+    }
+    .next-card.bottleneck {
+      border-color: var(--tier-accent);
+      box-shadow: 0 0 16px var(--tier-glow);
+    }
+    .next-card__tag {
+      font-size: 9px;
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--tier-accent);
+      margin-bottom: var(--space-3);
+    }
+    .next-card__pillar {
+      font-family: var(--font-display);
+      font-size: 24px;
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .next-card__action {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .next-xp-bar {
+      margin-top: var(--space-6);
+      grid-column: 1 / -1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-5);
+    }
+    .next-xp-bar__label {
+      display: flex;
+      justify-content: space-between;
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-2);
+    }
+    .next-xp-bar__track {
+      height: 8px;
+      background: var(--surface-high);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .next-xp-bar__fill {
+      height: 100%;
+      background: var(--tier-accent);
+      border-radius: 4px;
+      transition: width 1.5s var(--ease-out);
+    }
+
+    /* ── INTRO SECTION (brief, below card) ───────────────────── */
+    .intro-brief {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .intro-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-10);
+      align-items: start;
+    }
+    .intro-brief p {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      margin-bottom: var(--space-4);
+    }
+    .intro-brief p:last-child { margin-bottom: 0; }
+
+    /* Tier flavor text box */
+    .tier-flavors {
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .tier-flavors__header {
+      padding: var(--space-3) var(--space-5);
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 9px;
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--tier-accent);
+    }
+    .tf-row {
+      display: grid;
+      grid-template-columns: 24px 80px 1fr;
+      gap: var(--space-3);
+      align-items: start;
+      padding: var(--space-3) var(--space-5);
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: var(--text-xs);
+      transition: background var(--dur-fast);
+    }
+    .tf-row:last-child { border-bottom: none; }
+    .tf-row__icon { font-size: 14px; text-align: center; }
+    .tf-row__name { font-family: var(--font-mono); color: var(--text-faint); }
+    .tf-row__desc { color: var(--text-faint); line-height: 1.5; }
+    .tf-row.current { background: var(--tier-emblem-bg); }
+    .tf-row.current .tf-row__name,
+    .tf-row.current .tf-row__desc { color: var(--tier-accent); }
+
+    /* ── RADAR SECTION ───────────────────────────────────────── */
     .radar-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
       padding: var(--space-12) var(--page-padding);
-      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
     }
     .radar-layout {
       display: grid;
-      grid-template-columns: 460px 1fr;
-      gap: var(--space-12);
+      grid-template-columns: 420px 1fr;
+      gap: var(--space-10);
       align-items: start;
     }
     .radar-container {
       background: var(--surface);
       border: 1px solid var(--border);
-      padding: var(--space-8);
+      padding: var(--space-6);
       display: flex;
       flex-direction: column;
       align-items: center;
     }
     .radar-title {
-      font-size: var(--text-2xs);
+      font-size: 9px;
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
-      color: var(--text-muted);
+      color: var(--text-faint);
       margin-bottom: var(--space-4);
       align-self: flex-start;
     }
-    .radar-bars {
-      width: 100%;
-    }
-    .radar-bar-row {
+
+    /* RPG stat bars (chunky) */
+    .stat-bars { width: 100%; }
+    .stat-row {
       display: grid;
-      grid-template-columns: 90px 1fr 44px;
+      grid-template-columns: 100px 1fr 44px;
       gap: var(--space-3);
       align-items: center;
-      margin-bottom: var(--space-3);
+      margin-bottom: var(--space-4);
     }
-    .radar-bar-name {
+    .stat-row__name {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
       font-size: var(--text-xs);
       color: var(--text-muted);
-      letter-spacing: var(--ls-tag);
+      letter-spacing: var(--ls-label);
       text-transform: uppercase;
     }
-    .radar-bar-track {
-      height: 3px;
-      background: var(--surface-raised);
+    .stat-row__name span { font-size: 14px; }
+    .stat-row__track {
+      height: var(--tier-bar-height);
+      background: var(--surface-high);
+      border-radius: var(--tier-bar-radius);
       overflow: hidden;
+      position: relative;
     }
-    .radar-bar-fill {
+    .stat-row__fill {
       height: 100%;
+      border-radius: var(--tier-bar-radius);
       transition: width 1.2s var(--ease-out);
     }
-    .radar-bar-score {
+    /* Notch marks */
+    .stat-row__track::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, transparent 24.5%, rgba(8,12,10,0.6) 24.5%, rgba(8,12,10,0.6) 25.5%, transparent 25.5%),
+        linear-gradient(90deg, transparent 49.5%, rgba(8,12,10,0.6) 49.5%, rgba(8,12,10,0.6) 50.5%, transparent 50.5%),
+        linear-gradient(90deg, transparent 74.5%, rgba(8,12,10,0.6) 74.5%, rgba(8,12,10,0.6) 75.5%, transparent 75.5%);
+      pointer-events: none;
+    }
+    .stat-row__score {
+      font-family: var(--font-mono);
       font-size: var(--text-xs);
       color: var(--text);
       text-align: right;
-      font-family: var(--font-mono);
+    }
+    .score-legend {
+      display: flex;
+      gap: var(--space-6);
+      flex-wrap: wrap;
+      margin-top: var(--space-6);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--border-subtle);
+    }
+    .score-legend__item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+    }
+    .score-legend__dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
     }
 
-    /* Pillars grid */
+    /* ── PILLAR CARDS WITH SPARKLINES ────────────────────────── */
     .pillars-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
       padding: var(--space-12) var(--page-padding);
-      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
     }
     .pillars-grid {
       display: grid;
@@ -270,7 +538,7 @@
     }
     .pillar-card {
       background: var(--surface);
-      padding: var(--space-6);
+      padding: var(--space-5);
       transition: background var(--dur-fast);
     }
     .pillar-card:hover { background: var(--surface-raised); }
@@ -278,44 +546,74 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: var(--space-4);
+      margin-bottom: var(--space-3);
     }
     .pillar-card__name {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
       font-size: var(--text-xs);
       letter-spacing: var(--ls-label);
       text-transform: uppercase;
       color: var(--text-muted);
     }
+    .pillar-card__name span { font-size: 14px; }
     .pillar-card__xp {
-      font-size: var(--text-xs);
-      color: var(--accent);
+      font-size: var(--text-2xs);
+      font-family: var(--font-mono);
     }
+    .pillar-card__xp.pos { color: var(--c-green-500); }
     .pillar-card__xp.neg { color: var(--c-yellow-status); }
     .pillar-card__level {
       font-family: var(--font-display);
-      font-size: 48px;
+      font-size: 44px;
       color: var(--text);
       line-height: 1;
       margin-bottom: var(--space-3);
     }
     .pillar-card__bar {
-      height: 2px;
+      height: var(--tier-bar-height);
       background: var(--surface-high);
+      border-radius: var(--tier-bar-radius);
+      overflow: hidden;
+      position: relative;
       margin-bottom: var(--space-2);
     }
     .pillar-card__bar-fill {
       height: 100%;
-      background: var(--accent);
+      border-radius: var(--tier-bar-radius);
       transition: width 1.2s var(--ease-out);
+    }
+    .pillar-card__bar::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, transparent 24.5%, rgba(8,12,10,0.6) 24.5%, rgba(8,12,10,0.6) 25.5%, transparent 25.5%),
+        linear-gradient(90deg, transparent 49.5%, rgba(8,12,10,0.6) 49.5%, rgba(8,12,10,0.6) 50.5%, transparent 50.5%),
+        linear-gradient(90deg, transparent 74.5%, rgba(8,12,10,0.6) 74.5%, rgba(8,12,10,0.6) 75.5%, transparent 75.5%);
+      pointer-events: none;
     }
     .pillar-card__raw {
       font-size: var(--text-2xs);
-      color: var(--text-muted);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+    }
+    /* Sparkline */
+    .pillar-card__spark {
+      margin-top: var(--space-3);
+      border-top: 1px solid var(--border-subtle);
+      padding-top: var(--space-3);
+    }
+    .pillar-card__spark svg { display: block; width: 100%; }
+    .pillar-card__spark-label {
+      font-size: 8px;
+      color: var(--text-faint);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
+      margin-top: 2px;
     }
-
-    /* Data confidence badge */
+    /* Data confidence */
     .pillar-confidence {
       display: inline-flex;
       align-items: center;
@@ -328,80 +626,96 @@
     }
     .pillar-confidence--high { color: var(--c-green-500); }
     .pillar-confidence--low  { color: var(--c-yellow-status); }
+    .pillar-calibrating {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      animation: cal-pulse 1.8s ease-in-out infinite;
+    }
+    @keyframes cal-pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
 
-    /* Next Level Requirements section */
-    .next-level-section {
+    /* ── VISUAL TIMELINE ─────────────────────────────────────── */
+    .timeline-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
       padding: var(--space-12) var(--page-padding);
-      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
     }
-    .next-level-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-6);
+    .visual-timeline {
+      position: relative;
       margin-top: var(--space-8);
+      padding-left: 32px;
     }
-    .next-level-card {
+    .visual-timeline::before {
+      content: '';
+      position: absolute;
+      left: 11px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--border);
+    }
+    .vt-event {
+      position: relative;
+      padding: var(--space-4) 0 var(--space-6) var(--space-6);
+    }
+    .vt-event__dot {
+      position: absolute;
+      left: -26px;
+      top: var(--space-4);
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
       background: var(--surface);
-      border: 1px solid var(--border);
-      padding: var(--space-6);
+      border: 2px solid var(--border);
+      z-index: 1;
     }
-    .next-level-card.bottleneck {
-      border-color: var(--accent);
-      background: var(--accent-bg-subtle);
+    .vt-event--levelup .vt-event__dot {
+      background: var(--tier-accent);
+      border-color: var(--tier-accent);
+      box-shadow: 0 0 8px var(--tier-glow-strong);
     }
-    .next-level-card__label {
+    .vt-event--milestone .vt-event__dot {
+      background: var(--c-amber-500);
+      border-color: var(--c-amber-500);
+    }
+    .vt-event__date {
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
-      color: var(--accent-dim);
-      margin-bottom: var(--space-3);
+      color: var(--text-faint);
+      margin-bottom: var(--space-1);
     }
-    .next-level-card__pillar {
-      font-family: var(--font-display);
-      font-size: 28px;
-      color: var(--text);
-      margin-bottom: var(--space-2);
-    }
-    .next-level-card__action {
+    .vt-event__text {
       font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
+      color: var(--text);
+      line-height: 1.5;
     }
-    @media (max-width: 700px) {
-      .next-level-grid { grid-template-columns: 1fr; }
+    .vt-event__level {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--tier-accent);
+      background: var(--tier-emblem-bg);
+      padding: 1px var(--space-2);
+      margin-left: var(--space-2);
+      letter-spacing: var(--ls-label);
     }
 
-    /* Timeline */
-    .timeline-section {
+    /* ── HEATMAP ─────────────────────────────────────────────── */
+    .heatmap-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
       padding: var(--space-12) var(--page-padding);
-      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
     }
-    .event-list {
-      margin-top: var(--space-8);
-      border: 1px solid var(--border);
-    }
-    .event-row {
-      display: grid;
-      grid-template-columns: 120px 60px 1fr auto;
-      align-items: center;
-      gap: var(--space-4);
-      padding: var(--space-4) var(--space-6);
-      border-bottom: 1px solid var(--border-subtle);
-    }
-    .event-row:last-child { border-bottom: none; }
-    .event-date { font-size: var(--text-xs); color: var(--accent-dim); letter-spacing: var(--ls-tag); text-transform: uppercase; }
-    .event-arrow { font-family: var(--font-display); font-size: 22px; color: var(--accent); text-align: center; }
-    .event-text { font-size: var(--text-sm); color: var(--text); }
-    .event-levels { font-size: var(--text-xs); color: var(--text-muted); letter-spacing: var(--ls-tag); white-space: nowrap; }
-
-    /* ── CHAR-4: Pillar independence heatmap ── */
-    .heatmap-section { padding: var(--space-12) var(--page-padding); border-top: 1px solid var(--border); }
     .heatmap-section p { font-size: var(--text-sm); color: var(--text-muted); max-width: 560px; line-height: var(--lh-body); margin-top: var(--space-3); }
     .hm-grid { margin-top: var(--space-6); overflow-x: auto; }
     .hm-row { display: grid; grid-template-columns: 64px repeat(7, 1fr); gap: 3px; margin-bottom: 3px; }
     .hm-header { margin-bottom: var(--space-2); }
     .hm-week-label { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); display: flex; flex-direction: column; justify-content: center; padding-right: var(--space-2); }
-    .hm-week-label .hm-week-date { font-size: 9px; color: var(--text-faint); opacity: 0.6; }
+    .hm-week-label .hm-week-date { font-size: 9px; opacity: 0.6; }
     .hm-col-head { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); text-align: center; letter-spacing: 0.04em; line-height: 1.3; text-transform: uppercase; padding: var(--space-1); }
     .hm-col-head span { display: block; }
     .hm-cell { height: 36px; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 10px; color: rgba(232,237,233,0.85); font-weight: 500; transition: opacity 0.15s; cursor: default; }
@@ -410,272 +724,322 @@
     .hm-legend-item { display: flex; align-items: center; gap: var(--space-2); font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted); }
     .hm-legend-swatch { width: 14px; height: 14px; border-radius: 2px; flex-shrink: 0; }
 
-    /* ── CHAR-5: Category-colored earned badges ── */
-    #badge-grid-streaks .badge-card.earned { border-color: var(--c-amber-500); box-shadow: 0 0 10px rgba(186,117,23,0.25); }
-    #badge-grid-levels  .badge-card.earned { border-color: var(--accent); box-shadow: 0 0 10px rgba(29,158,117,0.25); }
-    #badge-grid-weight  .badge-card.earned { border-color: var(--c-green-500); box-shadow: 0 0 10px rgba(29,158,117,0.25); }
-    #badge-grid-data    .badge-card.earned { border-color: var(--accent-dim); box-shadow: 0 0 10px rgba(0,229,160,0.15); }
-    .badge-card.earned .badge-card__status { color: var(--c-green-500); }
-    .badge-card.earned .badge-card__status::before { content: '✓ '; }
-    .badge-card:not(.earned) { opacity: 0.6; }
-    .badge-card:not(.earned):hover { opacity: 0.8; }
-
-    /* ── CHAR-6: Calibrating state ── */
-    .pillar-calibrating { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted); letter-spacing: 0.05em; animation: cal-pulse 1.8s ease-in-out infinite; }
-    @keyframes cal-pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
-
-    /* Achievement badges */
+    /* ── BADGES (collapsible) ────────────────────────────────── */
     .badges-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
       padding: var(--space-12) var(--page-padding);
-      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
     }
+    .badge-group {
+      margin-top: var(--space-6);
+      border: 1px solid var(--border);
+    }
+    .badge-group__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-3) var(--space-5);
+      cursor: pointer;
+      background: var(--surface);
+      transition: background var(--dur-fast);
+    }
+    .badge-group__header:hover { background: var(--surface-raised); }
+    .badge-group__title {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--tier-accent);
+    }
+    .badge-group__count {
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+    }
+    .badge-group__chevron {
+      font-size: 12px;
+      color: var(--text-faint);
+      transition: transform var(--dur-mid);
+    }
+    .badge-group.open .badge-group__chevron { transform: rotate(180deg); }
+    .badge-group__body {
+      display: none;
+      border-top: 1px solid var(--border-subtle);
+    }
+    .badge-group.open .badge-group__body { display: block; }
     .badges-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-4);
-      margin-top: var(--space-8);
+      gap: 1px;
+      background: var(--border-subtle);
     }
     .badge-card {
       background: var(--surface);
-      border: 1px solid var(--border);
-      padding: var(--space-5) var(--space-5);
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2);
+      padding: var(--space-4);
       opacity: 0.4;
       transition: opacity var(--dur-fast);
     }
-    .badge-card.earned {
-      opacity: 1;
-      border-color: var(--accent);
-      background: var(--surface-raised);
-    }
-    .badge-card__icon { font-size: 22px; line-height: 1; }
+    .badge-card.earned { opacity: 1; }
+    .badge-card__icon { font-size: 20px; line-height: 1; margin-bottom: var(--space-2); }
     .badge-card__name {
       font-family: var(--font-display);
       font-size: var(--text-base);
       color: var(--text);
+      margin-bottom: var(--space-1);
     }
-    .badge-card.earned .badge-card__name { color: var(--accent); }
+    .badge-card.earned .badge-card__name { color: var(--tier-accent); }
     .badge-card__desc {
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      line-height: 1.4;
     }
     .badge-card__status {
-      font-size: var(--text-2xs);
+      font-size: 9px;
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
-      margin-top: var(--space-1);
+      margin-top: var(--space-2);
+      color: var(--text-faint);
     }
     .badge-card.earned .badge-card__status { color: var(--c-green-500); }
-    .badge-card:not(.earned) .badge-card__status { color: var(--text-faint); }
+    .badge-card.earned .badge-card__status::before { content: '✓ '; }
     .badge-date-chip {
       display: inline-block;
       background: var(--bg);
-      border: 1px solid var(--accent);
-      color: var(--accent-dim);
-      font-size: var(--text-2xs);
+      border: 1px solid var(--tier-accent);
+      color: var(--tier-accent);
+      font-size: 9px;
       letter-spacing: var(--ls-label);
-      padding: 2px var(--space-2);
+      padding: 1px var(--space-2);
       margin-top: var(--space-1);
     }
-    .badges-group-label {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
-      margin: var(--space-8) 0 var(--space-2);
-    }
-    .badges-group-label:first-child { margin-top: 0; }
+    /* Category glow for earned badges */
+    #badge-grid-streaks .badge-card.earned { border-left: 2px solid var(--c-amber-500); }
+    #badge-grid-levels  .badge-card.earned { border-left: 2px solid var(--tier-accent); }
+    #badge-grid-weight  .badge-card.earned { border-left: 2px solid var(--c-green-500); }
+    #badge-grid-data    .badge-card.earned { border-left: 2px solid var(--accent-dim); }
+    #badge-grid-experiments .badge-card.earned { border-left: 2px solid var(--c-amber-400); }
 
-    /* RPG intro section */
-    .rpg-why-section {
-      padding: var(--space-12) var(--page-padding);
-      border-top: 1px solid var(--border);
+    /* ── METHODOLOGY ─────────────────────────────────────────── */
+    .method-section {
       max-width: var(--max-width);
       margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
     }
-    .rpg-why-section p {
+    .method-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-8);
+      margin-top: var(--space-6);
+    }
+    .method-grid p {
       font-size: var(--text-base);
       color: var(--text-muted);
       line-height: var(--lh-body);
-      max-width: 640px;
+      margin-bottom: var(--space-4);
     }
-
-    /* Avatar section */
-    .char-avatar-section {
-      padding: var(--space-10) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      justify-content: center;
+    .sources-table {
+      border: 1px solid var(--border);
+      background: var(--surface);
     }
-    .char-avatar {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: var(--space-4);
-    }
-    .char-avatar__face { width: 80px; height: 80px; }
-    .char-avatar__score {
-      font-family: var(--font-display);
-      font-size: 56px;
-      color: var(--accent);
-      line-height: 1;
-    }
-    .char-avatar__score-label {
-      font-size: var(--text-2xs);
+    .sources-table__header {
+      padding: var(--space-3) var(--space-5);
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 9px;
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
-      color: var(--text-faint);
+      color: var(--tier-accent);
     }
-    .char-avatar__state {
+    .sources-row {
+      display: grid;
+      grid-template-columns: 90px 1fr;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-5);
+      border-bottom: 1px solid var(--border-subtle);
       font-size: var(--text-xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
+    }
+    .sources-row:last-child { border-bottom: none; }
+    .sources-row__name { color: var(--tier-accent); font-family: var(--font-mono); }
+    .sources-row__desc { color: var(--text-muted); }
+
+    /* ── LEVEL-UP NOTIFICATION CTA (Phase C) ─────────────────── */
+    .levelup-cta {
+      max-width: 520px;
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      text-align: center;
+    }
+    .levelup-cta__icon { font-size: 32px; margin-bottom: var(--space-4); }
+    .levelup-cta__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .levelup-cta__desc {
+      font-size: var(--text-sm);
       color: var(--text-muted);
+      line-height: var(--lh-body);
+      margin-bottom: var(--space-6);
+    }
+    .levelup-cta__form {
+      display: flex;
+      gap: var(--space-2);
+      max-width: 380px;
+      margin: 0 auto;
+    }
+    .levelup-cta__input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--tier-accent);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      padding: var(--space-3) var(--space-4);
+      outline: none;
+    }
+    .levelup-cta__input:focus { box-shadow: 0 0 0 1px var(--tier-accent); }
+    .levelup-cta__btn {
+      background: var(--tier-accent);
+      color: var(--bg);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      letter-spacing: var(--ls-label);
+      text-transform: uppercase;
+      padding: var(--space-3) var(--space-5);
+      border: 1px solid var(--tier-accent);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity var(--dur-fast);
+    }
+    .levelup-cta__btn:hover { opacity: 0.85; }
+    .levelup-cta__msg {
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-tag);
+      margin-top: var(--space-3);
+      min-height: 1em;
     }
 
+    /* ── RESPONSIVE ──────────────────────────────────────────── */
     @media (max-width: 900px) {
-      .character-card { grid-template-columns: 1fr; }
-      .cc-left { border-right: none; border-bottom: 1px solid var(--border); }
+      .tc-top { grid-template-columns: auto 1fr; }
+      .tc-composite { border-left: none; border-top: 1px solid var(--border-subtle); grid-column: 1 / -1; display: flex; align-items: center; gap: var(--space-4); justify-content: center; padding: var(--space-3); }
+      .tc-pillars { grid-template-columns: repeat(4, 1fr); }
+      .radar-layout { grid-template-columns: 1fr; }
       .pillars-grid { grid-template-columns: 1fr 1fr; }
-      .event-row { grid-template-columns: 90px 40px 1fr; }
-      .event-levels { display: none; }
-      .intro-grid { grid-template-columns: 1fr !important; }
+      .intro-cols { grid-template-columns: 1fr; }
+      .next-grid { grid-template-columns: 1fr; }
+      .method-grid { grid-template-columns: 1fr; }
       .badges-grid { grid-template-columns: 1fr 1fr; }
     }
     @media (max-width: 600px) {
+      .tc-pillars { grid-template-columns: repeat(3, 1fr); }
+      .tc-footer__stats { gap: var(--space-4); }
+      .tc-footer { flex-direction: column; gap: var(--space-3); }
       .badges-grid { grid-template-columns: 1fr; }
+      .hero-card { padding-left: var(--page-padding-sm); padding-right: var(--page-padding-sm); }
     }
   </style>
 </head>
-<body>
+<body data-tier="foundation">
 
 <div id="amj-nav"></div>
-</div>
 
-
-
-
-
-
-
-<div class="page-header">
-  <div class="eyebrow page-header__kicker">The Data</div>
-  <h1 class="page-header__title">Level <span id="h-level">2</span> — <span id="h-tier">Foundation</span></h1>
-  <p class="page-header__sub">Life optimization tracked across 7 pillars. Scores are computed nightly from real wearable, habit, and biometric data — not self-reported.</p>
-</div>
-
-<!-- Live state banner — populated by hydrate() -->
-<div id="char-state-banner" style="max-width:var(--max-width);margin:0 auto;padding:var(--space-4) var(--page-padding);border-bottom:1px solid var(--border);background:var(--surface);display:flex;flex-wrap:wrap;gap:var(--space-6);align-items:center;">
-  <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">
-    <span style="color:var(--accent)" id="cbs-level">Level —</span>
-    <span style="color:var(--border-subtle)">&nbsp;·&nbsp;</span>
-    <span id="cbs-tier">—</span>
-    <span style="color:var(--border-subtle)">&nbsp;·&nbsp;</span>
-    <span id="cbs-days">— days active</span>
+<!-- ═══ HERO: TRADING CARD ═══ -->
+<section class="hero-card reveal">
+  <div class="trading-card" id="trading-card">
+    <div class="tc-top">
+      <div class="tc-emblem" id="tc-emblem">
+        <!-- SVG emblem injected by JS based on tier -->
+      </div>
+      <div class="tc-identity">
+        <div class="tc-class" id="tc-class">Foundation · Level 2</div>
+        <div class="tc-name">Matthew Walker</div>
+        <div class="tc-subtitle" id="tc-subtitle">// 20 days active · 38 total XP</div>
+      </div>
+      <div class="tc-composite">
+        <div class="tc-composite__num" id="tc-score">—</div>
+        <div class="tc-composite__label">Score</div>
+      </div>
+    </div>
+    <div class="tc-pillars" id="tc-pillars">
+      <!-- 7 pillar mini-cards injected by JS -->
+    </div>
+    <div class="tc-footer">
+      <div class="tc-footer__stats" id="tc-stats">
+        <div class="tc-stat"><div class="tc-stat__label">XP</div><div class="tc-stat__value" id="tc-xp">38</div></div>
+        <div class="tc-stat"><div class="tc-stat__label">Days</div><div class="tc-stat__value" id="tc-days">20</div></div>
+        <div class="tc-stat"><div class="tc-stat__label">Events</div><div class="tc-stat__value" id="tc-events">16</div></div>
+        <div class="tc-stat"><div class="tc-stat__label">Next Tier</div><div class="tc-stat__value" id="tc-nexttier">Lv 21</div></div>
+      </div>
+      <div class="tc-footer__tier-path" id="tc-tierpath">
+        <!-- Tier dots injected by JS -->
+      </div>
+    </div>
   </div>
-  <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">
-    Strongest:&nbsp;<span id="cbs-strongest" style="color:var(--c-green-500)">—</span>
-    <span style="color:var(--border-subtle)">&nbsp;→&nbsp;</span>
-    Bottleneck:&nbsp;<span id="cbs-bottleneck" style="color:var(--c-yellow-status)">—</span>
-  </div>
-</div>
-
-<!-- CHAR-1: Thesis opener -->
-<section class="reveal" style="padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border);background:var(--surface);">
-  <p style="font-size:var(--text-lg);color:var(--text);line-height:1.6;max-width:720px;font-family:var(--font-serif);font-style:italic;">
-    &ldquo;Weight is one number. This system measures whether I&rsquo;m actually becoming a happier, healthier, more connected human&nbsp;&mdash; and turns it into a game I can&rsquo;t cheat.&rdquo;
-  </p>
-  <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-tag);margin-top:var(--space-3)">// 7 pillars · scored from live data · no self-reporting</p>
 </section>
 
-<!-- Intro narrative -->
-<section class="reveal" style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border);">
-  <div class="intro-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-12);align-items:start;">
+<!-- ═══ LEVEL UP IMMINENT BANNER ═══ -->
+<div class="levelup-banner" id="levelup-banner">
+  <span class="levelup-banner__icon">⚡</span>
+  <span class="levelup-banner__text" id="levelup-text">Level up imminent</span>
+  <span class="levelup-banner__sub" id="levelup-sub"></span>
+</div>
+
+<!-- ═══ NEXT LEVEL REQUIREMENTS (moved up) ═══ -->
+<section class="next-section reveal" id="next-section">
+  <div class="eyebrow">Progression</div>
+  <h2 class="text-h3" style="color:var(--text)">What needs to move</h2>
+  <div class="next-grid" id="next-grid">
+    <!-- Injected by JS -->
+  </div>
+</section>
+
+<!-- ═══ INTRO + TIER FLAVORS ═══ -->
+<section class="intro-brief reveal">
+  <div class="intro-cols">
     <div>
-      <h2 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">The Character Sheet</h2>
-      <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-4)">This isn't a weight tracker. It's an experiment: can you quantify whether someone is actually becoming a better version of themselves? Seven pillars. Each measured from real data. No self-reporting. The score is honest, and it's public — because accountability to an audience is itself a performance variable.</p>
-      <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-4)">Every night, <span data-const="platform.data_sources">19</span> data sources feed a scoring engine that grades yesterday across 7 pillars — Sleep, Movement, Nutrition, Metabolic, Mind, Social, Consistency. Each pillar has a raw score of 0–100. The composite becomes your Character Score, which drives level progression on a logarithmic XP curve.</p>
-      <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body)">The tier system — Foundation → Momentum → Chisel → Elite — requires not just a high score today, but sustained performance over multiple weeks. A single great day doesn't level you up. A month of great days does.</p>
+      <h2 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">The Game</h2>
+      <p>This isn't a weight tracker. It's an RPG for real life. Seven pillars, each scored from live wearable and biometric data — no self-reporting. The score is honest, and it's public, because accountability to an audience is itself a performance variable.</p>
+      <p>Every night, <span data-const="platform.data_sources">19</span> data sources feed a scoring engine that grades yesterday across Sleep, Movement, Nutrition, Metabolic, Mind, Social, and Consistency. The composite drives level progression on a logarithmic XP curve — early levels come fast, higher levels demand sustained performance across all pillars.</p>
+      <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-label);margin-bottom:0">// 7 pillars · scored nightly · no self-reporting · logarithmic XP curve</p>
     </div>
     <div>
-      <div style="border:1px solid var(--border);background:var(--surface);padding:var(--space-6);">
-        <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-5)">// what each tier means</div>
-        <div style="display:flex;flex-direction:column;gap:var(--space-4);">
-          <div id="td-foundation" style="display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
-            <span style="font-family:var(--font-mono)" class="td-name">Foundation</span>
-            <span class="td-desc">Building consistent habits. Weeks 1–4. Most people live here permanently.</span>
-          </div>
-          <div id="td-momentum" style="display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
-            <span style="font-family:var(--font-mono)" class="td-name">Momentum</span>
-            <span class="td-desc">Habits are automated. Progress is measurable. The compound curve starts.</span>
-          </div>
-          <div id="td-chisel" style="display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
-            <span style="font-family:var(--font-mono)" class="td-name">Chisel</span>
-            <span class="td-desc">Optimizing from a stable base. Active experiments running.</span>
-          </div>
-          <div id="td-elite" style="display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
-            <span style="font-family:var(--font-mono)" class="td-name">Elite</span>
-            <span class="td-desc">All 7 pillars performing simultaneously. The rarest state.</span>
-          </div>
+      <div class="tier-flavors" id="tier-flavors">
+        <div class="tier-flavors__header">// Tier progression</div>
+        <div class="tf-row" id="tf-foundation">
+          <div class="tf-row__icon">🔨</div>
+          <div class="tf-row__name">Foundation</div>
+          <div class="tf-row__desc">The proving ground. You're building the infrastructure everything else depends on. Most people never leave this tier.</div>
+        </div>
+        <div class="tf-row" id="tf-momentum">
+          <div class="tf-row__icon">🔥</div>
+          <div class="tf-row__name">Momentum</div>
+          <div class="tf-row__desc">The habits are automated. The compound curve has started. You don't have to think about whether to show up — you just do.</div>
+        </div>
+        <div class="tf-row" id="tf-discipline">
+          <div class="tf-row__icon">⚔️</div>
+          <div class="tf-row__name">Discipline</div>
+          <div class="tf-row__desc">Optimizing from a stable base. Running experiments. The hard part isn't starting anymore — it's not stopping.</div>
+        </div>
+        <div class="tf-row" id="tf-mastery">
+          <div class="tf-row__icon">🏆</div>
+          <div class="tf-row__name">Mastery</div>
+          <div class="tf-row__desc">All 7 pillars performing. Experiments producing discoveries. The system works, and you're refining it.</div>
+        </div>
+        <div class="tf-row" id="tf-elite">
+          <div class="tf-row__icon">👑</div>
+          <div class="tf-row__name">Elite</div>
+          <div class="tf-row__desc">The rarest state. Sustained peak across every dimension. Most people see this once. You live here.</div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- Avatar -->
-<section class="char-avatar-section reveal">
-  <div class="char-avatar">
-    <svg class="char-avatar__face" id="avatar-face" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="40" cy="40" r="38" fill="var(--surface)" stroke="var(--border)" stroke-width="2"/>
-    </svg>
-    <div class="char-avatar__score" id="avatar-score">—</div>
-    <div class="char-avatar__score-label">composite score</div>
-    <div class="char-avatar__state" id="avatar-state">// loading</div>
-  </div>
-</section>
-
-<!-- Main character card -->
-<div class="character-card reveal">
-  <div class="cc-left">
-    <div class="cc-level-ring">
-      <div class="cc-level-num" id="cc-level">2</div>
-      <div class="cc-level-label">Level</div>
-    </div>
-    <div class="cc-title" id="cc-name">Matthew Walker</div>
-    <div class="cc-tier" id="cc-tier">🔨 Foundation tier</div>
-    <div class="cc-stats">
-      <div class="cc-stat">
-        <div class="cc-stat__label">Total XP</div>
-        <div class="cc-stat__value" id="cc-xp">38</div>
-      </div>
-      <div class="cc-stat">
-        <div class="cc-stat__label">Days active</div>
-        <div class="cc-stat__value" id="cc-days">20</div>
-      </div>
-      <div class="cc-stat">
-        <div class="cc-stat__label">Level events</div>
-        <div class="cc-stat__value" id="cc-events">16</div>
-      </div>
-      <div class="cc-stat">
-        <div class="cc-stat__label">Next tier</div>
-        <div class="cc-stat__value" id="cc-next">Lv 21</div>
-      </div>
-    </div>
-  </div>
-  <div class="cc-right">
-    <div class="label" style="margin-bottom:var(--space-5)">Tier progression</div>
-    <div class="cc-tier-map" id="tier-map">
-      <!-- Injected by JS -->
-    </div>
-    <div class="label label-accent" style="margin-top:var(--space-4)">// Tiers unlock through sustained performance over multiple weeks. Level 21 required for Momentum.</div>
-  </div>
-</div>
-
-<!-- Radar chart -->
+<!-- ═══ RADAR CHART ═══ -->
 <section class="radar-section reveal">
   <div class="eyebrow">Pillar radar</div>
   <div class="radar-layout">
@@ -684,22 +1048,19 @@
       <svg id="radar-svg" viewBox="0 0 400 400" width="400" height="400" xmlns="http://www.w3.org/2000/svg" style="cursor:pointer;max-width:100%;"></svg>
     </div>
     <div>
-      <div class="label label-accent" style="margin-bottom:var(--space-5);">Score breakdown</div>
-      <div class="radar-bars" id="radar-bars"></div>
-      <div style="margin-top:var(--space-6);padding-top:var(--space-6);border-top:1px solid var(--border);">
-        <div class="label" style="margin-bottom:var(--space-4);">Score legend</div>
-        <div style="display:flex;gap:var(--space-6);flex-wrap:wrap;">
-          <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-xs);color:var(--text-muted);"><div style="width:8px;height:8px;background:#1D9E75;border-radius:50%;"></div> 50+ strong</div>
-          <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-xs);color:var(--text-muted);"><div style="width:8px;height:8px;background:#BA7517;border-radius:50%;"></div> 25–49 building</div>
-          <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-xs);color:var(--text-muted);"><div style="width:8px;height:8px;background:#E24B4A;border-radius:50%;"></div> &lt;25 focus area</div>
-          <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-xs);color:var(--text-muted);"><div style="width:8px;height:8px;background:#4a6050;border-radius:50%;"></div> no data</div>
-        </div>
+      <div style="font-size:9px;letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--tier-accent);margin-bottom:var(--space-5)">Score breakdown</div>
+      <div class="stat-bars" id="stat-bars"></div>
+      <div class="score-legend">
+        <div class="score-legend__item"><div class="score-legend__dot" style="background:#1D9E75"></div> 50+ strong</div>
+        <div class="score-legend__item"><div class="score-legend__dot" style="background:#BA7517"></div> 25–49 building</div>
+        <div class="score-legend__item"><div class="score-legend__dot" style="background:#E24B4A"></div> &lt;25 focus area</div>
+        <div class="score-legend__item"><div class="score-legend__dot" style="background:#4a6050"></div> no data</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- Pillars -->
+<!-- ═══ PILLAR CARDS + SPARKLINES ═══ -->
 <section class="pillars-section reveal">
   <div class="eyebrow">7 pillars</div>
   <h2 class="text-h3" style="color:var(--text)">Pillar scores</h2>
@@ -708,17 +1069,16 @@
   </div>
 </section>
 
-<!-- FEAT-10: Next Level Requirements -->
-<section class="next-level-section reveal" id="next-level-section">
-  <div class="eyebrow">Progression</div>
-  <h2 class="text-h3" style="color:var(--text)">Next Level Requirements</h2>
-  <p style="font-size:var(--text-sm);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);margin-top:var(--space-3)">What needs to move to get to the next level. The bottleneck pillar is the weakest link — improving it has the highest leverage.</p>
-  <div class="next-level-grid" id="next-level-grid">
+<!-- ═══ VISUAL TIMELINE ═══ -->
+<section class="timeline-section reveal">
+  <div class="eyebrow">Level history</div>
+  <h2 class="text-h3" style="color:var(--text)">Event log</h2>
+  <div class="visual-timeline" id="visual-timeline">
     <!-- Injected by JS -->
   </div>
 </section>
 
-<!-- CHAR-4: Pillar independence heatmap -->
+<!-- ═══ PILLAR HEATMAP ═══ -->
 <section class="heatmap-section reveal" id="heatmap-section" style="display:none">
   <div class="eyebrow">Pillar history</div>
   <h2 class="text-h3" style="color:var(--text)">Weekly pillar heatmap</h2>
@@ -732,668 +1092,691 @@
   </div>
 </section>
 
-<!-- Timeline -->
-<section class="timeline-section reveal">
-  <div class="eyebrow">Level history</div>
-  <h2 class="text-h3" style="color:var(--text)">Event log</h2>
-  <div class="event-list" id="event-list">
-    <!-- Injected by JS -->
-  </div>
-</section>
-
-<!-- Achievement Badges -->
+<!-- ═══ ACHIEVEMENT BADGES ═══ -->
 <section class="badges-section reveal" id="badges-section">
   <div class="eyebrow">Achievements</div>
   <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-2)">Achievement Badges</h2>
-  <p style="font-size:var(--text-sm);color:var(--text-muted);max-width:560px;line-height:var(--lh-body)">Earned through sustained effort. Locked badges show the requirement — earned badges show the date unlocked. Dynamically updated from live data.</p>
+  <p style="font-size:var(--text-sm);color:var(--text-muted);max-width:560px;line-height:var(--lh-body)">Earned through sustained effort. Locked badges show the requirement. Earned badges glow.</p>
 
-  <div class="badges-group-label">// streaks</div>
-  <div class="badges-grid" id="badge-grid-streaks">
-    <div class="badge-card" id="badge-week-warrior">
-      <div class="badge-card__icon">🔥</div>
-      <div class="badge-card__name">Week Warrior</div>
-      <div class="badge-card__desc">7-day Tier 0 streak maintained.</div>
-      <div class="badge-card__status" id="badge-week-warrior-status">Requires 7-day streak</div>
+  <!-- Streaks -->
+  <div class="badge-group open" id="bg-streaks">
+    <div class="badge-group__header" onclick="this.parentElement.classList.toggle('open')">
+      <span class="badge-group__title">Streaks</span>
+      <span class="badge-group__count" id="bg-streaks-count"></span>
+      <span class="badge-group__chevron">▼</span>
     </div>
-    <div class="badge-card" id="badge-monthly-grind">
-      <div class="badge-card__icon">🔥🔥</div>
-      <div class="badge-card__name">Monthly Grind</div>
-      <div class="badge-card__desc">30-day Tier 0 streak without breaking.</div>
-      <div class="badge-card__status">Requires 30-day streak</div>
-    </div>
-    <div class="badge-card" id="badge-quarterly">
-      <div class="badge-card__icon">🔥🔥🔥</div>
-      <div class="badge-card__name">Quarterly</div>
-      <div class="badge-card__desc">90-day Tier 0 streak. The long game.</div>
-      <div class="badge-card__status">Requires 90-day streak</div>
+    <div class="badge-group__body">
+      <div class="badges-grid" id="badge-grid-streaks">
+        <div class="badge-card" id="badge-week-warrior"><div class="badge-card__icon">🔥</div><div class="badge-card__name">Week Warrior</div><div class="badge-card__desc">7-day Tier 0 streak</div><div class="badge-card__status" id="badge-week-warrior-status">Requires 7-day streak</div></div>
+        <div class="badge-card" id="badge-monthly-grind"><div class="badge-card__icon">🔥🔥</div><div class="badge-card__name">Monthly Grind</div><div class="badge-card__desc">30-day Tier 0 streak</div><div class="badge-card__status">Requires 30-day streak</div></div>
+        <div class="badge-card" id="badge-quarterly"><div class="badge-card__icon">🔥🔥🔥</div><div class="badge-card__name">Quarterly</div><div class="badge-card__desc">90-day Tier 0 streak</div><div class="badge-card__status">Requires 90-day streak</div></div>
+      </div>
     </div>
   </div>
 
-  <div class="badges-group-label">// level milestones</div>
-  <div class="badges-grid" id="badge-grid-levels">
-    <div class="badge-card earned" id="badge-first-levelup">
-      <div class="badge-card__icon">⬡</div>
-      <div class="badge-card__name">First Level Up</div>
-      <div class="badge-card__desc">Reached Level 2 — the system is working.</div>
-      <div class="badge-date-chip">Earned</div>
-      <div class="badge-card__status">Unlocked</div>
+  <!-- Levels -->
+  <div class="badge-group open" id="bg-levels">
+    <div class="badge-group__header" onclick="this.parentElement.classList.toggle('open')">
+      <span class="badge-group__title">Level milestones</span>
+      <span class="badge-group__count" id="bg-levels-count"></span>
+      <span class="badge-group__chevron">▼</span>
     </div>
-    <div class="badge-card" id="badge-apprentice">
-      <div class="badge-card__icon">⬡⬡</div>
-      <div class="badge-card__name">Apprentice</div>
-      <div class="badge-card__desc">Reached Level 5 across all pillars.</div>
-      <div class="badge-card__status" id="badge-apprentice-status">Requires Level 5</div>
-    </div>
-    <div class="badge-card" id="badge-journeyman">
-      <div class="badge-card__icon">⬡⬡⬡</div>
-      <div class="badge-card__name">Journeyman</div>
-      <div class="badge-card__desc">Reached Level 10 — sustained performer.</div>
-      <div class="badge-card__status">Requires Level 10</div>
+    <div class="badge-group__body">
+      <div class="badges-grid" id="badge-grid-levels">
+        <div class="badge-card earned" id="badge-first-levelup"><div class="badge-card__icon">⬡</div><div class="badge-card__name">First Level Up</div><div class="badge-card__desc">Reached Level 2</div><div class="badge-date-chip">Earned</div><div class="badge-card__status">Unlocked</div></div>
+        <div class="badge-card" id="badge-apprentice"><div class="badge-card__icon">⬡⬡</div><div class="badge-card__name">Apprentice</div><div class="badge-card__desc">Reached Level 5</div><div class="badge-card__status" id="badge-apprentice-status">Requires Level 5</div></div>
+        <div class="badge-card" id="badge-journeyman"><div class="badge-card__icon">⬡⬡⬡</div><div class="badge-card__name">Journeyman</div><div class="badge-card__desc">Reached Level 10</div><div class="badge-card__status">Requires Level 10</div></div>
+      </div>
     </div>
   </div>
 
-  <div class="badges-group-label">// weight milestones</div>
-  <div class="badges-grid" id="badge-grid-weight">
-    <div class="badge-card earned" id="badge-minus20">
-      <div class="badge-card__icon">⚖️</div>
-      <div class="badge-card__name">-20 lbs</div>
-      <div class="badge-card__desc">First 20 pounds lost from starting weight.</div>
-      <div class="badge-date-chip">Earned</div>
-      <div class="badge-card__status">Unlocked</div>
+  <!-- Weight -->
+  <div class="badge-group open" id="bg-weight">
+    <div class="badge-group__header" onclick="this.parentElement.classList.toggle('open')">
+      <span class="badge-group__title">Weight milestones</span>
+      <span class="badge-group__count" id="bg-weight-count"></span>
+      <span class="badge-group__chevron">▼</span>
     </div>
-    <div class="badge-card" id="badge-sub280">
-      <div class="badge-card__icon">⚖️⚖️</div>
-      <div class="badge-card__name">Sub-280</div>
-      <div class="badge-card__desc">Weight reading below 280 lbs confirmed.</div>
-      <div class="badge-card__status" id="badge-sub280-status">Checking live data…</div>
-    </div>
-    <div class="badge-card" id="badge-sub260">
-      <div class="badge-card__icon">⚖️⚖️⚖️</div>
-      <div class="badge-card__name">Sub-260</div>
-      <div class="badge-card__desc">Weight reading below 260 lbs confirmed.</div>
-      <div class="badge-card__status">Requires weight &lt; 260 lbs</div>
+    <div class="badge-group__body">
+      <div class="badges-grid" id="badge-grid-weight">
+        <div class="badge-card earned" id="badge-minus20"><div class="badge-card__icon">⚖️</div><div class="badge-card__name">-20 lbs</div><div class="badge-card__desc">First 20 pounds lost</div><div class="badge-date-chip">Earned</div><div class="badge-card__status">Unlocked</div></div>
+        <div class="badge-card" id="badge-sub280"><div class="badge-card__icon">⚖️⚖️</div><div class="badge-card__name">Sub-280</div><div class="badge-card__desc">Weight below 280 lbs</div><div class="badge-card__status" id="badge-sub280-status">Checking…</div></div>
+        <div class="badge-card" id="badge-sub260"><div class="badge-card__icon">⚖️⚖️⚖️</div><div class="badge-card__name">Sub-260</div><div class="badge-card__desc">Weight below 260 lbs</div><div class="badge-card__status">Requires &lt; 260 lbs</div></div>
+      </div>
     </div>
   </div>
 
-  <div class="badges-group-label">// data consistency</div>
-  <div class="badges-grid" id="badge-grid-data">
-    <div class="badge-card earned" id="badge-100days">
-      <div class="badge-card__icon">📊</div>
-      <div class="badge-card__name">100 Days Tracked</div>
-      <div class="badge-card__desc">100+ days of habit log data recorded.</div>
-      <div class="badge-date-chip">Earned</div>
-      <div class="badge-card__status">Unlocked</div>
+  <!-- Data -->
+  <div class="badge-group" id="bg-data">
+    <div class="badge-group__header" onclick="this.parentElement.classList.toggle('open')">
+      <span class="badge-group__title">Data consistency</span>
+      <span class="badge-group__count" id="bg-data-count"></span>
+      <span class="badge-group__chevron">▼</span>
     </div>
-    <div class="badge-card" id="badge-365days">
-      <div class="badge-card__icon">📊📊</div>
-      <div class="badge-card__name">365 Days Tracked</div>
-      <div class="badge-card__desc">One full year of continuous data.</div>
-      <div class="badge-card__status" id="badge-365days-status">Checking live data…</div>
+    <div class="badge-group__body">
+      <div class="badges-grid" id="badge-grid-data">
+        <div class="badge-card earned" id="badge-100days"><div class="badge-card__icon">📊</div><div class="badge-card__name">100 Days Tracked</div><div class="badge-card__desc">100+ days of data</div><div class="badge-date-chip">Earned</div><div class="badge-card__status">Unlocked</div></div>
+        <div class="badge-card" id="badge-365days"><div class="badge-card__icon">📊📊</div><div class="badge-card__name">365 Days Tracked</div><div class="badge-card__desc">One full year</div><div class="badge-card__status" id="badge-365days-status">Checking…</div></div>
+        <div class="badge-card" style="visibility:hidden"></div>
+      </div>
     </div>
-    <div class="badge-card" style="visibility:hidden;pointer-events:none;"></div>
   </div>
 
-  <div class="badges-group-label">// experiments</div>
-  <div class="badges-grid" id="badge-grid-experiments">
-    <div class="badge-card earned" id="badge-first-experiment">
-      <div class="badge-card__icon">🔬</div>
-      <div class="badge-card__name">First Experiment</div>
-      <div class="badge-card__desc">Completed the first structured N=1 experiment.</div>
-      <div class="badge-date-chip">Earned</div>
-      <div class="badge-card__status">Unlocked</div>
+  <!-- Experiments -->
+  <div class="badge-group" id="bg-experiments">
+    <div class="badge-group__header" onclick="this.parentElement.classList.toggle('open')">
+      <span class="badge-group__title">Experiments</span>
+      <span class="badge-group__count" id="bg-experiments-count"></span>
+      <span class="badge-group__chevron">▼</span>
     </div>
-    <div class="badge-card" id="badge-hypothesis-confirmed">
-      <div class="badge-card__icon">🔬🔬</div>
-      <div class="badge-card__name">Hypothesis Confirmed</div>
-      <div class="badge-card__desc">N=1 result validated with statistical confidence.</div>
-      <div class="badge-card__status">Requires validated experiment result</div>
+    <div class="badge-group__body">
+      <div class="badges-grid" id="badge-grid-experiments">
+        <div class="badge-card earned" id="badge-first-experiment"><div class="badge-card__icon">🔬</div><div class="badge-card__name">First Experiment</div><div class="badge-card__desc">Completed first N=1</div><div class="badge-date-chip">Earned</div><div class="badge-card__status">Unlocked</div></div>
+        <div class="badge-card" id="badge-hypothesis-confirmed"><div class="badge-card__icon">🔬🔬</div><div class="badge-card__name">Hypothesis Confirmed</div><div class="badge-card__desc">Validated with confidence</div><div class="badge-card__status">Requires validation</div></div>
+        <div class="badge-card" style="visibility:hidden"></div>
+      </div>
     </div>
-    <div class="badge-card" style="visibility:hidden;pointer-events:none;"></div>
   </div>
 </section>
 
-<!-- WR-37: Scoring methodology transparency -->
-<section class="reveal" style="padding:var(--space-12) var(--page-padding);border-top:1px solid var(--border);">
+<!-- ═══ METHODOLOGY ═══ -->
+<section class="method-section reveal">
   <div class="eyebrow">Methodology</div>
-  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-6)">How scores are computed</h2>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-8);">
+  <h2 class="text-h3" style="color:var(--text)">How scores are computed</h2>
+  <div class="method-grid">
     <div>
-      <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-4)">Each pillar’s raw score (0–100) is computed nightly from real wearable, habit, and biometric data — not self-reported. Scores feed into an XP system that determines character level.</p>
-      <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-4)">Pillar weights are configurable but currently equal (14.3% each). The composite Character Score is the weighted average of all 7 pillars. Level progression uses a logarithmic XP curve — early levels come fast, higher levels require sustained performance.</p>
-      <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-label)">// Full algorithm: <a href="/platform/" style="color:var(--accent-dim);text-decoration:none;">see platform architecture</a></p>
+      <p>Each pillar's raw score (0–100) is computed nightly from real wearable, habit, and biometric data — not self-reported. Scores feed into an XP system that determines character level.</p>
+      <p>Pillar weights are configurable but currently equal (14.3% each). The composite Character Score is the weighted average. Level progression uses a logarithmic XP curve — early levels come fast, higher levels require sustained performance.</p>
+      <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-label);margin-bottom:0">// Full algorithm: <a href="/platform/" style="color:var(--tier-accent);text-decoration:none;">see platform architecture</a></p>
     </div>
-    <div style="border:1px solid var(--border);background:var(--surface);">
-      <div style="padding:var(--space-4) var(--space-5);border-bottom:1px solid var(--border-subtle);">
-        <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim)">// pillar data sources</span>
-      </div>
-      <div style="padding:var(--space-3) var(--space-5);border-bottom:1px solid var(--border-subtle);display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
-        <span style="color:var(--accent);font-family:var(--font-mono)">Sleep</span>
-        <span style="color:var(--text-muted)">Whoop sleep score, Eight Sleep data, sleep duration + efficiency</span>
-      </div>
-      <div style="padding:var(--space-3) var(--space-5);border-bottom:1px solid var(--border-subtle);display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
-        <span style="color:var(--accent);font-family:var(--font-mono)">Movement</span>
-        <span style="color:var(--text-muted)">Strava/Garmin activities, Zone 2 minutes, ACWR ratio, step count</span>
-      </div>
-      <div style="padding:var(--space-3) var(--space-5);border-bottom:1px solid var(--border-subtle);display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
-        <span style="color:var(--accent);font-family:var(--font-mono)">Nutrition</span>
-        <span style="color:var(--text-muted)">MacroFactor calories, protein target, deficit compliance</span>
-      </div>
-      <div style="padding:var(--space-3) var(--space-5);border-bottom:1px solid var(--border-subtle);display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
-        <span style="color:var(--accent);font-family:var(--font-mono)">Metabolic</span>
-        <span style="color:var(--text-muted)">Withings weight, Dexcom CGM glucose, blood pressure, labs</span>
-      </div>
-      <div style="padding:var(--space-3) var(--space-5);border-bottom:1px solid var(--border-subtle);display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
-        <span style="color:var(--accent);font-family:var(--font-mono)">Mind</span>
-        <span style="color:var(--text-muted)">Notion journal sentiment, state-of-mind log, Habitify mindfulness habits</span>
-      </div>
-      <div style="padding:var(--space-3) var(--space-5);border-bottom:1px solid var(--border-subtle);display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
-        <span style="color:var(--accent);font-family:var(--font-mono)">Social</span>
-        <span style="color:var(--text-muted)">Interaction log frequency + depth, journal social references</span>
-      </div>
-      <div style="padding:var(--space-3) var(--space-5);display:grid;grid-template-columns:90px 1fr;gap:var(--space-3);font-size:var(--text-xs);">
-        <span style="color:var(--accent);font-family:var(--font-mono)">Consist.</span>
-        <span style="color:var(--text-muted)">Habitify T0 streak, vice streak days, Todoist completion rate</span>
-      </div>
+    <div class="sources-table">
+      <div class="sources-table__header">// pillar data sources</div>
+      <div class="sources-row"><span class="sources-row__name">Sleep</span><span class="sources-row__desc">Whoop sleep score, Eight Sleep, duration + efficiency</span></div>
+      <div class="sources-row"><span class="sources-row__name">Movement</span><span class="sources-row__desc">Strava/Garmin, Zone 2, ACWR, step count</span></div>
+      <div class="sources-row"><span class="sources-row__name">Nutrition</span><span class="sources-row__desc">MacroFactor calories, protein target, deficit compliance</span></div>
+      <div class="sources-row"><span class="sources-row__name">Metabolic</span><span class="sources-row__desc">Withings weight, Dexcom CGM, blood pressure, labs</span></div>
+      <div class="sources-row"><span class="sources-row__name">Mind</span><span class="sources-row__desc">Notion journal sentiment, state-of-mind, mindfulness habits</span></div>
+      <div class="sources-row"><span class="sources-row__name">Social</span><span class="sources-row__desc">Interaction log frequency + depth, journal references</span></div>
+      <div class="sources-row"><span class="sources-row__name">Consist.</span><span class="sources-row__desc">Habitify T0 streak, vice streaks, Todoist completion</span></div>
     </div>
   </div>
 </section>
 
-<!-- N=1 Disclaimer -->
-<aside style="
-  max-width: var(--prose-width);
-  margin: 0 auto;
-  padding: var(--space-10) var(--page-padding);
-  border-top: 1px solid var(--border-subtle);
-">
-  <p style="
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text-faint);
-    line-height: var(--lh-body);
-    letter-spacing: var(--ls-label);
-  ">
-    <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
-    This is a single-person experiment. Correlations observed in this data may not
-    apply to anyone else. I track everything to make better decisions for myself,
-    not to prove universal principles. Where I note that X correlates with Y, I
-    mean in my data, during this period, with confounders I can’t fully control for.
+<!-- ═══ N=1 DISCLAIMER ═══ -->
+<aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-bottom:1px solid var(--border-subtle);">
+  <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label);">
+    <span style="color:var(--tier-accent)">// N=1 DISCLAIMER</span><br>
+    This is a single-person experiment. Correlations observed may not apply to anyone else.
+    I track everything to make better decisions for myself, not to prove universal principles.
   </p>
 </aside>
 
-<!-- S2-T1-8: Email CTA footer — injected by add_email_cta.py -->
-<div id="amj-subscribe"></div>
-<!-- Mobile bottom nav -->
-<div id="amj-bottom-nav"></div>
+<!-- ═══ LEVEL-UP NOTIFICATION CTA (Phase C) ═══ -->
+<section class="levelup-cta reveal">
+  <div class="levelup-cta__icon">⚡</div>
+  <h3 class="levelup-cta__title">Get notified when I level up</h3>
+  <p class="levelup-cta__desc">One email per level-up. No spam, no weekly digest — just the moment the number ticks. You'll see it before anyone else.</p>
+  <div class="levelup-cta__form">
+    <input class="levelup-cta__input" type="email" id="levelup-email" placeholder="your@email.com">
+    <button class="levelup-cta__btn" onclick="subscribeLevelUp()">Notify me</button>
+  </div>
+  <p class="levelup-cta__msg" id="levelup-msg"></p>
+</section>
 
+<!-- ═══ STANDARD SUBSCRIBE + FOOTER ═══ -->
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
 <div id="amj-reading-path"></div>
 <div id="amj-footer"></div>
 
+<!-- Reading path -->
+<section class="reading-path reveal" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
+  <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>
+  <a href="/habits/" style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--tier-accent);text-decoration:none;letter-spacing:var(--ls-display);">The habits that feed the score →</a>
+  <p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">65 daily habits tracked — adherence, streaks, and keystones</p>
+</section>
+
 <script>
-  const DEFAULTS = { character:{ level:2, tier:'Foundation', tier_emoji:'🔨', xp_total:38, days_active:20, level_events_count:16, next_tier:'Momentum', next_tier_level:21 }, pillars:[ { name:'sleep', emoji:'😴', level:2, raw_score:60.0, xp_delta:2, trend:'up' }, { name:'movement', emoji:'🏋️', level:2, raw_score:0.0, xp_delta:-1, trend:'neutral' }, { name:'nutrition', emoji:'🥗', level:2, raw_score:12.2, xp_delta:-1, trend:'neutral' }, { name:'metabolic', emoji:'📊', level:2, raw_score:40.0, xp_delta:1, trend:'up' }, { name:'mind', emoji:'🧠', level:2, raw_score:7.1, xp_delta:-1, trend:'neutral' }, { name:'relationships', emoji:'💬', level:2, raw_score:40.0, xp_delta:1, trend:'up' }, { name:'consistency', emoji:'🎯', level:2, raw_score:14.3, xp_delta:-1, trend:'neutral' } ], timeline:[ { date:'2026-02-22', character_level:1, event:'Platform activated' }, { date:'2026-02-26', character_level:2, event:'First level up — all pillars' }, { date:'2026-02-28', character_level:2, event:'Nutrition joins the board' }, { date:'2026-03-11', character_level:2, event:'Second tier cycle complete' } ], tiers:[ { name:'Foundation', emoji:'🔨', min_level:1, max_level:20, status:'current' }, { name:'Momentum', emoji:'🔥', min_level:21, max_level:40, status:'locked' }, { name:'Discipline', emoji:'⚔️', min_level:41, max_level:60, status:'locked' }, { name:'Mastery', emoji:'🏆', min_level:61, max_level:80, status:'locked' }, { name:'Elite', emoji:'👑', min_level:81, max_level:100, status:'locked' } ] };
+/* ═══════════════════════════════════════════════════════════════
+   CHARACTER PAGE — RPG ENGINE
+   ═══════════════════════════════════════════════════════════════ */
 
-  function hydrate(data) {
-    const { character, pillars, timeline, tiers } = data;
+const DEFAULTS = {
+  character: { level:2, tier:'Foundation', tier_emoji:'🔨', xp_total:38, days_active:20, level_events_count:16, next_tier:'Momentum', next_tier_level:21, xp_for_current_level:30, xp_for_next_level:60 },
+  pillars: [
+    { name:'sleep', emoji:'😴', level:2, raw_score:60.0, xp_delta:2, trend:'up' },
+    { name:'movement', emoji:'🏋️', level:2, raw_score:0.0, xp_delta:-1, trend:'neutral' },
+    { name:'nutrition', emoji:'🥗', level:2, raw_score:12.2, xp_delta:-1, trend:'neutral' },
+    { name:'metabolic', emoji:'📊', level:2, raw_score:40.0, xp_delta:1, trend:'up' },
+    { name:'mind', emoji:'🧠', level:2, raw_score:7.1, xp_delta:-1, trend:'neutral' },
+    { name:'relationships', emoji:'💬', level:2, raw_score:40.0, xp_delta:1, trend:'up' },
+    { name:'consistency', emoji:'🎯', level:2, raw_score:14.3, xp_delta:-1, trend:'neutral' }
+  ],
+  timeline: [
+    { date:'2026-02-22', character_level:1, event:'Platform activated' },
+    { date:'2026-02-26', character_level:2, event:'First level up — all pillars' },
+    { date:'2026-02-28', character_level:2, event:'Nutrition joins the board' },
+    { date:'2026-03-11', character_level:2, event:'Second tier cycle complete' }
+  ],
+  tiers: [
+    { name:'Foundation', emoji:'🔨', min_level:1, max_level:20, status:'current' },
+    { name:'Momentum', emoji:'🔥', min_level:21, max_level:40, status:'locked' },
+    { name:'Discipline', emoji:'⚔️', min_level:41, max_level:60, status:'locked' },
+    { name:'Mastery', emoji:'🏆', min_level:61, max_level:80, status:'locked' },
+    { name:'Elite', emoji:'👑', min_level:81, max_level:100, status:'locked' }
+  ]
+};
 
-    // Header
-    document.getElementById('h-level').textContent = character.level;
-    document.getElementById('h-tier').textContent  = character.tier;
-    document.getElementById('cc-level').textContent = character.level;
-    document.getElementById('cc-tier').textContent  = `${character.tier_emoji} ${character.tier} tier`;
-    document.getElementById('cc-xp').textContent   = character.xp_total;
-    document.getElementById('cc-days').textContent  = character.days_active;
-    document.getElementById('cc-events').textContent = character.level_events_count;
-    document.getElementById('cc-next').textContent  = `Lv ${character.next_tier_level}`;
+/* ── Color helpers ─────────────────────────────────────────── */
+function scoreColor(s) {
+  if (s >= 50) return '#1D9E75';
+  if (s >= 25) return '#BA7517';
+  if (s > 0) return '#E24B4A';
+  return '#4a6050';
+}
 
-    // Live state banner
-    const sortedForBanner = [...pillars].sort((a, b) => b.raw_score - a.raw_score);
-    const strongest = sortedForBanner[0];
-    const weakest   = sortedForBanner[sortedForBanner.length - 1];
-    const cbLevel = document.getElementById('cbs-level');
-    const cbTier  = document.getElementById('cbs-tier');
-    const cbDays  = document.getElementById('cbs-days');
-    const cbS     = document.getElementById('cbs-strongest');
-    const cbB     = document.getElementById('cbs-bottleneck');
-    if (cbLevel) cbLevel.textContent = `Level ${character.level}`;
-    if (cbTier)  cbTier.textContent  = `${character.tier_emoji || ''} ${character.tier}`.trim();
-    if (cbDays)  cbDays.textContent  = `${character.days_active} days active`;
-    if (cbS && strongest) cbS.textContent = `${strongest.emoji || ''} ${strongest.name} (${strongest.raw_score.toFixed(0)})`.trim();
-    if (cbB && weakest)   cbB.textContent = `${weakest.emoji   || ''} ${weakest.name  } (${weakest.raw_score.toFixed(0)})`.trim();
+/* ── Tier Emblem SVGs ──────────────────────────────────────── */
+function tierEmblem(tier, level) {
+  const t = tier.toLowerCase();
+  const ac = getComputedStyle(document.documentElement).getPropertyValue('--tier-accent').trim() || '#00e5a0';
+  const bg = 'var(--bg)';
 
-    // Tier description highlight
-    const tierIdMap = { Foundation:'td-foundation', Momentum:'td-momentum', Discipline:'td-chisel', Chisel:'td-chisel', Elite:'td-elite', Mastery:'td-elite' };
-    ['td-foundation','td-momentum','td-chisel','td-elite'].forEach(id => {
-      const row = document.getElementById(id);
-      if (!row) return;
-      row.querySelectorAll('.td-name,.td-desc').forEach(el => el.style.color = 'var(--text-faint)');
-    });
-    const currentId = tierIdMap[character.tier];
-    if (currentId) {
-      const row = document.getElementById(currentId);
-      if (row) {
-        row.querySelectorAll('.td-name,.td-desc').forEach(el => el.style.color = 'var(--accent)');
-        const note = row.querySelector('.td-desc');
-        if (note) note.textContent = note.textContent.replace('Current tier — ', '') ;
-        const first = row.querySelector('.td-name');
-        if (first) { const span = document.createElement('span'); span.style.cssText='font-size:var(--text-2xs);color:var(--accent-dim);margin-left:4px;font-family:var(--font-sans)'; span.textContent=' ← current'; first.parentNode.insertBefore(span,first.nextSibling); }
-      }
-    }
+  // Foundation: simple hexagon with level number
+  if (t === 'foundation') return `
+    <svg viewBox="0 0 110 120" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="55,4 102,28 102,76 55,100 8,76 8,28" fill="none" stroke="${ac}" stroke-width="1.5" opacity="0.4"/>
+      <polygon points="55,14 92,34 92,70 55,90 18,70 18,34" fill="none" stroke="${ac}" stroke-width="1"/>
+      <text x="55" y="58" text-anchor="middle" font-family="Bebas Neue,Impact,sans-serif" font-size="38" fill="${ac}">${level}</text>
+      <text x="55" y="76" text-anchor="middle" font-family="Space Mono,monospace" font-size="8" fill="${ac}" opacity="0.6" letter-spacing="0.15em">LEVEL</text>
+    </svg>`;
 
-    // Avatar — composite score + mood state
-    const scores = pillars.map(p => p.raw_score);
-    const composite = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-    const avatarScore = document.getElementById('avatar-score');
-    const avatarState = document.getElementById('avatar-state');
-    const avatarFace  = document.getElementById('avatar-face');
-    if (avatarScore) avatarScore.textContent = composite.toFixed(0);
-    let moodColor = '#BA7517', moodLabel = '// building momentum';
-    let mouthPath = `<line x1="24" y1="54" x2="56" y2="54" stroke="${moodColor}" stroke-width="3" stroke-linecap="round"/>`;
-    if (composite > 70) {
-      moodColor = '#1D9E75'; moodLabel = '// performing well';
-      mouthPath = `<path d="M24 50 Q40 64 56 50" stroke="${moodColor}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
-    } else if (composite < 40) {
-      moodColor = '#E24B4A'; moodLabel = '// needs attention';
-      mouthPath = `<path d="M24 58 Q40 44 56 58" stroke="${moodColor}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
-    }
-    if (avatarState) avatarState.textContent = moodLabel;
-    if (avatarFace) avatarFace.innerHTML =
-      `<circle cx="40" cy="40" r="38" fill="var(--surface)" stroke="${moodColor}" stroke-width="2"/>` +
-      `<circle cx="27" cy="32" r="4" fill="${moodColor}"/>` +
-      `<circle cx="53" cy="32" r="4" fill="${moodColor}"/>` +
-      mouthPath;
+  // Momentum: hexagon with flame-like top
+  if (t === 'momentum') return `
+    <svg viewBox="0 0 110 120" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="flame-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f5a623"/><stop offset="100%" stop-color="#e08a00"/></linearGradient></defs>
+      <polygon points="55,4 102,28 102,76 55,100 8,76 8,28" fill="none" stroke="url(#flame-g)" stroke-width="2"/>
+      <polygon points="55,14 92,34 92,70 55,90 18,70 18,34" fill="none" stroke="${ac}" stroke-width="1" opacity="0.5"/>
+      <path d="M40,8 Q55,-8 70,8" fill="none" stroke="${ac}" stroke-width="2" opacity="0.6"/>
+      <text x="55" y="58" text-anchor="middle" font-family="Bebas Neue,Impact,sans-serif" font-size="38" fill="${ac}">${level}</text>
+      <text x="55" y="76" text-anchor="middle" font-family="Space Mono,monospace" font-size="8" fill="${ac}" opacity="0.6" letter-spacing="0.15em">LEVEL</text>
+    </svg>`;
 
-    // Tier journey path (CHAR-3)
-    const tierMap = document.getElementById('tier-map');
-    const doneCount = tiers.filter(t => t.status === 'unlocked').length;
-    const currentIdx = tiers.findIndex(t => t.status === 'current');
-    // Fill line % = portion of waypoints that are done + partial current progress
-    let fillPct = 0;
-    if (tiers.length > 1) {
-      const segWidth = 100 / (tiers.length - 1);
-      fillPct = doneCount * segWidth;
-      if (currentIdx >= 0) {
-        const t = tiers[currentIdx];
-        const segProgress = Math.min((character.level - t.min_level) / Math.max(t.max_level - t.min_level, 1), 1);
-        fillPct += segProgress * segWidth;
-      }
-    }
-    tierMap.innerHTML = `
-      <div class="tier-path">
-        <div class="tier-path__line"><div class="tier-path__line-fill" id="tier-line-fill" style="width:0%"></div></div>
-        ${tiers.map(t => {
-          const cls = t.status === 'current' ? 'tier-waypoint--current' : t.status === 'unlocked' ? 'tier-waypoint--done' : '';
-          return `<div class="tier-waypoint ${cls}">
-            <div class="tier-waypoint__dot"></div>
-            <div class="tier-waypoint__emoji">${t.emoji}</div>
-            <div class="tier-waypoint__name">${t.name}</div>
-            <div class="tier-waypoint__range">Lv ${t.min_level}–${t.max_level}</div>
-          </div>`;
-        }).join('')}
-      </div>`;
-    setTimeout(() => {
-      const fill = document.getElementById('tier-line-fill');
-      if (fill) fill.style.width = Math.min(fillPct, 100) + '%';
-    }, 300);
+  // Discipline: shield shape
+  if (t === 'discipline') return `
+    <svg viewBox="0 0 110 120" xmlns="http://www.w3.org/2000/svg">
+      <path d="M55,4 L100,20 L100,65 Q100,95 55,112 Q10,95 10,65 L10,20 Z" fill="none" stroke="${ac}" stroke-width="2"/>
+      <path d="M55,16 L90,28 L90,62 Q90,86 55,100 Q20,86 20,62 L20,28 Z" fill="none" stroke="${ac}" stroke-width="0.8" opacity="0.3"/>
+      <text x="55" y="60" text-anchor="middle" font-family="Bebas Neue,Impact,sans-serif" font-size="38" fill="${ac}">${level}</text>
+      <text x="55" y="78" text-anchor="middle" font-family="Space Mono,monospace" font-size="8" fill="${ac}" opacity="0.6" letter-spacing="0.15em">LEVEL</text>
+    </svg>`;
 
-    // Pillars
-    const pg = document.getElementById('pillars-grid');
-    pg.innerHTML = pillars.map(p => {
-      const xpSign = p.xp_delta >= 0 ? '+' : '';
-      const xpClass = p.xp_delta >= 0 ? '' : 'neg';
-      const barW = Math.min(p.raw_score, 100);
-      // FEAT-10: data confidence badge (shown when API provides readings count)
-      // CHAR-6: Calibrating state for pillars with no meaningful data
-      const isCalibrating = p.raw_score === 0 || (p.readings != null && p.readings < 3);
-      let confidenceHtml = '';
-      if (isCalibrating) {
-        confidenceHtml = `<div class="pillar-calibrating">// calibrating…</div>`;
-      } else if (p.readings != null) {
-        const confClass = p.readings >= 30 ? 'pillar-confidence--high' : 'pillar-confidence--low';
-        const confLabel = p.readings >= 30 ? '✓ High' : '⚠ Low';
-        confidenceHtml = `<div class="pillar-confidence ${confClass}">${confLabel} (${p.readings} readings)</div>`;
-      }
-      return `<div class="pillar-card">
-        <div class="pillar-card__header">
-          <div class="pillar-card__name">${p.name}</div>
-          <div class="pillar-card__xp ${xpClass}">${xpSign}${p.xp_delta} XP</div>
-        </div>
-        <div class="pillar-card__level">${p.level}</div>
-        <div class="pillar-card__bar"><div class="pillar-card__bar-fill" data-w="${barW}"></div></div>
-        <div class="pillar-card__raw">raw ${p.raw_score.toFixed(1)} / 100</div>
-        ${confidenceHtml}
-      </div>`;
-    }).join('');
+  // Mastery: ornate shield with crown hint
+  if (t === 'mastery') return `
+    <svg viewBox="0 0 110 120" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="gold-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#d4a520"/><stop offset="100%" stop-color="#b8860b"/></linearGradient></defs>
+      <path d="M55,4 L100,20 L100,65 Q100,95 55,112 Q10,95 10,65 L10,20 Z" fill="none" stroke="url(#gold-g)" stroke-width="2.5"/>
+      <path d="M30,4 L40,14 L55,4 L70,14 L80,4" fill="none" stroke="${ac}" stroke-width="1.5" opacity="0.7"/>
+      <text x="55" y="60" text-anchor="middle" font-family="Bebas Neue,Impact,sans-serif" font-size="38" fill="${ac}">${level}</text>
+      <text x="55" y="78" text-anchor="middle" font-family="Space Mono,monospace" font-size="8" fill="${ac}" opacity="0.6" letter-spacing="0.15em">LEVEL</text>
+    </svg>`;
 
-    // FEAT-10: Next Level Requirements — identify bottleneck pillar
-    const nlGrid = document.getElementById('next-level-grid');
-    if (nlGrid && pillars.length) {
-      const sorted = [...pillars].sort((a, b) => a.raw_score - b.raw_score);
-      const bottleneck = sorted[0];
-      const secondWeakest = sorted[1] || sorted[0];
+  // Elite: crown + shield
+  return `
+    <svg viewBox="0 0 110 120" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="royal-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ffd700"/><stop offset="100%" stop-color="#daa520"/></linearGradient></defs>
+      <path d="M55,18 L100,32 L100,70 Q100,98 55,114 Q10,98 10,70 L10,32 Z" fill="none" stroke="url(#royal-g)" stroke-width="3"/>
+      <path d="M20,14 L35,2 L55,14 L75,2 L90,14 L82,18 L55,6 L28,18 Z" fill="none" stroke="${ac}" stroke-width="2"/>
+      <circle cx="35" cy="4" r="3" fill="${ac}"/><circle cx="55" cy="10" r="3" fill="${ac}"/><circle cx="75" cy="4" r="3" fill="${ac}"/>
+      <text x="55" y="68" text-anchor="middle" font-family="Bebas Neue,Impact,sans-serif" font-size="38" fill="${ac}">${level}</text>
+      <text x="55" y="86" text-anchor="middle" font-family="Space Mono,monospace" font-size="8" fill="${ac}" opacity="0.6" letter-spacing="0.15em">LEVEL</text>
+    </svg>`;
+}
 
-      const PILLAR_ACTIONS = {
-        sleep:         'Hit 8h sleep + consistent bed time. Prioritize sleep over late training sessions.',
-        movement:      'Log at least one activity per day. Zone 2 cardio 3×/week raises this fastest.',
-        nutrition:     'Hit protein target daily. Caloric deficit within ±5% moves this score most.',
-        metabolic:     'Morning glucose consistency + Withings weigh-in daily. CGM wear rate matters.',
-        mind:          'Journal daily in Notion + log a mindfulness habit in Habitify.',
-        relationships: 'Log at least one meaningful interaction per day in the social habit tracker.',
-        consistency:   'Maintain Tier 0 habit streak without breaking. Avoid vice days.',
-      };
-      const action = PILLAR_ACTIONS[bottleneck.name] || 'Increase raw score by logging more data for this pillar.';
-      const action2 = PILLAR_ACTIONS[secondWeakest.name] || 'Focus on consistent logging and protocol adherence.';
+/* ── Sparkline SVG generator ───────────────────────────────── */
+function sparklineSVG(history, pillarName) {
+  // history is array of weekly pillar objects with pillar scores
+  if (!history || history.length < 2) return '';
+  const scores = history.map(w => (w.pillars && w.pillars[pillarName]) || 0).slice(-8);
+  if (scores.every(s => s === 0)) return '';
 
-      nlGrid.innerHTML = `
-        <div class="next-level-card bottleneck">
-          <div class="next-level-card__label">// Bottleneck pillar — highest leverage</div>
-          <div class="next-level-card__pillar">${bottleneck.emoji || ''} ${bottleneck.name} — ${bottleneck.raw_score.toFixed(0)}/100</div>
-          <div class="next-level-card__action">${action}</div>
-        </div>
-        <div class="next-level-card">
-          <div class="next-level-card__label">// Second focus area</div>
-          <div class="next-level-card__pillar">${secondWeakest.emoji || ''} ${secondWeakest.name} — ${secondWeakest.raw_score.toFixed(0)}/100</div>
-          <div class="next-level-card__action">${action2}</div>
-        </div>
-        <div class="next-level-card" style="grid-column:1/-1;border-color:var(--border-subtle)">
-          <div class="next-level-card__label">// What moves the composite score</div>
-          <div class="next-level-card__action" style="font-size:var(--text-xs);color:var(--text-muted)">
-            Composite = average of all 7 pillars (14.3% each). Each 10-point increase in any pillar adds ~1.4 points to your Character Score. The bottleneck pillar has the most room to grow — focus there first before optimising pillars already above 70.
-          </div>
-        </div>`;
-    }
+  const w = 100, h = 24, pad = 2;
+  const max = Math.max(...scores, 1);
+  const min = Math.min(...scores.filter(s => s > 0), 0);
+  const range = max - min || 1;
+  const pts = scores.map((s, i) => {
+    const x = pad + (i / (scores.length - 1)) * (w - 2 * pad);
+    const y = h - pad - ((s - min) / range) * (h - 2 * pad);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const last = scores[scores.length - 1];
+  const col = scoreColor(last);
 
-    setTimeout(() => {
-      document.querySelectorAll('.pillar-card__bar-fill').forEach(el => {
-        el.style.width = el.dataset.w + '%';
-      });
-    }, 300);
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" height="24" xmlns="http://www.w3.org/2000/svg">
+    <polyline points="${pts.join(' ')}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${pts[pts.length-1].split(',')[0]}" cy="${pts[pts.length-1].split(',')[1]}" r="2.5" fill="${col}"/>
+  </svg>`;
+}
 
-    // Event list
-    const el = document.getElementById('event-list');
-    el.innerHTML = [...data.timeline].reverse().map(ev => `
-      <div class="event-row">
-        <div class="event-date">${ev.date}</div>
-        <div class="event-arrow">↑</div>
-        <div class="event-text">${ev.event}</div>
-        <div class="event-levels">Lv ${ev.character_level}</div>
-      </div>`).join('');
+/* ── Main hydrate ──────────────────────────────────────────── */
+function hydrate(data) {
+  const { character, pillars, timeline, tiers } = data;
+
+  // Set tier theme on body
+  const tierSlug = (character.tier || 'foundation').toLowerCase();
+  document.body.setAttribute('data-tier', tierSlug);
+
+  // Emblem
+  document.getElementById('tc-emblem').innerHTML = tierEmblem(character.tier, character.level);
+
+  // Trading card header
+  document.getElementById('tc-class').textContent = `${character.tier} · Level ${character.level}`;
+  document.getElementById('tc-subtitle').textContent = `// ${character.days_active} days active · ${character.xp_total} total XP`;
+
+  // Composite score
+  const scores = pillars.map(p => p.raw_score);
+  const composite = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+  document.getElementById('tc-score').textContent = composite.toFixed(0);
+
+  // Trading card pillar mini-bars
+  const tcPillars = document.getElementById('tc-pillars');
+  tcPillars.innerHTML = pillars.map(p => {
+    const col = scoreColor(p.raw_score);
+    const xpSign = p.xp_delta >= 0 ? '+' : '';
+    const xpClass = p.xp_delta >= 0 ? 'pos' : 'neg';
+    return `<div class="tc-pillar">
+      <div class="tc-pillar__icon">${p.emoji}</div>
+      <div class="tc-pillar__name">${p.name.slice(0,5)}</div>
+      <div class="tc-pillar__level">${p.level}</div>
+      <div class="tc-pillar__bar"><div class="tc-pillar__bar-fill" data-w="${Math.min(p.raw_score,100)}" style="width:0%;background:${col}"></div></div>
+      <div class="tc-pillar__score">${p.raw_score.toFixed(0)}/100</div>
+      <div class="tc-pillar__xp ${xpClass}">${xpSign}${p.xp_delta} XP</div>
+    </div>`;
+  }).join('');
+
+  // Footer stats
+  document.getElementById('tc-xp').textContent = character.xp_total;
+  document.getElementById('tc-days').textContent = character.days_active;
+  document.getElementById('tc-events').textContent = character.level_events_count;
+  document.getElementById('tc-nexttier').textContent = `Lv ${character.next_tier_level}`;
+
+  // Tier path dots
+  const tierPath = document.getElementById('tc-tierpath');
+  tierPath.innerHTML = tiers.map(t => {
+    const cls = t.status === 'current' ? 'tc-tier-dot--current' : t.status === 'unlocked' ? 'tc-tier-dot--done' : '';
+    return `<div class="tc-tier-dot ${cls}" title="${t.name} (Lv ${t.min_level}–${t.max_level})"></div>`;
+  }).join('');
+
+  // ── Level up imminent check ──
+  const xpCur = character.xp_for_current_level || 0;
+  const xpNext = character.xp_for_next_level || 100;
+  const xpTotal = character.xp_total || 0;
+  const xpProgress = xpNext > xpCur ? (xpTotal - xpCur) / (xpNext - xpCur) : 0;
+  if (xpProgress >= 0.80) {
+    const banner = document.getElementById('levelup-banner');
+    banner.classList.add('show');
+    document.getElementById('levelup-text').textContent = `Level ${character.level + 1} imminent`;
+    document.getElementById('levelup-sub').textContent = `${Math.round(xpProgress * 100)}% to next level`;
   }
 
-  function renderRadar(pillars) {
-    const svg = document.getElementById('radar-svg');
-    const barsEl = document.getElementById('radar-bars');
-    if (!svg || !barsEl) return;
-    svg.innerHTML = '';
-
-    const N = pillars.length;
-    const cx = 200, cy = 200, R = 156, levels = 5;
-
-    function pt(angle, radius) {
-      const a = angle - Math.PI / 2;
-      return { x: cx + radius * Math.cos(a), y: cy + radius * Math.sin(a) };
-    }
-    function color(score) {
-      if (score >= 50) return '#1D9E75';
-      if (score >= 25) return '#BA7517';
-      if (score > 0)  return '#E24B4A';
-      return '#4a6050';
-    }
-    function svgEl(tag, attrs) {
-      const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
-      Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k, v));
-      return el;
-    }
-
-    // Rings
-    for (let l = 1; l <= levels; l++) {
-      const pts = Array.from({length: N}, (_, i) => {
-        const p = pt((2*Math.PI*i)/N, (R/levels)*l);
-        return p.x+','+p.y;
-      });
-      svg.appendChild(svgEl('polygon', { points: pts.join(' '), fill: 'none',
-        stroke: 'rgba(0,229,160,0.08)', 'stroke-width': '0.5' }));
-    }
-    // Axes
-    for (let i = 0; i < N; i++) {
-      const p = pt((2*Math.PI*i)/N, R);
-      svg.appendChild(svgEl('line', { x1: cx, y1: cy, x2: p.x, y2: p.y,
-        stroke: 'rgba(0,229,160,0.08)', 'stroke-width': '0.5' }));
-    }
-    // Data polygon
-    const dataRadii = pillars.map(p => (p.raw_score / 100) * R);
-    const polyPts = dataRadii.map((r, i) => {
-      const p = pt((2*Math.PI*i)/N, r); return p.x+','+p.y;
-    }).join(' ');
-    const poly = svgEl('polygon', { points: polyPts,
-      fill: 'rgba(0,229,160,0.10)', stroke: '#00e5a0',
-      'stroke-width': '1.5', 'stroke-linejoin': 'round' });
-    poly.style.transformOrigin = cx+'px '+cy+'px';
-    poly.style.transform = 'scale(0)';
-    poly.style.transition = 'transform 0.8s cubic-bezier(0.34,1.56,0.64,1)';
-    svg.appendChild(poly);
-    setTimeout(() => { poly.style.transform = 'scale(1)'; }, 150);
-    // Dots
-    pillars.forEach((p, i) => {
-      const pos = pt((2*Math.PI*i)/N, (p.raw_score/100)*R);
-      const dot = svgEl('circle', { cx: pos.x, cy: pos.y, r: '4',
-        fill: color(p.raw_score), stroke: '#080c0a', 'stroke-width': '1.5' });
-      dot.style.opacity = '0';
-      dot.style.transition = 'opacity 0.3s '+(0.6+i*0.06)+'s';
-      svg.appendChild(dot);
-      setTimeout(() => { dot.style.opacity = '1'; }, 150);
-    });
-    // Emoji + name labels
-    pillars.forEach((p, i) => {
-      const pos = pt((2*Math.PI*i)/N, R+26);
-      const t = svgEl('text', { x: pos.x, y: pos.y, 'text-anchor': 'middle',
-        'dominant-baseline': 'middle', 'font-size': '13', fill: '#7a9080' });
-      t.textContent = (p.emoji || '') + ' ' + (p.name.slice(0,4));
-      svg.appendChild(t);
-    });
-    // Centre level
-    const lvl = svgEl('text', { x: cx, y: cy-8, 'text-anchor': 'middle',
-      'font-size': '28', 'font-weight': '500', fill: '#e8ede9' });
-    lvl.textContent = document.getElementById('cc-level')?.textContent || '2';
-    svg.appendChild(lvl);
-    const lvlLabel = svgEl('text', { x: cx, y: cy+10, 'text-anchor': 'middle',
-      'font-size': '9', fill: '#7a9080', 'letter-spacing': '0.08em' });
-    lvlLabel.textContent = 'LEVEL';
-    svg.appendChild(lvlLabel);
-
-    // Click handlers: clicking dot or near axis highlights pillar bar
-    pillars.forEach((p, i) => {
-      const pos = pt((2*Math.PI*i)/N, R);
-      const hitArea = svgEl('circle', { cx: pos.x, cy: pos.y, r: '20',
-        fill: 'transparent', style: 'cursor:pointer' });
-      hitArea.addEventListener('click', function() {
-        const bars = barsEl.querySelectorAll('.radar-bar-row');
-        bars.forEach((bar, j) => {
-          bar.style.opacity = j === i ? '1' : '0.35';
-          bar.style.background = j === i ? 'var(--surface-raised)' : '';
-        });
-        // Reset after 2s
-        setTimeout(() => bars.forEach(bar => { bar.style.opacity = ''; bar.style.background = ''; }), 2000);
-      });
-      svg.appendChild(hitArea);
-    });
-
-    // Bars
-    barsEl.innerHTML = pillars.map(p => {
-      const c = color(p.raw_score);
-      const w = Math.max(p.raw_score, p.raw_score > 0 ? 2 : 0);
-      return `<div class="radar-bar-row">
-        <div class="radar-bar-name">${p.emoji || ''} ${p.name}</div>
-        <div class="radar-bar-track">
-          <div class="radar-bar-fill" data-w="${w}" style="width:0%;background:${c}"></div>
+  // ── Next Level Requirements ──
+  const nlGrid = document.getElementById('next-grid');
+  if (nlGrid && pillars.length) {
+    const sorted = [...pillars].sort((a, b) => a.raw_score - b.raw_score);
+    const bottleneck = sorted[0];
+    const second = sorted[1] || sorted[0];
+    const ACTIONS = {
+      sleep: 'Hit 8h sleep + consistent bed time. Prioritize sleep over late training.',
+      movement: 'Log one activity per day. Zone 2 cardio 3×/week raises this fastest.',
+      nutrition: 'Hit protein target daily. Caloric deficit within ±5% moves this most.',
+      metabolic: 'Morning glucose consistency + daily weigh-in. CGM wear rate matters.',
+      mind: 'Journal daily in Notion + log mindfulness habit in Habitify.',
+      relationships: 'Log one meaningful interaction per day in the social tracker.',
+      consistency: 'Maintain Tier 0 habit streak without breaking. Avoid vice days.',
+    };
+    nlGrid.innerHTML = `
+      <div class="next-card bottleneck">
+        <div class="next-card__tag">// Bottleneck — highest leverage</div>
+        <div class="next-card__pillar">${bottleneck.emoji} ${bottleneck.name} — ${bottleneck.raw_score.toFixed(0)}/100</div>
+        <div class="next-card__action">${ACTIONS[bottleneck.name] || 'Increase raw score by logging more data.'}</div>
+      </div>
+      <div class="next-card">
+        <div class="next-card__tag">// Second focus</div>
+        <div class="next-card__pillar">${second.emoji} ${second.name} — ${second.raw_score.toFixed(0)}/100</div>
+        <div class="next-card__action">${ACTIONS[second.name] || 'Focus on consistent logging.'}</div>
+      </div>
+      <div class="next-xp-bar">
+        <div class="next-xp-bar__label">
+          <span>XP progress to Level ${character.level + 1}</span>
+          <span>${xpTotal} / ${xpNext} XP</span>
         </div>
-        <div class="radar-bar-score">${p.raw_score.toFixed(1)}</div>
+        <div class="next-xp-bar__track"><div class="next-xp-bar__fill" data-w="${Math.min(xpProgress * 100, 100)}"></div></div>
       </div>`;
-    }).join('');
-    setTimeout(() => {
-      barsEl.querySelectorAll('.radar-bar-fill').forEach(el => {
-        el.style.width = el.dataset.w + '%';
-      });
-    }, 300);
   }
 
-  // CHAR-4: Pillar independence heatmap renderer
-  function renderHeatmap(pillarHistory) {
-    const section = document.getElementById('heatmap-section');
-    const grid    = document.getElementById('hm-grid');
-    if (!section || !grid || !pillarHistory || !pillarHistory.length) return;
+  // ── Tier flavor text highlight ──
+  const tierIdMap = { foundation:'tf-foundation', momentum:'tf-momentum', discipline:'tf-discipline', mastery:'tf-mastery', elite:'tf-elite' };
+  Object.values(tierIdMap).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('current');
+  });
+  const currentTfId = tierIdMap[tierSlug];
+  if (currentTfId) {
+    const el = document.getElementById(currentTfId);
+    if (el) el.classList.add('current');
+  }
 
-    const PILLARS = ['sleep','movement','nutrition','metabolic','mind','relationships','consistency'];
-    const EMOJIS  = {sleep:'😴',movement:'🏋️',nutrition:'🥗',metabolic:'📊',mind:'🧠',relationships:'💬',consistency:'🎯'};
-
-    function heatColor(score) {
-      if (!score || score <= 0) return 'var(--border)';
-      if (score < 25) return 'rgba(226,75,74,0.5)';
-      if (score < 50) return 'rgba(186,117,23,0.55)';
-      if (score < 75) return 'rgba(29,158,117,0.55)';
-      return 'rgba(29,158,117,0.9)';
+  // ── Pillar cards with sparklines ──
+  const pg = document.getElementById('pillars-grid');
+  pg.innerHTML = pillars.map(p => {
+    const xpSign = p.xp_delta >= 0 ? '+' : '';
+    const xpClass = p.xp_delta >= 0 ? 'pos' : 'neg';
+    const col = scoreColor(p.raw_score);
+    const barW = Math.min(p.raw_score, 100);
+    const isCalibrating = p.raw_score === 0 || (p.readings != null && p.readings < 3);
+    let confHtml = '';
+    if (isCalibrating) confHtml = '<div class="pillar-calibrating">// calibrating…</div>';
+    else if (p.readings != null) {
+      const cls = p.readings >= 30 ? 'pillar-confidence--high' : 'pillar-confidence--low';
+      const lbl = p.readings >= 30 ? '✓ High' : '⚠ Low';
+      confHtml = `<div class="pillar-confidence ${cls}">${lbl} (${p.readings} readings)</div>`;
     }
+    // Sparkline from pillar_history
+    const spark = data.pillar_history ? sparklineSVG(data.pillar_history, p.name) : '';
+    const sparkHtml = spark ? `<div class="pillar-card__spark">${spark}<div class="pillar-card__spark-label">8-week trend</div></div>` : '';
 
-    // Header row
-    let html = '<div class="hm-row hm-header"><div class="hm-week-label"></div>';
+    return `<div class="pillar-card">
+      <div class="pillar-card__header">
+        <div class="pillar-card__name"><span>${p.emoji}</span> ${p.name}</div>
+        <div class="pillar-card__xp ${xpClass}">${xpSign}${p.xp_delta} XP</div>
+      </div>
+      <div class="pillar-card__level">${p.level}</div>
+      <div class="pillar-card__bar"><div class="pillar-card__bar-fill" data-w="${barW}" style="width:0%;background:${col}"></div></div>
+      <div class="pillar-card__raw">${p.raw_score.toFixed(1)} / 100</div>
+      ${confHtml}${sparkHtml}
+    </div>`;
+  }).join('');
+
+  // ── Visual timeline ──
+  const vtEl = document.getElementById('visual-timeline');
+  const events = [...timeline].reverse();
+  vtEl.innerHTML = events.map(ev => {
+    const isLevelUp = /level\s*up/i.test(ev.event) || /activated/i.test(ev.event);
+    const cls = isLevelUp ? 'vt-event--levelup' : '';
+    return `<div class="vt-event ${cls}">
+      <div class="vt-event__dot"></div>
+      <div class="vt-event__date">${ev.date}</div>
+      <div class="vt-event__text">${ev.event}<span class="vt-event__level">Lv ${ev.character_level}</span></div>
+    </div>`;
+  }).join('');
+
+  // Animate bars after render
+  setTimeout(() => {
+    document.querySelectorAll('[data-w]').forEach(el => {
+      el.style.width = el.dataset.w + '%';
+    });
+  }, 300);
+}
+
+/* ── Radar chart ───────────────────────────────────────────── */
+function renderRadar(pillars) {
+  const svg = document.getElementById('radar-svg');
+  const barsEl = document.getElementById('stat-bars');
+  if (!svg || !barsEl) return;
+  svg.innerHTML = '';
+
+  const N = pillars.length, cx = 200, cy = 200, R = 156, levels = 5;
+
+  function pt(angle, radius) {
+    const a = angle - Math.PI / 2;
+    return { x: cx + radius * Math.cos(a), y: cy + radius * Math.sin(a) };
+  }
+  function svgEl(tag, attrs) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k, v));
+    return el;
+  }
+
+  // Rings
+  for (let l = 1; l <= levels; l++) {
+    const pts = Array.from({length: N}, (_, i) => {
+      const p = pt((2*Math.PI*i)/N, (R/levels)*l);
+      return p.x+','+p.y;
+    });
+    svg.appendChild(svgEl('polygon', { points: pts.join(' '), fill: 'none', stroke: 'rgba(0,229,160,0.08)', 'stroke-width': '0.5' }));
+  }
+  // Axes
+  for (let i = 0; i < N; i++) {
+    const p = pt((2*Math.PI*i)/N, R);
+    svg.appendChild(svgEl('line', { x1:cx, y1:cy, x2:p.x, y2:p.y, stroke:'rgba(0,229,160,0.08)', 'stroke-width':'0.5' }));
+  }
+  // Data polygon
+  const dataRadii = pillars.map(p => (p.raw_score / 100) * R);
+  const polyPts = dataRadii.map((r, i) => {
+    const p = pt((2*Math.PI*i)/N, r);
+    return p.x+','+p.y;
+  }).join(' ');
+  const poly = svgEl('polygon', { points:polyPts, fill:'rgba(0,229,160,0.10)', stroke:'#00e5a0', 'stroke-width':'1.5', 'stroke-linejoin':'round' });
+  poly.style.transformOrigin = cx+'px '+cy+'px';
+  poly.style.transform = 'scale(0)';
+  poly.style.transition = 'transform 0.8s cubic-bezier(0.34,1.56,0.64,1)';
+  svg.appendChild(poly);
+  setTimeout(() => { poly.style.transform = 'scale(1)'; }, 150);
+  // Dots
+  pillars.forEach((p, i) => {
+    const pos = pt((2*Math.PI*i)/N, (p.raw_score/100)*R);
+    const dot = svgEl('circle', { cx:pos.x, cy:pos.y, r:'4', fill:scoreColor(p.raw_score), stroke:'#080c0a', 'stroke-width':'1.5' });
+    dot.style.opacity = '0';
+    dot.style.transition = 'opacity 0.3s '+(0.6+i*0.06)+'s';
+    svg.appendChild(dot);
+    setTimeout(() => { dot.style.opacity = '1'; }, 150);
+  });
+  // Labels
+  pillars.forEach((p, i) => {
+    const pos = pt((2*Math.PI*i)/N, R+26);
+    const t = svgEl('text', { x:pos.x, y:pos.y, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size':'13', fill:'#7a9080' });
+    t.textContent = (p.emoji||'') + ' ' + p.name.slice(0,4);
+    svg.appendChild(t);
+  });
+  // Centre level
+  const lvl = svgEl('text', { x:cx, y:cy-8, 'text-anchor':'middle', 'font-size':'28', 'font-weight':'500', fill:'#e8ede9' });
+  lvl.textContent = document.querySelector('.tc-composite__num')?.textContent || '—';
+  svg.appendChild(lvl);
+  const lbl = svgEl('text', { x:cx, y:cy+10, 'text-anchor':'middle', 'font-size':'9', fill:'#7a9080', 'letter-spacing':'0.08em' });
+  lbl.textContent = 'SCORE';
+  svg.appendChild(lbl);
+
+  // Click to highlight
+  pillars.forEach((p, i) => {
+    const pos = pt((2*Math.PI*i)/N, R);
+    const hit = svgEl('circle', { cx:pos.x, cy:pos.y, r:'20', fill:'transparent', style:'cursor:pointer' });
+    hit.addEventListener('click', () => {
+      const bars = barsEl.querySelectorAll('.stat-row');
+      bars.forEach((bar, j) => {
+        bar.style.opacity = j === i ? '1' : '0.35';
+        bar.style.background = j === i ? 'var(--surface-raised)' : '';
+      });
+      setTimeout(() => bars.forEach(bar => { bar.style.opacity = ''; bar.style.background = ''; }), 2000);
+    });
+    svg.appendChild(hit);
+  });
+
+  // Stat bars (chunky RPG style)
+  barsEl.innerHTML = pillars.map(p => {
+    const c = scoreColor(p.raw_score);
+    const w = Math.max(p.raw_score, p.raw_score > 0 ? 2 : 0);
+    return `<div class="stat-row">
+      <div class="stat-row__name"><span>${p.emoji||''}</span> ${p.name}</div>
+      <div class="stat-row__track"><div class="stat-row__fill" data-w="${w}" style="width:0%;background:${c}"></div></div>
+      <div class="stat-row__score">${p.raw_score.toFixed(1)}</div>
+    </div>`;
+  }).join('');
+  setTimeout(() => {
+    barsEl.querySelectorAll('.stat-row__fill').forEach(el => {
+      el.style.width = el.dataset.w + '%';
+    });
+  }, 400);
+}
+
+/* ── Heatmap ───────────────────────────────────────────────── */
+function renderHeatmap(pillarHistory) {
+  const section = document.getElementById('heatmap-section');
+  const grid = document.getElementById('hm-grid');
+  if (!section || !grid || !pillarHistory || !pillarHistory.length) return;
+  const PILLARS = ['sleep','movement','nutrition','metabolic','mind','relationships','consistency'];
+  const EMOJIS = {sleep:'😴',movement:'🏋️',nutrition:'🥗',metabolic:'📊',mind:'🧠',relationships:'💬',consistency:'🎯'};
+  function heatColor(s) {
+    if (!s || s <= 0) return 'var(--border)';
+    if (s < 25) return 'rgba(226,75,74,0.5)';
+    if (s < 50) return 'rgba(186,117,23,0.55)';
+    if (s < 75) return 'rgba(29,158,117,0.55)';
+    return 'rgba(29,158,117,0.9)';
+  }
+  let html = '<div class="hm-row hm-header"><div class="hm-week-label"></div>';
+  PILLARS.forEach(p => { html += `<div class="hm-col-head">${EMOJIS[p]||''}<span>${p.slice(0,4)}</span></div>`; });
+  html += '</div>';
+  pillarHistory.forEach(week => {
+    html += `<div class="hm-row"><div class="hm-week-label">${week.week_label}<span class="hm-week-date">${(week.week_end||'').slice(5)}</span></div>`;
     PILLARS.forEach(p => {
-      html += `<div class="hm-col-head">${EMOJIS[p] || ''}<span>${p.slice(0,4)}</span></div>`;
+      const s = ((week.pillars||{})[p]) || 0;
+      html += `<div class="hm-cell" style="background:${heatColor(s)}" title="${p}: ${s}">${s > 0 ? Math.round(s) : '—'}</div>`;
     });
     html += '</div>';
+  });
+  grid.innerHTML = html;
+  section.style.display = '';
+  section.classList.add('is-visible');
+}
 
-    // Data rows (oldest first)
-    pillarHistory.forEach(week => {
-      html += `<div class="hm-row"><div class="hm-week-label">${week.week_label}<span class="hm-week-date">${(week.week_end||'').slice(5)}</span></div>`;
-      PILLARS.forEach(p => {
-        const score = ((week.pillars || {})[p]) || 0;
-        html += `<div class="hm-cell" style="background:${heatColor(score)}" title="${p}: ${score}">${score > 0 ? Math.round(score) : '—'}</div>`;
-      });
-      html += '</div>';
-    });
-
-    grid.innerHTML = html;
-    section.style.display = '';
-    section.classList.add('is-visible');
-  }
-
-  fetch('../data/character_stats.json')
-    .then(r => r.json())
-    .then(data => {
-      hydrate(data);
-      renderRadar(data.pillars || DEFAULTS.pillars);
-      if (data.pillar_history && data.pillar_history.length) {
-        renderHeatmap(data.pillar_history);
-      }
-    })
-    .catch(() => { hydrate(DEFAULTS); renderRadar(DEFAULTS.pillars); });
-</script>
-
-<script>
-(function() {
+/* ── Badge hydration ───────────────────────────────────────── */
+function hydrateBadges() {
   function earnBadge(id, dateText) {
-    var el = document.getElementById(id);
+    const el = document.getElementById(id);
     if (!el) return;
     el.classList.add('earned');
-    var statusEl = document.getElementById(id + '-status') || el.querySelector('.badge-card__status');
-    if (statusEl) statusEl.textContent = 'Unlocked' + (dateText ? ' \u2014 ' + dateText : '');
+    const status = document.getElementById(id + '-status') || el.querySelector('.badge-card__status');
+    if (status) status.textContent = 'Unlocked' + (dateText ? ' — ' + dateText : '');
     if (dateText) {
-      var existing = el.querySelector('.badge-date-chip');
+      const existing = el.querySelector('.badge-date-chip');
       if (!existing) {
-        var chip = document.createElement('div');
+        const chip = document.createElement('div');
         chip.className = 'badge-date-chip';
         chip.textContent = dateText;
-        var desc = el.querySelector('.badge-card__desc');
+        const desc = el.querySelector('.badge-card__desc');
         if (desc) desc.after(chip);
       }
     }
   }
-
   function setHint(id, hint) {
-    var statusEl = document.getElementById(id + '-status');
-    if (!statusEl) {
-      var el = document.getElementById(id);
-      if (el) statusEl = el.querySelector('.badge-card__status');
-    }
-    if (statusEl) statusEl.textContent = hint;
+    const status = document.getElementById(id + '-status') || (document.getElementById(id) || {}).querySelector?.('.badge-card__status');
+    if (status) status.textContent = hint;
   }
 
-  // Try /api/achievements first — richer data (unlock_hints, earned_dates)
   fetch('https://averagejoematt.com/api/achievements')
-    .then(function(r) { return r.ok ? r.json() : Promise.reject('no-ok'); })
-    .then(function(data) {
-      var badges = (data && data.achievements) || (data && data.badges) || [];
-      if (!badges.length) return Promise.reject('empty');
-      badges.forEach(function(badge) {
-        var id = 'badge-' + badge.id.replace(/_/g, '-');
-        if (badge.earned) {
-          earnBadge(id, badge.earned_date || null);
-        } else if (badge.unlock_hint) {
-          setHint(id, badge.unlock_hint);
-        }
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(data => {
+      const badges = (data && data.achievements) || (data && data.badges) || [];
+      if (!badges.length) return Promise.reject();
+      badges.forEach(b => {
+        const id = 'badge-' + b.id.replace(/_/g, '-');
+        if (b.earned) earnBadge(id, b.earned_date || null);
+        else if (b.unlock_hint) setHint(id, b.unlock_hint);
       });
+      updateBadgeCounts();
     })
-    .catch(function() {
+    .catch(() => {
       // Fallback: manual checks
       Promise.all([
-        fetch('https://averagejoematt.com/api/vitals').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
-        fetch('https://averagejoematt.com/api/character').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
-        fetch('https://averagejoematt.com/api/habit_streaks').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; })
-      ]).then(function(results) {
-        var vitalsData = results[0], characterData = results[1], habitsData = results[2];
-        var hs = (habitsData && habitsData.habit_streaks) || {};
-        var streak = hs.aggregate_streak || 0;
-        if (streak >= 7)  earnBadge('badge-week-warrior');
+        fetch('https://averagejoematt.com/api/vitals').then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch('https://averagejoematt.com/api/character').then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch('https://averagejoematt.com/api/habit_streaks').then(r => r.ok ? r.json() : null).catch(() => null)
+      ]).then(([vitals, char, habits]) => {
+        const streak = (habits?.habit_streaks || {}).aggregate_streak || 0;
+        if (streak >= 7) earnBadge('badge-week-warrior');
         if (streak >= 30) earnBadge('badge-monthly-grind');
         if (streak >= 90) earnBadge('badge-quarterly');
         if (streak < 7) setHint('badge-week-warrior', (7 - streak) + ' days to unlock');
 
-        var ch = (characterData && characterData.character) || {};
-        var level = ch.level || 0;
-        if (level >= 5)  earnBadge('badge-apprentice');
+        const level = (char?.character || {}).level || 0;
+        if (level >= 5) earnBadge('badge-apprentice');
         if (level >= 10) earnBadge('badge-journeyman');
         if (level < 5 && level > 0) setHint('badge-apprentice', (5 - level) + ' levels to unlock');
 
-        var v = (vitalsData && vitalsData.vitals) || {};
-        var weight = v.weight_lbs ? parseFloat(v.weight_lbs) : null;
+        const weight = vitals?.vitals?.weight_lbs ? parseFloat(vitals.vitals.weight_lbs) : null;
         if (weight !== null) {
           if (weight < 280) earnBadge('badge-sub280');
-          else setHint('badge-sub280', 'Current: ' + weight.toFixed(1) + ' lbs (need < 280)');
+          else setHint('badge-sub280', 'Current: ' + weight.toFixed(1) + ' lbs');
           if (weight < 260) earnBadge('badge-sub260');
         }
-        var daysActive = ch.days_active || 0;
-        if (daysActive >= 365) earnBadge('badge-365days');
-        else setHint('badge-365days', daysActive + ' / 365 days tracked');
+        const days = (char?.character || {}).days_active || 0;
+        if (days >= 365) earnBadge('badge-365days');
+        else setHint('badge-365days', days + ' / 365 days');
+
+        updateBadgeCounts();
       });
     });
-})();
+}
+
+function updateBadgeCounts() {
+  ['streaks', 'levels', 'weight', 'data', 'experiments'].forEach(cat => {
+    const grid = document.getElementById('badge-grid-' + cat);
+    const count = document.getElementById('bg-' + cat + '-count');
+    if (!grid || !count) return;
+    const earned = grid.querySelectorAll('.badge-card.earned').length;
+    const total = grid.querySelectorAll('.badge-card:not([style*="visibility:hidden"])').length;
+    count.textContent = earned + '/' + total + ' earned';
+  });
+}
+
+/* ── Level-up subscription ─────────────────────────────────── */
+window.subscribeLevelUp = async function() {
+  const email = document.getElementById('levelup-email').value.trim();
+  const msg = document.getElementById('levelup-msg');
+  if (!email || !email.includes('@')) {
+    msg.textContent = 'Enter a valid email.';
+    msg.style.color = 'var(--c-yellow-status)';
+    return;
+  }
+  msg.textContent = 'Subscribing…';
+  msg.style.color = 'var(--text-muted)';
+  try {
+    const res = await fetch('/api/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, source: 'levelup_alert' }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msg.textContent = '⚡ You\'ll know the moment it happens.';
+      msg.style.color = 'var(--tier-accent)';
+      document.getElementById('levelup-email').value = '';
+    } else {
+      msg.textContent = data.error || 'Something went wrong.';
+      msg.style.color = 'var(--c-yellow-status)';
+    }
+  } catch (e) {
+    msg.textContent = 'Network error — try again.';
+    msg.style.color = 'var(--c-yellow-status)';
+  }
+};
+
+/* ── INIT ──────────────────────────────────────────────────── */
+fetch('../data/character_stats.json')
+  .then(r => r.json())
+  .then(data => {
+    hydrate(data);
+    renderRadar(data.pillars || DEFAULTS.pillars);
+    if (data.pillar_history && data.pillar_history.length) {
+      renderHeatmap(data.pillar_history);
+    }
+    hydrateBadges();
+  })
+  .catch(() => {
+    hydrate(DEFAULTS);
+    renderRadar(DEFAULTS.pillars);
+    hydrateBadges();
+  });
 </script>
 
-<!-- WEB-WCT: Weekly Challenge Ticker -->
-<div class="challenge-bar" id="challenge-bar" style="display:none">
-  <span class="challenge-bar__pip"></span>
-  <span class="challenge-bar__label" id="cb-week">Week —</span>
-  <span class="challenge-bar__divider"></span>
-  <span class="challenge-bar__text" id="cb-challenge">Loading challenge…</span>
-  <span class="challenge-bar__divider"></span>
-  <span class="challenge-bar__progress" id="cb-progress"></span>
-</div>
-<script>
-(function(){
-  const API = '/api/current_challenge';
-  fetch(API).then(r=>r.ok?r.json():null).then(data=>{
-    if(!data||!data.current_challenge) return;
-    const c = data.current_challenge;
-    const bar = document.getElementById('challenge-bar');
-    if(c.week_num) document.getElementById('cb-week').textContent = 'Week '+c.week_num+' Challenge';
-    if(c.challenge) document.getElementById('cb-challenge').innerHTML = '<strong>'+c.challenge+'</strong>'+(c.detail?' — '+c.detail:'');
-    if(c.days_total) document.getElementById('cb-progress').textContent = (c.days_complete||0)+'/'+c.days_total+' days';
-    bar.style.display = 'flex';
-  }).catch(()=>{});
-})();
-</script>
-<section class="reading-path" style="padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
-  <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:var(--space-3)">Continue the story</span>
-  <a href="/habits/" style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-display);">The habits that feed the score →</a>
-  <p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">65 daily habits tracked — adherence, streaks, and keystones</p>
-</section>
 <script src="/assets/js/reveal.js"></script>
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>

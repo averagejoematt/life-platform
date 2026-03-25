@@ -948,6 +948,41 @@ def operational_data_reconciliation() -> list[iam.PolicyStatement]:
     ]
 
 
+def operational_site_stats_refresh() -> list[iam.PolicyStatement]:
+    """Site stats refresh: invokes ingestion Lambdas, reads DDB, reads+writes public_stats.json."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="S3Read",
+            actions=["s3:GetObject"],
+            resources=_s3("site/*"),
+        ),
+        iam.PolicyStatement(
+            sid="S3Write",
+            actions=["s3:PutObject"],
+            resources=_s3("site/*"),
+        ),
+        iam.PolicyStatement(
+            sid="InvokeIngestionLambdas",
+            actions=["lambda:InvokeFunction"],
+            resources=[
+                f"arn:aws:lambda:{REGION}:{ACCT}:function:whoop-data-ingestion",
+                f"arn:aws:lambda:{REGION}:{ACCT}:function:withings-data-ingestion",
+                f"arn:aws:lambda:{REGION}:{ACCT}:function:habitify-data-ingestion",
+            ],
+        ),
+    ]
+
+
 def operational_insight_email_parser() -> list[iam.PolicyStatement]:
     """Insight email parser: reads from SES S3 drop, writes insight records to DDB."""
     return [
