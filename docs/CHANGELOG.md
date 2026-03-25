@@ -1,3 +1,33 @@
+## v3.9.13 — 2026-03-25: Benchmarks → "The Standards" — 6-domain research reference redesign
+
+### Summary
+Complete redesign of the Benchmarks page from a physical-lifts-only Centenarian Decathlon tracker into "The Standards" — a 6-domain, 27-benchmark research reference library. Product Board convened ground-up to redefine purpose: this page answers "what should a human be measuring, and what does 'good' look like according to the research?" Covers Physical Capacity, Sleep & Recovery, Cognitive & Intellectual, Emotional & Psychological, Social Connection, and Behavioral Discipline. Each benchmark has an evidence rating (●●●/●●/●), a letter grade (A–F), a trend arrow (▲/▶/▼ vs 30d ago), and a research citation. Interactive self-assessment lets visitors check themselves against the research. Three deploy iterations: base page, grade badges, trend indicators + API field fix.
+
+### Changes
+
+**site/benchmarks/index.html** (COMPLETE REWRITE)
+- Renamed "Centenarian Decathlon" → "The Standards"
+- 6 domains: Physical (6 benchmarks), Sleep (5), Cognitive (4), Emotional (4), Social (4), Discipline (4)
+- Unique visual per domain: arc gauges, sleep architecture bars, animated bookshelf, sentiment waveform, Dunbar rings, consistency heatmap
+- Letter grade badges (A–F) on every card, auto-computed from % to target
+- Trend indicator row per card (▲ improving / ▶ flat / ▼ declining vs 30d ago) — hidden until `/api/benchmark_trends` endpoint exists
+- Evidence legend + grade scale + trend legend in page header
+- Interactive "Check Yourself Against the Research" self-assessment (6 domain questions, client-side only)
+- Research citations: Mandsager (JAMA 2018), Leong (Lancet 2015), Cappuccio (Sleep 2010), Xie (Science 2013), Bavishi (SSM 2016), Holt-Lunstad (PLOS Med 2010), Dunbar (2010), Lally (EJSP 2010), Emmons (JPSP 2003), Epel (PNAS 2004), WHO-5
+- Data from: `/api/vitals` (sleep, HRV, RHR, weight), `/api/habits` (T0 completion), `/api/vice_streaks` (streak days)
+- No new API endpoints — uses existing site-api
+
+### Bug fixes (across 3 iterations)
+- Remapped JS data loading from non-existent `/api/character` fields to correct `/api/vitals` field names
+- Fixed double `.json()` call on character response stream
+- Removed `overflow: hidden` that clipped grade badges
+- Fixed vice streak field name (`current_streak` not `streak_days`)
+
+### Deployed
+- 4 S3 uploads + CloudFront invalidations this session
+
+---
+
 ## v3.9.12 — 2026-03-25: Habits + Supplements page overhauls — Product Board Phase A/B/C
 
 ### Summary
