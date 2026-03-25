@@ -4,20 +4,15 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="N=1 Experiment Archive — real self-experiments with data, hypotheses, and outcomes.">
-  <meta property="og:title" content="N=1 Experiments — Matthew Walker">
-  <meta property="og:description" content="Real self-experiments with data. Hypothesis, protocol, duration, result — no filtering.">
+  <meta name="description" content="52 evidence-based experiments across 7 pillars — vote on what I test next, track live progress, see every result.">
+  <meta property="og:title" content="The Lab — N=1 Experiments">
+  <meta property="og:description" content="52 evidence-based experiments. Vote on what I test next. Every result published.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com/experiments/">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="N=1 Experiments — Matthew Walker">
-  <meta name="twitter:description" content="Real self-experiments with data. Hypothesis, protocol, duration, result — no filtering.">
-  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <title>N=1 Experiments — Matthew Walker</title>
-    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <title>The Lab — N=1 Experiments</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
@@ -25,6 +20,7 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
+    /* ── Page Header ── */
     .page-header {
       padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
       border-bottom: 1px solid var(--border);
@@ -46,7 +42,7 @@
       font-size: var(--text-base);
       color: var(--text-muted);
       line-height: var(--lh-body);
-      max-width: 560px;
+      max-width: 620px;
     }
     .page-header__meta {
       margin-top: var(--space-8);
@@ -69,7 +65,14 @@
       letter-spacing: var(--ls-display);
     }
 
-    /* N=1 explainer strip */
+    /* ── Pipeline Nav ── */
+    .pipeline-nav { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-4) var(--page-padding); border-bottom:1px solid var(--border); background:var(--surface); font-family:var(--font-mono); font-size:var(--text-2xs); letter-spacing:var(--ls-tag); overflow-x:auto; }
+    .pipeline-nav__step { color:var(--text-faint); text-decoration:none; text-transform:uppercase; white-space:nowrap; padding:var(--space-1) var(--space-3); border:1px solid transparent; }
+    .pipeline-nav__step:hover { color:var(--text-muted); }
+    .pipeline-nav__step.active { color:var(--accent); border-color:var(--accent-dim); }
+    .pipeline-nav__arrow { color:var(--border); }
+
+    /* ── H/P/D Explainer ── */
     .explainer {
       max-width: var(--max-width);
       margin: 0 auto;
@@ -103,165 +106,142 @@
       line-height: var(--lh-mono);
     }
 
-    /* ── Active Experiment Spotlight ── */
-    .active-spotlight {
+    /* ── Zone 1: Mission Control ── */
+    .mission-control {
       max-width: var(--max-width);
       margin: 0 auto;
-      padding: var(--space-10) var(--page-padding) 0;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
     }
-    .spotlight-heading {
+    .zone-heading {
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       color: var(--accent);
       font-family: var(--font-mono);
-      margin-bottom: var(--space-5);
+      margin-bottom: var(--space-6);
     }
-    .spotlight-card {
-      border: 1px solid var(--accent);
+    .mc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--space-6); }
+
+    .mc-card {
+      border: 1px solid var(--accent-dim);
       background: var(--surface);
       position: relative;
       overflow: hidden;
     }
-    .spotlight-card::before {
+    .mc-card::before {
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0; height: 2px;
       background: linear-gradient(90deg, var(--accent) 0%, var(--accent-dim) 60%, transparent 100%);
     }
-    .spotlight-card__top {
+    .mc-card__top {
       display: grid;
-      grid-template-columns: 1fr auto;
-      gap: var(--space-6);
+      grid-template-columns: 1fr 90px;
+      gap: var(--space-4);
       align-items: start;
-      padding: var(--space-6) var(--space-8);
-      border-bottom: 1px solid var(--border);
+      padding: var(--space-6) var(--space-6) var(--space-4);
     }
-    .spotlight-card__name {
+    .mc-card__name {
       font-family: var(--font-display);
-      font-size: 28px;
+      font-size: 22px;
       color: var(--text);
       letter-spacing: var(--ls-display);
       margin-bottom: var(--space-2);
     }
-    .spotlight-card__hypothesis {
+    .mc-card__hypo {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       color: var(--text-muted);
       line-height: var(--lh-mono);
-      max-width: 580px;
     }
-    .spotlight-card__hypothesis em { color: var(--text); font-style: normal; }
-    .spotlight-counter {
-      text-align: right;
+    .mc-card__hypo em { color: var(--text); font-style: normal; }
+
+    /* Progress ring */
+    .progress-ring { position: relative; width: 80px; height: 80px; }
+    .progress-ring svg { transform: rotate(-90deg); }
+    .progress-ring__track { fill: none; stroke: var(--surface-raised); stroke-width: 5; }
+    .progress-ring__fill { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 1.2s ease-out; }
+    .progress-ring__text {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
     }
-    .spotlight-counter__num {
+    .progress-ring__day {
       font-family: var(--font-display);
-      font-size: 48px;
+      font-size: 20px;
       color: var(--accent);
       line-height: 1;
-      letter-spacing: var(--ls-display);
+      display: block;
     }
-    .spotlight-counter__label {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
+    .progress-ring__label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-muted);
       text-transform: uppercase;
-      color: var(--text-muted);
-      font-family: var(--font-mono);
+      letter-spacing: var(--ls-tag);
     }
-    .spotlight-card__progress {
-      padding: var(--space-5) var(--space-8);
-      border-bottom: 1px solid var(--border);
+
+    .mc-card__bar {
+      padding: 0 var(--space-6) var(--space-4);
+      display: flex; align-items: center; gap: var(--space-3);
     }
-    .spotlight-progress-row {
-      display: flex;
-      align-items: center;
-      gap: var(--space-4);
+    .mc-bar-track { flex:1; height:3px; background:var(--surface-raised); border-radius:2px; overflow:hidden; }
+    .mc-bar-fill { height:100%; background:var(--accent); border-radius:2px; transition:width 1s ease-out; }
+    .mc-bar-label { font-family:var(--font-mono); font-size:var(--text-2xs); color:var(--text-muted); white-space:nowrap; }
+
+    .mc-card__chips {
+      display: flex; gap: var(--space-2); flex-wrap: wrap;
+      padding: var(--space-3) var(--space-6) var(--space-5);
+      border-top: 1px solid var(--border);
     }
-    .spotlight-progress-track {
-      flex: 1;
-      height: 4px;
-      background: var(--surface-raised);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .spotlight-progress-fill {
-      height: 100%;
-      background: var(--accent);
-      border-radius: 2px;
-      transition: width 1s var(--ease-out);
-    }
-    .spotlight-progress-label {
-      font-size: var(--text-2xs);
-      font-family: var(--font-mono);
-      color: var(--text-muted);
-      letter-spacing: var(--ls-label);
-      white-space: nowrap;
-    }
-    .spotlight-card__metrics {
-      display: flex;
-      gap: var(--space-2);
-      flex-wrap: wrap;
-      padding: var(--space-4) var(--space-8);
-    }
-    .metric-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2);
+    .chip {
+      display: inline-flex; align-items: center; gap: var(--space-2);
       padding: 2px var(--space-3);
       border: 1px solid var(--border);
-      background: var(--surface-raised);
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
       color: var(--text-muted);
       letter-spacing: var(--ls-label);
     }
-    .metric-chip.primary {
-      border-color: var(--accent-dim);
-      color: var(--accent);
-      background: var(--accent-bg-subtle);
-    }
+    .chip--accent { border-color: var(--accent-dim); color: var(--accent); background: var(--accent-bg-subtle); }
+    .chip--tier { background: var(--surface-raised); text-transform: uppercase; }
+    .chip--evidence { text-transform: uppercase; }
 
-    /* ── Before/After delta on completed cards ── */
-    .exp-delta {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2);
-      padding: 2px var(--space-3);
-      border-radius: 2px;
+    .mc-card__delta {
+      padding: var(--space-3) var(--space-6);
+      border-top: 1px solid var(--border);
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      font-weight: 600;
-      letter-spacing: var(--ls-label);
-      margin-left: var(--space-3);
-    }
-    .exp-delta.positive { background: rgba(0,229,160,0.1); color: var(--accent); border: 1px solid var(--accent-dim); }
-    .exp-delta.negative { background: rgba(255,82,82,0.08); color: #FF5252; border: 1px solid rgba(255,82,82,0.3); }
-    .exp-delta.neutral  { background: var(--surface-raised); color: var(--text-muted); border: 1px solid var(--border); }
-    .exp-confirmed {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2);
-      padding: 2px var(--space-3);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: #2EA98F;
-      border: 1px solid rgba(46,169,143,0.3);
-      background: rgba(46,169,143,0.06);
-      font-family: var(--font-mono);
-      margin-top: var(--space-3);
-      display: inline-block;
+      color: var(--text-muted);
     }
 
-    /* Experiment list */
-    .experiments-section {
+    .mc-empty {
+      padding: var(--space-12);
+      text-align: center;
+      border: 1px dashed var(--border);
+    }
+    .mc-empty__title {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--text-muted);
+      margin-bottom: var(--space-3);
+    }
+    .mc-empty__sub { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-faint); }
+
+    /* ── Zone 2: The Library ── */
+    .library {
       max-width: var(--max-width);
       margin: 0 auto;
-      padding: var(--space-10) var(--page-padding) var(--space-20);
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
     }
-    .experiments-filter { display: flex; gap: var(--space-2); margin-bottom: var(--space-8); flex-wrap: wrap; }
-    .filter-btn {
+    .library__filters {
+      display: flex; gap: var(--space-2); flex-wrap: wrap;
+      margin-bottom: var(--space-8);
+    }
+    .lib-filter {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
@@ -273,13 +253,164 @@
       cursor: pointer;
       transition: all var(--dur-fast);
     }
-    .filter-btn:hover, .filter-btn.active {
+    .lib-filter:hover, .lib-filter.active {
       border-color: var(--accent);
       color: var(--accent);
       background: var(--accent-bg-subtle);
     }
+    .lib-sort {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      background: transparent;
+      border: 1px solid var(--border);
+      padding: var(--space-2) var(--space-4);
+      cursor: pointer;
+    }
 
-    /* Experiment card */
+    /* Pillar section */
+    .pillar-section { margin-bottom: var(--space-8); }
+    .pillar-header {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      gap: var(--space-3);
+      align-items: center;
+      padding: var(--space-4) var(--space-5);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      transition: border-color var(--dur-fast);
+      margin-bottom: var(--space-4);
+    }
+    .pillar-header:hover { border-color: var(--accent-dim); }
+    .pillar-header__icon {
+      width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .pillar-header__name {
+      font-family: var(--font-display);
+      font-size: 18px;
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+    }
+    .pillar-header__stats {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+    }
+    .pillar-header__chevron {
+      font-family: var(--font-mono);
+      color: var(--text-faint);
+      transition: transform var(--dur-fast);
+    }
+    .pillar-section.collapsed .pillar-header__chevron { transform: rotate(-90deg); }
+    .pillar-section.collapsed .pillar-grid { display: none; }
+
+    .pillar-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: var(--space-4);
+    }
+
+    /* Library tile */
+    .lib-tile {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: var(--space-5);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      transition: border-color var(--dur-fast);
+      position: relative;
+    }
+    .lib-tile:hover { border-color: var(--accent-dim); }
+    .lib-tile--active { border-color: var(--accent-dim); }
+    .lib-tile--active::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 2px;
+      background: var(--accent);
+    }
+    .lib-tile--completed { opacity: 0.85; }
+    .lib-tile--failed { opacity: 0.6; }
+
+    .lib-tile__top { display: flex; justify-content: space-between; align-items: start; }
+    .lib-tile__name {
+      font-family: var(--font-display);
+      font-size: 16px;
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      line-height: 1.3;
+    }
+    .lib-tile__evidence {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .lib-tile__desc {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-mono);
+    }
+    .lib-tile__meta {
+      display: flex; gap: var(--space-3); flex-wrap: wrap;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+    }
+    .lib-tile__bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: auto;
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--border);
+    }
+    .lib-status {
+      display: inline-flex; align-items: center; gap: var(--space-2);
+      padding: var(--space-1) var(--space-3);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      border: 1px solid currentColor;
+      font-family: var(--font-mono);
+    }
+    .lib-status--backlog { color: var(--text-muted); border-color: var(--border); }
+    .lib-status--active { color: var(--accent); border-color: var(--accent-dim); }
+    .lib-status--completed { color: #2EA98F; border-color: rgba(46,169,143,0.3); }
+    .lib-status--partial { color: var(--c-amber-400); border-color: var(--c-amber-300); }
+    .lib-status--failed { color: var(--text-muted); border-color: var(--border); }
+    .lib-status__dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+    .vote-btn {
+      display: inline-flex; align-items: center; gap: var(--space-2);
+      padding: var(--space-1) var(--space-3);
+      border: 1px solid var(--border);
+      background: transparent;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all var(--dur-fast);
+    }
+    .vote-btn:hover { border-color: var(--accent-dim); color: var(--accent); }
+    .vote-btn.voted { border-color: var(--accent-dim); color: var(--accent); background: var(--accent-bg-subtle); }
+    .vote-btn__arrow { font-size: 12px; }
+
+    /* ── Zone 3: The Record ── */
+    .record {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding) var(--space-20);
+    }
+    .record__filters { display:flex; gap:var(--space-2); margin-bottom:var(--space-8); flex-wrap:wrap; }
+
+    /* Existing exp-card styles */
     .exp-card {
       border: 1px solid var(--border);
       background: var(--surface);
@@ -318,9 +449,7 @@
     }
     .exp-card__hypothesis em { color: var(--text); font-style: normal; }
     .exp-status {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2);
+      display: inline-flex; align-items: center; gap: var(--space-2);
       padding: var(--space-1) var(--space-3);
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
@@ -328,8 +457,9 @@
       border: 1px solid currentColor;
       white-space: nowrap;
     }
-    .exp-status--active    { color: var(--accent); border-color: var(--accent-dim); background: var(--accent-bg-subtle); }
-    .exp-status--completed { color: #2EA98F; border-color: rgba(46,169,143,0.3); background: rgba(46,169,143,0.05); }
+    .exp-status--active { color: var(--accent); border-color: var(--accent-dim); background: var(--accent-bg-subtle); }
+    .exp-status--completed { color: #2EA98F; border-color: rgba(46,169,143,0.3); }
+    .exp-status--partial { color: var(--c-amber-400); border-color: var(--c-amber-300); }
     .exp-status--abandoned { color: var(--text-muted); border-color: var(--border); }
     .exp-status__dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
     .exp-card__body {
@@ -398,15 +528,24 @@
       background: var(--surface-raised);
       color: var(--text-muted);
     }
-
-    /* EXP-2: Mechanism + key finding depth rows */
+    .exp-delta {
+      display: inline-flex; align-items: center; gap: var(--space-2);
+      padding: 2px var(--space-3);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-weight: 600;
+      letter-spacing: var(--ls-label);
+      margin-left: var(--space-3);
+    }
+    .exp-delta.positive { background: rgba(0,229,160,0.1); color: var(--accent); border: 1px solid var(--accent-dim); }
+    .exp-delta.negative { background: rgba(255,82,82,0.08); color: #FF5252; border: 1px solid rgba(255,82,82,0.3); }
+    .exp-delta.neutral { background: var(--surface-raised); color: var(--text-muted); border: 1px solid var(--border); }
     .exp-card__mechanism {
       padding: var(--space-4) var(--space-8);
-      border-top: 1px solid var(--border-subtle);
+      border-top: 1px solid var(--border-subtle, var(--border));
       display: grid;
       grid-template-columns: 100px 1fr;
       gap: var(--space-4);
-      align-items: start;
     }
     .exp-card__mechanism-label {
       font-size: var(--text-2xs);
@@ -416,19 +555,14 @@
       font-family: var(--font-mono);
       padding-top: 2px;
     }
-    .exp-card__mechanism-text {
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-    }
+    .exp-card__mechanism-text { font-size: var(--text-xs); color: var(--text-muted); line-height: var(--lh-body); }
     .exp-card__finding {
       padding: var(--space-4) var(--space-8);
-      border-top: 1px solid var(--border-subtle);
+      border-top: 1px solid var(--border-subtle, var(--border));
       background: rgba(0,229,160,0.03);
       display: grid;
       grid-template-columns: 100px 1fr;
       gap: var(--space-4);
-      align-items: start;
     }
     .exp-card__finding-label {
       font-size: var(--text-2xs);
@@ -444,111 +578,20 @@
       color: var(--text);
       line-height: var(--lh-mono);
     }
-
-    /* Empty state */
-    .empty-state {
-      padding: var(--space-20) 0;
-      text-align: center;
-      border: 1px dashed var(--border);
-    }
-    .empty-state__title {
-      font-family: var(--font-display);
-      font-size: 36px;
-      color: var(--text-muted);
-      letter-spacing: var(--ls-display);
-      margin-bottom: var(--space-4);
-    }
-    .empty-state__sub {
+    .grade-badge {
+      display: inline-flex; align-items: center; gap: var(--space-2);
+      padding: var(--space-1) var(--space-3);
       font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      letter-spacing: var(--ls-tag);
-      line-height: var(--lh-mono);
-      max-width: 400px;
-      margin: 0 auto;
-    }
-    .empty-state__coming {
-      margin-top: var(--space-8);
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
-      color: var(--accent-dim);
-    }
-
-    /* Experiment design 2-col */
-    .exp-design {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-6);
-    }
-    .exp-design__col {
-      border: 1px solid var(--border-subtle);
-      background: var(--surface);
-      padding: var(--space-6);
-    }
-    .exp-design__col-heading {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
-      margin-bottom: var(--space-5);
-    }
-    .exp-design__step {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: var(--space-3);
-      align-items: baseline;
-      margin-bottom: var(--space-4);
-    }
-    .exp-design__step:last-child { margin-bottom: 0; }
-    .exp-design__step-num {
-      font-family: var(--font-display);
-      font-size: 28px;
-      color: var(--accent);
-      line-height: 1;
-      letter-spacing: var(--ls-display);
-    }
-    .exp-design__step-label {
-      font-size: var(--text-xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--text);
-      margin-bottom: var(--space-1);
-    }
-    .exp-design__step-desc {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      line-height: var(--lh-mono);
-    }
-    .exp-design__check {
-      display: flex;
-      gap: var(--space-3);
-      align-items: baseline;
       margin-bottom: var(--space-3);
     }
-    .exp-design__check:last-child { margin-bottom: 0; }
-    .exp-design__check::before {
-      content: '//';
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      flex-shrink: 0;
-    }
-    .exp-design__check-text {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-    }
-    .exp-design__check-text strong { color: var(--text); }
-    @media (max-width: 768px) { .exp-design { grid-template-columns: 1fr; } }
+    .grade-badge--completed { color: #2EA98F; border: 1px solid rgba(46,169,143,0.3); background: rgba(46,169,143,0.06); }
+    .grade-badge--partial { color: var(--c-amber-400); border: 1px solid var(--c-amber-300); background: var(--c-amber-050); }
+    .grade-badge--failed { color: var(--text-muted); border: 1px solid var(--border); background: var(--surface-raised); }
 
-    /* Methodology */
+    /* ── Methodology ── */
     .methodology {
       max-width: var(--max-width);
       margin: 0 auto;
@@ -573,32 +616,35 @@
     .methodology__text p + p { margin-top: var(--space-4); }
     .methodology__text strong { color: var(--text); }
 
+    .empty-state {
+      padding: var(--space-16) 0;
+      text-align: center;
+      border: 1px dashed var(--border);
+    }
+    .empty-state__title {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--text-muted);
+      margin-bottom: var(--space-3);
+    }
+    .empty-state__sub { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-faint); }
+
     @media (max-width: 768px) {
       .explainer { grid-template-columns: 1fr; }
       .exp-card__body { grid-template-columns: 1fr 1fr; }
       .exp-card__header { grid-template-columns: 1fr; }
       .methodology { grid-template-columns: 1fr; }
+      .mc-card__top { grid-template-columns: 1fr; }
+      .progress-ring { margin: 0 auto var(--space-4); }
+      .pillar-grid { grid-template-columns: 1fr; }
     }
-    .pipeline-nav { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-4) var(--page-padding); border-bottom:1px solid var(--border); background:var(--surface); font-family:var(--font-mono); font-size:var(--text-2xs); letter-spacing:var(--ls-tag); overflow-x:auto; }
-    .pipeline-nav__step { color:var(--text-faint); text-decoration:none; text-transform:uppercase; white-space:nowrap; padding:var(--space-1) var(--space-3); border:1px solid transparent; }
-    .pipeline-nav__step:hover { color:var(--text-muted); }
-    .pipeline-nav__step.active { color:var(--accent); border-color:var(--accent-dim); }
-    .pipeline-nav__arrow { color:var(--border); }
   </style>
 </head>
 <body>
 
 <div id="amj-nav"></div>
-</div>
 
-
-
-
-
-
-
-
-<!-- PROTO-4: Pipeline nav -->
+<!-- Pipeline Nav -->
 <nav class="pipeline-nav">
   <a href="/protocols/" class="pipeline-nav__step">Protocols</a>
   <span class="pipeline-nav__arrow">→</span>
@@ -607,15 +653,15 @@
   <a href="/discoveries/" class="pipeline-nav__step">Discoveries</a>
 </nav>
 
-<div class="experiment-thread">Experiments generate Discoveries → <a href="/discoveries/">Discoveries →</a></div>
+<!-- Page Header -->
 <div class="page-header animate-in">
   <div class="page-header__kicker">The Science</div>
-  <h1 class="page-header__title">The Lab <span>Notebook</span></h1>
-  <p class="page-header__sub">Self-experiments with a clear hypothesis, defined protocol, and real data. No cherry-picking. Results published regardless of outcome.</p>
+  <h1 class="page-header__title">The <span>Lab</span></h1>
+  <p class="page-header__sub">52 evidence-based experiments across 7 pillars. Vote on what I test next. Every result published — including the failures.</p>
   <div class="page-header__meta">
     <div class="meta-stat">
-      <div class="meta-stat__label">Total experiments</div>
-      <div class="meta-stat__value" id="stat-total">—</div>
+      <div class="meta-stat__label">In the library</div>
+      <div class="meta-stat__value" id="stat-library">52</div>
     </div>
     <div class="meta-stat">
       <div class="meta-stat__label">Active now</div>
@@ -625,9 +671,14 @@
       <div class="meta-stat__label">Completed</div>
       <div class="meta-stat__value" id="stat-completed">—</div>
     </div>
+    <div class="meta-stat">
+      <div class="meta-stat__label">Community votes</div>
+      <div class="meta-stat__value" id="stat-votes">—</div>
+    </div>
   </div>
 </div>
 
+<!-- H/P/D Explainer -->
 <div class="explainer animate-in reveal">
   <div class="explainer__item">
     <div class="explainer__num">H</div>
@@ -637,7 +688,7 @@
   <div class="explainer__item">
     <div class="explainer__num">P</div>
     <div class="explainer__label">Protocol</div>
-    <div class="explainer__desc">Defined intervention, duration, and measurement approach. Baseline established before starting. No mid-experiment changes.</div>
+    <div class="explainer__desc">Defined intervention, duration, and measurement. Baseline established before starting. No mid-experiment changes.</div>
   </div>
   <div class="explainer__item">
     <div class="explainer__num">D</div>
@@ -646,315 +697,335 @@
   </div>
 </div>
 
-<div class="exp-design animate-in reveal">
-  <div class="exp-design__col">
-    <div class="exp-design__col-heading">How experiments are designed</div>
-    <div class="exp-design__step">
-      <div class="exp-design__step-num">1</div>
-      <div>
-        <div class="exp-design__step-label">Hypothesis</div>
-        <div class="exp-design__step-desc">State a falsifiable prediction: "If I add 10g of creatine daily for 4 weeks, I expect fasting glucose to remain stable while lean mass increases by at least 0.5 lbs." The specific prediction is set before starting.</div>
-      </div>
-    </div>
-    <div class="exp-design__step">
-      <div class="exp-design__step-num">2</div>
-      <div>
-        <div class="exp-design__step-label">Protocol</div>
-        <div class="exp-design__step-desc">Define the exact intervention, start date, and duration. Establish a baseline window (7–14 days of data before the intervention begins). No mid-experiment changes to variables.</div>
-      </div>
-    </div>
-    <div class="exp-design__step">
-      <div class="exp-design__step-num">3</div>
-      <div>
-        <div class="exp-design__step-label">Measurement</div>
-        <div class="exp-design__step-desc">Identify the primary outcome metric and which data source tracks it. Secondary metrics are pre-specified, not cherry-picked after results come in.</div>
-      </div>
-    </div>
-    <div class="exp-design__step">
-      <div class="exp-design__step-num">4</div>
-      <div>
-        <div class="exp-design__step-label">Result</div>
-        <div class="exp-design__step-desc">Compare the experiment window against the pre-experiment baseline. Publish regardless of outcome. Negative results are as informative as positive ones.</div>
-      </div>
-    </div>
-  </div>
-  <div class="exp-design__col">
-    <div class="exp-design__col-heading">What makes a good N=1 experiment</div>
-    <div class="exp-design__check">
-      <div class="exp-design__check-text"><strong>Control for the obvious confounders.</strong> Don't start a sleep experiment during a travel week. Don't test a training protocol while also changing diet. One variable at a time — or explicitly note when you can't.</div>
-    </div>
-    <div class="exp-design__check">
-      <div class="exp-design__check-text"><strong>Minimum duration matched to the outcome.</strong> HRV changes can be visible in 1–2 weeks. Body composition changes need 4+ weeks to clear noise. Lab biomarkers need 8–12 weeks. Match the window to the biology.</div>
-    </div>
-    <div class="exp-design__check">
-      <div class="exp-design__check-text"><strong>Pre-register the hypothesis.</strong> Deciding what "success" looks like after seeing the data is how self-experiments become confirmation bias. The hypothesis is locked before Day 1.</div>
-    </div>
-    <div class="exp-design__check">
-      <div class="exp-design__check-text"><strong>Use an objective metric.</strong> "I feel better" isn't a result. "HRV increased from 58ms baseline to 67ms average over the experiment window" is a result. The platform's 19 live data sources make objective outcomes the default.</div>
-    </div>
-    <div class="exp-design__check">
-      <div class="exp-design__check-text"><strong>N=1 is still useful.</strong> Between-person variance is the enemy of population studies. Single-subject experiments bypass it entirely — the person is their own control. The limitation is generalisability, not signal quality.</div>
-    </div>
+<!-- Zone 1: Mission Control -->
+<div class="mission-control" id="mission-control">
+  <div class="zone-heading">// currently running</div>
+  <div class="mc-grid" id="mc-grid">
+    <div class="mc-empty"><div class="mc-empty__title">Loading…</div></div>
   </div>
 </div>
 
-<!-- Active Experiment Spotlight (hidden until data loads) -->
-<div class="active-spotlight" id="active-spotlight" style="display:none">
-  <div class="spotlight-heading">// currently running</div>
-  <div class="spotlight-card">
-    <div class="spotlight-card__top">
-      <div>
-        <div class="spotlight-card__name" id="sp-name">—</div>
-        <div class="spotlight-card__hypothesis" id="sp-hypothesis"></div>
-      </div>
-      <div class="spotlight-counter">
-        <div class="spotlight-counter__num" id="sp-days">—</div>
-        <div class="spotlight-counter__label">days in</div>
-      </div>
-    </div>
-    <div class="spotlight-card__progress" id="sp-progress-section" style="display:none">
-      <div class="spotlight-progress-row">
-        <div class="spotlight-progress-track">
-          <div class="spotlight-progress-fill" id="sp-progress-fill" style="width:0%"></div>
-        </div>
-        <div class="spotlight-progress-label" id="sp-progress-label"></div>
-      </div>
-    </div>
-    <div class="spotlight-card__metrics" id="sp-metrics"></div>
+<!-- Zone 2: The Library -->
+<div class="library" id="library">
+  <div class="zone-heading">// experiment library — vote on what i test next</div>
+  <div class="library__filters" id="lib-filters">
+    <button class="lib-filter active" data-pillar="all">All</button>
+    <select class="lib-sort" id="lib-sort">
+      <option value="votes">Most voted</option>
+      <option value="active">Recently active</option>
+      <option value="alpha">A–Z</option>
+    </select>
+  </div>
+  <div id="library-grid">
+    <div class="empty-state"><div class="empty-state__title">Loading library…</div></div>
   </div>
 </div>
 
+<!-- Methodology -->
 <div class="methodology reveal">
   <div class="methodology__label">On the methodology</div>
   <div class="methodology__text">
     <p>These are <strong>N=1 experiments</strong> — single-subject self-experiments with no control group. The scientific limitations are real: no blinding, no randomization, seasonal confounders, regression to the mean. Results apply to me specifically and may not generalize.</p>
     <p>What makes them useful anyway: <strong>consistency of measurement</strong>. With 19 live data sources running continuously, the baseline data is dense enough that meaningful signal can emerge from even a single-person study — particularly for outcomes with low day-to-day variance like resting HRV and fasting glucose.</p>
-    <p>Experiments are tracked inside the Life Platform. Each one has a defined start date, hypothesis variables, and auto-comparison against the pre-experiment window. Results are published here unchanged — including the ones that didn't work.</p>
+    <p>The library experiments are <strong>graded by evidence tier</strong>: ●●● Strong (multiple RCTs), ●● Moderate (observational studies), ● Emerging (preclinical or anecdotal). And each experiment is classified as <strong>Measurable</strong> (has a biomarker endpoint from my 19 data sources) or <strong>Behavioral</strong> (compliance tracking is the outcome).</p>
   </div>
 </div>
 
-<div class="experiments-section animate-in reveal">
-  <div class="experiments-filter">
-    <button class="filter-btn active" data-filter="all">All</button>
-    <button class="filter-btn" data-filter="active">Active</button>
-    <button class="filter-btn" data-filter="completed">Completed</button>
-    <button class="filter-btn" data-filter="abandoned">Abandoned</button>
+<!-- Zone 3: The Record -->
+<div class="record" id="record">
+  <div class="zone-heading">// the record — completed experiments</div>
+  <div class="record__filters">
+    <button class="lib-filter active" data-record="all">All</button>
+    <button class="lib-filter" data-record="completed">Completed</button>
+    <button class="lib-filter" data-record="abandoned">Abandoned</button>
   </div>
-  <div id="experiment-list">
-    <div class="empty-state"><div class="empty-state__title">Loading…</div></div>
+  <div id="record-list">
+    <div class="empty-state">
+      <div class="empty-state__title">No completed experiments yet</div>
+      <div class="empty-state__sub">Results will appear here once the first experiment completes.</div>
+    </div>
   </div>
 </div>
 
 <!-- N=1 Disclaimer -->
-<aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle)">
+<aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle, var(--border))">
   <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label)">
     <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
-    This is a single-person experiment. Correlations observed in this data may not apply to anyone else. I track everything to make better decisions for myself, not to prove universal principles. Where I note that X correlates with Y, I mean in my data, during this period, with confounders I can’t fully control for.
+    This is a single-person experiment. Correlations observed in this data may not apply to anyone else. I track everything to make better decisions for myself, not to prove universal principles.
   </p>
 </aside>
 
-<!-- S2-T1-8: Email CTA footer — injected by add_email_cta.py -->
 <div id="amj-subscribe"></div>
-<!-- Mobile bottom nav -->
 <div id="amj-bottom-nav"></div>
-
 <div id="amj-reading-path"></div>
 <div id="amj-footer"></div>
 
-<!-- WEB-WCT: Weekly Challenge Ticker -->
-<div class="challenge-bar" id="challenge-bar" style="display:none">
-  <span class="challenge-bar__pip"></span>
-  <span class="challenge-bar__label" id="cb-week">Week —</span>
-  <span class="challenge-bar__divider"></span>
-  <span class="challenge-bar__text" id="cb-challenge">Loading challenge…</span>
-  <span class="challenge-bar__divider"></span>
-  <span class="challenge-bar__progress" id="cb-progress"></span>
-</div>
-
 <script>
 (function() {
-  // Nav date
-  const navEl = document.getElementById('nav-date');
-  if (navEl) navEl.textContent = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}).toUpperCase();
+  'use strict';
 
+  var API = 'https://averagejoematt.com/api';
+  var PILLAR_ICONS = {sleep:'☾',movement:'◎',nutrition:'⚘',supplements:'⬡',mental:'◈',social:'◇',discipline:'▣'};
+  var EVIDENCE_DOTS = {strong:'●●●',moderate:'●●',emerging:'●'};
+  var EVIDENCE_LABEL = {strong:'Strong',moderate:'Moderate',emerging:'Emerging'};
+  var votedSet = {};
+  try { votedSet = JSON.parse(localStorage.getItem('amj_exp_votes') || '{}'); } catch(e) {}
+
+  // ── Helpers ──
   function formatDate(s) {
     if (!s) return '—';
     try { return new Date(s+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}).toUpperCase(); }
     catch(e) { return s; }
   }
-
   function daysBetween(a, b) {
-    try {
-      return Math.max(0, Math.round((new Date(b ? b+'T12:00:00' : Date.now()) - new Date(a+'T12:00:00')) / 86400000));
-    } catch(e) { return 0; }
+    try { return Math.max(0, Math.round((new Date(b ? b+'T12:00:00' : Date.now()) - new Date(a+'T12:00:00')) / 86400000)); }
+    catch(e) { return 0; }
   }
 
-  function statusBadge(status) {
-    const labels = {active:'Running', completed:'Completed', abandoned:'Abandoned'};
-    return `<span class="exp-status exp-status--${status}"><span class="exp-status__dot"></span>${labels[status]||status}</span>`;
-  }
-
-  // ── Active Spotlight ─────────────────────────────────────────────────────
-  function renderSpotlight(exp) {
-    var el = document.getElementById('active-spotlight');
-    if (!el) return;
-    var nameEl      = document.getElementById('sp-name');
-    var hypoEl      = document.getElementById('sp-hypothesis');
-    var daysEl      = document.getElementById('sp-days');
-    var progSection = document.getElementById('sp-progress-section');
-    var progFill    = document.getElementById('sp-progress-fill');
-    var progLabel   = document.getElementById('sp-progress-label');
-    var metricsEl   = document.getElementById('sp-metrics');
-
-    if (nameEl)  nameEl.textContent = exp.name;
-    if (hypoEl)  hypoEl.innerHTML   = '<em>Hypothesis:</em> ' + (exp.hypothesis || 'Not specified');
-    if (daysEl)  daysEl.textContent = exp.days_in != null ? exp.days_in : daysBetween(exp.start_date, null);
-
-    if (exp.progress_pct != null && progSection && progFill && progLabel) {
-      progFill.style.width  = exp.progress_pct + '%';
-      progLabel.textContent = exp.progress_pct + '% through planned duration';
-      progSection.style.display = '';
+  // ── Zone 1: Mission Control ──
+  function renderMissionControl(experiments) {
+    var active = experiments.filter(function(e) { return e.status === 'active'; });
+    var grid = document.getElementById('mc-grid');
+    if (!active.length) {
+      grid.innerHTML = '<div class="mc-empty"><div class="mc-empty__title">Between experiments</div><div class="mc-empty__sub">Vote below to pick what I test next.</div></div>';
+      return;
     }
+    grid.innerHTML = active.map(function(exp) {
+      var daysIn = exp.days_in != null ? exp.days_in : daysBetween(exp.start_date, null);
+      var planned = exp.planned_duration_days || 84;
+      var pct = Math.min(100, Math.round(daysIn / planned * 100));
+      var circumference = 2 * Math.PI * 34;
+      var offset = circumference - (pct / 100) * circumference;
+      var tierLabel = exp.duration_tier || (planned <= 14 ? '7-day sprint' : planned <= 30 ? '30-day trial' : '60-day deep dive');
+      var evidenceLabel = exp.experiment_type === 'behavioral' ? 'Behavioral' : 'Measurable';
 
-    if (metricsEl) {
-      var chips = [];
-      if (exp.primary_metric) chips.push('<span class="metric-chip primary">● ' + exp.primary_metric + '</span>');
-      (exp.metrics_tracked || []).forEach(function(m) {
-        if (m !== exp.primary_metric) chips.push('<span class="metric-chip">' + m + '</span>');
+      var chips = '';
+      if (exp.primary_metric) chips += '<span class="chip chip--accent">● ' + exp.primary_metric + '</span>';
+      (exp.metrics_tracked || []).forEach(function(m) { if (m !== exp.primary_metric) chips += '<span class="chip">' + m + '</span>'; });
+      (exp.tags || []).slice(0, 3).forEach(function(t) { chips += '<span class="chip">' + t + '</span>'; });
+      chips += '<span class="chip chip--tier">' + tierLabel + '</span>';
+      chips += '<span class="chip chip--evidence">' + evidenceLabel + '</span>';
+
+      return '<div class="mc-card">' +
+        '<div class="mc-card__top">' +
+          '<div>' +
+            '<div class="mc-card__name">' + exp.name + '</div>' +
+            '<div class="mc-card__hypo"><em>Hypothesis:</em> ' + (exp.hypothesis || 'Not specified') + '</div>' +
+          '</div>' +
+          '<div class="progress-ring">' +
+            '<svg width="80" height="80" viewBox="0 0 80 80">' +
+              '<circle class="progress-ring__track" cx="40" cy="40" r="34"/>' +
+              '<circle class="progress-ring__fill" cx="40" cy="40" r="34" stroke-dasharray="' + circumference + '" stroke-dashoffset="' + offset + '"/>' +
+            '</svg>' +
+            '<div class="progress-ring__text">' +
+              '<span class="progress-ring__day">' + daysIn + '</span>' +
+              '<span class="progress-ring__label">of ' + planned + '</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="mc-card__bar">' +
+          '<div class="mc-bar-track"><div class="mc-bar-fill" style="width:' + pct + '%"></div></div>' +
+          '<div class="mc-bar-label">' + pct + '%</div>' +
+        '</div>' +
+        '<div class="mc-card__chips">' + chips + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // ── Zone 2: Library ──
+  var libraryData = null;
+  var currentPillar = 'all';
+  var currentSort = 'votes';
+
+  function renderLibrary() {
+    if (!libraryData) return;
+    var container = document.getElementById('library-grid');
+    var pillars = libraryData.pillars;
+
+    // Build pillar filter buttons
+    var filterHtml = '<button class="lib-filter' + (currentPillar === 'all' ? ' active' : '') + '" data-pillar="all">All</button>';
+    pillars.forEach(function(p) {
+      filterHtml += '<button class="lib-filter' + (currentPillar === p.id ? ' active' : '') + '" data-pillar="' + p.id + '">' + p.label + '</button>';
+    });
+    filterHtml += '<select class="lib-sort" id="lib-sort"><option value="votes"' + (currentSort==='votes'?' selected':'') + '>Most voted</option><option value="active"' + (currentSort==='active'?' selected':'') + '>Recently active</option><option value="alpha"' + (currentSort==='alpha'?' selected':'') + '>A–Z</option></select>';
+    document.getElementById('lib-filters').innerHTML = filterHtml;
+
+    // Filter pillars
+    var filtered = currentPillar === 'all' ? pillars : pillars.filter(function(p) { return p.id === currentPillar; });
+
+    var html = '';
+    filtered.forEach(function(pillar) {
+      var exps = pillar.experiments.slice();
+      if (currentSort === 'votes') exps.sort(function(a,b) { return (b.votes||0) - (a.votes||0); });
+      else if (currentSort === 'alpha') exps.sort(function(a,b) { return a.name.localeCompare(b.name); });
+
+      var statsStr = pillar.stats.active + ' active · ' + pillar.stats.completed + ' completed · ' + pillar.stats.backlog + ' backlog';
+      html += '<div class="pillar-section" data-pillar="' + pillar.id + '">';
+      html += '<div class="pillar-header" onclick="this.parentElement.classList.toggle(\'collapsed\')">';
+      html += '<div class="pillar-header__icon">' + (PILLAR_ICONS[pillar.id] || '◆') + '</div>';
+      html += '<div class="pillar-header__name">' + pillar.label + '</div>';
+      html += '<div class="pillar-header__stats">' + pillar.stats.total + ' experiments · ' + statsStr + '</div>';
+      html += '<div class="pillar-header__chevron">▾</div>';
+      html += '</div>';
+      html += '<div class="pillar-grid">';
+
+      exps.forEach(function(exp) {
+        var statusClass = 'backlog';
+        var statusLabel = 'Backlog';
+        if (exp.status === 'active') { statusClass = 'active'; statusLabel = 'Day ' + (exp.days_in || '?'); }
+        else if (exp.status === 'completed') { statusClass = 'completed'; statusLabel = '✓ Done'; }
+        else if (exp.status === 'partial') { statusClass = 'partial'; statusLabel = '~ Partial'; }
+        else if (exp.status === 'failed' || exp.status === 'abandoned') { statusClass = 'failed'; statusLabel = '✗ Shelved'; }
+
+        var evidDots = EVIDENCE_DOTS[exp.evidence_tier] || '●';
+        var evidLabel = EVIDENCE_LABEL[exp.evidence_tier] || exp.evidence_tier;
+        var tileClass = 'lib-tile lib-tile--' + statusClass;
+        var isVoted = votedSet[exp.id];
+
+        html += '<div class="' + tileClass + '">';
+        html += '<div class="lib-tile__top">';
+        html += '<div class="lib-tile__name">' + exp.name + '</div>';
+        html += '<div class="lib-tile__evidence">' + evidDots + ' ' + evidLabel + '</div>';
+        html += '</div>';
+        html += '<div class="lib-tile__desc">' + exp.description + '</div>';
+        html += '<div class="lib-tile__meta">';
+        html += '<span>' + exp.suggested_duration_days + ' days</span>';
+        html += '<span>' + (exp.difficulty || 'medium') + '</span>';
+        html += '<span>' + (exp.experiment_type === 'behavioral' ? 'Behavioral' : 'Measurable') + '</span>';
+        html += '</div>';
+        html += '<div class="lib-tile__bottom">';
+        html += '<span class="lib-status lib-status--' + statusClass + '"><span class="lib-status__dot"></span>' + statusLabel + '</span>';
+        html += '<button class="vote-btn' + (isVoted ? ' voted' : '') + '" data-lib-id="' + exp.id + '" onclick="handleVote(this)">';
+        html += '<span class="vote-btn__arrow">▲</span> ' + (exp.votes || 0);
+        html += '</button>';
+        html += '</div>';
+        html += '</div>';
       });
-      (exp.tags || []).forEach(function(t) {
-        chips.push('<span class="metric-chip">' + t + '</span>');
-      });
-      if (chips.length) metricsEl.innerHTML = chips.join('');
-    }
-    el.style.display = '';
-  }
 
-  // ── Delta chip for completed cards ──────────────────────────────────────
-  function deltaChip(exp) {
-    if (exp.baseline_value == null || exp.result_value == null) return '';
-    var baseline = parseFloat(exp.baseline_value);
-    var result   = parseFloat(exp.result_value);
-    if (isNaN(baseline) || isNaN(result)) return '';
-    var diff  = result - baseline;
-    var arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '→';
-    var sign  = diff > 0 ? '+' : '';
-    var cls   = diff > 0 ? 'positive' : diff < 0 ? 'negative' : 'neutral';
-    var lowerIsBetter = /weight|rhr|glucose|resting/i.test(exp.primary_metric || '');
-    if (lowerIsBetter) cls = diff < 0 ? 'positive' : diff > 0 ? 'negative' : 'neutral';
-    var label = exp.primary_metric
-      ? (sign + diff.toFixed(1) + ' ' + exp.primary_metric)
-      : (sign + Math.round(diff / Math.abs(baseline) * 100) + '%');
-    return '<span class="exp-delta ' + cls + '">' + arrow + ' ' + label + '</span>';
-  }
-
-  function renderCard(exp) {
-    const isActive = exp.status === 'active';
-    const days = exp.duration_days != null ? exp.duration_days
-      : daysBetween(exp.start_date, isActive ? null : exp.end_date);
-    const tags = (exp.tags||[]).map(t=>`<span class="exp-tag">${t}</span>`).join('');
-
-    const delta = !isActive ? deltaChip(exp) : '';
-    const confirmedBadge = exp.hypothesis_confirmed === true
-      ? '<div class="exp-confirmed">✓ Hypothesis confirmed</div>'
-      : exp.hypothesis_confirmed === false
-      ? '<div class="exp-confirmed" style="color:var(--c-amber-400);border-color:rgba(200,132,58,0.3);background:rgba(200,132,58,0.06)">× Hypothesis not supported</div>'
-      : '';
-
-    const outcomeHtml = exp.outcome
-      ? `<div class="exp-card__outcome"><div class="exp-card__outcome-label">Outcome ${delta}</div><div class="exp-card__outcome-text">${exp.outcome}${confirmedBadge}</div></div>`
-      : isActive
-      ? `<div class="exp-card__outcome"><div class="exp-card__outcome-label">Status</div><div class="exp-card__outcome-text">Experiment in progress — results published on completion.</div></div>`
-      : '';
-
-    const metricField = exp.primary_metric
-      ? `<div class="exp-card__field"><div class="exp-card__field-label">Primary Metric</div><div class="exp-card__field-value">${exp.primary_metric}</div></div>`
-      : `<div class="exp-card__field"><div class="exp-card__field-label">Category</div><div class="exp-card__field-value">${(exp.tags||[]).join(', ')||'—'}</div></div>`;
-
-    return `<div class="exp-card exp-card--${exp.status}" data-status="${exp.status}">
-      <div class="exp-card__header">
-        <div>
-          <div class="exp-card__name">${exp.name}</div>
-          <div class="exp-card__hypothesis"><em>Hypothesis:</em> ${exp.hypothesis||'Not specified'}</div>
-          ${tags ? `<div class="exp-tags">${tags}</div>` : ''}
-        </div>
-        <div style="text-align:right">
-          ${statusBadge(exp.status)}
-          <div class="exp-days" style="margin-top:var(--space-4)">${days}<span>${isActive ? 'days in' : 'days total'}</span></div>
-        </div>
-      </div>
-      <div class="exp-card__body">
-        <div class="exp-card__field"><div class="exp-card__field-label">Started</div><div class="exp-card__field-value">${formatDate(exp.start_date)}</div></div>
-        <div class="exp-card__field"><div class="exp-card__field-label">${isActive ? 'Running' : 'Ended'}</div><div class="exp-card__field-value">${isActive ? 'Ongoing' : formatDate(exp.end_date)}</div></div>
-        ${metricField}
-        <div class="exp-card__field"><div class="exp-card__field-label">Result</div><div class="exp-card__field-value">${exp.status==='completed'?'Published':exp.status==='active'?'Pending':'Abandoned'}</div></div>
-      </div>
-      ${outcomeHtml}
-      ${exp.mechanism ? `<div class="exp-card__mechanism"><div class="exp-card__mechanism-label">Mechanism</div><div class="exp-card__mechanism-text">${exp.mechanism}</div></div>` : ''}
-      ${exp.key_finding ? `<div class="exp-card__finding"><div class="exp-card__finding-label">// So far</div><div class="exp-card__finding-text">${exp.key_finding}</div></div>` : ''}
-    </div>`;
-  }
-
-  function renderEmpty(filter) {
-    const msgs = {
-      all:       ['No experiments yet','The first N=1 experiment will appear here once logged to the platform.'],
-      active:    ['No active experiments','No experiments running right now.'],
-      completed: ['No completed experiments','Completed experiments with outcomes will appear here.'],
-      abandoned: ['None abandoned','No experiments have been abandoned.'],
-    };
-    const [title, sub] = msgs[filter]||msgs.all;
-    return `<div class="empty-state">
-      <div class="empty-state__title">${title}</div>
-      <div class="empty-state__sub">${sub}</div>
-      <div class="empty-state__coming">// First experiments launching soon</div>
-    </div>`;
-  }
-
-  let allExperiments = [];
-
-  function applyFilter(filter) {
-    document.querySelectorAll('.filter-btn').forEach(btn =>
-      btn.classList.toggle('active', btn.dataset.filter === filter));
-    const filtered = filter === 'all' ? allExperiments : allExperiments.filter(e => e.status === filter);
-    document.getElementById('experiment-list').innerHTML =
-      filtered.length ? filtered.map(renderCard).join('') : renderEmpty(filter);
-  }
-
-  document.querySelectorAll('.filter-btn').forEach(btn =>
-    btn.addEventListener('click', () => applyFilter(btn.dataset.filter)));
-
-  fetch('https://averagejoematt.com/api/experiments')
-    .then(r => r.ok ? r.json() : null)
-    .then(data => {
-      const exps = (data && data.experiments) ? data.experiments : [];
-      allExperiments = exps;
-      document.getElementById('stat-total').textContent     = exps.length;
-      document.getElementById('stat-active').textContent    = exps.filter(e=>e.status==='active').length;
-      document.getElementById('stat-completed').textContent = exps.filter(e=>e.status==='completed').length;
-
-      // Show Active Spotlight for the most recently started active experiment
-      const activeExp = exps.find(e => e.status === 'active');
-      if (activeExp) renderSpotlight(activeExp);
-
-      applyFilter('all');
-    })
-    .catch(() => {
-      ['stat-total','stat-active','stat-completed'].forEach(id =>
-        document.getElementById(id).textContent = '0');
-      document.getElementById('experiment-list').innerHTML = renderEmpty('all');
+      html += '</div></div>';
     });
 
-  // Weekly Challenge Ticker
-  fetch('https://averagejoematt.com/api/current_challenge')
-    .then(r=>r.ok?r.json():null).then(data=>{
-      if(!data||!data.current_challenge) return;
-      const c = data.current_challenge;
-      const bar = document.getElementById('challenge-bar');
-      if(c.week_num) document.getElementById('cb-week').textContent='Week '+c.week_num+' Challenge';
-      if(c.challenge) document.getElementById('cb-challenge').innerHTML='<strong>'+c.challenge+'</strong>'+(c.detail?' — '+c.detail:'');
-      if(c.days_total) document.getElementById('cb-progress').textContent=(c.days_complete||0)+'/'+c.days_total+' days';
-      bar.style.display='flex';
-    }).catch(()=>{});
+    container.innerHTML = html || '<div class="empty-state"><div class="empty-state__title">No experiments in this category</div></div>';
+
+    // Rebind filter clicks
+    document.querySelectorAll('#lib-filters .lib-filter').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        currentPillar = btn.dataset.pillar;
+        renderLibrary();
+      });
+    });
+    var sortEl = document.getElementById('lib-sort');
+    if (sortEl) sortEl.addEventListener('change', function() { currentSort = sortEl.value; renderLibrary(); });
+  }
+
+  // Vote handler
+  window.handleVote = function(btn) {
+    var libId = btn.dataset.libId;
+    if (votedSet[libId]) return;
+    btn.classList.add('voted');
+    var countText = parseInt(btn.textContent.replace(/[^0-9]/g, '') || '0') + 1;
+    btn.innerHTML = '<span class="vote-btn__arrow">▲</span> ' + countText;
+    votedSet[libId] = true;
+    try { localStorage.setItem('amj_exp_votes', JSON.stringify(votedSet)); } catch(e) {}
+
+    fetch(API + '/experiment_vote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ library_id: libId })
+    }).catch(function() {});
+  };
+
+  // ── Zone 3: The Record ──
+  var allExperiments = [];
+
+  function renderRecord(filter) {
+    var completed = allExperiments.filter(function(e) { return e.status !== 'active'; });
+    if (filter && filter !== 'all') {
+      completed = completed.filter(function(e) { return e.status === filter; });
+    }
+
+    document.querySelectorAll('.record__filters .lib-filter').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.record === (filter || 'all'));
+    });
+
+    if (!completed.length) {
+      document.getElementById('record-list').innerHTML = '<div class="empty-state"><div class="empty-state__title">No completed experiments yet</div><div class="empty-state__sub">Results will appear here once experiments complete.</div></div>';
+      return;
+    }
+
+    document.getElementById('record-list').innerHTML = completed.map(function(exp) {
+      var days = exp.duration_days != null ? exp.duration_days : daysBetween(exp.start_date, exp.end_date);
+      var tags = (exp.tags||[]).map(function(t) { return '<span class="exp-tag">' + t + '</span>'; }).join('');
+      var gradeClass = exp.grade === 'partial' ? 'partial' : exp.status === 'abandoned' ? 'failed' : 'completed';
+      var gradeLabel = exp.grade === 'partial' ? '~ Partial' : exp.status === 'abandoned' ? '✗ Shelved' : '✓ Completed';
+      var statusBadge = '<span class="exp-status exp-status--' + (exp.status === 'abandoned' ? 'abandoned' : 'completed') + '"><span class="exp-status__dot"></span>' + (exp.status === 'abandoned' ? 'Abandoned' : 'Completed') + '</span>';
+
+      var outcomeHtml = exp.outcome
+        ? '<div class="exp-card__outcome"><div class="exp-card__outcome-label">Outcome</div><div class="exp-card__outcome-text">' + exp.outcome + '</div></div>'
+        : '';
+
+      return '<div class="exp-card exp-card--' + exp.status + '" data-status="' + exp.status + '">' +
+        '<div class="exp-card__header">' +
+          '<div>' +
+            '<div class="grade-badge grade-badge--' + gradeClass + '">' + gradeLabel + '</div>' +
+            '<div class="exp-card__name">' + exp.name + '</div>' +
+            '<div class="exp-card__hypothesis"><em>Hypothesis:</em> ' + (exp.hypothesis || 'Not specified') + '</div>' +
+            (tags ? '<div class="exp-tags">' + tags + '</div>' : '') +
+          '</div>' +
+          '<div style="text-align:right">' +
+            statusBadge +
+            '<div class="exp-days" style="margin-top:var(--space-4)">' + days + '<span>days total</span></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="exp-card__body">' +
+          '<div class="exp-card__field"><div class="exp-card__field-label">Started</div><div class="exp-card__field-value">' + formatDate(exp.start_date) + '</div></div>' +
+          '<div class="exp-card__field"><div class="exp-card__field-label">Ended</div><div class="exp-card__field-value">' + formatDate(exp.end_date) + '</div></div>' +
+          '<div class="exp-card__field"><div class="exp-card__field-label">Primary metric</div><div class="exp-card__field-value">' + (exp.primary_metric || '—') + '</div></div>' +
+          '<div class="exp-card__field"><div class="exp-card__field-label">Result</div><div class="exp-card__field-value">' + (exp.status === 'completed' ? 'Published' : 'Abandoned') + '</div></div>' +
+        '</div>' +
+        outcomeHtml +
+        (exp.mechanism ? '<div class="exp-card__mechanism"><div class="exp-card__mechanism-label">Mechanism</div><div class="exp-card__mechanism-text">' + exp.mechanism + '</div></div>' : '') +
+        (exp.key_finding ? '<div class="exp-card__finding"><div class="exp-card__finding-label">// Finding</div><div class="exp-card__finding-text">' + exp.key_finding + '</div></div>' : '') +
+      '</div>';
+    }).join('');
+  }
+
+  // Record filter clicks
+  document.querySelectorAll('.record__filters .lib-filter').forEach(function(btn) {
+    btn.addEventListener('click', function() { renderRecord(btn.dataset.record); });
+  });
+
+  // ── Fetch data ──
+  // Active experiments (existing endpoint)
+  fetch(API + '/experiments')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (!data || !data.experiments) return;
+      var exps = data.experiments;
+      allExperiments = exps;
+      document.getElementById('stat-active').textContent = exps.filter(function(e) { return e.status === 'active'; }).length;
+      document.getElementById('stat-completed').textContent = exps.filter(function(e) { return e.status === 'completed'; }).length;
+      renderMissionControl(exps);
+      renderRecord('all');
+    })
+    .catch(function() {
+      document.getElementById('mc-grid').innerHTML = '<div class="mc-empty"><div class="mc-empty__title">Could not load experiments</div></div>';
+    });
+
+  // Library (new endpoint)
+  fetch(API + '/experiment_library')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (!data || !data.pillars) return;
+      libraryData = data;
+      document.getElementById('stat-library').textContent = data.total_experiments || 52;
+      document.getElementById('stat-votes').textContent = data.total_votes || 0;
+      renderLibrary();
+    })
+    .catch(function() {
+      document.getElementById('library-grid').innerHTML = '<div class="empty-state"><div class="empty-state__title">Could not load library</div></div>';
+    });
+
 })();
 </script>
 <script src="/assets/js/reveal.js"></script>
