@@ -553,19 +553,25 @@ class WebStack(Stack):
                         ],
                         cached_methods=["GET", "HEAD"],
                     ),
-                    # /api/* — site-api Lambda (read-only, TTL-cached).
+                    # /api/* — site-api Lambda (all methods, query strings forwarded).
+                    # POST endpoints (nudge, vote, follow, submit_finding) need POST.
+                    # GET endpoints (experiment_detail) need query_string=True.
+                    # Lambda sets its own Cache-Control headers; CloudFront respects them.
                     cloudfront.CfnDistribution.CacheBehaviorProperty(
                         path_pattern="/api/*",
                         target_origin_id="LambdaApiOrigin",
                         viewer_protocol_policy="https-only",
                         forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
-                            query_string=False,
-                            headers=["Origin"],
+                            query_string=True,
+                            headers=["Origin", "Content-Type"],
                         ),
                         default_ttl=300,
                         max_ttl=3600,
                         min_ttl=0,
-                        allowed_methods=["GET", "HEAD", "OPTIONS"],
+                        allowed_methods=[
+                            "GET", "HEAD", "OPTIONS",
+                            "POST", "PUT", "PATCH", "DELETE",
+                        ],
                         cached_methods=["GET", "HEAD"],
                     ),
                 ],
