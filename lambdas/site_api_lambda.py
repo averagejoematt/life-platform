@@ -1316,13 +1316,32 @@ def handle_habits() -> dict:
 
 # ── WEB-CE: Correlation data ────────────────────────────────────
 
-def handle_correlations() -> dict:
+def handle_correlations(event: dict = None) -> dict:
     """
     GET /api/correlations
     Returns the most recent weekly correlation matrix (23 pairs)
     for the public Correlation Explorer.
+
+    HP-06: When ?featured=true is passed, returns a flat array of
+    the top N significant correlations (default 3) for the homepage
+    dynamic discoveries section. Response shape changes to:
+      {"correlations": [{...}, ...], "week": "...", "count": N}
+    so the homepage JS can iterate directly.
+
     Cache: 3600s.
     """
+    # HP-06: Parse query params
+    params = {}
+    if event:
+        params = event.get("queryStringParameters") or {}
+    featured = (params.get("featured") or "").lower() == "true"
+    limit = None
+    if params.get("limit"):
+        try:
+            limit = max(1, min(20, int(params["limit"])))
+        except (ValueError, TypeError):
+            pass
+
     pk = f"{USER_PREFIX}weekly_correlations"
     resp = table.query(
         KeyConditionExpression=Key("pk").eq(pk),
@@ -1347,17 +1366,51 @@ def handle_correlations() -> dict:
             "field_b":   p.get("field_b", ""),
             "label_b":   p.get("label_b", p.get("field_b", "")),
             "r":         round(float(p.get("r", 0)), 3),
+            "p":         round(float(p.get("p_value", p.get("p", 1))), 4),
             "n":         int(p.get("n", 0)),
             "strength":  p.get("strength", "weak"),
             "fdr_significant": p.get("fdr_significant", False),
             "correlation_type": p.get("correlation_type", "cross_sectional"),
             "lag_days":  int(p.get("lag_days", 0)),
+            "description": p.get("description", ""),
+            "direction":   p.get("direction", ""),
+            # HP-06: metric labels for homepage cards
+            "metric_a":  p.get("label_a", p.get("field_a", "")),
+            "metric_b":  p.get("label_b", p.get("field_b", "")),
         })
 
+    # Sort all by absolute r descending
+    public_pairs.sort(key=lambda x: -abs(x["r"]))
+
+    # HP-06: Featured mode — return flat array of top significant correlations
+    if featured:
+        # Filter to significant only (p < 0.05 or FDR-significant)
+        significant = [p for p in public_pairs if p.get("fdr_significant") or p.get("p", 1) < 0.05]
+        # Fall back to strongest by |r| if no significant ones found
+        if not significant:
+            significant = public_pairs
+        # Apply limit (default 3)
+        top = significant[:limit or 3]
+        # Auto-generate description if missing
+        for p in top:
+            if not p.get("description"):
+                direction = "positive" if p["r"] > 0 else "inverse"
+                p["description"] = (
+                    f"{direction.title()} correlation between "
+                    f"{p['metric_a']} and {p['metric_b']} "
+                    f"(r={p['r']:.2f})"
+                )
+        return _ok({
+            "correlations": top,
+            "week":  week,
+            "count": len(top),
+        }, cache_seconds=3600)
+
+    # Standard mode — return full object for explorer page
     return _ok({
         "correlations": {
             "week":  week,
-            "pairs": sorted(public_pairs, key=lambda x: -abs(x["r"])),
+            "pairs": public_pairs,
             "count": len(public_pairs),
             "methodology": "Pearson r over 90-day rolling window. Benjamini-Hochberg FDR correction. n-gated strength labels.",
         }
@@ -3001,6 +3054,10 @@ def lambda_handler(event, context):
     # EL-F2: Experiment Detail (GET with query params)
     if path == "/api/experiment_detail":
         return _handle_experiment_detail(event)
+
+    # HP-06: Correlations with optional ?featured=true&limit=N
+    if path == "/api/correlations":
+        return handle_correlations(event)
 
     # Special handling: /api/ask accepts POST
     if path == "/api/ask":

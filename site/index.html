@@ -984,6 +984,82 @@
   <p style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-label);margin-top:var(--space-4)">// N=1 data. Correlations are not causation. BH FDR-corrected. See methodology on the <a href="/explorer/" style="color:var(--accent-dim);text-decoration:none">explorer page</a>.</p>
 </section>
 
+<!-- HP-14: Recent Chronicle entries -->
+<section class="reveal" style="border-bottom:1px solid var(--border);padding:var(--space-12) var(--page-padding);" id="chronicle-cards">
+  <div class="eyebrow" style="margin-bottom:var(--space-6)">The Measured Life</div>
+  <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-3)">Recent Chronicles</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);margin-bottom:var(--space-8)">Every Wednesday, Elena Voss writes the week. Raw numbers, honest narrative, no filter.</p>
+  <div id="chronicle-cards-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
+    <!-- Populated by JS from public_stats.json chronicle_recent array -->
+    <!-- Fallback: hidden by default, shown only if JS fails or no data -->
+    <div class="chron-fallback" style="display:none;background:var(--surface);padding:var(--space-6);text-align:center;grid-column:1/-1;">
+      <p style="font-size:var(--text-sm);color:var(--text-muted);">Chronicles publish every Wednesday. <a href="/chronicle/" style="color:var(--accent);text-decoration:none;">Read the archive →</a></p>
+    </div>
+  </div>
+  <script>
+  // HP-14: Chronicle cards loader
+  (function(){
+    function renderChronicleCards(entries) {
+      var grid = document.getElementById('chronicle-cards-grid');
+      if (!grid || !entries || !entries.length) {
+        // Show fallback
+        var fb = grid && grid.querySelector('.chron-fallback');
+        if (fb) fb.style.display = 'block';
+        return;
+      }
+      // Clear fallback
+      grid.querySelectorAll('.chron-fallback').forEach(function(el){ el.remove(); });
+      entries.forEach(function(c){
+        var card = document.createElement('a');
+        card.href = c.url || '/chronicle/';
+        card.style.cssText = 'display:block;background:var(--surface);padding:var(--space-6);text-decoration:none;transition:background var(--dur-fast);';
+        card.onmouseover = function(){ this.style.background='var(--surface-raised)'; };
+        card.onmouseout = function(){ this.style.background='var(--surface)'; };
+        var weekLabel = c.week_num ? 'Week ' + c.week_num : '';
+        var dateLabel = c.date ? new Date(c.date + 'T12:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric'}) : '';
+        card.innerHTML =
+          '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-2)">' + weekLabel + (weekLabel && dateLabel ? ' · ' : '') + dateLabel + '</div>' +
+          '<div style="font-family:var(--font-display);font-size:16px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-3);line-height:1.4;">' + (c.title || 'Untitled') + '</div>' +
+          '<div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">' + (c.excerpt || '') + '</div>';
+        grid.appendChild(card);
+      });
+    }
+    // Try to get from already-loaded public_stats
+    function tryLoad() {
+      if (window.__amjStats && window.__amjStats.chronicle_recent) {
+        renderChronicleCards(window.__amjStats.chronicle_recent);
+        return true;
+      }
+      return false;
+    }
+    if (tryLoad()) return;
+    // Wait for main data loader, then try again
+    setTimeout(function(){
+      if (tryLoad()) return;
+      // Last resort: fetch public_stats.json directly
+      fetch('/public_stats.json', { cache: 'force-cache' })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          renderChronicleCards(d.chronicle_recent || []);
+        })
+        .catch(function(){
+          var grid = document.getElementById('chronicle-cards-grid');
+          var fb = grid && grid.querySelector('.chron-fallback');
+          if (fb) fb.style.display = 'block';
+        });
+    }, 1200);
+  })();
+  </script>
+  <style>
+    @media (max-width: 768px) {
+      #chronicle-cards-grid { grid-template-columns: 1fr !important; }
+    }
+  </style>
+  <div style="margin-top:var(--space-4);">
+    <a href="/chronicle/" class="btn btn--ghost" style="font-size:var(--text-xs);">All chronicles →</a>
+  </div>
+</section>
+
 <!-- WR-33: Day 1 vs. Today — 4-dimension comparison (HOME-3) -->
 <section class="reveal" style="border-bottom:1px solid var(--border);padding:var(--space-12) var(--page-padding);">
   <div class="eyebrow" style="margin-bottom:var(--space-6)">Progress</div>
