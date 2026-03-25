@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
 S3_BUCKET = "matthew-life-platform"
 PUBLIC_STATS_KEY = "site/public_stats.json"
 CHARACTER_STATS_KEY = "site/data/character_stats.json"
+PULSE_KEY = "site/pulse.json"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # BS-02: Hero narrative copy (finalised v3.7.67)
@@ -282,4 +283,214 @@ def write_character_stats(s3_client, character: dict, pillars: list, timeline: l
 
     except Exception as e:
         logger.warning(f"[site_writer] Failed to write character_stats.json: {e}")
+        return False
+
+
+# ── PULSE-A1/A2/A3: Pulse computation and storage ──────────────────────────────
+
+def _glyph_state(green_test, amber_test, has_data):
+    """Return 'green', 'amber', 'red', or 'gray' based on signal thresholds."""
+    if not has_data:
+        return "gray"
+    if green_test:
+        return "green"
+    if amber_test:
+        return "amber"
+    return "red"
+
+
+def _compute_pulse(vitals: dict, journey: dict, training: dict,
+                   journal_data: dict = None, mood_data: dict = None,
+                   trends: dict = None, brief_excerpt: str = None) -> dict:
+    """Compute the full pulse object from daily brief data."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    try:
+        from datetime import date as _date
+        started = _date.fromisoformat(JOURNEY_START_DATE)
+        day_number = max(0, (_date.today() - started).days)
+    except Exception:
+        day_number = 0
+
+    glyphs = {}
+
+    # ── 1. SCALE ──
+    weight = vitals.get("weight_lbs")
+    weight_daily = (trends or {}).get("weight_daily", [])
+    day_delta = None
+    direction = None
+    if weight_daily and len(weight_daily) >= 2:
+        prev = weight_daily[-2].get("lbs")
+        curr = weight_daily[-1].get("lbs")
+        if prev and curr:
+            day_delta = round(curr - prev, 1)
+            direction = "down" if day_delta < 0 else ("up" if day_delta > 0 else "flat")
+
+    glyphs["scale"] = {
+        "state": _glyph_state(
+            green_test=(day_delta is not None and day_delta <= 0),
+            amber_test=(day_delta is not None and day_delta <= 0.5),
+            has_data=(weight is not None),
+        ),
+        "direction": direction,
+        "value": round(weight, 1) if weight else None,
+        "delta": day_delta,
+        "delta_label": f"{day_delta:+.1f} from yesterday" if day_delta is not None else None,
+        "journey_summary": (
+            f"{round(JOURNEY_START_WEIGHT - weight, 1)} lbs lost "
+            f"({round((JOURNEY_START_WEIGHT - weight) / (JOURNEY_START_WEIGHT - GOAL_WEIGHT) * 100, 1)}%)"
+            if weight and weight < JOURNEY_START_WEIGHT else None
+        ),
+        "sparkline_7d": [d.get("lbs") for d in weight_daily[-7:]] if weight_daily else [],
+        "as_of": vitals.get("weight_as_of") or today,
+    }
+
+    # ── 2. WATER (not yet tracked) ──
+    glyphs["water"] = {"state": "gray", "liters": None, "target": 3.0, "label": None,
+                       "sparkline_7d": [], "as_of": today}
+
+    # ── 3. MOVEMENT ──
+    z2_week = training.get("zone2_this_week_min", 0) or 0
+    activity_type = training.get("today_activity")
+    has_movement = z2_week > 0 or activity_type
+    glyphs["movement"] = {
+        "state": _glyph_state(green_test=bool(activity_type or z2_week > 60),
+                              amber_test=(z2_week > 0), has_data=has_movement),
+        "steps": None, "zone2_week_min": round(z2_week), "zone2_target": 150,
+        "activity_type": activity_type, "sparkline_7d": [], "as_of": today,
+    }
+
+    # ── 4. LIFT ──
+    trained_today = bool(activity_type)
+    glyphs["lift"] = {
+        "state": _glyph_state(green_test=trained_today, amber_test=True, has_data=True),
+        "trained_today": trained_today, "workout_type": activity_type or "Rest",
+        "strain": training.get("today_strain"), "sessions_this_week": 0,
+        "rest_day_streak": 0, "as_of": today,
+    }
+
+    # ── 5. RECOVERY ──
+    recovery_pct = vitals.get("recovery_pct")
+    recovery_trend = (trends or {}).get("recovery_daily", [])
+    glyphs["recovery"] = {
+        "state": _glyph_state(green_test=(recovery_pct and recovery_pct >= 67),
+                              amber_test=(recovery_pct and recovery_pct >= 33),
+                              has_data=(recovery_pct is not None)),
+        "recovery_pct": round(recovery_pct) if recovery_pct else None,
+        "status_label": ("Optimal" if (recovery_pct or 0) >= 67 else
+                         ("Moderate" if (recovery_pct or 0) >= 33 else "Needs rest"))
+                         if recovery_pct else None,
+        "hrv_ms": vitals.get("hrv_ms"), "rhr_bpm": vitals.get("rhr_bpm"),
+        "sparkline_7d": [d.get("pct") for d in recovery_trend[-7:]] if recovery_trend else [],
+        "as_of": today,
+    }
+
+    # ── 6. SLEEP ──
+    sleep_hours = vitals.get("sleep_hours")
+    sleep_trend = (trends or {}).get("sleep_daily", [])
+    glyphs["sleep"] = {
+        "state": _glyph_state(green_test=(sleep_hours and sleep_hours >= 7),
+                              amber_test=(sleep_hours and sleep_hours >= 6),
+                              has_data=(sleep_hours is not None)),
+        "hours": round(sleep_hours, 1) if sleep_hours else None,
+        "score": vitals.get("sleep_score"),
+        "sparkline_7d": [d.get("hrs") for d in sleep_trend[-7:]] if sleep_trend else [],
+        "as_of": today,
+    }
+
+    # ── 7. JOURNAL ──
+    journal = journal_data or {}
+    written_today = bool(journal.get("entries") and journal["entries"] > 0)
+    glyphs["journal"] = {
+        "state": "green" if written_today else "gray",
+        "written_today": written_today, "streak_days": journal.get("streak_days", 0),
+        "themes": (journal.get("themes") or [])[:3], "binary_14d": [], "as_of": today,
+    }
+
+    # ── 8. MIND ──
+    mood = mood_data or {}
+    mood_score = mood.get("score") or mood.get("mood_avg")
+    has_mood = mood_score is not None
+    mood_labels = {1: "Low", 2: "Below avg", 3: "Average", 4: "Good", 5: "Excellent"}
+    glyphs["mind"] = {
+        "state": _glyph_state(green_test=(mood_score and float(mood_score) >= 4),
+                              amber_test=(mood_score and float(mood_score) >= 3),
+                              has_data=has_mood),
+        "score": round(float(mood_score)) if mood_score else None, "max_score": 5,
+        "label": mood_labels.get(round(float(mood_score))) if mood_score else None,
+        "sparkline_7d": [], "as_of": today,
+    }
+
+    # ── PULSE STATUS ──
+    glyph_states = [g["state"] for g in glyphs.values()]
+    green_count = glyph_states.count("green")
+    reporting_count = len([s for s in glyph_states if s != "gray"])
+    has_red = "red" in glyph_states
+
+    if reporting_count <= 2:
+        status, status_color = "quiet", "#3a5a48"
+    elif green_count >= 6 and not has_red:
+        status, status_color = "strong", "#00e5a0"
+    else:
+        status, status_color = "mixed", "#f5a623"
+
+    # ── NARRATIVE ──
+    narrative = brief_excerpt
+    if not narrative:
+        if status == "quiet":
+            narrative = (f"{reporting_count} signal{'s' if reporting_count != 1 else ''}"
+                         " reporting. The rest is silence.")
+        elif status == "strong":
+            parts = []
+            if day_delta is not None and day_delta < 0:
+                parts.append(f"Weight dropped {abs(day_delta)} lbs")
+            if sleep_hours and sleep_hours >= 7:
+                parts.append(f"Sleep at {round(sleep_hours, 1)}h")
+            if recovery_pct and recovery_pct >= 67:
+                parts.append(f"Recovery {round(recovery_pct)}%")
+            narrative = ". ".join(parts[:3]) + ". The system is humming." if parts else "All signals green."
+        else:
+            amber_red = [n for n, g in glyphs.items() if g["state"] in ("amber", "red")]
+            narrative = f"{', '.join(amber_red[:2]).title()} flagged. Mixed signals today."
+
+    return {
+        "pulse": {
+            "day_number": day_number, "date": today,
+            "status": status, "status_color": status_color,
+            "narrative": narrative,
+            "signals_reporting": reporting_count, "signals_total": 8,
+            "glyphs": glyphs,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    }
+
+
+def write_pulse_json(s3_client, vitals: dict, journey: dict, training: dict,
+                     journal_data: dict = None, mood_data: dict = None,
+                     trends: dict = None, brief_excerpt: str = None,
+                     table_client=None, user_id: str = "matthew") -> bool:
+    """PULSE-A2/A3: Write pulse.json to S3 + DynamoDB for /api/pulse."""
+    try:
+        pulse = _compute_pulse(vitals=vitals, journey=journey, training=training,
+                               journal_data=journal_data, mood_data=mood_data,
+                               trends=trends, brief_excerpt=brief_excerpt)
+        s3_client.put_object(Bucket=S3_BUCKET, Key=PULSE_KEY,
+                             Body=json.dumps(pulse, indent=2, default=str),
+                             ContentType="application/json", CacheControl="max-age=300")
+        logger.info("[site_writer] pulse.json written to S3")
+
+        if table_client is not None:
+            today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            try:
+                pulse_json = json.dumps(pulse["pulse"], default=str)
+                pulse_item = json.loads(pulse_json, parse_float=lambda x: int(float(x)) if float(x) == int(float(x)) else float(x))
+                table_client.put_item(Item={"pk": "PULSE", "sk": f"DATE#{today_str}",
+                                            "date": today_str,
+                                            **{k: v for k, v in pulse_item.items() if v is not None}})
+                logger.info(f"[site_writer] Pulse DynamoDB: {today_str}")
+            except Exception as ddb_e:
+                logger.warning(f"[site_writer] Pulse DDB write failed: {ddb_e}")
+        return True
+    except Exception as e:
+        logger.warning(f"[site_writer] pulse.json failed: {e}")
         return False

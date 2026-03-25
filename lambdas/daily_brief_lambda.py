@@ -1900,6 +1900,50 @@ def lambda_handler(event, context):
                 },
             )
             print("[INFO] site_writer: public_stats.json written with baseline")
+
+            # PULSE-A1: Write pulse.json to S3 + DynamoDB for /api/pulse endpoint
+            try:
+                from site_writer import write_pulse_json
+                _journal_pulse = {
+                    "entries": len(data.get("journal_entries") or []),
+                    "themes": (data.get("journal") or {}).get("themes", []),
+                    "streak_days": 0,
+                }
+                _mood_pulse = {
+                    "mood_avg": (data.get("journal") or {}).get("mood_avg"),
+                }
+                write_pulse_json(
+                    s3_client=s3,
+                    vitals={
+                        "weight_lbs": round(_curr_wt, 1) if _curr_wt else None,
+                        "weight_as_of": _weight_as_of,
+                        "weight_delta_30d": round(_curr_wt - float(_week_ago), 1) if _week_ago and _curr_wt else None,
+                        "hrv_ms": round(float(_hrv.get("hrv_yesterday") or _hrv.get("hrv_7d") or 0), 1) or None,
+                        "rhr_bpm": safe_float(_w, "resting_heart_rate"),
+                        "recovery_pct": round(_rec, 0) if _rec else None,
+                        "recovery_status": _rec_status,
+                        "sleep_hours": safe_float(data.get("sleep"), "sleep_duration_hours"),
+                    },
+                    journey={
+                        "current_weight_lbs": _curr_wt,
+                        "lost_lbs": _lost,
+                        "progress_pct": _prog_pct,
+                    },
+                    training={
+                        "zone2_this_week_min": round(_z2_this_week),
+                        "today_activity": None,
+                    },
+                    journal_data=_journal_pulse,
+                    mood_data=_mood_pulse,
+                    trends=_trends,
+                    brief_excerpt=_brief_excerpt,
+                    table_client=table,
+                    user_id=USER_ID,
+                )
+                print("[INFO] PULSE-A: pulse.json written")
+            except Exception as _pulse_e:
+                print(f"[WARN] PULSE-A: pulse write failed (non-fatal): {_pulse_e}")
+
         except Exception as _sw_e:
             print(f"[WARN] site_writer failed (non-fatal): {_sw_e}")
 

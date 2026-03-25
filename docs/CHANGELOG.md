@@ -1,3 +1,68 @@
+## v3.9.17 — 2026-03-25: Pulse Redesign Sprint 1+2 — API pipeline + glyph page live
+
+### Summary
+Product Board reviewed the `/live/` page and unanimously agreed to split it into two jobs: **The Pulse** (daily glanceable state) and **The Journey Dashboard** (retrospective achievement story). Built full data pipeline (Sprint 1/Phase A) and redesigned page (Sprint 2/Phase B) in a single session. 8 symbolic SVG glyph icons, 3-layer progressive disclosure, Elena Voss narrative voice, single `/api/pulse` composite endpoint.
+
+### Changes
+
+**lambdas/site_writer.py** (PULSE-A1/A2/A3: +210 lines)
+- Added `PULSE_KEY = "site/pulse.json"` constant
+- Added `_glyph_state()` — green/amber/red/gray classification helper
+- Added `_compute_pulse()` — synthesizes 8 glyph states from vitals, journey, training, journal, mood, trends data. Generates status word (strong/mixed/quiet), status color, Elena Voss narrative, sparkline arrays
+- Added `write_pulse_json()` — writes pulse.json to S3 (300s cache) + DynamoDB `PK=PULSE, SK=DATE#YYYY-MM-DD` for historical navigation
+- Shared Lambda Layer v12 published with updated site_writer.py
+
+**lambdas/site_api_lambda.py** (PULSE-A4: +38 lines)
+- Added `handle_pulse()` — reads `site/pulse.json` from S3, 300s cache. Graceful fallback when pulse not yet generated (returns quiet status with "generates at 11 AM PT" narrative)
+- Added `/api/pulse` to ROUTES dict
+
+**lambdas/daily_brief_lambda.py** (PULSE-A1 integration: +44 lines)
+- Added `write_pulse_json()` call after `write_public_stats()` in the site_writer block
+- Passes vitals, journey, training, journal, mood, trends, and brief excerpt to pulse computation
+- Non-fatal: pulse write failure never breaks the Daily Brief
+
+**site/live/index.html** (PULSE-B: complete rewrite)
+- **Layer 1: Pulse Headline** — Day counter (large display type), breathing pulse dot (color matches status), status word (Strong/Mixed/Quiet), Elena Voss narrative, date, yesterday/tomorrow nav placeholders
+- **Layer 2: Glyph Strip** — 8 symbolic SVG icons (mountain descent, droplet, winding path, rising pillar, EKG pulse, crescent moon, open/closed book, flame). Color-only status (no numbers). Horizontal responsive strip with scroll on mobile
+- **Layer 3: Detail Cards** — Grid of 8 cards with value, unit, sub-text, and sparkline bars. Click glyph to isolate its card, click again to show all
+- **Journey section** — Below fold, separated from pulse. Current weight, day count, signals reporting
+- Single fetch to `/api/pulse` replaces 8 separate API calls from old cockpit page
+- Full dark/light mode support via tokens.css
+- Responsive: mobile collapses to single-column cards, stacked day counter
+
+**docs/PULSE_REDESIGN_SPEC.md** (new)
+- Full implementation spec with 3-layer architecture, 8 glyph signal definitions with green/amber/red/gray thresholds, `/api/pulse` JSON schema, Elena Voss narrative rules, 22 tasks across 4 phases
+
+**deploy/p3_build_shared_utils_layer.sh**
+- Fixed layer description length error (>256 chars) — hardcoded short description
+
+### Infrastructure
+- Shared Lambda Layer v12 published and attached to all 15 consumers
+- `/api/pulse` endpoint live at averagejoematt.com/api/pulse (300s CloudFront cache)
+- DynamoDB: new `PK=PULSE` partition for historical pulse records
+- S3: new `site/pulse.json` object (written daily by daily brief, 300s cache)
+
+### Sprint 1 (Phase A) — API + Data Pipeline ✅
+| Task | Description | Status |
+|------|-------------|--------|
+| PULSE-A1 | Pulse computation in daily brief | ✅ |
+| PULSE-A2 | pulse.json to S3 | ✅ |
+| PULSE-A3 | DynamoDB historical record (PK=PULSE) | ✅ |
+| PULSE-A4 | /api/pulse route in site-api | ✅ |
+| PULSE-A5 | CloudFront cache (inherits /api/*) | ✅ |
+
+### Sprint 2 (Phase B) — Glyph Page ✅
+| Task | Description | Status |
+|------|-------------|--------|
+| PULSE-B1 | 8 SVG glyph icons (symbolic) | ✅ |
+| PULSE-B2 | Layer 1: Pulse headline | ✅ |
+| PULSE-B3 | Layer 2: Glyph strip | ✅ |
+| PULSE-B4 | Layer 3: Detail cards with sparklines | ✅ |
+| PULSE-B5 | Wire to /api/pulse | ✅ |
+| PULSE-C1 | Journey section below fold | ✅ |
+
+---
+
 ## v3.9.16 — 2026-03-25: Data-Driven Architecture Pivot — S3 configs, 4 new API endpoints, all pages wired
 
 ### Summary
