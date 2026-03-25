@@ -591,6 +591,33 @@
     .grade-badge--partial { color: var(--c-amber-400); border: 1px solid var(--c-amber-300); background: var(--c-amber-050); }
     .grade-badge--failed { color: var(--text-muted); border: 1px solid var(--border); background: var(--surface-raised); }
 
+    /* EL-19: Compliance bar */
+    .compliance-bar { margin-top: var(--space-4); padding: var(--space-4) var(--space-8); }
+    .compliance-bar__label { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted); letter-spacing: var(--ls-label); text-transform: uppercase; margin-bottom: var(--space-2); }
+    .compliance-bar__track { height: 6px; background: var(--surface-raised); border-radius: 3px; overflow: hidden; }
+    .compliance-bar__fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+    .compliance-bar__fill--high { background: #2EA98F; }
+    .compliance-bar__fill--mid { background: var(--c-amber-400); }
+    .compliance-bar__fill--low { background: var(--text-muted); }
+    .compliance-bar__pct { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted); margin-top: var(--space-1); text-align: right; }
+
+    /* EL-17: Reflection field */
+    .exp-card__reflection { padding: var(--space-5) var(--space-8); border-top: 1px solid var(--border-subtle, var(--border)); }
+    .exp-card__reflection-label { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--accent-dim); letter-spacing: var(--ls-label); text-transform: uppercase; margin-bottom: var(--space-2); }
+    .exp-card__reflection-text { font-size: var(--text-xs); color: var(--text-muted); line-height: var(--lh-body); font-style: italic; }
+
+    /* EL-18: Duration planned vs actual */
+    .exp-card__duration-compare { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted); margin-top: var(--space-2); }
+
+    /* F1: Follow button */
+    .follow-btn { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted); background: transparent; border: 1px solid var(--border); padding: var(--space-1) var(--space-3); cursor: pointer; border-radius: 2px; transition: all 0.2s; }
+    .follow-btn:hover { border-color: var(--accent-dim); color: var(--accent-dim); }
+    .follow-btn.followed { color: var(--accent); border-color: var(--accent-dim); }
+
+    /* F4: Try it CTA */
+    .exp-card__cta { padding: var(--space-5) var(--space-8); border-top: 1px solid var(--border-subtle, var(--border)); }
+    .exp-card__cta-text { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--accent-dim); letter-spacing: var(--ls-label); }
+
     /* ── Methodology ── */
     .methodology {
       max-width: var(--max-width);
@@ -737,7 +764,8 @@
   <div class="record__filters">
     <button class="lib-filter active" data-record="all">All</button>
     <button class="lib-filter" data-record="completed">Completed</button>
-    <button class="lib-filter" data-record="abandoned">Abandoned</button>
+    <button class="lib-filter" data-record="partial">Partial</button>
+    <button class="lib-filter" data-record="abandoned">Failed / Shelved</button>
   </div>
   <div id="record-list">
     <div class="empty-state">
@@ -896,8 +924,9 @@
         html += '</div>';
         html += '<div class="lib-tile__bottom">';
         html += '<span class="lib-status lib-status--' + statusClass + '"><span class="lib-status__dot"></span>' + statusLabel + '</span>';
-        html += '<span style="display:flex;gap:var(--space-2);align-items:center">';
+        html += '<span style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">';
         html += '<a href="/experiments/detail/?id=' + exp.id + '" class="vote-btn" style="text-decoration:none">Details</a>';
+        html += '<button class="follow-btn" data-follow-id="' + exp.id + '" onclick="handleFollow(this)">✉ Follow</button>';
         html += '<button class="vote-btn' + (isVoted ? ' voted' : '') + '" data-lib-id="' + exp.id + '" onclick="handleVote(this)">';
         html += '<span class="vote-btn__arrow">▲</span> ' + (exp.votes || 0);
         html += '</button>';
@@ -939,13 +968,32 @@
     }).catch(function() {});
   };
 
+  // F1: Follow handler
+  window.handleFollow = function(btn) {
+    var libId = btn.dataset.followId;
+    if (btn.classList.contains('followed')) return;
+    var email = prompt('Get notified when this experiment completes. Enter your email:');
+    if (!email || email.indexOf('@') < 0) return;
+    btn.classList.add('followed');
+    btn.textContent = '✓ Following';
+    fetch(API + '/experiment_follow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ library_id: libId, email: email })
+    }).catch(function() {});
+  };
+
   // ── Zone 3: The Record ──
   var allExperiments = [];
 
   function renderRecord(filter) {
     var completed = allExperiments.filter(function(e) { return e.status !== 'active'; });
     if (filter && filter !== 'all') {
-      completed = completed.filter(function(e) { return e.status === filter; });
+      if (filter === 'partial') {
+        completed = completed.filter(function(e) { return e.grade === 'partial'; });
+      } else {
+        completed = completed.filter(function(e) { return e.status === filter; });
+      }
     }
 
     document.querySelectorAll('.record__filters .lib-filter').forEach(function(btn) {
@@ -953,43 +1001,85 @@
     });
 
     if (!completed.length) {
-      document.getElementById('record-list').innerHTML = '<div class="empty-state"><div class="empty-state__title">No completed experiments yet</div><div class="empty-state__sub">Results will appear here once experiments complete.</div></div>';
+      document.getElementById('record-list').innerHTML = '<div class="empty-state"><div class="empty-state__title">No experiments match this filter</div><div class="empty-state__sub">Results will appear here once experiments complete.</div></div>';
       return;
     }
 
     document.getElementById('record-list').innerHTML = completed.map(function(exp) {
       var days = exp.duration_days != null ? exp.duration_days : daysBetween(exp.start_date, exp.end_date);
       var tags = (exp.tags||[]).map(function(t) { return '<span class="exp-tag">' + t + '</span>'; }).join('');
-      var gradeClass = exp.grade === 'partial' ? 'partial' : exp.status === 'abandoned' ? 'failed' : 'completed';
-      var gradeLabel = exp.grade === 'partial' ? '~ Partial' : exp.status === 'abandoned' ? '✗ Shelved' : '✓ Completed';
+      var gradeClass = exp.grade === 'partial' ? 'partial' : (exp.grade === 'failed' || exp.status === 'abandoned') ? 'failed' : 'completed';
+      var gradeLabel = exp.grade === 'partial' ? '~ Partial' : (exp.grade === 'failed' || exp.status === 'abandoned') ? '✗ Shelved' : '✓ Completed';
       var statusBadge = '<span class="exp-status exp-status--' + (exp.status === 'abandoned' ? 'abandoned' : 'completed') + '"><span class="exp-status__dot"></span>' + (exp.status === 'abandoned' ? 'Abandoned' : 'Completed') + '</span>';
 
       var outcomeHtml = exp.outcome
         ? '<div class="exp-card__outcome"><div class="exp-card__outcome-label">Outcome</div><div class="exp-card__outcome-text">' + exp.outcome + '</div></div>'
         : '';
 
-      return '<div class="exp-card exp-card--' + exp.status + '" data-status="' + exp.status + '">' +
+      // EL-19: Compliance bar
+      var complianceHtml = '';
+      if (exp.compliance_pct != null) {
+        var cpct = Math.min(100, Math.max(0, exp.compliance_pct));
+        var fillClass = cpct >= 80 ? 'high' : cpct >= 50 ? 'mid' : 'low';
+        complianceHtml = '<div class="compliance-bar">' +
+          '<div class="compliance-bar__label">Compliance</div>' +
+          '<div class="compliance-bar__track"><div class="compliance-bar__fill compliance-bar__fill--' + fillClass + '" style="width:' + cpct + '%"></div></div>' +
+          '<div class="compliance-bar__pct">' + cpct + '%</div>' +
+        '</div>';
+      }
+
+      // EL-17: Reflection
+      var reflectionHtml = '';
+      if (exp.reflection) {
+        reflectionHtml = '<div class="exp-card__reflection">' +
+          '<div class="exp-card__reflection-label">// What I\'d do differently</div>' +
+          '<div class="exp-card__reflection-text">"' + exp.reflection + '"</div>' +
+        '</div>';
+      }
+
+      // EL-18: Duration planned vs actual
+      var durationCompare = '';
+      if (exp.planned_duration_days && days != null) {
+        durationCompare = '<div class="exp-card__duration-compare">' + days + ' of ' + exp.planned_duration_days + ' planned days</div>';
+      }
+
+      // F4: Protocol CTA for completed experiments
+      var ctaHtml = '';
+      if (exp.status === 'completed' && exp.protocol) {
+        ctaHtml = '<div class="exp-card__cta">' +
+          '<div class="exp-card__cta-text">Here\'s the protocol. Run your own version — no app needed.</div>' +
+        '</div>';
+      }
+
+      // Iteration badge
+      var iterLabel = (exp.iteration && exp.iteration > 1) ? ' <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted)">(Run #' + exp.iteration + ')</span>' : '';
+
+      return '<div class="exp-card exp-card--' + exp.status + '" data-status="' + exp.status + '" data-grade="' + (exp.grade || '') + '">' +
         '<div class="exp-card__header">' +
           '<div>' +
             '<div class="grade-badge grade-badge--' + gradeClass + '">' + gradeLabel + '</div>' +
-            '<div class="exp-card__name">' + exp.name + '</div>' +
+            '<div class="exp-card__name">' + exp.name + iterLabel + '</div>' +
             '<div class="exp-card__hypothesis"><em>Hypothesis:</em> ' + (exp.hypothesis || 'Not specified') + '</div>' +
             (tags ? '<div class="exp-tags">' + tags + '</div>' : '') +
           '</div>' +
           '<div style="text-align:right">' +
             statusBadge +
             '<div class="exp-days" style="margin-top:var(--space-4)">' + days + '<span>days total</span></div>' +
+            durationCompare +
           '</div>' +
         '</div>' +
         '<div class="exp-card__body">' +
           '<div class="exp-card__field"><div class="exp-card__field-label">Started</div><div class="exp-card__field-value">' + formatDate(exp.start_date) + '</div></div>' +
           '<div class="exp-card__field"><div class="exp-card__field-label">Ended</div><div class="exp-card__field-value">' + formatDate(exp.end_date) + '</div></div>' +
           '<div class="exp-card__field"><div class="exp-card__field-label">Primary metric</div><div class="exp-card__field-value">' + (exp.primary_metric || '—') + '</div></div>' +
-          '<div class="exp-card__field"><div class="exp-card__field-label">Result</div><div class="exp-card__field-value">' + (exp.status === 'completed' ? 'Published' : 'Abandoned') + '</div></div>' +
+          '<div class="exp-card__field"><div class="exp-card__field-label">Evidence</div><div class="exp-card__field-value">' + (exp.evidence_tier || '—') + '</div></div>' +
         '</div>' +
+        complianceHtml +
         outcomeHtml +
         (exp.mechanism ? '<div class="exp-card__mechanism"><div class="exp-card__mechanism-label">Mechanism</div><div class="exp-card__mechanism-text">' + exp.mechanism + '</div></div>' : '') +
         (exp.key_finding ? '<div class="exp-card__finding"><div class="exp-card__finding-label">// Finding</div><div class="exp-card__finding-text">' + exp.key_finding + '</div></div>' : '') +
+        reflectionHtml +
+        ctaHtml +
       '</div>';
     }).join('');
   }

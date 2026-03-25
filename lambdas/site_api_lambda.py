@@ -612,6 +612,14 @@ def handle_experiments() -> dict:
             "key_finding":       item.get("key_finding"),
             "protocol":          item.get("protocol"),
             "evidence_tier":     item.get("evidence_tier"),
+            # EL-16+: Evolution fields for Record zone
+            "grade":             item.get("grade"),
+            "compliance_pct":    item.get("compliance_pct"),
+            "reflection":        item.get("reflection"),
+            "library_id":        item.get("library_id"),
+            "duration_tier":     item.get("duration_tier"),
+            "experiment_type":   item.get("experiment_type"),
+            "iteration":         item.get("iteration", 1),
         })
     experiments.sort(key=lambda x: x["start_date"], reverse=True)
 
@@ -2033,12 +2041,33 @@ def handle_achievements() -> dict:
     exp_resp = table.query(
         KeyConditionExpression=Key("pk").eq(exp_pk),
         ScanIndexForward=False,
-        Limit=5,
+        Limit=50,
     )
-    completed_exps = [
+    all_exps = [
         i for i in _decimal_to_float(exp_resp.get("Items", []))
-        if i.get("sk", "").startswith("EXP#") and i.get("status") in ("completed", "confirmed")
+        if i.get("sk", "").startswith("EXP#")
     ]
+    completed_exps = [i for i in all_exps if i.get("status") in ("completed", "confirmed")]
+
+    # EL-21: Streak detection — last 3 finished experiments all completed (no abandoned/failed)
+    _exp_has_3_streak = False
+    finished = sorted(
+        [i for i in all_exps if i.get("status") in ("completed", "confirmed", "abandoned")],
+        key=lambda x: x.get("end_date") or x.get("start_date", ""), reverse=True,
+    )
+    if len(finished) >= 3:
+        _exp_has_3_streak = all(e.get("status") in ("completed", "confirmed") for e in finished[:3])
+
+    # EL-21: Pillar coverage — completed experiment in each of 7 pillars
+    _ALL_PILLARS = {"sleep", "movement", "nutrition", "supplements", "mental", "social", "discipline"}
+    _covered_pillars = set()
+    for e in completed_exps:
+        for tag in (e.get("tags") or []):
+            tag_lower = tag.lower()
+            for p in _ALL_PILLARS:
+                if p in tag_lower:
+                    _covered_pillars.add(p)
+    _exp_all_pillars_covered = _covered_pillars >= _ALL_PILLARS
 
     def badge(id_, label, category, desc, earned, earned_date=None, unlock_hint=None):
         return {
@@ -2112,6 +2141,30 @@ def handle_achievements() -> dict:
               "N=1 result statistically validated",
               earned=False,  # requires manual confirmation
               unlock_hint="Complete a tracked experiment to unlock"),
+
+        # EL-21: Experiment evolution badges
+        badge("exp_3_completed", "Lab Rat", "science",
+              "Completed 3 experiments",
+              earned=len(completed_exps) >= 3,
+              earned_date=today if len(completed_exps) >= 3 else None,
+              unlock_hint=f"{max(0, 3 - len(completed_exps))} experiments to unlock" if len(completed_exps) < 3 else None),
+        badge("exp_5_completed", "Research Fellow", "science",
+              "Completed 5 experiments",
+              earned=len(completed_exps) >= 5,
+              earned_date=today if len(completed_exps) >= 5 else None,
+              unlock_hint=f"{max(0, 5 - len(completed_exps))} experiments to unlock" if len(completed_exps) < 5 else None),
+        badge("exp_10_completed", "Principal Investigator", "science",
+              "Completed 10 experiments",
+              earned=len(completed_exps) >= 10,
+              unlock_hint=f"{max(0, 10 - len(completed_exps))} experiments to unlock" if len(completed_exps) < 10 else None),
+        badge("exp_streak_3", "Hot Streak", "science",
+              "3 consecutive completed experiments (no fails)",
+              earned=_exp_has_3_streak,
+              unlock_hint="Complete 3 experiments in a row without abandoning"),
+        badge("exp_all_pillars", "Renaissance Man", "science",
+              "Completed experiment in every pillar",
+              earned=_exp_all_pillars_covered,
+              unlock_hint="Complete at least one experiment in each of the 7 pillars"),
     ]
 
     earned_count = sum(1 for a in achievements if a["earned"])
@@ -2738,114 +2791,6 @@ def _handle_experiment_detail(event: dict) -> dict:
 
     return _ok(lib_exp, cache_seconds=900)
 
-
-# (Duplicate removed — authoritative definitions are above)
-
-def _REMOVED_handle_experiment_detail(event: dict) -> dict:
-    """
-    GET /api/experiment_detail?id=post-dinner-walk
-    Returns full detail for a single experiment from the library,
-    merged with any active/completed DynamoDB experiment data.
-    Cache: 900s.
-    """
-    params = event.get("queryStringParameters") or {}
-    lib_id = (params.get("id") or "").strip().lower()
-    if not lib_id:
-        return _error(400, "id query parameter is required")
-
-    S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
-    try:
-        s3_client = boto3.client("s3", region_name=S3_REGION)
-        resp = s3_client.get_object(Bucket=S3_BUCKET, Key="site/config/experiment_library.json")
-        library = json.loads(resp["Body"].read().decode("utf-8"))
-    except Exception as e:
-        logger.error(f"[experiment_detail] S3 read failed: {e}")
-        return _error(503, "Experiment library not available")
-
-    lib_exp = None
-    for exp in library.get("experiments", []):
-        if exp.get("id") == lib_id:
-            lib_exp = exp
-            break
-    if not lib_exp:
-        return _error(404, f"Experiment '{lib_id}' not found in library")
-
-    pillar_meta = library.get("pillars", {}).get(lib_exp.get("pillar", ""), {})
-    lib_exp["pillar_label"] = pillar_meta.get("label", lib_exp.get("pillar", "").title())
-    lib_exp["pillar_icon"] = pillar_meta.get("icon", "circle")
-
-    # Vote count
-    try:
-        vote_resp = table.get_item(Key={"pk": "VOTES#experiment_library", "sk": f"LIB#{lib_id}"})
-        vote_item = _decimal_to_float(vote_resp.get("Item"))
-        lib_exp["votes"] = int(vote_item.get("vote_count", 0)) if vote_item else 0
-    except Exception:
-        lib_exp["votes"] = 0
-
-    # Follower count
-    try:
-        follow_resp = table.query(
-            KeyConditionExpression=Key("pk").eq("EXPERIMENT_FOLLOWS") & Key("sk").begins_with("EMAIL#"),
-            FilterExpression="library_id = :lid",
-            ExpressionAttributeValues={":lid": lib_id},
-            Select="COUNT",
-        )
-        lib_exp["follower_count"] = follow_resp.get("Count", 0)
-    except Exception:
-        lib_exp["follower_count"] = 0
-
-    # Past runs from DynamoDB
-    runs = []
-    try:
-        exp_pk = f"{USER_PREFIX}experiments"
-        exp_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(exp_pk),
-            ScanIndexForward=False,
-            Limit=100,
-        )
-        for item in _decimal_to_float(exp_resp.get("Items", [])):
-            if not item.get("sk", "").startswith("EXP#"):
-                continue
-            item_lib_id = item.get("library_id")
-            name_slug = re.sub(r"[^a-z0-9]+", "-", item.get("name", "").lower()).strip("-")[:40]
-            if item_lib_id == lib_id or name_slug == lib_id or lib_id in (item_lib_id or ""):
-                start = item.get("start_date", "")
-                end = item.get("end_date")
-                status = item.get("status", "unknown")
-                days = None
-                try:
-                    end_d = datetime.strptime(end, "%Y-%m-%d") if end else datetime.now(timezone.utc).replace(tzinfo=None)
-                    start_d = datetime.strptime(start, "%Y-%m-%d")
-                    days = max(0, (end_d - start_d).days)
-                except Exception:
-                    pass
-                runs.append({
-                    "experiment_id": item.get("sk", "").replace("EXP#", ""),
-                    "status": status,
-                    "start_date": start,
-                    "end_date": end,
-                    "days": days,
-                    "hypothesis": item.get("hypothesis"),
-                    "outcome": item.get("outcome") or item.get("result_summary"),
-                    "primary_metric": item.get("primary_metric"),
-                    "baseline_value": item.get("baseline_value"),
-                    "result_value": item.get("result_value"),
-                    "grade": item.get("grade"),
-                    "compliance_pct": item.get("compliance_pct"),
-                    "reflection": item.get("reflection"),
-                    "mechanism": item.get("mechanism"),
-                    "key_finding": item.get("key_finding"),
-                    "hypothesis_confirmed": item.get("hypothesis_confirmed"),
-                })
-    except Exception as e:
-        logger.warning(f"[experiment_detail] Experiment query failed: {e}")
-
-    lib_exp["runs"] = runs
-    lib_exp["total_runs"] = len(runs)
-    lib_exp["active_run"] = next((r for r in runs if r["status"] == "active"), None)
-    lib_exp["completed_runs_count"] = sum(1 for r in runs if r["status"] == "completed")
-
-    return _ok(lib_exp, cache_seconds=900)
 
 
 # ── Router ──────────────────────────────────────────────────
