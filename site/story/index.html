@@ -111,15 +111,16 @@
       margin-top: var(--space-2);
     }
 
-    /* ── Prose sections ── */
+    /* ── Prose sections (editorial feel — Tyrell) ── */
     .story-body {
       max-width: var(--prose-width);
       margin: 0 auto;
-      padding: var(--space-20) var(--page-padding);
+      padding: var(--space-16) var(--page-padding);
     }
     .story-chapter {
-      margin-bottom: var(--space-20);
+      margin-bottom: var(--space-16);
     }
+    .story-chapter:last-child { margin-bottom: 0; }
     .chapter-num {
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
@@ -132,27 +133,18 @@
       font-size: var(--text-h3);
       color: var(--text);
       letter-spacing: var(--ls-display);
-      margin-bottom: var(--space-8);
+      margin-bottom: var(--space-6);
     }
     .chapter-body {
       font-family: var(--font-serif);
-      font-size: 17px;
+      font-size: 18px;
       color: var(--text-muted);
-      line-height: 1.85;
+      line-height: 1.9;
     }
-    .chapter-body p { margin-bottom: var(--space-5); }
+    .chapter-body p { margin-bottom: var(--space-6); }
     .chapter-body p:last-child { margin-bottom: 0; }
     .chapter-body strong { color: var(--text); font-weight: 600; }
     .chapter-body em { color: var(--text); font-style: italic; }
-
-    /* Placeholder blocks — hidden until Matthew writes content */
-    .placeholder {
-      display: none;
-    }
-    .placeholder__tag,
-    .placeholder__prompt {
-      display: none;
-    }
 
     /* ── Pull quote ── */
     .pull-quote {
@@ -185,6 +177,39 @@
       margin-bottom: var(--space-3);
     }
     .data-moment .highlight { color: var(--accent); font-weight: 700; }
+
+    /* ── Throughline callout ── */
+    .throughline {
+      margin: var(--space-10) 0;
+      padding: var(--space-5) var(--space-6);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+    .throughline__text {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      flex: 1;
+    }
+    .throughline__link {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--accent);
+      text-decoration: none;
+      white-space: nowrap;
+      letter-spacing: var(--ls-tag);
+    }
+    .throughline__link:hover { text-decoration: underline; }
+
+    /* ── Chapter divider ── */
+    .chapter-divider {
+      border: none;
+      border-top: 1px solid var(--border-subtle);
+      margin: var(--space-16) 0;
+    }
 
     /* ── Next / prev ── */
     .story-nav {
@@ -341,7 +366,7 @@
       border-radius: 50%;
     }
 
-    /* STORY-5: Tech ↔ Life intersection cards */
+    /* STORY-5: Tech / Life intersection cards */
     .intersection-section {
       padding: var(--space-16) var(--page-padding);
       border-top: 1px solid var(--border);
@@ -419,7 +444,7 @@
   <p class="story-header__kicker">The Story</p>
   <h1 class="story-header__title"><span data-const="journey.start_weight">302</span> pounds.<br>One <span>decision</span>.</h1>
   <p class="story-header__lede">
-    Most people optimize in the dark — gut feelings, Instagram advice, someone's podcast take.
+    Most people optimize in the dark &mdash; gut feelings, Instagram advice, someone's podcast take.
     I decided to build the infrastructure to <strong>know</strong>.
     This is what that actually looks like.
   </p>
@@ -434,7 +459,7 @@
   </div>
   <div class="milestone">
     <div class="milestone__date">Today</div>
-    <div class="milestone__value" id="story-weight">—</div>
+    <div class="milestone__value" id="story-weight">&mdash;</div>
     <div class="milestone__label">Current weight (lbs)</div>
   </div>
   <div class="milestone">
@@ -444,16 +469,202 @@
   </div>
   <div class="milestone">
     <div class="milestone__date">The experiment</div>
-    <div class="milestone__value" id="story-day-x">—</div>
-    <div class="milestone__label">Days in — and counting</div>
+    <div class="milestone__value" id="story-day-x">&mdash;</div>
+    <div class="milestone__label">Days in &mdash; and counting</div>
   </div>
 </div>
+
+<!-- Story body -->
+<div class="story-body">
+
+  <!-- Chapter 1 -->
+  <div class="story-chapter">
+    <p class="chapter-num">Chapter 01</p>
+    <h2 class="chapter-title">The Moment</h2>
+    <div class="chapter-body">
+      <p>
+        I've lost 100 pounds before. Three times, actually &mdash; maybe four if you count the one in college. I know how to do it. I know the meal prep, the progressive overload, the morning walks that turn into rucks that turn into mountain trails. I know what it feels like when people start noticing. When old clothes fit again. When strangers at the gym nod at you like you belong there.
+      </p>
+      <p>
+        In May 2025, I was there. I'd spent nine months being ruthless &mdash; stretching every single day for 36 weeks straight, rucking Washington mountains with 25 pounds on my back, running 10-mile Saturday sessions and then hitting the gym afterwards. I was eating clean. I was wearing all my old clothes. I was down to 190 and felt like a different person. An old man at the gym came up to me and told me how determined I was. My girlfriend's dad said he couldn't recognize me. I bought myself a Rolex &mdash; not because I'm flashy, but because I'd never let myself have something like that, and I wanted a permanent reminder that I'd done it. I threw out every piece of large clothing I owned.
+      </p>
+      <p>
+        And then life happened. Within a few months, I lost a family member to cancer &mdash; the second time cancer had taken someone close to me. Work became uncertain in ways that affected not just me but people I was responsible for. The travel, the grief, the stress &mdash; each one alone might have been manageable. Together, they dismantled everything.
+      </p>
+      <p>
+        The slide didn't happen all at once. It never does. It started with one DoorDash order &mdash; something innocent, maybe justified. Then another. Then the gym sessions went from five days to three to one to none. Then it was just: wake up, work, sleep. Wake up, work, sleep. Weekends disappeared into nothing. I wasn't partying. I wasn't living some reckless life. I was just... on standby. Present, powered on, but doing nothing. And before I knew it, five months had gone by.
+      </p>
+      <p>
+        By February 2026, I stepped on the scale and saw 302.
+      </p>
+      <p>
+        The disgust wasn't new. The disappointment wasn't new. But this time there was something else underneath it &mdash; a recognition that I'd made this exact promise before. That I'd stood in front of a mirror at this exact weight, said &ldquo;never again,&rdquo; and meant it completely. And yet here I was, buying an entirely new wardrobe to replace the one I'd thrown out in celebration six months earlier.
+      </p>
+      <p>
+        That's when the question changed. It wasn't &ldquo;how do I lose weight again?&rdquo; I know how. The question was: <strong>why does it keep coming back?</strong>
+      </p>
+    </div>
+  </div>
+
+  <hr class="chapter-divider">
+
+  <!-- Chapter 2 -->
+  <div class="story-chapter">
+    <p class="chapter-num">Chapter 02</p>
+    <h2 class="chapter-title">The Problem With Previous Attempts</h2>
+    <div class="chapter-body">
+      <p>
+        I've been on this ride since I was a teenager. Gained weight before college, lost it, gained it back. Had my first real fitness chapter at 20, got in great shape, then went to work at sea &mdash; sailing, port cities, being 22 &mdash; and it crept up again. Moved to Seattle, found a girlfriend, lost and gained in cycles for years. From 22 to 27, I had it pretty well managed.
+      </p>
+      <p>
+        Then the wheels came off for real. I got promoted to a director role while finishing an MBA, relocated to a city where I knew nobody, and then my mum was diagnosed with stage 4 cancer &mdash; all at the same time. That was when the eating stopped being about hunger or convenience and became something else. A release. A way to feel something good in the middle of something terrible.
+      </p>
+
+      <div class="pull-quote">
+        &ldquo;Every previous attempt treated this as a weight problem. Calories in, calories out. But the weight was never the root issue. It was the coping mechanism.&rdquo;
+      </div>
+
+      <p>
+        Here's the pattern, if I'm honest about it: I can do the work. That's never been the issue. When I'm locked in, I'm relentless &mdash; daily stretching, mountain rucks, 10-mile runs, clean eating for months on end. The engine runs. But the moment something disrupts the routine &mdash; a trip, a stressful week, a loss &mdash; there's a crack. And through that crack comes one DoorDash order. Then another. Then the gym falls away, and suddenly I'm in a cycle of work-sleep-work-sleep, and five months evaporate before I even register what happened.
+      </p>
+      <p>
+        The cruelest part is the embarrassment. When you've been visibly, publicly in shape &mdash; when people have congratulated you, when you've made the speeches and bought the watch and thrown out the clothes &mdash; regaining everything doesn't just feel like failure. It feels like fraud. You stop wanting to see people. You cancel plans. You find reasons not to leave the house. Not because you're lazy, but because the gap between who you were six months ago and who you are now is so loud that you can't face anyone who remembers the other version.
+      </p>
+    </div>
+  </div>
+
+  <hr class="chapter-divider">
+
+  <!-- Chapter 3 -->
+  <div class="story-chapter">
+    <p class="chapter-num">Chapter 03</p>
+    <h2 class="chapter-title">The Build</h2>
+    <div class="chapter-body">
+      <p>
+        The first thing I built had nothing to do with a website.
+      </p>
+      <p>
+        I'm a Senior Director at a SaaS company &mdash; my background is IT leadership. I manage teams, approve architecture decisions, run vendor relationships. I've overseen production deployments, upgraded servers, managed Oracle databases, shipped network infrastructure. But I had never, in my career, written application code and deployed it myself.
+      </p>
+      <p>
+        The idea was simple: get my health data into AWS so I could talk to Claude about it with actual numbers attached. Every AI conversation I'd had about my health was limited by the same problem &mdash; I'd give it context from memory, which meant I was filtering, forgetting, and rationalizing before the AI even got a chance to help. If I could pipe in real data from Whoop, Eight Sleep, MacroFactor, Habitify &mdash; all the things I was already tracking &mdash; then the feedback would be based on what actually happened, not what I remembered happening.
+      </p>
+
+      <div class="data-moment">
+        <div class="data-moment__label">// current build stats</div>
+        <span class="highlight" id="story-lambda-count">48</span> Lambda functions &nbsp;&middot;&nbsp;
+        <span class="highlight" id="story-data-sources-stat">19</span> data sources &nbsp;&middot;&nbsp;
+        <span class="highlight" id="story-tools-count">95</span> intelligence tools &nbsp;&middot;&nbsp;
+        <span class="highlight">CI/CD pipeline</span> with auto-rollback &nbsp;&middot;&nbsp;
+        <span class="highlight">~$13/mo</span> on AWS
+      </div>
+
+      <p>
+        So I started. The first Lambda function was terrifying. I knew what Lambda <em>was</em> &mdash; my team uses these technologies daily, I'd approved dozens of architecture decisions involving them &mdash; but writing one myself, wiring it to DynamoDB, getting IAM permissions right? That was new. Claude handled the code. I handled the architecture decisions, the &ldquo;what should this system actually do&rdquo; questions, and every single deploy.
+      </p>
+      <p>
+        The thing that surprised me wasn't that Claude could write Python. I expected that. It was the infrastructure work &mdash; IAM roles, CI/CD pipelines, git workflows &mdash; where I had my first genuine &ldquo;wait, this is actually possible&rdquo; moment. The amount of operational complexity that just... worked, with minimal instruction, was the early signal that this wasn't going to be a toy project.
+      </p>
+      <p>
+        What I bring is the thing no language model can simulate: I know what it's like to be me. I know which patterns matter and which are noise. I know that my relationship with food isn't about macros &mdash; it's about coping. I know that my sleep quality correlates with how I'm doing mentally in ways that no generic training data can capture. The platform I'm building isn't something a prompt could decode, because the person it's designed for is too specific, too contradictory, and too stubborn to fit in a template.
+      </p>
+      <p>
+        The professional angle matters too. My team at work is responsible for rolling out Claude across the company. Building this platform gave me something I couldn't get from vendor demos or pilot programs &mdash; real, visceral understanding of what AI-assisted development actually feels like when you're not an engineer. Every conversation I have at work about AI adoption is now grounded in something I built with my own hands, on my own time, for stakes that actually matter to me.
+      </p>
+
+      <div class="throughline">
+        <span class="throughline__text">See exactly how the platform is built &mdash; architecture, data flow, cost breakdown.</span>
+        <a href="/platform/" class="throughline__link">The Platform &rarr;</a>
+      </div>
+    </div>
+  </div>
+
+  <hr class="chapter-divider">
+
+  <!-- Chapter 4 -->
+  <div class="story-chapter">
+    <p class="chapter-num">Chapter 04</p>
+    <h2 class="chapter-title">What the Data Has Shown</h2>
+    <div class="chapter-body">
+      <p>
+        This section is honest about where things stand: the platform is young, and I've spent more time building it than I have running it during a sustained active phase. But even in the early data, there are signals.
+      </p>
+      <p>
+        The first thing that surprised me was how directly supplements affect my sleep architecture. Not just &ldquo;I slept well&rdquo; or &ldquo;I didn't&rdquo; &mdash; but measurable shifts in deep sleep duration and HRV recovery that tracked to specific changes in my evening stack. Before the platform, I was taking supplements on faith. Now I can see which ones actually move the needle on the thing I care about most: waking up recovered.
+      </p>
+      <p>
+        The second discovery was more about my mind than my metabolism. I'd been carrying low-grade health anxiety for a while &mdash; the kind where you catastrophize every symptom, avoid the doctor when things are bad, and only go when you feel good enough to hear reassuring news. When I started wearing a continuous glucose monitor, the data didn't reveal some dramatic dietary problem. It showed me something better: I'm not in the danger zone I'd been quietly terrified of. The CGM didn't change my blood sugar. It changed my relationship with the fear. That's a discovery the platform surfaced that no amount of Googling at 2am ever could.
+      </p>
+      <p>
+        The third discovery is the hardest to admit: <strong>the platform didn't prevent the relapse.</strong>
+      </p>
+      <p>
+        I built sick-day tracking. I built habit monitoring. I built an AI that reads 19 data sources every morning and writes me a coaching brief. And when the cold hit and the DoorDash started and the days on the couch stretched from three to thirty &mdash; the system watched it happen. It logged it faithfully. It didn't catch me.
+      </p>
+      <p>
+        That's not a failure of the technology. It's a gap in the design. The system was built to support someone who's engaged. It wasn't built to intervene when someone checks out. That gap &mdash; the space between tracking data and actually changing behavior during a spiral &mdash; is what the next phase of this platform needs to solve. If the AI can see that I'm logging sick days for three weeks straight while my gym check-ins vanish, it should do something about it. Not just record it.
+      </p>
+      <p>
+        This chapter will grow as the data does. I'm building the platform in public specifically so that the discoveries &mdash; real ones, with statistical backing &mdash; accumulate here over time. Right now, the most honest thing I can tell you is: the early signals are promising, the system works when I work with it, and the biggest insight so far is about what happens when I stop.
+      </p>
+
+      <div class="throughline">
+        <span class="throughline__text">Explore the real correlation data, FDR-corrected, as it accumulates.</span>
+        <a href="/explorer/" class="throughline__link">Data Explorer &rarr;</a>
+      </div>
+    </div>
+  </div>
+
+  <hr class="chapter-divider">
+
+  <!-- Chapter 5 -->
+  <div class="story-chapter">
+    <p class="chapter-num">Chapter 05</p>
+    <h2 class="chapter-title">Why Public</h2>
+    <div class="chapter-body">
+      <p>
+        Here's the part I didn't plan to write.
+      </p>
+      <p>
+        Since my mum passed in 2019, I lost my cheerleader. That sounds simple but it isn't. She was the person who cared &mdash; really cared &mdash; about every promotion, every milestone, every &ldquo;you won't believe what happened today&rdquo; phone call. My dad and my brother love me, but the way they show it is different. A short text. A standard follow-up question. It's enough, and I don't blame them for it. But the feeling of being <em>seen</em> &mdash; of someone tracking the full arc of your life and caring about the details &mdash; that left when she did.
+      </p>
+      <p>
+        Maybe this site is me trying to find my cheerleaders.
+      </p>
+      <p>
+        I don't mean that in a self-pitying way. I mean it practically: I perform better when someone is watching. Not judging &mdash; watching. When I was in shape last May, part of what kept me going was that people could see it. The gym regulars. My girlfriend's family. The old man who said I was determined. The visibility wasn't vanity. It was accountability with a human face.
+      </p>
+      <p>
+        So I decided to publish everything. The weight. The streaks. The days I didn't show up. The weeks where the data flatlines because I was on the couch ordering delivery food and calling it &ldquo;sick days.&rdquo; If I'm going to build a system that demands honesty from the data, I should demand the same from myself.
+      </p>
+      <p>
+        The second reason is less personal and more forward-looking. I know from years of quietly reading Reddit threads that there are a lot of people stuck in the same cycle I am &mdash; people who can do the work but can't sustain it, people who've lost the weight and gained it back and feel like frauds for it. I love fitness. I love working out. That's what's so strange about the periods when I stop &mdash; it's not that I hate it. I just... disconnect. If this platform and this site can show someone in that position that the problem isn't willpower, that there might be something more structural going on, and that there's a way to build systems around it &mdash; that would matter to me more than any metric on a dashboard.
+      </p>
+      <p>
+        185 pounds isn't just a number. It's the version of me where sports, exercise, socializing &mdash; none of it felt out of reach. I'm not naive enough to think I can go back to being 25. But for a couple of weeks last May, even with all my anxiety and awkwardness still intact, I could tell: I was better. Everything was a little more possible. That's what I'm building toward.
+      </p>
+      <p>
+        Every week, an AI journalist named Elena Voss reads <span id="story-data-sources-1">19</span> data sources and writes a chronicle of what the numbers say.
+        She doesn't soften bad weeks. She doesn't celebrate plateaus as progress.
+        The point is that the data tells the truth, even when I don't want it to.
+      </p>
+      <p>
+        You're welcome to watch.
+      </p>
+
+      <div class="throughline">
+        <span class="throughline__text">Follow the weekly chronicle &mdash; every number, every failure, every week.</span>
+        <a href="/chronicle/" class="throughline__link">The Chronicle &rarr;</a>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /story-body -->
 
 <!-- Journey Timeline -->
 <div class="jtl-section reveal">
   <div class="jtl-heading">// the experiment so far</div>
   <div class="jtl-list" id="jtl-list">
-    <!-- skeleton -->
     <div class="jtl-skeleton" id="jtl-skeleton">
       <div class="jtl-node">
         <div class="jtl-skel-line" style="width:80px"></div>
@@ -473,163 +684,12 @@
   </div>
 </div>
 
-<!-- Story body -->
-<div class="story-body">
-
-  <!-- Chapter 1 — hidden until written -->
-  <div class="story-chapter" style="display:none">
-    <p class="chapter-num">Chapter 01</p>
-    <h2 class="chapter-title">The Moment</h2>
-    <div class="chapter-body">
-      <div class="placeholder">
-        <p class="placeholder__tag">// Matthew — write this section (aim for 3–5 paragraphs)</p>
-        <p class="placeholder__prompt">
-          <strong>Start with:</strong> "In February 2026, I was [doing what / where / with whom] when..."
-          <br><br>
-          <strong>Questions to answer:</strong><br>
-          • What was the specific moment, scene, or realization? (Date, place, what you were doing)<br>
-          • Had you weighed yourself recently? Did you know you were 302?<br>
-          • What emotion hit you — shame, frustration, fear, exhaustion, anger at yourself?<br>
-          • What made this time feel different from the other times you’d “decided to change”?<br>
-          • Was there a conversation with Brittany, or a health scare, or just a quiet moment of honesty?<br>
-          <br>
-          <strong>This is the most important section.</strong> A stranger won’t care about 19 data sources until they care about you. Give them 60 seconds of your real life.
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Chapter 2 -->
-  <div class="story-chapter">
-    <p class="chapter-num">Chapter 02</p>
-    <h2 class="chapter-title">The Problem With Previous Attempts</h2>
-    <div class="chapter-body">
-      <div class="placeholder">
-        <p class="placeholder__tag">// Matthew — write this section (aim for 2–3 paragraphs)</p>
-        <p class="placeholder__prompt">
-          <strong>Start with:</strong> "I’d tried to lose weight [how many] times before. The most recent was..."
-          <br><br>
-          <strong>Questions to answer:</strong><br>
-          • Name 2–3 specific past attempts (the app, the diet, the plan). What happened?<br>
-          • How long did each last? What was the pattern — strong start then slow fade?<br>
-          • What was the *real* reason they failed? (Not "I got busy" — the deeper thing: no feedback loop? No accountability? Lying to yourself about the numbers?)<br>
-          • The reader should think: "That’s exactly what I do." Write for that person.<br>
-          <br>
-          <strong>Tone:</strong> Self-aware, not self-pitying. You’re diagnosing the failure pattern, not wallowing in it.
-        </p>
-      </div>
-
-      <div class="pull-quote">
-        "The problem wasn't motivation. I had that. The problem was I was making decisions without data."
-      </div>
-      <!-- NOTE: Replace pull quote above with your actual words if this isn't accurate. -->
-
-    </div>
-  </div>
-
-  <!-- Chapter 3 -->
-  <div class="story-chapter">
-    <p class="chapter-num">Chapter 03</p>
-    <h2 class="chapter-title">The Build</h2>
-    <div class="chapter-body">
-      <p>
-        I'm not a developer. My background is IT leadership — managing teams, vendors, enterprise infrastructure.
-        I've never shipped production code at work. But I understand systems, and I've spent 15 years
-        watching what happens when complex systems are built without clear principles.
-      </p>
-      <p>
-        So I applied the same frameworks I use at work to myself. Architecture decisions.
-        Data governance. Version control. Automated testing. An external review board.
-        The Life Platform was always going to be a <em>real</em> system, or it was going to be nothing.
-      </p>
-
-      <div class="data-moment">
-        <div class="data-moment__label">// current build stats</div>
-        <span class="highlight" id="story-lambda-count">48</span> Lambda functions &nbsp;·&nbsp;
-        <span class="highlight" id="story-data-sources-stat">19</span> data sources &nbsp;·&nbsp;
-        <span class="highlight" id="story-tools-count">95</span> intelligence tools &nbsp;·&nbsp;
-        <span class="highlight">853/853</span> tests passing &nbsp;·&nbsp;
-        <span class="highlight">~$13/mo</span> on AWS
-      </div>
-
-      <div class="placeholder">
-        <p class="placeholder__tag">// Matthew — add 2–3 paragraphs here</p>
-        <p class="placeholder__prompt">
-          <strong>Start with:</strong> "The first Lambda function took me [how long]. I didn’t even know what a Lambda was..."
-          <br><br>
-          <strong>Questions to answer:</strong><br>
-          • What was the first thing you tried to build? How did it go?<br>
-          • When was the first time Claude wrote something that *just worked* and you thought “wait, really?”?<br>
-          • What did *you* bring that Claude couldn’t? (Systems thinking? Knowing what questions to ask? Management discipline?)<br>
-          • What’s the most surprising thing about building production software with AI when you’re not an engineer?<br>
-          • Did you ever think about quitting the build? What kept you going?<br>
-          <br>
-          <strong>This is the section the HN audience will read most carefully.</strong> Be specific and honest about your skill level.
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Chapter 4 — hidden until written -->
-  <div class="story-chapter" style="display:none">
-    <p class="chapter-num">Chapter 04</p>
-    <h2 class="chapter-title">What the Data Has Shown</h2>
-    <div class="chapter-body">
-      <div class="placeholder">
-        <p class="placeholder__tag">// Matthew — write this section (3–4 paragraphs — the most powerful section)</p>
-        <p class="placeholder__prompt">
-          <strong>Start with:</strong> "The first thing the data showed me that I didn’t expect was..."
-          <br><br>
-          <strong>Write about 2–3 specific discoveries:</strong><br>
-          • <strong>Discovery 1 (sleep):</strong> What did you learn about your sleep that surprised you? (e.g., Eight Sleep data, sleep architecture, how sleep affects next-day recovery)<br>
-          • <strong>Discovery 2 (nutrition/glucose):</strong> What did the CGM or MacroFactor data reveal? A food you thought was fine that spiked glucose? A pattern you never noticed?<br>
-          • <strong>Discovery 3 (the meta-insight):</strong> What’s the thing about *tracking itself* that changed your behavior? The feeling of knowing the AI is going to read your data tomorrow morning?<br>
-          <br>
-          <strong>The key:</strong> Each discovery should be a story, not a stat. "I learned that when I eat Thai food after 8pm, my HRV drops 15ms the next day" is great. "My HRV improved 12%" is not.
-          <br><br>
-          <strong>This is where skeptics become believers.</strong> The insights need to be personal and surprising enough that readers think “I wonder what MY data would show.”
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Chapter 5 — placeholder hidden, Elena paragraph visible -->
-  <div class="story-chapter">
-    <p class="chapter-num">Chapter 05</p>
-    <h2 class="chapter-title">Why Public</h2>
-    <div class="chapter-body">
-      <div class="placeholder">
-        <p class="placeholder__tag">// Matthew — write this section (2–3 paragraphs)</p>
-        <p class="placeholder__prompt">
-          <strong>Start with:</strong> "I almost kept this private. The reason I didn’t is..."
-          <br><br>
-          <strong>Questions to answer:</strong><br>
-          • What was the moment you decided to make the numbers public? Was there hesitation?<br>
-          • What does publishing the bad weeks do for you psychologically? (Accountability? Honesty? Proving something?)<br>
-          • Who is this for? If one specific person read this site and it changed something for them, who would that person be?<br>
-          • What’s the thing you’re most afraid someone will see in the data?<br>
-          <br>
-          <strong>End with a forward-looking sentence.</strong> Where are you going? What does 185 lbs represent beyond a number?
-        </p>
-      </div>
-
-      <p>
-        Every week, an AI journalist named Elena Voss reads <span id="story-data-sources-1">19</span> data sources and writes a chronicle of what the numbers say.
-        She doesn't soften bad weeks. She doesn't celebrate plateaus as progress.
-        The point is that the data tells the truth, even when I don't want it to.
-      </p>
-    </div>
-  </div>
-
-</div><!-- /story-body -->
-
 <!-- STORY-4: Emotional waveform -->
 <div class="waveform-section reveal">
   <div class="waveform-label">// the pulse of the journey</div>
   <div class="waveform-heading">42 Days of Momentum</div>
   <p class="waveform-sub">Each bar is one day. Height = combined pillar score across sleep, movement, nutrition, metabolic health, mind, consistency, and relationships.</p>
   <div class="waveform-chart" id="waveform-chart">
-    <!-- JS populated -->
     <div style="width:100%;height:40px;background:var(--surface-raised);border-radius:2px;opacity:0.3"></div>
   </div>
   <div class="waveform-legend">
@@ -640,28 +700,28 @@
   </div>
 </div>
 
-<!-- STORY-5: Tech ↔ Life intersection cards -->
+<!-- STORY-5: Tech / Life intersection cards -->
 <div class="intersection-section reveal">
   <div class="intersection-label">// where the platform meets the person</div>
   <div class="intersection-heading">The System Catches What I Miss</div>
   <div class="intersection-grid">
     <div class="intersection-card">
       <div class="intersection-card__tech">// Daily AI Brief</div>
-      <div class="intersection-card__arrow">↓</div>
+      <div class="intersection-card__arrow">&darr;</div>
       <div class="intersection-card__life">Caught a sleep pattern I didn't see</div>
-      <p class="intersection-card__body">The brief flagged that my 11pm–1am late window was costing me deep sleep stage time — not obvious from a single night, but visible across 3 weeks of data. Changed my schedule. HRV improved within days.</p>
+      <p class="intersection-card__body">The brief flagged that my 11pm&ndash;1am late window was costing me deep sleep stage time &mdash; not obvious from a single night, but visible across 3 weeks of data. Changed my schedule. HRV improved within days.</p>
     </div>
     <div class="intersection-card">
       <div class="intersection-card__tech">// Character Sheet</div>
-      <div class="intersection-card__arrow">↓</div>
+      <div class="intersection-card__arrow">&darr;</div>
       <div class="intersection-card__life">Gamified accountability that actually works</div>
       <p class="intersection-card__body">Every behavior earns XP. Every pillar is visible. The moment I could see that my Relationships score was lagging, I called my family. The score is artificial; the call wasn't.</p>
     </div>
     <div class="intersection-card">
       <div class="intersection-card__tech">// Public Website</div>
-      <div class="intersection-card__arrow">↓</div>
+      <div class="intersection-card__arrow">&darr;</div>
       <div class="intersection-card__life">You can't lie to yourself when everyone's watching</div>
-      <p class="intersection-card__body">Publishing the data live — including the bad weeks — removes the option of private rationalization. The 12% Valentine's Day recovery score is right there. I can't un-publish it. That's the design.</p>
+      <p class="intersection-card__body">Publishing the data live &mdash; including the bad weeks &mdash; removes the option of private rationalization. The numbers are right there. I can't un-publish them. That's the design.</p>
     </div>
   </div>
 </div>
@@ -677,7 +737,7 @@
   <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
   <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Follow the experiment.</h3>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
-    Real numbers from <span id="story-data-sources-2">19</span> data sources. Every Wednesday, in your inbox. No highlight reel — every failure included.
+    Real numbers from <span id="story-data-sources-2">19</span> data sources. Every Wednesday, in your inbox. No highlight reel &mdash; every failure included.
   </p>
   <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
     <input id="story-email" type="email" placeholder="your@email.com" style="
@@ -691,8 +751,9 @@
 </section>
 
 <div class="story-nav">
-  <a href="/chronicle/" class="btn btn--ghost">Read the Chronicle →</a>
-  <a href="/platform/" class="btn btn--ghost">See the Platform →</a>
+  <a href="/chronicle/" class="btn btn--ghost">Read the Chronicle &rarr;</a>
+  <a href="/platform/" class="btn btn--ghost">See the Platform &rarr;</a>
+  <a href="/live/" class="btn btn--ghost">Today's Pulse &rarr;</a>
 </div>
 
 <!-- Mobile bottom nav -->
@@ -717,7 +778,6 @@
     if (dxEl) dxEl.textContent = daysIn;
     // D6: update data_sources prose spans
     const plat = d.platform || {};
-    // STORY-1: Wire data-moment stats to public_stats.json
     const ds = plat.data_sources;
     if (ds != null) {
       ['story-data-sources-1','story-data-sources-2','story-data-sources-stat'].forEach(function(id) {
@@ -758,13 +818,13 @@
     if (skel) skel.remove();
 
     if (!events || !events.length) {
-      list.innerHTML = '<div style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono)">// no events yet</div>';
+      list.innerHTML = '<div style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono)">// timeline populates as the experiment runs</div>';
       return;
     }
 
     list.innerHTML += events.map(function(e) {
       var color = TYPE_COLORS[e.type] || 'var(--border-strong)';
-      var linkHtml = e.link ? ' <a href="' + esc(e.link) + '" class="jtl-link">' + (e.type === 'weight' ? 'live →' : e.type === 'experiment' ? 'experiments →' : e.type === 'discovery' ? 'discoveries →' : e.type === 'level_up' ? 'character →' : 'story →') + '</a>' : '';
+      var linkHtml = e.link ? ' <a href="' + esc(e.link) + '" class="jtl-link">' + (e.type === 'weight' ? 'live \u2192' : e.type === 'experiment' ? 'experiments \u2192' : e.type === 'discovery' ? 'discoveries \u2192' : e.type === 'level_up' ? 'character \u2192' : 'story \u2192') + '</a>' : '';
       return '<div class="jtl-node jtl-node--' + esc(e.type) + '">' +
         '<div class="jtl-date">' + esc(fmtDate(e.date)) + '</div>' +
         '<div class="jtl-title">' + esc(e.title) + '</div>' +
@@ -824,14 +884,14 @@ document.getElementById('story-subscribe-btn').addEventListener('click', async (
     });
     const data = await res.json();
     if (res.ok) {
-      msg.textContent = '✓ You\'re in. Check your inbox to confirm.';
+      msg.textContent = '\u2713 You\'re in. Check your inbox to confirm.';
       msg.style.color = 'var(--c-amber-500)';
       document.getElementById('story-email').value = '';
     } else {
       msg.textContent = data.error || 'Something went wrong.';
       msg.style.color = 'var(--c-yellow-status)';
     }
-  } catch { msg.textContent = 'Network error — try again.'; msg.style.color = 'var(--c-yellow-status)'; }
+  } catch { msg.textContent = 'Network error \u2014 try again.'; msg.style.color = 'var(--c-yellow-status)'; }
 });
 document.getElementById('story-email').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('story-subscribe-btn').click();
