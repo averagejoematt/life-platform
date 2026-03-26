@@ -1,3 +1,58 @@
+## v3.9.30 — 2026-03-26: Build Section Overhaul + /builders/ Page
+
+### Summary
+Joint Product Board + Technical Board review of all 6 Build section pages. Implemented board recommendations across every page, plus created a new `/builders/` page targeting the technical/HN audience.
+
+### New Page: `/builders/`
+- Created `site/builders/index.html` — "For Builders" page
+- 5 sections: The Stack (8-row reference table), Key Decisions (8 ADR cards), Lessons Learned (8 real incidents with gotcha warnings), Build Timeline (5-week progression), Getting Started (build-first vs skip-until-later split)
+- Stats strip: 52 Lambdas, 103 tools, 19 sources, 33 ADRs, $13/mo, A- grade
+- Minimum viable platform spec: 3 Lambdas + 1 DDB + 1 EventBridge + 1 SES = $2–4/month, one weekend
+- Added to Build dropdown nav + footer in `components.js`
+
+### `/cost/` Improvements
+- Added "DIY with ChatGPT + spreadsheets" comparison row (Free, ~10 hrs/week manual)
+- Added cost-per-insight callout: $0.43/daily brief, $0.13/data source/month, 0 idle cost
+
+### `/board/` UX Overhaul
+- Pre-loaded demo response on page load (sleep vs exercise question, all 6 personas)
+- Per-persona accent colors on response cards (Vasquez=blue, Okafor=purple, Patrick=green, Norton=amber, Clear=teal, Goggins=red)
+- Free question limit increased 3 → 5
+- Added `renderPersonaCard()` shared function for consistent styling
+
+### `/platform/` Cleanup
+- Removed 80-line hub grid (duplicated nav/footer), replaced with clean 3×2 "Explore the Build" CTA grid
+
+### `/methodology/` Enhancements
+- Moved signature quote to hero area
+- Added "Methodology in Action" 4-step case study: raw signal → hypothesis → observation → action
+- Removed duplicate quote from bottom
+
+### `/intelligence/` Addition
+- New "Sample Daily Brief" section between pipeline diagram and feature grid
+- Shows redacted real email: 3 priorities, coaching insight, vitals strip
+
+### `/tools/` Expansion (3 → 6 calculators)
+- Sleep Efficiency Scorer: time-in-bed vs actual sleep, clinical grading (Excellent/Good/Fair/Poor)
+- Deficit Sustainability Calculator: deficit %, risk level, timeline with metabolic adaptation buffer, protein minimums
+- VO2max Estimator: Rockport walk test formula, age-group ACSM percentiles, Attia centenarian targets
+- Updated page description to reflect 6 tools
+
+### Files Created
+- `site/builders/index.html` — New page
+
+### Files Modified
+- `site/cost/index.html` — DIY row + cost-per-insight
+- `site/board/index.html` — Demo response, persona colors, limit bump
+- `site/platform/index.html` — Hub grid → CTA grid
+- `site/methodology/index.html` — Hero quote, case study
+- `site/intelligence/index.html` — Sample Daily Brief
+- `site/tools/index.html` — 3 new calculators
+- `site/assets/js/components.js` — /builders/ in nav + footer
+- `deploy/sync_doc_metadata.py` — Version bump v3.9.29 → v3.9.30
+
+---
+
 ## v3.9.29 — 2026-03-26: Phase D + E — Challenge XP Wiring, Auto-Verification, Nav Update
 
 ### Summary
