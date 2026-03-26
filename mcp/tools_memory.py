@@ -44,6 +44,7 @@ VALID_CATEGORIES = {
     "journey_milestone",
     "insight",
     "experiment_result",
+    "baseline_snapshot",
 }
 
 
@@ -242,3 +243,171 @@ def tool_delete_platform_memory(category: str, date: str) -> dict:
         return {"status": "deleted", "sk": sk, "category": category, "date": date}
     except Exception as e:
         return {"error": str(e), "sk": sk}
+
+
+# ==============================================================================
+# BASELINE SNAPSHOT — Day 1 capture
+# ==============================================================================
+
+def tool_capture_baseline(args: dict) -> dict:
+    """
+    Capture a full-state baseline snapshot across all key domains.
+    Stores a permanent record in platform_memory under 'baseline_snapshot'.
+
+    This is designed to be run once on Day 1 (April 1, 2026) to create
+    the anchor point that all future progress is measured against.
+
+    Args:
+        date: Optional date override (YYYY-MM-DD). Defaults to today.
+        label: Optional label (e.g. 'day_1', 'month_3'). Defaults to 'day_1'.
+        force: If True, overwrites any existing snapshot for that date.
+               Defaults to False (safety against accidental re-runs).
+
+    Returns:
+        Full snapshot record with all captured metrics.
+    """
+    from boto3.dynamodb.conditions import Key as DDBKey
+    from decimal import Decimal
+
+    table = _get_table()
+    uid = _get_user_id()
+    today = datetime.now(timezone.utc).date().isoformat()
+    date_str = args.get("date") or today
+    label = args.get("label", "day_1")
+    force = args.get("force", False)
+
+    # Safety: don't overwrite unless forced
+    if not force:
+        existing_pk = _memory_pk()
+        existing_sk = _sk("baseline_snapshot", date_str)
+        existing = table.get_item(Key={"pk": existing_pk, "sk": existing_sk})
+        if existing.get("Item"):
+            return {
+                "error": "Baseline snapshot already exists for this date.",
+                "date": date_str,
+                "hint": "Use force=true to overwrite, or choose a different date.",
+            }
+
+    def _latest_from(source, proj=None):
+        """Get most recent record from a source partition."""
+        pk = f"USER#{uid}#SOURCE#{source}"
+        kwargs = {
+            "KeyConditionExpression": DDBKey("pk").eq(pk),
+            "Limit": 1,
+            "ScanIndexForward": False,
+        }
+        if proj:
+            kwargs["ProjectionExpression"] = proj
+        resp = table.query(**kwargs)
+        items = resp.get("Items", [])
+        return _d2f(items[0]) if items else None
+
+    def _latest_sot(domain):
+        """Get most recent SOT record for a domain."""
+        pk = f"USER#{uid}#SOURCE#sot"
+        prefix = f"DOMAIN#{domain}#"
+        resp = table.query(
+            KeyConditionExpression=DDBKey("pk").eq(pk) & DDBKey("sk").begins_with(prefix),
+            Limit=1,
+            ScanIndexForward=False,
+        )
+        items = resp.get("Items", [])
+        return _d2f(items[0]) if items else None
+
+    # ── Gather data across domains ────────────────────────────
+    snapshot = {
+        "label": label,
+        "captured_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    # Weight / body composition
+    withings = _latest_from("withings")
+    if withings:
+        snapshot["weight_lbs"] = withings.get("weight_lbs") or withings.get("weight")
+        snapshot["body_fat_pct"] = withings.get("body_fat_pct") or withings.get("fat_ratio")
+        snapshot["muscle_mass_lbs"] = withings.get("muscle_mass_lbs")
+        snapshot["weight_date"] = withings.get("date")
+
+    # Blood pressure
+    bp = _latest_from("blood_pressure")
+    if bp:
+        snapshot["systolic"] = bp.get("systolic")
+        snapshot["diastolic"] = bp.get("diastolic")
+        snapshot["heart_rate_bp"] = bp.get("heart_rate")
+        snapshot["bp_date"] = bp.get("date")
+
+    # Whoop recovery / HRV / RHR
+    whoop = _latest_from("whoop")
+    if whoop:
+        snapshot["hrv"] = whoop.get("hrv")
+        snapshot["resting_hr"] = whoop.get("resting_heart_rate")
+        snapshot["recovery_score"] = whoop.get("recovery_score")
+        snapshot["sleep_score"] = whoop.get("sleep_score")
+        snapshot["whoop_date"] = whoop.get("date")
+
+    # Character Sheet score
+    char_sot = _latest_sot("character")
+    if char_sot:
+        snapshot["character_composite"] = char_sot.get("composite_score")
+        snapshot["character_pillars"] = {
+            k: v for k, v in char_sot.items()
+            if k.endswith("_score") and k != "composite_score"
+        }
+        snapshot["character_date"] = char_sot.get("date")
+
+    # Habit completion (latest SOT)
+    habit_sot = _latest_sot("habits")
+    if habit_sot:
+        snapshot["t0_completion_pct"] = habit_sot.get("tier0_completion_pct")
+        snapshot["overall_completion_pct"] = habit_sot.get("completion_pct")
+        snapshot["habit_date"] = habit_sot.get("date")
+
+    # Vice streaks
+    vice_sot = _latest_sot("vices")
+    if vice_sot:
+        snapshot["vice_streaks"] = {
+            k: v for k, v in vice_sot.items()
+            if "streak" in k.lower() or "days" in k.lower()
+        }
+        snapshot["vice_date"] = vice_sot.get("date")
+
+    # CGM / glucose (if available)
+    cgm = _latest_from("cgm")
+    if cgm:
+        snapshot["avg_glucose"] = cgm.get("average_glucose") or cgm.get("avg_glucose")
+        snapshot["time_in_range_pct"] = cgm.get("time_in_range_pct")
+        snapshot["cgm_date"] = cgm.get("date")
+
+    # Nutrition (latest MacroFactor)
+    macro = _latest_from("macrofactor")
+    if macro:
+        snapshot["calories"] = macro.get("calories")
+        snapshot["protein_g"] = macro.get("protein")
+        snapshot["nutrition_date"] = macro.get("date")
+
+    # ── Store the snapshot ────────────────────────────────────
+    result = tool_write_platform_memory(
+        category="baseline_snapshot",
+        content=snapshot,
+        date=date_str,
+        overwrite=force,
+    )
+
+    return {
+        "status": result.get("status", "error"),
+        "label": label,
+        "date": date_str,
+        "domains_captured": [
+            k for k in [
+                "weight" if "weight_lbs" in snapshot else None,
+                "blood_pressure" if "systolic" in snapshot else None,
+                "recovery" if "hrv" in snapshot else None,
+                "character" if "character_composite" in snapshot else None,
+                "habits" if "t0_completion_pct" in snapshot else None,
+                "vices" if "vice_streaks" in snapshot else None,
+                "glucose" if "avg_glucose" in snapshot else None,
+                "nutrition" if "calories" in snapshot else None,
+            ] if k
+        ],
+        "snapshot": snapshot,
+    }

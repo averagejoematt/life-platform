@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="I built an AI operating system for my body. 19 data sources. Real numbers. One hypothesis: compounding data changes everything.">
+  <meta name="description" content="Day 1: April 1, 2026. I built an AI health platform, fell off the wagon, and I'm starting over — publicly. 302 lbs. 19 data sources. Every failure included.">
   <meta property="og:title" content="Quantified Self Experiment — AI-Powered Health Tracking with Real Data">
-  <meta property="og:description" content="One person. 19 data sources. An AI operating system for the body. Tracking a 302→185 lb transformation — every number public, every failure included.">
+  <meta property="og:description" content="I built an AI health platform with 19 data sources. Then I fell off the wagon. April 1 is Day 1 — starting over, publicly. Every number, every failure.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
@@ -332,7 +332,7 @@
 <!-- Ticker -->
 <div class="ticker" style="margin-top:var(--nav-height)">
   <div class="ticker__inner">
-    <span class="ticker__item">ONE PERSON. 19 DATA SOURCES. ZERO FILTERS.</span>
+    <span class="ticker__item">DAY 1 — APRIL 1, 2026. FOR REAL THIS TIME.</span>
     <span class="ticker__item">⬥</span>
     <span class="ticker__item">WEIGHT <strong id="tk-weight">287.7 LBS</strong></span>
     <span class="ticker__item">⬥</span>
@@ -344,7 +344,7 @@
     <span class="ticker__item">⬥</span>
     <span class="ticker__item">JOURNEY <strong id="tk-journey">12.2% TO GOAL</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item">ONE PERSON. 19 DATA SOURCES. ZERO FILTERS.</span>
+    <span class="ticker__item">DAY 1 — APRIL 1, 2026. FOR REAL THIS TIME.</span>
     <span class="ticker__item">⬥</span>
     <span class="ticker__item">WEIGHT <strong id="tk-weight-2">287.7 LBS</strong></span>
     <span class="ticker__item">⬥</span>
@@ -363,24 +363,40 @@
 <section class="hero" id="experiment">
 
   <h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">
-    Matthew Walker — Quantified Self Health Experiment: 302 to 185 lbs with AI and 19 Data Sources
+    Matthew Walker — Quantified Self Health Experiment: 302 to 185 lbs with AI and 19 Data Sources — Launching April 1, 2026
   </h1>
 
-  <p class="hero-label">The Weekly Signal</p>
+  <p class="hero-label" style="margin-bottom:16px;">The Measured Life Experiment</p>
 
-  <!-- Live weight counter: 302 → current → 185 -->
-  <div class="weight-counter">
+  <!-- Central countdown / Day N -->
+  <div class="experiment-counter" style="margin-bottom:24px;opacity:0;animation:fadeUp 0.6s ease forwards 0.15s;"></div>
+
+  <!-- The honest tagline -->
+  <p style="
+    font-family:var(--font-display);
+    font-size:clamp(28px, 4vw, 44px);
+    color:var(--text);
+    letter-spacing:var(--ls-display);
+    line-height:1.15;
+    text-align:center;
+    max-width:600px;
+    margin:0 0 12px;
+    opacity:0;
+    animation:fadeUp 0.6s ease forwards 0.25s;
+  ">Day 1. <span style="color:var(--accent)">For real this time.</span></p>
+
+  <!-- Weight counter: 302 → current → 185 -->
+  <div class="weight-counter" style="margin-bottom:20px;">
     <div class="weight-node start">
       <span class="label">Started</span>
       <span class="value" data-const="journey.start_weight">302</span>
     </div>
-    <span class="weight-arrow">→</span>
+    <span class="weight-arrow">&rarr;</span>
     <div class="weight-node current">
       <span class="label">Today</span>
       <span class="value" id="hero-weight">287.7</span>
-      </span>
     </div>
-    <span class="weight-arrow">→</span>
+    <span class="weight-arrow">&rarr;</span>
     <div class="weight-node goal">
       <span class="label">Goal</span>
       <span class="value" data-const="journey.goal_weight">185</span>
@@ -398,11 +414,18 @@
     </div>
   </div>
 
+  <!-- The narrative — honest, raw -->
+  <p class="hero-why" id="hero-why" style="max-width:520px;">
+    I built an AI health platform with 19 data sources and 95 intelligence tools.
+    Then I got sick, fell off the wagon, and the system I built didn't catch me.
+    <strong>So I'm starting over &mdash; publicly.</strong>
+    April 1, 2026 is Day 1. Every number, every failure, no filter.
+  </p>
 
   <!-- HP-12: Elena Voss hero one-liner -->
   <div id="elena-hero-line" style="
     max-width:500px;
-    margin:var(--space-4) 0 var(--space-2);
+    margin:0 0 var(--space-4);
     padding:var(--space-3) var(--space-5);
     border-left:2px solid var(--c-amber-300);
     font-family:var(--font-serif);
@@ -417,18 +440,31 @@
     <span style="font-family:var(--font-mono);font-size:var(--text-2xs);font-style:normal;color:var(--c-amber-500);margin-left:var(--space-2);">— Elena Voss</span>
   </div>
 
-  <!-- Narrative paragraph (BS-02 TODO: set HERO_WHY_PARAGRAPH + paragraph_is_placeholder=False in site_writer.py) -->
-  <p class="hero-why" id="hero-why">
-    Most people optimize in the dark — gut feelings, Instagram advice, someone's podcast take.
-    I connect <span id="prose-data-sources-1">19</span> data sources to a custom AI and publish every number, every week, without filtering.
-    <strong><span data-const="journey.start_weight">302</span> lbs to <span data-const="journey.goal_weight">185</span>.</strong> Every failure included. This is what systematic self-improvement actually looks like.
-  </p>
+  <!-- Prequel context banner (hidden after April 1) -->
+  <div id="prequel-banner" style="
+    max-width:520px;
+    margin:0 0 var(--space-6);
+    padding:var(--space-4) var(--space-5);
+    background:rgba(var(--amber-rgb), 0.04);
+    border:1px solid rgba(var(--amber-rgb), 0.12);
+    border-radius:6px;
+    text-align:center;
+    opacity:0;
+    animation:fadeUp 0.6s ease forwards 0.48s;
+  ">
+    <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--c-amber-500);margin-bottom:6px;">Prequel Phase &middot; Baseline Period</div>
+    <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.5;">
+      Everything before April 1 is the testing window &mdash; kicking the tires,
+      building the infrastructure, and being honest about what didn't work.
+      <a href="/chronicle/" style="color:var(--c-amber-400);text-decoration:none;font-weight:600;">Read the prequel chronicles &rarr;</a>
+    </div>
+  </div>
 
   <!-- Below-fold stat chips -->
   <div class="hero-below-fold">
     <div class="stat-chip">
-      <span class="chip-label">Days on Journey</span>
-      <span class="chip-value" id="hero-days">0</span>
+      <span class="chip-label">Experiment Day</span>
+      <span class="chip-value experiment-counter" data-format="number" id="hero-days">0</span>
     </div>
     <div class="stat-chip">
       <span class="chip-label">Current Streak</span>
@@ -448,7 +484,6 @@
     z-index:0;
   ">
     <canvas id="heartbeat-canvas" style="width:100%;height:80px;display:block;"></canvas>
-    <!-- Hidden status spans for JS updateHeartbeat compatibility -->
     <span id="hb-status" style="display:none"></span>
     <span id="hb-label" style="display:none"></span>
   </div>
@@ -459,7 +494,7 @@
     <span class="teaser-title" id="chronicle-teaser-title"></span>
   </a>
 
-  <!-- WR-31: "Start here" CTA for new visitors -->
+  <!-- WR-31: "Start here" CTA -->
   <div style="
     max-width: 500px;
     margin: 0 0 var(--space-6);
@@ -477,13 +512,12 @@
       letter-spacing: var(--ls-tag);
       color: var(--c-amber-400);
       text-decoration: none;
-    ">New here? Read the story first &rarr;</a>
+    ">New here? Read the full story &rarr;</a>
   </div>
-
 
   <!-- HP-03: Hero subscribe input -->
   <div class="hero-subscribe" style="max-width:500px;opacity:0;animation:fadeUp 0.6s ease forwards 0.58s;">
-    <div class="hero-subscribe-label">Get the weekly signal</div>
+    <div class="hero-subscribe-label">Follow from Day 1</div>
     <div class="subscribe-row">
       <input type="email" id="hero-email" class="subscribe-input" placeholder="your@email.com" autocomplete="email">
       <button id="hero-subscribe-btn" class="btn btn--primary" style="font-size:var(--text-xs);white-space:nowrap;padding:var(--space-3) var(--space-5);">Subscribe</button>
@@ -493,10 +527,10 @@
 
   <!-- WR-16: Dual-path navigation CTAs -->
   <div class="hero-dual-cta">
-    <a href="/story/" class="dual-cta dual-cta--journey">
+    <a href="/chronicle/" class="dual-cta dual-cta--journey">
       <span class="dual-cta__label">// the human side</span>
-      <span class="dual-cta__title">Follow the Journey</span>
-      <span class="dual-cta__sub" data-const="journey.cta_sub">302 lbs. A goal. Every failure included.</span>
+      <span class="dual-cta__title">The Prequel Chronicles</span>
+      <span class="dual-cta__sub" data-const="journey.cta_sub">302 lbs. A relapse. A relaunch. Day 1.</span>
       <span class="dual-cta__arrow">&darr;</span>
     </a>
     <a href="/platform/" class="dual-cta dual-cta--platform">
@@ -1581,7 +1615,17 @@
 </script>
 <script src="/assets/js/reveal.js"></script>
 <script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/countdown.js"></script>
 <script src="/assets/js/components.js"></script>
 <script src="/assets/js/nav.js"></script>
+<script>
+// Hide prequel banner after experiment launch
+(function() {
+  if (window.AMJ_EXPERIMENT && window.AMJ_EXPERIMENT.isLive) {
+    var banner = document.getElementById('prequel-banner');
+    if (banner) banner.style.display = 'none';
+  }
+})();
+</script>
 </body>
 </html>
