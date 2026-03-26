@@ -17,130 +17,289 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    :root { --n-amber: #f59e0b; --n-amber-dim: rgba(245,158,11,0.15); --n-amber-glow: rgba(245,158,11,0.08); --n-green: #3ecf8e; --n-red: #ef4444; }
+    :root {
+      --n-amber: #f59e0b;
+      --n-amber-dim: rgba(245,158,11,0.15);
+      --n-amber-glow: rgba(245,158,11,0.06);
+      --n-green: #3ecf8e;
+      --n-red: #ef4444;
+      --n-violet: #818cf8;
+    }
 
-    /* ── Hero ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes ringDraw {
+      from { stroke-dasharray: 0 251; }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       HERO — B's 2-column + C's gauge row
+       ═══════════════════════════════════════════════════════ */
     .n-hero {
       padding: calc(var(--nav-height) + var(--space-20)) var(--page-padding) var(--space-16);
       position: relative;
       overflow: hidden;
       border-bottom: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
     }
-    .n-hero::before {
-      content: '';
-      position: absolute;
-      top: -50%; right: -20%;
-      width: 600px; height: 600px;
-      background: radial-gradient(circle, var(--n-amber-glow) 0%, transparent 70%);
-      pointer-events: none;
+    .n-hero-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-12);
+      align-items: center;
     }
     .n-hero__eyebrow {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
-      letter-spacing: 0.15em;
+      letter-spacing: 0.2em;
       text-transform: uppercase;
       color: var(--n-amber);
       margin-bottom: var(--space-6);
-      opacity: 0; animation: fadeUp 0.6s 0.1s forwards;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.1s forwards;
+    }
+    .n-hero__eyebrow::before {
+      content: '';
+      width: 32px;
+      height: 1px;
+      background: var(--n-amber);
     }
     .n-hero__title {
       font-family: var(--font-display);
-      font-size: clamp(36px, 5vw, 56px);
+      font-size: clamp(36px, 5vw, 52px);
       color: var(--text);
-      line-height: 1.1;
-      max-width: 700px;
+      line-height: 1.05;
+      max-width: 520px;
       margin-bottom: var(--space-6);
-      opacity: 0; animation: fadeUp 0.6s 0.2s forwards;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.2s forwards;
     }
-    .n-hero__title em { font-style: normal; color: var(--n-amber); }
+    .n-hero__title em {
+      font-style: normal;
+      color: var(--n-amber);
+    }
     .n-hero__sub {
       font-size: var(--text-base);
       color: var(--text-muted);
-      max-width: 520px;
-      line-height: 1.7;
-      opacity: 0; animation: fadeUp 0.6s 0.3s forwards;
+      max-width: 420px;
+      line-height: 1.8;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.3s forwards;
     }
-    @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
 
-    /* ── Macro Ring Section ── */
-    .n-rings {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-16) var(--page-padding);
+    /* Gauge row (4 mini rings) */
+    .n-gauge-row {
       display: grid;
-      grid-template-columns: 280px 1fr;
-      gap: var(--space-12);
-      align-items: center;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+      opacity: 0;
+      animation: fadeUp 0.6s 0.4s forwards;
     }
-    .n-ring-wrap { position: relative; width: 240px; height: 240px; margin: 0 auto; }
-    .n-ring-wrap svg { width: 100%; height: 100%; }
-    .n-ring-center {
+    .n-gauge {
+      text-align: center;
+      padding: var(--space-5) var(--space-3);
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .n-gauge__ring {
+      width: 88px;
+      height: 88px;
+      margin: 0 auto var(--space-3);
+      position: relative;
+    }
+    .n-gauge__ring svg {
+      width: 100%;
+      height: 100%;
+    }
+    .n-gauge__center {
       position: absolute;
-      top: 50%; left: 50%;
+      top: 50%;
+      left: 50%;
       transform: translate(-50%, -50%);
       text-align: center;
     }
-    .n-ring-center__cal {
+    .n-gauge__num {
       font-family: var(--font-display);
-      font-size: 32px;
-      color: var(--text);
+      font-size: 22px;
       line-height: 1;
     }
-    .n-ring-center__label {
+    .n-gauge__unit {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-faint);
+      letter-spacing: 0.08em;
+    }
+    .n-gauge__label {
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-muted);
       letter-spacing: 0.1em;
       text-transform: uppercase;
     }
-    .n-macro-list { display: flex; flex-direction: column; gap: var(--space-6); }
-    .n-macro-row {
-      display: grid;
-      grid-template-columns: 80px 1fr 60px;
+
+    /* ═══════════════════════════════════════════════════════
+       PULL-QUOTES — B's editorial style + N=1 badge
+       ═══════════════════════════════════════════════════════ */
+    .n-pullquote {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      position: relative;
+      border-bottom: 1px solid var(--border);
+    }
+    .n-pullquote__watermark {
+      position: absolute;
+      top: 24px;
+      right: var(--page-padding);
+      font-family: var(--font-display);
+      font-size: 120px;
+      color: rgba(245, 158, 11, 0.04);
+      line-height: 1;
+      pointer-events: none;
+    }
+    .n-pullquote__text {
+      font-family: var(--font-display);
+      font-size: clamp(24px, 3.5vw, 32px);
+      line-height: 1.3;
+      color: var(--text);
+      max-width: 640px;
+      position: relative;
+    }
+    .n-pullquote__text em {
+      font-style: normal;
+      color: var(--n-amber);
+    }
+    .n-pullquote__attr {
+      display: flex;
       align-items: center;
-      gap: var(--space-4);
+      gap: var(--space-3);
+      margin-top: var(--space-4);
+    }
+    .n-pullquote__badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--n-amber);
+      background: var(--n-amber-dim);
+      padding: 3px 10px;
+      display: inline-block;
+    }
+    .n-pullquote__source {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      letter-spacing: 0.06em;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       MACRO EDITORIAL — B's 3-column spread
+       ═══════════════════════════════════════════════════════ */
+    .n-macro-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .n-macro-header {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-8);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .n-macro-header::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .n-macro-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+    }
+    .n-macro-col {
+      padding: var(--space-6) var(--space-6);
+    }
+    .n-macro-col:not(:last-child) {
+      border-right: 1px solid var(--border);
+    }
+    .n-macro-bar {
+      height: 3px;
+      background: rgba(255,255,255,0.03);
+      margin-bottom: var(--space-5);
+      position: relative;
+      overflow: hidden;
+    }
+    .n-macro-bar__fill {
+      height: 100%;
+      position: absolute;
+      left: 0;
+      top: 0;
+      transition: width 1.2s ease;
+    }
+    .n-macro-big {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 4vw, 44px);
+      line-height: 1;
+      margin-bottom: var(--space-2);
     }
     .n-macro-name {
       font-family: var(--font-mono);
-      font-size: var(--text-xs);
+      font-size: 11px;
       color: var(--text-muted);
+      letter-spacing: 0.1em;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      margin-bottom: var(--space-3);
     }
-    .n-macro-bar {
-      height: 6px;
-      background: rgba(255,255,255,0.04);
-      border-radius: 3px;
-      overflow: hidden;
+    .n-macro-detail {
+      font-size: var(--text-sm);
+      color: var(--text-faint);
+      line-height: 1.7;
     }
-    .n-macro-fill { height: 100%; border-radius: 3px; transition: width 1s ease; }
-    .n-macro-val {
-      font-family: var(--font-display);
-      font-size: var(--text-h3);
-      color: var(--text);
-      text-align: right;
+    .n-macro-detail a {
+      color: var(--n-amber);
+      text-decoration: none;
     }
 
-    /* ── Protein Meter ── */
+    /* ═══════════════════════════════════════════════════════
+       PROTEIN ADHERENCE
+       ═══════════════════════════════════════════════════════ */
     .n-protein-section {
       max-width: var(--max-width);
       margin: 0 auto;
-      padding: 0 var(--page-padding) var(--space-16);
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
     }
     .n-protein-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: var(--space-8);
+      background: rgba(62, 207, 142, 0.03);
+      border: 1px solid rgba(62, 207, 142, 0.1);
+      padding: var(--space-8) var(--space-8);
       display: grid;
-      grid-template-columns: 1fr 200px;
+      grid-template-columns: 1fr 180px;
       gap: var(--space-8);
       align-items: center;
     }
     .n-protein-card__title {
       font-family: var(--font-display);
-      font-size: var(--text-h2);
+      font-size: var(--text-h3);
       color: var(--text);
-      margin-bottom: var(--space-3);
+      margin-bottom: var(--space-2);
+    }
+    .n-protein-card__title em {
+      font-style: normal;
+      color: var(--n-green);
     }
     .n-protein-card__sub {
       font-size: var(--text-sm);
@@ -149,16 +308,15 @@
       margin-bottom: var(--space-5);
     }
     .n-protein-track {
-      height: 10px;
+      height: 8px;
       background: rgba(255,255,255,0.04);
-      border-radius: 5px;
+      border-radius: 4px;
       overflow: hidden;
-      position: relative;
     }
     .n-protein-fill {
       height: 100%;
-      border-radius: 5px;
-      background: linear-gradient(90deg, var(--n-red), var(--n-amber), var(--n-green));
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--n-red) 0%, var(--n-amber) 40%, var(--n-green) 75%);
       transition: width 1.2s ease;
     }
     .n-protein-markers {
@@ -169,35 +327,37 @@
       font-size: 10px;
       color: var(--text-faint);
     }
-    .n-protein-gauge {
+    .n-protein-big {
       text-align: center;
     }
-    .n-protein-gauge__num {
+    .n-protein-big__num {
       font-family: var(--font-display);
-      font-size: 48px;
+      font-size: 56px;
       line-height: 1;
       color: var(--n-green);
     }
-    .n-protein-gauge__unit {
+    .n-protein-big__unit {
       font-family: var(--font-mono);
-      font-size: var(--text-xs);
+      font-size: 11px;
       color: var(--text-muted);
-      letter-spacing: 0.08em;
+      letter-spacing: 0.1em;
+      margin-top: 2px;
     }
-    .n-protein-gauge__label {
+    .n-protein-big__sub {
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-faint);
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
       margin-top: var(--space-2);
     }
 
-    /* ── Trend Chart ── */
+    /* ═══════════════════════════════════════════════════════
+       TREND CHART
+       ═══════════════════════════════════════════════════════ */
     .n-chart-section {
       max-width: var(--max-width);
       margin: 0 auto;
-      padding: 0 var(--page-padding) var(--space-16);
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
     }
     .n-chart-header {
       display: flex;
@@ -208,13 +368,36 @@
     .n-chart-title {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
-      color: var(--text-muted);
-      letter-spacing: 0.1em;
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
       text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
-    .n-chart-legend { display: flex; gap: var(--space-4); }
-    .n-legend-item { display:flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:10px; color:var(--text-muted); }
-    .n-legend-dot { width:8px; height:8px; border-radius:50%; }
+    .n-chart-title::after {
+      content: '';
+      width: 48px;
+      height: 1px;
+      background: var(--border);
+    }
+    .n-chart-legend {
+      display: flex;
+      gap: var(--space-4);
+    }
+    .n-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+    }
+    .n-legend-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
     canvas.n-chart {
       width: 100%;
       height: 200px;
@@ -223,19 +406,31 @@
       border: 1px solid var(--border);
     }
 
-    /* ── Rules Section ── */
+    /* ═══════════════════════════════════════════════════════
+       N=1 RULES — C's bordered cards + left accent
+       ═══════════════════════════════════════════════════════ */
     .n-rules-section {
       max-width: var(--max-width);
       margin: 0 auto;
-      padding: 0 var(--page-padding) var(--space-16);
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
     }
     .n-rules-header {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
-      color: var(--text-muted);
-      letter-spacing: 0.1em;
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
       text-transform: uppercase;
       margin-bottom: var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .n-rules-header::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
     }
     .n-rule-grid {
       display: grid;
@@ -243,62 +438,121 @@
       gap: var(--space-4);
     }
     .n-rule {
-      background: var(--surface);
-      border: 1px solid var(--border);
       padding: var(--space-6);
-      position: relative;
-      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.04);
+      border-left: 3px solid var(--n-amber);
+      background: var(--surface);
     }
-    .n-rule::before {
-      content: attr(data-num);
-      position: absolute;
-      top: -8px; right: 8px;
-      font-family: var(--font-display);
-      font-size: 64px;
-      color: var(--n-amber-dim);
-      line-height: 1;
-      pointer-events: none;
+    .n-rule__num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--n-amber);
+      margin-bottom: var(--space-3);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .n-rule__num::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(245,158,11,0.1);
     }
     .n-rule__finding {
       font-family: var(--font-display);
       font-size: var(--text-base);
       color: var(--text);
-      line-height: 1.4;
+      line-height: 1.35;
       margin-bottom: var(--space-3);
-      position: relative;
     }
     .n-rule__evidence {
       font-family: var(--font-mono);
-      font-size: 10px;
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+    .n-rule__evidence em {
+      font-style: normal;
       color: var(--n-amber);
-      letter-spacing: 0.05em;
+    }
+    .n-rule__evidence a {
+      color: var(--n-amber);
+      text-decoration: none;
     }
 
-    /* ── Narrative ── */
+    /* ═══════════════════════════════════════════════════════
+       CROSS-LINKS (mid-page)
+       ═══════════════════════════════════════════════════════ */
+    .n-xref {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+      border-bottom: 1px solid var(--border);
+    }
+    .n-xref-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--n-amber);
+      padding: var(--space-5) var(--space-6);
+      transition: border-color 0.15s;
+      text-decoration: none;
+      display: block;
+    }
+    .n-xref-card:hover {
+      border-color: var(--n-amber);
+    }
+    .n-xref-card__tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--n-amber);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-2);
+    }
+    .n-xref-card__text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       NARRATIVE
+       ═══════════════════════════════════════════════════════ */
     .n-narrative {
       max-width: var(--max-width);
       margin: 0 auto;
       padding: var(--space-12) var(--page-padding);
-      border-top: 1px solid var(--border);
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: var(--space-12);
+      border-bottom: 1px solid var(--border);
     }
     .n-narrative__title {
       font-family: var(--font-display);
       font-size: var(--text-h2);
       color: var(--text);
-      line-height: 1.2;
+      line-height: 1.15;
       margin-bottom: var(--space-5);
     }
-    .n-narrative__title em { font-style: normal; color: var(--n-amber); }
+    .n-narrative__title em {
+      font-style: normal;
+      color: var(--n-amber);
+    }
     .n-narrative__body {
       font-size: var(--text-sm);
       color: var(--text-muted);
       line-height: 1.8;
     }
-    .n-narrative__body strong { color: var(--text); }
-    .n-protocol-list { display: flex; flex-direction: column; gap: var(--space-4); }
+    .n-narrative__body strong {
+      color: var(--text);
+    }
+    .n-protocol-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+    }
     .n-protocol-item {
       display: flex;
       gap: var(--space-4);
@@ -319,22 +573,34 @@
       color: var(--text-muted);
       line-height: 1.6;
     }
-    .n-protocol-text strong { color: var(--text); }
+    .n-protocol-text strong {
+      color: var(--text);
+    }
 
-    /* ── Methodology ── */
+    /* ═══════════════════════════════════════════════════════
+       METHODOLOGY
+       ═══════════════════════════════════════════════════════ */
     .n-method {
       max-width: var(--max-width);
       margin: 0 auto;
       padding: var(--space-10) var(--page-padding);
-      border-top: 1px solid var(--border);
     }
     .n-method__title {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
-      color: var(--text-muted);
-      letter-spacing: 0.1em;
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
       text-transform: uppercase;
       margin-bottom: var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .n-method__title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
     }
     .n-method-grid {
       display: grid;
@@ -355,51 +621,26 @@
       margin-bottom: var(--space-2);
     }
 
-    /* ── Cross-links ── */
-    .n-xref {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: 0 var(--page-padding) var(--space-10);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-4);
-    }
-    .n-xref-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--n-amber);
-      padding: var(--space-5) var(--space-6);
-      transition: border-color 0.15s;
-      text-decoration: none;
-      display: block;
-    }
-    .n-xref-card:hover { border-color: var(--n-amber); }
-    .n-xref-card__tag {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--n-amber);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      margin-bottom: var(--space-2);
-    }
-    .n-xref-card__text {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-
-    /* ── Loading ── */
+    /* ═══════════════════════════════════════════════════════
+       LOADING
+       ═══════════════════════════════════════════════════════ */
     .n-loading {
       text-align: center;
       padding: var(--space-20);
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
-      color: var(--text-muted);
+      color: var(--text-faint);
       letter-spacing: 0.15em;
     }
 
+    /* ═══════════════════════════════════════════════════════
+       RESPONSIVE
+       ═══════════════════════════════════════════════════════ */
     @media (max-width: 768px) {
-      .n-rings { grid-template-columns: 1fr; }
+      .n-hero-grid { grid-template-columns: 1fr; }
+      .n-gauge-row { grid-template-columns: repeat(2, 1fr); }
+      .n-macro-grid { grid-template-columns: 1fr; }
+      .n-macro-col:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
       .n-protein-card { grid-template-columns: 1fr; }
       .n-rule-grid { grid-template-columns: 1fr; }
       .n-narrative { grid-template-columns: 1fr; }
@@ -412,70 +653,138 @@
 
 <div id="amj-nav"></div>
 
+<!-- ════════════════════════════════════════════════════════════
+     HERO — B's 2-column layout + C's gauge row
+     ════════════════════════════════════════════════════════════ -->
 <div class="n-hero">
-  <div class="n-hero__eyebrow">The Science &mdash; Nutrition Observatory</div>
-  <h1 class="n-hero__title">Every calorie. Every protein target.<br>Every <em>honest day</em>.</h1>
-  <p class="n-hero__sub">
-    What fueling a 117-lb transformation on a deficit actually requires &mdash;
-    tracked daily via MacroFactor, cross-referenced with CGM glucose data.
-  </p>
+  <div class="n-hero-grid">
+    <div>
+      <div class="n-hero__eyebrow">Nutrition Observatory</div>
+      <h1 class="n-hero__title">The <em>fuel log</em> for a body in transformation</h1>
+      <p class="n-hero__sub">
+        30+ weeks of MacroFactor data. Every calorie logged within 30 minutes.
+        Cross-referenced with continuous glucose monitoring.
+      </p>
+    </div>
+    <div class="n-gauge-row">
+      <div class="n-gauge">
+        <div class="n-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-cal-arc" cx="44" cy="44" r="35" fill="none" stroke="#f59e0b" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.5s"/>
+          </svg>
+          <div class="n-gauge__center">
+            <div class="n-gauge__num" id="g-cal-num" style="color:#f59e0b">&mdash;</div>
+            <div class="n-gauge__unit">cal</div>
+          </div>
+        </div>
+        <div class="n-gauge__label">Daily avg</div>
+      </div>
+      <div class="n-gauge">
+        <div class="n-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-pro-arc" cx="44" cy="44" r="35" fill="none" stroke="#3ecf8e" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.6s"/>
+          </svg>
+          <div class="n-gauge__center">
+            <div class="n-gauge__num" id="g-pro-num" style="color:#3ecf8e">&mdash;</div>
+            <div class="n-gauge__unit">hit</div>
+          </div>
+        </div>
+        <div class="n-gauge__label">Protein target</div>
+      </div>
+      <div class="n-gauge">
+        <div class="n-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-days-arc" cx="44" cy="44" r="35" fill="none" stroke="#a78bfa" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.7s"/>
+          </svg>
+          <div class="n-gauge__center">
+            <div class="n-gauge__num" id="g-days-num" style="color:#a78bfa">&mdash;</div>
+            <div class="n-gauge__unit">days</div>
+          </div>
+        </div>
+        <div class="n-gauge__label">Logged</div>
+      </div>
+      <div class="n-gauge">
+        <div class="n-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-def-arc" cx="44" cy="44" r="35" fill="none" stroke="#ef4444" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.8s"/>
+          </svg>
+          <div class="n-gauge__center">
+            <div class="n-gauge__num" id="g-def-num" style="color:#ef4444">&mdash;</div>
+            <div class="n-gauge__unit">cal</div>
+          </div>
+        </div>
+        <div class="n-gauge__label">Avg deficit</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="n-loading" class="n-loading">LOADING NUTRITION DATA&hellip;</div>
 <div id="n-content" style="display:none">
 
-<!-- Macro donut + bars -->
-<section class="n-rings reveal">
-  <div class="n-ring-wrap">
-    <svg viewBox="0 0 240 240" id="n-donut">
-      <circle cx="120" cy="120" r="95" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="18"/>
-      <!-- Protein arc (drawn by JS) -->
-      <circle id="arc-pro" cx="120" cy="120" r="95" fill="none" stroke="#3ecf8e" stroke-width="18"
-        stroke-dasharray="0 597" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 120 120)"
-        style="transition: stroke-dasharray 1.2s ease;"/>
-      <circle id="arc-carb" cx="120" cy="120" r="95" fill="none" stroke="#f59e0b" stroke-width="18"
-        stroke-dasharray="0 597" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 120 120)"
-        style="transition: stroke-dasharray 1.2s ease;"/>
-      <circle id="arc-fat" cx="120" cy="120" r="95" fill="none" stroke="#ef4444" stroke-width="18"
-        stroke-dasharray="0 597" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 120 120)"
-        style="transition: stroke-dasharray 1.2s ease;"/>
-    </svg>
-    <div class="n-ring-center">
-      <div class="n-ring-center__cal" id="ring-cal">&mdash;</div>
-      <div class="n-ring-center__label">avg cal/day</div>
-    </div>
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE #1 — Breakfast protein finding
+     ════════════════════════════════════════════════════════════ -->
+<div class="n-pullquote reveal">
+  <div class="n-pullquote__watermark">01</div>
+  <div class="n-pullquote__text">
+    Front-loading <em>40g+ protein</em> at breakfast predicts hitting 180g by day end &mdash;
+    <em>87% hit rate</em> on front-loaded days.
   </div>
-  <div class="n-macro-list">
-    <div class="n-macro-row">
+  <div class="n-pullquote__attr">
+    <span class="n-pullquote__badge">N=1 &middot; Correlational</span>
+    <span class="n-pullquote__source">200+ days of MacroFactor data</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     MACRO EDITORIAL — B's 3-column
+     ════════════════════════════════════════════════════════════ -->
+<section class="n-macro-section reveal">
+  <div class="n-macro-header">Daily average breakdown</div>
+  <div class="n-macro-grid">
+    <div class="n-macro-col">
+      <div class="n-macro-bar"><div class="n-macro-bar__fill" id="mbar-pro" style="width:0%;background:#3ecf8e"></div></div>
+      <div class="n-macro-big" id="mval-pro" style="color:#3ecf8e">&mdash;</div>
       <div class="n-macro-name">Protein</div>
-      <div class="n-macro-bar"><div class="n-macro-fill" id="bar-pro" style="width:0%;background:#3ecf8e"></div></div>
-      <div class="n-macro-val" id="val-pro">&mdash;</div>
+      <div class="n-macro-detail">Non-negotiable. Leucine threshold (2.5g/meal) drives muscle protein synthesis even in deficit.</div>
     </div>
-    <div class="n-macro-row">
+    <div class="n-macro-col">
+      <div class="n-macro-bar"><div class="n-macro-bar__fill" id="mbar-carb" style="width:0%;background:#f59e0b"></div></div>
+      <div class="n-macro-big" id="mval-carb" style="color:#f59e0b">&mdash;</div>
       <div class="n-macro-name">Carbs</div>
-      <div class="n-macro-bar"><div class="n-macro-fill" id="bar-carb" style="width:0%;background:#f59e0b"></div></div>
-      <div class="n-macro-val" id="val-carb">&mdash;</div>
+      <div class="n-macro-detail">Timed around <a href="/training/">training</a> for glycogen replenishment. Fuels Zone 2 and strength work.</div>
     </div>
-    <div class="n-macro-row">
+    <div class="n-macro-col">
+      <div class="n-macro-bar"><div class="n-macro-bar__fill" id="mbar-fat" style="width:0%;background:#ef4444"></div></div>
+      <div class="n-macro-big" id="mval-fat" style="color:#ef4444">&mdash;</div>
       <div class="n-macro-name">Fat</div>
-      <div class="n-macro-bar"><div class="n-macro-fill" id="bar-fat" style="width:0%;background:#ef4444"></div></div>
-      <div class="n-macro-val" id="val-fat">&mdash;</div>
-    </div>
-    <div class="n-macro-row">
-      <div class="n-macro-name">Fiber</div>
-      <div class="n-macro-bar"><div class="n-macro-fill" id="bar-fiber" style="width:0%;background:#818cf8"></div></div>
-      <div class="n-macro-val" id="val-fiber">&mdash;</div>
+      <div class="n-macro-detail">Hormone health floor. Essential fatty acid minimum. Not further restricted.</div>
     </div>
   </div>
 </section>
 
-<!-- Protein adherence card -->
+<!-- ════════════════════════════════════════════════════════════
+     PROTEIN ADHERENCE
+     ════════════════════════════════════════════════════════════ -->
 <section class="n-protein-section reveal">
   <div class="n-protein-card">
     <div>
-      <div class="n-protein-card__title">Protein Adherence</div>
+      <div class="n-protein-card__title">Protein adherence is the <em>non-negotiable</em></div>
       <div class="n-protein-card__sub">
-        180g/day target &mdash; the non-negotiable. Leucine threshold at every meal.
+        180g/day target. Leucine threshold at every meal.
         Hit rate = days at or above target out of total logged days.
       </div>
       <div class="n-protein-track">
@@ -485,18 +794,35 @@
         <span>0%</span><span>50%</span><span>80%</span><span>100%</span>
       </div>
     </div>
-    <div class="n-protein-gauge">
-      <div class="n-protein-gauge__num" id="protein-pct">&mdash;</div>
-      <div class="n-protein-gauge__unit">hit rate</div>
-      <div class="n-protein-gauge__label" id="protein-days">&mdash; of &mdash; days</div>
+    <div class="n-protein-big">
+      <div class="n-protein-big__num" id="protein-pct">&mdash;</div>
+      <div class="n-protein-big__unit">hit rate</div>
+      <div class="n-protein-big__sub" id="protein-days">&mdash; of &mdash; days</div>
     </div>
   </div>
 </section>
 
-<!-- 30d trend -->
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE #2 — CGM finding
+     ════════════════════════════════════════════════════════════ -->
+<div class="n-pullquote reveal">
+  <div class="n-pullquote__watermark">02</div>
+  <div class="n-pullquote__text">
+    Protein shakes are my body&rsquo;s A+ food &mdash;
+    <em>+6&thinsp;mg/dL</em> glucose spike vs pizza at <em>+55&thinsp;mg/dL</em>.
+  </div>
+  <div class="n-pullquote__attr">
+    <span class="n-pullquote__badge">N=1 &middot; CGM-confirmed</span>
+    <span class="n-pullquote__source">Dexcom Stelo continuous glucose data &mdash; <a href="/glucose/" style="color:var(--n-amber);text-decoration:none">Glucose Observatory</a></span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     30-DAY TREND CHART
+     ════════════════════════════════════════════════════════════ -->
 <section class="n-chart-section reveal">
   <div class="n-chart-header">
-    <div class="n-chart-title">30-Day Calorie &amp; Protein Trend</div>
+    <div class="n-chart-title">30-day calorie &amp; protein trend</div>
     <div class="n-chart-legend">
       <div class="n-legend-item"><div class="n-legend-dot" style="background:#f59e0b"></div> Calories (&divide;10)</div>
       <div class="n-legend-item"><div class="n-legend-dot" style="background:#3ecf8e"></div> Protein (g)</div>
@@ -505,30 +831,55 @@
   <canvas class="n-chart" id="n-trend-canvas"></canvas>
 </section>
 
-<!-- N=1 Rules -->
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE #3 — Deficit finding
+     ════════════════════════════════════════════════════════════ -->
+<div class="n-pullquote reveal">
+  <div class="n-pullquote__watermark">03</div>
+  <div class="n-pullquote__text">
+    <em>500&ndash;750 cal deficit</em> is the sweet spot &mdash;
+    below that, <a href="/training/" style="color:var(--n-amber);text-decoration:none">training</a> strain drops 15%.
+  </div>
+  <div class="n-pullquote__attr">
+    <span class="n-pullquote__badge">N=1 &middot; Correlational</span>
+    <span class="n-pullquote__source">Whoop strain data cross-referenced with MacroFactor deficit</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     N=1 RULES — C's bordered cards + left accent
+     ════════════════════════════════════════════════════════════ -->
 <section class="n-rules-section reveal">
-  <div class="n-rules-header">// N=1 Nutrition Rules &mdash; 30+ weeks of data</div>
+  <div class="n-rules-header">N=1 nutrition rules &mdash; 30+ weeks of data</div>
   <div class="n-rule-grid">
-    <div class="n-rule" data-num="01">
+    <div class="n-rule">
+      <div class="n-rule__num">Rule 01</div>
       <div class="n-rule__finding">Front-loading protein at breakfast predicts hitting 180g by day end</div>
-      <div class="n-rule__evidence">40g+ breakfast protein &rarr; 87% daily target hit rate</div>
+      <div class="n-rule__evidence">40g+ breakfast protein &rarr; <em>87% daily target hit rate</em></div>
     </div>
-    <div class="n-rule" data-num="02">
-      <div class="n-rule__finding">Protein shakes are my body&rsquo;s A+ food &mdash; +6&thinsp;mg/dL glucose spike</div>
-      <div class="n-rule__evidence">CGM-confirmed &bull; vs pizza at +55&thinsp;mg/dL &rarr; <a href="/glucose/" style="color:var(--n-amber);text-decoration:none">Glucose Observatory</a></div>
+    <div class="n-rule">
+      <div class="n-rule__num">Rule 02</div>
+      <div class="n-rule__finding">Protein shakes produce the lowest glucose response of any meal</div>
+      <div class="n-rule__evidence">+6 mg/dL spike &bull; vs pizza at <em>+55 mg/dL</em> &rarr; <a href="/glucose/">Glucose Observatory</a></div>
     </div>
-    <div class="n-rule" data-num="03">
-      <div class="n-rule__finding">500&ndash;750&thinsp;cal deficit is the sweet spot &mdash; below that, training suffers</div>
-      <div class="n-rule__evidence">Strain drops 15% in weeks with &gt;1000&thinsp;cal deficit</div>
+    <div class="n-rule">
+      <div class="n-rule__num">Rule 03</div>
+      <div class="n-rule__finding">500&ndash;750 cal deficit is the sweet spot &mdash; below that, training suffers</div>
+      <div class="n-rule__evidence">Strain drops <em>15%</em> in weeks with &gt;1000 cal deficit</div>
     </div>
-    <div class="n-rule" data-num="04">
+    <div class="n-rule">
+      <div class="n-rule__num">Rule 04</div>
       <div class="n-rule__finding">Fiber above 30g/day correlates with lower glucose variability</div>
-      <div class="n-rule__evidence">SD 14 vs 22 mg/dL on high vs low fiber days &rarr; <a href="/explorer/" style="color:var(--n-amber);text-decoration:none">Data Explorer</a></div>
+      <div class="n-rule__evidence">SD <em>14 vs 22</em> mg/dL on high vs low fiber days &rarr; <a href="/explorer/">Data Explorer</a></div>
     </div>
   </div>
 </section>
 
-<!-- Cross-links -->
+</div><!-- /n-content -->
+
+<!-- ════════════════════════════════════════════════════════════
+     CROSS-LINKS (mid-page, contextual)
+     ════════════════════════════════════════════════════════════ -->
 <div class="n-xref reveal">
   <a href="/glucose/" class="n-xref-card">
     <div class="n-xref-card__tag">MacroFactor &times; Dexcom Stelo</div>
@@ -540,9 +891,9 @@
   </a>
 </div>
 
-</div><!-- /n-content -->
-
-<!-- Narrative — always visible -->
+<!-- ════════════════════════════════════════════════════════════
+     NARRATIVE
+     ════════════════════════════════════════════════════════════ -->
 <section class="n-narrative reveal">
   <div>
     <h2 class="n-narrative__title">Losing weight without<br>losing <em>muscle</em></h2>
@@ -551,8 +902,8 @@
       <strong>Protein adequacy is the primary defense</strong> &mdash; 1.6&ndash;2.2g per kg of
       lean body mass preserves muscle during a caloric deficit.</p>
       <p>MacroFactor tracks every meal. The platform ingests this nightly and computes adherence
-      rates, TDEE estimates, and cross-references meals with CGM glucose data to score each food
-      by its metabolic impact.</p>
+      rates, TDEE estimates, and cross-references meals with <a href="/glucose/" style="color:var(--n-amber);text-decoration:none">CGM glucose data</a>
+      to score each food by its metabolic impact.</p>
     </div>
   </div>
   <div class="n-protocol-list">
@@ -566,7 +917,7 @@
     </div>
     <div class="n-protocol-item">
       <div class="n-protocol-num">03</div>
-      <div class="n-protocol-text"><strong>Protein-first meal ordering</strong> &mdash; protein and fat before carbs. Blunts glucose spike. CGM-confirmed.</div>
+      <div class="n-protocol-text"><strong>Protein-first meal ordering</strong> &mdash; protein and fat before carbs. Blunts <a href="/glucose/" style="color:var(--n-amber);text-decoration:none">glucose spike</a>. CGM-confirmed.</div>
     </div>
     <div class="n-protocol-item">
       <div class="n-protocol-num">04</div>
@@ -579,9 +930,11 @@
   </div>
 </section>
 
-<!-- Methodology -->
+<!-- ════════════════════════════════════════════════════════════
+     METHODOLOGY
+     ════════════════════════════════════════════════════════════ -->
 <section class="n-method reveal">
-  <div class="n-method__title">Measurement Protocol</div>
+  <div class="n-method__title">Measurement protocol</div>
   <div class="n-method-grid">
     <div class="n-method-item">
       <strong>MACROFACTOR</strong>
@@ -609,120 +962,148 @@
 <script src="/assets/js/reveal.js"></script>
 <script>
 (async function() {
-  const API = 'https://averagejoematt.com';
-  const loading = document.getElementById('n-loading');
-  const content = document.getElementById('n-content');
-  const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-  const setWidth = (id, pct) => { const el = document.getElementById(id); if (el) el.style.width = Math.min(100, Math.max(0, pct)) + '%'; };
+  var API = 'https://averagejoematt.com';
+  var loading = document.getElementById('n-loading');
+  var content = document.getElementById('n-content');
+  var setText = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+  var setWidth = function(id, pct) { var el = document.getElementById(id); if (el) el.style.width = Math.min(100, Math.max(0, pct)) + '%'; };
+  var circ = 2 * Math.PI * 35; /* gauge ring circumference */
+
+  function setArc(id, pct) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var len = (Math.min(pct, 100) / 100) * circ;
+    el.setAttribute('stroke-dasharray', len + ' ' + (circ - len));
+  }
 
   try {
-    const resp = await fetch(API + '/api/nutrition_overview');
+    var resp = await fetch(API + '/api/nutrition_overview');
     if (!resp.ok) throw new Error(resp.status);
-    const data = await resp.json();
-    const n = data.nutrition;
-    const trend = data.nutrition_trend || [];
+    var data = await resp.json();
+    var n = data.nutrition;
+    var trend = data.nutrition_trend || [];
     if (!n) { loading.textContent = 'No nutrition data yet.'; return; }
 
-    // Donut ring center
-    setText('ring-cal', n.avg_calories ? n.avg_calories.toLocaleString() : '\u2014');
+    /* ── Hero gauges ── */
+    var avgCal = n.avg_calories || 0;
+    setText('g-cal-num', avgCal ? avgCal.toLocaleString() : '\u2014');
+    setArc('g-cal-arc', Math.min(100, (avgCal / 3000) * 100));
 
-    // Macro bars
-    const maxG = 300;
-    if (n.avg_protein_g) { setWidth('bar-pro', (n.avg_protein_g/maxG)*100); setText('val-pro', n.avg_protein_g.toFixed(0)+'g'); }
-    if (n.avg_carbs_g) { setWidth('bar-carb', (n.avg_carbs_g/maxG)*100); setText('val-carb', n.avg_carbs_g.toFixed(0)+'g'); }
-    if (n.avg_fat_g) { setWidth('bar-fat', (n.avg_fat_g/150)*100); setText('val-fat', n.avg_fat_g.toFixed(0)+'g'); }
-    if (n.avg_fiber_g) { setWidth('bar-fiber', (n.avg_fiber_g/50)*100); setText('val-fiber', n.avg_fiber_g.toFixed(0)+'g'); }
+    var hitPct = n.protein_hit_pct || 0;
+    setText('g-pro-num', hitPct != null ? hitPct + '%' : '\u2014');
+    setArc('g-pro-arc', hitPct);
 
-    // Donut arcs (protein/carb/fat as proportions of total cals)
-    const totalMacroCal = (n.avg_protein_g||0)*4 + (n.avg_carbs_g||0)*4 + (n.avg_fat_g||0)*9;
-    if (totalMacroCal > 0) {
-      const circ = 2 * Math.PI * 95; // ~597
-      const proPct = ((n.avg_protein_g||0)*4) / totalMacroCal;
-      const carbPct = ((n.avg_carbs_g||0)*4) / totalMacroCal;
-      const fatPct = ((n.avg_fat_g||0)*9) / totalMacroCal;
-      const gap = 8;
-      const proLen = proPct * circ - gap;
-      const carbLen = carbPct * circ - gap;
-      const fatLen = fatPct * circ - gap;
+    var daysLogged = n.days_logged || 0;
+    setText('g-days-num', daysLogged);
+    setArc('g-days-arc', Math.min(100, (daysLogged / 365) * 100));
 
-      const arcPro = document.getElementById('arc-pro');
-      const arcCarb = document.getElementById('arc-carb');
-      const arcFat = document.getElementById('arc-fat');
-      setTimeout(() => {
-        arcPro.setAttribute('stroke-dasharray', proLen + ' ' + (circ - proLen));
-        arcCarb.setAttribute('stroke-dasharray', carbLen + ' ' + (circ - carbLen));
-        arcCarb.setAttribute('stroke-dashoffset', -(proLen + gap));
-        arcFat.setAttribute('stroke-dasharray', fatLen + ' ' + (circ - fatLen));
-        arcFat.setAttribute('stroke-dashoffset', -(proLen + carbLen + gap*2));
-      }, 200);
+    var deficit = n.avg_deficit || (n.avg_tdee && n.avg_calories ? Math.round(n.avg_tdee - n.avg_calories) : 0);
+    setText('g-def-num', deficit || '\u2014');
+    setArc('g-def-arc', Math.min(100, (deficit / 1000) * 100));
+
+    /* ── Macro editorial ── */
+    var maxG = 300;
+    if (n.avg_protein_g) {
+      setWidth('mbar-pro', (n.avg_protein_g / maxG) * 100);
+      setText('mval-pro', Math.round(n.avg_protein_g) + 'g');
+    }
+    if (n.avg_carbs_g) {
+      setWidth('mbar-carb', (n.avg_carbs_g / maxG) * 100);
+      setText('mval-carb', Math.round(n.avg_carbs_g) + 'g');
+    }
+    if (n.avg_fat_g) {
+      setWidth('mbar-fat', (n.avg_fat_g / 150) * 100);
+      setText('mval-fat', Math.round(n.avg_fat_g) + 'g');
     }
 
-    // Protein gauge
-    setText('protein-pct', n.protein_hit_pct != null ? n.protein_hit_pct + '%' : '\u2014');
-    const pgNum = document.getElementById('protein-pct');
-    if (pgNum) pgNum.style.color = n.protein_hit_pct >= 80 ? '#3ecf8e' : n.protein_hit_pct >= 50 ? '#f59e0b' : '#ef4444';
-    setWidth('protein-fill', n.protein_hit_pct || 0);
-    setText('protein-days', (n.protein_hit_days||0) + ' of ' + (n.days_logged||0) + ' days');
+    /* ── Protein adherence ── */
+    setText('protein-pct', hitPct != null ? hitPct + '%' : '\u2014');
+    var pgNum = document.getElementById('protein-pct');
+    if (pgNum) pgNum.style.color = hitPct >= 80 ? '#3ecf8e' : hitPct >= 50 ? '#f59e0b' : '#ef4444';
+    setWidth('protein-fill', hitPct || 0);
+    setText('protein-days', (n.protein_hit_days || 0) + ' of ' + (daysLogged || 0) + ' days');
 
-    // Trend chart
+    /* ── Trend chart ── */
     if (trend.length >= 3) {
-      const canvas = document.getElementById('n-trend-canvas');
-      const dpr = window.devicePixelRatio || 1;
+      var canvas = document.getElementById('n-trend-canvas');
+      var dpr = window.devicePixelRatio || 1;
       canvas.width = canvas.offsetWidth * dpr;
       canvas.height = canvas.offsetHeight * dpr;
-      const ctx = canvas.getContext('2d');
+      var ctx = canvas.getContext('2d');
       ctx.scale(dpr, dpr);
-      const W = canvas.offsetWidth, H = canvas.offsetHeight;
-      const pad = {t:20, r:16, b:28, l:44};
-      const iW = W-pad.l-pad.r, iH = H-pad.t-pad.b;
-      const nn = trend.length;
-      const xOf = i => pad.l + (i/(nn-1))*iW;
-      const yOf = v => pad.t + iH - (v/300)*iH;
+      var W = canvas.offsetWidth, H = canvas.offsetHeight;
+      var pad = { t: 20, r: 16, b: 28, l: 44 };
+      var iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
+      var nn = trend.length;
+      var xOf = function(i) { return pad.l + (i / (nn - 1)) * iW; };
+      var yOf = function(v) { return pad.t + iH - (v / 300) * iH; };
 
-      // Grid
-      ctx.strokeStyle='rgba(255,255,255,0.03)'; ctx.lineWidth=1;
-      for(let r=0;r<=4;r++){const y=pad.t+(r/4)*iH; ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();}
-
-      // 180g target line
-      ctx.strokeStyle='rgba(62,207,142,0.2)'; ctx.setLineDash([4,4]);
-      ctx.beginPath();ctx.moveTo(pad.l,yOf(180));ctx.lineTo(W-pad.r,yOf(180));ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Area fill for calories
-      const calGrad = ctx.createLinearGradient(0,pad.t,0,pad.t+iH);
-      calGrad.addColorStop(0,'rgba(245,158,11,0.12)');
-      calGrad.addColorStop(1,'rgba(245,158,11,0)');
-      ctx.beginPath();
-      let first=true;
-      trend.forEach((d,i) => { if(d.calories==null) return; const x=xOf(i),y=yOf(d.calories/10); first?(ctx.moveTo(x,y),first=false):ctx.lineTo(x,y); });
-      if(!first){
-        const li=trend.length-1; ctx.lineTo(xOf(li),pad.t+iH); ctx.lineTo(xOf(0),pad.t+iH); ctx.closePath();
-        ctx.fillStyle=calGrad; ctx.fill();
+      /* Grid lines */
+      ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+      ctx.lineWidth = 1;
+      for (var r = 0; r <= 4; r++) {
+        var y = pad.t + (r / 4) * iH;
+        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
       }
 
-      // Calorie line
-      ctx.strokeStyle='rgba(245,158,11,0.8)'; ctx.lineWidth=2;
-      ctx.beginPath(); first=true;
-      trend.forEach((d,i) => { if(d.calories==null)return; const x=xOf(i),y=yOf(d.calories/10); first?(ctx.moveTo(x,y),first=false):ctx.lineTo(x,y); });
+      /* 180g target line */
+      ctx.strokeStyle = 'rgba(62,207,142,0.2)';
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(pad.l, yOf(180)); ctx.lineTo(W - pad.r, yOf(180)); ctx.stroke();
+      ctx.setLineDash([]);
+
+      /* Area fill for calories */
+      var calGrad = ctx.createLinearGradient(0, pad.t, 0, pad.t + iH);
+      calGrad.addColorStop(0, 'rgba(245,158,11,0.12)');
+      calGrad.addColorStop(1, 'rgba(245,158,11,0)');
+      ctx.beginPath();
+      var first = true;
+      trend.forEach(function(d, i) {
+        if (d.calories == null) return;
+        var x = xOf(i), yy = yOf(d.calories / 10);
+        first ? (ctx.moveTo(x, yy), first = false) : ctx.lineTo(x, yy);
+      });
+      if (!first) {
+        ctx.lineTo(xOf(trend.length - 1), pad.t + iH);
+        ctx.lineTo(xOf(0), pad.t + iH);
+        ctx.closePath();
+        ctx.fillStyle = calGrad;
+        ctx.fill();
+      }
+
+      /* Calorie line */
+      ctx.strokeStyle = 'rgba(245,158,11,0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      first = true;
+      trend.forEach(function(d, i) {
+        if (d.calories == null) return;
+        var x = xOf(i), yy = yOf(d.calories / 10);
+        first ? (ctx.moveTo(x, yy), first = false) : ctx.lineTo(x, yy);
+      });
       ctx.stroke();
 
-      // Protein dots
-      trend.forEach((d,i) => {
-        if(d.protein_g==null) return;
-        const x=xOf(i),y=yOf(d.protein_g);
-        ctx.fillStyle = d.protein_g>=180 ? 'rgba(62,207,142,0.85)' : 'rgba(239,68,68,0.6)';
-        ctx.beginPath(); ctx.arc(x,y,3.5,0,Math.PI*2); ctx.fill();
+      /* Protein dots */
+      trend.forEach(function(d, i) {
+        if (d.protein_g == null) return;
+        var x = xOf(i), yy = yOf(d.protein_g);
+        ctx.fillStyle = d.protein_g >= 180 ? 'rgba(62,207,142,0.85)' : 'rgba(239,68,68,0.6)';
+        ctx.beginPath(); ctx.arc(x, yy, 3.5, 0, Math.PI * 2); ctx.fill();
       });
 
-      // Y labels
-      ctx.fillStyle='rgba(255,255,255,0.25)'; ctx.font='10px monospace'; ctx.textAlign='right';
-      [0,100,200,300].forEach(v => ctx.fillText(v,pad.l-6,yOf(v)+4));
+      /* Y labels */
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'right';
+      [0, 100, 200, 300].forEach(function(v) {
+        ctx.fillText(v, pad.l - 6, yOf(v) + 4);
+      });
     }
 
-    loading.style.display='none';
-    content.style.display='block';
-  } catch(e) {
-    loading.textContent='Could not load nutrition data.';
+    loading.style.display = 'none';
+    content.style.display = 'block';
+  } catch (e) {
+    loading.textContent = 'Could not load nutrition data.';
     console.error(e);
   }
 })();

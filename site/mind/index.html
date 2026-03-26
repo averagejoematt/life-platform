@@ -13,89 +13,222 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    :root { --m-violet: #a78bfa; --m-violet-dim: rgba(167,139,250,0.12); --m-violet-glow: rgba(167,139,250,0.06); --m-green: #3ecf8e; --m-red: #ef4444; }
+    :root {
+      --m-violet: #a78bfa;
+      --m-violet-dim: rgba(167,139,250,0.12);
+      --m-violet-glow: rgba(167,139,250,0.06);
+      --m-green: #3ecf8e;
+      --m-red: #ef4444;
+      --m-amber: #f59e0b;
+    }
 
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       HERO — B's 2-column + C's gauge row
+       ═══════════════════════════════════════════════════════ */
     .m-hero {
       padding: calc(var(--nav-height) + var(--space-20)) var(--page-padding) var(--space-16);
-      position: relative; overflow: hidden;
+      position: relative;
+      overflow: hidden;
       border-bottom: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
     }
-    .m-hero::before { content:''; position:absolute; bottom:-30%; right:-15%; width:500px; height:500px; background:radial-gradient(circle, var(--m-violet-glow) 0%, transparent 70%); pointer-events:none; }
-    .m-hero__eyebrow { font-family:var(--font-mono); font-size:var(--text-2xs); letter-spacing:0.15em; text-transform:uppercase; color:var(--m-violet); margin-bottom:var(--space-6); opacity:0; animation:fadeUp 0.6s 0.1s forwards; }
-    .m-hero__title { font-family:var(--font-display); font-size:clamp(36px,5vw,56px); color:var(--text); line-height:1.1; max-width:600px; margin-bottom:var(--space-6); opacity:0; animation:fadeUp 0.6s 0.2s forwards; }
-    .m-hero__title em { font-style:normal; color:var(--m-violet); }
-    .m-hero__sub { font-size:var(--text-base); color:var(--text-muted); max-width:520px; line-height:1.8; opacity:0; animation:fadeUp 0.6s 0.3s forwards; }
-    @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-
-    /* ── Pillar + Resist hero ── */
-    .m-signal-row {
-      max-width: var(--max-width); margin:0 auto;
-      padding: var(--space-12) var(--page-padding);
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-6);
+    .m-hero-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-12);
+      align-items: center;
     }
-    .m-signal-card {
-      text-align: center;
-      padding: var(--space-8) var(--space-5);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-top: 2px solid var(--m-violet);
-    }
-    .m-signal-card__val {
-      font-family: var(--font-display);
-      font-size: 44px;
-      line-height: 1;
-      color: var(--m-violet);
-      margin-bottom: var(--space-2);
-    }
-    .m-signal-card__label {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-muted);
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-    }
-    .m-signal-card__sub {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-faint);
-      margin-top: var(--space-1);
-    }
-
-    /* ── Vice Streaks ── */
-    .m-vice-section {
-      max-width: var(--max-width); margin:0 auto;
-      padding: 0 var(--page-padding) var(--space-12);
-    }
-    .m-section-label {
+    .m-hero__eyebrow {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--m-violet);
+      margin-bottom: var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.1s forwards;
+    }
+    .m-hero__eyebrow::before {
+      content: '';
+      width: 32px;
+      height: 1px;
+      background: var(--m-violet);
+    }
+    .m-hero__title {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 5vw, 52px);
+      color: var(--text);
+      line-height: 1.05;
+      max-width: 520px;
+      margin-bottom: var(--space-6);
+      opacity: 0;
+      animation: fadeUp 0.6s 0.2s forwards;
+    }
+    .m-hero__title em {
+      font-style: normal;
+      color: var(--m-violet);
+    }
+    .m-hero__sub {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 420px;
+      line-height: 1.8;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.3s forwards;
+    }
+
+    /* Gauge row (4 mini rings) */
+    .m-gauge-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+      opacity: 0;
+      animation: fadeUp 0.6s 0.4s forwards;
+    }
+    .m-gauge {
+      text-align: center;
+      padding: var(--space-5) var(--space-3);
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .m-gauge__ring {
+      width: 88px;
+      height: 88px;
+      margin: 0 auto var(--space-3);
+      position: relative;
+    }
+    .m-gauge__ring svg { width: 100%; height: 100%; }
+    .m-gauge__center {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    .m-gauge__num {
+      font-family: var(--font-display);
+      font-size: 22px;
+      line-height: 1;
+    }
+    .m-gauge__unit {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-faint);
+      letter-spacing: 0.08em;
+    }
+    .m-gauge__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
       color: var(--text-muted);
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      margin-bottom: var(--space-5);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       PULL-QUOTES
+       ═══════════════════════════════════════════════════════ */
+    .m-pullquote {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      position: relative;
+      border-bottom: 1px solid var(--border);
+    }
+    .m-pullquote__watermark {
+      position: absolute;
+      top: 24px;
+      right: var(--page-padding);
+      font-family: var(--font-display);
+      font-size: 120px;
+      color: rgba(167, 139, 250, 0.04);
+      line-height: 1;
+      pointer-events: none;
+    }
+    .m-pullquote__text {
+      font-family: var(--font-display);
+      font-size: clamp(24px, 3.5vw, 32px);
+      line-height: 1.3;
+      color: var(--text);
+      max-width: 640px;
+      position: relative;
+    }
+    .m-pullquote__text em {
+      font-style: normal;
+      color: var(--m-violet);
+    }
+    .m-pullquote__attr {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-top: var(--space-4);
+    }
+    .m-pullquote__badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--m-violet);
+      background: var(--m-violet-dim);
+      padding: 3px 10px;
+      display: inline-block;
+    }
+    .m-pullquote__source {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      letter-spacing: 0.06em;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       VICE STREAKS — editorial grid
+       ═══════════════════════════════════════════════════════ */
+    .m-vice-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .m-section-header {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .m-section-header::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
     }
     .m-vice-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
       gap: var(--space-3);
     }
     .m-vice-card {
       background: var(--surface);
       border: 1px solid var(--border);
+      border-left: 3px solid var(--m-violet);
       padding: var(--space-5) var(--space-4);
       text-align: center;
       position: relative;
       overflow: hidden;
     }
-    .m-vice-card::after {
-      content: '';
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 2px;
-      background: var(--m-violet);
-      transform: scaleX(var(--streak-pct, 0));
-      transform-origin: left;
-      transition: transform 1s ease;
+    .m-vice-card.broken {
+      border-left-color: var(--m-red);
     }
     .m-vice-card__name {
       font-family: var(--font-mono);
@@ -111,20 +244,34 @@
       line-height: 1;
       color: var(--m-violet);
     }
+    .m-vice-card.broken .m-vice-card__streak { color: var(--m-red); }
     .m-vice-card__unit {
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-faint);
       letter-spacing: 0.1em;
     }
-    .m-vice-card.broken .m-vice-card__streak { color: var(--m-red); }
-    .m-vice-card.broken::after { background: var(--m-red); }
+    .m-vice-card__bottom-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 2px;
+      background: var(--m-violet);
+      transition: width 1s ease;
+    }
+    .m-vice-card.broken .m-vice-card__bottom-bar { background: var(--m-red); }
 
-    /* ── Connection + Willpower bars ── */
+    /* ═══════════════════════════════════════════════════════
+       CONNECTION + WILLPOWER — editorial 2-column
+       ═══════════════════════════════════════════════════════ */
     .m-bars-section {
-      max-width: var(--max-width); margin:0 auto;
-      padding: 0 var(--page-padding) var(--space-12);
-      display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6);
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-6);
+      border-bottom: 1px solid var(--border);
     }
     .m-bar-card {
       background: var(--surface);
@@ -139,22 +286,61 @@
       text-transform: uppercase;
       margin-bottom: var(--space-5);
     }
-    .m-bar-wrap { display:flex; flex-direction:column; gap:var(--space-4); }
-    .m-bar-row { display:grid; grid-template-columns:90px 1fr 40px; align-items:center; gap:var(--space-3); }
-    .m-bar-label { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-muted); }
-    .m-bar-track { height:6px; background:rgba(255,255,255,0.04); border-radius:3px; overflow:hidden; }
-    .m-bar-fill { height:100%; border-radius:3px; transition:width 1s ease; }
-    .m-bar-val { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-muted); text-align:right; }
+    .m-bar-wrap { display: flex; flex-direction: column; gap: var(--space-4); }
+    .m-bar-row { display: grid; grid-template-columns: 90px 1fr 40px; align-items: center; gap: var(--space-3); }
+    .m-bar-label { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
+    .m-bar-track { height: 6px; background: rgba(255,255,255,0.04); border-radius: 3px; overflow: hidden; }
+    .m-bar-fill { height: 100%; border-radius: 3px; transition: width 1s ease; }
+    .m-bar-val { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); text-align: right; }
 
-    /* ── Mood Chart ── */
-    .m-chart-section { max-width:var(--max-width); margin:0 auto; padding:0 var(--page-padding) var(--space-12); }
-    .m-chart-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:var(--space-4); }
-    canvas.m-chart { width:100%; height:180px; display:block; background:var(--surface); border:1px solid var(--border); }
+    /* ═══════════════════════════════════════════════════════
+       MOOD CHART
+       ═══════════════════════════════════════════════════════ */
+    .m-chart-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .m-chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: var(--space-4);
+    }
+    .m-chart-title {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .m-chart-title::after {
+      content: '';
+      width: 48px;
+      height: 1px;
+      background: var(--border);
+    }
+    canvas.m-chart {
+      width: 100%;
+      height: 180px;
+      display: block;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
 
-    /* ── Building This — the honest gap ── */
+    /* ═══════════════════════════════════════════════════════
+       BUILDING THIS — honest gap
+       ═══════════════════════════════════════════════════════ */
     .m-building {
       max-width: 560px;
-      margin: 0 auto var(--space-12);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+    }
+    .m-building__inner {
       padding: var(--space-8);
       border: 1px dashed var(--border);
       border-left: 3px solid var(--m-violet);
@@ -173,74 +359,275 @@
       line-height: 1.8;
     }
 
-    /* ── Narrative ── */
-    .m-narrative { max-width:var(--max-width); margin:0 auto; padding:var(--space-12) var(--page-padding); border-top:1px solid var(--border); display:grid; grid-template-columns:1fr 1fr; gap:var(--space-12); }
-    .m-narrative__title { font-family:var(--font-display); font-size:var(--text-h2); color:var(--text); line-height:1.2; margin-bottom:var(--space-5); }
-    .m-narrative__title em { font-style:normal; color:var(--m-violet); }
-    .m-narrative__body { font-size:var(--text-sm); color:var(--text-muted); line-height:1.8; }
-    .m-narrative__body strong { color:var(--text); }
-    .m-intent-list { display:flex; flex-direction:column; gap:var(--space-4); }
-    .m-intent-item { display:flex; gap:var(--space-4); padding:var(--space-4); background:var(--surface); border-left:2px solid var(--m-violet); }
-    .m-intent-num { font-family:var(--font-display); font-size:20px; color:var(--m-violet); line-height:1; flex-shrink:0; width:28px; }
-    .m-intent-text { font-size:var(--text-sm); color:var(--text-muted); line-height:1.6; }
-    .m-intent-text strong { color:var(--text); }
+    /* ═══════════════════════════════════════════════════════
+       CROSS-LINKS
+       ═══════════════════════════════════════════════════════ */
+    .m-xref {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+      border-bottom: 1px solid var(--border);
+    }
+    .m-xref-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--m-violet);
+      padding: var(--space-5) var(--space-6);
+      transition: border-color 0.15s;
+      text-decoration: none;
+      display: block;
+    }
+    .m-xref-card:hover { border-color: var(--m-violet); }
+    .m-xref-card__tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--m-violet);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-2);
+    }
+    .m-xref-card__text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
 
-    .m-method { max-width:var(--max-width); margin:0 auto; padding:var(--space-10) var(--page-padding); border-top:1px solid var(--border); }
-    .m-method__title { font-family:var(--font-mono); font-size:var(--text-2xs); color:var(--text-muted); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:var(--space-6); }
-    .m-method-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-6); }
-    .m-method-item { font-size:var(--text-sm); color:var(--text-muted); line-height:1.7; }
-    .m-method-item strong { display:block; color:var(--text); font-family:var(--font-mono); font-size:var(--text-2xs); letter-spacing:0.08em; margin-bottom:var(--space-2); }
+    /* ═══════════════════════════════════════════════════════
+       NARRATIVE
+       ═══════════════════════════════════════════════════════ */
+    .m-narrative {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-12);
+      border-bottom: 1px solid var(--border);
+    }
+    .m-narrative__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      line-height: 1.15;
+      margin-bottom: var(--space-5);
+    }
+    .m-narrative__title em { font-style: normal; color: var(--m-violet); }
+    .m-narrative__body {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.8;
+    }
+    .m-narrative__body strong { color: var(--text); }
+    .m-narrative__body a { color: var(--m-violet); text-decoration: none; }
+    .m-intent-list { display: flex; flex-direction: column; gap: var(--space-4); }
+    .m-intent-item {
+      display: flex;
+      gap: var(--space-4);
+      padding: var(--space-4);
+      background: var(--surface);
+      border-left: 2px solid var(--m-violet);
+    }
+    .m-intent-num {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: var(--m-violet);
+      line-height: 1;
+      flex-shrink: 0;
+      width: 28px;
+    }
+    .m-intent-text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .m-intent-text strong { color: var(--text); }
 
-    .m-loading { text-align:center; padding:var(--space-20); font-family:var(--font-mono); font-size:var(--text-2xs); color:var(--text-muted); letter-spacing:0.15em; }
+    /* ═══════════════════════════════════════════════════════
+       METHODOLOGY
+       ═══════════════════════════════════════════════════════ */
+    .m-method {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+    }
+    .m-method__title {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .m-method__title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .m-method-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-6);
+    }
+    .m-method-item {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+    .m-method-item strong {
+      display: block;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.08em;
+      margin-bottom: var(--space-2);
+    }
 
-    @media(max-width:768px) { .m-signal-row { grid-template-columns:1fr; } .m-bars-section,.m-narrative,.m-method-grid { grid-template-columns:1fr; } }
+    /* ═══════════════════════════════════════════════════════
+       LOADING + RESPONSIVE
+       ═══════════════════════════════════════════════════════ */
+    .m-loading {
+      text-align: center;
+      padding: var(--space-20);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+    }
+
+    @media (max-width: 768px) {
+      .m-hero-grid { grid-template-columns: 1fr; }
+      .m-gauge-row { grid-template-columns: repeat(2, 1fr); }
+      .m-bars-section { grid-template-columns: 1fr; }
+      .m-narrative { grid-template-columns: 1fr; }
+      .m-method-grid { grid-template-columns: 1fr; }
+      .m-xref { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
 <div id="amj-nav"></div>
 
+<!-- ════════════════════════════════════════════════════════════
+     HERO — B's 2-column + C's gauge row
+     ════════════════════════════════════════════════════════════ -->
 <div class="m-hero">
-  <div class="m-hero__eyebrow">The Science &mdash; Inner Life</div>
-  <h1 class="m-hero__title">The pillar I<br><em>avoided building</em>.</h1>
-  <p class="m-hero__sub">
-    The physical transformation is the visible part. This page tracks what&rsquo;s happening
-    underneath &mdash; mood, willpower, connection, and the signals that wearables can&rsquo;t measure.
-  </p>
+  <div class="m-hero-grid">
+    <div>
+      <div class="m-hero__eyebrow">Inner Life</div>
+      <h1 class="m-hero__title">The pillar I <em>avoided building</em></h1>
+      <p class="m-hero__sub">
+        The physical transformation is the visible part. This page tracks what&rsquo;s happening
+        underneath &mdash; mood, willpower, connection, and the signals that wearables can&rsquo;t measure.
+      </p>
+    </div>
+    <div class="m-gauge-row">
+      <div class="m-gauge">
+        <div class="m-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-mind-arc" cx="44" cy="44" r="35" fill="none" stroke="#a78bfa" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.5s"/>
+          </svg>
+          <div class="m-gauge__center">
+            <div class="m-gauge__num" id="g-mind-num" style="color:#a78bfa">&mdash;</div>
+            <div class="m-gauge__unit">level</div>
+          </div>
+        </div>
+        <div class="m-gauge__label">Mind pillar</div>
+      </div>
+      <div class="m-gauge">
+        <div class="m-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-resist-arc" cx="44" cy="44" r="35" fill="none" stroke="#3ecf8e" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.6s"/>
+          </svg>
+          <div class="m-gauge__center">
+            <div class="m-gauge__num" id="g-resist-num" style="color:#3ecf8e">&mdash;</div>
+            <div class="m-gauge__unit">rate</div>
+          </div>
+        </div>
+        <div class="m-gauge__label">Resist rate</div>
+      </div>
+      <div class="m-gauge">
+        <div class="m-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-journal-arc" cx="44" cy="44" r="35" fill="none" stroke="#f59e0b" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.7s"/>
+          </svg>
+          <div class="m-gauge__center">
+            <div class="m-gauge__num" id="g-journal-num" style="color:#f59e0b">&mdash;</div>
+            <div class="m-gauge__unit">entries</div>
+          </div>
+        </div>
+        <div class="m-gauge__label">Journal (30d)</div>
+      </div>
+      <div class="m-gauge">
+        <div class="m-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-vice-arc" cx="44" cy="44" r="35" fill="none" stroke="#ef4444" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.8s"/>
+          </svg>
+          <div class="m-gauge__center">
+            <div class="m-gauge__num" id="g-vice-num" style="color:#ef4444">&mdash;</div>
+            <div class="m-gauge__unit">active</div>
+          </div>
+        </div>
+        <div class="m-gauge__label">Vice streaks</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="m-loading" class="m-loading">LOADING INNER LIFE DATA&hellip;</div>
 <div id="m-content" style="display:none">
 
-<section class="m-signal-row reveal">
-  <div class="m-signal-card">
-    <div class="m-signal-card__val" id="m-level">&mdash;</div>
-    <div class="m-signal-card__label">Mind Pillar</div>
-    <div class="m-signal-card__sub" id="m-tier"></div>
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE #1 — Identity threshold
+     ════════════════════════════════════════════════════════════ -->
+<div class="m-pullquote reveal">
+  <div class="m-pullquote__watermark">01</div>
+  <div class="m-pullquote__text">
+    Day 30 isn&rsquo;t willpower. It&rsquo;s <em>identity</em>. Vice streaks past 30 days
+    have a <em>92% hold rate</em> &mdash; the behavior becomes who you are.
   </div>
-  <div class="m-signal-card">
-    <div class="m-signal-card__val" id="m-resist">&mdash;</div>
-    <div class="m-signal-card__label">Resist Rate</div>
-    <div class="m-signal-card__sub">Temptation willpower (90d)</div>
+  <div class="m-pullquote__attr">
+    <span class="m-pullquote__badge">N=1 &middot; Observational</span>
+    <span class="m-pullquote__source">Habitify streak data &mdash; compounding value model</span>
   </div>
-  <div class="m-signal-card">
-    <div class="m-signal-card__val" id="m-journal">&mdash;</div>
-    <div class="m-signal-card__label">Journal Entries</div>
-    <div class="m-signal-card__sub">Last 30 days</div>
-  </div>
-</section>
+</div>
 
+<!-- ════════════════════════════════════════════════════════════
+     VICE STREAKS — editorial grid with left accent
+     ════════════════════════════════════════════════════════════ -->
 <section class="m-vice-section reveal">
-  <div class="m-section-label">// Vice Streak Portfolio &mdash; each day is a vote for who I&rsquo;m becoming</div>
+  <div class="m-section-header">Vice streak portfolio &mdash; each day is a vote</div>
   <div class="m-vice-grid" id="m-vice-grid"></div>
 </section>
 
+<!-- ════════════════════════════════════════════════════════════
+     CONNECTION + WILLPOWER — editorial 2-column
+     ════════════════════════════════════════════════════════════ -->
 <section class="m-bars-section reveal">
   <div class="m-bar-card">
-    <div class="m-bar-card__title">Connection Depth (30d)</div>
+    <div class="m-bar-card__title">Connection depth (30d)</div>
     <div class="m-bar-wrap">
       <div class="m-bar-row"><div class="m-bar-label">Deep</div><div class="m-bar-track"><div class="m-bar-fill" id="bar-deep" style="width:0%;background:var(--m-violet)"></div></div><div class="m-bar-val" id="pct-deep">&mdash;</div></div>
       <div class="m-bar-row"><div class="m-bar-label">Meaningful</div><div class="m-bar-track"><div class="m-bar-fill" id="bar-meaning" style="width:0%;background:var(--m-green)"></div></div><div class="m-bar-val" id="pct-meaning">&mdash;</div></div>
-      <div class="m-bar-row"><div class="m-bar-label">Surface</div><div class="m-bar-track"><div class="m-bar-fill" id="bar-surface" style="width:0%;background:#f59e0b"></div></div><div class="m-bar-val" id="pct-surface">&mdash;</div></div>
+      <div class="m-bar-row"><div class="m-bar-label">Surface</div><div class="m-bar-track"><div class="m-bar-fill" id="bar-surface" style="width:0%;background:var(--m-amber)"></div></div><div class="m-bar-val" id="pct-surface">&mdash;</div></div>
     </div>
   </div>
   <div class="m-bar-card">
@@ -252,33 +639,89 @@
   </div>
 </section>
 
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE #2 — Social connection
+     ════════════════════════════════════════════════════════════ -->
+<div class="m-pullquote reveal">
+  <div class="m-pullquote__watermark">02</div>
+  <div class="m-pullquote__text">
+    Murthy&rsquo;s threshold: <em>3&ndash;5 close relationships</em> is the wellbeing floor.
+    This page tracks depth, not frequency &mdash; because <em>surface connections don&rsquo;t compound</em>.
+  </div>
+  <div class="m-pullquote__attr">
+    <span class="m-pullquote__badge">Evidence-based &middot; Longitudinal</span>
+    <span class="m-pullquote__source">Surgeon General&rsquo;s Advisory on Loneliness &amp; Connection</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     MOOD CHART
+     ════════════════════════════════════════════════════════════ -->
 <section class="m-chart-section reveal" id="m-mood-section" style="display:none">
   <div class="m-chart-header">
-    <div class="m-section-label">// Mood Valence (30d)</div>
+    <div class="m-chart-title">Mood valence (30d)</div>
     <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint)">-1 unpleasant &rarr; +1 pleasant</div>
   </div>
   <canvas class="m-chart" id="m-mood-canvas"></canvas>
 </section>
 
-<div class="m-building reveal" id="m-building" style="display:none">
-  <div class="m-building__title">Building this measurement</div>
-  <div class="m-building__body">
-    Journal data is growing. As entries accumulate, this section will show cognitive pattern
-    distribution, mood-energy divergence detection, burnout early warning, and values alignment.
-    The gap here is honest &mdash; this is the hardest thing to measure and the most important to get right.
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE #3 — Mood-energy divergence
+     ════════════════════════════════════════════════════════════ -->
+<div class="m-pullquote reveal">
+  <div class="m-pullquote__watermark">03</div>
+  <div class="m-pullquote__text">
+    When mood rises but energy falls, that&rsquo;s a <em>burnout precursor</em>.
+    The platform detects this divergence &mdash; often <em>2 weeks before</em> it becomes obvious.
+  </div>
+  <div class="m-pullquote__attr">
+    <span class="m-pullquote__badge">N=1 &middot; Emerging signal</span>
+    <span class="m-pullquote__source">Journal sentiment + How We Feel + <a href="/sleep/" style="color:var(--m-violet);text-decoration:none">Sleep Observatory</a> cross-reference</span>
   </div>
 </div>
 
+<!-- ════════════════════════════════════════════════════════════
+     BUILDING THIS — honest gap (conditionally shown)
+     ════════════════════════════════════════════════════════════ -->
+<div class="m-building reveal" id="m-building" style="display:none">
+  <div class="m-building__inner">
+    <div class="m-building__title">Building this measurement</div>
+    <div class="m-building__body">
+      Journal data is growing. As entries accumulate, this section will show cognitive pattern
+      distribution, mood-energy divergence detection, burnout early warning, and values alignment.
+      The gap here is honest &mdash; this is the hardest thing to measure and the most important to get right.
+    </div>
+  </div>
 </div>
 
+</div><!-- /m-content -->
+
+<!-- ════════════════════════════════════════════════════════════
+     CROSS-LINKS (mid-page, contextual)
+     ════════════════════════════════════════════════════════════ -->
+<div class="m-xref reveal">
+  <a href="/sleep/" class="m-xref-card">
+    <div class="m-xref-card__tag">Sleep &times; Mood correlation</div>
+    <div class="m-xref-card__text">Poor sleep predicts next-day mood drops. The Sleep Observatory tracks the recovery side of this equation.</div>
+  </a>
+  <a href="/character/" class="m-xref-card">
+    <div class="m-xref-card__tag">Mind Pillar &mdash; 1 of 7</div>
+    <div class="m-xref-card__text">Vice streaks, resist rate, journal consistency, and social connection feed the Mind pillar in the Character Sheet.</div>
+  </a>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     NARRATIVE
+     ════════════════════════════════════════════════════════════ -->
 <section class="m-narrative reveal">
   <div>
     <h2 class="m-narrative__title">The <em>fifth pillar</em><br>everyone avoids</h2>
     <div class="m-narrative__body">
       <p>Attia added emotional health as his fifth pillar after decades of hiding behind data.
       <strong>Chronic psychological stress elevates cortisol, suppresses immune function,
-      disrupts sleep, and accelerates cellular aging.</strong></p>
-      <p>You can optimize sleep, glucose, and training perfectly. If you&rsquo;re miserable, it erodes all of it.
+      disrupts <a href="/sleep/">sleep</a>, and accelerates cellular aging.</strong></p>
+      <p>You can optimize sleep, <a href="/glucose/">glucose</a>, and <a href="/training/">training</a>
+      perfectly. If you&rsquo;re miserable, it erodes all of it.
       This page is intentionally incomplete. Showing the gaps honestly is part of the project.</p>
     </div>
   </div>
@@ -291,8 +734,11 @@
   </div>
 </section>
 
+<!-- ════════════════════════════════════════════════════════════
+     METHODOLOGY
+     ════════════════════════════════════════════════════════════ -->
 <section class="m-method reveal">
-  <div class="m-method__title">Measurement Protocol</div>
+  <div class="m-method__title">Measurement protocol</div>
   <div class="m-method-grid">
     <div class="m-method-item"><strong>HOW WE FEEL</strong>Mood valence via Apple Health. Scale: -1 (very unpleasant) to +1 (very pleasant). Synced via webhook.</div>
     <div class="m-method-item"><strong>JOURNAL ANALYSIS</strong>Notion entries enriched by Haiku: mood, energy, stress, cognitive patterns (CBT), themes, emotions, social quality (PERMA).</div>
@@ -310,113 +756,167 @@
 <script src="/assets/js/reveal.js"></script>
 <script>
 (async function(){
-  const API='https://averagejoematt.com';
-  const loading=document.getElementById('m-loading');
-  const content=document.getElementById('m-content');
-  const setText=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
-  const setWidth=(id,p)=>{const el=document.getElementById(id);if(el)el.style.width=Math.min(100,Math.max(0,p))+'%';};
+  var API = 'https://averagejoematt.com';
+  var loading = document.getElementById('m-loading');
+  var content = document.getElementById('m-content');
+  var setText = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+  var setWidth = function(id, p) { var el = document.getElementById(id); if (el) el.style.width = Math.min(100, Math.max(0, p)) + '%'; };
+  var circ = 2 * Math.PI * 35;
 
-  try{
-    const resp=await fetch(API+'/api/mind_overview');
-    if(!resp.ok) throw new Error(resp.status);
-    const data=await resp.json();
-    const m=data.mind, vices=data.vice_streaks||[], mood=data.mood_trend||[];
-    if(!m){loading.textContent='No inner life data yet.';return;}
+  function setArc(id, pct) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var len = (Math.min(pct, 100) / 100) * circ;
+    el.setAttribute('stroke-dasharray', len + ' ' + (circ - len));
+  }
 
-    // Signals
-    if(m.mind_pillar){
-      setText('m-level','L'+m.mind_pillar.level.toFixed(0));
-      setText('m-tier',m.mind_pillar.tier+' \u2022 '+m.mind_pillar.raw_score.toFixed(1));
+  try {
+    var resp = await fetch(API + '/api/mind_overview');
+    if (!resp.ok) throw new Error(resp.status);
+    var data = await resp.json();
+    var m = data.mind, vices = data.vice_streaks || [], mood = data.mood_trend || [];
+    if (!m) { loading.textContent = 'No inner life data yet.'; return; }
+
+    /* ── Hero gauges ── */
+    if (m.mind_pillar) {
+      var lvl = m.mind_pillar.level || 0;
+      setText('g-mind-num', 'L' + Math.round(lvl));
+      setArc('g-mind-arc', (lvl / 100) * 100);
     }
-    if(m.resist_rate_pct!=null){
-      const re=document.getElementById('m-resist');
-      setText('m-resist',m.resist_rate_pct+'%');
-      if(re) re.style.color=m.resist_rate_pct>=80?'#3ecf8e':m.resist_rate_pct>=50?'#f59e0b':'#ef4444';
-    }
-    const je=document.getElementById('m-journal');
-    setText('m-journal',m.journal_entries_30d||'0');
-    if(je) je.style.color=m.journal_entries_30d>=20?'#3ecf8e':m.journal_entries_30d>=10?'#f59e0b':'#ef4444';
 
-    // Vice cards
-    const vg=document.getElementById('m-vice-grid');
-    if(vices.length){
-      const maxStreak=Math.max(...vices.map(v=>v.current_streak),30);
-      vg.innerHTML=vices.map(v=>{
-        const pct=(v.current_streak/maxStreak).toFixed(2);
-        return `<div class="m-vice-card${v.holding?'':' broken'}" style="--streak-pct:${pct}">
-          <div class="m-vice-card__name">${v.name}</div>
-          <div class="m-vice-card__streak">${v.current_streak}</div>
-          <div class="m-vice-card__unit">${v.holding?'days':'broken'}</div>
-        </div>`;
+    var resistPct = m.resist_rate_pct || 0;
+    setText('g-resist-num', resistPct != null ? resistPct + '%' : '\u2014');
+    var resistEl = document.getElementById('g-resist-num');
+    if (resistEl) resistEl.style.color = resistPct >= 80 ? '#3ecf8e' : resistPct >= 50 ? '#f59e0b' : '#ef4444';
+    setArc('g-resist-arc', resistPct);
+
+    var journalCount = m.journal_entries_30d || 0;
+    setText('g-journal-num', journalCount);
+    var journalEl = document.getElementById('g-journal-num');
+    if (journalEl) journalEl.style.color = journalCount >= 20 ? '#3ecf8e' : journalCount >= 10 ? '#f59e0b' : '#ef4444';
+    setArc('g-journal-arc', Math.min(100, (journalCount / 30) * 100));
+
+    var holdingCount = vices.filter(function(v) { return v.holding; }).length;
+    setText('g-vice-num', holdingCount);
+    setArc('g-vice-arc', vices.length > 0 ? (holdingCount / vices.length) * 100 : 0);
+    var viceEl = document.getElementById('g-vice-num');
+    if (viceEl) viceEl.style.color = holdingCount === vices.length ? '#3ecf8e' : holdingCount >= vices.length * 0.7 ? '#f59e0b' : '#ef4444';
+
+    /* ── Vice streak cards ── */
+    var vg = document.getElementById('m-vice-grid');
+    if (vices.length) {
+      var maxStreak = Math.max.apply(null, vices.map(function(v) { return v.current_streak; }).concat([30]));
+      vg.innerHTML = vices.map(function(v) {
+        var pct = ((v.current_streak / maxStreak) * 100).toFixed(1);
+        return '<div class="m-vice-card' + (v.holding ? '' : ' broken') + '">' +
+          '<div class="m-vice-card__name">' + v.name + '</div>' +
+          '<div class="m-vice-card__streak">' + v.current_streak + '</div>' +
+          '<div class="m-vice-card__unit">' + (v.holding ? 'days' : 'broken') + '</div>' +
+          '<div class="m-vice-card__bottom-bar" style="width:' + pct + '%"></div>' +
+          '</div>';
       }).join('');
-    } else { vg.innerHTML='<div style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px">No vice streaks tracked yet.</div>'; }
-
-    // Bars
-    const dc=m.depth_counts||{}, tot=m.total_interactions_30d||1;
-    setWidth('bar-deep',(dc.deep||0)/tot*100); setText('pct-deep',dc.deep||0);
-    setWidth('bar-meaning',(dc.meaningful||0)/tot*100); setText('pct-meaning',dc.meaningful||0);
-    setWidth('bar-surface',(dc.surface||0)/tot*100); setText('pct-surface',dc.surface||0);
-    if(m.total_temptations_90d>0){
-      const tt=m.total_temptations_90d;
-      setWidth('bar-resisted',(m.resisted_90d/tt)*100); setText('pct-resisted',m.resisted_90d);
-      setWidth('bar-succumbed',((tt-m.resisted_90d)/tt)*100); setText('pct-succumbed',tt-m.resisted_90d);
+    } else {
+      vg.innerHTML = '<div style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px">No vice streaks tracked yet.</div>';
     }
 
-    // Mood chart
-    if(mood.length>=3){
-      document.getElementById('m-mood-section').style.display='';
-      const canvas=document.getElementById('m-mood-canvas');
-      const dpr=window.devicePixelRatio||1;
-      canvas.width=canvas.offsetWidth*dpr; canvas.height=canvas.offsetHeight*dpr;
-      const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
-      const W=canvas.offsetWidth,H=canvas.offsetHeight;
-      const pad={t:16,r:16,b:24,l:42};
-      const iW=W-pad.l-pad.r,iH=H-pad.t-pad.b;
-      const nn=mood.length;
-      const xOf=i=>pad.l+(i/(nn-1))*iW;
-      const yOf=v=>pad.t+iH/2-(v*iH/2);
+    /* ── Connection + Willpower bars ── */
+    var dc = m.depth_counts || {}, tot = m.total_interactions_30d || 1;
+    setWidth('bar-deep', (dc.deep || 0) / tot * 100); setText('pct-deep', dc.deep || 0);
+    setWidth('bar-meaning', (dc.meaningful || 0) / tot * 100); setText('pct-meaning', dc.meaningful || 0);
+    setWidth('bar-surface', (dc.surface || 0) / tot * 100); setText('pct-surface', dc.surface || 0);
+    if (m.total_temptations_90d > 0) {
+      var tt = m.total_temptations_90d;
+      setWidth('bar-resisted', (m.resisted_90d / tt) * 100); setText('pct-resisted', m.resisted_90d);
+      setWidth('bar-succumbed', ((tt - m.resisted_90d) / tt) * 100); setText('pct-succumbed', tt - m.resisted_90d);
+    }
 
-      // Subtle gradient background zones
-      const posGrad=ctx.createLinearGradient(0,pad.t,0,pad.t+iH/2);
-      posGrad.addColorStop(0,'rgba(167,139,250,0.06)'); posGrad.addColorStop(1,'transparent');
-      ctx.fillStyle=posGrad; ctx.fillRect(pad.l,pad.t,iW,iH/2);
-      const negGrad=ctx.createLinearGradient(0,pad.t+iH/2,0,pad.t+iH);
-      negGrad.addColorStop(0,'transparent'); negGrad.addColorStop(1,'rgba(239,68,68,0.04)');
-      ctx.fillStyle=negGrad; ctx.fillRect(pad.l,pad.t+iH/2,iW,iH/2);
+    /* ── Mood chart ── */
+    if (mood.length >= 3) {
+      document.getElementById('m-mood-section').style.display = '';
+      var canvas = document.getElementById('m-mood-canvas');
+      var dpr = window.devicePixelRatio || 1;
+      canvas.width = canvas.offsetWidth * dpr;
+      canvas.height = canvas.offsetHeight * dpr;
+      var ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      var W = canvas.offsetWidth, H = canvas.offsetHeight;
+      var pad = { t: 16, r: 16, b: 24, l: 42 };
+      var iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
+      var nn = mood.length;
+      var xOf = function(i) { return pad.l + (i / (nn - 1)) * iW; };
+      var yOf = function(v) { return pad.t + iH / 2 - (v * iH / 2); };
 
-      ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.setLineDash([4,4]);
-      ctx.beginPath();ctx.moveTo(pad.l,yOf(0));ctx.lineTo(W-pad.r,yOf(0));ctx.stroke();
+      /* Subtle gradient zones */
+      var posGrad = ctx.createLinearGradient(0, pad.t, 0, pad.t + iH / 2);
+      posGrad.addColorStop(0, 'rgba(167,139,250,0.06)');
+      posGrad.addColorStop(1, 'transparent');
+      ctx.fillStyle = posGrad;
+      ctx.fillRect(pad.l, pad.t, iW, iH / 2);
+      var negGrad = ctx.createLinearGradient(0, pad.t + iH / 2, 0, pad.t + iH);
+      negGrad.addColorStop(0, 'transparent');
+      negGrad.addColorStop(1, 'rgba(239,68,68,0.04)');
+      ctx.fillStyle = negGrad;
+      ctx.fillRect(pad.l, pad.t + iH / 2, iW, iH / 2);
+
+      /* Zero line */
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(pad.l, yOf(0)); ctx.lineTo(W - pad.r, yOf(0)); ctx.stroke();
       ctx.setLineDash([]);
 
-      // Area fill
-      const areaGrad=ctx.createLinearGradient(0,pad.t,0,pad.t+iH);
-      areaGrad.addColorStop(0,'rgba(167,139,250,0.15)'); areaGrad.addColorStop(0.5,'rgba(167,139,250,0.02)'); areaGrad.addColorStop(1,'rgba(239,68,68,0.08)');
+      /* Area fill */
+      var areaGrad = ctx.createLinearGradient(0, pad.t, 0, pad.t + iH);
+      areaGrad.addColorStop(0, 'rgba(167,139,250,0.15)');
+      areaGrad.addColorStop(0.5, 'rgba(167,139,250,0.02)');
+      areaGrad.addColorStop(1, 'rgba(239,68,68,0.08)');
       ctx.beginPath();
-      mood.forEach((d,i)=>{const x=xOf(i),y=yOf(d.valence); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
-      ctx.lineTo(xOf(nn-1),yOf(0)); ctx.lineTo(xOf(0),yOf(0)); ctx.closePath();
-      ctx.fillStyle=areaGrad; ctx.fill();
+      mood.forEach(function(d, i) {
+        var x = xOf(i), y = yOf(d.valence);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.lineTo(xOf(nn - 1), yOf(0));
+      ctx.lineTo(xOf(0), yOf(0));
+      ctx.closePath();
+      ctx.fillStyle = areaGrad;
+      ctx.fill();
 
-      // Line
-      ctx.strokeStyle='rgba(167,139,250,0.85)'; ctx.lineWidth=2;
+      /* Line */
+      ctx.strokeStyle = 'rgba(167,139,250,0.85)';
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      mood.forEach((d,i)=>{const x=xOf(i),y=yOf(d.valence); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+      mood.forEach(function(d, i) {
+        var x = xOf(i), y = yOf(d.valence);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
       ctx.stroke();
 
-      // Dots
-      mood.forEach((d,i)=>{
-        const x=xOf(i),y=yOf(d.valence);
-        ctx.fillStyle=d.valence>=0.3?'rgba(62,207,142,0.85)':d.valence>=-0.3?'rgba(167,139,250,0.85)':'rgba(239,68,68,0.85)';
-        ctx.beginPath();ctx.arc(x,y,3.5,0,Math.PI*2);ctx.fill();
+      /* Dots */
+      mood.forEach(function(d, i) {
+        var x = xOf(i), y = yOf(d.valence);
+        ctx.fillStyle = d.valence >= 0.3 ? 'rgba(62,207,142,0.85)' : d.valence >= -0.3 ? 'rgba(167,139,250,0.85)' : 'rgba(239,68,68,0.85)';
+        ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fill();
       });
 
-      ctx.fillStyle='rgba(255,255,255,0.25)';ctx.font='10px monospace';ctx.textAlign='right';
-      [{v:1,l:'+1'},{v:0,l:'0'},{v:-1,l:'-1'}].forEach(({v,l})=>ctx.fillText(l,pad.l-6,yOf(v)+4));
+      /* Y labels */
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'right';
+      [{v: 1, l: '+1'}, {v: 0, l: '0'}, {v: -1, l: '-1'}].forEach(function(o) {
+        ctx.fillText(o.l, pad.l - 6, yOf(o.v) + 4);
+      });
     }
 
-    if(m.journal_entries_30d<10) document.getElementById('m-building').style.display='';
+    /* Building this — show if sparse journal data */
+    if (journalCount < 10) {
+      document.getElementById('m-building').style.display = '';
+    }
 
-    loading.style.display='none'; content.style.display='block';
-  }catch(e){loading.textContent='Could not load inner life data.';console.error(e);}
+    loading.style.display = 'none';
+    content.style.display = 'block';
+  } catch (e) {
+    loading.textContent = 'Could not load inner life data.';
+    console.error(e);
+  }
 })();
 </script>
 </body>

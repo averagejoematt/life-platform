@@ -1,3 +1,43 @@
+## v3.9.24 — 2026-03-26: Observatory Visual Redesign — 3 pages rebuilt (Board-voted hybrid)
+
+### Summary
+Product Board convened for visual design overhaul of the 3 observatory pages built in v3.9.23 (Nutrition, Training, Inner Life). Three visual concepts mocked up in Visualizer (A: The Plate, B: The Editorial, C: The Infographic). Full 8-persona vote produced a B-dominant hybrid direction: B's 2-column editorial hero + C's gauge row (5-3 vote), B's 3-column macro editorial (5-2-1), B's pull-quotes with N=1 evidence badges (8-0 unanimous), C's bordered rule cards with left accent (6-2), pull-quotes established as cross-observatory reusable pattern (8-0 unanimous). All 3 pages rebuilt from scratch and deployed.
+
+### Design System Pattern Established
+- **Hero**: 2-column editorial layout (eyebrow with dash accent, display title, subtitle) + 4 mini gauge rings (animated SVG arcs with staggered delays)
+- **Pull-quotes**: Staggered throughout page (2-3 per page), oversized watermark numbers (01/02/03), `N=1 · Correlational` / `N=1 · CGM-confirmed` / `N=1 · Observational` evidence badges per Lena Johansson's amendment
+- **Section headers**: Monospace uppercase with trailing dash line (`::after` pseudo-element)
+- **Data sections**: 3-column editorial spread with thin accent bars, display-type numbers
+- **Rule cards**: Left accent border (page color), monospace `Rule 01` header with trailing fade line
+- **Cross-links**: Mid-page contextual cards (not just footer), inline links woven through narrative
+- **Color coding**: Nutrition=amber (#f59e0b), Training=red (#ef4444), Inner Life=violet (#a78bfa)
+
+### Product Board Vote Results
+| Decision | Winner | Vote |
+|----------|--------|------|
+| Hero section | C's gauge row in B's 2-col layout | 5-3 |
+| Macro/data breakdown | B's 3-column editorial | 5-2-1 |
+| N=1 findings | B's pull-quotes + evidence badges | 8-0 |
+| Rules section | C's bordered cards + left accent | 6-2 |
+| Cross-observatory pattern | Pull-quotes as signature | 8-0 |
+
+### Files Modified
+- `site/nutrition/index.html` — Complete rewrite: 2-col hero + gauge row, 3 pull-quotes, editorial macro spread, protein adherence card, bordered rule cards, mid-page cross-links
+- `site/training/index.html` — Complete rewrite: 2-col hero + gauge row (Z2/workouts/strain/strength), 3 pull-quotes, 3-col Z2 detail, activity chips, bordered rule cards, cross-links to nutrition + sleep
+- `site/mind/index.html` — Complete rewrite: 2-col hero + gauge row (mind pillar/resist rate/journal/vices), 3 pull-quotes, vice streak grid with left accent, connection + willpower bars, mood chart, honest gap section
+
+### Deploy Log
+- S3: 3 files synced (nutrition, training, mind index.html)
+- CloudFront: 3 invalidations (nutrition/*, training/*, mind/*)
+
+### Next Steps
+1. Check live pages and iterate on any visual issues
+2. Consider applying same pattern to Sleep + Glucose observatories for full consistency
+3. SIMP-1 Phase 2 + ADR-025 cleanup still targeted ~April 13
+4. DISC-7 annotation testing/seeding still pending
+
+---
+
 ## v3.9.23 — 2026-03-25: DISC-7 Annotations + 3 Observatory Pages (Nutrition, Training, Inner Life)
 
 ### Summary
