@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Elena Voss — AI journalist and narrator of The Measured Life chronicle series.">
+  <meta property="og:title" content="Elena Voss — The Measured Life">
+  <meta property="og:description" content="The AI journalist with embedded access to 19 data sources, writing weekly narrative non-fiction about one man's transformation.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Elena Voss — The Measured Life">
+  <meta name="twitter:description" content="AI journalist. Embedded access. Every number, every failure, every week.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:type" content="profile">
+  <title>Elena Voss — The Measured Life</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .elena-header {
+      padding: calc(var(--nav-height) + var(--space-20)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      max-width: calc(var(--prose-width) + var(--page-padding) * 2);
+      margin: 0 auto;
+    }
+    .elena-header__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+    }
+    .elena-header__name {
+      font-family: var(--font-serif);
+      font-size: clamp(36px, 5vw, 56px);
+      font-weight: 400;
+      font-style: italic;
+      color: var(--text);
+      line-height: 1.1;
+      margin-bottom: var(--space-4);
+    }
+    .elena-header__role {
+      font-family: var(--font-mono);
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+
+    .elena-body {
+      max-width: calc(var(--prose-width) + var(--page-padding) * 2);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding) var(--space-20);
+    }
+    .elena-prose {
+      font-family: var(--font-serif);
+      font-size: var(--text-lg);
+      line-height: var(--lh-prose);
+      color: var(--text-body);
+    }
+    .elena-prose p { margin-bottom: var(--space-6); }
+    .elena-prose hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: var(--space-10) 0;
+    }
+
+    .elena-detail {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: var(--space-6);
+      margin: var(--space-10) 0;
+    }
+    .elena-detail__header {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-4);
+      padding-bottom: var(--space-3);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .elena-detail__row {
+      display: flex;
+      gap: var(--space-4);
+      padding: var(--space-2) 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-mono);
+    }
+    .elena-detail__label {
+      color: var(--text-faint);
+      min-width: 140px;
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+
+    .elena-nav {
+      max-width: calc(var(--prose-width) + var(--page-padding) * 2);
+      margin: 0 auto;
+      padding: 0 var(--page-padding) var(--space-12);
+      display: flex;
+      gap: var(--space-6);
+    }
+    .elena-nav a {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      text-decoration: none;
+      transition: color var(--dur-fast);
+    }
+    .elena-nav a:hover { color: var(--accent); }
+
+    @media (max-width: 600px) {
+      .elena-detail__row { flex-direction: column; gap: var(--space-1); }
+      .elena-detail__label { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="amj-nav"></div>
+
+<div class="elena-header animate-in reveal">
+  <div class="elena-header__label">// The Reporter</div>
+  <h1 class="elena-header__name">Elena Voss</h1>
+  <p class="elena-header__role">AI journalist · Narrator of <em>The Measured Life</em></p>
+</div>
+
+<div class="elena-body animate-in reveal">
+  <div class="elena-prose">
+    <p>Elena Voss is not a real person. She's an AI-generated journalist persona — a narrative device that gives structure and voice to this experiment's weekly chronicle.</p>
+
+    <p>Here's why she exists: Matthew Walker is attempting a multi-year body transformation, tracked by <span data-const="platform.data_sources">19</span> data sources and a custom-built intelligence platform. The data is real. The numbers are real. But raw data doesn't tell a story. It doesn't notice that the week you stopped journaling was the same week your HRV collapsed. It doesn't ask the uncomfortable questions.</p>
+
+    <p>Elena does.</p>
+
+    <p>Each week, she receives the full data export — recovery scores, sleep staging, glucose curves, habit streaks, journal entries, weight trends, supplement logs, training loads. She writes a narrative non-fiction dispatch about what actually happened. Not a highlight reel. Not a pep talk. The real week, including the bad ones.</p>
+
+    <hr>
+
+    <p>Her editorial approach has three rules:</p>
+
+    <p><strong>Show the data honestly.</strong> If the numbers are bad, they're bad. If a streak broke, it broke. Elena doesn't soften the signal to protect feelings. The whole point of making this public is accountability — and accountability requires a reporter who won't look away.</p>
+
+    <p><strong>Ask the questions the subject won't.</strong> Matthew built a platform that watched him spiral through a relapse without intervening. Elena's job is to notice that. To ask why the system that tracks everything couldn't change anything. To sit in the uncomfortable gap between measurement and action.</p>
+
+    <p><strong>Never cheerleading.</strong> Good weeks get documented, not celebrated. A downward weight trend is interesting data, not a victory lap. Elena treats this experiment the way a science journalist would — with curiosity, skepticism, and respect for what the numbers actually show.</p>
+
+    <hr>
+
+    <div class="elena-detail">
+      <div class="elena-detail__header">// Technical Details</div>
+      <div class="elena-detail__row">
+        <span class="elena-detail__label">Generated by</span>
+        <span>Claude (Anthropic) via the Life Platform's chronicle pipeline</span>
+      </div>
+      <div class="elena-detail__row">
+        <span class="elena-detail__label">Data access</span>
+        <span>Full read access to all <span data-const="platform.data_sources">19</span> data sources via platform API</span>
+      </div>
+      <div class="elena-detail__row">
+        <span class="elena-detail__label">Frequency</span>
+        <span>Weekly — every Wednesday</span>
+      </div>
+      <div class="elena-detail__row">
+        <span class="elena-detail__label">Editorial voice</span>
+        <span>Narrative non-fiction. Third person. Present tense preferred.</span>
+      </div>
+      <div class="elena-detail__row">
+        <span class="elena-detail__label">Human review</span>
+        <span>Matthew reviews each installment before publication for privacy and accuracy</span>
+      </div>
+    </div>
+
+    <p>The name "Elena Voss" was chosen to be distinct from Matthew's identity — a clear signal that the narrator and the subject are separate roles, even when both are ultimately powered by the same person's decision to make this public.</p>
+
+    <p>If you're reading the chronicle and wondering whether this is "real journalism" — it's not, and it doesn't claim to be. It's an experiment in using AI to create narrative accountability around health data. The data is real. The voice is synthetic. The story is somewhere in between.</p>
+  </div>
+
+  <div class="elena-nav">
+    <a href="/chronicle/">← Read the chronicle</a>
+    <a href="/subscribe/">Follow the weekly signal →</a>
+  </div>
+</div>
+
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+<div id="amj-reading-path"></div>
+<div id="amj-footer"></div>
+
+<script src="/assets/js/reveal.js"></script>
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>
