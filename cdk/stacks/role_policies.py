@@ -477,6 +477,15 @@ def compute_hypothesis_engine() -> list[iam.PolicyStatement]:
 # ingestion_google_calendar() removed v3.7.46 — ADR-030 (integration retired)
 
 
+def compute_challenge_generator() -> list[iam.PolicyStatement]:
+    """Challenge generator: reads journal/character/habits from DDB, uses ai-keys for Sonnet, writes challenges to DDB."""
+    return _compute_base(
+        needs_kms=True,
+        needs_ai_keys=True,
+        needs_s3_config=True,
+    )
+
+
 def compute_weekly_correlations() -> list[iam.PolicyStatement]:
     """Weekly correlation compute (R8-LT9): reads 8 source partitions, writes SOURCE#weekly_correlations."""
     return _compute_base(needs_kms=True)

@@ -3039,12 +3039,144 @@ def handle_protocols() -> dict:
     return _ok({"protocols": protocols, "count": len(protocols)}, cache_seconds=3600)
 
 def handle_challenges() -> dict:
-    """GET /api/challenges — Return challenge definitions from S3 config."""
+    """GET /api/challenges — Return challenges from DynamoDB (primary) with S3 fallback.
+
+    DynamoDB partition: USER#matthew#SOURCE#challenges
+    Returns active + candidate challenges for the website.
+    """
+    challenges_pk = f"USER#{USER_ID}#SOURCE#challenges"
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(challenges_pk) & Key("sk").begins_with("CHALLENGE#"),
+            ScanIndexForward=False,
+        )
+        items = resp.get("Items", [])
+
+        # Build response — website mainly needs active + candidate
+        result = []
+        for item in items:
+            status = item.get("status", "candidate")
+            # Include active, candidate, and recently completed (last 30 days)
+            if status in ("active", "candidate", "completed", "failed"):
+                ch = _decimal_to_float(item)
+                ch.pop("pk", None)
+                ch.pop("sk", None)
+
+                # Compute progress for active challenges
+                if status == "active":
+                    checkins = ch.get("daily_checkins", [])
+                    duration = int(ch.get("duration_days", 7))
+                    completed_days = sum(1 for c in checkins if c.get("completed"))
+                    ch["progress"] = {
+                        "checkin_days":   len(checkins),
+                        "completed_days": completed_days,
+                        "duration_days":  duration,
+                        "completion_pct": round(len(checkins) / duration * 100) if duration else 0,
+                        "success_rate":   round(completed_days / len(checkins) * 100) if checkins else 0,
+                    }
+
+                result.append(ch)
+
+        # Summary
+        summary = {
+            "total":     len(items),
+            "active":    sum(1 for i in items if i.get("status") == "active"),
+            "candidate": sum(1 for i in items if i.get("status") == "candidate"),
+            "completed": sum(1 for i in items if i.get("status") == "completed"),
+        }
+
+        if result:
+            return _ok({"challenges": result, "count": len(result), "summary": summary, "source": "dynamodb"}, cache_seconds=300)
+
+    except Exception as e:
+        logger.warning(f"[challenges] DynamoDB query failed, falling back to S3: {e}")
+
+    # Fallback to S3 config if DynamoDB is empty or errors
     global _challenges_cache
     if _challenges_cache is None:
         _challenges_cache = _load_s3_json("site/config/challenges.json", "challenges")
     challenges = _challenges_cache.get("challenges", [])
-    return _ok({"challenges": challenges, "count": len(challenges)}, cache_seconds=3600)
+    return _ok({"challenges": challenges, "count": len(challenges), "source": "s3_fallback"}, cache_seconds=3600)
+
+
+def _handle_challenge_checkin(event: dict) -> dict:
+    """POST /api/challenge_checkin — Public check-in for active challenges.
+
+    Body: {"challenge_id": "...", "completed": true/false, "note": "...", "date": "YYYY-MM-DD"}
+    Uses localStorage on the client to prevent double-taps.
+    """
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (json.JSONDecodeError, TypeError):
+        return _error(400, "Invalid JSON body")
+
+    challenge_id = (body.get("challenge_id") or "").strip()
+    completed = body.get("completed")
+    note = (body.get("note") or "").strip()[:500]
+    date_str = (body.get("date") or "").strip()
+
+    if not challenge_id:
+        return _error(400, "challenge_id required")
+    if completed is None:
+        return _error(400, "completed (true/false) required")
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if not date_str:
+        date_str = today
+
+    challenges_pk = f"USER#{USER_ID}#SOURCE#challenges"
+    sk = f"CHALLENGE#{challenge_id}"
+
+    # Verify challenge exists and is active
+    try:
+        item = table.get_item(Key={"pk": challenges_pk, "sk": sk}).get("Item")
+    except Exception as e:
+        logger.error(f"[challenge_checkin] DDB get failed: {e}")
+        return _error(500, "Database error")
+
+    if not item:
+        return _error(404, "Challenge not found")
+    if item.get("status") != "active":
+        return _error(400, f"Challenge is not active (status: {item.get('status')})")
+
+    # Build checkin
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    checkin = {
+        "date":      date_str,
+        "completed": bool(completed),
+        "logged_at": now_iso,
+        "source":    "website",
+    }
+    if note:
+        checkin["note"] = note
+
+    # Append to daily_checkins list
+    try:
+        table.update_item(
+            Key={"pk": challenges_pk, "sk": sk},
+            UpdateExpression="SET daily_checkins = list_append(if_not_exists(daily_checkins, :empty), :ci)",
+            ExpressionAttributeValues={
+                ":ci":    [checkin],
+                ":empty": [],
+            },
+        )
+    except Exception as e:
+        logger.error(f"[challenge_checkin] DDB update failed: {e}")
+        return _error(500, "Failed to record check-in")
+
+    existing = item.get("daily_checkins", [])
+    total = len(existing) + 1
+    duration = int(item.get("duration_days", 7) if item.get("duration_days") else 7)
+
+    return _ok({
+        "checked_in":     True,
+        "challenge_id":   challenge_id,
+        "date":           date_str,
+        "completed":      bool(completed),
+        "total_checkins": total,
+        "duration_days":  duration,
+        "completion_pct":  round(total / duration * 100) if duration else 0,
+    }, cache_seconds=0)
 
 def handle_domains() -> dict:
     """GET /api/domains — Return domain groupings from S3 config."""
@@ -3767,6 +3899,7 @@ ROUTES = {
     # DATA-DRIVEN: S3 config + DynamoDB source-of-truth endpoints
     "/api/protocols":          handle_protocols,
     "/api/challenges":         handle_challenges,
+    "/api/challenge_checkin":   None,  # POST handler in lambda_handler
     "/api/domains":            handle_domains,
     "/api/habit_registry":     handle_habit_registry,
     # PULSE-A4: Daily pulse endpoint
@@ -3833,6 +3966,12 @@ def lambda_handler(event, context):
         if method != "POST":
             return _error(405, "Use POST method")
         return _handle_experiment_follow(event)
+
+    # Challenge Check-in (POST)
+    if path == "/api/challenge_checkin":
+        if method != "POST":
+            return _error(405, "Use POST method")
+        return _handle_challenge_checkin(event)
 
     # EL-F2: Experiment Detail (GET with query params)
     if path == "/api/experiment_detail":
