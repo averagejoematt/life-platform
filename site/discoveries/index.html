@@ -4,20 +4,17 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="What Matthew's AI has actually found — data-backed discoveries from 90 days of cross-source health tracking. Plain English correlation insights.">
+  <meta name="description" content="The journey timeline — every milestone, finding, experiment, and breakthrough in Matthew's health transformation, told chronologically.">
   <meta property="og:title" content="Discoveries — Matthew Walker">
-  <meta property="og:description" content="What the AI has actually found. Bedtime before 11pm, HRV, recovery — real correlation findings in plain English.">
+  <meta property="og:description" content="Weight lost. Experiments run. AI findings. The timeline of one person's health transformation.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com/discoveries/">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Discoveries — Matthew Walker">
-  <meta name="twitter:description" content="What the AI has actually found. Real correlation findings in plain English.">
-  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <title>Discoveries — Matthew Walker</title>
-    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
@@ -25,6 +22,7 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
+    /* ── Page Header ──────────────────────────────────────── */
     .page-header {
       padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
       border-bottom: 1px solid var(--border);
@@ -45,279 +43,281 @@
       max-width: 600px;
       line-height: var(--lh-body);
     }
-
-    /* Stats strip */
-    .stats-strip {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1px;
-      background: var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    .stat-box {
-      background: var(--bg);
-      padding: var(--space-6);
-      text-align: center;
-    }
-    .stat-box__value {
-      font-family: var(--font-display);
-      font-size: 36px;
-      color: var(--accent);
-      line-height: 1;
-    }
-    .stat-box__label {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin-top: var(--space-2);
-    }
-    .stat-box__note {
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      margin-top: 2px;
-    }
-
-    /* Featured insight */
-    .featured-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .section-eyebrow {
-      font-size: var(--text-xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
-      margin-bottom: var(--space-4);
-    }
-    .featured-card {
-      border: 1px solid var(--border);
-      border-left: 4px solid var(--accent);
-      background: var(--surface);
-      padding: var(--space-8);
-    }
-    .featured-card__finding {
-      font-family: var(--font-display);
-      font-size: var(--text-h2);
-      color: var(--text);
-      margin-bottom: var(--space-4);
-      line-height: 1.3;
-    }
-    .featured-card__finding span { color: var(--accent); }
-    .featured-card__story {
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-      max-width: 680px;
-      margin-bottom: var(--space-6);
-    }
-    .featured-card__data {
+    .page-header__stats {
       display: flex;
-      gap: var(--space-6);
+      gap: var(--space-8);
+      margin-top: var(--space-8);
       flex-wrap: wrap;
     }
-    .featured-card__datum {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
+    .header-stat {
+      border-left: 2px solid var(--accent);
+      padding-left: var(--space-4);
     }
-    .featured-card__datum strong { color: var(--accent); }
-
-    /* Spotlight */
-    .spotlight-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
+    .header-stat__value {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--accent);
+      line-height: 1;
     }
-    .spotlight-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-6);
-    }
-    .spotlight-card {
-      border: 1px solid var(--border);
-      background: var(--surface);
-      padding: var(--space-6);
-      transition: border-color var(--dur-fast);
-    }
-    .spotlight-card:hover { border-color: var(--accent); }
-    .spotlight-card__tag {
+    .header-stat__label {
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
-      color: var(--text-faint);
-      margin-bottom: var(--space-3);
+      color: var(--text-muted);
+      margin-top: var(--space-1);
     }
-    .spotlight-card__r {
+
+    /* ── Filter Bar ──────────────────────────────────────── */
+    .filter-bar {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-4) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: var(--space-2);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .filter-btn {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: var(--space-2) var(--space-4);
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .filter-btn:hover { border-color: var(--text-muted); color: var(--text); }
+    .filter-btn.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-bg-subtle);
+    }
+
+    /* ── Timeline Container ──────────────────────────────── */
+    .timeline {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding) var(--space-20);
+      position: relative;
+    }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: calc(var(--page-padding) + 59px);
+      top: var(--space-12);
+      bottom: var(--space-20);
+      width: 2px;
+      background: linear-gradient(
+        to bottom,
+        var(--accent) 0%,
+        var(--border) 30%,
+        var(--border) 70%,
+        transparent 100%
+      );
+    }
+
+    /* ── Timeline Event ──────────────────────────────────── */
+    .tl-event {
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      gap: var(--space-6);
+      margin-bottom: var(--space-8);
+      position: relative;
+      opacity: 0;
+      transform: translateY(12px);
+      animation: tl-fade-in 0.4s ease forwards;
+    }
+    @keyframes tl-fade-in {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Date column (left of line) */
+    .tl-event__date {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      text-align: right;
+      padding-top: var(--space-4);
+      line-height: 1.3;
+    }
+    .tl-event__date-day {
       font-family: var(--font-display);
-      font-size: 48px;
+      font-size: 20px;
+      color: var(--text-muted);
       line-height: 1;
+    }
+
+    /* Node on the line */
+    .tl-event__node {
+      position: absolute;
+      left: 55px;
+      top: var(--space-4);
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--bg);
+      z-index: 2;
+      transition: all 0.2s;
+    }
+    .tl-event:hover .tl-event__node {
+      transform: scale(1.3);
+    }
+
+    /* Card (right of line) */
+    .tl-event__card {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: var(--space-5) var(--space-6);
+      transition: border-color 0.15s;
+      margin-left: var(--space-4);
+    }
+    .tl-event:hover .tl-event__card {
+      border-color: var(--text-muted);
+    }
+    .tl-event__type {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      margin-bottom: var(--space-2);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .tl-event__icon {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+    }
+    .tl-event__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      line-height: 1.3;
       margin-bottom: var(--space-2);
     }
-    .spotlight-card__r.pos { color: var(--accent); }
-    .spotlight-card__r.neg { color: var(--c-red-status); }
-    .spotlight-card__pair {
+    .tl-event__body {
       font-size: var(--text-sm);
-      color: var(--text);
-      margin-bottom: var(--space-3);
-    }
-    .spotlight-card__story {
-      font-size: var(--text-xs);
       color: var(--text-muted);
       line-height: var(--lh-body);
     }
-    .spotlight-card__meta {
-      margin-top: var(--space-4);
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: var(--ls-label);
-    }
-    .fdr-badge {
+    .tl-event__link {
       display: inline-block;
+      margin-top: var(--space-3);
+      font-family: var(--font-mono);
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
-      padding: 1px 5px;
-      border: 1px solid var(--c-green-100);
-      color: var(--accent);
-      margin-left: var(--space-2);
-    }
-
-    /* Archive */
-    .archive-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .archive-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .archive-table th {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
+      color: var(--accent-dim);
+      text-decoration: none;
       text-transform: uppercase;
-      color: var(--text-faint);
+    }
+    .tl-event__link:hover { color: var(--accent); }
+    .tl-event__meta {
+      margin-top: var(--space-3);
       font-family: var(--font-mono);
-      padding: var(--space-3) var(--space-4);
-      border-bottom: 1px solid var(--border);
-      text-align: left;
-    }
-    .archive-table td {
-      padding: var(--space-4);
-      border-bottom: 1px solid var(--border-subtle);
-      vertical-align: top;
-    }
-    .archive-table tr:hover td { background: var(--surface); }
-    .archive-table .td-finding {
-      font-size: var(--text-sm);
-      color: var(--text);
-    }
-    .archive-table .td-stat {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      white-space: nowrap;
-    }
-    .archive-table .td-r {
-      font-family: var(--font-display);
-      font-size: 22px;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-    .archive-table .td-r.pos { color: var(--accent); }
-    .archive-table .td-r.neg { color: var(--c-red-status); }
-
-    /* Counterintuitive section */
-    .counterintuitive {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .ci-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-4);
-    }
-    .ci-card {
-      border: 1px solid var(--c-amber-100);
-      background: var(--c-amber-050);
-      padding: var(--space-6);
-    }
-    .ci-card__surprise {
       font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--c-amber-500);
-      margin-bottom: var(--space-3);
-    }
-    .ci-card__finding {
-      font-size: var(--text-sm);
-      color: var(--text);
-      margin-bottom: var(--space-3);
-      line-height: 1.4;
-    }
-    .ci-card__expected {
-      font-size: var(--text-xs);
       color: var(--text-faint);
-      font-family: var(--font-mono);
-      margin-bottom: var(--space-2);
-    }
-    .ci-card__actual {
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      font-family: var(--font-mono);
     }
 
-    .corr-explainer {
+    /* ── Type Colors ─────────────────────────────────────── */
+    /* Weight milestones — primary green */
+    .tl-event[data-type="weight"] .tl-event__node { border-color: var(--c-green-500); background: var(--c-green-500); }
+    .tl-event[data-type="weight"] .tl-event__card { border-left: 3px solid var(--c-green-500); }
+    .tl-event[data-type="weight"] .tl-event__type { color: var(--c-green-500); }
+    .tl-event[data-type="weight"] .tl-event__title { color: var(--c-green-500); }
+
+    /* Milestone (Day 1) — gold/accent */
+    .tl-event[data-type="milestone"] .tl-event__node { border-color: var(--c-amber-500); background: var(--c-amber-500); width: 16px; height: 16px; left: 53px; }
+    .tl-event[data-type="milestone"] .tl-event__card { border-left: 3px solid var(--c-amber-500); }
+    .tl-event[data-type="milestone"] .tl-event__type { color: var(--c-amber-500); }
+
+    /* Level up — teal */
+    .tl-event[data-type="level_up"] .tl-event__node { border-color: #00b4d8; background: #00b4d8; }
+    .tl-event[data-type="level_up"] .tl-event__card { border-left: 3px solid #00b4d8; }
+    .tl-event[data-type="level_up"] .tl-event__type { color: #00b4d8; }
+
+    /* Experiment — purple */
+    .tl-event[data-type="experiment"] .tl-event__node { border-color: #a78bfa; background: #a78bfa; }
+    .tl-event[data-type="experiment"] .tl-event__card { border-left: 3px solid #a78bfa; }
+    .tl-event[data-type="experiment"] .tl-event__type { color: #a78bfa; }
+
+    /* AI Finding — blue */
+    .tl-event[data-type="finding"] .tl-event__node { border-color: #60a5fa; background: #60a5fa; }
+    .tl-event[data-type="finding"] .tl-event__card { border-left: 3px solid #60a5fa; }
+    .tl-event[data-type="finding"] .tl-event__type { color: #60a5fa; }
+
+    /* Counterintuitive — amber alert */
+    .tl-event[data-type="counterintuitive"] .tl-event__node { border-color: var(--c-amber-500); background: var(--c-amber-500); }
+    .tl-event[data-type="counterintuitive"] .tl-event__card { border-left: 3px solid var(--c-amber-500); background: var(--c-amber-050); }
+    .tl-event[data-type="counterintuitive"] .tl-event__type { color: var(--c-amber-500); }
+
+    /* Discovery (experiment complete) — gold */
+    .tl-event[data-type="discovery"] .tl-event__node { border-color: #fbbf24; background: #fbbf24; }
+    .tl-event[data-type="discovery"] .tl-event__card { border-left: 3px solid #fbbf24; }
+    .tl-event[data-type="discovery"] .tl-event__type { color: #fbbf24; }
+
+    /* ── Empty / Loading ─────────────────────────────────── */
+    .timeline-empty {
+      text-align: center;
+      padding: var(--space-16) var(--page-padding);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--text-faint);
+    }
+
+    /* ── Explorer link ───────────────────────────────────── */
+    .explorer-cta {
       max-width: var(--max-width);
       margin: 0 auto;
       padding: var(--space-6) var(--page-padding);
-      border-bottom: 1px solid var(--border);
+      border-top: 1px solid var(--border-subtle);
     }
-    .corr-explainer__box {
+    .explorer-cta__box {
       border: 1px solid var(--border-subtle);
       border-left: 3px solid var(--accent-dim);
       background: var(--surface);
       padding: var(--space-5) var(--space-6);
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: var(--space-5);
-      align-items: start;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-4);
     }
-    .corr-explainer__label {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
-      white-space: nowrap;
-      padding-top: 2px;
-    }
-    .corr-explainer__text {
+    .explorer-cta__text {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       color: var(--text-muted);
-      line-height: var(--lh-mono);
     }
-    .corr-explainer__text strong { color: var(--text); }
-    @media (max-width: 640px) { .corr-explainer__box { grid-template-columns: 1fr; } }
+    .explorer-cta__link {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--accent-dim);
+      text-decoration: none;
+    }
+    .explorer-cta__link:hover { color: var(--accent); }
 
-    .loading-msg { padding: var(--space-10); text-align: center; color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); }
-
+    /* ── Responsive ──────────────────────────────────────── */
     @media (max-width: 768px) {
-      .stats-strip { grid-template-columns: 1fr 1fr; }
-      .spotlight-grid { grid-template-columns: 1fr; }
-      .ci-grid { grid-template-columns: 1fr; }
-      .archive-table .td-strength { display: none; }
+      .timeline::before { left: calc(var(--page-padding) + 11px); }
+      .tl-event { grid-template-columns: 1fr; gap: var(--space-2); }
+      .tl-event__date {
+        text-align: left;
+        padding-left: var(--space-8);
+        padding-top: 0;
+      }
+      .tl-event__date-day { display: inline; font-size: var(--text-sm); }
+      .tl-event__node { left: 6px; top: 6px; width: 10px; height: 10px; }
+      .tl-event[data-type="milestone"] .tl-event__node { left: 4px; width: 14px; height: 14px; }
+      .tl-event__card { margin-left: var(--space-8); }
+      .page-header__stats { gap: var(--space-4); }
     }
+
+    /* ── Pipeline nav (shared pattern) ───────────────────── */
     .pipeline-nav { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-4) var(--page-padding); border-bottom:1px solid var(--border); background:var(--surface); font-family:var(--font-mono); font-size:var(--text-2xs); letter-spacing:var(--ls-tag); overflow-x:auto; }
     .pipeline-nav__step { color:var(--text-faint); text-decoration:none; text-transform:uppercase; white-space:nowrap; padding:var(--space-1) var(--space-3); border:1px solid transparent; }
     .pipeline-nav__step:hover { color:var(--text-muted); }
@@ -328,330 +328,186 @@
 <body>
 
 <div id="amj-nav"></div>
-</div>
 
-
-
-<!-- PROTO-4: Pipeline nav -->
+<!-- Pipeline nav -->
 <nav class="pipeline-nav">
   <a href="/protocols/" class="pipeline-nav__step">Protocols</a>
-  <span class="pipeline-nav__arrow">→</span>
+  <span class="pipeline-nav__arrow">&rarr;</span>
   <a href="/experiments/" class="pipeline-nav__step">Experiments</a>
-  <span class="pipeline-nav__arrow">→</span>
+  <span class="pipeline-nav__arrow">&rarr;</span>
   <a href="/discoveries/" class="pipeline-nav__step active">Discoveries</a>
 </nav>
 
-<div class="experiment-thread">Discoveries power the Intelligence Layer → <a href="/intelligence/">Intelligence →</a></div>
 <header class="page-header reveal">
   <div class="eyebrow" style="margin-bottom:var(--space-4)">The Science</div>
-  <h1 class="page-header__title">What the AI has <span>actually found</span></h1>
+  <h1 class="page-header__title">What I've <span>discovered</span></h1>
   <p class="page-header__sub">
-    The correlation engine runs every Sunday on 90 days of real data &mdash; sleep, recovery, HRV, nutrition, training, habits.
-    These are the strongest patterns it has found. Not theory. Measurement.
+    Every milestone, finding, and breakthrough &mdash; told chronologically.
+    Weight lost. Experiments run. Patterns the AI found that I wouldn&rsquo;t have seen.
+    The story of what actually happened.
   </p>
-</header>
-
-<!-- Stats strip -->
-<div class="stats-strip reveal">
-  <div class="stat-box">
-    <div class="stat-box__value" id="stat-pairs">—</div>
-    <div class="stat-box__label">Pairs tested weekly</div>
-    <div class="stat-box__note">Cross-source + 3 lagged predictors</div>
-  </div>
-  <div class="stat-box">
-    <div class="stat-box__value" id="stat-sig">—</div>
-    <div class="stat-box__label">Statistically significant</div>
-    <div class="stat-box__note">After Benjamini-Hochberg FDR correction</div>
-  </div>
-  <div class="stat-box">
-    <div class="stat-box__value" id="stat-week">—</div>
-    <div class="stat-box__label">Latest data week</div>
-    <div class="stat-box__note">90-day rolling window</div>
-  </div>
-</div>
-
-<!-- How to read correlations info-box -->
-<div class="corr-explainer reveal">
-  <div class="corr-explainer__box">
-    <div class="corr-explainer__label">// how to read this</div>
-    <div class="corr-explainer__text">
-      <strong>r value:</strong> Pearson correlation coefficient. r=1.0 = perfect positive relationship; r=0 = no relationship; r=−1.0 = perfect inverse. In practice, r&ge;0.4 is a moderate relationship, r&ge;0.6 is strong — especially for noisy biometric data. &nbsp;<strong>FDR correction:</strong> When testing 23+ pairs simultaneously, you'd expect ~1 false positive at p&lt;0.05 by chance alone. The Benjamini-Hochberg correction raises the significance bar proportionally, so only pairs that clear the adjusted threshold are flagged. A finding marked "FDR" survived that stricter test. &nbsp;<strong>Why N=1 still matters:</strong> Population studies average out individual variation. These correlations are computed on a single person's data — meaning between-person variance is eliminated entirely. The signal-to-noise ratio is often better than a small clinical trial.
+  <div class="page-header__stats">
+    <div class="header-stat">
+      <div class="header-stat__value" id="stat-total">&mdash;</div>
+      <div class="header-stat__label">Discoveries</div>
+    </div>
+    <div class="header-stat">
+      <div class="header-stat__value" id="stat-days">&mdash;</div>
+      <div class="header-stat__label">Days tracked</div>
+    </div>
+    <div class="header-stat">
+      <div class="header-stat__value" id="stat-weight">&mdash;</div>
+      <div class="header-stat__label">Weight events</div>
+    </div>
+    <div class="header-stat">
+      <div class="header-stat__value" id="stat-findings">&mdash;</div>
+      <div class="header-stat__label">AI findings</div>
     </div>
   </div>
+</header>
+
+<!-- Filter bar -->
+<div class="filter-bar" id="filter-bar">
+  <button class="filter-btn active" data-filter="all">All</button>
+  <button class="filter-btn" data-filter="weight">Weight</button>
+  <button class="filter-btn" data-filter="level_up">Level Up</button>
+  <button class="filter-btn" data-filter="experiment">Experiments</button>
+  <button class="filter-btn" data-filter="finding">AI Findings</button>
+  <button class="filter-btn" data-filter="counterintuitive">Surprises</button>
+  <button class="filter-btn" data-filter="milestone">Milestones</button>
 </div>
 
-<!-- Featured insight of the week -->
-<div class="featured-section reveal">
-  <div class="section-eyebrow">// Featured discovery this week</div>
-  <div class="featured-card" id="featured-card">
-    <div class="loading-msg">Loading this week&rsquo;s top finding&hellip;</div>
+<!-- Timeline -->
+<div class="timeline" id="timeline">
+  <div class="timeline-empty">Loading timeline&hellip;</div>
+</div>
+
+<!-- Explorer CTA -->
+<div class="explorer-cta">
+  <div class="explorer-cta__box">
+    <span class="explorer-cta__text">Want the raw correlation data? 23 pairs, FDR-corrected, updated weekly.</span>
+    <a href="/explorer/" class="explorer-cta__link">Open Data Explorer &rarr;</a>
   </div>
 </div>
-
-<!-- Correlation spotlight: top 2 pairs as readable stories -->
-<div class="spotlight-section reveal">
-  <div class="section-eyebrow">// Correlation Spotlight</div>
-  <h2 style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);margin-bottom:var(--space-4)">
-    The strongest signals, explained
-  </h2>
-  <p style="font-size:var(--text-sm);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);margin-bottom:var(--space-8)">
-    The top correlations from this week&rsquo;s run, translated from statistics into plain English.
-  </p>
-  <div class="spotlight-grid" id="spotlight-grid">
-    <div class="loading-msg">Loading correlation data&hellip;</div>
-  </div>
-</div>
-
-<!-- Discovery archive: all pairs as table -->
-<div class="archive-section reveal">
-  <div class="section-eyebrow">// All discoveries &mdash; current week</div>
-  <h2 style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);margin-bottom:var(--space-8)">
-    Full correlation archive
-  </h2>
-  <table class="archive-table" id="archive-table">
-    <thead>
-      <tr>
-        <th>r</th>
-        <th>Finding (plain English)</th>
-        <th>Variables</th>
-        <th>n / Strength</th>
-      </tr>
-    </thead>
-    <tbody id="archive-body">
-      <tr><td colspan="4" class="loading-msg">Loading&hellip;</td></tr>
-    </tbody>
-  </table>
-  <p style="margin-top:var(--space-6);font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono)">
-    Want the raw numbers? &nbsp;<a href="/explorer/" style="color:var(--accent-dim);text-decoration:none">Open the correlation explorer &rarr;</a>
-  </p>
-</div>
-
-<!-- Counterintuitive finds -->
-<div class="counterintuitive reveal">
-  <div class="section-eyebrow">// Counterintuitive finds</div>
-  <h2 style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);margin-bottom:var(--space-4)">
-    Things that surprised the data
-  </h2>
-  <p style="font-size:var(--text-sm);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);margin-bottom:var(--space-8)">
-    Findings that went against the conventional expectation. This is where the N=1 experiment gets interesting.
-  </p>
-  <div class="ci-grid" id="ci-grid">
-    <div class="loading-msg">Loading counterintuitive findings&hellip;</div>
-  </div>
-</div>
-
-<!-- N=1 disclaimer -->
-<aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle);">
-  <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label)">
-    <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
-    All correlations are Pearson r over a 90-day rolling window on a single person&rsquo;s data.
-    FDR correction applied. Correlation does not imply causation.
-    These findings changed my behavior &mdash; they may not apply to you.
-    This is observation, not prescription.
-    <strong style="color:var(--text-muted)">These findings have not been externally validated and should not be used to make medical decisions.</strong>
-  </p>
-</aside>
 
 <!-- Email CTA -->
 <div id="amj-subscribe"></div>
-
-<!-- Mobile bottom nav -->
 <div id="amj-bottom-nav"></div>
-
 <div id="amj-reading-path"></div>
 <div id="amj-footer"></div>
 
 <script src="/assets/js/reveal.js"></script>
 <script>
 const API = 'https://averagejoematt.com';
-
-function rClass(r) { return r > 0 ? 'pos' : 'neg'; }
-function rSign(r)  { return r > 0 ? '+' : ''; }
-function strengthLabel(p) {
-  return p.strength + (p.fdr_significant ? ' ✓' : '');
-}
-
-function pairToEnglish(p) {
-  const a = p.label_a || p.field_a;
-  const b = p.label_b || p.field_b;
-  const dir = p.r > 0 ? 'higher' : 'lower';
-  const lag = p.lag_days > 0 ? ` (next day)` : '';
-  return `${a}${lag} → ${dir} ${b}`;
-}
-
-function pairToStory(p) {
-  const a = p.label_a || p.field_a;
-  const b = p.label_b || p.field_b;
-  const abs = Math.abs(p.r);
-  const pct = Math.round(abs * 100);
-  const dir = p.r > 0 ? 'tends to be higher' : 'tends to be lower';
-  const lagNote = p.lag_days > 0 ? `The day after ${a} is high, ` : `On days when ${a} is high, `;
-  return `${lagNote}${b} ${dir}. This ${pct}% correlation was measured over ${p.n} days${p.fdr_significant ? ' and passed statistical significance testing' : ''}.`;
-}
-
 const JOURNEY_START = new Date('2026-02-09');
-const FULL_WINDOW   = 90; // days before rolling window is complete
 
 function daysSinceStart() {
   return Math.floor((Date.now() - JOURNEY_START.getTime()) / 86400000);
 }
 
-function renderEmptyState() {
-  const days   = daysSinceStart();
-  const needed = Math.max(0, FULL_WINDOW - days);
-  const pct    = Math.min(100, Math.round(days / FULL_WINDOW * 100));
+// Icons per event type (inline SVG paths)
+const ICONS = {
+  milestone:        '<svg class="tl-event__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0l2.2 5.5H16l-4.7 3.8 1.8 5.7L8 11.3 2.9 15l1.8-5.7L0 5.5h5.8z"/></svg>',
+  weight:           '<svg class="tl-event__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M3 13h10V6H3v7zM5 2v2h6V2H5zM2 5h12a1 1 0 011 1v8a1 1 0 01-1 1H2a1 1 0 01-1-1V6a1 1 0 011-1z"/></svg>',
+  level_up:         '<svg class="tl-event__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l5 6H9v8H7V7H3l5-6z"/></svg>',
+  experiment:       '<svg class="tl-event__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M6 1h4v2h-1v4l4 6H3l4-6V3H6V1zm2 6.5L5.5 12h5L8 7.5z"/></svg>',
+  discovery:        '<svg class="tl-event__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a5 5 0 013 9v2H5V9A5 5 0 018 0zM6 12h4v1H6v-1zm0 2h4v1H6v-1z"/></svg>',
+  finding:          '<svg class="tl-event__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M1 14h14v1H1v-1zM2 8l3-3 3 2 4-5 1 1-5 6-3-2-2 2z"/></svg>',
+  counterintuitive: '<svg class="tl-event__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0l8 14H0L8 0zm0 5a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1zm0 7a1 1 0 100-2 1 1 0 000 2z"/></svg>',
+};
 
-  const banner = `
-    <div style="border:1px solid var(--border);border-left:4px solid var(--accent-dim);background:var(--surface);padding:var(--space-8);">
-      <div style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-4)">\/\/ data accumulating</div>
-      <div style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);margin-bottom:var(--space-4)">
-        <span style="color:var(--accent)">${days}</span> days of data collected
-      </div>
-      <p style="font-size:var(--text-sm);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);margin-bottom:var(--space-6)">
-        The correlation engine runs on a <strong style="color:var(--text)">90-day rolling window</strong>.
-        ${needed > 0
-          ? `${needed} more days of logging will unlock the full analysis &mdash; including FDR-corrected significance testing across all 23 variable pairs.`
-          : 'The full window is complete. Check back after the next Sunday engine run.'}
-      </p>
-      <div style="background:var(--bg);border:1px solid var(--border-subtle);height:6px;max-width:400px;margin-bottom:var(--space-3);">
-        <div style="background:var(--accent);height:100%;width:${pct}%;transition:width 0.6s ease;"></div>
-      </div>
-      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">
-        ${pct}% of rolling window complete &nbsp;&middot;&nbsp; tracking: sleep, HRV, recovery, weight, glucose, habits, strain
-      </div>
-    </div>`;
+const TYPE_LABELS = {
+  milestone:        'Milestone',
+  weight:           'Weight',
+  level_up:         'Level Up',
+  experiment:       'Experiment',
+  discovery:        'Result',
+  finding:          'AI Finding',
+  counterintuitive: 'Surprise',
+};
 
-  document.getElementById('featured-card').innerHTML    = banner;
-  document.getElementById('spotlight-grid').innerHTML   = `<div style="grid-column:1/-1">${banner}</div>`;
-  document.getElementById('archive-body').innerHTML     = `<tr><td colspan="4"><div style="padding:var(--space-8);text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">${days} days tracked &mdash; pairs appear here after ${FULL_WINDOW}-day window fills</div></td></tr>`;
-  document.getElementById('stat-pairs').textContent     = '—';
-  document.getElementById('stat-sig').textContent       = '—';
-  document.getElementById('stat-week').textContent      = '—';
+function formatDate(dateStr) {
+  try {
+    const d = new Date(dateStr + 'T00:00:00');
+    const month = d.toLocaleString('en', { month: 'short' }).toUpperCase();
+    const day = d.getDate();
+    return { month, day };
+  } catch { return { month: '???', day: '?' }; }
 }
 
-async function loadDiscoveries() {
+function renderTimeline(events, filter) {
+  const filtered = filter === 'all' ? events : events.filter(e => e.type === filter);
+  const container = document.getElementById('timeline');
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div class="timeline-empty">No ${filter === 'all' ? '' : TYPE_LABELS[filter] + ' '}events yet. The journey is just beginning.</div>`;
+    return;
+  }
+
+  // Reverse chronological — most recent at top
+  const sorted = [...filtered].reverse();
+
+  container.innerHTML = sorted.map((e, i) => {
+    const { month, day } = formatDate(e.date);
+    const icon = ICONS[e.type] || ICONS.milestone;
+    const typeLabel = TYPE_LABELS[e.type] || e.type;
+    const link = e.link ? `<a href="${e.link}" class="tl-event__link">View details &rarr;</a>` : '';
+    const meta = e.meta ? `<div class="tl-event__meta">r=${e.meta.r > 0 ? '+' : ''}${e.meta.r?.toFixed(2)} &middot; n=${e.meta.n} days &middot; ${e.meta.week}</div>` : '';
+    return `
+      <div class="tl-event" data-type="${e.type}" style="animation-delay: ${Math.min(i * 0.06, 0.8)}s">
+        <div class="tl-event__date">
+          <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag)">${month}</div>
+          <div class="tl-event__date-day">${day}</div>
+        </div>
+        <div class="tl-event__node"></div>
+        <div class="tl-event__card">
+          <div class="tl-event__type">${icon} ${typeLabel}</div>
+          <div class="tl-event__title">${e.title}</div>
+          <div class="tl-event__body">${e.body}</div>
+          ${meta}
+          ${link}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// Filter button logic
+let allEvents = [];
+document.getElementById('filter-bar').addEventListener('click', (evt) => {
+  const btn = evt.target.closest('.filter-btn');
+  if (!btn) return;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTimeline(allEvents, btn.dataset.filter);
+});
+
+async function loadTimeline() {
   try {
-    const res = await fetch(`${API}/api/correlations`);
+    const res = await fetch(`${API}/api/journey_timeline`);
+    if (!res.ok) throw new Error(res.status);
+    const json = await res.json();
+    allEvents = json.events || [];
 
-    // 503 = no data yet
-    if (res.status === 503) {
-      renderEmptyState();
-      return;
-    }
+    // Stats
+    const days = daysSinceStart();
+    const weightEvents = allEvents.filter(e => e.type === 'weight').length;
+    const findingEvents = allEvents.filter(e => e.type === 'finding' || e.type === 'counterintuitive').length;
+    document.getElementById('stat-total').textContent = allEvents.length;
+    document.getElementById('stat-days').textContent = days;
+    document.getElementById('stat-weight').textContent = weightEvents;
+    document.getElementById('stat-findings').textContent = findingEvents;
 
-    const json  = await res.json();
-    const c     = json.correlations;
-    const pairs = c.pairs || [];
-
-    if (pairs.length === 0) {
-      renderEmptyState();
-      return;
-    }
-
-    const sig = pairs.filter(p => p.fdr_significant);
-
-    document.getElementById('stat-pairs').textContent = c.count;
-    document.getElementById('stat-sig').textContent   = sig.length;
-    document.getElementById('stat-week').textContent  = c.week || '—';
-
-    // 'Last updated' note below stats strip
-    const statsStrip = document.querySelector('.stats-strip');
-    if (statsStrip && c.week && !document.getElementById('last-updated-note')) {
-      const note = document.createElement('div');
-      note.id = 'last-updated-note';
-      note.style.cssText = 'max-width:var(--max-width);margin:0 auto;padding:var(--space-3) var(--page-padding);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);border-bottom:1px solid var(--border-subtle)';
-      note.textContent = `// engine last ran: week of ${c.week}  ·  next run: Sunday  ·  ${daysSinceStart()} days tracked`;
-      statsStrip.insertAdjacentElement('afterend', note);
-    }
-
-    // DISC-2: Featured card — strongest SIGNIFICANT pair, or honest "no strong signal"
-    const significantPairs = pairs.filter(p => p.fdr_significant || (p.p < 0.05 && Math.abs(p.r) >= 0.3));
-    const top = significantPairs.length > 0 ? significantPairs[0] : null;
-
-    if (top) {
-      document.getElementById('featured-card').innerHTML = `
-        <div class="featured-card__finding">
-          ${(top.label_a || top.field_a)} <span>${top.r > 0 ? '↑ positively' : '↓ negatively'} predicts</span> ${(top.label_b || top.field_b)}
-        </div>
-        <div class="featured-card__story">
-          ${pairToStory(top)}
-          ${top.fdr_significant ? ' <strong style="color:var(--accent)">This finding survived multiple-testing correction — it&rsquo;s not noise.</strong>' : ''}
-        </div>
-        <div class="featured-card__data">
-          <span class="featured-card__datum">r = <strong>${rSign(top.r)}${top.r.toFixed(3)}</strong></span>
-          <span class="featured-card__datum">n = <strong>${top.n} days</strong></span>
-          <span class="featured-card__datum">Strength: <strong>${top.strength}</strong></span>
-          <span class="featured-card__datum">Sources: <strong>${top.source_a} × ${top.source_b}</strong></span>
-          ${top.lag_days > 0 ? `<span class="featured-card__datum">Lag: <strong>${top.lag_days}d (predictive)</strong></span>` : ''}
-        </div>`;
-    } else {
-      document.getElementById('featured-card').innerHTML = `
-        <div style="border:1px solid var(--border-subtle);border-left:4px solid var(--accent-dim);padding:var(--space-8);">
-          <div style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);margin-bottom:var(--space-4)">
-            No strong signal this week
-          </div>
-          <p style="font-size:var(--text-sm);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);">
-            The engine tested ${pairs.length} pairs but none cleared the significance threshold
-            (FDR-corrected p &lt; 0.05 with |r| &ge; 0.3).
-            That&rsquo;s not a failure &mdash; it&rsquo;s honest science. Noise isn&rsquo;t signal.
-          </p>
-        </div>`;
-    }
-
-    // Spotlight: top 2 pairs
-    document.getElementById('spotlight-grid').innerHTML = pairs.slice(0, 2).map(p => `
-      <div class="spotlight-card">
-        <div class="spotlight-card__tag">${p.source_a} × ${p.source_b}${p.lag_days > 0 ? ' · predictive' : ''}</div>
-        <div class="spotlight-card__r ${rClass(p.r)}">${rSign(p.r)}${p.r.toFixed(2)}${p.fdr_significant ? '<span class="fdr-badge">FDR ✓</span>' : ''}</div>
-        <div class="spotlight-card__pair">${pairToEnglish(p)}</div>
-        <div class="spotlight-card__story">${pairToStory(p)}</div>
-        <div class="spotlight-card__meta">Strength: ${p.strength} &middot; n = ${p.n} days</div>
-      </div>`).join('');
-
-    // Archive table
-    document.getElementById('archive-body').innerHTML = pairs.map(p => `
-      <tr>
-        <td class="td-r ${rClass(p.r)}">${rSign(p.r)}${p.r.toFixed(2)}</td>
-        <td class="td-finding">${pairToEnglish(p)}</td>
-        <td class="td-stat">${p.label_a || p.field_a} &middot; ${p.label_b || p.field_b}</td>
-        <td class="td-stat td-strength">n=${p.n} &middot; ${strengthLabel(p)}</td>
-      </tr>`).join('');
-
-    // DISC-1: Dynamic counterintuitive section (replaces hardcoded cards)
-    const counterintuitive = pairs.filter(p => p.counterintuitive);
-    const ciGrid = document.getElementById('ci-grid');
-    if (counterintuitive.length > 0) {
-      ciGrid.innerHTML = counterintuitive.slice(0, 3).map(p => `
-        <div class="ci-card">
-          <div class="ci-card__surprise">// Counterintuitive</div>
-          <div class="ci-card__finding">${pairToEnglish(p)}</div>
-          <div class="ci-card__expected">Expected: ${p.expected_direction} relationship</div>
-          <div class="ci-card__actual">Observed: r=${rSign(p.r)}${p.r.toFixed(2)} (${p.r > 0 ? 'positive' : 'negative'}, n=${p.n} days)</div>
-        </div>`).join('');
-    } else {
-      ciGrid.innerHTML = `
-        <div style="grid-column:1/-1;border:1px solid var(--border-subtle);padding:var(--space-8);text-align:center;">
-          <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">
-            No counterintuitive findings this week &mdash; all correlations match expected directions.
-            <br>Check back after Sunday&rsquo;s engine run.
-          </div>
-        </div>`;
-    }
-
-    // DISC-5: Show analysis window dates if available
-    if (c.start_date && c.end_date) {
-      const windowNote = document.getElementById('last-updated-note');
-      if (windowNote) {
-        windowNote.textContent += `  ·  window: ${c.start_date} → ${c.end_date}`;
-      }
-    }
-
+    renderTimeline(allEvents, 'all');
   } catch(e) {
-    renderEmptyState();
+    document.getElementById('timeline').innerHTML = `
+      <div class="timeline-empty">
+        Timeline loading&hellip; The journey starts on Day 1.
+        <br><span style="font-size:var(--text-2xs);color:var(--text-faint)">If this persists, the API may be caching. Try again in a few minutes.</span>
+      </div>`;
   }
 }
 
-loadDiscoveries();
+loadTimeline();
 </script>
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>

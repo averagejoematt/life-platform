@@ -35,7 +35,7 @@ The Discoveries page (`site/discoveries/index.html`) calls `/api/correlations` w
 
 **Effort**: 1-2 sessions | **Priority**: Do first
 
-### DISC-1: Wire counterintuitive section to real data
+### DISC-1: Wire counterintuitive section to real data ✨
 
 **Problem**: Three hardcoded `<div class="ci-card">` elements that never change. On a page titled "What the AI has actually found," static content is a credibility breach.
 
@@ -316,7 +316,9 @@ This requires adding `start_date` and `end_date` to the API response (they're al
 
 **Implementation approach**:
 
-1. **New API endpoint**: `/api/correlation_history?pair=hrv_vs_recovery`:
+1. **New API parameter**: `/api/correlations?history=true&pair=hrv_vs_recovery` returns the r-value for a specific pair across all stored weeks.
+
+2. **New API endpoint**: `/api/correlation_history?pair=hrv_vs_recovery` (cleaner, dedicated):
 
 ```python
 def handle_correlation_history(event: dict = None) -> dict:
@@ -356,7 +358,7 @@ def handle_correlation_history(event: dict = None) -> dict:
     }, cache_seconds=3600)
 ```
 
-2. **UI**: Clickable sparkline on each spotlight card and archive row. Clicking expands to a mini chart (Chart.js line chart) showing r-value over time with FDR threshold line.
+3. **UI**: Clickable sparkline on each spotlight card and archive row. Clicking expands to a mini chart (Chart.js line chart) showing r-value over time with FDR threshold line.
 
 **Files changed**: `site_api_lambda.py` (new endpoint), `site/discoveries/index.html` (sparkline + expand interaction)
 
@@ -533,11 +535,11 @@ Session 6: DISC-11 (auto-chronicle) + DISC-12 (share cards)
 
 | Field | Type | New? | Description |
 |-------|------|------|-------------|
-| `expected_direction` | string | Yes | Domain knowledge: "positive" or "negative" |
-| `counterintuitive` | bool | Yes | True when observed != expected and |r| >= 0.2 |
-| `first_detected` | string | Yes | ISO week when this pair first appeared with consistent direction |
-| `weeks_confirmed` | int | Yes | Number of weeks this finding has held with same direction |
-| `ever_fdr_significant` | bool | Yes | Has this pair ever passed FDR in any week? |
+| `expected_direction` | string | ✅ | Domain knowledge: "positive" or "negative" |
+| `counterintuitive` | bool | ✅ | True when observed ≠ expected and |r| ≥ 0.2 |
+| `first_detected` | string | ✅ | ISO week when this pair first appeared with consistent direction |
+| `weeks_confirmed` | int | ✅ | Number of weeks this finding has held with same direction |
+| `ever_fdr_significant` | bool | ✅ | Has this pair ever passed FDR in any week? |
 
 ### `site_api_lambda.py` — `/api/correlations` response
 
