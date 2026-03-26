@@ -17,11 +17,12 @@ window.AMJ = {
     start_weight:  302,
     goal_weight:   185,
     start_date:    '2026-02-22',
-    phase:         'Ignition',
-    hero_tagline:  '302 → 185. 19 data sources. 95 AI tools. Every number public. Built by a non-engineer with Claude.',
+    experiment_start: '2026-04-01',  // Day 1 of the public experiment
+    phase:         'Launch',
+    hero_tagline:  'Day 1. For real this time.',
     hero_short:    '302 → 185. 19 data sources. Every number public.',
-    hero_copy:     'Most people optimize in the dark — gut feelings, Instagram advice, someone\'s podcast take. I connect 19 data sources to a custom AI and publish every number, every week, without filtering. 302 lbs to 185. Every failure included. This is what systematic self-improvement actually looks like.',
-    cta_sub:       '302 lbs. A goal. Every failure included.',
+    hero_copy:     'I built an AI health platform, got sick, fell off the wagon, and the system I built didn\'t catch me. So I\'m starting over — publicly. April 1, 2026 is Day 1. Every number, every failure, no filter.',
+    cta_sub:       '302 lbs. A relapse. A relaunch. Day 1.',
   },
 
   // ── Platform ───────────────────────────────────────────────
@@ -46,7 +47,7 @@ window.AMJ = {
 
   // ── OG / meta descriptions ─────────────────────────────────
   meta: {
-    home:        '302 → 185. 19 data sources. 95 AI tools. Every number public. Built by a non-engineer with Claude.',
+    home:        'Day 1: April 1, 2026. 302 lbs. 19 data sources. An AI health platform. Every number public, every failure included.',
     live:        'Real-time metrics from 19 data sources. Weight, HRV, recovery, habits, and the full transformation timeline.',
     story:       '302 lbs. And a decision to stop optimizing in the dark.',
     about:       'IT leader by day. Solo engineer by night. Building the infrastructure to change everything.',

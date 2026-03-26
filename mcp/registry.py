@@ -36,6 +36,7 @@ from mcp.tools_social import *
 from mcp.tools_adaptive import *
 from mcp.tools_todoist import *
 from mcp.tools_memory import *
+from mcp.tools_memory import tool_capture_baseline
 from mcp.tools_decisions import *
 from mcp.tools_hypotheses import *
 from mcp.tools_sick_days import *
@@ -1983,6 +1984,28 @@ TOOLS = {
                     "date":     {"type": "string", "description": "Date of the record to delete (YYYY-MM-DD)."},
                 },
                 "required": ["category", "date"],
+            },
+        },
+    },
+    "capture_baseline": {
+        "fn": tool_capture_baseline,
+        "schema": {
+            "name": "capture_baseline",
+            "description": (
+                "Capture a full-state baseline snapshot across all key domains (weight, body composition, "
+                "blood pressure, HRV, recovery, Character Sheet score, habit completion, vice streaks, "
+                "glucose, nutrition). Stores a permanent record in platform_memory. Designed to run on "
+                "Day 1 (April 1, 2026) to create the anchor point for all future progress comparisons. "
+                "Safe by default: won't overwrite existing snapshot unless force=true."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "date":  {"type": "string", "description": "Date for the snapshot (YYYY-MM-DD). Defaults to today."},
+                    "label": {"type": "string", "description": "Label for this snapshot (e.g. 'day_1', 'month_3'). Defaults to 'day_1'."},
+                    "force": {"type": "boolean", "description": "If true, overwrite existing snapshot for this date. Default false."},
+                },
+                "required": [],
             },
         },
     },

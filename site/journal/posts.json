@@ -1,45 +1,72 @@
 {
   "posts": [
     {
-      "week": 4,
-      "title": "The Silence in the Data",
-      "date": "2026-03-17",
-      "stats_line": "Weight: 287.7 lbs \u00b7 Week Grade: avg 70/100 \u00b7 T0 Streak: \u2014",
-      "url": "/journal/posts/week-04/",
-      "excerpt": "There\u2019s a particular kind of story that\u2019s hard to write, and it\u2019s the one where nothing happens. Not nothing in the dramatic sense \u2014 no injury, no crisis, no spectacular collapse. Just a week that arrives and departs without leaving much of a mark.",
-      "word_count": 1650,
-      "has_board_interview": false
+      "week": -1,
+      "title": "The Interview",
+      "date": "2026-03-25",
+      "stats_line": "Prequel · Week −1 · March 25, 2026 · Seattle, WA",
+      "url": "/journal/posts/week-minus-1/",
+      "excerpt": "Six days before Day 1. Elena Voss sits down with Matthew for the first time — no data cards, no board verdicts. Just a conversation about what went wrong, what he learned, and what April 1 actually means.",
+      "word_count": 2200,
+      "has_board_interview": true,
+      "phase": "prequel"
     },
     {
-      "week": 3,
+      "week": -2,
+      "title": "The Silence in the Data",
+      "date": "2026-03-17",
+      "stats_line": "Prequel · Week −2 · Weight: 287.7 lbs · Week Grade: avg 70/100",
+      "url": "/journal/posts/week-04/",
+      "excerpt": "There's a particular kind of story that's hard to write, and it's the one where nothing happens. Not nothing in the dramatic sense — no injury, no crisis, no spectacular collapse. Just a week that arrives and departs without leaving much of a mark.",
+      "word_count": 1650,
+      "has_board_interview": false,
+      "phase": "prequel"
+    },
+    {
+      "week": -3,
       "title": "The DoorDash Chronicle",
       "date": "2026-03-11",
-      "stats_line": "Weight: tracking paused \u00b7 Grade: sick days logged",
+      "stats_line": "Prequel · Week −3 · Weight: tracking paused · Grade: sick days logged",
       "url": "/journal/posts/week-03/",
       "excerpt": "He has nineteen data sources. He has a platform that generates a daily briefing, tracks his HRV to two decimal places, and maintains a gamified character sheet scoring seven dimensions of his health. He has, in other words, built an extraordinarily sophisticated apparatus for listening to his body.",
       "word_count": 1070,
-      "has_board_interview": false
+      "has_board_interview": false,
+      "phase": "prequel"
     },
     {
-      "week": 2,
+      "week": -4,
       "title": "The Empty Journal",
       "date": "2026-03-03",
-      "stats_line": "Week 2 \u00b7 February 25 \u2013 March 3, 2026 \u00b7 Seattle, WA",
+      "stats_line": "Prequel · Week −4 · February 25 – March 3, 2026 · Seattle, WA",
       "url": "/journal/posts/week-02/",
-      "excerpt": "Here is something I did not expect to find two weeks into this assignment: a man who has built twenty-seven automated programs to monitor his sleep, his blood glucose, his heart rate recovery, his gait symmetry, and whether he remembered to take his apigenin before bed \u2014 who has not written a single",
+      "excerpt": "Here is something I did not expect to find two weeks into this assignment: a man who has built twenty-seven automated programs to monitor his sleep, his blood glucose, his heart rate recovery, his gait symmetry, and whether he remembered to take his apigenin before bed — who has not written a single",
       "word_count": 1421,
-      "has_board_interview": false
+      "has_board_interview": false,
+      "phase": "prequel"
+    },
+    {
+      "week": -5,
+      "title": "First Contact",
+      "date": "2026-02-28",
+      "stats_line": "Prequel · Week −5 · February 28, 2026",
+      "url": "/journal/posts/week-01/",
+      "excerpt": "The experiment begins. Sensors syncing, platform live, protocol locked. What happens in the first week when the system meets real life.",
+      "word_count": 900,
+      "has_board_interview": false,
+      "phase": "prequel"
     },
     {
       "week": 0,
       "title": "Before the Numbers",
       "date": "2026-02-22",
-      "stats_line": "Prologue \u00b7 February 2026 \u00b7 Seattle, WA",
+      "stats_line": "Prequel · Prologue · February 2026 · Seattle, WA",
       "url": "/journal/posts/week-00/",
-      "excerpt": "The first thing you notice about Matthew's apartment is the charging cables.\n\nThere's one snaking from the nightstand \u2014 that's the Whoop strap, a fitness tracker that monitors his heart rate variability while he sleeps. Another on the bathroom counter feeds a Garmin Epix watch that measures his stre",
+      "excerpt": "The first thing you notice about Matthew's apartment is the charging cables.\n\nThere's one snaking from the nightstand — that's the Whoop strap, a fitness tracker that monitors his heart rate variability while he sleeps. Another on the bathroom counter feeds a Garmin Epix watch that measures his stre",
       "word_count": 1240,
-      "has_board_interview": false
+      "has_board_interview": false,
+      "phase": "prequel"
     }
   ],
-  "updated_at": "2026-03-24T03:55:00.000000+00:00"
+  "experiment_start": "2026-04-01",
+  "updated_at": "2026-03-25T23:30:00.000000+00:00"
 }
