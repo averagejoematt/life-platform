@@ -5,18 +5,13 @@
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="30+ weeks of continuous glucose monitoring data — time-in-range, variability, meal response tables, and metabolic intelligence from Dexcom Stelo.">
-  <meta property="og:title" content="Glucose Intelligence — Matthew Walker">
+  <meta property="og:title" content="Glucose Observatory — Matthew Walker">
   <meta property="og:description" content="Real CGM data: time-in-range, glucose variability, and what my metabolic patterns actually look like.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com/glucose/">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Glucose Intelligence — Matthew Walker">
-  <meta name="twitter:description" content="30+ weeks of CGM data. Time-in-range, variability, and what keeping glucose stable actually requires.">
-  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <title>Glucose Intelligence — Matthew Walker</title>
+  <title>Glucose Observatory — Matthew Walker</title>
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
@@ -25,744 +20,948 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    .glc-header {
-      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
-      border-bottom: 1px solid var(--border);
-    }
-    .glc-header__title {
-      font-family: var(--font-display);
-      font-size: var(--text-h1);
-      line-height: var(--lh-display);
-      color: var(--text);
-      margin-bottom: var(--space-4);
-    }
-    .glc-header__title span { color: var(--accent); }
-    .glc-header__sub {
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      max-width: 560px;
-      line-height: var(--lh-body);
+    :root {
+      --g-teal: #2dd4bf;
+      --g-teal-dim: rgba(45,212,191,0.15);
+      --g-teal-glow: rgba(45,212,191,0.06);
+      --g-green: #3ecf8e;
+      --g-red: #ef4444;
+      --g-amber: #f59e0b;
+      --g-violet: #818cf8;
     }
 
-    .glc-body {
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes ringDraw {
+      from { stroke-dasharray: 0 251; }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       HERO
+       ═══════════════════════════════════════════════════════ */
+    .g-hero {
+      padding: calc(var(--nav-height) + var(--space-20)) var(--page-padding) var(--space-16);
+      position: relative;
+      overflow: hidden;
+      border-bottom: 1px solid var(--border);
       max-width: var(--max-width);
       margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
+    }
+    .g-hero-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-12);
+      align-items: center;
+    }
+    .g-hero__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--g-teal);
+      margin-bottom: var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.1s forwards;
+    }
+    .g-hero__eyebrow::before {
+      content: '';
+      width: 32px;
+      height: 1px;
+      background: var(--g-teal);
+    }
+    .g-hero__title {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 5vw, 52px);
+      color: var(--text);
+      line-height: 1.05;
+      max-width: 520px;
+      margin-bottom: var(--space-6);
+      opacity: 0;
+      animation: fadeUp 0.6s 0.2s forwards;
+    }
+    .g-hero__title em {
+      font-style: normal;
+      color: var(--g-teal);
+    }
+    .g-hero__sub {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 420px;
+      line-height: 1.8;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.3s forwards;
     }
 
-    /* ── Stat cards ── */
-    .glc-stats {
+    /* Gauge row */
+    .g-gauge-row {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1px;
-      background: var(--border);
-      border: 1px solid var(--border);
-      margin-bottom: var(--space-10);
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+      opacity: 0;
+      animation: fadeUp 0.6s 0.4s forwards;
     }
-    .glc-stat {
+    .g-gauge {
+      text-align: center;
+      padding: var(--space-5) var(--space-3);
       background: var(--surface);
-      padding: var(--space-6) var(--space-5);
+      border: 1px solid var(--border);
     }
-    .glc-stat__label {
+    .g-gauge__ring {
+      width: 88px;
+      height: 88px;
+      margin: 0 auto var(--space-3);
+      position: relative;
+    }
+    .g-gauge__ring svg { width: 100%; height: 100%; }
+    .g-gauge__center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    .g-gauge__num {
+      font-family: var(--font-display);
+      font-size: 22px;
+      line-height: 1;
+    }
+    .g-gauge__unit {
       font-family: var(--font-mono);
-      font-size: var(--text-xs);
+      font-size: 9px;
+      color: var(--text-faint);
+      letter-spacing: 0.08em;
+    }
+    .g-gauge__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
       color: var(--text-muted);
-      letter-spacing: var(--ls-tag);
+      letter-spacing: 0.1em;
       text-transform: uppercase;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       PULL-QUOTES
+       ═══════════════════════════════════════════════════════ */
+    .g-pullquote {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      position: relative;
+      border-bottom: 1px solid var(--border);
+    }
+    .g-pullquote__watermark {
+      position: absolute;
+      top: 24px;
+      right: var(--page-padding);
+      font-family: var(--font-display);
+      font-size: 120px;
+      color: rgba(45, 212, 191, 0.04);
+      line-height: 1;
+      pointer-events: none;
+    }
+    .g-pullquote__text {
+      font-family: var(--font-display);
+      font-size: clamp(24px, 3.5vw, 32px);
+      line-height: 1.3;
+      color: var(--text);
+      max-width: 640px;
+      position: relative;
+    }
+    .g-pullquote__text em {
+      font-style: normal;
+      color: var(--g-teal);
+    }
+    .g-pullquote__attr {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-top: var(--space-4);
+    }
+    .g-pullquote__badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--g-teal);
+      background: var(--g-teal-dim);
+      padding: 3px 10px;
+      display: inline-block;
+    }
+    .g-pullquote__source {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      letter-spacing: 0.06em;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       TIR EDITORIAL — 3-column
+       ═══════════════════════════════════════════════════════ */
+    .g-tir-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .g-tir-header {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-8);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .g-tir-header::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .g-tir-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+    }
+    .g-tir-col {
+      padding: var(--space-6) var(--space-6);
+    }
+    .g-tir-col:not(:last-child) {
+      border-right: 1px solid var(--border);
+    }
+    .g-tir-bar {
+      height: 3px;
+      background: rgba(255,255,255,0.03);
+      margin-bottom: var(--space-5);
+      position: relative;
+      overflow: hidden;
+    }
+    .g-tir-bar__fill {
+      height: 100%;
+      position: absolute;
+      left: 0;
+      top: 0;
+      transition: width 1.2s ease;
+    }
+    .g-tir-big {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 4vw, 44px);
+      line-height: 1;
       margin-bottom: var(--space-2);
     }
-    .glc-stat__value {
-      font-family: var(--font-display);
-      font-size: var(--text-h2);
-      color: var(--text);
-      line-height: 1;
-      margin-bottom: var(--space-1);
-    }
-    .glc-stat__sub {
+    .g-tir-name {
       font-family: var(--font-mono);
-      font-size: var(--text-xs);
+      font-size: 11px;
       color: var(--text-muted);
-    }
-    .glc-stat__value.green { color: var(--c-green-400); }
-    .glc-stat__value.yellow { color: var(--c-amber-400); }
-    .glc-stat__value.red { color: var(--c-red-400); }
-
-    /* ── Meal response table ── */
-    .glc-meal-section {
-      margin-bottom: var(--space-10);
-    }
-    .glc-meal-section__header {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      margin-bottom: var(--space-5);
-      flex-wrap: wrap;
-      gap: var(--space-3);
-    }
-    .glc-meal-section__title {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      letter-spacing: var(--ls-tag);
+      letter-spacing: 0.1em;
       text-transform: uppercase;
+      margin-bottom: var(--space-3);
     }
-    .glc-meal-section__sub {
+    .g-tir-detail {
       font-size: var(--text-sm);
-      color: var(--text-muted);
+      color: var(--text-faint);
+      line-height: 1.7;
     }
-    .glc-meal-table {
+    .g-tir-detail a {
+      color: var(--g-teal);
+      text-decoration: none;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       MEAL RESPONSE TABLE
+       ═══════════════════════════════════════════════════════ */
+    .g-meal-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .g-meal-header {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .g-meal-header::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .g-meal-table {
       width: 100%;
       border-collapse: collapse;
       background: var(--surface);
       border: 1px solid var(--border);
     }
-    .glc-meal-table th {
+    .g-meal-table th {
       font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      letter-spacing: var(--ls-tag);
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.1em;
       text-transform: uppercase;
       text-align: left;
-      padding: var(--space-3) var(--space-4);
+      padding: var(--space-4) var(--space-5);
       border-bottom: 1px solid var(--border);
-      background: var(--surface-raised, var(--surface));
     }
-    .glc-meal-table td {
+    .g-meal-table td {
       font-size: var(--text-sm);
       color: var(--text-muted);
-      padding: var(--space-3) var(--space-4);
-      border-bottom: 1px solid var(--border);
-      line-height: var(--lh-body);
+      padding: var(--space-4) var(--space-5);
+      border-bottom: 1px solid rgba(255,255,255,0.02);
+      line-height: 1.5;
     }
-    .glc-meal-table tr:last-child td { border-bottom: none; }
-    .glc-meal-table td:first-child {
+    .g-meal-table tr:last-child td { border-bottom: none; }
+    .g-meal-table td:first-child {
       color: var(--text);
       font-weight: 500;
     }
-    .glc-meal-table .spike-low  { color: var(--c-green-400); font-family: var(--font-mono); }
-    .glc-meal-table .spike-mid  { color: var(--c-amber-400); font-family: var(--font-mono); }
-    .glc-meal-table .spike-high { color: var(--c-red-400);   font-family: var(--font-mono); }
-    .glc-meal-table td.mono { font-family: var(--font-mono); }
+    .g-meal-table .spike-low  { color: var(--g-green); font-family: var(--font-mono); }
+    .g-meal-table .spike-mid  { color: var(--g-amber); font-family: var(--font-mono); }
+    .g-meal-table .spike-high { color: var(--g-red);   font-family: var(--font-mono); }
+    .g-meal-table .mono { font-family: var(--font-mono); }
 
-    /* ── TIR gauge section ── */
-    .glc-gauge-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-6);
-      margin-bottom: var(--space-10);
-    }
-    .glc-gauge-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: var(--space-6);
-    }
-    .glc-gauge-card__title {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      margin-bottom: var(--space-4);
-    }
-    .glc-bar-wrap {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-3);
-    }
-    .glc-bar-row {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-    }
-    .glc-bar-label {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      width: 110px;
-      flex-shrink: 0;
-    }
-    .glc-bar-track {
-      flex: 1;
-      height: 8px;
-      background: var(--surface-raised);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-    .glc-bar-fill {
-      height: 100%;
-      border-radius: 4px;
-      transition: width 0.6s ease;
-    }
-    .glc-bar-fill.green  { background: var(--c-green-500); }
-    .glc-bar-fill.yellow { background: var(--c-amber-500); }
-    .glc-bar-fill.red    { background: var(--c-red-500); }
-    .glc-bar-pct {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      width: 38px;
-      text-align: right;
-    }
-
-    /* ── Trend chart ── */
-    .glc-chart-section {
-      margin-bottom: var(--space-10);
-    }
-    .glc-chart-header {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      margin-bottom: var(--space-4);
-    }
-    .glc-chart-title {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-    }
-    .glc-chart-legend {
-      display: flex;
-      gap: var(--space-4);
-    }
-    .glc-legend-item {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-muted);
-    }
-    .glc-legend-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-    }
-    canvas.glc-chart {
-      width: 100%;
-      height: 180px;
-      display: block;
-      background: var(--surface);
-      border: 1px solid var(--border);
-    }
-
-    /* ── Variability section ── */
-    .glc-var-section {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-6);
-      margin-bottom: var(--space-10);
-    }
-    .glc-info-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: var(--space-6);
-    }
-    .glc-info-card__eyebrow {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      margin-bottom: var(--space-3);
-    }
-    .glc-info-card__headline {
-      font-family: var(--font-display);
-      font-size: var(--text-h3);
-      color: var(--text);
-      margin-bottom: var(--space-3);
-    }
-    .glc-info-card__body {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-    }
-
-    /* ── Cross-reference callout ── */
-    .glc-xref-section {
-      margin-bottom: var(--space-10);
-    }
-    .glc-xref-section__title {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      margin-bottom: var(--space-5);
-    }
-    .glc-xref-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-4);
-    }
-    .glc-xref-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--accent);
-      padding: var(--space-5) var(--space-6);
-    }
-    .glc-xref-card__stat {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--c-green-400);
-      margin-bottom: var(--space-3);
-    }
-    .glc-xref-card__text {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-      margin-bottom: var(--space-3);
-    }
-    .glc-xref-card__link {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-    }
-    .glc-xref-card__link a {
-      color: var(--accent);
-      text-decoration: none;
-    }
-    .glc-xref-card__link a:hover { text-decoration: underline; }
-
-    /* ── Methodology ── */
-    .glc-method {
-      border-top: 1px solid var(--border);
-      padding-top: var(--space-8);
-      margin-top: var(--space-2);
-    }
-    .glc-method__title {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      margin-bottom: var(--space-4);
-    }
-    .glc-method__grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-4);
-    }
-    .glc-method__item {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-    }
-    .glc-method__item strong {
-      display: block;
-      color: var(--text);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      margin-bottom: var(--space-1);
-    }
-
-    /* ── Loading ── */
-    .glc-loading {
-      text-align: center;
-      padding: var(--space-16);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      letter-spacing: var(--ls-tag);
-    }
-
-    /* ── Why CGM narrative ── */
-    .glc-narrative {
+    /* ═══════════════════════════════════════════════════════
+       TREND CHART
+       ═══════════════════════════════════════════════════════ */
+    .g-chart-section {
       max-width: var(--max-width);
       margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
+      padding: var(--space-12) var(--page-padding);
       border-bottom: 1px solid var(--border);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-10);
-      align-items: start;
     }
-    .glc-narrative__eyebrow {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
+    .g-chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
       margin-bottom: var(--space-4);
     }
-    .glc-narrative__title {
+    .g-chart-title {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .g-chart-title::after {
+      content: '';
+      width: 48px;
+      height: 1px;
+      background: var(--border);
+    }
+    .g-chart-legend {
+      display: flex;
+      gap: var(--space-4);
+    }
+    .g-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+    }
+    .g-legend-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+    canvas.g-chart {
+      width: 100%;
+      height: 200px;
+      display: block;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       N=1 RULES
+       ═══════════════════════════════════════════════════════ */
+    .g-rules-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .g-rules-header {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .g-rules-header::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .g-rule-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+    }
+    .g-rule {
+      padding: var(--space-6);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-left: 3px solid var(--g-teal);
+      background: var(--surface);
+    }
+    .g-rule__num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--g-teal);
+      margin-bottom: var(--space-3);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .g-rule__num::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(45,212,191,0.1);
+    }
+    .g-rule__finding {
+      font-family: var(--font-display);
+      font-size: var(--text-base);
+      color: var(--text);
+      line-height: 1.35;
+      margin-bottom: var(--space-3);
+    }
+    .g-rule__evidence {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+    .g-rule__evidence em {
+      font-style: normal;
+      color: var(--g-teal);
+    }
+    .g-rule__evidence a {
+      color: var(--g-teal);
+      text-decoration: none;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       CROSS-LINKS
+       ═══════════════════════════════════════════════════════ */
+    .g-xref {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+      border-bottom: 1px solid var(--border);
+    }
+    .g-xref-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--g-teal);
+      padding: var(--space-5) var(--space-6);
+      transition: border-color 0.15s;
+      text-decoration: none;
+      display: block;
+    }
+    .g-xref-card:hover { border-color: var(--g-teal); }
+    .g-xref-card__tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--g-teal);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-2);
+    }
+    .g-xref-card__text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       NARRATIVE
+       ═══════════════════════════════════════════════════════ */
+    .g-narrative {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-12);
+      border-bottom: 1px solid var(--border);
+    }
+    .g-narrative__title {
       font-family: var(--font-display);
       font-size: var(--text-h2);
       color: var(--text);
-      margin-bottom: var(--space-5);
-      line-height: var(--lh-heading);
-    }
-    .glc-narrative__title span { color: var(--accent); }
-    .glc-narrative__body {
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-    }
-    .glc-narrative__body p { margin: 0 0 var(--space-4); }
-    .glc-narrative__body p:last-child { margin-bottom: 0; }
-    .glc-narrative__body strong { color: var(--text); }
-    .glc-context-box {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--accent);
-      padding: var(--space-6);
-    }
-    .glc-context-box__heading {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
+      line-height: 1.15;
       margin-bottom: var(--space-5);
     }
-    .glc-context-item {
-      display: flex;
-      align-items: flex-start;
-      gap: var(--space-3);
-      margin-bottom: var(--space-4);
+    .g-narrative__title em {
+      font-style: normal;
+      color: var(--g-teal);
     }
-    .glc-context-item:last-child { margin-bottom: 0; }
-    .glc-context-item__bullet {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--accent);
-      flex-shrink: 0;
-      padding-top: 2px;
-    }
-    .glc-context-item__text {
+    .g-narrative__body {
       font-size: var(--text-sm);
       color: var(--text-muted);
-      line-height: var(--lh-body);
+      line-height: 1.8;
     }
-    .glc-context-item__text strong { color: var(--text); }
+    .g-narrative__body strong { color: var(--text); }
+    .g-protocol-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+    }
+    .g-protocol-item {
+      display: flex;
+      gap: var(--space-4);
+      padding: var(--space-4);
+      background: var(--surface);
+      border-left: 2px solid var(--g-teal);
+    }
+    .g-protocol-num {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: var(--g-teal);
+      line-height: 1;
+      flex-shrink: 0;
+      width: 28px;
+    }
+    .g-protocol-text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .g-protocol-text strong { color: var(--text); }
 
+    /* ═══════════════════════════════════════════════════════
+       METHODOLOGY
+       ═══════════════════════════════════════════════════════ */
+    .g-method {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+    }
+    .g-method__title {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .g-method__title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .g-method-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-6);
+    }
+    .g-method-item {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+    .g-method-item strong {
+      display: block;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.08em;
+      margin-bottom: var(--space-2);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       LOADING
+       ═══════════════════════════════════════════════════════ */
+    .g-loading {
+      text-align: center;
+      padding: var(--space-20);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       RESPONSIVE
+       ═══════════════════════════════════════════════════════ */
     @media (max-width: 768px) {
-      .glc-stats { grid-template-columns: repeat(2, 1fr); }
-      .glc-gauge-row { grid-template-columns: 1fr; }
-      .glc-var-section { grid-template-columns: 1fr; }
-      .glc-method__grid { grid-template-columns: 1fr; }
-      .glc-narrative { grid-template-columns: 1fr; gap: var(--space-6); }
-      .glc-xref-grid { grid-template-columns: 1fr; }
-      .glc-meal-table { font-size: var(--text-xs); }
-      .glc-meal-table th, .glc-meal-table td { padding: var(--space-2) var(--space-3); }
+      .g-hero-grid { grid-template-columns: 1fr; }
+      .g-gauge-row { grid-template-columns: repeat(2, 1fr); }
+      .g-tir-grid { grid-template-columns: 1fr; }
+      .g-tir-col:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
+      .g-rule-grid { grid-template-columns: 1fr; }
+      .g-narrative { grid-template-columns: 1fr; }
+      .g-method-grid { grid-template-columns: 1fr; }
+      .g-xref { grid-template-columns: 1fr; }
+      .g-meal-table { font-size: var(--text-xs); }
+      .g-meal-table th, .g-meal-table td { padding: var(--space-3); }
     }
   </style>
 </head>
 <body>
 
 <div id="amj-nav"></div>
-</div>
 
-
-
-
-
-
-
-<div class="experiment-thread">Glucose feeds the Metabolic pillar → <a href="/character/">Character →</a></div>
-<header class="glc-header reveal">
-  <div class="eyebrow page-header__kicker" style="margin-bottom:var(--space-4)">The Science</div>
-  <h1 class="glc-header__title">Glucose <span>Observatory</span></h1>
-  <p class="glc-header__sub">
-    Most people never know their glucose response to food. Here&rsquo;s mine, over 30+ weeks of CGM data.
-  </p>
-</header>
-
-<!-- Why CGM — narrative section -->
-<div class="glc-narrative reveal">
-  <div class="glc-narrative__left">
-    <div class="glc-narrative__eyebrow">// what a CGM reveals</div>
-    <h2 class="glc-narrative__title">What fasting glucose <span>doesn't tell you</span></h2>
-    <div class="glc-narrative__body">
-      <p>
-        A fasting glucose test gives you one number &mdash; a snapshot taken after 8+ hours without food.
-        <strong>It captures none of the metabolic action</strong>: not what happens after meals,
-        not whether glucose spikes at 2am, not whether a salad or a steak drives different
-        post-meal curves in your body specifically.
+<!-- ════════════════════════════════════════════════════════════
+     HERO
+     ════════════════════════════════════════════════════════════ -->
+<div class="g-hero">
+  <div class="g-hero-grid">
+    <div>
+      <div class="g-hero__eyebrow">Glucose Observatory</div>
+      <h1 class="g-hero__title">What fasting glucose <em>doesn&rsquo;t</em> tell you</h1>
+      <p class="g-hero__sub">
+        288 readings per day via Dexcom Stelo CGM. Time-in-range, variability,
+        and how specific foods interact with my individual physiology.
       </p>
-      <p>
-        A continuous glucose monitor (CGM) reads glucose every 5 minutes, 24 hours a day.
-        That's <strong>288 data points per day</strong> versus one. The additional signal includes
-        glucose variability (low variability = stable metabolism), post-meal spike magnitude,
-        nocturnal patterns, and how specific foods interact with your individual physiology &mdash;
-        not population averages.
-      </p>
-      <p>
-        Time-in-range (TIR) &mdash; the percentage of readings between 70 and 180 mg/dL &mdash; is
-        now considered <strong>a more actionable metric than HbA1c</strong> for lifestyle
-        optimization because it responds to intervention within days, not months.
-      </p>
+    </div>
+    <div class="g-gauge-row">
+      <div class="g-gauge">
+        <div class="g-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="gg-tir-arc" cx="44" cy="44" r="35" fill="none" stroke="#2dd4bf" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.5s"/>
+          </svg>
+          <div class="g-gauge__center">
+            <div class="g-gauge__num" id="gg-tir-num" style="color:#2dd4bf">&mdash;</div>
+            <div class="g-gauge__unit">%</div>
+          </div>
+        </div>
+        <div class="g-gauge__label">Time in range</div>
+      </div>
+      <div class="g-gauge">
+        <div class="g-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="gg-avg-arc" cx="44" cy="44" r="35" fill="none" stroke="#3ecf8e" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.6s"/>
+          </svg>
+          <div class="g-gauge__center">
+            <div class="g-gauge__num" id="gg-avg-num" style="color:#3ecf8e">&mdash;</div>
+            <div class="g-gauge__unit">mg/dL</div>
+          </div>
+        </div>
+        <div class="g-gauge__label">Avg glucose</div>
+      </div>
+      <div class="g-gauge">
+        <div class="g-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="gg-sd-arc" cx="44" cy="44" r="35" fill="none" stroke="#f59e0b" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.7s"/>
+          </svg>
+          <div class="g-gauge__center">
+            <div class="g-gauge__num" id="gg-sd-num" style="color:#f59e0b">&mdash;</div>
+            <div class="g-gauge__unit">SD</div>
+          </div>
+        </div>
+        <div class="g-gauge__label">Variability</div>
+      </div>
+      <div class="g-gauge">
+        <div class="g-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="gg-opt-arc" cx="44" cy="44" r="35" fill="none" stroke="#818cf8" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.8s"/>
+          </svg>
+          <div class="g-gauge__center">
+            <div class="g-gauge__num" id="gg-opt-num" style="color:#818cf8">&mdash;</div>
+            <div class="g-gauge__unit">%</div>
+          </div>
+        </div>
+        <div class="g-gauge__label">Optimal range</div>
+      </div>
     </div>
   </div>
-  <div class="glc-narrative__right">
-    <div class="glc-context-box">
-      <div class="glc-context-box__heading">// Matthew's CGM context</div>
-      <div class="glc-context-item">
-        <div class="glc-context-item__bullet">01</div>
-        <div class="glc-context-item__text"><strong>Device: Dexcom Stelo</strong> &mdash; worn
-          continuously, no prescription required. Replaced every 15 days.
-          Data syncs automatically to life-platform.</div>
-      </div>
-      <div class="glc-context-item">
-        <div class="glc-context-item__bullet">02</div>
-        <div class="glc-context-item__text"><strong>Target TIR &gt;90%</strong> in the
-          70&ndash;180 mg/dL range and &gt;70% in the tighter 70&ndash;120 optimal window.
-          Both tracked daily.</div>
-      </div>
-      <div class="glc-context-item">
-        <div class="glc-context-item__bullet">03</div>
-        <div class="glc-context-item__text"><strong>Protein-first meals</strong> moved the
-          needle most. Eating protein and fat before carbohydrates blunts the post-meal
-          spike by slowing gastric emptying.</div>
-      </div>
-      <div class="glc-context-item">
-        <div class="glc-context-item__bullet">04</div>
-        <div class="glc-context-item__text"><strong>10-minute walk after eating</strong>
-          consistently drops post-meal peak by 15&ndash;25 mg/dL. Muscle contraction
-          creates glucose uptake independent of insulin.</div>
-      </div>
-      <div class="glc-context-item">
-        <div class="glc-context-item__bullet">05</div>
-        <div class="glc-context-item__text"><strong>Reducing refined carbs</strong> (bread,
-          white rice, sweetened drinks) eliminated the majority of &gt;140 readings.
-          Whole-food carbs with fiber produce much smaller spikes.</div>
-      </div>
-    </div>
+</div>
+
+<div id="g-loading" class="g-loading">LOADING METABOLIC DATA&hellip;</div>
+<div id="g-content" style="display:none">
+
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE #1 — Protein shake finding
+     ════════════════════════════════════════════════════════════ -->
+<div class="g-pullquote reveal">
+  <div class="g-pullquote__watermark">01</div>
+  <div class="g-pullquote__text">
+    Protein shakes are my body&rsquo;s A+ food &mdash;
+    <em>+6&thinsp;mg/dL</em> glucose spike vs pizza at <em>+55&thinsp;mg/dL</em>.
+  </div>
+  <div class="g-pullquote__attr">
+    <span class="g-pullquote__badge">N=1 &middot; CGM-confirmed</span>
+    <span class="g-pullquote__source">Dexcom Stelo continuous glucose data</span>
   </div>
 </div>
 
-<div class="glc-body">
-  <div id="glc-loading" class="glc-loading">LOADING METABOLIC DATA...</div>
-  <div id="glc-content" style="display:none">
-
-    <!-- Stat cards -->
-    <div class="glc-stats reveal">
-      <div class="glc-stat">
-        <div class="glc-stat__label">Time in Range</div>
-        <div class="glc-stat__value" id="glc-tir">&mdash;</div>
-        <div class="glc-stat__sub">Target &gt;90%</div>
-      </div>
-      <div class="glc-stat">
-        <div class="glc-stat__label">Avg Glucose</div>
-        <div class="glc-stat__value" id="glc-avg">&mdash;</div>
-        <div class="glc-stat__sub">mg/dL today</div>
-      </div>
-      <div class="glc-stat">
-        <div class="glc-stat__label">Variability (SD)</div>
-        <div class="glc-stat__value" id="glc-std">&mdash;</div>
-        <div class="glc-stat__sub">Target &lt;20 mg/dL</div>
-      </div>
-      <div class="glc-stat">
-        <div class="glc-stat__label">30d Avg TIR</div>
-        <div class="glc-stat__value" id="glc-tir30">&mdash;</div>
-        <div class="glc-stat__sub">30-day average</div>
-      </div>
+<!-- ════════════════════════════════════════════════════════════
+     TIR EDITORIAL — 3-column
+     ════════════════════════════════════════════════════════════ -->
+<section class="g-tir-section reveal">
+  <div class="g-tir-header">Time-in-range breakdown — today</div>
+  <div class="g-tir-grid">
+    <div class="g-tir-col">
+      <div class="g-tir-bar"><div class="g-tir-bar__fill" id="gbar-opt" style="width:0%;background:#3ecf8e"></div></div>
+      <div class="g-tir-big" id="gval-opt" style="color:#3ecf8e">&mdash;</div>
+      <div class="g-tir-name">Optimal (70&ndash;120)</div>
+      <div class="g-tir-detail">Longevity medicine target. The tighter window where glucose, energy, and cognition are all stable.</div>
     </div>
-
-    <!-- TIR breakdown -->
-    <div class="glc-gauge-row reveal">
-      <div class="glc-gauge-card">
-        <div class="glc-gauge-card__title">Today &mdash; Range Breakdown</div>
-        <div class="glc-bar-wrap">
-          <div class="glc-bar-row">
-            <div class="glc-bar-label">Optimal 70&ndash;120</div>
-            <div class="glc-bar-track">
-              <div class="glc-bar-fill green" id="bar-optimal" style="width:0%"></div>
-            </div>
-            <div class="glc-bar-pct" id="pct-optimal">&mdash;</div>
-          </div>
-          <div class="glc-bar-row">
-            <div class="glc-bar-label">In Range 70&ndash;180</div>
-            <div class="glc-bar-track">
-              <div class="glc-bar-fill yellow" id="bar-tir" style="width:0%"></div>
-            </div>
-            <div class="glc-bar-pct" id="pct-tir">&mdash;</div>
-          </div>
-          <div class="glc-bar-row">
-            <div class="glc-bar-label">Elevated &gt;140</div>
-            <div class="glc-bar-track">
-              <div class="glc-bar-fill red" id="bar-high" style="width:0%"></div>
-            </div>
-            <div class="glc-bar-pct" id="pct-high">&mdash;</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="glc-gauge-card">
-        <div class="glc-gauge-card__title">30-Day Averages</div>
-        <div class="glc-bar-wrap">
-          <div class="glc-bar-row">
-            <div class="glc-bar-label">Avg glucose</div>
-            <div class="glc-bar-track">
-              <div class="glc-bar-fill green" id="bar-avg30" style="width:0%"></div>
-            </div>
-            <div class="glc-bar-pct" id="pct-avg30">&mdash;</div>
-          </div>
-          <div class="glc-bar-row">
-            <div class="glc-bar-label">Optimal %</div>
-            <div class="glc-bar-track">
-              <div class="glc-bar-fill green" id="bar-opt30" style="width:0%"></div>
-            </div>
-            <div class="glc-bar-pct" id="pct-opt30">&mdash;</div>
-          </div>
-          <div class="glc-bar-row">
-            <div class="glc-bar-label">Variability SD</div>
-            <div class="glc-bar-track">
-              <div class="glc-bar-fill yellow" id="bar-std30" style="width:0%"></div>
-            </div>
-            <div class="glc-bar-pct" id="pct-std30">&mdash;</div>
-          </div>
-        </div>
-      </div>
+    <div class="g-tir-col">
+      <div class="g-tir-bar"><div class="g-tir-bar__fill" id="gbar-tir" style="width:0%;background:#2dd4bf"></div></div>
+      <div class="g-tir-big" id="gval-tir" style="color:#2dd4bf">&mdash;</div>
+      <div class="g-tir-name">In Range (70&ndash;180)</div>
+      <div class="g-tir-detail">ADA standard for non-diabetic. Target &gt;90%. More actionable than HbA1c because it responds in days.</div>
     </div>
-
-    <!-- Trend chart -->
-    <div class="glc-chart-section reveal">
-      <div class="glc-chart-header">
-        <div class="glc-chart-title">30-Day Glucose Trend</div>
-        <div class="glc-chart-legend">
-          <div class="glc-legend-item">
-            <div class="glc-legend-dot" style="background:var(--c-green-500)"></div>
-            Avg glucose
-          </div>
-          <div class="glc-legend-item">
-            <div class="glc-legend-dot" style="background:var(--accent)"></div>
-            Time in range %
-          </div>
-        </div>
-      </div>
-      <canvas class="glc-chart" id="glc-trend-canvas"></canvas>
+    <div class="g-tir-col">
+      <div class="g-tir-bar"><div class="g-tir-bar__fill" id="gbar-hi" style="width:0%;background:#ef4444"></div></div>
+      <div class="g-tir-big" id="gval-hi" style="color:#ef4444">&mdash;</div>
+      <div class="g-tir-name">Elevated (&gt;140)</div>
+      <div class="g-tir-detail">Post-meal spikes above 140 indicate metabolic stress. Reduced by <a href="/nutrition/">protein-first meal ordering</a>.</div>
     </div>
+  </div>
+</section>
 
-    <!-- Meal response table -->
-    <div class="glc-meal-section reveal">
-      <div class="glc-meal-section__header">
-        <div class="glc-meal-section__title">// Top Meal Responses</div>
-        <div class="glc-meal-section__sub">Hardcoded from 30+ weeks of CGM logs &mdash; best and worst examples</div>
-      </div>
-      <table class="glc-meal-table">
-        <thead>
-          <tr>
-            <th>Meal</th>
-            <th>Avg Spike</th>
-            <th>Time to Peak</th>
-            <th>Time to Baseline</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Protein shake only</td>
-            <td class="spike-low">+6 mg/dL</td>
-            <td class="mono">25 min</td>
-            <td class="mono">0.8 hrs</td>
-          </tr>
-          <tr>
-            <td>Oatmeal + protein</td>
-            <td class="spike-low">+18 mg/dL</td>
-            <td class="mono">52 min</td>
-            <td class="mono">1.4 hrs</td>
-          </tr>
-          <tr>
-            <td>Sweet potato</td>
-            <td class="spike-mid">+22 mg/dL</td>
-            <td class="mono">45 min</td>
-            <td class="mono">1.6 hrs</td>
-          </tr>
-          <tr>
-            <td>White rice (1 cup)</td>
-            <td class="spike-mid">+42 mg/dL</td>
-            <td class="mono">38 min</td>
-            <td class="mono">2.1 hrs</td>
-          </tr>
-          <tr>
-            <td>Pizza (2 slices)</td>
-            <td class="spike-high">+55 mg/dL</td>
-            <td class="mono">48 min</td>
-            <td class="mono">3.2 hrs</td>
-          </tr>
-        </tbody>
-      </table>
+<!-- ════════════════════════════════════════════════════════════
+     MEAL RESPONSE TABLE
+     ════════════════════════════════════════════════════════════ -->
+<section class="g-meal-section reveal">
+  <div class="g-meal-header">Top meal responses &mdash; 30+ weeks of CGM logs</div>
+  <table class="g-meal-table">
+    <thead>
+      <tr>
+        <th>Meal</th>
+        <th>Avg Spike</th>
+        <th>Time to Peak</th>
+        <th>Time to Baseline</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Protein shake only</td>
+        <td class="spike-low">+6 mg/dL</td>
+        <td class="mono">25 min</td>
+        <td class="mono">0.8 hrs</td>
+      </tr>
+      <tr>
+        <td>Oatmeal + protein</td>
+        <td class="spike-low">+18 mg/dL</td>
+        <td class="mono">52 min</td>
+        <td class="mono">1.4 hrs</td>
+      </tr>
+      <tr>
+        <td>Sweet potato</td>
+        <td class="spike-mid">+22 mg/dL</td>
+        <td class="mono">45 min</td>
+        <td class="mono">1.6 hrs</td>
+      </tr>
+      <tr>
+        <td>White rice (1 cup)</td>
+        <td class="spike-mid">+42 mg/dL</td>
+        <td class="mono">38 min</td>
+        <td class="mono">2.1 hrs</td>
+      </tr>
+      <tr>
+        <td>Pizza (2 slices)</td>
+        <td class="spike-high">+55 mg/dL</td>
+        <td class="mono">48 min</td>
+        <td class="mono">3.2 hrs</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE #2 — Walk finding
+     ════════════════════════════════════════════════════════════ -->
+<div class="g-pullquote reveal">
+  <div class="g-pullquote__watermark">02</div>
+  <div class="g-pullquote__text">
+    A <em>10-minute walk</em> after eating consistently drops post-meal peak
+    by <em>15&ndash;25&thinsp;mg/dL</em> &mdash; muscle contraction drives glucose uptake independent of insulin.
+  </div>
+  <div class="g-pullquote__attr">
+    <span class="g-pullquote__badge">N=1 &middot; Reproducible</span>
+    <span class="g-pullquote__source">CGM &times; step data cross-reference</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     30-DAY TREND CHART
+     ════════════════════════════════════════════════════════════ -->
+<section class="g-chart-section reveal">
+  <div class="g-chart-header">
+    <div class="g-chart-title">30-day glucose trend</div>
+    <div class="g-chart-legend">
+      <div class="g-legend-item"><div class="g-legend-dot" style="background:#2dd4bf"></div> Avg glucose</div>
+      <div class="g-legend-item"><div class="g-legend-dot" style="background:#3ecf8e"></div> TIR %</div>
     </div>
+  </div>
+  <canvas class="g-chart" id="g-trend-canvas"></canvas>
+</section>
 
-    <!-- Variability + context -->
-    <div class="glc-var-section reveal">
-      <div class="glc-info-card">
-        <div class="glc-info-card__eyebrow">Why variability matters</div>
-        <div class="glc-info-card__headline" id="glc-var-headline">Glucose variability</div>
-        <div class="glc-info-card__body">
-          Standard deviation (SD) measures how much glucose swings day-to-day.
-          Even with a normal average, high variability indicates metabolic stress &mdash;
-          large spikes and crashes that don't show up in HbA1c.
-          Target: SD &lt; 20 mg/dL (longevity medicine consensus).
-          Lower is better. Stable glucose = stable energy, mood, and cognition.
-        </div>
-      </div>
-      <div class="glc-info-card">
-        <div class="glc-info-card__eyebrow">Data source</div>
-        <div class="glc-info-card__headline" id="glc-source-headline">Dexcom Stelo CGM</div>
-        <div class="glc-info-card__body" id="glc-source-body">
-          Continuous glucose monitoring via Dexcom Stelo &mdash; a reading every 5 minutes,
-          288 data points per day. Synced to Apple Health, ingested nightly into
-          life-platform DynamoDB. Daily aggregates computed: avg, min, max, SD,
-          time-in-range (70&ndash;180 mg/dL), and longevity optimal range (70&ndash;120 mg/dL).
-        </div>
-      </div>
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE #3 — Fiber finding
+     ════════════════════════════════════════════════════════════ -->
+<div class="g-pullquote reveal">
+  <div class="g-pullquote__watermark">03</div>
+  <div class="g-pullquote__text">
+    Fiber above <em>30g/day</em> correlates with lower glucose variability &mdash;
+    SD <em>14 vs 22</em>&thinsp;mg/dL on high vs low fiber days.
+  </div>
+  <div class="g-pullquote__attr">
+    <span class="g-pullquote__badge">N=1 &middot; Correlational</span>
+    <span class="g-pullquote__source">MacroFactor fiber data &times; Dexcom Stelo SD &mdash; <a href="/nutrition/" style="color:var(--g-teal);text-decoration:none">Nutrition Observatory</a></span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     N=1 RULES
+     ════════════════════════════════════════════════════════════ -->
+<section class="g-rules-section reveal">
+  <div class="g-rules-header">N=1 glucose rules &mdash; 30+ weeks of CGM data</div>
+  <div class="g-rule-grid">
+    <div class="g-rule">
+      <div class="g-rule__num">Rule 01</div>
+      <div class="g-rule__finding">Protein-first meal ordering blunts post-meal glucose spikes</div>
+      <div class="g-rule__evidence">Protein + fat before carbs &rarr; <em>30&ndash;40% smaller spike</em> &rarr; <a href="/nutrition/">Nutrition</a></div>
     </div>
-
-    <!-- Cross-references -->
-    <div class="glc-xref-section reveal">
-      <div class="glc-xref-section__title">// Connected signals</div>
-      <div class="glc-xref-grid">
-        <div class="glc-xref-card">
-          <div class="glc-xref-card__stat">r=0.52 &nbsp;&bull;&nbsp; 30-day window</div>
-          <div class="glc-xref-card__text">
-            Fasting glucose correlates with previous night&rsquo;s sleep quality.
-            Poor sleep elevates cortisol, which directly raises morning glucose.
-          </div>
-          <div class="glc-xref-card__link">&rarr; <a href="/sleep/">Sleep &rarr;</a></div>
-        </div>
-        <div class="glc-xref-card">
-          <div class="glc-xref-card__stat">Body pillar &mdash; one of seven</div>
-          <div class="glc-xref-card__text">
-            Glucose variability factors into the Body pillar score. Stable metabolic
-            function is a prerequisite for sustained physical performance.
-          </div>
-          <div class="glc-xref-card__link">&rarr; <a href="/character/">Character &rarr;</a></div>
-        </div>
-      </div>
+    <div class="g-rule">
+      <div class="g-rule__num">Rule 02</div>
+      <div class="g-rule__finding">10-minute post-meal walk drops peak glucose by 15&ndash;25 mg/dL</div>
+      <div class="g-rule__evidence">Muscle contraction drives <em>insulin-independent glucose uptake</em></div>
     </div>
-
-    <!-- Methodology -->
-    <div class="glc-method reveal">
-      <div class="glc-method__title">Measurement Protocol</div>
-      <div class="glc-method__grid">
-        <div class="glc-method__item">
-          <strong>SENSOR</strong>
-          Dexcom Stelo OTC CGM. 15-day wear cycle. 5-minute reading interval.
-          No calibration required.
-        </div>
-        <div class="glc-method__item">
-          <strong>TIME IN RANGE (TIR)</strong>
-          Standard: 70&ndash;180 mg/dL (ADA guideline for non-diabetic).
-          Optimal: 70&ndash;120 mg/dL (longevity medicine target, stricter).
-          Target: &gt;90% standard, &gt;70% optimal.
-        </div>
-        <div class="glc-method__item">
-          <strong>VARIABILITY (SD)</strong>
-          Standard deviation of all 5-min readings in a 24-hour period.
-          SD &lt;15: excellent. 15&ndash;20: good. &gt;20: elevated metabolic stress.
-          N=1 data &mdash; individual baselines vary.
-        </div>
-      </div>
+    <div class="g-rule">
+      <div class="g-rule__num">Rule 03</div>
+      <div class="g-rule__finding">Fiber above 30g/day correlates with lower glucose variability</div>
+      <div class="g-rule__evidence">SD <em>14 vs 22</em> mg/dL on high vs low fiber days &rarr; <a href="/explorer/">Data Explorer</a></div>
     </div>
+    <div class="g-rule">
+      <div class="g-rule__num">Rule 04</div>
+      <div class="g-rule__finding">Poor sleep elevates next-morning fasting glucose via cortisol</div>
+      <div class="g-rule__evidence"><em>r=0.52</em> &bull; fasting glucose &times; prior night sleep quality &rarr; <a href="/sleep/">Sleep</a></div>
+    </div>
+  </div>
+</section>
 
-  </div><!-- /glc-content -->
-</div><!-- /glc-body -->
+</div><!-- /g-content -->
 
-<!-- Mobile bottom nav -->
+<!-- ════════════════════════════════════════════════════════════
+     CROSS-LINKS
+     ════════════════════════════════════════════════════════════ -->
+<div class="g-xref reveal">
+  <a href="/nutrition/" class="g-xref-card">
+    <div class="g-xref-card__tag">MacroFactor &times; Dexcom Stelo</div>
+    <div class="g-xref-card__text">Each meal scored against CGM glucose response. Protein-first meals consistently produce the lowest spikes.</div>
+  </a>
+  <a href="/character/" class="g-xref-card">
+    <div class="g-xref-card__tag">Metabolic Pillar &mdash; 1 of 7</div>
+    <div class="g-xref-card__text">Glucose variability and time-in-range factor into the Body pillar in the Character Sheet.</div>
+  </a>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     NARRATIVE
+     ════════════════════════════════════════════════════════════ -->
+<section class="g-narrative reveal">
+  <div>
+    <h2 class="g-narrative__title">288 readings per day<br>vs <em>one fasting number</em></h2>
+    <div class="g-narrative__body">
+      <p>A fasting glucose test gives you one snapshot taken after 8+ hours without food.
+      <strong>It captures none of the metabolic action</strong>: not what happens after meals,
+      not whether glucose spikes at 2am, not whether a salad or a steak drives different
+      post-meal curves in your body specifically.</p>
+      <p>A continuous glucose monitor reads glucose every 5 minutes, 24 hours a day.
+      The additional signal includes glucose variability, post-meal spike magnitude,
+      nocturnal patterns, and how specific foods interact with <strong>your individual
+      physiology</strong> &mdash; not population averages.</p>
+      <p>Time-in-range is now considered a more actionable metric than HbA1c because
+      it responds to intervention within days, not months.</p>
+    </div>
+  </div>
+  <div class="g-protocol-list">
+    <div class="g-protocol-item">
+      <div class="g-protocol-num">01</div>
+      <div class="g-protocol-text"><strong>Dexcom Stelo CGM</strong> &mdash; worn continuously, no prescription required. Replaced every 15 days. Syncs to life-platform automatically.</div>
+    </div>
+    <div class="g-protocol-item">
+      <div class="g-protocol-num">02</div>
+      <div class="g-protocol-text"><strong>Target TIR &gt;90%</strong> in the 70&ndash;180 mg/dL range and &gt;70% in the tighter 70&ndash;120 optimal window.</div>
+    </div>
+    <div class="g-protocol-item">
+      <div class="g-protocol-num">03</div>
+      <div class="g-protocol-text"><strong>Protein-first meals</strong> moved the needle most. Eating protein and fat before carbs blunts the spike by slowing gastric emptying.</div>
+    </div>
+    <div class="g-protocol-item">
+      <div class="g-protocol-num">04</div>
+      <div class="g-protocol-text"><strong>10-minute walk after eating</strong> consistently drops post-meal peak. Muscle contraction creates glucose uptake independent of insulin.</div>
+    </div>
+    <div class="g-protocol-item">
+      <div class="g-protocol-num">05</div>
+      <div class="g-protocol-text"><strong>Reducing refined carbs</strong> eliminated the majority of &gt;140 readings. Whole-food carbs with fiber produce much smaller spikes.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     METHODOLOGY
+     ════════════════════════════════════════════════════════════ -->
+<section class="g-method reveal">
+  <div class="g-method__title">Measurement protocol</div>
+  <div class="g-method-grid">
+    <div class="g-method-item">
+      <strong>SENSOR</strong>
+      Dexcom Stelo OTC CGM. 15-day wear cycle. 5-minute reading interval.
+      No calibration required. 288 data points per day.
+    </div>
+    <div class="g-method-item">
+      <strong>TIME IN RANGE (TIR)</strong>
+      Standard: 70&ndash;180 mg/dL (ADA guideline). Optimal: 70&ndash;120 mg/dL (longevity medicine target).
+      Target: &gt;90% standard, &gt;70% optimal.
+    </div>
+    <div class="g-method-item">
+      <strong>VARIABILITY (SD)</strong>
+      Standard deviation of all 5-min readings in a 24-hour period.
+      SD &lt;15: excellent. 15&ndash;20: good. &gt;20: elevated metabolic stress.
+      N=1 data &mdash; individual baselines vary.
+    </div>
+  </div>
+</section>
+
+<div id="amj-subscribe"></div>
 <div id="amj-bottom-nav"></div>
-
-
 <div id="amj-reading-path"></div>
 <div id="amj-footer"></div>
 
@@ -772,161 +971,148 @@
 <script src="/assets/js/reveal.js"></script>
 <script>
 (async function() {
-  const API = 'https://averagejoematt.com';
-  const loading = document.getElementById('glc-loading');
-  const content = document.getElementById('glc-content');
+  var API = 'https://averagejoematt.com';
+  var loading = document.getElementById('g-loading');
+  var content = document.getElementById('g-content');
+  var setText = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+  var setWidth = function(id, pct) { var el = document.getElementById(id); if (el) el.style.width = Math.min(100, Math.max(0, pct)) + '%'; };
+  var circ = 2 * Math.PI * 35;
 
-  const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  const setWidth = (id, pct) => {
-    const el = document.getElementById(id);
-    if (el) el.style.width = Math.min(100, Math.max(0, pct)) + '%';
-  };
-  const colorClass = (el, cls) => {
+  function setArc(id, pct) {
+    var el = document.getElementById(id);
     if (!el) return;
-    el.classList.remove('green','yellow','red');
-    el.classList.add(cls);
-  };
+    var len = (Math.min(pct, 100) / 100) * circ;
+    el.setAttribute('stroke-dasharray', len + ' ' + (circ - len));
+  }
 
   try {
-    const resp = await fetch(API + '/api/glucose');
-    if (!resp.ok) throw new Error('API error');
-    const data = await resp.json();
-    const g = data.glucose;
-    const trend = data.glucose_trend || [];
+    var resp = await fetch(API + '/api/glucose');
+    if (!resp.ok) throw new Error(resp.status);
+    var data = await resp.json();
+    var g = data.glucose;
+    var trend = data.glucose_trend || [];
+    if (!g) { loading.textContent = 'No CGM data yet.'; return; }
 
-    if (!g) {
-      loading.textContent = 'No CGM data available yet.';
-      return;
+    /* ── Hero gauges ── */
+    var tir = g.time_in_range_pct || 0;
+    setText('gg-tir-num', tir ? tir.toFixed(0) : '\u2014');
+    setArc('gg-tir-arc', tir);
+
+    var avg = g.avg_mg_dl || 0;
+    setText('gg-avg-num', avg ? avg.toFixed(0) : '\u2014');
+    setArc('gg-avg-arc', avg ? Math.min(100, ((180 - avg) / 80) * 100) : 0); /* lower is better: 100→100%, 180→0% */
+
+    var sd = g.std_dev || 0;
+    setText('gg-sd-num', sd ? sd.toFixed(0) : '\u2014');
+    setArc('gg-sd-arc', sd ? Math.min(100, ((40 - sd) / 40) * 100) : 0); /* lower is better */
+
+    var opt = g.time_in_optimal_pct || 0;
+    setText('gg-opt-num', opt ? opt.toFixed(0) : '\u2014');
+    setArc('gg-opt-arc', opt);
+
+    /* ── TIR editorial ── */
+    if (g.time_in_optimal_pct != null) {
+      setWidth('gbar-opt', g.time_in_optimal_pct);
+      setText('gval-opt', g.time_in_optimal_pct.toFixed(1) + '%');
     }
-
-    // Stat cards
-    const tir = g.time_in_range_pct;
-    const tirEl = document.getElementById('glc-tir');
-    setText('glc-tir', tir != null ? tir.toFixed(1) + '%' : '\u2014');
-    if (tirEl) colorClass(tirEl, tir >= 90 ? 'green' : tir >= 70 ? 'yellow' : 'red');
-
-    const avgEl = document.getElementById('glc-avg');
-    setText('glc-avg', g.avg_mg_dl != null ? g.avg_mg_dl.toFixed(0) : '\u2014');
-    if (avgEl && g.avg_mg_dl) colorClass(avgEl, g.avg_mg_dl <= 100 ? 'green' : g.avg_mg_dl <= 120 ? 'yellow' : 'red');
-
-    const stdEl = document.getElementById('glc-std');
-    setText('glc-std', g.std_dev != null ? g.std_dev.toFixed(1) : '\u2014');
-    if (stdEl && g.std_dev) colorClass(stdEl, g.std_dev < 15 ? 'green' : g.std_dev < 20 ? 'yellow' : 'red');
-
-    setText('glc-tir30', g['30d_avg_tir'] != null ? g['30d_avg_tir'].toFixed(1) + '%' : '\u2014');
-
-    // TIR bars — today
-    const opt = g.time_in_optimal_pct || 0;
-    const hi  = g.time_above_140_pct  || 0;
-    setWidth('bar-optimal', opt);
-    setText('pct-optimal', opt.toFixed(1) + '%');
-    setWidth('bar-tir', tir || 0);
-    setText('pct-tir', (tir || 0).toFixed(1) + '%');
-    setWidth('bar-high', hi);
-    setText('pct-high', hi.toFixed(1) + '%');
-
-    // 30d bars — scale avg 60–160 → 0–100%
-    const avg30 = g['30d_avg_mg_dl'] || 0;
-    const opt30 = g['30d_avg_optimal'] || 0;
-    const std30 = g['30d_avg_std'] || 0;
-    setWidth('bar-avg30', Math.max(0, ((avg30 - 60) / 100) * 100));
-    setText('pct-avg30', avg30 ? avg30.toFixed(0) + ' mg/dL' : '\u2014');
-    setWidth('bar-opt30', opt30);
-    setText('pct-opt30', opt30 ? opt30.toFixed(1) + '%' : '\u2014');
-    setWidth('bar-std30', Math.min(100, (std30 / 40) * 100));
-    setText('pct-std30', std30 ? std30.toFixed(1) : '\u2014');
-
-    // Variability headline
-    const varHeadEl = document.getElementById('glc-var-headline');
-    if (varHeadEl && g.variability_status) {
-      varHeadEl.textContent = {
-        low: 'Low variability \u2014 excellent',
-        moderate: 'Moderate variability \u2014 room to improve',
-        high: 'High variability \u2014 needs attention'
-      }[g.variability_status] || 'Glucose variability';
+    if (g.time_in_range_pct != null) {
+      setWidth('gbar-tir', g.time_in_range_pct);
+      setText('gval-tir', g.time_in_range_pct.toFixed(1) + '%');
     }
+    var hi = g.time_above_140_pct || 0;
+    setWidth('gbar-hi', hi);
+    setText('gval-hi', hi.toFixed(1) + '%');
 
-    // Source headline
-    const srcEl = document.getElementById('glc-source-headline');
-    if (srcEl) {
-      srcEl.textContent = g.cgm_source === 'dexcom_stelo' ? 'Dexcom Stelo CGM' : 'Manual Glucose Log';
-    }
-    const srcBodyEl = document.getElementById('glc-source-body');
-    if (srcBodyEl && g.days_tracked) {
-      srcBodyEl.textContent = `${g.days_tracked} days tracked this month. ` + srcBodyEl.textContent;
-    }
-
-    // Trend chart
+    /* ── 30-day trend chart ── */
     if (trend.length >= 3) {
-      const canvas = document.getElementById('glc-trend-canvas');
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width  = canvas.offsetWidth  * dpr;
+      var canvas = document.getElementById('g-trend-canvas');
+      var dpr = window.devicePixelRatio || 1;
+      canvas.width = canvas.offsetWidth * dpr;
       canvas.height = canvas.offsetHeight * dpr;
-      const ctx = canvas.getContext('2d');
+      var ctx = canvas.getContext('2d');
       ctx.scale(dpr, dpr);
-      const W = canvas.offsetWidth;
-      const H = canvas.offsetHeight;
-      const pad = { t: 16, r: 16, b: 24, l: 42 };
-      const iW = W - pad.l - pad.r;
-      const iH = H - pad.t - pad.b;
+      var W = canvas.offsetWidth, H = canvas.offsetHeight;
+      var pad = { t: 16, r: 16, b: 24, l: 42 };
+      var iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
+      var nn = trend.length;
 
-      const avgPts  = trend.map(d => d.avg).filter(v => v != null);
-      const minAvg  = Math.min(...avgPts, 70);
-      const maxAvg  = Math.max(...avgPts, 130);
-      const n = trend.length;
+      var avgs = trend.map(function(d) { return d.avg; }).filter(function(v) { return v != null; });
+      var minA = Math.min.apply(null, avgs.concat([70]));
+      var maxA = Math.max.apply(null, avgs.concat([130]));
 
-      const xOf = i => pad.l + (i / (n - 1)) * iW;
-      const yOf = (v, mn, mx) => pad.t + iH - ((v - mn) / (mx - mn)) * iH;
+      var xOf = function(i) { return pad.l + (i / (nn - 1)) * iW; };
+      var yOf = function(v) { return pad.t + iH - ((v - minA) / (maxA - minA)) * iH; };
 
-      // Background grid
+      /* Grid */
       ctx.strokeStyle = 'rgba(255,255,255,0.04)';
       ctx.lineWidth = 1;
-      for (let r = 0; r <= 4; r++) {
-        const y = pad.t + (r / 4) * iH;
+      for (var r = 0; r <= 4; r++) {
+        var y = pad.t + (r / 4) * iH;
         ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
       }
 
-      // Target zone 70–120 shaded
-      const y70  = yOf(70, minAvg, maxAvg);
-      const y120 = yOf(120, minAvg, maxAvg);
-      ctx.fillStyle = 'rgba(62,207,142,0.06)';
-      ctx.fillRect(pad.l, y120, iW, y70 - y120);
+      /* 70–120 target zone */
+      if (120 <= maxA) {
+        var y70 = yOf(Math.max(70, minA));
+        var y120 = yOf(Math.min(120, maxA));
+        ctx.fillStyle = 'rgba(45,212,191,0.06)';
+        ctx.fillRect(pad.l, y120, iW, y70 - y120);
+      }
 
-      // Avg glucose line
-      ctx.strokeStyle = 'rgba(62,207,142,0.9)';
+      /* Area fill */
+      var gradient = ctx.createLinearGradient(0, pad.t, 0, pad.t + iH);
+      gradient.addColorStop(0, 'rgba(45,212,191,0.15)');
+      gradient.addColorStop(1, 'rgba(45,212,191,0)');
+      ctx.beginPath();
+      var first = true;
+      trend.forEach(function(d, i) {
+        if (d.avg == null) return;
+        var x = xOf(i), yy = yOf(d.avg);
+        first ? (ctx.moveTo(x, yy), first = false) : ctx.lineTo(x, yy);
+      });
+      if (!first) {
+        ctx.lineTo(xOf(nn - 1), pad.t + iH);
+        ctx.lineTo(xOf(0), pad.t + iH);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
+      }
+
+      /* Avg glucose line */
+      ctx.strokeStyle = 'rgba(45,212,191,0.9)';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      trend.forEach((d, i) => {
+      first = true;
+      trend.forEach(function(d, i) {
         if (d.avg == null) return;
-        const x = xOf(i), y = yOf(d.avg, minAvg, maxAvg);
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        var x = xOf(i), yy = yOf(d.avg);
+        first ? (ctx.moveTo(x, yy), first = false) : ctx.lineTo(x, yy);
       });
       ctx.stroke();
 
-      // TIR % as dots on secondary axis (0–100 → bottom third of chart)
-      trend.forEach((d, i) => {
+      /* TIR dots */
+      trend.forEach(function(d, i) {
         if (d.tir == null) return;
-        const x = xOf(i);
-        const y = pad.t + iH - (d.tir / 100) * iH;
+        var x = xOf(i);
+        var yy = pad.t + iH - (d.tir / 100) * iH;
         ctx.fillStyle = d.tir >= 90 ? 'rgba(62,207,142,0.7)' : d.tir >= 70 ? 'rgba(245,158,11,0.7)' : 'rgba(239,68,68,0.7)';
-        ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x, yy, 3, 0, Math.PI * 2); ctx.fill();
       });
 
-      // Y-axis labels
+      /* Y-axis */
       ctx.fillStyle = 'rgba(255,255,255,0.3)';
       ctx.font = '10px monospace';
       ctx.textAlign = 'right';
-      [minAvg, Math.round((minAvg + maxAvg) / 2), maxAvg].forEach(v => {
-        ctx.fillText(v.toFixed(0), pad.l - 4, yOf(v, minAvg, maxAvg) + 4);
+      [minA, Math.round((minA + maxA) / 2), maxA].forEach(function(v) {
+        ctx.fillText(v.toFixed(0), pad.l - 4, yOf(v) + 4);
       });
     }
 
     loading.style.display = 'none';
     content.style.display = 'block';
-
-  } catch (err) {
+  } catch (e) {
     loading.textContent = 'Could not load glucose data.';
-    console.error(err);
+    console.error(e);
   }
 })();
 </script>

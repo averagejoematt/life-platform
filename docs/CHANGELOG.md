@@ -1,3 +1,47 @@
+## v3.9.25 — 2026-03-25: Sleep + Glucose Observatory Visual Redesign (5/5 Consistency)
+
+### Summary
+Sleep and Glucose observatory pages rebuilt from scratch using the v3.9.24 board-voted hybrid design pattern. All 5 observatories now share the same visual language: 2-column hero with gauge rings, pull-quotes with watermark numbers and N=1 badges, 3-column editorial data sections, left-accent rule cards, mid-page cross-links, 2-column narrative with protocol items, and 3-column methodology.
+
+### Domain Color Map (complete)
+| Observatory | Accent | Hex |
+|-------------|--------|-----|
+| Nutrition | Amber | `#f59e0b` |
+| Training | Red | `#ef4444` |
+| Inner Life | Violet | `#818cf8` |
+| Sleep | Blue | `#60a5fa` |
+| Glucose | Teal | `#2dd4bf` |
+
+### Sleep Observatory
+- Hero gauges: Avg Duration, Sleep Score (30d), Deep %, Recovery
+- 3-column editorial: Deep / REM / HRV breakdown with accent bars
+- Temperature discovery card (conditional on `optimal_temp_f` from API)
+- Pull-quotes: Bed temp 68°F sweet spot, Screen-off +12% HRV, Alcohol −18pts
+- 4 rule cards: Screen-off, Temperature, Alcohol, Bed time consistency
+- Cross-links: Training (recovery) + Character (sleep pillar)
+- API: `/api/sleep_detail` (unchanged)
+
+### Glucose Observatory
+- Hero gauges: TIR %, Avg Glucose, Variability SD, Optimal %
+- 3-column editorial: Optimal (70–120) / In-Range (70–180) / Elevated (>140)
+- Meal response table: 5 foods from protein shake (+6) to pizza (+55)
+- Pull-quotes: Protein shake spike, Post-meal walk −15–25mg/dL, Fiber variability
+- 4 rule cards: Protein-first ordering, Post-meal walk, Fiber >30g, Sleep→glucose
+- Cross-links: Nutrition (MacroFactor × CGM) + Character (metabolic pillar)
+- API: `/api/glucose` (unchanged)
+
+### Files Modified
+- `site/sleep/index.html` — Complete rewrite to v3.9.24 design pattern
+- `site/glucose/index.html` — Complete rewrite to v3.9.24 design pattern
+- `deploy/sync_doc_metadata.py` — Version bump v3.9.19 → v3.9.25
+
+### Deploy Log
+- S3: 2 files synced (sleep, glucose index.html)
+- CloudFront: Invalidation I2JSIE9H2IROP4EO5JB2BN7N1A (`/sleep/*`, `/glucose/*`)
+- No Lambda changes
+
+---
+
 ## v3.9.24 — 2026-03-26: Observatory Visual Redesign — 3 pages rebuilt (Board-voted hybrid)
 
 ### Summary
