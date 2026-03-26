@@ -1,3 +1,30 @@
+## v3.9.26 — 2026-03-25: April 1 Launch Reframe — Prequel Chronicles, Baseline Snapshot
+
+### Summary
+Product Board emergency session unanimously endorsed reframing all pre-April data as the "testing window" with April 1, 2026 as Day 1 of the public experiment. Chronicle archive relabeled with prequel numbering (Week −5 through Week −1). New "The Interview" chronicle written — Elena Voss's first direct conversation with Matthew covering the relapse, the gap, and what Day 1 means. Global countdown/Day N component added to homepage and archive. Baseline snapshot MCP tool built for April 1 Day 1 capture.
+
+### Added
+- `site/assets/js/countdown.js` — Global Day N / T-minus counter component. Before April 1: "T-{N}" nav badge + countdown. After April 1: "DAY {N}" badge. Exposes `window.AMJ_EXPERIMENT` global.
+- `site/journal/posts/week-minus-1/index.html` — "The Interview" (Prequel Week −1). Elena's first direct Q&A with Matthew. Covers relapse, testing window reframe, April 1 commitment.
+- `capture_baseline` MCP tool (tools_memory.py) — Captures 8-domain snapshot (weight, BP, HRV/recovery, Character Sheet, habits, vices, glucose, nutrition) into platform_memory. Safe by default (won't overwrite without `force=true`).
+- `baseline_snapshot` added to platform_memory VALID_CATEGORIES
+- `.experiment-counter`, `.nav-day-badge` styles in base.css
+
+### Changed
+- `site/index.html` — Hero rewritten with countdown, "Day 1. For real this time." headline, prequel banner (auto-hides after April 1), subscribe label "Follow from Day 1"
+- `site/chronicle/archive/index.html` — All episodes relabeled as Prequel series (Prologue, Week −5 through −1). Phase divider added. April 1 Week 1 teaser replaces "coming soon" placeholder.
+- `site/chronicle/posts.json` + `site/journal/posts.json` — Rewritten with prequel framing, negative week numbers, `phase: "prequel"` field
+- `site/assets/js/site_constants.js` — Added `experiment_start: '2026-04-01'`, phase → 'Launch', hero copy/tagline/cta rewritten for April 1
+- Meta tags updated on homepage for April 1 launch messaging
+- `countdown.js` loaded on homepage + chronicle archive
+
+### Deploy Notes
+- MCP Lambda redeployed (full mcp/ package) for capture_baseline tool
+- CloudFront invalidation `/*`
+- Day 1 action: run `capture_baseline` MCP tool with no args on April 1 morning
+
+---
+
 ## v3.9.25 — 2026-03-25: Sleep + Glucose Observatory Visual Redesign (5/5 Consistency)
 
 ### Summary
