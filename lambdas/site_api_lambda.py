@@ -2250,6 +2250,26 @@ def handle_achievements() -> dict:
                     _covered_pillars.add(p)
     _exp_all_pillars_covered = _covered_pillars >= _ALL_PILLARS
 
+    # ── Challenge completion counts
+    challenges_pk = f"USER#{USER_ID}#SOURCE#challenges"
+    completed_challenges = 0
+    perfect_challenges = 0
+    try:
+        ch_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(challenges_pk) & Key("sk").begins_with("CHALLENGE#"),
+        )
+        ch_items = _decimal_to_float(ch_resp.get("Items", []))
+        for ch in ch_items:
+            if ch.get("status") == "completed":
+                completed_challenges += 1
+                checkins = ch.get("daily_checkins", [])
+                if checkins:
+                    success = sum(1 for c in checkins if c.get("completed"))
+                    if success == len(checkins):
+                        perfect_challenges += 1
+    except Exception as _ch_e:
+        logger.warning("[achievements] Challenge query failed (non-fatal): %s", _ch_e)
+
     def badge(id_, label, category, desc, earned, earned_date=None, unlock_hint=None):
         return {
             "id": id_, "label": label, "category": category, "description": desc,
@@ -2346,6 +2366,28 @@ def handle_achievements() -> dict:
               "Completed experiment in every pillar",
               earned=_exp_all_pillars_covered,
               unlock_hint="Complete at least one experiment in each of the 7 pillars"),
+
+        # ── Challenges
+        badge("first_challenge", "Arena Debut", "challenge",
+              "Completed first challenge",
+              earned=completed_challenges >= 1,
+              earned_date=today if completed_challenges >= 1 else None),
+        badge("five_challenges", "Arena Regular", "challenge",
+              "Completed 5 challenges",
+              earned=completed_challenges >= 5,
+              unlock_hint=f"{max(0, 5 - completed_challenges)} challenges to unlock" if completed_challenges < 5 else None),
+        badge("ten_challenges", "Arena Veteran", "challenge",
+              "Completed 10 challenges",
+              earned=completed_challenges >= 10,
+              unlock_hint=f"{max(0, 10 - completed_challenges)} challenges to unlock" if completed_challenges < 10 else None),
+        badge("twenty_five_challenges", "Arena Legend", "challenge",
+              "Completed 25 challenges",
+              earned=completed_challenges >= 25,
+              unlock_hint=f"{max(0, 25 - completed_challenges)} challenges to unlock" if completed_challenges < 25 else None),
+        badge("perfect_challenge", "Flawless", "challenge",
+              "Completed a challenge with 100% success rate (7+ days)",
+              earned=perfect_challenges >= 1,
+              unlock_hint="Complete a 7+ day challenge without missing a single day"),
     ]
 
     earned_count = sum(1 for a in achievements if a["earned"])
@@ -2359,6 +2401,8 @@ def handle_achievements() -> dict:
             "days_tracked":   days_tracked,
             "current_level":  current_level,
             "current_weight": round(current_weight, 1),
+            "completed_challenges": completed_challenges,
+            "perfect_challenges": perfect_challenges,
         },
     }, cache_seconds=3600)
 
@@ -2979,6 +3023,7 @@ def _handle_experiment_detail(event: dict) -> dict:
 # ── S3 config caches for data-driven pages ─────────────────
 _protocols_cache = None
 _challenges_cache = None
+_challenge_catalog_cache = None
 _domains_cache = None
 
 def _load_s3_json(key, cache_name):
@@ -3037,6 +3082,21 @@ def handle_protocols() -> dict:
         _protocols_cache = _load_s3_json("site/config/protocols.json", "protocols")
     protocols = _protocols_cache.get("protocols", [])
     return _ok({"protocols": protocols, "count": len(protocols)}, cache_seconds=3600)
+
+def handle_challenge_catalog() -> dict:
+    """GET /api/challenge_catalog — Static challenge catalog from S3.
+
+    Returns the full catalog of challenges with metadata (icons, evidence,
+    board recommenders, protocols). This is the browsable 'menu' of challenges.
+    Dynamic status (active/completed/checkins) comes from /api/challenges.
+    """
+    global _challenge_catalog_cache
+    if _challenge_catalog_cache is None:
+        _challenge_catalog_cache = _load_s3_json(
+            "site/config/challenges_catalog.json", "challenge_catalog"
+        )
+    return _ok(_challenge_catalog_cache, cache_seconds=3600)
+
 
 def handle_challenges() -> dict:
     """GET /api/challenges — Return challenges from DynamoDB (primary) with S3 fallback.
@@ -3899,6 +3959,7 @@ ROUTES = {
     # DATA-DRIVEN: S3 config + DynamoDB source-of-truth endpoints
     "/api/protocols":          handle_protocols,
     "/api/challenges":         handle_challenges,
+    "/api/challenge_catalog":  handle_challenge_catalog,
     "/api/challenge_checkin":   None,  # POST handler in lambda_handler
     "/api/domains":            handle_domains,
     "/api/habit_registry":     handle_habit_registry,

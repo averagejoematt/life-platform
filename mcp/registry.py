@@ -2324,6 +2324,7 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "name":             {"type": "string", "description": "Challenge name (e.g. '10,000 Steps Every Day')."},
+                    "catalog_id":       {"type": "string", "description": "ID from challenges_catalog.json to link this DDB record back to the catalog tile."},
                     "description":      {"type": "string", "description": "What and why — the motivation."},
                     "source":           {"type": "string", "description": "Generation source: journal_mining, data_signal, hypothesis_graduate, science_scan, manual, community. Default: manual."},
                     "source_detail":    {"type": "string", "description": "Specific trigger (e.g. 'avoidance_flag: late_night_snacking x6 in 14d')."},
