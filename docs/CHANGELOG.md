@@ -1,3 +1,41 @@
+## v3.9.23 — 2026-03-25: DISC-7 Annotations + 3 Observatory Pages (Nutrition, Training, Inner Life)
+
+### Summary
+Full-stack DISC-7 behavioral response annotations shipped: MCP tool (`annotate_discovery` + `get_discovery_annotations`), site API merge in `handle_journey_timeline()`, and frontend rendering on Discoveries timeline cards. Product Board convened twice to define Observatory strategy — Matthew challenged the board to include Nutrition and Inner Life alongside Training, resulting in 5-observatory Evidence architecture. Three new pages built and deployed: Nutrition Observatory (amber accent, MacroFactor macros, protein adherence donut, trend chart), Training Observatory (crimson accent, Zone 2 ring gauge, 12-week bar chart, activity chips), Inner Life Observatory (violet accent, vice streak cards, mood valence chart, connection depth, honest "Building This" section). Three new API endpoints: `/api/nutrition_overview`, `/api/training_overview`, `/api/mind_overview`. Nav + footer updated with all 3 pages in Evidence dropdown.
+
+### DISC-7: Discovery Annotations
+- `mcp/config.py`: Added `ANNOTATIONS_PK` constant
+- `mcp/tools_social.py`: `tool_annotate_discovery()` + `tool_get_discovery_annotations()` — writes to `USER#matthew#SOURCE#discovery_annotations / EVENT#{sha256_key}`
+- `mcp/registry.py`: Both tools registered with schemas
+- `lambdas/site_api_lambda.py`: Section 6 in `handle_journey_timeline()` — loads all annotations, merges by event_key hash match into timeline events
+- `site/discoveries/index.html`: CSS `.tl-event__annotation*` classes + JS rendering "What I did" section with action tag and outcome
+
+### Observatory Pages
+- `site/nutrition/index.html`: Donut ring SVG (macro proportions), protein adherence gradient meter, area-fill trend chart, N=1 rules with watermark numbers
+- `site/training/index.html`: Zone 2 animated ring gauge, activity type chips, stacked bar chart (total + Z2 overlay), centenarian framing
+- `site/mind/index.html`: 3 signal cards hero, vice streak cards with bottom-fill animation, mood valence chart with zone gradient, "Building This" honest gap section
+- `lambdas/site_api_lambda.py`: 3 new handlers — `handle_nutrition_overview()` (MacroFactor 30d), `handle_training_overview()` (Strava+Hevy+Whoop 90d), `handle_mind_overview()` (mood+vices+interactions+journal+temptations)
+- `site/assets/js/components.js`: Evidence dropdown + footer updated (now 7 pages: Sleep, Glucose, Nutrition, Training, Inner Life, Benchmarks, Data Explorer)
+
+### Product Board Sessions
+- Round 1: Reviewed glucose + sleep pages, endorsed Training Observatory
+- Round 2: Matthew challenged board on Nutrition — board agreed it's as data-rich as Sleep/Glucose
+- Round 3: Matthew challenged board on Inner Life — board reversed position, acknowledged emotional health as the most differentiated content on the site
+- Final consensus: 5 observatories (Sleep ✅, Glucose ✅, Nutrition ✅, Training ✅, Inner Life ✅)
+
+### Deploy Log
+- `life-platform-mcp` Lambda deployed (full mcp/ package)
+- `life-platform-site-api` Lambda deployed (2x — DISC-7 merge, then observatory endpoints)
+- S3: discoveries, nutrition, training, mind HTML + components.js + observatory.css
+- CloudFront invalidated: 7 paths across all new pages + APIs
+
+### Known Issues / Next Session
+- Visual design quality: pages are functional but not yet at the infographic/editorial quality Matthew wants — next session should do focused visual overhaul one page at a time using Visualizer mockup workflow
+- `observatory.css` exists but new pages use self-contained styles — consider consolidating
+- MCP Lambda name is `life-platform-mcp` (not `life-platform-mcp-server`) — deploy_lambda.sh doesn't handle it (requires full zip with mcp/ directory)
+
+---
+
 ## v3.9.22 — 2026-03-25: Discoveries page evolution — DISC-1/DISC-2 + critical API fix
 
 ### Summary

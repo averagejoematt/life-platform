@@ -1598,6 +1598,47 @@ TOOLS = {
             },
         },
     },
+    # DISC-7: Discovery annotations (behavioral response to findings)
+    "annotate_discovery": {
+        "fn": tool_annotate_discovery,
+        "schema": {
+            "name": "annotate_discovery",
+            "description": (
+                "Add a behavioral response annotation to a Discoveries timeline event. "
+                "Records what Matthew did in response to a finding, weight milestone, experiment, or level-up. "
+                "The annotation appears on the public Discoveries page timeline card. "
+                "Use for: 'annotate the Steps→Sleep finding', 'what did I do when I crossed 290', "
+                "'add a response to the creatine experiment'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "date": {"type": "string", "description": "Date of the timeline event YYYY-MM-DD."},
+                    "event_type": {"type": "string", "description": "Timeline event type: weight, level_up, experiment, discovery, finding, counterintuitive, milestone."},
+                    "title": {"type": "string", "description": "Exact title of the timeline event (used to compute the event key)."},
+                    "annotation": {"type": "string", "description": "What I did about this — the behavioral response."},
+                    "action_taken": {"type": "string", "description": "Short label for the action (e.g. 'Added evening walks', 'Started creatine')."},
+                    "outcome": {"type": "string", "description": "Optional outcome of the action."},
+                },
+                "required": ["date", "event_type", "title", "annotation"],
+            },
+        },
+    },
+    "get_discovery_annotations": {
+        "fn": tool_get_discovery_annotations,
+        "schema": {
+            "name": "get_discovery_annotations",
+            "description": (
+                "List all discovery annotations — behavioral responses to timeline events. "
+                "Use for: 'show my discovery annotations', 'what responses have I logged'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
     "get_adaptive_mode": {
         "fn": get_adaptive_mode,
         "schema": {

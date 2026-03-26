@@ -14,6 +14,7 @@ from decimal import Decimal
 from mcp.config import (
     table, USER_PREFIX, USER_ID, logger,
     LIFE_EVENTS_PK, INTERACTIONS_PK, TEMPTATIONS_PK, EXPOSURES_PK,
+    ANNOTATIONS_PK,
 )
 from mcp.core import (
     query_source, decimal_to_float, get_profile,
@@ -760,4 +761,97 @@ def tool_get_exposure_correlation(args):
                 "Heat exposure (sauna 20+ min) increases growth hormone and improves cardiovascular markers."
             ),
         },
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# DISC-7 — DISCOVERY ANNOTATIONS (behavioral response to findings)
+# ═══════════════════════════════════════════════════════════════════════
+
+import hashlib as _hashlib
+
+
+def _make_event_key(date: str, event_type: str, title: str) -> str:
+    """Compute deterministic key for a timeline event."""
+    raw = f"{date}|{event_type}|{title}"
+    return _hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+def tool_annotate_discovery(args):
+    """Add a behavioral response annotation to a Discoveries timeline event."""
+    date = (args.get("date") or "").strip()
+    event_type = (args.get("event_type") or "").strip()
+    title = (args.get("title") or "").strip()
+    annotation = (args.get("annotation") or "").strip()
+
+    if not date or not event_type or not title:
+        return {"error": "date, event_type, and title are required to identify the timeline event."}
+    if not annotation:
+        return {"error": "annotation text is required."}
+
+    event_key = _make_event_key(date, event_type, title)
+    action_taken = (args.get("action_taken") or "").strip()
+    outcome = (args.get("outcome") or "").strip()
+
+    item = {
+        "pk": ANNOTATIONS_PK,
+        "sk": f"EVENT#{event_key}",
+        "date": date,
+        "event_type": event_type,
+        "event_title": title,
+        "annotation": annotation,
+        "source": "discovery_annotations",
+        "annotated_at": datetime.utcnow().isoformat(),
+    }
+    if action_taken:
+        item["action_taken"] = action_taken
+    if outcome:
+        item["outcome"] = outcome
+
+    try:
+        table.put_item(Item=item)
+    except Exception as e:
+        return {"error": f"Failed to save annotation: {e}"}
+
+    return {
+        "status": "annotated",
+        "event_key": event_key,
+        "date": date,
+        "event_type": event_type,
+        "title": title,
+        "annotation": annotation,
+        "action_taken": action_taken or None,
+        "outcome": outcome or None,
+        "message": f"Annotation saved for '{title}' ({event_type}) on {date}. Will appear on the Discoveries timeline.",
+    }
+
+
+def tool_get_discovery_annotations(args):
+    """List all discovery annotations."""
+    from boto3.dynamodb.conditions import Key as _Key
+    try:
+        resp = table.query(
+            KeyConditionExpression=_Key("pk").eq(ANNOTATIONS_PK),
+            ScanIndexForward=True,
+        )
+        items = decimal_to_float(resp.get("Items", []))
+    except Exception as e:
+        return {"error": f"Failed to query annotations: {e}"}
+
+    annotations = []
+    for item in items:
+        annotations.append({
+            "event_key": item.get("sk", "").replace("EVENT#", ""),
+            "date": item.get("date", ""),
+            "event_type": item.get("event_type", ""),
+            "event_title": item.get("event_title", ""),
+            "annotation": item.get("annotation", ""),
+            "action_taken": item.get("action_taken"),
+            "outcome": item.get("outcome"),
+            "annotated_at": item.get("annotated_at"),
+        })
+
+    return {
+        "annotations": annotations,
+        "count": len(annotations),
     }

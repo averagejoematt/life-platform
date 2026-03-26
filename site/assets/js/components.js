@@ -40,8 +40,11 @@
       { href: '/achievements/',   text: 'Milestones' },
     ]},
     { label: 'Evidence', items: [
-      { href: '/sleep/',     text: 'Sleep' },
-      { href: '/glucose/',   text: 'Glucose' },
+      { href: '/sleep/',      text: 'Sleep' },
+      { href: '/glucose/',    text: 'Glucose' },
+      { href: '/nutrition/',  text: 'Nutrition' },
+      { href: '/training/',   text: 'Training' },
+      { href: '/mind/',       text: 'Inner Life' },
       { href: '/benchmarks/',text: 'Benchmarks' },
       { href: '/explorer/',  text: 'Data Explorer' },
     ]},
@@ -193,6 +196,9 @@
       { heading: 'Evidence', links: [
         { href: '/sleep/', text: 'Sleep' },
         { href: '/glucose/', text: 'Glucose' },
+        { href: '/nutrition/', text: 'Nutrition' },
+        { href: '/training/', text: 'Training' },
+        { href: '/mind/', text: 'Inner Life' },
         { href: '/benchmarks/', text: 'Benchmarks' },
         { href: '/explorer/', text: 'Data Explorer' },
       ]},

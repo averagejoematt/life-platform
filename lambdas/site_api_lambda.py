@@ -1081,6 +1081,34 @@ def handle_journey_timeline() -> dict:
             seen_evt.add(key)
             deduped.append(e)
 
+    # ── 6. DISC-7: Merge behavioral response annotations ──────────────
+    try:
+        ann_pk = f"{USER_PREFIX}discovery_annotations"
+        ann_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(ann_pk),
+            ScanIndexForward=True,
+        )
+        ann_items = _decimal_to_float(ann_resp.get("Items", []))
+        # Build lookup: event_key → annotation data
+        ann_lookup: dict = {}
+        for ai in ann_items:
+            ek = ai.get("sk", "").replace("EVENT#", "")
+            ann_lookup[ek] = {
+                "annotation": ai.get("annotation", ""),
+                "action_taken": ai.get("action_taken"),
+                "outcome": ai.get("outcome"),
+            }
+        # Attach annotations to matching events
+        if ann_lookup:
+            for e in deduped:
+                ek = hashlib.sha256(
+                    f"{e['date']}|{e['type']}|{e['title']}".encode()
+                ).hexdigest()[:16]
+                if ek in ann_lookup:
+                    e["annotation"] = ann_lookup[ek]
+    except Exception as _ann_e:
+        logger.warning("journey_timeline: annotation merge failed (non-fatal): %s", _ann_e)
+
     return _ok({
         "as_of_date": today,
         "events":     deduped,
@@ -3046,6 +3074,657 @@ def handle_habit_registry() -> dict:
         return _error(500, "Failed to load habit registry")
 
 
+# ── Observatory API endpoints ────────────────────────────────────────────────
+
+def handle_nutrition_observatory() -> dict:
+    """
+    GET /api/nutrition_observatory
+    Returns: 30-day macro averages, protein adherence, eating window, daily trend.
+    Cache: 3600s.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+
+    items = _query_source("macrofactor", d30, today)
+    items.sort(key=lambda x: x.get("sk", ""))
+
+    if not items:
+        return _ok({"nutrition": None, "trend": []}, cache_seconds=3600)
+
+    cals = [float(i["calories"]) for i in items if i.get("calories")]
+    prots = [float(i["protein_g"]) for i in items if i.get("protein_g")]
+    carbs = [float(i["carbs_g"]) for i in items if i.get("carbs_g")]
+    fats = [float(i["fat_g"]) for i in items if i.get("fat_g")]
+    fibers = [float(i["fiber_g"]) for i in items if i.get("fiber_g")]
+
+    def avg(lst): return round(sum(lst) / len(lst), 1) if lst else None
+
+    protein_target = 180
+    protein_hits = sum(1 for p in prots if p >= protein_target)
+    protein_hit_pct = round(protein_hits / len(prots) * 100) if prots else None
+
+    # Eating window from first/last meal times
+    windows = []
+    for i in items:
+        first = i.get("first_meal_time") or i.get("eating_window_start")
+        last = i.get("last_meal_time") or i.get("eating_window_end")
+        dur = i.get("eating_window_hours")
+        if dur:
+            windows.append(float(dur))
+
+    latest = items[-1]
+    trend = [
+        {
+            "date": i.get("sk", "").replace("DATE#", ""),
+            "calories": round(float(i["calories"])) if i.get("calories") else None,
+            "protein": round(float(i["protein_g"]), 1) if i.get("protein_g") else None,
+            "carbs": round(float(i["carbs_g"]), 1) if i.get("carbs_g") else None,
+            "fat": round(float(i["fat_g"]), 1) if i.get("fat_g") else None,
+        }
+        for i in items
+    ]
+
+    return _ok({
+        "nutrition": {
+            "avg_calories": avg(cals),
+            "avg_protein_g": avg(prots),
+            "avg_carbs_g": avg(carbs),
+            "avg_fat_g": avg(fats),
+            "avg_fiber_g": avg(fibers),
+            "protein_target_g": protein_target,
+            "protein_hit_pct": protein_hit_pct,
+            "protein_hits": protein_hits,
+            "days_tracked": len(items),
+            "avg_eating_window_hrs": avg(windows),
+            "latest_calories": round(float(latest["calories"])) if latest.get("calories") else None,
+            "latest_protein": round(float(latest["protein_g"]), 1) if latest.get("protein_g") else None,
+            "tdee_estimate": round(float(latest.get("tdee") or latest.get("expenditure") or 0)) or None,
+            "as_of_date": latest.get("sk", "").replace("DATE#", ""),
+        },
+        "trend": trend,
+    }, cache_seconds=3600)
+
+
+def handle_training_observatory() -> dict:
+    """
+    GET /api/training_observatory
+    Returns: training load (CTL/ATL/TSB), recent workouts, zone 2 stats, strength summary.
+    Cache: 3600s.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    d90 = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
+
+    # Training load from compute partition
+    load_pk = f"{USER_PREFIX}training_load"
+    load_item = None
+    try:
+        load_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(load_pk),
+            ScanIndexForward=False, Limit=1,
+        )
+        load_items = _decimal_to_float(load_resp.get("Items", []))
+        load_item = load_items[0] if load_items else None
+    except Exception:
+        pass
+
+    ctl = float(load_item.get("ctl", 0)) if load_item else None
+    atl = float(load_item.get("atl", 0)) if load_item else None
+    tsb = float(load_item.get("tsb", 0)) if load_item else None
+    acwr = float(load_item.get("acwr", 0)) if load_item else None
+
+    # Recent Strava activities
+    strava_items = _query_source("strava", d30, today)
+    workouts = []
+    zone2_mins = 0
+    for s in sorted(strava_items, key=lambda x: x.get("sk", ""), reverse=True):
+        sport = s.get("sport_type") or s.get("type", "")
+        dur_min = float(s.get("moving_time_seconds", 0) or 0) / 60
+        avg_hr = float(s.get("average_heartrate", 0) or 0)
+        dist_mi = round(float(s.get("distance_meters", 0) or 0) / 1609.34, 1)
+        cals = float(s.get("kilojoules", 0) or s.get("calories", 0) or 0)
+
+        # Zone 2 estimate: HR 60-70% of max (assume max_hr ~ 190)
+        max_hr = 190
+        if avg_hr and 0.60 * max_hr <= avg_hr <= 0.70 * max_hr and dur_min >= 10:
+            zone2_mins += dur_min
+
+        if len(workouts) < 10:
+            workouts.append({
+                "date": s.get("sk", "").replace("DATE#", ""),
+                "sport": sport,
+                "duration_min": round(dur_min),
+                "distance_mi": dist_mi if dist_mi > 0 else None,
+                "avg_hr": round(avg_hr) if avg_hr else None,
+                "calories": round(cals) if cals else None,
+            })
+
+    # Strength PRs from Hevy
+    hevy_items = _query_source("hevy", d90, today)
+    exercises_seen = {}
+    for h in hevy_items:
+        for ex in h.get("exercises", []):
+            name = ex.get("name", "")
+            e1rm = float(ex.get("estimated_1rm", 0) or 0)
+            if name and e1rm > exercises_seen.get(name, 0):
+                exercises_seen[name] = e1rm
+    top_lifts = sorted(exercises_seen.items(), key=lambda x: -x[1])[:8]
+
+    # Fitness status
+    fitness_status = "building"
+    if tsb is not None:
+        if tsb > 10:
+            fitness_status = "fresh"
+        elif tsb > -10:
+            fitness_status = "neutral"
+        elif tsb > -20:
+            fitness_status = "fatigued"
+        else:
+            fitness_status = "overreaching"
+
+    return _ok({
+        "training": {
+            "ctl": round(ctl, 1) if ctl else None,
+            "atl": round(atl, 1) if atl else None,
+            "tsb": round(tsb, 1) if tsb else None,
+            "acwr": round(acwr, 2) if acwr else None,
+            "fitness_status": fitness_status,
+            "zone2_mins_30d": round(zone2_mins),
+            "zone2_weekly_avg": round(zone2_mins / 4.3),
+            "zone2_target_min": 150,
+            "workouts_30d": len(strava_items),
+            "days_tracked": 30,
+        },
+        "recent_workouts": workouts,
+        "top_lifts": [{"name": n, "est_1rm": round(v, 1)} for n, v in top_lifts],
+    }, cache_seconds=3600)
+
+
+def handle_mind_observatory() -> dict:
+    """
+    GET /api/mind_observatory
+    Returns: mood/energy trend, Mind pillar score, vice streaks, social connection,
+    cognitive pattern aggregates. No raw journal text exposed.
+    Cache: 3600s.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    d90 = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
+
+    # Mind pillar from character_sheet
+    mind_level = None
+    mind_score = None
+    mind_tier = None
+    cs_pk = f"{USER_PREFIX}character_sheet"
+    for date_str in [today, yesterday]:
+        try:
+            resp = table.get_item(Key={"pk": cs_pk, "sk": f"DATE#{date_str}"})
+            rec = _decimal_to_float(resp.get("Item"))
+            if rec:
+                pm = rec.get("pillar_mind", {})
+                mind_level = float(pm.get("level", 1))
+                mind_score = float(pm.get("raw_score", 0))
+                mind_tier = pm.get("tier", "Foundation")
+                break
+        except Exception:
+            pass
+
+    # Mood/energy/stress from state_of_mind or journal enrichment
+    som_items = _query_source("state_of_mind", d30, today)
+    mood_trend = []
+    moods = []
+    energies = []
+    for s in sorted(som_items, key=lambda x: x.get("sk", "")):
+        date_str = s.get("sk", "").replace("DATE#", "")
+        m = s.get("valence") or s.get("mood")
+        e = s.get("energy")
+        if m is not None:
+            moods.append(float(m))
+        if e is not None:
+            energies.append(float(e))
+        mood_trend.append({
+            "date": date_str,
+            "mood": round(float(m), 1) if m is not None else None,
+            "energy": round(float(e), 1) if e is not None else None,
+        })
+
+    # Also try journal-enriched mood from notion partition
+    if not mood_trend:
+        notion_items = _query_source("notion", d30, today)
+        for n in sorted(notion_items, key=lambda x: x.get("sk", "")):
+            m = n.get("enriched_mood") or n.get("mood_score")
+            e = n.get("enriched_energy") or n.get("energy_score")
+            st = n.get("enriched_stress") or n.get("stress_score")
+            if m is not None or e is not None:
+                moods.append(float(m)) if m else None
+                energies.append(float(e)) if e else None
+                mood_trend.append({
+                    "date": n.get("sk", "").replace("DATE#", ""),
+                    "mood": round(float(m), 1) if m is not None else None,
+                    "energy": round(float(e), 1) if e is not None else None,
+                    "stress": round(float(st), 1) if st is not None else None,
+                })
+
+    def avg(lst): return round(sum(lst) / len(lst), 1) if lst else None
+
+    # Vice streaks from habit_scores
+    content_filter = _load_content_filter()
+    blocked_set = set(v.lower().strip() for v in content_filter.get("blocked_vices", []))
+    hs_pk = f"{USER_PREFIX}habit_scores"
+    hs_resp = table.query(
+        KeyConditionExpression=Key("pk").eq(hs_pk),
+        ScanIndexForward=False, Limit=1,
+    )
+    hs_items = _decimal_to_float(hs_resp.get("Items", []))
+    vices = []
+    if hs_items:
+        vs = hs_items[0].get("vice_streaks") or {}
+        if isinstance(vs, dict):
+            for name, streak in vs.items():
+                if name.lower().strip() not in blocked_set:
+                    vices.append({"name": name, "streak": int(streak or 0)})
+            vices.sort(key=lambda v: -v["streak"])
+
+    # Social connection from interactions
+    int_pk = f"{USER_PREFIX}interactions"
+    try:
+        int_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(int_pk) & Key("sk").between(
+                f"DATE#{d30}", f"DATE#{today}"
+            ),
+        )
+        interactions = _decimal_to_float(int_resp.get("Items", []))
+        total_interactions = len(interactions)
+        meaningful = sum(1 for i in interactions if i.get("depth") in ("meaningful", "deep"))
+        unique_people = len(set(i.get("person", "") for i in interactions if i.get("person")))
+    except Exception:
+        total_interactions = 0
+        meaningful = 0
+        unique_people = 0
+
+    # Cognitive patterns from journal enrichment (aggregate only — no raw text)
+    cognitive_patterns = {}
+    try:
+        notion_30 = _query_source("notion", d90, today)
+        for n in notion_30:
+            patterns = n.get("enriched_cognitive_patterns") or n.get("cognitive_patterns") or []
+            if isinstance(patterns, str):
+                patterns = [p.strip() for p in patterns.split(",")]
+            for p in patterns:
+                if p:
+                    cognitive_patterns[p] = cognitive_patterns.get(p, 0) + 1
+        # Normalize to percentages
+        total_p = sum(cognitive_patterns.values())
+        if total_p:
+            cognitive_patterns = {
+                k: round(v / total_p * 100, 1)
+                for k, v in sorted(cognitive_patterns.items(), key=lambda x: -x[1])
+            }
+    except Exception:
+        pass
+
+    # Divergence detection (mood vs energy)
+    divergence = None
+    if len(moods) >= 7 and len(energies) >= 7:
+        mood_recent = sum(moods[-7:]) / 7
+        mood_prior = sum(moods[:7]) / 7 if len(moods) >= 14 else mood_recent
+        energy_recent = sum(energies[-7:]) / 7
+        energy_prior = sum(energies[:7]) / 7 if len(energies) >= 14 else energy_recent
+        mood_delta = mood_recent - mood_prior
+        energy_delta = energy_recent - energy_prior
+        if mood_delta > 0.3 and energy_delta < -0.3:
+            divergence = "burnout_risk"
+        elif mood_delta < -0.3 and energy_delta > 0.3:
+            divergence = "disconnection"
+        elif mood_delta < -0.3 and energy_delta < -0.3:
+            divergence = "declining"
+        else:
+            divergence = "aligned"
+
+    return _ok({
+        "mind": {
+            "pillar_level": mind_level,
+            "pillar_score": mind_score,
+            "pillar_tier": mind_tier,
+            "avg_mood": avg(moods),
+            "avg_energy": avg(energies),
+            "divergence_status": divergence,
+            "days_with_mood_data": len(moods),
+            "total_interactions_30d": total_interactions,
+            "meaningful_interactions_30d": meaningful,
+            "unique_people_30d": unique_people,
+            "as_of_date": today,
+        },
+        "mood_trend": mood_trend[-30:],
+        "vice_streaks": vices[:6],
+        "cognitive_patterns": cognitive_patterns,
+        "social": {
+            "total_30d": total_interactions,
+            "meaningful_30d": meaningful,
+            "unique_people": unique_people,
+        },
+    }, cache_seconds=3600)
+
+
+# ── Observatory endpoints: Nutrition, Training, Mind ──────────────────
+
+def handle_nutrition_overview() -> dict:
+    """
+    GET /api/nutrition_overview
+    Returns: 30-day macro averages, protein adherence, eating window, deficit status.
+    Source: MacroFactor DynamoDB partition.
+    Cache: 3600s.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    d7 = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+
+    items = _query_source("macrofactor", d30, today)
+    if not items:
+        return _error(503, "No nutrition data available.")
+
+    items.sort(key=lambda x: x.get("sk", ""))
+
+    def safe_avg(field):
+        vals = [float(i[field]) for i in items if i.get(field) is not None]
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    def safe_sum_avg(field):
+        return safe_avg(field)
+
+    cal_vals = [float(i["calories"]) for i in items if i.get("calories")]
+    pro_vals = [float(i["protein_g"]) for i in items if i.get("protein_g")]
+    carb_vals = [float(i["carbs_g"]) for i in items if i.get("carbs_g")]
+    fat_vals = [float(i["fat_g"]) for i in items if i.get("fat_g")]
+    fiber_vals = [float(i["fiber_g"]) for i in items if i.get("fiber_g")]
+
+    protein_target = 180
+    protein_hit_days = sum(1 for v in pro_vals if v >= protein_target)
+    protein_hit_pct = round(protein_hit_days / len(pro_vals) * 100) if pro_vals else 0
+
+    # Latest day
+    latest = items[-1] if items else {}
+    latest_date = latest.get("date") or latest.get("sk", "").replace("DATE#", "")
+
+    # 7-day vs 30-day comparison
+    items_7d = [i for i in items if (i.get("date") or i.get("sk", "").replace("DATE#", "")) >= d7]
+    cal_7d = [float(i["calories"]) for i in items_7d if i.get("calories")]
+    pro_7d = [float(i["protein_g"]) for i in items_7d if i.get("protein_g")]
+
+    # TDEE estimate (if available in latest record)
+    tdee = float(latest.get("tdee") or latest.get("expenditure") or 0) or None
+    avg_cal = round(sum(cal_vals) / len(cal_vals)) if cal_vals else None
+    deficit = round(tdee - avg_cal) if tdee and avg_cal else None
+
+    # Daily trend for chart
+    trend = []
+    for i in items:
+        d = i.get("date") or i.get("sk", "").replace("DATE#", "")
+        trend.append({
+            "date": d,
+            "calories": round(float(i["calories"])) if i.get("calories") else None,
+            "protein_g": round(float(i["protein_g"]), 1) if i.get("protein_g") else None,
+            "carbs_g": round(float(i["carbs_g"]), 1) if i.get("carbs_g") else None,
+            "fat_g": round(float(i["fat_g"]), 1) if i.get("fat_g") else None,
+        })
+
+    return _ok({
+        "nutrition": {
+            "avg_calories": round(sum(cal_vals) / len(cal_vals)) if cal_vals else None,
+            "avg_protein_g": round(sum(pro_vals) / len(pro_vals), 1) if pro_vals else None,
+            "avg_carbs_g": round(sum(carb_vals) / len(carb_vals), 1) if carb_vals else None,
+            "avg_fat_g": round(sum(fat_vals) / len(fat_vals), 1) if fat_vals else None,
+            "avg_fiber_g": round(sum(fiber_vals) / len(fiber_vals), 1) if fiber_vals else None,
+            "protein_target_g": protein_target,
+            "protein_hit_pct": protein_hit_pct,
+            "protein_hit_days": protein_hit_days,
+            "days_logged": len(items),
+            "tdee": round(tdee) if tdee else None,
+            "avg_deficit": deficit,
+            "cal_7d_avg": round(sum(cal_7d) / len(cal_7d)) if cal_7d else None,
+            "pro_7d_avg": round(sum(pro_7d) / len(pro_7d), 1) if pro_7d else None,
+            "latest_date": latest_date,
+            "latest_calories": round(float(latest.get("calories", 0))) if latest.get("calories") else None,
+            "latest_protein_g": round(float(latest.get("protein_g", 0)), 1) if latest.get("protein_g") else None,
+        },
+        "nutrition_trend": trend,
+    }, cache_seconds=3600)
+
+
+def handle_training_overview() -> dict:
+    """
+    GET /api/training_overview
+    Returns: workout frequency, zone 2 minutes, training load, strength summary.
+    Sources: Strava (cardio), Hevy (strength), Whoop (strain).
+    Cache: 3600s.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d90 = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
+    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+
+    # Strava activities (90 days)
+    strava_items = _query_source("strava", d90, today)
+    strava_30d = [s for s in strava_items if (s.get("date") or s.get("sk", "").replace("DATE#", "")) >= d30]
+
+    total_workouts_90d = len(strava_items)
+    total_workouts_30d = len(strava_30d)
+    weekly_avg = round(total_workouts_30d / 4.3, 1) if total_workouts_30d else 0
+
+    # Zone 2 detection: HR between 60-70% of max (assume max 190 if not in profile)
+    max_hr = 190
+    z2_low, z2_high = max_hr * 0.60, max_hr * 0.70
+    z2_minutes_30d = 0
+    for s in strava_30d:
+        avg_hr = s.get("average_heartrate") or s.get("avg_hr")
+        duration = s.get("duration_minutes") or s.get("moving_time_minutes") or 0
+        if avg_hr and duration:
+            avg_hr = float(avg_hr)
+            duration = float(duration)
+            if z2_low <= avg_hr <= z2_high:
+                z2_minutes_30d += duration
+    z2_weekly_avg = round(z2_minutes_30d / 4.3)
+    z2_target = 150  # minutes/week
+    z2_pct = round(z2_weekly_avg / z2_target * 100) if z2_target else 0
+
+    # Activity type breakdown (30d)
+    type_counts = {}
+    for s in strava_30d:
+        sport = s.get("sport_type") or s.get("type") or "Other"
+        type_counts[sport] = type_counts.get(sport, 0) + 1
+    top_activities = sorted(type_counts.items(), key=lambda x: -x[1])[:5]
+
+    # Total training minutes and distance (30d)
+    total_minutes_30d = sum(float(s.get("duration_minutes") or s.get("moving_time_minutes") or 0) for s in strava_30d)
+    total_distance_mi = sum(float(s.get("distance_miles") or s.get("distance", 0)) / 1609.34 if s.get("distance") else float(s.get("distance_miles", 0)) for s in strava_30d)
+
+    # Whoop strain (30d)
+    whoop_30d = _query_source("whoop", d30, today)
+    strain_vals = [float(w["strain"]) for w in whoop_30d if w.get("strain")]
+    avg_strain = round(sum(strain_vals) / len(strain_vals), 1) if strain_vals else None
+
+    # Hevy — latest strength session info
+    hevy_items = _query_source("hevy", d30, today)
+    strength_sessions_30d = len(hevy_items)
+
+    # Weekly trend (for chart)
+    from collections import defaultdict as _dd
+    week_buckets = _dd(lambda: {"workouts": 0, "minutes": 0, "z2_min": 0})
+    for s in strava_items:
+        d = s.get("date") or s.get("sk", "").replace("DATE#", "")
+        try:
+            dt = datetime.strptime(d, "%Y-%m-%d")
+            week_key = dt.strftime("%Y-W%V")
+        except Exception:
+            continue
+        week_buckets[week_key]["workouts"] += 1
+        dur = float(s.get("duration_minutes") or s.get("moving_time_minutes") or 0)
+        week_buckets[week_key]["minutes"] += dur
+        avg_hr = s.get("average_heartrate") or s.get("avg_hr")
+        if avg_hr and z2_low <= float(avg_hr) <= z2_high:
+            week_buckets[week_key]["z2_min"] += dur
+
+    weekly_trend = sorted([
+        {"week": k, "workouts": v["workouts"], "minutes": round(v["minutes"]), "z2_min": round(v["z2_min"])}
+        for k, v in week_buckets.items()
+    ], key=lambda x: x["week"])[-12:]  # last 12 weeks
+
+    return _ok({
+        "training": {
+            "workouts_30d": total_workouts_30d,
+            "workouts_90d": total_workouts_90d,
+            "weekly_avg": weekly_avg,
+            "total_minutes_30d": round(total_minutes_30d),
+            "total_distance_mi": round(total_distance_mi, 1),
+            "z2_weekly_avg_min": z2_weekly_avg,
+            "z2_target_min": z2_target,
+            "z2_pct": min(z2_pct, 100),
+            "avg_strain": avg_strain,
+            "strength_sessions_30d": strength_sessions_30d,
+            "top_activities": [{"type": t, "count": c} for t, c in top_activities],
+        },
+        "weekly_trend": weekly_trend,
+    }, cache_seconds=3600)
+
+
+def handle_mind_overview() -> dict:
+    """
+    GET /api/mind_overview
+    Returns: mood/energy/stress trends, vice streaks, social connection quality,
+    mind pillar score, cognitive patterns (when journal data is available).
+    Cache: 3600s.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    d90 = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
+
+    # ── 1. Mind pillar from character_sheet ──
+    mind_pillar = None
+    cs_pk = f"{USER_PREFIX}character_sheet"
+    for date_str in [today, yesterday]:
+        resp = table.get_item(Key={"pk": cs_pk, "sk": f"DATE#{date_str}"})
+        record = _decimal_to_float(resp.get("Item"))
+        if record:
+            mp = record.get("pillar_mind", {})
+            mind_pillar = {
+                "level": float(mp.get("level", 1)),
+                "raw_score": float(mp.get("raw_score", 0)),
+                "tier": mp.get("tier", "Foundation"),
+            }
+            break
+
+    # ── 2. State of mind / mood data (Apple Health How We Feel) ──
+    som_items = _query_source("state_of_mind", d30, today)
+    mood_entries = []
+    for s in som_items:
+        valence = s.get("valence")
+        if valence is not None:
+            mood_entries.append({
+                "date": s.get("date") or s.get("sk", "").replace("DATE#", ""),
+                "valence": float(valence),
+                "label": s.get("label", ""),
+            })
+    mood_entries.sort(key=lambda x: x["date"])
+    avg_valence = None
+    if mood_entries:
+        vals = [m["valence"] for m in mood_entries]
+        avg_valence = round(sum(vals) / len(vals), 2)
+
+    # ── 3. Vice streaks from habit_scores ──
+    content_filter = _load_content_filter()
+    blocked_set = set(v.lower().strip() for v in content_filter.get("blocked_vices", []))
+
+    hs_pk = f"{USER_PREFIX}habit_scores"
+    hs_resp = table.query(
+        KeyConditionExpression=Key("pk").eq(hs_pk),
+        ScanIndexForward=False,
+        Limit=1,
+    )
+    hs_items = _decimal_to_float(hs_resp.get("Items", []))
+    vice_data = []
+    if hs_items:
+        latest_hs = hs_items[0]
+        raw_vs = latest_hs.get("vice_streaks") or {}
+        if isinstance(raw_vs, dict):
+            for name, streak_val in raw_vs.items():
+                if name.lower().strip() in blocked_set:
+                    continue
+                vice_data.append({
+                    "name": name,
+                    "current_streak": int(streak_val or 0),
+                    "holding": int(streak_val or 0) > 0,
+                })
+        vice_data.sort(key=lambda v: -v["current_streak"])
+
+    # ── 4. Social connection quality (interactions) ──
+    int_pk = f"{USER_PREFIX}interactions"
+    try:
+        int_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(int_pk) & Key("sk").between(
+                f"DATE#{d30}", f"DATE#{today}~"
+            ),
+            ScanIndexForward=True,
+        )
+        interactions = _decimal_to_float(int_resp.get("Items", []))
+    except Exception:
+        interactions = []
+
+    total_interactions = len(interactions)
+    depth_counts = {"surface": 0, "meaningful": 0, "deep": 0}
+    for i in interactions:
+        d = (i.get("depth") or "surface").lower()
+        if d in depth_counts:
+            depth_counts[d] += 1
+    meaningful_pct = round((depth_counts["meaningful"] + depth_counts["deep"]) / total_interactions * 100) if total_interactions else 0
+
+    # ── 5. Temptation resist rate (90d) ──
+    temp_pk = f"{USER_PREFIX}temptations"
+    try:
+        temp_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(temp_pk) & Key("sk").between(
+                f"DATE#{d90}", f"DATE#{today}~"
+            ),
+        )
+        temptations = _decimal_to_float(temp_resp.get("Items", []))
+    except Exception:
+        temptations = []
+
+    total_temptations = len(temptations)
+    resisted = sum(1 for t in temptations if t.get("resisted"))
+    resist_rate = round(resisted / total_temptations * 100) if total_temptations else None
+
+    # ── 6. Journal entry count (as journaling progress signal) ──
+    journal_pk = f"{USER_PREFIX}notion"
+    try:
+        j_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(journal_pk) & Key("sk").between(
+                f"DATE#{d30}", f"DATE#{today}"
+            ),
+            Select="COUNT",
+        )
+        journal_count = j_resp.get("Count", 0)
+    except Exception:
+        journal_count = 0
+
+    return _ok({
+        "mind": {
+            "mind_pillar": mind_pillar,
+            "avg_valence": avg_valence,
+            "mood_entries_count": len(mood_entries),
+            "journal_entries_30d": journal_count,
+            "resist_rate_pct": resist_rate,
+            "total_temptations_90d": total_temptations,
+            "resisted_90d": resisted,
+            "total_interactions_30d": total_interactions,
+            "meaningful_pct": meaningful_pct,
+            "depth_counts": depth_counts,
+        },
+        "vice_streaks": vice_data,
+        "mood_trend": mood_entries[-30:],  # last 30 entries for chart
+    }, cache_seconds=3600)
+
+
 ROUTES = {
     "/api/vitals":          handle_vitals,
     "/api/journey":         handle_journey,
@@ -3092,6 +3771,10 @@ ROUTES = {
     "/api/habit_registry":     handle_habit_registry,
     # PULSE-A4: Daily pulse endpoint
     "/api/pulse":              handle_pulse,
+    # Observatory pages
+    "/api/nutrition_overview":  handle_nutrition_overview,
+    "/api/training_overview":   handle_training_overview,
+    "/api/mind_overview":       handle_mind_overview,
 }
 
 
