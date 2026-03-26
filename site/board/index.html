@@ -110,6 +110,7 @@
     .board-member { background: var(--surface); border: 1px solid var(--border); padding: var(--space-4) var(--space-4) var(--space-3); cursor: pointer; transition: border-color var(--dur-mid), background var(--dur-mid); user-select: none; }
     .board-member:hover { border-color: rgba(255,255,255,0.15); }
     .board-member.selected { border-color: var(--accent); background: var(--accent-bg-subtle); }
+    .board-member[data-color].selected { border-color: attr(data-color); }
     .board-member .member-icon { font-size: 1.4rem; margin-bottom: var(--space-2); display: block; }
     .board-member .member-name { font-weight: 600; font-size: var(--text-sm); color: var(--text); margin-bottom: 2px; }
     .board-member .member-title { font-size: var(--text-2xs); color: var(--text-muted); line-height: 1.3; }
@@ -271,7 +272,7 @@
   </div>
   <div class="chips" id="chipContainer"></div>
   <div class="rate-notice">
-    <span id="questionsLeft">3</span> free questions remaining ·
+    <span id="questionsLeft">5</span> free questions remaining ·
     <a href="/subscribe/" style="color:var(--accent); text-decoration:none;">Subscribe</a> for unlimited
   </div>
 </div>
@@ -300,12 +301,12 @@
 
 <script>
   const BOARD_MEMBERS = [
-    { id: 'vasquez', name: 'Dr. Elena Vasquez', title: 'Metabolic Medicine & Longevity',    icon: '🩺', focus: 'lifespan, Zone 2, VO2max, CGM, metabolic health' },
-    { id: 'okafor',  name: 'Dr. James Okafor', title: 'Performance Neuroscience',         icon: '🧠', focus: 'sleep architecture, neuroplasticity, dopamine' },
-    { id: 'patrick', name: 'Rhonda Patrick',  title: 'Cellular Biology & Nutrition',    icon: '🔬', focus: 'micronutrients, heat/cold, omega-3s, inflammation' },
-    { id: 'norton',  name: 'Layne Norton',    title: 'Evidence-Based Nutrition',        icon: '💪', focus: 'protein synthesis, body composition, deficit dieting' },
-    { id: 'clear',   name: 'James Clear',     title: 'Habit Architecture',              icon: '⚡', focus: 'habit stacking, identity-based change, systems' },
-    { id: 'goggins', name: 'David Goggins',   title: 'Mental Toughness',                icon: '🔥', focus: 'callusing the mind, no excuses, 40% rule' },
+    { id: 'vasquez', name: 'Dr. Elena Vasquez', title: 'Metabolic Medicine & Longevity',    icon: '🩺', focus: 'lifespan, Zone 2, VO2max, CGM, metabolic health', color: '#5ba4cf' },
+    { id: 'okafor',  name: 'Dr. James Okafor', title: 'Performance Neuroscience',         icon: '🧠', focus: 'sleep architecture, neuroplasticity, dopamine', color: '#b388ff' },
+    { id: 'patrick', name: 'Rhonda Patrick',  title: 'Cellular Biology & Nutrition',    icon: '🔬', focus: 'micronutrients, heat/cold, omega-3s, inflammation', color: '#00e5a0' },
+    { id: 'norton',  name: 'Layne Norton',    title: 'Evidence-Based Nutrition',        icon: '💪', focus: 'protein synthesis, body composition, deficit dieting', color: '#f0a500' },
+    { id: 'clear',   name: 'James Clear',     title: 'Habit Architecture',              icon: '⚡', focus: 'habit stacking, identity-based change, systems', color: '#4ecdc4' },
+    { id: 'goggins', name: 'David Goggins',   title: 'Mental Toughness',                icon: '🔥', focus: 'callusing the mind, no excuses, 40% rule', color: '#ff5252' },
   ];
 
   const CHIPS = [
@@ -319,7 +320,7 @@
     "What does research say about Zone 2?",
   ];
 
-  const BOARD_LIMIT = 3;
+  const BOARD_LIMIT = 5;
   let selected = new Set(BOARD_MEMBERS.map(m => m.id));
   let sessionCount = parseInt(sessionStorage.getItem('lp_board_count') || '0');
 
@@ -398,16 +399,7 @@
 
       document.getElementById('responsesContainer').innerHTML = members.map(m => {
         const text = (data.responses[m.id] || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        return `<div class="persona-card">
-          <div class="persona-header">
-            <div class="persona-avatar">${m.icon}</div>
-            <div class="persona-meta">
-              <div class="name">${m.name}</div>
-              <div class="title-tag">${m.title}</div>
-            </div>
-          </div>
-          <div class="persona-body">${text}</div>
-        </div>`;
+        return renderPersonaCard(m, text);
       }).join('');
 
       sessionCount++;
@@ -424,10 +416,45 @@
     }
   }
 
+  function renderPersonaCard(m, text) {
+    const c = m.color || 'var(--accent)';
+    return `<div class="persona-card" style="border-left:3px solid ${c};">
+      <div class="persona-header">
+        <div class="persona-avatar" style="background:${c};">${m.icon}</div>
+        <div class="persona-meta">
+          <div class="name">${m.name}</div>
+          <div class="title-tag" style="color:${c};">${m.title}</div>
+        </div>
+      </div>
+      <div class="persona-body">${text}</div>
+    </div>`;
+  }
+
+  // Demo response shown on page load — no question required
+  const DEMO_QUESTION = 'Should I prioritize sleep or exercise if I can only optimize one?';
+  const DEMO_RESPONSES = {
+    vasquez: "<strong>Sleep, unequivocally.</strong> Every metabolic pathway you're trying to optimize — insulin sensitivity, growth hormone pulsatility, cortisol clearance — depends on adequate sleep architecture. You can train perfectly and eat optimally, but without 7+ hours of quality sleep, your VO2max gains plateau and your glucose regulation degrades. Fix sleep first; exercise benefits compound on top of it.",
+    okafor: "<strong>Sleep is the foundation of neuroplasticity.</strong> During deep sleep, your glymphatic system clears metabolic waste from the brain at 10× the waking rate. Without it, reaction time drops, emotional regulation suffers, and the prefrontal cortex — your decision-making center — operates at reduced capacity. You'll make worse choices about exercise, nutrition, and everything else.",
+    patrick: "<strong>Both matter, but sleep affects more systems simultaneously.</strong> During sleep, your body upregulates DNA repair enzymes, produces melatonin (a potent antioxidant), and consolidates motor learning from exercise. Chronic sleep restriction increases inflammatory markers like IL-6 and CRP — the very markers exercise is supposed to reduce. You'd be fighting yourself.",
+    norton: "<strong>Context matters more than the binary.</strong> If you're sleeping 4 hours, obviously fix that. But if you're getting 6.5 hours and zero exercise, the marginal return on 30 minutes of resistance training is enormous — muscle protein synthesis, GLUT4 translocation, bone density. Don't let perfect sleep become an excuse to skip the gym. The data supports both as non-negotiable.",
+    clear: "<strong>Optimize the one that makes the other easier.</strong> For most people, that's sleep. When you sleep well, you have the energy and willpower to exercise. When you exercise first thing, you might sleep better — but that requires a level of discipline that's hard to sustain when exhausted. Build the sleep habit first; let it create the conditions for the exercise habit.",
+    goggins: "<strong>You're asking the wrong question.</strong> You don't get to choose. Life doesn't give you the option to optimize one thing at a time. You sleep AND you train. Period. The voice in your head looking for permission to skip one — that's the enemy. Set the alarm for 5am, get your miles in, and get to bed by 9:30. Stop negotiating with yourself."
+  };
+
+  function showDemoResponse() {
+    const area = document.getElementById('resultsArea');
+    const container = document.getElementById('responsesContainer');
+    document.getElementById('questionDisplay').textContent = DEMO_QUESTION;
+    area.style.display = 'block';
+    container.innerHTML = '<div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);font-family:var(--font-mono);margin-bottom:var(--space-4);padding:var(--space-3) var(--space-4);background:var(--accent-bg-subtle);border:1px solid var(--accent);display:inline-block;">// SAMPLE RESPONSE — ask your own question above</div>' +
+      BOARD_MEMBERS.map(m => renderPersonaCard(m, DEMO_RESPONSES[m.id])).join('');
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     renderGrid();
     renderChips();
     updateRateDisplay();
+    showDemoResponse();
     document.getElementById('questionInput').addEventListener('keydown', e => {
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); askBoard(); }
     });

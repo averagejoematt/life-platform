@@ -282,8 +282,12 @@
       <span class="compare-row__name">Custom health data engineer (hourly)</span>
       <span class="compare-row__cost theirs">$200+/hr</span>
     </div>
+    <div class="compare-row">
+      <span class="compare-row__name">DIY with ChatGPT + spreadsheets</span>
+      <span class="compare-row__cost" style="color:var(--text-muted)">Free <span style="font-size:var(--text-2xs);color:var(--text-faint)">(~10 hrs/week manual)</span></span>
+    </div>
     <div class="compare-row" style="border-bottom:none">
-      <span class="compare-row__name"><strong>This platform (full stack)</strong></span>
+      <span class="compare-row__name"><strong>This platform (full stack, automated)</strong></span>
       <span class="compare-row__cost mine"><strong>~$13/mo</strong></span>
     </div>
   </div>
@@ -382,6 +386,22 @@
       </tr>
     </tfoot>
   </table>
+  <p style="margin-top:var(--space-4);font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono)">
+  </p>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-top:var(--space-6);">
+    <div style="background:var(--surface);padding:var(--space-5);text-align:center;">
+      <div style="font-family:var(--font-display);font-size:36px;color:var(--accent);line-height:1;">$0.43</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-top:var(--space-2)">Per daily AI coaching brief</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5);text-align:center;">
+      <div style="font-family:var(--font-display);font-size:36px;color:var(--text);line-height:1;">$0.13</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-top:var(--space-2)">Per data source per month</div>
+    </div>
+    <div style="background:var(--surface);padding:var(--space-5);text-align:center;">
+      <div style="font-family:var(--font-display);font-size:36px;color:var(--text);line-height:1;">0</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-top:var(--space-2)">Idle cost when nobody visits</div>
+    </div>
+  </div>
   <p style="margin-top:var(--space-4);font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono)">
     // MCP server (Claude Desktop integration) runs locally — no cloud cost for that component.
     Wearable subscriptions (Whoop, Withings, Eight Sleep, Garmin, etc.) not included — those are health device costs, not infrastructure.
