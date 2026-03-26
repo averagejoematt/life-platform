@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-**Version:** v3.9.25 | **Last updated:** 2026-03-26 | **Total tools:** 98
+**Version:** v3.9.26 | **Last updated:** 2026-03-26 | **Total tools:** 98
 
 > SIMP-1 Phase 1 complete (v3.7.17–19): 116 → 86 tools via 13 view-dispatchers. ADR-030 (v3.7.46): `get_calendar_events` + `get_schedule_load` retired (Google Calendar integration blocked by IT policy). 88 → 87 tools.
 > Many previously standalone tools are now `view=` parameters of a parent dispatcher.
@@ -248,6 +248,7 @@
 | `read_platform_memory` | category, days=, limit= | Retrieve memory records |
 | `list_memory_categories` | days= | List categories with record counts |
 | `delete_platform_memory` | category, date | Delete a memory record |
+| `capture_baseline` | date=, label=, force= | Capture full-state Day 1 baseline snapshot across 8 domains (weight, BP, HRV, character, habits, vices, glucose, nutrition). Stores permanent record in platform_memory. Safe: won't overwrite without force=true. |
 
 ### Decision Journal
 | Tool | Key Params | Description |
