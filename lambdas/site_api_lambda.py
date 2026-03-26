@@ -1020,14 +1020,65 @@ def handle_journey_timeline() -> dict:
     except Exception:
         pass
 
+    # ── 5. FDR-significant correlation findings ────────────────────────
+    corr_pk = f"{USER_PREFIX}weekly_correlations"
+    try:
+        corr_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(corr_pk),
+            ScanIndexForward=True,
+        )
+        _METRIC_LABELS = {
+            "hrv": "Heart Rate Variability", "recovery_score": "Recovery Score",
+            "sleep_duration": "Sleep Duration", "sleep_score": "Sleep Score",
+            "resting_hr": "Resting Heart Rate", "strain": "Strain",
+            "tsb": "Training Stress Balance", "training_kj": "Training Load",
+            "training_mins": "Training Minutes", "protein_g": "Protein",
+            "calories": "Calories", "carbs_g": "Carbs", "steps": "Steps",
+            "habit_pct": "Habit Completion", "day_grade": "Day Grade",
+            "readiness": "Readiness", "tier0_streak": "Tier 0 Streak",
+        }
+        seen_findings: set = set()
+        for item in _decimal_to_float(corr_resp.get("Items", [])):
+            week = item.get("week", item.get("sk", "").replace("WEEK#", ""))
+            end_d = item.get("end_date", "")
+            corrs = item.get("correlations", {})
+            if not isinstance(corrs, dict):
+                continue
+            for label, data in corrs.items():
+                if not data.get("fdr_significant"):
+                    continue
+                if label in seen_findings:
+                    continue  # only show first detection
+                seen_findings.add(label)
+                r_val = float(data.get("pearson_r", 0) or 0)
+                n_val = int(data.get("n_days", 0) or 0)
+                ma = data.get("metric_a", "")
+                mb = data.get("metric_b", "")
+                la = _METRIC_LABELS.get(ma, ma)
+                lb = _METRIC_LABELS.get(mb, mb)
+                direction = "higher" if r_val > 0 else "lower"
+                is_ci = data.get("counterintuitive", False)
+                evt_type = "counterintuitive" if is_ci else "finding"
+                title_prefix = "⚠️ Surprise: " if is_ci else "AI Finding: "
+                events.append({
+                    "date":  end_d or week,
+                    "type":  evt_type,
+                    "title": f"{title_prefix}{la} → {direction} {lb}",
+                    "body":  f"r={r_val:+.2f} over {n_val} days. Passed FDR significance testing (week {week}).",
+                    "link":  "/explorer/",
+                    "meta":  {"r": r_val, "n": n_val, "pair": label, "week": week},
+                })
+    except Exception as e:
+        logger.warning("journey_timeline: correlation events failed (non-fatal): %s", e)
+
     # Sort chronologically, deduplicate by date+title
     events.sort(key=lambda e: e["date"])
-    seen: set = set()
+    seen_evt: set = set()
     deduped = []
     for e in events:
         key = (e["date"], e["title"])
-        if key not in seen:
-            seen.add(key)
+        if key not in seen_evt:
+            seen_evt.add(key)
             deduped.append(e)
 
     return _ok({
