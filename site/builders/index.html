@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="How to build your own AI health platform on AWS for $13/month. Architecture decisions, stack choices, lessons learned, and the full technical blueprint.">
+  <meta property="og:title" content="For Builders — How This Platform Was Built">
+  <meta property="og:description" content="A non-engineer built a 52-Lambda AI health system on AWS for $13/month. Here's the complete technical blueprint.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="For Builders — How This Platform Was Built">
+  <meta name="twitter:description" content="52 Lambdas. 103 MCP tools. 19 data sources. $13/month. Built by a non-engineer with Claude. Full blueprint.">
+  <meta property="og:type" content="article">
+  <title>For Builders — Matthew Walker</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .page-header {
+      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .page-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      color: var(--text);
+      margin-bottom: var(--space-4);
+    }
+    .page-header__title span { color: var(--accent); }
+    .page-header__sub {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 580px;
+      line-height: var(--lh-body);
+    }
+
+    .builders-body {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 var(--page-padding);
+    }
+    .builders-section {
+      padding: var(--space-12) 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .builders-section:last-of-type { border-bottom: none; }
+    .builders-section__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .builders-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      margin-bottom: var(--space-6);
+    }
+    .builders-section__body {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      max-width: var(--prose-width);
+    }
+    .builders-section__body + .builders-section__body { margin-top: var(--space-4); }
+
+    /* Numbers strip */
+    .numbers-strip {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin: var(--space-8) 0;
+    }
+    .numbers-strip__item {
+      background: var(--surface);
+      padding: var(--space-5);
+      text-align: center;
+    }
+    .numbers-strip__value {
+      font-family: var(--font-display);
+      font-size: 36px;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .numbers-strip__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-top: var(--space-2);
+    }
+
+    /* Decision cards */
+    .decision-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+      margin-top: var(--space-8);
+    }
+    .decision-card {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: var(--space-6);
+    }
+    .decision-card__tag {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      margin-bottom: var(--space-3);
+    }
+    .decision-card__tag.chose { color: var(--accent); }
+    .decision-card__tag.avoided { color: var(--c-red-status, #ff5252); }
+    .decision-card__title {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .decision-card__body {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .decision-card__why {
+      margin-top: var(--space-4);
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--border-subtle);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+    }
+
+    /* Lessons learned */
+    .lesson-grid {
+      display: grid;
+      gap: var(--space-3);
+      margin-top: var(--space-8);
+    }
+    .lesson-item {
+      display: grid;
+      grid-template-columns: 50px 1fr;
+      gap: var(--space-4);
+      padding: var(--space-5);
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .lesson-item__num {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--accent);
+      text-align: center;
+      padding-top: var(--space-1);
+    }
+    .lesson-item__title {
+      font-size: var(--text-sm);
+      color: var(--text);
+      font-weight: 600;
+      margin-bottom: var(--space-2);
+    }
+    .lesson-item__body {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .lesson-item__code {
+      margin-top: var(--space-3);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--accent-dim);
+      background: var(--bg);
+      border: 1px solid var(--border-subtle);
+      padding: var(--space-2) var(--space-3);
+      letter-spacing: var(--ls-label);
+    }
+
+    /* Timeline */
+    .timeline { margin-top: var(--space-8); }
+    .timeline-item {
+      display: grid;
+      grid-template-columns: 100px 1fr;
+      gap: var(--space-4);
+      padding: var(--space-4) 0;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .timeline-item:last-child { border-bottom: none; }
+    .timeline-item__date {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--accent-dim);
+      letter-spacing: var(--ls-label);
+      padding-top: 2px;
+    }
+    .timeline-item__title {
+      font-size: var(--text-sm);
+      color: var(--text);
+      margin-bottom: var(--space-1);
+    }
+    .timeline-item__desc {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      line-height: var(--lh-body);
+    }
+
+    /* CTA block */
+    .builders-cta {
+      margin-top: var(--space-8);
+      padding: var(--space-6);
+      border-left: 3px solid var(--accent);
+      background: var(--accent-bg-subtle);
+    }
+    .builders-cta__text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      margin-bottom: var(--space-4);
+    }
+    .builders-cta__text strong { color: var(--text); }
+
+    @media (max-width: 768px) {
+      .numbers-strip { grid-template-columns: repeat(3, 1fr); }
+      .decision-grid { grid-template-columns: 1fr; }
+      .lesson-item { grid-template-columns: 40px 1fr; }
+      .timeline-item { grid-template-columns: 80px 1fr; }
+    }
+    @media (max-width: 480px) {
+      .numbers-strip { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<div id="amj-nav"></div>
+</div>
+
+<header class="page-header reveal">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">The Build</div>
+  <h1 class="page-header__title">For <span>Builders</span></h1>
+  <p class="page-header__sub">
+    A non-engineer built a 52-Lambda AI health intelligence system on AWS for $13/month using Claude as the primary engineering partner. Here's the complete technical blueprint &mdash; every decision, every mistake, every lesson.
+  </p>
+</header>
+
+<div class="builders-body">
+
+  <!-- The Numbers -->
+  <div class="numbers-strip reveal">
+    <div class="numbers-strip__item">
+      <div class="numbers-strip__value" data-const="platform.lambdas">52</div>
+      <div class="numbers-strip__label">AWS Lambdas</div>
+    </div>
+    <div class="numbers-strip__item">
+      <div class="numbers-strip__value" data-const="platform.mcp_tools">103</div>
+      <div class="numbers-strip__label">MCP tools</div>
+    </div>
+    <div class="numbers-strip__item">
+      <div class="numbers-strip__value">19</div>
+      <div class="numbers-strip__label">Data sources</div>
+    </div>
+    <div class="numbers-strip__item">
+      <div class="numbers-strip__value">$13</div>
+      <div class="numbers-strip__label">/month total</div>
+    </div>
+    <div class="numbers-strip__item">
+      <div class="numbers-strip__value">0</div>
+      <div class="numbers-strip__label">Engineers on team</div>
+    </div>
+  </div>
+
+  <!-- Who this is for -->
+  <div class="builders-section reveal">
+    <div class="builders-section__eyebrow">// 01 &mdash; audience</div>
+    <h2 class="builders-section__title">Who This Is For</h2>
+    <p class="builders-section__body">
+      You're a developer, hobbyist, or technical leader who wants to build a personal data system &mdash;
+      health tracking, quantified self, home automation, or any domain where you're collecting data from multiple
+      sources and want AI to reason about it. You don't need a team. You don't need a budget.
+      You need a pattern.
+    </p>
+    <p class="builders-section__body">
+      This page documents the architectural pattern I followed: what I chose, what I avoided, what broke,
+      and what I'd do differently if I started over tomorrow.
+    </p>
+  </div>
+
+  <!-- Architecture Decisions -->
+  <div class="builders-section reveal">
+    <div class="builders-section__eyebrow">// 02 &mdash; architecture decisions</div>
+    <h2 class="builders-section__title">What I Chose (and What I Didn't)</h2>
+    <p class="builders-section__body">
+      Every decision here was optimized for a single operator. No team coordination overhead, no multi-tenant complexity,
+      no premature abstraction. The philosophy: the simplest thing that works, run by one person, at near-zero cost.
+    </p>
+
+    <div class="decision-grid">
+      <div class="decision-card">
+        <div class="decision-card__tag chose">// chose</div>
+        <div class="decision-card__title">DynamoDB single-table, no GSIs</div>
+        <div class="decision-card__body">One table. PK = <code>USER#matthew#SOURCE#{source}</code>, SK = <code>DATE#YYYY-MM-DD</code>. Every query is a known key pattern. No GSIs means no extra cost and no index propagation lag.</div>
+        <div class="decision-card__why">// trade-off: ad-hoc queries are impossible. You must know your access patterns upfront. For N=1 data, you always do.</div>
+      </div>
+      <div class="decision-card">
+        <div class="decision-card__tag avoided">// avoided</div>
+        <div class="decision-card__title">PostgreSQL / RDS</div>
+        <div class="decision-card__body">RDS starts at ~$15/month even for the smallest instance, runs 24/7, and requires patching. For write-once-read-many time-series health data, it's overkill. DynamoDB on-demand: $0.48/month.</div>
+        <div class="decision-card__why">// would reconsider if: ad-hoc analytical queries became critical, or multi-user support was needed</div>
+      </div>
+      <div class="decision-card">
+        <div class="decision-card__tag chose">// chose</div>
+        <div class="decision-card__title">Lambda + EventBridge (no containers)</div>
+        <div class="decision-card__body">Every function is event-driven. Ingestion runs on cron (06:45&ndash;11:00 AM PT). Compute runs in sequence. Zero idle cost. Cold starts are <2s and irrelevant for batch processing.</div>
+        <div class="decision-card__why">// trade-off: 15-min max timeout, no long-running jobs, package size limits. All manageable for this workload.</div>
+      </div>
+      <div class="decision-card">
+        <div class="decision-card__tag avoided">// avoided</div>
+        <div class="decision-card__title">ECS / Fargate / EC2</div>
+        <div class="decision-card__body">Always-on compute makes no sense for a system that runs ~100 invocations/day. Even the smallest Fargate task is ~$10/month. The platform's entire Lambda bill is $0.12/month.</div>
+        <div class="decision-card__why">// would reconsider if: real-time streaming ingestion or websocket features were needed</div>
+      </div>
+      <div class="decision-card">
+        <div class="decision-card__tag chose">// chose</div>
+        <div class="decision-card__title">CDK (TypeScript) for IaC</div>
+        <div class="decision-card__body">8 CDK stacks define all infrastructure. IAM roles are least-privilege per Lambda. EventBridge schedules, DynamoDB table, S3 buckets, CloudFront &mdash; all in code, all version-controlled.</div>
+        <div class="decision-card__why">// trade-off: CDK learning curve is steep. But "infrastructure as code" means rebuilding from scratch takes minutes, not days.</div>
+      </div>
+      <div class="decision-card">
+        <div class="decision-card__tag avoided">// avoided</div>
+        <div class="decision-card__title">Terraform / SAM / manual console</div>
+        <div class="decision-card__body">Terraform is cloud-agnostic but adds a state file management burden. SAM is fine but CDK gives you real programming constructs (loops, conditionals). Manual console is how incidents happen.</div>
+        <div class="decision-card__why">// would reconsider if: multi-cloud was a requirement (it never will be for a personal project)</div>
+      </div>
+      <div class="decision-card">
+        <div class="decision-card__tag chose">// chose</div>
+        <div class="decision-card__title">MCP (Model Context Protocol) for AI</div>
+        <div class="decision-card__body">103 tools exposed via MCP. Claude calls them in natural language. No SQL, no dashboards, no manual queries. The AI is the interface. OAuth 2.1 + HMAC auth on the Lambda Function URL.</div>
+        <div class="decision-card__why">// trade-off: vendor lock-in to Anthropic's protocol. But MCP is open spec, and the tool implementations are just Python functions.</div>
+      </div>
+      <div class="decision-card">
+        <div class="decision-card__tag avoided">// avoided</div>
+        <div class="decision-card__title">Custom dashboard / Grafana / Retool</div>
+        <div class="decision-card__body">Dashboards require maintenance, are hard to make flexible, and can't answer questions you didn't anticipate. "What correlates with my bad sleep last week?" is a natural language question, not a dashboard filter.</div>
+        <div class="decision-card__why">// exception: the public website (averagejoematt.com) is a read-only dashboard for visitors. But I query via Claude.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- The Stack -->
+  <div class="builders-section reveal">
+    <div class="builders-section__eyebrow">// 03 &mdash; the stack</div>
+    <h2 class="builders-section__title">The Exact Stack</h2>
+    <p class="builders-section__body">
+      No frameworks. No ORMs. No dependency trees. The entire platform runs on Python stdlib + boto3 + one Claude API call per digest.
+    </p>
+
+    <div style="display:grid;grid-template-columns:200px 1fr;gap:var(--space-3) var(--space-6);margin-top:var(--space-8);font-size:var(--text-sm);">
+      <div style="font-family:var(--font-mono);color:var(--text-faint);letter-spacing:var(--ls-label)">Language</div>
+      <div style="color:var(--text-muted)"><strong style="color:var(--text)">Python 3.12</strong> &mdash; stdlib only for all Lambdas. No pip dependencies. urllib for HTTP, json for parsing, boto3 from Lambda runtime.</div>
+
+      <div style="font-family:var(--font-mono);color:var(--text-faint);letter-spacing:var(--ls-label)">Infrastructure</div>
+      <div style="color:var(--text-muted)"><strong style="color:var(--text)">AWS CDK (TypeScript)</strong> &mdash; 8 stacks: Compute, Data, Web, Alarms, IAM, Shared Layer, Site, Monitoring.</div>
+
+      <div style="font-family:var(--font-mono);color:var(--text-faint);letter-spacing:var(--ls-label)">Database</div>
+      <div style="color:var(--text-muted)"><strong style="color:var(--text)">DynamoDB</strong> &mdash; single table, on-demand, PK+SK only, no GSIs, KMS encrypted, PITR 35-day, deletion protection.</div>
+
+      <div style="font-family:var(--font-mono);color:var(--text-faint);letter-spacing:var(--ls-label)">Object store</div>
+      <div style="color:var(--text-muted)"><strong style="color:var(--text)">S3</strong> &mdash; raw JSON archive (<code>raw/{source}/{type}/{Y}/{M}/{D}.json</code>), config files, static site hosting.</div>
+
+      <div style="font-family:var(--font-mono);color:var(--text-faint);letter-spacing:var(--ls-label)">AI</div>
+      <div style="color:var(--text-muted)"><strong style="color:var(--text)">Claude (Anthropic)</strong> &mdash; Sonnet for analysis, Haiku for classification. ~$3/month. MCP for tool calls.</div>
+
+      <div style="font-family:var(--font-mono);color:var(--text-faint);letter-spacing:var(--ls-label)">CI/CD</div>
+      <div style="color:var(--text-muted)"><strong style="color:var(--text)">GitHub Actions</strong> &mdash; OIDC federation (no static keys), lint &rarr; test &rarr; plan &rarr; deploy with manual approval gate, auto-rollback on smoke test failure.</div>
+
+      <div style="font-family:var(--font-mono);color:var(--text-faint);letter-spacing:var(--ls-label)">Monitoring</div>
+      <div style="color:var(--text-muted)"><strong style="color:var(--text)">CloudWatch + X-Ray</strong> &mdash; 49 alarms, synthetic canary every 4h, dead-letter queues on all async invocations.</div>
+
+      <div style="font-family:var(--font-mono);color:var(--text-faint);letter-spacing:var(--ls-label)">Auth</div>
+      <div style="color:var(--text-muted)"><strong style="color:var(--text)">Secrets Manager + KMS</strong> &mdash; 9 secrets, in-memory Lambda caching, OIDC for CI/CD, OAuth 2.1 for MCP.</div>
+
+      <div style="font-family:var(--font-mono);color:var(--text-faint);letter-spacing:var(--ls-label)">Frontend</div>
+      <div style="color:var(--text-muted)"><strong style="color:var(--text)">Vanilla HTML/CSS/JS</strong> &mdash; no React, no build step, no bundler. S3 + CloudFront. Site API via Lambda Function URL.</div>
+    </div>
+  </div>
+
+  <!-- Lessons Learned (the hard way) -->
+  <div class="builders-section reveal">
+    <div class="builders-section__eyebrow">// 04 &mdash; lessons learned the hard way</div>
+    <h2 class="builders-section__title">What Broke (and What I Learned)</h2>
+    <p class="builders-section__body">
+      These aren't hypothetical. Each lesson cost at least one incident, one late-night debug session, or one "how did I miss that" moment.
+    </p>
+
+    <div class="lesson-grid">
+      <div class="lesson-item">
+        <div class="lesson-item__num">01</div>
+        <div>
+          <div class="lesson-item__title">Never register an MCP tool without the implementing function</div>
+          <div class="lesson-item__body">Registered a tool name in the TOOLS dict before writing the function. Lambda imported cleanly but crashed on invocation with a NameError. Production MCP was down for 2 hours before I noticed.</div>
+          <div class="lesson-item__code">// fix: run pytest tests/test_mcp_registry.py -v before every MCP deploy</div>
+        </div>
+      </div>
+      <div class="lesson-item">
+        <div class="lesson-item__num">02</div>
+        <div>
+          <div class="lesson-item__title">S3 sync --delete will wipe Lambda-generated files</div>
+          <div class="lesson-item__body">Used <code>aws s3 sync site/ s3://bucket/site/ --delete</code> to deploy the static site. It also deleted pulse.json, character_stats.json, and public_stats.json &mdash; files generated by compute Lambdas, not in the local site/ folder.</div>
+          <div class="lesson-item__code">// fix: --exclude "pulse.json" --exclude "data/*" --exclude "public_stats.json"</div>
+        </div>
+      </div>
+      <div class="lesson-item">
+        <div class="lesson-item__num">03</div>
+        <div>
+          <div class="lesson-item__title">Manual deploys were the #1 operational risk</div>
+          <div class="lesson-item__body">8 deployment-related incidents before CI/CD. Wrong zip filename, forgotten chmod, stale handler config. Architecture Review #13 flagged it as the top finding. CI/CD pipeline resolved all 8 failure modes.</div>
+          <div class="lesson-item__code">// fix: GitHub Actions with OIDC, manual approval gate, auto-rollback on smoke test</div>
+        </div>
+      </div>
+      <div class="lesson-item">
+        <div class="lesson-item__num">04</div>
+        <div>
+          <div class="lesson-item__title">Lambda@Edge deploys to us-east-1 regardless of your home region</div>
+          <div class="lesson-item__body">Spent 3 hours debugging why Lambda@Edge couldn't read secrets. Everything was in us-west-2. Lambda@Edge runs in us-east-1. Secrets must be there too.</div>
+          <div class="lesson-item__code">// also: CloudWatch billing alarms must use SNS in us-east-1</div>
+        </div>
+      </div>
+      <div class="lesson-item">
+        <div class="lesson-item__num">05</div>
+        <div>
+          <div class="lesson-item__title">macOS ships bash 3.2 &mdash; no associative arrays</div>
+          <div class="lesson-item__body">Wrote a deploy script using <code>declare -A</code> for a Lambda mapping. Worked on Linux, crashed on macOS. Bash 3.2 doesn't support associative arrays (Apple ships ancient bash due to GPL v3 licensing).</div>
+          <div class="lesson-item__code">// fix: use parallel indexed arrays or inline Python blocks in bash scripts</div>
+        </div>
+      </div>
+      <div class="lesson-item">
+        <div class="lesson-item__num">06</div>
+        <div>
+          <div class="lesson-item__title">Accidentally deleted a Secrets Manager secret</div>
+          <div class="lesson-item__body">Deleted the Habitify API secret thinking it was unused. It was consumed by the habits ingestion Lambda. 3 days of missing habit data before I noticed the CloudWatch errors.</div>
+          <div class="lesson-item__code">// fix: ADR-014 secrets governance &mdash; document which Lambdas consume which secrets. Never bundle unless consumed by the same set.</div>
+        </div>
+      </div>
+      <div class="lesson-item">
+        <div class="lesson-item__num">07</div>
+        <div>
+          <div class="lesson-item__title">Correlation &ne; Causation (and your AI will forget this)</div>
+          <div class="lesson-item__body">Early daily briefs said things like "your high HRV <em>caused</em> better sleep quality." The correlation engine found a relationship. Claude narrated it as causal. Had to add explicit correlational framing instructions to every AI prompt.</div>
+          <div class="lesson-item__code">// fix: system prompt mandates "correlates with" / "is associated with" &mdash; never "causes" or "leads to"</div>
+        </div>
+      </div>
+      <div class="lesson-item">
+        <div class="lesson-item__num">08</div>
+        <div>
+          <div class="lesson-item__title">Don't connect your employer's tools to your personal AWS</div>
+          <div class="lesson-item__body">Considered connecting Google Calendar (used for work) to the platform. Realized this would pipe company meeting data into a personal AWS account. Deliberately deferred &mdash; correct instinct.</div>
+          <div class="lesson-item__code">// lesson: data governance isn't just a corporate concern. Think about data boundaries even in personal projects.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Build Timeline -->
+  <div class="builders-section reveal">
+    <div class="builders-section__eyebrow">// 05 &mdash; build timeline</div>
+    <h2 class="builders-section__title">How Fast It Grew</h2>
+    <p class="builders-section__body">
+      From zero to 52 Lambdas in 5 weeks. Every version was built with Claude as the sole engineering partner.
+    </p>
+
+    <div class="timeline">
+      <div class="timeline-item">
+        <div class="timeline-item__date">Feb 22</div>
+        <div>
+          <div class="timeline-item__title">Day 1 &mdash; First Lambda, first DynamoDB write</div>
+          <div class="timeline-item__desc">Whoop ingestion. Single Lambda, single table. 15 minutes from idea to working code.</div>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-item__date">Week 1</div>
+        <div>
+          <div class="timeline-item__title">8 data sources online</div>
+          <div class="timeline-item__desc">Whoop, Withings, Strava, Apple Health, MacroFactor, Habitify, Garmin, Eight Sleep. All on EventBridge crons.</div>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-item__date">Week 2</div>
+        <div>
+          <div class="timeline-item__title">Daily Brief email + MCP server</div>
+          <div class="timeline-item__desc">Claude synthesizes all data into a coaching email every morning. MCP tools let me query data in natural language.</div>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-item__date">Week 3</div>
+        <div>
+          <div class="timeline-item__title">Character Sheet engine + public website</div>
+          <div class="timeline-item__desc">7-pillar scoring system with EMA smoothing, level/tier transitions. averagejoematt.com goes live with live data.</div>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-item__date">Week 4</div>
+        <div>
+          <div class="timeline-item__title">Intelligence layer: correlations + hypothesis engine</div>
+          <div class="timeline-item__desc">23-pair Pearson correlation matrix with BH-FDR correction. Weekly AI hypothesis generation from data patterns.</div>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-item__date">Week 5</div>
+        <div>
+          <div class="timeline-item__title">CI/CD, architecture reviews, 103 MCP tools</div>
+          <div class="timeline-item__desc">GitHub Actions pipeline with OIDC. 17 architecture reviews by 14-member AI board. Challenge system with XP gamification.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- If I Started Over -->
+  <div class="builders-section reveal">
+    <div class="builders-section__eyebrow">// 06 &mdash; if I started over tomorrow</div>
+    <h2 class="builders-section__title">What I'd Do Differently</h2>
+
+    <div style="display:grid;gap:var(--space-4);margin-top:var(--space-6);">
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:var(--space-3);padding:var(--space-4);border:1px solid var(--border-subtle);background:var(--surface);">
+        <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent)">01</span>
+        <span style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body)"><strong style="color:var(--text)">CI/CD from day one.</strong> Not day 30. The 8 deployment incidents were entirely preventable. GitHub Actions + OIDC takes 2 hours to set up and saves hundreds of hours.</span>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:var(--space-3);padding:var(--space-4);border:1px solid var(--border-subtle);background:var(--surface);">
+        <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent)">02</span>
+        <span style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body)"><strong style="color:var(--text)">Start with 3 data sources, not 8.</strong> Whoop + Habitify + one nutrition tracker is enough to build the full pipeline pattern. Adding sources later is trivial once the pattern exists.</span>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:var(--space-3);padding:var(--space-4);border:1px solid var(--border-subtle);background:var(--surface);">
+        <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent)">03</span>
+        <span style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body)"><strong style="color:var(--text)">Design the MCP tools as the primary interface from the start.</strong> I built dashboards first, then realized Claude was a better interface. Would skip straight to MCP and build the website as a secondary output.</span>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:var(--space-3);padding:var(--space-4);border:1px solid var(--border-subtle);background:var(--surface);">
+        <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent)">04</span>
+        <span style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body)"><strong style="color:var(--text)">Write Architecture Decision Records from day one.</strong> ADRs are 5-minute documents that save hours of "why did I do it this way?" 3 months later. The platform now has 27 ADRs and they're invaluable.</span>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:var(--space-3);padding:var(--space-4);border:1px solid var(--border-subtle);background:var(--surface);">
+        <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent)">05</span>
+        <span style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body)"><strong style="color:var(--text)">Pre-compute everything, query nothing live.</strong> The Compute &rarr; Store &rarr; Read pattern means MCP tools read from pre-calculated results, never from raw data. This makes the system fast, cheap, and predictable.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Start Building -->
+  <div class="builders-section reveal">
+    <div class="builders-section__eyebrow">// 07 &mdash; start here</div>
+    <h2 class="builders-section__title">Your First Weekend</h2>
+    <p class="builders-section__body">
+      You can have a working personal data system in one weekend. Here's the minimum viable path:
+    </p>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-top:var(--space-8);">
+      <div style="background:var(--surface);padding:var(--space-6);">
+        <div style="font-family:var(--font-display);font-size:36px;color:var(--accent);line-height:1;margin-bottom:var(--space-3)">1</div>
+        <div style="font-size:var(--text-sm);color:var(--text);font-weight:600;margin-bottom:var(--space-2)">Saturday morning</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body)">
+          <code>npx cdk init</code>. One DynamoDB table, one Lambda, one EventBridge cron.
+          Pick your most interesting data source (Whoop, Oura, Garmin).
+          Write the ingestion Lambda. Deploy. Verify data in DynamoDB console.
+        </div>
+      </div>
+      <div style="background:var(--surface);padding:var(--space-6);">
+        <div style="font-family:var(--font-display);font-size:36px;color:var(--accent);line-height:1;margin-bottom:var(--space-3)">2</div>
+        <div style="font-size:var(--text-sm);color:var(--text);font-weight:600;margin-bottom:var(--space-2)">Saturday afternoon</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body)">
+          Add a second data source. Write an MCP tool that reads both.
+          Test with Claude Desktop. Ask it: "How did I sleep this week?"
+          The moment Claude answers from your own data is when it clicks.
+        </div>
+      </div>
+      <div style="background:var(--surface);padding:var(--space-6);">
+        <div style="font-family:var(--font-display);font-size:36px;color:var(--accent);line-height:1;margin-bottom:var(--space-3)">3</div>
+        <div style="font-size:var(--text-sm);color:var(--text);font-weight:600;margin-bottom:var(--space-2)">Sunday</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body)">
+          Write a Daily Brief Lambda that reads DynamoDB and calls Claude to synthesize an email.
+          Schedule it with EventBridge. Tomorrow morning, your AI sends you a coaching brief.
+          You now have a platform. Everything else is iteration.
+        </div>
+      </div>
+    </div>
+
+    <div class="builders-cta">
+      <div class="builders-cta__text">
+        <strong>Want to see exactly how each piece works?</strong> The full architecture diagram, all 52 Lambda definitions,
+        the MCP tool catalog, and every EventBridge schedule are documented on the platform page.
+        The cost page shows exactly what you'll spend.
+      </div>
+      <div style="display:flex;gap:var(--space-4);flex-wrap:wrap;">
+        <a href="/platform/" class="btn btn--primary">See the architecture &rarr;</a>
+        <a href="/cost/" class="btn btn--ghost" style="font-size:var(--text-xs)">See the cost breakdown &rarr;</a>
+        <a href="/intelligence/" class="btn btn--ghost" style="font-size:var(--text-xs)">See the AI layer &rarr;</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- N=1 disclaimer -->
+<aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle);">
+  <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label)">
+    <span style="color:var(--accent-dim)">// BUILDER'S NOTE</span><br>
+    This platform was built by a Senior Director in IT &mdash; not a software engineer. Background: people management, not code.
+    Every line of code was written with Claude as an AI engineering partner. If I can build this, you can build this.
+  </p>
+</aside>
+
+<!-- Email CTA -->
+<div id="amj-subscribe"></div>
+
+<!-- Mobile bottom nav -->
+<div id="amj-bottom-nav"></div>
+<div id="amj-footer"></div>
+<script src="/assets/js/reveal.js"></script>
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>
