@@ -1,3 +1,49 @@
+## v3.9.33 — 2026-03-26: Arena v2 + Lab v2 — Challenge & Experiment Page Overhaul
+
+### Summary
+Product Board convened (8 personas) to review /challenges/ and /experiments/ pages. Both redesigned from verbose document layouts to immersive visual tile walls. 35 challenges seeded across 6 categories. Three lifecycle gaps identified and coded: overdue detection, catalog→DDB bridge (catalog_id), and achievements integration (5 new challenge badges). Implementation brief written for next session: challenge voting ("I'd try this"), podcast intelligence pipeline, and 6 new experiments.
+
+### What Shipped (Deployed)
+- `/challenges/` Arena v2 — icon-forward tile grid, category filter bar, detail overlay with evidence + board quotes, collapsed methodology, active hero with check-in dots
+- `/experiments/` Lab v2 — compact tile grid with evidence rings, vote buttons, category tabs, compact mission control, collapsed H/P/D, detail overlay
+- `challenges_catalog.json` — 35 challenges (Movement 7, Sleep 3, Nutrition 5, Mind 7, Social 7, Discipline 5) with icons, evidence tiers, board recommenders, protocols. Config-driven from S3.
+- `/api/challenge_catalog` endpoint — new handler + route in site_api_lambda.py
+- `experiment_library.json` copied to `site/config/` (Lambda reads from `site/config/` but file was only at `config/`)
+
+### What's Coded (Awaiting Deploy)
+- `mcp/tools_challenges.py` — `catalog_id` field on create_challenge; overdue detection in list_challenges (days_since_activation, overdue bool, days_overdue); summary includes overdue count
+- `mcp/registry.py` — `catalog_id` added to create_challenge schema
+- `lambdas/site_api_lambda.py` — handle_achievements() queries challenges partition, counts completed + perfect challenges, 5 new badges (Arena Debut/Regular/Veteran/Legend/Flawless)
+- `site/achievements/index.html` — challenge category (amber), badge icons, CSS color
+
+### Product Board Decisions
+- Challenge voting framed as "I'd try this" (pledge, not vote) with email capture — reuses experiment vote/follow infrastructure
+- Podcast intelligence pipeline Phase 1 = conversational (tell Claude what you heard, it creates the entry). Phase 2 = automated weekly scanner Lambda (~$0.40/month)
+- Evidence tier comes from cited research, not the podcast — podcast is discovery mechanism, not evidence source
+
+### Files Created
+- `seeds/challenges_catalog.json` — 35-challenge catalog
+- `deploy/deploy_challenges_overhaul.sh` — Arena v2 deploy script
+- `deploy/deploy_experiments_v2.sh` — Lab v2 deploy script
+- `deploy/deploy_lifecycle_gaps.sh` — 3 gap fixes deploy script
+- `docs/briefs/BRIEF_2026-03-26_arena_lab_v2.md` — Full implementation brief for remaining work
+
+### Files Modified
+- `site/challenges/index.html` — Complete rewrite (Arena v2)
+- `site/experiments/index.html` — Complete rewrite (Lab v2)
+- `lambdas/site_api_lambda.py` — challenge_catalog handler/route + achievements challenge badges
+- `mcp/tools_challenges.py` — catalog_id + overdue detection
+- `mcp/registry.py` — catalog_id schema
+- `site/achievements/index.html` — Challenge category + icons
+
+### Next Session (from Implementation Brief)
+1. Deploy lifecycle gaps: `python3 -m pytest tests/test_mcp_registry.py -v && bash deploy/deploy_lifecycle_gaps.sh`
+2. Challenge voting frontend + backend (Task 1 in brief)
+3. Podcast schema extension + detail overlay rendering (Task 2a in brief)
+4. Seed 6 new experiments from brainstorm (Task 3 in brief)
+
+---
+
 ## v3.9.32 — 2026-03-26: Sessions 3+4 — Chronicle/Subscribe + About/Builders/Throughline
 
 ### Summary

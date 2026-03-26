@@ -4,12 +4,13 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Weekly challenges born from your data — journal patterns, broken streaks, weak pillars. Join one. Check in daily. Earn XP.">
+  <meta name="description" content="35+ challenges across movement, sleep, nutrition, mind, social &amp; discipline. Pick one. Track daily. Earn badges.">
   <meta property="og:title" content="The Arena — Challenges">
-  <meta property="og:description" content="Challenges born from real data. Not generic fitness goals — personalized provocations from 19 data sources.">
+  <meta property="og:description" content="35+ challenges born from science and your data. Not generic goals — personalized provocations. Pick one. Track daily. Earn badges.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com/challenges/">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
   <title>The Arena — Challenges</title>
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
@@ -19,57 +20,70 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    /* ── Arena Accent Override ── */
-    .arena { --ar: var(--c-amber-500); --ar-dim: var(--c-amber-300); --ar-bg: var(--c-amber-100); --ar-bg-s: var(--c-amber-050); --ar-rgb: var(--amber-rgb); }
+    /* ── Arena Tokens ── */
+    .arena {
+      --ar: var(--c-amber-500, #f59e0b);
+      --ar-dim: var(--c-amber-300, #fcd34d);
+      --ar-bg: var(--c-amber-100, rgba(252,211,77,0.15));
+      --ar-bg-s: var(--c-amber-050, rgba(252,211,77,0.06));
+      --ar-rgb: 245, 158, 11;
+    }
 
-    /* ── Page Header ── */
-    .page-header {
-      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
-      border-bottom: 1px solid var(--border);
+    /* ── Compact Header ── */
+    .arena-header {
+      padding: calc(var(--nav-height) + var(--space-12)) var(--page-padding) var(--space-8);
       max-width: var(--max-width);
       margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: var(--space-8);
+      border-bottom: 1px solid var(--border);
     }
-    .page-header__kicker {
+    .arena-header__kicker {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       color: var(--ar);
-      margin-bottom: var(--space-4);
+      margin-bottom: var(--space-2);
     }
-    .page-header__title {
+    .arena-header__title {
       font-family: var(--font-display);
-      font-size: var(--text-h1);
-      line-height: var(--lh-display);
+      font-size: clamp(36px, 5vw, 56px);
+      line-height: 1;
       letter-spacing: var(--ls-display);
       color: var(--text);
-      margin-bottom: var(--space-4);
+      margin-bottom: var(--space-3);
     }
-    .page-header__title span { color: var(--ar); }
-    .page-header__sub {
+    .arena-header__title span { color: var(--ar); }
+    .arena-header__sub {
       font-family: var(--font-mono);
-      font-size: var(--text-base);
+      font-size: var(--text-xs);
       color: var(--text-muted);
-      line-height: var(--lh-body);
-      max-width: 620px;
+      line-height: var(--lh-mono);
+      max-width: 500px;
     }
-    .page-header__meta {
-      margin-top: var(--space-8);
-      display: flex; gap: var(--space-8); flex-wrap: wrap;
+    .arena-stats {
+      display: flex;
+      gap: var(--space-6);
     }
-    .meta-stat { border-left: 2px solid var(--ar); padding-left: var(--space-4); }
-    .meta-stat__label {
-      font-size: var(--text-2xs);
+    .arena-stat {
+      text-align: center;
+    }
+    .arena-stat__value {
+      font-family: var(--font-display);
+      font-size: 32px;
+      color: var(--ar);
+      line-height: 1;
+    }
+    .arena-stat__label {
+      font-family: var(--font-mono);
+      font-size: 9px;
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       color: var(--text-muted);
-      margin-bottom: var(--space-1);
-    }
-    .meta-stat__value {
-      font-family: var(--font-display);
-      font-size: 28px;
-      color: var(--text);
-      letter-spacing: var(--ls-display);
+      margin-top: var(--space-1);
     }
 
     /* ── Pipeline Nav ── */
@@ -79,404 +93,519 @@
     .pipeline-nav__step.active { color:var(--ar); border-color:var(--ar-dim); }
     .pipeline-nav__arrow { color:var(--border); }
 
-    /* ── Explainer ── */
-    .explainer {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 1px;
-      background: var(--border);
-    }
-    .explainer__item { background: var(--bg); padding: var(--space-8); }
-    .explainer__icon {
-      font-size: 32px;
-      margin-bottom: var(--space-3);
-      line-height: 1;
-    }
-    .explainer__label {
-      font-family: var(--font-display);
-      font-size: 18px;
-      letter-spacing: var(--ls-display);
-      color: var(--ar);
-      margin-bottom: var(--space-2);
-    }
-    .explainer__desc {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      line-height: var(--lh-mono);
-    }
-
-    /* ── Active Challenge Hero ── */
+    /* ── Active Hero Zone ── */
     .hero-zone {
       max-width: var(--max-width);
       margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
+      padding: var(--space-8) var(--page-padding);
       border-bottom: 1px solid var(--border);
     }
-    .zone-heading {
+    .zone-label {
+      font-family: var(--font-mono);
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       color: var(--ar);
-      font-family: var(--font-mono);
-      margin-bottom: var(--space-6);
+      margin-bottom: var(--space-4);
     }
-
-    .hero-card {
-      border: 2px solid var(--ar-dim);
+    .hero-active {
+      display: grid;
+      grid-template-columns: 80px 1fr 120px;
+      gap: var(--space-6);
+      align-items: center;
       background: var(--surface);
+      border: 2px solid var(--ar-dim);
+      padding: var(--space-6);
       position: relative;
       overflow: hidden;
     }
-    .hero-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; height: 3px;
-      background: linear-gradient(90deg, var(--ar) 0%, var(--ar-dim) 50%, transparent 100%);
+    .hero-active::before {
+      content:'';
+      position:absolute;
+      top:0;left:0;right:0;height:2px;
+      background:linear-gradient(90deg,var(--ar),var(--ar-dim) 50%,transparent);
     }
-    .hero-card__inner {
-      display: grid;
-      grid-template-columns: 1fr 200px;
-      gap: var(--space-8);
-      padding: var(--space-8);
-      align-items: start;
+    .hero-active__icon {
+      font-size: 48px;
+      line-height: 1;
+      text-align: center;
     }
-    .hero-card__name {
+    .hero-active__info {}
+    .hero-active__name {
       font-family: var(--font-display);
-      font-size: 32px;
+      font-size: 24px;
       color: var(--text);
       letter-spacing: var(--ls-display);
-      margin-bottom: var(--space-3);
+      margin-bottom: var(--space-1);
     }
-    .hero-card__desc {
+    .hero-active__liner {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       color: var(--text-muted);
-      line-height: var(--lh-mono);
-      margin-bottom: var(--space-4);
+      margin-bottom: var(--space-3);
     }
-    .hero-card__protocol {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text);
-      line-height: var(--lh-mono);
-      padding: var(--space-4);
-      border: 1px solid var(--ar-dim);
-      background: var(--ar-bg-s);
-      margin-bottom: var(--space-4);
-    }
-    .hero-card__protocol-label {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--ar);
-      margin-bottom: var(--space-2);
-    }
-    .hero-card__chips {
+    .hero-active__chips {
       display: flex; gap: var(--space-2); flex-wrap: wrap;
     }
     .ar-chip {
-      display: inline-flex; align-items: center; gap: var(--space-2);
       padding: 2px var(--space-3);
       border: 1px solid var(--ar-dim);
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
       color: var(--ar);
       letter-spacing: var(--ls-label);
-      text-transform: uppercase;
     }
-
-    /* Countdown ring */
-    .countdown-ring { text-align: center; }
-    .countdown-ring svg { transform: rotate(-90deg); }
-    .countdown-ring__track { fill: none; stroke: var(--surface-raised); stroke-width: 6; }
-    .countdown-ring__fill { fill: none; stroke: var(--ar); stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 1.2s ease-out; }
-    .countdown-ring__text {
+    .hero-active__ring { text-align: center; }
+    .hero-active__ring svg { transform: rotate(-90deg); }
+    .ring-track { fill: none; stroke: var(--surface-raised); stroke-width: 6; }
+    .ring-fill { fill: none; stroke: var(--ar); stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 1s ease-out; }
+    .ring-center {
       position: absolute;
       top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
+      transform: translate(-50%,-50%);
       text-align: center;
     }
-    .countdown-ring__day {
+    .ring-num {
       font-family: var(--font-display);
-      font-size: 36px;
+      font-size: 28px;
       color: var(--ar);
       line-height: 1;
       display: block;
     }
-    .countdown-ring__label {
+    .ring-sub {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: 8px;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: var(--ls-tag);
+      letter-spacing: 1.5px;
     }
-    .countdown-ring__wrapper { position: relative; width: 140px; height: 140px; margin: 0 auto var(--space-4); }
+    .hero-empty {
+      text-align: center;
+      padding: var(--space-8);
+      border: 1px dashed var(--border);
+    }
+    .hero-empty__text {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+    }
 
-    /* Check-in calendar strip */
-    .checkin-strip {
-      display: flex; gap: 4px; flex-wrap: wrap;
-      padding: var(--space-4) var(--space-8);
+    /* ── Check-in strip on hero ── */
+    .checkin-bar {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 3px;
+      padding-top: var(--space-4);
       border-top: 1px solid var(--border);
+      align-items: center;
     }
-    .checkin-strip__label {
-      width: 100%;
+    .checkin-bar__label {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin-bottom: var(--space-2);
+      color: var(--text-faint);
+      margin-right: var(--space-3);
+      white-space: nowrap;
     }
-    .checkin-dot {
-      width: 28px; height: 28px;
+    .ck-dot {
+      width: 22px; height: 22px;
       border-radius: 50%;
       border: 2px solid var(--border);
       display: flex; align-items: center; justify-content: center;
-      font-family: var(--font-mono);
       font-size: 9px;
       color: var(--text-faint);
-      transition: all 0.3s ease;
+      flex-shrink: 0;
     }
-    .checkin-dot--done {
-      border-color: var(--ar);
-      background: var(--ar-bg);
-      color: var(--ar);
+    .ck-dot--done { border-color: var(--ar); background: var(--ar-bg-s); color: var(--ar); }
+    .ck-dot--done::after { content: '✓'; }
+    .ck-dot--miss { border-color: var(--c-red-status, #ff5252); color: var(--c-red-status, #ff5252); }
+    .ck-dot--miss::after { content: '✗'; font-size: 8px; }
+    .ck-dot--today { border-color: var(--ar); box-shadow: 0 0 8px rgba(var(--ar-rgb),0.4); }
+    .checkin-bar__actions {
+      margin-left: auto;
+      display: flex;
+      gap: var(--space-2);
     }
-    .checkin-dot--done::after { content: '✓'; font-size: 12px; }
-    .checkin-dot--missed {
-      border-color: var(--c-red-status);
-      background: rgba(255, 82, 82, 0.08);
-      color: var(--c-red-status);
-    }
-    .checkin-dot--missed::after { content: '✗'; font-size: 10px; }
-    .checkin-dot--today {
-      border-color: var(--ar);
-      animation: pulse-ring 2s ease-in-out infinite;
-    }
-    @keyframes pulse-ring {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(var(--ar-rgb), 0.3); }
-      50% { box-shadow: 0 0 0 6px rgba(var(--ar-rgb), 0); }
-    }
-
-    /* CTA button */
-    .hero-card__cta {
-      padding: var(--space-4) var(--space-8);
-      border-top: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .btn-checkin {
+    .btn-ck {
       font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      padding: var(--space-3) var(--space-6);
-      border: 2px solid var(--ar);
+      font-size: var(--text-2xs);
+      padding: var(--space-2) var(--space-4);
+      border: 1px solid var(--ar);
       background: var(--ar-bg);
       color: var(--ar);
       cursor: pointer;
+      letter-spacing: var(--ls-tag);
       transition: all 0.2s;
     }
-    .btn-checkin:hover { background: var(--ar); color: var(--bg); }
-    .btn-checkin:disabled { opacity: 0.4; cursor: not-allowed; }
-    .btn-checkin--miss {
-      border-color: var(--border);
-      background: transparent;
-      color: var(--text-muted);
-    }
-    .btn-checkin--miss:hover { border-color: var(--c-red-status); color: var(--c-red-status); }
+    .btn-ck:hover { background: var(--ar); color: var(--bg); }
+    .btn-ck--miss { border-color: var(--border); background: transparent; color: var(--text-muted); }
+    .btn-ck--miss:hover { border-color: var(--c-red-status, #ff5252); color: var(--c-red-status, #ff5252); }
 
-    /* ── Source badge ── */
-    .source-badge {
-      display: inline-flex; align-items: center; gap: var(--space-2);
-      padding: var(--space-2) var(--space-4);
-      border: 1px dashed var(--ar-dim);
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--ar);
-      letter-spacing: var(--ls-label);
-      margin-top: var(--space-4);
-    }
-    .source-badge__icon { font-size: 14px; }
-
-    /* ── Candidate Grid ── */
-    .candidates-zone {
+    /* ── Category Filter Tabs ── */
+    .cat-bar {
+      display: flex;
+      gap: var(--space-2);
+      padding: var(--space-6) var(--page-padding);
       max-width: var(--max-width);
       margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
+      overflow-x: auto;
       border-bottom: 1px solid var(--border);
     }
-    .candidates-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: var(--space-4);
-    }
-    .cand-card {
+    .cat-tab {
+      display: flex; align-items: center; gap: var(--space-2);
+      padding: var(--space-2) var(--space-4);
       border: 1px solid var(--border);
-      background: var(--surface);
-      padding: var(--space-6);
-      position: relative;
-      transition: border-color 0.2s;
-    }
-    .cand-card:hover { border-color: var(--ar-dim); }
-    .cand-card__domain {
+      background: transparent;
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
-      color: var(--ar);
-      margin-bottom: var(--space-3);
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
     }
-    .cand-card__name {
+    .cat-tab:hover { border-color: var(--ar-dim); color: var(--text); }
+    .cat-tab.active { border-color: var(--ar); color: var(--ar); background: var(--ar-bg-s); }
+    .cat-tab__icon { font-size: 14px; }
+    .cat-tab__count {
+      background: var(--surface-raised);
+      padding: 1px 5px;
+      border-radius: 8px;
+      font-size: 9px;
+    }
+    .cat-tab.active .cat-tab__count { background: var(--ar-bg); }
+
+    /* ── Tile Grid ── */
+    .tile-zone {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding) var(--space-16);
+    }
+    .tile-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: var(--space-4);
+    }
+
+    /* ── Challenge Tile ── */
+    .tile {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-5) var(--space-4);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: var(--space-2);
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+    }
+    .tile:hover {
+      border-color: var(--tile-color, var(--ar-dim));
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+    .tile__icon {
+      font-size: 36px;
+      line-height: 1;
+      margin-bottom: var(--space-1);
+      transition: transform 0.2s;
+    }
+    .tile:hover .tile__icon { transform: scale(1.1); }
+    .tile__name {
       font-family: var(--font-display);
-      font-size: 18px;
+      font-size: 15px;
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      line-height: 1.3;
+    }
+    .tile__liner {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      line-height: 1.4;
+      display: none;
+    }
+    .tile__footer {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-top: auto;
+      padding-top: var(--space-2);
+    }
+    .tile__duration {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+    }
+    .tile__difficulty {
+      display: flex; gap: 2px;
+    }
+    .diff-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--surface-raised);
+    }
+    .diff-dot--filled { background: var(--tile-color, var(--ar)); }
+
+    /* Evidence ring on tile */
+    .tile__evidence {
+      position: absolute;
+      top: var(--space-2);
+      right: var(--space-2);
+      width: 20px; height: 20px;
+    }
+    .tile__evidence svg { width: 20px; height: 20px; transform: rotate(-90deg); }
+    .ev-track { fill: none; stroke: var(--surface-raised); stroke-width: 2; }
+    .ev-fill { fill: none; stroke-width: 2; stroke-linecap: round; }
+
+    /* Active tile glow */
+    .tile--active {
+      border-color: var(--ar);
+      box-shadow: 0 0 20px rgba(var(--ar-rgb), 0.15);
+      animation: tile-glow 3s ease-in-out infinite;
+    }
+    @keyframes tile-glow {
+      0%,100% { box-shadow: 0 0 12px rgba(var(--ar-rgb),0.1); }
+      50% { box-shadow: 0 0 24px rgba(var(--ar-rgb),0.25); }
+    }
+    .tile--active::before {
+      content: 'ACTIVE';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      background: var(--ar);
+      color: var(--bg);
+      font-family: var(--font-mono);
+      font-size: 8px;
+      letter-spacing: 2px;
+      text-align: center;
+      padding: 2px;
+    }
+
+    /* Completed tile */
+    .tile--completed {
+      border-color: rgba(46,169,143,0.3);
+    }
+    .tile--completed::after {
+      content: '✓';
+      position: absolute;
+      top: var(--space-2);
+      left: var(--space-2);
+      width: 18px; height: 18px;
+      background: #2EA98F;
+      color: white;
+      border-radius: 50%;
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .tile--completed .tile__icon { opacity: 0.7; }
+
+    /* Achievement type (one-time, no duration) */
+    .tile--achievement .tile__duration::before { content: '🏅 '; }
+
+    /* ── Expanded Detail Overlay ── */
+    .detail-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-8);
+    }
+    .detail-overlay.open { display: flex; }
+    .detail-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      max-width: 520px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .detail-card__top {
+      padding: var(--space-8);
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .detail-card__icon { font-size: 56px; margin-bottom: var(--space-3); }
+    .detail-card__name {
+      font-family: var(--font-display);
+      font-size: 28px;
       color: var(--text);
       letter-spacing: var(--ls-display);
       margin-bottom: var(--space-2);
     }
-    .cand-card__desc {
+    .detail-card__liner {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       color: var(--text-muted);
       line-height: var(--lh-mono);
-      margin-bottom: var(--space-4);
     }
-    .cand-card__meta {
-      display: flex; gap: var(--space-3); flex-wrap: wrap;
-      margin-bottom: var(--space-4);
+    .detail-card__meta {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-4);
+      margin-top: var(--space-4);
     }
-    .cand-chip {
+    .detail-meta-item { text-align: center; }
+    .detail-meta-item__value {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--ar);
+    }
+    .detail-meta-item__label {
       font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      padding: 2px 8px;
-      border: 1px solid var(--border);
+      font-size: 9px;
       color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: var(--ls-tag);
     }
-    .cand-card__source {
+    .detail-card__body { padding: var(--space-6); }
+    .detail-field { margin-bottom: var(--space-5); }
+    .detail-field__label {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: var(--ls-label);
-      padding-top: var(--space-3);
-      border-top: 1px solid var(--border);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--ar);
+      margin-bottom: var(--space-2);
     }
-    .cand-card__source strong { color: var(--ar-dim); }
+    .detail-field__value {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-mono);
+    }
+    .detail-board-quote {
+      padding: var(--space-4);
+      border-left: 2px solid var(--ar-dim);
+      margin-top: var(--space-2);
+    }
+    .detail-board-quote__text {
+      font-size: var(--text-xs);
+      color: var(--text);
+      font-style: italic;
+      line-height: var(--lh-body);
+    }
+    .detail-board-quote__attr {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--ar);
+      margin-top: var(--space-2);
+    }
+    .detail-card__close {
+      position: absolute;
+      top: var(--space-4);
+      right: var(--space-4);
+      font-size: 24px;
+      color: var(--text-muted);
+      cursor: pointer;
+      background: none;
+      border: none;
+      z-index: 1001;
+    }
+    .detail-card__close:hover { color: var(--text); }
+
+    /* Evidence badge in detail */
+    .ev-badge {
+      display: inline-flex; align-items: center; gap: var(--space-2);
+      padding: var(--space-1) var(--space-3);
+      border: 1px solid;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+    }
+    .ev-badge--strong { color: #2EA98F; border-color: rgba(46,169,143,0.3); }
+    .ev-badge--moderate { color: var(--ar); border-color: var(--ar-dim); }
+    .ev-badge--emerging { color: var(--text-muted); border-color: var(--border); }
 
     /* ── Record (completed challenges) ── */
     .record-zone {
       max-width: var(--max-width);
       margin: 0 auto;
-      padding: var(--space-10) var(--page-padding) var(--space-20);
+      padding: var(--space-8) var(--page-padding);
+      border-top: 1px solid var(--border);
     }
-    .record-card {
-      border: 1px solid var(--border);
-      background: var(--surface);
-      margin-bottom: var(--space-4);
+    .record-row {
       display: grid;
-      grid-template-columns: 80px 1fr auto;
-      gap: var(--space-6);
-      padding: var(--space-5) var(--space-6);
+      grid-template-columns: 40px 1fr auto;
+      gap: var(--space-4);
       align-items: center;
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--border);
     }
-    .record-card__xp {
-      text-align: center;
-    }
-    .record-card__xp-value {
+    .record-row__icon { font-size: 20px; text-align: center; }
+    .record-row__name {
       font-family: var(--font-display);
-      font-size: 24px;
-      color: var(--ar);
-      line-height: 1;
-    }
-    .record-card__xp-label {
-      font-family: var(--font-mono);
-      font-size: 9px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: var(--ls-tag);
-    }
-    .record-card__info {}
-    .record-card__name {
-      font-family: var(--font-display);
-      font-size: 16px;
+      font-size: 15px;
       color: var(--text);
-      letter-spacing: var(--ls-display);
-      margin-bottom: var(--space-1);
     }
-    .record-card__detail {
+    .record-row__detail {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
       color: var(--text-muted);
     }
-    .record-card__badge {
-      display: inline-flex; align-items: center; gap: var(--space-2);
-      padding: var(--space-2) var(--space-4);
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-    }
-    .record-card__badge--completed { color: #2EA98F; border: 1px solid rgba(46,169,143,0.3); }
-    .record-card__badge--failed { color: var(--text-muted); border: 1px solid var(--border); }
-
-    /* ── Empty states ── */
-    .empty-state {
-      padding: var(--space-12);
-      text-align: center;
-      border: 1px dashed var(--border);
-    }
-    .empty-state__icon { font-size: 48px; margin-bottom: var(--space-4); opacity: 0.3; }
-    .empty-state__title {
+    .record-row__xp {
       font-family: var(--font-display);
-      font-size: 28px;
-      color: var(--text-muted);
-      margin-bottom: var(--space-3);
-    }
-    .empty-state__sub {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      max-width: 400px;
-      margin: 0 auto;
-      line-height: var(--lh-mono);
+      font-size: 18px;
+      color: var(--ar);
     }
 
-    /* ── Methodology ── */
-    .methodology {
+    /* ── Methodology (collapsible) ── */
+    .method-toggle {
       max-width: var(--max-width);
       margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
+      padding: var(--space-6) var(--page-padding);
       border-top: 1px solid var(--border);
-      display: grid;
-      grid-template-columns: 200px 1fr;
-      gap: var(--space-12);
     }
-    .methodology__label {
-      font-family: var(--font-display);
-      font-size: var(--text-h3);
-      letter-spacing: var(--ls-display);
+    .method-toggle__btn {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      background: none;
+      border: none;
+      cursor: pointer;
       color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
     }
-    .methodology__text {
+    .method-toggle__btn:hover { color: var(--text); }
+    .method-toggle__chevron { transition: transform 0.2s; }
+    .method-toggle.open .method-toggle__chevron { transform: rotate(180deg); }
+    .method-toggle__body {
+      display: none;
+      padding-top: var(--space-6);
+    }
+    .method-toggle.open .method-toggle__body { display: block; }
+    .method-toggle__body p {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       color: var(--text-muted);
       line-height: var(--lh-mono);
+      margin-bottom: var(--space-4);
     }
-    .methodology__text p + p { margin-top: var(--space-4); }
-    .methodology__text strong { color: var(--text); }
+    .method-toggle__body strong { color: var(--text); }
 
     /* ── Responsive ── */
     @media (max-width: 768px) {
-      .hero-card__inner { grid-template-columns: 1fr; }
-      .countdown-ring__wrapper { margin: var(--space-4) auto; }
-      .explainer { grid-template-columns: 1fr; }
-      .record-card { grid-template-columns: 60px 1fr; }
-      .record-card__badge { display: none; }
-      .methodology { grid-template-columns: 1fr; }
+      .arena-header { grid-template-columns: 1fr; }
+      .arena-stats { justify-content: flex-start; }
+      .hero-active { grid-template-columns: 60px 1fr; }
+      .hero-active__ring { display: none; }
+      .tile-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-3); }
+      .tile__name { font-size: 13px; }
+      .tile__icon { font-size: 28px; }
+    }
+    @media (max-width: 480px) {
+      .tile-grid { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
@@ -487,109 +616,92 @@
 
 <div class="arena">
 
-<!-- Page Header -->
-<div class="page-header animate-in">
-  <div class="page-header__kicker">The Science</div>
-  <h1 class="page-header__title">The <span>Arena</span></h1>
-  <p class="page-header__sub">Challenges born from your data. Not generic fitness goals &mdash; personalized provocations from journal patterns, broken streaks, weak pillars, and the latest science. Join one. Check in daily. Earn XP.</p>
-  <div class="page-header__meta">
-    <div class="meta-stat">
-      <div class="meta-stat__label">Active now</div>
-      <div class="meta-stat__value" id="stat-active">&mdash;</div>
+<!-- ── Compact Header ── -->
+<header class="arena-header animate-in">
+  <div>
+    <div class="arena-header__kicker">The Science</div>
+    <h1 class="arena-header__title">The <span>Arena</span></h1>
+    <p class="arena-header__sub">Pick a challenge. Track daily. Earn badges. Short-term provocations born from science and your data.</p>
+  </div>
+  <div class="arena-stats">
+    <div class="arena-stat">
+      <div class="arena-stat__value" id="stat-total">—</div>
+      <div class="arena-stat__label">Challenges</div>
     </div>
-    <div class="meta-stat">
-      <div class="meta-stat__label">Available</div>
-      <div class="meta-stat__value" id="stat-candidates">&mdash;</div>
+    <div class="arena-stat">
+      <div class="arena-stat__value" id="stat-active">0</div>
+      <div class="arena-stat__label">Active</div>
     </div>
-    <div class="meta-stat">
-      <div class="meta-stat__label">Completed</div>
-      <div class="meta-stat__value" id="stat-completed">&mdash;</div>
-    </div>
-    <div class="meta-stat">
-      <div class="meta-stat__label">Total XP earned</div>
-      <div class="meta-stat__value" id="stat-xp">&mdash;</div>
+    <div class="arena-stat">
+      <div class="arena-stat__value" id="stat-completed">0</div>
+      <div class="arena-stat__label">Done</div>
     </div>
   </div>
-</div>
+</header>
 
-<!-- Pipeline Nav -->
+<!-- ── Pipeline Nav ── -->
 <nav class="pipeline-nav">
   <a href="/protocols/" class="pipeline-nav__step">Protocols</a>
   <span class="pipeline-nav__arrow">&rarr;</span>
-  <a href="/experiments/" class="pipeline-nav__step">Experiments</a>
+  <a href="/experiments/" class="pipeline-nav__step">Active Tests</a>
   <span class="pipeline-nav__arrow">&rarr;</span>
   <a href="/challenges/" class="pipeline-nav__step active">Challenges</a>
   <span class="pipeline-nav__arrow">&rarr;</span>
   <a href="/discoveries/" class="pipeline-nav__step">Discoveries</a>
 </nav>
 
-<!-- How It Works -->
-<div class="explainer animate-in reveal">
-  <div class="explainer__item">
-    <div class="explainer__icon">&#x1F50D;</div>
-    <div class="explainer__label">Sourced from data</div>
-    <div class="explainer__desc">Challenges aren&rsquo;t random. They come from your journal patterns, broken habit streaks, declining pillar scores, or cutting-edge science. The system finds where you&rsquo;re struggling and challenges you to fix it.</div>
-  </div>
-  <div class="explainer__item">
-    <div class="explainer__icon">&#x1F525;</div>
-    <div class="explainer__label">Short &amp; intense</div>
-    <div class="explainer__desc">7 to 30 days. Check in daily &mdash; did you do it? No hypothesis required. No complex protocols. One clear action, repeated until it sticks or you learn something.</div>
-  </div>
-  <div class="explainer__item">
-    <div class="explainer__icon">&#x1F3C6;</div>
-    <div class="explainer__label">Earn XP &amp; badges</div>
-    <div class="explainer__desc">Completing challenges awards Character XP scaled by difficulty and success rate. Perfect completions get a 1.5&times; bonus. Badges unlock at milestones. Challenges feed the Character Sheet.</div>
-  </div>
-</div>
-
-<!-- Zone 1: Active Challenge Hero -->
+<!-- ── Active Challenge Hero ── -->
 <div class="hero-zone" id="hero-zone">
-  <div class="zone-heading">// active challenge</div>
+  <div class="zone-label">// active now</div>
   <div id="hero-content">
-    <div class="empty-state">
-      <div class="empty-state__icon">&#x23F3;</div>
-      <div class="empty-state__title">Loading&hellip;</div>
+    <div class="hero-empty">
+      <div class="hero-empty__text">No active challenge — pick one from the wall below</div>
     </div>
   </div>
 </div>
 
-<!-- Zone 2: Candidates -->
-<div class="candidates-zone" id="candidates-zone">
-  <div style="display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-6);">
-    <div class="zone-heading" style="margin-bottom:0;">// up next &mdash; available challenges</div>
-    <div style="flex:1;height:1px;background:var(--ar-dim);opacity:0.3;"></div>
-  </div>
-  <div class="candidates-grid" id="candidates-grid">
-    <div class="empty-state" style="grid-column:1/-1">
-      <div class="empty-state__title">Loading&hellip;</div>
-    </div>
+<!-- ── Category Filter ── -->
+<div class="cat-bar" id="cat-bar">
+  <button class="cat-tab active" data-cat="all"><span class="cat-tab__icon">⚡</span> All</button>
+</div>
+
+<!-- ── Tile Grid ── -->
+<div class="tile-zone">
+  <div class="tile-grid" id="tile-grid">
+    <div style="grid-column:1/-1;text-align:center;padding:var(--space-10);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">Loading challenges…</div>
   </div>
 </div>
 
-<!-- Zone 3: Completed Record -->
-<div class="record-zone" id="record-zone">
-  <div class="zone-heading">// the record &mdash; completed challenges</div>
-  <div id="record-list">
-    <div class="empty-state">
-      <div class="empty-state__icon">&#x1F4DC;</div>
-      <div class="empty-state__title">No completed challenges yet</div>
-      <div class="empty-state__sub">Once you finish your first challenge, results, XP, and badges appear here.</div>
-    </div>
+<!-- ── Completed Record ── -->
+<div class="record-zone" id="record-zone" style="display:none">
+  <div class="zone-label">// completed</div>
+  <div id="record-list"></div>
+</div>
+
+<!-- ── Methodology (collapsed) ── -->
+<div class="method-toggle" id="method-toggle">
+  <button class="method-toggle__btn" onclick="document.getElementById('method-toggle').classList.toggle('open')">
+    <span class="method-toggle__chevron">▾</span>
+    Experiments vs Challenges — how it works
+  </button>
+  <div class="method-toggle__body">
+    <p><strong>Experiments are science.</strong> They have a falsifiable hypothesis, a controlled protocol, a minimum duration, and published data. They test whether something <em>works</em>. They belong in the Lab.</p>
+    <p><strong>Challenges are action.</strong> No hypothesis required. Pick a protocol, commit to the duration, see what happens. They test whether you can <em>do it</em>. They belong in the Arena.</p>
+    <p>Challenges can graduate into experiments — if a 7-day step challenge reveals that 10,000 steps correlates with better sleep, that becomes a formal hypothesis. Experiments can spawn challenges — if cold showers boost morning HRV, that becomes a recurring challenge for anyone to try.</p>
+    <p><strong>Where do challenges come from?</strong> Five sources: journal mining, data signals, hypothesis graduates, science scans, and board recommendations. Each challenge shows its source and which board member recommended it.</p>
+  </div>
+</div>
+
+<!-- ── Detail Overlay ── -->
+<div class="detail-overlay" id="detail-overlay" onclick="if(event.target===this)closeDetail()">
+  <div class="detail-card" id="detail-card">
+    <button class="detail-card__close" onclick="closeDetail()">&times;</button>
+    <div class="detail-card__top" id="detail-top"></div>
+    <div class="detail-card__body" id="detail-body"></div>
   </div>
 </div>
 
 </div><!-- /.arena -->
-
-<!-- Methodology -->
-<div class="methodology reveal">
-  <div class="methodology__label">Experiments<br>vs<br>Challenges</div>
-  <div class="methodology__text">
-    <p><strong>Experiments are science.</strong> They have a falsifiable hypothesis, a controlled protocol, a minimum duration, and published data. They test whether something <em>works</em>. They belong in the Lab.</p>
-    <p><strong>Challenges are action.</strong> No hypothesis required. Pick a protocol, commit to the duration, see what happens. They test whether you can <em>do it</em>. They belong in the Arena.</p>
-    <p>Challenges can graduate into experiments &mdash; if a 7-day step challenge reveals that 10,000 steps correlates with better sleep, that becomes a formal hypothesis. And experiments can spawn challenges &mdash; if a completed experiment proves cold showers boost morning HRV, that becomes a recurring challenge for anyone to try.</p>
-    <p><strong>Where do challenges come from?</strong> Five sources: <em>journal mining</em> (your own words surface avoidance patterns), <em>data signals</em> (weak pillars, broken streaks), <em>hypothesis graduates</em> (confirmed patterns worth testing behaviourally), <em>science scans</em> (latest research), and <em>manual creation</em> (you or the community).</p>
-  </div>
-</div>
 
 <div id="amj-subscribe"></div>
 <div id="amj-bottom-nav"></div>
@@ -601,234 +713,283 @@
   'use strict';
 
   var API = 'https://averagejoematt.com/api';
-  var SOURCE_LABELS = {
-    journal_mining: '&#x1F4D3; Journal pattern',
-    data_signal: '&#x1F4CA; Data signal',
-    hypothesis_graduate: '&#x1F9EA; Hypothesis graduate',
-    science_scan: '&#x1F52C; Science scan',
-    manual: '&#x270D;&#xFE0F; Manual',
-    community: '&#x1F465; Community suggestion'
-  };
-  var DIFF_LABEL = {easy:'Easy', moderate:'Moderate', hard:'Hard'};
+  var EV_CIRC = 2 * Math.PI * 7; // evidence ring circumference
+  var EV_PCT = {strong: 100, moderate: 66, emerging: 33};
+  var EV_COLOR = {strong: '#2EA98F', moderate: '#f59e0b', emerging: '#6b7280'};
+  var EV_LABEL = {strong: '●●● Strong', moderate: '●● Moderate', emerging: '● Emerging'};
+  var DIFF_MAX = 5;
+  var allChallenges = [];
+  var categories = [];
+  var currentCat = 'all';
+  var dynamicStatus = {}; // challenge_id → {status, checkins, xp}
 
-  // ── Render helpers ──
-  function formatDate(s) {
-    if (!s) return '';
-    try { return new Date(s + 'T12:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric'}).toUpperCase(); }
-    catch(e) { return s; }
+  // ── Evidence ring SVG ──
+  function evRingSvg(tier) {
+    var pct = EV_PCT[tier] || 33;
+    var color = EV_COLOR[tier] || '#6b7280';
+    var offset = EV_CIRC - (pct / 100) * EV_CIRC;
+    return '<svg viewBox="0 0 20 20"><circle class="ev-track" cx="10" cy="10" r="7"/>' +
+      '<circle class="ev-fill" cx="10" cy="10" r="7" stroke="' + color + '" ' +
+      'stroke-dasharray="' + EV_CIRC.toFixed(1) + '" stroke-dashoffset="' + offset.toFixed(1) + '"/></svg>';
   }
 
-  function buildCheckinStrip(checkins, durationDays) {
-    var html = '<div class="checkin-strip__label">Daily check-in</div>';
-    var today = new Date().toISOString().split('T')[0];
-    var checkinMap = {};
-    (checkins || []).forEach(function(c) { checkinMap[c.date] = c; });
-
-    for (var i = 0; i < durationDays; i++) {
-      var dayNum = i + 1;
-      // We can't easily compute exact dates without activated_at, so show numbered dots
-      var ci = checkins[i];
-      var cls = 'checkin-dot';
-      if (ci && ci.completed) cls += ' checkin-dot--done';
-      else if (ci && !ci.completed) cls += ' checkin-dot--missed';
-      else if (i === (checkins || []).length) cls += ' checkin-dot--today';
-      html += '<div class="' + cls + '" title="Day ' + dayNum + '">' + (ci ? '' : dayNum) + '</div>';
+  // ── Difficulty dots ──
+  function diffDots(level) {
+    var html = '';
+    for (var i = 1; i <= DIFF_MAX; i++) {
+      html += '<div class="diff-dot' + (i <= level ? ' diff-dot--filled' : '') + '"></div>';
     }
     return html;
   }
 
-  // ── Hero: Active Challenge ──
-  function renderHero(challenges) {
-    var active = challenges.filter(function(c) { return c.status === 'active'; });
-    var container = document.getElementById('hero-content');
+  // ── Render category tabs ──
+  function renderCatBar() {
+    var html = '<button class="cat-tab' + (currentCat === 'all' ? ' active' : '') + '" data-cat="all"><span class="cat-tab__icon">⚡</span> All <span class="cat-tab__count">' + allChallenges.length + '</span></button>';
+    categories.forEach(function(cat) {
+      var count = allChallenges.filter(function(c) { return c.category === cat.id; }).length;
+      html += '<button class="cat-tab' + (currentCat === cat.id ? ' active' : '') + '" data-cat="' + cat.id + '">' +
+        '<span class="cat-tab__icon">' + cat.icon + '</span> ' + cat.label +
+        ' <span class="cat-tab__count">' + count + '</span></button>';
+    });
+    document.getElementById('cat-bar').innerHTML = html;
+    document.querySelectorAll('.cat-tab').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        currentCat = btn.dataset.cat;
+        renderCatBar();
+        renderTiles();
+      });
+    });
+  }
 
-    if (!active.length) {
-      container.innerHTML = '<div class="empty-state">' +
-        '<div class="empty-state__icon">&#x1F3AF;</div>' +
-        '<div class="empty-state__title">No active challenge</div>' +
-        '<div class="empty-state__sub">Browse the available challenges below and start one. Or wait for the AI to generate a new one based on your data.</div>' +
+  // ── Render tile grid ──
+  function renderTiles() {
+    var filtered = currentCat === 'all' ? allChallenges : allChallenges.filter(function(c) { return c.category === c.category && c.category === currentCat; });
+    // Sort: active first, then by difficulty desc
+    filtered.sort(function(a, b) {
+      var sa = getStatus(a.id); var sb = getStatus(b.id);
+      if (sa === 'active' && sb !== 'active') return -1;
+      if (sb === 'active' && sa !== 'active') return 1;
+      if (sa === 'completed' && sb !== 'completed') return 1;
+      if (sb === 'completed' && sa !== 'completed') return -1;
+      return (b.difficulty || 0) - (a.difficulty || 0);
+    });
+
+    var html = '';
+    filtered.forEach(function(ch) {
+      var status = getStatus(ch.id);
+      var cls = 'tile';
+      if (status === 'active') cls += ' tile--active';
+      if (status === 'completed') cls += ' tile--completed';
+      if (ch.type === 'achievement') cls += ' tile--achievement';
+      var catObj = categories.find(function(c) { return c.id === ch.category; });
+      var catColor = catObj ? catObj.color : 'var(--ar)';
+      var durLabel = ch.duration_days ? ch.duration_days + 'd' : 'One-time';
+
+      html += '<div class="' + cls + '" style="--tile-color:' + catColor + '" onclick="showDetail(\'' + ch.id + '\')">' +
+        '<div class="tile__evidence">' + evRingSvg(ch.evidence_tier) + '</div>' +
+        '<div class="tile__icon">' + ch.icon + '</div>' +
+        '<div class="tile__name">' + ch.name + '</div>' +
+        '<div class="tile__footer">' +
+          '<span class="tile__duration">' + durLabel + '</span>' +
+          '<div class="tile__difficulty">' + diffDots(ch.difficulty || 2) + '</div>' +
+        '</div>' +
       '</div>';
+    });
+    document.getElementById('tile-grid').innerHTML = html || '<div style="grid-column:1/-1;text-align:center;padding:var(--space-10);color:var(--text-faint)">No challenges in this category</div>';
+  }
+
+  function getStatus(id) {
+    return (dynamicStatus[id] || {}).status || 'backlog';
+  }
+
+  // ── Render Active Hero ──
+  function renderHero() {
+    var active = allChallenges.filter(function(c) { return getStatus(c.id) === 'active'; });
+    var container = document.getElementById('hero-content');
+    if (!active.length) {
+      container.innerHTML = '<div class="hero-empty"><div class="hero-empty__text">No active challenge — pick one from the wall below</div></div>';
       return;
     }
-
-    var ch = active[0]; // Primary active challenge
-    var checkins = ch.daily_checkins || [];
-    var duration = ch.duration_days || 7;
+    var ch = active[0];
+    var ds = dynamicStatus[ch.id] || {};
+    var checkins = ds.checkins || [];
+    var dur = ch.duration_days || 7;
     var daysIn = checkins.length;
-    var completedDays = checkins.filter(function(c) { return c.completed; }).length;
-    var pct = Math.min(100, Math.round(daysIn / duration * 100));
-    var circumference = 2 * Math.PI * 58;
-    var offset = circumference - (pct / 100) * circumference;
-    var daysLeft = Math.max(0, duration - daysIn);
-    var successRate = daysIn ? Math.round(completedDays / daysIn * 100) : 0;
+    var pct = Math.min(100, Math.round(daysIn / dur * 100));
+    var circ = 2 * Math.PI * 44;
+    var offset = circ - (pct / 100) * circ;
+    var daysLeft = Math.max(0, dur - daysIn);
 
-    var sourceLabel = SOURCE_LABELS[ch.source] || ch.source;
-
-    var html = '<div class="hero-card">' +
-      '<div class="hero-card__inner">' +
-        '<div>' +
-          '<div class="hero-card__name">' + ch.name + '</div>' +
-          '<div class="hero-card__desc">' + (ch.description || '') + '</div>' +
-          (ch.protocol ? '<div class="hero-card__protocol"><div class="hero-card__protocol-label">// the protocol</div>' + ch.protocol + '</div>' : '') +
-          '<div class="hero-card__chips">' +
-            '<span class="ar-chip">' + (DIFF_LABEL[ch.difficulty] || 'Moderate') + '</span>' +
-            '<span class="ar-chip">' + duration + ' days</span>' +
-            '<span class="ar-chip">' + (ch.domain || 'general') + '</span>' +
-            '<span class="ar-chip">' + successRate + '% success</span>' +
-          '</div>' +
-          (ch.source_detail ? '<div class="source-badge"><span class="source-badge__icon">&#x26A1;</span> ' + ch.source_detail + '</div>' : '') +
-        '</div>' +
-        '<div class="countdown-ring">' +
-          '<div class="countdown-ring__wrapper">' +
-            '<svg width="140" height="140" viewBox="0 0 140 140">' +
-              '<circle class="countdown-ring__track" cx="70" cy="70" r="58"/>' +
-              '<circle class="countdown-ring__fill" cx="70" cy="70" r="58" stroke-dasharray="' + circumference + '" stroke-dashoffset="' + offset + '"/>' +
-            '</svg>' +
-            '<div class="countdown-ring__text">' +
-              '<span class="countdown-ring__day">' + daysLeft + '</span>' +
-              '<span class="countdown-ring__label">days left</span>' +
-            '</div>' +
-          '</div>' +
-          '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);text-align:center">Day ' + (daysIn + 1) + ' of ' + duration + '</div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="checkin-strip">' + buildCheckinStrip(checkins, duration) + '</div>' +
-      '<div class="hero-card__cta">' +
-        '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">' + sourceLabel + '</div>' +
-        '<div style="display:flex;gap:var(--space-3)">' +
-          '<button class="btn-checkin btn-checkin--miss" onclick="doCheckin(\'' + ch.challenge_id + '\', false)">&#x2717; Missed it</button>' +
-          '<button class="btn-checkin" onclick="doCheckin(\'' + ch.challenge_id + '\', true)">&#x2713; Did it today</button>' +
-        '</div>' +
-      '</div>' +
+    var ckHtml = '<div class="checkin-bar__label">Day ' + (daysIn + 1) + ' of ' + dur + '</div>';
+    for (var i = 0; i < dur; i++) {
+      var ci = checkins[i];
+      var cls = 'ck-dot';
+      if (ci && ci.completed) cls += ' ck-dot--done';
+      else if (ci && !ci.completed) cls += ' ck-dot--miss';
+      else if (i === daysIn) cls += ' ck-dot--today';
+      ckHtml += '<div class="' + cls + '"></div>';
+    }
+    ckHtml += '<div class="checkin-bar__actions">' +
+      '<button class="btn-ck btn-ck--miss" onclick="doCheckin(\'' + ch.id + '\',false)">✗ Missed</button>' +
+      '<button class="btn-ck" onclick="doCheckin(\'' + ch.id + '\',true)">✓ Did it</button>' +
     '</div>';
 
-    // Additional active challenges
-    if (active.length > 1) {
-      html += '<div style="margin-top:var(--space-6);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">+ ' + (active.length - 1) + ' more active</div>';
+    container.innerHTML = '<div class="hero-active">' +
+      '<div class="hero-active__icon">' + ch.icon + '</div>' +
+      '<div class="hero-active__info">' +
+        '<div class="hero-active__name">' + ch.name + '</div>' +
+        '<div class="hero-active__liner">' + ch.one_liner + '</div>' +
+        '<div class="hero-active__chips">' +
+          '<span class="ar-chip">' + (ch.duration_days || '?') + ' days</span>' +
+          '<span class="ar-chip">' + ch.category + '</span>' +
+          '<span class="ar-chip">' + (ch.board_recommender || '') + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="hero-active__ring" style="position:relative">' +
+        '<svg width="100" height="100" viewBox="0 0 100 100" style="transform:rotate(-90deg)">' +
+          '<circle class="ring-track" cx="50" cy="50" r="44"/>' +
+          '<circle class="ring-fill" cx="50" cy="50" r="44" stroke-dasharray="' + circ + '" stroke-dashoffset="' + offset + '"/>' +
+        '</svg>' +
+        '<div class="ring-center"><span class="ring-num">' + daysLeft + '</span><span class="ring-sub">left</span></div>' +
+      '</div>' +
+      '<div class="checkin-bar">' + ckHtml + '</div>' +
+    '</div>';
+  }
+
+  // ── Detail overlay ──
+  window.showDetail = function(id) {
+    var ch = allChallenges.find(function(c) { return c.id === id; });
+    if (!ch) return;
+    var status = getStatus(id);
+    var evClass = 'ev-badge--' + (ch.evidence_tier || 'emerging');
+    var evLabel = EV_LABEL[ch.evidence_tier] || '● Emerging';
+    var durLabel = ch.duration_days ? ch.duration_days + ' days' : 'One-time';
+
+    document.getElementById('detail-top').innerHTML =
+      '<div class="detail-card__icon">' + ch.icon + '</div>' +
+      '<div class="detail-card__name">' + ch.name + '</div>' +
+      '<div class="detail-card__liner">' + ch.one_liner + '</div>' +
+      '<div class="detail-card__meta">' +
+        '<div class="detail-meta-item"><div class="detail-meta-item__value">' + durLabel + '</div><div class="detail-meta-item__label">Duration</div></div>' +
+        '<div class="detail-meta-item"><div class="detail-meta-item__value">' + (ch.difficulty || 2) + '/5</div><div class="detail-meta-item__label">Difficulty</div></div>' +
+        '<div class="detail-meta-item"><div class="detail-meta-item__value"><span class="ev-badge ' + evClass + '">' + evLabel + '</span></div><div class="detail-meta-item__label">Evidence</div></div>' +
+      '</div>';
+
+    var bodyHtml = '';
+    if (ch.protocol) {
+      bodyHtml += '<div class="detail-field"><div class="detail-field__label">// The Protocol</div><div class="detail-field__value">' + ch.protocol + '</div></div>';
     }
-
-    container.innerHTML = html;
-  }
-
-  // ── Candidates ──
-  function renderCandidates(challenges) {
-    var candidates = challenges.filter(function(c) { return c.status === 'candidate'; });
-    var grid = document.getElementById('candidates-grid');
-
-    if (!candidates.length) {
-      grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1">' +
-        '<div class="empty-state__icon">&#x1F331;</div>' +
-        '<div class="empty-state__title">No pending challenges</div>' +
-        '<div class="empty-state__sub">The AI generates new challenge candidates weekly based on your journal, habits, and data trends.</div>' +
-      '</div>';
-      return;
+    if (ch.evidence_summary) {
+      bodyHtml += '<div class="detail-field"><div class="detail-field__label">// The Evidence</div><div class="detail-field__value">' + ch.evidence_summary + '</div></div>';
     }
+    if (ch.board_recommender && ch.board_quote) {
+      bodyHtml += '<div class="detail-field"><div class="detail-field__label">// Board Recommendation</div>' +
+        '<div class="detail-board-quote">' +
+          '<div class="detail-board-quote__text">"' + ch.board_quote + '"</div>' +
+          '<div class="detail-board-quote__attr">— ' + ch.board_recommender + '</div>' +
+        '</div></div>';
+    }
+    document.getElementById('detail-body').innerHTML = bodyHtml;
+    document.getElementById('detail-overlay').classList.add('open');
+  };
 
-    grid.innerHTML = candidates.map(function(ch) {
-      var sourceLabel = SOURCE_LABELS[ch.source] || ch.source;
-      return '<div class="cand-card">' +
-        '<div class="cand-card__domain">' + (ch.domain || 'general') + '</div>' +
-        '<div class="cand-card__name">' + ch.name + '</div>' +
-        '<div class="cand-card__desc">' + (ch.description || '') + '</div>' +
-        '<div class="cand-card__meta">' +
-          '<span class="cand-chip">' + (DIFF_LABEL[ch.difficulty] || 'Moderate') + '</span>' +
-          '<span class="cand-chip">' + (ch.duration_days || 7) + ' days</span>' +
-          (ch.verification_method === 'metric_auto' ? '<span class="cand-chip" style="color:var(--ar);border-color:var(--ar-dim)">Auto-verified</span>' : '') +
-        '</div>' +
-        '<div class="cand-card__source">' + sourceLabel +
-          (ch.source_detail ? ' &mdash; <strong>' + ch.source_detail + '</strong>' : '') +
-        '</div>' +
-      '</div>';
-    }).join('');
-  }
+  window.closeDetail = function() {
+    document.getElementById('detail-overlay').classList.remove('open');
+  };
 
-  // ── Record (completed) ──
-  function renderRecord(challenges) {
-    var finished = challenges.filter(function(c) { return c.status === 'completed' || c.status === 'failed'; });
-    var list = document.getElementById('record-list');
+  // Escape key closes detail
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeDetail(); });
 
-    if (!finished.length) return; // keep default empty state
-
-    list.innerHTML = finished.map(function(ch) {
-      var xp = ch.character_xp_awarded || 0;
-      var checkins = ch.daily_checkins || [];
-      var completedDays = checkins.filter(function(c) { return c.completed; }).length;
-      var successRate = checkins.length ? Math.round(completedDays / checkins.length * 100) : 0;
-      var badgeClass = ch.status === 'completed' ? 'completed' : 'failed';
-      var badgeLabel = ch.status === 'completed' ? '&#x2713; Completed' : '&#x2717; Failed';
-
-      return '<div class="record-card">' +
-        '<div class="record-card__xp">' +
-          '<div class="record-card__xp-value">+' + xp + '</div>' +
-          '<div class="record-card__xp-label">XP</div>' +
-        '</div>' +
-        '<div class="record-card__info">' +
-          '<div class="record-card__name">' + ch.name + '</div>' +
-          '<div class="record-card__detail">' +
-            (ch.duration_days || '?') + ' days &middot; ' +
-            completedDays + '/' + checkins.length + ' days completed &middot; ' +
-            successRate + '% success' +
-            (ch.badge_earned ? ' &middot; &#x1F3C5; ' + ch.badge_earned : '') +
-          '</div>' +
-        '</div>' +
-        '<div class="record-card__badge record-card__badge--' + badgeClass + '">' + badgeLabel + '</div>' +
-      '</div>';
-    }).join('');
-  }
-
-  // ── Check-in handler ──
+  // ── Check-in ──
   window.doCheckin = function(challengeId, completed) {
     var today = new Date().toISOString().split('T')[0];
     var key = 'amj_ch_' + challengeId + '_' + today;
     if (localStorage.getItem(key)) { alert('Already checked in today!'); return; }
-
     fetch(API + '/challenge_checkin', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({challenge_id: challengeId, completed: completed, date: today})
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
+    }).then(function(r) {
       localStorage.setItem(key, '1');
-      // Reload data
-      loadChallenges();
-    })
-    .catch(function(err) {
-      console.error('Check-in failed:', err);
-      alert('Check-in failed. Please try again.');
-    });
+      loadAll();
+    }).catch(function() { alert('Check-in failed. Try again.'); });
   };
 
   // ── Load data ──
-  function loadChallenges() {
-    fetch(API + '/challenges')
-      .then(function(r) { return r.ok ? r.json() : Promise.reject('API error'); })
+  function loadAll() {
+    // Load static catalog from S3
+    fetch(API + '/challenge_catalog')
+      .then(function(r) { return r.ok ? r.json() : Promise.reject('catalog'); })
       .then(function(data) {
+        categories = data.categories || [];
+        allChallenges = data.challenges || [];
+        document.getElementById('stat-total').textContent = allChallenges.length;
+        renderCatBar();
+        renderTiles();
+      })
+      .catch(function() {
+        // Fallback: try challenges endpoint
+        fetch(API + '/challenges')
+          .then(function(r) { return r.ok ? r.json() : null; })
+          .then(function(data) {
+            if (data && data.challenges) {
+              allChallenges = data.challenges;
+              document.getElementById('stat-total').textContent = allChallenges.length;
+              renderCatBar();
+              renderTiles();
+            }
+          })
+          .catch(function() {
+            document.getElementById('tile-grid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:var(--space-10);color:var(--text-faint)">Could not load challenges — try refreshing</div>';
+          });
+      });
+
+    // Load dynamic status (active/completed from DynamoDB)
+    fetch(API + '/challenges')
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        if (!data) return;
         var challenges = data.challenges || [];
-        var summary = data.summary || {};
-
-        // Stats
-        document.getElementById('stat-active').textContent = summary.active || 0;
-        document.getElementById('stat-candidates').textContent = summary.candidate || 0;
-        document.getElementById('stat-completed').textContent = summary.completed || 0;
-
-        // Total XP
-        var totalXP = 0;
-        challenges.forEach(function(c) { totalXP += (c.character_xp_awarded || 0); });
-        document.getElementById('stat-xp').textContent = totalXP || '0';
-
-        renderHero(challenges);
-        renderCandidates(challenges);
+        var activeCount = 0, completedCount = 0;
+        challenges.forEach(function(ch) {
+          dynamicStatus[ch.challenge_id || ch.id] = {
+            status: ch.status,
+            checkins: ch.daily_checkins || [],
+            xp: ch.character_xp_awarded || 0
+          };
+          if (ch.status === 'active') activeCount++;
+          if (ch.status === 'completed') completedCount++;
+        });
+        document.getElementById('stat-active').textContent = activeCount;
+        document.getElementById('stat-completed').textContent = completedCount;
+        renderHero();
+        renderTiles();
         renderRecord(challenges);
       })
-      .catch(function(err) {
-        console.error('Failed to load challenges:', err);
-        document.getElementById('hero-content').innerHTML =
-          '<div class="empty-state"><div class="empty-state__title">Could not load challenges</div></div>';
-      });
+      .catch(function() {});
   }
 
-  loadChallenges();
+  // ── Record ──
+  function renderRecord(challenges) {
+    var finished = challenges.filter(function(c) { return c.status === 'completed' || c.status === 'failed'; });
+    if (!finished.length) return;
+    var zone = document.getElementById('record-zone');
+    zone.style.display = 'block';
+    var html = '';
+    finished.forEach(function(ch) {
+      var icon = (allChallenges.find(function(ac) { return ac.id === (ch.challenge_id || ch.id); }) || {}).icon || '🏅';
+      html += '<div class="record-row">' +
+        '<div class="record-row__icon">' + icon + '</div>' +
+        '<div><div class="record-row__name">' + ch.name + '</div>' +
+          '<div class="record-row__detail">' + (ch.duration_days || '?') + 'd · ' + (ch.status === 'completed' ? '✓' : '✗') + '</div>' +
+        '</div>' +
+        '<div class="record-row__xp">+' + (ch.character_xp_awarded || 0) + '</div>' +
+      '</div>';
+    });
+    document.getElementById('record-list').innerHTML = html;
+  }
+
+  loadAll();
 })();
 </script>
 <script src="/assets/js/reveal.js"></script>

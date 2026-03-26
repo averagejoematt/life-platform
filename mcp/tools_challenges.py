@@ -69,6 +69,7 @@ def tool_create_challenge(args):
     if not name:
         raise ValueError("name is required.")
 
+    catalog_id       = (args.get("catalog_id") or "").strip()
     description      = (args.get("description") or "").strip()
     source           = (args.get("source") or "manual").strip()
     source_detail    = (args.get("source_detail") or "").strip()
@@ -112,6 +113,7 @@ def tool_create_challenge(args):
         "pk":                   CHALLENGES_PK,
         "sk":                   sk,
         "challenge_id":         challenge_id,
+        "catalog_id":           catalog_id,
         "name":                 name,
         "description":          description,
         "source":               source,
@@ -449,18 +451,48 @@ def tool_list_challenges(args):
             checkins = ch.get("daily_checkins", [])
             duration = int(ch.get("duration_days", 7))
             completed_days = sum(1 for c in checkins if c.get("completed"))
+            # Overdue detection: activated_at + duration < today
+            days_since_activation = 0
+            overdue = False
+            days_overdue = 0
+            activated_at = ch.get("activated_at", "")
+            if activated_at:
+                try:
+                    act_date = datetime.strptime(activated_at[:10], "%Y-%m-%d")
+                    days_since_activation = (datetime.utcnow() - act_date).days
+                    if days_since_activation >= duration:
+                        overdue = True
+                        days_overdue = days_since_activation - duration
+                except Exception:
+                    pass
             ch["progress"] = {
                 "checkin_days":   len(checkins),
                 "completed_days": completed_days,
                 "duration_days":  duration,
                 "completion_pct": round(len(checkins) / duration * 100) if duration else 0,
                 "success_rate":   round(completed_days / len(checkins) * 100) if checkins else 0,
+                "days_since_activation": days_since_activation,
+                "overdue":        overdue,
+                "days_overdue":   days_overdue,
             }
 
         result.append(ch)
 
     # Summary stats
     all_items = resp.get("Items", [])
+    # Compute overdue count across all active items
+    overdue_count = 0
+    for ai in all_items:
+        if ai.get("status") == "active":
+            act_at = ai.get("activated_at", "")
+            dur = int(decimal_to_float(ai.get("duration_days", 7)))
+            if act_at:
+                try:
+                    ad = datetime.strptime(str(act_at)[:10], "%Y-%m-%d")
+                    if (datetime.utcnow() - ad).days >= dur:
+                        overdue_count += 1
+                except Exception:
+                    pass
     summary = {
         "total":     len(all_items),
         "candidate": sum(1 for i in all_items if i.get("status") == "candidate"),
@@ -468,6 +500,7 @@ def tool_list_challenges(args):
         "completed": sum(1 for i in all_items if i.get("status") == "completed"),
         "failed":    sum(1 for i in all_items if i.get("status") == "failed"),
         "declined":  sum(1 for i in all_items if i.get("status") == "declined"),
+        "overdue":   overdue_count,
     }
 
     return {
