@@ -212,6 +212,87 @@ def tool_activate_challenge(args):
 
 
 # ═══════════════════════════════════════════════════════════════════════
+# Phase E: Metric auto-verification
+# ═══════════════════════════════════════════════════════════════════════
+
+# Metric → DDB source + field mapping for auto-verification
+AUTO_METRIC_MAP = {
+    "daily_steps":         {"source": "apple",       "field": "steps"},
+    "weight_lbs":          {"source": "withings",    "field": "weight_lbs"},
+    "eating_window_hours": {"source": "macrofactor",  "field": "eating_window_hours"},
+    "zone2_minutes":       {"source": "strava",       "field": "zone2_minutes"},
+    "sleep_hours":         {"source": "whoop",        "field": "sleep_hours"},
+    "hrv":                 {"source": "whoop",        "field": "hrv"},
+    "calories":            {"source": "macrofactor",  "field": "calories"},
+    "protein_g":           {"source": "macrofactor",  "field": "protein_g"},
+}
+
+
+def _check_metric_targets(metric_targets, date_str):
+    """Auto-verify metric targets against DDB data for a given date.
+
+    metric_targets: dict like {"daily_steps": {"min": 8000}, "sleep_hours": {"min": 7}}
+    Returns: {"passed": bool, "results": {metric: {"target": ..., "actual": ..., "met": bool}}}
+    """
+    if not metric_targets:
+        return {"passed": None, "results": {}}
+
+    results = {}
+    all_met = True
+
+    for metric_key, target_spec in metric_targets.items():
+        mapping = AUTO_METRIC_MAP.get(metric_key)
+        if not mapping:
+            results[metric_key] = {"target": target_spec, "actual": None, "met": None, "error": "unknown_metric"}
+            continue
+
+        source = mapping["source"]
+        field = mapping["field"]
+        pk = f"USER#{USER_ID}#SOURCE#{source}"
+        sk = f"DATE#{date_str}"
+
+        try:
+            resp = table.get_item(Key={"pk": pk, "sk": sk})
+            item = resp.get("Item")
+            if not item:
+                results[metric_key] = {"target": target_spec, "actual": None, "met": None, "error": "no_data"}
+                all_met = False
+                continue
+
+            raw_val = item.get(field)
+            if raw_val is None:
+                results[metric_key] = {"target": target_spec, "actual": None, "met": None, "error": "field_missing"}
+                all_met = False
+                continue
+
+            actual = float(decimal_to_float(raw_val))
+            met = True
+
+            # Support min, max, and exact targets
+            if "min" in target_spec and actual < float(target_spec["min"]):
+                met = False
+            if "max" in target_spec and actual > float(target_spec["max"]):
+                met = False
+            if "exact" in target_spec and abs(actual - float(target_spec["exact"])) > 0.01:
+                met = False
+
+            if not met:
+                all_met = False
+
+            results[metric_key] = {
+                "target": decimal_to_float(target_spec),
+                "actual": round(actual, 2),
+                "met":    met,
+            }
+        except Exception as e:
+            logger.warning(f"Auto-verify {metric_key} failed: {e}")
+            results[metric_key] = {"target": target_spec, "actual": None, "met": None, "error": str(e)}
+            all_met = False
+
+    return {"passed": all_met, "results": results}
+
+
+# ═══════════════════════════════════════════════════════════════════════
 # Tool 3: checkin_challenge
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -243,12 +324,26 @@ def tool_checkin_challenge(args):
     if item.get("status") != "active":
         raise ValueError(f"Challenge is not active (status: {item.get('status')}).")
 
+    # Phase E: Auto-verification for metric_auto and hybrid challenges
+    verification = item.get("verification_method", "self_report")
+    metric_targets = item.get("metric_targets") or {}
+    auto_result = None
+
+    if verification in ("metric_auto", "hybrid") and metric_targets:
+        auto_result = _check_metric_targets(metric_targets, date)
+        if verification == "metric_auto":
+            # Pure auto: metric result overrides manual input
+            completed = auto_result["passed"] if auto_result["passed"] is not None else completed
+        # hybrid: auto-check runs for data, but manual 'completed' flag is respected
+
     # Build checkin entry
     checkin = {
         "date":      date,
         "completed": completed,
         "logged_at": _now_iso(),
     }
+    if auto_result:
+        checkin["auto_verification"] = auto_result
     if note:
         checkin["note"] = note
     if rating is not None:
@@ -266,7 +361,7 @@ def tool_checkin_challenge(args):
                 ExpressionAttributeValues={":dc": existing_checkins},
             )
             logger.info(f"checkin_challenge: {challenge_id} date={date} REPLACED")
-            return {
+            result = {
                 "checked_in": True,
                 "replaced":   True,
                 "challenge_id": challenge_id,
@@ -274,6 +369,9 @@ def tool_checkin_challenge(args):
                 "completed":  completed,
                 "total_checkins": len(existing_checkins),
             }
+            if auto_result:
+                result["auto_verification"] = auto_result
+            return result
 
     # Append new checkin
     table.update_item(
@@ -291,7 +389,7 @@ def tool_checkin_challenge(args):
 
     logger.info(f"checkin_challenge: {challenge_id} date={date} completed={completed}")
 
-    return {
+    result = {
         "checked_in":     True,
         "challenge_id":   challenge_id,
         "date":           date,
@@ -301,6 +399,9 @@ def tool_checkin_challenge(args):
         "days_remaining": days_remaining,
         "completion_pct": round(total / duration * 100) if duration else 0,
     }
+    if auto_result:
+        result["auto_verification"] = auto_result
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════════════
