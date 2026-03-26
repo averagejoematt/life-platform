@@ -559,8 +559,11 @@ async function loadTimeline() {
   } catch(e) {
     document.getElementById('timeline').innerHTML = `
       <div class="timeline-empty">
-        Timeline loading&hellip; The journey starts on Day 1.
-        <br><span style="font-size:var(--text-2xs);color:var(--text-faint)">If this persists, the API may be caching. Try again in a few minutes.</span>
+        <strong style="font-size:var(--text-base);color:var(--text-muted);">Discoveries populate over time</strong><br><br>
+        Discoveries are real findings from the correlation engine and completed experiments.
+        This page populates as data accumulates &mdash; the first meaningful signals typically
+        appear after 4&ndash;6 weeks of continuous tracking.<br><br>
+        <span style="font-size:var(--text-2xs);color:var(--text-faint)">Day 1 is April 1, 2026. Check back after launch.</span>
       </div>`;
   }
 }

@@ -272,11 +272,29 @@
   // ── SUBSCRIBE CTA ──────────────────────────────────────────
   function buildSubscribeCTA() {
     var slug = path.replace(/\//g, '').replace(/-/g, '') || 'home';
+
+    // Contextual CTA messaging
+    var ctaHeadline = 'Get the data, every week.';
+    var ctaBody = 'Real numbers from <span data-const="platform.data_sources">19</span> data sources. No highlight reel. Every Wednesday, in your inbox.';
+    if (path.startsWith('/chronicle') || path.startsWith('/journal')) {
+      ctaHeadline = "Follow Elena's weekly chronicle.";
+      ctaBody = 'Every Wednesday, a new dispatch. The real week — including the bad ones.';
+    } else if (path.startsWith('/story/')) {
+      ctaHeadline = 'Follow the journey.';
+      ctaBody = 'The story continues every week. Subscribe for the next chapter.';
+    } else if (path === '/' || path === '/index.html') {
+      ctaHeadline = 'Follow the experiment from Day 1.';
+      ctaBody = 'Real numbers from <span data-const="platform.data_sources">19</span> data sources. No highlight reel. Every Wednesday, in your inbox.';
+    } else if (path.startsWith('/sleep') || path.startsWith('/glucose') || path.startsWith('/nutrition') || path.startsWith('/training') || path.startsWith('/live') || path.startsWith('/character') || path.startsWith('/explorer')) {
+      ctaHeadline = 'Get AI-powered insights weekly.';
+      ctaBody = 'This data feeds a weekly digest with board commentary. No noise, just signal.';
+    }
+
     var html = '<section class="email-cta-footer reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface);text-align:center;">';
     html += '<p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>';
-    html += '<h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>';
+    html += '<h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">' + ctaHeadline + '</h3>';
     html += '<p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">';
-    html += 'Real numbers from 19 data sources. No highlight reel. Every Wednesday, in your inbox.<br>';
+    html += ctaBody + '<br>';
     html += '<a href="/chronicle/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue →</a></p>';
     html += '<div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">';
     html += '<input id="cta-email-' + slug + '" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);outline:none;transition:border-color var(--dur-fast);" onfocus="this.style.borderColor=\'var(--c-amber-400)\'" onblur="this.style.borderColor=\'var(--c-amber-500)\'">';

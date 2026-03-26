@@ -1231,7 +1231,8 @@
       Every week I publish the real numbers — the bad days included.
     </p>
     <div style="margin-top:var(--space-8);display:flex;gap:var(--space-4)">
-      <a href="/chronicle/" class="btn btn--ghost">Read the journal</a>
+      <a href="/story/" class="btn btn--ghost">Read my story</a>
+      <a href="/chronicle/" class="btn btn--ghost">The chronicle</a>
       <a href="/platform/" class="btn btn--ghost">See the platform</a>
     </div>
   </div>
@@ -1506,8 +1507,11 @@
   if (dismissed && Date.now() - parseInt(dismissed) < 7*86400000) return;
   if (subscribed) return;
 
+  var timeReady = false;
+  setTimeout(function(){ timeReady = true; }, 60000);
+
   function checkScroll() {
-    if (!hero) return;
+    if (!hero || !timeReady) return;
     var rect = hero.getBoundingClientRect();
     if (rect.bottom < 0) {
       bar.style.display = 'flex';

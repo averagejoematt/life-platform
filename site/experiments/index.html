@@ -815,7 +815,7 @@
     var active = experiments.filter(function(e) { return e.status === 'active'; });
     var grid = document.getElementById('mc-grid');
     if (!active.length) {
-      grid.innerHTML = '<div class="mc-empty"><div class="mc-empty__title">Between experiments</div><div class="mc-empty__sub">Vote below to pick what I test next.</div></div>';
+      grid.innerHTML = '<div class="mc-empty"><div class="mc-empty__title">Experiments begin on Day 1</div><div class="mc-empty__sub">N=1 experiments launch after April 1, 2026. Each tests one variable at a time with a minimum 14-day window. Vote below to pick what I test first.</div></div>';
       return;
     }
     grid.innerHTML = active.map(function(exp) {
