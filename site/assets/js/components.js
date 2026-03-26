@@ -391,4 +391,13 @@
     }
   }
 
+  // ── Auto-load countdown.js if not already included ──
+  // Guard: skip if page already loaded it via explicit <script> tag
+  if (!window.AMJ_EXPERIMENT) {
+    var cdScript = document.createElement('script');
+    cdScript.src = '/assets/js/countdown.js';
+    cdScript.async = false;
+    document.body.appendChild(cdScript);
+  }
+
 })();
