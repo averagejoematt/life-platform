@@ -1353,30 +1353,77 @@ def handle_correlations(event: dict = None) -> dict:
         return _error(503, "No correlation data available yet.")
 
     record = items[0]
-    pairs = record.get("pairs", [])
     week = record.get("sk", "").replace("WEEK#", "")
+    start_date = record.get("start_date", "")
+    end_date = record.get("end_date", "")
+
+    # The compute lambda stores correlations as a dict (label → data).
+    # Convert to list for the public API. Also supports legacy "pairs" list format.
+    raw_corrs = record.get("correlations", {})
+    if isinstance(raw_corrs, list):
+        # Legacy format: already a list
+        pairs = raw_corrs
+    elif isinstance(raw_corrs, dict):
+        # Current format: dict keyed by label. Convert to list.
+        pairs = []
+        for label, data in raw_corrs.items():
+            entry = dict(data)
+            entry["label"] = label
+            pairs.append(entry)
+    else:
+        pairs = []
+
+    # Human-readable labels and source names for each metric
+    _METRIC_META = {
+        "hrv":            {"label": "Heart Rate Variability", "source": "Whoop"},
+        "recovery_score": {"label": "Recovery Score",         "source": "Whoop"},
+        "sleep_duration": {"label": "Sleep Duration",         "source": "Whoop"},
+        "sleep_score":    {"label": "Sleep Score",            "source": "Whoop"},
+        "resting_hr":     {"label": "Resting Heart Rate",     "source": "Whoop"},
+        "strain":         {"label": "Strain",                 "source": "Whoop"},
+        "tsb":            {"label": "Training Stress Balance", "source": "Computed"},
+        "training_kj":    {"label": "Training Load (kJ)",     "source": "Strava"},
+        "training_mins":  {"label": "Training Minutes",       "source": "Strava"},
+        "protein_g":      {"label": "Protein (g)",            "source": "MacroFactor"},
+        "calories":       {"label": "Calories",               "source": "MacroFactor"},
+        "carbs_g":        {"label": "Carbs (g)",              "source": "MacroFactor"},
+        "fat_g":          {"label": "Fat (g)",                "source": "MacroFactor"},
+        "steps":          {"label": "Steps",                  "source": "Apple Health"},
+        "habit_pct":      {"label": "Habit Completion %",     "source": "Habitify"},
+        "day_grade":      {"label": "Day Grade",              "source": "Computed"},
+        "readiness":      {"label": "Readiness Score",        "source": "Computed"},
+        "tier0_streak":   {"label": "Tier 0 Streak",          "source": "Computed"},
+    }
 
     public_pairs = []
     for p in pairs:
+        metric_a = p.get("metric_a", p.get("field_a", ""))
+        metric_b = p.get("metric_b", p.get("field_b", ""))
+        meta_a = _METRIC_META.get(metric_a, {})
+        meta_b = _METRIC_META.get(metric_b, {})
+        r_val = float(p.get("pearson_r", p.get("r", 0)) or 0)
         public_pairs.append({
-            "source_a":  p.get("source_a", ""),
-            "field_a":   p.get("field_a", ""),
-            "label_a":   p.get("label_a", p.get("field_a", "")),
-            "source_b":  p.get("source_b", ""),
-            "field_b":   p.get("field_b", ""),
-            "label_b":   p.get("label_b", p.get("field_b", "")),
-            "r":         round(float(p.get("r", 0)), 3),
-            "p":         round(float(p.get("p_value", p.get("p", 1))), 4),
-            "n":         int(p.get("n", 0)),
-            "strength":  p.get("strength", "weak"),
+            "source_a":  meta_a.get("source", p.get("source_a", "")),
+            "field_a":   metric_a,
+            "label_a":   meta_a.get("label", p.get("label_a", metric_a)),
+            "source_b":  meta_b.get("source", p.get("source_b", "")),
+            "field_b":   metric_b,
+            "label_b":   meta_b.get("label", p.get("label_b", metric_b)),
+            "r":         round(r_val, 3),
+            "p":         round(float(p.get("p_value", p.get("p", 1)) or 1), 4),
+            "n":         int(p.get("n_days", p.get("n", 0)) or 0),
+            "strength":  p.get("interpretation", p.get("strength", "weak")),
             "fdr_significant": p.get("fdr_significant", False),
             "correlation_type": p.get("correlation_type", "cross_sectional"),
-            "lag_days":  int(p.get("lag_days", 0)),
+            "lag_days":  int(p.get("lag_days", 0) or 0),
             "description": p.get("description", ""),
             "direction":   p.get("direction", ""),
+            # DISC-1: counterintuitive flag from compute lambda
+            "counterintuitive":    p.get("counterintuitive", False),
+            "expected_direction":  p.get("expected_direction", ""),
             # HP-06: metric labels for homepage cards
-            "metric_a":  p.get("label_a", p.get("field_a", "")),
-            "metric_b":  p.get("label_b", p.get("field_b", "")),
+            "metric_a":  meta_a.get("label", p.get("label_a", metric_a)),
+            "metric_b":  meta_b.get("label", p.get("label_b", metric_b)),
         })
 
     # Sort all by absolute r descending
@@ -1410,6 +1457,8 @@ def handle_correlations(event: dict = None) -> dict:
     return _ok({
         "correlations": {
             "week":  week,
+            "start_date": start_date,
+            "end_date":   end_date,
             "pairs": public_pairs,
             "count": len(public_pairs),
             "methodology": "Pearson r over 90-day rolling window. Benjamini-Hochberg FDR correction. n-gated strength labels.",

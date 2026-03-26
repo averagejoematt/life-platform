@@ -316,7 +316,7 @@
       .stats-strip { grid-template-columns: 1fr 1fr; }
       .spotlight-grid { grid-template-columns: 1fr; }
       .ci-grid { grid-template-columns: 1fr; }
-      .archive-table .td-stat { display: none; }
+      .archive-table .td-strength { display: none; }
     }
     .pipeline-nav { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-4) var(--page-padding); border-bottom:1px solid var(--border); background:var(--surface); font-family:var(--font-mono); font-size:var(--text-2xs); letter-spacing:var(--ls-tag); overflow-x:auto; }
     .pipeline-nav__step { color:var(--text-faint); text-decoration:none; text-transform:uppercase; white-space:nowrap; padding:var(--space-1) var(--space-3); border:1px solid transparent; }
@@ -329,11 +329,6 @@
 
 <div id="amj-nav"></div>
 </div>
-
-
-
-
-
 
 
 
@@ -441,25 +436,7 @@
     Findings that went against the conventional expectation. This is where the N=1 experiment gets interesting.
   </p>
   <div class="ci-grid" id="ci-grid">
-    <!-- Static examples — updated as findings accumulate -->
-    <div class="ci-card">
-      <div class="ci-card__surprise">// Counterintuitive</div>
-      <div class="ci-card__finding">More training didn&rsquo;t immediately improve recovery</div>
-      <div class="ci-card__expected">Expected: more Zone 2 → higher next-day HRV</div>
-      <div class="ci-card__actual">Observed: high training load negatively correlated with same-week recovery score when sleep was below target (r≈−0.31)</div>
-    </div>
-    <div class="ci-card">
-      <div class="ci-card__surprise">// Counterintuitive</div>
-      <div class="ci-card__finding">Sleep quality matters more than sleep duration</div>
-      <div class="ci-card__expected">Expected: longer sleep → better recovery score</div>
-      <div class="ci-card__actual">Observed: HRV (quality proxy) correlates more strongly with recovery than total hours. 7h high-HRV sleep > 9h low-HRV sleep.</div>
-    </div>
-    <div class="ci-card">
-      <div class="ci-card__surprise">// Counterintuitive</div>
-      <div class="ci-card__finding">Consistency beats intensity on weekly habit score</div>
-      <div class="ci-card__expected">Expected: high-output training days would boost overall weekly score</div>
-      <div class="ci-card__actual">Observed: the 7 Tier 0 non-negotiable habits predict weekly character score more reliably than any single high-output day.</div>
-    </div>
+    <div class="loading-msg">Loading counterintuitive findings&hellip;</div>
   </div>
 </div>
 
@@ -471,6 +448,7 @@
     FDR correction applied. Correlation does not imply causation.
     These findings changed my behavior &mdash; they may not apply to you.
     This is observation, not prescription.
+    <strong style="color:var(--text-muted)">These findings have not been externally validated and should not be used to make medical decisions.</strong>
   </p>
 </aside>
 
@@ -586,23 +564,39 @@ async function loadDiscoveries() {
       statsStrip.insertAdjacentElement('afterend', note);
     }
 
-    // Featured card: strongest pair
-    const top = pairs[0];
-    document.getElementById('featured-card').innerHTML = `
-      <div class="featured-card__finding">
-        ${(top.label_a || top.field_a)} <span>${top.r > 0 ? '↑ positively' : '↓ negatively'} predicts</span> ${(top.label_b || top.field_b)}
-      </div>
-      <div class="featured-card__story">
-        ${pairToStory(top)}
-        ${top.fdr_significant ? ' <strong style="color:var(--accent)">This finding survived multiple-testing correction — it&rsquo;s not noise.</strong>' : ''}
-      </div>
-      <div class="featured-card__data">
-        <span class="featured-card__datum">r = <strong>${rSign(top.r)}${top.r.toFixed(3)}</strong></span>
-        <span class="featured-card__datum">n = <strong>${top.n} days</strong></span>
-        <span class="featured-card__datum">Strength: <strong>${top.strength}</strong></span>
-        <span class="featured-card__datum">Sources: <strong>${top.source_a} × ${top.source_b}</strong></span>
-        ${top.lag_days > 0 ? `<span class="featured-card__datum">Lag: <strong>${top.lag_days}d (predictive)</strong></span>` : ''}
-      </div>`;
+    // DISC-2: Featured card — strongest SIGNIFICANT pair, or honest "no strong signal"
+    const significantPairs = pairs.filter(p => p.fdr_significant || (p.p < 0.05 && Math.abs(p.r) >= 0.3));
+    const top = significantPairs.length > 0 ? significantPairs[0] : null;
+
+    if (top) {
+      document.getElementById('featured-card').innerHTML = `
+        <div class="featured-card__finding">
+          ${(top.label_a || top.field_a)} <span>${top.r > 0 ? '↑ positively' : '↓ negatively'} predicts</span> ${(top.label_b || top.field_b)}
+        </div>
+        <div class="featured-card__story">
+          ${pairToStory(top)}
+          ${top.fdr_significant ? ' <strong style="color:var(--accent)">This finding survived multiple-testing correction — it&rsquo;s not noise.</strong>' : ''}
+        </div>
+        <div class="featured-card__data">
+          <span class="featured-card__datum">r = <strong>${rSign(top.r)}${top.r.toFixed(3)}</strong></span>
+          <span class="featured-card__datum">n = <strong>${top.n} days</strong></span>
+          <span class="featured-card__datum">Strength: <strong>${top.strength}</strong></span>
+          <span class="featured-card__datum">Sources: <strong>${top.source_a} × ${top.source_b}</strong></span>
+          ${top.lag_days > 0 ? `<span class="featured-card__datum">Lag: <strong>${top.lag_days}d (predictive)</strong></span>` : ''}
+        </div>`;
+    } else {
+      document.getElementById('featured-card').innerHTML = `
+        <div style="border:1px solid var(--border-subtle);border-left:4px solid var(--accent-dim);padding:var(--space-8);">
+          <div style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);margin-bottom:var(--space-4)">
+            No strong signal this week
+          </div>
+          <p style="font-size:var(--text-sm);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);">
+            The engine tested ${pairs.length} pairs but none cleared the significance threshold
+            (FDR-corrected p &lt; 0.05 with |r| &ge; 0.3).
+            That&rsquo;s not a failure &mdash; it&rsquo;s honest science. Noise isn&rsquo;t signal.
+          </p>
+        </div>`;
+    }
 
     // Spotlight: top 2 pairs
     document.getElementById('spotlight-grid').innerHTML = pairs.slice(0, 2).map(p => `
@@ -620,8 +614,37 @@ async function loadDiscoveries() {
         <td class="td-r ${rClass(p.r)}">${rSign(p.r)}${p.r.toFixed(2)}</td>
         <td class="td-finding">${pairToEnglish(p)}</td>
         <td class="td-stat">${p.label_a || p.field_a} &middot; ${p.label_b || p.field_b}</td>
-        <td class="td-stat">n=${p.n} &middot; ${strengthLabel(p)}</td>
+        <td class="td-stat td-strength">n=${p.n} &middot; ${strengthLabel(p)}</td>
       </tr>`).join('');
+
+    // DISC-1: Dynamic counterintuitive section (replaces hardcoded cards)
+    const counterintuitive = pairs.filter(p => p.counterintuitive);
+    const ciGrid = document.getElementById('ci-grid');
+    if (counterintuitive.length > 0) {
+      ciGrid.innerHTML = counterintuitive.slice(0, 3).map(p => `
+        <div class="ci-card">
+          <div class="ci-card__surprise">// Counterintuitive</div>
+          <div class="ci-card__finding">${pairToEnglish(p)}</div>
+          <div class="ci-card__expected">Expected: ${p.expected_direction} relationship</div>
+          <div class="ci-card__actual">Observed: r=${rSign(p.r)}${p.r.toFixed(2)} (${p.r > 0 ? 'positive' : 'negative'}, n=${p.n} days)</div>
+        </div>`).join('');
+    } else {
+      ciGrid.innerHTML = `
+        <div style="grid-column:1/-1;border:1px solid var(--border-subtle);padding:var(--space-8);text-align:center;">
+          <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">
+            No counterintuitive findings this week &mdash; all correlations match expected directions.
+            <br>Check back after Sunday&rsquo;s engine run.
+          </div>
+        </div>`;
+    }
+
+    // DISC-5: Show analysis window dates if available
+    if (c.start_date && c.end_date) {
+      const windowNote = document.getElementById('last-updated-note');
+      if (windowNote) {
+        windowNote.textContent += `  ·  window: ${c.start_date} → ${c.end_date}`;
+      }
+    }
 
   } catch(e) {
     renderEmptyState();
