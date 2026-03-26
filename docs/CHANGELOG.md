@@ -1,3 +1,42 @@
+## v3.9.29 — 2026-03-26: Phase D + E — Challenge XP Wiring, Auto-Verification, Nav Update
+
+### Summary
+Three items: wired challenge completion XP into character sheet compute pipeline, added metric auto-verification for challenges, and added /challenges/ (The Arena) to site navigation.
+
+### Nav Update
+- Added `/challenges/` as "The Arena" to `site/assets/js/components.js`:
+  - SECTIONS → Method → "What I Tested" dropdown group
+  - Footer → Method column
+  - HIER_ITEMS hierarchy nav bar
+  - HIER_CONTEXT blurb for /challenges/ path
+
+### Phase D — Challenge XP → Character Sheet
+- `lambdas/character_sheet_lambda.py` v1.2.0:
+  - After `compute_character_sheet()`, queries `SOURCE#challenges` for challenges completed yesterday
+  - Maps challenge domain → pillar (e.g., movement→movement, mental→mind, discipline→consistency)
+  - Adds bonus XP to pillar `xp_total` in the character record
+  - Sets `xp_consumed_at` on challenge record to prevent double-counting
+  - Adds `challenge_bonus_xp` dict to character record for transparency
+  - Surfaces `challenge_bonus_xp` per-pillar in `write_character_stats` site output
+  - Fully non-fatal: wrapped in try/except, character sheet still writes even if challenge query fails
+
+### Phase E — Metric Auto-Verification
+- `mcp/tools_challenges.py`:
+  - Added `AUTO_METRIC_MAP` — 8 supported metrics: daily_steps, weight_lbs, eating_window_hours, zone2_minutes, sleep_hours, hrv, calories, protein_g
+  - Added `_check_metric_targets()` function — queries DDB source partitions, compares against min/max/exact targets
+  - Wired into `checkin_challenge`: for `metric_auto` mode, metric result overrides manual input; for `hybrid` mode, auto-check runs but manual flag respected
+  - Auto-verification results stored in each checkin's `auto_verification` field
+  - Results returned in checkin response for full transparency
+- Science scan source already wired in `challenge_generator_lambda.py` prompt — lights up automatically when health data flows
+
+### Files Modified
+- `site/assets/js/components.js` — Nav, footer, hierarchy nav, hierarchy context
+- `lambdas/character_sheet_lambda.py` — Phase D challenge XP wiring (v1.2.0)
+- `mcp/tools_challenges.py` — Phase E auto-verification engine + checkin integration
+- `deploy/sync_doc_metadata.py` — Version bump v3.9.28 → v3.9.29
+
+---
+
 ## v3.9.28 — 2026-03-26: Challenge System — Full Stack Build
 
 ### Summary

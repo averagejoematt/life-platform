@@ -23,6 +23,7 @@ Must run BEFORE:
 
 v1.0.0 — 2026-03-02
 v1.1.0 — 2026-03-09: Sick day freeze — EMA frozen, no penalty on sick days
+v1.2.0 — 2026-03-26: Phase D — Challenge bonus XP wired into pillar xp_total
 """
 
 import json
@@ -423,6 +424,58 @@ def lambda_handler(event, context):
         for eff in effects:
             logger.info(f"[character]   EFFECT: {eff.get('emoji', '')} {eff.get('name', '')}")
 
+    # ── Phase D: Challenge bonus XP ──────────────────────────────────────
+    # Query challenges completed on the target date that haven't been
+    # XP-consumed yet. Add bonus XP to the relevant pillar.
+    CHALLENGE_DOMAIN_TO_PILLAR = {
+        "sleep": "sleep", "movement": "movement", "nutrition": "nutrition",
+        "supplements": "nutrition", "mental": "mind", "social": "relationships",
+        "discipline": "consistency", "metabolic": "metabolic", "general": "consistency",
+    }
+    challenge_bonus_xp = {}  # pillar → total bonus XP
+    try:
+        from boto3.dynamodb.conditions import Key as _Key
+        _ch_pk = USER_PREFIX + "challenges"
+        _ch_resp = table.query(
+            KeyConditionExpression=_Key("pk").eq(_ch_pk) & _Key("sk").begins_with("CHALLENGE#"),
+        )
+        _completed_today = [
+            c for c in _ch_resp.get("Items", [])
+            if c.get("status") in ("completed", "failed")
+            and (c.get("completed_at", "") or "").startswith(yesterday_str)
+            and not c.get("xp_consumed_at")
+            and int(d2f(c.get("character_xp_awarded", 0))) > 0
+        ]
+        for ch in _completed_today:
+            xp = int(d2f(ch.get("character_xp_awarded", 0)))
+            domain = ch.get("domain", "general")
+            pillar = CHALLENGE_DOMAIN_TO_PILLAR.get(domain, "consistency")
+            challenge_bonus_xp[pillar] = challenge_bonus_xp.get(pillar, 0) + xp
+
+            # Apply bonus to pillar in record
+            pillar_key = f"pillar_{pillar}"
+            if pillar_key in record:
+                record[pillar_key]["xp_total"] = record[pillar_key].get("xp_total", 0) + xp
+                record[pillar_key]["challenge_bonus_xp"] = record[pillar_key].get("challenge_bonus_xp", 0) + xp
+                logger.info(f"[character]   CHALLENGE XP: +{xp} to {pillar} from '{ch.get('name', '?')}' ({domain})")
+
+            # Mark challenge as XP-consumed (prevent double-counting)
+            table.update_item(
+                Key={"pk": _ch_pk, "sk": ch["sk"]},
+                UpdateExpression="SET xp_consumed_at = :ts",
+                ExpressionAttributeValues={":ts": datetime.now(timezone.utc).isoformat()},
+            )
+
+        if challenge_bonus_xp:
+            # Recalculate total character XP with bonuses
+            record["character_xp"] = sum(
+                record.get(f"pillar_{p}", {}).get("xp_total", 0) for p in PILLAR_ORDER
+            )
+            record["challenge_bonus_xp"] = challenge_bonus_xp
+            logger.info(f"[character] Challenge bonus XP applied: {challenge_bonus_xp}")
+    except Exception as _ch_err:
+        logger.warning(f"[character] Challenge XP bonus failed (non-fatal): {_ch_err}")
+
     # ── Store (with DATA-2 validation — Item 3, R12) ──
     # validate_item before store_character_sheet, which adds pk/sk and Decimal-converts.
     # We validate a lightweight proxy item — only the fields the schema checks.
@@ -474,6 +527,7 @@ def lambda_handler(event, context):
                 "raw_score": float(record.get(f"pillar_{p}", {}).get("raw_score", 0)),
                 "tier":      record.get(f"pillar_{p}", {}).get("tier", "Foundation"),
                 "xp_delta":  float(record.get(f"pillar_{p}", {}).get("xp_delta", 0)),
+                "challenge_bonus_xp": float(record.get(f"pillar_{p}", {}).get("challenge_bonus_xp", 0)),
                 "trend":     "up" if float(record.get(f"pillar_{p}", {}).get("xp_delta", 0)) > 0 else "neutral",
             }
             for p in PILLAR_ORDER
@@ -531,6 +585,7 @@ def lambda_handler(event, context):
                 "next_tier":          "Momentum",
                 "next_tier_level":    21,
                 "started_date":       "2026-02-22",
+                "challenge_bonus_xp": {k: v for k, v in (record.get("challenge_bonus_xp") or {}).items()},
             },
             pillars=pillars_for_site,
             timeline=timeline_events,

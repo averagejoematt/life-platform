@@ -56,6 +56,7 @@
       ]},
       { heading: 'What I Tested', items: [
         { href: '/experiments/', text: 'Active Tests' },
+        { href: '/challenges/',  text: 'The Arena' },
         { href: '/discoveries/', text: 'Discoveries' },
       ]},
     ]},
@@ -207,6 +208,7 @@
         { href: '/protocols/', text: 'Protocols' },
         { href: '/supplements/', text: 'Supplements' },
         { href: '/experiments/', text: 'Active Tests' },
+        { href: '/challenges/', text: 'The Arena' },
         { href: '/discoveries/', text: 'Discoveries' },
       ]},
       { heading: 'Build', links: [
@@ -324,6 +326,7 @@
     { href: '/protocols/',   label: 'Protocols',    sub: 'strategy',     rel: 'contains' },
     { href: '/habits/',      label: 'Habits',       sub: 'daily actions',rel: '·' },
     { href: '/experiments/', label: 'Experiments',   sub: 'tests',        rel: '·' },
+    { href: '/challenges/',  label: 'The Arena',     sub: 'challenges',   rel: '·' },
     { href: '/discoveries/', label: 'Discoveries',  sub: 'evidence',     rel: '→' },
     { href: '/supplements/', label: 'Supplements',  sub: 'the stack',    rel: '·' },
     { href: '/achievements/',label: 'Milestones',   sub: 'outcomes',     rel: '·' },
@@ -334,6 +337,7 @@
     '/protocols/':    'Protocols are the <strong>strategy layer</strong>. Each one contains <a href="/habits/">daily habits</a> that execute it, and may spawn <a href="/experiments/">experiments</a> to test variations.',
     '/habits/':       'Habits are the <strong>daily execution layer</strong> of each <a href="/protocols/">protocol</a>. Sustained habits unlock <a href="/achievements/">milestones</a> and feed your <a href="/character/">character score</a>.',
     '/experiments/':  'Experiments are <strong>time-bounded tests</strong> of <a href="/protocols/">protocol</a> variations. Each has a hypothesis, defined duration, and produces data that becomes a <a href="/discoveries/">discovery</a>.',
+    '/challenges/':   'Challenges are <strong>action-oriented goals</strong> generated from journal patterns, data signals, and confirmed <a href="/experiments/">experiments</a>. Complete them to earn XP and level up your <a href="/character/">character</a>.',
     '/discoveries/':  'Discoveries are <strong>validated insights</strong> from completed <a href="/experiments/">experiments</a>. Confirmed findings feed back into <a href="/protocols/">protocols</a>.',
     '/supplements/':  'Supplements <strong>support the protocols</strong>. Each one has a rationale, evidence tier, and links to the <a href="/protocols/">protocol</a> it serves.',
     '/achievements/': 'Milestones are <strong>thresholds unlocked</strong> by sustained <a href="/habits/">habit</a> execution, <a href="/experiments/">experiment</a> completion, and <a href="/character/">character</a> growth. Computed from live data.',
