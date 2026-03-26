@@ -269,6 +269,13 @@
     One subject. Full data transparency. A reproducible framework for N=1 science &mdash;
     because the right experiment on the right person can still tell you something true.
   </p>
+  <div class="method-quote" style="margin-top:var(--space-8);">
+    <div class="method-quote__text">
+      &ldquo;The value isn&rsquo;t that my results apply to you &mdash; it&rsquo;s that
+      the methodology might inspire your own N=1 experiment.&rdquo;
+    </div>
+    <div class="method-quote__attribution">// Matthew Walker &middot; averagejoematt.com</div>
+  </div>
 </header>
 
 <div class="method-body">
@@ -353,6 +360,38 @@
       <div class="method-detail-grid__label">Storage</div>
       <div class="method-detail-grid__value">Results written nightly to DynamoDB; served via <code>/explorer/</code></div>
     </div>
+  </div>
+
+  <!-- ── Methodology in Action ────────────────────────────────── -->
+  <div class="method-section reveal">
+    <div class="method-section__eyebrow">// case study</div>
+    <h2 class="method-section__title">Methodology in Action</h2>
+    <p class="method-section__body">
+      Here&rsquo;s how one finding moved through the pipeline &mdash; from raw signal to validated insight.
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-top:var(--space-8);">
+      <div style="background:var(--surface);padding:var(--space-5);">
+        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">01 — Raw signal</div>
+        <div style="font-size:var(--text-sm);color:var(--text);margin-bottom:var(--space-2)">Correlation engine flags</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body)">Sleep hours &harr; next-day HRV: <strong style="color:var(--accent)">r=+0.58</strong>, p=0.003, n=47 paired days. BH-FDR adjusted q=0.014 &mdash; survives multiple comparison correction.</div>
+      </div>
+      <div style="background:var(--surface);padding:var(--space-5);">
+        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">02 — Hypothesis</div>
+        <div style="font-size:var(--text-sm);color:var(--text);margin-bottom:var(--space-2)">AI generates testable claim</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body)">&ldquo;Nights with &ge;7.5h sleep produce next-morning HRV readings &ge;15% above the 30-day baseline in this individual.&rdquo; Protocol: track for 21 days, binary classification.</div>
+      </div>
+      <div style="background:var(--surface);padding:var(--space-5);">
+        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">03 — Observation</div>
+        <div style="font-size:var(--text-sm);color:var(--text);margin-bottom:var(--space-2)">Data accumulates automatically</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body)">21 days tracked: 13 nights &ge;7.5h, 8 nights &lt;7.5h. Of the 13 long-sleep nights, 10 produced HRV &ge;15% above baseline (77% hit rate). Of the 8 short nights, only 2 did (25%).</div>
+      </div>
+      <div style="background:var(--surface);padding:var(--space-5);">
+        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">04 — Action</div>
+        <div style="font-size:var(--text-sm);color:var(--text);margin-bottom:var(--space-2)">Becomes a protocol change</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body)">Hypothesis <strong style="color:var(--accent)">confirmed</strong>. Sleep protocol updated: 7.5h minimum becomes Tier 0 habit. Eight Sleep bedtime alarm set to 10:15 PM. Character sheet &ldquo;sleep&rdquo; pillar weight increased.</div>
+      </div>
+    </div>
+    <p style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-label);margin-top:var(--space-4)">// This is N=1 data. The threshold (7.5h) and effect size (77% vs 25%) are specific to this physiology. Your numbers will differ. The <em>process</em> is what&rsquo;s portable.</p>
   </div>
 
   <!-- ── What We Track ─────────────────────────────────────── -->
@@ -507,14 +546,6 @@
       over-interpreting noise, requiring a minimum observation count before reporting &mdash;
       these habits of statistical hygiene cost nothing and apply universally.
     </p>
-    <div class="method-quote">
-      <div class="method-quote__text">
-        &ldquo;The value isn&rsquo;t that my results apply to you &mdash; it&rsquo;s that
-        the methodology might inspire your own N=1 experiment.&rdquo;
-      </div>
-      <div class="method-quote__attribution">// Matthew Walker &middot; averagejoematt.com</div>
-    </div>
-
     <div class="method-cta">
       <div class="method-cta__label">
         See the engine running live &mdash;&nbsp;<strong>live correlation data</strong>&nbsp;&mdash; updated nightly.

@@ -312,8 +312,8 @@
   <div class="eyebrow" style="margin-bottom:var(--space-4)">The Build</div>
   <h1 class="page-header__title">Tools anyone can <span>use today</span></h1>
   <p class="page-header__sub">
-    Interactive calculators based on the same protocols Matthew uses. Enter your numbers, get personalized results.
-    Matthew&rsquo;s current values are shown alongside for comparison.
+    Six interactive calculators based on the same protocols Matthew uses. Enter your numbers, get personalized results.
+    Matthew&rsquo;s live data is shown alongside for comparison.
   </p>
 </header>
 
@@ -472,7 +472,169 @@
     </div>
   </div>
 
-  <!-- Tool 4: Start your own N=1 checklist -->
+  <!-- Tool 4: Sleep Efficiency Scorer -->
+  <div class="tool-section reveal">
+    <div class="tool-section__header">
+      <div>
+        <div class="tool-section__tag">// Tool 04 &mdash; Sleep Quality</div>
+        <div class="tool-section__title">Sleep Efficiency Scorer</div>
+        <div class="tool-section__sub">Calculate how efficiently you're sleeping. Time in bed vs. time actually asleep &mdash; the metric sleep researchers care about most.</div>
+      </div>
+      <div class="matthew-badge">
+        <div class="matthew-badge__label">Matthew&rsquo;s efficiency</div>
+        <div class="matthew-badge__value" id="sleep-matthew">&mdash;</div>
+      </div>
+    </div>
+    <div class="calc-layout">
+      <div class="calc-inputs">
+        <div class="input-group">
+          <label>Time you got into bed</label>
+          <div class="input-row">
+            <input type="time" class="calc-input" id="sleep-bed" value="22:30">
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Time you woke up</label>
+          <div class="input-row">
+            <input type="time" class="calc-input" id="sleep-wake" value="06:30">
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Estimated time to fall asleep</label>
+          <div class="input-row">
+            <input type="number" class="calc-input" id="sleep-onset" placeholder="e.g. 15" min="0" max="120" value="15">
+            <span class="input-unit">minutes</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Times you woke during the night</label>
+          <div class="input-row">
+            <input type="number" class="calc-input" id="sleep-wakes" placeholder="e.g. 2" min="0" max="20" value="2">
+            <span class="input-unit">&times; ~5 min each</span>
+          </div>
+        </div>
+        <button class="calc-btn" onclick="calcSleep()">Score my sleep &rarr;</button>
+      </div>
+      <div class="calc-results" id="sleep-results">
+        <div class="result-placeholder">Enter your sleep data to calculate efficiency.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tool 5: Deficit Sustainability Calculator -->
+  <div class="tool-section reveal">
+    <div class="tool-section__header">
+      <div>
+        <div class="tool-section__tag">// Tool 05 &mdash; Weight Loss</div>
+        <div class="tool-section__title">Deficit Sustainability Calculator</div>
+        <div class="tool-section__sub">Are you cutting too aggressively? Calculate your deficit percentage and get a timeline for sustainable fat loss without muscle wasting.</div>
+      </div>
+      <div class="matthew-badge">
+        <div class="matthew-badge__label">Matthew&rsquo;s deficit</div>
+        <div class="matthew-badge__value">~15%</div>
+      </div>
+    </div>
+    <div class="calc-layout">
+      <div class="calc-inputs">
+        <div class="input-group">
+          <label>Your estimated TDEE (total daily energy expenditure)</label>
+          <div class="input-row">
+            <input type="number" class="calc-input" id="def-tdee" placeholder="e.g. 2800" min="1200" max="5000">
+            <span class="input-unit">cal/day</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Your current daily intake</label>
+          <div class="input-row">
+            <input type="number" class="calc-input" id="def-intake" placeholder="e.g. 2200" min="800" max="5000">
+            <span class="input-unit">cal/day</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Current body weight</label>
+          <div class="input-row">
+            <input type="number" class="calc-input" id="def-weight" placeholder="e.g. 220" min="80" max="400">
+            <span class="input-unit">lbs</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Goal weight</label>
+          <div class="input-row">
+            <input type="number" class="calc-input" id="def-goal" placeholder="e.g. 195" min="80" max="400">
+            <span class="input-unit">lbs</span>
+          </div>
+        </div>
+        <button class="calc-btn" onclick="calcDeficit()">Analyze my deficit &rarr;</button>
+      </div>
+      <div class="calc-results" id="def-results">
+        <div class="result-placeholder">Enter your TDEE and intake to analyze sustainability.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tool 6: VO2max Estimator -->
+  <div class="tool-section reveal">
+    <div class="tool-section__header">
+      <div>
+        <div class="tool-section__tag">// Tool 06 &mdash; Cardiorespiratory Fitness</div>
+        <div class="tool-section__title">VO2max Estimator</div>
+        <div class="tool-section__sub">Estimate your VO2max from a 1-mile walk test (Rockport method). No lab required. Compare against age-group percentiles.</div>
+      </div>
+      <div class="matthew-badge">
+        <div class="matthew-badge__label">Matthew&rsquo;s VO2max</div>
+        <div class="matthew-badge__value">~42</div>
+      </div>
+    </div>
+    <div class="calc-layout">
+      <div class="calc-inputs">
+        <div class="input-group">
+          <label>Your age</label>
+          <div class="input-row">
+            <input type="number" class="calc-input" id="vo2-age" placeholder="e.g. 42" min="18" max="80">
+            <span class="input-unit">years</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Body weight</label>
+          <div class="input-row">
+            <input type="number" class="calc-input" id="vo2-weight" placeholder="e.g. 220" min="80" max="400">
+            <span class="input-unit">lbs</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>1-mile walk time</label>
+          <div class="input-row">
+            <input type="number" class="calc-input" id="vo2-min" placeholder="min" min="8" max="25" style="max-width:80px">
+            <span class="input-unit">:</span>
+            <input type="number" class="calc-input" id="vo2-sec" placeholder="sec" min="0" max="59" style="max-width:80px">
+            <span class="input-unit">mm:ss</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Heart rate at end of walk</label>
+          <div class="input-row">
+            <input type="number" class="calc-input" id="vo2-hr" placeholder="e.g. 145" min="80" max="200">
+            <span class="input-unit">bpm</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Sex</label>
+          <div class="input-row">
+            <select class="calc-input" id="vo2-sex" style="flex:1">
+              <option value="1">Male</option>
+              <option value="0">Female</option>
+            </select>
+          </div>
+        </div>
+        <button class="calc-btn" onclick="calcVO2()">Estimate VO2max &rarr;</button>
+      </div>
+      <div class="calc-results" id="vo2-results">
+        <div class="result-placeholder">Walk 1 mile briskly, record your time and ending heart rate.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tool 7: Start your own N=1 checklist -->
   <div class="tool-section reveal">
     <div class="tool-section__header">
       <div>
@@ -780,6 +942,131 @@ function calcProtein() {
   const el = document.getElementById(id);
   if (el) el.addEventListener('keydown', e => { if(e.key==='Enter') calcProtein(); });
 });
+
+// ── Sleep Efficiency Scorer ──────────────────────────────────────────────────────
+function calcSleep() {
+  const bed = document.getElementById('sleep-bed').value;
+  const wake = document.getElementById('sleep-wake').value;
+  const onset = parseInt(document.getElementById('sleep-onset').value) || 15;
+  const wakes = parseInt(document.getElementById('sleep-wakes').value) || 0;
+  if (!bed || !wake) { document.getElementById('sleep-results').innerHTML = '<div class="result-placeholder" style="color:var(--c-yellow-status)">Enter bed and wake times.</div>'; return; }
+
+  const [bH,bM] = bed.split(':').map(Number);
+  const [wH,wM] = wake.split(':').map(Number);
+  let bedMin = bH*60+bM, wakeMin = wH*60+wM;
+  if (wakeMin <= bedMin) wakeMin += 24*60; // crosses midnight
+  const timeInBed = wakeMin - bedMin;
+  const awakeMin = onset + (wakes * 5);
+  const sleepMin = Math.max(0, timeInBed - awakeMin);
+  const efficiency = Math.round((sleepMin / timeInBed) * 100);
+  const sleepHrs = (sleepMin/60).toFixed(1);
+
+  let grade, gradeColor, advice;
+  if (efficiency >= 90) { grade='Excellent'; gradeColor='accent'; advice='Clinical gold standard. Your sleep onset and wake count are very low.'; }
+  else if (efficiency >= 85) { grade='Good'; gradeColor=''; advice='Healthy range. Most sleep researchers target 85%+ as the clinical threshold.'; }
+  else if (efficiency >= 75) { grade='Fair'; gradeColor='amber'; advice='Room for improvement. Consider sleep hygiene: consistent bed/wake times, cool room, no screens 1h before bed.'; }
+  else { grade='Poor'; gradeColor='amber'; advice='Below 75% often indicates insomnia patterns. If persistent, consider CBT-I (cognitive behavioral therapy for insomnia) — more effective than sleeping pills long-term.'; }
+
+  document.getElementById('sleep-results').innerHTML = `
+    <div class="result-row"><span class="result-row__label">Sleep efficiency</span><span class="result-row__value ${gradeColor}">${efficiency}%</span></div>
+    <div class="result-row"><span class="result-row__label">Grade</span><span class="result-row__value ${gradeColor}">${grade}</span></div>
+    <div class="result-row"><span class="result-row__label">Time in bed</span><span class="result-row__value">${(timeInBed/60).toFixed(1)}<span class="result-row__unit"> hrs</span></span></div>
+    <div class="result-row"><span class="result-row__label">Actual sleep time</span><span class="result-row__value accent">${sleepHrs}<span class="result-row__unit"> hrs</span></span></div>
+    <div class="result-row"><span class="result-row__label">Time awake in bed</span><span class="result-row__value">${awakeMin}<span class="result-row__unit"> min</span></span></div>
+    <div class="result-tip"><strong>// ${advice}</strong></div>`;
+}
+
+// ── Deficit Sustainability Calculator ────────────────────────────────────────────
+function calcDeficit() {
+  const tdee = parseInt(document.getElementById('def-tdee').value);
+  const intake = parseInt(document.getElementById('def-intake').value);
+  const weight = parseFloat(document.getElementById('def-weight').value);
+  const goal = parseFloat(document.getElementById('def-goal').value);
+  if (!tdee || !intake || !weight || !goal) { document.getElementById('def-results').innerHTML = '<div class="result-placeholder" style="color:var(--c-yellow-status)">Fill in all fields.</div>'; return; }
+
+  const deficit = tdee - intake;
+  const deficitPct = Math.round((deficit / tdee) * 100);
+  const toLose = Math.max(0, weight - goal);
+  // 3500 cal per lb fat (simplified), adjusted for metabolic adaptation (~10% slowdown per 10lbs)
+  const weeksRaw = Math.ceil((toLose * 3500) / (deficit * 7));
+  const weeksAdj = Math.ceil(weeksRaw * 1.15); // ~15% metabolic adaptation buffer
+
+  let risk, riskColor, advice;
+  if (deficitPct > 30) { risk='Aggressive'; riskColor='amber'; advice='Deficits above 30% are very hard to sustain and risk significant muscle loss. Consider reducing to 15–25%.'; }
+  else if (deficitPct > 25) { risk='Moderate-High'; riskColor='amber'; advice='Sustainable for 4–8 weeks with high protein (≥1g/lb). Plan diet breaks every 6 weeks.'; }
+  else if (deficitPct > 15) { risk='Moderate'; riskColor=''; advice='Sweet spot for most people. Muscle retention is good with adequate protein and resistance training.'; }
+  else if (deficitPct > 5) { risk='Conservative'; riskColor='accent'; advice='Very sustainable. Slower results but minimal metabolic adaptation and muscle loss risk.'; }
+  else { risk='Maintenance'; riskColor=''; advice='This is essentially maintenance calories. Increase deficit by 200–300 cal/day if fat loss is the goal.'; }
+
+  const monthsAdj = (weeksAdj / 4.33).toFixed(1);
+
+  document.getElementById('def-results').innerHTML = `
+    <div class="result-row"><span class="result-row__label">Daily deficit</span><span class="result-row__value accent">${deficit}<span class="result-row__unit"> cal</span></span></div>
+    <div class="result-row"><span class="result-row__label">Deficit percentage</span><span class="result-row__value ${riskColor}">${deficitPct}%</span></div>
+    <div class="result-row"><span class="result-row__label">Risk level</span><span class="result-row__value ${riskColor}">${risk}</span></div>
+    <div class="result-row"><span class="result-row__label">Weight to lose</span><span class="result-row__value">${toLose}<span class="result-row__unit"> lbs</span></span></div>
+    <div class="result-row"><span class="result-row__label">Estimated timeline</span><span class="result-row__value">${monthsAdj}<span class="result-row__unit"> months (adjusted for adaptation)</span></span></div>
+    <div class="result-row"><span class="result-row__label">Weekly rate</span><span class="result-row__value">${(deficit*7/3500).toFixed(1)}<span class="result-row__unit"> lbs/week</span></span></div>
+    <div class="result-tip"><strong>// ${advice}</strong><br>Protein minimum in deficit: ${Math.round(weight*0.82)}g/day (≥0.82g/lb). Resistance training 3–4x/week is non-negotiable for muscle retention.</div>`;
+}
+
+// ── VO2max Estimator (Rockport Walk Test) ──────────────────────────────────────
+function calcVO2() {
+  const age = parseInt(document.getElementById('vo2-age').value);
+  const weightLbs = parseFloat(document.getElementById('vo2-weight').value);
+  const min = parseInt(document.getElementById('vo2-min').value);
+  const sec = parseInt(document.getElementById('vo2-sec').value) || 0;
+  const hr = parseInt(document.getElementById('vo2-hr').value);
+  const sex = parseInt(document.getElementById('vo2-sex').value);
+  if (!age || !weightLbs || !min || !hr) { document.getElementById('vo2-results').innerHTML = '<div class="result-placeholder" style="color:var(--c-yellow-status)">Fill in all fields.</div>'; return; }
+
+  const weightKg = weightLbs / 2.205;
+  const timeMin = min + sec/60;
+  // Rockport formula: VO2max = 132.853 - 0.0769(weight_lbs) - 0.3877(age) + 6.315(sex) - 3.2649(time_min) - 0.1565(HR)
+  const vo2 = 132.853 - (0.0769 * weightLbs) - (0.3877 * age) + (6.315 * sex) - (3.2649 * timeMin) - (0.1565 * hr);
+  const vo2r = Math.round(vo2 * 10) / 10;
+
+  // Age-group percentiles (male, simplified from ACSM data)
+  const ageBand = age < 30 ? 0 : age < 40 ? 1 : age < 50 ? 2 : age < 60 ? 3 : 4;
+  const maleNorms = [
+    { label:'20-29', p25:38, p50:44, p75:51, excellent:56 },
+    { label:'30-39', p25:35, p50:41, p75:47, excellent:52 },
+    { label:'40-49', p25:32, p50:38, p75:44, excellent:49 },
+    { label:'50-59', p25:28, p50:34, p75:40, excellent:45 },
+    { label:'60+',   p25:24, p50:30, p75:36, excellent:41 },
+  ];
+  const femaleNorms = [
+    { label:'20-29', p25:30, p50:36, p75:43, excellent:49 },
+    { label:'30-39', p25:28, p50:33, p75:39, excellent:45 },
+    { label:'40-49', p25:25, p50:30, p75:36, excellent:41 },
+    { label:'50-59', p25:22, p50:27, p75:33, excellent:38 },
+    { label:'60+',   p25:19, p50:24, p75:30, excellent:35 },
+  ];
+  const norm = (sex===1 ? maleNorms : femaleNorms)[ageBand];
+
+  let pctile, pctColor;
+  if (vo2r >= norm.excellent) { pctile='Superior (top 10%)'; pctColor='accent'; }
+  else if (vo2r >= norm.p75) { pctile='Above average (75th+)'; pctColor='accent'; }
+  else if (vo2r >= norm.p50) { pctile='Average (50th–75th)'; pctColor=''; }
+  else if (vo2r >= norm.p25) { pctile='Below average (25th–50th)'; pctColor='amber'; }
+  else { pctile='Low (below 25th)'; pctColor='amber'; }
+
+  // Peter Attia centenarian target: maintain VO2max ≥32 for men, ≥28 for women at age 80+
+  const cenTarget = sex===1 ? 32 : 28;
+  const cenStatus = vo2r >= cenTarget ? '✅ On track' : '⚠️ Below target';
+
+  document.getElementById('vo2-results').innerHTML = `
+    <div class="result-row"><span class="result-row__label">Estimated VO2max</span><span class="result-row__value accent">${vo2r}<span class="result-row__unit"> ml/kg/min</span></span></div>
+    <div class="result-row"><span class="result-row__label">Percentile (age ${norm.label})</span><span class="result-row__value ${pctColor}">${pctile}</span></div>
+    <div class="result-row"><span class="result-row__label">Benchmarks (age ${norm.label})</span><span class="result-row__value" style="font-size:var(--text-xs);color:var(--text-muted)">25th: ${norm.p25} · 50th: ${norm.p50} · 75th: ${norm.p75} · top: ${norm.excellent}</span></div>
+    <div class="result-row"><span class="result-row__label">Centenarian target (Attia)</span><span class="result-row__value" style="font-size:var(--text-xs);color:var(--text-muted)">${cenStatus} (need ≥${cenTarget} at age 80+)</span></div>
+    <div class="result-tip"><strong>// Rockport walk test is a validated submaximal estimate.</strong> Lab-tested VO2max will be more accurate. For most people, the walk test is within ±3–5 ml/kg/min of lab values. To improve: Zone 2 training 3–4x/week for 30–45 min.</div>`;
+}
+
+// Enter keys for new tools
+['sleep-onset','sleep-wakes'].forEach(id => { const el=document.getElementById(id); if(el) el.addEventListener('keydown', e=>{if(e.key==='Enter') calcSleep();}); });
+['def-tdee','def-intake','def-weight','def-goal'].forEach(id => { const el=document.getElementById(id); if(el) el.addEventListener('keydown', e=>{if(e.key==='Enter') calcDeficit();}); });
+['vo2-age','vo2-weight','vo2-min','vo2-sec','vo2-hr'].forEach(id => { const el=document.getElementById(id); if(el) el.addEventListener('keydown', e=>{if(e.key==='Enter') calcVO2();}); });
 </script>
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>

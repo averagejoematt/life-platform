@@ -823,117 +823,41 @@
   <span class="zone-divider__sub">every page · every data stream · every tool</span>
 </div>
 
-<!-- Feature hub -->
-<section class="hub-section reveal">
-  <div class="eyebrow" style="margin-bottom:var(--space-6)">Everything on this site</div>
-  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-10)">All platform surfaces</h2>
-
-  <div class="hub-category">
-    <div class="hub-category__label">The Build</div>
-    <div class="hub-grid">
-      <a href="/intelligence/" class="hub-card">
-        <div class="hub-card__icon">🤖</div>
-        <div class="hub-card__title">INTELLIGENCE</div>
-        <div class="hub-card__desc">Daily AI coaching brief. What Claude reads, predicts, and recommends from 19 sources.</div>
-      </a>
-      <a href="/cost/" class="hub-card">
-        <div class="hub-card__icon">💰</div>
-        <div class="hub-card__title">COST</div>
-        <div class="hub-card__desc">Full AWS bill breakdown. $13/month AI health OS — every line item.</div>
-      </a>
-      <a href="/methodology/" class="hub-card">
-        <div class="hub-card__icon">📏</div>
-        <div class="hub-card__title">METHODOLOGY</div>
-        <div class="hub-card__desc">How the scoring works. Statistics, FDR correction, character sheet scoring rules.</div>
-      </a>
-      <a href="/tools/" class="hub-card">
-        <div class="hub-card__icon">🔧</div>
-        <div class="hub-card__title">TOOLS</div>
-        <div class="hub-card__desc">Every device, app, and service in the stack with integration method.</div>
-      </a>
-      <a href="/board/" class="hub-card">
-        <div class="hub-card__icon">🎯</div>
-        <div class="hub-card__title">BOARD</div>
-        <div class="hub-card__desc">AI advisory board. 6 expert personas reviewing architecture and decisions.</div>
-      </a>
-      <a href="/ask/" class="hub-card">
-        <div class="hub-card__icon">💬</div>
-        <div class="hub-card__title">ASK</div>
-        <div class="hub-card__desc">Natural language queries against live health data. Subscribers get full access.</div>
-      </a>
-    </div>
-  </div>
-
-  <div class="hub-category">
-    <div class="hub-category__label">The Data</div>
-    <div class="hub-grid">
-      <a href="/habits/" class="hub-card">
-        <div class="hub-card__icon">📊</div>
-        <div class="hub-card__title">HABITS</div>
-        <div class="hub-card__desc">52-week heatmap. Every habit tracked daily.</div>
-      </a>
-      <a href="/character/" class="hub-card">
-        <div class="hub-card__icon">🧙</div>
-        <div class="hub-card__title">CHARACTER</div>
-        <div class="hub-card__desc">7-pillar RPG scoring system. Sleep, movement, nutrition, and more.</div>
-      </a>
-      <a href="/benchmarks/" class="hub-card">
-        <div class="hub-card__icon">📐</div>
-        <div class="hub-card__title">BENCHMARKS</div>
-        <div class="hub-card__desc">Current numbers vs. population norms and centenarian targets.</div>
-      </a>
-      <a href="/discoveries/" class="hub-card">
-        <div class="hub-card__icon">🔬</div>
-        <div class="hub-card__title">DISCOVERIES</div>
-        <div class="hub-card__desc">What the AI found. Correlations and patterns surfaced from longitudinal data.</div>
-      </a>
-      <a href="/explorer/" class="hub-card">
-        <div class="hub-card__icon">🔭</div>
-        <div class="hub-card__title">EXPLORER</div>
-        <div class="hub-card__desc">23 cross-source correlations. FDR-corrected. What predicts what.</div>
-      </a>
-      <a href="/experiments/" class="hub-card">
-        <div class="hub-card__icon">⚗️</div>
-        <div class="hub-card__title">EXPERIMENTS</div>
-        <div class="hub-card__desc">N=1 self-experiments with data. Hypothesis → protocol → result.</div>
-      </a>
-      <a href="/glucose/" class="hub-card">
-        <div class="hub-card__icon">🩸</div>
-        <div class="hub-card__title">GLUCOSE</div>
-        <div class="hub-card__desc">30-day CGM data. Time-in-range, variability, metabolic patterns.</div>
-      </a>
-      <a href="/sleep/" class="hub-card">
-        <div class="hub-card__icon">🌙</div>
-        <div class="hub-card__title">SLEEP</div>
-        <div class="hub-card__desc">Eight Sleep × Whoop cross-referenced. Bed temp vs. sleep quality.</div>
-      </a>
-    </div>
-  </div>
-
-  <div class="hub-category" style="margin-bottom:0;">
-    <div class="hub-category__label">The Live Feed</div>
-    <div class="hub-grid">
-      <a href="/live/" class="hub-card">
-        <div class="hub-card__icon">📡</div>
-        <div class="hub-card__title">LIVE</div>
-        <div class="hub-card__desc">Real-time snapshot and long-arc trend lines across all 19 sources.</div>
-      </a>
-      <a href="/chronicle/" class="hub-card">
-        <div class="hub-card__icon">📝</div>
-        <div class="hub-card__title">CHRONICLE</div>
-        <div class="hub-card__desc">Weekly chronicles from 19 data sources. Every number, every week.</div>
-      </a>
-      <a href="/week/" class="hub-card">
-        <div class="hub-card__icon">📅</div>
-        <div class="hub-card__title">THIS WEEK</div>
-        <div class="hub-card__desc">Current week's data snapshot across all tracked metrics.</div>
-      </a>
-      <a href="/accountability/" class="hub-card">
-        <div class="hub-card__icon">👥</div>
-        <div class="hub-card__title">ACCOUNTABILITY</div>
-        <div class="hub-card__desc">Public commitments. Tracked, verified, and reported by the platform.</div>
-      </a>
-    </div>
+<!-- Explore deeper CTA (replaces hub grid) -->
+<section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);text-align:center;">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">Go deeper</div>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-6)">Explore the Build</h2>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);max-width:800px;margin:0 auto;">
+    <a href="/intelligence/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:24px;margin-bottom:var(--space-2)">🤖</div>
+      <div style="font-family:var(--font-display);font-size:15px;color:var(--text);margin-bottom:var(--space-1)">The AI</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint)">14 systems running daily</div>
+    </a>
+    <a href="/cost/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-family:var(--font-display);font-size:36px;color:var(--accent);line-height:1;margin-bottom:var(--space-2)">$13</div>
+      <div style="font-family:var(--font-display);font-size:15px;color:var(--text);margin-bottom:var(--space-1)">The Cost</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint)">Every line item, explained</div>
+    </a>
+    <a href="/board/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:24px;margin-bottom:var(--space-2)">🎯</div>
+      <div style="font-family:var(--font-display);font-size:15px;color:var(--text);margin-bottom:var(--space-1)">Ask the Board</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint)">6 AI advisors, one question</div>
+    </a>
+    <a href="/methodology/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:24px;margin-bottom:var(--space-2)">📏</div>
+      <div style="font-family:var(--font-display);font-size:15px;color:var(--text);margin-bottom:var(--space-1)">Methodology</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint)">N=1 science, FDR correction</div>
+    </a>
+    <a href="/tools/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:24px;margin-bottom:var(--space-2)">🔧</div>
+      <div style="font-family:var(--font-display);font-size:15px;color:var(--text);margin-bottom:var(--space-1)">Free Tools</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint)">Zone 2, HRV, protein calculators</div>
+    </a>
+    <a href="/ask/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+      <div style="font-size:24px;margin-bottom:var(--space-2)">💬</div>
+      <div style="font-family:var(--font-display);font-size:15px;color:var(--text);margin-bottom:var(--space-1)">Ask the Data</div>
+      <div style="font-size:var(--text-2xs);color:var(--text-faint)">Natural language queries</div>
+    </a>
   </div>
 </section>
 
