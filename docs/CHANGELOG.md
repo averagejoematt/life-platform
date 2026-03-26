@@ -1,3 +1,51 @@
+## v3.9.32 — 2026-03-26: Sessions 3+4 — Chronicle/Subscribe + About/Builders/Throughline
+
+### Summary
+Completed Sessions 3 and 4 of the WR4 implementation plan (23 of 25 tasks). All pre-launch blockers cleared. Last remaining blocker (/chronicle/sample/) shipped. Elena Voss bio page created. Subscribe funnel unified to "The Weekly Signal." About page softened. Builders page extended with GitHub rationale. Throughline connectors added across 5 pages. Experiments and discoveries get honest empty states.
+
+### What Shipped
+
+**Session 3 — Chronicle + Subscribe Funnel (tasks 3.1–3.10)**
+- 🔴 FINAL BLOCKER CLEARED: `/chronicle/sample/` page — email preview mock with data grid, chronicle excerpt, board commentary, and "what you get" breakdown
+- Chronicle numbering explainer added below series intro cards
+- Elena Voss bio page created (`site/elena/index.html`) — editorial prose, 3 rules, technical details
+- Chronicle "About the reporter" link → `/elena/` (was `/about/`)
+- Subscribe naming unified to "The Weekly Signal" (title, eyebrow, button)
+- Subscribe page updated with sample link + "Week 1 ships after April 1"
+- Contextual CTA messaging: 5 variants by page context in `components.js`
+- Sticky subscribe bar toned down: 60-second delay before showing
+- Per-article OG meta tags verified (already existed on all 4 articles)
+
+**Session 4 — About + Builders + Experiments + Throughline (tasks 4.1–4.15)**
+- About page press/speaking softened: "I'd love to talk about this" + "First interviews welcome" + honest framing
+- "Why not Apple Health?" callout added to about page
+- Builders page: GitHub rationale section ("Why the Repo Is Private") with alternative links
+- Experiments: "Experiments begin on Day 1" empty state
+- Discoveries: "Discoveries populate over time" empty state with 4-6 week signal timeline
+- Homepage about section: Story link added before Chronicle
+- Chronicle → Data throughline: Explorer + Pulse links
+- Live/Pulse → Story throughline: callout bar
+- Platform → Chronicle throughline: callout bar
+- Deferred to post-launch: 4.6 ("How I built this" walkthrough), 4.15 (data page journey callouts)
+
+### Files Created
+- `site/elena/index.html` — Elena Voss bio/byline page
+- `site/chronicle/sample/index.html` — Newsletter sample issue page
+
+### Files Modified
+- `site/chronicle/index.html` — Numbering explainer, reporter link, data throughline
+- `site/subscribe/index.html` — Title, eyebrow, button, sample link
+- `site/index.html` — Sticky bar 60s delay, about section story link
+- `site/assets/js/components.js` — Contextual CTA messaging
+- `site/about/index.html` — Press tone, Apple Health callout
+- `site/builders/index.html` — GitHub rationale section
+- `site/experiments/index.html` — Empty state
+- `site/discoveries/index.html` — Empty state
+- `site/platform/index.html` — Chronicle throughline
+- `site/live/index.html` — Story throughline
+
+---
+
 ## v3.9.31 — 2026-03-26: Website Review #4 + Story Page + Homepage Overhaul
 
 ### Summary
