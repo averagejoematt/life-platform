@@ -145,27 +145,13 @@
     .chapter-body strong { color: var(--text); font-weight: 600; }
     .chapter-body em { color: var(--text); font-style: italic; }
 
-    /* Placeholder blocks — Matthew fills these in */
+    /* Placeholder blocks — hidden until Matthew writes content */
     .placeholder {
-      background: rgba(0, 229, 160, 0.04);
-      border: 1px dashed var(--border-strong);
-      padding: var(--space-6) var(--space-8);
-      font-family: var(--font-mono);
-      font-size: var(--text-sm);
-      color: var(--accent-dim);
-      line-height: var(--lh-body);
-      border-radius: 0;
+      display: none;
     }
-    .placeholder__tag {
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: var(--space-2);
-    }
+    .placeholder__tag,
     .placeholder__prompt {
-      color: var(--text-muted);
-      font-style: italic;
+      display: none;
     }
 
     /* ── Pull quote ── */
@@ -490,8 +476,8 @@
 <!-- Story body -->
 <div class="story-body">
 
-  <!-- Chapter 1 -->
-  <div class="story-chapter">
+  <!-- Chapter 1 — hidden until written -->
+  <div class="story-chapter" style="display:none">
     <p class="chapter-num">Chapter 01</p>
     <h2 class="chapter-title">The Moment</h2>
     <div class="chapter-body">
@@ -584,8 +570,8 @@
     </div>
   </div>
 
-  <!-- Chapter 4 -->
-  <div class="story-chapter">
+  <!-- Chapter 4 — hidden until written -->
+  <div class="story-chapter" style="display:none">
     <p class="chapter-num">Chapter 04</p>
     <h2 class="chapter-title">What the Data Has Shown</h2>
     <div class="chapter-body">
@@ -607,7 +593,7 @@
     </div>
   </div>
 
-  <!-- Chapter 5 -->
+  <!-- Chapter 5 — placeholder hidden, Elena paragraph visible -->
   <div class="story-chapter">
     <p class="chapter-num">Chapter 05</p>
     <h2 class="chapter-title">Why Public</h2>

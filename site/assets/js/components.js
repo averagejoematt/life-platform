@@ -242,7 +242,7 @@
 
     html += '</div>';
     html += '<div class="footer-v2__bottom">';
-    html += '<span class="footer-v2__brand">AMJ</span>';
+    html += '<span class="footer-v2__brand">AJM</span>';
     html += '<span class="footer-v2__copy">// updated daily by life-platform</span>';
     html += '</div></footer>';
 
