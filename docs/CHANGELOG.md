@@ -1,3 +1,52 @@
+## v3.9.22 — 2026-03-25: Discoveries page evolution — DISC-1/DISC-2 + critical API fix
+
+### Summary
+Product Board convened to review the Discoveries page (`/discoveries/`). Full 8-persona review produced a 12-task, 3-tier evolution spec (`docs/DISCOVERIES_EVOLUTION_SPEC.md`). Session 1 shipped DISC-1 (dynamic counterintuitive section), DISC-2 (confidence threshold on featured card), DISC-4 (mobile column fix), DISC-5 (strengthened disclaimer + analysis window dates), plus a critical bug fix: the site API was reading `record.get("pairs")` but the compute Lambda stores data as a `correlations` dict — the page was likely showing the empty state even when data existed.
+
+### Changes
+
+**lambdas/weekly_correlation_compute_lambda.py**
+- DISC-1: Added `EXPECTED_DIRECTIONS` map (23 pairs with domain-knowledge expected direction)
+- DISC-1: Added `counterintuitive` and `expected_direction` fields to each correlation result (flags when observed direction differs from expected AND |r| >= 0.2)
+- Enhanced logging: counterintuitive pairs flagged with `** COUNTERINTUITIVE` in CloudWatch
+- Fix: `_dec_correlations()` now handles `bool` before `int` check (Python `bool` is subclass of `int`, `Decimal("False")` crashes)
+
+**lambdas/site_api_lambda.py** — `handle_correlations()`
+- **Critical fix**: Now reads `record.get("correlations", {})` instead of `record.get("pairs", [])` — handles both dict (current compute format) and list (legacy) formats
+- Added `_METRIC_META` lookup table: maps raw metric names to human-readable labels and source names (e.g. `hrv` → "Heart Rate Variability" / "Whoop")
+- DISC-1: Surfaces `counterintuitive` and `expected_direction` fields in public response
+- DISC-5: Surfaces `start_date` and `end_date` in standard response (already stored in DDB, now exposed)
+- Field mapping fixes: `pearson_r`→`r`, `n_days`→`n`, `interpretation`→`strength` with fallbacks for both formats
+
+**site/discoveries/index.html**
+- DISC-1: Replaced 3 hardcoded counterintuitive `ci-card` elements with dynamic JS rendering from API data. Shows "no counterintuitive findings" empty state when all pairs match expected directions
+- DISC-2: Featured card now filters for significant pairs only (FDR-significant OR p<0.05 with |r|>=0.3). Shows "No strong signal this week" card when no pairs qualify
+- DISC-4: Mobile CSS now hides `.td-strength` column (n/strength) instead of `.td-stat` (variable names) — keeps the more important data visible on small screens
+- DISC-5: N=1 disclaimer strengthened with: "These findings have not been externally validated and should not be used to make medical decisions."
+- DISC-5: Analysis window dates (`start_date → end_date`) appended to the "last updated" note below stats strip
+
+**docs/DISCOVERIES_EVOLUTION_SPEC.md** — NEW
+- Full Product Board review output: 12 tasks across 3 tiers
+- Tier 1 (fix what's broken): DISC-1 through DISC-5
+- Tier 2 (make it a destination): DISC-6 through DISC-8 (timeline, behavioral response, bidirectional links)
+- Tier 3 (growth engine): DISC-9 through DISC-12 (SEO, email CTA, auto-chronicle, share cards)
+- Implementation order, data model changes, validation checklist
+
+### Deployed
+- `weekly-correlation-compute` Lambda deployed (v2)
+- `life-platform-site-api` Lambda deployed
+- `site/discoveries/index.html` synced to S3
+- CloudFront invalidated: `/discoveries/*`, `/api/correlations*`
+- Force-recomputed W13 correlations: 23 pairs, 5 FDR-significant, 1 counterintuitive, 88 days analyzed
+
+### Validation
+- API returns 23 pairs with human-readable labels and source names
+- 1 counterintuitive finding detected: Steps → Sleep Score (expected positive, observed r=-0.271)
+- Top pair: HRV → Recovery Score r=0.861 (Whoop × Whoop)
+- 5 FDR-significant findings available for featured card
+
+---
+
 ## v3.9.21 — 2026-03-25: Accountability page evolution — Product Board Review #4
 
 ### Summary

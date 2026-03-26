@@ -402,6 +402,36 @@ CORRELATION_PAIRS = [
 ]
 
 
+# DISC-1: Domain knowledge — expected direction for each pair.
+# When observed direction differs from expected AND |r| >= 0.2, the finding
+# is flagged as counterintuitive for the public Discoveries page.
+EXPECTED_DIRECTIONS = {
+    "hrv_vs_recovery":                  "positive",   # higher HRV → better recovery
+    "sleep_duration_vs_recovery":       "positive",   # more sleep → better recovery
+    "sleep_score_vs_recovery":          "positive",   # better sleep → better recovery
+    "hrv_vs_sleep_score":               "positive",   # higher HRV → better sleep
+    "rhr_vs_recovery":                  "negative",   # lower RHR → better recovery
+    "tsb_vs_recovery":                  "positive",   # positive TSB → better recovery
+    "strain_vs_hrv":                    "negative",   # more strain → lower HRV (same day)
+    "training_load_vs_hrv":             "negative",   # more training → lower HRV
+    "training_mins_vs_recovery":        "negative",   # more training → lower recovery (same day)
+    "protein_vs_recovery":              "positive",   # more protein → better recovery
+    "calories_vs_hrv":                  "positive",   # adequate calories → higher HRV
+    "carbs_vs_hrv":                     "positive",   # adequate carbs → higher HRV
+    "steps_vs_recovery":                "positive",   # more steps → better recovery
+    "steps_vs_hrv":                     "positive",   # more steps → higher HRV
+    "steps_vs_sleep":                   "positive",   # more steps → better sleep
+    "habit_pct_vs_day_grade":           "positive",   # better habits → better day
+    "habit_pct_vs_recovery":            "positive",   # better habits → better recovery
+    "tier0_streak_vs_day_grade":        "positive",   # longer streak → better day
+    "calories_vs_day_grade":            "positive",   # adequate calories → better day
+    "readiness_vs_day_grade":           "positive",   # higher readiness → better day
+    "hrv_predicts_next_day_load":       "positive",   # higher HRV → more training next day
+    "recovery_predicts_next_day_load":  "positive",   # better recovery → more training next day
+    "load_predicts_next_day_recovery":  "negative",   # more load → lower recovery next day
+}
+
+
 def compute_correlations(series):
     """Compute all pairs from the daily series dict.
 
@@ -457,8 +487,21 @@ def compute_correlations(series):
             "correlation_type": correlation_type,   # Henning R12: cross_sectional vs lagged
             "lag_days":        lag_days if lag_days > 0 else None,
         }
+        # DISC-1: Flag counterintuitive findings where observed direction
+        # differs from domain-knowledge expected direction.
+        expected = EXPECTED_DIRECTIONS.get(label)
+        observed = results[label].get("direction")
+        results[label]["expected_direction"] = expected
+        results[label]["counterintuitive"] = (
+            expected is not None
+            and observed is not None
+            and expected != observed
+            and abs(r or 0) >= 0.2  # only flag if signal is meaningful
+        )
+
         if r is not None:
-            logger.info("  %-45s r=%.3f (n=%d, %s, %s)", label, r, n, interpret_r(r, n), correlation_type)
+            ci_flag = " ** COUNTERINTUITIVE" if results[label]["counterintuitive"] else ""
+            logger.info("  %-45s r=%.3f (n=%d, %s, %s)%s", label, r, n, interpret_r(r, n), correlation_type, ci_flag)
 
     # R13-F15: Apply Benjamini-Hochberg FDR correction across all m=23 pairs.
     # With 23 simultaneous tests at alpha=0.05, naive thresholding yields ~1.15
@@ -484,7 +527,9 @@ def store_correlations(week_key, correlations, start_date, end_date, computed_at
         for label, data in corr_dict.items():
             result[label] = {}
             for k, v in data.items():
-                if isinstance(v, float):
+                if isinstance(v, bool):
+                    result[label][k] = v  # bool before int (bool is subclass of int)
+                elif isinstance(v, float):
                     result[label][k] = _to_dec(v) or Decimal("0")
                 elif isinstance(v, int):
                     result[label][k] = Decimal(str(v))
