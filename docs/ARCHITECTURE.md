@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-26 (v3.9.27 — 98 tools, 31-module MCP package, 19 data sources, 51 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed)
+Last updated: 2026-03-26 (v3.9.28 — 103 tools, 32-module MCP package, 19 data sources, 52 Lambdas, 9 secrets, 49 alarms, 8 CDK stacks deployed)
 
 ---
 
@@ -282,7 +282,7 @@ Target: under $25/month | Current: ~$13/month
 ~/Documents/Claude/life-platform/
   mcp_server.py                   ← MCP Lambda entry point
   mcp_bridge.py                   ← Local MCP adapter (Claude Desktop → Lambda HTTPS)
-  mcp/                            ← MCP server package (31 modules)
+  mcp/                            ← MCP server package (32 modules)
     handler.py, config.py, utils.py, core.py, helpers.py, warmer.py
     labs_helpers.py, strength_helpers.py, registry.py
     tools_sleep, tools_health, tools_training, tools_nutrition, tools_habits

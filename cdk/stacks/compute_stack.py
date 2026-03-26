@@ -5,15 +5,16 @@ v2.0 (v3.4.0): CDK-managed IAM roles replace existing_role_arn references.
   All 7 Lambdas now have dedicated CDK-owned roles with least-privilege policies.
   DLQ managed normally for all Lambdas (no more shared-role SQS workaround).
 
-Lambdas (7):
+Lambdas (8+):
   anomaly-detector          cron(5 15 * * ? *)    — 8:05 AM PT daily
   character-sheet-compute   cron(35 17 * * ? *)   — 9:35 AM PT daily
   daily-metrics-compute     cron(40 17 * * ? *)   — 9:40 AM PT daily
   daily-insight-compute     cron(45 17 * * ? *)   — 9:45 AM PT daily
   adaptive-mode-compute     cron(50 17 * * ? *)   — 9:50 AM PT daily
-  hypothesis-engine         cron(0 19 ? * SUN *)  — Sunday 11:00 AM PT
+  hypothesis-engine         cron(0 19 ? * SUN *)  — Sunday 12:00 PM PT
   weekly-correlation-compute cron(30 18 ? * SUN *) — Sunday 11:30 AM PT
   dashboard-refresh         cron(0 21 * * ? *)    — 2:00 PM PDT + 6:00 PM PDT
+  challenge-generator       cron(0 22 ? * SUN *)  — Sunday 3:00 PM PT
 """
 
 import aws_cdk as cdk
@@ -209,5 +210,23 @@ class ComputeStack(Stack):
                 "AI_MODEL_HAIKU": AI_MODEL_HAIKU,
             },
             custom_policies=rp.compute_failure_pattern(),
+            **shared,
+        )
+
+        # ══════════════════════════════════════════════════════════════
+        # Challenge Generator — AI-powered weekly challenge pipeline
+        # Runs Sunday 3 PM PT (after hypothesis engine + weekly correlations)
+        # ══════════════════════════════════════════════════════════════
+        create_platform_lambda(
+            self, "ChallengeGenerator",
+            function_name="challenge-generator",
+            handler="challenge_generator_lambda.lambda_handler",
+            source_file="lambdas/challenge_generator_lambda.py",
+            schedule="cron(0 22 ? * SUN *)",  # Sunday 3:00 PM PT (22:00 UTC)
+            timeout_seconds=120, memory_mb=512,
+            environment={
+                "ANTHROPIC_SECRET": "life-platform/ai-keys",
+            },
+            custom_policies=rp.compute_challenge_generator(),
             **shared,
         )

@@ -1,3 +1,40 @@
+## v3.9.28 — 2026-03-26: Challenge System — Full Stack Build
+
+### Summary
+Built the complete Challenge system across 3 phases. Joint Product Board + Technical Board session established the split: Experiments ("The Lab") = science with hypotheses; Challenges ("The Arena") = action with gamification. Five generation sources: journal mining, data signals, hypothesis graduates, science scans, manual/community.
+
+### Phase A — Data Foundation
+- Added `CHALLENGES_PK` to `mcp/config.py`
+- Created `mcp/tools_challenges.py` with 5 MCP tools: `create_challenge`, `activate_challenge`, `checkin_challenge`, `list_challenges`, `complete_challenge`
+- Registered all 5 tools in `mcp/registry.py` (103 tools total, 7/7 tests passed)
+- Updated `site_api_lambda.py`: `/api/challenges` now reads from DynamoDB (S3 fallback), new `/api/challenge_checkin` POST endpoint
+- DynamoDB schema: `pk=USER#matthew#SOURCE#challenges`, `sk=CHALLENGE#<slug>_<date>`
+- XP system: base XP by difficulty (easy=25, moderate=50, hard=100) × success rate, 1.5× bonus for perfect completion
+- Badge system: milestone badges at 1, 5, 10, 25 completions + perfect completion badges
+
+### Phase B — AI Generation Pipeline
+- Created `lambdas/challenge_generator_lambda.py` — weekly AI pipeline
+- Gathers 14d context: enriched journal entries, character sheet pillars, habit scores (missed T0, vice streaks), confirmed hypotheses, health snapshot (HRV, recovery, weight)
+- Calls Claude Sonnet with structured prompt → 0-5 challenge candidates with dedup
+- Added to `ci/lambda_map.json` (not_deployed: true, needs CDK)
+- Estimated cost: ~$0.05/week
+
+### Phase C — The Arena Page
+- Created `site/challenges/index.html` — full page with amber accent theme
+- Active Challenge Hero: countdown ring, check-in calendar strip, daily check-in buttons
+- Candidates Grid: source badges showing what triggered each challenge
+- Completed Record: XP earned, success rates, badge unlocks
+- Pipeline nav: Protocols → Experiments → Challenges → Discoveries
+- Updated `site/experiments/index.html`: removed Zone 2.5, replaced with single-line CTA to /challenges/
+
+### Board Session
+- Product Board (8 personas) unanimous: split experiments and challenges into separate pages
+- Technical Board designed DynamoDB schema, generation pipeline, and verification methods
+- Documented 5-source challenge generation architecture
+- Established visual language: Lab=green/clinical, Arena=amber/energetic
+
+---
+
 ## v3.9.27 — 2026-03-26: Nutrition Bug Fix + Global Countdown.js
 
 ### Summary

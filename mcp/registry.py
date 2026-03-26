@@ -40,6 +40,11 @@ from mcp.tools_memory import tool_capture_baseline
 from mcp.tools_decisions import *
 from mcp.tools_hypotheses import *
 from mcp.tools_sick_days import *
+from mcp.tools_challenges import (
+    tool_create_challenge, tool_activate_challenge,
+    tool_checkin_challenge, tool_list_challenges,
+    tool_complete_challenge,
+)
 
 TOOLS = {
     "get_sources": {
@@ -2299,6 +2304,125 @@ TOOLS = {
                     "days":       {"type": "integer", "description": "Rolling window in days (default: 60)."},
                 },
                 "required": [],
+            },
+        },
+    },
+    # ── Challenge tools ──────────────────────────────────────────────────────
+    "create_challenge": {
+        "fn": tool_create_challenge,
+        "schema": {
+            "name": "create_challenge",
+            "description": (
+                "Create a new challenge — a participation invitation with gamification, not a formal experiment. "
+                "Challenges can come from journal mining, platform data signals, hypothesis graduates, "
+                "science scans, or manual creation. Starts as 'candidate' by default; use activate_challenge to start. "
+                "Set status='active' to start immediately. "
+                "Use for: 'create a 7-day step challenge', 'challenge me to no snacking after 8pm', "
+                "'create a 30-day cold shower challenge', 'new challenge for movement pillar'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "name":             {"type": "string", "description": "Challenge name (e.g. '10,000 Steps Every Day')."},
+                    "description":      {"type": "string", "description": "What and why — the motivation."},
+                    "source":           {"type": "string", "description": "Generation source: journal_mining, data_signal, hypothesis_graduate, science_scan, manual, community. Default: manual."},
+                    "source_detail":    {"type": "string", "description": "Specific trigger (e.g. 'avoidance_flag: late_night_snacking x6 in 14d')."},
+                    "domain":           {"type": "string", "description": "Pillar: sleep, movement, nutrition, supplements, mental, social, discipline, metabolic, general."},
+                    "difficulty":       {"type": "string", "description": "easy, moderate, hard. Default: moderate."},
+                    "duration_days":    {"type": "integer", "description": "Challenge length in days (default: 7)."},
+                    "protocol":         {"type": "string", "description": "What to do — the specific actions."},
+                    "success_criteria": {"type": "string", "description": "How to know you succeeded."},
+                    "metric_targets":   {"type": "object", "description": "Optional measurable targets (e.g. {'steps': 10000})."},
+                    "status":           {"type": "string", "description": "'candidate' (default) or 'active' to start immediately."},
+                    "verification_method": {"type": "string", "description": "self_report (default), metric_auto, or hybrid."},
+                    "tags":             {"type": "array", "items": {"type": "string"}, "description": "Optional tags."},
+                    "related_experiment_id": {"type": "string", "description": "Link to experiment if graduated from one."},
+                },
+                "required": ["name"],
+            },
+        },
+    },
+    "activate_challenge": {
+        "fn": tool_activate_challenge,
+        "schema": {
+            "name": "activate_challenge",
+            "description": (
+                "Activate a candidate challenge — transitions from 'candidate' to 'active'. "
+                "Use for: 'start the step challenge', 'activate the no-snacking challenge', 'begin challenge X'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "challenge_id": {"type": "string", "description": "Challenge ID from create_challenge or list_challenges."},
+                },
+                "required": ["challenge_id"],
+            },
+        },
+    },
+    "checkin_challenge": {
+        "fn": tool_checkin_challenge,
+        "schema": {
+            "name": "checkin_challenge",
+            "description": (
+                "Record a daily check-in for an active challenge. Did you do it today? "
+                "Supports optional note and difficulty rating (1-5). "
+                "Use for: 'I did the step challenge today', 'check in on my challenge', "
+                "'missed the challenge today', 'challenge check-in'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "challenge_id": {"type": "string", "description": "Challenge ID."},
+                    "completed":    {"type": "boolean", "description": "true if you did it, false if missed."},
+                    "note":         {"type": "string", "description": "Optional reflection."},
+                    "rating":       {"type": "integer", "description": "Optional 1-5 difficulty rating."},
+                    "date":         {"type": "string", "description": "Date YYYY-MM-DD (default: today)."},
+                },
+                "required": ["challenge_id", "completed"],
+            },
+        },
+    },
+    "list_challenges": {
+        "fn": tool_list_challenges,
+        "schema": {
+            "name": "list_challenges",
+            "description": (
+                "List challenges with optional filters by status, source, or domain. "
+                "Shows progress stats for active challenges. "
+                "Use for: 'show my challenges', 'active challenges', 'challenge candidates', "
+                "'completed challenges', 'what challenges are available?'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "description": "Filter: candidate, active, completed, failed, declined. Omit for all."},
+                    "source": {"type": "string", "description": "Filter by source: journal_mining, data_signal, etc."},
+                    "domain": {"type": "string", "description": "Filter by domain: sleep, movement, nutrition, etc."},
+                    "limit":  {"type": "integer", "description": "Max results (default: 50)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "complete_challenge": {
+        "fn": tool_complete_challenge,
+        "schema": {
+            "name": "complete_challenge",
+            "description": (
+                "End an active challenge. Computes success rate, awards Character XP, and unlocks badges. "
+                "Status can be 'completed' or 'failed'. XP scaled by difficulty and success rate. "
+                "Use for: 'end my step challenge', 'complete the challenge', 'I failed the challenge', "
+                "'finish challenge X'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "challenge_id": {"type": "string", "description": "Challenge ID to end."},
+                    "status":       {"type": "string", "description": "'completed' (default) or 'failed'."},
+                    "outcome":      {"type": "string", "description": "What happened — summary."},
+                    "reflection":   {"type": "string", "description": "What I'd do differently."},
+                },
+                "required": ["challenge_id"],
             },
         },
     },
