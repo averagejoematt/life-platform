@@ -15,7 +15,7 @@ from mcp.config import (
     INSIGHTS_PK, EXPERIMENTS_PK, TRAVEL_PK,
 )
 from mcp.core import (
-    query_source, parallel_query_sources, query_source_range,
+    query_source, parallel_query_sources,
     get_profile, get_sot, decimal_to_float,
     ddb_cache_get, ddb_cache_set, mem_cache_get, mem_cache_set,
     date_diff_days, resolve_field,
@@ -399,8 +399,7 @@ def tool_get_nutrition_summary(args):
     end_date   = args.get("end_date",   datetime.utcnow().strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=29)).strftime("%Y-%m-%d"))
 
-    pk = USER_PREFIX + "macrofactor"
-    items = query_source_range(table, pk, start_date, end_date)
+    items = query_source("macrofactor", start_date, end_date)
 
     if not items:
         return {"error": "No MacroFactor data found for the requested range.", "start_date": start_date, "end_date": end_date}
@@ -490,8 +489,7 @@ def tool_get_macro_targets(args):
     calorie_target = args.get("calorie_target")   # optional override
     protein_target = args.get("protein_target")   # optional override
 
-    pk_mf = USER_PREFIX + "macrofactor"
-    items = query_source_range(table, pk_mf, start_date, end_date)
+    items = query_source("macrofactor", start_date, end_date)
 
     if not items:
         return {"error": "No MacroFactor data found.", "start_date": start_date, "end_date": end_date}
@@ -499,8 +497,7 @@ def tool_get_macro_targets(args):
     # Pull current weight for TDEE estimate if no calorie_target override
     if not calorie_target:
         try:
-            pk_wt = USER_PREFIX + "withings"
-            wt_items = query_source_range(table, pk_wt,
+            wt_items = query_source("withings",
                 (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=14)).strftime("%Y-%m-%d"),
                 end_date)
             wt_items_sorted = sorted(wt_items, key=lambda x: x["date"], reverse=True)

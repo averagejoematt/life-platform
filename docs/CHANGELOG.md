@@ -1,3 +1,21 @@
+## v3.9.27 — 2026-03-26: Nutrition Bug Fix + Global Countdown.js
+
+### Summary
+Fixed positional args bug in `get_nutrition` MCP tool (3 broken `query_source_range` calls replaced with correct `query_source` signature). Cleaned up unused `query_source_range` imports from tools_nutrition.py. Added dynamic countdown.js loader to components.js so all ~50+ pages automatically get the Day N badge and experiment counter — no per-page HTML edits needed.
+
+### Fixed
+- `tools_nutrition.py` — 3 call sites passing positional args to `query_source_range(table, pk, start, end)` replaced with `query_source(source, start, end)`. Affected: `tool_get_nutrition_summary`, `tool_get_macro_targets` (×2 for macrofactor + withings)
+- Removed unused `query_source_range` import from `tools_nutrition.py`
+
+### Changed
+- `site/assets/js/components.js` — Added dynamic script loader for countdown.js at end of IIFE. Guard: checks `window.AMJ_EXPERIMENT` to skip if page already includes countdown.js explicitly. All pages using shared components now get Day N badge automatically.
+
+### Deploy Notes
+- MCP Lambda redeploy needed (nutrition fix)
+- S3 site sync + CloudFront invalidation (components.js change)
+
+---
+
 ## v3.9.26 — 2026-03-25: April 1 Launch Reframe — Prequel Chronicles, Baseline Snapshot
 
 ### Summary
