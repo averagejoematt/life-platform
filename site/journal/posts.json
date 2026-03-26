@@ -12,17 +12,6 @@
       "phase": "prequel"
     },
     {
-      "week": -2,
-      "title": "The Silence in the Data",
-      "date": "2026-03-17",
-      "stats_line": "Prequel · Week −2 · Weight: 287.7 lbs · Week Grade: avg 70/100",
-      "url": "/journal/posts/week-04/",
-      "excerpt": "There's a particular kind of story that's hard to write, and it's the one where nothing happens. Not nothing in the dramatic sense — no injury, no crisis, no spectacular collapse. Just a week that arrives and departs without leaving much of a mark.",
-      "word_count": 1650,
-      "has_board_interview": false,
-      "phase": "prequel"
-    },
-    {
       "week": -3,
       "title": "The DoorDash Chronicle",
       "date": "2026-03-11",
@@ -45,17 +34,6 @@
       "phase": "prequel"
     },
     {
-      "week": -5,
-      "title": "First Contact",
-      "date": "2026-02-28",
-      "stats_line": "Prequel · Week −5 · February 28, 2026",
-      "url": "/journal/posts/week-01/",
-      "excerpt": "The experiment begins. Sensors syncing, platform live, protocol locked. What happens in the first week when the system meets real life.",
-      "word_count": 900,
-      "has_board_interview": false,
-      "phase": "prequel"
-    },
-    {
       "week": 0,
       "title": "Before the Numbers",
       "date": "2026-02-22",
@@ -68,5 +46,5 @@
     }
   ],
   "experiment_start": "2026-04-01",
-  "updated_at": "2026-03-25T23:30:00.000000+00:00"
+  "updated_at": "2026-03-26T12:00:00.000000+00:00"
 }
