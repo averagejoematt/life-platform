@@ -261,6 +261,46 @@
     .tl-event[data-type="discovery"] .tl-event__card { border-left: 3px solid #fbbf24; }
     .tl-event[data-type="discovery"] .tl-event__type { color: #fbbf24; }
 
+    /* ── Annotation (DISC-7) ────────────────────────────── */
+    .tl-event__annotation {
+      margin-top: var(--space-4);
+      padding-top: var(--space-3);
+      border-top: 1px dashed var(--border);
+    }
+    .tl-event__annotation-label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-2);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .tl-event__annotation-text {
+      font-size: var(--text-sm);
+      color: var(--text);
+      line-height: var(--lh-body);
+    }
+    .tl-event__annotation-action {
+      display: inline-block;
+      margin-top: var(--space-2);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--accent);
+      background: var(--accent-bg-subtle);
+      padding: var(--space-1) var(--space-3);
+      letter-spacing: var(--ls-tag);
+    }
+    .tl-event__annotation-outcome {
+      margin-top: var(--space-2);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
     /* ── Empty / Loading ─────────────────────────────────── */
     .timeline-empty {
       text-align: center;
@@ -453,6 +493,23 @@ function renderTimeline(events, filter) {
     const typeLabel = TYPE_LABELS[e.type] || e.type;
     const link = e.link ? `<a href="${e.link}" class="tl-event__link">View details &rarr;</a>` : '';
     const meta = e.meta ? `<div class="tl-event__meta">r=${e.meta.r > 0 ? '+' : ''}${e.meta.r?.toFixed(2)} &middot; n=${e.meta.n} days &middot; ${e.meta.week}</div>` : '';
+    // DISC-7: Render behavioral response annotation if present
+    let annHtml = '';
+    if (e.annotation) {
+      const a = e.annotation;
+      const actionTag = a.action_taken ? `<span class="tl-event__annotation-action">${a.action_taken}</span>` : '';
+      const outcomeTag = a.outcome ? `<div class="tl-event__annotation-outcome">Outcome: ${a.outcome}</div>` : '';
+      annHtml = `
+        <div class="tl-event__annotation">
+          <div class="tl-event__annotation-label">
+            <svg class="tl-event__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M14 1H2a1 1 0 00-1 1v9a1 1 0 001 1h3l3 3 3-3h3a1 1 0 001-1V2a1 1 0 00-1-1zM4 5h8v1H4V5zm0 3h6v1H4V8z"/></svg>
+            What I did
+          </div>
+          <div class="tl-event__annotation-text">${a.annotation}</div>
+          ${actionTag}
+          ${outcomeTag}
+        </div>`;
+    }
     return `
       <div class="tl-event" data-type="${e.type}" style="animation-delay: ${Math.min(i * 0.06, 0.8)}s">
         <div class="tl-event__date">
@@ -466,6 +523,7 @@ function renderTimeline(events, filter) {
           <div class="tl-event__body">${e.body}</div>
           ${meta}
           ${link}
+          ${annHtml}
         </div>
       </div>`;
   }).join('');
