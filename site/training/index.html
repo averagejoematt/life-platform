@@ -13,155 +13,701 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    :root { --t-red: #ef4444; --t-red-dim: rgba(239,68,68,0.12); --t-red-glow: rgba(239,68,68,0.06); --t-green: #3ecf8e; }
+    :root {
+      --t-red: #ef4444;
+      --t-red-dim: rgba(239,68,68,0.12);
+      --t-red-glow: rgba(239,68,68,0.06);
+      --t-green: #3ecf8e;
+      --t-amber: #f59e0b;
+      --t-violet: #818cf8;
+    }
 
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       HERO — B's 2-column + C's gauge row
+       ═══════════════════════════════════════════════════════ */
     .t-hero {
       padding: calc(var(--nav-height) + var(--space-20)) var(--page-padding) var(--space-16);
-      position: relative; overflow: hidden;
+      position: relative;
+      overflow: hidden;
+      border-bottom: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .t-hero-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-12);
+      align-items: center;
+    }
+    .t-hero__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--t-red);
+      margin-bottom: var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.1s forwards;
+    }
+    .t-hero__eyebrow::before {
+      content: '';
+      width: 32px;
+      height: 1px;
+      background: var(--t-red);
+    }
+    .t-hero__title {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 5vw, 52px);
+      color: var(--text);
+      line-height: 1.05;
+      max-width: 520px;
+      margin-bottom: var(--space-6);
+      opacity: 0;
+      animation: fadeUp 0.6s 0.2s forwards;
+    }
+    .t-hero__title em {
+      font-style: normal;
+      color: var(--t-red);
+    }
+    .t-hero__sub {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      max-width: 420px;
+      line-height: 1.8;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.3s forwards;
+    }
+
+    /* Gauge row */
+    .t-gauge-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+      opacity: 0;
+      animation: fadeUp 0.6s 0.4s forwards;
+    }
+    .t-gauge {
+      text-align: center;
+      padding: var(--space-5) var(--space-3);
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .t-gauge__ring {
+      width: 88px;
+      height: 88px;
+      margin: 0 auto var(--space-3);
+      position: relative;
+    }
+    .t-gauge__ring svg { width: 100%; height: 100%; }
+    .t-gauge__center {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    .t-gauge__num {
+      font-family: var(--font-display);
+      font-size: 22px;
+      line-height: 1;
+    }
+    .t-gauge__unit {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-faint);
+      letter-spacing: 0.08em;
+    }
+    .t-gauge__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       PULL-QUOTES
+       ═══════════════════════════════════════════════════════ */
+    .t-pullquote {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      position: relative;
       border-bottom: 1px solid var(--border);
     }
-    .t-hero::before { content:''; position:absolute; top:-40%; left:-10%; width:500px; height:500px; background:radial-gradient(circle, var(--t-red-glow) 0%, transparent 70%); pointer-events:none; }
-    .t-hero__eyebrow { font-family:var(--font-mono); font-size:var(--text-2xs); letter-spacing:0.15em; text-transform:uppercase; color:var(--t-red); margin-bottom:var(--space-6); opacity:0; animation:fadeUp 0.6s 0.1s forwards; }
-    .t-hero__title { font-family:var(--font-display); font-size:clamp(36px,5vw,56px); color:var(--text); line-height:1.1; max-width:700px; margin-bottom:var(--space-6); opacity:0; animation:fadeUp 0.6s 0.2s forwards; }
-    .t-hero__title em { font-style:normal; color:var(--t-red); }
-    .t-hero__sub { font-size:var(--text-base); color:var(--text-muted); max-width:520px; line-height:1.7; opacity:0; animation:fadeUp 0.6s 0.3s forwards; }
-    @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-
-    /* Zone 2 gauge — big visual hero */
-    .t-z2-hero {
-      max-width: var(--max-width); margin:0 auto;
-      padding: var(--space-16) var(--page-padding);
-      display: grid; grid-template-columns: 240px 1fr; gap: var(--space-12); align-items: center;
+    .t-pullquote__watermark {
+      position: absolute;
+      top: 24px;
+      right: var(--page-padding);
+      font-family: var(--font-display);
+      font-size: 120px;
+      color: rgba(239, 68, 68, 0.04);
+      line-height: 1;
+      pointer-events: none;
     }
-    .t-z2-ring { position:relative; width:220px; height:220px; margin:0 auto; }
-    .t-z2-ring svg { width:100%; height:100%; }
-    .t-z2-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; }
-    .t-z2-center__val { font-family:var(--font-display); font-size:40px; color:var(--text); line-height:1; }
-    .t-z2-center__unit { font-family:var(--font-mono); font-size:10px; color:var(--text-muted); letter-spacing:0.1em; }
-    .t-z2-center__label { font-family:var(--font-mono); font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.12em; margin-top:var(--space-2); }
-    .t-z2-detail { display:flex; flex-direction:column; gap: var(--space-6); }
-    .t-z2-row { display:grid; grid-template-columns:120px 1fr 70px; align-items:center; gap:var(--space-3); }
-    .t-z2-label { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; }
-    .t-z2-bar { height:6px; background:rgba(255,255,255,0.04); border-radius:3px; overflow:hidden; }
-    .t-z2-fill { height:100%; border-radius:3px; transition: width 1s ease; }
-    .t-z2-val { font-family:var(--font-display); font-size:var(--text-h3); color:var(--text); text-align:right; }
+    .t-pullquote__text {
+      font-family: var(--font-display);
+      font-size: clamp(24px, 3.5vw, 32px);
+      line-height: 1.3;
+      color: var(--text);
+      max-width: 640px;
+      position: relative;
+    }
+    .t-pullquote__text em {
+      font-style: normal;
+      color: var(--t-red);
+    }
+    .t-pullquote__attr {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-top: var(--space-4);
+    }
+    .t-pullquote__badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--t-red);
+      background: var(--t-red-dim);
+      padding: 3px 10px;
+      display: inline-block;
+    }
+    .t-pullquote__source {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      letter-spacing: 0.06em;
+    }
 
-    /* Weekly chart */
-    .t-chart-section { max-width:var(--max-width); margin:0 auto; padding:0 var(--page-padding) var(--space-16); }
-    .t-chart-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:var(--space-4); }
-    .t-chart-title { font-family:var(--font-mono); font-size:var(--text-2xs); color:var(--text-muted); letter-spacing:0.1em; text-transform:uppercase; }
-    .t-chart-legend { display:flex; gap:var(--space-4); }
-    .t-legend-item { display:flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:10px; color:var(--text-muted); }
-    .t-legend-dot { width:8px; height:8px; border-radius:50%; }
-    canvas.t-chart { width:100%; height:200px; display:block; background:var(--surface); border:1px solid var(--border); }
+    /* ═══════════════════════════════════════════════════════
+       ZONE 2 DETAIL — editorial 3-column
+       ═══════════════════════════════════════════════════════ */
+    .t-z2-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .t-section-header {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-8);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .t-section-header::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .t-z2-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+    }
+    .t-z2-col {
+      padding: var(--space-6);
+    }
+    .t-z2-col:not(:last-child) {
+      border-right: 1px solid var(--border);
+    }
+    .t-z2-bar {
+      height: 3px;
+      background: rgba(255,255,255,0.03);
+      margin-bottom: var(--space-5);
+      position: relative;
+      overflow: hidden;
+    }
+    .t-z2-bar__fill {
+      height: 100%;
+      position: absolute;
+      left: 0;
+      top: 0;
+      transition: width 1.2s ease;
+    }
+    .t-z2-big {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 4vw, 44px);
+      line-height: 1;
+      margin-bottom: var(--space-2);
+    }
+    .t-z2-name {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-3);
+    }
+    .t-z2-detail {
+      font-size: var(--text-sm);
+      color: var(--text-faint);
+      line-height: 1.7;
+    }
 
-    /* Activity mosaic */
-    .t-activity-section { max-width:var(--max-width); margin:0 auto; padding:0 var(--page-padding) var(--space-16); }
-    .t-activity-grid { display:flex; gap:var(--space-3); flex-wrap:wrap; }
+    /* ═══════════════════════════════════════════════════════
+       ACTIVITY MIX
+       ═══════════════════════════════════════════════════════ */
+    .t-activity-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .t-activity-grid {
+      display: flex;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+    }
     .t-activity-chip {
-      background:var(--surface); border:1px solid var(--border); padding:var(--space-3) var(--space-5);
-      font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-muted);
-      display:flex; align-items:center; gap:var(--space-2);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--t-red);
+      padding: var(--space-3) var(--space-5);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
     }
-    .t-activity-chip__count { font-family:var(--font-display); font-size:18px; color:var(--t-red); }
+    .t-activity-chip__count {
+      font-family: var(--font-display);
+      font-size: 18px;
+      color: var(--t-red);
+    }
 
-    /* Rules */
-    .t-rules-section { max-width:var(--max-width); margin:0 auto; padding:0 var(--page-padding) var(--space-16); }
-    .t-rules-header { font-family:var(--font-mono); font-size:var(--text-2xs); color:var(--text-muted); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:var(--space-6); }
-    .t-rule-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:var(--space-4); }
-    .t-rule { background:var(--surface); border:1px solid var(--border); padding:var(--space-6); position:relative; overflow:hidden; }
-    .t-rule::before { content:attr(data-num); position:absolute; top:-8px; right:8px; font-family:var(--font-display); font-size:64px; color:var(--t-red-dim); line-height:1; pointer-events:none; }
-    .t-rule__finding { font-family:var(--font-display); font-size:var(--text-base); color:var(--text); line-height:1.4; margin-bottom:var(--space-3); position:relative; }
-    .t-rule__evidence { font-family:var(--font-mono); font-size:10px; color:var(--t-red); letter-spacing:0.05em; }
+    /* ═══════════════════════════════════════════════════════
+       WEEKLY CHART
+       ═══════════════════════════════════════════════════════ */
+    .t-chart-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .t-chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: var(--space-4);
+    }
+    .t-chart-title {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .t-chart-title::after {
+      content: '';
+      width: 48px;
+      height: 1px;
+      background: var(--border);
+    }
+    .t-chart-legend {
+      display: flex;
+      gap: var(--space-4);
+    }
+    .t-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+    }
+    .t-legend-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+    canvas.t-chart {
+      width: 100%;
+      height: 200px;
+      display: block;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
 
-    /* Narrative */
-    .t-narrative { max-width:var(--max-width); margin:0 auto; padding:var(--space-12) var(--page-padding); border-top:1px solid var(--border); display:grid; grid-template-columns:1fr 1fr; gap:var(--space-12); }
-    .t-narrative__title { font-family:var(--font-display); font-size:var(--text-h2); color:var(--text); line-height:1.2; margin-bottom:var(--space-5); }
-    .t-narrative__title em { font-style:normal; color:var(--t-red); }
-    .t-narrative__body { font-size:var(--text-sm); color:var(--text-muted); line-height:1.8; }
-    .t-narrative__body strong { color:var(--text); }
-    .t-protocol-list { display:flex; flex-direction:column; gap:var(--space-4); }
-    .t-protocol-item { display:flex; gap:var(--space-4); padding:var(--space-4); background:var(--surface); border-left:2px solid var(--t-red); }
-    .t-protocol-num { font-family:var(--font-display); font-size:20px; color:var(--t-red); line-height:1; flex-shrink:0; width:28px; }
-    .t-protocol-text { font-size:var(--text-sm); color:var(--text-muted); line-height:1.6; }
-    .t-protocol-text strong { color:var(--text); }
+    /* ═══════════════════════════════════════════════════════
+       N=1 RULES — C's bordered cards + left accent
+       ═══════════════════════════════════════════════════════ */
+    .t-rules-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .t-rule-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+    }
+    .t-rule {
+      padding: var(--space-6);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-left: 3px solid var(--t-red);
+      background: var(--surface);
+    }
+    .t-rule__num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--t-red);
+      margin-bottom: var(--space-3);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .t-rule__num::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(239,68,68,0.1);
+    }
+    .t-rule__finding {
+      font-family: var(--font-display);
+      font-size: var(--text-base);
+      color: var(--text);
+      line-height: 1.35;
+      margin-bottom: var(--space-3);
+    }
+    .t-rule__evidence {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+    .t-rule__evidence em {
+      font-style: normal;
+      color: var(--t-red);
+    }
 
-    .t-method { max-width:var(--max-width); margin:0 auto; padding:var(--space-10) var(--page-padding); border-top:1px solid var(--border); }
-    .t-method__title { font-family:var(--font-mono); font-size:var(--text-2xs); color:var(--text-muted); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:var(--space-6); }
-    .t-method-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-6); }
-    .t-method-item { font-size:var(--text-sm); color:var(--text-muted); line-height:1.7; }
-    .t-method-item strong { display:block; color:var(--text); font-family:var(--font-mono); font-size:var(--text-2xs); letter-spacing:0.08em; margin-bottom:var(--space-2); }
+    /* ═══════════════════════════════════════════════════════
+       CROSS-LINKS
+       ═══════════════════════════════════════════════════════ */
+    .t-xref {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+      border-bottom: 1px solid var(--border);
+    }
+    .t-xref-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--t-red);
+      padding: var(--space-5) var(--space-6);
+      transition: border-color 0.15s;
+      text-decoration: none;
+      display: block;
+    }
+    .t-xref-card:hover { border-color: var(--t-red); }
+    .t-xref-card__tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--t-red);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-2);
+    }
+    .t-xref-card__text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
 
-    .t-loading { text-align:center; padding:var(--space-20); font-family:var(--font-mono); font-size:var(--text-2xs); color:var(--text-muted); letter-spacing:0.15em; }
+    /* ═══════════════════════════════════════════════════════
+       NARRATIVE
+       ═══════════════════════════════════════════════════════ */
+    .t-narrative {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-12);
+      border-bottom: 1px solid var(--border);
+    }
+    .t-narrative__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      line-height: 1.15;
+      margin-bottom: var(--space-5);
+    }
+    .t-narrative__title em { font-style: normal; color: var(--t-red); }
+    .t-narrative__body {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.8;
+    }
+    .t-narrative__body strong { color: var(--text); }
+    .t-narrative__body a { color: var(--t-red); text-decoration: none; }
+    .t-protocol-list { display: flex; flex-direction: column; gap: var(--space-4); }
+    .t-protocol-item {
+      display: flex;
+      gap: var(--space-4);
+      padding: var(--space-4);
+      background: var(--surface);
+      border-left: 2px solid var(--t-red);
+    }
+    .t-protocol-num {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: var(--t-red);
+      line-height: 1;
+      flex-shrink: 0;
+      width: 28px;
+    }
+    .t-protocol-text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .t-protocol-text strong { color: var(--text); }
+    .t-protocol-text a { color: var(--t-red); text-decoration: none; }
 
-    @media(max-width:768px) { .t-z2-hero,.t-rule-grid,.t-narrative,.t-method-grid { grid-template-columns:1fr; } .t-z2-hero { gap:var(--space-6); } }
+    /* ═══════════════════════════════════════════════════════
+       METHODOLOGY
+       ═══════════════════════════════════════════════════════ */
+    .t-method {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+    }
+    .t-method__title {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .t-method__title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .t-method-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-6);
+    }
+    .t-method-item {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+    .t-method-item strong {
+      display: block;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.08em;
+      margin-bottom: var(--space-2);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       LOADING + RESPONSIVE
+       ═══════════════════════════════════════════════════════ */
+    .t-loading {
+      text-align: center;
+      padding: var(--space-20);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+    }
+
+    @media (max-width: 768px) {
+      .t-hero-grid { grid-template-columns: 1fr; }
+      .t-gauge-row { grid-template-columns: repeat(2, 1fr); }
+      .t-z2-grid { grid-template-columns: 1fr; }
+      .t-z2-col:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
+      .t-rule-grid { grid-template-columns: 1fr; }
+      .t-narrative { grid-template-columns: 1fr; }
+      .t-method-grid { grid-template-columns: 1fr; }
+      .t-xref { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
 <div id="amj-nav"></div>
 
+<!-- ════════════════════════════════════════════════════════════
+     HERO — B's 2-column + C's gauge row
+     ════════════════════════════════════════════════════════════ -->
 <div class="t-hero">
-  <div class="t-hero__eyebrow">The Science &mdash; Training Observatory</div>
-  <h1 class="t-hero__title">Training for <em>80</em>,<br>not for 30.</h1>
-  <p class="t-hero__sub">Zone 2 cardio, compound strength, centenarian benchmarks. Four data sources synthesized into one training intelligence layer.</p>
+  <div class="t-hero-grid">
+    <div>
+      <div class="t-hero__eyebrow">Training Observatory</div>
+      <h1 class="t-hero__title">Training for <em>80</em>, not for 30</h1>
+      <p class="t-hero__sub">
+        Zone 2 cardio, compound strength, centenarian benchmarks. Four data sources
+        synthesized into one training intelligence layer.
+      </p>
+    </div>
+    <div class="t-gauge-row">
+      <div class="t-gauge">
+        <div class="t-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-z2-arc" cx="44" cy="44" r="35" fill="none" stroke="#3ecf8e" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.5s"/>
+          </svg>
+          <div class="t-gauge__center">
+            <div class="t-gauge__num" id="g-z2-num" style="color:#3ecf8e">&mdash;</div>
+            <div class="t-gauge__unit">min/wk</div>
+          </div>
+        </div>
+        <div class="t-gauge__label">Zone 2 avg</div>
+      </div>
+      <div class="t-gauge">
+        <div class="t-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-wk-arc" cx="44" cy="44" r="35" fill="none" stroke="#ef4444" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.6s"/>
+          </svg>
+          <div class="t-gauge__center">
+            <div class="t-gauge__num" id="g-wk-num" style="color:#ef4444">&mdash;</div>
+            <div class="t-gauge__unit">sessions</div>
+          </div>
+        </div>
+        <div class="t-gauge__label">Workouts (30d)</div>
+      </div>
+      <div class="t-gauge">
+        <div class="t-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-strain-arc" cx="44" cy="44" r="35" fill="none" stroke="#f59e0b" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.7s"/>
+          </svg>
+          <div class="t-gauge__center">
+            <div class="t-gauge__num" id="g-strain-num" style="color:#f59e0b">&mdash;</div>
+            <div class="t-gauge__unit">strain</div>
+          </div>
+        </div>
+        <div class="t-gauge__label">Avg strain</div>
+      </div>
+      <div class="t-gauge">
+        <div class="t-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-str-arc" cx="44" cy="44" r="35" fill="none" stroke="#818cf8" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.8s"/>
+          </svg>
+          <div class="t-gauge__center">
+            <div class="t-gauge__num" id="g-str-num" style="color:#818cf8">&mdash;</div>
+            <div class="t-gauge__unit">sessions</div>
+          </div>
+        </div>
+        <div class="t-gauge__label">Strength (30d)</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="t-loading" class="t-loading">LOADING TRAINING DATA&hellip;</div>
 <div id="t-content" style="display:none">
 
-<section class="t-z2-hero reveal">
-  <div class="t-z2-ring">
-    <svg viewBox="0 0 220 220">
-      <circle cx="110" cy="110" r="90" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="14"/>
-      <circle id="z2-arc" cx="110" cy="110" r="90" fill="none" stroke="#3ecf8e" stroke-width="14"
-        stroke-dasharray="0 565" stroke-linecap="round" transform="rotate(-90 110 110)"
-        style="transition: stroke-dasharray 1.2s ease;"/>
-      <circle id="z2-arc-bg" cx="110" cy="110" r="90" fill="none" stroke="rgba(239,68,68,0.15)" stroke-width="14"
-        stroke-dasharray="565 0" stroke-linecap="round" transform="rotate(-90 110 110)"/>
-    </svg>
-    <div class="t-z2-center">
-      <div class="t-z2-center__val" id="z2-val">&mdash;</div>
-      <div class="t-z2-center__unit">min/week</div>
-      <div class="t-z2-center__label">Zone 2 avg</div>
-    </div>
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE #1 — Zone 2 recovery finding
+     ════════════════════════════════════════════════════════════ -->
+<div class="t-pullquote reveal">
+  <div class="t-pullquote__watermark">01</div>
+  <div class="t-pullquote__text">
+    Zone 2 volume predicts next-week <em>recovery</em> better than any other variable &mdash;
+    <em>150+ min/week</em> yields 12% higher average recovery.
   </div>
-  <div class="t-z2-detail">
-    <div class="t-z2-row">
-      <div class="t-z2-label">Workouts/30d</div>
-      <div class="t-z2-bar"><div class="t-z2-fill" id="bar-wk" style="width:0%;background:var(--t-red)"></div></div>
-      <div class="t-z2-val" id="val-wk">&mdash;</div>
+  <div class="t-pullquote__attr">
+    <span class="t-pullquote__badge">N=1 &middot; Correlational</span>
+    <span class="t-pullquote__source">Whoop recovery &times; Strava Zone 2 minutes &mdash; 30+ weeks</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     ZONE 2 + VOLUME DETAIL — editorial 3-column
+     ════════════════════════════════════════════════════════════ -->
+<section class="t-z2-section reveal">
+  <div class="t-section-header">Training volume breakdown</div>
+  <div class="t-z2-grid">
+    <div class="t-z2-col">
+      <div class="t-z2-bar"><div class="t-z2-bar__fill" id="zbar-z2" style="width:0%;background:#3ecf8e"></div></div>
+      <div class="t-z2-big" id="zval-z2" style="color:#3ecf8e">&mdash;</div>
+      <div class="t-z2-name">Zone 2 min/week</div>
+      <div class="t-z2-detail">Target: 150 min/week (WHO + Attia). HR 114&ndash;133 bpm. Highest-evidence longevity modality.</div>
     </div>
-    <div class="t-z2-row">
-      <div class="t-z2-label">Weekly avg</div>
-      <div class="t-z2-bar"><div class="t-z2-fill" id="bar-wavg" style="width:0%;background:var(--t-red)"></div></div>
-      <div class="t-z2-val" id="val-wavg">&mdash;</div>
+    <div class="t-z2-col">
+      <div class="t-z2-bar"><div class="t-z2-bar__fill" id="zbar-total" style="width:0%;background:#ef4444"></div></div>
+      <div class="t-z2-big" id="zval-total" style="color:#ef4444">&mdash;</div>
+      <div class="t-z2-name">Total min (30d)</div>
+      <div class="t-z2-detail">All modalities: cardio, strength, walks, rucks. Four sources merged nightly.</div>
     </div>
-    <div class="t-z2-row">
-      <div class="t-z2-label">Total minutes</div>
-      <div class="t-z2-bar"><div class="t-z2-fill" id="bar-mins" style="width:0%;background:#818cf8"></div></div>
-      <div class="t-z2-val" id="val-mins">&mdash;</div>
-    </div>
-    <div class="t-z2-row">
-      <div class="t-z2-label">Avg strain</div>
-      <div class="t-z2-bar"><div class="t-z2-fill" id="bar-strain" style="width:0%;background:#f59e0b"></div></div>
-      <div class="t-z2-val" id="val-strain">&mdash;</div>
-    </div>
-    <div class="t-z2-row">
-      <div class="t-z2-label">Strength sessions</div>
-      <div class="t-z2-bar"><div class="t-z2-fill" id="bar-str" style="width:0%;background:var(--t-green)"></div></div>
-      <div class="t-z2-val" id="val-str">&mdash;</div>
+    <div class="t-z2-col">
+      <div class="t-z2-bar"><div class="t-z2-bar__fill" id="zbar-wavg" style="width:0%;background:#818cf8"></div></div>
+      <div class="t-z2-big" id="zval-wavg" style="color:#818cf8">&mdash;</div>
+      <div class="t-z2-name">Weekly avg sessions</div>
+      <div class="t-z2-detail">Consistency over intensity. The platform flags weeks below 4 sessions.</div>
     </div>
   </div>
 </section>
 
+<!-- ════════════════════════════════════════════════════════════
+     ACTIVITY MIX
+     ════════════════════════════════════════════════════════════ -->
 <section class="t-activity-section reveal">
-  <div class="t-chart-title" style="margin-bottom:var(--space-4)">// Activity Mix (30 days)</div>
+  <div class="t-section-header">Activity mix (30 days)</div>
   <div class="t-activity-grid" id="t-activities"></div>
 </section>
 
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE #2 — Rucking finding
+     ════════════════════════════════════════════════════════════ -->
+<div class="t-pullquote reveal">
+  <div class="t-pullquote__watermark">02</div>
+  <div class="t-pullquote__text">
+    Rucking is the highest Zone 2 yield per hour &mdash;
+    <em>92% of ruck time</em> in Zone 2 vs 61% walking. The most efficient <a href="/nutrition/" style="color:var(--t-red);text-decoration:none">calorie burn</a> too.
+  </div>
+  <div class="t-pullquote__attr">
+    <span class="t-pullquote__badge">N=1 &middot; Correlational</span>
+    <span class="t-pullquote__source">Garmin HR zones &times; Strava activity type &mdash; 90+ day dataset</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     12-WEEK TREND CHART
+     ════════════════════════════════════════════════════════════ -->
 <section class="t-chart-section reveal">
   <div class="t-chart-header">
-    <div class="t-chart-title">12-Week Training Volume</div>
+    <div class="t-chart-title">12-week training volume</div>
     <div class="t-chart-legend">
       <div class="t-legend-item"><div class="t-legend-dot" style="background:var(--t-red)"></div> Total min</div>
       <div class="t-legend-item"><div class="t-legend-dot" style="background:var(--t-green)"></div> Zone 2 min</div>
@@ -170,37 +716,91 @@
   <canvas class="t-chart" id="t-trend-canvas"></canvas>
 </section>
 
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE #3 — HRV finding
+     ════════════════════════════════════════════════════════════ -->
+<div class="t-pullquote reveal">
+  <div class="t-pullquote__watermark">03</div>
+  <div class="t-pullquote__text">
+    Back-to-back strain above 18 <em>tanks HRV for 48 hours</em> &mdash;
+    a 20% drop that erases the <a href="/sleep/" style="color:var(--t-red);text-decoration:none">sleep</a> gains from the night before.
+  </div>
+  <div class="t-pullquote__attr">
+    <span class="t-pullquote__badge">N=1 &middot; Correlational</span>
+    <span class="t-pullquote__source">Whoop strain &times; HRV &mdash; consecutive high-strain day pairs</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     N=1 RULES — C's bordered cards + left accent
+     ════════════════════════════════════════════════════════════ -->
 <section class="t-rules-section reveal">
-  <div class="t-rules-header">// N=1 Training Rules &mdash; 30+ weeks of multi-source data</div>
+  <div class="t-section-header">N=1 training rules &mdash; 30+ weeks of multi-source data</div>
   <div class="t-rule-grid">
-    <div class="t-rule" data-num="01"><div class="t-rule__finding">Zone 2 volume predicts next-week recovery better than any other variable</div><div class="t-rule__evidence">150+ min/week &rarr; 12% higher avg recovery</div></div>
-    <div class="t-rule" data-num="02"><div class="t-rule__finding">Back-to-back strain above 18 tanks HRV for 48 hours</div><div class="t-rule__evidence">HRV drops 20% avg after consecutive high-strain days</div></div>
-    <div class="t-rule" data-num="03"><div class="t-rule__finding">Morning workouts before 9am produce better sleep scores than evening</div><div class="t-rule__evidence">+6 pts avg sleep score &bull; 90+ day dataset</div></div>
-    <div class="t-rule" data-num="04"><div class="t-rule__finding">Rucking is the highest Zone 2 yield per hour of any activity</div><div class="t-rule__evidence">92% of ruck time in Zone 2 vs 61% walking</div></div>
+    <div class="t-rule">
+      <div class="t-rule__num">Rule 01</div>
+      <div class="t-rule__finding">Zone 2 volume predicts next-week recovery better than any other variable</div>
+      <div class="t-rule__evidence">150+ min/week &rarr; <em>12% higher avg recovery</em></div>
+    </div>
+    <div class="t-rule">
+      <div class="t-rule__num">Rule 02</div>
+      <div class="t-rule__finding">Back-to-back strain above 18 tanks HRV for 48 hours</div>
+      <div class="t-rule__evidence">HRV drops <em>20%</em> avg after consecutive high-strain days</div>
+    </div>
+    <div class="t-rule">
+      <div class="t-rule__num">Rule 03</div>
+      <div class="t-rule__finding">Morning workouts before 9am produce better sleep scores than evening</div>
+      <div class="t-rule__evidence"><em>+6 pts</em> avg sleep score &bull; 90+ day dataset</div>
+    </div>
+    <div class="t-rule">
+      <div class="t-rule__num">Rule 04</div>
+      <div class="t-rule__finding">Rucking is the highest Zone 2 yield per hour of any activity</div>
+      <div class="t-rule__evidence"><em>92%</em> of ruck time in Zone 2 vs 61% walking</div>
+    </div>
   </div>
 </section>
 
+</div><!-- /t-content -->
+
+<!-- ════════════════════════════════════════════════════════════
+     CROSS-LINKS
+     ════════════════════════════════════════════════════════════ -->
+<div class="t-xref reveal">
+  <a href="/nutrition/" class="t-xref-card">
+    <div class="t-xref-card__tag">Training &times; Nutrition</div>
+    <div class="t-xref-card__text">Deficit depth directly impacts training quality. Strain drops 15% in weeks with &gt;1000 cal deficit.</div>
+  </a>
+  <a href="/sleep/" class="t-xref-card">
+    <div class="t-xref-card__tag">Training &times; Sleep</div>
+    <div class="t-xref-card__text">Morning workouts before 9am correlate with +6 pts avg sleep score. Recovery-gated intensity prevents overreach.</div>
+  </a>
 </div>
 
+<!-- ════════════════════════════════════════════════════════════
+     NARRATIVE
+     ════════════════════════════════════════════════════════════ -->
 <section class="t-narrative reveal">
   <div>
     <h2 class="t-narrative__title">Training for the<br><em>centenarian decathlon</em></h2>
     <div class="t-narrative__body">
       <p>Most programs optimize for aesthetics at 30. This one optimizes for <strong>carrying groceries, climbing stairs, and getting off the floor at 85</strong>.</p>
-      <p>You lose 8&ndash;12% of strength per decade after 40. To deadlift your bodyweight at 85, you need <strong>~2x bodyweight now</strong>. Four data sources &mdash; Strava, Hevy, Garmin, Whoop &mdash; feed a single training load model.</p>
+      <p>You lose 8&ndash;12% of strength per decade after 40. To deadlift your bodyweight at 85, you need <strong>~2x bodyweight now</strong>. Four data sources &mdash; Strava, Hevy, Garmin, Whoop &mdash; feed a single training load model that cross-references with <a href="/nutrition/">nutrition</a> and <a href="/sleep/">sleep</a> data.</p>
     </div>
   </div>
   <div class="t-protocol-list">
     <div class="t-protocol-item"><div class="t-protocol-num">01</div><div class="t-protocol-text"><strong>150+ min/week Zone 2</strong> &mdash; walking, cycling, rucking. HR 114&ndash;133. Highest-evidence longevity modality.</div></div>
     <div class="t-protocol-item"><div class="t-protocol-num">02</div><div class="t-protocol-text"><strong>3x/week compound lifts</strong> &mdash; squat, deadlift, bench, OHP. Progressive overload toward centenarian benchmarks.</div></div>
     <div class="t-protocol-item"><div class="t-protocol-num">03</div><div class="t-protocol-text"><strong>ACWR &lt;1.5</strong> &mdash; Acute:Chronic Workload Ratio guards against injury spikes.</div></div>
-    <div class="t-protocol-item"><div class="t-protocol-num">04</div><div class="t-protocol-text"><strong>Recovery-gated intensity</strong> &mdash; Whoop &lt;34% triggers deload suggestion in daily brief.</div></div>
+    <div class="t-protocol-item"><div class="t-protocol-num">04</div><div class="t-protocol-text"><strong>Recovery-gated intensity</strong> &mdash; Whoop &lt;34% triggers deload suggestion in <a href="/character/">daily brief</a>.</div></div>
     <div class="t-protocol-item"><div class="t-protocol-num">05</div><div class="t-protocol-text"><strong>80/20 polarization</strong> &mdash; 80% low intensity, 20% high. No Zone 3 junk miles.</div></div>
   </div>
 </section>
 
+<!-- ════════════════════════════════════════════════════════════
+     METHODOLOGY
+     ════════════════════════════════════════════════════════════ -->
 <section class="t-method reveal">
-  <div class="t-method__title">Measurement Protocol</div>
+  <div class="t-method__title">Measurement protocol</div>
   <div class="t-method-grid">
     <div class="t-method-item"><strong>STRAVA</strong>All cardio: runs, rides, walks, rucks. GPS + HR from Garmin. Duration, distance, avg HR synced daily.</div>
     <div class="t-method-item"><strong>HEVY</strong>All strength: sets, reps, weight. 1RM via Brzycki. Volume load = sets &times; reps &times; weight.</div>
@@ -218,74 +818,117 @@
 <script src="/assets/js/reveal.js"></script>
 <script>
 (async function(){
-  const API='https://averagejoematt.com';
-  const loading=document.getElementById('t-loading');
-  const content=document.getElementById('t-content');
-  const setText=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
-  const setWidth=(id,p)=>{const el=document.getElementById(id);if(el)el.style.width=Math.min(100,Math.max(0,p))+'%';};
+  var API = 'https://averagejoematt.com';
+  var loading = document.getElementById('t-loading');
+  var content = document.getElementById('t-content');
+  var setText = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+  var setWidth = function(id, p) { var el = document.getElementById(id); if (el) el.style.width = Math.min(100, Math.max(0, p)) + '%'; };
+  var circ = 2 * Math.PI * 35;
 
-  try{
-    const resp=await fetch(API+'/api/training_overview');
-    if(!resp.ok) throw new Error(resp.status);
-    const data=await resp.json();
-    const t=data.training, trend=data.weekly_trend||[];
-    if(!t){loading.textContent='No training data yet.';return;}
+  function setArc(id, pct) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var len = (Math.min(pct, 100) / 100) * circ;
+    el.setAttribute('stroke-dasharray', len + ' ' + (circ - len));
+  }
 
-    // Zone 2 ring
-    setText('z2-val',t.z2_weekly_avg_min||0);
-    const circ=2*Math.PI*90;
-    const z2Pct=Math.min(t.z2_pct||0,100)/100;
-    setTimeout(()=>{
-      document.getElementById('z2-arc').setAttribute('stroke-dasharray',(z2Pct*circ)+' '+(circ-z2Pct*circ));
-    },300);
+  try {
+    var resp = await fetch(API + '/api/training_overview');
+    if (!resp.ok) throw new Error(resp.status);
+    var data = await resp.json();
+    var t = data.training, trend = data.weekly_trend || [];
+    if (!t) { loading.textContent = 'No training data yet.'; return; }
 
-    // Detail bars
-    setText('val-wk',t.workouts_30d||0); setWidth('bar-wk',(t.workouts_30d/30)*100);
-    setText('val-wavg',t.weekly_avg||0); setWidth('bar-wavg',(t.weekly_avg/7)*100);
-    setText('val-mins',t.total_minutes_30d||0); setWidth('bar-mins',Math.min(100,(t.total_minutes_30d/2000)*100));
-    setText('val-strain',t.avg_strain!=null?t.avg_strain.toFixed(1):'\u2014'); setWidth('bar-strain',((t.avg_strain||0)/21)*100);
-    setText('val-str',t.strength_sessions_30d||0); setWidth('bar-str',(t.strength_sessions_30d/15)*100);
+    /* ── Hero gauges ── */
+    var z2Avg = t.z2_weekly_avg_min || 0;
+    setText('g-z2-num', z2Avg);
+    var z2El = document.getElementById('g-z2-num');
+    if (z2El) z2El.style.color = z2Avg >= 150 ? '#3ecf8e' : z2Avg >= 90 ? '#f59e0b' : '#ef4444';
+    setArc('g-z2-arc', Math.min(100, (z2Avg / 200) * 100));
 
-    // Activity chips
-    const actGrid=document.getElementById('t-activities');
-    if(t.top_activities&&t.top_activities.length){
-      actGrid.innerHTML=t.top_activities.map(a=>`<div class="t-activity-chip"><span class="t-activity-chip__count">${a.count}</span> ${a.type}</div>`).join('');
-    } else { actGrid.innerHTML='<div style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px">No activity data</div>'; }
+    var wk30 = t.workouts_30d || 0;
+    setText('g-wk-num', wk30);
+    setArc('g-wk-arc', Math.min(100, (wk30 / 30) * 100));
 
-    // Weekly chart
-    if(trend.length>=3){
-      const canvas=document.getElementById('t-trend-canvas');
-      const dpr=window.devicePixelRatio||1;
-      canvas.width=canvas.offsetWidth*dpr; canvas.height=canvas.offsetHeight*dpr;
-      const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
-      const W=canvas.offsetWidth,H=canvas.offsetHeight;
-      const pad={t:20,r:16,b:28,l:44};
-      const iW=W-pad.l-pad.r,iH=H-pad.t-pad.b;
-      const nn=trend.length, barW=Math.max(10,(iW/nn)-6);
-      const maxMin=Math.max(...trend.map(w=>w.minutes),300);
+    var avgStrain = t.avg_strain;
+    setText('g-strain-num', avgStrain != null ? avgStrain.toFixed(1) : '\u2014');
+    setArc('g-strain-arc', avgStrain != null ? (avgStrain / 21) * 100 : 0);
 
-      ctx.strokeStyle='rgba(255,255,255,0.03)';ctx.lineWidth=1;
-      for(let r=0;r<=4;r++){const y=pad.t+(r/4)*iH;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();}
+    var strSessions = t.strength_sessions_30d || 0;
+    setText('g-str-num', strSessions);
+    setArc('g-str-arc', Math.min(100, (strSessions / 15) * 100));
 
-      trend.forEach((w,i)=>{
-        const x=pad.l+(i/nn)*iW+3;
-        const hTotal=(w.minutes/maxMin)*iH;
-        const hZ2=(w.z2_min/maxMin)*iH;
-        ctx.fillStyle='rgba(239,68,68,0.35)';
-        ctx.fillRect(x,pad.t+iH-hTotal,barW,hTotal);
-        ctx.fillStyle='rgba(62,207,142,0.65)';
-        ctx.fillRect(x,pad.t+iH-hZ2,barW,hZ2);
+    /* ── Zone 2 editorial 3-col ── */
+    setText('zval-z2', z2Avg + ' min');
+    setWidth('zbar-z2', Math.min(100, (z2Avg / 200) * 100));
+
+    var totalMin = t.total_minutes_30d || 0;
+    setText('zval-total', totalMin.toLocaleString() + ' min');
+    setWidth('zbar-total', Math.min(100, (totalMin / 2000) * 100));
+
+    var weeklyAvg = t.weekly_avg || 0;
+    setText('zval-wavg', weeklyAvg);
+    setWidth('zbar-wavg', Math.min(100, (weeklyAvg / 7) * 100));
+
+    /* ── Activity chips ── */
+    var actGrid = document.getElementById('t-activities');
+    if (t.top_activities && t.top_activities.length) {
+      actGrid.innerHTML = t.top_activities.map(function(a) {
+        return '<div class="t-activity-chip"><span class="t-activity-chip__count">' + a.count + '</span> ' + a.type + '</div>';
+      }).join('');
+    } else {
+      actGrid.innerHTML = '<div style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px">No activity data</div>';
+    }
+
+    /* ── Weekly chart ── */
+    if (trend.length >= 3) {
+      var canvas = document.getElementById('t-trend-canvas');
+      var dpr = window.devicePixelRatio || 1;
+      canvas.width = canvas.offsetWidth * dpr;
+      canvas.height = canvas.offsetHeight * dpr;
+      var ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      var W = canvas.offsetWidth, H = canvas.offsetHeight;
+      var pad = { t: 20, r: 16, b: 28, l: 44 };
+      var iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
+      var nn = trend.length, barW = Math.max(10, (iW / nn) - 6);
+      var maxMin = Math.max.apply(null, trend.map(function(w) { return w.minutes; }).concat([300]));
+
+      /* Grid lines */
+      ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+      ctx.lineWidth = 1;
+      for (var r = 0; r <= 4; r++) {
+        var y = pad.t + (r / 4) * iH;
+        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+      }
+
+      /* Bars */
+      trend.forEach(function(w, i) {
+        var x = pad.l + (i / nn) * iW + 3;
+        var hTotal = (w.minutes / maxMin) * iH;
+        var hZ2 = (w.z2_min / maxMin) * iH;
+        ctx.fillStyle = 'rgba(239,68,68,0.35)';
+        ctx.fillRect(x, pad.t + iH - hTotal, barW, hTotal);
+        ctx.fillStyle = 'rgba(62,207,142,0.65)';
+        ctx.fillRect(x, pad.t + iH - hZ2, barW, hZ2);
       });
 
-      ctx.fillStyle='rgba(255,255,255,0.25)';ctx.font='10px monospace';ctx.textAlign='right';
-      [0,Math.round(maxMin/2),maxMin].forEach(v=>{
-        const y=pad.t+iH-(v/maxMin)*iH;
-        ctx.fillText(v+'m',pad.l-6,y+4);
+      /* Y labels */
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'right';
+      [0, Math.round(maxMin / 2), maxMin].forEach(function(v) {
+        var yy = pad.t + iH - (v / maxMin) * iH;
+        ctx.fillText(v + 'm', pad.l - 6, yy + 4);
       });
     }
 
-    loading.style.display='none'; content.style.display='block';
-  }catch(e){loading.textContent='Could not load training data.';console.error(e);}
+    loading.style.display = 'none';
+    content.style.display = 'block';
+  } catch (e) {
+    loading.textContent = 'Could not load training data.';
+    console.error(e);
+  }
 })();
 </script>
 </body>
