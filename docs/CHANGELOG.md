@@ -1,3 +1,65 @@
+## v3.9.31 — 2026-03-26: Website Review #4 + Story Page + Homepage Overhaul
+
+### Summary
+Product Board conducted comprehensive pre-launch website audit (Review #4) with 5 simulated audience personas and 8-member board synthesis. Identified 47 implementation tasks across 5 sessions. Completed Sessions 1 and 2 — story page content and homepage integrity fixes.
+
+### What Shipped
+
+**Session 0 — Quick fixes (earlier in session)**
+- Footer logo AMJ → AJM (`components.js`)
+- Story page placeholder blocks hidden via CSS
+- Chronicle: removed "Silence in the Data" + "First Contact" from `posts.json`
+- All 4 seed experiments abandoned (Tongkat Ali, NMN, Creatine, Berberine) — cleaned DynamoDB
+
+**Session 1 — Story Page (tasks 1.1–1.10)**
+- All 5 chapters implemented from `STORY_DRAFTS_v1.md` into `site/story/index.html`
+- Chapter 1: "The Moment" (302 lbs, the cycle, DoorDash spiral, "why does it keep coming back?")
+- Chapter 2: "The Problem With Previous Attempts" (pattern diagnosis, coping mechanism insight)
+- Chapter 3: "The Build" (first Lambda, Claude partnership, professional angle)
+- Chapter 4: "What the Data Has Shown" (supplements→sleep, CGM→anxiety, platform didn't prevent relapse)
+- Chapter 5: "Why Public" (losing cheerleader, accountability, building toward 185)
+- Pull quote updated to real words from interview
+- Editorial typography: 18px font, 1.9 line-height, chapter dividers, throughline callout component
+- Throughline links: Ch3→/platform/, Ch4→/explorer/, Ch5→/chronicle/, story-nav→/live/
+- Journey timeline moved below story body for uninterrupted reading
+- About page: "production code" wording fixed (task 4.1)
+
+**Session 2 — Homepage (tasks 2.1–2.9)**
+- 🔴 BLOCKER RESOLVED: Fake discovery cards removed (fabricated r-values, p-values)
+- Replaced with 3 narrative insight cards from real interview observations (supplements→sleep, CGM→anxiety, platform→relapse)
+- Dynamic correlation loader preserved — will auto-replace with real FDR data when available
+- Hero simplified: removed stat chips, heartbeat canvas, "Start here" box (~11 elements → ~6)
+- Dual-path CTAs updated: "Read My Story" is now primary left-side CTA (was "Prequel Chronicles")
+- "Day 1 vs Today" empty states fixed: shows "Apr 1" / "data starts Day 1" instead of dashes/loading
+
+### Files Created
+- `docs/reviews/REVIEW_2026-03-26_website_v4.md` — Full review with 5 personas, 8 board members, page rankings
+- `docs/reviews/IMPLEMENTATION_PLAN_WR4.md` — 47-task implementation plan across 5 sessions
+
+### Files Modified
+- `site/story/index.html` — Complete rewrite (5 chapters, editorial CSS, throughline links)
+- `site/index.html` — Discovery cards, hero simplification, empty states
+- `site/about/index.html` — "production code" wording
+- `site/assets/js/components.js` — Footer AMJ→AJM
+- `site/journal/posts.json` — Removed 2 articles
+
+### Pre-Launch Blockers Remaining (from WR4)
+- ~~Story page content~~ ✅ DONE
+- ~~Fake discovery cards~~ ✅ DONE
+- ~~About page wording~~ ✅ DONE
+- Chronicle sample page (`/chronicle/sample/`) — Session 3
+- Homepage hero further simplification (ticker) — Session 2 stretch
+
+### Next Session (Session 3: Chronicle + Subscribe Funnel)
+See `docs/reviews/IMPLEMENTATION_PLAN_WR4.md` tasks 3.1–3.10:
+- Chronicle numbering explainer
+- Elena Voss bio page (`site/elena/index.html`)
+- /chronicle/sample/ page (pre-launch blocker)
+- Subscribe CTA messaging unification
+- Sticky subscribe bar timing adjustment
+
+---
+
 ## v3.9.30.1 — 2026-03-26: Story Page Content Audit + Interview Drafts
 
 ### Summary
