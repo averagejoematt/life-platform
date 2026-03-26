@@ -215,14 +215,50 @@
     </div>
   </div>
 
-  <h2>Review History</h2>
-  <p>The platform has been reviewed 17 times since its inception. Grade trajectory:</p>
-  <div style="display:flex;gap:var(--space-3);flex-wrap:wrap;margin:var(--space-4) 0;">
-    <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);border:1px solid var(--border);padding:4px 10px;">R13: B+</span>
-    <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);border:1px solid var(--border);padding:4px 10px;">R14: A</span>
-    <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);border:1px solid var(--border);padding:4px 10px;">R15: A</span>
-    <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);border:1px solid var(--border);padding:4px 10px;">R16: A</span>
-    <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);border:1px solid var(--accent-dim);padding:4px 10px;">R17: A-</span>
+  <h2>Full Review History</h2>
+  <p>17 architecture reviews since inception. Each triggered by a major platform change. Grade trajectory shows the journey from early builds to production-grade system.</p>
+
+  <div style="display:grid;grid-template-columns:60px 50px 1fr;gap:0;margin-top:var(--space-6);border:1px solid var(--border);">
+    <div style="padding:var(--space-2) var(--space-3);background:var(--surface);font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);border-bottom:1px solid var(--border);">Review</div>
+    <div style="padding:var(--space-2) var(--space-3);background:var(--surface);font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);border-bottom:1px solid var(--border);">Grade</div>
+    <div style="padding:var(--space-2) var(--space-3);background:var(--surface);font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);border-bottom:1px solid var(--border);">What changed</div>
+
+    <div style="padding:var(--space-3);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);border-bottom:1px solid var(--border-subtle);">R1&ndash;R4</div>
+    <div style="padding:var(--space-3);font-family:var(--font-display);font-size:18px;color:var(--text-muted);border-bottom:1px solid var(--border-subtle);">C&ndash;B</div>
+    <div style="padding:var(--space-3);font-size:var(--text-xs);color:var(--text-muted);border-bottom:1px solid var(--border-subtle);line-height:var(--lh-body)">Early builds. Single-table design established. First ingest Lambdas. No CI/CD, no monitoring, manual deploys only.</div>
+
+    <div style="padding:var(--space-3);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);border-bottom:1px solid var(--border-subtle);">R5&ndash;R8</div>
+    <div style="padding:var(--space-3);font-family:var(--font-display);font-size:18px;color:var(--text-muted);border-bottom:1px solid var(--border-subtle);">B&ndash;B+</div>
+    <div style="padding:var(--space-3);font-size:var(--text-xs);color:var(--text-muted);border-bottom:1px solid var(--border-subtle);line-height:var(--lh-body)">MCP server launched. Character sheet engine. KMS encryption added. Secrets Manager migration from .env files. 19 data sources integrated.</div>
+
+    <div style="padding:var(--space-3);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);border-bottom:1px solid var(--border-subtle);">R9&ndash;R12</div>
+    <div style="padding:var(--space-3);font-family:var(--font-display);font-size:18px;color:var(--text-muted);border-bottom:1px solid var(--border-subtle);">B+</div>
+    <div style="padding:var(--space-3);font-size:var(--text-xs);color:var(--text-muted);border-bottom:1px solid var(--border-subtle);line-height:var(--lh-body)">Intelligence layer: correlation engine, hypothesis generation, adaptive mode. Ingestion validator. PITR enabled. Still no CI/CD &mdash; deployment incidents accumulating.</div>
+
+    <div style="padding:var(--space-3);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);border-bottom:1px solid var(--border-subtle);">R13</div>
+    <div style="padding:var(--space-3);font-family:var(--font-display);font-size:18px;color:var(--c-amber-500);border-bottom:1px solid var(--border-subtle);">B+</div>
+    <div style="padding:var(--space-3);font-size:var(--text-xs);color:var(--text-muted);border-bottom:1px solid var(--border-subtle);line-height:var(--lh-body)"><strong style="color:var(--text)">Turning point.</strong> First comprehensive external-style review. 15 findings. #1 risk: no CI/CD pipeline. 8 deployment-related incidents documented. Triggered the 30-60-90 day remediation plan.</div>
+
+    <div style="padding:var(--space-3);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);border-bottom:1px solid var(--border-subtle);">R14</div>
+    <div style="padding:var(--space-3);font-family:var(--font-display);font-size:18px;color:var(--accent);border-bottom:1px solid var(--border-subtle);">A</div>
+    <div style="padding:var(--space-3);font-size:var(--text-xs);color:var(--text-muted);border-bottom:1px solid var(--border-subtle);line-height:var(--lh-body)">X-Ray tracing on all Lambdas. MCP synthetic canary every 4h. Security hardening: OIDC, OAuth 2.1, HMAC. R13 critical findings resolved.</div>
+
+    <div style="padding:var(--space-3);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);border-bottom:1px solid var(--border-subtle);">R15</div>
+    <div style="padding:var(--space-3);font-family:var(--font-display);font-size:18px;color:var(--accent);border-bottom:1px solid var(--border-subtle);">A</div>
+    <div style="padding:var(--space-3);font-size:var(--text-xs);color:var(--text-muted);border-bottom:1px solid var(--border-subtle);line-height:var(--lh-body)">Platform steady state. Zero dimension changes from R14. All 6 R15 findings resolved. Google Calendar deliberately deferred (data governance).</div>
+
+    <div style="padding:var(--space-3);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);border-bottom:1px solid var(--border-subtle);">R16</div>
+    <div style="padding:var(--space-3);font-family:var(--font-display);font-size:18px;color:var(--accent);border-bottom:1px solid var(--border-subtle);">A</div>
+    <div style="padding:var(--space-3);font-size:var(--text-xs);color:var(--text-muted);border-bottom:1px solid var(--border-subtle);line-height:var(--lh-body)">CI/CD pipeline activated. GitHub Actions with OIDC federation. Manual approval gate + auto-rollback. R13 #1 finding officially closed.</div>
+
+    <div style="padding:var(--space-3);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);">
+      R17</div>
+    <div style="padding:var(--space-3);font-family:var(--font-display);font-size:18px;color:var(--accent);">A-</div>
+    <div style="padding:var(--space-3);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body)"><strong style="color:var(--text)">Current.</strong> Public site with AI endpoints expanded the attack surface. Grade dips from A to A- because security/observability controls are catching up to the new risk profile. 13 findings, 0 critical.</div>
+  </div>
+
+  <div style="margin-top:var(--space-6);padding:var(--space-5);border-left:2px solid var(--accent);background:var(--accent-bg-subtle);">
+    <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body)"><strong style="color:var(--text)">The pattern:</strong> Grade drops when the platform takes on new risk (public endpoints, AI integration, new data sources). Grade recovers when controls catch up. The R13&rarr;R14 jump from B+ to A is the sharpest improvement &mdash; that's what happens when you fix the deployment pipeline.</div>
   </div>
 
   <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);margin-top:var(--space-8);">
