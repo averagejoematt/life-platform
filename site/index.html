@@ -460,33 +460,9 @@
     </div>
   </div>
 
-  <!-- Below-fold stat chips -->
-  <div class="hero-below-fold">
-    <div class="stat-chip">
-      <span class="chip-label">Experiment Day</span>
-      <span class="chip-value experiment-counter" data-format="number" id="hero-days">0</span>
-    </div>
-    <div class="stat-chip">
-      <span class="chip-label">Current Streak</span>
-      <span class="chip-value" id="hero-streak">Day 0</span>
-    </div>
-    <div class="stat-chip">
-      <span class="chip-label">Data Sources</span>
-      <span class="chip-value" id="hero-data-sources">19</span>
-    </div>
-  </div>
+  <!-- Stat chips moved to /live/ — hero stays clean -->
 
-  <!-- HP-11: Heartbeat as ambient hero background -->
-  <div id="heartbeat-wrap" style="
-    position:absolute;bottom:0;left:50%;transform:translateX(-50%);
-    width:100%;max-width:900px;height:80px;
-    opacity:0.15;pointer-events:none;
-    z-index:0;
-  ">
-    <canvas id="heartbeat-canvas" style="width:100%;height:80px;display:block;"></canvas>
-    <span id="hb-status" style="display:none"></span>
-    <span id="hb-label" style="display:none"></span>
-  </div>
+  <!-- Heartbeat canvas removed from hero for clarity -->
 
   <!-- Latest Chronicle headline -->
   <a class="chronicle-teaser" href="/chronicle/" id="chronicle-teaser" style="display:none;">
@@ -494,26 +470,7 @@
     <span class="teaser-title" id="chronicle-teaser-title"></span>
   </a>
 
-  <!-- WR-31: "Start here" CTA -->
-  <div style="
-    max-width: 500px;
-    margin: 0 0 var(--space-6);
-    padding: var(--space-4) var(--space-5);
-    background: rgba(var(--amber-rgb), 0.06);
-    border: 1px solid rgba(var(--amber-rgb), 0.15);
-    border-radius: 8px;
-    text-align: center;
-    opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.55s;
-  ">
-    <a href="/story/" style="
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--ls-tag);
-      color: var(--c-amber-400);
-      text-decoration: none;
-    ">New here? Read the full story &rarr;</a>
-  </div>
+  <!-- "Read the story" is now the primary CTA in the dual-path section below -->
 
   <!-- HP-03: Hero subscribe input -->
   <div class="hero-subscribe" style="max-width:500px;opacity:0;animation:fadeUp 0.6s ease forwards 0.58s;">
@@ -527,10 +484,10 @@
 
   <!-- WR-16: Dual-path navigation CTAs -->
   <div class="hero-dual-cta">
-    <a href="/chronicle/" class="dual-cta dual-cta--journey">
-      <span class="dual-cta__label">// the human side</span>
-      <span class="dual-cta__title">The Prequel Chronicles</span>
-      <span class="dual-cta__sub" data-const="journey.cta_sub">302 lbs. A relapse. A relaunch. Day 1.</span>
+    <a href="/story/" class="dual-cta dual-cta--journey">
+      <span class="dual-cta__label">// start here</span>
+      <span class="dual-cta__title">Read My Story</span>
+      <span class="dual-cta__sub">302 lbs. A relapse. A relaunch. Why I built this.</span>
       <span class="dual-cta__arrow">&darr;</span>
     </a>
     <a href="/platform/" class="dual-cta dual-cta--platform">
@@ -549,10 +506,10 @@
 </section>
 
 <script>
-// WR-43: Animated heartbeat / biometric signature
+// WR-43: Heartbeat animation — disabled (canvas removed for hero simplification)
 (function() {
   const canvas = document.getElementById('heartbeat-canvas');
-  if (!canvas) return;
+  if (!canvas) return; // exits immediately — canvas removed
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   const W = 460, H = 54;
@@ -696,14 +653,14 @@
       <!-- Weight -->
       <div style="margin-bottom:var(--space-5);">
         <div style="font-size:var(--text-2xs);color:var(--text-muted);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:2px">Weight</div>
-        <div style="font-family:var(--font-display);font-size:32px;color:var(--accent)" id="compare-weight">—</div>
-        <div style="font-size:var(--text-2xs);color:var(--accent-dim);font-family:var(--font-mono)" id="compare-weight-journey">lbs · loading</div>
+        <div style="font-family:var(--font-display);font-size:32px;color:var(--accent)" id="compare-weight">Apr 1</div>
+        <div style="font-size:var(--text-2xs);color:var(--accent-dim);font-family:var(--font-mono)" id="compare-weight-journey">data starts Day 1</div>
         <div style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono)" id="compare-weight-30d"></div>
       </div>
       <!-- Habits -->
       <div style="margin-bottom:var(--space-5);">
         <div style="font-size:var(--text-2xs);color:var(--text-muted);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:2px">Habits</div>
-        <div style="font-family:var(--font-display);font-size:32px;color:var(--accent)" id="compare-habits">—</div>
+        <div style="font-family:var(--font-display);font-size:32px;color:var(--accent)" id="compare-habits">0</div>
         <div style="font-size:var(--text-2xs);color:var(--accent-dim);font-family:var(--font-mono)" id="compare-habits-label">day streak</div>
       </div>
       <!-- Sleep -->
@@ -716,7 +673,7 @@
       <div>
         <div style="font-size:var(--text-2xs);color:var(--text-muted);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:2px">Level</div>
         <div style="font-family:var(--font-display);font-size:32px;color:var(--accent)" id="compare-level">—</div>
-        <div style="font-size:var(--text-2xs);color:var(--accent-dim);font-family:var(--font-mono)" id="compare-level-label">loading...</div>
+        <div style="font-size:var(--text-2xs);color:var(--accent-dim);font-family:var(--font-mono)" id="compare-level-label">tracking from Day 1</div>
       </div>
     </div>
   </div>
@@ -1016,25 +973,22 @@
   </div>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);margin-bottom:var(--space-8)">The platform runs weekly Pearson correlation analysis across 23 metric pairs with Benjamini-Hochberg FDR correction. These are real patterns from my data — not universal truths.</p>
   <div id="discoveries-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
-    <!-- HP-06: Dynamically loaded from /api/correlations?featured=true&limit=3 -->
-    <!-- Fallback cards shown until JS loads or if fetch fails -->
+    <!-- Narrative insight cards (real observations from interview, not fabricated stats) -->
+    <!-- Dynamic loader below will replace these with real FDR-significant correlations when available -->
     <div class="disc-fallback" style="background:var(--surface);padding:var(--space-6);">
-      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">Sleep onset → Recovery</div>
-      <p style="font-size:var(--text-sm);color:var(--text);line-height:var(--lh-body);margin-bottom:var(--space-3)">Bedtime after 11pm correlates with <strong style="color:var(--c-red-status)">-12% next-day recovery</strong></p>
-      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">r = -0.38 · p = 0.04 · n = 28d</div>
-      <div class="disc-share"><button class="disc-share-btn" onclick="shareDiscovery('Sleep → Recovery','Bedtime after 11pm correlates with -12% next-day recovery (r=-0.38).')">Share ↗</button></div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">Supplements → Sleep architecture</div>
+      <p style="font-size:var(--text-sm);color:var(--text);line-height:var(--lh-body);margin-bottom:var(--space-3)">Measurable shifts in deep sleep duration tracked to specific changes in my evening supplement stack. Before the platform, I was taking them on faith.</p>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">Personal observation · Platform-surfaced</div>
     </div>
     <div class="disc-fallback" style="background:var(--surface);padding:var(--space-6);">
-      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">Bed temp → Deep sleep</div>
-      <p style="font-size:var(--text-sm);color:var(--text);line-height:var(--lh-body);margin-bottom:var(--space-3)">Lowering Eight Sleep by 2° added <strong style="color:var(--accent)">+18 min deep sleep</strong>/night</p>
-      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">N=1 experiment · 14d window</div>
-      <div class="disc-share"><button class="disc-share-btn" onclick="shareDiscovery('Bed Temp → Deep Sleep','Lowering Eight Sleep by 2° added +18 min deep sleep/night.')">Share ↗</button></div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">CGM → Anxiety relief</div>
+      <p style="font-size:var(--text-sm);color:var(--text);line-height:var(--lh-body);margin-bottom:var(--space-3)">The continuous glucose monitor didn't reveal a dietary crisis. It showed me <strong style="color:var(--accent)">I'm not in the danger zone I'd feared.</strong> The data changed my relationship with the anxiety.</p>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">Personal observation · CGM data</div>
     </div>
     <div class="disc-fallback" style="background:var(--surface);padding:var(--space-6);">
-      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">Zone 2 → HRV trend</div>
-      <p style="font-size:var(--text-sm);color:var(--text);line-height:var(--lh-body);margin-bottom:var(--space-3)">Weeks with 150+ min Zone 2 show <strong style="color:var(--accent)">+8% HRV improvement</strong></p>
-      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">r = 0.31 · p = 0.08 (trending, not significant) · 4 weeks</div>
-      <div class="disc-share"><button class="disc-share-btn" onclick="shareDiscovery('Zone 2 → HRV','Weeks with 150+ min Zone 2 show +8% HRV improvement (trending).')">Share ↗</button></div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">Platform → Didn't prevent relapse</div>
+      <p style="font-size:var(--text-sm);color:var(--text);line-height:var(--lh-body);margin-bottom:var(--space-3)">19 data sources. Daily AI briefs. Habit tracking. <strong style="color:var(--c-red-status)">The system watched the spiral happen</strong> without intervening. That gap is what Day 1 is designed to fix.</p>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">Honest assessment · <a href="/story/" style="color:var(--accent-dim);text-decoration:none">Read the full story</a></div>
     </div>
   </div>
   <script>
