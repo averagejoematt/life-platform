@@ -1,8 +1,8 @@
-## v3.9.40 — 2026-03-27: Nav Spacer Architecture + Bug Sweep
+## v3.9.40 — 2026-03-27: Nav Spacer Architecture + Catalog Fix + UX Cleanup
 
-Tech Board–approved architectural fix: centralized nav clearance via .nav-spacer div injected by components.js, eliminating per-page calc(var(--nav-height) + ...) padding across 37 files. Fixed S3 path mismatch blocking challenges/experiments, dropdown heading visibility, home page alignment, stale nav labels.
+Tech Board–approved nav spacer architecture (5-1-1 vote), Product Board–approved hierarchy tab removal (7-0 vote). Fixed challenge catalog format bug that broke all 65 tiles. Swept Arena/Lab naming to Challenges/Experiments everywhere. Centered home page comparison. Fixed dropdown headings. 37-file nav-height sweep.
 
-### Architecture (Tech Board Approved)
+### Architecture (Tech Board Approved — 5-1-1)
 - **Nav spacer pattern**: components.js injects `.nav-spacer` div after nav — single source of truth for fixed-nav clearance
 - `.nav-spacer` CSS class in base.css (height: var(--nav-height))
 - `deploy/nav_spacer_sweep.sh` — automated 3-pattern sweep across all 37 page files
@@ -10,16 +10,28 @@ Tech Board–approved architectural fix: centralized nav clearance via .nav-spac
   - Pattern B: `margin-top:var(--nav-height)` on tickers → `margin-top:0` (home, achievements, chronicle)
   - Pattern C: `top:var(--nav-height)` on fixed elements → kept intentionally (chronicle reading progress)
 
+### UX (Product Board Approved — 7-0)
+- **Hierarchy tab bar removed** from all method pages — breadcrumb + main nav sufficient for wayfinding
+- **"Where This Fits" contextual blurb kept** — provides relationship context without competing navigation
+- `buildHierarchyNav()` now returns only the blurb, no tab bar
+
 ### Fixes
+- **Challenge catalog format**: v3.9.39 expansion rewrote JSON as flat list instead of `{categories, challenges}` dict — API crashed, only DynamoDB active records showed. Rebuilt with proper wrapper — all 65 tiles restored
 - **S3 path mismatch**: challenge catalog + experiment library uploaded to `config/` but Lambda reads `site/config/` — fixed
+- **Name consistency**: "The Arena" → "Challenges" and "The Lab" → "Experiments" in breadcrumbs, `<title>`, `<h1>`, OG tags, pipeline navs
+- **Pipeline navs removed** from challenges + discoveries pages (inconsistent — appeared on some pages, not others)
+- **Discoveries page**: added missing breadcrumb + hierarchy-nav mount
 - **Dropdown headings**: "What I Do" / "What I Tested" now visually distinct (font-weight: 700, color: accent-dim)
 - **Home page Day 1 vs Today**: centered grid + heading + CTA (was left-aligned)
-- **Stale nav labels**: "Active Tests" → "Experiments" in challenges pipeline nav; "The Arena" → "Challenges" in experiments CTA + reading-path
 
 ### Files Modified
-- `site/assets/js/components.js` — nav spacer injection
-- `site/assets/css/base.css` — .nav-spacer class, dropdown heading styling, breadcrumb revert
+- `site/assets/js/components.js` — nav spacer injection, hierarchy tab bar removal
+- `site/assets/css/base.css` — .nav-spacer class, dropdown heading styling
 - `site/index.html` — Day 1 vs Today centering
+- `site/challenges/index.html` — name cleanup, pipeline nav removed
+- `site/experiments/index.html` — name cleanup
+- `site/discoveries/index.html` — pipeline nav removed, breadcrumb + hierarchy mount added
+- `seeds/challenges_catalog.json` — rebuilt with proper dict format
 - 37 page HTML files — nav-height clearance removed (via sweep script)
 - `deploy/nav_spacer_sweep.sh` — reusable sweep script
 
