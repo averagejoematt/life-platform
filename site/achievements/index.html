@@ -189,6 +189,11 @@
       font-size: 24px;
       line-height: 1;
     }
+    .badge__icon img {
+      width: 56px;
+      height: 56px;
+      display: block;
+    }
     .badge--locked .badge__icon { filter: grayscale(1) opacity(0.5); }
 
     .badge__name {
@@ -364,34 +369,18 @@
   function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
   var CATEGORY_META = {
-    streak:    { label: 'Streaks',          emoji: '🔥', order: 1 },
-    level:     { label: 'Level Milestones', emoji: '⬡',  order: 2 },
-    milestone: { label: 'Weight Milestones',emoji: '⚖️', order: 3 },
-    data:      { label: 'Data Consistency', emoji: '📊', order: 4 },
-    science:   { label: 'Experiments',      emoji: '🔬', order: 5 },
-    challenge: { label: 'Challenges',       emoji: '🏆', order: 6 },
+    streak:    { label: 'Streaks',          icon: '<img src="/assets/icons/custom/icon-streak.svg" width="18" height="18" style="vertical-align:middle">', order: 1 },
+    level:     { label: 'Level Milestones', icon: '<img src="/assets/icons/custom/icon-level-up.svg" width="18" height="18" style="vertical-align:middle">', order: 2 },
+    milestone: { label: 'Weight Milestones',icon: '<img src="/assets/icons/custom/icon-scale.svg" width="18" height="18" style="vertical-align:middle">', order: 3 },
+    data:      { label: 'Data Consistency', icon: '<img src="/assets/icons/custom/icon-cgm.svg" width="18" height="18" style="vertical-align:middle">', order: 4 },
+    science:   { label: 'Experiments',      icon: '<img src="/assets/icons/custom/icon-experiment.svg" width="18" height="18" style="vertical-align:middle">', order: 5 },
+    challenge: { label: 'Challenges',       icon: '<img src="/assets/icons/custom/icon-consistency.svg" width="18" height="18" style="vertical-align:middle">', order: 6 },
   };
 
-  var BADGE_ICONS = {
-    week_warrior:          '🔥',
-    monthly_grind:         '🔥',
-    quarterly:             '🔥',
-    first_level_up:        '⬡',
-    apprentice:            '⬡',
-    journeyman:            '⬡',
-    lost_20:               '⚖️',
-    sub_280:               '⚖️',
-    sub_260:               '⚖️',
-    '100_days':            '📊',
-    '365_days':            '📊',
-    first_experiment:      '🔬',
-    hypothesis_confirmed:  '🔬',
-    first_challenge:       '🏆',
-    five_challenges:       '🏆',
-    ten_challenges:        '🏆',
-    twenty_five_challenges:'🏆',
-    perfect_challenge:     '✨',
-  };
+  // Badge SVG path helper — maps badge ID to custom SVG file
+  function badgeSvgPath(id) {
+    return '/assets/img/badges/badge_' + id + '.svg';
+  }
 
   // Circumference of badge ring (r=30)
   var CIRC = 2 * Math.PI * 30;
@@ -409,7 +398,6 @@
 
   function renderBadge(badge) {
     var cls = badge.earned ? 'badge badge--earned' : 'badge badge--locked';
-    var icon = BADGE_ICONS[badge.id] || '🏅';
     var statusText = '';
     if (badge.earned) {
       statusText = '✓ Earned';
@@ -430,7 +418,7 @@
 
     return '<div class="' + cls + '">' +
       '<div class="badge__ring">' + renderBadgeRing(badge.earned) +
-        '<div class="badge__icon">' + icon + '</div>' +
+        '<div class="badge__icon"><img src="' + badgeSvgPath(badge.id) + '" alt="' + esc(badge.label) + '" width="56" height="56" loading="lazy"></div>' +
       '</div>' +
       '<div class="badge__name">' + esc(badge.label) + '</div>' +
       '<div class="badge__desc">' + esc(badge.description) + '</div>' +
@@ -477,12 +465,12 @@
 
     var html = '';
     catKeys.forEach(function(cat) {
-      var meta = CATEGORY_META[cat] || { label: cat, emoji: '🏅' };
+      var meta = CATEGORY_META[cat] || { label: cat, icon: '' };
       var catBadges = groups[cat];
       var earned = catBadges.filter(function(b) { return b.earned; }).length;
       html += '<section class="badge-section badge-section--' + cat + ' reveal">' +
         '<div class="badge-section__header">' +
-          '<div class="eyebrow">' + meta.emoji + '</div>' +
+          '<div class="eyebrow">' + meta.icon + '</div>' +
           '<h2 class="badge-section__title">' + meta.label + '</h2>' +
           '<div class="badge-section__count">' + earned + ' / ' + catBadges.length + '</div>' +
         '</div>' +
