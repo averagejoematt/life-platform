@@ -1,46 +1,31 @@
 ## v3.9.41 — 2026-03-27: Pre-Launch Content Review (Product Board Editorial Session)
 
-Full editorial review across Home, Story, and About pages with Product Board content panel (Ava Moreau, Sofia Herrera, Jordan Kim, Margaret Calloway, Elena Voss, Mara Chen). Matthew provided detailed page-by-page feedback; board aligned and added independent catches.
+Full editorial review across Home, Story, and About pages with Product Board content panel. Matthew provided page-by-page feedback; board aligned and added catches.
 
 ### Home Page
-- **Hero tagline**: "For real this time" → "One person. Nineteen data sources. Every week, publicly."
-- **Hero narrative**: Broadened beyond weight — frames around being drowning in advice, wanting to listen to yourself, AI as lens for sleep/habits/mental state/relationships/happiness
-- **"Why I'm doing this in public"**: Rewritten — focuses on curiosity about AI reading full life picture + disappearing pattern + honesty
-- **Ticker**: "FOR REAL THIS TIME" → "THE EXPERIMENT BEGINS"
-- **Meta/OG/title tags**: Updated to match broader framing ("The Measured Life — AI Health Experiment")
-- **Bug fixes**: Removed duplicate subscribe line, duplicate "See a sample issue" link, duplicate social proof script, duplicate subscribe redirect
-- Removed "Senior Director at a SaaS company" from about section
+- Hero tagline: "For real this time" → "One person. Nineteen data sources. Every week, publicly."
+- Hero narrative broadened beyond weight (apps/podcasts/reels framing)
+- "Why I'm doing this in public" rewritten (disappearing pattern, honesty)
+- "Senior Director" removed, ticker updated, meta/OG/title tags updated
+- Fixed 4 duplicate bugs (subscribe line, sample link, social proof script, redirect)
 
-### Story Page
-- **Ch 1**: "Three times, actually — maybe four" → "Multiple times"
-- **Ch 1**: May 2025 passage leads with 5am gym/diet, not stretching
-- **Ch 1**: Slide paragraph rewritten — family, gentleman's agreement, Mondays counting to 100lbs
-- **Ch 1**: "Disgust" → "Disappointment" + promise elaboration (covenant, Rolex as covenant, trust question)
-- **Ch 2**: De-doxxed biographical details (removed ages, sailing, cities, relationships), added athletics (300lb lifts, 16-mile runs, competitive sports), isolation trigger framing
-- **Ch 2**: Pattern paragraph — limbic system/dopamine framing, purpose hypothesis, 5am gym sessions lead
-- **Ch 3**: Rewritten as product journey — AI therapy → optimization → data idea → mind spiraling. Removed "Senior Director", "terrifying"
-- **Ch 4**: Simplified to forward-looking — 10yr weight logs, stock-ticker pattern, "no data on mind yet"
-- **Ch 5**: Cheerleader/mum passage removed. Replaced with disappearing pattern, honesty, accountability
-- **Waveform**: Moved from bottom of page to between Ch 1 and Ch 2 for visual impact. Renamed "The Pattern"
-- **Meta tags**: Updated OG descriptions
+### Story Page (All 5 Chapters Rewritten)
+- Ch 1: "Multiple times", gym/diet leads, slide rewritten (gentleman's agreement), "disappointment" not "disgust", promise elaboration (covenant, trust)
+- Ch 2: De-doxxed, added athletics + isolation trigger, limbic system/purpose framing
+- Ch 3: Product journey focus (AI therapy → data idea → spiral), removed "Senior Director"/"terrifying"
+- Ch 4: Simplified to forward-looking (10yr logs, stock-ticker pattern, mind data gap)
+- Ch 5: Cheerleader passage removed, replaced with disappearing pattern + honesty
+- Waveform moved between Ch 1 and Ch 2, renamed "The Pattern"
 
 ### About Page
-- **Mission Brief sidebar**: Replaced weight/location/job blocks with dossier-style visual showing physical targets (weight, run, strength, movement), mental targets (social, mental health, journaling, satisfaction), system targets (character score 80+, no 5-month gaps), and current status
-- **"Senior Director"**: Removed from header, meta, bio prose, sidebar throughout
-- **Press/media section**: Replaced with warm "If You Want to Connect" section
-- **Media kit**: Removed entirely (speaking, bios, talk topics, booking, assets) — 60 lines stripped. Re-add after meaningful traffic
-- Dead `copyBio()` function removed
+- "Senior Director" removed throughout (meta, header, bio, sidebar)
+- Press/media section → warm "If You Want to Connect" section
+- Media kit/speaking/bios/talk topics removed entirely (60 lines)
+- Sidebar: "Day job: Sr. Director" → "Background: IT Career"
 
-### Bug Fixes (All Pages)
-- Removed stray `</div>` after nav mount on story + about pages
-- Duplicate dark mode toggle: nav.js was injecting second theme-toggle button alongside the one in components.js — removed nav.js duplicate
-
-### Files Modified
-- `site/index.html` — hero, narrative, "why public", meta tags, ticker, 4 duplicate bugs
-- `site/story/index.html` — all 5 chapters rewritten, waveform repositioned, meta tags, stray div
-- `site/about/index.html` — mission brief sidebar, connect section, media kit removed, meta tags, stray div, dead code
-- `site/assets/js/nav.js` — removed duplicate theme toggle (30 lines)
-- `deploy/cleanup_mediakit.py` — one-time script for media kit removal
+### Bug Fixes
+- Duplicate dark mode toggle in nav.js removed (components.js is source of truth)
+- Stray `</div>` tags removed from story + about pages
 
 ---
 
