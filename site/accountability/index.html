@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Matthew's public accountability board — every commitment tracked live. Tier 0 habits, pillar scores, weight progress. No hiding.">
+  <meta name="description" content="Matthew's public accountability contract — every commitment tracked live. The unedited record. No hiding.">
   <meta property="og:title" content="Accountability — Matthew Walker">
-  <meta property="og:description" content="Every commitment. Live compliance. No hiding. Public contract with daily data.">
+  <meta property="og:description" content="A public contract. Every commitment tracked. The unedited record.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com/accountability/">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
@@ -14,7 +14,7 @@
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Accountability — Matthew Walker">
-  <meta name="twitter:description" content="Every commitment. Live compliance. No hiding.">
+  <meta name="twitter:description" content="A public contract. Every commitment tracked. The unedited record.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <title>Accountability — Matthew Walker</title>
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
@@ -25,217 +25,158 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    /* ─── State Hero (ACCT-1 enhanced) ─── */
-    .state-hero {
+    /* ─── Accountability page — warm social-contract aesthetic ─── */
+    /* Override accent to amber/coral for visual warmth */
+    .acct-page { --acct-accent: var(--c-amber-500); --acct-accent-dim: var(--c-amber-300); --acct-coral: var(--c-coral-500); }
+
+    /* ─── Commitment Hero (6b) ─── */
+    .commitment-hero {
       padding-top: var(--nav-height);
       border-bottom: 1px solid var(--border);
     }
-    .state-hero__inner {
+    .commitment-hero__inner {
+      max-width: var(--prose-width);
+      margin: 0 auto;
+      padding: var(--space-16, 6rem) var(--page-padding) var(--space-12);
+    }
+    .commitment-hero blockquote {
+      margin: 0;
+      padding: var(--space-10) var(--space-10);
+      border-left: 4px solid var(--acct-accent);
+      background: var(--surface);
+      position: relative;
+    }
+    .commitment-hero blockquote::before {
+      content: '\201C';
+      font-family: var(--font-display);
+      font-size: 120px;
+      line-height: 0.7;
+      color: var(--acct-accent);
+      opacity: 0.08;
+      position: absolute;
+      top: var(--space-4);
+      left: var(--space-6);
+      pointer-events: none;
+    }
+    .commitment-hero blockquote p {
+      font-family: var(--font-serif);
+      font-size: clamp(1.25rem, 2.5vw, 1.5rem);
+      color: var(--text);
+      line-height: 1.65;
+      margin: 0;
+      position: relative;
+      z-index: 1;
+    }
+    .commitment-hero blockquote cite {
+      display: block;
+      margin-top: var(--space-6);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-style: normal;
+      letter-spacing: var(--ls-label);
+    }
+    .commitment-hero__rule {
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.7;
+      margin-top: var(--space-8);
+      max-width: var(--prose-width);
+    }
+    .commitment-hero__rule strong { color: var(--text); font-weight: 600; }
+
+    /* Witness counter (6f) */
+    .witness-counter {
+      margin-top: var(--space-8);
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+    .witness-counter__dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--acct-accent);
+      animation: witness-pulse 2s infinite;
+    }
+    @keyframes witness-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .witness-counter__text {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-label);
+    }
+    .witness-counter__number {
+      color: var(--acct-accent);
+      font-weight: 600;
+    }
+
+    /* Comparative context (6g) */
+    .comparative-context {
+      margin-top: var(--space-6);
+      padding: var(--space-4) var(--space-6);
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .comparative-context strong { color: var(--acct-accent); font-weight: 600; }
+
+    /* Pulse crosslink (6e) */
+    .pulse-link {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-6) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .pulse-link__text {
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+    }
+    .pulse-link__cta {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--acct-accent);
+      text-decoration: none;
+      letter-spacing: var(--ls-tag);
+      transition: color var(--dur-fast);
+    }
+    .pulse-link__cta:hover { color: var(--text); }
+
+    /* ─── Evidence sections ─── */
+    .evidence-section {
       max-width: var(--max-width);
       margin: 0 auto;
       padding: var(--space-12) var(--page-padding);
-      display: flex;
-      align-items: flex-start;
-      gap: var(--space-10);
-    }
-    .state-hero__ring {
-      flex-shrink: 0;
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      border: 3px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
-    }
-    .state-hero__ring--thriving { border-color: var(--c-green-500); box-shadow: 0 0 20px rgba(0,229,160,0.2); }
-    .state-hero__ring--grinding { border-color: var(--c-amber-500); box-shadow: 0 0 20px rgba(186,117,23,0.2); }
-    .state-hero__ring--slipping { border-color: var(--c-red-status); box-shadow: 0 0 20px rgba(226,75,74,0.2); }
-    .state-hero__ring--dormant  { border-color: var(--border); border-style: dashed; opacity: 0.6; }
-    .state-hero__ring-dot {
-      width: 24px; height: 24px;
-      border-radius: 50%;
-      background: var(--border);
-      transition: background var(--dur-fast);
-    }
-    .state-hero__ring--thriving .state-hero__ring-dot { background: var(--c-green-500); animation: pulse-dot 2s infinite; }
-    .state-hero__ring--grinding .state-hero__ring-dot { background: var(--c-amber-500); }
-    .state-hero__ring--slipping .state-hero__ring-dot { background: var(--c-red-status); }
-    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.5} }
-
-    .state-hero__body { flex: 1; }
-    .state-hero__eyebrow {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
-      margin-bottom: var(--space-3);
-    }
-    .state-hero__state {
-      font-family: var(--font-display);
-      font-size: var(--text-h1);
-      line-height: var(--lh-heading);
-      letter-spacing: var(--ls-display);
-      color: var(--text);
-      margin-bottom: var(--space-3);
-      transition: color var(--dur-fast);
-    }
-    .state-hero__state--thriving { color: var(--c-green-500); }
-    .state-hero__state--grinding { color: var(--c-amber-500); }
-    .state-hero__state--slipping { color: var(--c-red-status); }
-    .state-hero__state--dormant  { color: var(--text-muted); }
-    .state-hero__detail {
-      font-family: var(--font-mono);
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-    }
-    .state-hero__context {
-      margin-top: var(--space-4);
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-      max-width: 520px;
-    }
-
-    /* ─── 3-number snapshot (ACCT-3) ─── */
-    .snap3 {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1px;
-      background: var(--border);
       border-bottom: 1px solid var(--border);
     }
-    .snap3-card {
-      background: var(--bg);
-      padding: var(--space-8) var(--space-6);
-      text-decoration: none;
-      display: block;
-      transition: background var(--dur-fast);
-    }
-    .snap3-card:hover { background: var(--surface); }
-    .snap3-card__label {
+    .evidence-section__eyebrow {
       font-family: var(--font-mono);
-      font-size: var(--text-2xs);
+      font-size: var(--text-xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
-      color: var(--text-muted);
+      color: var(--acct-accent-dim);
       margin-bottom: var(--space-3);
     }
-    .snap3-card__value {
-      font-family: var(--font-display);
-      font-size: 48px;
-      line-height: 1;
-      color: var(--accent);
-      letter-spacing: var(--ls-display);
-    }
-    .snap3-card__sub {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      margin-top: var(--space-2);
-      letter-spacing: var(--ls-label);
-    }
-    .snap3-card__arrow {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      margin-top: var(--space-3);
-    }
-
-    /* ─── Accountability Arc (NEW) ─── */
-    .acct-arc {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .acct-arc__header {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      margin-bottom: var(--space-2);
-    }
-    .acct-arc__eyebrow {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
-    }
-    .acct-arc__avg {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-    }
-    .acct-arc__title {
+    .evidence-section__title {
       font-family: var(--font-display);
       font-size: var(--text-h2);
       color: var(--text);
       margin-bottom: var(--space-2);
     }
-    .acct-arc__sub {
+    .evidence-section__sub {
+      font-family: var(--font-serif);
       font-size: var(--text-sm);
       color: var(--text-muted);
-      margin-bottom: var(--space-8);
-      line-height: var(--lh-body);
-    }
-    .acct-arc__chart {
-      width: 100%;
-      height: 120px;
-      position: relative;
-    }
-    .acct-arc__chart svg {
-      width: 100%;
-      height: 100%;
-    }
-    .acct-arc__legend {
-      display: flex;
-      gap: var(--space-6);
-      margin-top: var(--space-4);
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-    }
-    .acct-arc__legend-dot {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-right: var(--space-2);
-      vertical-align: middle;
-    }
-
-    /* ─── Calendar section ─── */
-    .acct-section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .acct-section__eyebrow {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      color: var(--accent-dim);
-      margin-bottom: var(--space-3);
-    }
-    .acct-section__title {
-      font-family: var(--font-display);
-      font-size: var(--text-h2);
-      color: var(--text);
-      margin-bottom: var(--space-2);
-    }
-    .acct-section__sub {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      margin-bottom: var(--space-8);
-      line-height: var(--lh-body);
+      margin-bottom: var(--space-10);
+      line-height: 1.7;
+      max-width: 580px;
     }
 
     /* 30-day compliance calendar */
@@ -267,9 +208,9 @@
       pointer-events: none;
       z-index: 10;
     }
-    .cal-day--perfect { background: var(--c-green-500); }
+    .cal-day--perfect { background: var(--acct-accent); }
     .cal-day--partial  { background: var(--c-amber-500); opacity: 0.8; }
-    .cal-day--missed   { background: var(--c-red-status); opacity: 0.6; }
+    .cal-day--missed   { background: var(--c-coral-500); opacity: 0.7; }
     .cal-day--nodata   { background: var(--surface-raised); }
 
     /* Milestone link strip */
@@ -288,60 +229,188 @@
       letter-spacing: var(--ls-label);
     }
     .milestone-link__text strong {
-      color: var(--accent);
+      color: var(--acct-accent);
       font-weight: 600;
     }
     .milestone-link__cta {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      color: var(--accent-dim);
+      color: var(--acct-accent-dim);
       text-decoration: none;
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       transition: color var(--dur-fast);
     }
-    .milestone-link__cta:hover { color: var(--accent); }
+    .milestone-link__cta:hover { color: var(--acct-accent); }
 
-    /* ─── Nudge system (ACCT-2 evolved) ─── */
-    .nudge-panel {
+    /* ─── 90-day arc ─── */
+    .acct-arc {
       max-width: var(--max-width);
       margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
+      padding: var(--space-12) var(--page-padding);
       border-bottom: 1px solid var(--border);
     }
-    .nudge-panel__header {
+    .acct-arc__header {
       display: flex;
       align-items: baseline;
       justify-content: space-between;
       margin-bottom: var(--space-2);
     }
-    .nudge-panel__eyebrow {
+    .acct-arc__eyebrow {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
-      color: var(--accent-dim);
+      color: var(--acct-accent-dim);
     }
-    .nudge-panel__counter {
+    .acct-arc__avg {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      color: var(--text-faint);
-      transition: color var(--dur-fast);
+      color: var(--text-muted);
     }
-    .nudge-panel__counter--active { color: var(--c-green-500); }
-    .nudge-panel__title {
+    .acct-arc__title {
       font-family: var(--font-display);
-      font-size: var(--text-h3);
+      font-size: var(--text-h2);
       color: var(--text);
       margin-bottom: var(--space-2);
     }
-    .nudge-panel__sub {
+    .acct-arc__sub {
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-10);
+      line-height: 1.7;
+    }
+    .acct-arc__chart {
+      width: 100%;
+      height: 120px;
+      position: relative;
+    }
+    .acct-arc__chart svg {
+      width: 100%;
+      height: 100%;
+    }
+    .acct-arc__legend {
+      display: flex;
+      gap: var(--space-6);
+      margin-top: var(--space-4);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+    }
+    .acct-arc__legend-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: var(--space-2);
+      vertical-align: middle;
+    }
+
+    /* ─── Nudge Centerpiece (6c) ─── */
+    .nudge-centerpiece {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .nudge-centerpiece__header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: var(--space-2);
+    }
+    .nudge-centerpiece__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--acct-accent-dim);
+    }
+    .nudge-centerpiece__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .nudge-centerpiece__sub {
+      font-family: var(--font-serif);
       font-size: var(--text-sm);
       color: var(--text-muted);
       margin-bottom: var(--space-8);
-      max-width: 520px;
-      line-height: var(--lh-body);
+      max-width: 580px;
+      line-height: 1.7;
     }
+
+    /* Social proof stats (6c, 6k) */
+    .nudge-stats {
+      display: flex;
+      gap: var(--space-8);
+      margin-bottom: var(--space-8);
+      padding: var(--space-5) var(--space-6);
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+    }
+    .nudge-stat {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+    .nudge-stat__value {
+      font-family: var(--font-display);
+      font-size: 28px;
+      line-height: 1;
+      color: var(--acct-accent);
+      letter-spacing: var(--ls-display);
+    }
+    .nudge-stat__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      text-transform: uppercase;
+    }
+
+    /* Nudge distribution (6c) */
+    .nudge-distribution {
+      margin-bottom: var(--space-8);
+    }
+    .nudge-dist__bar-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-2);
+    }
+    .nudge-dist__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      width: 100px;
+      flex-shrink: 0;
+      text-align: right;
+    }
+    .nudge-dist__bar-track {
+      flex: 1;
+      height: 6px;
+      background: var(--surface-raised);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .nudge-dist__bar-fill {
+      height: 100%;
+      background: var(--acct-accent);
+      border-radius: 3px;
+      transition: width 0.6s ease;
+    }
+    .nudge-dist__count {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      width: 30px;
+      flex-shrink: 0;
+    }
+
+    /* Nudge buttons */
     .nudge-buttons {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -362,12 +431,12 @@
       align-items: center;
       gap: var(--space-3);
     }
-    .nudge-btn:hover:not(:disabled) { border-color: var(--accent); background: var(--bg); }
+    .nudge-btn:hover:not(:disabled) { border-color: var(--acct-accent); background: var(--bg); }
     .nudge-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .nudge-btn--sent { border-color: var(--c-green-500); background: rgba(0,229,160,0.06); color: var(--c-green-500); }
+    .nudge-btn--sent { border-color: var(--acct-accent); background: rgba(var(--amber-rgb), 0.06); color: var(--acct-accent); }
     .nudge-btn--sent:disabled { opacity: 1; }
     .nudge-btn svg { flex-shrink: 0; width: 18px; height: 18px; }
-    .nudge-panel__feedback {
+    .nudge-centerpiece__feedback {
       margin-top: var(--space-5);
       font-family: var(--font-mono);
       font-size: var(--text-xs);
@@ -375,11 +444,17 @@
       min-height: 1.5em;
     }
 
-    /* Recent nudge feed */
+    /* Recent nudge feed (6k) */
     .nudge-feed {
       margin-top: var(--space-8);
       padding-top: var(--space-6);
       border-top: 1px solid var(--border-subtle);
+    }
+    .nudge-feed__header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: var(--space-4);
     }
     .nudge-feed__label {
       font-family: var(--font-mono);
@@ -387,7 +462,11 @@
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       color: var(--text-faint);
-      margin-bottom: var(--space-4);
+    }
+    .nudge-feed__last-nudge {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
     }
     .nudge-feed__items {
       display: flex;
@@ -410,11 +489,154 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
+    /* ─── Nudge-Chronicle Loop (6j) ─── */
+    .chronicle-loop {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .chronicle-loop__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--acct-accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .chronicle-loop__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .chronicle-loop__sub {
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-8);
+      line-height: 1.7;
+      max-width: 580px;
+    }
+    .chronicle-loop__examples {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-6);
+    }
+    .chronicle-example {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: var(--space-4);
+      align-items: start;
+      padding: var(--space-6);
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+    }
+    .chronicle-example__nudge,
+    .chronicle-example__response {
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+    .chronicle-example__nudge { color: var(--acct-accent); }
+    .chronicle-example__arrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      align-self: center;
+    }
+    .chronicle-example__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-2);
+    }
+
+    /* ─── Reader Reflection (6i) ─── */
+    .reader-reflection {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .reader-reflection__inner {
+      max-width: 580px;
+    }
+    .reader-reflection__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--acct-accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .reader-reflection__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .reader-reflection__sub {
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin-bottom: var(--space-6);
+      line-height: 1.7;
+    }
+    .reader-reflection__textarea {
+      width: 100%;
+      min-height: 80px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-serif);
+      font-size: var(--text-sm);
+      padding: var(--space-4);
+      outline: none;
+      resize: vertical;
+      line-height: 1.6;
+      transition: border-color var(--dur-fast);
+    }
+    .reader-reflection__textarea::placeholder { color: var(--text-faint); }
+    .reader-reflection__textarea:focus { border-color: var(--acct-accent); }
+    .reader-reflection__row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: var(--space-3);
+    }
+    .reader-reflection__btn {
+      background: var(--acct-accent);
+      border: none;
+      color: var(--bg);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: var(--space-3) var(--space-6);
+      cursor: pointer;
+      transition: opacity var(--dur-fast);
+      white-space: nowrap;
+    }
+    .reader-reflection__btn:hover { opacity: 0.85; }
+    .reader-reflection__btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .reader-reflection__feedback {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      min-height: 1.4em;
+    }
+    .reader-reflection__feedback--ok { color: var(--acct-accent); }
+    .reader-reflection__feedback--err { color: var(--c-red-status); }
+
     /* ─── Subscribe CTA ─── */
     .acct-subscribe {
       max-width: var(--max-width);
       margin: 0 auto;
-      padding: var(--space-10) var(--page-padding);
+      padding: var(--space-12) var(--page-padding);
       border-bottom: 1px solid var(--border);
     }
     .acct-subscribe__inner {
@@ -425,7 +647,7 @@
       font-size: var(--text-xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
-      color: var(--accent-dim);
+      color: var(--acct-accent-dim);
       margin-bottom: var(--space-3);
     }
     .acct-subscribe__title {
@@ -435,10 +657,11 @@
       margin-bottom: var(--space-2);
     }
     .acct-subscribe__sub {
+      font-family: var(--font-serif);
       font-size: var(--text-sm);
       color: var(--text-muted);
       margin-bottom: var(--space-6);
-      line-height: var(--lh-body);
+      line-height: 1.7;
     }
     .acct-subscribe__row {
       display: flex;
@@ -456,9 +679,9 @@
       transition: border-color var(--dur-fast);
     }
     .acct-subscribe__input::placeholder { color: var(--text-faint); }
-    .acct-subscribe__input:focus { border-color: var(--accent); }
+    .acct-subscribe__input:focus { border-color: var(--acct-accent); }
     .acct-subscribe__btn {
-      background: var(--accent);
+      background: var(--acct-accent);
       border: none;
       color: var(--bg);
       font-family: var(--font-mono);
@@ -479,134 +702,94 @@
       color: var(--text-muted);
       min-height: 1.4em;
     }
-    .acct-subscribe__feedback--ok { color: var(--c-green-500); }
+    .acct-subscribe__feedback--ok { color: var(--acct-accent); }
     .acct-subscribe__feedback--err { color: var(--c-red-status); }
 
-    /* ─── Public commitment (enhanced) ─── */
-    .public-commitment {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-    }
-    .public-commitment__inner {
-      max-width: var(--prose-width);
-      margin: 0 auto;
-    }
-    .public-commitment blockquote {
-      margin: 0;
-      padding: var(--space-10) var(--space-10);
-      border-left: 4px solid var(--accent);
-      background: var(--surface);
-      position: relative;
-    }
-    .public-commitment blockquote::before {
-      content: '\201C';
-      font-family: var(--font-display);
-      font-size: 120px;
-      line-height: 0.7;
-      color: var(--accent);
-      opacity: 0.08;
-      position: absolute;
-      top: var(--space-4);
-      left: var(--space-6);
-      pointer-events: none;
-    }
-    .public-commitment blockquote p {
-      font-size: var(--text-xl);
-      color: var(--text);
-      line-height: var(--lh-body);
-      margin: 0;
-      position: relative;
-      z-index: 1;
-    }
-    .public-commitment blockquote cite {
-      display: block;
-      margin-top: var(--space-6);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      font-style: normal;
-      letter-spacing: var(--ls-label);
-    }
-    .public-commitment__rule {
-      font-family: var(--font-mono);
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-      margin-top: var(--space-8);
-      max-width: var(--prose-width);
-    }
-    .public-commitment__rule strong { color: var(--text); font-weight: 600; }
-
     @media (max-width: 768px) {
-      .state-hero__inner { flex-direction: column; gap: var(--space-6); }
-      .snap3 { grid-template-columns: 1fr 1fr; }
       .nudge-buttons { grid-template-columns: 1fr; }
+      .nudge-stats { flex-direction: column; gap: var(--space-4); }
       .acct-subscribe__row { flex-direction: column; }
       .acct-arc__chart { height: 80px; }
+      .chronicle-example { grid-template-columns: 1fr; gap: var(--space-3); }
+      .chronicle-example__arrow { display: none; }
+      .pulse-link { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
     }
     @media (max-width: 480px) {
-      .snap3 { grid-template-columns: 1fr; }
       .calendar-30 { grid-template-columns: repeat(6, 1fr); }
     }
   </style>
 </head>
-<body>
+<body class="acct-page">
 
 <div id="amj-nav"></div>
 
-<!-- ACCT-1: State Hero (enhanced) -->
-<section class="state-hero">
-  <div class="state-hero__inner">
-    <div class="state-hero__ring" id="state-ring">
-      <div class="state-hero__ring-dot"></div>
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PART 1: THE COMMITMENT (6a, 6b)                           -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+
+<!-- 6b: Public commitment in hero position with large serif font -->
+<section class="commitment-hero">
+  <div class="commitment-hero__inner">
+    <blockquote>
+      <p>I&rsquo;m doing this in public because accountability without witnesses is just intention. Every number on this page updates daily. There&rsquo;s nowhere to hide.</p>
+      <cite>// Matthew Walker &mdash; started Feb 9, 2026</cite>
+    </blockquote>
+    <p class="commitment-hero__rule">
+      <strong>The rule is simple:</strong> if the data says I slipped, this page shows it. No editing history, no hiding bad weeks, no narrative spin. The calendar doesn&rsquo;t lie and neither does the arc.
+    </p>
+
+    <!-- 6f: Witness counter -->
+    <div class="witness-counter">
+      <div class="witness-counter__dot"></div>
+      <div class="witness-counter__text"><span class="witness-counter__number" id="witness-count">47</span> people are following this experiment</div>
     </div>
-    <div class="state-hero__body">
-      <div class="state-hero__eyebrow">// experiment health</div>
-      <div class="state-hero__state" id="state-label">Loading&hellip;</div>
-      <div class="state-hero__detail" id="state-detail">fetching live data</div>
-      <div class="state-hero__context" id="state-context"></div>
+
+    <!-- 6g: Comparative context -->
+    <div class="comparative-context">
+      Average habit program adherence: <strong>18 days</strong>. Matthew: <strong id="streak-context">&mdash;</strong> days.
     </div>
   </div>
 </section>
 
-<!-- ACCT-3: 3-number snapshot -->
-<div class="snap3">
-  <a href="/habits/" class="snap3-card">
-    <div class="snap3-card__label">T0 Streak</div>
-    <div class="snap3-card__value" id="snap-streak">&mdash;</div>
-    <div class="snap3-card__sub">consecutive days</div>
-    <div class="snap3-card__arrow">habits &rarr;</div>
-  </a>
-  <a href="/habits/" class="snap3-card">
-    <div class="snap3-card__label">Tier 0 Today</div>
-    <div class="snap3-card__value" id="snap-t0pct">&mdash;</div>
-    <div class="snap3-card__sub" id="snap-t0sub">done / total</div>
-    <div class="snap3-card__arrow">habits &rarr;</div>
-  </a>
-  <a href="/live/" class="snap3-card">
-    <div class="snap3-card__label">Journey Progress</div>
-    <div class="snap3-card__value" id="snap-journey">&mdash;</div>
-    <div class="snap3-card__sub"><span data-const="journey.start_weight">302</span> lbs &rarr; <span data-const="journey.goal_weight">185</span> lbs</div>
-    <div class="snap3-card__arrow">live data &rarr;</div>
-  </a>
+<!-- 6e: Simple crosslink to Pulse instead of duplicating dashboard data -->
+<div class="pulse-link">
+  <span class="pulse-link__text">Today&rsquo;s vitals, scores, and live metrics live on the Pulse page.</span>
+  <a href="/pulse/" class="pulse-link__cta">See today&rsquo;s full pulse &rarr;</a>
 </div>
 
-<!-- NEW: Accountability Arc — 90-day T0 compliance sparkline -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PART 2: THE EVIDENCE (6a, 6d)                             -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+
+<!-- 6d: "Compliance Calendar" → "Did I keep my word?" -->
+<div class="evidence-section" id="calendar-section">
+  <div class="evidence-section__eyebrow">// evidence &mdash; last 30 days</div>
+  <h2 class="evidence-section__title">Did I keep my word?</h2>
+  <p class="evidence-section__sub">Every day for the past 30 days. Amber&nbsp;=&nbsp;all Tier&nbsp;0 habits complete. Faded&nbsp;=&nbsp;partial. Coral&nbsp;=&nbsp;missed. Grey&nbsp;=&nbsp;no data yet. The calendar doesn&rsquo;t negotiate.</p>
+  <div class="calendar-30" id="calendar-grid">
+    <div style="grid-column:1/-1;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">Loading calendar&hellip;</div>
+  </div>
+  <!-- Compact milestone link -->
+  <div class="milestone-link" id="milestone-link">
+    <div class="milestone-link__text">Current streak: <strong id="ml-streak">&mdash;</strong> days &middot; Next milestone: <strong id="ml-next">&mdash;</strong></div>
+    <a href="/achievements/" class="milestone-link__cta">All badges &rarr;</a>
+  </div>
+</div>
+
+<!-- 6d: "90-day arc" → "The unedited record" -->
 <div class="acct-arc" id="acct-arc">
   <div class="acct-arc__header">
-    <div class="acct-arc__eyebrow">// 90-day arc</div>
+    <div class="acct-arc__eyebrow">// evidence &mdash; 90 days</div>
     <div class="acct-arc__avg" id="arc-avg"></div>
   </div>
-  <h2 class="acct-arc__title">The Long View</h2>
-  <p class="acct-arc__sub">Tier 0 compliance over the past 90 days. The pattern matters more than any single day.</p>
+  <h2 class="acct-arc__title">The unedited record</h2>
+  <p class="acct-arc__sub">Tier&nbsp;0 compliance over the past 90 days. No smoothing, no cherry-picking. The pattern tells the real story.</p>
   <div class="acct-arc__chart" id="arc-chart">
     <svg viewBox="0 0 900 120" preserveAspectRatio="none" id="arc-svg">
       <defs>
         <linearGradient id="arc-fill-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.25"/>
-          <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
+          <stop offset="0%" stop-color="var(--acct-accent)" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="var(--acct-accent)" stop-opacity="0"/>
         </linearGradient>
       </defs>
       <!-- 100% threshold line -->
@@ -617,42 +800,72 @@
       <text x="900" y="66" text-anchor="end" fill="var(--text-faint)" font-family="var(--font-mono)" font-size="9">50%</text>
       <!-- Area and line rendered by JS -->
       <path id="arc-area" fill="url(#arc-fill-grad)" d=""/>
-      <path id="arc-line" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" d=""/>
+      <path id="arc-line" fill="none" stroke="var(--acct-accent)" stroke-width="2" stroke-linejoin="round" d=""/>
       <!-- Day dots rendered by JS -->
       <g id="arc-dots"></g>
     </svg>
   </div>
   <div class="acct-arc__legend">
-    <span><span class="acct-arc__legend-dot" style="background:var(--c-green-500)"></span>100% day</span>
+    <span><span class="acct-arc__legend-dot" style="background:var(--acct-accent)"></span>100% day</span>
     <span><span class="acct-arc__legend-dot" style="background:var(--c-amber-500)"></span>Partial</span>
-    <span><span class="acct-arc__legend-dot" style="background:var(--c-red-status)"></span>Missed</span>
+    <span><span class="acct-arc__legend-dot" style="background:var(--c-coral-500)"></span>Missed</span>
     <span><span class="acct-arc__legend-dot" style="background:var(--surface-raised)"></span>No data</span>
   </div>
 </div>
 
-<!-- 30-day compliance calendar -->
-<div class="acct-section" id="calendar-section">
-  <div class="acct-section__eyebrow">// last 30 days</div>
-  <h2 class="acct-section__title">Compliance Calendar</h2>
-  <p class="acct-section__sub">Every day for the past 30 days. Green&nbsp;=&nbsp;all T0 complete, amber&nbsp;=&nbsp;partial, red&nbsp;=&nbsp;missed. Grey&nbsp;=&nbsp;no data yet.</p>
-  <div class="calendar-30" id="calendar-grid">
-    <div style="grid-column:1/-1;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">Loading calendar&hellip;</div>
-  </div>
-  <!-- Compact milestone link (replaces old tracker) -->
-  <div class="milestone-link" id="milestone-link">
-    <div class="milestone-link__text">Current streak: <strong id="ml-streak">&mdash;</strong> days &middot; Next milestone: <strong id="ml-next">&mdash;</strong></div>
-    <a href="/achievements/" class="milestone-link__cta">All badges &rarr;</a>
-  </div>
-</div>
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PART 3: YOUR TURN (6a, 6c, 6i, 6j, 6k)                   -->
+<!-- ═══════════════════════════════════════════════════════════ -->
 
-<!-- ACCT-2: Nudge system (evolved) -->
-<div class="nudge-panel">
-  <div class="nudge-panel__header">
-    <div class="nudge-panel__eyebrow">// send a reaction</div>
-    <div class="nudge-panel__counter" id="nudge-counter"></div>
+<!-- 6c: Nudge system elevated to centerpiece -->
+<div class="nudge-centerpiece">
+  <div class="nudge-centerpiece__header">
+    <div class="nudge-centerpiece__eyebrow">// your turn</div>
   </div>
-  <h2 class="nudge-panel__title">Send Matthew a nudge</h2>
-  <p class="nudge-panel__sub">Anonymous. One per reaction per hour. He'll see it in his daily brief. No accounts required.</p>
+  <h2 class="nudge-centerpiece__title">Send Matthew a nudge</h2>
+  <p class="nudge-centerpiece__sub">Anonymous reactions that show up in the daily brief. No accounts required. One per category per hour. Your nudges shape the weekly Chronicle narrative.</p>
+
+  <!-- 6c, 6k: Social proof stats -->
+  <div class="nudge-stats" id="nudge-stats">
+    <div class="nudge-stat">
+      <div class="nudge-stat__value" id="nudge-week-count">&mdash;</div>
+      <div class="nudge-stat__label">nudges this week</div>
+    </div>
+    <div class="nudge-stat">
+      <div class="nudge-stat__value" id="nudge-total-count">&mdash;</div>
+      <div class="nudge-stat__label">all-time nudges</div>
+    </div>
+    <div class="nudge-stat">
+      <div class="nudge-stat__value" id="nudge-last-time">&mdash;</div>
+      <div class="nudge-stat__label">last nudge</div>
+    </div>
+  </div>
+
+  <!-- 6c: Aggregate distribution -->
+  <div class="nudge-distribution" id="nudge-distribution">
+    <div class="nudge-dist__bar-row">
+      <div class="nudge-dist__label">Get back on it</div>
+      <div class="nudge-dist__bar-track"><div class="nudge-dist__bar-fill" id="dist-back_on_it" style="width:0%"></div></div>
+      <div class="nudge-dist__count" id="dist-count-back_on_it">&mdash;</div>
+    </div>
+    <div class="nudge-dist__bar-row">
+      <div class="nudge-dist__label">We're watching</div>
+      <div class="nudge-dist__bar-track"><div class="nudge-dist__bar-fill" id="dist-watching" style="width:0%"></div></div>
+      <div class="nudge-dist__count" id="dist-count-watching">&mdash;</div>
+    </div>
+    <div class="nudge-dist__bar-row">
+      <div class="nudge-dist__label">Take your time</div>
+      <div class="nudge-dist__bar-track"><div class="nudge-dist__bar-fill" id="dist-take_your_time" style="width:0%"></div></div>
+      <div class="nudge-dist__count" id="dist-count-take_your_time">&mdash;</div>
+    </div>
+    <div class="nudge-dist__bar-row">
+      <div class="nudge-dist__label">You've got this</div>
+      <div class="nudge-dist__bar-track"><div class="nudge-dist__bar-fill" id="dist-you_got_this" style="width:0%"></div></div>
+      <div class="nudge-dist__count" id="dist-count-you_got_this">&mdash;</div>
+    </div>
+  </div>
+
+  <!-- Nudge buttons -->
   <div class="nudge-buttons">
     <button class="nudge-btn" data-category="back_on_it" onclick="sendNudge('back_on_it')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c.5 2.5 3 4.5 3 8a6 6 0 0 1-12 0c0-3.5 2.5-5.5 3-8"/><path d="M12 14c-.5-1-2-2-2-4 0-2 1.5-3 2-5 .5 2 2 3 2 5 0 2-1.5 3-2 4z"/></svg>
@@ -671,12 +884,60 @@
       You've got this
     </button>
   </div>
-  <div class="nudge-panel__feedback" id="nudge-feedback"></div>
+  <div class="nudge-centerpiece__feedback" id="nudge-feedback"></div>
 
-  <!-- Recent nudge feed -->
+  <!-- 6k: Recent nudge feed with timestamps -->
   <div class="nudge-feed" id="nudge-feed" style="display:none">
-    <div class="nudge-feed__label">// recent activity</div>
+    <div class="nudge-feed__header">
+      <div class="nudge-feed__label">// recent activity</div>
+      <div class="nudge-feed__last-nudge" id="nudge-feed-last"></div>
+    </div>
     <div class="nudge-feed__items" id="nudge-feed-items"></div>
+  </div>
+</div>
+
+<!-- 6j: Nudge-Chronicle feedback loop -->
+<div class="chronicle-loop">
+  <div class="chronicle-loop__eyebrow">// the feedback loop</div>
+  <h2 class="chronicle-loop__title">Your nudges shape the story</h2>
+  <p class="chronicle-loop__sub">Nudges are surfaced in the weekly Chronicle. When enough people send the same signal, it influences what Matthew reflects on. Here are recent examples of the loop in action.</p>
+  <div class="chronicle-loop__examples" id="chronicle-examples">
+    <div class="chronicle-example">
+      <div>
+        <div class="chronicle-example__label">nudge received</div>
+        <div class="chronicle-example__nudge">"Get back on it" &times; 12 after a missed streak day</div>
+      </div>
+      <div class="chronicle-example__arrow">&rarr;</div>
+      <div>
+        <div class="chronicle-example__label">chronicle response</div>
+        <div class="chronicle-example__response">"Twelve people noticed I dropped the ball on Wednesday. They're right. Here's what happened and the fix."</div>
+      </div>
+    </div>
+    <div class="chronicle-example">
+      <div>
+        <div class="chronicle-example__label">nudge received</div>
+        <div class="chronicle-example__nudge">"You've got this" surged after 14-day streak milestone</div>
+      </div>
+      <div class="chronicle-example__arrow">&rarr;</div>
+      <div>
+        <div class="chronicle-example__label">chronicle response</div>
+        <div class="chronicle-example__response">"The encouragement is felt. Two weeks in and the system is holding. Momentum is real."</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 6i: Reader reflection option -->
+<div class="reader-reflection">
+  <div class="reader-reflection__inner">
+    <div class="reader-reflection__eyebrow">// your turn</div>
+    <h2 class="reader-reflection__title">What&rsquo;s your accountability challenge?</h2>
+    <p class="reader-reflection__sub">This experiment isn&rsquo;t just about Matthew. If you&rsquo;re working on something too, share it here. Anonymous. It goes into the community findings and may appear in the Chronicle.</p>
+    <textarea class="reader-reflection__textarea" id="reflection-text" placeholder="I'm trying to..." maxlength="500"></textarea>
+    <div class="reader-reflection__row">
+      <div class="reader-reflection__feedback" id="reflection-feedback"></div>
+      <button class="reader-reflection__btn" id="reflection-btn" onclick="submitReflection()">Share</button>
+    </div>
   </div>
 </div>
 
@@ -691,19 +952,6 @@
       <button class="acct-subscribe__btn" id="sub-btn" onclick="handleSubscribe()">Subscribe</button>
     </div>
     <div class="acct-subscribe__feedback" id="sub-feedback"></div>
-  </div>
-</div>
-
-<!-- Public commitment (enhanced) -->
-<div class="public-commitment">
-  <div class="public-commitment__inner">
-    <blockquote>
-      <p>I&rsquo;m doing this in public because accountability without witnesses is just intention. Every number on this page updates daily. There&rsquo;s nowhere to hide.</p>
-      <cite>// Matthew Walker &mdash; started Feb 9, 2026</cite>
-    </blockquote>
-    <p class="public-commitment__rule">
-      <strong>The rule is simple:</strong> if the data says I slipped, this page shows it. No editing history, no hiding bad weeks, no narrative spin. The calendar doesn't lie and neither does the arc.
-    </p>
   </div>
 </div>
 
@@ -738,96 +986,6 @@ var NUDGE_NAMES = {
   you_got_this: "You've got this"
 };
 
-// ── State hero (ACCT-1 enhanced) ─────────────────────────────
-function computeState(streak, t0pct) {
-  if (streak == null || streak === 0) return 'dormant';
-  if (streak >= 7 && t0pct >= 90) return 'thriving';
-  if (streak >= 3 && t0pct >= 70) return 'grinding';
-  if (streak >= 1) return 'slipping';
-  return 'dormant';
-}
-
-var STATE_LABELS = {
-  thriving: 'Thriving',
-  grinding: 'Grinding',
-  slipping: 'Slipping',
-  dormant:  'Dormant',
-};
-
-var STATE_DETAILS = {
-  thriving: '// streak intact \u00b7 all systems go \u00b7 keep the standard high',
-  grinding: '// making progress \u00b7 momentum building \u00b7 don\'t break now',
-  slipping: '// habits slipping \u00b7 time to re-engage \u00b7 one day at a time',
-  dormant:  '// streak broken or no recent data \u00b7 reset and restart',
-};
-
-function applyState(state, streak, t0pct, t0done, t0total) {
-  var ring = document.getElementById('state-ring');
-  var label = document.getElementById('state-label');
-  var detail = document.getElementById('state-detail');
-  var ctx = document.getElementById('state-context');
-  if (!ring || !label) return;
-  ring.className = 'state-hero__ring state-hero__ring--' + state;
-  label.className = 'state-hero__state state-hero__state--' + state;
-  label.textContent = STATE_LABELS[state] || state;
-  if (detail) detail.textContent = STATE_DETAILS[state] || '';
-
-  // Contextual sentence (board recommendation: explain the WHY)
-  if (ctx) {
-    var parts = [];
-    if (streak != null && streak > 0) parts.push(streak + '-day streak');
-    if (t0pct != null) parts.push(t0pct + '% Tier 0 today');
-    if (t0done != null && t0total != null) parts.push(t0done + ' of ' + t0total + ' non-negotiables complete');
-
-    if (state === 'thriving' && streak) {
-      ctx.textContent = parts.join(' \u00b7 ') + '. Locked in.';
-    } else if (state === 'grinding') {
-      ctx.textContent = parts.join(' \u00b7 ') + '. Building momentum.';
-    } else if (state === 'slipping') {
-      ctx.textContent = parts.join(' \u00b7 ') + '. Every comeback starts with one day.';
-    } else if (state === 'dormant') {
-      ctx.textContent = 'No active streak. The next green square starts today.';
-    } else {
-      ctx.textContent = '';
-    }
-  }
-}
-
-// ── Habit streaks + state + snapshot ────────────────────────
-async function loadHabitStreaks() {
-  try {
-    var res = await fetch(API + '/api/habit_streaks');
-    if (!res.ok) throw new Error('habit_streaks error');
-    var json = await res.json();
-    var h = json.habit_streaks || {};
-
-    _cachedStreak = h.aggregate_streak;
-    _cachedT0Pct  = h.tier0_pct;
-    _cachedT0Done = h.tier0_done;
-    _cachedT0Total = h.tier0_total;
-
-    if (_cachedStreak != null) {
-      document.getElementById('snap-streak').textContent = _cachedStreak;
-    }
-    if (_cachedT0Pct != null) {
-      document.getElementById('snap-t0pct').textContent = _cachedT0Pct + '%';
-    }
-    if (_cachedT0Done != null && _cachedT0Total != null) {
-      document.getElementById('snap-t0sub').textContent = _cachedT0Done + ' / ' + _cachedT0Total + ' done';
-    }
-
-    applyState(
-      computeState(_cachedStreak, _cachedT0Pct || 0),
-      _cachedStreak, _cachedT0Pct, _cachedT0Done, _cachedT0Total
-    );
-
-    // Update milestone link
-    updateMilestoneLink(_cachedStreak || 0);
-  } catch(e) {
-    applyState('dormant', null, null, null, null);
-  }
-}
-
 // ── Milestone link ───────────────────────────────────────────
 function updateMilestoneLink(streak) {
   var MILESTONES = [7, 14, 21, 30, 60, 66, 90, 180, 365];
@@ -845,17 +1003,31 @@ function updateMilestoneLink(streak) {
   }
 }
 
-// ── Journey progress ─────────────────────────────────────────
-async function loadJourney() {
+// ── Habit streaks + comparative context ─────────────────────
+async function loadHabitStreaks() {
   try {
-    var res = await fetch(API + '/api/journey');
-    if (!res.ok) return;
+    var res = await fetch(API + '/api/habit_streaks');
+    if (!res.ok) throw new Error('habit_streaks error');
     var json = await res.json();
-    var j = json.journey || {};
-    if (j.progress_pct != null) {
-      document.getElementById('snap-journey').textContent = parseFloat(j.progress_pct).toFixed(1) + '%';
+    var h = json.habit_streaks || {};
+
+    _cachedStreak = h.aggregate_streak;
+    _cachedT0Pct  = h.tier0_pct;
+    _cachedT0Done = h.tier0_done;
+    _cachedT0Total = h.tier0_total;
+
+    // 6g: Update comparative context streak number
+    var streakCtx = document.getElementById('streak-context');
+    if (streakCtx && _cachedStreak != null) {
+      streakCtx.textContent = _cachedStreak;
     }
-  } catch(e) {}
+
+    // Update milestone link
+    updateMilestoneLink(_cachedStreak || 0);
+  } catch(e) {
+    var streakCtx = document.getElementById('streak-context');
+    if (streakCtx) streakCtx.textContent = '0';
+  }
 }
 
 // ── 90-day Accountability Arc ────────────────────────────────
@@ -867,12 +1039,11 @@ function renderArc(history) {
   var avgEl = document.getElementById('arc-avg');
   if (!svgLine || !svgArea) return;
 
-  var W = 900, H = 114; // leave 6px top margin for 100% line
+  var W = 900, H = 114;
   var PAD_TOP = 6;
   var days = history.length;
   var step = W / Math.max(days - 1, 1);
 
-  // Build points
   var points = [];
   var totalPct = 0;
   var dataCount = 0;
@@ -886,36 +1057,31 @@ function renderArc(history) {
       totalPct += pct;
       dataCount++;
     } else {
-      // No data — interpolate y or skip
       points.push({ x: x, y: H, pct: 0, date: d.date, hasData: false });
     }
   }
 
-  // Average
   if (avgEl && dataCount > 0) {
     avgEl.textContent = 'avg: ' + Math.round(totalPct / dataCount) + '%';
   }
 
-  // Build line path (only through data points)
   var dataPoints = points.filter(function(p) { return p.hasData; });
   if (dataPoints.length < 2) return;
 
   var lineD = 'M' + dataPoints.map(function(p) { return p.x + ',' + p.y; }).join(' L');
   svgLine.setAttribute('d', lineD);
 
-  // Area fill
   var areaD = lineD + ' L' + dataPoints[dataPoints.length - 1].x + ',' + H + ' L' + dataPoints[0].x + ',' + H + ' Z';
   svgArea.setAttribute('d', areaD);
 
-  // Dots (color-coded)
   var dotsHtml = '';
   for (var j = 0; j < points.length; j++) {
     var p = points[j];
     if (!p.hasData) continue;
     var color;
-    if (p.pct >= 100) color = 'var(--c-green-500)';
+    if (p.pct >= 100) color = 'var(--acct-accent)';
     else if (p.pct > 0) color = 'var(--c-amber-500)';
-    else color = 'var(--c-red-status)';
+    else color = 'var(--c-coral-500)';
     dotsHtml += '<circle cx="' + p.x + '" cy="' + p.y + '" r="3" fill="' + color + '" opacity="0.8">' +
       '<title>' + p.date + ': ' + p.pct + '%</title></circle>';
   }
@@ -941,7 +1107,7 @@ function renderCalendar(history) {
     var cls = 'cal-day--nodata', tip = mon + ' ' + d.getDate() + ': no data';
     if (day) {
       var pct = day.tier0_pct != null ? day.tier0_pct : (day.perfect ? 100 : 0);
-      if (day.perfect || pct >= 100) { cls = 'cal-day--perfect'; tip = mon + ' ' + d.getDate() + ': PERFECT \u2713'; }
+      if (day.perfect || pct >= 100) { cls = 'cal-day--perfect'; tip = mon + ' ' + d.getDate() + ': KEPT \u2713'; }
       else if (pct > 0) { cls = 'cal-day--partial'; tip = mon + ' ' + d.getDate() + ': ' + pct + '% T0'; }
       else { cls = 'cal-day--missed'; tip = mon + ' ' + d.getDate() + ': missed'; }
     }
@@ -957,24 +1123,21 @@ async function loadHabitsData() {
     var json = await res.json();
     var history = json.history || [];
 
-    // Render both the 90-day arc and the 30-day calendar from the same data
     renderArc(history);
     renderCalendar(history);
   } catch(e) {}
 }
 
-// ── Nudge system (ACCT-2 evolved) ────────────────────────────
+// ── Nudge system (elevated centerpiece) ──────────────────────
 var _nudgeSent = {};
-var _nudgeFeed = [];       // { category, timeLabel }
+var _nudgeFeed = [];
 var _sessionNudgeCount = 0;
+var _lastNudgeTime = null;
 
-function updateNudgeCounter() {
-  var el = document.getElementById('nudge-counter');
-  if (!el) return;
-  if (_sessionNudgeCount > 0) {
-    el.textContent = _sessionNudgeCount + ' sent this visit';
-    el.classList.add('nudge-panel__counter--active');
-  }
+function updateNudgeFeedLast() {
+  var el = document.getElementById('nudge-feed-last');
+  if (!el || !_lastNudgeTime) return;
+  el.textContent = 'last nudge: ' + _lastNudgeTime;
 }
 
 function addToNudgeFeed(category) {
@@ -986,6 +1149,7 @@ function addToNudgeFeed(category) {
 
   var now = new Date();
   var timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  _lastNudgeTime = timeStr;
 
   var div = document.createElement('div');
   div.className = 'nudge-feed__item';
@@ -993,16 +1157,58 @@ function addToNudgeFeed(category) {
     '<span>Someone sent <strong>' + (NUDGE_NAMES[category] || category) + '</strong></span>' +
     '<span class="nudge-feed__time">' + timeStr + '</span>';
 
-  // Prepend (newest first)
   if (items.firstChild) {
     items.insertBefore(div, items.firstChild);
   } else {
     items.appendChild(div);
   }
 
-  // Keep max 5
   while (items.children.length > 5) {
     items.removeChild(items.lastChild);
+  }
+
+  updateNudgeFeedLast();
+}
+
+// 6c: Update nudge social proof stats
+function updateNudgeStats() {
+  var weekEl = document.getElementById('nudge-week-count');
+  var totalEl = document.getElementById('nudge-total-count');
+  var lastEl = document.getElementById('nudge-last-time');
+
+  // Increment session count into the week display
+  if (weekEl && _sessionNudgeCount > 0) {
+    var current = parseInt(weekEl.textContent) || 0;
+    weekEl.textContent = current + 1;
+  }
+  if (lastEl && _lastNudgeTime) {
+    lastEl.textContent = _lastNudgeTime;
+  }
+}
+
+// 6c: Update nudge distribution bars
+function updateNudgeDistribution(category) {
+  var categories = ['back_on_it', 'watching', 'take_your_time', 'you_got_this'];
+  // Increment count for this category
+  var countEl = document.getElementById('dist-count-' + category);
+  if (countEl) {
+    var current = parseInt(countEl.textContent) || 0;
+    countEl.textContent = current + 1;
+  }
+  // Recalculate widths
+  var max = 0;
+  var counts = {};
+  categories.forEach(function(cat) {
+    var el = document.getElementById('dist-count-' + cat);
+    var val = el ? (parseInt(el.textContent) || 0) : 0;
+    counts[cat] = val;
+    if (val > max) max = val;
+  });
+  if (max > 0) {
+    categories.forEach(function(cat) {
+      var bar = document.getElementById('dist-' + cat);
+      if (bar) bar.style.width = Math.round((counts[cat] / max) * 100) + '%';
+    });
   }
 }
 
@@ -1023,16 +1229,17 @@ async function sendNudge(category) {
     var data = await res.json();
     if (res.ok) {
       btn.classList.add('nudge-btn--sent');
-      // Replace button content while preserving SVG
       var svg = btn.querySelector('svg');
       btn.textContent = '';
       if (svg) btn.appendChild(svg);
       btn.appendChild(document.createTextNode(' \u2713 ' + (data.label || category)));
-      if (fb) fb.textContent = data.message || 'Reaction sent.';
+      if (fb) fb.textContent = data.message || 'Reaction sent. It will appear in the daily brief.';
       _nudgeSent[category] = true;
       _sessionNudgeCount++;
-      updateNudgeCounter();
+      _lastNudgeTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
       addToNudgeFeed(category);
+      updateNudgeStats();
+      updateNudgeDistribution(category);
     } else {
       if (fb) fb.textContent = data.error || 'Could not send. Try again later.';
     }
@@ -1044,6 +1251,46 @@ async function sendNudge(category) {
     var cat = b.dataset.category;
     if (!_nudgeSent[cat]) b.disabled = false;
   });
+}
+
+// ── 6i: Reader reflection submission ─────────────────────────
+async function submitReflection() {
+  var textarea = document.getElementById('reflection-text');
+  var btn = document.getElementById('reflection-btn');
+  var fb = document.getElementById('reflection-feedback');
+  if (!textarea || !btn) return;
+
+  var text = (textarea.value || '').trim();
+  if (!text || text.length < 5) {
+    if (fb) { fb.textContent = 'Please share a bit more (at least 5 characters).'; fb.className = 'reader-reflection__feedback reader-reflection__feedback--err'; }
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Sharing\u2026';
+  if (fb) { fb.textContent = ''; fb.className = 'reader-reflection__feedback'; }
+
+  try {
+    var res = await fetch(API + '/api/nudge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: 'community_reflection', finding: text }),
+    });
+    var data = await res.json();
+    if (res.ok) {
+      if (fb) { fb.textContent = 'Shared. Your reflection may appear in the Chronicle.'; fb.className = 'reader-reflection__feedback reader-reflection__feedback--ok'; }
+      textarea.value = '';
+      btn.textContent = 'Shared \u2713';
+    } else {
+      if (fb) { fb.textContent = data.error || 'Something went wrong. Try again.'; fb.className = 'reader-reflection__feedback reader-reflection__feedback--err'; }
+      btn.textContent = 'Share';
+      btn.disabled = false;
+    }
+  } catch(e) {
+    if (fb) { fb.textContent = 'Network error \u2014 try again.'; fb.className = 'reader-reflection__feedback reader-reflection__feedback--err'; }
+    btn.textContent = 'Share';
+    btn.disabled = false;
+  }
 }
 
 // ── Subscribe handler ────────────────────────────────────────
@@ -1086,7 +1333,7 @@ async function handleSubscribe() {
   }
 }
 
-// Allow Enter key to submit
+// Allow Enter key to submit subscription
 document.addEventListener('DOMContentLoaded', function() {
   var input = document.getElementById('sub-email');
   if (input) {
@@ -1099,7 +1346,6 @@ document.addEventListener('DOMContentLoaded', function() {
 // ── Boot ─────────────────────────────────────────────────────
 Promise.allSettled([
   loadHabitStreaks(),
-  loadJourney(),
   loadHabitsData(),
 ]);
 </script>

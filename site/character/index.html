@@ -923,6 +923,249 @@
       min-height: 1em;
     }
 
+    /* ── 4a: PLAIN-LANGUAGE SUBTITLES ──────────────────────── */
+    .tc-class-subtitle {
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+      margin-top: 2px;
+    }
+    .tc-xp-hint {
+      font-size: 8px;
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+      margin-top: 2px;
+    }
+
+    /* ── 4b: SHARE CARD BUTTON ─────────────────────────────── */
+    .tc-share {
+      display: block;
+      margin: var(--space-4) auto 0;
+      background: transparent;
+      border: 1px solid var(--tier-accent);
+      color: var(--tier-accent);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-label);
+      padding: var(--space-2) var(--space-6);
+      cursor: pointer;
+      transition: background var(--dur-fast), color var(--dur-fast);
+    }
+    .tc-share:hover {
+      background: var(--tier-accent);
+      color: var(--bg);
+    }
+    .tc-share.copied {
+      border-color: var(--c-green-500);
+      color: var(--c-green-500);
+    }
+
+    /* ── 4e: COMPOSITE SCORE HISTORY CHART ─────────────────── */
+    .score-history-section {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .score-history-chart {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-6);
+      border-radius: 0;
+      box-shadow: 0 0 20px var(--tier-glow);
+    }
+    .score-history-chart svg {
+      display: block;
+      width: 100%;
+      height: 120px;
+    }
+    .score-history-label {
+      font-size: 8px;
+      color: var(--text-faint);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      margin-top: var(--space-2);
+      font-family: var(--font-mono);
+    }
+
+    /* ── 4f: NARRATIVE PULL-QUOTE ──────────────────────────── */
+    .game-pullquote {
+      border-left: 2px solid var(--tier-accent);
+      padding: var(--space-4) var(--space-6);
+      margin: var(--space-6) 0 0 0;
+      background: var(--tier-emblem-bg);
+    }
+    .game-pullquote p {
+      font-size: var(--text-sm) !important;
+      color: var(--text-muted) !important;
+      font-style: italic;
+      line-height: var(--lh-body);
+      margin: 0 !important;
+    }
+    .game-pullquote cite {
+      display: block;
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      font-style: normal;
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+      margin-top: var(--space-2);
+    }
+
+    /* ── 4g: RPG STAT BLOCK PILLAR CARDS ───────────────────── */
+    .pillar-card {
+      border-top: 3px solid var(--tier-accent);
+      position: relative;
+    }
+    .pillar-card__header {
+      background: var(--tier-emblem-bg);
+      margin: calc(-1 * var(--space-5));
+      margin-bottom: var(--space-3);
+      padding: var(--space-3) var(--space-5);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .pillar-card__level {
+      color: var(--tier-accent);
+    }
+
+    /* ── 4h: MIND/SOCIAL UNCERTAINTY NOTE ──────────────────── */
+    .pillar-data-note {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: var(--text-2xs);
+      color: var(--c-yellow-status);
+      font-family: var(--font-mono);
+      letter-spacing: var(--ls-label);
+      margin-top: var(--space-2);
+    }
+
+    /* ── 4i: EXPANDABLE MATH SECTION ───────────────────────── */
+    .math-details {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .math-details summary {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--tier-accent);
+      letter-spacing: var(--ls-label);
+      text-transform: uppercase;
+      cursor: pointer;
+      padding: var(--space-3) 0;
+      list-style: none;
+    }
+    .math-details summary::-webkit-details-marker { display: none; }
+    .math-details summary::before {
+      content: '+ ';
+      font-weight: bold;
+    }
+    .math-details[open] summary::before {
+      content: '- ';
+    }
+    .math-details__body {
+      padding: var(--space-4) 0;
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .math-details__body code {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--tier-accent);
+      background: var(--surface);
+      padding: 1px var(--space-2);
+    }
+
+    /* ── 4j: VISUAL ENERGY CONTINUITY ──────────────────────── */
+    .radar-container {
+      box-shadow: 0 0 24px var(--tier-glow);
+    }
+    .pillars-grid {
+      box-shadow: 0 0 16px var(--tier-glow);
+    }
+    .visual-timeline::before {
+      background: linear-gradient(180deg, var(--tier-accent), var(--border) 50%, transparent);
+    }
+    .vt-event__dot {
+      box-shadow: 0 0 6px var(--tier-glow);
+    }
+    .hm-cell {
+      box-shadow: inset 0 0 4px rgba(0,0,0,0.2);
+    }
+    .badge-card.earned {
+      box-shadow: 0 0 12px var(--tier-glow);
+    }
+
+    /* ── 4k: SECTION LABELS / DIVIDERS ─────────────────────── */
+    .section-label {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding) var(--space-3);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--tier-accent);
+      border-top: 1px solid var(--tier-accent);
+      opacity: 0.7;
+    }
+    .section-label::before {
+      content: '// ';
+    }
+
+    /* ── 7b: COMPACT BADGE SUMMARY ─────────────────────────── */
+    .badge-compact {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+      padding: var(--space-4) 0;
+    }
+    .badge-compact__icons {
+      display: flex;
+      gap: var(--space-2);
+    }
+    .badge-compact__icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1.5px solid var(--tier-accent);
+      overflow: hidden;
+      box-shadow: 0 0 8px var(--tier-glow);
+    }
+    .badge-compact__icon img {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .badge-compact__count {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-label);
+    }
+    .badge-compact__link {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--tier-accent);
+      text-decoration: none;
+      letter-spacing: var(--ls-label);
+      border: 1px solid var(--tier-accent);
+      padding: var(--space-1) var(--space-4);
+      transition: background var(--dur-fast), color var(--dur-fast);
+    }
+    .badge-compact__link:hover {
+      background: var(--tier-accent);
+      color: var(--bg);
+    }
+    .badges-full-grid { display: none; }
+    .badges-full-grid.show { display: block; }
+
     /* ── RESPONSIVE ──────────────────────────────────────────── */
     @media (max-width: 900px) {
       .tc-top { grid-template-columns: auto 1fr; }
@@ -993,6 +1236,9 @@
 
 <div id="amj-nav"></div>
 
+<!-- ═══ SECTION: IDENTITY (Decision 4k) ═══ -->
+<div class="section-label">Identity</div>
+
 <!-- ═══ HERO: TRADING CARD ═══ -->
 <section class="hero-card reveal">
   <div class="trading-card" id="trading-card">
@@ -1029,6 +1275,7 @@
       </div>
     </div>
   </div>
+  <button class="tc-share" id="share-card">Share my card →</button>
 </section>
 
 <!-- ═══ LEVEL UP IMMINENT BANNER ═══ -->
@@ -1037,6 +1284,28 @@
   <span class="levelup-banner__text" id="levelup-text">Level up imminent</span>
   <span class="levelup-banner__sub" id="levelup-sub"></span>
 </div>
+
+<!-- ═══ COMPOSITE SCORE TRAJECTORY (Decision 4e) ═══ -->
+<section class="score-history-section reveal" id="score-history-section" style="display:none">
+  <div class="eyebrow">Score trajectory</div>
+  <h2 class="text-h3" style="color:var(--text)">Composite score over time</h2>
+  <div class="score-history-chart" id="score-history-chart">
+    <!-- SVG injected by JS from pillar_history -->
+  </div>
+  <div class="score-history-label">Weekly composite average</div>
+</section>
+
+<!-- ═══ LEVEL-UP NOTIFICATION CTA (moved up — Decision 4c) ═══ -->
+<section class="levelup-cta reveal">
+  <div class="levelup-cta__icon">⚡</div>
+  <h3 class="levelup-cta__title">Get notified when I level up</h3>
+  <p class="levelup-cta__desc">One email per level-up. No spam, no weekly digest — just the moment the number ticks. You'll see it before anyone else.</p>
+  <div class="levelup-cta__form">
+    <input class="levelup-cta__input" type="email" id="levelup-email" placeholder="your@email.com">
+    <button class="levelup-cta__btn" onclick="subscribeLevelUp()">Notify me</button>
+  </div>
+  <p class="levelup-cta__msg" id="levelup-msg"></p>
+</section>
 
 <!-- ═══ NEXT LEVEL REQUIREMENTS (moved up) ═══ -->
 <section class="next-section reveal" id="next-section">
@@ -1055,6 +1324,10 @@
       <p>This isn't a weight tracker. It's an RPG for real life. Seven pillars, each scored from live wearable and biometric data — no self-reporting. The score is honest, and it's public, because accountability to an audience is itself a performance variable.</p>
       <p>Every night, <span data-const="platform.data_sources">19</span> data sources feed a scoring engine that grades yesterday across Sleep, Movement, Nutrition, Metabolic, Mind, Social, and Consistency. The composite drives level progression on a logarithmic XP curve — early levels come fast, higher levels demand sustained performance across all pillars.</p>
       <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-label);margin-bottom:0">// 7 pillars · scored nightly · no self-reporting · logarithmic XP curve</p>
+      <blockquote class="game-pullquote">
+        <p>The game metaphor isn't a gimmick. It's the only framework that made health feel like something I was building, not something I was failing at.</p>
+        <cite>— from the journal, day 1</cite>
+      </blockquote>
     </div>
     <div>
       <div class="tier-flavors" id="tier-flavors">
@@ -1088,6 +1361,9 @@
     </div>
   </div>
 </section>
+
+<!-- ═══ SECTION: METRICS (Decision 4k) ═══ -->
+<div class="section-label">Metrics</div>
 
 <!-- ═══ RADAR CHART ═══ -->
 <section class="radar-section reveal">
@@ -1142,11 +1418,26 @@
   </div>
 </section>
 
+<!-- ═══ SECTION: ACHIEVEMENTS (Decision 4k) ═══ -->
+<div class="section-label">Achievements</div>
+
 <!-- ═══ ACHIEVEMENT BADGES ═══ -->
 <section class="badges-section reveal" id="badges-section">
   <div class="eyebrow">Achievements</div>
   <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-2)">Achievement Badges</h2>
   <p style="font-size:var(--text-sm);color:var(--text-muted);max-width:560px;line-height:var(--lh-body)">Earned through sustained effort. Locked badges show the requirement. Earned badges glow.</p>
+
+  <!-- 7b: Compact badge summary -->
+  <div class="badge-compact" id="badge-compact">
+    <div class="badge-compact__icons" id="badge-compact-icons">
+      <!-- Earned badge icons injected by JS -->
+    </div>
+    <span class="badge-compact__count" id="badge-compact-count">0 earned</span>
+    <a href="/achievements/" class="badge-compact__link">See all milestones →</a>
+  </div>
+
+  <!-- Full badge grids (toggled by JS) -->
+  <div class="badges-full-grid" id="badges-full-grid">
 
   <!-- Streaks -->
   <div class="badge-group open" id="bg-streaks">
@@ -1227,6 +1518,8 @@
       </div>
     </div>
   </div>
+
+  </div><!-- /.badges-full-grid -->
 </section>
 
 <!-- ═══ METHODOLOGY ═══ -->
@@ -1252,6 +1545,17 @@
   </div>
 </section>
 
+<!-- ═══ THE MATH (Decision 4i) ═══ -->
+<details class="math-details">
+  <summary>The Math</summary>
+  <div class="math-details__body">
+    <p>Each pillar's raw score (0-100) feeds into the XP engine nightly. The composite Character Score is the mean of all 7 pillar scores.</p>
+    <p>XP per day = <code>composite_score / 10</code>, accumulated into a lifetime total. Level is determined by a logarithmic curve: <code>level = floor(sqrt(xp_total / 5))</code>. This means early levels (1-5) come within the first few weeks, but higher levels (20+) require months of sustained, across-the-board performance.</p>
+    <p>Tier thresholds: Foundation (Lv 1-20), Momentum (Lv 21-40), Discipline (Lv 41-60), Mastery (Lv 61-80), Elite (Lv 81-100). Pillar weights are currently equal at 14.3% each.</p>
+    <p>Badges are evaluated nightly against streak counts, level milestones, weight thresholds, and data consistency targets. No manual overrides.</p>
+  </div>
+</details>
+
 <!-- ═══ N=1 DISCLAIMER ═══ -->
 <aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-bottom:1px solid var(--border-subtle);">
   <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label);">
@@ -1260,18 +1564,6 @@
     I track everything to make better decisions for myself, not to prove universal principles.
   </p>
 </aside>
-
-<!-- ═══ LEVEL-UP NOTIFICATION CTA (Phase C) ═══ -->
-<section class="levelup-cta reveal">
-  <div class="levelup-cta__icon">⚡</div>
-  <h3 class="levelup-cta__title">Get notified when I level up</h3>
-  <p class="levelup-cta__desc">One email per level-up. No spam, no weekly digest — just the moment the number ticks. You'll see it before anyone else.</p>
-  <div class="levelup-cta__form">
-    <input class="levelup-cta__input" type="email" id="levelup-email" placeholder="your@email.com">
-    <button class="levelup-cta__btn" onclick="subscribeLevelUp()">Notify me</button>
-  </div>
-  <p class="levelup-cta__msg" id="levelup-msg"></p>
-</section>
 
 <!-- ═══ STANDARD SUBSCRIBE + FOOTER ═══ -->
 <div id="amj-subscribe"></div>
@@ -1491,9 +1783,16 @@ function hydrate(data) {
   // Emblem
   document.getElementById('tc-emblem').innerHTML = tierEmblem(character.tier, character.level);
 
-  // Trading card header
-  document.getElementById('tc-class').textContent = `${character.tier} · Level ${character.level}`;
-  document.getElementById('tc-subtitle').textContent = `// ${character.days_active} days active · ${character.xp_total} total XP`;
+  // Trading card header (4a: plain-language subtitles)
+  const TIER_SUBTITLES = {
+    foundation: 'Early stage: building baseline habits',
+    momentum: 'Gaining traction: consistency forming',
+    discipline: 'Sustained effort: patterns solidifying',
+    mastery: 'Advanced: optimizing across domains',
+    elite: 'Peak performance: all systems integrated'
+  };
+  document.getElementById('tc-class').innerHTML = `${character.tier} · Level ${character.level}<div class="tc-class-subtitle">${TIER_SUBTITLES[tierSlug] || ''}</div>`;
+  document.getElementById('tc-subtitle').innerHTML = `// ${character.days_active} days active · ${character.xp_total} total XP<div class="tc-xp-hint">Progress points earned from daily health data</div>`;
 
   // Composite score
   const scores = pillars.map(p => p.raw_score);
@@ -1607,6 +1906,12 @@ function hydrate(data) {
     const spark = data.pillar_history ? sparklineSVG(data.pillar_history, p.name) : '';
     const sparkHtml = spark ? `<div class="pillar-card__spark">${spark}<div class="pillar-card__spark-label">8-week trend</div></div>` : '';
 
+    // 4h: uncertainty note for Mind and Relationships
+    const uncertainPillars = ['mind', 'relationships'];
+    const dataNote = uncertainPillars.includes(p.name)
+      ? '<div class="pillar-data-note">&#9888; Limited data — qualitative self-report</div>'
+      : '';
+
     return `<div class="pillar-card">
       <div class="pillar-card__header">
         <div class="pillar-card__name"><span>${p.emoji}</span> ${p.name}</div>
@@ -1615,7 +1920,7 @@ function hydrate(data) {
       <div class="pillar-card__level">${p.level}</div>
       <div class="pillar-card__bar"><div class="pillar-card__bar-fill" data-w="${barW}" style="width:0%;background:${col}"></div></div>
       <div class="pillar-card__raw">${p.raw_score.toFixed(1)} / 100</div>
-      ${confHtml}${sparkHtml}
+      ${confHtml}${dataNote}${sparkHtml}
     </div>`;
   }).join('');
 
@@ -1882,6 +2187,136 @@ window.subscribeLevelUp = async function() {
   }
 };
 
+/* ── 4b: Share card to clipboard ───────────────────────────── */
+document.getElementById('share-card')?.addEventListener('click', function() {
+  const btn = this;
+  const tier = document.getElementById('tc-class')?.textContent?.split('\n')[0] || '';
+  const score = document.getElementById('tc-score')?.textContent || '—';
+  const xp = document.getElementById('tc-xp')?.textContent || '0';
+  const days = document.getElementById('tc-days')?.textContent || '0';
+  const text = `${tier.trim()}\nCharacter Score: ${score}/100 | ${xp} XP | ${days} days active\n\nReal-life RPG character sheet — 7 pillars scored from live wearable data.\nhttps://averagejoematt.com/character/`;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied to clipboard!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Share my card →'; btn.classList.remove('copied'); }, 2000);
+  }).catch(() => {
+    btn.textContent = 'Copy failed';
+    setTimeout(() => { btn.textContent = 'Share my card →'; }, 2000);
+  });
+});
+
+/* ── 4e: Composite score history chart ─────────────────────── */
+function renderScoreHistory(pillarHistory) {
+  const section = document.getElementById('score-history-section');
+  const chart = document.getElementById('score-history-chart');
+  if (!section || !chart || !pillarHistory || pillarHistory.length < 2) return;
+
+  const PILLARS = ['sleep','movement','nutrition','metabolic','mind','relationships','consistency'];
+  const composites = pillarHistory.map(week => {
+    const scores = PILLARS.map(p => (week.pillars && week.pillars[p]) || 0);
+    const nonZero = scores.filter(s => s > 0);
+    return nonZero.length ? nonZero.reduce((a,b) => a+b, 0) / nonZero.length : 0;
+  });
+
+  if (composites.every(c => c === 0)) return;
+
+  const w = 400, h = 120, padX = 30, padY = 16;
+  const max = Math.max(...composites, 50);
+  const min = Math.min(...composites.filter(c => c > 0), 0);
+  const range = max - min || 1;
+
+  const pts = composites.map((c, i) => {
+    const x = padX + (i / (composites.length - 1)) * (w - 2 * padX);
+    const y = h - padY - ((c - min) / range) * (h - 2 * padY);
+    return { x, y, val: c };
+  });
+
+  const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const areaD = pathD + ` L${pts[pts.length-1].x.toFixed(1)},${h-padY} L${pts[0].x.toFixed(1)},${h-padY} Z`;
+
+  let svg = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">`;
+  // Grid lines
+  for (let g = 0; g <= 100; g += 25) {
+    const gy = h - padY - ((g - min) / range) * (h - 2 * padY);
+    if (gy >= padY && gy <= h - padY) {
+      svg += `<line x1="${padX}" y1="${gy.toFixed(1)}" x2="${w-padX}" y2="${gy.toFixed(1)}" stroke="rgba(0,229,160,0.08)" stroke-width="0.5"/>`;
+      svg += `<text x="${padX-4}" y="${gy.toFixed(1)}" text-anchor="end" font-size="8" fill="#4a6050" dominant-baseline="middle">${g}</text>`;
+    }
+  }
+  // Area fill
+  svg += `<path d="${areaD}" fill="var(--tier-glow)" opacity="0.5"/>`;
+  // Line
+  svg += `<path d="${pathD}" fill="none" stroke="var(--tier-accent)" stroke-width="2" stroke-linejoin="round"/>`;
+  // Dots
+  pts.forEach((p, i) => {
+    svg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="var(--tier-accent)" stroke="var(--bg)" stroke-width="1.5"/>`;
+  });
+  // Week labels
+  pillarHistory.forEach((week, i) => {
+    if (i % 2 === 0 || i === pillarHistory.length - 1) {
+      const x = padX + (i / (pillarHistory.length - 1)) * (w - 2 * padX);
+      const label = (week.week_label || '').replace('Week ', 'W');
+      svg += `<text x="${x.toFixed(1)}" y="${h-2}" text-anchor="middle" font-size="7" fill="#4a6050">${label}</text>`;
+    }
+  });
+  svg += '</svg>';
+
+  chart.innerHTML = svg;
+  section.style.display = '';
+  section.classList.add('is-visible');
+}
+
+/* ── 4d: Collapse locked badges by default ─────────────────── */
+function collapseLocked() {
+  ['streaks', 'levels', 'weight', 'data', 'experiments'].forEach(cat => {
+    const grid = document.getElementById('badge-grid-' + cat);
+    if (!grid) return;
+    const cards = grid.querySelectorAll('.badge-card:not([style*="visibility:hidden"])');
+    const earned = grid.querySelectorAll('.badge-card.earned');
+    const locked = grid.querySelectorAll('.badge-card:not(.earned):not([style*="visibility:hidden"])');
+    // If there are locked badges, hide them and show a toggle
+    if (locked.length > 0) {
+      locked.forEach(c => c.style.display = 'none');
+      let toggle = grid.parentElement.querySelector('.locked-toggle');
+      if (!toggle) {
+        toggle = document.createElement('button');
+        toggle.className = 'locked-toggle';
+        toggle.style.cssText = 'display:block;width:100%;padding:var(--space-3);background:var(--surface);border:none;border-top:1px solid var(--border-subtle);color:var(--text-faint);font-family:var(--font-mono);font-size:var(--text-2xs);cursor:pointer;letter-spacing:var(--ls-label);';
+        toggle.textContent = locked.length + ' more to unlock';
+        toggle.addEventListener('click', function() {
+          const hidden = locked[0].style.display === 'none';
+          locked.forEach(c => c.style.display = hidden ? '' : 'none');
+          this.textContent = hidden ? 'Collapse locked' : locked.length + ' more to unlock';
+        });
+        grid.parentElement.appendChild(toggle);
+      }
+    }
+  });
+}
+
+/* ── 7b: Compact badge summary builder ─────────────────────── */
+function buildBadgeCompact() {
+  const iconsEl = document.getElementById('badge-compact-icons');
+  const countEl = document.getElementById('badge-compact-count');
+  if (!iconsEl || !countEl) return;
+
+  const allBadges = document.querySelectorAll('#badges-full-grid .badge-card:not([style*="visibility:hidden"])');
+  const earnedBadges = document.querySelectorAll('#badges-full-grid .badge-card.earned');
+
+  iconsEl.innerHTML = '';
+  earnedBadges.forEach(b => {
+    const img = b.querySelector('.badge-card__icon img');
+    if (img) {
+      const icon = document.createElement('div');
+      icon.className = 'badge-compact__icon';
+      icon.innerHTML = `<img src="${img.src}" alt="${img.alt}" width="32" height="32">`;
+      iconsEl.appendChild(icon);
+    }
+  });
+
+  countEl.textContent = `${earnedBadges.length} earned · ${allBadges.length} total`;
+}
+
 /* ── INIT ──────────────────────────────────────────────────── */
 fetch('../data/character_stats.json')
   .then(r => r.json())
@@ -1890,13 +2325,16 @@ fetch('../data/character_stats.json')
     renderRadar(data.pillars || DEFAULTS.pillars);
     if (data.pillar_history && data.pillar_history.length) {
       renderHeatmap(data.pillar_history);
+      renderScoreHistory(data.pillar_history);
     }
     hydrateBadges();
+    setTimeout(() => { collapseLocked(); buildBadgeCompact(); }, 1500);
   })
   .catch(() => {
     hydrate(DEFAULTS);
     renderRadar(DEFAULTS.pillars);
     hydrateBadges();
+    setTimeout(() => { collapseLocked(); buildBadgeCompact(); }, 1500);
   });
 </script>
 

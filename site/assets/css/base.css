@@ -407,7 +407,7 @@ body { padding-bottom: 36px; }
 }
 .ticker__inner {
   display: inline-block;
-  animation: ticker-scroll 35s linear infinite;
+  animation: ticker-scroll 45s linear infinite;
 }
 @keyframes ticker-scroll {
   from { transform: translateX(0); }

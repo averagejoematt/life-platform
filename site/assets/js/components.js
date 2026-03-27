@@ -16,40 +16,38 @@
  *
  * WHY: Editing nav/footer/CTA structure requires changing 1 file instead of 54.
  *
- * v3.0.0 — 2026-03-26 — Signal Doctrine Tier 2: 5-section IA
- *   The Story | The Data | The Science | The Build | Follow
+ * v4.0.0 — 2026-03-27 — Offsite Decision 1: 6-section IA
+ *   The Story | The Evidence | The Pulse | The Practice | The Platform | The Chronicle
  */
 (function() {
   'use strict';
 
   var path = window.location.pathname;
 
-  // ── Section mapping — 5-section IA ────────────────────────
+  // ── Section mapping — 6-section IA (Decision 1a) ──────────
   var SECTIONS = [
     { label: 'The Story', items: [
-      { href: '/',       text: 'Home' },
-      { href: '/story/', text: 'My Story' },
-      { href: '/about/', text: 'The Mission' },
+      { href: '/',              text: 'Home' },
+      { href: '/story/',        text: 'My Story' },
+      { href: '/about/',        text: 'The Mission' },
+      { href: '/achievements/', text: 'Milestones' },
     ]},
-    { label: 'The Data', groups: [
-      { heading: 'My Numbers', items: [
-        { href: '/live/',           text: 'Today' },
-        { href: '/character/',      text: 'Character' },
-        { href: '/habits/',         text: 'Habits' },
-        { href: '/accountability/', text: 'Accountability' },
-        { href: '/achievements/',   text: 'Milestones' },
-      ]},
-      { heading: 'The Evidence', items: [
-        { href: '/sleep/',       text: 'Sleep' },
-        { href: '/glucose/',     text: 'Glucose' },
-        { href: '/nutrition/',   text: 'Nutrition' },
-        { href: '/training/',    text: 'Training' },
-        { href: '/mind/',        text: 'Inner Life' },
-        { href: '/benchmarks/',  text: 'Benchmarks' },
-        { href: '/explorer/',    text: 'Data Explorer' },
-      ]},
+    { label: 'The Evidence', items: [
+      { href: '/sleep/',       text: 'Sleep' },
+      { href: '/glucose/',     text: 'Glucose' },
+      { href: '/nutrition/',   text: 'Nutrition' },
+      { href: '/training/',    text: 'Training' },
+      { href: '/mind/',        text: 'Inner Life' },
+      { href: '/benchmarks/',  text: 'Benchmarks' },
+      { href: '/explorer/',    text: 'Data Explorer' },
     ]},
-    { label: 'The Science', groups: [
+    { label: 'The Pulse', items: [
+      { href: '/live/',           text: 'Today' },
+      { href: '/character/',      text: 'The Score' },
+      { href: '/habits/',         text: 'Habits' },
+      { href: '/accountability/', text: 'Accountability' },
+    ]},
+    { label: 'The Practice', groups: [
       { heading: 'What I Do', items: [
         { href: '/stack/',       text: 'The Stack' },
         { href: '/protocols/',   text: 'Protocols' },
@@ -61,20 +59,20 @@
         { href: '/discoveries/', text: 'Discoveries' },
       ]},
     ]},
-    { label: 'The Build', items: [
-      { href: '/platform/',     text: 'Platform' },
+    { label: 'The Platform', items: [
+      { href: '/platform/',     text: 'How It Works' },
       { href: '/intelligence/', text: 'The AI' },
       { href: '/board/',        text: 'AI Board' },
-      { href: '/cost/',         text: 'Cost' },
       { href: '/methodology/',  text: 'Methodology' },
+      { href: '/cost/',         text: 'Cost' },
       { href: '/tools/',        text: 'Tools' },
       { href: '/builders/',     text: 'For Builders' },
     ]},
-    { label: 'Follow', items: [
-      { href: '/chronicle/', text: 'Chronicle' },
+    { label: 'The Chronicle', items: [
+      { href: '/chronicle/', text: 'Chronicle Archive' },
       { href: '/weekly/',    text: 'Weekly Snapshots' },
-      { href: '/subscribe/', text: 'Subscribe' },
       { href: '/ask/',       text: 'Ask the Data' },
+      { href: '/subscribe/', text: 'Subscribe' },
     ]},
   ];
 
@@ -164,7 +162,7 @@
         });
       }
 
-      if (sec.label === 'Follow') {
+      if (sec.label === 'The Chronicle') {
         html += '<a href="/rss.xml" class="nav-overlay__link">RSS</a>';
         html += '<a href="/privacy/" class="nav-overlay__link">Privacy</a>';
       }
@@ -184,13 +182,9 @@
         { href: '/', text: 'Home' },
         { href: '/story/', text: 'My Story' },
         { href: '/about/', text: 'The Mission' },
-      ]},
-      { heading: 'The Data', links: [
-        { href: '/live/', text: 'Today' },
-        { href: '/character/', text: 'Character' },
-        { href: '/habits/', text: 'Habits' },
-        { href: '/accountability/', text: 'Accountability' },
         { href: '/achievements/', text: 'Milestones' },
+      ]},
+      { heading: 'The Evidence', links: [
         { href: '/sleep/', text: 'Sleep' },
         { href: '/glucose/', text: 'Glucose' },
         { href: '/nutrition/', text: 'Nutrition' },
@@ -199,7 +193,13 @@
         { href: '/benchmarks/', text: 'Benchmarks' },
         { href: '/explorer/', text: 'Data Explorer' },
       ]},
-      { heading: 'The Science', links: [
+      { heading: 'The Pulse', links: [
+        { href: '/live/', text: 'Today' },
+        { href: '/character/', text: 'The Score' },
+        { href: '/habits/', text: 'Habits' },
+        { href: '/accountability/', text: 'Accountability' },
+      ]},
+      { heading: 'The Practice', links: [
         { href: '/stack/', text: 'The Stack' },
         { href: '/protocols/', text: 'Protocols' },
         { href: '/supplements/', text: 'Supplements' },
@@ -207,20 +207,20 @@
         { href: '/challenges/',  text: 'Challenges' },
         { href: '/discoveries/', text: 'Discoveries' },
       ]},
-      { heading: 'The Build', links: [
-        { href: '/platform/', text: 'Platform' },
+      { heading: 'The Platform', links: [
+        { href: '/platform/', text: 'How It Works' },
         { href: '/intelligence/', text: 'The AI' },
         { href: '/board/', text: 'AI Board' },
-        { href: '/cost/', text: 'Cost' },
         { href: '/methodology/', text: 'Methodology' },
+        { href: '/cost/', text: 'Cost' },
         { href: '/tools/', text: 'Tools' },
         { href: '/builders/', text: 'For Builders' },
       ]},
-      { heading: 'Follow', links: [
-        { href: '/chronicle/', text: 'Chronicle' },
+      { heading: 'The Chronicle', links: [
+        { href: '/chronicle/', text: 'Chronicle Archive' },
         { href: '/weekly/', text: 'Weekly Snapshots' },
-        { href: '/subscribe/', text: 'Subscribe' },
         { href: '/ask/', text: 'Ask the Data' },
+        { href: '/subscribe/', text: 'Subscribe' },
         { href: '/rss.xml', text: 'RSS' },
         { href: '/privacy/', text: 'Privacy' },
       ]},
@@ -244,14 +244,13 @@
     return html;
   }
 
-  // ── BOTTOM NAV (mobile) — 5 section entry points ──────────
+  // ── BOTTOM NAV (mobile) — 4 sections + More (Decision 1b) ─
   function buildBottomNav() {
     var items = [
-      { href: '/',           label: 'Story',   icon: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>' },
-      { href: '/live/',      label: 'Data',    icon: '<circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/>' },
-      { href: '/stack/',     label: 'Science', icon: '<path d="M9 3h6v4l3 7H6l3-7V3z"/><path d="M6 14v4a2 2 0 002 2h8a2 2 0 002-2v-4"/><line x1="12" y1="3" x2="12" y2="1"/>' },
-      { href: '/platform/',  label: 'Build',   icon: '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>' },
-      { href: '/subscribe/', label: 'Follow',  icon: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>' },
+      { href: '/',           label: 'Story',     icon: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>' },
+      { href: '/sleep/',     label: 'Evidence',  icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>' },
+      { href: '/live/',      label: 'Pulse',     icon: '<circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/>' },
+      { href: '/chronicle/', label: 'Chronicle', icon: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>' },
     ];
 
     var html = '<nav class="bottom-nav" aria-label="Mobile navigation">';
@@ -260,6 +259,10 @@
       html += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' + item.icon + '</svg>';
       html += '<span>' + item.label + '</span></a>';
     });
+    // "More" button opens the full overlay (The Practice + The Platform)
+    html += '<button class="bottom-nav__link bottom-nav__more" aria-label="More sections">';
+    html += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>';
+    html += '<span>More</span></button>';
     html += '</nav>';
     return html;
   }

@@ -43,6 +43,14 @@
       max-width: 560px;
       line-height: var(--lh-body);
     }
+    .page-header__subtitle {
+      font-size: var(--text-lg, 18px);
+      color: var(--accent);
+      max-width: 640px;
+      line-height: var(--lh-body);
+      margin-top: var(--space-3);
+      font-weight: 500;
+    }
 
     /* ── Summary strip ──────────────────────────────────── */
     .summary-strip {
@@ -237,6 +245,178 @@
     .badge-section--science { --badge-color: #e06060; }
     .badge-section--challenge { --badge-color: #f59e0b; }
 
+    /* ── Vignette (7c) ─────────────────────────────────── */
+    .badge__vignette {
+      font-size: var(--text-2xs, 11px);
+      color: var(--text-faint);
+      line-height: 1.5;
+      font-style: italic;
+      margin-top: var(--space-1);
+      padding: var(--space-2) var(--space-3);
+      border-left: 2px solid var(--badge-color, var(--accent));
+      text-align: left;
+      width: 100%;
+    }
+
+    /* ── Clinical context (7g) ─────────────────────────── */
+    .badge__clinical {
+      font-size: var(--text-2xs, 11px);
+      color: var(--badge-color, var(--accent));
+      letter-spacing: var(--ls-label);
+      margin-top: var(--space-1);
+      opacity: 0.85;
+    }
+
+    /* ── Narrative link (7k) ───────────────────────────── */
+    .badge__narrative-link {
+      font-size: var(--text-2xs, 11px);
+      color: var(--badge-color, var(--accent));
+      text-decoration: none;
+      letter-spacing: var(--ls-label);
+      margin-top: var(--space-1);
+      transition: opacity var(--dur-mid) var(--ease-out);
+    }
+    .badge__narrative-link:hover { opacity: 0.7; }
+
+    /* ── Share button (7e) ─────────────────────────────── */
+    .badge__share {
+      position: absolute;
+      top: var(--space-2);
+      right: var(--space-2);
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all var(--dur-mid) var(--ease-out);
+      padding: 0;
+      line-height: 1;
+    }
+    .badge__share:hover {
+      border-color: var(--badge-color, var(--accent));
+      color: var(--badge-color, var(--accent));
+    }
+    .badge__share--copied {
+      border-color: var(--badge-color, var(--accent));
+      color: var(--badge-color, var(--accent));
+    }
+
+    /* ── Progress bar for locked badges (7f) ───────────── */
+    .badge__progress {
+      width: 100%;
+      margin-top: var(--space-2);
+    }
+    .badge__progress-bar {
+      width: 100%;
+      height: 4px;
+      background: var(--surface-raised);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .badge__progress-fill {
+      height: 100%;
+      background: var(--text-faint);
+      border-radius: 2px;
+      transition: width 1s var(--ease-out);
+    }
+    .badge__progress-label {
+      font-size: var(--text-2xs, 11px);
+      color: var(--text-faint);
+      margin-top: 2px;
+      letter-spacing: var(--ls-label);
+    }
+
+    /* ── View toggle (7d) ──────────────────────────────── */
+    .view-toggle {
+      display: flex;
+      justify-content: center;
+      gap: 0;
+      margin: var(--space-6) var(--page-padding) 0;
+    }
+    .view-toggle__btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: var(--space-2) var(--space-5);
+      cursor: pointer;
+      transition: all var(--dur-mid) var(--ease-out);
+    }
+    .view-toggle__btn:first-child { border-right: none; }
+    .view-toggle__btn--active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--bg);
+    }
+
+    /* ── Timeline date headers (7d) ────────────────────── */
+    .timeline-month {
+      padding: var(--space-6) var(--page-padding) var(--space-2);
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      border-top: 1px solid var(--border);
+    }
+    .timeline-month:first-child { border-top: none; }
+
+    /* ── Badge notification CTA (7j) ───────────────────── */
+    .badge-notify {
+      max-width: var(--prose-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      text-align: center;
+    }
+    .badge-notify__heading {
+      font-family: var(--font-display);
+      font-size: var(--text-h4, 16px);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .badge-notify__form {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+    }
+    .badge-notify__input {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      padding: var(--space-2) var(--space-4);
+      width: 240px;
+      outline: none;
+    }
+    .badge-notify__input:focus { border-color: var(--accent); }
+    .badge-notify__btn {
+      background: var(--accent);
+      border: 1px solid var(--accent);
+      color: var(--bg);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: var(--space-2) var(--space-5);
+      cursor: pointer;
+      transition: opacity var(--dur-mid) var(--ease-out);
+    }
+    .badge-notify__btn:hover { opacity: 0.85; }
+    .badge-notify__msg {
+      font-size: var(--text-2xs);
+      color: var(--accent);
+      margin-top: var(--space-2);
+      min-height: 1.2em;
+    }
+
     /* ── Loading / error ───────────────────────────────── */
     .badge-loading {
       padding: var(--space-20) 0;
@@ -302,7 +482,8 @@
 <div class="page-header reveal">
   <div class="eyebrow">The Data</div>
   <h1 class="page-header__title"><span id="h-earned">—</span> of <span id="h-total">—</span> <span>Unlocked</span></h1>
-  <p class="page-header__sub">Badges are computed from live data — weight milestones, habit streaks, character levels, experiments completed. You can't fake these. They unlock when the numbers say so.</p>
+  <p class="page-header__subtitle">Badges are computed from live data — weight milestones, habit streaks, character levels, experiments completed.</p>
+  <p class="page-header__sub">You can't fake these. They unlock when the numbers say so.</p>
 </div>
 
 <!-- Progress ring + summary -->
@@ -312,7 +493,7 @@
     <circle class="progress-ring__fill" id="ring-fill" cx="80" cy="80" r="68"
       stroke-dasharray="427.3" stroke-dashoffset="427.3"/>
     <text class="progress-ring__text" x="80" y="74" id="ring-pct">—</text>
-    <text class="progress-ring__sub" x="80" y="96">COMPLETE</text>
+    <text class="progress-ring__sub" x="80" y="96" id="ring-sub">EARNED</text>
   </svg>
 </div>
 
@@ -335,11 +516,27 @@
   </div>
 </div>
 
+<!-- View toggle (7d) -->
+<div class="view-toggle" id="view-toggle">
+  <button class="view-toggle__btn view-toggle__btn--active" data-view="category">By Category</button>
+  <button class="view-toggle__btn" data-view="date">By Date</button>
+</div>
+
 <!-- Badge sections (populated by JS) -->
 <div id="badge-sections">
   <div class="badge-loading">
     <div class="badge-loading__text">// loading achievements from live data…</div>
   </div>
+</div>
+
+<!-- Badge notification CTA (7j) -->
+<div class="badge-notify reveal" id="badge-notify">
+  <div class="badge-notify__heading">Get notified when a new badge is earned</div>
+  <form class="badge-notify__form" id="badge-notify-form">
+    <input class="badge-notify__input" type="email" placeholder="your@email.com" required aria-label="Email address">
+    <button class="badge-notify__btn" type="submit">Subscribe</button>
+  </form>
+  <div class="badge-notify__msg" id="badge-notify-msg"></div>
 </div>
 
 <!-- N=1 Disclaimer -->
@@ -396,6 +593,42 @@
       '</svg>';
   }
 
+  // Clinical context map for weight milestones (7g)
+  var WEIGHT_CLINICAL = {
+    'sub-280': 'Below obesity threshold for 6\'1" male',
+    'sub-260': 'Entering overweight range',
+    'sub-240': 'Approaching healthy BMI range',
+    'sub-220': 'Within healthy BMI range',
+    'sub-200': 'Lean body composition territory'
+  };
+
+  function getWeightClinical(badge) {
+    // Check explicit clinical_context first (7k)
+    if (badge.clinical_context) return badge.clinical_context;
+    if (badge.category !== 'milestone') return null;
+    // Try to match from badge label or id
+    var label = (badge.label || '').toLowerCase().replace(/\s+/g, '-');
+    var id = (badge.id || '').toLowerCase();
+    for (var key in WEIGHT_CLINICAL) {
+      if (label.indexOf(key) !== -1 || id.indexOf(key) !== -1) {
+        return WEIGHT_CLINICAL[key];
+      }
+    }
+    return null;
+  }
+
+  // Parse weight target from badge description for progress (7f)
+  function parseWeightTarget(badge) {
+    if (badge.progress_target) return badge.progress_target;
+    var desc = badge.description || '';
+    var match = desc.match(/(\d{3})\s*(?:lbs?|pounds?)/i);
+    if (match) return parseInt(match[1], 10);
+    // Try from label, e.g. "Sub-260"
+    var labelMatch = (badge.label || '').match(/sub[- ]?(\d{3})/i);
+    if (labelMatch) return parseInt(labelMatch[1], 10);
+    return null;
+  }
+
   function renderBadge(badge) {
     var cls = badge.earned ? 'badge badge--earned' : 'badge badge--locked';
     var statusText = '';
@@ -406,6 +639,8 @@
     } else {
       statusText = 'Locked';
     }
+
+    // Date display
     var dateHtml = '';
     if (badge.earned && badge.earned_date) {
       try {
@@ -416,40 +651,115 @@
       } catch(e) {}
     }
 
+    // Share button for earned badges (7e)
+    var shareHtml = '';
+    if (badge.earned) {
+      shareHtml = '<button class="badge__share" title="Copy share text" ' +
+        'onclick="window.__shareBadge(this, \'' + esc(badge.label).replace(/'/g, "\\'") + '\', \'' + esc(badge.description).replace(/'/g, "\\'") + '\')">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>' +
+        '</button>';
+    }
+
+    // Vignette for earned badges (7c)
+    var vignetteHtml = '';
+    if (badge.earned) {
+      var vigText = badge.vignette || 'This moment meant something. The data tells one story; the feeling tells another.';
+      vignetteHtml = '<div class="badge__vignette">' + esc(vigText) + '</div>';
+    }
+
+    // Clinical context for weight badges (7g)
+    var clinicalHtml = '';
+    var clinical = getWeightClinical(badge);
+    if (clinical) {
+      clinicalHtml = '<div class="badge__clinical">' + esc(clinical) + '</div>';
+    }
+
+    // Narrative link (7k)
+    var narrativeHtml = '';
+    if (badge.narrative_link) {
+      narrativeHtml = '<a class="badge__narrative-link" href="' + esc(badge.narrative_link) + '">Read the story &rarr;</a>';
+    }
+
+    // Progress bar for locked badges (7f)
+    var progressHtml = '';
+    if (!badge.earned) {
+      var current = badge.progress_current;
+      var target = badge.progress_target;
+      // For weight milestones, infer progress from weight target
+      if (!target && badge.category === 'milestone') {
+        target = parseWeightTarget(badge);
+        if (target && currentWeight) {
+          // Weight progress: going DOWN, so progress = how far we've come from start toward target
+          // Show as distance remaining
+          current = currentWeight;
+        }
+      }
+      if (current != null && target != null) {
+        var pct;
+        var label;
+        if (badge.category === 'milestone' && current > target) {
+          // Weight: higher is further from goal
+          // Assume starting point was ~300 (or just show distance remaining)
+          var remaining = (current - target).toFixed(1);
+          pct = Math.max(0, Math.min(100, ((300 - current) / (300 - target)) * 100));
+          label = remaining + ' lbs to go';
+        } else if (target > 0) {
+          pct = Math.min(100, (current / target) * 100);
+          label = current + ' / ' + target;
+        } else {
+          pct = 0;
+          label = '';
+        }
+        if (label) {
+          progressHtml = '<div class="badge__progress">' +
+            '<div class="badge__progress-bar"><div class="badge__progress-fill" style="width:' + pct.toFixed(0) + '%"></div></div>' +
+            '<div class="badge__progress-label">' + esc(label) + '</div>' +
+            '</div>';
+        }
+      }
+    }
+
     return '<div class="' + cls + '">' +
+      shareHtml +
       '<div class="badge__ring">' + renderBadgeRing(badge.earned) +
         '<div class="badge__icon"><img src="' + badgeSvgPath(badge.id) + '" alt="' + esc(badge.label) + '" width="56" height="56" loading="lazy"></div>' +
       '</div>' +
       '<div class="badge__name">' + esc(badge.label) + '</div>' +
       '<div class="badge__desc">' + esc(badge.description) + '</div>' +
+      clinicalHtml +
+      vignetteHtml +
+      narrativeHtml +
       dateHtml +
+      progressHtml +
       '<div class="badge__status">' + statusText + '</div>' +
     '</div>';
   }
 
-  function render(data) {
-    var badges = data.achievements || [];
-    var summary = data.summary || {};
+  // Share badge to clipboard (7e)
+  window.__shareBadge = function(btn, name, desc) {
+    var text = 'Matthew just earned ' + name + ' \u2014 ' + desc + ' averagejoematt.com/achievements/';
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(function() {
+        btn.classList.add('badge__share--copied');
+        btn.innerHTML = '\u2713';
+        setTimeout(function() {
+          btn.classList.remove('badge__share--copied');
+          btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>';
+        }, 2000);
+      });
+    }
+  };
 
-    // Header
-    document.getElementById('h-earned').textContent = summary.earned || 0;
-    document.getElementById('h-total').textContent = summary.total || badges.length;
+  // Track current weight for progress bar calculations
+  var currentWeight = null;
 
-    // Progress ring
-    var pct = summary.total > 0 ? Math.round((summary.earned / summary.total) * 100) : 0;
-    document.getElementById('ring-pct').textContent = pct + '%';
-    var ringCirc = 2 * Math.PI * 68;
-    var ringOffset = ringCirc - (pct / 100) * ringCirc;
-    setTimeout(function() {
-      document.getElementById('ring-fill').style.strokeDashoffset = ringOffset;
-    }, 300);
+  // Store badge data for view toggling
+  var allBadgeData = null;
+  var currentView = 'category';
 
-    // Summary cards
-    document.getElementById('sum-streak').textContent = summary.current_streak || 0;
-    document.getElementById('sum-days').textContent = summary.days_tracked || 0;
-    document.getElementById('sum-level').textContent = summary.current_level || 0;
-    document.getElementById('sum-weight').textContent = summary.current_weight ? summary.current_weight.toFixed(1) : '—';
-
+  function renderCategoryView(badges) {
     // Group by category
     var groups = {};
     badges.forEach(function(b) {
@@ -478,14 +788,114 @@
       catBadges.forEach(function(b) { html += renderBadge(b); });
       html += '</div></section>';
     });
+    return html;
+  }
 
+  function renderTimelineView(badges) {
+    // Get all badges with earned_date, sorted reverse chronologically
+    var earned = badges.filter(function(b) { return b.earned && b.earned_date; })
+      .sort(function(a, b) { return b.earned_date.localeCompare(a.earned_date); });
+    var locked = badges.filter(function(b) { return !b.earned; });
+
+    var html = '';
+    var lastMonth = '';
+    var monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+
+    // Render earned badges grouped by month
+    if (earned.length > 0) {
+      var currentGridOpen = false;
+      earned.forEach(function(b) {
+        var parts = b.earned_date.split('-');
+        var monthKey = parts[0] + '-' + parts[1];
+        var monthLabel = monthNames[parseInt(parts[1], 10) - 1] + ' ' + parts[0];
+        if (monthKey !== lastMonth) {
+          if (currentGridOpen) html += '</div>';
+          html += '<div class="timeline-month reveal">' + monthLabel + '</div>';
+          // Apply category color via wrapper
+          html += '<div class="badge-grid" style="padding:0 var(--page-padding);margin-bottom:var(--space-4);">';
+          currentGridOpen = true;
+          lastMonth = monthKey;
+        }
+        // Wrap in category section for color
+        html += '<div class="badge-section--' + (b.category || 'other') + '" style="display:contents">';
+        html += renderBadge(b);
+        html += '</div>';
+      });
+      if (currentGridOpen) html += '</div>';
+    }
+
+    // Render locked badges at the bottom
+    if (locked.length > 0) {
+      html += '<div class="timeline-month reveal" style="color:var(--text-muted)">Locked</div>';
+      html += '<div class="badge-grid" style="padding:0 var(--page-padding);margin-bottom:var(--space-4);">';
+      locked.forEach(function(b) {
+        html += '<div class="badge-section--' + (b.category || 'other') + '" style="display:contents">';
+        html += renderBadge(b);
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+
+    return html;
+  }
+
+  function renderBadges() {
+    if (!allBadgeData) return;
+    var badges = allBadgeData.achievements || [];
+    var html = currentView === 'date' ? renderTimelineView(badges) : renderCategoryView(badges);
     document.getElementById('badge-sections').innerHTML = html;
-
     // Trigger reveal animations
     document.querySelectorAll('.reveal').forEach(function(el) {
       el.classList.add('is-visible');
     });
   }
+
+  function render(data) {
+    allBadgeData = data;
+    var badges = data.achievements || [];
+    var summary = data.summary || {};
+
+    // Store current weight for progress bars (7f)
+    currentWeight = summary.current_weight || null;
+
+    // Header
+    document.getElementById('h-earned').textContent = summary.earned || 0;
+    document.getElementById('h-total').textContent = summary.total || badges.length;
+
+    // Progress ring — show earned count, not percentage (7i)
+    var earnedCount = summary.earned || 0;
+    document.getElementById('ring-pct').textContent = earnedCount;
+    var pct = summary.total > 0 ? Math.round((summary.earned / summary.total) * 100) : 0;
+    var ringCirc = 2 * Math.PI * 68;
+    var ringOffset = ringCirc - (pct / 100) * ringCirc;
+    setTimeout(function() {
+      document.getElementById('ring-fill').style.strokeDashoffset = ringOffset;
+    }, 300);
+
+    // Summary cards
+    document.getElementById('sum-streak').textContent = summary.current_streak || 0;
+    document.getElementById('sum-days').textContent = summary.days_tracked || 0;
+    document.getElementById('sum-level').textContent = summary.current_level || 0;
+    document.getElementById('sum-weight').textContent = summary.current_weight ? summary.current_weight.toFixed(1) : '—';
+
+    // Render badge sections
+    renderBadges();
+  }
+
+  // View toggle handler (7d)
+  document.getElementById('view-toggle').addEventListener('click', function(e) {
+    var btn = e.target.closest('.view-toggle__btn');
+    if (!btn || btn.classList.contains('view-toggle__btn--active')) return;
+    var view = btn.getAttribute('data-view');
+    if (!view) return;
+    currentView = view;
+    document.querySelectorAll('.view-toggle__btn').forEach(function(b) {
+      b.classList.remove('view-toggle__btn--active');
+    });
+    btn.classList.add('view-toggle__btn--active');
+    renderBadges();
+  });
 
   // Fetch from API
   fetch('/api/achievements')
@@ -522,6 +932,35 @@
       ].forEach(function(pair) { setText(pair[0], pair[1]); });
     })
     .catch(function() {});
+
+  // Badge notification subscribe form (7j)
+  var notifyForm = document.getElementById('badge-notify-form');
+  if (notifyForm) {
+    notifyForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var input = notifyForm.querySelector('input[type="email"]');
+      var msg = document.getElementById('badge-notify-msg');
+      var email = input.value.trim();
+      if (!email) return;
+      msg.textContent = 'Subscribing...';
+      fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, source: 'badge_alert' })
+      })
+        .then(function(r) {
+          if (r.ok) {
+            msg.textContent = 'Subscribed. You\'ll hear from us when a badge drops.';
+            input.value = '';
+          } else {
+            msg.textContent = 'Something went wrong. Try again.';
+          }
+        })
+        .catch(function() {
+          msg.textContent = 'Network error. Try again later.';
+        });
+    });
+  }
 })();
 </script>
 

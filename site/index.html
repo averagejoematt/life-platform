@@ -337,32 +337,40 @@
 
 
 
-<!-- Ticker -->
+<!-- Ticker (Decision 2) — DAY N always leads (2g), terminal aesthetic (2f) -->
 <div class="ticker" style="margin-top:0">
   <div class="ticker__inner">
     <span class="ticker__item">DAY 1 — APRIL 1, 2026. THE EXPERIMENT BEGINS.</span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item">WEIGHT <strong id="tk-weight">287.7 LBS</strong></span>
+    <span class="ticker__item">WEIGHT <strong id="tk-weight">287.7 LBS · MAR 27</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item" title="Heart Rate Variability — higher is better. Measures autonomic nervous system recovery." >HRV <strong id="tk-hrv">54 MS</strong></span>
+    <span class="ticker__item" title="Heart Rate Variability — higher is better. Measures autonomic nervous system recovery.">HRV <strong id="tk-hrv">54 MS</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item" title="Whoop Recovery Score — percentage of physiological readiness (0-100%)." >RECOVERY <strong id="tk-recovery">75%</strong></span>
+    <span class="ticker__item" title="Whoop Recovery Score — percentage of physiological readiness (0-100%).">RECOVERY <strong id="tk-recovery">75%</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item" title="Consecutive days completing all Tier 0 (non-negotiable) habits." >STREAK <strong id="tk-streak">0D STREAK</strong></span>
+    <span class="ticker__item" title="Sleep duration and efficiency from last night.">SLEEP <strong id="tk-sleep">7.2H · 92%</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item" title="Consecutive days completing all Tier 0 (non-negotiable) habits.">STREAK <strong id="tk-streak">T0: 0%</strong></span>
     <span class="ticker__item">⬥</span>
     <span class="ticker__item">JOURNEY <strong id="tk-journey">12.2% TO GOAL</strong></span>
     <span class="ticker__item">⬥</span>
+    <span class="ticker__item"><a href="/chronicle/" id="tk-chronicle" style="color:var(--c-amber-400);text-decoration:none;">LATEST: WEEK 1 →</a></span>
+    <span class="ticker__item">⬥</span>
     <span class="ticker__item">DAY 1 — APRIL 1, 2026. THE EXPERIMENT BEGINS.</span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item">WEIGHT <strong id="tk-weight-2">287.7 LBS</strong></span>
+    <span class="ticker__item">WEIGHT <strong id="tk-weight-2">287.7 LBS · MAR 27</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item" title="Heart Rate Variability — higher is better. Measures autonomic nervous system recovery." >HRV <strong id="tk-hrv-2">54 MS</strong></span>
+    <span class="ticker__item" title="Heart Rate Variability — higher is better. Measures autonomic nervous system recovery.">HRV <strong id="tk-hrv-2">54 MS</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item" title="Whoop Recovery Score — percentage of physiological readiness (0-100%)." >RECOVERY <strong id="tk-recovery-2">75%</strong></span>
+    <span class="ticker__item" title="Whoop Recovery Score — percentage of physiological readiness (0-100%).">RECOVERY <strong id="tk-recovery-2">75%</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item" title="Consecutive days completing all Tier 0 (non-negotiable) habits." >STREAK <strong id="tk-streak-2">0D STREAK</strong></span>
+    <span class="ticker__item" title="Sleep duration and efficiency from last night.">SLEEP <strong id="tk-sleep-2">7.2H · 92%</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item" title="Consecutive days completing all Tier 0 (non-negotiable) habits.">STREAK <strong id="tk-streak-2">T0: 0%</strong></span>
     <span class="ticker__item">⬥</span>
     <span class="ticker__item">JOURNEY <strong id="tk-journey-2">12.2% TO GOAL</strong></span>
+    <span class="ticker__item">⬥</span>
+    <span class="ticker__item"><a href="/chronicle/" id="tk-chronicle-2" style="color:var(--c-amber-400);text-decoration:none;">LATEST: WEEK 1 →</a></span>
     <span class="ticker__item">⬥</span>
   </div>
 </div>
@@ -1348,29 +1356,75 @@
       } catch (_e) { /* graceful degradation */ }
     }
     const _MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    // 2d: Always show freshness date on weight
     function _fmtWeight(lbs, asOf) {
       if (!lbs) return '—';
       const base = lbs.toFixed(1) + ' LBS';
       if (!asOf) return base;
-      const daysAgo = Math.floor((Date.now() - new Date(asOf)) / 86400000);
-      if (daysAgo <= 3) return base;
       const parts = asOf.split('-');
-      return base + ' (' + _MONTHS[parseInt(parts[1]) - 1] + ' ' + parseInt(parts[2]) + ')';
+      return base + ' · ' + _MONTHS[parseInt(parts[1]) - 1] + ' ' + parseInt(parts[2]);
     }
     const _weightDisplay = _fmtWeight(_wLbs, _wAsOf);
 
+    // 2a: Directional arrows — compare current to 7-day avg from trends
+    const trends = raw.trends || {};
+    function _arrow(current, trendArr) {
+      if (!current || !trendArr || !trendArr.length) return '';
+      const vals = trendArr.slice(-7).map(function(d) { return d.pct || d.lbs || d.hrs || d.ms || d.value || 0; });
+      if (!vals.length) return '';
+      const avg = vals.reduce(function(a,b){ return a+b; }, 0) / vals.length;
+      const delta = (current - avg) / (Math.abs(avg) || 1);
+      if (delta > 0.03) return ' ↗';
+      if (delta < -0.03) return ' ↘';
+      return ' →';
+    }
+    const wArrow = _arrow(_wLbs, trends.weight_daily);
+    const hrvArrow = _arrow(v.hrv_ms, trends.hrv_daily || []);
+    const recArrow = _arrow(v.recovery_pct, trends.recovery_daily);
+
+    // 2e: Reframe streak < 5 as T0 percentage
+    function _fmtStreak(streakVal, pctVal) {
+      if (streakVal >= 5) return streakVal + 'D STREAK';
+      if (pctVal != null) return 'T0: ' + Math.round(pctVal) + '%';
+      return 'T0: ' + streakVal + 'D';
+    }
+    const _t0Pct = (p.tier0_adherence_pct != null) ? p.tier0_adherence_pct : null;
+    const _streakDisplay = _fmtStreak(streak, _t0Pct);
+
+    // 2b: Sleep ticker item
+    const _sleepHrs = v.sleep_hours;
+    const _sleepEff = v.sleep_efficiency_pct || v.sleep_quality_score;
+    const _sleepDisplay = _sleepHrs ? (_sleepHrs.toFixed(1) + 'H' + (_sleepEff ? ' · ' + Math.round(_sleepEff) + '%' : '')) : '—';
+
+    // 2c: Chronicle latest as clickable ticker item
+    const cl = raw.chronicle_latest || {};
+    const _chronicleText = cl.title ? ('LATEST: ' + cl.title.toUpperCase() + ' →') : '';
+
     [
-      ['tk-weight',    _weightDisplay],
-      ['tk-hrv',       v.hrv_ms       ? Math.round(v.hrv_ms) + ' MS'                    : '—'],
-      ['tk-recovery',  v.recovery_pct ? Math.round(v.recovery_pct) + '%'                : '—'],
-      ['tk-streak',    streak + 'D STREAK'],
+      ['tk-weight',    _weightDisplay + wArrow],
+      ['tk-hrv',       v.hrv_ms       ? Math.round(v.hrv_ms) + ' MS' + hrvArrow             : '—'],
+      ['tk-recovery',  v.recovery_pct ? Math.round(v.recovery_pct) + '%' + recArrow          : '—'],
+      ['tk-sleep',     _sleepDisplay],
+      ['tk-streak',    _streakDisplay],
       ['tk-journey',   j.progress_pct != null ? j.progress_pct.toFixed(1) + '% TO GOAL' : '—'],
-      ['tk-weight-2',  _weightDisplay],
-      ['tk-hrv-2',     v.hrv_ms       ? Math.round(v.hrv_ms) + ' MS'                    : '—'],
-      ['tk-recovery-2',v.recovery_pct ? Math.round(v.recovery_pct) + '%'                : '—'],
-      ['tk-streak-2',  streak + 'D STREAK'],
+      ['tk-weight-2',  _weightDisplay + wArrow],
+      ['tk-hrv-2',     v.hrv_ms       ? Math.round(v.hrv_ms) + ' MS' + hrvArrow             : '—'],
+      ['tk-recovery-2',v.recovery_pct ? Math.round(v.recovery_pct) + '%' + recArrow          : '—'],
+      ['tk-sleep-2',   _sleepDisplay],
+      ['tk-streak-2',  _streakDisplay],
       ['tk-journey-2', j.progress_pct != null ? j.progress_pct.toFixed(1) + '% TO GOAL' : '—'],
     ].forEach(([id, val]) => setText(id, val));
+
+    // 2c: Chronicle latest link text + href
+    if (_chronicleText) {
+      ['tk-chronicle', 'tk-chronicle-2'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) {
+          el.textContent = _chronicleText;
+          if (cl.url) el.setAttribute('href', cl.url);
+        }
+      });
+    }
 
     // BS-02 Hero: weight counter
     const cw = hero.current_weight_lbs || j.current_weight_lbs || v.weight_lbs;
