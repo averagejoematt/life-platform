@@ -1,3 +1,26 @@
+## v3.9.39 — 2026-03-27: Pre-Launch Sweep — Nav Fixes, Mobile Scroll, Catalog Expansion
+
+Consolidated all undone items from 10+ sessions into action plan. Fixed nav naming (Arena→Challenges), mobile menu scroll bug, verified subscribe flow, built baseline capture script, expanded challenge catalog 34→66 and experiment library 58→71.
+
+### Fixes
+- Nav rename: "The Arena" → "Challenges", "Active Tests" → "Experiments" (components.js, 3 locations)
+- Mobile hamburger menu scroll: overlay now scrollable, page behind locked (iOS-safe body position fix)
+
+### Infrastructure
+- `deploy/capture_baseline.sh` — Day 1 snapshot script (character, daily data, habits, vices → platform_memory)
+- Subscribe flow verified: Lambda → SES → confirmation email ✅
+- Warmup script tested (2 endpoints flagged: character_stats 503, subscriber_count 405)
+
+### Content Expansion
+- Challenge catalog: 34 → 66 (+32 across all 6 categories)
+- Experiment library: 58 → 71 (+13 including sauna, cold plunge, journaling modalities, social protocols, supplement timing)
+
+### Documentation
+- `docs/ACTION_PLAN_APRIL_LAUNCH.md` — 23-item consolidated action plan across 4 phases
+- Phase B visual prompt package for Recraft/Midjourney
+
+---
+
 ## v3.9.38 — 2026-03-26: Visual Asset System — 65 SVGs + 3-Page Integration
 
 Product Board visual strategy session → creative direction document → 65 SVG assets generated → wired into milestones, live, and character pages → deployed to CloudFront.
