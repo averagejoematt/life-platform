@@ -1,3 +1,49 @@
+## v3.9.41 — 2026-03-27: Pre-Launch Content Review (Product Board Editorial Session)
+
+Full editorial review across Home, Story, and About pages with Product Board content panel (Ava Moreau, Sofia Herrera, Jordan Kim, Margaret Calloway, Elena Voss, Mara Chen). Matthew provided detailed page-by-page feedback; board aligned and added independent catches.
+
+### Home Page
+- **Hero tagline**: "For real this time" → "One person. Nineteen data sources. Every week, publicly."
+- **Hero narrative**: Broadened beyond weight — frames around being drowning in advice, wanting to listen to yourself, AI as lens for sleep/habits/mental state/relationships/happiness
+- **"Why I'm doing this in public"**: Rewritten — focuses on curiosity about AI reading full life picture + disappearing pattern + honesty
+- **Ticker**: "FOR REAL THIS TIME" → "THE EXPERIMENT BEGINS"
+- **Meta/OG/title tags**: Updated to match broader framing ("The Measured Life — AI Health Experiment")
+- **Bug fixes**: Removed duplicate subscribe line, duplicate "See a sample issue" link, duplicate social proof script, duplicate subscribe redirect
+- Removed "Senior Director at a SaaS company" from about section
+
+### Story Page
+- **Ch 1**: "Three times, actually — maybe four" → "Multiple times"
+- **Ch 1**: May 2025 passage leads with 5am gym/diet, not stretching
+- **Ch 1**: Slide paragraph rewritten — family, gentleman's agreement, Mondays counting to 100lbs
+- **Ch 1**: "Disgust" → "Disappointment" + promise elaboration (covenant, Rolex as covenant, trust question)
+- **Ch 2**: De-doxxed biographical details (removed ages, sailing, cities, relationships), added athletics (300lb lifts, 16-mile runs, competitive sports), isolation trigger framing
+- **Ch 2**: Pattern paragraph — limbic system/dopamine framing, purpose hypothesis, 5am gym sessions lead
+- **Ch 3**: Rewritten as product journey — AI therapy → optimization → data idea → mind spiraling. Removed "Senior Director", "terrifying"
+- **Ch 4**: Simplified to forward-looking — 10yr weight logs, stock-ticker pattern, "no data on mind yet"
+- **Ch 5**: Cheerleader/mum passage removed. Replaced with disappearing pattern, honesty, accountability
+- **Waveform**: Moved from bottom of page to between Ch 1 and Ch 2 for visual impact. Renamed "The Pattern"
+- **Meta tags**: Updated OG descriptions
+
+### About Page
+- **Mission Brief sidebar**: Replaced weight/location/job blocks with dossier-style visual showing physical targets (weight, run, strength, movement), mental targets (social, mental health, journaling, satisfaction), system targets (character score 80+, no 5-month gaps), and current status
+- **"Senior Director"**: Removed from header, meta, bio prose, sidebar throughout
+- **Press/media section**: Replaced with warm "If You Want to Connect" section
+- **Media kit**: Removed entirely (speaking, bios, talk topics, booking, assets) — 60 lines stripped. Re-add after meaningful traffic
+- Dead `copyBio()` function removed
+
+### Bug Fixes (All Pages)
+- Removed stray `</div>` after nav mount on story + about pages
+- Duplicate dark mode toggle: nav.js was injecting second theme-toggle button alongside the one in components.js — removed nav.js duplicate
+
+### Files Modified
+- `site/index.html` — hero, narrative, "why public", meta tags, ticker, 4 duplicate bugs
+- `site/story/index.html` — all 5 chapters rewritten, waveform repositioned, meta tags, stray div
+- `site/about/index.html` — mission brief sidebar, connect section, media kit removed, meta tags, stray div, dead code
+- `site/assets/js/nav.js` — removed duplicate theme toggle (30 lines)
+- `deploy/cleanup_mediakit.py` — one-time script for media kit removal
+
+---
+
 ## v3.9.40 — 2026-03-27: Nav Spacer Architecture + Catalog Fix + UX Cleanup
 
 Tech Board–approved nav spacer architecture (5-1-1 vote), Product Board–approved hierarchy tab removal (7-0 vote). Fixed challenge catalog format bug that broke all 65 tiles. Swept Arena/Lab naming to Challenges/Experiments everywhere. Centered home page comparison. Fixed dropdown headings. 37-file nav-height sweep.
