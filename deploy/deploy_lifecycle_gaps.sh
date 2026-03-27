@@ -13,7 +13,15 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 echo "=== Lifecycle Gap Fixes ==="
 
 echo "[1/5] Deploying MCP server (overdue detection + catalog_id)..."
-bash "$PROJECT_ROOT/deploy/deploy_lambda.sh" life-platform-mcp-server "$PROJECT_ROOT/mcp_server.py"
+# MCP Lambda requires full zip with mcp/ directory — deploy_lambda.sh doesn't handle this.
+# Build zip manually with all mcp modules.
+cd "$PROJECT_ROOT"
+zip -r /tmp/mcp_deploy.zip mcp_server.py mcp/ -x "mcp/__pycache__/*" "mcp/*.pyc"
+aws lambda update-function-code \
+  --function-name life-platform-mcp \
+  --zip-file fileb:///tmp/mcp_deploy.zip \
+  --region "$REGION" --no-cli-pager
+rm -f /tmp/mcp_deploy.zip
 echo "  Done"
 sleep 10
 

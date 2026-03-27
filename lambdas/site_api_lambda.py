@@ -50,6 +50,7 @@ IAM ROLE:
 v1.0.0 — 2026-03-16
 """
 
+import copy
 import hashlib
 import json
 import logging
@@ -174,6 +175,7 @@ CORS_HEADERS = {
     "Access-Control-Allow-Origin":  CORS_ORIGIN,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-Subscriber-Token",
+    "Access-Control-Max-Age":       "3600",
     "Content-Type":                 "application/json",
 }
 
@@ -1606,7 +1608,10 @@ def _get_token_secret() -> str:
     if _token_secret_cache:
         return _token_secret_cache
     import hashlib as _h
-    api_key = _get_anthropic_key() or "fallback-dev-secret"
+    api_key = _get_anthropic_key()
+    if not api_key:
+        logger.error("[token_secret] No API key available — subscriber tokens cannot be signed")
+        raise RuntimeError("Token signing secret unavailable")
     _token_secret_cache = _h.sha256(f"subscriber-token-v1:{api_key}".encode()).hexdigest()
     return _token_secret_cache
 
@@ -2000,9 +2005,9 @@ SAFETY (WR-40):
 - NEVER reveal: addresses, phone numbers, emails, employer details, financial info, passwords, API keys.
 - NEVER provide: medical diagnoses, medication recommendations, mental health assessments.
 - Stick to publicly shared health metrics: weight, HRV, sleep, recovery, training, habits, nutrition trends.
-- If asked about something outside your data
+- If asked about something outside your data, say "I don't have that data" — don't speculate.
 - CONTENT FILTER: NEVER mention porn, pornography, marijuana, cannabis, weed, THC, or any related terms.
-- If asked about these topics, respond only with "I don't have data on that specific topic.", say "I don't have that data" — don't speculate."""
+- If asked about these topics, respond only with: I don't have data on that specific topic."""
 
 
 def handle_ask() -> dict:
@@ -2867,14 +2872,15 @@ def _handle_experiment_follow(event: dict) -> dict:
             ReturnValues="UPDATED_NEW",
         )
         count = int(result.get("Attributes", {}).get("follow_count", 1))
-        if count > 10:
+        if count >= 10:
             return {
                 "statusCode": 429,
                 "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
                 "body": json.dumps({"error": "Too many follow requests. Try again later."}),
             }
     except Exception as e:
-        logger.warning(f"[experiment_follow] Rate limit check failed (non-fatal): {e}")
+        logger.error(f"[experiment_follow] Rate limit check failed: {e}")
+        return _error(500, "Follow rate limit check failed")
 
     # Store the follow interest
     follow_pk = "EXPERIMENT_FOLLOWS"
@@ -3083,11 +3089,169 @@ def handle_protocols() -> dict:
     protocols = _protocols_cache.get("protocols", [])
     return _ok({"protocols": protocols, "count": len(protocols)}, cache_seconds=3600)
 
+
+def _handle_challenge_vote(event: dict) -> dict:
+    """POST /api/challenge_vote — Rate-limited vote for challenge catalog entries.
+    Body: {"catalog_id": "cold-shower-finish"}
+    Rate limit: 1 vote per IP per challenge per 24 hours via DynamoDB TTL.
+    """
+    source_ip = (
+        event.get("requestContext", {}).get("http", {}).get("sourceIp")
+        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
+        or "unknown"
+    )
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except Exception:
+        return _error(400, "Invalid JSON body")
+
+    catalog_id = (body.get("catalog_id") or "").strip().lower()
+    if not catalog_id or len(catalog_id) > 80:
+        return _error(400, "catalog_id is required (max 80 chars)")
+
+    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    rate_pk = "VOTES#rate_limit"
+    rate_sk = f"IP#{ip_hash}#CH#{catalog_id}"
+    now_epoch = int(datetime.now(timezone.utc).timestamp())
+    ttl_24h = now_epoch + 86400
+
+    try:
+        table.put_item(
+            Item={
+                "pk": rate_pk,
+                "sk": rate_sk,
+                "voted_at": now_epoch,
+                "ttl": ttl_24h,
+            },
+            ConditionExpression="attribute_not_exists(pk)",
+        )
+    except Exception as e:
+        if "ConditionalCheckFailedException" in str(e):
+            return {
+                "statusCode": 429,
+                "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+                "body": json.dumps({"error": "Already voted for this challenge in the last 24 hours"}),
+            }
+        logger.error(f"[challenge_vote] Rate limit check failed: {e}")
+        return _error(500, "Vote rate limit check failed")
+
+    vote_pk = "VOTES#challenges"
+    vote_sk = f"CH#{catalog_id}"
+    try:
+        result = table.update_item(
+            Key={"pk": vote_pk, "sk": vote_sk},
+            UpdateExpression="ADD vote_count :one SET catalog_id = :cid, last_voted = :ts",
+            ExpressionAttributeValues={
+                ":one": 1,
+                ":cid": catalog_id,
+                ":ts": now_epoch,
+            },
+            ReturnValues="UPDATED_NEW",
+        )
+        new_count = int(result.get("Attributes", {}).get("vote_count", 1))
+    except Exception as e:
+        logger.error(f"[challenge_vote] Vote increment failed: {e}")
+        return _error(500, "Failed to record vote")
+
+    return {
+        "statusCode": 200,
+        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+        "body": json.dumps({
+            "catalog_id": catalog_id,
+            "new_count": new_count,
+        }),
+    }
+
+
+def _handle_challenge_follow(event: dict) -> dict:
+    """POST /api/challenge_follow — Email follow for challenge catalog entries.
+    Body: {"email": "user@example.com", "catalog_id": "cold-shower-finish"}
+    Rate limit: 10 follows per IP per hour.
+    """
+    source_ip = (
+        event.get("requestContext", {}).get("http", {}).get("sourceIp")
+        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
+        or "unknown"
+    )
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except Exception:
+        return _error(400, "Invalid JSON body")
+
+    email = (body.get("email") or "").strip().lower()
+    catalog_id = (body.get("catalog_id") or "").strip().lower()
+
+    if not email or "@" not in email or len(email) > 200:
+        return _error(400, "Valid email is required")
+    if not catalog_id or len(catalog_id) > 80:
+        return _error(400, "catalog_id is required")
+
+    email_hash = hashlib.sha256(email.encode()).hexdigest()[:16]
+    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    now_epoch = int(datetime.now(timezone.utc).timestamp())
+
+    # Rate limit: 10 follows per IP per hour
+    rate_pk = "VOTES#rate_limit"
+    rate_sk = f"CHFOLLOW#{ip_hash}#{now_epoch // 3600}"
+    try:
+        result = table.update_item(
+            Key={"pk": rate_pk, "sk": rate_sk},
+            UpdateExpression="ADD follow_count :one SET #ttl = :ttl",
+            ExpressionAttributeNames={"#ttl": "ttl"},
+            ExpressionAttributeValues={
+                ":one": 1,
+                ":ttl": now_epoch + 7200,
+            },
+            ReturnValues="UPDATED_NEW",
+        )
+        count = int(result.get("Attributes", {}).get("follow_count", 1))
+        if count >= 10:
+            return {
+                "statusCode": 429,
+                "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+                "body": json.dumps({"error": "Too many follow requests. Try again later."}),
+            }
+    except Exception as e:
+        logger.error(f"[challenge_follow] Rate limit check failed: {e}")
+        return _error(500, "Follow rate limit check failed")
+
+    # Store the follow interest
+    follow_pk = "CHALLENGE_FOLLOWS"
+    follow_sk = f"EMAIL#{email_hash}#CH#{catalog_id}"
+    try:
+        table.put_item(
+            Item={
+                "pk": follow_pk,
+                "sk": follow_sk,
+                "email": email,
+                "catalog_id": catalog_id,
+                "followed_at": now_epoch,
+                "notified": False,
+            },
+            ConditionExpression="attribute_not_exists(pk)",
+        )
+    except Exception as e:
+        if "ConditionalCheckFailedException" in str(e):
+            return {
+                "statusCode": 200,
+                "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+                "body": json.dumps({"already_following": True, "catalog_id": catalog_id}),
+            }
+        logger.error(f"[challenge_follow] DDB put failed: {e}")
+        return _error(500, "Failed to save follow")
+
+    return {
+        "statusCode": 200,
+        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+        "body": json.dumps({"followed": True, "catalog_id": catalog_id}),
+    }
+
+
 def handle_challenge_catalog() -> dict:
-    """GET /api/challenge_catalog — Static challenge catalog from S3.
+    """GET /api/challenge_catalog — Challenge catalog from S3 with vote counts.
 
     Returns the full catalog of challenges with metadata (icons, evidence,
-    board recommenders, protocols). This is the browsable 'menu' of challenges.
+    board recommenders, protocols) plus merged vote counts from DynamoDB.
     Dynamic status (active/completed/checkins) comes from /api/challenges.
     """
     global _challenge_catalog_cache
@@ -3095,7 +3259,31 @@ def handle_challenge_catalog() -> dict:
         _challenge_catalog_cache = _load_s3_json(
             "site/config/challenges_catalog.json", "challenge_catalog"
         )
-    return _ok(_challenge_catalog_cache, cache_seconds=3600)
+
+    # Merge vote counts from DynamoDB
+    vote_counts = {}
+    try:
+        vote_pk = "VOTES#challenges"
+        vote_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(vote_pk),
+            ProjectionExpression="sk, vote_count",
+        )
+        for item in _decimal_to_float(vote_resp.get("Items", [])):
+            cid = item.get("sk", "").replace("CH#", "")
+            vote_counts[cid] = int(item.get("vote_count", 0))
+    except Exception as e:
+        logger.warning(f"[challenge_catalog] Vote query failed (non-fatal): {e}")
+
+    # Inject votes into each challenge (deep copy to avoid mutating the cache)
+    result = copy.deepcopy(_challenge_catalog_cache)
+    challenges = result.get("challenges", [])
+    total_votes = 0
+    for ch in challenges:
+        ch["votes"] = vote_counts.get(ch.get("id", ""), 0)
+        total_votes += ch["votes"]
+    result["total_votes"] = total_votes
+
+    return _ok(result, cache_seconds=900)
 
 
 def handle_challenges() -> dict:
@@ -3960,7 +4148,9 @@ ROUTES = {
     "/api/protocols":          handle_protocols,
     "/api/challenges":         handle_challenges,
     "/api/challenge_catalog":  handle_challenge_catalog,
-    "/api/challenge_checkin":   None,  # POST handler in lambda_handler
+    "/api/challenge_vote":     None,  # POST handler in lambda_handler
+    "/api/challenge_follow":   None,  # POST handler in lambda_handler
+    "/api/challenge_checkin":  None,  # POST handler in lambda_handler
     "/api/domains":            handle_domains,
     "/api/habit_registry":     handle_habit_registry,
     # PULSE-A4: Daily pulse endpoint
@@ -4033,6 +4223,18 @@ def lambda_handler(event, context):
         if method != "POST":
             return _error(405, "Use POST method")
         return _handle_challenge_checkin(event)
+
+    # Challenge Vote (POST)
+    if path == "/api/challenge_vote":
+        if method != "POST":
+            return _error(405, "Use POST method")
+        return _handle_challenge_vote(event)
+
+    # Challenge Follow (POST)
+    if path == "/api/challenge_follow":
+        if method != "POST":
+            return _error(405, "Use POST method")
+        return _handle_challenge_follow(event)
 
     # EL-F2: Experiment Detail (GET with query params)
     if path == "/api/experiment_detail":
@@ -4124,7 +4326,7 @@ def lambda_handler(event, context):
 
     handler = ROUTES.get(path)
     if not handler:
-        return _error(404, f"Unknown route: {path}. Valid: {list(ROUTES.keys())}")
+        return _error(404, "Not found")
 
     try:
         return handler()

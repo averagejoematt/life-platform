@@ -361,6 +361,8 @@
 (function() {
   'use strict';
 
+  function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
   var CATEGORY_META = {
     streak:    { label: 'Streaks',          emoji: '🔥', order: 1 },
     level:     { label: 'Level Milestones', emoji: '⬡',  order: 2 },
@@ -412,7 +414,7 @@
     if (badge.earned) {
       statusText = '✓ Earned';
     } else if (badge.unlock_hint) {
-      statusText = badge.unlock_hint;
+      statusText = esc(badge.unlock_hint);
     } else {
       statusText = 'Locked';
     }
@@ -430,8 +432,8 @@
       '<div class="badge__ring">' + renderBadgeRing(badge.earned) +
         '<div class="badge__icon">' + icon + '</div>' +
       '</div>' +
-      '<div class="badge__name">' + badge.label + '</div>' +
-      '<div class="badge__desc">' + badge.description + '</div>' +
+      '<div class="badge__name">' + esc(badge.label) + '</div>' +
+      '<div class="badge__desc">' + esc(badge.description) + '</div>' +
       dateHtml +
       '<div class="badge__status">' + statusText + '</div>' +
     '</div>';

@@ -60,12 +60,11 @@ def _sk(category, date_str):
 # TOOL FUNCTIONS
 # ==============================================================================
 
-def tool_write_platform_memory(category: str, content: dict, date: str = None,
-                                overwrite: bool = True) -> dict:
+def tool_write_platform_memory(args: dict) -> dict:
     """
     Store a structured memory record in the platform_memory partition.
 
-    Args:
+    Args (via args dict):
         category: Memory category (e.g. 'failure_pattern', 'what_worked',
                   'coaching_calibration', 'journey_milestone', 'weekly_plate').
         content: Dict of key-value data to store. Will be merged into the DDB item.
@@ -75,6 +74,11 @@ def tool_write_platform_memory(category: str, content: dict, date: str = None,
     Returns:
         {"status": "stored", "sk": "...", "category": "...", "date": "..."}
     """
+    category = args.get("category", "")
+    content = args.get("content", {})
+    date = args.get("date")
+    overwrite = args.get("overwrite", True)
+
     table = _get_table()
     today = datetime.now(timezone.utc).date().isoformat()
     date_str = date or today
@@ -96,6 +100,12 @@ def tool_write_platform_memory(category: str, content: dict, date: str = None,
     }
     item.update(content)
 
+    # Convert any float values to Decimal for DynamoDB compatibility
+    from decimal import Decimal as _Dec
+    for k, v in item.items():
+        if isinstance(v, float):
+            item[k] = _Dec(str(v))
+
     if overwrite:
         table.put_item(Item=item)
     else:
@@ -113,11 +123,11 @@ def tool_write_platform_memory(category: str, content: dict, date: str = None,
     return {"status": "stored", "sk": sk, "category": category, "date": date_str}
 
 
-def tool_read_platform_memory(category: str, days: int = 30, limit: int = 10) -> dict:
+def tool_read_platform_memory(args: dict) -> dict:
     """
     Retrieve recent memory records for a given category.
 
-    Args:
+    Args (via args dict):
         category: Memory category to retrieve.
         days: How many days back to look (default 30, max 365).
         limit: Max records to return (default 10, max 50).
@@ -125,9 +135,13 @@ def tool_read_platform_memory(category: str, days: int = 30, limit: int = 10) ->
     Returns:
         {"category": "...", "records": [...], "count": N}
     """
+    category = args.get("category", "")
+    days = args.get("days", 30)
+    limit = args.get("limit", 10)
+
     table = _get_table()
-    days = min(max(1, days), 365)
-    limit = min(max(1, limit), 50)
+    days = min(max(1, int(days)), 365)
+    limit = min(max(1, int(limit)), 50)
 
     today = datetime.now(timezone.utc).date()
     start = (today - timedelta(days=days)).isoformat()
@@ -160,18 +174,20 @@ def tool_read_platform_memory(category: str, days: int = 30, limit: int = 10) ->
         return {"error": str(e), "category": category}
 
 
-def tool_list_memory_categories(days: int = 90) -> dict:
+def tool_list_memory_categories(args: dict) -> dict:
     """
     List all memory categories that have records, with counts.
 
-    Args:
+    Args (via args dict):
         days: How many days back to scan (default 90).
 
     Returns:
         {"categories": [{"category": "...", "count": N, "latest_date": "..."}], "total_records": N}
     """
+    days = args.get("days", 90)
+
     table = _get_table()
-    days = min(max(1, days), 365)
+    days = min(max(1, int(days)), 365)
 
     today = datetime.now(timezone.utc).date()
     start = (today - timedelta(days=days)).isoformat()
@@ -219,17 +235,20 @@ def tool_list_memory_categories(days: int = 90) -> dict:
         return {"error": str(e)}
 
 
-def tool_delete_platform_memory(category: str, date: str) -> dict:
+def tool_delete_platform_memory(args: dict) -> dict:
     """
     Delete a specific memory record by category + date.
 
-    Args:
+    Args (via args dict):
         category: Memory category.
         date: Date of the record to delete (YYYY-MM-DD).
 
     Returns:
         {"status": "deleted", "sk": "..."} or {"status": "not_found"}
     """
+    category = args.get("category", "")
+    date = args.get("date", "")
+
     table = _get_table()
     pk = _memory_pk()
     sk = _sk(category, date)

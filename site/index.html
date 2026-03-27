@@ -477,7 +477,7 @@
     <div class="hero-subscribe-label">Follow from Day 1</div>
     <div class="subscribe-row">
       <input type="email" id="hero-email" class="subscribe-input" placeholder="your@email.com" autocomplete="email">
-      <button id="hero-subscribe-btn" class="btn btn--primary" style="font-size:var(--text-xs);white-space:nowrap;padding:var(--space-3) var(--space-5);">Subscribe</button>
+      <button id="hero-subscribe-btn" class="btn btn--cta" style="font-size:var(--text-xs);white-space:nowrap;padding:var(--space-3) var(--space-5);">Subscribe</button>
     </div>
     <div id="subscribe-msg" class="hero-subscribe-note"></div>
   </div>
@@ -1571,6 +1571,18 @@
   }).catch(()=>{});
 })();
 </script>
+<nav class="reading-path-v2">
+  <a href="/subscribe/" class="reading-path-v2__link">
+    <span class="reading-path-v2__dir">Subscribe</span>
+    <span class="reading-path-v2__title">The Weekly Signal</span>
+  </a>
+  <a href="/story/" class="reading-path-v2__link reading-path-v2__link--next">
+    <span class="reading-path-v2__dir">Start here →</span>
+    <span class="reading-path-v2__title">The Story</span>
+  </a>
+</nav>
+
+<script src="/assets/js/animations.js" defer></script>
 <script src="/assets/js/reveal.js"></script>
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/countdown.js"></script>

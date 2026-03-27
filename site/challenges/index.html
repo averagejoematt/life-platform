@@ -239,6 +239,24 @@
     .btn-ck:hover { background: var(--ar); color: var(--bg); }
     .btn-ck--miss { border-color: var(--border); background: transparent; color: var(--text-muted); }
     .btn-ck--miss:hover { border-color: var(--c-red-status, #ff5252); color: var(--c-red-status, #ff5252); }
+    .btn-ck.followed { background: var(--ar-bg); color: var(--ar); border-color: var(--ar-dim); cursor: default; }
+
+    /* ── Vote Button ── */
+    .vote-btn {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 2px 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      letter-spacing: var(--ls-tag);
+      transition: all 0.2s;
+      border-radius: 3px;
+      margin-left: auto;
+    }
+    .vote-btn:hover { border-color: var(--ar-dim); color: var(--ar); }
+    .vote-btn.voted { border-color: var(--ar-dim); color: var(--ar); background: var(--ar-bg-s); }
 
     /* ── Category Filter Tabs ── */
     .cat-bar {
@@ -712,6 +730,8 @@
 (function() {
   'use strict';
 
+  function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
   var API = 'https://averagejoematt.com/api';
   var EV_CIRC = 2 * Math.PI * 7; // evidence ring circumference
   var EV_PCT = {strong: 100, moderate: 66, emerging: 33};
@@ -722,6 +742,8 @@
   var categories = [];
   var currentCat = 'all';
   var dynamicStatus = {}; // challenge_id → {status, checkins, xp}
+  var votedChallenges = {};
+  try { votedChallenges = JSON.parse(localStorage.getItem('amj_ch_votes') || '{}'); } catch(e) {}
 
   // ── Evidence ring SVG ──
   function evRingSvg(tier) {
@@ -763,7 +785,7 @@
 
   // ── Render tile grid ──
   function renderTiles() {
-    var filtered = currentCat === 'all' ? allChallenges : allChallenges.filter(function(c) { return c.category === c.category && c.category === currentCat; });
+    var filtered = currentCat === 'all' ? allChallenges : allChallenges.filter(function(c) { return c.category === currentCat; });
     // Sort: active first, then by difficulty desc
     filtered.sort(function(a, b) {
       var sa = getStatus(a.id); var sb = getStatus(b.id);
@@ -785,13 +807,18 @@
       var catColor = catObj ? catObj.color : 'var(--ar)';
       var durLabel = ch.duration_days ? ch.duration_days + 'd' : 'One-time';
 
+      var isVoted = votedChallenges[ch.id];
       html += '<div class="' + cls + '" style="--tile-color:' + catColor + '" onclick="showDetail(\'' + ch.id + '\')">' +
         '<div class="tile__evidence">' + evRingSvg(ch.evidence_tier) + '</div>' +
-        '<div class="tile__icon">' + ch.icon + '</div>' +
-        '<div class="tile__name">' + ch.name + '</div>' +
+        '<div class="tile__icon">' + esc(ch.icon) + '</div>' +
+        '<div class="tile__name">' + esc(ch.name) + '</div>' +
         '<div class="tile__footer">' +
           '<span class="tile__duration">' + durLabel + '</span>' +
           '<div class="tile__difficulty">' + diffDots(ch.difficulty || 2) + '</div>' +
+          '<button class="vote-btn' + (isVoted ? ' voted' : '') + '" ' +
+            'onclick="event.stopPropagation();handleChallengeVote(this,\'' + ch.id + '\')">' +
+            '\uD83D\uDE4B ' + (ch.votes || 0) +
+          '</button>' +
         '</div>' +
       '</div>';
     });
@@ -835,10 +862,10 @@
     '</div>';
 
     container.innerHTML = '<div class="hero-active">' +
-      '<div class="hero-active__icon">' + ch.icon + '</div>' +
+      '<div class="hero-active__icon">' + esc(ch.icon) + '</div>' +
       '<div class="hero-active__info">' +
-        '<div class="hero-active__name">' + ch.name + '</div>' +
-        '<div class="hero-active__liner">' + ch.one_liner + '</div>' +
+        '<div class="hero-active__name">' + esc(ch.name) + '</div>' +
+        '<div class="hero-active__liner">' + esc(ch.one_liner) + '</div>' +
         '<div class="hero-active__chips">' +
           '<span class="ar-chip">' + (ch.duration_days || '?') + ' days</span>' +
           '<span class="ar-chip">' + ch.category + '</span>' +
@@ -866,9 +893,9 @@
     var durLabel = ch.duration_days ? ch.duration_days + ' days' : 'One-time';
 
     document.getElementById('detail-top').innerHTML =
-      '<div class="detail-card__icon">' + ch.icon + '</div>' +
-      '<div class="detail-card__name">' + ch.name + '</div>' +
-      '<div class="detail-card__liner">' + ch.one_liner + '</div>' +
+      '<div class="detail-card__icon">' + esc(ch.icon) + '</div>' +
+      '<div class="detail-card__name">' + esc(ch.name) + '</div>' +
+      '<div class="detail-card__liner">' + esc(ch.one_liner) + '</div>' +
       '<div class="detail-card__meta">' +
         '<div class="detail-meta-item"><div class="detail-meta-item__value">' + durLabel + '</div><div class="detail-meta-item__label">Duration</div></div>' +
         '<div class="detail-meta-item"><div class="detail-meta-item__value">' + (ch.difficulty || 2) + '/5</div><div class="detail-meta-item__label">Difficulty</div></div>' +
@@ -877,18 +904,33 @@
 
     var bodyHtml = '';
     if (ch.protocol) {
-      bodyHtml += '<div class="detail-field"><div class="detail-field__label">// The Protocol</div><div class="detail-field__value">' + ch.protocol + '</div></div>';
+      bodyHtml += '<div class="detail-field"><div class="detail-field__label">// The Protocol</div><div class="detail-field__value">' + esc(ch.protocol) + '</div></div>';
     }
     if (ch.evidence_summary) {
-      bodyHtml += '<div class="detail-field"><div class="detail-field__label">// The Evidence</div><div class="detail-field__value">' + ch.evidence_summary + '</div></div>';
+      bodyHtml += '<div class="detail-field"><div class="detail-field__label">// The Evidence</div><div class="detail-field__value">' + esc(ch.evidence_summary) + '</div></div>';
     }
     if (ch.board_recommender && ch.board_quote) {
       bodyHtml += '<div class="detail-field"><div class="detail-field__label">// Board Recommendation</div>' +
         '<div class="detail-board-quote">' +
-          '<div class="detail-board-quote__text">"' + ch.board_quote + '"</div>' +
-          '<div class="detail-board-quote__attr">— ' + ch.board_recommender + '</div>' +
+          '<div class="detail-board-quote__text">"' + esc(ch.board_quote) + '"</div>' +
+          '<div class="detail-board-quote__attr">— ' + esc(ch.board_recommender) + '</div>' +
         '</div></div>';
     }
+    if (ch.source_type === 'podcast') {
+      bodyHtml += '<div class="detail-field">' +
+        '<div class="detail-field__label">// Discovered Via Podcast</div>' +
+        '<div class="detail-field__value">' +
+          '\uD83C\uDFA4 <strong>' + esc(ch.source_podcast) + '</strong>' +
+          (ch.source_episode ? ' — ' + esc(ch.source_episode) : '') +
+          (ch.source_speaker ? '<br>Speaker: ' + esc(ch.source_speaker) : '') +
+          (ch.source_timestamp ? ' (at ' + esc(ch.source_timestamp) + ')' : '') +
+          (ch.source_url ? '<br><a href="' + esc(ch.source_url) + '" target="_blank" rel="noopener" style="color:var(--ar);text-decoration:none;border-bottom:1px solid var(--ar-dim)">Listen to episode \u2192</a>' : '') +
+        '</div></div>';
+    }
+    bodyHtml += '<div class="detail-field" style="text-align:center;padding-top:var(--space-4)">' +
+      '<button class="btn-ck" onclick="handleChallengeFollow(\'' + ch.id + '\')" id="follow-btn-' + ch.id + '">' +
+        '\uD83D\uDD14 Notify me when this starts' +
+      '</button></div>';
     document.getElementById('detail-body').innerHTML = bodyHtml;
     document.getElementById('detail-overlay').classList.add('open');
   };
@@ -910,9 +952,39 @@
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({challenge_id: challengeId, completed: completed, date: today})
     }).then(function(r) {
+      if (!r.ok) throw new Error('Check-in failed');
       localStorage.setItem(key, '1');
       loadAll();
     }).catch(function() { alert('Check-in failed. Try again.'); });
+  };
+
+  // ── Vote + Follow ──
+  window.handleChallengeVote = function(btn, catalogId) {
+    if (votedChallenges[catalogId]) return;
+    btn.classList.add('voted');
+    var count = parseInt(btn.textContent.replace(/[^0-9]/g, '') || '0') + 1;
+    btn.innerHTML = '\uD83D\uDE4B ' + count;
+    votedChallenges[catalogId] = true;
+    try { localStorage.setItem('amj_ch_votes', JSON.stringify(votedChallenges)); } catch(e) {}
+    fetch(API + '/challenge_vote', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({catalog_id: catalogId})
+    }).catch(function() {});
+  };
+
+  window.handleChallengeFollow = function(catalogId) {
+    var btn = document.getElementById('follow-btn-' + catalogId);
+    if (btn.classList.contains('followed')) return;
+    var email = prompt('Get notified when this challenge activates. Enter your email:');
+    if (!email || email.length < 5 || email.indexOf('@') < 1 || email.indexOf('@') === email.length - 1) return;
+    btn.classList.add('followed');
+    btn.textContent = '\u2713 Following';
+    fetch(API + '/challenge_follow', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({catalog_id: catalogId, email: email})
+    }).catch(function() {});
   };
 
   // ── Load data ──

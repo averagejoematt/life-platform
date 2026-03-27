@@ -791,6 +791,7 @@
 <script>
 (function() {
   'use strict';
+  function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
   var API = 'https://averagejoematt.com/api';
   var PILLAR_ICONS = {sleep:'☾',movement:'◎',nutrition:'⚘',supplements:'⬡',mental:'◈',social:'◇',discipline:'▣'};
@@ -828,17 +829,17 @@
       var evidenceLabel = exp.experiment_type === 'behavioral' ? 'Behavioral' : 'Measurable';
 
       var chips = '';
-      if (exp.primary_metric) chips += '<span class="chip chip--accent">● ' + exp.primary_metric + '</span>';
-      (exp.metrics_tracked || []).forEach(function(m) { if (m !== exp.primary_metric) chips += '<span class="chip">' + m + '</span>'; });
-      (exp.tags || []).slice(0, 3).forEach(function(t) { chips += '<span class="chip">' + t + '</span>'; });
+      if (exp.primary_metric) chips += '<span class="chip chip--accent">● ' + esc(exp.primary_metric) + '</span>';
+      (exp.metrics_tracked || []).forEach(function(m) { if (m !== exp.primary_metric) chips += '<span class="chip">' + esc(m) + '</span>'; });
+      (exp.tags || []).slice(0, 3).forEach(function(t) { chips += '<span class="chip">' + esc(t) + '</span>'; });
       chips += '<span class="chip chip--tier">' + tierLabel + '</span>';
       chips += '<span class="chip chip--evidence">' + evidenceLabel + '</span>';
 
       return '<div class="mc-card">' +
         '<div class="mc-card__top">' +
           '<div>' +
-            '<div class="mc-card__name">' + exp.name + '</div>' +
-            '<div class="mc-card__hypo"><em>Hypothesis:</em> ' + (exp.hypothesis || 'Not specified') + '</div>' +
+            '<div class="mc-card__name">' + esc(exp.name) + '</div>' +
+            '<div class="mc-card__hypo"><em>Hypothesis:</em> ' + esc(exp.hypothesis || 'Not specified') + '</div>' +
             '<div style="margin-top:var(--space-3);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent-dim)">Running now — try it yourself. No app needed, just the protocol.</div>' +
           '</div>' +
           '<div class="progress-ring">' +
@@ -874,7 +875,7 @@
     // Build pillar filter buttons
     var filterHtml = '<button class="lib-filter' + (currentPillar === 'all' ? ' active' : '') + '" data-pillar="all">All</button>';
     pillars.forEach(function(p) {
-      filterHtml += '<button class="lib-filter' + (currentPillar === p.id ? ' active' : '') + '" data-pillar="' + p.id + '">' + p.label + '</button>';
+      filterHtml += '<button class="lib-filter' + (currentPillar === p.id ? ' active' : '') + '" data-pillar="' + esc(p.id) + '">' + esc(p.label) + '</button>';
     });
     filterHtml += '<select class="lib-sort" id="lib-sort"><option value="votes"' + (currentSort==='votes'?' selected':'') + '>Most voted</option><option value="active"' + (currentSort==='active'?' selected':'') + '>Recently active</option><option value="alpha"' + (currentSort==='alpha'?' selected':'') + '>A–Z</option></select>';
     document.getElementById('lib-filters').innerHTML = filterHtml;
@@ -892,7 +893,7 @@
       html += '<div class="pillar-section" data-pillar="' + pillar.id + '">';
       html += '<div class="pillar-header" onclick="this.parentElement.classList.toggle(\'collapsed\')">';
       html += '<div class="pillar-header__icon">' + (PILLAR_ICONS[pillar.id] || '◆') + '</div>';
-      html += '<div class="pillar-header__name">' + pillar.label + '</div>';
+      html += '<div class="pillar-header__name">' + esc(pillar.label) + '</div>';
       html += '<div class="pillar-header__stats">' + pillar.stats.total + ' experiments · ' + statsStr + '</div>';
       html += '<div class="pillar-header__chevron">▾</div>';
       html += '</div>';
@@ -913,13 +914,20 @@
 
         html += '<div class="' + tileClass + '">';
         html += '<div class="lib-tile__top">';
-        html += '<div class="lib-tile__name">' + exp.name + '</div>';
-        html += '<div class="lib-tile__evidence">' + evidDots + ' ' + evidLabel + '</div>';
+        html += '<div class="lib-tile__name">' + esc(exp.name) + '</div>';
+        html += '<div class="lib-tile__evidence">' + evidDots + ' ' + esc(evidLabel) + '</div>';
         html += '</div>';
-        html += '<div class="lib-tile__desc">' + exp.description + '</div>';
+        html += '<div class="lib-tile__desc">' + esc(exp.description) + '</div>';
+        if (exp.source_type === 'podcast') {
+          html += '<div class="lib-tile__podcast" style="font-family:var(--font-mono);font-size:10px;color:var(--accent-dim);margin-top:var(--space-1)">' +
+            '\uD83C\uDFA4 ' + esc(exp.source_podcast) +
+            (exp.source_speaker ? ' \u00B7 ' + esc(exp.source_speaker) : '') +
+            (exp.source_episode ? ' \u00B7 <em>' + esc(exp.source_episode) + '</em>' : '') +
+          '</div>';
+        }
         html += '<div class="lib-tile__meta">';
         html += '<span>' + exp.suggested_duration_days + ' days</span>';
-        html += '<span>' + (exp.difficulty || 'medium') + '</span>';
+        html += '<span>' + esc(exp.difficulty || 'medium') + '</span>';
         html += '<span>' + (exp.experiment_type === 'behavioral' ? 'Behavioral' : 'Measurable') + '</span>';
         html += '</div>';
         html += '<div class="lib-tile__bottom">';
@@ -973,7 +981,7 @@
     var libId = btn.dataset.followId;
     if (btn.classList.contains('followed')) return;
     var email = prompt('Get notified when this experiment completes. Enter your email:');
-    if (!email || email.indexOf('@') < 0) return;
+    if (!email || email.length < 5 || !/^[^\s@]+@[^\s@]+$/.test(email)) return;
     btn.classList.add('followed');
     btn.textContent = '✓ Following';
     fetch(API + '/experiment_follow', {
@@ -1007,13 +1015,13 @@
 
     document.getElementById('record-list').innerHTML = completed.map(function(exp) {
       var days = exp.duration_days != null ? exp.duration_days : daysBetween(exp.start_date, exp.end_date);
-      var tags = (exp.tags||[]).map(function(t) { return '<span class="exp-tag">' + t + '</span>'; }).join('');
+      var tags = (exp.tags||[]).map(function(t) { return '<span class="exp-tag">' + esc(t) + '</span>'; }).join('');
       var gradeClass = exp.grade === 'partial' ? 'partial' : (exp.grade === 'failed' || exp.status === 'abandoned') ? 'failed' : 'completed';
       var gradeLabel = exp.grade === 'partial' ? '~ Partial' : (exp.grade === 'failed' || exp.status === 'abandoned') ? '✗ Shelved' : '✓ Completed';
       var statusBadge = '<span class="exp-status exp-status--' + (exp.status === 'abandoned' ? 'abandoned' : 'completed') + '"><span class="exp-status__dot"></span>' + (exp.status === 'abandoned' ? 'Abandoned' : 'Completed') + '</span>';
 
       var outcomeHtml = exp.outcome
-        ? '<div class="exp-card__outcome"><div class="exp-card__outcome-label">Outcome</div><div class="exp-card__outcome-text">' + exp.outcome + '</div></div>'
+        ? '<div class="exp-card__outcome"><div class="exp-card__outcome-label">Outcome</div><div class="exp-card__outcome-text">' + esc(exp.outcome) + '</div></div>'
         : '';
 
       // EL-19: Compliance bar
@@ -1033,7 +1041,7 @@
       if (exp.reflection) {
         reflectionHtml = '<div class="exp-card__reflection">' +
           '<div class="exp-card__reflection-label">// What I\'d do differently</div>' +
-          '<div class="exp-card__reflection-text">"' + exp.reflection + '"</div>' +
+          '<div class="exp-card__reflection-text">"' + esc(exp.reflection) + '"</div>' +
         '</div>';
       }
 
@@ -1058,8 +1066,8 @@
         '<div class="exp-card__header">' +
           '<div>' +
             '<div class="grade-badge grade-badge--' + gradeClass + '">' + gradeLabel + '</div>' +
-            '<div class="exp-card__name">' + exp.name + iterLabel + '</div>' +
-            '<div class="exp-card__hypothesis"><em>Hypothesis:</em> ' + (exp.hypothesis || 'Not specified') + '</div>' +
+            '<div class="exp-card__name">' + esc(exp.name) + iterLabel + '</div>' +
+            '<div class="exp-card__hypothesis"><em>Hypothesis:</em> ' + esc(exp.hypothesis || 'Not specified') + '</div>' +
             (tags ? '<div class="exp-tags">' + tags + '</div>' : '') +
           '</div>' +
           '<div style="text-align:right">' +
@@ -1071,13 +1079,13 @@
         '<div class="exp-card__body">' +
           '<div class="exp-card__field"><div class="exp-card__field-label">Started</div><div class="exp-card__field-value">' + formatDate(exp.start_date) + '</div></div>' +
           '<div class="exp-card__field"><div class="exp-card__field-label">Ended</div><div class="exp-card__field-value">' + formatDate(exp.end_date) + '</div></div>' +
-          '<div class="exp-card__field"><div class="exp-card__field-label">Primary metric</div><div class="exp-card__field-value">' + (exp.primary_metric || '—') + '</div></div>' +
-          '<div class="exp-card__field"><div class="exp-card__field-label">Evidence</div><div class="exp-card__field-value">' + (exp.evidence_tier || '—') + '</div></div>' +
+          '<div class="exp-card__field"><div class="exp-card__field-label">Primary metric</div><div class="exp-card__field-value">' + esc(exp.primary_metric || '—') + '</div></div>' +
+          '<div class="exp-card__field"><div class="exp-card__field-label">Evidence</div><div class="exp-card__field-value">' + esc(exp.evidence_tier || '—') + '</div></div>' +
         '</div>' +
         complianceHtml +
         outcomeHtml +
-        (exp.mechanism ? '<div class="exp-card__mechanism"><div class="exp-card__mechanism-label">Mechanism</div><div class="exp-card__mechanism-text">' + exp.mechanism + '</div></div>' : '') +
-        (exp.key_finding ? '<div class="exp-card__finding"><div class="exp-card__finding-label">// Finding</div><div class="exp-card__finding-text">' + exp.key_finding + '</div></div>' : '') +
+        (exp.mechanism ? '<div class="exp-card__mechanism"><div class="exp-card__mechanism-label">Mechanism</div><div class="exp-card__mechanism-text">' + esc(exp.mechanism) + '</div></div>' : '') +
+        (exp.key_finding ? '<div class="exp-card__finding"><div class="exp-card__finding-label">// Finding</div><div class="exp-card__finding-text">' + esc(exp.key_finding) + '</div></div>' : '') +
         reflectionHtml +
         ctaHtml +
       '</div>';

@@ -46,7 +46,8 @@ git checkout "$TAG" -- site/
 
 # Sync to S3
 echo "Syncing to S3..."
-aws s3 sync site/ "s3://$BUCKET/site/" --delete
+source "$(dirname "$0")/lib/safe_sync.sh"
+safe_sync site/ "s3://$BUCKET/site/"
 
 # Invalidate CloudFront
 echo "Invalidating CloudFront..."

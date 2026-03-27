@@ -50,6 +50,7 @@
     "lambdas/chronicle_email_sender_lambda.py": { "function": "chronicle-email-sender" },
     "lambdas/chronicle_approve_lambda.py": { "function": "chronicle-approve" },
     "lambdas/site_api_lambda.py":              { "function": "life-platform-site-api" },
+    "lambdas/site_stats_refresh_lambda.py":    { "function": "site-stats-refresh" },
     "lambdas/challenge_generator_lambda.py":     { "function": "challenge-generator" }
   },
 

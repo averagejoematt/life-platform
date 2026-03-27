@@ -1049,10 +1049,12 @@ def operational_email_subscriber() -> list[iam.PolicyStatement]:
 
 
 def site_api() -> list[iam.PolicyStatement]:
-    """Site API Lambda: read-only access to DDB + KMS + site-api AI secret.
+    """Site API Lambda: read access + limited writes for public interaction endpoints.
 
     Serves averagejoematt.com real-time data endpoints.
-    NO write permissions. NO S3 write.
+    GET endpoints are read-only. POST endpoints (vote, follow, checkin, nudge,
+    submit_finding) perform targeted DDB writes to specific partitions.
+    NO S3 write.
     Yael directive: never expose MCP endpoint publicly — this is a
     separate, minimal-permission Lambda.
     WEB-WCT: Added S3 site/config/* read for /api/current_challenge endpoint.
@@ -1060,13 +1062,18 @@ def site_api() -> list[iam.PolicyStatement]:
     """
     return [
         iam.PolicyStatement(
-            sid="DynamoDB",
+            sid="DynamoDBRead",
             actions=["dynamodb:GetItem", "dynamodb:Query"],
             resources=[TABLE_ARN],
         ),
         iam.PolicyStatement(
+            sid="DynamoDBWrite",
+            actions=["dynamodb:PutItem", "dynamodb:UpdateItem"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
             sid="KMS",
-            actions=["kms:Decrypt"],
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
             resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(

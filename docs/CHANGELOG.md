@@ -1,3 +1,48 @@
+## v3.9.34 — 2026-03-26: Signal Doctrine — Design Brief Implementation
+
+### Summary
+Product Board (8 personas + external consultants) delivered comprehensive design brief for April 1st launch. "Signal Doctrine" visual identity: two-mode typography (signal/story), coral CTA accent, pillar color system, warm light mode, noise texture, card hover lifts, reading paths, and staggered reveals. Foundation CSS shipped site-wide; page-level changes applied to 8 pages. Inter font self-hosted.
+
+### What Shipped
+- **tokens.css overhaul**: Coral CTA ramp (`--c-coral-*`), 7 pillar color tokens (`--pillar-movement` through `--pillar-discipline`), body typography tokens (`--text-body-signal`, `--text-body-story`), warm light mode palette (`#fafaf8` bg, `#008f5f` accent), surface brightness bump, light mode pillar variants
+- **base.css: 15 new component blocks (DB-07→DB-21)**: `.body-signal`/`.body-story` classes, `.btn--cta` coral button, `.pull-quote`, `.breadcrumb`, card hover lift (`.vital:hover`), `.reveal-grid` staggered animations, `.divider-dots`/`.divider-fade`, dark mode text glow on vital values, noise texture overlay via SVG, light mode card shadows, `.reading-time`, `.sparkline` styles, pillar border/dot utilities, `.reading-path-v2` prev/next nav
+- **Inter font**: Self-hosted 400/500/600 weights via `deploy/download_inter_fonts.sh`
+- **noise.svg**: Tileable SVG noise texture at `/assets/images/noise.svg`
+- **animations.js**: Shared scroll reveal observer, number count-up, signal bar fill, back-to-top — vanilla JS, respects `prefers-reduced-motion`
+- **Homepage**: Coral subscribe CTA (`btn--cta`), reading path (Subscribe ↔ Story)
+- **Story page**: `body-story` class (Lora 17px serif), reading path (Home ↔ About)
+- **About page**: `body-story` class, reading path (Story ↔ Live)
+- **Chronicle page**: `body-story` class, animations.js
+- **Live page**: Reading path (About ↔ Character), animations.js
+- **Character page**: Reading path (Live ↔ Habits), animations.js
+- **Discoveries page**: Reading path (Experiments ↔ Sleep), animations.js
+- **Subscribe page**: Coral CTA button (`btn--cta`)
+
+### Design Brief
+Full brief at `docs/briefs/BRIEF_2026-03-26_design_brief.md` — 8 parts: diagnosis, direction, site-wide proposals (typography, color, dark/light mode, motion, visual elements), nav restructure, page-specific upgrades (3 priority tiers), CSS implementation checklist, board member statements, priority matrix.
+
+### Files Modified
+| File | Change |
+|------|--------|
+| `site/assets/css/tokens.css` | Complete rewrite — coral, pillars, warm light mode, body tokens |
+| `site/assets/css/base.css` | Inter @font-face + 15 DB component blocks appended |
+| `site/assets/images/noise.svg` | NEW — tileable SVG noise texture |
+| `site/assets/js/animations.js` | NEW — shared animation utilities |
+| `site/assets/fonts/inter-{400,500,600}.woff2` | NEW — self-hosted Inter font |
+| `site/index.html` | Coral CTA, reading path, animations.js |
+| `site/story/index.html` | body-story, reading path, animations.js |
+| `site/about/index.html` | body-story, reading path, animations.js |
+| `site/chronicle/index.html` | body-story, animations.js |
+| `site/live/index.html` | Reading path, animations.js |
+| `site/character/index.html` | Reading path, animations.js |
+| `site/discoveries/index.html` | Reading path, animations.js |
+| `site/subscribe/index.html` | Coral CTA button |
+| `deploy/download_inter_fonts.sh` | NEW — font download + S3 upload script |
+| `deploy/sync_doc_metadata.py` | Version bump v3.9.33 → v3.9.34 |
+| `docs/briefs/BRIEF_2026-03-26_design_brief.md` | NEW — full Product Board design brief |
+
+---
+
 ## v3.9.33 — 2026-03-26: Arena v2 + Lab v2 — Challenge & Experiment Page Overhaul
 
 ### Summary

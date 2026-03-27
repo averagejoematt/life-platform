@@ -23,8 +23,8 @@ echo ""
 
 # 1. Sync site to S3
 echo "[1/4] Syncing site/ to S3..."
-aws s3 sync site/ s3://matthew-life-platform/site/ \
-  --delete \
+source "$(dirname "$0")/lib/safe_sync.sh"
+safe_sync site/ s3://matthew-life-platform/site/ \
   --exclude ".DS_Store" \
   --exclude "data/*.json" \
   --cache-control "max-age=300" \
