@@ -390,7 +390,15 @@
   var subscribeMount = document.getElementById('amj-subscribe');
   var hierNavMount   = document.getElementById('amj-hierarchy-nav');
 
-  if (navMount)       navMount.innerHTML = buildNav();
+  if (navMount) {
+    navMount.innerHTML = buildNav();
+    // NAV-SPACER: Push page content below the fixed nav.
+    // This is the single source of truth for nav clearance.
+    // Pages should NOT use calc(var(--nav-height) + ...) in their headers.
+    var spacer = document.createElement('div');
+    spacer.className = 'nav-spacer';
+    navMount.parentNode.insertBefore(spacer, navMount.nextSibling);
+  }
   if (hierNavMount)   hierNavMount.innerHTML = buildHierarchyNav();
   if (subscribeMount) subscribeMount.innerHTML = buildSubscribeCTA();
   if (bottomNavMount) bottomNavMount.innerHTML = buildBottomNav();

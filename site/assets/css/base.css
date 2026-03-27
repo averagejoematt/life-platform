@@ -224,6 +224,14 @@ body { padding-bottom: 36px; }
   -webkit-backdrop-filter: blur(16px);
 }
 
+/* NAV-SPACER: Single source of truth for fixed-nav clearance.
+   Injected by components.js after the nav. Pages should NOT
+   add calc(var(--nav-height) + ...) to their own headers. */
+.nav-spacer {
+  height: var(--nav-height);
+  flex-shrink: 0;
+}
+
 .nav__brand {
   font-family: var(--font-display);
   font-size: 22px;
@@ -350,12 +358,13 @@ body { padding-bottom: 36px; }
 .nav__dropdown-item:hover,
 .nav__dropdown-item.active { color: var(--accent); background: var(--surface); }
 .nav__dropdown-heading {
-  padding: var(--space-2) var(--space-4) var(--space-1);
+  padding: var(--space-3) var(--space-4) var(--space-1);
   font-family: var(--font-mono);
   font-size: 9px;
+  font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-faint);
+  color: var(--accent-dim);
   pointer-events: none;
 }
 .nav__dropdown-divider {

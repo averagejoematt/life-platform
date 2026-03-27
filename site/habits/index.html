@@ -33,7 +33,7 @@
 
 /* ── Hero ── */
 .os-hero {
-  padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+  padding: var(--space-16) var(--page-padding) var(--space-12);
   border-bottom: 1px solid var(--border);
   position: relative;
   overflow: hidden;
@@ -520,7 +520,7 @@
 
 /* ── Responsive ── */
 @media(max-width:768px) {
-  .os-hero { padding: calc(var(--nav-height) + var(--space-10)) var(--page-padding-sm) var(--space-8); }
+  .os-hero { padding: var(--space-10) var(--page-padding-sm) var(--space-8); }
   .os-zone { padding: var(--space-8) var(--page-padding-sm); }
   .t0-grid { grid-template-columns: 1fr; }
   .t0-streak-hero { flex-direction: column; align-items: flex-start; gap: var(--space-4); }
