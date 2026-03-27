@@ -16,7 +16,7 @@
   <style>
     .pb-hero {
       text-align: center;
-      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-10);
+      padding: var(--space-16) var(--page-padding) var(--space-10);
       max-width: 700px;
       margin: 0 auto;
     }
@@ -221,7 +221,7 @@
     }
 
     @media (max-width: 720px) {
-      .pb-hero { padding: calc(var(--nav-height) + var(--space-10)) var(--page-padding-sm) var(--space-8); }
+      .pb-hero { padding: var(--space-10) var(--page-padding-sm) var(--space-8); }
       .roster, .tensions, .framework, .board-tabs { padding-left: var(--page-padding-sm); padding-right: var(--page-padding-sm); }
       .member { grid-template-columns: 1fr; }
       .member__avatar { width: 36px; height: 36px; font-size: 1.1rem; }
