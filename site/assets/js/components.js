@@ -16,39 +16,40 @@
  *
  * WHY: Editing nav/footer/CTA structure requires changing 1 file instead of 54.
  *
- * v2.0.0 — 2026-03-24 — Board-approved 6-section restructure
- *   Story | Pulse | Evidence | Method | Build | Follow
+ * v3.0.0 — 2026-03-26 — Signal Doctrine Tier 2: 5-section IA
+ *   The Story | The Data | The Science | The Build | Follow
  */
 (function() {
   'use strict';
 
   var path = window.location.pathname;
 
-  // ── Section mapping — which dropdown owns which paths ──────
-  // Items can be plain { href, text } or grouped with { heading, items }
+  // ── Section mapping — 5-section IA ────────────────────────
   var SECTIONS = [
-    { label: 'Story', items: [
+    { label: 'The Story', items: [
       { href: '/',       text: 'Home' },
       { href: '/story/', text: 'My Story' },
       { href: '/about/', text: 'The Mission' },
     ]},
-    { label: 'Pulse', items: [
-      { href: '/live/',           text: 'Today' },
-      { href: '/character/',      text: 'Character' },
-      { href: '/habits/',         text: 'Habits' },
-      { href: '/accountability/', text: 'Accountability' },
-      { href: '/achievements/',   text: 'Milestones' },
+    { label: 'The Data', groups: [
+      { heading: 'My Numbers', items: [
+        { href: '/live/',           text: 'Today' },
+        { href: '/character/',      text: 'Character' },
+        { href: '/habits/',         text: 'Habits' },
+        { href: '/accountability/', text: 'Accountability' },
+        { href: '/achievements/',   text: 'Milestones' },
+      ]},
+      { heading: 'The Evidence', items: [
+        { href: '/sleep/',       text: 'Sleep' },
+        { href: '/glucose/',     text: 'Glucose' },
+        { href: '/nutrition/',   text: 'Nutrition' },
+        { href: '/training/',    text: 'Training' },
+        { href: '/mind/',        text: 'Inner Life' },
+        { href: '/benchmarks/',  text: 'Benchmarks' },
+        { href: '/explorer/',    text: 'Data Explorer' },
+      ]},
     ]},
-    { label: 'Evidence', items: [
-      { href: '/sleep/',      text: 'Sleep' },
-      { href: '/glucose/',    text: 'Glucose' },
-      { href: '/nutrition/',  text: 'Nutrition' },
-      { href: '/training/',   text: 'Training' },
-      { href: '/mind/',       text: 'Inner Life' },
-      { href: '/benchmarks/',text: 'Benchmarks' },
-      { href: '/explorer/',  text: 'Data Explorer' },
-    ]},
-    { label: 'Method', groups: [
+    { label: 'The Science', groups: [
       { heading: 'What I Do', items: [
         { href: '/stack/',       text: 'The Stack' },
         { href: '/protocols/',   text: 'Protocols' },
@@ -60,7 +61,7 @@
         { href: '/discoveries/', text: 'Discoveries' },
       ]},
     ]},
-    { label: 'Build', items: [
+    { label: 'The Build', items: [
       { href: '/platform/',     text: 'Platform' },
       { href: '/intelligence/', text: 'The AI' },
       { href: '/board/',        text: 'AI Board' },
@@ -88,15 +89,13 @@
     return [];
   }
 
-  // Home path also belongs to Story for active-state purposes
   function sectionOwnsPath(section, p) {
-    if (section.label === 'Story' && p === '/') return true;
+    if (section.label === 'The Story' && p === '/') return true;
     return getSectionItems(section).some(function(item) {
       return p === item.href || p.startsWith(item.href);
     });
   }
 
-  // ── Helper: check if item is active ──
   function isItemActive(href, p) {
     return (p === href || (href !== '/' && p.startsWith(href)));
   }
@@ -114,7 +113,6 @@
       html += '<div class="nav__dropdown-menu">';
 
       if (sec.groups) {
-        // Grouped dropdown with sub-headers
         sec.groups.forEach(function(group, gi) {
           if (gi > 0) html += '<div class="nav__dropdown-divider"></div>';
           html += '<div class="nav__dropdown-heading">' + group.heading + '</div>';
@@ -124,7 +122,6 @@
           });
         });
       } else {
-        // Flat dropdown
         sec.items.forEach(function(item) {
           var itemActive = isItemActive(item.href, path) ? ' active' : '';
           html += '<a href="' + item.href + '" class="nav__dropdown-item' + itemActive + '">' + item.text + '</a>';
@@ -134,7 +131,7 @@
       html += '</div></div>';
     });
 
-    html += '<a href="/subscribe/" class="nav__link nav__cta">Subscribe →</a>';
+    html += '<a href="/subscribe/" class="nav__link nav__cta">Subscribe \u2192</a>';
     html += '</div>';
     html += '<button class="nav__hamburger" aria-label="Open menu"><span></span><span></span><span></span></button>';
     html += '<div class="nav__status"><div class="pulse"></div><span id="nav-date"></span></div>';
@@ -166,7 +163,6 @@
         });
       }
 
-      // Add extra links in Follow section
       if (sec.label === 'Follow') {
         html += '<a href="/rss.xml" class="nav-overlay__link">RSS</a>';
         html += '<a href="/privacy/" class="nav-overlay__link">Privacy</a>';
@@ -183,19 +179,17 @@
     var html = '<footer class="footer-v2"><div class="footer-v2__grid">';
 
     var footerCols = [
-      { heading: 'Story', links: [
+      { heading: 'The Story', links: [
         { href: '/', text: 'Home' },
         { href: '/story/', text: 'My Story' },
         { href: '/about/', text: 'The Mission' },
       ]},
-      { heading: 'Pulse', links: [
+      { heading: 'The Data', links: [
         { href: '/live/', text: 'Today' },
         { href: '/character/', text: 'Character' },
         { href: '/habits/', text: 'Habits' },
         { href: '/accountability/', text: 'Accountability' },
         { href: '/achievements/', text: 'Milestones' },
-      ]},
-      { heading: 'Evidence', links: [
         { href: '/sleep/', text: 'Sleep' },
         { href: '/glucose/', text: 'Glucose' },
         { href: '/nutrition/', text: 'Nutrition' },
@@ -204,7 +198,7 @@
         { href: '/benchmarks/', text: 'Benchmarks' },
         { href: '/explorer/', text: 'Data Explorer' },
       ]},
-      { heading: 'Method', links: [
+      { heading: 'The Science', links: [
         { href: '/stack/', text: 'The Stack' },
         { href: '/protocols/', text: 'Protocols' },
         { href: '/supplements/', text: 'Supplements' },
@@ -212,7 +206,7 @@
         { href: '/challenges/', text: 'The Arena' },
         { href: '/discoveries/', text: 'Discoveries' },
       ]},
-      { heading: 'Build', links: [
+      { heading: 'The Build', links: [
         { href: '/platform/', text: 'Platform' },
         { href: '/intelligence/', text: 'The AI' },
         { href: '/board/', text: 'AI Board' },
@@ -249,14 +243,14 @@
     return html;
   }
 
-  // ── BOTTOM NAV (mobile) ────────────────────────────────────
+  // ── BOTTOM NAV (mobile) — 5 section entry points ──────────
   function buildBottomNav() {
     var items = [
-      { href: '/',           label: 'Home',      icon: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>' },
-      { href: '/live/',      label: 'Today',     icon: '<circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/>' },
-      { href: '/character/', label: 'Character', icon: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>' },
-      { href: '/chronicle/', label: 'Chronicle', icon: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>' },
-      { href: '/ask/',       label: 'Ask',       icon: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>' },
+      { href: '/',           label: 'Story',   icon: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>' },
+      { href: '/live/',      label: 'Data',    icon: '<circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7"/>' },
+      { href: '/stack/',     label: 'Science', icon: '<path d="M9 3h6v4l3 7H6l3-7V3z"/><path d="M6 14v4a2 2 0 002 2h8a2 2 0 002-2v-4"/><line x1="12" y1="3" x2="12" y2="1"/>' },
+      { href: '/platform/',  label: 'Build',   icon: '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>' },
+      { href: '/subscribe/', label: 'Follow',  icon: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>' },
     ];
 
     var html = '<nav class="bottom-nav" aria-label="Mobile navigation">';
@@ -273,12 +267,11 @@
   function buildSubscribeCTA() {
     var slug = path.replace(/\//g, '').replace(/-/g, '') || 'home';
 
-    // Contextual CTA messaging
     var ctaHeadline = 'Get the data, every week.';
     var ctaBody = 'Real numbers from <span data-const="platform.data_sources">19</span> data sources. No highlight reel. Every Wednesday, in your inbox.';
     if (path.startsWith('/chronicle') || path.startsWith('/journal')) {
       ctaHeadline = "Follow Elena's weekly chronicle.";
-      ctaBody = 'Every Wednesday, a new dispatch. The real week — including the bad ones.';
+      ctaBody = 'Every Wednesday, a new dispatch. The real week \u2014 including the bad ones.';
     } else if (path.startsWith('/story/')) {
       ctaHeadline = 'Follow the journey.';
       ctaBody = 'The story continues every week. Subscribe for the next chapter.';
@@ -295,7 +288,7 @@
     html += '<h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">' + ctaHeadline + '</h3>';
     html += '<p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">';
     html += ctaBody + '<br>';
-    html += '<a href="/chronicle/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue →</a></p>';
+    html += '<a href="/chronicle/sample/" style="color:var(--c-amber-400);text-decoration:none;font-size:var(--text-xs)">See a sample issue \u2192</a></p>';
     html += '<div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">';
     html += '<input id="cta-email-' + slug + '" type="email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);outline:none;transition:border-color var(--dur-fast);" onfocus="this.style.borderColor=\'var(--c-amber-400)\'" onblur="this.style.borderColor=\'var(--c-amber-500)\'">';
     html += '<button onclick="amjSubscribe(\'' + slug + '\')" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap;color:var(--bg)">Subscribe</button>';
@@ -315,7 +308,7 @@
         msg.style.color = 'var(--c-yellow-status)';
         return;
       }
-      msg.textContent = 'Subscribing…';
+      msg.textContent = 'Subscribing\u2026';
       msg.style.color = 'var(--text-muted)';
       try {
         var res = await fetch('/api/subscribe', {
@@ -325,7 +318,7 @@
         });
         var data = await res.json();
         if (res.ok) {
-          msg.textContent = '✓ Check your inbox to confirm.';
+          msg.textContent = '\u2713 Check your inbox to confirm.';
           msg.style.color = 'var(--c-amber-500)';
           document.getElementById('cta-email-' + slug).value = '';
         } else {
@@ -333,27 +326,26 @@
           msg.style.color = 'var(--c-yellow-status)';
         }
       } catch (e) {
-        msg.textContent = 'Network error — try again.';
+        msg.textContent = 'Network error \u2014 try again.';
         msg.style.color = 'var(--c-yellow-status)';
       }
     };
   }
 
-  // ── INJECT ─────────────────────────────────────────────────
-  // ── HIERARCHY NAV (replaces pipeline nav on method pages) ──────
+  // ── HIERARCHY NAV (method pages) ───────────────────────────
   var HIER_ITEMS = [
     { href: '/stack/',       label: 'The Stack',    sub: 'the map',      rel: '' },
     { href: '/protocols/',   label: 'Protocols',    sub: 'strategy',     rel: 'contains' },
-    { href: '/habits/',      label: 'Habits',       sub: 'daily actions',rel: '·' },
-    { href: '/experiments/', label: 'Experiments',   sub: 'tests',        rel: '·' },
-    { href: '/challenges/',  label: 'The Arena',     sub: 'challenges',   rel: '·' },
-    { href: '/discoveries/', label: 'Discoveries',  sub: 'evidence',     rel: '→' },
-    { href: '/supplements/', label: 'Supplements',  sub: 'the stack',    rel: '·' },
-    { href: '/achievements/',label: 'Milestones',   sub: 'outcomes',     rel: '·' },
+    { href: '/habits/',      label: 'Habits',       sub: 'daily actions',rel: '\u00b7' },
+    { href: '/experiments/', label: 'Experiments',   sub: 'tests',        rel: '\u00b7' },
+    { href: '/challenges/',  label: 'The Arena',     sub: 'challenges',   rel: '\u00b7' },
+    { href: '/discoveries/', label: 'Discoveries',  sub: 'evidence',     rel: '\u2192' },
+    { href: '/supplements/', label: 'Supplements',  sub: 'the stack',    rel: '\u00b7' },
+    { href: '/achievements/',label: 'Milestones',   sub: 'outcomes',     rel: '\u00b7' },
   ];
 
   var HIER_CONTEXT = {
-    '/stack/':        'The complete picture — every protocol, habit, experiment, and supplement organized by domain.',
+    '/stack/':        'The complete picture \u2014 every protocol, habit, experiment, and supplement organized by domain.',
     '/protocols/':    'Protocols are the <strong>strategy layer</strong>. Each one contains <a href="/habits/">daily habits</a> that execute it, and may spawn <a href="/experiments/">experiments</a> to test variations.',
     '/habits/':       'Habits are the <strong>daily execution layer</strong> of each <a href="/protocols/">protocol</a>. Sustained habits unlock <a href="/achievements/">milestones</a> and feed your <a href="/character/">character score</a>.',
     '/experiments/':  'Experiments are <strong>time-bounded tests</strong> of <a href="/protocols/">protocol</a> variations. Each has a hypothesis, defined duration, and produces data that becomes a <a href="/discoveries/">discovery</a>.',
@@ -390,6 +382,7 @@
     return html;
   }
 
+  // ── INJECT ─────────────────────────────────────────────────
   var navMount       = document.getElementById('amj-nav');
   var footerMount    = document.getElementById('amj-footer');
   var bottomNavMount = document.getElementById('amj-bottom-nav');
@@ -415,8 +408,7 @@
     }
   }
 
-  // ── Auto-load countdown.js if not already included ──
-  // Guard: skip if page already loaded it via explicit <script> tag
+  // Auto-load countdown.js if not already included
   if (!window.AMJ_EXPERIMENT) {
     var cdScript = document.createElement('script');
     cdScript.src = '/assets/js/countdown.js';

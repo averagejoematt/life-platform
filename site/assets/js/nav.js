@@ -2,7 +2,7 @@
  * nav.js — Shared navigation component for averagejoematt.com
  * Handles: hamburger menu, bottom nav active state, theme toggle,
  *          GAM-01 "Since Your Last Visit" badges, GAM-02 Reading Path CTAs
- * v1.2.0 — 2026-03-21 — Phase 1 IA: 5-section nav, /chronicle/
+ * v2.0.0 — 2026-03-26 — Tier 2 IA: 5-section nav
  */
 (function() {
   'use strict';
@@ -15,7 +15,7 @@
 
   function openMenu() {
     if (overlay) {
-      overlay.style.display = 'flex'; // show before opacity transition
+      overlay.style.display = 'flex';
       requestAnimationFrame(function() {
         overlay.classList.add('is-open');
       });
@@ -26,7 +26,6 @@
     if (overlay) {
       overlay.classList.remove('is-open');
       body.style.overflow = '';
-      // Hide after opacity transition completes (250ms matches CSS transition)
       setTimeout(function() {
         if (!overlay.classList.contains('is-open')) {
           overlay.style.display = '';
@@ -74,33 +73,28 @@
   });
 
   // ── Desktop dropdown click support ────────────────────────
-  // Hover handles desktop; click handles keyboard nav + touch fallback
   var dropdowns = document.querySelectorAll('.nav__dropdown');
   dropdowns.forEach(function(dd) {
     var btn = dd.querySelector('.nav__dropdown-btn');
     if (!btn) return;
     btn.addEventListener('click', function(e) {
       var isOpen = dd.classList.contains('is-open');
-      // Close all dropdowns first
       dropdowns.forEach(function(d) { d.classList.remove('is-open'); });
       if (!isOpen) dd.classList.add('is-open');
       e.stopPropagation();
     });
   });
-  // Close dropdowns when clicking outside
   document.addEventListener('click', function() {
     dropdowns.forEach(function(d) { d.classList.remove('is-open'); });
   });
 
   // ── Theme toggle ──────────────────────────────────────────
-  // Restore saved theme before paint
   var savedTheme = localStorage.getItem('amj-theme');
   if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
 
-  // Inject toggle button into nav (appears on all pages automatically)
-  var navLinks = document.querySelector('.nav__links');
+  var navLinksContainer = document.querySelector('.nav__links');
   var ctaBtn = document.querySelector('.nav__cta');
-  if (navLinks) {
+  if (navLinksContainer) {
     var themeBtn = document.createElement('button');
     themeBtn.className = 'theme-toggle';
     themeBtn.setAttribute('aria-label', 'Toggle light/dark mode');
@@ -120,9 +114,9 @@
       updateThemeIcon();
     });
     if (ctaBtn) {
-      navLinks.insertBefore(themeBtn, ctaBtn);
+      navLinksContainer.insertBefore(themeBtn, ctaBtn);
     } else {
-      navLinks.appendChild(themeBtn);
+      navLinksContainer.appendChild(themeBtn);
     }
   }
 
@@ -131,11 +125,11 @@
     if (e.key === 'Escape') closeMenu();
   });
 
-  // ── Back to top button (U07) ───────────────────────────────
+  // ── Back to top button ────────────────────────────────────
   var btt = document.createElement('button');
   btt.className = 'back-to-top';
   btt.setAttribute('aria-label', 'Back to top');
-  btt.textContent = '↑';
+  btt.textContent = '\u2191';
   btt.addEventListener('click', function() { window.scrollTo({ top: 0, behavior: 'smooth' }); });
   document.body.appendChild(btt);
   window.addEventListener('scroll', function() {
@@ -151,25 +145,27 @@
   }
 
   // ── GAM-01: Since Your Last Visit badges ─────────────────
-  // Maps section root paths to their last-updated deploy date.
-  // Update these dates when content in that section changes.
   var SECTION_LAST_UPDATED = {
-    '/chronicle/':         '2026-03-21',
-    '/chronicle/archive/': '2026-03-21',
-    '/week/':              '2026-03-21',
-    '/live/':              '2026-03-21',
-    '/character/':         '2026-03-21',
-    '/habits/':            '2026-03-21',
-    '/discoveries/':       '2026-03-21',
-    '/sleep/':             '2026-03-21',
-    '/glucose/':           '2026-03-21',
+    '/chronicle/':         '2026-03-26',
+    '/chronicle/archive/': '2026-03-26',
+    '/week/':              '2026-03-26',
+    '/live/':              '2026-03-26',
+    '/character/':         '2026-03-26',
+    '/habits/':            '2026-03-26',
+    '/discoveries/':       '2026-03-26',
+    '/sleep/':             '2026-03-26',
+    '/glucose/':           '2026-03-26',
+    '/stack/':             '2026-03-26',
+    '/platform/':          '2026-03-26',
   };
 
-  // Bottom nav item → which section paths it represents
+  // Bottom nav → which paths it owns (5-section IA)
   var BADGE_MAP = {
-    '/chronicle/': ['/chronicle/', '/chronicle/archive/', '/week/'],
-    '/character/': ['/character/'],
-    '/live/': ['/live/', '/habits/', '/discoveries/'],
+    '/':           ['/story/', '/about/'],
+    '/live/':      ['/live/', '/character/', '/habits/', '/sleep/', '/glucose/', '/explorer/'],
+    '/stack/':     ['/stack/', '/protocols/', '/experiments/', '/discoveries/', '/challenges/'],
+    '/platform/':  ['/platform/', '/intelligence/', '/board/', '/tools/'],
+    '/subscribe/': ['/chronicle/', '/chronicle/archive/', '/weekly/', '/subscribe/'],
   };
 
   try {
@@ -192,51 +188,49 @@
         }
       });
 
-      // Clear badge for the current section (user is looking at it)
       Object.keys(BADGE_MAP).forEach(function(navHref) {
-        if (path.startsWith(navHref)) {
+        if (path.startsWith(navHref) && navHref !== '/') {
           var navEl = document.querySelector('.bottom-nav__link[href="' + navHref + '"]');
           if (navEl) navEl.classList.remove('has-badge');
         }
       });
     }
 
-    // Always update last_visit after badge logic runs
     localStorage.setItem(lastVisitKey, nowIso);
-  } catch (e) { /* localStorage blocked — degrade silently */ }
+  } catch (e) { /* localStorage blocked */ }
 
   // ── GAM-02: Reading Path CTAs ─────────────────────────────
-  // Maps current page path → next recommended read.
   var READING_PATHS = {
-    '/story/':              { href: '/live/',            title: 'See Today\'s Data →',      sub: 'What the sensors say right now' },
-    '/about/':              { href: '/story/',           title: 'The Story →',              sub: 'Read the full transformation narrative' },
-    '/live/':               { href: '/character/',       title: 'The Score →',              sub: 'How it all adds up' },
-    '/character/':          { href: '/habits/',          title: 'The Habits →',             sub: 'The inputs that drive the score' },
-    '/habits/':             { href: '/experiments/',     title: 'Experiments →',            sub: 'What\'s being actively tested' },
-    '/accountability/':     { href: '/methodology/',     title: 'The Methodology →',        sub: 'How the science works' },
-    '/protocols/':          { href: '/live/',            title: 'The Results →',            sub: 'What these protocols produced' },
-    '/experiments/':        { href: '/discoveries/',     title: 'Discoveries →',            sub: 'What the data proved' },
-    '/discoveries/':        { href: '/intelligence/',    title: 'The Intelligence Layer →', sub: 'How the AI finds these patterns' },
-    '/sleep/':              { href: '/glucose/',         title: 'Glucose Data →',           sub: '30-day CGM time-in-range' },
-    '/glucose/':            { href: '/benchmarks/',      title: 'Benchmarks →',             sub: 'How Matthew compares to population norms' },
-    '/benchmarks/':         { href: '/subscribe/',       title: 'Get Weekly Updates →',     sub: 'New data every week' },
-    '/supplements/':        { href: '/protocols/',       title: 'All Protocols →',          sub: 'Sleep, training, nutrition, supplements' },
-    '/platform/':           { href: '/cost/',            title: 'The Real Cost →',          sub: 'Running a full health OS for ~$13/month' },
-    '/cost/':               { href: '/methodology/',     title: 'The Methodology →',        sub: 'How the science works' },
-    '/methodology/':        { href: '/intelligence/',    title: 'The Intelligence Layer →', sub: 'What the AI actually does' },
-    '/intelligence/':       { href: '/discoveries/',     title: 'Discoveries →',            sub: 'What the data revealed' },
-    '/board/':              { href: '/board/technical/', title: 'Technical Board →',        sub: '12 personas keeping the architecture honest' },
-    '/board/technical/':    { href: '/board/product/',   title: 'Product Board →',          sub: '8 personas shaping what this site becomes' },
-    '/board/product/':      { href: '/platform/',        title: 'How This Works →',         sub: 'The full platform architecture' },
-    '/data/':               { href: '/methodology/',     title: 'The Methodology →',        sub: 'How the data is processed' },
-    '/tools/':              { href: '/ask/',             title: 'Ask the Data →',           sub: 'Query 19 sources of live data' },
-    '/week/':               { href: '/subscribe/',       title: 'Get This Weekly →',        sub: 'Every week, in your inbox' },
-    '/chronicle/':          { href: '/chronicle/archive/', title: 'All Entries →',          sub: 'The full chronicle archive' },
-    '/chronicle/archive/':  { href: '/subscribe/',       title: 'Get the Weekly Brief →',   sub: 'Delivered every week' },
-    '/ask/':                { href: '/platform/',        title: 'How This Works →',         sub: 'The platform behind the AI' },
-    '/explorer/':           { href: '/discoveries/',     title: 'Validated Discoveries →',  sub: 'Correlations that survived scrutiny' },
-    '/weekly/':             { href: '/explorer/',        title: 'Explore the Data →',       sub: 'Pick any two metrics and discover correlations' },
-    '/achievements/':       { href: '/character/',       title: 'The Character Sheet →',    sub: 'How it all adds up into one score' },
+    '/story/':              { href: '/live/',            title: 'See Today\u2019s Data \u2192',      sub: 'What the sensors say right now' },
+    '/about/':              { href: '/story/',           title: 'The Story \u2192',              sub: 'Read the full transformation narrative' },
+    '/live/':               { href: '/character/',       title: 'The Score \u2192',              sub: 'How it all adds up' },
+    '/character/':          { href: '/habits/',          title: 'The Habits \u2192',             sub: 'The inputs that drive the score' },
+    '/habits/':             { href: '/experiments/',     title: 'Experiments \u2192',            sub: 'What\u2019s being actively tested' },
+    '/accountability/':     { href: '/methodology/',     title: 'The Methodology \u2192',        sub: 'How the science works' },
+    '/protocols/':          { href: '/live/',            title: 'The Results \u2192',            sub: 'What these protocols produced' },
+    '/experiments/':        { href: '/discoveries/',     title: 'Discoveries \u2192',            sub: 'What the data proved' },
+    '/discoveries/':        { href: '/intelligence/',    title: 'The Intelligence Layer \u2192', sub: 'How the AI finds these patterns' },
+    '/sleep/':              { href: '/glucose/',         title: 'Glucose Data \u2192',           sub: '30-day CGM time-in-range' },
+    '/glucose/':            { href: '/benchmarks/',      title: 'Benchmarks \u2192',             sub: 'How Matthew compares to population norms' },
+    '/benchmarks/':         { href: '/subscribe/',       title: 'Get Weekly Updates \u2192',     sub: 'New data every week' },
+    '/supplements/':        { href: '/protocols/',       title: 'All Protocols \u2192',          sub: 'Sleep, training, nutrition, supplements' },
+    '/platform/':           { href: '/cost/',            title: 'The Real Cost \u2192',          sub: 'Running a full health OS for ~$13/month' },
+    '/cost/':               { href: '/methodology/',     title: 'The Methodology \u2192',        sub: 'How the science works' },
+    '/methodology/':        { href: '/intelligence/',    title: 'The Intelligence Layer \u2192', sub: 'What the AI actually does' },
+    '/intelligence/':       { href: '/discoveries/',     title: 'Discoveries \u2192',            sub: 'What the data revealed' },
+    '/board/':              { href: '/board/technical/', title: 'Technical Board \u2192',        sub: '12 personas keeping the architecture honest' },
+    '/board/technical/':    { href: '/board/product/',   title: 'Product Board \u2192',          sub: '8 personas shaping what this site becomes' },
+    '/board/product/':      { href: '/platform/',        title: 'How This Works \u2192',         sub: 'The full platform architecture' },
+    '/data/':               { href: '/methodology/',     title: 'The Methodology \u2192',        sub: 'How the data is processed' },
+    '/tools/':              { href: '/ask/',             title: 'Ask the Data \u2192',           sub: 'Query 19 sources of live data' },
+    '/week/':               { href: '/subscribe/',       title: 'Get This Weekly \u2192',        sub: 'Every week, in your inbox' },
+    '/chronicle/':          { href: '/chronicle/archive/', title: 'All Entries \u2192',          sub: 'The full chronicle archive' },
+    '/chronicle/archive/':  { href: '/subscribe/',       title: 'Get the Weekly Brief \u2192',   sub: 'Delivered every week' },
+    '/ask/':                { href: '/platform/',        title: 'How This Works \u2192',         sub: 'The platform behind the AI' },
+    '/explorer/':           { href: '/discoveries/',     title: 'Validated Discoveries \u2192',  sub: 'Correlations that survived scrutiny' },
+    '/weekly/':             { href: '/explorer/',        title: 'Explore the Data \u2192',       sub: 'Pick any two metrics and discover correlations' },
+    '/achievements/':       { href: '/character/',       title: 'The Character Sheet \u2192',    sub: 'How it all adds up into one score' },
+    '/stack/':              { href: '/protocols/',       title: 'Protocols \u2192',              sub: 'The strategy layer beneath the stack' },
   };
 
   var nextRead = READING_PATHS[path];
