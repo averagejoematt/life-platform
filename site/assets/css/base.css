@@ -642,6 +642,9 @@ body { padding-bottom: 36px; }
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.25s var(--ease-out);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 .nav-overlay.is-open {
   display: flex;
