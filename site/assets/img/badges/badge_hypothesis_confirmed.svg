@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" fill="none">
+  <path d="M36 2L66 14V42Q66 62 36 70Q6 62 6 42V14Z" fill="none" stroke="#e06060" stroke-width="1.5" opacity="0.3"/>
+  <path d="M36 8L60 18V40Q60 56 36 64Q12 56 12 40V18Z" fill="none" stroke="#e06060" stroke-width="0.8" opacity="0.15"/>
+  <path d="M32 20h8" stroke="#e06060" stroke-width="1.2"/>
+  <path d="M34 20v6l-5 10a1 1 0 0 0 .9 1.5h12.2a1 1 0 0 0 .9-1.5l-5-10v-6" stroke="#e06060" stroke-width="1.2" fill="none"/>
+  <polyline points="30 42 34 46 42 36" stroke="#e06060" stroke-width="2" fill="none" stroke-linecap="round"/>
+</svg>

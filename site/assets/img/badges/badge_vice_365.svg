@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" fill="none">
+  <path d="M36 2L66 14V42Q66 62 36 70Q6 62 6 42V14Z" fill="none" stroke="#00e5a0" stroke-width="1.5" opacity="0.3"/>
+  <path d="M36 8L60 18V40Q60 56 36 64Q12 56 12 40V18Z" fill="none" stroke="#00e5a0" stroke-width="0.8" opacity="0.15"/>
+  <path d="M36 20c-3 4-4 8-2 12s4 6 2 10" stroke="#00e5a0" stroke-width="1.2" fill="none"/>
+  <path d="M36 20c3 4 4 8 2 12s-4 6-2 10" stroke="#00e5a0" stroke-width="1.2" fill="none"/>
+  <circle cx="36" cy="26" r="2" fill="#00e5a0" opacity="0.4"/>
+  <text x="36" y="62" text-anchor="middle" font-family="Space Mono,monospace" font-size="6" fill="#00e5a0" letter-spacing="0.08em">1 YEAR</text>
+</svg>

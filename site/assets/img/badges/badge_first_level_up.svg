@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" fill="none">
+  <polygon points="36 2 66 19 66 53 36 70 6 53 6 19" fill="none" stroke="#00e5a0" stroke-width="1.5" opacity="0.3"/>
+  <polygon points="36 8 60 22 60 50 36 64 12 50 12 22" fill="none" stroke="#00e5a0" stroke-width="1"/>
+  <polyline points="30 38 36 28 42 38" stroke="#00e5a0" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <text x="36" y="62" text-anchor="middle" font-family="Space Mono,monospace" font-size="6" fill="#00e5a0" letter-spacing="0.08em">LV 2</text>
+</svg>

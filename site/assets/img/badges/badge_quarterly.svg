@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" fill="none">
+  <path d="M36 2L66 14V42Q66 62 36 70Q6 62 6 42V14Z" fill="none" stroke="#c8843a" stroke-width="1.5" opacity="0.3"/>
+  <path d="M36 8L60 18V40Q60 56 36 64Q12 56 12 40V18Z" fill="none" stroke="#c8843a" stroke-width="0.8" opacity="0.15"/>
+  <path d="M30 22c0 3-3 5-3 8s1.2 3.5 3 3.5" stroke="#c8843a" stroke-width="1" fill="none"/>
+  <path d="M36 20c0 3.5-4 5.5-4 9s1.5 4 4 4 4-1 4-4-4-5.5-4-9z" fill="#c8843a" opacity="0.6"/>
+  <path d="M42 22c0 3 3 5 3 8s-1.2 3.5-3 3.5" stroke="#c8843a" stroke-width="1" fill="none"/>
+  <text x="36" y="62" text-anchor="middle" font-family="Space Mono,monospace" font-size="6" fill="#c8843a" letter-spacing="0.08em">90 DAYS</text>
+</svg>

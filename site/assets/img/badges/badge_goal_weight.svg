@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" fill="none">
+  <path d="M36 2L66 14V42Q66 62 36 70Q6 62 6 42V14Z" fill="none" stroke="#d4a520" stroke-width="1.5" opacity="0.3"/>
+  <path d="M36 8L60 18V40Q60 56 36 64Q12 56 12 40V18Z" fill="none" stroke="#d4a520" stroke-width="0.8" opacity="0.15"/>
+  <path d="M28 16l4 5h-3l4 5h-3l7 7 7-7h-3l4-5h-3l4-5z" fill="#d4a520" opacity="0.2"/>
+  <text x="36" y="38" text-anchor="middle" font-family="Impact,Bebas Neue,sans-serif" font-size="16" fill="#d4a520">185</text>
+  <text x="36" y="50" text-anchor="middle" font-family="Space Mono,monospace" font-size="6" fill="#d4a520" letter-spacing="0.08em">THE GOAL</text>
+  <path d="M20 56c4-2 8-3 16-3s12 1 16 3" stroke="#d4a520" stroke-width="0.8" fill="none" opacity="0.4"/>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" fill="none">
+  <circle cx="36" cy="36" r="33" fill="none" stroke="#5ba4cf" stroke-width="1.5" opacity="0.3"/>
+  <circle cx="36" cy="36" r="27" fill="none" stroke="#5ba4cf" stroke-width="0.8" opacity="0.15"/>
+  <text x="36" y="34" text-anchor="middle" font-family="Impact,Bebas Neue,sans-serif" font-size="14" fill="#5ba4cf">5K</text>
+  <polyline points="24 42 30 38 36 40 42 37 48 42" stroke="#5ba4cf" stroke-width="1" fill="none" opacity="0.4"/>
+</svg>
