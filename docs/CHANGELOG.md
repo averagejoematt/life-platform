@@ -1,3 +1,59 @@
+## v3.9.36 — 2026-03-26: Signal Doctrine Tier 2 — 5-Section Nav + Observatory Accents + Podcast Scanner
+
+### Summary
+Shipped Signal Doctrine Tier 2: complete navigation restructure from 6 sections to 5 (The Story / The Data / The Science / The Build / Follow), Product Board-approved bottom nav routing (8-0 vote: Follow→/subscribe/), observatory pillar accent colors on 5 pages, home page sparklines + count-up animations, story-mode narrative intros on Sleep + Glucose pages, and Podcast Intelligence Phase 2 scanner Lambda.
+
+### Product Board Session
+Full 8-persona Product Board convened on two questions:
+- **Bottom nav routing**: Unanimous (8-0) — Follow tab routes to `/subscribe/` not `/chronicle/`. Rationale: conversion funnel, one-tap to subscribe form.
+- **Nav section names**: Desktop uses articles ("The Story" / "The Data" / "The Science" / "The Build" / "Follow"). Mobile bottom nav drops articles for space ("Story" / "Data" / "Science" / "Build" / "Follow"). Sofia's compromise adopted (6-2, James + Raj abstained).
+
+### What Shipped
+- **5-section nav restructure** (`components.js` v3.0.0): The Story (Home, My Story, The Mission) | The Data (My Numbers + The Evidence, grouped dropdown) | The Science (What I Do + What I Tested, grouped dropdown) | The Build (7 items) | Follow (4 items)
+- **Bottom nav** (mobile): Story→`/` | Data→`/live/` | Science→`/stack/` | Build→`/platform/` | Follow→`/subscribe/` (mail envelope icon)
+- **Footer**: Updated to 5-column layout matching new IA
+- **nav.js v2.0.0**: Badge map, reading paths, and active states synced to new 5-section IA
+- **Observatory pillar accents**: `--obs-accent` CSS custom property on sleep (purple), glucose (amber), nutrition (amber), training (green), mind (violet) pages
+- **Home sparklines**: 7-day SVG mini-sparklines on vital quadrant cards (Body weight, Recovery HRV)
+- **Count-up animations**: Wired `data-count-up` on dynamically-populated stat values
+- **Sleep narrative intro**: Story-mode serif paragraph above signal dashboard ("The thing I thought I was good at.")
+- **Glucose narrative intro**: Story-mode serif paragraph above signal dashboard ("The number that quieted the anxiety.")
+- **Podcast scanner Lambda**: Weekly YouTube RSS scanner → Claude Haiku extraction → DynamoDB candidates for review. Config at `config/podcast_watchlist.json` (7 podcasts: Huberman, Attia, Patrick, Norton, Wolf, Chatterjee, Hill)
+
+### Deploy Scripts Created
+| Script | Purpose |
+|--------|---------|
+| `deploy/fix_follow_route.py` | Bottom nav Follow → /subscribe/ + mail icon |
+| `deploy/fix_follow_badge.py` | nav.js BADGE_MAP key sync |
+| `deploy/patch_tier2_observatory.py` | --obs-accent pillar colors on 5 observatory pages |
+| `deploy/patch_tier2_home.py` | Sparkline containers + count-up wiring on home page |
+| `deploy/patch_tier2_narrative.py` | Story-mode narrative intros on sleep + glucose |
+| `deploy/deploy_v3.9.36.sh` | Master deploy orchestrator (8 steps) |
+
+### Files Modified
+| File | Change |
+|------|--------|
+| `site/assets/js/components.js` | Complete rewrite — 5-section IA, grouped dropdowns, /subscribe/ bottom nav |
+| `site/assets/js/nav.js` | Reading paths, badge map, active states synced to 5-section IA |
+| `site/sleep/index.html` | --obs-accent + narrative intro |
+| `site/glucose/index.html` | --obs-accent + narrative intro |
+| `site/nutrition/index.html` | --obs-accent |
+| `site/training/index.html` | --obs-accent |
+| `site/mind/index.html` | --obs-accent |
+| `site/index.html` | Sparkline containers + count-up wiring |
+
+### Files Created
+| File | Purpose |
+|------|---------|
+| `lambdas/podcast_scanner_lambda.py` | Weekly podcast scanner (YouTube RSS → Haiku extraction → DDB) |
+
+### Manual Follow-up
+1. Create podcast scanner Lambda in AWS (command in deploy script output)
+2. Add EventBridge weekly schedule rule
+3. Version bump in `deploy/sync_doc_metadata.py` (v3.9.35 → v3.9.36) + run `--apply`
+
+---
+
 ## v3.9.35 — 2026-03-26: Signal Doctrine Tier 1 Rollout + Arena Voting + Experiments
 
 ### Summary
