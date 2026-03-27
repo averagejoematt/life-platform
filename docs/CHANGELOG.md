@@ -1,3 +1,50 @@
+## v3.9.37 — 2026-03-26: Product Board Pre-Launch Punch List (23 items)
+
+All 23 items from the Product Board pre-launch review, preparing for April 1 go-live.
+
+### Must Fix (Launch Blockers)
+- **PB-1**: Journal → Chronicle 301 redirects — all `/journal/*` pages now redirect to `/chronicle/*`
+- **PB-2**: Fixed stray `</div>` DOM mismatch on homepage
+- **PB-3**: Belt-and-suspenders prequel banner hide (checks `AMJ_EXPERIMENT.isLive` AND raw date)
+- **PB-4**: Subscribe success redirects to new `/subscribe/confirm/` page
+- **PB-5**: AI Brief hardcoded sample replaced with honest fallback
+- **PB-7**: `/start/` page redirects to `/`
+- Fixed `/journal/` → `/chronicle/` link in subscriber welcome email
+
+### High Impact
+- **PB-8**: "Why I'm doing this" About section moved UP on homepage (before data grids)
+- **PB-9**: "See a sample issue →" link below hero subscribe input
+- **PB-10**: One-liner added to subscribe: "A weekly email. Real data, real failures, no filter."
+- **PB-11**: "Day X — Early data" banners on 5 observatory pages (sleep, glucose, nutrition, training, mind)
+- **PB-12**: Hero animation delays halved (0.7s → 0.35s max)
+- **PB-13**: Lambda warm-up script (`deploy/warmup_lambdas.sh`)
+- **PB-14**: Feature card hover: inline JS → CSS `.feature-card:hover`
+- **PB-15**: OG meta descriptions updated on 5 key subpages
+
+### Nice to Have
+- **PB-16**: Subscriber count social proof (dynamic, hidden if <5)
+- **PB-17**: `/subscribe/confirm/` page with 4-panel "while you wait" navigation
+- **PB-18**: Vital quadrant grid single-column on mobile (≤480px)
+- **PB-19**: Observatory accent colors on homepage feature cards (sleep=purple, glucose=amber, habits=green)
+- **PB-20**: Dark/light mode toggle wired into nav (persists via localStorage)
+- **PB-21**: Glossary tooltips on ticker metrics (HRV, Recovery, Streak)
+- **PB-22**: "Most Interesting Correlations" curated section on Data Explorer
+- **PB-23**: Week 04 chronicle entry synced from `/journal/` to `/chronicle/`
+
+### Incident
+- S3 `sync --delete` removed `public_stats.json` (Lambda-generated, not in local site/) — **homepage broken for ~5 min**
+- Restored via `site-stats-refresh` Lambda invocation
+- Deploy script fixed with `--exclude` for all Lambda-generated S3 files
+- Hotfix also fixed CSS leak (missing `<style>` tags) and duplicate theme toggle from patch running twice
+
+### Files Created
+- `site/subscribe/confirm/index.html`, `deploy/warmup_lambdas.sh`, `deploy/patch_v3.9.37_product_board.py`, `deploy/deploy_v3.9.37.sh`, `deploy/hotfix_v3.9.37.sh`, `site/chronicle/posts/week-04/index.html`
+
+### Files Modified
+- `site/index.html` (12 items), `site/assets/js/components.js` (theme toggle), `site/journal/**` (redirects), `site/start/index.html` (redirect), 5 observatory pages (Day X banners), 5 subpages (OG tags), `site/explorer/index.html` (curated section), `lambdas/email_subscriber_lambda.py` (journal→chronicle)
+
+---
+
 ## v3.9.36 — 2026-03-26: Signal Doctrine Tier 2 — 5-Section Nav + Observatory Accents + Podcast Scanner
 
 ### Summary
