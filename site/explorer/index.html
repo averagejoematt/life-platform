@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Data Explorer — pick any two metrics and discover correlations across 19 data sources.">
   <meta property="og:title" content="Data Explorer — Matthew Walker">
-  <meta property="og:description" content="Interactive correlation explorer. Pick two metrics. See the signal.">
+  <meta property="og:description" content="Interactive Data Explorer — pick any two health metrics and see the real correlation. N=1 data science.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -213,6 +213,47 @@
 <body class="body-signal">
 
 <div id="amj-nav"></div>
+<!-- Item 22: Curated "most interesting" correlations -->
+<section id="curated-correlations" style="padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border);">
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">Start here</div>
+  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-6);letter-spacing:var(--ls-display)">Most Interesting <span style="color:var(--accent)">Correlations</span></h3>
+  <div id="curated-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
+    <div style="background:var(--surface);padding:var(--space-5);text-align:center;color:var(--text-muted);font-size:var(--text-xs);grid-column:1/-1;">Loading featured correlations...</div>
+  </div>
+  <script>
+  (function(){
+    fetch('/api/correlations?featured=true&limit=6').then(function(r){return r.ok?r.json():null}).then(function(d){
+      var corrs = d && (d.correlations || d.featured || []);
+      if(!corrs||!corrs.length) return;
+      var grid = document.getElementById('curated-grid');
+      grid.innerHTML = '';
+      corrs.forEach(function(c){
+        var card = document.createElement('div');
+        card.style.cssText = 'background:var(--surface);padding:var(--space-5);cursor:pointer;transition:background 0.15s;';
+        card.onmouseover = function(){this.style.background='var(--surface-raised)';};
+        card.onmouseout = function(){this.style.background='var(--surface)';};
+        var rColor = c.r < 0 ? 'var(--c-red-status)' : 'var(--accent)';
+        card.innerHTML = '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-2)">'+(c.metric_a||'')+' → '+(c.metric_b||'')+'</div>'
+          +'<div style="font-family:var(--font-display);font-size:24px;color:'+rColor+';margin-bottom:var(--space-2)">r = '+(c.r?c.r.toFixed(2):'?')+'</div>'
+          +'<div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.4">'+(c.description||c.summary||'')+'</div>';
+        card.onclick = function(){
+          // Pre-select this pair in the explorer
+          var selA = document.getElementById('metric-a');
+          var selB = document.getElementById('metric-b');
+          if(selA&&c.metric_a) selA.value = c.metric_a_key||c.metric_a;
+          if(selB&&c.metric_b) selB.value = c.metric_b_key||c.metric_b;
+          document.getElementById('explorer-section').scrollIntoView({behavior:'smooth'});
+        };
+        grid.appendChild(card);
+      });
+    }).catch(function(){});
+  })();
+  </script>
+  <style>
+    @media (max-width: 768px) { #curated-grid { grid-template-columns: 1fr !important; } }
+  </style>
+</section>
+
 
 <nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">Evidence</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Data Explorer</span></nav>
 </div>

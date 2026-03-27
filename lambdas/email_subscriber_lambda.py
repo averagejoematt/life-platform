@@ -304,7 +304,7 @@ def _send_welcome_email(email: str) -> None:
     No filters. No "good news only." The bad weeks are in there too.
   </p>
 
-  <a href="{SITE_URL}/journal/"
+  <a href="{SITE_URL}/chronicle/"
      style="display:inline-block;background:#F0B429;color:#0D1117;font-size:15px;font-weight:600;
             padding:14px 28px;border-radius:8px;text-decoration:none;">
     Read the archive while you wait &rarr;

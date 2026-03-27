@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Almost there — check your inbox to confirm your subscription.">
+  <title>Confirm Your Subscription — averagejoematt.com</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+</head>
+<body>
+<div id="amj-nav"></div>
+
+<section style="
+  min-height:80vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-16);
+  text-align:center;
+">
+  <div style="font-size:48px;margin-bottom:var(--space-6);">✉️</div>
+  <h1 style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-4);">Check Your Inbox</h1>
+  <p style="font-size:var(--text-lg);color:var(--text-muted);max-width:480px;line-height:var(--lh-body);margin-bottom:var(--space-10);">
+    A confirmation email is on its way. Click the link inside to lock in your subscription to <strong style="color:var(--text)">The Weekly Signal</strong>.
+  </p>
+
+  <div style="max-width:500px;width:100%;">
+    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-6);">// while you wait</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);">
+      <a href="/story/" style="display:block;background:var(--surface);padding:var(--space-5);text-decoration:none;transition:background 0.15s;">
+        <div style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">The Story</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);">How this started. 302 lbs and a decision.</div>
+      </a>
+      <a href="/live/" style="display:block;background:var(--surface);padding:var(--space-5);text-decoration:none;transition:background 0.15s;">
+        <div style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">Today's Data</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);">Live numbers from 19 sources.</div>
+      </a>
+      <a href="/chronicle/" style="display:block;background:var(--surface);padding:var(--space-5);text-decoration:none;transition:background 0.15s;">
+        <div style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">The Chronicle</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);">Elena Voss writes every week.</div>
+      </a>
+      <a href="/platform/" style="display:block;background:var(--surface);padding:var(--space-5);text-decoration:none;transition:background 0.15s;">
+        <div style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--accent);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">The Platform</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);">How it's built. The tech.</div>
+      </a>
+    </div>
+  </div>
+
+  <p style="margin-top:var(--space-8);font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);">
+    No email? Check your spam folder or <a href="/subscribe/" style="color:var(--accent);text-decoration:none;">try again</a>.
+  </p>
+</section>
+
+<div id="amj-bottom-nav"></div>
+<div id="amj-footer"></div>
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/countdown.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>

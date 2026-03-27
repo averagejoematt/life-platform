@@ -97,7 +97,7 @@
     color: var(--c-amber-500);
     margin: 0 0 32px;
     opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.1s;
+    animation: fadeUp 0.6s ease forwards 0.05s;
   }
   .weight-counter {
     display: flex;
@@ -105,7 +105,7 @@
     gap: 16px;
     margin: 0 0 32px;
     opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.2s;
+    animation: fadeUp 0.6s ease forwards 0.05s;
   }
   .weight-node { text-align: center; }
   .weight-node .label {
@@ -133,7 +133,7 @@
     max-width: 460px;
     margin: 0 0 12px;
     opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.3s;
+    animation: fadeUp 0.6s ease forwards 0.08s;
   }
   .progress-bar-track {
     background: var(--border);
@@ -166,7 +166,7 @@
     text-align: center;
     margin: 12px 0 40px;
     opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.4s;
+    animation: fadeUp 0.6s ease forwards 0.1s;
   }
   .hero-why strong { color: var(--text); font-weight: 600; }
   .hero-below-fold {
@@ -177,7 +177,7 @@
     max-width: 640px;
     margin: 0 0 48px;
     opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.5s;
+    animation: fadeUp 0.6s ease forwards 0.12s;
   }
   .stat-chip {
     background: var(--surface);
@@ -205,7 +205,7 @@
     padding: 16px 20px;
     margin: 0 0 48px;
     opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.6s;
+    animation: fadeUp 0.6s ease forwards 0.15s;
     text-decoration: none;
     display: block;
   }
@@ -276,7 +276,7 @@
     color: var(--text-faint);
     letter-spacing: 1px;
     opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.7s;
+    animation: fadeUp 0.6s ease forwards 0.18s;
     cursor: pointer;
     transition: color 0.2s;
   }
@@ -317,11 +317,19 @@
   }
   .disc-share-btn:hover { color: var(--accent); }
   </style>
+  <style>
+    /* Item 14: Feature card hover via CSS */
+    .feature-card { transition: background var(--dur-fast); }
+    .feature-card:hover { background: var(--surface-raised) !important; }
+    /* Item 18: Vital quads single column on mobile */
+    @media (max-width: 480px) {
+      #vital-quads { grid-template-columns: 1fr !important; }
+    }
+  </style>
 </head>
 <body>
 
 <div id="amj-nav"></div>
-</div>
 
 
 
@@ -336,11 +344,11 @@
     <span class="ticker__item">⬥</span>
     <span class="ticker__item">WEIGHT <strong id="tk-weight">287.7 LBS</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item">HRV <strong id="tk-hrv">54 MS</strong></span>
+    <span class="ticker__item" title="Heart Rate Variability — higher is better. Measures autonomic nervous system recovery." >HRV <strong id="tk-hrv">54 MS</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item">RECOVERY <strong id="tk-recovery">75%</strong></span>
+    <span class="ticker__item" title="Whoop Recovery Score — percentage of physiological readiness (0-100%)." >RECOVERY <strong id="tk-recovery">75%</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item">STREAK <strong id="tk-streak">0D STREAK</strong></span>
+    <span class="ticker__item" title="Consecutive days completing all Tier 0 (non-negotiable) habits." >STREAK <strong id="tk-streak">0D STREAK</strong></span>
     <span class="ticker__item">⬥</span>
     <span class="ticker__item">JOURNEY <strong id="tk-journey">12.2% TO GOAL</strong></span>
     <span class="ticker__item">⬥</span>
@@ -348,11 +356,11 @@
     <span class="ticker__item">⬥</span>
     <span class="ticker__item">WEIGHT <strong id="tk-weight-2">287.7 LBS</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item">HRV <strong id="tk-hrv-2">54 MS</strong></span>
+    <span class="ticker__item" title="Heart Rate Variability — higher is better. Measures autonomic nervous system recovery." >HRV <strong id="tk-hrv-2">54 MS</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item">RECOVERY <strong id="tk-recovery-2">75%</strong></span>
+    <span class="ticker__item" title="Whoop Recovery Score — percentage of physiological readiness (0-100%)." >RECOVERY <strong id="tk-recovery-2">75%</strong></span>
     <span class="ticker__item">⬥</span>
-    <span class="ticker__item">STREAK <strong id="tk-streak-2">0D STREAK</strong></span>
+    <span class="ticker__item" title="Consecutive days completing all Tier 0 (non-negotiable) habits." >STREAK <strong id="tk-streak-2">0D STREAK</strong></span>
     <span class="ticker__item">⬥</span>
     <span class="ticker__item">JOURNEY <strong id="tk-journey-2">12.2% TO GOAL</strong></span>
     <span class="ticker__item">⬥</span>
@@ -369,7 +377,7 @@
   <p class="hero-label" style="margin-bottom:16px;">The Measured Life Experiment</p>
 
   <!-- Central countdown / Day N -->
-  <div class="experiment-counter" style="margin-bottom:24px;opacity:0;animation:fadeUp 0.6s ease forwards 0.15s;"></div>
+  <div class="experiment-counter" style="margin-bottom:24px;opacity:0;animation:fadeUp 0.6s ease forwards 0.08s;"></div>
 
   <!-- The honest tagline -->
   <p style="
@@ -382,7 +390,7 @@
     max-width:600px;
     margin:0 0 12px;
     opacity:0;
-    animation:fadeUp 0.6s ease forwards 0.25s;
+    animation:fadeUp 0.6s ease forwards 0.12s;
   ">Day 1. <span style="color:var(--accent)">For real this time.</span></p>
 
   <!-- Weight counter: 302 → current → 185 -->
@@ -450,7 +458,7 @@
     border-radius:6px;
     text-align:center;
     opacity:0;
-    animation:fadeUp 0.6s ease forwards 0.48s;
+    animation:fadeUp 0.6s ease forwards 0.24s;
   ">
     <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--c-amber-500);margin-bottom:6px;">Prequel Phase &middot; Baseline Period</div>
     <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.5;">
@@ -473,13 +481,41 @@
   <!-- "Read the story" is now the primary CTA in the dual-path section below -->
 
   <!-- HP-03: Hero subscribe input -->
-  <div class="hero-subscribe" style="max-width:500px;opacity:0;animation:fadeUp 0.6s ease forwards 0.58s;">
+  <div class="hero-subscribe" style="max-width:500px;opacity:0;animation:fadeUp 0.6s ease forwards 0.29s;">
     <div class="hero-subscribe-label">Follow from Day 1</div>
+    <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-2);max-width:400px;text-align:center;line-height:1.5;">A weekly email. Real data, real failures, no filter.</div>
+    <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-2);max-width:400px;text-align:center;line-height:1.5;">A weekly email. Real data, real failures, no filter.</div>
     <div class="subscribe-row">
       <input type="email" id="hero-email" class="subscribe-input" placeholder="your@email.com" autocomplete="email">
       <button id="hero-subscribe-btn" class="btn btn--cta" style="font-size:var(--text-xs);white-space:nowrap;padding:var(--space-3) var(--space-5);">Subscribe</button>
     </div>
     <div id="subscribe-msg" class="hero-subscribe-note"></div>
+    <a href="/chronicle/sample/" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--c-amber-400);text-decoration:none;letter-spacing:var(--ls-tag);margin-top:var(--space-2);display:inline-block;">See a sample issue →</a>
+    <div id="subscriber-proof" style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-tag);margin-top:var(--space-2);display:none;"></div>
+    <script>
+    // Item 16: subscriber count social proof
+    (function(){
+      fetch('/api/subscriber_count').then(function(r){return r.ok?r.json():null}).then(function(d){
+        if(d&&d.count>5){
+          var el=document.getElementById('subscriber-proof');
+          if(el){el.textContent='Join '+d.count+' others following along';el.style.display='block';}
+        }
+      }).catch(function(){});
+    })();
+    </script>
+    <a href="/chronicle/sample/" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--c-amber-400);text-decoration:none;letter-spacing:var(--ls-tag);margin-top:var(--space-2);display:inline-block;">See a sample issue →</a>
+    <div id="subscriber-proof" style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-tag);margin-top:var(--space-2);display:none;"></div>
+    <script>
+    // Item 16: subscriber count social proof
+    (function(){
+      fetch('/api/subscriber_count').then(function(r){return r.ok?r.json():null}).then(function(d){
+        if(d&&d.count>5){
+          var el=document.getElementById('subscriber-proof');
+          if(el){el.textContent='Join '+d.count+' others following along';el.style.display='block';}
+        }
+      }).catch(function(){});
+    })();
+    </script>
   </div>
 
   <!-- WR-16: Dual-path navigation CTAs -->
@@ -609,6 +645,65 @@
 })();
 </script>
 
+
+
+
+<section class="about-section reveal" id="about">
+  <div class="about-left">
+    <div class="eyebrow" style="margin-bottom:var(--space-6)">The experiment</div>
+    <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-6)">Why I'm doing this in public</h2>
+    <p style="font-size:var(--text-lg);color:var(--text-muted);line-height:var(--lh-body);max-width:480px">
+      I'm a senior director at a SaaS company in Seattle. In February 2026 I decided
+      to actually change — not with a new app or a 30-day challenge, but by
+      <span style="color:var(--text)">building the infrastructure to track everything</span>
+      and letting the data drive the decisions.
+      <br><br>
+      Every morning an AI reads <span id="prose-data-sources-3">19</span> data sources and writes me a coaching brief.
+      Every Wednesday a journalist named Elena Voss chronicles the week.
+      Every week I publish the real numbers — the bad days included.
+    </p>
+    <div style="margin-top:var(--space-8);display:flex;gap:var(--space-4)">
+      <a href="/story/" class="btn btn--ghost">Read my story</a>
+      <a href="/chronicle/" class="btn btn--ghost">The chronicle</a>
+      <a href="/platform/" class="btn btn--ghost">See the platform</a>
+    </div>
+  </div>
+  <div class="about-right">
+    <div class="eyebrow" style="margin-bottom:var(--space-6)"><span id="prose-data-sources-4">19</span> data sources</div>
+    <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-6)">The stack</h2>
+    <div class="sources-grid">
+      <div class="source-pill">Whoop</div>
+      <div class="source-pill">Eight Sleep</div>
+      <div class="source-pill">Withings</div>
+      <div class="source-pill">Garmin</div>
+      <div class="source-pill">Strava</div>
+      <div class="source-pill">Apple Health</div>
+      <div class="source-pill">MacroFactor</div>
+      <div class="source-pill">Habitify</div>
+      <div class="source-pill">Notion</div>
+      <div class="source-pill">Todoist</div>
+      <div class="source-pill">Dexcom Stelo</div>
+      <div class="source-pill">Genome</div>
+      <div class="source-pill">Labs</div>
+      <div class="source-pill">DEXA</div>
+      <div class="source-pill">Weather</div>
+      <div class="source-pill">Travel</div>
+      <div class="source-pill">Blood Pressure</div>
+      <div class="source-pill">Supplements</div>
+      <div class="source-pill">+ more</div>
+    </div>
+  </div>
+
+  <!-- HP-09: Quote embedded from standalone section -->
+  <div style="padding:var(--space-8) var(--page-padding);border-top:1px solid var(--border);">
+    <blockquote style="max-width:640px;margin:0;font-family:var(--font-serif);font-size:var(--text-base);font-style:italic;color:var(--text-muted);line-height:1.7;border-left:2px solid var(--accent-dim);padding-left:var(--space-4);">
+      &ldquo;I used to be the protagonist of my own life. Somewhere along the way, I became a spectator.&rdquo;
+      <footer style="margin-top:var(--space-2);font-family:var(--font-mono);font-size:var(--text-xs);font-style:normal;color:var(--accent-dim);letter-spacing:var(--ls-tag);">
+        &mdash; <a href="/story/" style="color:var(--accent-dim);text-decoration:none;">Matthew Walker</a>
+      </footer>
+    </blockquote>
+  </div>
+</section>
 
 <!-- WR-33: Day 1 vs. Today — 4-dimension comparison (HOME-3) -->
 <section class="reveal" style="border-bottom:1px solid var(--border);padding:var(--space-12) var(--page-padding);">
@@ -753,9 +848,9 @@
         line-height: 1.8;
         flex: 1;
       ">
-        <p style="margin-bottom: var(--space-4);" id="brief-static-1">Recovery at 75% on 7.7h sleep — solid but not green. HRV trending up 33% over 30 days (66ms vs 50ms baseline). Zone 2 deficit this week: 42 of 150 min target. Caloric deficit holding but protein timing was late yesterday — push first meal 2 hours earlier today.</p>
-        <p style="margin-bottom: var(--space-4);" id="brief-static-2">Key correlation flagged: sleep onset after 11pm correlates with -12% next-day recovery (r=-0.38, p=0.04, 28d window). Last 3 nights averaged 11:24pm. Consider alarm at 10:30pm this week.</p>
-        <p style="color: var(--text-faint); font-size: var(--text-xs); font-family: var(--font-mono);">Generated from 19 live data sources by Claude. <a href="/subscribe/" style="color:var(--c-amber-500);text-decoration:none;">Subscribe to The Weekly Signal</a> for the full version every Wednesday.</p>
+        <p style="margin-bottom: var(--space-4);" id="brief-static-1">Every morning at 6 AM, Claude reads 19 live data sources and writes a coaching brief. Recovery trends, habit adherence, sleep patterns, nutrition gaps — all synthesized into actionable guidance.</p>
+        <p style="margin-bottom: var(--space-4); color: var(--text-faint); font-style: italic;" id="brief-static-2">Today's brief loads here when the pipeline runs. <a href="/chronicle/sample/" style="color:var(--c-amber-400);text-decoration:none;">See a sample →</a></p>
+        <p style="color: var(--text-faint); font-size: var(--text-xs); font-family: var(--font-mono);">Generated from live data by Claude. <a href="/subscribe/" style="color:var(--c-amber-500);text-decoration:none;">Subscribe to The Weekly Signal</a> for the full version every Wednesday.</p>
       </div>
       <div style="border-top: 1px solid var(--border-subtle); padding-top: var(--space-4); margin-top: var(--space-6); display: flex; gap: var(--space-4);">
         <a href="/platform/" class="btn btn--ghost" style="font-size: var(--text-xs);">How it works →</a>
@@ -1134,46 +1229,46 @@
   </div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);">
 
-    <a href="/habits/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+    <a href="/habits/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;border-left:3px solid #1D9E75;transition:background var(--dur-fast);" class="feature-card">
       <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="4" y="14" width="4" height="10" rx="1"/><rect x="12" y="8" width="4" height="16" rx="1"/><rect x="20" y="4" width="4" height="20" rx="1"/></svg></div>
       <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">HABITS</div>
       <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;margin-bottom:var(--space-4);">52-week heatmap. Every habit tracked daily across <span id="prose-data-sources-2">19</span> sources.</div>
       <div style="font-size:var(--text-xs);font-family:var(--font-mono);color:var(--accent-dim);">Current streak: <span id="feat-streak">0</span> days</div>
     </a>
 
-    <a href="/character/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+    <a href="/character/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" class="feature-card">
       <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3L17 11H22L18 16L20 24L14 20L8 24L10 16L6 11H11Z"/></svg></div>
       <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">CHARACTER</div>
       <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;margin-bottom:var(--space-4);">RPG-style 7-pillar scoring: sleep, movement, nutrition, metabolic, mind, relationships, consistency.</div>
       <div style="font-size:var(--text-xs);font-family:var(--font-mono);color:var(--accent-dim);">Score: <span id="feat-char-score">—</span> / 100</div>
     </a>
 
-    <a href="/benchmarks/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+    <a href="/benchmarks/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" class="feature-card">
       <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="14" cy="14" r="10"/><circle cx="14" cy="14" r="4"/><line x1="14" y1="4" x2="14" y2="10"/><line x1="14" y1="18" x2="14" y2="24"/></svg></div>
       <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">BENCHMARKS</div>
       <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">Where my numbers sit vs. population norms. Interactive calculator.</div>
     </a>
 
-    <a href="/discoveries/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+    <a href="/discoveries/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" class="feature-card">
       <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="14" cy="10" r="6"/><path d="M14 16V24"/><path d="M10 20H18"/><path d="M11 4L17 4"/></svg></div>
       <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">DISCOVERIES</div>
       <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">What the AI found in my data. Correlations, anomalies, patterns a human would miss.</div>
     </a>
 
-    <a href="/intelligence/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+    <a href="/intelligence/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" class="feature-card">
       <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="8" width="16" height="14" rx="3"/><circle cx="11" cy="15" r="1.5"/><circle cx="17" cy="15" r="1.5"/><path d="M14 3V8"/><circle cx="14" cy="3" r="1.5"/><path d="M6 18H3"/><path d="M22 18H25"/></svg></div>
       <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">INTELLIGENCE</div>
       <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">AI coaching brief. What Claude is reading, predicting, and recommending each day.</div>
     </a>
 
 
-    <a href="/glucose/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+    <a href="/glucose/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;border-left:3px solid #f59e0b;transition:background var(--dur-fast);" class="feature-card">
       <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 18C4 18 8 14 10 10S14 4 14 4"/><path d="M14 4C14 4 16 8 18 10S24 18 24 18"/><path d="M4 18L24 18"/><path d="M4 22L24 22"/></svg></div>
       <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">GLUCOSE</div>
       <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">30-day CGM. Time-in-range, variability SD, Dexcom Stelo data.</div>
     </a>
 
-    <a href="/sleep/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
+    <a href="/sleep/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;border-left:3px solid #818cf8;transition:background var(--dur-fast);" class="feature-card">
       <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 16A9 9 0 1 1 12 7C12 7 12 16 21 16Z"/></svg></div>
       <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">SLEEP</div>
       <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">Eight Sleep × Whoop cross-referenced. What bed temp actually does to sleep quality.</div>
@@ -1220,62 +1315,7 @@
   </script>
 </section>
 
-<section class="about-section reveal" id="about">
-  <div class="about-left">
-    <div class="eyebrow" style="margin-bottom:var(--space-6)">The experiment</div>
-    <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-6)">Why I'm doing this in public</h2>
-    <p style="font-size:var(--text-lg);color:var(--text-muted);line-height:var(--lh-body);max-width:480px">
-      I'm a senior director at a SaaS company in Seattle. In February 2026 I decided
-      to actually change — not with a new app or a 30-day challenge, but by
-      <span style="color:var(--text)">building the infrastructure to track everything</span>
-      and letting the data drive the decisions.
-      <br><br>
-      Every morning an AI reads <span id="prose-data-sources-3">19</span> data sources and writes me a coaching brief.
-      Every Wednesday a journalist named Elena Voss chronicles the week.
-      Every week I publish the real numbers — the bad days included.
-    </p>
-    <div style="margin-top:var(--space-8);display:flex;gap:var(--space-4)">
-      <a href="/story/" class="btn btn--ghost">Read my story</a>
-      <a href="/chronicle/" class="btn btn--ghost">The chronicle</a>
-      <a href="/platform/" class="btn btn--ghost">See the platform</a>
-    </div>
-  </div>
-  <div class="about-right">
-    <div class="eyebrow" style="margin-bottom:var(--space-6)"><span id="prose-data-sources-4">19</span> data sources</div>
-    <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-6)">The stack</h2>
-    <div class="sources-grid">
-      <div class="source-pill">Whoop</div>
-      <div class="source-pill">Eight Sleep</div>
-      <div class="source-pill">Withings</div>
-      <div class="source-pill">Garmin</div>
-      <div class="source-pill">Strava</div>
-      <div class="source-pill">Apple Health</div>
-      <div class="source-pill">MacroFactor</div>
-      <div class="source-pill">Habitify</div>
-      <div class="source-pill">Notion</div>
-      <div class="source-pill">Todoist</div>
-      <div class="source-pill">Dexcom Stelo</div>
-      <div class="source-pill">Genome</div>
-      <div class="source-pill">Labs</div>
-      <div class="source-pill">DEXA</div>
-      <div class="source-pill">Weather</div>
-      <div class="source-pill">Travel</div>
-      <div class="source-pill">Blood Pressure</div>
-      <div class="source-pill">Supplements</div>
-      <div class="source-pill">+ more</div>
-    </div>
-  </div>
 
-  <!-- HP-09: Quote embedded from standalone section -->
-  <div style="padding:var(--space-8) var(--page-padding);border-top:1px solid var(--border);">
-    <blockquote style="max-width:640px;margin:0;font-family:var(--font-serif);font-size:var(--text-base);font-style:italic;color:var(--text-muted);line-height:1.7;border-left:2px solid var(--accent-dim);padding-left:var(--space-4);">
-      &ldquo;I used to be the protagonist of my own life. Somewhere along the way, I became a spectator.&rdquo;
-      <footer style="margin-top:var(--space-2);font-family:var(--font-mono);font-size:var(--text-xs);font-style:normal;color:var(--accent-dim);letter-spacing:var(--ls-tag);">
-        &mdash; <a href="/story/" style="color:var(--accent-dim);text-decoration:none;">Matthew Walker</a>
-      </footer>
-    </blockquote>
-  </div>
-</section>
 
 <!-- U13: Subscribe CTA — simplified to single clear action, nav Subscribe is primary -->
 <div id="amj-subscribe"></div><!-- Mobile bottom nav -->
@@ -1439,7 +1479,7 @@
         elEl.textContent = elenaLine;
         elWrap.style.display = 'block';
         elWrap.style.opacity = '1';
-        elWrap.style.animation = 'fadeUp 0.6s ease forwards 0.35s';
+        elWrap.style.animation = 'fadeUp 0.6s ease forwards 0.18s';
       }
     }
 
@@ -1478,6 +1518,8 @@
           msg.textContent = '✓ Check your inbox to confirm.';
           msg.style.color = 'var(--accent)';
           document.getElementById('hero-email').value = '';
+          setTimeout(function(){ window.location.href = '/subscribe/confirm/'; }, 1500);
+          setTimeout(function(){ window.location.href = '/subscribe/confirm/'; }, 1500);
         } else {
           msg.textContent = data.error || 'Something went wrong.';
           msg.style.color = 'var(--c-yellow-status)';
@@ -1593,9 +1635,11 @@
 <script src="/assets/js/components.js"></script>
 <script src="/assets/js/nav.js"></script>
 <script>
-// Hide prequel banner after experiment launch
+// Hide prequel banner after experiment launch (belt-and-suspenders)
 (function() {
-  if (window.AMJ_EXPERIMENT && window.AMJ_EXPERIMENT.isLive) {
+  var isLive = (window.AMJ_EXPERIMENT && window.AMJ_EXPERIMENT.isLive) ||
+               (new Date() >= new Date('2026-04-01T00:00:00-07:00'));
+  if (isLive) {
     var banner = document.getElementById('prequel-banner');
     if (banner) banner.style.display = 'none';
   }
