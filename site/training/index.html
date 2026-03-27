@@ -552,6 +552,17 @@
       .t-xref { grid-template-columns: 1fr; }
     }
   </style>
+
+  <style>
+    /* DB-03: Observatory pillar accent */
+    :root {
+      --obs-accent: var(--pillar-movement);
+      --obs-accent-dim: #3ecf8e66;
+      --obs-accent-bg: #3ecf8e18;
+    }
+    .s-hero__eyebrow, .eyebrow { color: var(--obs-accent) !important; }
+    .detail-card { border-left-color: var(--obs-accent); }
+  </style>
 </head>
 <body>
 <div id="amj-nav"></div>

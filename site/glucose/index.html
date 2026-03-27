@@ -42,7 +42,7 @@
        HERO
        ═══════════════════════════════════════════════════════ */
     .g-hero {
-      padding: calc(var(--nav-height) + var(--space-20)) var(--page-padding) var(--space-16);
+      padding: var(--space-12) var(--page-padding) var(--space-16);
       position: relative;
       overflow: hidden;
       border-bottom: 1px solid var(--border);
@@ -626,10 +626,50 @@
       .g-meal-table th, .g-meal-table td { padding: var(--space-3); }
     }
   </style>
+
+  <style>
+    /* DB-03: Observatory pillar accent */
+    :root {
+      --obs-accent: var(--pillar-nutrition);
+      --obs-accent-dim: #f59e0b66;
+      --obs-accent-bg: #f59e0b18;
+    }
+    .s-hero__eyebrow, .eyebrow { color: var(--obs-accent) !important; }
+    .detail-card { border-left-color: var(--obs-accent); }
+  </style>
 </head>
 <body class="body-signal">
 
 <div id="amj-nav"></div>
+<!-- Tier 2: Narrative intro — story mode above signal dashboard -->
+<section class="narrative-intro reveal" style="
+  padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+  max-width: var(--prose-width);
+  margin: 0 auto;
+  border-bottom: 1px solid var(--border-subtle);
+">
+  <div class="eyebrow" style="margin-bottom:var(--space-4);color:var(--pillar-nutrition)">// Glucose Observatory</div>
+  <h1 style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-6);">
+    The number that <span style="color:var(--pillar-nutrition)">quieted the anxiety.</span>
+  </h1>
+  <div style="font-family:var(--font-serif);font-size:var(--text-lg);color:var(--text-muted);line-height:1.8;">
+    <p style="margin-bottom:var(--space-4);">
+      At 302 pounds, I assumed my blood sugar was a disaster. I wore a CGM expecting
+      to confirm every fear I had about my metabolic health. Instead, I found out
+      I wasn't in the danger zone I'd imagined — and that data changed my relationship
+      with the anxiety more than any reassurance ever could.
+    </p>
+    <p style="margin-bottom:var(--space-4);">
+      This page shows what my glucose actually does: time-in-range, variability,
+      meal responses, and the patterns that connect what I eat to how I feel
+      two hours later.
+    </p>
+    <p style="font-size:var(--text-sm);color:var(--text-faint);font-family:var(--font-mono);">
+      Data from Dexcom Stelo CGM. 30-day rolling window.
+    </p>
+  </div>
+</section>
+
 
 <nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">Evidence</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Glucose Observatory</span></nav>
 

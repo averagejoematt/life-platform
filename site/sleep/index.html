@@ -42,7 +42,7 @@
        HERO — B's 2-column + C's gauge row
        ═══════════════════════════════════════════════════════ */
     .s-hero {
-      padding: calc(var(--nav-height) + var(--space-20)) var(--page-padding) var(--space-16);
+      padding: var(--space-12) var(--page-padding) var(--space-16);
       position: relative;
       overflow: hidden;
       border-bottom: 1px solid var(--border);
@@ -618,10 +618,50 @@
       .s-xref { grid-template-columns: 1fr; }
     }
   </style>
+
+  <style>
+    /* DB-03: Observatory pillar accent */
+    :root {
+      --obs-accent: var(--pillar-sleep);
+      --obs-accent-dim: #818cf866;
+      --obs-accent-bg: #818cf818;
+    }
+    .s-hero__eyebrow, .eyebrow { color: var(--obs-accent) !important; }
+    .detail-card { border-left-color: var(--obs-accent); }
+  </style>
 </head>
 <body class="body-signal">
 
 <div id="amj-nav"></div>
+<!-- Tier 2: Narrative intro — story mode above signal dashboard -->
+<section class="narrative-intro reveal" style="
+  padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+  max-width: var(--prose-width);
+  margin: 0 auto;
+  border-bottom: 1px solid var(--border-subtle);
+">
+  <div class="eyebrow" style="margin-bottom:var(--space-4);color:var(--pillar-sleep)">// Sleep Observatory</div>
+  <h1 style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-6);">
+    The thing I thought I was <span style="color:var(--pillar-sleep)">good at.</span>
+  </h1>
+  <div style="font-family:var(--font-serif);font-size:var(--text-lg);color:var(--text-muted);line-height:1.8;">
+    <p style="margin-bottom:var(--space-4);">
+      I always told myself I slept well. Eight hours, no alarm, out like a light.
+      Then I put a sensor on my wrist, a pod under my mattress, and a thermometer
+      in my bedroom — and discovered that <em>duration</em> and <em>quality</em>
+      are completely different metrics.
+    </p>
+    <p style="margin-bottom:var(--space-4);">
+      This page tracks what actually happens between lights-out and wake-up:
+      sleep architecture, HRV recovery, bed temperature experiments, and the
+      circadian patterns that predict whether tomorrow will be a good day or a hard one.
+    </p>
+    <p style="font-size:var(--text-sm);color:var(--text-faint);font-family:var(--font-mono);">
+      Data from Whoop, Eight Sleep, and Apple Health. Updated daily.
+    </p>
+  </div>
+</section>
+
 
 <nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">Evidence</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Sleep Observatory</span></nav>
 
