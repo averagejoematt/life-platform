@@ -27,8 +27,13 @@ def _d2f(obj):
 # get_hypotheses
 # ─────────────────────────────────────────────────────────────────────────────
 
-def tool_get_hypotheses(status=None, domain=None, days=90, include_archived=False):
+def tool_get_hypotheses(args: dict):
     """IC-18: List cross-domain hypotheses. Optionally filter by status or domain."""
+    status = args.get("status")
+    domain = args.get("domain")
+    days = args.get("days", 90)
+    include_archived = args.get("include_archived", False)
+
     table = get_table()
     try:
         resp = table.query(
@@ -104,15 +109,20 @@ def tool_get_hypotheses(status=None, domain=None, days=90, include_archived=Fals
 # update_hypothesis_outcome
 # ─────────────────────────────────────────────────────────────────────────────
 
-def tool_update_hypothesis_outcome(sk, verdict, evidence_note="", effectiveness=None):
+def tool_update_hypothesis_outcome(args: dict):
     """IC-18: Record a confirming or refuting observation for a hypothesis.
 
-    Args:
+    Args (via args dict):
         sk:             Sort key from get_hypotheses (starts with 'HYPOTHESIS#')
         verdict:        'confirming' | 'confirmed' | 'refuted' | 'insufficient' | 'archived'
         evidence_note:  What you observed (free text)
         effectiveness:  Optional 1-5 strength of evidence (5=very strong)
     """
+    sk = args.get("sk", "")
+    verdict = args.get("verdict", "")
+    evidence_note = args.get("evidence_note", "")
+    effectiveness = args.get("effectiveness")
+
     if not sk or not sk.startswith("HYPOTHESIS#"):
         return {"error": "Invalid sk. Must start with 'HYPOTHESIS#' (from get_hypotheses output)."}
 

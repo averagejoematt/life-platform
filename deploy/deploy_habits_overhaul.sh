@@ -22,7 +22,8 @@ echo ""
 
 # 3. Deploy to S3
 echo "🚀 Deploying to S3..."
-aws s3 sync site/ s3://matthew-life-platform/site/ --delete
+source "$(dirname "$0")/lib/safe_sync.sh"
+safe_sync site/ s3://matthew-life-platform/site/
 echo "   → S3 sync complete"
 
 # 4. Invalidate CloudFront

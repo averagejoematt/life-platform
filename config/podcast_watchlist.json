@@ -1,0 +1,73 @@
+{
+  "_version": "1.0.0",
+  "_updated": "2026-03-26",
+  "scan_frequency": "weekly",
+  "podcasts": [
+    {
+      "id": "foundmyfitness",
+      "name": "FoundMyFitness",
+      "host": "Dr. Rhonda Patrick",
+      "youtube_channel_id": "UCWF8SqJVNlx-ctXv4SkUIKg",
+      "type_bias": "experiment",
+      "domains": ["supplements", "nutrition", "metabolic"],
+      "active": true
+    },
+    {
+      "id": "stronger-by-science",
+      "name": "Stronger By Science",
+      "host": "Dr. Layne Norton & Eric Trexler",
+      "youtube_channel_id": "UCMgRFPaxBdSBFaetyOAMgEA",
+      "type_bias": "challenge",
+      "domains": ["nutrition", "movement"],
+      "active": true
+    },
+    {
+      "id": "huberman-lab",
+      "name": "Huberman Lab",
+      "host": "Dr. Andrew Huberman",
+      "youtube_channel_id": "UC2D2CMWXMOVWx7giW1n3LIg",
+      "type_bias": "both",
+      "domains": ["sleep", "mental", "discipline", "supplements"],
+      "active": true
+    },
+    {
+      "id": "the-drive",
+      "name": "The Drive",
+      "host": "Dr. Peter Attia",
+      "youtube_channel_id": "UC8kGsMa0LygSX9nkBcBH1Sg",
+      "type_bias": "experiment",
+      "domains": ["metabolic", "movement", "nutrition"],
+      "active": true
+    },
+    {
+      "id": "zoe-science",
+      "name": "ZOE Science & Nutrition",
+      "host": "Jonathan Wolf",
+      "youtube_channel_id": "UCB5f4Psg1TF9LZpCKkFahag",
+      "type_bias": "experiment",
+      "domains": ["nutrition", "metabolic"],
+      "active": true
+    },
+    {
+      "id": "feel-better-live-more",
+      "name": "Feel Better Live More",
+      "host": "Dr. Rangan Chatterjee",
+      "youtube_channel_id": "UCqYPhGiB9tkShZjXaKswZLQ",
+      "type_bias": "challenge",
+      "domains": ["social", "mental", "discipline"],
+      "active": true
+    },
+    {
+      "id": "the-proof",
+      "name": "The Proof",
+      "host": "Simon Hill",
+      "youtube_channel_id": "UCLSf2GlUO4k5AYnwPhiUoog",
+      "type_bias": "experiment",
+      "domains": ["nutrition"],
+      "active": true
+    }
+  ],
+  "extraction_prompt": "You are an expert health science curator. From this podcast transcript, extract any ACTIONABLE health interventions mentioned. For each intervention, return a JSON array of objects with: name (short), description (1 sentence), protocol (what to do), duration_days (suggested), difficulty (easy/moderate/hard), evidence_tier (strong if multiple RCTs cited, moderate if observational studies, emerging if anecdotal), evidence_citation (if any study was cited by name), speaker_quote (1 key quote under 15 words), type (experiment if measurable biomarker endpoint, challenge if behavioral), domains (array of: sleep, movement, nutrition, supplements, mental, social, discipline, metabolic). Return ONLY the JSON array, no preamble.",
+  "haiku_model": "claude-haiku-4-5-20251001",
+  "max_tokens_per_extraction": 2000
+}

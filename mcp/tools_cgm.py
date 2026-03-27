@@ -169,7 +169,7 @@ def tool_get_glucose_sleep_correlation(args):
     def _sf(v):
         if v is None: return None
         try: return float(v)
-        except: return None
+        except Exception: return None
 
     SLEEP_METRICS = ["sleep_efficiency_pct", "deep_pct", "rem_pct", "sleep_score", "hrv", "time_to_sleep_min"]
 
@@ -241,7 +241,7 @@ def tool_get_glucose_exercise_correlation(args):
     def _sf(v):
         if v is None: return None
         try: return float(v)
-        except: return None
+        except Exception: return None
 
     GM = ["glucose_avg", "glucose_sd", "time_in_range_pct", "time_above_140_pct", "glucose_min"]
     exercise_days = []

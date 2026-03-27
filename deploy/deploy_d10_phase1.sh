@@ -38,7 +38,8 @@ bash deploy/deploy_lambda.sh daily-brief lambdas/daily_brief_lambda.py \
 # ── Step 4: Sync site/ to S3 ──────────────────────────────────────────────────
 echo ""
 echo "[4/5] Syncing site/ to S3..."
-aws s3 sync site/ s3://matthew-life-platform/site/ --delete --quiet
+source "$(dirname "$0")/lib/safe_sync.sh"
+safe_sync site/ s3://matthew-life-platform/site/ --quiet
 echo "  ✅ S3 sync complete"
 
 # ── Step 5: CloudFront invalidation ───────────────────────────────────────────

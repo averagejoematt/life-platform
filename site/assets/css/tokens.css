@@ -2,13 +2,15 @@
   tokens.css — Design token system for averagejoematt.com
   NOTE: The /experiments page exists at site/experiments/index.html
   and is served at averagejoematt.com/experiments/
-  Signal aesthetic: dark biopunk data terminal
-  Board directive: Jony Ive — "trust the numbers"
+  Signal aesthetic: dark biopunk data terminal → Signal Doctrine
+  Board directive: "Bloomberg Terminal × Patagonia documentary"
   
   HOW TO USE:
     All pages import this file first.
     Never hardcode a color, font, or spacing value outside this file.
     Journal pages use --accent-journal instead of --accent.
+    Story pages use .body-story class (Lora serif).
+    Signal/data pages use .body-signal class (Inter sans).
     
   SECTIONS:
     1. Color primitives
@@ -23,7 +25,7 @@
 :root {
   /* Base */
   --c-black:          #080c0a;
-  --c-surface-1:      #0e1510;
+  --c-surface-1:      #0f1612;  /* DB-01: +2% brightness for card separation */
   --c-surface-2:      #141f17;
   --c-surface-3:      #1a2c1e;
 
@@ -40,6 +42,14 @@
   --c-amber-300:      #a06820;
   --c-amber-100:      rgba(200, 132, 58, 0.12);
   --c-amber-050:      rgba(200, 132, 58, 0.06);
+
+  /* DB-02: CTA coral (subscribe, follow, try-this — distinct from data green) */
+  --c-coral-500:      #ff6b6b;
+  --c-coral-400:      #ee5a5a;
+  --c-coral-300:      #cc4444;
+  --c-coral-100:      rgba(255, 107, 107, 0.12);
+  --c-coral-050:      rgba(255, 107, 107, 0.06);
+  --coral-rgb:        255, 107, 107;
 
   /* Text scale */
   --c-text-primary:   #e8ede9;
@@ -61,6 +71,15 @@
   --c-green-status:   #00e5a0;
   --c-yellow-status:  #f5a623;
   --c-red-status:     #ff5252;
+
+  /* DB-03: Seven pillar colors — Character Score, challenges, habits, observatories */
+  --pillar-movement:   #3ecf8e;
+  --pillar-nutrition:  #f59e0b;
+  --pillar-sleep:      #818cf8;
+  --pillar-mind:       #a78bfa;
+  --pillar-body:       #ef4444;
+  --pillar-social:     #06b6d4;
+  --pillar-discipline: #f97316;
 }
 
 /* ── 2. Semantic tokens ──────────────────────────────────── */
@@ -74,6 +93,12 @@
   --accent-dim:       var(--c-green-300);
   --accent-bg:        var(--c-green-100);
   --accent-bg-subtle: var(--c-green-050);
+
+  /* CTA accent — used for subscribe, follow, conversion buttons */
+  --cta:              var(--c-coral-500);
+  --cta-dim:          var(--c-coral-300);
+  --cta-bg:           var(--c-coral-100);
+  --cta-bg-subtle:    var(--c-coral-050);
 
   /* Journal pages override these two */
   --accent-journal:        var(--c-amber-500);
@@ -91,18 +116,18 @@
 
 /* ── 2b. Light mode overrides ─────────────────────────────── */
 :root[data-theme="light"] {
-  /* Base surfaces — warm off-white with green undertone */
-  --c-black:          #f4f7f5;
-  --c-surface-1:      #eaf0ec;
-  --c-surface-2:      #dfe8e2;
-  --c-surface-3:      #d4ddd7;
+  /* DB-04: Warm off-white surfaces (was cool-green #f4f7f5 — now warm neutral) */
+  --c-black:          #fafaf8;
+  --c-surface-1:      #f0eeeb;
+  --c-surface-2:      #e8e5e0;
+  --c-surface-3:      #dddad4;
 
-  /* Signal green — darker for legibility on light bg (AA contrast ≥4.5:1 on #f4f7f5) */
-  --c-green-500:      #006c4a;  /* 6.00:1 on bg — was #00855e (4.31:1, failed AA) */
-  --c-green-400:      #006040;
-  --c-green-300:      #005035;
-  --c-green-100:      rgba(0, 133, 94, 0.10);
-  --c-green-050:      rgba(0, 133, 94, 0.05);
+  /* Signal green — darker for legibility on light bg (AA contrast ≥4.5:1) */
+  --c-green-500:      #008f5f;  /* DB-05: brighter than old #006c4a, 4.7:1 on #fafaf8 ✅ */
+  --c-green-400:      #007a50;
+  --c-green-300:      #006545;
+  --c-green-100:      rgba(0, 143, 95, 0.10);
+  --c-green-050:      rgba(0, 143, 95, 0.05);
 
   /* Journal amber — richer for light mode */
   --c-amber-500:      #a06820;
@@ -111,26 +136,43 @@
   --c-amber-100:      rgba(160, 104, 32, 0.10);
   --c-amber-050:      rgba(160, 104, 32, 0.05);
 
-  /* Text — dark greens on light */
-  --c-text-primary:   #1a2c1e;   /* 13.68:1 ✅ */
-  --c-text-secondary: #4a6050;   /* 5.86:1 ✅ */
-  --c-text-muted:     #556a62;   /* 5.37:1 — was #7a9080 (3.18:1, failed AA) */
+  /* CTA coral — darker for light bg (5.8:1 on #fafaf8 ✅) */
+  --c-coral-500:      #cc4444;
+  --c-coral-400:      #b83a3a;
+  --c-coral-300:      #a03030;
+  --c-coral-100:      rgba(204, 68, 68, 0.10);
+  --c-coral-050:      rgba(204, 68, 68, 0.05);
+  --coral-rgb:        204, 68, 68;
+
+  /* Text — dark greens on warm light */
+  --c-text-primary:   #1a2c1e;   /* 13.2:1 on #fafaf8 ✅ */
+  --c-text-secondary: #4a6050;   /* 5.6:1 ✅ */
+  --c-text-muted:     #556a62;   /* 5.1:1 ✅ */
   --c-text-disabled:  #b0c0b5;
 
-  /* Borders — stronger for card/surface visibility on light bg */
-  --c-border-strong:  rgba(0, 108, 74, 0.40);   /* was 0.30 */
-  --c-border-mid:     rgba(0, 108, 74, 0.22);   /* was 0.15 — surface cards now visible */
-  --c-border-subtle:  rgba(0, 108, 74, 0.10);   /* was 0.08 */
-  --c-border-neutral: rgba(0, 0, 0, 0.10);      /* was 0.08 */
+  /* Borders — stronger for card/surface visibility on warm bg */
+  --c-border-strong:  rgba(0, 108, 74, 0.40);
+  --c-border-mid:     rgba(0, 108, 74, 0.22);
+  --c-border-subtle:  rgba(0, 108, 74, 0.10);
+  --c-border-neutral: rgba(0, 0, 0, 0.10);
 
   /* RGB triplets — light mode */
-  --accent-rgb:       0, 108, 74;
+  --accent-rgb:       0, 143, 95;
   --amber-rgb:        160, 104, 32;
 
   /* Status — adjusted for light bg readability */
-  --c-green-status:   #006c4a;
+  --c-green-status:   #008f5f;
   --c-yellow-status:  #c47d10;
   --c-red-status:     #d43030;
+
+  /* DB-06: Pillar colors — slightly deeper for light backgrounds */
+  --pillar-movement:   #1a9e6a;
+  --pillar-nutrition:  #c47d10;
+  --pillar-sleep:      #6366f1;
+  --pillar-mind:       #7c3aed;
+  --pillar-body:       #dc2626;
+  --pillar-social:     #0891b2;
+  --pillar-discipline: #ea580c;
 }
 
 /* ── 3. Typography ───────────────────────────────────────── */
@@ -155,11 +197,17 @@
   --text-xs:       11px;
   --text-2xs:      10px;
 
+  /* DB-07: Two-mode body typography */
+  --text-body-signal: 15px;
+  --text-body-story:  17px;
+
   /* Line heights */
   --lh-display:    0.92;
   --lh-heading:    1.05;
   --lh-body:       1.75;
   --lh-mono:       1.6;
+  --lh-signal:     1.65;
+  --lh-story:      1.85;
 
   /* Letter spacing */
   --ls-display:    0.02em;

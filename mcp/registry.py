@@ -2062,6 +2062,48 @@ TOOLS = {
             },
         },
     },
+    # ── Garmin biometrics + device agreement ─────────────────────────────────────────
+    "get_garmin_summary": {
+        "fn": tool_get_garmin_summary,
+        "schema": {
+            "name": "get_garmin_summary",
+            "description": (
+                "Garmin daily biometrics: Body Battery, physiological stress, overnight HRV, RHR, "
+                "and respiration from the Garmin Epix. These are Garmin-native metrics not available "
+                "from other sources. Use for: 'Garmin data', 'Body Battery', 'Garmin stress', "
+                "'Garmin HRV', 'wearable biometrics'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "start_date": {"type": "string", "description": "Start date (YYYY-MM-DD). Defaults to 7 days ago."},
+                    "end_date":   {"type": "string", "description": "End date (YYYY-MM-DD). Defaults to today."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "get_device_agreement": {
+        "fn": tool_get_device_agreement,
+        "schema": {
+            "name": "get_device_agreement",
+            "description": (
+                "Cross-device validation: Whoop vs Garmin agreement on HRV and RHR. "
+                "Surfaces nights where devices significantly disagree, which signals "
+                "measurement artifacts or genuine physiological noise. "
+                "Use for: 'do my devices agree?', 'Whoop vs Garmin', 'device confidence', "
+                "'cross-device validation'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "start_date": {"type": "string", "description": "Start date (YYYY-MM-DD). Defaults to 30 days ago."},
+                    "end_date":   {"type": "string", "description": "End date (YYYY-MM-DD). Defaults to today."},
+                },
+                "required": [],
+            },
+        },
+    },
     # ── BS-09: ACWR Training Load ────────────────────────────────────────────────────
     "get_acwr_status": {
         "fn": tool_get_acwr_status,
