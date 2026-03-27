@@ -357,22 +357,9 @@
   };
 
   function buildHierarchyNav() {
-    var html = '<nav style="display:flex;align-items:stretch;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:var(--text-2xs);overflow-x:auto;-webkit-overflow-scrolling:touch;">';
-    HIER_ITEMS.forEach(function(item, i) {
-      if (i > 0 && item.rel) {
-        html += '<span style="display:flex;align-items:center;padding:0 4px;color:var(--text-faint);font-size:9px;background:var(--surface);white-space:nowrap;">' + item.rel + '</span>';
-      }
-      var isActive = (path === item.href || (item.href !== '/' && path.startsWith(item.href)));
-      var bg = isActive ? 'var(--bg)' : 'var(--surface)';
-      var color = isActive ? 'var(--accent)' : 'var(--text-faint)';
-      var border = isActive ? 'border-bottom:2px solid var(--accent);' : '';
-      html += '<a href="' + item.href + '" style="padding:8px 10px;display:flex;flex-direction:column;align-items:center;gap:1px;text-decoration:none;color:' + color + ';background:' + bg + ';white-space:nowrap;min-width:70px;' + border + '">';
-      html += '<span style="font-weight:500;font-size:11px;letter-spacing:var(--ls-tag);">' + item.label + '</span>';
-      html += '<span style="font-size:9px;opacity:0.7;">' + item.sub + '</span>';
-      html += '</a>';
-    });
-    html += '</nav>';
-
+    // Product Board decision (7-0): kill tab bar, keep only "Where This Fits" blurb.
+    // Breadcrumb handles wayfinding. Main nav handles discovery. This provides relationship context.
+    var html = '';
     var contextText = HIER_CONTEXT[path];
     if (contextText) {
       html += '<div style="margin:12px var(--page-padding);padding:10px 14px;border-left:2px solid var(--accent);background:var(--surface);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body);">';
