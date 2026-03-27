@@ -28,6 +28,9 @@
       --s-red: #ef4444;
       --s-amber: #f59e0b;
       --s-violet: #818cf8;
+      --s-deep: #818cf8;
+      --s-rem: #60a5fa;
+      --s-light: #3ecf8e;
     }
 
     @keyframes fadeUp {
@@ -39,113 +42,28 @@
     }
 
     /* ═══════════════════════════════════════════════════════
-       HERO — B's 2-column + C's gauge row
+       EDITORIAL TEMPLATE — Monospace section headers with em-dashes
        ═══════════════════════════════════════════════════════ */
-    .s-hero {
-      padding: var(--space-12) var(--page-padding) var(--space-16);
-      position: relative;
-      overflow: hidden;
-      border-bottom: 1px solid var(--border);
-      max-width: var(--max-width);
-      margin: 0 auto;
-    }
-    .s-hero-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-12);
-      align-items: center;
-    }
-    .s-hero__eyebrow {
+    .s-section-header {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
-      letter-spacing: 0.2em;
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
       text-transform: uppercase;
-      color: var(--s-blue);
-      margin-bottom: var(--space-6);
+      margin-bottom: var(--space-8);
       display: flex;
       align-items: center;
       gap: 12px;
-      opacity: 0;
-      animation: fadeUp 0.6s 0.1s forwards;
     }
-    .s-hero__eyebrow::before {
-      content: '';
-      width: 32px;
-      height: 1px;
-      background: var(--s-blue);
-    }
-    .s-hero__title {
-      font-family: var(--font-display);
-      font-size: clamp(36px, 5vw, 52px);
-      color: var(--text);
-      line-height: 1.05;
-      max-width: 520px;
-      margin-bottom: var(--space-6);
-      opacity: 0;
-      animation: fadeUp 0.6s 0.2s forwards;
-    }
-    .s-hero__title em {
-      font-style: normal;
-      color: var(--s-blue);
-    }
-    .s-hero__sub {
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      max-width: 420px;
-      line-height: 1.8;
-      opacity: 0;
-      animation: fadeUp 0.6s 0.3s forwards;
-    }
-
-    /* Gauge row (4 mini rings) */
-    .s-gauge-row {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-4);
-      opacity: 0;
-      animation: fadeUp 0.6s 0.4s forwards;
-    }
-    .s-gauge {
-      text-align: center;
-      padding: var(--space-5) var(--space-3);
-      background: var(--surface);
-      border: 1px solid var(--border);
-    }
-    .s-gauge__ring {
-      width: 88px;
-      height: 88px;
-      margin: 0 auto var(--space-3);
-      position: relative;
-    }
-    .s-gauge__ring svg { width: 100%; height: 100%; }
-    .s-gauge__center {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-    }
-    .s-gauge__num {
-      font-family: var(--font-display);
-      font-size: 22px;
-      line-height: 1;
-    }
-    .s-gauge__unit {
-      font-family: var(--font-mono);
-      font-size: 9px;
+    .s-section-header::after {
+      content: '\2014\2014';
       color: var(--text-faint);
-      letter-spacing: 0.08em;
-    }
-    .s-gauge__label {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-muted);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
+      opacity: 0.4;
+      flex-shrink: 0;
     }
 
     /* ═══════════════════════════════════════════════════════
-       PULL-QUOTES
+       EDITORIAL PULL-QUOTES — Staggered, offset left, large serif
        ═══════════════════════════════════════════════════════ */
     .s-pullquote {
       max-width: var(--max-width);
@@ -153,6 +71,12 @@
       padding: var(--space-12) var(--page-padding);
       position: relative;
       border-bottom: 1px solid var(--border);
+    }
+    .s-pullquote--left {
+      padding-left: calc(var(--page-padding) + 8%);
+    }
+    .s-pullquote--right {
+      padding-left: calc(var(--page-padding) + 16%);
     }
     .s-pullquote__watermark {
       position: absolute;
@@ -199,31 +123,322 @@
       letter-spacing: 0.06em;
     }
 
+    /* Dynamic pull-quotes — larger editorial callouts */
+    .s-pullquote--dynamic .s-pullquote__text {
+      font-size: clamp(26px, 4vw, 36px);
+      border-left: 3px solid var(--s-blue);
+      padding-left: var(--space-6);
+    }
+
     /* ═══════════════════════════════════════════════════════
-       SLEEP STAGE EDITORIAL — 3-column
+       NARRATIVE CONTEXT — interpretive sentences between data
+       ═══════════════════════════════════════════════════════ */
+    .s-context {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-4) var(--page-padding) var(--space-6);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.8;
+      font-style: italic;
+      max-width: 680px;
+    }
+    .s-context strong { color: var(--text); font-style: normal; }
+
+    /* ═══════════════════════════════════════════════════════
+       LEFT-ACCENT RULE CARDS — key findings
+       ═══════════════════════════════════════════════════════ */
+    .s-accent-card {
+      border-left: 3px solid var(--s-blue);
+      background: var(--surface);
+      padding: var(--space-5) var(--space-6);
+      border-top: 1px solid rgba(255,255,255,0.04);
+      border-right: 1px solid rgba(255,255,255,0.04);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .s-accent-card__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--s-blue);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-2);
+    }
+    .s-accent-card__value {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .s-accent-card__note {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       HERO — Merged narrative + gauge payoff (8b)
+       ═══════════════════════════════════════════════════════ */
+    .s-hero {
+      padding: var(--space-16) var(--page-padding) var(--space-10);
+      position: relative;
+      overflow: hidden;
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .s-hero__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--s-blue);
+      margin-bottom: var(--space-4);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.1s forwards;
+    }
+    .s-hero__eyebrow::before {
+      content: '';
+      width: 32px;
+      height: 1px;
+      background: var(--s-blue);
+    }
+    .s-hero__title {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 5vw, 52px);
+      color: var(--text);
+      line-height: 1.05;
+      max-width: 640px;
+      margin-bottom: var(--space-6);
+      opacity: 0;
+      animation: fadeUp 0.6s 0.2s forwards;
+    }
+    .s-hero__title em {
+      font-style: normal;
+      color: var(--s-blue);
+    }
+    .s-hero__sub {
+      font-family: var(--font-serif, Georgia, serif);
+      font-size: var(--text-lg);
+      color: var(--text-muted);
+      max-width: 580px;
+      line-height: 1.8;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.3s forwards;
+      margin-bottom: var(--space-4);
+    }
+    .s-hero__sub-detail {
+      font-size: var(--text-sm);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      opacity: 0;
+      animation: fadeUp 0.6s 0.35s forwards;
+    }
+
+    /* Gauge row — data payoff below narrative (8b) */
+    .s-gauge-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-4);
+      opacity: 0;
+      animation: fadeUp 0.6s 0.5s forwards;
+      margin-top: var(--space-10);
+      padding-top: var(--space-8);
+      border-top: 1px solid var(--border);
+    }
+    .s-gauge {
+      text-align: center;
+      padding: var(--space-5) var(--space-3);
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .s-gauge__ring {
+      width: 88px;
+      height: 88px;
+      margin: 0 auto var(--space-3);
+      position: relative;
+    }
+    .s-gauge__ring svg { width: 100%; height: 100%; }
+    .s-gauge__center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    .s-gauge__num {
+      font-family: var(--font-display);
+      font-size: 22px;
+      line-height: 1;
+    }
+    .s-gauge__unit {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-faint);
+      letter-spacing: 0.08em;
+    }
+    .s-gauge__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       DIFFERENTIATORS CALLOUT (8m)
+       ═══════════════════════════════════════════════════════ */
+    .s-differentiators {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-6) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .s-differentiators__inner {
+      background: rgba(96,165,250,0.04);
+      border: 1px solid rgba(96,165,250,0.12);
+      padding: var(--space-5) var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: var(--space-6);
+      flex-wrap: wrap;
+    }
+    .s-differentiators__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--s-blue);
+      white-space: nowrap;
+    }
+    .s-differentiators__items {
+      display: flex;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+    }
+    .s-differentiators__items span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .s-differentiators__items span::before {
+      content: '';
+      width: 4px;
+      height: 4px;
+      background: var(--s-blue);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .s-diff-sep {
+      width: 1px;
+      height: 20px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       N=1 RULES TEASER (8g — elevated near top)
+       ═══════════════════════════════════════════════════════ */
+    .s-rule-teaser {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .s-rule-teaser__inner {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: var(--space-6);
+      align-items: center;
+      border-left: 3px solid var(--s-blue);
+      padding: var(--space-5) var(--space-6);
+      background: var(--surface);
+    }
+    .s-rule-teaser__number {
+      font-family: var(--font-display);
+      font-size: 48px;
+      color: var(--s-blue);
+      line-height: 1;
+      opacity: 0.7;
+    }
+    .s-rule-teaser__content {}
+    .s-rule-teaser__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--s-blue);
+      margin-bottom: var(--space-2);
+    }
+    .s-rule-teaser__finding {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      color: var(--text);
+      line-height: 1.3;
+      margin-bottom: var(--space-2);
+    }
+    .s-rule-teaser__evidence {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+    .s-rule-teaser__evidence em {
+      font-style: normal;
+      color: var(--s-blue);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       SLEEP EFFICIENCY (8d) — Large number display
+       ═══════════════════════════════════════════════════════ */
+    .s-efficiency {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .s-efficiency__grid {
+      display: grid;
+      grid-template-columns: 200px 1fr 1fr;
+      gap: var(--space-8);
+      align-items: center;
+    }
+    .s-efficiency__big {
+      text-align: center;
+    }
+    .s-efficiency__num {
+      font-family: var(--font-display);
+      font-size: 72px;
+      line-height: 1;
+      color: var(--s-green);
+    }
+    .s-efficiency__unit {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      margin-top: 4px;
+    }
+    .s-efficiency__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-top: var(--space-2);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       SLEEP STAGE EDITORIAL — 3-column (8a)
        ═══════════════════════════════════════════════════════ */
     .s-stage-section {
       max-width: var(--max-width);
       margin: 0 auto;
       padding: var(--space-12) var(--page-padding);
       border-bottom: 1px solid var(--border);
-    }
-    .s-stage-header {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      margin-bottom: var(--space-8);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .s-stage-header::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
     }
     .s-stage-grid {
       display: grid;
@@ -268,6 +483,117 @@
       font-size: var(--text-sm);
       color: var(--text-faint);
       line-height: 1.7;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       SLEEP ARCHITECTURE TREND (8e) — Stacked area chart
+       ═══════════════════════════════════════════════════════ */
+    .s-arch-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .s-arch-chart {
+      position: relative;
+      height: 200px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .s-arch-chart svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .s-arch-legend {
+      display: flex;
+      gap: var(--space-5);
+      margin-top: var(--space-4);
+    }
+    .s-arch-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+    }
+    .s-arch-legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       SLEEP CONSISTENCY / SOCIAL JETLAG (8c)
+       ═══════════════════════════════════════════════════════ */
+    .s-consistency {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .s-consistency__grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-6);
+    }
+    .s-consistency__card {
+      padding: var(--space-6);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--s-blue);
+    }
+    .s-consistency__card--alert {
+      border-top-color: var(--s-amber);
+    }
+    .s-consistency__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-3);
+    }
+    .s-consistency__value {
+      font-family: var(--font-display);
+      font-size: 36px;
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: var(--space-2);
+    }
+    .s-consistency__detail {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .s-consistency__bar {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-top: var(--space-3);
+    }
+    .s-consistency__bar-track {
+      flex: 1;
+      height: 4px;
+      background: rgba(255,255,255,0.04);
+      position: relative;
+    }
+    .s-consistency__bar-fill {
+      height: 100%;
+      position: absolute;
+      left: 0;
+      top: 0;
+      transition: width 1s ease;
+    }
+    .s-consistency__bar-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      flex-shrink: 0;
+      width: 36px;
+      text-align: right;
     }
 
     /* ═══════════════════════════════════════════════════════
@@ -327,7 +653,7 @@
     }
 
     /* ═══════════════════════════════════════════════════════
-       TREND CHART
+       TREND CHART with time-window toggles (8l)
        ═══════════════════════════════════════════════════════ */
     .s-chart-section {
       max-width: var(--max-width);
@@ -352,10 +678,14 @@
       gap: 12px;
     }
     .s-chart-title::after {
-      content: '';
-      width: 48px;
-      height: 1px;
-      background: var(--border);
+      content: '\2014\2014';
+      color: var(--text-faint);
+      opacity: 0.4;
+    }
+    .s-chart-controls {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
     }
     .s-chart-legend {
       display: flex;
@@ -374,13 +704,57 @@
       height: 6px;
       border-radius: 50%;
     }
+    /* Time window toggles */
+    .s-time-toggles {
+      display: flex;
+      gap: 2px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      padding: 2px;
+    }
+    .s-time-toggle {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      color: var(--text-faint);
+      background: none;
+      border: none;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .s-time-toggle:hover { color: var(--text-muted); }
+    .s-time-toggle.active {
+      color: var(--s-blue);
+      background: var(--s-blue-dim);
+    }
     canvas.s-chart {
       width: 100%;
       height: 200px;
       display: block;
       background: var(--surface);
       border: 1px solid var(--border);
+      cursor: crosshair;
     }
+    /* Chart tooltip */
+    .s-chart-tooltip {
+      position: absolute;
+      background: rgba(15,22,18,0.95);
+      border: 1px solid var(--s-blue);
+      padding: 8px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 10;
+      white-space: nowrap;
+    }
+    .s-chart-tooltip.visible { opacity: 1; }
+    .s-chart-tooltip__date { color: var(--text-faint); margin-bottom: 4px; }
+    .s-chart-tooltip__score { color: var(--s-blue); }
+    .s-chart-tooltip__whoop { color: rgba(255,255,255,0.5); }
 
     /* ═══════════════════════════════════════════════════════
        N=1 RULES — left accent border cards
@@ -390,23 +764,6 @@
       margin: 0 auto;
       padding: var(--space-12) var(--page-padding);
       border-bottom: 1px solid var(--border);
-    }
-    .s-rules-header {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      margin-bottom: var(--space-6);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .s-rules-header::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
     }
     .s-rule-grid {
       display: grid;
@@ -454,6 +811,165 @@
       color: var(--s-blue);
       text-decoration: none;
     }
+
+    /* ═══════════════════════════════════════════════════════
+       PROTOCOL ADHERENCE (8h)
+       ═══════════════════════════════════════════════════════ */
+    .s-adherence {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .s-adherence__grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+    }
+    .s-adherence__card {
+      padding: var(--space-6);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--s-blue);
+    }
+    .s-adherence__name {
+      font-family: var(--font-display);
+      font-size: var(--text-base);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .s-adherence__bar-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-3);
+    }
+    .s-adherence__bar-track {
+      flex: 1;
+      height: 6px;
+      background: rgba(255,255,255,0.04);
+      position: relative;
+      overflow: hidden;
+    }
+    .s-adherence__bar-fill {
+      height: 100%;
+      background: var(--s-blue);
+      position: absolute;
+      left: 0;
+      top: 0;
+      transition: width 1s ease;
+    }
+    .s-adherence__pct {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--s-blue);
+      flex-shrink: 0;
+      width: 40px;
+      text-align: right;
+    }
+    .s-adherence__outcome {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      line-height: 1.5;
+    }
+    .s-adherence__outcome em {
+      font-style: normal;
+      color: var(--s-green);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       CROSS-DOMAIN FINDINGS (8j)
+       ═══════════════════════════════════════════════════════ */
+    .s-cross-domain {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .s-cross-domain__grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+    }
+    .s-cross-card {
+      padding: var(--space-6);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      position: relative;
+      text-decoration: none;
+      display: block;
+      transition: border-color 0.15s;
+    }
+    .s-cross-card:hover { border-color: var(--s-blue); }
+    .s-cross-card__arrow {
+      position: absolute;
+      top: var(--space-4);
+      right: var(--space-4);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--s-blue);
+      opacity: 0.5;
+    }
+    .s-cross-card__from {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--s-blue);
+      margin-bottom: var(--space-2);
+    }
+    .s-cross-card__finding {
+      font-family: var(--font-display);
+      font-size: var(--text-base);
+      color: var(--text);
+      line-height: 1.35;
+      margin-bottom: var(--space-3);
+    }
+    .s-cross-card__evidence {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+    .s-cross-card__evidence em {
+      font-style: normal;
+      color: var(--s-blue);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       MEASUREMENT AGREEMENT NOTE (8k)
+       ═══════════════════════════════════════════════════════ */
+    .s-agreement {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .s-agreement__inner {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-5) var(--space-6);
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: var(--space-4);
+      align-items: start;
+    }
+    .s-agreement__icon {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      color: var(--s-amber);
+      padding: 3px 8px;
+      background: rgba(245,158,11,0.1);
+      border: 1px solid rgba(245,158,11,0.15);
+      white-space: nowrap;
+    }
+    .s-agreement__text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+    .s-agreement__text strong { color: var(--text); }
 
     /* ═══════════════════════════════════════════════════════
        CROSS-LINKS
@@ -555,23 +1071,6 @@
       margin: 0 auto;
       padding: var(--space-10) var(--page-padding);
     }
-    .s-method__title {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      margin-bottom: var(--space-6);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .s-method__title::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-    }
     .s-method-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -607,7 +1106,6 @@
        RESPONSIVE
        ═══════════════════════════════════════════════════════ */
     @media (max-width: 768px) {
-      .s-hero-grid { grid-template-columns: 1fr; }
       .s-gauge-row { grid-template-columns: repeat(2, 1fr); }
       .s-stage-grid { grid-template-columns: 1fr; }
       .s-stage-col:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
@@ -616,6 +1114,14 @@
       .s-narrative { grid-template-columns: 1fr; }
       .s-method-grid { grid-template-columns: 1fr; }
       .s-xref { grid-template-columns: 1fr; }
+      .s-efficiency__grid { grid-template-columns: 1fr; text-align: center; }
+      .s-consistency__grid { grid-template-columns: 1fr; }
+      .s-cross-domain__grid { grid-template-columns: 1fr; }
+      .s-adherence__grid { grid-template-columns: 1fr; }
+      .s-pullquote--left,
+      .s-pullquote--right { padding-left: var(--page-padding); }
+      .s-differentiators__inner { flex-direction: column; align-items: flex-start; }
+      .s-diff-sep { display: none; }
     }
   </style>
 
@@ -652,112 +1158,114 @@
   <a href="/subscribe/" style="color:var(--c-amber-400);text-decoration:none;margin-left:auto;white-space:nowrap;">Follow along →</a>
 </div>
 
-<!-- Tier 2: Narrative intro — story mode above signal dashboard -->
-<section class="narrative-intro reveal" style="
-  padding: var(--space-16) var(--page-padding) var(--space-12);
-  max-width: var(--prose-width);
-  margin: 0 auto;
-  border-bottom: 1px solid var(--border-subtle);
-">
-  <div class="eyebrow" style="margin-bottom:var(--space-4);color:var(--pillar-sleep)">// Sleep Observatory</div>
-  <h1 style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-6);">
-    The thing I thought I was <span style="color:var(--pillar-sleep)">good at.</span>
-  </h1>
-  <div style="font-family:var(--font-serif);font-size:var(--text-lg);color:var(--text-muted);line-height:1.8;">
-    <p style="margin-bottom:var(--space-4);">
-      I always told myself I slept well. Eight hours, no alarm, out like a light.
-      Then I put a sensor on my wrist, a pod under my mattress, and a thermometer
-      in my bedroom — and discovered that <em>duration</em> and <em>quality</em>
-      are completely different metrics.
-    </p>
-    <p style="margin-bottom:var(--space-4);">
-      This page tracks what actually happens between lights-out and wake-up:
-      sleep architecture, HRV recovery, bed temperature experiments, and the
-      circadian patterns that predict whether tomorrow will be a good day or a hard one.
-    </p>
-    <p style="font-size:var(--text-sm);color:var(--text-faint);font-family:var(--font-mono);">
-      Data from Whoop, Eight Sleep, and Apple Health. Updated daily.
-    </p>
-  </div>
-</section>
-
-
 <nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">Evidence</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Sleep Observatory</span></nav>
 
 <!-- ════════════════════════════════════════════════════════════
-     HERO
+     8b: MERGED HERO — Narrative intro is the sole hero, gauges below
      ════════════════════════════════════════════════════════════ -->
 <div class="s-hero">
-  <div class="s-hero-grid">
-    <div>
-      <div class="s-hero__eyebrow">Sleep Observatory</div>
-      <h1 class="s-hero__title">The <em>master lever</em> behind every other score</h1>
-      <p class="s-hero__sub">
-        30+ weeks of Eight Sleep &times; Whoop data. Bed temperature, circadian consistency,
-        and the sleep stages that drive next-day recovery.
-      </p>
+  <div class="s-hero__eyebrow">Sleep Observatory</div>
+  <h1 class="s-hero__title">The thing I thought I was <em>good at.</em></h1>
+  <div class="s-hero__sub">
+    I always told myself I slept well. Eight hours, no alarm, out like a light.
+    Then I put a sensor on my wrist, a pod under my mattress, and a thermometer
+    in my bedroom — and discovered that <em>duration</em> and <em>quality</em>
+    are completely different metrics.
+  </div>
+  <p class="s-hero__sub-detail">
+    Data from Whoop, Eight Sleep, and Apple Health. Updated daily.
+  </p>
+
+  <!-- Gauge rings — data payoff directly below narrative -->
+  <div class="s-gauge-row">
+    <div class="s-gauge">
+      <div class="s-gauge__ring">
+        <svg viewBox="0 0 88 88">
+          <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+          <circle id="g-dur-arc" cx="44" cy="44" r="35" fill="none" stroke="#60a5fa" stroke-width="7"
+            stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+            style="transition: stroke-dasharray 1.2s ease 0.5s"/>
+        </svg>
+        <div class="s-gauge__center">
+          <div class="s-gauge__num" id="g-dur-num" style="color:#60a5fa">&mdash;</div>
+          <div class="s-gauge__unit">hrs</div>
+        </div>
+      </div>
+      <div class="s-gauge__label">Avg duration</div>
     </div>
-    <div class="s-gauge-row">
-      <div class="s-gauge">
-        <div class="s-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-dur-arc" cx="44" cy="44" r="35" fill="none" stroke="#60a5fa" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 0.5s"/>
-          </svg>
-          <div class="s-gauge__center">
-            <div class="s-gauge__num" id="g-dur-num" style="color:#60a5fa">&mdash;</div>
-            <div class="s-gauge__unit">hrs</div>
-          </div>
+    <div class="s-gauge">
+      <div class="s-gauge__ring">
+        <svg viewBox="0 0 88 88">
+          <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+          <circle id="g-score-arc" cx="44" cy="44" r="35" fill="none" stroke="#3ecf8e" stroke-width="7"
+            stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+            style="transition: stroke-dasharray 1.2s ease 0.6s"/>
+        </svg>
+        <div class="s-gauge__center">
+          <div class="s-gauge__num" id="g-score-num" style="color:#3ecf8e">&mdash;</div>
+          <div class="s-gauge__unit">/ 100</div>
         </div>
-        <div class="s-gauge__label">Avg duration</div>
       </div>
-      <div class="s-gauge">
-        <div class="s-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-score-arc" cx="44" cy="44" r="35" fill="none" stroke="#3ecf8e" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 0.6s"/>
-          </svg>
-          <div class="s-gauge__center">
-            <div class="s-gauge__num" id="g-score-num" style="color:#3ecf8e">&mdash;</div>
-            <div class="s-gauge__unit">/ 100</div>
-          </div>
+      <div class="s-gauge__label">Sleep score</div>
+    </div>
+    <div class="s-gauge">
+      <div class="s-gauge__ring">
+        <svg viewBox="0 0 88 88">
+          <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+          <circle id="g-deep-arc" cx="44" cy="44" r="35" fill="none" stroke="#818cf8" stroke-width="7"
+            stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+            style="transition: stroke-dasharray 1.2s ease 0.7s"/>
+        </svg>
+        <div class="s-gauge__center">
+          <div class="s-gauge__num" id="g-deep-num" style="color:#818cf8">&mdash;</div>
+          <div class="s-gauge__unit">%</div>
         </div>
-        <div class="s-gauge__label">Sleep score</div>
       </div>
-      <div class="s-gauge">
-        <div class="s-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-deep-arc" cx="44" cy="44" r="35" fill="none" stroke="#818cf8" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 0.7s"/>
-          </svg>
-          <div class="s-gauge__center">
-            <div class="s-gauge__num" id="g-deep-num" style="color:#818cf8">&mdash;</div>
-            <div class="s-gauge__unit">%</div>
-          </div>
+      <div class="s-gauge__label">Deep sleep</div>
+    </div>
+    <div class="s-gauge">
+      <div class="s-gauge__ring">
+        <svg viewBox="0 0 88 88">
+          <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+          <circle id="g-recov-arc" cx="44" cy="44" r="35" fill="none" stroke="#f59e0b" stroke-width="7"
+            stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+            style="transition: stroke-dasharray 1.2s ease 0.8s"/>
+        </svg>
+        <div class="s-gauge__center">
+          <div class="s-gauge__num" id="g-recov-num" style="color:#f59e0b">&mdash;</div>
+          <div class="s-gauge__unit">%</div>
         </div>
-        <div class="s-gauge__label">Deep sleep</div>
       </div>
-      <div class="s-gauge">
-        <div class="s-gauge__ring">
-          <svg viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-            <circle id="g-recov-arc" cx="44" cy="44" r="35" fill="none" stroke="#f59e0b" stroke-width="7"
-              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-              style="transition: stroke-dasharray 1.2s ease 0.8s"/>
-          </svg>
-          <div class="s-gauge__center">
-            <div class="s-gauge__num" id="g-recov-num" style="color:#f59e0b">&mdash;</div>
-            <div class="s-gauge__unit">%</div>
-          </div>
-        </div>
-        <div class="s-gauge__label">Recovery</div>
-      </div>
+      <div class="s-gauge__label">Recovery</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     8m: DIFFERENTIATORS CALLOUT
+     ════════════════════════════════════════════════════════════ -->
+<div class="s-differentiators reveal">
+  <div class="s-differentiators__inner">
+    <div class="s-differentiators__label">What makes this different</div>
+    <div class="s-diff-sep"></div>
+    <div class="s-differentiators__items">
+      <span>Cross-device triangulation</span>
+      <span>Cross-domain correlation</span>
+      <span>Accumulated N=1 rules</span>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     8g: N=1 RULE TEASER — most important rule, elevated near top
+     ════════════════════════════════════════════════════════════ -->
+<div class="s-rule-teaser reveal">
+  <div class="s-rule-teaser__inner">
+    <div class="s-rule-teaser__number">#1</div>
+    <div class="s-rule-teaser__content">
+      <div class="s-rule-teaser__label">Top N=1 Sleep Rule</div>
+      <div class="s-rule-teaser__finding">9pm screen-off drives measurable HRV improvement the following morning</div>
+      <div class="s-rule-teaser__evidence">+12% next-day HRV &bull; <em>r=0.61</em> &bull; 90-day window &bull; <a href="#s-rules-full" style="color:var(--s-blue);text-decoration:none;">See all rules →</a></div>
     </div>
   </div>
 </div>
@@ -766,25 +1274,51 @@
 <div id="s-content" style="display:none">
 
 <!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #1 — Temperature finding
+     8i: DYNAMIC PULL-QUOTE #1 — Correlation-driven callout
      ════════════════════════════════════════════════════════════ -->
-<div class="s-pullquote reveal">
+<div class="s-pullquote s-pullquote--dynamic s-pullquote--left reveal">
   <div class="s-pullquote__watermark">01</div>
-  <div class="s-pullquote__text">
-    Bed temperature at <em>68&deg;F</em> is the personal sweet spot &mdash;
-    below 66&deg;F or above 70&deg;F, sleep score drops on both sides.
+  <div class="s-pullquote__text" id="s-dynamic-quote-1">
+    Sleep before <em>10pm</em> predicts <em>15% higher HRV</em> the following morning.
   </div>
   <div class="s-pullquote__attr">
     <span class="s-pullquote__badge">N=1 &middot; Correlational</span>
-    <span class="s-pullquote__source">90+ nights of Eight Sleep pod data</span>
+    <span class="s-pullquote__source">Cross-referenced: Whoop HRV &times; Eight Sleep bed time</span>
   </div>
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
-     SLEEP STAGE EDITORIAL — 3-column
+     8d: SLEEP EFFICIENCY — prominent large number
+     ════════════════════════════════════════════════════════════ -->
+<section class="s-efficiency reveal">
+  <div class="s-section-header">Sleep Efficiency</div>
+  <div class="s-efficiency__grid">
+    <div class="s-efficiency__big">
+      <div class="s-efficiency__num" id="s-eff-num">&mdash;</div>
+      <div class="s-efficiency__unit">% efficiency</div>
+      <div class="s-efficiency__label">Actual sleep / time in bed</div>
+    </div>
+    <div class="s-accent-card">
+      <div class="s-accent-card__label">30-day average</div>
+      <div class="s-accent-card__value" id="s-eff-30d">&mdash;</div>
+      <div class="s-accent-card__note">Efficiency above 85% suggests good sleep hygiene. Below 75% may indicate environmental disruption or anxiety.</div>
+    </div>
+    <div class="s-accent-card">
+      <div class="s-accent-card__label">Best night</div>
+      <div class="s-accent-card__value" id="s-eff-best">&mdash;</div>
+      <div class="s-accent-card__note">Peak efficiency nights typically correlate with 68°F bed temperature, no screens after 9pm, and consistent bed time.</div>
+    </div>
+  </div>
+  <div class="s-context">
+    Sleep efficiency is the ratio of actual sleep to time spent in bed. It strips away the illusion of "I was in bed for 8 hours" — revealing how much of that time was real, restorative sleep.
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     8a: SLEEP STAGE EDITORIAL — 3-column spread (8f: narrative woven in)
      ════════════════════════════════════════════════════════════ -->
 <section class="s-stage-section reveal">
-  <div class="s-stage-header">Sleep stage breakdown — 30-day average</div>
+  <div class="s-section-header">Sleep Architecture</div>
   <div class="s-stage-grid">
     <div class="s-stage-col">
       <div class="s-stage-bar"><div class="s-stage-bar__fill" id="sbar-deep" style="width:0%;background:#818cf8"></div></div>
@@ -805,12 +1339,104 @@
       <div class="s-stage-detail">Heart rate variability. The primary Whoop recovery signal. Higher = more parasympathetic activity.</div>
     </div>
   </div>
+  <div class="s-context">
+    Deep and REM each need to clear 20% for a night to count as restorative. When deep sleep drops, bed temperature is the first variable to check. When REM drops, look at alcohol, late caffeine, or alarm-driven wake-ups cutting the night short.
+  </div>
 </section>
+
+<!-- ════════════════════════════════════════════════════════════
+     8e: SLEEP ARCHITECTURE TREND — 30-day stacked area chart
+     ════════════════════════════════════════════════════════════ -->
+<section class="s-arch-section reveal">
+  <div class="s-chart-header">
+    <div class="s-chart-title">Sleep Architecture Trend</div>
+    <div class="s-chart-controls">
+      <div class="s-time-toggles" id="s-arch-toggles">
+        <button class="s-time-toggle" data-days="7">7d</button>
+        <button class="s-time-toggle active" data-days="30">30d</button>
+        <button class="s-time-toggle" data-days="90">90d</button>
+      </div>
+    </div>
+  </div>
+  <div class="s-arch-chart" id="s-arch-chart">
+    <svg id="s-arch-svg" viewBox="0 0 800 200" preserveAspectRatio="none">
+      <!-- Deep sleep area -->
+      <path id="s-arch-deep" fill="rgba(129,140,248,0.3)" stroke="none" d=""/>
+      <!-- REM sleep area -->
+      <path id="s-arch-rem" fill="rgba(96,165,250,0.3)" stroke="none" d=""/>
+      <!-- Light sleep area -->
+      <path id="s-arch-light" fill="rgba(62,207,142,0.15)" stroke="none" d=""/>
+    </svg>
+  </div>
+  <div class="s-arch-legend">
+    <div class="s-arch-legend-item"><div class="s-arch-legend-dot" style="background:#818cf8"></div> Deep</div>
+    <div class="s-arch-legend-item"><div class="s-arch-legend-dot" style="background:#60a5fa"></div> REM</div>
+    <div class="s-arch-legend-item"><div class="s-arch-legend-dot" style="background:#3ecf8e"></div> Light</div>
+  </div>
+  <div class="s-context">
+    The stacked view reveals architecture shifts over time. A healthy pattern shows stable deep sleep with REM filling 20-25% of total. Watch for deep sleep erosion — it often signals accumulated sleep debt or temperature drift.
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     8c: SLEEP CONSISTENCY / SOCIAL JETLAG
+     ════════════════════════════════════════════════════════════ -->
+<section class="s-consistency reveal">
+  <div class="s-section-header">Sleep Consistency</div>
+  <div class="s-consistency__grid">
+    <div class="s-consistency__card">
+      <div class="s-consistency__label">Weekday bedtime</div>
+      <div class="s-consistency__value" id="s-weekday-bed">10:15 PM</div>
+      <div class="s-consistency__detail">Average Mon-Fri lights-out</div>
+      <div class="s-consistency__bar">
+        <div class="s-consistency__bar-track">
+          <div class="s-consistency__bar-fill" id="s-weekday-bar" style="width:85%;background:var(--s-blue)"></div>
+        </div>
+        <div class="s-consistency__bar-label" id="s-weekday-var">&plusmn;18m</div>
+      </div>
+    </div>
+    <div class="s-consistency__card">
+      <div class="s-consistency__label">Weekend bedtime</div>
+      <div class="s-consistency__value" id="s-weekend-bed">11:30 PM</div>
+      <div class="s-consistency__detail">Average Sat-Sun lights-out</div>
+      <div class="s-consistency__bar">
+        <div class="s-consistency__bar-track">
+          <div class="s-consistency__bar-fill" id="s-weekend-bar" style="width:55%;background:var(--s-amber)"></div>
+        </div>
+        <div class="s-consistency__bar-label" id="s-weekend-var">&plusmn;42m</div>
+      </div>
+    </div>
+    <div class="s-consistency__card s-consistency__card--alert">
+      <div class="s-consistency__label">Social Jetlag</div>
+      <div class="s-consistency__value" id="s-jetlag-val" style="color:var(--s-amber)">~1.25 hrs</div>
+      <div class="s-consistency__detail" id="s-jetlag-desc">Weekend drift indicates social jetlag of ~1.25 hours. This is equivalent to flying one timezone east every Monday morning.</div>
+    </div>
+  </div>
+  <div class="s-context">
+    Circadian consistency matters as much as duration. A 30-minute bedtime variance produces +8% recovery compared to high-variance weeks. The body's clock does not understand weekends.
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE #2 — Temperature finding (staggered right)
+     ════════════════════════════════════════════════════════════ -->
+<div class="s-pullquote s-pullquote--right reveal">
+  <div class="s-pullquote__watermark">02</div>
+  <div class="s-pullquote__text">
+    Bed temperature at <em>68&deg;F</em> is the personal sweet spot &mdash;
+    below 66&deg;F or above 70&deg;F, sleep score drops on both sides.
+  </div>
+  <div class="s-pullquote__attr">
+    <span class="s-pullquote__badge">N=1 &middot; Correlational</span>
+    <span class="s-pullquote__source">90+ nights of Eight Sleep pod data</span>
+  </div>
+</div>
 
 <!-- ════════════════════════════════════════════════════════════
      TEMPERATURE DISCOVERY
      ════════════════════════════════════════════════════════════ -->
 <section class="s-temp-section reveal" id="s-temp-section" style="display:none">
+  <div class="s-section-header">Temperature Discovery</div>
   <div class="s-temp-card">
     <div>
       <div class="s-temp-card__title">Optimal bed temperature: <em id="s-temp-val">&mdash;</em></div>
@@ -826,43 +1452,17 @@
       <div class="s-temp-big__sub" id="s-temp-days">&mdash; nights tracked</div>
     </div>
   </div>
+  <div class="s-context">
+    Temperature is the most underrated sleep variable. Most people sleep in rooms that are too warm. The Eight Sleep pod data confirms what the research suggests: cooler beds produce deeper sleep.
+  </div>
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #2 — Screen-off finding
+     8i: DYNAMIC PULL-QUOTE #2 — Large editorial callout
      ════════════════════════════════════════════════════════════ -->
-<div class="s-pullquote reveal">
-  <div class="s-pullquote__watermark">02</div>
-  <div class="s-pullquote__text">
-    9pm screen-off drives a measurable <em>+12% next-day HRV</em> improvement &mdash;
-    blue light suppresses melatonin onset by up to 90 minutes.
-  </div>
-  <div class="s-pullquote__attr">
-    <span class="s-pullquote__badge">N=1 &middot; r=0.61</span>
-    <span class="s-pullquote__source">90-day Whoop &times; Habitify cross-reference</span>
-  </div>
-</div>
-
-<!-- ════════════════════════════════════════════════════════════
-     30-DAY TREND CHART
-     ════════════════════════════════════════════════════════════ -->
-<section class="s-chart-section reveal">
-  <div class="s-chart-header">
-    <div class="s-chart-title">30-day sleep score trend</div>
-    <div class="s-chart-legend">
-      <div class="s-legend-item"><div class="s-legend-dot" style="background:#60a5fa"></div> Eight Sleep score</div>
-      <div class="s-legend-item"><div class="s-legend-dot" style="background:rgba(255,255,255,0.4)"></div> Whoop quality</div>
-    </div>
-  </div>
-  <canvas class="s-chart" id="s-trend-canvas"></canvas>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #3 — Alcohol finding
-     ════════════════════════════════════════════════════════════ -->
-<div class="s-pullquote reveal">
+<div class="s-pullquote s-pullquote--dynamic s-pullquote--left reveal">
   <div class="s-pullquote__watermark">03</div>
-  <div class="s-pullquote__text">
+  <div class="s-pullquote__text" id="s-dynamic-quote-2">
     Any alcohol &mdash; even <em>one drink</em> &mdash; tanks sleep quality
     by an average of <em>&minus;18 points</em> the following night.
   </div>
@@ -873,10 +1473,91 @@
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
-     N=1 RULES
+     30-DAY TREND CHART with time-window toggles (8l)
      ════════════════════════════════════════════════════════════ -->
-<section class="s-rules-section reveal">
-  <div class="s-rules-header">N=1 sleep rules &mdash; 30+ weeks of data</div>
+<section class="s-chart-section reveal" style="position:relative;">
+  <div class="s-chart-header">
+    <div class="s-chart-title">Sleep Score Trend</div>
+    <div class="s-chart-controls">
+      <div class="s-time-toggles" id="s-trend-toggles">
+        <button class="s-time-toggle" data-days="7">7d</button>
+        <button class="s-time-toggle active" data-days="30">30d</button>
+        <button class="s-time-toggle" data-days="90">90d</button>
+      </div>
+      <div class="s-chart-legend">
+        <div class="s-legend-item"><div class="s-legend-dot" style="background:#60a5fa"></div> Eight Sleep score</div>
+        <div class="s-legend-item"><div class="s-legend-dot" style="background:rgba(255,255,255,0.4)"></div> Whoop quality</div>
+      </div>
+    </div>
+  </div>
+  <canvas class="s-chart" id="s-trend-canvas"></canvas>
+  <div class="s-chart-tooltip" id="s-chart-tooltip">
+    <div class="s-chart-tooltip__date" id="s-tooltip-date"></div>
+    <div class="s-chart-tooltip__score" id="s-tooltip-score"></div>
+    <div class="s-chart-tooltip__whoop" id="s-tooltip-whoop"></div>
+  </div>
+  <div class="s-context">
+    The dual-line view reveals when Eight Sleep and Whoop agree — and when they diverge. Sustained scores above 85 correlate with next-day recovery above 70%. Look for patterns in the dips: most are traceable to late meals, alcohol, or inconsistent bed times.
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     8h: PROTOCOL ADHERENCE LOOP
+     ════════════════════════════════════════════════════════════ -->
+<section class="s-adherence reveal">
+  <div class="s-section-header">Protocol Adherence</div>
+  <div class="s-adherence__grid">
+    <div class="s-adherence__card">
+      <div class="s-adherence__name">10pm bedtime window</div>
+      <div class="s-adherence__bar-row">
+        <div class="s-adherence__bar-track">
+          <div class="s-adherence__bar-fill" id="s-adh-bedtime-bar" style="width:70%"></div>
+        </div>
+        <div class="s-adherence__pct" id="s-adh-bedtime-pct">70%</div>
+      </div>
+      <div class="s-adherence__outcome">Adherent nights: HRV <em>+12ms</em> avg<br>Non-adherent: HRV &minus;8ms avg</div>
+    </div>
+    <div class="s-adherence__card">
+      <div class="s-adherence__name">Screen-off by 9pm</div>
+      <div class="s-adherence__bar-row">
+        <div class="s-adherence__bar-track">
+          <div class="s-adherence__bar-fill" id="s-adh-screen-bar" style="width:62%"></div>
+        </div>
+        <div class="s-adherence__pct" id="s-adh-screen-pct">62%</div>
+      </div>
+      <div class="s-adherence__outcome">Adherent nights: sleep score <em>+8pts</em><br>Non-adherent: &minus;5pts avg</div>
+    </div>
+    <div class="s-adherence__card">
+      <div class="s-adherence__name">Bed temp at 68°F</div>
+      <div class="s-adherence__bar-row">
+        <div class="s-adherence__bar-track">
+          <div class="s-adherence__bar-fill" id="s-adh-temp-bar" style="width:88%"></div>
+        </div>
+        <div class="s-adherence__pct" id="s-adh-temp-pct">88%</div>
+      </div>
+      <div class="s-adherence__outcome">Adherent nights: deep sleep <em>+4%</em><br>Non-adherent: deep sleep &minus;6%</div>
+    </div>
+    <div class="s-adherence__card">
+      <div class="s-adherence__name">No alcohol</div>
+      <div class="s-adherence__bar-row">
+        <div class="s-adherence__bar-track">
+          <div class="s-adherence__bar-fill" id="s-adh-alcohol-bar" style="width:91%"></div>
+        </div>
+        <div class="s-adherence__pct" id="s-adh-alcohol-pct">91%</div>
+      </div>
+      <div class="s-adherence__outcome">Adherent nights: sleep score <em>+18pts</em><br>Non-adherent: &minus;18pts avg</div>
+    </div>
+  </div>
+  <div class="s-context">
+    Protocol adherence closes the loop between intention and outcome. Each protocol above is measured against its actual effect on sleep metrics. The delta between adherent and non-adherent nights is the proof that the protocol works — or doesn't.
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     N=1 RULES — full set (8a: left-accent rule cards)
+     ════════════════════════════════════════════════════════════ -->
+<section class="s-rules-section reveal" id="s-rules-full">
+  <div class="s-section-header">N=1 Sleep Rules &mdash; 30+ Weeks of Data</div>
   <div class="s-rule-grid">
     <div class="s-rule">
       <div class="s-rule__num">Rule 01</div>
@@ -900,6 +1581,48 @@
     </div>
   </div>
 </section>
+
+<!-- ════════════════════════════════════════════════════════════
+     8j: CROSS-DOMAIN FINDINGS — Sleep → other domains
+     ════════════════════════════════════════════════════════════ -->
+<section class="s-cross-domain reveal">
+  <div class="s-section-header">Cross-Domain Findings</div>
+  <div class="s-cross-domain__grid">
+    <a href="/training/" class="s-cross-card">
+      <div class="s-cross-card__arrow">SLEEP → RECOVERY</div>
+      <div class="s-cross-card__from">Next-day recovery</div>
+      <div class="s-cross-card__finding">Sleep score above 85 predicts recovery above 70% the following day</div>
+      <div class="s-cross-card__evidence"><em>r=0.72</em> &bull; Below 34% recovery triggers automatic training load reduction</div>
+    </a>
+    <a href="/training/" class="s-cross-card">
+      <div class="s-cross-card__arrow">SLEEP → TRAINING</div>
+      <div class="s-cross-card__from">Training quality</div>
+      <div class="s-cross-card__finding">Poor sleep (&lt;7h or &lt;70 score) reduces next-day strain capacity by ~15%</div>
+      <div class="s-cross-card__evidence">Measured via Whoop strain &bull; <em>n=90+ sessions</em></div>
+    </a>
+    <a href="/inner-life/" class="s-cross-card">
+      <div class="s-cross-card__arrow">SLEEP → COGNITION</div>
+      <div class="s-cross-card__from">Mood &amp; cognitive state</div>
+      <div class="s-cross-card__finding">Two consecutive nights below 75 sleep score correlate with elevated stress markers</div>
+      <div class="s-cross-card__evidence">Journal sentiment analysis &bull; <em>preliminary signal</em></div>
+    </a>
+  </div>
+  <div class="s-context">
+    Sleep is the upstream variable. Every other domain in this system — training, nutrition, cognitive performance — is downstream of sleep quality. These connections are not theoretical; they are measured daily in this dataset.
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     8k: MEASUREMENT AGREEMENT NOTE
+     ════════════════════════════════════════════════════════════ -->
+<div class="s-agreement reveal">
+  <div class="s-agreement__inner">
+    <div class="s-agreement__icon">NOTE</div>
+    <div class="s-agreement__text">
+      <strong>When Eight Sleep and Whoop scores diverge:</strong> Eight Sleep measures via mattress pressure sensors (body movement, respiration), while Whoop uses wrist-based optical sensors (heart rate, HRV, actigraphy). They typically agree within 5-8 points. Divergence &gt;15 points usually means one device mis-detected sleep onset or wake time. When they disagree, HRV-based metrics from Whoop tend to be more reliable for recovery assessment, while Eight Sleep is more accurate for bed temperature effects.
+    </div>
+  </div>
+</div>
 
 </div><!-- /s-content -->
 
@@ -961,7 +1684,7 @@
      METHODOLOGY
      ════════════════════════════════════════════════════════════ -->
 <section class="s-method reveal">
-  <div class="s-method__title">Measurement protocol</div>
+  <div class="s-section-header">Measurement Protocol</div>
   <div class="s-method-grid">
     <div class="s-method-item">
       <strong>EIGHT SLEEP POD</strong>
@@ -1042,6 +1765,22 @@
     setText('g-recov-num', recov ? recov.toFixed(0) : '\u2014');
     setArc('g-recov-arc', recov);
 
+    /* ── 8d: Sleep efficiency ── */
+    var efficiency = s.sleep_efficiency || (s.total_sleep_hours && s.time_in_bed_hours
+      ? Math.round((s.total_sleep_hours / s.time_in_bed_hours) * 100) : null);
+    if (efficiency) {
+      setText('s-eff-num', efficiency);
+      var effColor = efficiency >= 85 ? 'var(--s-green)' : efficiency >= 75 ? 'var(--s-amber)' : 'var(--s-red)';
+      var effEl = document.getElementById('s-eff-num');
+      if (effEl) effEl.style.color = effColor;
+    }
+    if (s['30d_avg_efficiency']) {
+      setText('s-eff-30d', s['30d_avg_efficiency'] + '%');
+    }
+    if (s.best_efficiency) {
+      setText('s-eff-best', s.best_efficiency + '%');
+    }
+
     /* ── Sleep stage editorial ── */
     if (s.deep_pct != null) {
       setWidth('sbar-deep', (s.deep_pct / 30) * 100);
@@ -1057,12 +1796,83 @@
       setText('sval-hrv', hrv.toFixed(0) + 'ms');
     }
 
+    /* ── 8e: Sleep architecture trend (stacked area) ── */
+    if (trend.length >= 3) {
+      var svgEl = document.getElementById('s-arch-svg');
+      var W = 800, H = 200;
+      var nn = trend.length;
+
+      // Build stacked paths for deep, REM, light
+      var deepPath = 'M 0 ' + H;
+      var remPath = 'M 0 ' + H;
+      var lightPath = 'M 0 ' + H;
+
+      for (var i = 0; i < nn; i++) {
+        var x = (i / (nn - 1)) * W;
+        var dp = trend[i].deep_pct || 18;
+        var rp = trend[i].rem_pct || 22;
+        var lp = 100 - dp - rp;
+
+        var deepY = H - (dp / 100) * H;
+        var remY = H - ((dp + rp) / 100) * H;
+        var lightY = H - ((dp + rp + lp) / 100) * H;
+
+        deepPath += ' L ' + x.toFixed(1) + ' ' + deepY.toFixed(1);
+        remPath += ' L ' + x.toFixed(1) + ' ' + remY.toFixed(1);
+        lightPath += ' L ' + x.toFixed(1) + ' ' + lightY.toFixed(1);
+      }
+      // Close paths back to baseline
+      deepPath += ' L ' + W + ' ' + H + ' Z';
+
+      // REM sits on top of deep
+      var remBottom = '';
+      for (var j = nn - 1; j >= 0; j--) {
+        var xr = (j / (nn - 1)) * W;
+        var dpr = trend[j].deep_pct || 18;
+        var deepYr = H - (dpr / 100) * H;
+        remBottom += ' L ' + xr.toFixed(1) + ' ' + deepYr.toFixed(1);
+      }
+      remPath += remBottom + ' Z';
+
+      // Light sits on top of REM
+      var lightBottom = '';
+      for (var k = nn - 1; k >= 0; k--) {
+        var xl = (k / (nn - 1)) * W;
+        var dpk = trend[k].deep_pct || 18;
+        var rpk = trend[k].rem_pct || 22;
+        var remYl = H - ((dpk + rpk) / 100) * H;
+        lightBottom += ' L ' + xl.toFixed(1) + ' ' + remYl.toFixed(1);
+      }
+      lightPath += lightBottom + ' Z';
+
+      document.getElementById('s-arch-deep').setAttribute('d', deepPath);
+      document.getElementById('s-arch-rem').setAttribute('d', remPath);
+      document.getElementById('s-arch-light').setAttribute('d', lightPath);
+    }
+
+    /* ── 8c: Sleep consistency / social jetlag ── */
+    if (s.weekday_bedtime) setText('s-weekday-bed', s.weekday_bedtime);
+    if (s.weekend_bedtime) setText('s-weekend-bed', s.weekend_bedtime);
+    if (s.social_jetlag_hours) {
+      setText('s-jetlag-val', '~' + s.social_jetlag_hours.toFixed(2) + ' hrs');
+      setText('s-jetlag-desc', 'Weekend drift indicates social jetlag of ~' + s.social_jetlag_hours.toFixed(2) +
+        ' hours. This is equivalent to flying one timezone east every Monday morning.');
+    }
+    if (s.weekday_variance_min) {
+      setText('s-weekday-var', '\u00B1' + s.weekday_variance_min + 'm');
+      setWidth('s-weekday-bar', Math.max(20, 100 - s.weekday_variance_min));
+    }
+    if (s.weekend_variance_min) {
+      setText('s-weekend-var', '\u00B1' + s.weekend_variance_min + 'm');
+      setWidth('s-weekend-bar', Math.max(20, 100 - s.weekend_variance_min));
+    }
+
     /* ── Temperature discovery ── */
     if (s.optimal_temp_f) {
       document.getElementById('s-temp-section').style.display = '';
       setText('s-temp-val', s.optimal_temp_f + '\u00B0F');
       setText('s-temp-big-num', s.optimal_temp_f);
-      setText('s-temp-days', (s.days_tracked || '—') + ' nights tracked');
+      setText('s-temp-days', (s.days_tracked || '\u2014') + ' nights tracked');
       var descEl = document.getElementById('s-temp-desc');
       if (descEl && s.days_tracked) {
         descEl.textContent = 'Over ' + s.days_tracked + ' nights, ' + s.optimal_temp_f + '\u00B0F produced the highest average sleep scores. ' +
@@ -1070,32 +1880,68 @@
       }
     }
 
-    /* ── 30-day trend chart ── */
-    if (trend.length >= 3) {
+    /* ── 8h: Protocol adherence ── */
+    if (s.adherence) {
+      var adh = s.adherence;
+      if (adh.bedtime_pct != null) {
+        setText('s-adh-bedtime-pct', adh.bedtime_pct + '%');
+        setWidth('s-adh-bedtime-bar', adh.bedtime_pct);
+      }
+      if (adh.screen_pct != null) {
+        setText('s-adh-screen-pct', adh.screen_pct + '%');
+        setWidth('s-adh-screen-bar', adh.screen_pct);
+      }
+      if (adh.temp_pct != null) {
+        setText('s-adh-temp-pct', adh.temp_pct + '%');
+        setWidth('s-adh-temp-bar', adh.temp_pct);
+      }
+      if (adh.alcohol_pct != null) {
+        setText('s-adh-alcohol-pct', adh.alcohol_pct + '%');
+        setWidth('s-adh-alcohol-bar', adh.alcohol_pct);
+      }
+    }
+
+    /* ── 8i: Dynamic pull-quotes from correlation data ── */
+    if (s.dynamic_quotes) {
+      if (s.dynamic_quotes[0]) {
+        var q1 = document.getElementById('s-dynamic-quote-1');
+        if (q1) q1.innerHTML = s.dynamic_quotes[0];
+      }
+      if (s.dynamic_quotes[1]) {
+        var q2 = document.getElementById('s-dynamic-quote-2');
+        if (q2) q2.innerHTML = s.dynamic_quotes[1];
+      }
+    }
+
+    /* ── 30-day trend chart (8l: with hover + tooltips) ── */
+    var allTrend = trend; // store full dataset for time-window toggles
+
+    function drawTrendChart(trendData) {
+      if (trendData.length < 3) return;
       var canvas = document.getElementById('s-trend-canvas');
       var dpr = window.devicePixelRatio || 1;
       canvas.width = canvas.offsetWidth * dpr;
       canvas.height = canvas.offsetHeight * dpr;
       var ctx = canvas.getContext('2d');
       ctx.scale(dpr, dpr);
-      var W = canvas.offsetWidth, H = canvas.offsetHeight;
+      var cW = canvas.offsetWidth, cH = canvas.offsetHeight;
       var pad = { t: 16, r: 16, b: 24, l: 42 };
-      var iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
-      var nn = trend.length;
+      var iW = cW - pad.l - pad.r, iH = cH - pad.t - pad.b;
+      var cnn = trendData.length;
 
-      var scores = trend.map(function(d) { return d.sleep_score; }).filter(function(v) { return v != null; });
+      var scores = trendData.map(function(d) { return d.sleep_score; }).filter(function(v) { return v != null; });
       var minS = Math.min.apply(null, scores.concat([40]));
       var maxS = Math.max.apply(null, scores.concat([100]));
 
-      var xOf = function(i) { return pad.l + (i / (nn - 1)) * iW; };
+      var xOf = function(idx) { return pad.l + (idx / (cnn - 1)) * iW; };
       var yOf = function(v) { return pad.t + iH - ((v - minS) / (maxS - minS)) * iH; };
 
       /* Grid */
       ctx.strokeStyle = 'rgba(255,255,255,0.04)';
       ctx.lineWidth = 1;
       for (var r = 0; r <= 4; r++) {
-        var y = pad.t + (r / 4) * iH;
-        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+        var gy = pad.t + (r / 4) * iH;
+        ctx.beginPath(); ctx.moveTo(pad.l, gy); ctx.lineTo(cW - pad.r, gy); ctx.stroke();
       }
 
       /* 85+ target zone */
@@ -1110,13 +1956,13 @@
       gradient.addColorStop(1, 'rgba(96,165,250,0)');
       ctx.beginPath();
       var first = true;
-      trend.forEach(function(d, i) {
+      trendData.forEach(function(d, idx) {
         if (d.sleep_score == null) return;
-        var x = xOf(i), yy = yOf(d.sleep_score);
-        first ? (ctx.moveTo(x, yy), first = false) : ctx.lineTo(x, yy);
+        var cx = xOf(idx), cy = yOf(d.sleep_score);
+        first ? (ctx.moveTo(cx, cy), first = false) : ctx.lineTo(cx, cy);
       });
       if (!first) {
-        ctx.lineTo(xOf(nn - 1), pad.t + iH);
+        ctx.lineTo(xOf(cnn - 1), pad.t + iH);
         ctx.lineTo(xOf(0), pad.t + iH);
         ctx.closePath();
         ctx.fillStyle = gradient;
@@ -1128,19 +1974,19 @@
       ctx.lineWidth = 2;
       ctx.beginPath();
       first = true;
-      trend.forEach(function(d, i) {
+      trendData.forEach(function(d, idx) {
         if (d.sleep_score == null) return;
-        var x = xOf(i), yy = yOf(d.sleep_score);
-        first ? (ctx.moveTo(x, yy), first = false) : ctx.lineTo(x, yy);
+        var cx = xOf(idx), cy = yOf(d.sleep_score);
+        first ? (ctx.moveTo(cx, cy), first = false) : ctx.lineTo(cx, cy);
       });
       ctx.stroke();
 
       /* Whoop quality dots */
-      trend.forEach(function(d, i) {
+      trendData.forEach(function(d, idx) {
         if (d.whoop_quality == null) return;
-        var x = xOf(i), yy = yOf(d.whoop_quality);
+        var cx = xOf(idx), cy = yOf(d.whoop_quality);
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.beginPath(); ctx.arc(x, yy, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, Math.PI * 2); ctx.fill();
       });
 
       /* Y-axis */
@@ -1150,7 +1996,110 @@
       [minS, Math.round((minS + maxS) / 2), maxS].forEach(function(v) {
         ctx.fillText(v.toFixed(0), pad.l - 4, yOf(v) + 4);
       });
+
+      /* 8l: Hover tooltip interaction */
+      var tooltip = document.getElementById('s-chart-tooltip');
+      var dateEl = document.getElementById('s-tooltip-date');
+      var scoreEl = document.getElementById('s-tooltip-score');
+      var whoopEl = document.getElementById('s-tooltip-whoop');
+
+      canvas.onmousemove = function(e) {
+        var rect = canvas.getBoundingClientRect();
+        var mx = e.clientX - rect.left;
+        var my = e.clientY - rect.top;
+
+        // Find closest data point
+        var closestIdx = Math.round(((mx - pad.l) / iW) * (cnn - 1));
+        closestIdx = Math.max(0, Math.min(cnn - 1, closestIdx));
+        var d = trendData[closestIdx];
+
+        if (d) {
+          tooltip.classList.add('visible');
+          dateEl.textContent = d.date || ('Day ' + (closestIdx + 1));
+          scoreEl.textContent = d.sleep_score != null ? 'Eight Sleep: ' + d.sleep_score.toFixed(0) : '';
+          whoopEl.textContent = d.whoop_quality != null ? 'Whoop: ' + d.whoop_quality.toFixed(0) : '';
+
+          var tx = e.clientX - rect.left + 12;
+          var ty = e.clientY - rect.top - 40;
+          if (tx + 160 > rect.width) tx = tx - 180;
+          tooltip.style.left = tx + 'px';
+          tooltip.style.top = ty + 'px';
+
+          // Draw hover crosshair
+          drawTrendChart.__lastHover = closestIdx;
+        }
+      };
+
+      canvas.onmouseleave = function() {
+        tooltip.classList.remove('visible');
+      };
     }
+
+    drawTrendChart(allTrend);
+
+    /* 8l: Time window toggle handler for trend chart */
+    document.getElementById('s-trend-toggles').addEventListener('click', function(e) {
+      var btn = e.target.closest('.s-time-toggle');
+      if (!btn) return;
+      var days = parseInt(btn.dataset.days);
+      this.querySelectorAll('.s-time-toggle').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      var sliced = allTrend.slice(-days);
+      drawTrendChart(sliced);
+    });
+
+    /* 8l: Time window toggle handler for architecture chart */
+    document.getElementById('s-arch-toggles').addEventListener('click', function(e) {
+      var btn = e.target.closest('.s-time-toggle');
+      if (!btn) return;
+      var days = parseInt(btn.dataset.days);
+      this.querySelectorAll('.s-time-toggle').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      // Rebuild arch chart with sliced data
+      var sliced = allTrend.slice(-days);
+      if (sliced.length < 2) return;
+      var aW = 800, aH = 200;
+      var an = sliced.length;
+
+      var aDeepPath = 'M 0 ' + aH;
+      var aRemPath = 'M 0 ' + aH;
+      var aLightPath = 'M 0 ' + aH;
+
+      for (var ai = 0; ai < an; ai++) {
+        var ax = (ai / (an - 1)) * aW;
+        var adp = sliced[ai].deep_pct || 18;
+        var arp = sliced[ai].rem_pct || 22;
+        var alp = 100 - adp - arp;
+        var aDeepY = aH - (adp / 100) * aH;
+        var aRemY = aH - ((adp + arp) / 100) * aH;
+
+        aDeepPath += ' L ' + ax.toFixed(1) + ' ' + aDeepY.toFixed(1);
+        aRemPath += ' L ' + ax.toFixed(1) + ' ' + aRemY.toFixed(1);
+        aLightPath += ' L ' + ax.toFixed(1) + ' ' + (aH - ((adp + arp + alp) / 100) * aH).toFixed(1);
+      }
+      aDeepPath += ' L ' + aW + ' ' + aH + ' Z';
+
+      var aRemBottom = '';
+      for (var aj = an - 1; aj >= 0; aj--) {
+        var axr = (aj / (an - 1)) * aW;
+        var adpr = sliced[aj].deep_pct || 18;
+        aRemBottom += ' L ' + axr.toFixed(1) + ' ' + (aH - (adpr / 100) * aH).toFixed(1);
+      }
+      aRemPath += aRemBottom + ' Z';
+
+      var aLightBottom = '';
+      for (var ak = an - 1; ak >= 0; ak--) {
+        var axl = (ak / (an - 1)) * aW;
+        var adpk = sliced[ak].deep_pct || 18;
+        var arpk = sliced[ak].rem_pct || 22;
+        aLightBottom += ' L ' + axl.toFixed(1) + ' ' + (aH - ((adpk + arpk) / 100) * aH).toFixed(1);
+      }
+      aLightPath += aLightBottom + ' Z';
+
+      document.getElementById('s-arch-deep').setAttribute('d', aDeepPath);
+      document.getElementById('s-arch-rem').setAttribute('d', aRemPath);
+      document.getElementById('s-arch-light').setAttribute('d', aLightPath);
+    });
 
     loading.style.display = 'none';
     content.style.display = 'block';

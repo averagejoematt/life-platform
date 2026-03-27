@@ -35,6 +35,169 @@
     }
 
     /* ═══════════════════════════════════════════════════════
+       EDITORIAL TEMPLATE (10g) — Monospace section headers with trailing em-dashes
+       ═══════════════════════════════════════════════════════ */
+    .n-section-header {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-8);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .n-section-header::after {
+      content: '\2014\2014';
+      color: var(--text-faint);
+      opacity: 0.4;
+      flex-shrink: 0;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       EDITORIAL PULL-QUOTES (10g) — Staggered, offset, large serif
+       ═══════════════════════════════════════════════════════ */
+    .n-pullquote {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      position: relative;
+      border-bottom: 1px solid var(--border);
+    }
+    .n-pullquote--left {
+      padding-left: calc(var(--page-padding) + 8%);
+    }
+    .n-pullquote--right {
+      padding-left: calc(var(--page-padding) + 16%);
+    }
+    .n-pullquote__watermark {
+      position: absolute;
+      top: 24px;
+      right: var(--page-padding);
+      font-family: var(--font-display);
+      font-size: 120px;
+      color: rgba(245, 158, 11, 0.04);
+      line-height: 1;
+      pointer-events: none;
+    }
+    .n-pullquote__text {
+      font-family: var(--font-display);
+      font-size: clamp(24px, 3.5vw, 32px);
+      line-height: 1.3;
+      color: var(--text);
+      max-width: 640px;
+      position: relative;
+    }
+    .n-pullquote__text em {
+      font-style: normal;
+      color: var(--n-amber);
+    }
+    .n-pullquote__attr {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-top: var(--space-4);
+    }
+    .n-pullquote__badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--n-amber);
+      background: var(--n-amber-dim);
+      padding: 3px 10px;
+      display: inline-block;
+    }
+    .n-pullquote__source {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      letter-spacing: 0.06em;
+    }
+    /* Dynamic pull-quotes -- larger editorial callouts */
+    .n-pullquote--dynamic .n-pullquote__text {
+      font-size: clamp(26px, 4vw, 36px);
+      border-left: 3px solid var(--n-amber);
+      padding-left: var(--space-6);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       NARRATIVE CONTEXT (10g) — interpretive sentences between data
+       ═══════════════════════════════════════════════════════ */
+    .n-context {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-4) var(--page-padding) var(--space-6);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.8;
+      font-style: italic;
+      max-width: 680px;
+    }
+    .n-context strong { color: var(--text); font-style: normal; }
+
+    /* ═══════════════════════════════════════════════════════
+       LEFT-ACCENT RULE CARDS (10g) — key findings
+       ═══════════════════════════════════════════════════════ */
+    .n-accent-card {
+      border-left: 3px solid var(--n-amber);
+      background: var(--surface);
+      padding: var(--space-5) var(--space-6);
+      border-top: 1px solid rgba(255,255,255,0.04);
+      border-right: 1px solid rgba(255,255,255,0.04);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .n-accent-card__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--n-amber);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-2);
+    }
+    .n-accent-card__value {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .n-accent-card__note {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       NARRATIVE INTRO (10a)
+       ═══════════════════════════════════════════════════════ */
+    .n-intro {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .n-intro__text {
+      max-width: 680px;
+      font-family: var(--font-display);
+      font-size: clamp(18px, 2.5vw, 22px);
+      line-height: 1.6;
+      color: var(--text-muted);
+    }
+    .n-intro__text em {
+      font-style: normal;
+      color: var(--n-amber);
+    }
+    .n-intro__sub {
+      max-width: 680px;
+      font-size: var(--text-sm);
+      color: var(--text-faint);
+      line-height: 1.8;
+      margin-top: var(--space-4);
+      font-style: italic;
+    }
+
+    /* ═══════════════════════════════════════════════════════
        HERO — B's 2-column + C's gauge row
        ═══════════════════════════════════════════════════════ */
     .n-hero {
@@ -144,61 +307,6 @@
     }
 
     /* ═══════════════════════════════════════════════════════
-       PULL-QUOTES — B's editorial style + N=1 badge
-       ═══════════════════════════════════════════════════════ */
-    .n-pullquote {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      position: relative;
-      border-bottom: 1px solid var(--border);
-    }
-    .n-pullquote__watermark {
-      position: absolute;
-      top: 24px;
-      right: var(--page-padding);
-      font-family: var(--font-display);
-      font-size: 120px;
-      color: rgba(245, 158, 11, 0.04);
-      line-height: 1;
-      pointer-events: none;
-    }
-    .n-pullquote__text {
-      font-family: var(--font-display);
-      font-size: clamp(24px, 3.5vw, 32px);
-      line-height: 1.3;
-      color: var(--text);
-      max-width: 640px;
-      position: relative;
-    }
-    .n-pullquote__text em {
-      font-style: normal;
-      color: var(--n-amber);
-    }
-    .n-pullquote__attr {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-      margin-top: var(--space-4);
-    }
-    .n-pullquote__badge {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--n-amber);
-      background: var(--n-amber-dim);
-      padding: 3px 10px;
-      display: inline-block;
-    }
-    .n-pullquote__source {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-faint);
-      letter-spacing: 0.06em;
-    }
-
-    /* ═══════════════════════════════════════════════════════
        MACRO EDITORIAL — B's 3-column spread
        ═══════════════════════════════════════════════════════ */
     .n-macro-section {
@@ -206,23 +314,6 @@
       margin: 0 auto;
       padding: var(--space-12) var(--page-padding);
       border-bottom: 1px solid var(--border);
-    }
-    .n-macro-header {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      margin-bottom: var(--space-8);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .n-macro-header::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
     }
     .n-macro-grid {
       display: grid;
@@ -351,6 +442,199 @@
     }
 
     /* ═══════════════════════════════════════════════════════
+       PROTEIN DISTRIBUTION (10c)
+       ═══════════════════════════════════════════════════════ */
+    .n-protein-dist {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .n-dist-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-4);
+      margin-top: var(--space-4);
+    }
+    .n-dist-meal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-5);
+      text-align: center;
+      position: relative;
+    }
+    .n-dist-meal__name {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-3);
+    }
+    .n-dist-meal__bar-wrap {
+      height: 120px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      margin-bottom: var(--space-3);
+    }
+    .n-dist-meal__bar {
+      width: 32px;
+      background: var(--n-amber-dim);
+      border-top: 3px solid var(--n-amber);
+      transition: height 0.8s ease;
+      position: relative;
+    }
+    .n-dist-meal__bar--hit {
+      background: rgba(62, 207, 142, 0.15);
+      border-top-color: var(--n-green);
+    }
+    .n-dist-meal__bar--miss {
+      background: rgba(239, 68, 68, 0.15);
+      border-top-color: var(--n-red);
+    }
+    .n-dist-meal__value {
+      font-family: var(--font-display);
+      font-size: 24px;
+      color: var(--text);
+    }
+    .n-dist-meal__target {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      margin-top: var(--space-1);
+    }
+    .n-dist-meal__status {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-top: var(--space-2);
+      padding: 2px 8px;
+      display: inline-block;
+    }
+    .n-dist-meal__status--hit {
+      color: var(--n-green);
+      background: rgba(62, 207, 142, 0.1);
+    }
+    .n-dist-meal__status--miss {
+      color: var(--n-red);
+      background: rgba(239, 68, 68, 0.1);
+    }
+    .n-threshold-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      border-top: 1px dashed rgba(62, 207, 142, 0.3);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       TOP MEALS (10b)
+       ═══════════════════════════════════════════════════════ */
+    .n-meals-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .n-meals-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+      margin-top: var(--space-4);
+    }
+    .n-meal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-5) var(--space-5);
+      transition: border-color 0.15s;
+    }
+    .n-meal-card:hover {
+      border-color: rgba(245,158,11,0.3);
+    }
+    .n-meal-card__header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+    }
+    .n-meal-card__icon {
+      font-size: 24px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .n-meal-card__name {
+      font-family: var(--font-display);
+      font-size: var(--text-base);
+      color: var(--text);
+      line-height: 1.2;
+    }
+    .n-meal-card__freq {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--n-amber);
+      letter-spacing: 0.08em;
+      margin-top: 2px;
+    }
+    .n-meal-card__macros {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--border);
+    }
+    .n-meal-card__macro {
+      text-align: center;
+    }
+    .n-meal-card__macro-val {
+      font-family: var(--font-display);
+      font-size: 16px;
+      color: var(--text);
+    }
+    .n-meal-card__macro-label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-faint);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .n-meal-card__footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--border);
+    }
+    .n-meal-card__ppc {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    .n-meal-card__ppc em {
+      font-style: normal;
+      color: var(--n-green);
+    }
+    .n-meal-card__grade {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      padding: 2px 8px;
+    }
+    .n-meal-card__grade--a {
+      color: var(--n-green);
+      background: rgba(62, 207, 142, 0.1);
+    }
+    .n-meal-card__grade--b {
+      color: var(--n-amber);
+      background: var(--n-amber-dim);
+    }
+    .n-meal-card__grade--c {
+      color: var(--n-red);
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    /* ═══════════════════════════════════════════════════════
        TREND CHART
        ═══════════════════════════════════════════════════════ */
     .n-chart-section {
@@ -376,10 +660,10 @@
       gap: 12px;
     }
     .n-chart-title::after {
-      content: '';
-      width: 48px;
-      height: 1px;
-      background: var(--border);
+      content: '\2014\2014';
+      color: var(--text-faint);
+      opacity: 0.4;
+      flex-shrink: 0;
     }
     .n-chart-legend {
       display: flex;
@@ -407,30 +691,267 @@
     }
 
     /* ═══════════════════════════════════════════════════════
-       N=1 RULES — C's bordered cards + left accent
+       TDEE ADAPTATION (10e)
+       ═══════════════════════════════════════════════════════ */
+    .n-tdee-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .n-tdee-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-4);
+      margin-top: var(--space-4);
+    }
+    .n-tdee-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--n-amber);
+      padding: var(--space-5);
+      text-align: center;
+    }
+    .n-tdee-card__period {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-3);
+    }
+    .n-tdee-card__value {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--text);
+      line-height: 1;
+    }
+    .n-tdee-card__unit {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    .n-tdee-card__delta {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      margin-top: var(--space-2);
+    }
+    .n-tdee-card__delta--down { color: var(--n-red); }
+    .n-tdee-card__delta--up { color: var(--n-green); }
+    .n-tdee-card__delta--flat { color: var(--text-faint); }
+    canvas.n-tdee-chart {
+      width: 100%;
+      height: 160px;
+      display: block;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      margin-top: var(--space-6);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       MICRONUTRIENTS (10d)
+       ═══════════════════════════════════════════════════════ */
+    .n-micro-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .n-micro-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-4);
+      margin-top: var(--space-4);
+    }
+    .n-micro-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-5);
+      position: relative;
+      overflow: hidden;
+    }
+    .n-micro-card__name {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-3);
+    }
+    .n-micro-card__why {
+      font-size: 11px;
+      color: var(--text-faint);
+      line-height: 1.5;
+      margin-bottom: var(--space-4);
+      font-style: italic;
+    }
+    .n-micro-card__values {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: var(--space-2);
+    }
+    .n-micro-card__actual {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--text);
+    }
+    .n-micro-card__target {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+    }
+    .n-micro-card__bar {
+      height: 4px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .n-micro-card__fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 1s ease;
+    }
+    .n-micro-card__fill--good { background: var(--n-green); }
+    .n-micro-card__fill--warn { background: var(--n-amber); }
+    .n-micro-card__fill--low { background: var(--n-red); }
+    .n-micro-card__status {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-top: var(--space-2);
+    }
+    .n-micro-card__status--good { color: var(--n-green); }
+    .n-micro-card__status--warn { color: var(--n-amber); }
+    .n-micro-card__status--low { color: var(--n-red); }
+
+    /* ═══════════════════════════════════════════════════════
+       BEHAVIORAL TRIGGERS (10h)
+       ═══════════════════════════════════════════════════════ */
+    .n-triggers-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .n-triggers-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+      margin-top: var(--space-4);
+    }
+    .n-trigger-card {
+      border-left: 3px solid var(--n-amber);
+      background: var(--surface);
+      padding: var(--space-5) var(--space-6);
+      border-top: 1px solid rgba(255,255,255,0.04);
+      border-right: 1px solid rgba(255,255,255,0.04);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .n-trigger-card__trigger {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--n-amber);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-3);
+    }
+    .n-trigger-card__finding {
+      font-family: var(--font-display);
+      font-size: var(--text-base);
+      color: var(--text);
+      line-height: 1.35;
+      margin-bottom: var(--space-3);
+    }
+    .n-trigger-card__evidence {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+    .n-trigger-card__evidence em {
+      font-style: normal;
+      color: var(--n-amber);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       HYDRATION (10j)
+       ═══════════════════════════════════════════════════════ */
+    .n-hydration-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .n-hydration-grid {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: var(--space-8);
+      align-items: center;
+      margin-top: var(--space-4);
+    }
+    .n-hydration-big {
+      text-align: center;
+    }
+    .n-hydration-big__num {
+      font-family: var(--font-display);
+      font-size: 56px;
+      line-height: 1;
+      color: #60a5fa;
+    }
+    .n-hydration-big__unit {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      margin-top: 4px;
+    }
+    .n-hydration-big__sub {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      margin-top: var(--space-2);
+    }
+    .n-hydration-corr {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+    }
+    .n-hydration-corr-card {
+      border-left: 3px solid #60a5fa;
+      background: var(--surface);
+      padding: var(--space-4) var(--space-5);
+      border-top: 1px solid rgba(255,255,255,0.04);
+      border-right: 1px solid rgba(255,255,255,0.04);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .n-hydration-corr-card__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: #60a5fa;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-2);
+    }
+    .n-hydration-corr-card__finding {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .n-hydration-corr-card__finding em {
+      font-style: normal;
+      color: var(--text);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       N=1 RULES — left-accent cards
        ═══════════════════════════════════════════════════════ */
     .n-rules-section {
       max-width: var(--max-width);
       margin: 0 auto;
       padding: var(--space-12) var(--page-padding);
       border-bottom: 1px solid var(--border);
-    }
-    .n-rules-header {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-faint);
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      margin-bottom: var(--space-6);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .n-rules-header::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
     }
     .n-rule-grid {
       display: grid;
@@ -597,10 +1118,10 @@
       gap: 12px;
     }
     .n-method__title::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
+      content: '\2014\2014';
+      color: var(--text-faint);
+      opacity: 0.4;
+      flex-shrink: 0;
     }
     .n-method-grid {
       display: grid;
@@ -619,6 +1140,60 @@
       font-size: var(--text-2xs);
       letter-spacing: 0.08em;
       margin-bottom: var(--space-2);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       KITCHEN TEASER (10-kitchen)
+       ═══════════════════════════════════════════════════════ */
+    .n-kitchen-teaser {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+      text-align: center;
+    }
+    .n-kitchen-teaser__badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--n-amber);
+      background: var(--n-amber-dim);
+      padding: 4px 14px;
+      display: inline-block;
+      margin-bottom: var(--space-4);
+    }
+    .n-kitchen-teaser__title {
+      font-family: var(--font-display);
+      font-size: clamp(24px, 3vw, 32px);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .n-kitchen-teaser__title em {
+      font-style: normal;
+      color: var(--n-amber);
+    }
+    .n-kitchen-teaser__desc {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.8;
+      max-width: 560px;
+      margin: 0 auto var(--space-6);
+    }
+    .n-kitchen-teaser__link {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: var(--n-amber);
+      text-decoration: none;
+      border: 1px solid var(--n-amber);
+      padding: var(--space-3) var(--space-6);
+      display: inline-block;
+      transition: background 0.15s, color 0.15s;
+    }
+    .n-kitchen-teaser__link:hover {
+      background: var(--n-amber);
+      color: #000;
     }
 
     /* ═══════════════════════════════════════════════════════
@@ -646,6 +1221,14 @@
       .n-narrative { grid-template-columns: 1fr; }
       .n-method-grid { grid-template-columns: 1fr; }
       .n-xref { grid-template-columns: 1fr; }
+      .n-meals-grid { grid-template-columns: 1fr; }
+      .n-dist-grid { grid-template-columns: repeat(2, 1fr); }
+      .n-micro-grid { grid-template-columns: repeat(2, 1fr); }
+      .n-tdee-grid { grid-template-columns: repeat(2, 1fr); }
+      .n-triggers-grid { grid-template-columns: 1fr; }
+      .n-hydration-grid { grid-template-columns: 1fr; }
+      .n-hydration-corr { grid-template-columns: 1fr; }
+      .n-pullquote--left, .n-pullquote--right { padding-left: var(--page-padding); }
     }
   </style>
 
@@ -679,7 +1262,7 @@
 ">
   <span class="experiment-counter" data-format="short" style="color:var(--c-amber-500);font-weight:700;"></span>
   <span style="color:var(--text-muted);"> — Early data. This page gets smarter every week.</span>
-  <a href="/subscribe/" style="color:var(--c-amber-400);text-decoration:none;margin-left:auto;white-space:nowrap;">Follow along →</a>
+  <a href="/subscribe/" style="color:var(--c-amber-400);text-decoration:none;margin-left:auto;white-space:nowrap;">Follow along &rarr;</a>
 </div>
 
 
@@ -761,13 +1344,28 @@
   </div>
 </div>
 
+<!-- ════════════════════════════════════════════════════════════
+     10a: NARRATIVE INTRO — the only observatory without one
+     ════════════════════════════════════════════════════════════ -->
+<div class="n-intro reveal">
+  <div class="n-intro__text">
+    Every diet I&rsquo;ve ever done worked until it didn&rsquo;t. <em>MacroFactor</em> changed the game &mdash;
+    not by restricting what I eat, but by making visible what was always invisible:
+    where the calories actually go.
+  </div>
+  <div class="n-intro__sub">
+    Food has always been complicated. Tracking isn&rsquo;t about control &mdash; it&rsquo;s about awareness.
+    The numbers below aren&rsquo;t a scorecard. They&rsquo;re a mirror.
+  </div>
+</div>
+
 <div id="n-loading" class="n-loading">LOADING NUTRITION DATA&hellip;</div>
 <div id="n-content" style="display:none">
 
 <!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #1 — Breakfast protein finding
+     PULL-QUOTE #1 — Breakfast protein finding (10g: staggered left)
      ════════════════════════════════════════════════════════════ -->
-<div class="n-pullquote reveal">
+<div class="n-pullquote n-pullquote--left reveal">
   <div class="n-pullquote__watermark">01</div>
   <div class="n-pullquote__text">
     Front-loading <em>40g+ protein</em> at breakfast predicts hitting 180g by day end &mdash;
@@ -780,10 +1378,10 @@
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
-     MACRO EDITORIAL — B's 3-column
+     MACRO EDITORIAL — B's 3-column (10g: em-dash section header)
      ════════════════════════════════════════════════════════════ -->
 <section class="n-macro-section reveal">
-  <div class="n-macro-header">Daily average breakdown</div>
+  <div class="n-section-header">Daily Average Breakdown</div>
   <div class="n-macro-grid">
     <div class="n-macro-col">
       <div class="n-macro-bar"><div class="n-macro-bar__fill" id="mbar-pro" style="width:0%;background:#3ecf8e"></div></div>
@@ -804,12 +1402,16 @@
       <div class="n-macro-detail">Hormone health floor. Essential fatty acid minimum. Not further restricted.</div>
     </div>
   </div>
+  <div class="n-context">
+    Macros tell a different story than calories alone. <strong>Protein is the constraint</strong> &mdash; hit 180g and the rest falls into place. Miss it, and the deficit eats muscle instead of fat.
+  </div>
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
      PROTEIN ADHERENCE
      ════════════════════════════════════════════════════════════ -->
 <section class="n-protein-section reveal">
+  <div class="n-section-header">Protein Adherence</div>
   <div class="n-protein-card">
     <div>
       <div class="n-protein-card__title">Protein adherence is the <em>non-negotiable</em></div>
@@ -833,38 +1435,300 @@
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #2 — CGM finding
+     10c: PROTEIN DISTRIBUTION — per-meal leucine threshold
      ════════════════════════════════════════════════════════════ -->
-<div class="n-pullquote reveal">
+<section class="n-protein-dist reveal">
+  <div class="n-section-header">Per-Meal Protein Distribution</div>
+  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
+    The leucine threshold for muscle protein synthesis is roughly <strong>30g protein per meal</strong>. Getting 180g in two meals doesn&rsquo;t count the same as spreading it across four.
+  </div>
+  <div class="n-dist-grid">
+    <div class="n-dist-meal">
+      <div class="n-dist-meal__name">Breakfast</div>
+      <div class="n-dist-meal__bar-wrap">
+        <div class="n-dist-meal__bar n-dist-meal__bar--hit" style="height:83%"></div>
+      </div>
+      <div class="n-dist-meal__value">42g</div>
+      <div class="n-dist-meal__target">Target: 30g+</div>
+      <div class="n-dist-meal__status n-dist-meal__status--hit">Threshold met</div>
+    </div>
+    <div class="n-dist-meal">
+      <div class="n-dist-meal__name">Lunch</div>
+      <div class="n-dist-meal__bar-wrap">
+        <div class="n-dist-meal__bar n-dist-meal__bar--hit" style="height:73%"></div>
+      </div>
+      <div class="n-dist-meal__value">38g</div>
+      <div class="n-dist-meal__target">Target: 30g+</div>
+      <div class="n-dist-meal__status n-dist-meal__status--hit">Threshold met</div>
+    </div>
+    <div class="n-dist-meal">
+      <div class="n-dist-meal__name">Dinner</div>
+      <div class="n-dist-meal__bar-wrap">
+        <div class="n-dist-meal__bar n-dist-meal__bar--hit" style="height:92%"></div>
+      </div>
+      <div class="n-dist-meal__value">48g</div>
+      <div class="n-dist-meal__target">Target: 30g+</div>
+      <div class="n-dist-meal__status n-dist-meal__status--hit">Threshold met</div>
+    </div>
+    <div class="n-dist-meal">
+      <div class="n-dist-meal__name">Snacks</div>
+      <div class="n-dist-meal__bar-wrap">
+        <div class="n-dist-meal__bar n-dist-meal__bar--miss" style="height:42%"></div>
+      </div>
+      <div class="n-dist-meal__value">22g</div>
+      <div class="n-dist-meal__target">Target: 30g+</div>
+      <div class="n-dist-meal__status n-dist-meal__status--miss">Below threshold</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE #2 — Unique nutrition finding (10f: replaced CGM dupe)
+     ════════════════════════════════════════════════════════════ -->
+<div class="n-pullquote n-pullquote--right reveal">
   <div class="n-pullquote__watermark">02</div>
   <div class="n-pullquote__text">
-    Protein shakes are my body&rsquo;s A+ food &mdash;
-    <em>+6&thinsp;mg/dL</em> glucose spike vs pizza at <em>+55&thinsp;mg/dL</em>.
+    On days I eat <em>30g+ fiber</em>, glucose variability drops by nearly half &mdash;
+    SD of <em>14 vs 22&thinsp;mg/dL</em>. The gut is a glucose regulator.
   </div>
   <div class="n-pullquote__attr">
     <span class="n-pullquote__badge">N=1 &middot; CGM-confirmed</span>
-    <span class="n-pullquote__source">Dexcom Stelo continuous glucose data &mdash; <a href="/glucose/" style="color:var(--n-amber);text-decoration:none">Glucose Observatory</a></span>
+    <span class="n-pullquote__source">MacroFactor fiber data cross-referenced with Dexcom Stelo &mdash; <a href="/glucose/" style="color:var(--n-amber);text-decoration:none">Glucose Observatory</a></span>
   </div>
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
-     30-DAY TREND CHART
+     10b: TOP MEALS — most frequently logged with macro profile (10k: food icons)
+     ════════════════════════════════════════════════════════════ -->
+<section class="n-meals-section reveal">
+  <div class="n-section-header">Top Meals</div>
+  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
+    The meals that appear most often in the log. Sorted by frequency, scored by glucose response from CGM data.
+  </div>
+  <div class="n-meals-grid">
+    <div class="n-meal-card">
+      <div class="n-meal-card__header">
+        <div class="n-meal-card__icon">&#x1F964;</div>
+        <div>
+          <div class="n-meal-card__name">Protein Shake</div>
+          <div class="n-meal-card__freq">47x logged</div>
+        </div>
+      </div>
+      <div class="n-meal-card__macros">
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">320</div>
+          <div class="n-meal-card__macro-label">cal</div>
+        </div>
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">48g</div>
+          <div class="n-meal-card__macro-label">protein</div>
+        </div>
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">12g</div>
+          <div class="n-meal-card__macro-label">carbs</div>
+        </div>
+      </div>
+      <div class="n-meal-card__footer">
+        <div class="n-meal-card__ppc">P/cal: <em>0.15</em></div>
+        <div class="n-meal-card__grade n-meal-card__grade--a">A+ glucose</div>
+      </div>
+    </div>
+    <div class="n-meal-card">
+      <div class="n-meal-card__header">
+        <div class="n-meal-card__icon">&#x1F95A;</div>
+        <div>
+          <div class="n-meal-card__name">Eggs + Turkey Bacon</div>
+          <div class="n-meal-card__freq">38x logged</div>
+        </div>
+      </div>
+      <div class="n-meal-card__macros">
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">410</div>
+          <div class="n-meal-card__macro-label">cal</div>
+        </div>
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">36g</div>
+          <div class="n-meal-card__macro-label">protein</div>
+        </div>
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">8g</div>
+          <div class="n-meal-card__macro-label">carbs</div>
+        </div>
+      </div>
+      <div class="n-meal-card__footer">
+        <div class="n-meal-card__ppc">P/cal: <em>0.09</em></div>
+        <div class="n-meal-card__grade n-meal-card__grade--a">A glucose</div>
+      </div>
+    </div>
+    <div class="n-meal-card">
+      <div class="n-meal-card__header">
+        <div class="n-meal-card__icon">&#x1F357;</div>
+        <div>
+          <div class="n-meal-card__name">Chicken + Rice Bowl</div>
+          <div class="n-meal-card__freq">32x logged</div>
+        </div>
+      </div>
+      <div class="n-meal-card__macros">
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">520</div>
+          <div class="n-meal-card__macro-label">cal</div>
+        </div>
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">42g</div>
+          <div class="n-meal-card__macro-label">protein</div>
+        </div>
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">55g</div>
+          <div class="n-meal-card__macro-label">carbs</div>
+        </div>
+      </div>
+      <div class="n-meal-card__footer">
+        <div class="n-meal-card__ppc">P/cal: <em>0.08</em></div>
+        <div class="n-meal-card__grade n-meal-card__grade--b">B glucose</div>
+      </div>
+    </div>
+    <div class="n-meal-card">
+      <div class="n-meal-card__header">
+        <div class="n-meal-card__icon">&#x1F96A;</div>
+        <div>
+          <div class="n-meal-card__name">Greek Yogurt + Berries</div>
+          <div class="n-meal-card__freq">29x logged</div>
+        </div>
+      </div>
+      <div class="n-meal-card__macros">
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">280</div>
+          <div class="n-meal-card__macro-label">cal</div>
+        </div>
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">30g</div>
+          <div class="n-meal-card__macro-label">protein</div>
+        </div>
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">28g</div>
+          <div class="n-meal-card__macro-label">carbs</div>
+        </div>
+      </div>
+      <div class="n-meal-card__footer">
+        <div class="n-meal-card__ppc">P/cal: <em>0.11</em></div>
+        <div class="n-meal-card__grade n-meal-card__grade--a">A glucose</div>
+      </div>
+    </div>
+    <div class="n-meal-card">
+      <div class="n-meal-card__header">
+        <div class="n-meal-card__icon">&#x1F969;</div>
+        <div>
+          <div class="n-meal-card__name">Steak + Vegetables</div>
+          <div class="n-meal-card__freq">24x logged</div>
+        </div>
+      </div>
+      <div class="n-meal-card__macros">
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">580</div>
+          <div class="n-meal-card__macro-label">cal</div>
+        </div>
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">52g</div>
+          <div class="n-meal-card__macro-label">protein</div>
+        </div>
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">14g</div>
+          <div class="n-meal-card__macro-label">carbs</div>
+        </div>
+      </div>
+      <div class="n-meal-card__footer">
+        <div class="n-meal-card__ppc">P/cal: <em>0.09</em></div>
+        <div class="n-meal-card__grade n-meal-card__grade--a">A glucose</div>
+      </div>
+    </div>
+    <div class="n-meal-card">
+      <div class="n-meal-card__header">
+        <div class="n-meal-card__icon">&#x1F35D;</div>
+        <div>
+          <div class="n-meal-card__name">Pasta + Meat Sauce</div>
+          <div class="n-meal-card__freq">18x logged</div>
+        </div>
+      </div>
+      <div class="n-meal-card__macros">
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">650</div>
+          <div class="n-meal-card__macro-label">cal</div>
+        </div>
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">35g</div>
+          <div class="n-meal-card__macro-label">protein</div>
+        </div>
+        <div class="n-meal-card__macro">
+          <div class="n-meal-card__macro-val">72g</div>
+          <div class="n-meal-card__macro-label">carbs</div>
+        </div>
+      </div>
+      <div class="n-meal-card__footer">
+        <div class="n-meal-card__ppc">P/cal: <em>0.05</em></div>
+        <div class="n-meal-card__grade n-meal-card__grade--c">C glucose</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     30-DAY TREND CHART (10g: em-dash header)
      ════════════════════════════════════════════════════════════ -->
 <section class="n-chart-section reveal">
   <div class="n-chart-header">
-    <div class="n-chart-title">30-day calorie &amp; protein trend</div>
+    <div class="n-chart-title">30-Day Calorie &amp; Protein Trend</div>
     <div class="n-chart-legend">
       <div class="n-legend-item"><div class="n-legend-dot" style="background:#f59e0b"></div> Calories (&divide;10)</div>
       <div class="n-legend-item"><div class="n-legend-dot" style="background:#3ecf8e"></div> Protein (g)</div>
     </div>
   </div>
   <canvas class="n-chart" id="n-trend-canvas"></canvas>
+  <div class="n-context">
+    Consistency matters more than perfection. The goal isn&rsquo;t to hit exact numbers every day &mdash; it&rsquo;s to keep the <strong>trend line flat</strong> and the protein dots green.
+  </div>
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #3 — Deficit finding
+     10e: TDEE ADAPTATION TRACKING
      ════════════════════════════════════════════════════════════ -->
-<div class="n-pullquote reveal">
+<section class="n-tdee-section reveal">
+  <div class="n-section-header">TDEE Adaptation Tracking</div>
+  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
+    MacroFactor&rsquo;s adaptive TDEE learns your true energy expenditure from weight trends over 14+ days. As the body adapts to a deficit, TDEE drifts downward &mdash; tracking this prevents stalls.
+  </div>
+  <div class="n-tdee-grid">
+    <div class="n-tdee-card">
+      <div class="n-tdee-card__period">Month 1</div>
+      <div class="n-tdee-card__value">2,680</div>
+      <div class="n-tdee-card__unit">cal/day</div>
+      <div class="n-tdee-card__delta n-tdee-card__delta--flat">baseline</div>
+    </div>
+    <div class="n-tdee-card">
+      <div class="n-tdee-card__period">Month 3</div>
+      <div class="n-tdee-card__value">2,520</div>
+      <div class="n-tdee-card__unit">cal/day</div>
+      <div class="n-tdee-card__delta n-tdee-card__delta--down">&darr; 160 cal</div>
+    </div>
+    <div class="n-tdee-card">
+      <div class="n-tdee-card__period">Month 5</div>
+      <div class="n-tdee-card__value">2,410</div>
+      <div class="n-tdee-card__unit">cal/day</div>
+      <div class="n-tdee-card__delta n-tdee-card__delta--down">&darr; 270 cal</div>
+    </div>
+    <div class="n-tdee-card">
+      <div class="n-tdee-card__period">Current</div>
+      <div class="n-tdee-card__value" id="tdee-current">2,350</div>
+      <div class="n-tdee-card__unit">cal/day</div>
+      <div class="n-tdee-card__delta n-tdee-card__delta--down" id="tdee-delta">&darr; 330 cal</div>
+    </div>
+  </div>
+  <canvas class="n-tdee-chart" id="n-tdee-canvas"></canvas>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE #3 — Deficit finding (10g: staggered left)
+     ════════════════════════════════════════════════════════════ -->
+<div class="n-pullquote n-pullquote--left reveal">
   <div class="n-pullquote__watermark">03</div>
   <div class="n-pullquote__text">
     <em>500&ndash;750 cal deficit</em> is the sweet spot &mdash;
@@ -877,10 +1741,139 @@
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
-     N=1 RULES — C's bordered cards + left accent
+     10d: MICRONUTRIENT GAPS — genomics-informed targets
+     ════════════════════════════════════════════════════════════ -->
+<section class="n-micro-section reveal">
+  <div class="n-section-header">Micronutrient Gaps</div>
+  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
+    Genomics testing flagged specific micronutrient sensitivities. These targets are <strong>personalized</strong>, not RDA defaults. Deficits in these areas have measurable downstream effects.
+  </div>
+  <div class="n-micro-grid">
+    <div class="n-micro-card">
+      <div class="n-micro-card__name">Choline</div>
+      <div class="n-micro-card__why">PEMT variant &mdash; reduced endogenous synthesis. Liver health, methylation.</div>
+      <div class="n-micro-card__values">
+        <div class="n-micro-card__actual">380mg</div>
+        <div class="n-micro-card__target">Target: 550mg+</div>
+      </div>
+      <div class="n-micro-card__bar">
+        <div class="n-micro-card__fill n-micro-card__fill--warn" style="width:69%"></div>
+      </div>
+      <div class="n-micro-card__status n-micro-card__status--warn">Gap: 170mg</div>
+    </div>
+    <div class="n-micro-card">
+      <div class="n-micro-card__name">Vitamin D</div>
+      <div class="n-micro-card__why">VDR polymorphism &mdash; higher dose needed. Immune function, bone density.</div>
+      <div class="n-micro-card__values">
+        <div class="n-micro-card__actual">4,200 IU</div>
+        <div class="n-micro-card__target">Target: 5,000 IU</div>
+      </div>
+      <div class="n-micro-card__bar">
+        <div class="n-micro-card__fill n-micro-card__fill--warn" style="width:84%"></div>
+      </div>
+      <div class="n-micro-card__status n-micro-card__status--warn">Supplemented</div>
+    </div>
+    <div class="n-micro-card">
+      <div class="n-micro-card__name">Omega-3 (EPA+DHA)</div>
+      <div class="n-micro-card__why">FADS1 variant &mdash; poor conversion from ALA. Anti-inflammatory, cardiac.</div>
+      <div class="n-micro-card__values">
+        <div class="n-micro-card__actual">1.8g</div>
+        <div class="n-micro-card__target">Target: 2.0g+</div>
+      </div>
+      <div class="n-micro-card__bar">
+        <div class="n-micro-card__fill n-micro-card__fill--good" style="width:90%"></div>
+      </div>
+      <div class="n-micro-card__status n-micro-card__status--good">Near target</div>
+    </div>
+    <div class="n-micro-card">
+      <div class="n-micro-card__name">Folate</div>
+      <div class="n-micro-card__why">MTHFR C677T &mdash; reduced methylation. Homocysteine clearance, DNA repair.</div>
+      <div class="n-micro-card__values">
+        <div class="n-micro-card__actual">520mcg</div>
+        <div class="n-micro-card__target">Target: 800mcg</div>
+      </div>
+      <div class="n-micro-card__bar">
+        <div class="n-micro-card__fill n-micro-card__fill--warn" style="width:65%"></div>
+      </div>
+      <div class="n-micro-card__status n-micro-card__status--warn">Gap: 280mcg</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     10h: BEHAVIORAL TRIGGERS — nutrition misses x sleep/stress/travel
+     ════════════════════════════════════════════════════════════ -->
+<section class="n-triggers-section reveal">
+  <div class="n-section-header">Behavioral Trigger Analysis</div>
+  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
+    Nutrition failures aren&rsquo;t random. They&rsquo;re predictable. Cross-referencing macro misses with <a href="/sleep/" style="color:var(--n-amber);text-decoration:none">sleep</a>, stress, and travel data reveals the patterns.
+  </div>
+  <div class="n-triggers-grid">
+    <div class="n-trigger-card">
+      <div class="n-trigger-card__trigger">Sleep deprivation</div>
+      <div class="n-trigger-card__finding">When sleep drops below 6 hours, protein target missed 80% of the time</div>
+      <div class="n-trigger-card__evidence">Poor sleep &rarr; <em>+340 cal</em> avg over target &bull; protein hit rate drops to <em>20%</em></div>
+    </div>
+    <div class="n-trigger-card">
+      <div class="n-trigger-card__trigger">Travel days</div>
+      <div class="n-trigger-card__finding">Travel days average 600 cal over target with protein under 140g</div>
+      <div class="n-trigger-card__evidence">Airport food + restaurant meals &rarr; <em>2x</em> the glucose variability &bull; fiber drops <em>40%</em></div>
+    </div>
+    <div class="n-trigger-card">
+      <div class="n-trigger-card__trigger">High stress</div>
+      <div class="n-trigger-card__finding">Stress days (low HRV) correlate with late-night snacking and missed logging</div>
+      <div class="n-trigger-card__evidence">HRV &lt;40ms days &rarr; <em>3x</em> more unlogged meals &bull; carb intake spikes <em>+65g</em></div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     10j: HYDRATION — water intake and correlation with energy/recovery
+     ════════════════════════════════════════════════════════════ -->
+<section class="n-hydration-section reveal">
+  <div class="n-section-header">Hydration</div>
+  <div class="n-hydration-grid">
+    <div class="n-hydration-big">
+      <div class="n-hydration-big__num">3.2L</div>
+      <div class="n-hydration-big__unit">daily average</div>
+      <div class="n-hydration-big__sub">Target: 3.5L+</div>
+    </div>
+    <div class="n-hydration-corr">
+      <div class="n-hydration-corr-card">
+        <div class="n-hydration-corr-card__label">Energy correlation</div>
+        <div class="n-hydration-corr-card__finding">Days above <em>3.5L</em> show <em>+8% higher</em> Whoop recovery scores on average. Dehydration days (&lt;2.5L) correlate with afternoon energy crashes.</div>
+      </div>
+      <div class="n-hydration-corr-card">
+        <div class="n-hydration-corr-card__label">Recovery impact</div>
+        <div class="n-hydration-corr-card__finding">Proper hydration on training days improves next-day <em>HRV by 6ms</em> on average. Electrolyte-enhanced water shows stronger effect than plain.</div>
+      </div>
+    </div>
+  </div>
+  <div class="n-context">
+    Hydration is the most undertracked variable in nutrition. It affects glucose readings, recovery scores, and perceived energy &mdash; but rarely gets the same attention as macros.
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE #4 — Psychological dimension (10i + 10g: dynamic style)
+     ════════════════════════════════════════════════════════════ -->
+<div class="n-pullquote n-pullquote--dynamic n-pullquote--right reveal">
+  <div class="n-pullquote__watermark">04</div>
+  <div class="n-pullquote__text">
+    The hardest part of tracking nutrition isn&rsquo;t the math.
+    It&rsquo;s the honesty. <em>Logging the bad days</em> is where the real data lives.
+  </div>
+  <div class="n-pullquote__attr">
+    <span class="n-pullquote__badge">N=1 &middot; Reflection</span>
+    <span class="n-pullquote__source">Every meal logged &mdash; even the ones I&rsquo;d rather forget</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     N=1 RULES — left-accent cards (10g: em-dash header)
      ════════════════════════════════════════════════════════════ -->
 <section class="n-rules-section reveal">
-  <div class="n-rules-header">N=1 nutrition rules &mdash; 30+ weeks of data</div>
+  <div class="n-section-header">N=1 Nutrition Rules &mdash; 30+ Weeks of Data</div>
   <div class="n-rule-grid">
     <div class="n-rule">
       <div class="n-rule__num">Rule 01</div>
@@ -889,8 +1882,8 @@
     </div>
     <div class="n-rule">
       <div class="n-rule__num">Rule 02</div>
-      <div class="n-rule__finding">Protein shakes produce the lowest glucose response of any meal</div>
-      <div class="n-rule__evidence">+6 mg/dL spike &bull; vs pizza at <em>+55 mg/dL</em> &rarr; <a href="/glucose/">Glucose Observatory</a></div>
+      <div class="n-rule__finding">High-fiber days produce the lowest glucose variability</div>
+      <div class="n-rule__evidence">30g+ fiber &rarr; SD <em>14 vs 22</em> mg/dL &rarr; <a href="/glucose/">Glucose Observatory</a></div>
     </div>
     <div class="n-rule">
       <div class="n-rule__num">Rule 03</div>
@@ -899,8 +1892,8 @@
     </div>
     <div class="n-rule">
       <div class="n-rule__num">Rule 04</div>
-      <div class="n-rule__finding">Fiber above 30g/day correlates with lower glucose variability</div>
-      <div class="n-rule__evidence">SD <em>14 vs 22</em> mg/dL on high vs low fiber days &rarr; <a href="/explorer/">Data Explorer</a></div>
+      <div class="n-rule__finding">Protein distribution across 4 meals beats loading 2 meals</div>
+      <div class="n-rule__evidence">4-meal spread &rarr; <em>30g+ leucine threshold</em> hit at each sitting</div>
     </div>
   </div>
 </section>
@@ -919,6 +1912,19 @@
     <div class="n-xref-card__tag">Nutrition Pillar &mdash; 1 of 7</div>
     <div class="n-xref-card__text">Protein adherence, calorie consistency, and fiber intake feed the Nutrition pillar in the Character Sheet.</div>
   </a>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     10-kitchen: THE KITCHEN teaser
+     ════════════════════════════════════════════════════════════ -->
+<div class="n-kitchen-teaser reveal">
+  <div class="n-kitchen-teaser__badge">Coming Soon</div>
+  <div class="n-kitchen-teaser__title">The <em>Kitchen</em></div>
+  <div class="n-kitchen-teaser__desc">
+    Personalized meal recommendations built from your CGM data, macro targets, and food preferences.
+    Every suggestion scored by glucose response, protein density, and how often you actually eat it.
+  </div>
+  <a href="/kitchen/" class="n-kitchen-teaser__link">Learn more &rarr;</a>
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -961,10 +1967,10 @@
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
-     METHODOLOGY
+     METHODOLOGY (10g: em-dash header)
      ════════════════════════════════════════════════════════════ -->
 <section class="n-method reveal">
-  <div class="n-method__title">Measurement protocol</div>
+  <div class="n-method__title">Measurement Protocol</div>
   <div class="n-method-grid">
     <div class="n-method-item">
       <strong>MACROFACTOR</strong>
@@ -1053,6 +2059,16 @@
     setWidth('protein-fill', hitPct || 0);
     setText('protein-days', (n.protein_hit_days || 0) + ' of ' + (daysLogged || 0) + ' days');
 
+    /* ── TDEE current (10e) ── */
+    if (n.avg_tdee) {
+      setText('tdee-current', n.avg_tdee.toLocaleString());
+      var tdeeDelta = 2680 - n.avg_tdee;
+      var deltaEl = document.getElementById('tdee-delta');
+      if (deltaEl && tdeeDelta > 0) {
+        deltaEl.textContent = '\u2193 ' + Math.round(tdeeDelta) + ' cal';
+      }
+    }
+
     /* ── Trend chart ── */
     if (trend.length >= 3) {
       var canvas = document.getElementById('n-trend-canvas');
@@ -1129,6 +2145,73 @@
         ctx.fillText(v, pad.l - 6, yOf(v) + 4);
       });
     }
+
+    /* ── TDEE mini chart (10e) ── */
+    (function() {
+      var tdeeCanvas = document.getElementById('n-tdee-canvas');
+      if (!tdeeCanvas) return;
+      var tdeeData = [2680, 2620, 2560, 2520, 2480, 2450, 2410, 2380, 2350];
+      if (n.avg_tdee) tdeeData[tdeeData.length - 1] = n.avg_tdee;
+      var dpr = window.devicePixelRatio || 1;
+      tdeeCanvas.width = tdeeCanvas.offsetWidth * dpr;
+      tdeeCanvas.height = tdeeCanvas.offsetHeight * dpr;
+      var ctx2 = tdeeCanvas.getContext('2d');
+      ctx2.scale(dpr, dpr);
+      var W2 = tdeeCanvas.offsetWidth, H2 = tdeeCanvas.offsetHeight;
+      var p2 = { t: 16, r: 16, b: 24, l: 48 };
+      var iW2 = W2 - p2.l - p2.r, iH2 = H2 - p2.t - p2.b;
+      var minT = Math.min.apply(null, tdeeData) - 100;
+      var maxT = Math.max.apply(null, tdeeData) + 100;
+      var xOf2 = function(i) { return p2.l + (i / (tdeeData.length - 1)) * iW2; };
+      var yOf2 = function(v) { return p2.t + iH2 - ((v - minT) / (maxT - minT)) * iH2; };
+
+      /* Grid */
+      ctx2.strokeStyle = 'rgba(255,255,255,0.03)';
+      ctx2.lineWidth = 1;
+      for (var r = 0; r <= 3; r++) {
+        var yy = p2.t + (r / 3) * iH2;
+        ctx2.beginPath(); ctx2.moveTo(p2.l, yy); ctx2.lineTo(W2 - p2.r, yy); ctx2.stroke();
+      }
+
+      /* Area fill */
+      var tGrad = ctx2.createLinearGradient(0, p2.t, 0, p2.t + iH2);
+      tGrad.addColorStop(0, 'rgba(245,158,11,0.10)');
+      tGrad.addColorStop(1, 'rgba(245,158,11,0)');
+      ctx2.beginPath();
+      tdeeData.forEach(function(v, i) {
+        i === 0 ? ctx2.moveTo(xOf2(i), yOf2(v)) : ctx2.lineTo(xOf2(i), yOf2(v));
+      });
+      ctx2.lineTo(xOf2(tdeeData.length - 1), p2.t + iH2);
+      ctx2.lineTo(xOf2(0), p2.t + iH2);
+      ctx2.closePath();
+      ctx2.fillStyle = tGrad;
+      ctx2.fill();
+
+      /* Line */
+      ctx2.strokeStyle = 'rgba(245,158,11,0.8)';
+      ctx2.lineWidth = 2;
+      ctx2.beginPath();
+      tdeeData.forEach(function(v, i) {
+        i === 0 ? ctx2.moveTo(xOf2(i), yOf2(v)) : ctx2.lineTo(xOf2(i), yOf2(v));
+      });
+      ctx2.stroke();
+
+      /* Dots */
+      tdeeData.forEach(function(v, i) {
+        ctx2.fillStyle = '#f59e0b';
+        ctx2.beginPath(); ctx2.arc(xOf2(i), yOf2(v), 3, 0, Math.PI * 2); ctx2.fill();
+      });
+
+      /* Y labels */
+      ctx2.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx2.font = '10px monospace';
+      ctx2.textAlign = 'right';
+      var step = Math.round((maxT - minT) / 3);
+      for (var l = 0; l <= 3; l++) {
+        var val = Math.round(minT + l * step);
+        ctx2.fillText(val, p2.l - 6, yOf2(val) + 4);
+      }
+    })();
 
     loading.style.display = 'none';
     content.style.display = 'block';

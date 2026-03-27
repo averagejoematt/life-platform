@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="The journey timeline — every milestone, finding, experiment, and breakthrough in Matthew's health transformation, told chronologically.">
+  <meta name="description" content="The Lab Notebook — AI findings, counterintuitive surprises, experiment results, and scientific discoveries from Matthew's health transformation.">
   <meta property="og:title" content="Discoveries — Matthew Walker">
-  <meta property="og:description" content="Weight lost. Experiments run. AI findings. The timeline of one person's health transformation.">
+  <meta property="og:description" content="AI findings. Counterintuitive surprises. Experiments run. The scientific discoveries of one person's health transformation.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com/discoveries/">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
@@ -33,9 +33,17 @@
       font-family: var(--font-display);
       font-size: var(--text-h1);
       color: var(--text);
-      margin-bottom: var(--space-4);
+      margin-bottom: var(--space-2);
     }
     .page-header__title span { color: var(--accent); }
+    .page-header__subtitle {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-4);
+    }
     .page-header__sub {
       font-family: var(--font-mono);
       font-size: var(--text-base);
@@ -67,6 +75,56 @@
       margin-top: var(--space-1);
     }
 
+    /* ── Executive Summary (15b) ──────────────────────────── */
+    .exec-summary {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-6) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .exec-summary__box {
+      border: 1px solid var(--accent-dim);
+      border-left: 3px solid var(--accent);
+      background: var(--accent-bg-subtle);
+      padding: var(--space-5) var(--space-6);
+    }
+    .exec-summary__text {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--text);
+      line-height: var(--lh-body);
+    }
+    .exec-summary__text strong {
+      color: var(--accent);
+    }
+
+    /* ── Proof-of-Concept Aggregate Metric (15m) ──────────── */
+    .aggregate-metric {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-4) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .aggregate-metric__row {
+      display: flex;
+      gap: var(--space-6);
+      flex-wrap: wrap;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .aggregate-metric__item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .aggregate-metric__value {
+      color: var(--accent);
+      font-size: var(--text-xs);
+    }
+
     /* ── Filter Bar ──────────────────────────────────────── */
     .filter-bar {
       max-width: var(--max-width);
@@ -96,6 +154,133 @@
       border-color: var(--accent);
       color: var(--accent);
       background: var(--accent-bg-subtle);
+    }
+
+    /* ── Chapter Groupings (15g) ──────────────────────────── */
+    .tl-chapter {
+      max-width: var(--max-width);
+      margin: var(--space-8) auto var(--space-4);
+      padding: 0 var(--page-padding);
+      position: relative;
+    }
+    .tl-chapter__header {
+      border-left: 3px solid var(--accent-dim);
+      padding: var(--space-3) var(--space-5);
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .tl-chapter__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-1);
+    }
+    .tl-chapter__summary {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+    }
+
+    /* ── Hypotheses Section (15j) ─────────────────────────── */
+    .hypotheses-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-top: 1px solid var(--border);
+    }
+    .hypotheses-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .hypotheses-section__sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      margin-bottom: var(--space-8);
+    }
+    .hypothesis-card {
+      border: 1px solid var(--border);
+      border-left: 3px solid #a78bfa;
+      background: var(--surface);
+      padding: var(--space-5) var(--space-6);
+      margin-bottom: var(--space-4);
+    }
+    .hypothesis-card__status {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: #a78bfa;
+      margin-bottom: var(--space-2);
+    }
+    .hypothesis-card__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .hypothesis-card__body {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .hypothesis-card__meta {
+      margin-top: var(--space-3);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+    }
+
+    /* ── Inner Life Section (15h) ─────────────────────────── */
+    .inner-life-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-top: 1px solid var(--border);
+    }
+    .inner-life-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h2);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .inner-life-section__sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      margin-bottom: var(--space-8);
+    }
+    .inner-life-card {
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--c-amber-500);
+      background: var(--surface);
+      padding: var(--space-5) var(--space-6);
+      margin-bottom: var(--space-4);
+    }
+    .inner-life-card__category {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--c-amber-500);
+      margin-bottom: var(--space-2);
+    }
+    .inner-life-card__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .inner-life-card__body {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
     }
 
     /* ── Timeline Container ──────────────────────────────── */
@@ -176,6 +361,7 @@
       padding: var(--space-5) var(--space-6);
       transition: border-color 0.15s;
       margin-left: var(--space-4);
+      position: relative;
     }
     .tl-event:hover .tl-event__card {
       border-color: var(--text-muted);
@@ -224,22 +410,79 @@
       color: var(--text-faint);
     }
 
-    /* ── Type Colors ─────────────────────────────────────── */
-    /* Weight milestones — primary green */
-    .tl-event[data-type="weight"] .tl-event__node { border-color: var(--c-green-500); background: var(--c-green-500); }
-    .tl-event[data-type="weight"] .tl-event__card { border-left: 3px solid var(--c-green-500); }
-    .tl-event[data-type="weight"] .tl-event__type { color: var(--c-green-500); }
-    .tl-event[data-type="weight"] .tl-event__title { color: var(--c-green-500); }
+    /* ── Status Badges (15f) ──────────────────────────────── */
+    .tl-event__status-badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 2px;
+      margin-left: var(--space-2);
+      vertical-align: middle;
+    }
+    .badge--observed {
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      background: transparent;
+    }
+    .badge--investigating {
+      color: #60a5fa;
+      border: 1px solid #60a5fa;
+      background: rgba(96, 165, 250, 0.08);
+    }
+    .badge--confirmed {
+      color: var(--c-green-500);
+      border: 1px solid var(--c-green-500);
+      background: var(--c-green-050);
+    }
+    .badge--integrated {
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      background: var(--accent-bg-subtle);
+    }
+    .badge--refuted {
+      color: var(--c-red-status);
+      border: 1px solid var(--c-red-status);
+      background: rgba(255, 82, 82, 0.08);
+    }
 
+    /* ── Share Button (15k) ──────────────────────────────── */
+    .tl-event__share {
+      position: absolute;
+      top: var(--space-3);
+      right: var(--space-3);
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-faint);
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      transition: all 0.15s;
+    }
+    .tl-event__card:hover .tl-event__share {
+      opacity: 1;
+    }
+    .tl-event__share:hover {
+      border-color: var(--accent-dim);
+      color: var(--accent);
+    }
+    .tl-event__share.copied {
+      border-color: var(--accent);
+      color: var(--accent);
+      opacity: 1;
+    }
+
+    /* ── Type Colors ─────────────────────────────────────── */
     /* Milestone (Day 1) — gold/accent */
     .tl-event[data-type="milestone"] .tl-event__node { border-color: var(--c-amber-500); background: var(--c-amber-500); width: 16px; height: 16px; left: 53px; }
     .tl-event[data-type="milestone"] .tl-event__card { border-left: 3px solid var(--c-amber-500); }
     .tl-event[data-type="milestone"] .tl-event__type { color: var(--c-amber-500); }
-
-    /* Level up — teal */
-    .tl-event[data-type="level_up"] .tl-event__node { border-color: #00b4d8; background: #00b4d8; }
-    .tl-event[data-type="level_up"] .tl-event__card { border-left: 3px solid #00b4d8; }
-    .tl-event[data-type="level_up"] .tl-event__type { color: #00b4d8; }
 
     /* Experiment — purple */
     .tl-event[data-type="experiment"] .tl-event__node { border-color: #a78bfa; background: #a78bfa; }
@@ -251,54 +494,80 @@
     .tl-event[data-type="finding"] .tl-event__card { border-left: 3px solid #60a5fa; }
     .tl-event[data-type="finding"] .tl-event__type { color: #60a5fa; }
 
-    /* Counterintuitive — amber alert */
-    .tl-event[data-type="counterintuitive"] .tl-event__node { border-color: var(--c-amber-500); background: var(--c-amber-500); }
-    .tl-event[data-type="counterintuitive"] .tl-event__card { border-left: 3px solid var(--c-amber-500); background: var(--c-amber-050); }
+    /* Counterintuitive — amber alert, elevated (15c) */
+    .tl-event[data-type="counterintuitive"] .tl-event__node { border-color: var(--c-amber-500); background: var(--c-amber-500); width: 16px; height: 16px; left: 53px; }
+    .tl-event[data-type="counterintuitive"] .tl-event__card { border-left: 3px solid var(--c-amber-500); background: var(--c-amber-050); border-width: 1px; border-left-width: 3px; }
     .tl-event[data-type="counterintuitive"] .tl-event__type { color: var(--c-amber-500); }
+    .tl-event[data-type="counterintuitive"] .tl-event__title { color: var(--c-amber-500); font-size: var(--text-h2); }
 
     /* Discovery (experiment complete) — gold */
     .tl-event[data-type="discovery"] .tl-event__node { border-color: #fbbf24; background: #fbbf24; }
     .tl-event[data-type="discovery"] .tl-event__card { border-left: 3px solid #fbbf24; }
     .tl-event[data-type="discovery"] .tl-event__type { color: #fbbf24; }
 
-    /* ── Annotation (DISC-7) ────────────────────────────── */
+    /* Inner Life — amber/journal */
+    .tl-event[data-type="inner_life"] .tl-event__node { border-color: var(--c-amber-500); background: var(--c-amber-500); }
+    .tl-event[data-type="inner_life"] .tl-event__card { border-left: 3px solid var(--c-amber-500); }
+    .tl-event[data-type="inner_life"] .tl-event__type { color: var(--c-amber-500); }
+
+    /* ── DISC-7: Finding → Action → Outcome Flow (15e) ──── */
     .tl-event__annotation {
       margin-top: var(--space-4);
       padding-top: var(--space-3);
       border-top: 1px dashed var(--border);
     }
-    .tl-event__annotation-label {
-      font-family: var(--font-mono);
+    .annotation-flow {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: var(--space-3);
+      margin-top: var(--space-3);
+    }
+    .annotation-flow__step {
+      border: 1px solid var(--border);
+      padding: var(--space-3) var(--space-4);
+      position: relative;
+    }
+    .annotation-flow__step-number {
+      font-family: var(--font-display);
       font-size: var(--text-2xs);
+      color: var(--accent);
+      margin-bottom: var(--space-1);
+    }
+    .annotation-flow__step-label {
+      font-family: var(--font-mono);
+      font-size: 9px;
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
-      color: var(--accent-dim);
-      margin-bottom: var(--space-2);
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
+      color: var(--text-faint);
+      margin-bottom: var(--space-1);
     }
-    .tl-event__annotation-text {
+    .annotation-flow__step-text {
       font-size: var(--text-sm);
       color: var(--text);
       line-height: var(--lh-body);
     }
-    .tl-event__annotation-action {
-      display: inline-block;
-      margin-top: var(--space-2);
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--accent);
-      background: var(--accent-bg-subtle);
-      padding: var(--space-1) var(--space-3);
-      letter-spacing: var(--ls-tag);
-    }
-    .tl-event__annotation-outcome {
-      margin-top: var(--space-2);
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--text-muted);
+    .annotation-flow__step--empty .annotation-flow__step-text {
+      color: var(--text-faint);
       font-style: italic;
+    }
+    .annotation-flow__arrow {
+      display: none;
+    }
+
+    /* ── Explorer Cross-Link (15i) ────────────────────────── */
+    .tl-event__explorer-link {
+      display: inline-block;
+      margin-top: var(--space-3);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      text-decoration: none;
+      border-bottom: 1px dashed var(--border);
+      padding-bottom: 1px;
+    }
+    .tl-event__explorer-link:hover {
+      color: var(--accent-dim);
+      border-bottom-color: var(--accent-dim);
     }
 
     /* ── Empty / Loading ─────────────────────────────────── */
@@ -353,8 +622,12 @@
       .tl-event__date-day { display: inline; font-size: var(--text-sm); }
       .tl-event__node { left: 6px; top: 6px; width: 10px; height: 10px; }
       .tl-event[data-type="milestone"] .tl-event__node { left: 4px; width: 14px; height: 14px; }
+      .tl-event[data-type="counterintuitive"] .tl-event__node { left: 4px; width: 14px; height: 14px; }
       .tl-event__card { margin-left: var(--space-8); }
+      .tl-event__share { opacity: 1; }
       .page-header__stats { gap: var(--space-4); }
+      .annotation-flow { grid-template-columns: 1fr; }
+      .aggregate-metric__row { flex-direction: column; gap: var(--space-2); }
     }
 
     /* ── Pipeline nav (shared pattern) ───────────────────── */
@@ -369,16 +642,18 @@
 
 <div id="amj-nav"></div>
 
-<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">Method</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Discoveries</span></nav>
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">&rsaquo;</span><span class="breadcrumb__section">Method</span><span class="breadcrumb__sep">&rsaquo;</span><span class="breadcrumb__current">Discoveries</span></nav>
 <div id="amj-hierarchy-nav"></div>
 
+<!-- ── Header (15a, 15l) ──────────────────────────────────── -->
 <header class="page-header reveal">
   <div class="eyebrow" style="margin-bottom:var(--space-4)">The Science</div>
   <h1 class="page-header__title">What I've <span>discovered</span></h1>
+  <div class="page-header__subtitle">The Lab Notebook &mdash; What I've Learned</div>
   <p class="page-header__sub">
-    Every milestone, finding, and breakthrough &mdash; told chronologically.
-    Weight lost. Experiments run. Patterns the AI found that I wouldn&rsquo;t have seen.
-    The story of what actually happened.
+    AI findings, counterintuitive surprises, experiment results, and scientific discoveries.
+    Patterns the AI found that I wouldn&rsquo;t have seen. Hypotheses tested and outcomes measured.
+    The science of what actually happened.
   </p>
   <div class="page-header__stats">
     <div class="header-stat">
@@ -390,36 +665,113 @@
       <div class="header-stat__label">Days tracked</div>
     </div>
     <div class="header-stat">
-      <div class="header-stat__value" id="stat-weight">&mdash;</div>
-      <div class="header-stat__label">Weight events</div>
-    </div>
-    <div class="header-stat">
       <div class="header-stat__value" id="stat-findings">&mdash;</div>
       <div class="header-stat__label">AI findings</div>
+    </div>
+    <div class="header-stat">
+      <div class="header-stat__value" id="stat-experiments">&mdash;</div>
+      <div class="header-stat__label">Experiments</div>
     </div>
   </div>
 </header>
 
-<!-- Filter bar -->
+<!-- ── Executive Summary (15b) ────────────────────────────── -->
+<div class="exec-summary reveal">
+  <div class="exec-summary__box">
+    <div class="exec-summary__text" id="exec-summary-text">
+      In <strong id="exec-days">&mdash;</strong> days, the platform surfaced
+      <strong id="exec-findings">&mdash;</strong> findings.
+      <strong id="exec-investigated">&mdash;</strong> were investigated.
+      <strong id="exec-behavioral">&mdash;</strong> changed behavior.
+    </div>
+  </div>
+</div>
+
+<!-- ── Aggregate Metric (15m) ────────────────────────────── -->
+<div class="aggregate-metric reveal">
+  <div class="aggregate-metric__row">
+    <div class="aggregate-metric__item">
+      <span class="aggregate-metric__value" id="agg-behavioral-pct">&mdash;</span>
+      <span>of AI findings led to behavioral change</span>
+    </div>
+    <div class="aggregate-metric__item">
+      <span class="aggregate-metric__value" id="agg-experiment-pct">&mdash;</span>
+      <span>of experiments produced measurable outcome</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Filter Bar (15a: no weight, no level_up) ──────────── -->
 <div class="filter-bar" id="filter-bar">
   <button class="filter-btn active" data-filter="all">All</button>
-  <button class="filter-btn" data-filter="weight">Weight</button>
-  <button class="filter-btn" data-filter="level_up">Level Up</button>
-  <button class="filter-btn" data-filter="experiment">Experiments</button>
-  <button class="filter-btn" data-filter="finding">AI Findings</button>
   <button class="filter-btn" data-filter="counterintuitive">Surprises</button>
+  <button class="filter-btn" data-filter="finding">AI Findings</button>
+  <button class="filter-btn" data-filter="experiment">Experiments</button>
+  <button class="filter-btn" data-filter="discovery">Results</button>
+  <button class="filter-btn" data-filter="inner_life">Inner Life</button>
   <button class="filter-btn" data-filter="milestone">Milestones</button>
 </div>
 
-<!-- Timeline -->
+<!-- ── Timeline ──────────────────────────────────────────── -->
 <div class="timeline" id="timeline">
   <div class="timeline-empty">Loading timeline&hellip;</div>
 </div>
 
-<!-- Explorer CTA -->
+<!-- ── Active Hypotheses (15j) ────────────────────────────── -->
+<div class="hypotheses-section reveal" id="hypotheses-section">
+  <h2 class="hypotheses-section__title">What I'm Currently Testing</h2>
+  <p class="hypotheses-section__sub">Active hypotheses pulled from the hypothesis engine and running experiments.</p>
+  <div id="hypotheses-list">
+    <!-- Pre-seeded Day 1 hypotheses (15d) -->
+    <div class="hypothesis-card">
+      <div class="hypothesis-card__status">Active Hypothesis</div>
+      <div class="hypothesis-card__title">Sleep consistency matters more than sleep duration</div>
+      <div class="hypothesis-card__body">Testing whether a consistent bedtime/wake time (&plusmn;30 min) produces better HRV and recovery scores than simply logging more hours of variable-schedule sleep.</div>
+      <div class="hypothesis-card__meta">Started: Day 1 &middot; Source: Baseline literature review &middot; Metric: HRV, Recovery Score</div>
+    </div>
+    <div class="hypothesis-card">
+      <div class="hypothesis-card__status">Active Hypothesis</div>
+      <div class="hypothesis-card__title">Morning sunlight exposure improves evening sleep onset</div>
+      <div class="hypothesis-card__body">Hypothesis: 10+ minutes of outdoor light within 60 minutes of waking will reduce sleep onset latency by measurable amount within 2 weeks.</div>
+      <div class="hypothesis-card__meta">Started: Day 1 &middot; Source: Huberman protocol &middot; Metric: Sleep onset latency</div>
+    </div>
+    <div class="hypothesis-card">
+      <div class="hypothesis-card__status">Active Hypothesis</div>
+      <div class="hypothesis-card__title">Protein timing affects next-day recovery</div>
+      <div class="hypothesis-card__body">Testing whether consuming 30g+ protein within 2 hours of training produces measurably better next-day Whoop recovery vs. training days with delayed protein intake.</div>
+      <div class="hypothesis-card__meta">Started: Day 1 &middot; Source: Training protocol &middot; Metric: Whoop Recovery Score</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Inner Life Discoveries (15h) ──────────────────────── -->
+<div class="inner-life-section reveal" id="inner-life-section">
+  <h2 class="inner-life-section__title">Inner Life Discoveries</h2>
+  <p class="inner-life-section__sub">Journal breakthroughs, cognitive pattern shifts, and connection milestones. The inner life is the center.</p>
+  <div id="inner-life-list">
+    <!-- Pre-seeded Day 1 content (15d) -->
+    <div class="inner-life-card">
+      <div class="inner-life-card__category">Journal Breakthrough</div>
+      <div class="inner-life-card__title">First journal entry: Why am I doing this?</div>
+      <div class="inner-life-card__body">Day 1 reflection on motivation. Not weight, not aesthetics &mdash; the question is whether I can build a system that makes invisible patterns visible. The hypothesis: self-knowledge is the prerequisite for change.</div>
+    </div>
+    <div class="inner-life-card">
+      <div class="inner-life-card__category">Cognitive Pattern</div>
+      <div class="inner-life-card__title">Baseline cognitive patterns established</div>
+      <div class="inner-life-card__body">Initial journal analysis identified recurring thought patterns around energy, motivation, and self-talk. These become the baseline for tracking cognitive shifts over time.</div>
+    </div>
+    <div class="inner-life-card">
+      <div class="inner-life-card__category">Connection Milestone</div>
+      <div class="inner-life-card__title">First public commitment made</div>
+      <div class="inner-life-card__body">Publishing the platform itself is the commitment device. Building in public creates accountability that private tracking never could. Day 1 of being observed.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Explorer CTA (15i) ──────────────────────────────────── -->
 <div class="explorer-cta">
   <div class="explorer-cta__box">
-    <span class="explorer-cta__text">Want the raw correlation data? 23 pairs, FDR-corrected, updated weekly.</span>
+    <span class="explorer-cta__text">Want the raw correlation data? 23 pairs, FDR-corrected, updated weekly. Discoveries start as patterns spotted in the Explorer.</span>
     <a href="/explorer/" class="explorer-cta__link">Open Data Explorer &rarr;</a>
   </div>
 </div>
@@ -442,22 +794,31 @@ function daysSinceStart() {
 // Icons per event type (inline SVG paths)
 const ICONS = {
   milestone:        '<svg class="tl-event__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0l2.2 5.5H16l-4.7 3.8 1.8 5.7L8 11.3 2.9 15l1.8-5.7L0 5.5h5.8z"/></svg>',
-  weight:           '<svg class="tl-event__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M3 13h10V6H3v7zM5 2v2h6V2H5zM2 5h12a1 1 0 011 1v8a1 1 0 01-1 1H2a1 1 0 01-1-1V6a1 1 0 011-1z"/></svg>',
-  level_up:         '<svg class="tl-event__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l5 6H9v8H7V7H3l5-6z"/></svg>',
   experiment:       '<svg class="tl-event__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M6 1h4v2h-1v4l4 6H3l4-6V3H6V1zm2 6.5L5.5 12h5L8 7.5z"/></svg>',
   discovery:        '<svg class="tl-event__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a5 5 0 013 9v2H5V9A5 5 0 018 0zM6 12h4v1H6v-1zm0 2h4v1H6v-1z"/></svg>',
   finding:          '<svg class="tl-event__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M1 14h14v1H1v-1zM2 8l3-3 3 2 4-5 1 1-5 6-3-2-2 2z"/></svg>',
   counterintuitive: '<svg class="tl-event__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0l8 14H0L8 0zm0 5a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1zm0 7a1 1 0 100-2 1 1 0 000 2z"/></svg>',
+  inner_life:       '<svg class="tl-event__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.3l1.8 3.6 4 .6-2.9 2.8.7 4L8 10.5 4.4 12.3l.7-4L2.2 5.5l4-.6L8 1.3z"/></svg>',
 };
+
+const SHARE_ICON = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13 0a3 3 0 00-2.7 4.3L5.6 7A3 3 0 000 9a3 3 0 005.6 1.5l4.7 2.8A3 3 0 1014 11a3 3 0 00-1.6.5L7.7 8.7A3 3 0 008 8c0-.2 0-.5-.1-.7l4.7-2.8A3 3 0 1013 0z"/></svg>';
 
 const TYPE_LABELS = {
   milestone:        'Milestone',
-  weight:           'Weight',
-  level_up:         'Level Up',
   experiment:       'Experiment',
   discovery:        'Result',
   finding:          'AI Finding',
   counterintuitive: 'Surprise',
+  inner_life:       'Inner Life',
+};
+
+// 15f: Discovery lifecycle statuses
+const STATUS_CLASSES = {
+  observed:      'badge--observed',
+  investigating: 'badge--investigating',
+  confirmed:     'badge--confirmed',
+  integrated:    'badge--integrated',
+  refuted:       'badge--refuted',
 };
 
 function formatDate(dateStr) {
@@ -469,58 +830,143 @@ function formatDate(dateStr) {
   } catch { return { month: '???', day: '?' }; }
 }
 
+// 15k: Copy discovery summary to clipboard
+function shareDiscovery(btn, title, body) {
+  const text = `${title}\n\n${body}\n\n-- from averagejoematt.com/discoveries/`;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.classList.add('copied');
+    btn.title = 'Copied!';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.title = 'Copy summary';
+    }, 2000);
+  });
+}
+
+// 15g: Assign events to time-based chapters
+function getChapterForDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const dayNum = Math.floor((d - JOURNEY_START) / 86400000) + 1;
+  if (dayNum <= 28) return { id: 'ch1', title: 'Weeks 1\u20134: Baseline Phase', summary: 'Establishing measurement. Calibrating sensors. Building the daily habit.' };
+  if (dayNum <= 56) return { id: 'ch2', title: 'Weeks 5\u20138: First Signals', summary: 'Initial correlations emerge. First experiments launched.' };
+  if (dayNum <= 84) return { id: 'ch3', title: 'Weeks 9\u201312: Pattern Recognition', summary: 'AI findings accumulate. Behavioral adjustments begin.' };
+  return { id: 'ch4', title: 'Week 13+: Integration', summary: 'Confirmed discoveries shape daily protocols.' };
+}
+
 function renderTimeline(events, filter) {
-  const filtered = filter === 'all' ? events : events.filter(e => e.type === filter);
+  // 15a: Filter out weight and level_up events from this page
+  const scopedEvents = events.filter(e => e.type !== 'weight' && e.type !== 'level_up');
+  const filtered = filter === 'all' ? scopedEvents : scopedEvents.filter(e => e.type === filter);
   const container = document.getElementById('timeline');
 
   if (filtered.length === 0) {
-    container.innerHTML = `<div class="timeline-empty">No ${filter === 'all' ? '' : TYPE_LABELS[filter] + ' '}events yet. The journey is just beginning.</div>`;
+    container.innerHTML = '<div class="timeline-empty">No ' + (filter === 'all' ? '' : (TYPE_LABELS[filter] || filter) + ' ') + 'events yet. The journey is just beginning.</div>';
     return;
   }
 
-  // Reverse chronological — most recent at top
-  const sorted = [...filtered].reverse();
+  // 15c: Sort with counterintuitive findings first, then reverse chronological
+  const sorted = [...filtered].sort((a, b) => {
+    // Counterintuitive always floats to top
+    if (a.type === 'counterintuitive' && b.type !== 'counterintuitive') return -1;
+    if (b.type === 'counterintuitive' && a.type !== 'counterintuitive') return 1;
+    // Then reverse chronological
+    return b.date.localeCompare(a.date);
+  });
 
-  container.innerHTML = sorted.map((e, i) => {
+  // 15g: Build chapter groupings
+  let lastChapterId = null;
+  let html = '';
+
+  sorted.forEach((e, i) => {
+    // Insert chapter headers when filter is 'all'
+    if (filter === 'all') {
+      const chapter = getChapterForDate(e.date);
+      if (chapter.id !== lastChapterId) {
+        lastChapterId = chapter.id;
+        html += '<div class="tl-chapter"><div class="tl-chapter__header">' +
+          '<div class="tl-chapter__title">' + chapter.title + '</div>' +
+          '<div class="tl-chapter__summary">' + chapter.summary + '</div>' +
+          '</div></div>';
+      }
+    }
+
     const { month, day } = formatDate(e.date);
     const icon = ICONS[e.type] || ICONS.milestone;
     const typeLabel = TYPE_LABELS[e.type] || e.type;
-    const link = e.link ? `<a href="${e.link}" class="tl-event__link">View details &rarr;</a>` : '';
-    const meta = e.meta ? `<div class="tl-event__meta">r=${e.meta.r > 0 ? '+' : ''}${e.meta.r?.toFixed(2)} &middot; n=${e.meta.n} days &middot; ${e.meta.week}</div>` : '';
-    // DISC-7: Render behavioral response annotation if present
+    const link = e.link ? '<a href="' + e.link + '" class="tl-event__link">View details &rarr;</a>' : '';
+    const meta = e.meta ? '<div class="tl-event__meta">r=' + (e.meta.r > 0 ? '+' : '') + (e.meta.r != null ? e.meta.r.toFixed(2) : '?') + ' &middot; n=' + e.meta.n + ' days &middot; ' + e.meta.week + '</div>' : '';
+
+    // 15f: Status badge
+    let statusHtml = '';
+    if (e.status) {
+      const badgeClass = STATUS_CLASSES[e.status] || 'badge--observed';
+      statusHtml = '<span class="tl-event__status-badge ' + badgeClass + '">' + e.status + '</span>';
+    }
+
+    // 15k: Share button for confirmed discoveries and counterintuitive findings
+    let shareHtml = '';
+    if (e.type === 'counterintuitive' || e.type === 'discovery' || (e.status === 'confirmed' || e.status === 'integrated')) {
+      shareHtml = '<button class="tl-event__share" title="Copy summary" onclick="shareDiscovery(this, \'' + e.title.replace(/'/g, "\\'") + '\', \'' + (e.body || '').replace(/'/g, "\\'").replace(/<[^>]*>/g, '') + '\')">' + SHARE_ICON + '</button>';
+    }
+
+    // 15i: Explorer cross-link
+    let explorerHtml = '';
+    if (e.explorer_date) {
+      explorerHtml = '<a href="/explorer/" class="tl-event__explorer-link">Spotted in Explorer on ' + e.explorer_date + ' &rarr;</a>';
+    }
+
+    // 15e: DISC-7 elevated annotation flow (Finding → Action → Outcome)
     let annHtml = '';
     if (e.annotation) {
       const a = e.annotation;
-      const actionTag = a.action_taken ? `<span class="tl-event__annotation-action">${a.action_taken}</span>` : '';
-      const outcomeTag = a.outcome ? `<div class="tl-event__annotation-outcome">Outcome: ${a.outcome}</div>` : '';
-      annHtml = `
-        <div class="tl-event__annotation">
-          <div class="tl-event__annotation-label">
-            <svg class="tl-event__icon" viewBox="0 0 16 16" fill="currentColor"><path d="M14 1H2a1 1 0 00-1 1v9a1 1 0 001 1h3l3 3 3-3h3a1 1 0 001-1V2a1 1 0 00-1-1zM4 5h8v1H4V5zm0 3h6v1H4V8z"/></svg>
-            What I did
-          </div>
-          <div class="tl-event__annotation-text">${a.annotation}</div>
-          ${actionTag}
-          ${outcomeTag}
-        </div>`;
+      const findingText = a.annotation || e.body || '';
+      const actionText = a.action_taken || 'Pending...';
+      const outcomeText = a.outcome || 'Awaiting outcome...';
+      const actionEmpty = !a.action_taken ? ' annotation-flow__step--empty' : '';
+      const outcomeEmpty = !a.outcome ? ' annotation-flow__step--empty' : '';
+      annHtml =
+        '<div class="tl-event__annotation">' +
+          '<div class="annotation-flow">' +
+            '<div class="annotation-flow__step">' +
+              '<div class="annotation-flow__step-number">1</div>' +
+              '<div class="annotation-flow__step-label">Finding</div>' +
+              '<div class="annotation-flow__step-text">' + findingText + '</div>' +
+            '</div>' +
+            '<div class="annotation-flow__step' + actionEmpty + '">' +
+              '<div class="annotation-flow__step-number">2</div>' +
+              '<div class="annotation-flow__step-label">Action Taken</div>' +
+              '<div class="annotation-flow__step-text">' + actionText + '</div>' +
+            '</div>' +
+            '<div class="annotation-flow__step' + outcomeEmpty + '">' +
+              '<div class="annotation-flow__step-number">3</div>' +
+              '<div class="annotation-flow__step-label">Outcome</div>' +
+              '<div class="annotation-flow__step-text">' + outcomeText + '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
     }
-    return `
-      <div class="tl-event" data-type="${e.type}" style="animation-delay: ${Math.min(i * 0.06, 0.8)}s">
-        <div class="tl-event__date">
-          <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag)">${month}</div>
-          <div class="tl-event__date-day">${day}</div>
-        </div>
-        <div class="tl-event__node"></div>
-        <div class="tl-event__card">
-          <div class="tl-event__type">${icon} ${typeLabel}</div>
-          <div class="tl-event__title">${e.title}</div>
-          <div class="tl-event__body">${e.body}</div>
-          ${meta}
-          ${link}
-          ${annHtml}
-        </div>
-      </div>`;
-  }).join('');
+
+    html +=
+      '<div class="tl-event" data-type="' + e.type + '" style="animation-delay: ' + Math.min(i * 0.06, 0.8) + 's">' +
+        '<div class="tl-event__date">' +
+          '<div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag)">' + month + '</div>' +
+          '<div class="tl-event__date-day">' + day + '</div>' +
+        '</div>' +
+        '<div class="tl-event__node"></div>' +
+        '<div class="tl-event__card">' +
+          shareHtml +
+          '<div class="tl-event__type">' + icon + ' ' + typeLabel + statusHtml + '</div>' +
+          '<div class="tl-event__title">' + e.title + '</div>' +
+          '<div class="tl-event__body">' + e.body + '</div>' +
+          meta +
+          link +
+          explorerHtml +
+          annHtml +
+        '</div>' +
+      '</div>';
+  });
+
+  container.innerHTML = html;
 }
 
 // Filter button logic
@@ -533,32 +979,124 @@ document.getElementById('filter-bar').addEventListener('click', (evt) => {
   renderTimeline(allEvents, btn.dataset.filter);
 });
 
+// 15d: Pre-seeded Day 1 content — used as fallback if API returns empty or fails
+function getDay1Events() {
+  return [
+    {
+      date: '2026-02-09',
+      type: 'milestone',
+      title: 'Day 1: Platform goes live',
+      body: 'All sensors connected. Whoop, Oura, Levels CGM, Cronometer, and Apple Health streaming data. The experiment begins.',
+      status: 'confirmed',
+    },
+    {
+      date: '2026-02-09',
+      type: 'finding',
+      title: 'Baseline measurements established',
+      body: 'First complete data capture across all sources: sleep architecture, HRV baseline, resting heart rate, body composition, and nutritional intake. These become the reference point for every future discovery.',
+      status: 'observed',
+      annotation: {
+        annotation: 'Captured full baseline across 6 data sources on Day 1.',
+        action_taken: 'Established measurement protocols and daily tracking habits.',
+        outcome: 'Clean baseline data for all future comparisons.',
+      },
+    },
+    {
+      date: '2026-02-09',
+      type: 'experiment',
+      title: 'Hypothesis set established',
+      body: 'Three initial hypotheses queued for testing: sleep consistency vs. duration, morning light exposure on sleep onset, and protein timing on recovery. Each has defined metrics and success criteria.',
+      status: 'investigating',
+    },
+    {
+      date: '2026-02-09',
+      type: 'counterintuitive',
+      title: 'More data ≠ more insight (yet)',
+      body: 'Day 1 insight: having 6 data sources streaming doesn\'t produce instant clarity. The correlation engine needs 14+ days of data before signal emerges from noise. Patience is part of the protocol.',
+      status: 'observed',
+      annotation: {
+        annotation: 'Expected immediate patterns from multi-source data. Found only noise.',
+        action_taken: 'Set 2-week patience protocol. No conclusions before n=14.',
+        outcome: null,
+      },
+    },
+    {
+      date: '2026-02-10',
+      type: 'finding',
+      title: 'First AI daily brief generated',
+      body: 'The daily email brief ran successfully for the first time. Five compute Lambdas processed overnight data and produced the morning intelligence report. The feedback loop is operational.',
+      status: 'confirmed',
+      explorer_date: 'Feb 10',
+    },
+    {
+      date: '2026-02-14',
+      type: 'experiment',
+      title: 'First structured experiment launched',
+      body: 'Experiment #001: Does cutting screen time 60 minutes before bed improve sleep onset latency? Protocol: 7 days screen-free vs. 7 days normal. Measuring via Whoop sleep staging.',
+      status: 'investigating',
+    },
+  ];
+}
+
+function updateExecSummary(events) {
+  const days = daysSinceStart();
+  // 15a: Only count scientific event types
+  const scienceEvents = events.filter(e => e.type !== 'weight' && e.type !== 'level_up');
+  const findings = scienceEvents.filter(e => e.type === 'finding' || e.type === 'counterintuitive').length;
+  const investigated = scienceEvents.filter(e => e.status === 'investigating' || e.status === 'confirmed' || e.status === 'integrated').length;
+  const behavioral = scienceEvents.filter(e => e.status === 'integrated').length;
+
+  document.getElementById('exec-days').textContent = days;
+  document.getElementById('exec-findings').textContent = findings;
+  document.getElementById('exec-investigated').textContent = investigated;
+  document.getElementById('exec-behavioral').textContent = behavioral;
+
+  // 15m: Aggregate metrics
+  const behavioralPct = findings > 0 ? Math.round((behavioral / findings) * 100) + '%' : '0%';
+  const experiments = scienceEvents.filter(e => e.type === 'experiment');
+  const expWithOutcome = experiments.filter(e => e.status === 'confirmed' || e.status === 'integrated' || e.status === 'refuted').length;
+  const expPct = experiments.length > 0 ? Math.round((expWithOutcome / experiments.length) * 100) + '%' : '0%';
+
+  document.getElementById('agg-behavioral-pct').textContent = behavioralPct;
+  document.getElementById('agg-experiment-pct').textContent = expPct;
+}
+
 async function loadTimeline() {
   try {
-    const res = await fetch(`${API}/api/journey_timeline`);
+    const res = await fetch(API + '/api/journey_timeline');
     if (!res.ok) throw new Error(res.status);
     const json = await res.json();
     allEvents = json.events || [];
 
-    // Stats
-    const days = daysSinceStart();
-    const weightEvents = allEvents.filter(e => e.type === 'weight').length;
-    const findingEvents = allEvents.filter(e => e.type === 'finding' || e.type === 'counterintuitive').length;
-    document.getElementById('stat-total').textContent = allEvents.length;
-    document.getElementById('stat-days').textContent = days;
-    document.getElementById('stat-weight').textContent = weightEvents;
-    document.getElementById('stat-findings').textContent = findingEvents;
+    // If API returns no science events, use Day 1 pre-seeded content (15d)
+    const scienceEvents = allEvents.filter(e => e.type !== 'weight' && e.type !== 'level_up');
+    if (scienceEvents.length === 0) {
+      allEvents = getDay1Events();
+    }
 
+    // Stats (15a: scoped to science)
+    const scoped = allEvents.filter(e => e.type !== 'weight' && e.type !== 'level_up');
+    const days = daysSinceStart();
+    const findingEvents = scoped.filter(e => e.type === 'finding' || e.type === 'counterintuitive').length;
+    const experimentEvents = scoped.filter(e => e.type === 'experiment').length;
+    document.getElementById('stat-total').textContent = scoped.length;
+    document.getElementById('stat-days').textContent = days;
+    document.getElementById('stat-findings').textContent = findingEvents;
+    document.getElementById('stat-experiments').textContent = experimentEvents;
+
+    updateExecSummary(allEvents);
     renderTimeline(allEvents, 'all');
   } catch(e) {
-    document.getElementById('timeline').innerHTML = `
-      <div class="timeline-empty">
-        <strong style="font-size:var(--text-base);color:var(--text-muted);">Discoveries populate over time</strong><br><br>
-        Discoveries are real findings from the correlation engine and completed experiments.
-        This page populates as data accumulates &mdash; the first meaningful signals typically
-        appear after 4&ndash;6 weeks of continuous tracking.<br><br>
-        <span style="font-size:var(--text-2xs);color:var(--text-faint)">Day 1 is April 1, 2026. Check back after launch.</span>
-      </div>`;
+    // Fallback: render Day 1 pre-seeded content (15d)
+    allEvents = getDay1Events();
+    const days = daysSinceStart();
+    document.getElementById('stat-total').textContent = allEvents.length;
+    document.getElementById('stat-days').textContent = days;
+    document.getElementById('stat-findings').textContent = allEvents.filter(e => e.type === 'finding' || e.type === 'counterintuitive').length;
+    document.getElementById('stat-experiments').textContent = allEvents.filter(e => e.type === 'experiment').length;
+
+    updateExecSummary(allEvents);
+    renderTimeline(allEvents, 'all');
   }
 }
 
@@ -566,11 +1104,11 @@ loadTimeline();
 </script>
 <nav class="reading-path-v2">
   <a href="/experiments/" class="reading-path-v2__link">
-    <span class="reading-path-v2__dir">← Previous</span>
+    <span class="reading-path-v2__dir">&larr; Previous</span>
     <span class="reading-path-v2__title">Experiments</span>
   </a>
   <a href="/sleep/" class="reading-path-v2__link reading-path-v2__link--next">
-    <span class="reading-path-v2__dir">Next →</span>
+    <span class="reading-path-v2__dir">Next &rarr;</span>
     <span class="reading-path-v2__title">Sleep</span>
   </a>
 </nav>

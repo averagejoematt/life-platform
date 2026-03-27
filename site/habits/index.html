@@ -531,6 +531,204 @@
   .pipeline-flow { justify-content: flex-start; }
 }
 
+/* ═══════ TIER VISUAL IDENTITY (5e) ═══════ */
+
+/* T0: Heavy/anchored — solid borders, bold accent */
+.t0-card {
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 12px rgba(0,229,160,0.08);
+}
+.t0-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 20px rgba(0,229,160,0.15);
+}
+
+/* T1: Flowing — gradient left accent, medium weight */
+.t1-row {
+  position: relative;
+}
+.t1-row::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: linear-gradient(180deg, var(--accent-dim), var(--c-amber-400));
+}
+.purpose-group {
+  position: relative;
+}
+.purpose-group::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: linear-gradient(180deg, rgba(0,229,160,0.4), rgba(200,132,58,0.4));
+  z-index: 1;
+}
+
+/* T2: Light/aspirational — dashed borders, faint colors */
+.horizon-card {
+  border: 1px dashed var(--border);
+  background: rgba(255,255,255,0.01);
+}
+.horizon-card:hover {
+  border-color: var(--text-faint);
+  border-style: dashed;
+}
+.horizon-grid {
+  background: transparent;
+  border: 1px dashed var(--border);
+  gap: 0;
+}
+
+/* ═══════ PIPELINE HERO (5a) ═══════ */
+.pipeline-hero {
+  border: 2px solid var(--accent);
+  background: linear-gradient(135deg, rgba(0,229,160,0.04), transparent 60%);
+  padding: var(--space-8);
+  margin-bottom: var(--space-8);
+  position: relative;
+}
+.pipeline-hero .pipeline-flow {
+  display: flex; align-items: stretch; justify-content: center;
+  gap: var(--space-2); flex-wrap: wrap;
+}
+.pipeline-hero .pipeline-node {
+  padding: var(--space-3) var(--space-4) var(--space-2);
+  border: 1px solid var(--border); background: var(--bg);
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  color: var(--text-muted); letter-spacing: var(--ls-label);
+  text-transform: uppercase; text-align: center;
+  min-width: 90px;
+}
+.pipeline-hero .pipeline-node--active {
+  border-color: var(--accent); color: var(--accent);
+}
+.pipeline-node__rationale {
+  display: block; font-size: 9px; color: var(--text-faint);
+  letter-spacing: 0; text-transform: none;
+  margin-top: 4px; line-height: 1.3;
+  font-style: italic; opacity: 0.8;
+}
+.pipeline-hero .pipeline-arrow {
+  color: var(--accent-dim); font-size: var(--text-xs);
+  display: flex; align-items: center;
+}
+.pipeline-share-btn {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-faint); font-family: var(--font-mono);
+  font-size: var(--text-2xs); letter-spacing: var(--ls-label);
+  cursor: pointer; transition: all var(--dur-fast);
+  text-transform: uppercase;
+}
+.pipeline-share-btn:hover {
+  border-color: var(--accent); color: var(--accent);
+}
+.pipeline-share-btn.copied {
+  border-color: var(--accent); color: var(--accent);
+}
+
+/* ═══════ JOURNAL QUOTE (5c) ═══════ */
+.journal-quote {
+  max-width: var(--max-width); margin: 0 auto;
+  padding: var(--space-6) var(--page-padding);
+}
+.journal-quote blockquote {
+  border-left: 3px solid var(--accent);
+  padding: var(--space-5) var(--space-6);
+  background: linear-gradient(135deg, rgba(0,229,160,0.03), transparent 60%);
+  margin: 0;
+  font-size: var(--text-base); color: var(--text-muted);
+  line-height: var(--lh-body); font-style: italic;
+}
+.journal-quote cite {
+  display: block; margin-top: var(--space-3);
+  font-size: var(--text-2xs); color: var(--text-faint);
+  font-family: var(--font-mono); letter-spacing: var(--ls-label);
+  font-style: normal; text-transform: uppercase;
+}
+
+/* ═══════ START HERE RAMP (5k) ═══════ */
+.start-here {
+  max-width: var(--max-width); margin: 0 auto;
+  padding: var(--space-8) var(--page-padding);
+  border-bottom: 1px solid var(--border);
+}
+.start-here__header {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.start-here__badge {
+  display: inline-block; padding: var(--space-1) var(--space-3);
+  background: var(--accent); color: var(--bg);
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  letter-spacing: var(--ls-tag); text-transform: uppercase;
+  font-weight: 700;
+}
+.start-here__title {
+  font-family: var(--font-display); font-size: 22px; color: var(--text);
+}
+.start-here__intro {
+  font-size: var(--text-sm); color: var(--text-muted);
+  line-height: var(--lh-body); margin-bottom: var(--space-5);
+  max-width: 560px;
+}
+.start-here__list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+.start-here__item {
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--accent);
+  background: rgba(0,229,160,0.03);
+  font-size: var(--text-sm); color: var(--text);
+  display: flex; align-items: center; gap: var(--space-2);
+}
+.start-here__item-icon {
+  font-size: 16px; flex-shrink: 0;
+}
+.start-here__item-name {
+  font-family: var(--font-display); font-size: var(--text-sm);
+}
+
+/* ═══════ DOMAIN FILTER (5h) ═══════ */
+.domain-filter {
+  max-width: var(--max-width); margin: 0 auto;
+  padding: var(--space-4) var(--page-padding);
+  display: flex; align-items: center; gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.domain-filter__label {
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  letter-spacing: var(--ls-tag); text-transform: uppercase;
+  color: var(--text-faint); margin-right: var(--space-2);
+}
+.domain-chip {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-faint); font-family: var(--font-mono);
+  font-size: var(--text-2xs); letter-spacing: var(--ls-label);
+  cursor: pointer; transition: all var(--dur-fast);
+  text-transform: uppercase;
+}
+.domain-chip:hover {
+  border-color: var(--accent-dim); color: var(--text-muted);
+}
+.domain-chip.active {
+  border-color: var(--accent); color: var(--accent);
+  background: rgba(0,229,160,0.06);
+}
+
+/* ═══════ COMPASSIONATE FRAMING (5d) ═══════ */
+.compassion-note {
+  font-size: var(--text-xs); color: var(--text-muted);
+  font-style: italic; line-height: var(--lh-body);
+  padding: var(--space-3) var(--space-4);
+  border-left: 2px solid rgba(0,229,160,0.3);
+  margin-top: var(--space-4);
+  background: rgba(0,229,160,0.02);
+}
+
 /* ── Reveal animation ── */
 .reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.6s ease, transform 0.6s ease; }
 .reveal.is-visible { opacity: 1; transform: none; }
@@ -573,7 +771,7 @@
 <div class="reveal" style="max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-5);">
   <div style="border-left:2px solid var(--accent);padding-left:var(--space-4);">
     <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent);font-family:var(--font-mono);margin-bottom:4px">Tier 0 — Foundation</div>
-    <p style="font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body)">7 habits. Miss one, streak resets. The non-negotiable operating floor.</p>
+    <p style="font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body)">7 habits. The non-negotiable operating floor. Streaks measure consistency, not worth.</p>
   </div>
   <div style="border-left:2px solid var(--border);padding-left:var(--space-4);">
     <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:4px">Tier 1 — The System</div>
@@ -585,110 +783,56 @@
   </div>
 </div>
 
-<!-- Tooltip -->
-<div id="hm-tooltip"><div id="tt-date"></div><div id="tt-pct" style="color:var(--accent)"></div></div>
-
-<!-- ═══════ ZONE 1: THE FOUNDATION ═══════ -->
-<div class="tier-banner tier-banner--t0 reveal">
-  <span class="tier-banner__dot"></span>
-  Zone 1 — The Foundation · 7 Non-Negotiables
-</div>
-<div class="os-zone" id="zone-t0">
-  <div class="zone-head">
-    <div class="zone-head__title">The <em>Foundation</em></div>
-    <div class="zone-head__sub">// miss one, streak resets — everything else is built on these</div>
-  </div>
-
-  <!-- T0 Streak Hero -->
-  <div class="t0-streak-hero reveal" id="t0-streak-hero">
-    <div class="t0-streak__num" id="streak-big">—</div>
-    <div class="t0-streak__meta">
-      <div class="t0-streak__label">Day Tier 0 Streak — current run</div>
-      <div class="t0-streak__desc">Every protocol, every recovery metric, every performance variable traces back to whether these seven habits were completed that day.</div>
-    </div>
-  </div>
-
-  <!-- T0 Cards (populated by JS) -->
-  <div class="t0-grid" id="t0-grid">
-    <div class="skel" style="height:200px;border:1px solid var(--border);background:var(--surface)"></div>
-    <div class="skel" style="height:200px;border:1px solid var(--border);background:var(--surface)"></div>
-    <div class="skel" style="height:200px;border:1px solid var(--border);background:var(--surface)"></div>
-  </div>
-</div>
-
-<!-- ═══════ DISCIPLINE GATES (VICES) ═══════ -->
-<div class="tier-banner tier-banner--vice reveal">
-  <span class="tier-banner__dot"></span>
-  Discipline Gates — The habits of not doing
-</div>
-<div class="os-zone" id="zone-vices">
-  <div class="zone-head">
-    <div class="zone-head__title">Discipline <em>Gates</em></div>
-    <div class="zone-head__sub">// every day held compounds — every break resets the clock</div>
-  </div>
-  <div class="vice-summary-row" id="vice-summary"></div>
-  <div class="vice-grid" id="vice-grid"></div>
-</div>
-
-<!-- ═══════ ZONE 2: THE SYSTEM (T1 by purpose) ═══════ -->
-<div class="tier-banner tier-banner--t1 reveal">
-  <span class="tier-banner__dot"></span>
-  Zone 2 — The System · Daily Practice by Purpose
-</div>
-<div class="os-zone" id="zone-t1">
-  <div class="zone-head">
-    <div class="zone-head__title">The <em>System</em></div>
-    <div class="zone-head__sub">// tracked daily, grouped by purpose — not streak-critical but feeds your Character Score</div>
-  </div>
-  <div id="purpose-groups"></div>
-</div>
-
-<!-- ═══════ ZONE 3: THE HORIZON (T2) ═══════ -->
-<div class="tier-banner tier-banner--t2 reveal">
-  <span class="tier-banner__dot"></span>
-  Zone 3 — The Horizon · Aspirational
-</div>
-<div class="os-zone" id="zone-t2">
-  <div class="zone-head">
-    <div class="zone-head__title">The <em>Horizon</em></div>
-    <div class="zone-head__sub">// queued for activation — these unlock when the foundation is solid</div>
-  </div>
-  <div class="horizon-grid" id="horizon-grid"></div>
-  <div class="horizon-activation">// activates progressively when Tier 0 + Tier 1 consistency exceeds 90%</div>
-</div>
-
-<!-- ═══════ SYNERGY PIPELINE ═══════ -->
-<div class="os-zone reveal">
+<!-- ═══════ DAILY PIPELINE (elevated — 5a/5j) ═══════ -->
+<div class="os-zone reveal" id="pipeline-section">
   <div class="zone-head">
     <div class="zone-head__title">Daily <em>Pipeline</em></div>
-    <div class="zone-head__sub">// how the habit stacks flow through the day</div>
+    <div class="zone-head__sub">// how the habit stacks flow through the day — each step sequenced for a reason</div>
   </div>
-  <div class="pipeline-wrap">
+  <div class="pipeline-hero">
     <div class="pipeline-flow" id="pipeline-flow">
-      <div class="pipeline-node pipeline-node--active">5 AM Wake</div>
+      <div class="pipeline-node pipeline-node--active">5 AM Wake<span class="pipeline-node__rationale">Cortisol peak drives alertness</span></div>
       <span class="pipeline-arrow">→</span>
-      <div class="pipeline-node pipeline-node--active">Morning Light</div>
+      <div class="pipeline-node pipeline-node--active">Weigh-in<span class="pipeline-node__rationale">Lowest variance measurement window</span></div>
       <span class="pipeline-arrow">→</span>
-      <div class="pipeline-node pipeline-node--active">Journal</div>
+      <div class="pipeline-node pipeline-node--active">Morning Light<span class="pipeline-node__rationale">Anchors circadian clock via melanopsin</span></div>
       <span class="pipeline-arrow">→</span>
-      <div class="pipeline-node pipeline-node--active">Exercise</div>
+      <div class="pipeline-node pipeline-node--active">Journal<span class="pipeline-node__rationale">Clears cognitive load before execution</span></div>
       <span class="pipeline-arrow">→</span>
-      <div class="pipeline-node">Deep Work</div>
+      <div class="pipeline-node pipeline-node--active">Exercise<span class="pipeline-node__rationale">BDNF + cortisol regulation peaks AM</span></div>
       <span class="pipeline-arrow">→</span>
-      <div class="pipeline-node">Walk 5k</div>
+      <div class="pipeline-node">Deep Work<span class="pipeline-node__rationale">Post-exercise focus window is 2-4 hrs</span></div>
       <span class="pipeline-arrow">→</span>
-      <div class="pipeline-node">Evening Journal</div>
+      <div class="pipeline-node">Walk 5k<span class="pipeline-node__rationale">NEAT burn + afternoon cortisol clearing</span></div>
       <span class="pipeline-arrow">→</span>
-      <div class="pipeline-node pipeline-node--active">Red Light Glasses</div>
+      <div class="pipeline-node">Evening Journal<span class="pipeline-node__rationale">Cognitive offload before wind-down</span></div>
       <span class="pipeline-arrow">→</span>
-      <div class="pipeline-node pipeline-node--active">No Phone</div>
+      <div class="pipeline-node pipeline-node--active">Red Light Glasses<span class="pipeline-node__rationale">Blocks blue light, protects melatonin onset</span></div>
       <span class="pipeline-arrow">→</span>
-      <div class="pipeline-node pipeline-node--active">Sleep Stack</div>
+      <div class="pipeline-node pipeline-node--active">No Phone<span class="pipeline-node__rationale">Removes dopamine stimulation before sleep</span></div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-node pipeline-node--active">Sleep Stack<span class="pipeline-node__rationale">Thermoregulation + supplement timing</span></div>
     </div>
+    <button class="pipeline-share-btn" id="pipeline-share" onclick="(function(btn){
+      var nodes = document.querySelectorAll('#pipeline-flow .pipeline-node');
+      var text = 'My Daily Pipeline:\n';
+      nodes.forEach(function(n,i){
+        var name = n.childNodes[0].textContent.trim();
+        var rationale = n.querySelector('.pipeline-node__rationale');
+        text += (i+1) + '. ' + name;
+        if(rationale) text += ' — ' + rationale.textContent.trim();
+        text += '\n';
+      });
+      navigator.clipboard.writeText(text).then(function(){
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(function(){ btn.textContent = 'Copy pipeline as text'; btn.classList.remove('copied'); }, 2000);
+      });
+    })(this)">Copy pipeline as text</button>
   </div>
 </div>
 
-<!-- ═══════ INTELLIGENCE LAYER ═══════ -->
+<!-- ═══════ INTELLIGENCE LAYER (elevated — 5b) ═══════ -->
 <div class="intel-zone reveal">
   <div class="zone-head">
     <div class="zone-head__title">Habit <em>Intelligence</em></div>
@@ -701,9 +845,9 @@
     <div class="heatmap-legend">
       <span>Less</span>
       <span class="legend-dot hm-0"></span><span>0%</span>
-      <span class="legend-dot hm-1"></span><span>1–49%</span>
-      <span class="legend-dot hm-2"></span><span>50–79%</span>
-      <span class="legend-dot hm-3"></span><span>80–99%</span>
+      <span class="legend-dot hm-1"></span><span>1-49%</span>
+      <span class="legend-dot hm-2"></span><span>50-79%</span>
+      <span class="legend-dot hm-3"></span><span>80-99%</span>
       <span class="legend-dot hm-4"></span><span>Perfect</span>
       <span>More</span>
     </div>
@@ -734,6 +878,114 @@
     </div>
   </div>
 </div>
+
+<!-- ═══════ JOURNAL QUOTE (5c) ═══════ -->
+<div class="journal-quote reveal">
+  <blockquote>
+    "The hardest habit wasn't the workout. It was the journal. Writing down what I was thinking meant I couldn't pretend I wasn't thinking it."
+    <cite>// from a morning journal entry, day 47</cite>
+  </blockquote>
+</div>
+
+<!-- ═══════ START HERE ENTRY RAMP (5k) ═══════ -->
+<div class="start-here reveal" id="start-here">
+  <div class="start-here__header">
+    <span class="start-here__badge">Start here</span>
+    <span class="start-here__title">The 7 that matter</span>
+  </div>
+  <p class="start-here__intro">New here? These are the Tier 0 habits — the non-negotiable foundation. Every metric on this site traces back to whether these seven happened today. Master these before adding anything else.</p>
+  <div class="start-here__list" id="start-here-list">
+    <!-- Populated by JS from T0_HABITS -->
+  </div>
+</div>
+
+<!-- ═══════ DOMAIN FILTER (5h) ═══════ -->
+<div class="domain-filter reveal" id="domain-filter">
+  <span class="domain-filter__label">Filter by domain:</span>
+  <button class="domain-chip active" data-domain="all" onclick="filterByDomain('all')">All</button>
+  <button class="domain-chip" data-domain="sleep" onclick="filterByDomain('sleep')">Sleep</button>
+  <button class="domain-chip" data-domain="movement" onclick="filterByDomain('movement')">Movement</button>
+  <button class="domain-chip" data-domain="nutrition" onclick="filterByDomain('nutrition')">Nutrition</button>
+  <button class="domain-chip" data-domain="recovery" onclick="filterByDomain('recovery')">Recovery</button>
+  <button class="domain-chip" data-domain="mind" onclick="filterByDomain('mind')">Mind</button>
+  <button class="domain-chip" data-domain="discipline" onclick="filterByDomain('discipline')">Discipline</button>
+  <button class="domain-chip" data-domain="data" onclick="filterByDomain('data')">Data</button>
+</div>
+
+<!-- Tooltip -->
+<div id="hm-tooltip"><div id="tt-date"></div><div id="tt-pct" style="color:var(--accent)"></div></div>
+
+<!-- ═══════ ZONE 1: THE FOUNDATION ═══════ -->
+<div class="tier-banner tier-banner--t0 reveal">
+  <span class="tier-banner__dot"></span>
+  Zone 1 — The Foundation · 7 Non-Negotiables
+</div>
+<div class="os-zone" id="zone-t0">
+  <div class="zone-head">
+    <div class="zone-head__title">The <em>Foundation</em></div>
+    <div class="zone-head__sub">// the non-negotiable operating floor — everything else is built on these</div>
+  </div>
+
+  <!-- T0 Streak Hero -->
+  <div class="t0-streak-hero reveal" id="t0-streak-hero">
+    <div class="t0-streak__num" id="streak-big">—</div>
+    <div class="t0-streak__meta">
+      <div class="t0-streak__label">Day Tier 0 Streak — current run</div>
+      <div class="t0-streak__desc">Every protocol, every recovery metric, every performance variable traces back to whether these seven habits were completed that day.</div>
+    </div>
+  </div>
+
+  <!-- T0 Cards (populated by JS) -->
+  <div class="t0-grid" id="t0-grid">
+    <div class="skel" style="height:200px;border:1px solid var(--border);background:var(--surface)"></div>
+    <div class="skel" style="height:200px;border:1px solid var(--border);background:var(--surface)"></div>
+    <div class="skel" style="height:200px;border:1px solid var(--border);background:var(--surface)"></div>
+  </div>
+</div>
+
+<!-- ═══════ DISCIPLINE GATES (VICES) ═══════ -->
+<div class="tier-banner tier-banner--vice reveal">
+  <span class="tier-banner__dot"></span>
+  Discipline Gates — The habits of not doing
+</div>
+<div class="os-zone" id="zone-vices">
+  <div class="zone-head">
+    <div class="zone-head__title">Discipline <em>Gates</em></div>
+    <div class="zone-head__sub">// every day held compounds — building identity through restraint</div>
+  </div>
+  <div class="vice-summary-row" id="vice-summary"></div>
+  <div class="vice-grid" id="vice-grid"></div>
+  <div class="compassion-note">Streaks reset but progress doesn't. Every day you showed up still counts. A break isn't failure — it's data.</div>
+</div>
+
+<!-- ═══════ ZONE 2: THE SYSTEM (T1 by purpose) ═══════ -->
+<div class="tier-banner tier-banner--t1 reveal">
+  <span class="tier-banner__dot"></span>
+  Zone 2 — The System · Daily Practice by Purpose
+</div>
+<div class="os-zone" id="zone-t1">
+  <div class="zone-head">
+    <div class="zone-head__title">The <em>System</em></div>
+    <div class="zone-head__sub">// tracked daily, grouped by purpose — not streak-critical but feeds your Character Score</div>
+  </div>
+  <div id="purpose-groups"></div>
+</div>
+
+<!-- ═══════ ZONE 3: THE HORIZON (T2) ═══════ -->
+<div class="tier-banner tier-banner--t2 reveal">
+  <span class="tier-banner__dot"></span>
+  Zone 3 — The Horizon · Aspirational
+</div>
+<div class="os-zone" id="zone-t2">
+  <div class="zone-head">
+    <div class="zone-head__title">The <em>Horizon</em></div>
+    <div class="zone-head__sub">// queued for activation — these unlock when the foundation is solid</div>
+  </div>
+  <div class="horizon-grid" id="horizon-grid"></div>
+  <div class="horizon-activation">// activates progressively when Tier 0 + Tier 1 consistency exceeds 90%</div>
+</div>
+
+
 
 <!-- Subscribe CTA -->
 <nav class="reading-path-v2">
@@ -807,10 +1059,11 @@ function transformRegistry(habits) {
     return {
       name: h.name,
       pillar: pillar,
+      domain: pillar.toLowerCase(),
       icon: PILLAR_ICONS[pillar] || PILLAR_ICONS[h.category] || '●',
       why: h.expected_impact || '',
       science: h.science || '',
-      ev: 'strong' // T0 habits are all strong evidence
+      ev: h.science && h.science.toLowerCase().indexOf('peer') !== -1 ? 'strong' : 'personal protocol'
     };
   });
 
@@ -823,7 +1076,8 @@ function transformRegistry(habits) {
       name: h.name,
       why: h.expected_impact || '',
       ev: h.science ? (h.science.length > 50 ? 'strong' : 'moderate') : 'emerging',
-      freq: freqLabel(h.target_frequency)
+      freq: freqLabel(h.target_frequency),
+      domain: (h.maps_to_primary || h.category || 'other').toLowerCase()
     });
   });
   PURPOSE_GROUPS = Object.keys(groupMap).map(function(sg){
@@ -870,7 +1124,7 @@ function sparkHTML(vals, h, colorFn){
 }
 
 function evBadge(ev){
-  var cls = ev==='strong'?'ev-badge--strong':ev==='moderate'?'ev-badge--moderate':'ev-badge--emerging';
+  var cls = ev==='strong'?'ev-badge--strong':ev==='moderate'?'ev-badge--moderate':ev==='personal protocol'?'ev-badge--moderate':'ev-badge--emerging';
   return '<span class="ev-badge '+cls+'">'+ev+'</span>';
 }
 
@@ -900,8 +1154,21 @@ function buildT0(history){
   var last30 = history.slice(-30).map(function(d){return d.tier0_pct||0});
   var avgPct = last30.length ? Math.round(last30.reduce(function(a,b){return a+b},0)/last30.length) : 0;
 
+  // Build per-habit sparkline data from history (5f fix)
+  var habitSparkData = {};
+  history.slice(-30).forEach(function(d){
+    var completions = d.habit_completions || d.habits || {};
+    Object.keys(completions).forEach(function(hName){
+      if(!habitSparkData[hName]) habitSparkData[hName] = [];
+      habitSparkData[hName].push(completions[hName] ? 100 : 0);
+    });
+  });
+
   grid.innerHTML = T0_HABITS.map(function(h){
-    return '<div class="t0-card">' +
+    // 5f: use per-habit completion data for sparkline, fallback to T0 aggregate
+    var sparkData = habitSparkData[h.name] || last30;
+    var domain = h.pillar.toLowerCase();
+    return '<div class="t0-card" data-habit-name="'+h.name+'" data-domain="'+domain+'">' +
       '<div class="t0-card__top">' +
         ringSVG(avgPct, 56) +
         '<div class="t0-card__info">' +
@@ -909,11 +1176,22 @@ function buildT0(history){
           '<div class="t0-card__pillar">'+h.pillar+'</div>' +
         '</div>' +
       '</div>' +
-      '<div class="t0-card__spark">'+sparkHTML(last30, 20)+'</div>' +
+      '<div class="t0-card__spark">'+sparkHTML(sparkData, 20)+'</div>' +
       '<div class="t0-card__why">"'+h.why+'"</div>' +
       '<div class="t0-card__science">// '+h.science+' '+evBadge(h.ev)+'</div>' +
     '</div>';
   }).join('');
+
+  // 5k: Populate the "Start Here" list with T0 habits
+  var startList = document.getElementById('start-here-list');
+  if(startList){
+    startList.innerHTML = T0_HABITS.map(function(h){
+      return '<div class="start-here__item">' +
+        '<span class="start-here__item-icon">'+h.icon+'</span>' +
+        '<span class="start-here__item-name">'+h.name+'</span>' +
+      '</div>';
+    }).join('');
+  }
 }
 
 // ── Build Vice Section ──
@@ -930,7 +1208,7 @@ function buildVices(viceData){
     var cls = v.holding ? 'vice-card--holding' : 'vice-card--broken';
     var numCls = v.holding ? 'vice-num--holding' : 'vice-num--broken';
     var name = v.name.replace(/^No /i,'');
-    var label = v.holding ? 'No '+name : name+' — streak broken';
+    var label = v.holding ? 'No '+name : name+' — rebuilding';
     var meta = 'best: '+v.best_streak+'d';
     if(v.relapses_90d>0) meta += ' · '+v.relapses_90d+' relapse'+(v.relapses_90d===1?'':'s')+' (90d)';
     return '<div class="vice-card '+cls+'">' +
@@ -944,16 +1222,27 @@ function buildVices(viceData){
   document.getElementById('zone-vices').style.display = '';
 }
 
-// ── Build Purpose Groups (T1) ──
+// ── Build Purpose Groups (T1) — 5i: visible by default, 5f: per-habit sparklines ──
 function buildPurposeGroups(history){
   var container = document.getElementById('purpose-groups');
-  var last14 = history.slice(-14).map(function(d){return d.tier0_pct||0});
+
+  // Build per-habit completion lookup from history (5f fix)
+  // Each history entry may have a habit_completions map: {habit_name: true/false}
+  var habitSparkData = {};
+  var last7 = history.slice(-7);
+  last7.forEach(function(d){
+    var completions = d.habit_completions || d.habits || {};
+    Object.keys(completions).forEach(function(hName){
+      if(!habitSparkData[hName]) habitSparkData[hName] = [];
+      habitSparkData[hName].push(completions[hName] ? 100 : 0);
+    });
+  });
 
   container.innerHTML = PURPOSE_GROUPS.map(function(g){
     var habCount = g.habits.length;
-    // Simple adherence proxy from group data
-    return '<div class="purpose-group">' +
-      '<button class="purpose-toggle" aria-expanded="false" onclick="(function(b){' +
+    // 5i: purpose groups open by default (aria-expanded=true, body has .open)
+    return '<div class="purpose-group" data-group-id="'+g.id+'">' +
+      '<button class="purpose-toggle" aria-expanded="true" onclick="(function(b){' +
         'var body=b.nextElementSibling;var open=body.classList.contains(\'open\');' +
         'body.classList.toggle(\'open\',!open);b.setAttribute(\'aria-expanded\',!open?\'true\':\'false\');' +
       '})(this)">' +
@@ -962,16 +1251,22 @@ function buildPurposeGroups(history){
           '<div class="purpose-toggle__name">'+g.name+'</div>' +
           '<div class="purpose-toggle__count">'+habCount+' habit'+(habCount===1?'':'s')+'</div>' +
         '</div>' +
-        '<span class="purpose-arrow">▶</span>' +
+        '<span class="purpose-arrow" style="transform:rotate(90deg)">▶</span>' +
       '</button>' +
-      '<div class="purpose-body">' +
+      '<div class="purpose-body open">' +
         '<div class="purpose-body__desc">'+g.desc+'</div>' +
         '<div class="t1-list">' +
           g.habits.map(function(h){
             if(isBlocked(h.name)) return '';
-            return '<div class="t1-row">' +
+            // 5f: use per-habit sparkline data, not global T0 data
+            var perHabitData = habitSparkData[h.name];
+            if(!perHabitData || perHabitData.length === 0) {
+              // Fallback: generate neutral placeholder instead of T0 data
+              perHabitData = [null, null, null, null, null, null, null];
+            }
+            return '<div class="t1-row" data-habit-name="'+h.name+'" data-domain="'+(h.domain||g.id)+'">' +
               '<div class="t1-row__name">'+h.name+'</div>' +
-              '<div class="t1-row__spark">'+sparkHTML(last14.slice(-7), 14)+'</div>' +
+              '<div class="t1-row__spark">'+sparkHTML(perHabitData.slice(-7), 14)+'</div>' +
               '<div class="t1-row__tag">'+h.freq+' '+evBadge(h.ev)+'</div>' +
             '</div>';
           }).join('') +
@@ -990,7 +1285,7 @@ function buildPurposeGroups(history){
 function buildHorizon(){
   var grid = document.getElementById('horizon-grid');
   grid.innerHTML = T2_HABITS.filter(function(h){return !isBlocked(h.name)}).map(function(h){
-    return '<div class="horizon-card">' +
+    return '<div class="horizon-card" data-domain="'+(h.cat||'other').toLowerCase()+'">' +
       '<div class="horizon-card__lock">🔒</div>' +
       '<div class="horizon-card__name">'+h.name+'</div>' +
       '<div class="horizon-card__cat">'+h.cat+'</div>' +
@@ -1108,6 +1403,58 @@ function computeStats(data){
   document.getElementById('hero-days').textContent = days;
   document.getElementById('streak-big').textContent = streak;
 }
+
+// ── Domain Filter (5h) ──
+// Exposed globally for onclick handlers
+window.filterByDomain = function(domain) {
+  // Update chip states
+  document.querySelectorAll('.domain-chip').forEach(function(chip){
+    chip.classList.toggle('active', chip.getAttribute('data-domain') === domain);
+  });
+
+  // Domain mapping: chip value -> habit pillar/domain keywords
+  var domainMap = {
+    'sleep': ['sleep'],
+    'movement': ['movement', 'training', 'exercise'],
+    'nutrition': ['nutrition', 'fuel', 'metabolic'],
+    'recovery': ['recovery', 'restoration'],
+    'mind': ['mind', 'wellbeing', 'growth', 'journal'],
+    'discipline': ['discipline'],
+    'data': ['data']
+  };
+
+  var showAll = domain === 'all';
+  var keywords = domainMap[domain] || [];
+
+  function matchesDomain(el) {
+    if (showAll) return true;
+    var d = (el.getAttribute('data-domain') || '').toLowerCase();
+    return keywords.some(function(kw){ return d.indexOf(kw) !== -1; });
+  }
+
+  // Filter T0 cards
+  document.querySelectorAll('.t0-card').forEach(function(card){
+    card.style.display = matchesDomain(card) ? '' : 'none';
+  });
+
+  // Filter T1 rows
+  document.querySelectorAll('.t1-row').forEach(function(row){
+    row.style.display = matchesDomain(row) ? '' : 'none';
+  });
+
+  // Filter purpose groups — hide group if all habits hidden
+  document.querySelectorAll('.purpose-group').forEach(function(group){
+    var rows = group.querySelectorAll('.t1-row');
+    var anyVisible = false;
+    rows.forEach(function(r){ if(r.style.display !== 'none') anyVisible = true; });
+    group.style.display = (showAll || anyVisible) ? '' : 'none';
+  });
+
+  // Filter horizon cards
+  document.querySelectorAll('.horizon-card').forEach(function(card){
+    card.style.display = matchesDomain(card) ? '' : 'none';
+  });
+};
 
 // ── Main Load ──
 async function load(){

@@ -2,7 +2,7 @@
  * nav.js — Shared navigation component for averagejoematt.com
  * Handles: hamburger menu, bottom nav active state, theme toggle,
  *          GAM-01 "Since Your Last Visit" badges, GAM-02 Reading Path CTAs
- * v2.0.0 — 2026-03-26 — Tier 2 IA: 5-section nav
+ * v3.0.0 — 2026-03-27 — Decision 1: 6-section IA
  */
 (function() {
   'use strict';
@@ -47,6 +47,9 @@
   }
 
   if (hamburger) hamburger.addEventListener('click', openMenu);
+  // "More" bottom-nav button also opens the overlay (Decision 1b)
+  var moreBtn = document.querySelector('.bottom-nav__more');
+  if (moreBtn) moreBtn.addEventListener('click', openMenu);
   if (overlayClose) overlayClose.addEventListener('click', closeMenu);
   if (overlay) {
     overlay.addEventListener('click', function(e) {
@@ -54,16 +57,23 @@
     });
   }
 
-  // ── Bottom nav active state ───────────────────────────────
+  // ── Bottom nav active state (6-section IA) ───────────────
   var path = window.location.pathname;
-  var bottomLinks = document.querySelectorAll('.bottom-nav__link');
+  // Map bottom nav hrefs to the full set of paths each owns
+  var BOTTOM_NAV_OWNS = {
+    '/':           ['/', '/story/', '/about/', '/achievements/'],
+    '/sleep/':     ['/sleep/', '/glucose/', '/nutrition/', '/training/', '/mind/', '/benchmarks/', '/explorer/'],
+    '/live/':      ['/live/', '/character/', '/habits/', '/accountability/'],
+    '/chronicle/': ['/chronicle/', '/weekly/', '/ask/', '/subscribe/'],
+  };
+  var bottomLinks = document.querySelectorAll('.bottom-nav__link:not(.bottom-nav__more)');
   bottomLinks.forEach(function(link) {
     var href = link.getAttribute('href');
-    if (href === '/' && path === '/') {
-      link.classList.add('active');
-    } else if (href !== '/' && path.startsWith(href)) {
-      link.classList.add('active');
-    }
+    var owned = BOTTOM_NAV_OWNS[href] || [];
+    var isActive = owned.some(function(p) {
+      return (p === '/' && path === '/') || (p !== '/' && path.startsWith(p));
+    });
+    if (isActive) link.classList.add('active');
   });
 
   // ── Top nav active state ──────────────────────────────────
@@ -141,13 +151,12 @@
     '/platform/':          '2026-03-26',
   };
 
-  // Bottom nav → which paths it owns (5-section IA)
+  // Bottom nav → which paths it owns (6-section IA, Decision 1c)
   var BADGE_MAP = {
-    '/':           ['/story/', '/about/'],
-    '/live/':      ['/live/', '/character/', '/habits/', '/sleep/', '/glucose/', '/explorer/'],
-    '/stack/':     ['/stack/', '/protocols/', '/experiments/', '/discoveries/', '/challenges/'],
-    '/platform/':  ['/platform/', '/intelligence/', '/board/', '/tools/'],
-    '/subscribe/': ['/chronicle/', '/chronicle/archive/', '/weekly/', '/subscribe/'],
+    '/':           ['/story/', '/about/', '/achievements/'],
+    '/sleep/':     ['/sleep/', '/glucose/', '/nutrition/', '/training/', '/mind/', '/benchmarks/', '/explorer/'],
+    '/live/':      ['/live/', '/character/', '/habits/', '/accountability/'],
+    '/chronicle/': ['/chronicle/', '/chronicle/archive/', '/weekly/', '/ask/', '/subscribe/'],
   };
 
   try {
@@ -181,38 +190,47 @@
     localStorage.setItem(lastVisitKey, nowIso);
   } catch (e) { /* localStorage blocked */ }
 
-  // ── GAM-02: Reading Path CTAs ─────────────────────────────
+  // ── GAM-02: Reading Path CTAs (Decision 1d — 6-section IA) ─
   var READING_PATHS = {
-    '/story/':              { href: '/live/',            title: 'See Today\u2019s Data \u2192',      sub: 'What the sensors say right now' },
-    '/about/':              { href: '/story/',           title: 'The Story \u2192',              sub: 'Read the full transformation narrative' },
-    '/live/':               { href: '/character/',       title: 'The Score \u2192',              sub: 'How it all adds up' },
-    '/character/':          { href: '/habits/',          title: 'The Habits \u2192',             sub: 'The inputs that drive the score' },
-    '/habits/':             { href: '/experiments/',     title: 'Experiments \u2192',            sub: 'What\u2019s being actively tested' },
-    '/accountability/':     { href: '/methodology/',     title: 'The Methodology \u2192',        sub: 'How the science works' },
-    '/protocols/':          { href: '/live/',            title: 'The Results \u2192',            sub: 'What these protocols produced' },
-    '/experiments/':        { href: '/discoveries/',     title: 'Discoveries \u2192',            sub: 'What the data proved' },
-    '/discoveries/':        { href: '/intelligence/',    title: 'The Intelligence Layer \u2192', sub: 'How the AI finds these patterns' },
-    '/sleep/':              { href: '/glucose/',         title: 'Glucose Data \u2192',           sub: '30-day CGM time-in-range' },
-    '/glucose/':            { href: '/benchmarks/',      title: 'Benchmarks \u2192',             sub: 'How Matthew compares to population norms' },
-    '/benchmarks/':         { href: '/subscribe/',       title: 'Get Weekly Updates \u2192',     sub: 'New data every week' },
-    '/supplements/':        { href: '/protocols/',       title: 'All Protocols \u2192',          sub: 'Sleep, training, nutrition, supplements' },
-    '/platform/':           { href: '/cost/',            title: 'The Real Cost \u2192',          sub: 'Running a full health OS for ~$13/month' },
-    '/cost/':               { href: '/methodology/',     title: 'The Methodology \u2192',        sub: 'How the science works' },
-    '/methodology/':        { href: '/intelligence/',    title: 'The Intelligence Layer \u2192', sub: 'What the AI actually does' },
-    '/intelligence/':       { href: '/discoveries/',     title: 'Discoveries \u2192',            sub: 'What the data revealed' },
-    '/board/':              { href: '/board/technical/', title: 'Technical Board \u2192',        sub: '12 personas keeping the architecture honest' },
-    '/board/technical/':    { href: '/board/product/',   title: 'Product Board \u2192',          sub: '8 personas shaping what this site becomes' },
-    '/board/product/':      { href: '/platform/',        title: 'How This Works \u2192',         sub: 'The full platform architecture' },
-    '/data/':               { href: '/methodology/',     title: 'The Methodology \u2192',        sub: 'How the data is processed' },
-    '/tools/':              { href: '/ask/',             title: 'Ask the Data \u2192',           sub: 'Query 19 sources of live data' },
-    '/week/':               { href: '/subscribe/',       title: 'Get This Weekly \u2192',        sub: 'Every week, in your inbox' },
-    '/chronicle/':          { href: '/chronicle/archive/', title: 'All Entries \u2192',          sub: 'The full chronicle archive' },
-    '/chronicle/archive/':  { href: '/subscribe/',       title: 'Get the Weekly Brief \u2192',   sub: 'Delivered every week' },
-    '/ask/':                { href: '/platform/',        title: 'How This Works \u2192',         sub: 'The platform behind the AI' },
-    '/explorer/':           { href: '/discoveries/',     title: 'Validated Discoveries \u2192',  sub: 'Correlations that survived scrutiny' },
-    '/weekly/':             { href: '/explorer/',        title: 'Explore the Data \u2192',       sub: 'Pick any two metrics and discover correlations' },
-    '/achievements/':       { href: '/character/',       title: 'The Character Sheet \u2192',    sub: 'How it all adds up into one score' },
-    '/stack/':              { href: '/protocols/',       title: 'Protocols \u2192',              sub: 'The strategy layer beneath the stack' },
+    // The Story flow
+    '/story/':              { href: '/live/',             title: 'See Today\u2019s Data \u2192',      sub: 'What the sensors say right now' },
+    '/about/':              { href: '/story/',            title: 'The Story \u2192',              sub: 'Read the full transformation narrative' },
+    '/achievements/':       { href: '/character/',        title: 'The Score \u2192',              sub: 'How it all adds up into one score' },
+    // The Evidence flow
+    '/sleep/':              { href: '/glucose/',          title: 'Glucose Data \u2192',           sub: '30-day CGM time-in-range' },
+    '/glucose/':            { href: '/nutrition/',        title: 'Nutrition Data \u2192',          sub: 'Macro tracking, protein targets, TDEE' },
+    '/nutrition/':          { href: '/training/',         title: 'Training Data \u2192',           sub: 'Workouts, zone 2, strength progress' },
+    '/training/':           { href: '/mind/',             title: 'Inner Life \u2192',             sub: 'The pillar that determines all the others' },
+    '/mind/':               { href: '/benchmarks/',       title: 'The Standards \u2192',           sub: 'How Matthew compares to population norms' },
+    '/benchmarks/':         { href: '/explorer/',         title: 'Explore the Data \u2192',        sub: 'Cross-domain correlations and patterns' },
+    '/explorer/':           { href: '/discoveries/',      title: 'Validated Discoveries \u2192',   sub: 'Correlations that survived scrutiny' },
+    // The Pulse flow
+    '/live/':               { href: '/character/',        title: 'The Score \u2192',              sub: 'How it all adds up' },
+    '/character/':          { href: '/habits/',           title: 'The Habits \u2192',             sub: 'The inputs that drive the score' },
+    '/habits/':             { href: '/accountability/',   title: 'Accountability \u2192',          sub: 'The public commitment' },
+    '/accountability/':     { href: '/sleep/',            title: 'The Evidence \u2192',            sub: 'Start with sleep data' },
+    // The Practice flow
+    '/stack/':              { href: '/protocols/',        title: 'Protocols \u2192',              sub: 'The strategy layer beneath the stack' },
+    '/protocols/':          { href: '/experiments/',      title: 'Experiments \u2192',            sub: 'What\u2019s being actively tested' },
+    '/supplements/':        { href: '/protocols/',        title: 'All Protocols \u2192',          sub: 'Sleep, training, nutrition, supplements' },
+    '/experiments/':        { href: '/challenges/',       title: 'Challenges \u2192',             sub: 'Action-oriented goals from the data' },
+    '/challenges/':         { href: '/discoveries/',      title: 'Discoveries \u2192',            sub: 'What the data proved' },
+    '/discoveries/':        { href: '/intelligence/',     title: 'The Intelligence Layer \u2192',  sub: 'How the AI finds these patterns' },
+    // The Platform flow
+    '/platform/':           { href: '/intelligence/',     title: 'The AI \u2192',                 sub: 'What the intelligence layer actually does' },
+    '/intelligence/':       { href: '/board/',            title: 'AI Board \u2192',               sub: 'The advisory personas shaping this platform' },
+    '/board/':              { href: '/board/technical/',  title: 'Technical Board \u2192',        sub: '12 personas keeping the architecture honest' },
+    '/board/technical/':    { href: '/board/product/',    title: 'Product Board \u2192',          sub: '8 personas shaping what this site becomes' },
+    '/board/product/':      { href: '/methodology/',      title: 'Methodology \u2192',            sub: 'How the science works' },
+    '/methodology/':        { href: '/cost/',             title: 'The Real Cost \u2192',          sub: 'Running a full health OS for ~$13/month' },
+    '/cost/':               { href: '/tools/',            title: 'Tools \u2192',                  sub: 'Every tool in the platform' },
+    '/tools/':              { href: '/builders/',         title: 'For Builders \u2192',           sub: 'Build your own health platform' },
+    '/builders/':           { href: '/subscribe/',        title: 'Subscribe \u2192',              sub: 'Follow the experiment' },
+    // The Chronicle flow
+    '/chronicle/':          { href: '/chronicle/archive/', title: 'All Entries \u2192',           sub: 'The full chronicle archive' },
+    '/chronicle/archive/':  { href: '/subscribe/',        title: 'Get the Weekly Brief \u2192',   sub: 'Delivered every week' },
+    '/weekly/':             { href: '/ask/',              title: 'Ask the Data \u2192',           sub: 'Query 19 sources of live data' },
+    '/ask/':                { href: '/subscribe/',        title: 'Subscribe \u2192',              sub: 'Follow the experiment' },
   };
 
   var nextRead = READING_PATHS[path];

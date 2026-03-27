@@ -28,7 +28,62 @@
     }
 
     /* ═══════════════════════════════════════════════════════
-       HERO — B's 2-column + C's gauge row
+       12h: INTIMATE VISUAL LANGUAGE
+       Serif body text, softer grid, more white space,
+       journal-like texture. This page feels different.
+       ═══════════════════════════════════════════════════════ */
+    .mind-page {
+      --mind-serif: var(--font-serif);
+    }
+    .mind-page .m-hero__sub,
+    .mind-page .m-narrative__body,
+    .mind-page .m-confessional__body,
+    .mind-page .m-commitment-text,
+    .mind-page .m-sparsity__body,
+    .mind-page .m-connection-intent__text,
+    .mind-page .m-causal-desc,
+    .mind-page .m-intelligence-desc,
+    .mind-page .m-journal-excerpt__body,
+    .mind-page .m-future__body,
+    .mind-page .m-vice-card__why,
+    .mind-page .m-clinical__body,
+    .mind-page .m-building__body,
+    .mind-page .m-method-item {
+      font-family: var(--mind-serif);
+    }
+
+    /* Subtle paper-like texture overlay */
+    .mind-page::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 28px,
+        rgba(167,139,250,0.008) 28px,
+        rgba(167,139,250,0.008) 29px
+      );
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* More white space between sections */
+    .mind-page section,
+    .mind-page .m-pullquote,
+    .mind-page .m-confessional,
+    .mind-page .m-commitment-section,
+    .mind-page .m-causal-section,
+    .mind-page .m-connection-section,
+    .mind-page .m-intelligence-section,
+    .mind-page .m-journal-section,
+    .mind-page .m-future-section {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       HERO — 2-column + gauge row
        ═══════════════════════════════════════════════════════ */
     .m-hero {
       padding: var(--space-20) var(--page-padding) var(--space-16);
@@ -37,6 +92,7 @@
       border-bottom: 1px solid var(--border);
       max-width: var(--max-width);
       margin: 0 auto;
+      z-index: 1;
     }
     .m-hero-grid {
       display: grid;
@@ -133,6 +189,109 @@
     }
 
     /* ═══════════════════════════════════════════════════════
+       12a: CONFESSIONAL NARRATIVE — expanded intro
+       ═══════════════════════════════════════════════════════ */
+    .m-confessional {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: var(--space-16) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+      z-index: 1;
+      position: relative;
+    }
+    .m-confessional__body {
+      font-size: var(--text-base);
+      color: var(--text-muted);
+      line-height: 2;
+      letter-spacing: 0.01em;
+    }
+    .m-confessional__body p {
+      margin-bottom: var(--space-6);
+    }
+    .m-confessional__body strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .m-confessional__body em {
+      color: var(--m-violet);
+      font-style: italic;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       12m: CAUSAL HIERARCHY CALLOUT
+       ═══════════════════════════════════════════════════════ */
+    .m-hierarchy-callout {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      z-index: 1;
+      position: relative;
+    }
+    .m-hierarchy-callout__inner {
+      padding: var(--space-6) var(--space-8);
+      border-left: 3px solid var(--m-violet);
+      background: var(--m-violet-glow);
+    }
+    .m-hierarchy-callout__text {
+      font-family: var(--font-serif);
+      font-size: clamp(16px, 2.2vw, 20px);
+      color: var(--text);
+      line-height: 1.6;
+      font-style: italic;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       12f: FIVE COMMITMENTS — personal promises
+       ═══════════════════════════════════════════════════════ */
+    .m-commitment-section {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .m-commitment-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-8);
+    }
+    .m-commitment-section__title em {
+      font-style: normal;
+      color: var(--m-violet);
+    }
+    .m-commitment-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-5);
+    }
+    .m-commitment-item {
+      display: flex;
+      gap: var(--space-5);
+      padding: var(--space-5) var(--space-6);
+      background: var(--surface);
+      border-left: 2px solid var(--m-violet);
+    }
+    .m-commitment-num {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: var(--m-violet);
+      line-height: 1;
+      flex-shrink: 0;
+      width: 28px;
+    }
+    .m-commitment-text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.8;
+    }
+    .m-commitment-text strong {
+      color: var(--text);
+      display: block;
+      font-family: var(--font-body);
+      margin-bottom: 2px;
+    }
+
+    /* ═══════════════════════════════════════════════════════
        PULL-QUOTES
        ═══════════════════════════════════════════════════════ */
     .m-pullquote {
@@ -215,8 +374,8 @@
     }
     .m-vice-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: var(--space-3);
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: var(--space-4);
     }
     .m-vice-card {
       background: var(--surface);
@@ -251,6 +410,16 @@
       color: var(--text-faint);
       letter-spacing: 0.1em;
     }
+    /* 12k: warm why-line under each streak */
+    .m-vice-card__why {
+      font-size: 11px;
+      color: var(--text-faint);
+      line-height: 1.5;
+      margin-top: var(--space-3);
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--border);
+      font-style: italic;
+    }
     .m-vice-card__bottom-bar {
       position: absolute;
       bottom: 0;
@@ -260,6 +429,37 @@
       transition: width 1s ease;
     }
     .m-vice-card.broken .m-vice-card__bottom-bar { background: var(--m-red); }
+
+    /* ═══════════════════════════════════════════════════════
+       12c: DATA SPARSITY — honest framing
+       ═══════════════════════════════════════════════════════ */
+    .m-sparsity {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      z-index: 1;
+      position: relative;
+    }
+    .m-sparsity__inner {
+      padding: var(--space-6) var(--space-8);
+      border: 1px dashed rgba(167,139,250,0.2);
+      border-left: 3px solid var(--m-violet);
+      background: var(--m-violet-glow);
+    }
+    .m-sparsity__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .m-sparsity__body {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.9;
+    }
+    .m-sparsity__body strong {
+      color: var(--text);
+    }
 
     /* ═══════════════════════════════════════════════════════
        CONNECTION + WILLPOWER — editorial 2-column
@@ -292,6 +492,86 @@
     .m-bar-track { height: 6px; background: rgba(255,255,255,0.04); border-radius: 3px; overflow: hidden; }
     .m-bar-fill { height: 100%; border-radius: 3px; transition: width 1s ease; }
     .m-bar-val { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); text-align: right; }
+
+    /* ═══════════════════════════════════════════════════════
+       12e: SOCIAL CONNECTION — intention-first redesign
+       ═══════════════════════════════════════════════════════ */
+    .m-connection-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .m-connection-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .m-connection-section__title em {
+      font-style: normal;
+      color: var(--m-violet);
+    }
+    .m-connection-threshold {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      letter-spacing: 0.06em;
+      margin-bottom: var(--space-8);
+      padding: var(--space-3) var(--space-4);
+      background: var(--m-violet-glow);
+      border-left: 2px solid var(--m-violet);
+      display: inline-block;
+    }
+    .m-connection-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: var(--space-4);
+    }
+    .m-connection-intent {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--m-violet);
+      padding: var(--space-5) var(--space-5);
+    }
+    .m-connection-intent__who {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--m-violet);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-2);
+    }
+    .m-connection-intent__text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.7;
+      margin-bottom: var(--space-3);
+    }
+    .m-connection-intent__progress {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+    .m-connection-intent__bar {
+      flex: 1;
+      height: 4px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .m-connection-intent__fill {
+      height: 100%;
+      background: var(--m-violet);
+      border-radius: 2px;
+      transition: width 1s ease;
+    }
+    .m-connection-intent__hours {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
 
     /* ═══════════════════════════════════════════════════════
        MOOD CHART
@@ -333,31 +613,297 @@
     }
 
     /* ═══════════════════════════════════════════════════════
-       BUILDING THIS — honest gap
+       12d: CROSS-DOMAIN CAUSAL CONNECTIONS
        ═══════════════════════════════════════════════════════ */
-    .m-building {
-      max-width: 560px;
+    .m-causal-section {
+      max-width: var(--max-width);
       margin: 0 auto;
       padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
     }
-    .m-building__inner {
-      padding: var(--space-8);
-      border: 1px dashed var(--border);
-      border-left: 3px solid var(--m-violet);
-      background: var(--surface);
-      text-align: center;
-    }
-    .m-building__title {
+    .m-causal-section__title {
       font-family: var(--font-display);
       font-size: var(--text-h3);
       color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .m-causal-section__title em {
+      font-style: normal;
+      color: var(--m-violet);
+    }
+    .m-causal-section__sub {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      letter-spacing: 0.06em;
+      margin-bottom: var(--space-8);
+    }
+    .m-causal-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--space-5);
+    }
+    .m-causal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-5) var(--space-6);
+    }
+    .m-causal-arrow {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--m-violet);
+      letter-spacing: 0.04em;
+      margin-bottom: var(--space-3);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .m-causal-arrow__from {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .m-causal-arrow__to {
+      color: var(--m-violet);
+      font-weight: 600;
+    }
+    .m-causal-arrow__dir {
+      color: var(--m-violet);
+      font-size: 16px;
+    }
+    .m-causal-desc {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+    .m-causal-correlate {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.06em;
+      margin-top: var(--space-3);
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--border);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       12i: CLINICAL REALITY — naming patterns honestly
+       ═══════════════════════════════════════════════════════ */
+    .m-clinical {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .m-clinical__inner {
+      padding: var(--space-6) var(--space-8);
+      border-left: 3px solid rgba(167,139,250,0.3);
+      background: var(--m-violet-glow);
+    }
+    .m-clinical__title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--m-violet);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-3);
+    }
+    .m-clinical__body {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.9;
+    }
+    .m-clinical__body strong {
+      color: var(--text);
+    }
+    .m-clinical__frameworks {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.06em;
+      margin-top: var(--space-4);
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--border);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       12g: INTELLIGENCE LAYER PREVIEW
+       ═══════════════════════════════════════════════════════ */
+    .m-intelligence-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .m-intelligence-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .m-intelligence-section__title em {
+      font-style: normal;
+      color: var(--m-violet);
+    }
+    .m-intelligence-section__sub {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      letter-spacing: 0.06em;
+      margin-bottom: var(--space-8);
+    }
+    .m-intelligence-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-5);
+    }
+    .m-intelligence-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top: 2px solid var(--m-violet);
+      padding: var(--space-6);
+      text-align: center;
+    }
+    .m-intelligence-card__title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
       margin-bottom: var(--space-4);
     }
-    .m-building__body {
+    .m-intelligence-placeholder {
+      height: 120px;
+      border: 1px dashed rgba(167,139,250,0.15);
+      background: var(--m-violet-glow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: var(--space-4);
+    }
+    .m-intelligence-placeholder__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.08em;
+    }
+    .m-intelligence-desc {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    /* Radar placeholder animation */
+    .m-intelligence-placeholder svg {
+      opacity: 0.3;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       12l: JOURNAL EXCERPT SECTION
+       ═══════════════════════════════════════════════════════ */
+    .m-journal-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .m-journal-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-8);
+    }
+    .m-journal-section__title em {
+      font-style: normal;
+      color: var(--m-violet);
+    }
+    .m-journal-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-5);
+    }
+    .m-journal-excerpt {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-6);
+    }
+    .m-journal-excerpt__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--m-violet);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-4);
+    }
+    .m-journal-excerpt__body {
       font-size: var(--text-sm);
       color: var(--text-muted);
       line-height: 1.8;
+      font-style: italic;
     }
+    .m-journal-excerpt__meta {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.06em;
+      margin-top: var(--space-4);
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--border);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       12j: WHAT THIS PAGE WILL BECOME
+       ═══════════════════════════════════════════════════════ */
+    .m-future-section {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .m-future-section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      margin-bottom: var(--space-6);
+    }
+    .m-future-section__title em {
+      font-style: normal;
+      color: var(--m-violet);
+    }
+    .m-future__body {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.9;
+      margin-bottom: var(--space-6);
+    }
+    .m-future__body strong {
+      color: var(--text);
+    }
+    .m-future-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+    .m-future-item {
+      display: flex;
+      gap: var(--space-4);
+      padding: var(--space-4) var(--space-5);
+      background: var(--surface);
+      border-left: 2px solid var(--m-violet);
+    }
+    .m-future-item__timeline {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--m-violet);
+      letter-spacing: 0.08em;
+      white-space: nowrap;
+      flex-shrink: 0;
+      width: 56px;
+    }
+    .m-future-item__text {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .m-future-item__text strong { color: var(--text); }
 
     /* ═══════════════════════════════════════════════════════
        CROSS-LINKS
@@ -394,56 +940,6 @@
       color: var(--text-muted);
       line-height: 1.6;
     }
-
-    /* ═══════════════════════════════════════════════════════
-       NARRATIVE
-       ═══════════════════════════════════════════════════════ */
-    .m-narrative {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: var(--space-12) var(--page-padding);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-12);
-      border-bottom: 1px solid var(--border);
-    }
-    .m-narrative__title {
-      font-family: var(--font-display);
-      font-size: var(--text-h2);
-      color: var(--text);
-      line-height: 1.15;
-      margin-bottom: var(--space-5);
-    }
-    .m-narrative__title em { font-style: normal; color: var(--m-violet); }
-    .m-narrative__body {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.8;
-    }
-    .m-narrative__body strong { color: var(--text); }
-    .m-narrative__body a { color: var(--m-violet); text-decoration: none; }
-    .m-intent-list { display: flex; flex-direction: column; gap: var(--space-4); }
-    .m-intent-item {
-      display: flex;
-      gap: var(--space-4);
-      padding: var(--space-4);
-      background: var(--surface);
-      border-left: 2px solid var(--m-violet);
-    }
-    .m-intent-num {
-      font-family: var(--font-display);
-      font-size: 20px;
-      color: var(--m-violet);
-      line-height: 1;
-      flex-shrink: 0;
-      width: 28px;
-    }
-    .m-intent-text {
-      font-size: var(--text-sm);
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-    .m-intent-text strong { color: var(--text); }
 
     /* ═══════════════════════════════════════════════════════
        METHODOLOGY
@@ -505,7 +1001,10 @@
       .m-hero-grid { grid-template-columns: 1fr; }
       .m-gauge-row { grid-template-columns: repeat(2, 1fr); }
       .m-bars-section { grid-template-columns: 1fr; }
-      .m-narrative { grid-template-columns: 1fr; }
+      .m-intelligence-grid { grid-template-columns: 1fr; }
+      .m-journal-grid { grid-template-columns: 1fr; }
+      .m-causal-grid { grid-template-columns: 1fr; }
+      .m-connection-grid { grid-template-columns: 1fr; }
       .m-method-grid { grid-template-columns: 1fr; }
       .m-xref { grid-template-columns: 1fr; }
     }
@@ -522,7 +1021,7 @@
     .detail-card { border-left-color: var(--obs-accent); }
   </style>
 </head>
-<body>
+<body class="mind-page">
 <div id="amj-nav"></div>
 <!-- Product Board Item 11: Day X context banner -->
 <div id="day-x-banner" style="
@@ -545,7 +1044,7 @@
 
 
 <!-- ════════════════════════════════════════════════════════════
-     HERO — B's 2-column + C's gauge row
+     HERO — 12n: GUARDRAIL — title preserved exactly
      ════════════════════════════════════════════════════════════ -->
 <div class="m-hero">
   <div class="m-hero-grid">
@@ -622,8 +1121,75 @@
   </div>
 </div>
 
+<!-- ════════════════════════════════════════════════════════════
+     12a: CONFESSIONAL NARRATIVE — vulnerability first
+     ════════════════════════════════════════════════════════════ -->
+<div class="m-confessional reveal">
+  <div class="m-confessional__body">
+    <p>I built the sleep observatory first because sleep felt safe. There were numbers. Scores. A clean axis from bad to good. I built the glucose page next, then training, then nutrition. Each one gave me something to optimize, something to control. I was four pillars deep before I admitted what I was doing: <strong>building an elaborate system to avoid looking at the thing that actually needed measuring.</strong></p>
+
+    <p>The truth is, I spent most of my thirties making health decisions driven by anxiety I wouldn&rsquo;t name. I&rsquo;d over-train after stressful weeks &mdash; not because the program called for it, but because the gym was the only place where rumination stopped. I&rsquo;d optimize my sleep stack while ignoring that I was lying awake replaying conversations from a decade ago. I tracked every biomarker except the one that determined the trajectory of all the others: <em>how I was actually doing.</em></p>
+
+    <p>Social withdrawal was the quietest cost. Not dramatic isolation &mdash; just a slow fade. Fewer calls returned. Fewer invitations extended. A shrinking circle justified by &ldquo;I&rsquo;m busy building something.&rdquo; Busy, yes. But also afraid that real connection would require honesty I wasn&rsquo;t ready for. The data gap on this page &mdash; sparse journal entries, zero logged connections &mdash; is the archaeological record of that avoidance.</p>
+
+    <p>This page is the commitment to stop hiding behind the other pillars. To measure mood, name cognitive patterns, track connection quality, and sit with the numbers even when they&rsquo;re unflattering. <strong>If the physical transformation is the visible part of this project, this page is the load-bearing part.</strong> Everything else I&rsquo;m building rests on what&rsquo;s measured here.</p>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     12m: CAUSAL HIERARCHY CALLOUT
+     ════════════════════════════════════════════════════════════ -->
+<div class="m-hierarchy-callout reveal">
+  <div class="m-hierarchy-callout__inner">
+    <div class="m-hierarchy-callout__text">
+      This pillar doesn&rsquo;t sit alongside the others. It determines the trajectory of all of them.
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     12f: FIVE COMMITMENTS — personal promises, not protocol
+     ════════════════════════════════════════════════════════════ -->
+<div class="m-commitment-section reveal">
+  <h2 class="m-commitment-section__title">Five <em>promises</em></h2>
+  <div class="m-commitment-list">
+    <div class="m-commitment-item">
+      <div class="m-commitment-num">01</div>
+      <div class="m-commitment-text"><strong>I will journal every day, even when I don&rsquo;t want to.</strong>Morning and evening entries feeding sentiment analysis and burnout early warning. The days I resist writing are the days the data matters most.</div>
+    </div>
+    <div class="m-commitment-item">
+      <div class="m-commitment-num">02</div>
+      <div class="m-commitment-text"><strong>I will name what I&rsquo;m feeling, not just what I&rsquo;m doing.</strong>Mood-energy divergence &mdash; when mood rises but energy falls &mdash; is a burnout precursor. I can&rsquo;t detect it if I won&rsquo;t report it.</div>
+    </div>
+    <div class="m-commitment-item">
+      <div class="m-commitment-num">03</div>
+      <div class="m-commitment-text"><strong>I will invest in relationships, not just track them.</strong>Murthy says 3&ndash;5 close relationships is the wellbeing threshold. I&rsquo;m below that. This page holds me accountable to changing it.</div>
+    </div>
+    <div class="m-commitment-item">
+      <div class="m-commitment-num">04</div>
+      <div class="m-commitment-text"><strong>I will treat vice streaks as identity evidence, not willpower tests.</strong>Day 30 isn&rsquo;t discipline. It&rsquo;s who I&rsquo;m becoming. Each day held is a vote for the person I&rsquo;m building.</div>
+    </div>
+    <div class="m-commitment-item">
+      <div class="m-commitment-num">05</div>
+      <div class="m-commitment-text"><strong>I will look at the cognitive patterns, even the ugly ones.</strong>Catastrophizing, rumination, imposter syndrome &mdash; the data will show which patterns dominate. I commit to reading what it says.</div>
+    </div>
+  </div>
+</div>
+
 <div id="m-loading" class="m-loading">LOADING INNER LIFE DATA&hellip;</div>
 <div id="m-content" style="display:none">
+
+<!-- ════════════════════════════════════════════════════════════
+     12c: DATA SPARSITY — the gap IS the data
+     ════════════════════════════════════════════════════════════ -->
+<div class="m-sparsity reveal" id="m-sparsity" style="display:none">
+  <div class="m-sparsity__inner">
+    <div class="m-sparsity__title">The data gap is the data</div>
+    <div class="m-sparsity__body" id="m-sparsity-body">
+      <span id="m-sparsity-journal-count">One</span> journal entry. <span id="m-sparsity-connection-count">Zero</span> logged connections. That&rsquo;s not a bug in the measurement system &mdash; <strong>that&rsquo;s the measurement.</strong> The sparsity on this page is an honest record of the pillar I avoided building. As entries accumulate, every section below transforms from empty framework to working intelligence.
+    </div>
+  </div>
+</div>
 
 <!-- ════════════════════════════════════════════════════════════
      PULL-QUOTE #1 — Identity threshold
@@ -641,7 +1207,7 @@
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
-     VICE STREAKS — editorial grid with left accent
+     VICE STREAKS — 12k: warmer, with why-lines
      ════════════════════════════════════════════════════════════ -->
 <section class="m-vice-section reveal">
   <div class="m-section-header">Vice streak portfolio &mdash; each day is a vote</div>
@@ -649,7 +1215,7 @@
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
-     CONNECTION + WILLPOWER — editorial 2-column
+     WILLPOWER — resist/succumb bars
      ════════════════════════════════════════════════════════════ -->
 <section class="m-bars-section reveal">
   <div class="m-bar-card">
@@ -670,19 +1236,46 @@
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #2 — Social connection
+     12e: SOCIAL CONNECTION — intention-first redesign
      ════════════════════════════════════════════════════════════ -->
-<div class="m-pullquote reveal">
-  <div class="m-pullquote__watermark">02</div>
-  <div class="m-pullquote__text">
-    Murthy&rsquo;s threshold: <em>3&ndash;5 close relationships</em> is the wellbeing floor.
-    This page tracks depth, not frequency &mdash; because <em>surface connections don&rsquo;t compound</em>.
+<section class="m-connection-section reveal">
+  <h2 class="m-connection-section__title">People I&rsquo;m <em>trying to reconnect with</em></h2>
+  <div class="m-connection-threshold">MURTHY THRESHOLD: 150 hours/year for close friendship &mdash; that&rsquo;s ~3 hours/week per person</div>
+  <div class="m-connection-grid">
+    <div class="m-connection-intent">
+      <div class="m-connection-intent__who">Friend A</div>
+      <div class="m-connection-intent__text">Weekly calls restarted. Rebuilding a friendship I let fade during the years I was &ldquo;too busy building.&rdquo;</div>
+      <div class="m-connection-intent__progress">
+        <div class="m-connection-intent__bar"><div class="m-connection-intent__fill" id="conn-a-fill" style="width:0%"></div></div>
+        <div class="m-connection-intent__hours" id="conn-a-hours">0 / 150 hrs</div>
+      </div>
+    </div>
+    <div class="m-connection-intent">
+      <div class="m-connection-intent__who">Family member B</div>
+      <div class="m-connection-intent__text">Monthly visits. Proximity isn&rsquo;t connection &mdash; tracking actual quality time, not just coexistence.</div>
+      <div class="m-connection-intent__progress">
+        <div class="m-connection-intent__bar"><div class="m-connection-intent__fill" id="conn-b-fill" style="width:0%"></div></div>
+        <div class="m-connection-intent__hours" id="conn-b-hours">0 / 150 hrs</div>
+      </div>
+    </div>
+    <div class="m-connection-intent">
+      <div class="m-connection-intent__who">Friend C</div>
+      <div class="m-connection-intent__text">Training partner who became a real friend. Investing beyond the gym &mdash; the relationship that surprised me.</div>
+      <div class="m-connection-intent__progress">
+        <div class="m-connection-intent__bar"><div class="m-connection-intent__fill" id="conn-c-fill" style="width:0%"></div></div>
+        <div class="m-connection-intent__hours" id="conn-c-hours">0 / 150 hrs</div>
+      </div>
+    </div>
+    <div class="m-connection-intent">
+      <div class="m-connection-intent__who">Family member D</div>
+      <div class="m-connection-intent__text">The call I keep meaning to make. Data fills in here as evidence of effort, not just intent.</div>
+      <div class="m-connection-intent__progress">
+        <div class="m-connection-intent__bar"><div class="m-connection-intent__fill" id="conn-d-fill" style="width:0%"></div></div>
+        <div class="m-connection-intent__hours" id="conn-d-hours">0 / 150 hrs</div>
+      </div>
+    </div>
   </div>
-  <div class="m-pullquote__attr">
-    <span class="m-pullquote__badge">Evidence-based &middot; Longitudinal</span>
-    <span class="m-pullquote__source">Surgeon General&rsquo;s Advisory on Loneliness &amp; Connection</span>
-  </div>
-</div>
+</section>
 
 <!-- ════════════════════════════════════════════════════════════
      MOOD CHART
@@ -696,10 +1289,69 @@
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #3 — Mood-energy divergence
+     12d: CROSS-DOMAIN CAUSAL CONNECTIONS
+     ════════════════════════════════════════════════════════════ -->
+<section class="m-causal-section reveal">
+  <h2 class="m-causal-section__title">How inner life <em>drives</em> everything else</h2>
+  <div class="m-causal-section__sub">Directional arrows &mdash; physiological correlates confirm what journaling reveals</div>
+  <div class="m-causal-grid">
+    <div class="m-causal-card">
+      <div class="m-causal-arrow">
+        <span class="m-causal-arrow__from">Sleep quality</span>
+        <span class="m-causal-arrow__dir">&rarr;</span>
+        <span class="m-causal-arrow__to">Next-day mood</span>
+      </div>
+      <div class="m-causal-desc">Poor sleep (&lt;6.5 hrs or &lt;80% efficiency) predicts next-day mood drops of 0.3&ndash;0.5 on the valence scale. The causal direction is clear: sleep disruption precedes mood deterioration, not the reverse.</div>
+      <div class="m-causal-correlate">Correlate: HRV &mdash; low overnight HRV confirms sympathetic overdrive feeding anxious mood</div>
+    </div>
+    <div class="m-causal-card">
+      <div class="m-causal-arrow">
+        <span class="m-causal-arrow__from">Training load</span>
+        <span class="m-causal-arrow__dir">&rarr;</span>
+        <span class="m-causal-arrow__to">Anxiety reduction</span>
+      </div>
+      <div class="m-causal-desc">Moderate training sessions (&lt;75% max HR) reduce same-day anxiety markers. But over-training after stressful weeks backfires &mdash; the body reads it as more threat, not relief.</div>
+      <div class="m-causal-correlate">Correlate: Respiratory rate &mdash; elevated nighttime RR signals unresolved stress despite training</div>
+    </div>
+    <div class="m-causal-card">
+      <div class="m-causal-arrow">
+        <span class="m-causal-arrow__from">Cortisol patterns</span>
+        <span class="m-causal-arrow__dir">&rarr;</span>
+        <span class="m-causal-arrow__to">Rumination loops</span>
+      </div>
+      <div class="m-causal-desc">Chronic cortisol elevation doesn&rsquo;t just feel bad &mdash; it physically impairs prefrontal function, making rumination harder to interrupt. The biochemistry creates the cognitive trap.</div>
+      <div class="m-causal-correlate">Correlate: Skin temp variability &mdash; stress-related peripheral vasoconstriction visible in wearable data</div>
+    </div>
+    <div class="m-causal-card">
+      <div class="m-causal-arrow">
+        <span class="m-causal-arrow__from">Social isolation</span>
+        <span class="m-causal-arrow__dir">&rarr;</span>
+        <span class="m-causal-arrow__to">Inflammation</span>
+      </div>
+      <div class="m-causal-desc">Loneliness activates the same inflammatory pathways as physical injury. Murthy&rsquo;s research shows social disconnection raises CRP and IL-6 &mdash; measurable in bloodwork, visible in recovery scores.</div>
+      <div class="m-causal-correlate">Correlate: Recovery score &mdash; Whoop recovery trends lower during periods of social withdrawal</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     12i: CLINICAL REALITY — naming patterns honestly
+     ════════════════════════════════════════════════════════════ -->
+<div class="m-clinical reveal">
+  <div class="m-clinical__inner">
+    <div class="m-clinical__title">Naming what this actually is</div>
+    <div class="m-clinical__body">
+      Anxiety, social withdrawal, and imposter syndrome aren&rsquo;t character flaws. They&rsquo;re <strong>mental health patterns</strong> with established clinical frameworks and evidence-based interventions. This page doesn&rsquo;t pathologize them &mdash; it names them, measures them, and connects them to the physiological data that other observatories collect. Cognitive Behavioral Therapy (CBT) provides the pattern taxonomy. Acceptance and Commitment Therapy (ACT) provides the values alignment framework. The PERMA model provides the wellbeing structure. None of this replaces professional support. It makes the invisible visible so that conversations with professionals &mdash; and with yourself &mdash; can be grounded in evidence rather than guesswork.
+    </div>
+    <div class="m-clinical__frameworks">Frameworks referenced: CBT cognitive distortion categories &middot; ACT values-driven behavior model &middot; Seligman PERMA wellbeing taxonomy</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE #2 — Mood-energy divergence
      ════════════════════════════════════════════════════════════ -->
 <div class="m-pullquote reveal">
-  <div class="m-pullquote__watermark">03</div>
+  <div class="m-pullquote__watermark">02</div>
   <div class="m-pullquote__text">
     When mood rises but energy falls, that&rsquo;s a <em>burnout precursor</em>.
     The platform detects this divergence &mdash; often <em>2 weeks before</em> it becomes obvious.
@@ -711,18 +1363,76 @@
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
-     BUILDING THIS — honest gap (conditionally shown)
+     12l: JOURNAL EXCERPT SECTION — AI-surfaced themes
      ════════════════════════════════════════════════════════════ -->
-<div class="m-building reveal" id="m-building" style="display:none">
-  <div class="m-building__inner">
-    <div class="m-building__title">Building this measurement</div>
-    <div class="m-building__body">
-      Journal data is growing. As entries accumulate, this section will show cognitive pattern
-      distribution, mood-energy divergence detection, burnout early warning, and values alignment.
-      The gap here is honest &mdash; this is the hardest thing to measure and the most important to get right.
+<section class="m-journal-section reveal">
+  <h2 class="m-journal-section__title">What the journal <em>reveals</em></h2>
+  <div class="m-journal-grid">
+    <div class="m-journal-excerpt">
+      <div class="m-journal-excerpt__label">Emotional weather</div>
+      <div class="m-journal-excerpt__body" id="journal-weather">Awaiting sufficient journal entries to detect emotional weather patterns. The AI surfaces recurring emotional states across entries &mdash; not individual moods, but the climate beneath them.</div>
+      <div class="m-journal-excerpt__meta" id="journal-weather-meta">Source: Haiku sentiment analysis across journal corpus</div>
+    </div>
+    <div class="m-journal-excerpt">
+      <div class="m-journal-excerpt__label">Recurring themes</div>
+      <div class="m-journal-excerpt__body" id="journal-themes">Theme extraction begins after 10+ entries. Early patterns will show what you write about when you&rsquo;re anxious vs. calm &mdash; the topics that surface under stress are often the ones that matter most.</div>
+      <div class="m-journal-excerpt__meta" id="journal-themes-meta">Source: NLP topic clustering across journal entries</div>
+    </div>
+    <div class="m-journal-excerpt">
+      <div class="m-journal-excerpt__label">Growth signals</div>
+      <div class="m-journal-excerpt__body" id="journal-growth">Growth signal detection requires longitudinal data. The system looks for cognitive reframing: moments where the same stressor produces a different response. That shift is measurable.</div>
+      <div class="m-journal-excerpt__meta" id="journal-growth-meta">Source: CBT pattern classification + sentiment trajectory</div>
     </div>
   </div>
-</div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     12g: INTELLIGENCE LAYER PREVIEW
+     ════════════════════════════════════════════════════════════ -->
+<section class="m-intelligence-section reveal">
+  <h2 class="m-intelligence-section__title">What the platform will <em>detect</em> as data accumulates</h2>
+  <div class="m-intelligence-section__sub">Empty frameworks &mdash; these populate automatically as journal entries, mood logs, and connection data grow</div>
+  <div class="m-intelligence-grid">
+    <div class="m-intelligence-card">
+      <div class="m-intelligence-card__title">Cognitive pattern radar</div>
+      <div class="m-intelligence-placeholder">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <polygon points="40,8 72,24 72,56 40,72 8,56 8,24" fill="none" stroke="rgba(167,139,250,0.15)" stroke-width="1"/>
+          <polygon points="40,16 64,28 64,52 40,64 16,52 16,28" fill="none" stroke="rgba(167,139,250,0.1)" stroke-width="1"/>
+          <polygon points="40,24 56,32 56,48 40,56 24,48 24,32" fill="none" stroke="rgba(167,139,250,0.07)" stroke-width="1"/>
+          <circle cx="40" cy="40" r="2" fill="rgba(167,139,250,0.3)"/>
+        </svg>
+      </div>
+      <div class="m-intelligence-desc">CBT categories: catastrophizing, mind-reading, all-or-nothing, personalization, fortune-telling, rumination. The radar shows which patterns dominate your thinking.</div>
+    </div>
+    <div class="m-intelligence-card">
+      <div class="m-intelligence-card__title">Mood-energy divergence</div>
+      <div class="m-intelligence-placeholder">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <line x1="8" y1="72" x2="72" y2="72" stroke="rgba(167,139,250,0.15)" stroke-width="1"/>
+          <line x1="8" y1="72" x2="8" y2="8" stroke="rgba(167,139,250,0.15)" stroke-width="1"/>
+          <line x1="8" y1="40" x2="72" y2="40" stroke="rgba(167,139,250,0.07)" stroke-width="1" stroke-dasharray="2,3"/>
+          <text x="4" y="76" font-size="6" fill="rgba(167,139,250,0.2)" font-family="monospace">ENERGY</text>
+          <text x="4" y="6" font-size="6" fill="rgba(167,139,250,0.2)" font-family="monospace" transform="rotate(-90, 4, 6)" dx="0" dy="0">MOOD</text>
+        </svg>
+      </div>
+      <div class="m-intelligence-desc">Two axes that should track together. When they diverge &mdash; mood up, energy down &mdash; burnout is approaching. The scatter plot will show your trajectory over 30-day windows.</div>
+    </div>
+    <div class="m-intelligence-card">
+      <div class="m-intelligence-card__title">Sentiment trajectory</div>
+      <div class="m-intelligence-placeholder">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <line x1="8" y1="72" x2="72" y2="72" stroke="rgba(167,139,250,0.15)" stroke-width="1"/>
+          <line x1="8" y1="72" x2="8" y2="8" stroke="rgba(167,139,250,0.15)" stroke-width="1"/>
+          <line x1="8" y1="40" x2="72" y2="40" stroke="rgba(167,139,250,0.07)" stroke-width="1" stroke-dasharray="2,3"/>
+          <text x="36" y="78" font-size="5" fill="rgba(167,139,250,0.2)" font-family="monospace">TIME</text>
+          <path d="M8,40 Q20,42 30,38 Q40,34 50,36 Q60,38 72,32" fill="none" stroke="rgba(167,139,250,0.2)" stroke-width="1" stroke-dasharray="3,3"/>
+        </svg>
+      </div>
+      <div class="m-intelligence-desc">Rolling sentiment from journal entries over time. Not daily mood &mdash; the deeper trend line. Are you getting more hopeful, more realistic, more resilient? The curve tells the story.</div>
+    </div>
+  </div>
+</section>
 
 </div><!-- /m-content -->
 
@@ -741,26 +1451,30 @@
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
-     NARRATIVE
+     12j: WHAT THIS PAGE WILL BECOME — 6-month vision
      ════════════════════════════════════════════════════════════ -->
-<section class="m-narrative reveal">
-  <div>
-    <h2 class="m-narrative__title">The <em>fifth pillar</em><br>everyone avoids</h2>
-    <div class="m-narrative__body">
-      <p>Attia added emotional health as his fifth pillar after decades of hiding behind data.
-      <strong>Chronic psychological stress elevates cortisol, suppresses immune function,
-      disrupts <a href="/sleep/">sleep</a>, and accelerates cellular aging.</strong></p>
-      <p>You can optimize sleep, <a href="/glucose/">glucose</a>, and <a href="/training/">training</a>
-      perfectly. If you&rsquo;re miserable, it erodes all of it.
-      This page is intentionally incomplete. Showing the gaps honestly is part of the project.</p>
-    </div>
+<section class="m-future-section reveal">
+  <h2 class="m-future-section__title">What this page <em>will become</em></h2>
+  <div class="m-future__body">
+    This is the youngest observatory on the site. Every other page had months of data before it went live. This one launched sparse on purpose &mdash; because waiting until the data was comfortable would have meant waiting forever. <strong>Here is what accumulates over the next six months:</strong>
   </div>
-  <div class="m-intent-list">
-    <div class="m-intent-item"><div class="m-intent-num">01</div><div class="m-intent-text"><strong>Consistent journaling</strong> &mdash; morning + evening entries feeding sentiment analysis and burnout early warning.</div></div>
-    <div class="m-intent-item"><div class="m-intent-num">02</div><div class="m-intent-text"><strong>Mood-energy divergence</strong> &mdash; when mood rises but energy falls, that&rsquo;s a burnout precursor the platform can detect.</div></div>
-    <div class="m-intent-item"><div class="m-intent-num">03</div><div class="m-intent-text"><strong>Meaningful connections</strong> &mdash; Murthy: 3&ndash;5 close relationships is the wellbeing threshold. Tracking depth, not frequency.</div></div>
-    <div class="m-intent-item"><div class="m-intent-num">04</div><div class="m-intent-text"><strong>Vice streaks as identity</strong> &mdash; Day 30 isn&rsquo;t willpower. It&rsquo;s who you are.</div></div>
-    <div class="m-intent-item"><div class="m-intent-num">05</div><div class="m-intent-text"><strong>Cognitive patterns (CBT)</strong> &mdash; catastrophizing, rumination, reframing, growth mindset. The data shows which patterns dominate.</div></div>
+  <div class="m-future-list">
+    <div class="m-future-item">
+      <div class="m-future-item__timeline">Month 1-2</div>
+      <div class="m-future-item__text"><strong>Cognitive pattern tracking</strong> &mdash; AI classification of journal entries into CBT categories. The radar chart above begins populating. You see which distortions dominate.</div>
+    </div>
+    <div class="m-future-item">
+      <div class="m-future-item__timeline">Month 2-3</div>
+      <div class="m-future-item__text"><strong>Burnout early warning</strong> &mdash; mood-energy divergence detection goes live. The system alerts when the gap between &ldquo;I feel fine&rdquo; and physiological markers says otherwise.</div>
+    </div>
+    <div class="m-future-item">
+      <div class="m-future-item__timeline">Month 3-4</div>
+      <div class="m-future-item__text"><strong>Social connection trends</strong> &mdash; the Murthy threshold bars above start filling with real data. Anonymized relationship investment tracking shows effort over time.</div>
+    </div>
+    <div class="m-future-item">
+      <div class="m-future-item__timeline">Month 4-6</div>
+      <div class="m-future-item__text"><strong>Cross-pillar integration</strong> &mdash; sleep disruption predicts mood drops. Training load modulates anxiety. Glucose stability affects cognitive performance. All arrows become bidirectional.</div>
+    </div>
   </div>
 </section>
 
@@ -800,6 +1514,32 @@
     el.setAttribute('stroke-dasharray', len + ' ' + (circ - len));
   }
 
+  /* 12k: vice streak why-lines — connect each to the reason */
+  var viceWhyMap = {
+    'alcohol': 'Not because it\u2019s forbidden, but because sleep quality drops 23% on drinking nights.',
+    'cannabis': 'Clarity matters more than calm. The rebound anxiety isn\u2019t worth the temporary quiet.',
+    'sugar': 'Glucose spikes feed the anxiety loop. Stable blood sugar, stable mood.',
+    'fast food': 'Inflammation is the hidden cost. Every skip is a vote for lower CRP.',
+    'social media': 'Comparison is the thief of contentment. Every day off is a day the algorithm loses.',
+    'caffeine after 12pm': 'Adenosine debt compounds. Afternoon caffeine steals tomorrow\u2019s recovery.',
+    'nicotine': 'The calm it promises is the calm it stole. Breaking the cycle, not managing it.',
+    'gambling': 'Dopamine hijacking dressed as entertainment. Real stakes are in the other pillars.',
+    'porn': 'Connection can\u2019t be simulated. Investing in real relationships instead.',
+    'junk food': 'Gut inflammation feeds brain fog. Clean fuel, clear thinking.',
+    'energy drinks': 'Borrowed energy with compounding interest. Sleep is the only real source.',
+    'vaping': 'Lung capacity matters for training. Every day clear is a day the cardiovascular system heals.',
+    'soda': 'Empty calories, glucose spike, crash. Water is the only drink the body actually wants.',
+    'late night eating': 'Eating after 8pm disrupts sleep architecture. The kitchen closes so recovery can start.'
+  };
+
+  function getViceWhy(name) {
+    var key = name.toLowerCase();
+    for (var k in viceWhyMap) {
+      if (key.indexOf(k) !== -1 || k.indexOf(key) !== -1) return viceWhyMap[k];
+    }
+    return 'Each day held is a vote for who I\u2019m becoming.';
+  }
+
   try {
     var resp = await fetch(API + '/api/mind_overview');
     if (!resp.ok) throw new Error(resp.status);
@@ -832,16 +1572,18 @@
     var viceEl = document.getElementById('g-vice-num');
     if (viceEl) viceEl.style.color = holdingCount === vices.length ? '#3ecf8e' : holdingCount >= vices.length * 0.7 ? '#f59e0b' : '#ef4444';
 
-    /* ── Vice streak cards ── */
+    /* ── 12k: Vice streak cards with warm why-lines ── */
     var vg = document.getElementById('m-vice-grid');
     if (vices.length) {
       var maxStreak = Math.max.apply(null, vices.map(function(v) { return v.current_streak; }).concat([30]));
       vg.innerHTML = vices.map(function(v) {
         var pct = ((v.current_streak / maxStreak) * 100).toFixed(1);
+        var why = getViceWhy(v.name);
         return '<div class="m-vice-card' + (v.holding ? '' : ' broken') + '">' +
           '<div class="m-vice-card__name">' + v.name + '</div>' +
           '<div class="m-vice-card__streak">' + v.current_streak + '</div>' +
           '<div class="m-vice-card__unit">' + (v.holding ? 'days' : 'broken') + '</div>' +
+          '<div class="m-vice-card__why">' + why + '</div>' +
           '<div class="m-vice-card__bottom-bar" style="width:' + pct + '%"></div>' +
           '</div>';
       }).join('');
@@ -858,6 +1600,22 @@
       var tt = m.total_temptations_90d;
       setWidth('bar-resisted', (m.resisted_90d / tt) * 100); setText('pct-resisted', m.resisted_90d);
       setWidth('bar-succumbed', ((tt - m.resisted_90d) / tt) * 100); setText('pct-succumbed', tt - m.resisted_90d);
+    }
+
+    /* ── 12c: Data sparsity — show if sparse data ── */
+    if (journalCount < 15) {
+      var sparsityEl = document.getElementById('m-sparsity');
+      if (sparsityEl) sparsityEl.style.display = '';
+      var jcEl = document.getElementById('m-sparsity-journal-count');
+      if (jcEl) {
+        var countWords = ['Zero','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten'];
+        jcEl.textContent = journalCount <= 10 ? (countWords[journalCount] || journalCount) : journalCount;
+      }
+      var ccEl = document.getElementById('m-sparsity-connection-count');
+      var totalConn = (dc.deep || 0) + (dc.meaningful || 0) + (dc.surface || 0);
+      if (ccEl) {
+        ccEl.textContent = totalConn <= 10 ? (['Zero','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten'][totalConn] || totalConn) : totalConn;
+      }
     }
 
     /* ── Mood chart ── */
@@ -934,11 +1692,6 @@
       [{v: 1, l: '+1'}, {v: 0, l: '0'}, {v: -1, l: '-1'}].forEach(function(o) {
         ctx.fillText(o.l, pad.l - 6, yOf(o.v) + 4);
       });
-    }
-
-    /* Building this — show if sparse journal data */
-    if (journalCount < 10) {
-      document.getElementById('m-building').style.display = '';
     }
 
     loading.style.display = 'none';
