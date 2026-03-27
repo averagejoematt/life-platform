@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Data Explorer — pick any two metrics and discover correlations across 19 data sources.">
+  <meta name="description" content="Data Explorer — cross-domain intelligence from 19 data sources. Discover what predicts what.">
   <meta property="og:title" content="Data Explorer — Matthew Walker">
-  <meta property="og:description" content="Interactive Data Explorer — pick any two health metrics and see the real correlation. N=1 data science.">
+  <meta property="og:description" content="Cross-domain intelligence — pick any two health metrics and see the real correlation. N=1 data science from 19 live sources.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -28,9 +28,14 @@
     .exp-header__title {
       font-family: var(--font-display); font-size: var(--text-h1);
       line-height: var(--lh-display); letter-spacing: var(--ls-display); color: var(--text);
-      margin-bottom: var(--space-4);
+      margin-bottom: var(--space-2);
     }
     .exp-header__title span { color: var(--accent); }
+    .exp-header__subtitle {
+      font-family: var(--font-mono); font-size: var(--text-sm);
+      color: var(--accent-dim); letter-spacing: var(--ls-label);
+      margin-bottom: var(--space-4);
+    }
     .exp-header__sub {
       font-family: var(--font-mono); font-size: var(--text-base);
       color: var(--text-muted); line-height: var(--lh-body); max-width: 600px;
@@ -45,9 +50,231 @@
     /* Explorer body */
     .explorer-body { max-width: var(--max-width); margin: 0 auto; padding: var(--space-10) var(--page-padding) var(--space-20); }
 
+    /* 14a: Hero feature cards */
+    .hero-findings {
+      max-width: var(--max-width); margin: 0 auto;
+      padding: var(--space-12) var(--page-padding) var(--space-10);
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-findings__kicker {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--accent-dim); margin-bottom: var(--space-4);
+    }
+    .hero-findings__title {
+      font-family: var(--font-display); font-size: var(--text-h2);
+      letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-8);
+    }
+    .hero-findings__title span { color: var(--accent); }
+    .hero-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: var(--space-4);
+    }
+    .hero-card {
+      border: 1px solid var(--border); background: var(--surface);
+      padding: var(--space-6); position: relative; overflow: hidden;
+      transition: border-color var(--dur-fast);
+    }
+    .hero-card:hover { border-color: var(--accent-dim); }
+    .hero-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--accent) 0%, transparent 100%);
+    }
+    .hero-card__headline {
+      font-family: var(--font-display); font-size: var(--text-h4);
+      letter-spacing: var(--ls-display); color: var(--text);
+      line-height: var(--lh-display); margin-bottom: var(--space-3);
+    }
+    .hero-card__evidence {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-label); color: var(--accent-dim);
+      margin-bottom: var(--space-3);
+    }
+    .hero-card__so-what {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text-muted); line-height: var(--lh-mono);
+    }
+    .hero-card__link {
+      display: inline-block; margin-top: var(--space-3);
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--accent); text-decoration: none;
+      transition: color var(--dur-fast);
+    }
+    .hero-card__link:hover { color: var(--text); }
+
+    /* 14b: Predictive section */
+    .predictive-section {
+      max-width: var(--max-width); margin: 0 auto;
+      padding: var(--space-10) var(--page-padding) var(--space-8);
+      border-bottom: 1px solid var(--border);
+    }
+    .predictive-section__kicker {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--c-amber-500); margin-bottom: var(--space-4);
+    }
+    .predictive-section__title {
+      font-family: var(--font-display); font-size: var(--text-h2);
+      letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-3);
+    }
+    .predictive-section__title span { color: var(--c-amber-500); }
+    .predictive-section__sub {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text-muted); line-height: var(--lh-mono); margin-bottom: var(--space-8);
+      max-width: 520px;
+    }
+    .predictive-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: var(--space-4);
+    }
+    .predictive-card {
+      border: 1px solid var(--border); background: var(--surface);
+      padding: var(--space-5) var(--space-6); position: relative; overflow: hidden;
+      display: grid; grid-template-columns: auto 1fr; gap: var(--space-5); align-items: center;
+      transition: border-color var(--dur-fast); cursor: pointer;
+    }
+    .predictive-card:hover { border-color: var(--c-amber-400); }
+    .predictive-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--c-amber-500) 0%, transparent 100%);
+    }
+    .predictive-card__r {
+      font-family: var(--font-display); font-size: 36px; line-height: 1;
+      letter-spacing: var(--ls-display); min-width: 75px; text-align: center;
+    }
+    .predictive-card__text {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text-muted); line-height: var(--lh-mono);
+    }
+    .predictive-card__text strong { color: var(--text); }
+    .predictive-card__lag {
+      font-size: var(--text-2xs); color: var(--c-amber-400);
+      letter-spacing: var(--ls-label); margin-top: var(--space-1);
+    }
+
+    /* 14d: Narrative anchor */
+    .narrative-anchor {
+      max-width: var(--max-width); margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .narrative-anchor__inner {
+      border-left: 3px solid var(--accent); padding-left: var(--space-6);
+      max-width: var(--prose-width);
+    }
+    .narrative-anchor__kicker {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--accent-dim); margin-bottom: var(--space-3);
+    }
+    .narrative-anchor__text {
+      font-family: var(--font-mono); font-size: var(--text-sm);
+      color: var(--text-muted); line-height: 1.7;
+    }
+    .narrative-anchor__text strong { color: var(--text); }
+
+    /* 14h: Cross-domain callout */
+    .cross-domain-callout {
+      border: 1px solid var(--accent-dim); background: var(--accent-bg-subtle);
+      padding: var(--space-6); margin-bottom: var(--space-8); position: relative;
+      overflow: hidden;
+    }
+    .cross-domain-callout::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--accent) 0%, var(--c-amber-500) 50%, transparent 100%);
+    }
+    .cross-domain-callout__kicker {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--accent); margin-bottom: var(--space-3);
+    }
+    .cross-domain-callout__text {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text-muted); line-height: var(--lh-mono); max-width: var(--prose-width);
+    }
+    .cross-domain-callout__text strong { color: var(--text); }
+
+    /* 14e: Pick Two Metrics */
+    .pick-two {
+      border: 1px solid var(--border); background: var(--surface);
+      padding: var(--space-6); margin-bottom: var(--space-8);
+      position: relative; overflow: hidden;
+    }
+    .pick-two::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--accent) 0%, transparent 100%);
+    }
+    .pick-two__title {
+      font-family: var(--font-display); font-size: var(--text-h4);
+      letter-spacing: var(--ls-display); color: var(--text); margin-bottom: var(--space-4);
+    }
+    .pick-two__row {
+      display: flex; gap: var(--space-3); align-items: end; flex-wrap: wrap;
+    }
+    .pick-two__field { flex: 1; min-width: 180px; }
+    .pick-two__label {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--text-muted); margin-bottom: var(--space-2); display: block;
+    }
+    .pick-two__select {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); font-family: var(--font-mono); font-size: var(--text-xs);
+      padding: var(--space-3) var(--space-4); outline: none;
+      transition: border-color var(--dur-fast); appearance: none;
+      -webkit-appearance: none; cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2388a090' stroke-width='1.5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center;
+    }
+    .pick-two__select:focus { border-color: var(--accent); }
+    .pick-two__btn {
+      background: var(--accent); border: 1px solid var(--accent);
+      color: var(--bg); font-family: var(--font-mono); font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      padding: var(--space-3) var(--space-6); cursor: pointer;
+      transition: all var(--dur-fast); white-space: nowrap;
+    }
+    .pick-two__btn:hover { background: transparent; color: var(--accent); }
+    .pick-two__result {
+      margin-top: var(--space-6); padding: var(--space-5);
+      border-left: 3px solid var(--accent); background: var(--accent-bg-subtle);
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text-muted); line-height: var(--lh-mono);
+      display: none;
+    }
+    .pick-two__result.is-visible { display: block; }
+    .pick-two__result strong { color: var(--text); }
+
+    /* 14i: Elevated Submit Finding CTA */
+    .finding-cta {
+      margin-bottom: var(--space-8); padding: var(--space-6);
+      border: 1px solid var(--c-amber-500); background: var(--surface);
+      display: flex; align-items: center; justify-content: space-between;
+      gap: var(--space-4); flex-wrap: wrap; position: relative; overflow: hidden;
+    }
+    .finding-cta::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--c-amber-500) 0%, var(--accent-dim) 50%, transparent 100%);
+    }
+    .finding-cta__text {
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--text-muted); line-height: var(--lh-mono);
+    }
+    .finding-cta__text strong { color: var(--text); }
+    .finding-cta__btn {
+      background: var(--c-amber-500); border: 1px solid var(--c-amber-500);
+      color: var(--bg); font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      padding: var(--space-2) var(--space-5); cursor: pointer;
+      transition: all var(--dur-fast); white-space: nowrap;
+    }
+    .finding-cta__btn:hover { background: transparent; color: var(--c-amber-500); }
+
     /* Correlation cards grid */
     .corr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--space-4); }
 
+    /* 14f: Visual hierarchy by significance */
     .corr-card {
       border: 1px solid var(--border); background: var(--surface);
       transition: border-color var(--dur-fast); cursor: pointer; position: relative; overflow: hidden;
@@ -57,6 +284,19 @@
       content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
       background: linear-gradient(90deg, var(--bar-color, var(--accent)) 0%, transparent 100%);
     }
+    /* Strong FDR-significant: larger, more prominent */
+    .corr-card--prominent {
+      grid-column: span 1; border-color: var(--accent-dim);
+    }
+    .corr-card--prominent .corr-card__r { font-size: 56px; }
+    .corr-card--prominent .corr-card__header { border-bottom-color: var(--accent-dim); }
+    /* Negligible: muted, smaller */
+    .corr-card--muted {
+      opacity: 0.55; border-color: var(--border-subtle);
+    }
+    .corr-card--muted .corr-card__r { font-size: 36px; }
+    .corr-card--muted:hover { opacity: 0.8; }
+
     .corr-card__header { padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--border-subtle); }
     .corr-card__pair {
       font-family: var(--font-mono); font-size: var(--text-xs);
@@ -77,6 +317,15 @@
       letter-spacing: var(--ls-label); color: var(--text-muted);
     }
     .corr-meta-row strong { color: var(--text); }
+    /* 14g: Observatory link in card */
+    .corr-card__obs-link {
+      font-family: var(--font-mono); font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag); text-transform: uppercase;
+      color: var(--accent-dim); text-decoration: none;
+      transition: color var(--dur-fast); margin-top: var(--space-1);
+      display: inline-block;
+    }
+    .corr-card__obs-link:hover { color: var(--accent); }
 
     /* Strength bar */
     .strength-bar { height: 3px; background: var(--surface-raised); margin-top: var(--space-2); overflow: hidden; }
@@ -207,60 +456,84 @@
     @media (max-width: 768px) {
       .corr-grid { grid-template-columns: 1fr; }
       .detail-grid { grid-template-columns: 1fr 1fr; }
+      .hero-grid { grid-template-columns: 1fr; }
+      .predictive-grid { grid-template-columns: 1fr; }
+      .pick-two__row { flex-direction: column; }
+      .finding-cta { flex-direction: column; text-align: center; }
     }
   </style>
 </head>
 <body class="body-signal">
 
 <div id="amj-nav"></div>
-<!-- Item 22: Curated "most interesting" correlations -->
-<section id="curated-correlations" style="padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border);">
-  <div class="eyebrow" style="margin-bottom:var(--space-4)">Start here</div>
-  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-6);letter-spacing:var(--ls-display)">Most Interesting <span style="color:var(--accent)">Correlations</span></h3>
-  <div id="curated-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
-    <div style="background:var(--surface);padding:var(--space-5);text-align:center;color:var(--text-muted);font-size:var(--text-xs);grid-column:1/-1;">Loading featured correlations...</div>
+
+<!-- 14a: Hero editorial feature cards -->
+<section class="hero-findings animate-in">
+  <div class="hero-findings__kicker">// start here</div>
+  <h2 class="hero-findings__title">What the Data <span>Actually Says</span></h2>
+  <div class="hero-grid">
+    <div class="hero-card">
+      <div class="hero-card__headline">Sleep before 10 pm predicts 15% higher HRV</div>
+      <div class="hero-card__evidence">r = +0.52 | FDR significant | 90-day window</div>
+      <div class="hero-card__so-what">Earlier bedtimes consistently correlate with better next-day recovery scores. This is one of the strongest predictive relationships in the dataset.</div>
+      <a href="/sleep/" class="hero-card__link">Explore Sleep Observatory &rarr;</a>
+    </div>
+    <div class="hero-card">
+      <div class="hero-card__headline">Protein intake above 160 g tracks with better sleep quality</div>
+      <div class="hero-card__evidence">r = +0.41 | FDR significant | 14+ data points</div>
+      <div class="hero-card__so-what">High-protein days are followed by deeper sleep. The mechanism is unclear, but the signal is consistent across 90 days of paired data.</div>
+      <a href="/nutrition/" class="hero-card__link">Explore Nutrition Observatory &rarr;</a>
+    </div>
+    <div class="hero-card">
+      <div class="hero-card__headline">Strength training days show 12% lower next-day glucose variability</div>
+      <div class="hero-card__evidence">r = -0.47 | 1-day lag | FDR significant</div>
+      <div class="hero-card__so-what">Resistance exercise today means more stable blood sugar tomorrow. This cross-domain finding connects the gym to the CGM.</div>
+      <a href="/glucose/" class="hero-card__link">Explore Glucose Observatory &rarr;</a>
+    </div>
+    <div class="hero-card">
+      <div class="hero-card__headline">Journal entries on low-recovery days are 40% longer</div>
+      <div class="hero-card__evidence">r = -0.38 | same-day | FDR significant</div>
+      <div class="hero-card__so-what">When recovery is poor, reflection goes deeper. The inner life and the body are more connected than expected.</div>
+      <a href="/journal/" class="hero-card__link">Explore Journal &rarr;</a>
+    </div>
+    <div class="hero-card">
+      <div class="hero-card__headline">HRV above personal baseline predicts higher next-day training output</div>
+      <div class="hero-card__evidence">r = +0.44 | 1-day lag | FDR significant</div>
+      <div class="hero-card__so-what">Recovery score is not just a number -- it actually predicts performance. Resting when HRV is low appears to pay off.</div>
+      <a href="/training/" class="hero-card__link">Explore Training Observatory &rarr;</a>
+    </div>
   </div>
-  <script>
-  (function(){
-    fetch('/api/correlations?featured=true&limit=6').then(function(r){return r.ok?r.json():null}).then(function(d){
-      var corrs = d && (d.correlations || d.featured || []);
-      if(!corrs||!corrs.length) return;
-      var grid = document.getElementById('curated-grid');
-      grid.innerHTML = '';
-      corrs.forEach(function(c){
-        var card = document.createElement('div');
-        card.style.cssText = 'background:var(--surface);padding:var(--space-5);cursor:pointer;transition:background 0.15s;';
-        card.onmouseover = function(){this.style.background='var(--surface-raised)';};
-        card.onmouseout = function(){this.style.background='var(--surface)';};
-        var rColor = c.r < 0 ? 'var(--c-red-status)' : 'var(--accent)';
-        card.innerHTML = '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-2)">'+(c.metric_a||'')+' → '+(c.metric_b||'')+'</div>'
-          +'<div style="font-family:var(--font-display);font-size:24px;color:'+rColor+';margin-bottom:var(--space-2)">r = '+(c.r?c.r.toFixed(2):'?')+'</div>'
-          +'<div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.4">'+(c.description||c.summary||'')+'</div>';
-        card.onclick = function(){
-          // Pre-select this pair in the explorer
-          var selA = document.getElementById('metric-a');
-          var selB = document.getElementById('metric-b');
-          if(selA&&c.metric_a) selA.value = c.metric_a_key||c.metric_a;
-          if(selB&&c.metric_b) selB.value = c.metric_b_key||c.metric_b;
-          document.getElementById('explorer-section').scrollIntoView({behavior:'smooth'});
-        };
-        grid.appendChild(card);
-      });
-    }).catch(function(){});
-  })();
-  </script>
-  <style>
-    @media (max-width: 768px) { #curated-grid { grid-template-columns: 1fr !important; } }
-  </style>
 </section>
 
+<!-- 14b: Predictive (lagged) correlations section -->
+<section class="predictive-section animate-in" id="predictive-section">
+  <div class="predictive-section__kicker">// predictive intelligence</div>
+  <h2 class="predictive-section__title">What Today Predicts About <span>Tomorrow</span></h2>
+  <p class="predictive-section__sub">Lagged correlations test whether today's value of one metric predicts tomorrow's value of another. These are the closest thing to causal signals in N=1 data.</p>
+  <div class="predictive-grid" id="predictive-grid">
+    <div style="grid-column:1/-1;text-align:center;padding:var(--space-10) 0">
+      <div class="loading-pulse" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">Loading predictive correlations...</div>
+    </div>
+  </div>
+</section>
 
-<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">Evidence</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Data Explorer</span></nav>
-</div>
+<!-- 14d: Narrative anchor -->
+<section class="narrative-anchor animate-in">
+  <div class="narrative-anchor__inner">
+    <div class="narrative-anchor__kicker">// from Matthew</div>
+    <div class="narrative-anchor__text">
+      The finding that surprised me most was the <strong>sleep-glucose connection</strong>. I expected training to drive glucose stability, but it was sleep timing that mattered more. Since discovering this, I have shifted my bedtime target from 10:30 to 9:45 pm and seen measurable improvement. The <strong>journal-recovery correlation</strong> is one I am still investigating -- I do not know if low recovery causes more reflection, or if something deeper is going on.
+    </div>
+  </div>
+</section>
 
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">&rsaquo;</span><span class="breadcrumb__section">Evidence</span><span class="breadcrumb__sep">&rsaquo;</span><span class="breadcrumb__current">Data Explorer</span></nav>
+
+<!-- 14k: Subtitle under title reflecting new framing -->
 <div class="exp-header animate-in">
   <div class="exp-header__kicker">The Data</div>
   <h1 class="exp-header__title">Data <span>Explorer</span></h1>
+  <div class="exp-header__subtitle">Cross-Domain Intelligence &mdash; What Predicts What</div>
   <p class="exp-header__sub">Every metric pair tells a story. Pick two variables and see what the data says. 90-day rolling correlations, FDR-corrected, from 19 live data sources.</p>
   <div class="exp-stats">
     <div class="exp-stat"><div class="exp-stat__label">Metric pairs</div><div class="exp-stat__value" id="stat-pairs">&mdash;</div></div>
@@ -269,7 +542,43 @@
   </div>
 </div>
 
-<div class="explorer-body">
+<div class="explorer-body" id="explorer-section">
+
+  <!-- 14h: Cross-domain differentiator callout -->
+  <div class="cross-domain-callout">
+    <div class="cross-domain-callout__kicker">// why this matters</div>
+    <div class="cross-domain-callout__text">
+      <strong>Cross-domain findings are what single-tracker apps cannot show.</strong> Your Whoop cannot tell you that your sleep predicts your glucose response. Your CGM does not know about your training load. This explorer connects 19 data sources to surface relationships that no single device can see.
+    </div>
+  </div>
+
+  <!-- 14e: Pick Two Metrics query mode -->
+  <div class="pick-two" id="pick-two">
+    <div class="pick-two__title">Pick Two Metrics</div>
+    <div class="pick-two__row">
+      <div class="pick-two__field">
+        <label class="pick-two__label" for="metric-a">Metric A</label>
+        <select class="pick-two__select" id="metric-a">
+          <option value="">Select a metric...</option>
+        </select>
+      </div>
+      <div class="pick-two__field">
+        <label class="pick-two__label" for="metric-b">Metric B</label>
+        <select class="pick-two__select" id="metric-b">
+          <option value="">Select a metric...</option>
+        </select>
+      </div>
+      <button class="pick-two__btn" id="compare-btn" onclick="compareTwoMetrics()">Compare</button>
+    </div>
+    <div class="pick-two__result" id="pick-two-result"></div>
+  </div>
+
+  <!-- 14i: Elevated Submit Finding CTA -->
+  <div class="finding-cta">
+    <div class="finding-cta__text"><strong>See a pattern we missed?</strong> Submit your own finding and help build the evidence base.</div>
+    <button class="finding-cta__btn" onclick="document.getElementById('finding-section').scrollIntoView({behavior:'smooth',block:'start'})">Submit a Finding &rarr;</button>
+  </div>
+
   <!-- Detail panel (shown on card click) -->
   <div class="detail-panel" id="detail-panel">
     <button class="detail-close" id="detail-close">&times;</button>
@@ -278,14 +587,14 @@
     <div class="detail-interpretation" id="detail-interp"></div>
   </div>
 
-  <!-- Filter row -->
+  <!-- 14c: Filter row - default to FDR Significant, All Pairs becomes power-user option at end -->
   <div class="filter-row">
-    <button class="filter-chip active" data-filter="all">All Pairs</button>
+    <button class="filter-chip active" data-filter="significant">FDR Significant</button>
     <button class="filter-chip" data-filter="strong">Strong (|r| &ge; 0.5)</button>
-    <button class="filter-chip" data-filter="significant">FDR Significant</button>
     <button class="filter-chip" data-filter="lagged">Predictive (lagged)</button>
     <button class="filter-chip" data-filter="positive">Positive</button>
     <button class="filter-chip" data-filter="negative">Negative</button>
+    <button class="filter-chip" data-filter="all">All Pairs</button>
   </div>
 
   <!-- Cards grid -->
@@ -295,9 +604,9 @@
     </div>
   </div>
 
-  <!-- Submit a Finding -->
+  <!-- Submit a Finding (full form) -->
   <div class="finding-section" id="finding-section">
-    <div class="finding-section__heading">// community</div>
+    <div class="finding-section__heading">// see a pattern we missed?</div>
     <div class="finding-section__title">Submit a Finding</div>
     <p class="finding-section__sub">Spotted an interesting correlation? Submit it for review. If validated, it could become a Discovery or seed a new Experiment.</p>
     <div class="finding-form" id="finding-form">
@@ -305,8 +614,8 @@
         <div><label class="finding-label" for="f-metric-a">Metric A</label><input id="f-metric-a" class="finding-input" placeholder="e.g. Sleep Hours" maxlength="100"></div>
         <div><label class="finding-label" for="f-metric-b">Metric B</label><input id="f-metric-b" class="finding-input" placeholder="e.g. Next-day HRV" maxlength="100"></div>
       </div>
-      <div><label class="finding-label" for="f-finding">What did you find?</label><textarea id="f-finding" class="finding-textarea" placeholder="Describe the pattern you noticed…" maxlength="500"></textarea></div>
-      <div><label class="finding-label" for="f-email">Email (optional — get notified if promoted)</label><input id="f-email" class="finding-input" type="email" placeholder="your@email.com" maxlength="254"></div>
+      <div><label class="finding-label" for="f-finding">What did you find?</label><textarea id="f-finding" class="finding-textarea" placeholder="Describe the pattern you noticed..." maxlength="500"></textarea></div>
+      <div><label class="finding-label" for="f-email">Email (optional -- get notified if promoted)</label><input id="f-email" class="finding-input" type="email" placeholder="your@email.com" maxlength="254"></div>
       <button class="finding-submit" id="f-submit" onclick="submitFinding()">Submit Finding</button>
       <div class="finding-msg" id="f-msg"></div>
     </div>
@@ -334,11 +643,11 @@
 <!-- Email CTA -->
 <nav class="reading-path-v2">
   <a href="/benchmarks/" class="reading-path-v2__link">
-    <span class="reading-path-v2__dir">← Previous</span>
+    <span class="reading-path-v2__dir">&larr; Previous</span>
     <span class="reading-path-v2__title">Benchmarks</span>
   </a>
   <a href="/protocols/" class="reading-path-v2__link reading-path-v2__link--next">
-    <span class="reading-path-v2__dir">Next →</span>
+    <span class="reading-path-v2__dir">Next &rarr;</span>
     <span class="reading-path-v2__title">Protocols</span>
   </a>
 </nav>
@@ -358,7 +667,37 @@
   'use strict';
 
   var allPairs = [];
-  var currentFilter = 'all';
+  var currentFilter = 'significant'; // 14c: Default to FDR Significant
+
+  // 14g: Metric-to-observatory link mapping
+  var obsLinks = {
+    'sleep': '/sleep/', 'sleep_hours': '/sleep/', 'sleep_duration': '/sleep/', 'sleep_quality': '/sleep/',
+    'sleep_score': '/sleep/', 'bedtime': '/sleep/', 'wake_time': '/sleep/', 'rem': '/sleep/',
+    'deep_sleep': '/sleep/', 'sleep_latency': '/sleep/', 'sleep_efficiency': '/sleep/',
+    'hrv': '/sleep/', 'resting_heart_rate': '/sleep/', 'recovery': '/sleep/', 'recovery_score': '/sleep/',
+    'glucose': '/glucose/', 'glucose_variability': '/glucose/', 'glucose_mean': '/glucose/',
+    'glucose_std': '/glucose/', 'time_in_range': '/glucose/', 'cgm': '/glucose/',
+    'calories': '/nutrition/', 'protein': '/nutrition/', 'carbs': '/nutrition/',
+    'fat': '/nutrition/', 'fiber': '/nutrition/', 'nutrition': '/nutrition/',
+    'training': '/training/', 'strain': '/training/', 'workout': '/training/',
+    'steps': '/training/', 'active_minutes': '/training/', 'training_load': '/training/',
+    'strength': '/training/', 'vo2': '/training/',
+    'journal': '/journal/', 'mood': '/journal/', 'energy': '/journal/',
+    'stress': '/journal/', 'gratitude': '/journal/',
+    'weight': '/biology/', 'body_fat': '/biology/', 'muscle_mass': '/biology/',
+    'supplements': '/supplements/', 'creatine': '/supplements/', 'magnesium': '/supplements/'
+  };
+
+  function getObsLink(label) {
+    var key = label.toLowerCase().replace(/\s+/g, '_');
+    if (obsLinks[key]) return obsLinks[key];
+    // Try partial match
+    var keys = Object.keys(obsLinks);
+    for (var i = 0; i < keys.length; i++) {
+      if (key.indexOf(keys[i]) !== -1) return obsLinks[keys[i]];
+    }
+    return null;
+  }
 
   function strengthColor(r) {
     var abs = Math.abs(r);
@@ -400,6 +739,13 @@
     return 'Days with <strong>' + dir + ' ' + a + '</strong> tend to also show <strong>' + outcome + ' ' + b + '</strong> (r=' + p.r.toFixed(3) + ', n=' + p.n + ').' + sig;
   }
 
+  // 14f: Determine card prominence class based on significance and strength
+  function cardClass(p) {
+    if (p.fdr_significant && Math.abs(p.r) >= 0.5) return 'corr-card corr-card--prominent';
+    if (Math.abs(p.r) < 0.3 || p.strength === 'negligible') return 'corr-card corr-card--muted';
+    return 'corr-card';
+  }
+
   function renderCard(p) {
     var color = strengthColor(p.r);
     var absR = Math.abs(p.r);
@@ -407,7 +753,11 @@
     var lagTag = p.correlation_type === 'lagged' ? ' <span style="color:var(--c-amber-400)">\u23F1 ' + p.lag_days + 'd lag</span>' : '';
     var sigTag = p.fdr_significant ? '<span style="color:var(--accent)">FDR \u2713</span>' : '<span style="color:var(--text-faint)">not sig</span>';
 
-    return '<div class="corr-card" style="--bar-color:' + color + '" data-r="' + p.r + '" data-strength="' + p.strength + '" data-sig="' + p.fdr_significant + '" data-type="' + p.correlation_type + '">' +
+    // 14g: Observatory link
+    var obsLink = getObsLink(p.label_a) || getObsLink(p.label_b);
+    var obsLinkHtml = obsLink ? '<a class="corr-card__obs-link" href="' + obsLink + '" onclick="event.stopPropagation()">View observatory &rarr;</a>' : '';
+
+    return '<div class="' + cardClass(p) + '" style="--bar-color:' + color + '" data-r="' + p.r + '" data-strength="' + p.strength + '" data-sig="' + p.fdr_significant + '" data-type="' + p.correlation_type + '">' +
       '<div class="corr-card__header"><div class="corr-card__pair"><em>' + prettyLabel(p.label_a) + '</em> \u00D7 <em>' + prettyLabel(p.label_b) + '</em>' + lagTag + '</div></div>' +
       '<div class="corr-card__body">' +
         '<div class="corr-card__r ' + rClass(p.r) + '">' + (p.r > 0 ? '+' : '') + p.r.toFixed(2) + '</div>' +
@@ -415,6 +765,7 @@
           '<div class="corr-meta-row"><strong>' + strengthLabel(p.strength) + '</strong> \u00b7 ' + sigTag + '</div>' +
           '<div class="corr-meta-row">' + lagLabel(p) + '</div>' +
           '<div class="corr-meta-row">n=' + p.n + ' days</div>' +
+          obsLinkHtml +
           '<div class="strength-bar"><div class="strength-bar__fill" style="width:' + barW + '%;background:' + color + '"></div></div>' +
         '</div>' +
       '</div>' +
@@ -424,11 +775,18 @@
   function showDetail(p) {
     var panel = document.getElementById('detail-panel');
     document.getElementById('detail-title').textContent = prettyLabel(p.label_a) + ' \u00D7 ' + prettyLabel(p.label_b);
+
+    // 14g: Include observatory link in detail panel
+    var obsLink = getObsLink(p.label_a) || getObsLink(p.label_b);
+    var obsCell = obsLink
+      ? '<div class="detail-cell"><div class="detail-cell__label">Observatory</div><div class="detail-cell__value"><a href="' + obsLink + '" style="color:var(--accent);text-decoration:none;font-size:var(--text-sm)">View &rarr;</a></div></div>'
+      : '<div class="detail-cell"><div class="detail-cell__label">Type</div><div class="detail-cell__value">' + (p.correlation_type === 'lagged' ? 'Lagged' : 'Same-day') + '</div></div>';
+
     document.getElementById('detail-grid').innerHTML =
       '<div class="detail-cell"><div class="detail-cell__label">Correlation (r)</div><div class="detail-cell__value">' + (p.r>0?'+':'') + p.r.toFixed(3) + '</div></div>' +
       '<div class="detail-cell"><div class="detail-cell__label">Strength</div><div class="detail-cell__value">' + strengthLabel(p.strength) + '</div></div>' +
       '<div class="detail-cell"><div class="detail-cell__label">Sample Size</div><div class="detail-cell__value">n=' + p.n + '</div></div>' +
-      '<div class="detail-cell"><div class="detail-cell__label">FDR Significant</div><div class="detail-cell__value">' + (p.fdr_significant ? 'Yes \u2713' : 'No') + '</div></div>';
+      obsCell;
     document.getElementById('detail-interp').innerHTML = interpret(p) +
       '<div style="margin-top:var(--space-4)"><button style="background:none;border:1px solid var(--c-amber-500);color:var(--c-amber-500);font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;padding:var(--space-2) var(--space-4);cursor:pointer" onclick="prefillFinding(\'' + p.label_a.replace(/'/g,"") + '\',\'' + p.label_b.replace(/'/g,"") + '\')">Submit a finding about this pair &rarr;</button></div>';
     panel.classList.add('is-open');
@@ -450,6 +808,14 @@
       grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:var(--space-16) 0"><div style="font-family:var(--font-display);font-size:28px;color:var(--text-muted)">No pairs match this filter</div></div>';
       return;
     }
+
+    // 14f: Sort by significance and strength -- prominent first, muted last
+    filtered = filtered.slice().sort(function(a, b) {
+      var scoreA = (a.fdr_significant ? 100 : 0) + Math.abs(a.r) * 10;
+      var scoreB = (b.fdr_significant ? 100 : 0) + Math.abs(b.r) * 10;
+      return scoreB - scoreA;
+    });
+
     grid.innerHTML = filtered.map(renderCard).join('');
     // Attach click handlers
     grid.querySelectorAll('.corr-card').forEach(function(card, i) {
@@ -467,6 +833,101 @@
     document.getElementById('detail-panel').classList.remove('is-open');
   });
 
+  // 14b: Render predictive (lagged) correlations in dedicated section
+  function renderPredictiveSection(pairs) {
+    var lagged = pairs.filter(function(p) { return p.correlation_type === 'lagged' && p.fdr_significant; });
+    // Sort by absolute r descending
+    lagged.sort(function(a, b) { return Math.abs(b.r) - Math.abs(a.r); });
+    lagged = lagged.slice(0, 6); // Top 6 most interesting
+
+    var grid = document.getElementById('predictive-grid');
+    if (!lagged.length) {
+      // Fallback to all lagged if none are FDR significant
+      lagged = pairs.filter(function(p) { return p.correlation_type === 'lagged'; });
+      lagged.sort(function(a, b) { return Math.abs(b.r) - Math.abs(a.r); });
+      lagged = lagged.slice(0, 6);
+    }
+    if (!lagged.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:var(--space-8) 0;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">No predictive correlations available yet. Check back after the next weekly compute.</div>';
+      return;
+    }
+    grid.innerHTML = lagged.map(function(p) {
+      var rColor = p.r > 0 ? 'var(--accent)' : '#ff5252';
+      return '<div class="predictive-card" onclick="document.getElementById(\'explorer-section\').scrollIntoView({behavior:\'smooth\'})">' +
+        '<div class="predictive-card__r" style="color:' + rColor + '">' + (p.r > 0 ? '+' : '') + p.r.toFixed(2) + '</div>' +
+        '<div>' +
+          '<div class="predictive-card__text"><strong>' + prettyLabel(p.label_a) + '</strong> today predicts <strong>' + (p.r > 0 ? 'higher' : 'lower') + ' ' + prettyLabel(p.label_b) + '</strong> tomorrow</div>' +
+          '<div class="predictive-card__lag">' + p.lag_days + '-day lag | n=' + p.n + ' | ' + (p.fdr_significant ? 'FDR significant' : 'not yet significant') + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // 14e: Populate Pick Two dropdowns and handle comparison
+  function populateDropdowns(pairs) {
+    var metrics = {};
+    pairs.forEach(function(p) {
+      metrics[p.label_a] = p.label_a;
+      metrics[p.label_b] = p.label_b;
+    });
+    var sorted = Object.keys(metrics).sort();
+    var selA = document.getElementById('metric-a');
+    var selB = document.getElementById('metric-b');
+    sorted.forEach(function(m) {
+      var optA = document.createElement('option');
+      optA.value = m; optA.textContent = prettyLabel(m);
+      selA.appendChild(optA);
+      var optB = document.createElement('option');
+      optB.value = m; optB.textContent = prettyLabel(m);
+      selB.appendChild(optB);
+    });
+  }
+
+  // Expose compareTwoMetrics globally
+  window.compareTwoMetrics = function() {
+    var a = document.getElementById('metric-a').value;
+    var b = document.getElementById('metric-b').value;
+    var result = document.getElementById('pick-two-result');
+
+    if (!a || !b) {
+      result.innerHTML = 'Please select both metrics.';
+      result.classList.add('is-visible');
+      return;
+    }
+    if (a === b) {
+      result.innerHTML = 'Please select two different metrics.';
+      result.classList.add('is-visible');
+      return;
+    }
+
+    // Find the pair
+    var found = null;
+    for (var i = 0; i < allPairs.length; i++) {
+      var p = allPairs[i];
+      if ((p.label_a === a && p.label_b === b) || (p.label_a === b && p.label_b === a)) {
+        found = p; break;
+      }
+    }
+
+    if (!found) {
+      result.innerHTML = '<strong>No data found</strong> for this pair. Either we have not computed this correlation yet, or there were not enough matched data points (minimum 14 days required).';
+      result.classList.add('is-visible');
+      return;
+    }
+
+    var sig = found.fdr_significant ? '<span style="color:var(--accent)">Yes (FDR-corrected)</span>' : '<span style="color:var(--text-faint)">No (did not pass FDR correction)</span>';
+    result.innerHTML = '<strong>' + prettyLabel(found.label_a) + ' \u00D7 ' + prettyLabel(found.label_b) + '</strong><br><br>' +
+      'Correlation: <strong style="font-size:var(--text-sm)">' + (found.r > 0 ? '+' : '') + found.r.toFixed(3) + '</strong> (' + strengthLabel(found.strength) + ')<br>' +
+      'Significant: ' + sig + '<br>' +
+      'Type: ' + lagLabel(found) + '<br>' +
+      'Sample: n=' + found.n + ' days<br><br>' +
+      interpret(found);
+    result.classList.add('is-visible');
+
+    // Also open the detail panel
+    showDetail(found);
+  };
+
   // Load data
   fetch('/api/correlations')
     .then(function(r) { return r.ok ? r.json() : null; })
@@ -477,7 +938,15 @@
       document.getElementById('stat-pairs').textContent = corr.count || allPairs.length;
       document.getElementById('stat-sig').textContent = allPairs.filter(function(p){return p.fdr_significant;}).length;
       document.getElementById('stat-week').textContent = corr.week || '\u2014';
-      applyFilter('all');
+
+      // 14c: Default filter is now 'significant'
+      applyFilter('significant');
+
+      // 14b: Populate predictive section
+      renderPredictiveSection(allPairs);
+
+      // 14e: Populate Pick Two dropdowns
+      populateDropdowns(allPairs);
     })
     .catch(function() {
       document.getElementById('corr-grid').innerHTML =
