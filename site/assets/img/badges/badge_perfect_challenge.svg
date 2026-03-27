@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" fill="none">
+  <circle cx="36" cy="36" r="33" fill="none" stroke="#f59e0b" stroke-width="1.5" opacity="0.3"/>
+  <circle cx="36" cy="36" r="27" fill="none" stroke="#f59e0b" stroke-width="0.8" opacity="0.15"/>
+  <path d="M28 30h16v-4l4 4-4 4v-4" stroke="#f59e0b" stroke-width="1.2" fill="none"/>
+  <path d="M28 30v8h16v-8" stroke="#f59e0b" stroke-width="1.2" fill="none"/>
+  <circle cx="36" cy="30" r="14" fill="none" stroke="#f59e0b" stroke-width="0.8" stroke-dasharray="2 2" opacity="0.5"/>
+  <text x="36" y="50" text-anchor="middle" font-family="Space Mono,monospace" font-size="6" fill="#f59e0b">PERFECT</text>
+</svg>

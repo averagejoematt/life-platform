@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" fill="none">
+  <path d="M36 2L66 14V42Q66 62 36 70Q6 62 6 42V14Z" fill="none" stroke="#d4a520" stroke-width="1.5" opacity="0.3"/>
+  <path d="M36 8L60 18V40Q60 56 36 64Q12 56 12 40V18Z" fill="none" stroke="#d4a520" stroke-width="0.8" opacity="0.15"/>
+  <polygon points="36 12 40 24 52 24 42 32 46 44 36 36 26 44 30 32 20 24 32 24" fill="#d4a520" opacity="0.3"/>
+  <polygon points="36 12 40 24 52 24 42 32 46 44 36 36 26 44 30 32 20 24 32 24" stroke="#d4a520" stroke-width="1.5" fill="none"/>
+  <circle cx="36" cy="30" r="6" fill="#d4a520" opacity="0.3"/>
+  <circle cx="36" cy="30" r="3" fill="#d4a520" opacity="0.5"/>
+  <text x="36" y="62" text-anchor="middle" font-family="Space Mono,monospace" font-size="6" fill="#d4a520" letter-spacing="0.08em">LV 40</text>
+</svg>

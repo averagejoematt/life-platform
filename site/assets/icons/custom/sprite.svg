@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="icon-sleep" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/>
+  <path d="M15 4l1.5 2L18 4" opacity="0.6"/>
+  <path d="M18 7l1 1.5L20 7" opacity="0.4"/>
+  </symbol>
+  <symbol id="icon-movement" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="14" cy="4" r="2"/>
+  <path d="M8 21l2-6 3 2v-6l-4-2-3 4"/>
+  <path d="M13 11l3-2 3 5"/>
+  </symbol>
+  <symbol id="icon-nutrition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2c-3 4-6 6-6 10a6 6 0 0 0 12 0c0-4-3-6-6-10z"/>
+  <path d="M12 8v8"/>
+  <path d="M9 14h6"/>
+  </symbol>
+  <symbol id="icon-metabolic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="2 13 5 13 7 8 9 18 11 6 13 16 15 10 17 13 22 13"/>
+  </symbol>
+  <symbol id="icon-mind" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2a7 7 0 0 0-7 7c0 2.5 1.3 4.7 3.3 6L9 22h6l.7-7c2-1.3 3.3-3.5 3.3-6a7 7 0 0 0-7-7z"/>
+  <path d="M9 15h6" opacity="0.5"/>
+  <path d="M10 18h4" opacity="0.4"/>
+  </symbol>
+  <symbol id="icon-social" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="9" cy="10" r="5"/>
+  <circle cx="15" cy="10" r="5"/>
+  </symbol>
+  <symbol id="icon-consistency" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9"/>
+  <circle cx="12" cy="12" r="5"/>
+  <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+  </symbol>
+  <symbol id="icon-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3v15"/>
+  <path d="M5 7l7-4 7 4"/>
+  <path d="M3 13l2-6 2 6a3 3 0 0 1-4 0z"/>
+  <path d="M17 13l2-6 2 6a3 3 0 0 1-4 0z"/>
+  <path d="M8 21h8"/>
+  </symbol>
+  <symbol id="icon-water" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2s-6 8-6 12a6 6 0 0 0 12 0c0-4-6-12-6-12z"/>
+  <path d="M8 16c1.5 1 3.5 1 5 0" opacity="0.5"/>
+  </symbol>
+  <symbol id="icon-lift" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 12h16"/>
+  <rect x="2" y="9" width="3" height="6" rx="1"/>
+  <rect x="19" y="9" width="3" height="6" rx="1"/>
+  <rect x="6" y="10" width="2" height="4" rx="0.5"/>
+  <rect x="16" y="10" width="2" height="4" rx="0.5"/>
+  </symbol>
+  <symbol id="icon-recovery" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20.42 4.58a5.4 5.4 0 0 0-7.65 0L12 5.34l-.77-.76a5.4 5.4 0 0 0-7.65 7.65l.77.76L12 20.65l7.65-7.66.77-.76a5.4 5.4 0 0 0 0-7.65z"/>
+  <polyline points="8 13 10 13 11 11 13 15 14 13 16 13" stroke-width="1.2"/>
+  </symbol>
+  <symbol id="icon-journal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+  <path d="M8 7h8" opacity="0.5"/>
+  <path d="M8 11h5" opacity="0.4"/>
+  </symbol>
+  <symbol id="icon-streak" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z"/>
+  <path d="M12 10c0 2-1.5 3-1.5 4.5a1.5 1.5 0 0 0 3 0c0-1.5-1.5-2.5-1.5-4.5z" fill="currentColor" opacity="0.3"/>
+  </symbol>
+  <symbol id="icon-experiment" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 3h6"/>
+  <path d="M10 3v6l-5 8.5a1 1 0 0 0 .85 1.5h12.3a1 1 0 0 0 .85-1.5L14 9V3"/>
+  <circle cx="10" cy="14" r="1" fill="currentColor" opacity="0.4"/>
+  <circle cx="13" cy="16" r="0.7" fill="currentColor" opacity="0.3"/>
+  </symbol>
+  <symbol id="icon-discovery" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 18h6"/>
+  <path d="M10 22h4"/>
+  <path d="M12 2a7 7 0 0 1 4 12.7V18H8v-3.3A7 7 0 0 1 12 2z"/>
+  <path d="M12 8v2" opacity="0.5"/>
+  <path d="M11 10h2" opacity="0.5"/>
+  </symbol>
+  <symbol id="icon-supplement" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="6" y="4" width="12" height="16" rx="6"/>
+  <path d="M6 12h12"/>
+  <rect x="6" y="4" width="12" height="8" rx="6" fill="currentColor" opacity="0.15"/>
+  </symbol>
+  <symbol id="icon-cgm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+  <polyline points="7 15 9 11 11 14 13 8 15 12 17 9"/>
+  </symbol>
+  <symbol id="icon-blood" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2s-5 7-5 11a5 5 0 0 0 10 0c0-4-5-11-5-11z"/>
+  <path d="M10 14h4"/>
+  <path d="M12 12v4"/>
+  </symbol>
+  <symbol id="icon-steps" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 3c-.5 2.5-.2 4.5 1 6s1.5 4 .5 6"/>
+  <ellipse cx="8" cy="18" rx="2.5" ry="3"/>
+  <path d="M16 1c-.5 2.5-.2 4.5 1 6s1.5 4 .5 6"/>
+  <ellipse cx="16" cy="16" rx="2.5" ry="3"/>
+  </symbol>
+  <symbol id="icon-zone2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="14" cy="4" r="2"/>
+  <path d="M8 21l2-6 3 2v-6l-4-2-3 4"/>
+  <path d="M13 11l3-2 3 5"/>
+  <path d="M3 12h2" opacity="0.4"/>
+  <path d="M3 9h1" opacity="0.3"/>
+  <path d="M3 15h1" opacity="0.3"/>
+  </symbol>
+  <symbol id="icon-level-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="12 2 21.5 7.5 21.5 16.5 12 22 2.5 16.5 2.5 7.5"/>
+  <polyline points="8 14 12 8 16 14"/>
+  </symbol>
+  <symbol id="icon-tier" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2l8 4v6c0 5.5-3.8 10.7-8 12-4.2-1.3-8-6.5-8-12V6l8-4z"/>
+  <path d="M8 13h8" opacity="0.5"/>
+  <path d="M8 10h8" opacity="0.4"/>
+  <path d="M8 16h8" opacity="0.3"/>
+  </symbol>
+  <symbol id="icon-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10"/>
+  </symbol>
+  <symbol id="icon-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2"/>
+  <path d="M16 2v4"/>
+  <path d="M8 2v4"/>
+  <path d="M3 10h18"/>
+  <rect x="7" y="14" width="3" height="3" rx="0.5" fill="currentColor" opacity="0.2"/>
+  </symbol>
+  <symbol id="icon-trend-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="4 18 8 14 12 16 20 6"/>
+  <polyline points="15 6 20 6 20 11"/>
+  </symbol>
+  <symbol id="icon-trend-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="4 6 8 10 12 8 20 18"/>
+  <polyline points="15 18 20 18 20 13"/>
+  </symbol>
+</svg>

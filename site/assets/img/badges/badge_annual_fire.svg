@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" fill="none">
+  <path d="M36 2L66 14V42Q66 62 36 70Q6 62 6 42V14Z" fill="none" stroke="#c8843a" stroke-width="1.5" opacity="0.3"/>
+  <path d="M36 8L60 18V40Q60 56 36 64Q12 56 12 40V18Z" fill="none" stroke="#c8843a" stroke-width="0.8" opacity="0.15"/>
+  <circle cx="36" cy="32" r="12" fill="#c8843a" opacity="0.15"/>
+  <path d="M36 16c0 6-8 8-8 14s4 8 8 8 8-2 8-8-8-8-8-14z" fill="#c8843a" opacity="0.5"/>
+  <path d="M36 16c0 6-8 8-8 14s4 8 8 8 8-2 8-8-8-8-8-14z" stroke="#c8843a" stroke-width="1.5" fill="none"/>
+  <line x1="28" y1="12" x2="26" y2="8" stroke="#c8843a" stroke-width="0.8" opacity="0.4"/>
+  <line x1="44" y1="12" x2="46" y2="8" stroke="#c8843a" stroke-width="0.8" opacity="0.4"/>
+  <line x1="36" y1="10" x2="36" y2="6" stroke="#c8843a" stroke-width="0.8" opacity="0.4"/>
+  <text x="36" y="62" text-anchor="middle" font-family="Space Mono,monospace" font-size="6" fill="#c8843a" letter-spacing="0.08em">365 DAYS</text>
+</svg>
