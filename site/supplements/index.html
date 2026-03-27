@@ -322,9 +322,11 @@
 .reveal.is-visible { opacity: 1; transform: none; }
   </style>
 </head>
-<body>
+<body class="body-signal">
 
 <div id="amj-nav"></div>
+
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">Method</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">The Pharmacy</span></nav>
 
 <div class="experiment-thread">Supplement adherence feeds the Nutrition pillar → <a href="/character/">Character →</a></div>
 
@@ -418,6 +420,17 @@
     </p>
   </aside>
 </div>
+
+<nav class="reading-path-v2">
+  <a href="/protocols/" class="reading-path-v2__link">
+    <span class="reading-path-v2__dir">← Previous</span>
+    <span class="reading-path-v2__title">Protocols</span>
+  </a>
+  <a href="/experiments/" class="reading-path-v2__link reading-path-v2__link--next">
+    <span class="reading-path-v2__dir">Next →</span>
+    <span class="reading-path-v2__title">The Lab</span>
+  </a>
+</nav>
 
 <div id="amj-subscribe"></div>
 <div id="amj-bottom-nav"></div>
@@ -632,5 +645,6 @@ document.addEventListener('DOMContentLoaded', buildPage);
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
 <script src="/assets/js/nav.js"></script>
+<script src="/assets/js/animations.js" defer></script>
 </body>
 </html>

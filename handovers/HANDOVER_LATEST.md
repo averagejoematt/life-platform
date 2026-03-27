@@ -1,2 +1,2 @@
 # Latest Handover Pointer
-→ See [HANDOVER_v3.9.34.md](HANDOVER_v3.9.34.md)
+→ See [HANDOVER_v3.9.35.md](HANDOVER_v3.9.35.md)

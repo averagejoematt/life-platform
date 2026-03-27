@@ -1,6 +1,5 @@
 {
-  "_version": "1.0.0",
-  "_updated": "2026-03-26",
+  "version": "1.0.0",
   "scan_frequency": "weekly",
   "podcasts": [
     {

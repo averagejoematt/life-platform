@@ -627,9 +627,11 @@
     }
   </style>
 </head>
-<body>
+<body class="body-signal">
 
 <div id="amj-nav"></div>
+
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">Method</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">The Arena</span></nav>
 <div id="amj-hierarchy-nav"></div>
 
 <div class="arena">
@@ -720,6 +722,17 @@
 </div>
 
 </div><!-- /.arena -->
+
+<nav class="reading-path-v2">
+  <a href="/experiments/" class="reading-path-v2__link">
+    <span class="reading-path-v2__dir">← Previous</span>
+    <span class="reading-path-v2__title">The Lab</span>
+  </a>
+  <a href="/discoveries/" class="reading-path-v2__link reading-path-v2__link--next">
+    <span class="reading-path-v2__dir">Next →</span>
+    <span class="reading-path-v2__title">Discoveries</span>
+  </a>
+</nav>
 
 <div id="amj-subscribe"></div>
 <div id="amj-bottom-nav"></div>
@@ -1068,5 +1081,6 @@
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
 <script src="/assets/js/nav.js"></script>
+<script src="/assets/js/animations.js" defer></script>
 </body>
 </html>
