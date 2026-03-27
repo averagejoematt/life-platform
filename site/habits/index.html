@@ -536,9 +536,11 @@
 .reveal.is-visible { opacity: 1; transform: none; }
   </style>
 </head>
-<body>
+<body class="body-signal">
 
 <div id="amj-nav"></div>
+
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">Pulse</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">The Operating System</span></nav>
 
 <div id="amj-hierarchy-nav"></div>
 
@@ -734,6 +736,17 @@
 </div>
 
 <!-- Subscribe CTA -->
+<nav class="reading-path-v2">
+  <a href="/character/" class="reading-path-v2__link">
+    <span class="reading-path-v2__dir">← Previous</span>
+    <span class="reading-path-v2__title">Character</span>
+  </a>
+  <a href="/sleep/" class="reading-path-v2__link reading-path-v2__link--next">
+    <span class="reading-path-v2__dir">Next →</span>
+    <span class="reading-path-v2__title">Sleep</span>
+  </a>
+</nav>
+
 <div id="amj-subscribe"></div>
 <div id="amj-bottom-nav"></div>
 <div id="amj-reading-path"></div>
@@ -1154,5 +1167,6 @@ document.addEventListener('DOMContentLoaded', load);
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
 <script src="/assets/js/nav.js"></script>
+<script src="/assets/js/animations.js" defer></script>
 </body>
 </html>

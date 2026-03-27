@@ -941,6 +941,51 @@
       .badges-grid { grid-template-columns: 1fr; }
       .hero-card { padding-left: var(--page-padding-sm); padding-right: var(--page-padding-sm); }
     }
+  
+    /* ── DB-RING: 7-Segment Pillar Ring Chart ────────────── */
+    .pillar-ring-wrap {
+      width: 180px; height: 180px;
+      margin: 0 auto;
+      position: relative;
+    }
+    .pillar-ring-wrap svg { width: 100%; height: 100%; }
+    .pillar-ring__segment {
+      fill: none;
+      stroke-width: 10;
+      stroke-linecap: butt;
+      opacity: 0.15;
+    }
+    .pillar-ring__fill {
+      fill: none;
+      stroke-width: 10;
+      stroke-linecap: butt;
+      transition: stroke-dashoffset 1.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .pillar-ring__center {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    .pillar-ring__score {
+      font-family: var(--font-display);
+      font-size: 44px;
+      color: var(--tier-accent);
+      line-height: 1;
+    }
+    .pillar-ring__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-top: 2px;
+    }
+    @media (max-width: 600px) {
+      .pillar-ring-wrap { width: 140px; height: 140px; }
+      .pillar-ring__score { font-size: 36px; }
+    }
+
   </style>
 </head>
 <body data-tier="foundation">
@@ -959,9 +1004,13 @@
         <div class="tc-name">Matthew Walker</div>
         <div class="tc-subtitle" id="tc-subtitle">// 20 days active · 38 total XP</div>
       </div>
-      <div class="tc-composite">
-        <div class="tc-composite__num" id="tc-score">—</div>
-        <div class="tc-composite__label">Score</div>
+      <div class="tc-composite" style="padding:var(--space-2);border-left:1px solid var(--border-subtle)">
+        <div class="pillar-ring-wrap" id="pillar-ring-mount">
+          <div class="pillar-ring__center">
+            <div class="pillar-ring__score" id="tc-score">—</div>
+            <div class="pillar-ring__label">Score</div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="tc-pillars" id="tc-pillars">
@@ -1355,6 +1404,79 @@ function sparklineSVG(history, pillarName) {
     <polyline points="${pts.join(' ')}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
     <circle cx="${pts[pts.length-1].split(',')[0]}" cy="${pts[pts.length-1].split(',')[1]}" r="2.5" fill="${col}"/>
   </svg>`;
+}
+
+
+/* ── DB-RING: 7-Segment Pillar Ring Chart ──────────────────── */
+function renderPillarRing(pillars, composite) {
+  var container = document.getElementById('pillar-ring-mount');
+  if (!container) return;
+
+  var COLORS = {
+    sleep:         'var(--pillar-sleep)',
+    movement:      'var(--pillar-movement)',
+    nutrition:     'var(--pillar-nutrition)',
+    metabolic:     'var(--pillar-body)',
+    mind:          'var(--pillar-mind)',
+    relationships: 'var(--pillar-social)',
+    consistency:   'var(--pillar-discipline)'
+  };
+
+  var R = 75, CX = 90, CY = 90;
+  var GAP_DEG = 4;  // gap between segments
+  var N = pillars.length || 7;
+  var SEGMENT_DEG = (360 - N * GAP_DEG) / N;
+  var circ = 2 * Math.PI * R;
+
+  var svg = '<svg viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">';
+
+  pillars.forEach(function(p, i) {
+    var startAngle = i * (SEGMENT_DEG + GAP_DEG) - 90;
+    var segLen = (SEGMENT_DEG / 360) * circ;
+    var gapLen = circ - segLen;
+    var color = COLORS[p.name] || 'var(--accent)';
+    var fillPct = Math.min(p.raw_score, 100) / 100;
+    var fillLen = segLen * fillPct;
+    var fillGap = circ - fillLen;
+
+    // Background track
+    svg += '<circle cx="' + CX + '" cy="' + CY + '" r="' + R + '" ' +
+      'class="pillar-ring__segment" stroke="' + color + '" ' +
+      'stroke-dasharray="' + segLen + ' ' + gapLen + '" ' +
+      'stroke-dashoffset="' + (-i * (SEGMENT_DEG + GAP_DEG) * circ / 360) + '" ' +
+      'transform="rotate(-90 ' + CX + ' ' + CY + ')"/>';
+
+    // Filled arc (animated)
+    svg += '<circle cx="' + CX + '" cy="' + CY + '" r="' + R + '" ' +
+      'class="pillar-ring__fill" stroke="' + color + '" ' +
+      'stroke-dasharray="' + fillLen + ' ' + fillGap + '" ' +
+      'stroke-dashoffset="' + (-i * (SEGMENT_DEG + GAP_DEG) * circ / 360) + '" ' +
+      'transform="rotate(-90 ' + CX + ' ' + CY + ')" ' +
+      'style="stroke-dashoffset:' + circ + ';transition-delay:' + (0.2 + i * 0.1) + 's"/>';
+  });
+
+  svg += '</svg>';
+  svg += '<div class="pillar-ring__center">';
+  svg += '<div class="pillar-ring__score">' + composite.toFixed(0) + '</div>';
+  svg += '<div class="pillar-ring__label">Score</div>';
+  svg += '</div>';
+
+  container.innerHTML = svg;
+
+  // Animate: set correct dashoffset after render
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      container.querySelectorAll('.pillar-ring__fill').forEach(function(el, i) {
+        var p = pillars[i];
+        var segLen = (SEGMENT_DEG / 360) * circ;
+        var fillPct = Math.min(p.raw_score, 100) / 100;
+        var fillLen = segLen * fillPct;
+        var fillGap = circ - fillLen;
+        var offset = -i * (SEGMENT_DEG + GAP_DEG) * circ / 360;
+        el.style.strokeDashoffset = offset;
+      });
+    });
+  });
 }
 
 /* ── Main hydrate ──────────────────────────────────────────── */

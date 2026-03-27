@@ -667,9 +667,11 @@
     }
   </style>
 </head>
-<body>
+<body class="body-signal">
 
 <div id="amj-nav"></div>
+
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">Method</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">The Lab</span></nav>
 
 <div id="amj-hierarchy-nav"></div>
 
@@ -782,6 +784,17 @@
     This is a single-person experiment. Correlations observed in this data may not apply to anyone else. I track everything to make better decisions for myself, not to prove universal principles.
   </p>
 </aside>
+
+<nav class="reading-path-v2">
+  <a href="/supplements/" class="reading-path-v2__link">
+    <span class="reading-path-v2__dir">← Previous</span>
+    <span class="reading-path-v2__title">The Pharmacy</span>
+  </a>
+  <a href="/challenges/" class="reading-path-v2__link reading-path-v2__link--next">
+    <span class="reading-path-v2__dir">Next →</span>
+    <span class="reading-path-v2__title">The Arena</span>
+  </a>
+</nav>
 
 <div id="amj-subscribe"></div>
 <div id="amj-bottom-nav"></div>
@@ -1134,5 +1147,6 @@
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
 <script src="/assets/js/nav.js"></script>
+<script src="/assets/js/animations.js" defer></script>
 </body>
 </html>

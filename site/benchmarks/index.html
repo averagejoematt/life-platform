@@ -422,9 +422,11 @@
     }
   </style>
 </head>
-<body>
+<body class="body-signal">
 
 <div id="amj-nav"></div>
+
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">Evidence</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Benchmarks</span></nav>
 <div class="experiment-thread">The science behind every target → <a href="/character/">See your Character Score →</a></div>
 
 <header class="std-hero reveal">
@@ -621,6 +623,17 @@
   <div class="reading-path__label">Next →</div>
   <a href="/character/" class="reading-path__link"><span class="reading-path__title">Character Sheet</span><span class="reading-path__sub">— see how these benchmarks feed your score</span></a>
 </div>
+
+<nav class="reading-path-v2">
+  <a href="/glucose/" class="reading-path-v2__link">
+    <span class="reading-path-v2__dir">← Previous</span>
+    <span class="reading-path-v2__title">Glucose</span>
+  </a>
+  <a href="/explorer/" class="reading-path-v2__link reading-path-v2__link--next">
+    <span class="reading-path-v2__dir">Next →</span>
+    <span class="reading-path-v2__title">Data Explorer</span>
+  </a>
+</nav>
 
 <div id="amj-subscribe"></div>
 <div id="amj-bottom-nav"></div>
@@ -898,5 +911,6 @@ loadTrends();
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
 <script src="/assets/js/nav.js"></script>
+<script src="/assets/js/animations.js" defer></script>
 </body>
 </html>

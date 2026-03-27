@@ -627,9 +627,11 @@
     }
   </style>
 </head>
-<body>
+<body class="body-signal">
 
 <div id="amj-nav"></div>
+
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">Evidence</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Glucose Observatory</span></nav>
 
 <!-- ════════════════════════════════════════════════════════════
      HERO
@@ -960,6 +962,17 @@
   </div>
 </section>
 
+<nav class="reading-path-v2">
+  <a href="/sleep/" class="reading-path-v2__link">
+    <span class="reading-path-v2__dir">← Previous</span>
+    <span class="reading-path-v2__title">Sleep</span>
+  </a>
+  <a href="/benchmarks/" class="reading-path-v2__link reading-path-v2__link--next">
+    <span class="reading-path-v2__dir">Next →</span>
+    <span class="reading-path-v2__title">Benchmarks</span>
+  </a>
+</nav>
+
 <div id="amj-subscribe"></div>
 <div id="amj-bottom-nav"></div>
 <div id="amj-reading-path"></div>
@@ -1116,5 +1129,6 @@
   }
 })();
 </script>
+<script src="/assets/js/animations.js" defer></script>
 </body>
 </html>
