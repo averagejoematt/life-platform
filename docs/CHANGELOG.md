@@ -1,3 +1,36 @@
+## v3.9.38 — 2026-03-26: Visual Asset System — 65 SVGs + 3-Page Integration
+
+Product Board visual strategy session → creative direction document → 65 SVG assets generated → wired into milestones, live, and character pages → deployed to CloudFront.
+
+### Visual Strategy
+- Full 8-persona Product Board convened on site visual identity gap
+- Defined 5-phase visual execution plan across 6 asset categories
+- Decisions: editorial illustration avatar style (NYT), geometric Phase A badges now, rich Phase B roadmapped
+- `docs/VISUAL_ASSET_BRIEF.md` — comprehensive creative direction with AI prompt templates for Recraft/Midjourney
+
+### Assets Generated (65 SVGs)
+- **26 custom icons** (`site/assets/icons/custom/`) — geometric, 24×24, stroke-only, `currentColor` adaptable
+- **39 achievement badges** (`site/assets/img/badges/`) — military insignia meets data terminal aesthetic
+- **SVG sprite** for `<use>` reference pattern
+- **Generator script** (`deploy/generate_visual_assets.py`) — regenerates entire set from source definitions
+- Badge categories: streaks (5), levels (6), weight (8), data (4), experiments (4), challenges (5), vice streaks (4), running (3)
+
+### Site Integration
+- **Milestones page**: `BADGE_ICONS` emoji → `badgeSvgPath()` loading SVG files; `CATEGORY_META` emoji → custom icon `<img>` tags
+- **Live page**: 60-line `GLYPH_ICONS` inline SVG functions → CSS mask-image system (10 lines); state coloring via `.glyph__ring--{state} .glyph__icn`
+- **Character page**: 13 hardcoded badge emoji → SVG `<img>` references
+
+### Files Created
+- `docs/VISUAL_ASSET_BRIEF.md`, `docs/VISUAL_DECISIONS.md`
+- `deploy/generate_visual_assets.py`, `deploy/deploy_visual_assets.sh`
+- `site/assets/icons/custom/*.svg` (26 icons + sprite.svg)
+- `site/assets/img/badges/*.svg` (39 badges)
+
+### Files Modified
+- `site/achievements/index.html`, `site/live/index.html`, `site/character/index.html`
+
+---
+
 ## v3.9.37 — 2026-03-26: Product Board Pre-Launch Punch List (23 items)
 
 All 23 items from the Product Board pre-launch review, preparing for April 1 go-live.
