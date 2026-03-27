@@ -27,7 +27,7 @@
   <style>
     /* ── Page header ─────────────────────────────────────── */
     .page-header {
-      padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-12);
+      padding: var(--space-16) var(--page-padding) var(--space-12);
       border-bottom: 1px solid var(--border);
       max-width: var(--max-width);
       margin: 0 auto;
@@ -376,7 +376,7 @@
       .stat-strip { grid-template-columns: repeat(2, 1fr); }
     }
     @media (max-width: 640px) {
-      .page-header { padding: calc(var(--nav-height) + var(--space-10)) var(--page-padding-sm) var(--space-8); }
+      .page-header { padding: var(--space-10) var(--page-padding-sm) var(--space-8); }
       .features-section { padding: var(--space-8) var(--page-padding-sm); }
       .intro { padding: var(--space-8) var(--page-padding-sm); }
       .cta-section { padding: var(--space-10) var(--page-padding-sm); }

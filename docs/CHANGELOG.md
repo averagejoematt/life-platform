@@ -1,3 +1,30 @@
+## v3.9.40 — 2026-03-27: Nav Spacer Architecture + Bug Sweep
+
+Tech Board–approved architectural fix: centralized nav clearance via .nav-spacer div injected by components.js, eliminating per-page calc(var(--nav-height) + ...) padding across 37 files. Fixed S3 path mismatch blocking challenges/experiments, dropdown heading visibility, home page alignment, stale nav labels.
+
+### Architecture (Tech Board Approved)
+- **Nav spacer pattern**: components.js injects `.nav-spacer` div after nav — single source of truth for fixed-nav clearance
+- `.nav-spacer` CSS class in base.css (height: var(--nav-height))
+- `deploy/nav_spacer_sweep.sh` — automated 3-pattern sweep across all 37 page files
+  - Pattern A: `calc(var(--nav-height) + var(--space-XX))` → `var(--space-XX)` (bulk of files)
+  - Pattern B: `margin-top:var(--nav-height)` on tickers → `margin-top:0` (home, achievements, chronicle)
+  - Pattern C: `top:var(--nav-height)` on fixed elements → kept intentionally (chronicle reading progress)
+
+### Fixes
+- **S3 path mismatch**: challenge catalog + experiment library uploaded to `config/` but Lambda reads `site/config/` — fixed
+- **Dropdown headings**: "What I Do" / "What I Tested" now visually distinct (font-weight: 700, color: accent-dim)
+- **Home page Day 1 vs Today**: centered grid + heading + CTA (was left-aligned)
+- **Stale nav labels**: "Active Tests" → "Experiments" in challenges pipeline nav; "The Arena" → "Challenges" in experiments CTA + reading-path
+
+### Files Modified
+- `site/assets/js/components.js` — nav spacer injection
+- `site/assets/css/base.css` — .nav-spacer class, dropdown heading styling, breadcrumb revert
+- `site/index.html` — Day 1 vs Today centering
+- 37 page HTML files — nav-height clearance removed (via sweep script)
+- `deploy/nav_spacer_sweep.sh` — reusable sweep script
+
+---
+
 ## v3.9.39 — 2026-03-27: Pre-Launch Sweep — Nav Fixes, Mobile Scroll, Catalog Expansion
 
 Consolidated all undone items from 10+ sessions into action plan. Fixed nav naming (Arena→Challenges), mobile menu scroll bug, verified subscribe flow, built baseline capture script, expanded challenge catalog 34→66 and experiment library 58→71.
