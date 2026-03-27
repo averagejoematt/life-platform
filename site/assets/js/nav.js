@@ -13,19 +13,31 @@
   var overlayClose = document.querySelector('.nav-overlay__close');
   var body = document.body;
 
+  var savedScrollY = 0;
+
   function openMenu() {
     if (overlay) {
+      savedScrollY = window.scrollY;
       overlay.style.display = 'flex';
       requestAnimationFrame(function() {
         overlay.classList.add('is-open');
       });
       body.style.overflow = 'hidden';
+      body.style.position = 'fixed';
+      body.style.top = '-' + savedScrollY + 'px';
+      body.style.left = '0';
+      body.style.right = '0';
     }
   }
   function closeMenu() {
     if (overlay) {
       overlay.classList.remove('is-open');
       body.style.overflow = '';
+      body.style.position = '';
+      body.style.top = '';
+      body.style.left = '';
+      body.style.right = '';
+      window.scrollTo(0, savedScrollY);
       setTimeout(function() {
         if (!overlay.classList.contains('is-open')) {
           overlay.style.display = '';
