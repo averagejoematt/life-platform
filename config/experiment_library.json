@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "updated": "2026-03-26",
+  "updated": "2026-03-27",
   "pillar_order": [
     "sleep",
     "movement",
@@ -1998,7 +1998,481 @@
         "recovery"
       ],
       "status": "backlog"
+    },
+    {
+      "id": "sauna-2x-week",
+      "name": "Sauna Protocol 2x/Week",
+      "description": "Regular sauna bathing twice weekly at 170°F+ for 15-20 minutes",
+      "pillar": "movement",
+      "evidence_tier": "strong",
+      "evidence_summary": "Laukkanen et al. 2015: 2-3 sauna sessions/week associated with 24% reduced all-cause mortality. 4-7 sessions: 40% reduction.",
+      "evidence_citation": "Laukkanen et al., JAMA Internal Medicine 2015",
+      "suggested_duration_days": 30,
+      "duration_tier": "30-day trial",
+      "difficulty": "medium",
+      "metrics_measurable": [
+        "hrv",
+        "resting_heart_rate",
+        "recovery_score"
+      ],
+      "metrics_behavioral": [
+        "compliance"
+      ],
+      "experiment_type": "thermal",
+      "hypothesis_template": "Sauna 2x/week for {duration} days will improve HRV and recovery scores compared to baseline.",
+      "protocol_template": "2 sessions/week, 170-190°F, 15-20 min per session. Cool down 5-10 min between rounds. Hydrate with 16oz water before and after. Track sessions via Habitify.",
+      "why_it_matters": "Finnish longitudinal data shows dose-dependent mortality reduction with sauna frequency. This tests the minimum effective dose.",
+      "tags": [
+        "sauna",
+        "recovery",
+        "longevity",
+        "heat"
+      ],
+      "related_protocols": [
+        "recovery"
+      ],
+      "status": "backlog",
+      "votes": 0,
+      "promoted_date": null,
+      "completed_runs": []
+    },
+    {
+      "id": "cold-plunge-daily",
+      "name": "Daily Cold Exposure",
+      "description": "2-minute cold shower finish or cold plunge daily",
+      "pillar": "movement",
+      "evidence_tier": "moderate",
+      "evidence_summary": "Cold exposure increases norepinephrine 200-300%, improves mood and alertness. Susanna Søberg: 11 min/week cold total.",
+      "evidence_citation": "Søberg et al., Cell Reports Medicine 2021",
+      "suggested_duration_days": 21,
+      "duration_tier": "21-day trial",
+      "difficulty": "hard",
+      "metrics_measurable": [
+        "hrv",
+        "recovery_score",
+        "mood_score"
+      ],
+      "metrics_behavioral": [
+        "compliance"
+      ],
+      "experiment_type": "thermal",
+      "hypothesis_template": "Daily cold exposure for {duration} days will increase baseline HRV and improve subjective mood scores.",
+      "protocol_template": "End every shower with 2+ min cold (as cold as available) OR cold plunge 50-59°F for 2 min. Morning preferred. Log duration and temperature.",
+      "why_it_matters": "Cold stress is a hormetic stressor — controlled discomfort that builds resilience. The mood and focus benefits are near-immediate.",
+      "tags": [
+        "cold",
+        "recovery",
+        "mood",
+        "hormesis"
+      ],
+      "related_protocols": [
+        "recovery"
+      ],
+      "status": "backlog",
+      "votes": 0,
+      "promoted_date": null,
+      "completed_runs": []
+    },
+    {
+      "id": "expressive-writing",
+      "name": "Pennebaker Expressive Writing",
+      "description": "20 minutes of deep emotional writing 4 days in a row, repeated weekly",
+      "pillar": "mental",
+      "evidence_tier": "strong",
+      "evidence_summary": "Pennebaker's protocol: 4 consecutive days of 20-min emotional writing reduces anxiety, improves immune markers, reduces doctor visits.",
+      "evidence_citation": "Pennebaker & Beall, Journal of Abnormal Psychology 1986",
+      "suggested_duration_days": 28,
+      "duration_tier": "28-day trial",
+      "difficulty": "medium",
+      "metrics_measurable": [
+        "mood_score",
+        "hrv"
+      ],
+      "metrics_behavioral": [
+        "compliance",
+        "journal_depth"
+      ],
+      "experiment_type": "behavioral",
+      "hypothesis_template": "Structured expressive writing for {duration} days will improve mood scores and reduce anxiety indicators.",
+      "protocol_template": "4 consecutive days per week: write for 20 min about your deepest thoughts and feelings about a stressful experience. Don't worry about grammar. New topic each week or continue the same one.",
+      "why_it_matters": "The most replicated finding in therapeutic writing research. Works by externalizing and organizing emotional experience.",
+      "tags": [
+        "journaling",
+        "mental_health",
+        "anxiety",
+        "writing"
+      ],
+      "related_protocols": [
+        "mind"
+      ],
+      "status": "backlog",
+      "votes": 0,
+      "promoted_date": null,
+      "completed_runs": []
+    },
+    {
+      "id": "gratitude-journal",
+      "name": "Three Good Things",
+      "description": "Write three good things that happened each day before bed",
+      "pillar": "mental",
+      "evidence_tier": "strong",
+      "evidence_summary": "Seligman's Three Good Things exercise: significant reduction in depression symptoms for 6 months after just 1 week.",
+      "evidence_citation": "Seligman et al., American Psychologist 2005",
+      "suggested_duration_days": 21,
+      "duration_tier": "21-day trial",
+      "difficulty": "easy",
+      "metrics_measurable": [
+        "mood_score"
+      ],
+      "metrics_behavioral": [
+        "compliance"
+      ],
+      "experiment_type": "behavioral",
+      "hypothesis_template": "Nightly gratitude journaling for {duration} days will improve average mood scores vs baseline.",
+      "protocol_template": "Each night before bed: write 3 specific good things that happened today and why they happened. Be specific (not 'nice weather' but 'the walk at Green Lake where I saw the heron').",
+      "why_it_matters": "Redirects attention from negativity bias to positive events. One of the most studied positive psychology interventions.",
+      "tags": [
+        "gratitude",
+        "journaling",
+        "mood",
+        "positive_psychology"
+      ],
+      "related_protocols": [
+        "mind"
+      ],
+      "status": "backlog",
+      "votes": 0,
+      "promoted_date": null,
+      "completed_runs": []
+    },
+    {
+      "id": "morning-pages",
+      "name": "Morning Pages",
+      "description": "3 pages of stream-of-consciousness writing every morning",
+      "pillar": "mental",
+      "evidence_tier": "moderate",
+      "evidence_summary": "Julia Cameron's Artist's Way: morning freewriting clears mental clutter, reduces rumination, improves creative output.",
+      "evidence_citation": "Cameron, The Artist's Way 1992",
+      "suggested_duration_days": 30,
+      "duration_tier": "30-day trial",
+      "difficulty": "medium",
+      "metrics_measurable": [
+        "mood_score"
+      ],
+      "metrics_behavioral": [
+        "compliance",
+        "word_count"
+      ],
+      "experiment_type": "behavioral",
+      "hypothesis_template": "30 days of morning pages will reduce decision fatigue scores and improve subjective mental clarity.",
+      "protocol_template": "Immediately upon waking (before phone): write 3 pages longhand, stream of consciousness. Don't stop, don't edit, don't read back. Takes ~30 min.",
+      "why_it_matters": "Externalizes the mental chatter that otherwise runs in background loops. Anecdotally transformative for many practitioners.",
+      "tags": [
+        "journaling",
+        "creativity",
+        "morning_routine",
+        "mental_clarity"
+      ],
+      "related_protocols": [
+        "mind"
+      ],
+      "status": "backlog",
+      "votes": 0,
+      "promoted_date": null,
+      "completed_runs": []
+    },
+    {
+      "id": "weekly-deep-conversation",
+      "name": "One Deep Conversation per Week",
+      "description": "Have one meaningful, vulnerable conversation with someone each week",
+      "pillar": "social",
+      "evidence_tier": "strong",
+      "evidence_summary": "Murthy: loneliness epidemic driven by lack of depth, not lack of contact. One deep conversation/week correlates with wellbeing.",
+      "evidence_citation": "Murthy, Together 2020",
+      "suggested_duration_days": 30,
+      "duration_tier": "30-day trial",
+      "difficulty": "medium",
+      "metrics_measurable": [
+        "mood_score"
+      ],
+      "metrics_behavioral": [
+        "compliance",
+        "interaction_depth"
+      ],
+      "experiment_type": "behavioral",
+      "hypothesis_template": "One intentionally deep conversation per week for {duration} days will improve social pillar score and mood.",
+      "protocol_template": "Once per week: have a conversation that goes beyond surface level. Ask real questions, share something real. In person preferred. Log via social interaction tracker.",
+      "why_it_matters": "The loneliness epidemic isn't about being alone — it's about being surrounded by people and feeling unknown.",
+      "tags": [
+        "social",
+        "connection",
+        "vulnerability",
+        "loneliness"
+      ],
+      "related_protocols": [
+        "social"
+      ],
+      "status": "backlog",
+      "votes": 0,
+      "promoted_date": null,
+      "completed_runs": []
+    },
+    {
+      "id": "stranger-conversation",
+      "name": "Talk to a Stranger Daily",
+      "description": "Initiate one brief conversation with a stranger each day",
+      "pillar": "social",
+      "evidence_tier": "moderate",
+      "evidence_summary": "Epley & Schroeder (2014): people consistently underestimate how much strangers enjoy being talked to. Brief interactions boost mood.",
+      "evidence_citation": "Epley & Schroeder, Journal of Experimental Psychology 2014",
+      "suggested_duration_days": 14,
+      "duration_tier": "14-day trial",
+      "difficulty": "hard",
+      "metrics_measurable": [
+        "mood_score"
+      ],
+      "metrics_behavioral": [
+        "compliance"
+      ],
+      "experiment_type": "behavioral",
+      "hypothesis_template": "Daily stranger conversations for {duration} days will increase social confidence and improve daily mood ratings.",
+      "protocol_template": "One interaction per day with someone you don't know: barista, fellow gym-goer, person on the trail. Just a real comment or question, not forced. Log what happened.",
+      "why_it_matters": "Social muscles atrophy. This is the gym for your social confidence. Most people find it's far less scary than expected.",
+      "tags": [
+        "social",
+        "confidence",
+        "strangers",
+        "mood"
+      ],
+      "related_protocols": [
+        "social"
+      ],
+      "status": "backlog",
+      "votes": 0,
+      "promoted_date": null,
+      "completed_runs": []
+    },
+    {
+      "id": "creatine-timing",
+      "name": "Creatine: Morning vs Evening",
+      "description": "Test whether creatine timing affects cognitive performance",
+      "pillar": "supplements",
+      "evidence_tier": "moderate",
+      "evidence_summary": "Creatine improves cognitive performance under stress; timing may affect sleep architecture via ATP availability.",
+      "evidence_citation": "Avgerinos et al., Experimental Gerontology 2018",
+      "suggested_duration_days": 28,
+      "duration_tier": "28-day trial",
+      "difficulty": "easy",
+      "metrics_measurable": [
+        "sleep_score",
+        "deep_sleep_pct",
+        "hrv"
+      ],
+      "metrics_behavioral": [
+        "compliance"
+      ],
+      "experiment_type": "supplement_timing",
+      "hypothesis_template": "Switching creatine from evening to morning dosing will maintain cognitive benefits without disrupting sleep metrics.",
+      "protocol_template": "Phase 1 (14 days): 5g creatine with morning meal. Phase 2 (14 days): 5g creatine with evening meal. Compare sleep metrics between phases.",
+      "why_it_matters": "Creatine is one of the most studied supplements. Timing optimization is the next frontier after confirming the dose.",
+      "tags": [
+        "creatine",
+        "timing",
+        "sleep",
+        "cognitive"
+      ],
+      "related_protocols": [
+        "supplements"
+      ],
+      "status": "backlog",
+      "votes": 0,
+      "promoted_date": null,
+      "completed_runs": []
+    },
+    {
+      "id": "magnesium-sleep",
+      "name": "Magnesium Glycinate for Sleep",
+      "description": "400mg magnesium glycinate 1 hour before bed",
+      "pillar": "supplements",
+      "evidence_tier": "moderate",
+      "evidence_summary": "Magnesium deficiency is common; supplementation improves sleep quality in deficient individuals. Glycinate form has calming effect.",
+      "evidence_citation": "Abbasi et al., Journal of Research in Medical Sciences 2012",
+      "suggested_duration_days": 30,
+      "duration_tier": "30-day trial",
+      "difficulty": "easy",
+      "metrics_measurable": [
+        "sleep_score",
+        "deep_sleep_pct",
+        "sleep_latency"
+      ],
+      "metrics_behavioral": [
+        "compliance"
+      ],
+      "experiment_type": "supplement",
+      "hypothesis_template": "400mg magnesium glycinate before bed for {duration} days will improve deep sleep % and reduce sleep onset latency.",
+      "protocol_template": "400mg magnesium glycinate (e.g. Doctor's Best) 1 hour before target bedtime. Take consistently. Track sleep metrics via Whoop.",
+      "why_it_matters": "Magnesium is involved in 300+ enzymatic reactions. Most Americans are deficient. Sleep is where you notice it first.",
+      "tags": [
+        "magnesium",
+        "sleep",
+        "supplement",
+        "recovery"
+      ],
+      "related_protocols": [
+        "sleep-hygiene",
+        "supplements"
+      ],
+      "status": "backlog",
+      "votes": 0,
+      "promoted_date": null,
+      "completed_runs": []
+    },
+    {
+      "id": "fiber-first-meals",
+      "name": "Fiber-First Meal Order",
+      "description": "Eat vegetables and fiber before carbohydrates at every meal",
+      "pillar": "nutrition",
+      "evidence_tier": "strong",
+      "evidence_summary": "Eating fiber before carbs reduces postprandial glucose spike by 30-40%. Validated by CGM studies.",
+      "evidence_citation": "Shukla et al., Diabetes Care 2015",
+      "suggested_duration_days": 14,
+      "duration_tier": "14-day trial",
+      "difficulty": "easy",
+      "metrics_measurable": [
+        "glucose_avg",
+        "glucose_variability"
+      ],
+      "metrics_behavioral": [
+        "compliance"
+      ],
+      "experiment_type": "behavioral",
+      "hypothesis_template": "Eating fiber/vegetables before carbohydrates for {duration} days will reduce average glucose spikes by >20%.",
+      "protocol_template": "At every meal containing carbs: eat vegetables and protein first, wait 5 min, then eat carbs. Same meals, different order. Compare CGM data.",
+      "why_it_matters": "Same food, different glucose response. This is the simplest dietary hack with the strongest CGM evidence.",
+      "tags": [
+        "glucose",
+        "nutrition",
+        "meal_order",
+        "cgm"
+      ],
+      "related_protocols": [
+        "nutrition"
+      ],
+      "status": "backlog",
+      "votes": 0,
+      "promoted_date": null,
+      "completed_runs": []
+    },
+    {
+      "id": "elimination-dairy",
+      "name": "Dairy Elimination",
+      "description": "Remove all dairy for 21 days, then reintroduce",
+      "pillar": "nutrition",
+      "evidence_tier": "moderate",
+      "evidence_summary": "Dairy sensitivity is common and underdiagnosed. Elimination + reintroduction is the gold standard for identifying food sensitivities.",
+      "evidence_citation": "Turnbull et al., Journal of the American College of Nutrition 2015",
+      "suggested_duration_days": 28,
+      "duration_tier": "28-day trial",
+      "difficulty": "medium",
+      "metrics_measurable": [
+        "glucose_variability",
+        "body_weight"
+      ],
+      "metrics_behavioral": [
+        "compliance",
+        "digestive_symptoms"
+      ],
+      "experiment_type": "elimination",
+      "hypothesis_template": "Removing dairy for 21 days then reintroducing will reveal whether dairy contributes to inflammation, digestive issues, or skin problems.",
+      "protocol_template": "Days 1-21: zero dairy (milk, cheese, yogurt, whey protein, butter). Read labels. Days 22-28: reintroduce one dairy type per day. Journal symptoms daily.",
+      "why_it_matters": "You can't know if dairy affects you without removing it completely. The reintroduction phase is where the signal appears.",
+      "tags": [
+        "dairy",
+        "elimination",
+        "inflammation",
+        "nutrition"
+      ],
+      "related_protocols": [
+        "nutrition"
+      ],
+      "status": "backlog",
+      "votes": 0,
+      "promoted_date": null,
+      "completed_runs": []
+    },
+    {
+      "id": "sleep-consistency",
+      "name": "Bulletproof Sleep Schedule",
+      "description": "Same bedtime and wake time (±15 min) every day for 30 days",
+      "pillar": "sleep",
+      "evidence_tier": "strong",
+      "evidence_summary": "Sleep regularity index is a stronger predictor of mortality than sleep duration (Windred et al. 2024).",
+      "evidence_citation": "Windred et al., Sleep 2024",
+      "suggested_duration_days": 30,
+      "duration_tier": "30-day trial",
+      "difficulty": "hard",
+      "metrics_measurable": [
+        "sleep_score",
+        "hrv",
+        "recovery_score"
+      ],
+      "metrics_behavioral": [
+        "compliance"
+      ],
+      "experiment_type": "behavioral",
+      "hypothesis_template": "Perfect sleep consistency (±15 min) for {duration} days will improve average recovery score by >10%.",
+      "protocol_template": "Pick bedtime and wake time. Hit both within 15 min every day including weekends. No exceptions. Track with Whoop.",
+      "why_it_matters": "The newest sleep research says consistency may matter more than duration. This is the hardest sleep experiment and potentially the most impactful.",
+      "tags": [
+        "sleep",
+        "consistency",
+        "circadian",
+        "longevity"
+      ],
+      "related_protocols": [
+        "sleep-hygiene"
+      ],
+      "status": "backlog",
+      "votes": 0,
+      "promoted_date": null,
+      "completed_runs": []
+    },
+    {
+      "id": "dopamine-fast-weekend",
+      "name": "Dopamine Reset Weekend",
+      "description": "One weekend per month with zero screens, social media, or high-stimulation activities",
+      "pillar": "discipline",
+      "evidence_tier": "moderate",
+      "evidence_summary": "Periodic abstinence from superstimuli restores dopamine receptor sensitivity and improves capacity for delayed gratification.",
+      "evidence_citation": "Lembke, Dopamine Nation 2021",
+      "suggested_duration_days": 30,
+      "duration_tier": "30-day trial",
+      "difficulty": "hard",
+      "metrics_measurable": [
+        "mood_score",
+        "hrv"
+      ],
+      "metrics_behavioral": [
+        "compliance"
+      ],
+      "experiment_type": "behavioral",
+      "hypothesis_template": "One low-stimulation weekend per month for {duration} days will improve weekday focus and reduce compulsive phone checking.",
+      "protocol_template": "One weekend/month (Sat 6am to Sun 10pm): no social media, no streaming, no video games, no news. Books, walks, cooking, conversation, nature. Journal the experience.",
+      "why_it_matters": "Modern life is a firehose of dopamine. Periodic withdrawal teaches your brain to find satisfaction in ordinary experience.",
+      "tags": [
+        "dopamine",
+        "discipline",
+        "screens",
+        "reset"
+      ],
+      "related_protocols": [
+        "discipline"
+      ],
+      "status": "backlog",
+      "votes": 0,
+      "promoted_date": null,
+      "completed_runs": []
     }
   ],
-  "_updated": "2026-03-26"
+  "_updated": "2026-03-27"
 }
