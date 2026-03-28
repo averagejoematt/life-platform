@@ -190,6 +190,7 @@
 :root {
   /* Fonts */
   --font-display:  'Bebas Neue', 'Impact', sans-serif;
+  --font-nav:      'Barlow Condensed', 'Arial Narrow', sans-serif; /* DB-22: wayfinding voice — nav, CTAs, footers */
   --font-mono:     'Space Mono', 'Courier New', monospace;
   --font-serif:    'Lora', 'Georgia', 'Times New Roman', serif;
   --font-sans:     'Inter', system-ui, sans-serif;

@@ -1,3 +1,17 @@
+## R18 Architecture Review — 2026-03-28 (v4.3.0)
+
+### Architecture Review
+- Tech Board review #18 at v4.3.0. **Composite grade: B+** (down from A- at R17)
+- Grade movement: Security B+→A- (WAF deployed), Product B+→A- (47-page product, reader engagement). Architecture A-→B+ (CDK drift, doc mismatch), Observability A-→B (monitoring didn't scale), Operability B+→B (docs materially wrong)
+- Held: Cost A, Data A, AI A, Statistics A, Code Quality A→A-
+- 9 new findings: R18-F01 (doc drift, HIGH), R18-F02 (CLI Lambdas outside CDK, HIGH), R18-F03 (lambda_map stale), R18-F04 (new resources unmonitored), R18-F05 (47-page manual deploy), R18-F06 (WAF rules too broad), R18-F07 (SIMP-1 regression 95→110), R18-F08 (INT_LAYER 5th consecutive stale flag), R18-F09 (cross-region worsened to 13+ routes)
+- R17 findings: 4 resolved (WAF, rate limiting, privacy policy), 2 worsened, 3 persisting, 2 partially resolved
+- Top priority: documentation reconciliation, CDK adoption, lambda_map update — all within launch week
+- Path to A-: 2-3 focused sessions. Path to A: cross-region migration + SIMP-1 Phase 2
+- Review: `docs/reviews/REVIEW_2026-03-28_v18.md`
+
+---
+
 ## v4.3.0 — 2026-03-28: Reader Engagement, Labs Page, OG Images, Architectural Fixes
 
 Major implementation session. 4-phase reader engagement rollout, new pages, new Lambdas, privacy fixes, and architectural cleanup.
