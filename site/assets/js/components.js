@@ -48,12 +48,12 @@
       { href: '/accountability/', text: 'Accountability' },
     ]},
     { label: 'The Practice', groups: [
-      { heading: 'What I Do', items: [
+      { heading: 'The System', items: [
         { href: '/stack/',       text: 'The Stack' },
         { href: '/protocols/',   text: 'Protocols' },
         { href: '/supplements/', text: 'Supplements' },
       ]},
-      { heading: 'What I Tested', items: [
+      { heading: 'The Pipeline', items: [
         { href: '/experiments/', text: 'Experiments' },
         { href: '/challenges/',  text: 'Challenges' },
         { href: '/discoveries/', text: 'Discoveries' },
@@ -336,16 +336,14 @@
     };
   }
 
-  // ── HIERARCHY NAV (method pages) ───────────────────────────
-  var HIER_ITEMS = [
-    { href: '/stack/',       label: 'The Stack',    sub: 'the map',      rel: '' },
-    { href: '/protocols/',   label: 'Protocols',    sub: 'strategy',     rel: 'contains' },
-    { href: '/habits/',      label: 'Habits',       sub: 'daily actions',rel: '\u00b7' },
-    { href: '/experiments/', label: 'Experiments',   sub: 'tests',        rel: '\u00b7' },
-    { href: '/challenges/',  label: 'Challenges',    sub: 'challenges',   rel: '\u00b7' },
-    { href: '/discoveries/', label: 'Discoveries',  sub: 'evidence',     rel: '\u2192' },
-    { href: '/supplements/', label: 'Supplements',  sub: 'the stack',    rel: '\u00b7' },
-    { href: '/achievements/',label: 'Milestones',   sub: 'outcomes',     rel: '\u00b7' },
+  // ── PIPELINE NAV — shared Practice section component (P-SHARED) ──
+  var PIPELINE_STEPS = [
+    { href: '/stack/',       label: 'Stack' },
+    { href: '/protocols/',   label: 'Protocols' },
+    { href: '/supplements/', label: 'Supplements' },
+    { href: '/experiments/', label: 'Experiments' },
+    { href: '/challenges/',  label: 'Challenges' },
+    { href: '/discoveries/', label: 'Discoveries' },
   ];
 
   var HIER_CONTEXT = {
@@ -359,10 +357,23 @@
     '/achievements/': 'Milestones are <strong>thresholds unlocked</strong> by sustained <a href="/habits/">habit</a> execution, <a href="/experiments/">experiment</a> completion, and <a href="/character/">character</a> growth. Computed from live data.',
   };
 
+  function buildPipelineNav() {
+    var isPracticePage = PIPELINE_STEPS.some(function(s) { return s.href === path; });
+    if (!isPracticePage) return '';
+    var html = '<style>.pipeline-nav{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-4) var(--page-padding);border-bottom:1px solid var(--border);background:var(--surface);font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);overflow-x:auto}.pipeline-nav__step{color:var(--text-faint);text-decoration:none;text-transform:uppercase;white-space:nowrap;padding:var(--space-1) var(--space-3);border:1px solid transparent;transition:color .15s}.pipeline-nav__step:hover{color:var(--text-muted)}.pipeline-nav__step.active{color:var(--accent);border-color:var(--accent-dim)}.pipeline-nav__arrow{color:var(--border)}</style>';
+    html += '<nav class="pipeline-nav" aria-label="Practice lifecycle">';
+    PIPELINE_STEPS.forEach(function(step, i) {
+      if (i > 0) html += '<span class="pipeline-nav__arrow">\u2192</span>';
+      var cls = 'pipeline-nav__step' + (step.href === path ? ' active' : '');
+      html += '<a href="' + step.href + '" class="' + cls + '">' + step.label + '</a>';
+    });
+    html += '</nav>';
+    return html;
+  }
+
   function buildHierarchyNav() {
-    // Product Board decision (7-0): kill tab bar, keep only "Where This Fits" blurb.
-    // Breadcrumb handles wayfinding. Main nav handles discovery. This provides relationship context.
-    var html = '';
+    // Pipeline nav for Practice pages + context blurb for all hierarchy pages
+    var html = buildPipelineNav();
     var contextText = HIER_CONTEXT[path];
     if (contextText) {
       html += '<div style="margin:12px var(--page-padding);padding:10px 14px;border-left:2px solid var(--accent);background:var(--surface);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body);">';

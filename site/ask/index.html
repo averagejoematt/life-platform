@@ -53,7 +53,7 @@
       max-width: var(--max-width);
       margin: 0 auto;
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(6, 1fr);
       gap: 1px;
       background: var(--border);
       border-bottom: 1px solid var(--border);
@@ -243,17 +243,15 @@
     }
 
     @media (max-width: 768px) {
-      .data-strip { grid-template-columns: repeat(2, 1fr); }
+      .data-strip { grid-template-columns: repeat(3, 1fr); }
     }
   </style>
 </head>
 <body>
 
 <div id="amj-nav"></div>
-</div>
 
-
-
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><a href="/chronicle/" class="breadcrumb__section">The Chronicle</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Ask the Data</span></nav>
 
 
 
@@ -266,6 +264,9 @@
   <p class="ask-header__sub">
     AI-powered answers from 19 live data sources. Ask about weight, sleep, HRV, habits, training, nutrition, or any pattern in the data. The platform answers from real numbers.
   </p>
+  <div style="margin-top:var(--space-4);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent-dim);letter-spacing:var(--ls-tag);text-transform:uppercase;">
+    19 sources · <span id="ask-days">—</span> days of data · 7 lab draws · 110 SNPs · 37 tracked habits
+  </div>
 </header>
 
 <div class="data-strip animate-in reveal">
@@ -274,41 +275,76 @@
     <div class="data-strip__value" id="ds-weight">—</div>
   </div>
   <div class="data-strip__item">
+    <div class="data-strip__label">Days tracked</div>
+    <div class="data-strip__value" id="ds-days">—</div>
+  </div>
+  <div class="data-strip__item">
     <div class="data-strip__label">HRV</div>
     <div class="data-strip__value" id="ds-hrv">—</div>
   </div>
   <div class="data-strip__item">
-    <div class="data-strip__label">Recovery</div>
-    <div class="data-strip__value" id="ds-recovery">—</div>
+    <div class="data-strip__label">Lab draws</div>
+    <div class="data-strip__value">7</div>
   </div>
   <div class="data-strip__item">
-    <div class="data-strip__label">Progress</div>
-    <div class="data-strip__value" id="ds-progress">—</div>
+    <div class="data-strip__label">SNPs analyzed</div>
+    <div class="data-strip__value">110</div>
   </div>
+  <div class="data-strip__item">
+    <div class="data-strip__label">Data sources</div>
+    <div class="data-strip__value">19</div>
+  </div>
+</div>
+
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-3) var(--page-padding);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);border-bottom:1px solid var(--border);">
+  Want the full analysis? <a href="/explorer/" style="color:var(--accent);text-decoration:none;">Data Explorer</a> &middot; Want the narrative? <a href="/chronicle/" style="color:var(--accent);text-decoration:none;">Chronicle</a> &middot; Want the raw numbers? <a href="/weekly/" style="color:var(--accent);text-decoration:none;">Weekly Snapshots</a>
 </div>
 
 <div class="ask-container">
 
-  <div class="suggestions" id="suggestions">
-    <button class="suggestion-chip" data-q="What happens to Matthew's HRV when he sleeps less than 7 hours?">HRV vs. sleep</button>
-    <button class="suggestion-chip" data-q="How has the weight trend looked over the last 30 days?">Weight trend</button>
-    <button class="suggestion-chip" data-q="Which pillar on the Character Sheet is weakest right now?">Weakest pillar</button>
-    <button class="suggestion-chip" data-q="What's the correlation between training volume and recovery?">Training vs. recovery</button>
-    <button class="suggestion-chip" data-q="How much Zone 2 training has Matthew done this week vs target?">Zone 2 progress</button>
-    <button class="suggestion-chip" data-q="Give me a summary of where things stand today.">Today's snapshot</button>
+  <div id="suggestions">
+    <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2);margin-top:var(--space-4);">Sleep & Recovery</div>
+    <div class="suggestions">
+      <button class="suggestion-chip" data-q="How's my sleep trending over the last two weeks?">How's my sleep trending?</button>
+      <button class="suggestion-chip" data-q="What predicts good HRV days?">What predicts good HRV?</button>
+      <button class="suggestion-chip" data-q="What was the best night of sleep this month?">Best sleep this month?</button>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2);margin-top:var(--space-4);">Nutrition & Body</div>
+    <div class="suggestions">
+      <button class="suggestion-chip" data-q="Am I hitting my protein targets consistently?">Am I hitting protein targets?</button>
+      <button class="suggestion-chip" data-q="What foods or meals spike my glucose the most?">What foods spike my glucose?</button>
+      <button class="suggestion-chip" data-q="How has the weight trend looked over the last 30 days?">Weight trend this month?</button>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2);margin-top:var(--space-4);">Training</div>
+    <div class="suggestions">
+      <button class="suggestion-chip" data-q="How much Zone 2 training has Matthew done this week vs target?">How much Zone 2 this week?</button>
+      <button class="suggestion-chip" data-q="Am I showing signs of overtraining based on recovery and HRV trends?">Am I overtraining?</button>
+      <button class="suggestion-chip" data-q="What's the relationship between training load and next-day recovery?">Training load vs recovery?</button>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2);margin-top:var(--space-4);">Cross-domain</div>
+    <div class="suggestions" style="margin-bottom:var(--space-8);">
+      <button class="suggestion-chip" data-q="What's the biggest health risk I should focus on right now?">What's my biggest risk right now?</button>
+      <button class="suggestion-chip" data-q="Show me the strongest correlations across all my data.">Show my strongest correlations</button>
+      <button class="suggestion-chip" data-q="What changed or stood out in my data this week?">What changed this week?</button>
+      <button class="suggestion-chip" data-q="Compare the last two weeks — what improved and what got worse?">Compare last two weeks</button>
+      <button class="suggestion-chip" data-q="Based on everything, what should I focus on improving next?">What should I focus on?</button>
+    </div>
   </div>
 
   <div class="ask-input-wrap">
     <textarea id="ask-input" class="ask-input" placeholder="Ask a question about the data..." rows="1"></textarea>
     <button id="ask-btn" class="ask-btn" onclick="submitQuestion()">Ask</button>
   </div>
-  <div class="ask-hint"><span id="ask-remaining">3</span> questions remaining</div>
+  <div class="ask-hint"><span id="ask-remaining">5</span> questions remaining</div>
 
   <div class="rate-banner" id="rate-banner" style="display:none;">
-    <p style="font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body);margin:0 0 var(--space-4)">
-      <strong style="color:var(--accent)">You've used your 3 free questions.</strong>
-      Already a subscriber? Verify your email to unlock 20 questions per hour.
+    <p style="font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body);margin:0 0 var(--space-2)">
+      <strong style="color:var(--accent)">You've used your 5 free questions this hour.</strong>
     </p>
+    <p style="font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body);margin:0 0 var(--space-4)">
+      Subscribers get <strong style="color:var(--accent)">20 questions/hour</strong> + <strong style="color:var(--accent)">The Measured Life</strong> weekly newsletter + <strong style="color:var(--accent)">anomaly alerts</strong> when the data flags something unusual.
+    </p>
+    <p style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase;margin:0 0 var(--space-3);">Already subscribed? Verify below to unlock.</p>
     <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-3)">
       <input type="email" id="sub-gate-email" placeholder="your@email.com"
         style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);
@@ -322,7 +358,7 @@
     <div id="sub-gate-status" style="font-size:var(--text-2xs);color:var(--text-faint);min-height:1em;
          font-family:var(--font-mono);letter-spacing:var(--ls-tag);"></div>
     <p style="font-size:var(--text-2xs);color:var(--text-faint);margin:var(--space-3) 0 0;font-family:var(--font-mono);">
-      Not subscribed? <a href="/subscribe/" style="color:var(--accent);text-decoration:none;">Join The Weekly Signal →</a>
+      Not subscribed yet? <a href="/subscribe/" style="color:var(--accent);text-decoration:none;">Join The Measured Life — free weekly deep dives into one person's data →</a>
     </p>
   </div>
 
@@ -330,7 +366,9 @@
 
   <div class="ask-disclaimer">
     <span>// N=1 DISCLAIMER</span><br>
-    This is a single-person experiment. Answers are generated by AI from one person's health data and should not be interpreted as medical advice or generalizable findings. The AI may occasionally misinterpret data or identify spurious patterns.
+    This is a single-person experiment. Answers are generated by AI from one person's health data and should not be interpreted as medical advice or generalizable findings. The AI may occasionally misinterpret data or identify spurious patterns.<br><br>
+    <span>// MEDICAL ADVICE</span><br>
+    This AI cannot provide medical advice. When questions touch medical territory, responses will include appropriate caveats. Data may suggest patterns, but medical interpretation requires a clinician.
   </div>
 </div>
 
@@ -344,7 +382,7 @@
 
 <script>
 const API_BASE = 'https://averagejoematt.com';
-const MAX_QUESTIONS = 3;         // Anonymous limit
+const MAX_QUESTIONS = 5;         // Anonymous limit
 const SUBSCRIBER_LIMIT = 20;     // Verified subscriber limit
 const SUB_TOKEN_KEY = 'lp_sub_token';
 let questionsUsed = 0;
@@ -407,8 +445,12 @@ async function loadContext() {
     const j = journey?.journey || {};
     if (v.weight_lbs) document.getElementById('ds-weight').textContent = v.weight_lbs + ' lbs';
     if (v.hrv_ms) document.getElementById('ds-hrv').textContent = Math.round(v.hrv_ms) + ' ms';
-    if (v.recovery_pct) document.getElementById('ds-recovery').textContent = Math.round(v.recovery_pct) + '%';
-    if (j.progress_pct) document.getElementById('ds-progress').textContent = j.progress_pct + '%';
+    // Populate days tracked from journey data or calculate from start date
+    const daysTracked = j.days_tracked || j.total_days;
+    if (daysTracked) {
+      document.getElementById('ds-days').textContent = daysTracked;
+      document.getElementById('ask-days').textContent = daysTracked;
+    }
   } catch (e) {
     // Silently fail — the data strip will show dashes
   }
@@ -459,7 +501,7 @@ async function submitQuestion() {
     const banner = document.getElementById('rate-banner');
     if (banner) {
       if (subscriberToken) {
-        banner.innerHTML = '<p style="font-size:var(--text-xs);color:var(--text-muted)"><strong style="color:var(--accent)">Hourly limit reached.</strong> You\'ve used your 20 subscriber questions this hour.</p>';
+        banner.innerHTML = '<p style="font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body)"><strong style="color:var(--accent)">Hourly limit reached.</strong> You\'ve used your 20 subscriber questions this hour. Check back soon.</p>';
       }
       banner.style.display = 'block';
     }
@@ -497,7 +539,7 @@ function updateMessage(id, content) {
   conv.appendChild(btn);
 }
 
-document.querySelectorAll('.suggestion-chip').forEach(chip => {
+document.querySelectorAll('#suggestions .suggestion-chip').forEach(chip => {
   chip.addEventListener('click', () => {
     document.getElementById('ask-input').value = chip.dataset.q;
     submitQuestion();
