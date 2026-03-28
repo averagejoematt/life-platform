@@ -106,9 +106,21 @@ LOOKBACK_DAYS  = int(os.environ.get("LOOKBACK_DAYS", "7"))
 CLIENT_API = "https://client-api.8slp.net"
 AUTH_API   = "https://auth-api.8slp.net"
 
-# OAuth2 client credentials (from pyEight open-source library)
-KNOWN_CLIENT_ID     = "0894c7f33bb94800a03f1f4df13a4f38"
-KNOWN_CLIENT_SECRET = "f0954a3ed5763ba3d06834c73731a32f15f168f47d4f164751275def86db0c76"
+# OAuth2 client credentials — loaded from Secrets Manager at first use
+_es_client_cache = None
+
+
+def _get_es_client_creds():
+    global _es_client_cache
+    if _es_client_cache is not None:
+        return _es_client_cache
+    try:
+        resp = secrets_client.get_secret_value(SecretId="life-platform/eightsleep-client")
+        _es_client_cache = json.loads(resp["SecretString"])
+    except Exception as e:
+        logger.warning(f"[eightsleep] Failed to load client creds from Secrets Manager: {e}")
+        _es_client_cache = {}
+    return _es_client_cache
 
 # ── Timezone offset map ────────────────────────────────────────────────────────
 # No pytz in Lambda. DST offset is ±1h — acceptable for circadian analysis
@@ -162,8 +174,8 @@ def save_secret(secret: dict):
 def login(email: str, password: str, client_id: str = None, client_secret: str = None, **kwargs) -> dict:
     """OAuth2 password-grant. Returns {access_token, refresh_token, user_id}."""
     payload = json.dumps({
-        "client_id":     client_id or KNOWN_CLIENT_ID,
-        "client_secret": client_secret or KNOWN_CLIENT_SECRET,
+        "client_id":     client_id or _get_es_client_creds().get("client_id", ""),
+        "client_secret": client_secret or _get_es_client_creds().get("client_secret", ""),
         "grant_type":    "password",
         "username":      email,
         "password":      password,
