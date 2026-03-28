@@ -1,3 +1,8 @@
+> **This document is frozen at v3.7.68 (2026-03-17).** The platform is now at v4.3.0+.
+> For IC changes after v3.7.68 — including signal doctrine, challenge system modifiers,
+> food delivery integration, and reader engagement signals — see CHANGELOG.md.
+> A full refresh is planned for ~May 2026.
+
 # Life Platform — Intelligence Layer
 
 > Documents the Intelligence Compounding (IC) features: how the platform learns, remembers, and improves over time.
