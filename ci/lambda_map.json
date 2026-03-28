@@ -1,6 +1,6 @@
 {
   "_comment": "Lambda source file → AWS function name mapping for CI/CD. Used by .github/workflows/ci-cd.yml",
-  "_updated": "2026-03-22 v3.8.7",
+  "_updated": "2026-03-28 v4.3.1",
 
   "lambdas": {
     "lambdas/strava_lambda.py":              { "function": "strava-data-ingestion" },
@@ -52,7 +52,9 @@
     "lambdas/site_api_lambda.py":              { "function": "life-platform-site-api" },
     "lambdas/site_stats_refresh_lambda.py":    { "function": "site-stats-refresh" },
     "lambdas/challenge_generator_lambda.py":     { "function": "challenge-generator" },
-    "lambdas/food_delivery_lambda.py":           { "function": "food-delivery-ingestion" }
+    "lambdas/food_delivery_lambda.py":           { "function": "food-delivery-ingestion" },
+    "lambdas/og_image_lambda.py":                { "function": "og-image-generator" },
+    "lambdas/email_subscriber_lambda.py":        { "function": "email-subscriber" }
   },
 
   "mcp": {

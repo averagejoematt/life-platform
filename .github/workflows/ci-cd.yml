@@ -101,6 +101,23 @@ jobs:
           fi
           echo "✅ All files pass syntax check"
 
+      - name: Check lambda_map coverage
+        # R18-F03: Detect Lambda source files missing from ci/lambda_map.json
+        run: |
+          MISSING=0
+          for f in lambdas/*_lambda.py lambdas/*_handler.py; do
+            [ -f "$f" ] || continue
+            if ! grep -q "\"$f\"" ci/lambda_map.json; then
+              echo "::warning file=$f::Lambda source file not in lambda_map.json"
+              MISSING=$((MISSING + 1))
+            fi
+          done
+          if [ $MISSING -gt 0 ]; then
+            echo "::warning::$MISSING Lambda source files missing from lambda_map.json"
+          else
+            echo "✅ All Lambda source files present in lambda_map.json"
+          fi
+
   # ════════════════════════════════════════════════════════════════
   # Job 2: Unit Tests — run pytest on tests/test_shared_modules.py
   # ════════════════════════════════════════════════════════════════
