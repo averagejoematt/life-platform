@@ -27,10 +27,11 @@
   // ── Section mapping — 6-section IA (Decision 1a) ──────────
   var SECTIONS = [
     { label: 'The Story', items: [
-      { href: '/',              text: 'Home' },
-      { href: '/story/',        text: 'My Story' },
-      { href: '/about/',        text: 'The Mission' },
-      { href: '/achievements/', text: 'Milestones' },
+      { href: '/',               text: 'Home' },
+      { href: '/story/',         text: 'My Story' },
+      { href: '/first-person/',  text: 'First Person' },
+      { href: '/about/',         text: 'The Mission' },
+      { href: '/achievements/',  text: 'Milestones' },
     ]},
     { label: 'The Evidence', items: [
       { href: '/sleep/',       text: 'Sleep' },
