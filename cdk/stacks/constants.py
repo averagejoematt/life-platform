@@ -35,3 +35,9 @@ SHARED_LAYER_VERSION = 10  # ADR-027: v10 adds stable mcp/ core modules
 SHARED_LAYER_ARN = (
     f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
 )
+
+# Pillow image processing layer (HP-13: OG image generator)
+PILLOW_LAYER_VERSION = 1
+PILLOW_LAYER_ARN = (
+    f"arn:aws:lambda:{REGION}:{ACCT}:layer:pillow-layer:{PILLOW_LAYER_VERSION}"
+)

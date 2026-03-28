@@ -52,3 +52,7 @@ token*.json
 # Backup files (use git instead)
 *.bak*
 *.sw[po]
+
+# Session briefs (ephemeral, regenerated per session)
+CLAUDE_CODE_BRIEF*.md
+docs/CLAUDE_CODE_BRIEF*.md

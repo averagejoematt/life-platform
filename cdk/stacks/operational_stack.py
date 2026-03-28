@@ -6,7 +6,7 @@ v2.1 (v3.4.0): CDK-managed IAM roles + CDK-managed EventBridge rules.
   EventBridge rules created via schedule= (no more add_permission workaround).
   Freshness-checker and insight-email-parser added (previously unmanaged).
 
-Lambdas (10):
+Lambdas (11):
   life-platform-freshness-checker   cron(45 16 * * ? *)     — 9:45 AM PT daily
   life-platform-dlq-consumer        rate(6 hours)
   life-platform-canary              rate(4 hours)
@@ -17,6 +17,7 @@ Lambdas (10):
   life-platform-data-reconciliation cron(30 7 ? * MON *)    — Monday 12:30 AM PT
   insight-email-parser              (SES inbound trigger only)
   site-stats-refresh                4x/day (15:00, 19:00, 23:00, 03:00 UTC) — no AI calls
+  og-image-generator                cron(30 19 * * ? *)     — 11:30 AM PT daily (HP-13)
 """
 
 import aws_cdk as cdk
@@ -216,6 +217,9 @@ class OperationalStack(Stack):
                 "USER_ID":        "matthew",
                 "TABLE_NAME":     "life-platform",
                 "AI_SECRET_NAME": "life-platform/site-api-ai-key",
+                "S3_BUCKET":      "matthew-life-platform",
+                "S3_REGION":      "us-west-2",
+                "CORS_ORIGIN":    "https://averagejoematt.com",
             },
         )
 
@@ -295,6 +299,26 @@ class OperationalStack(Stack):
                 schedule=events.Schedule.cron(hour=str(utc_hour), minute="0"),
             )
             rule.add_target(targets.LambdaFunction(site_stats_fn))
+
+        # ── 12. OG Image Generator — daily at 19:30 UTC (11:30 AM PT, after daily brief)
+        # Generates 6 data-driven 1200x630 PNG OG images from public_stats.json using Pillow.
+        from stacks.constants import PILLOW_LAYER_ARN
+        pillow_layer = _lambda.LayerVersion.from_layer_version_arn(self, "PillowLayer", PILLOW_LAYER_ARN)
+
+        og_image_fn = create_platform_lambda(self, "OgImageGenerator",
+            function_name="og-image-generator",
+            source_file="lambdas/og_image_lambda.py",
+            handler="og_image_lambda.lambda_handler",
+            timeout_seconds=60, memory_mb=512,
+            environment={
+                "S3_BUCKET":            "matthew-life-platform",
+                "CF_DISTRIBUTION_ID":   "E3S424OXQZ8NBE",
+            },
+            custom_policies=rp.operational_og_image_generator(),
+            table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None,
+            additional_layers=[pillow_layer],
+            schedule="cron(30 19 * * ? *)",
+        )
 
         cdk.CfnOutput(self, "FreshnessCheckerArn", value=freshness.function_arn, description="Freshness checker Lambda ARN")
         cdk.CfnOutput(self, "CanaryArn", value=canary.function_arn, description="Canary Lambda ARN")

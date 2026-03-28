@@ -56,11 +56,11 @@ aws s3 sync "$SITE_DIR/" "s3://$BUCKET/$S3_PREFIX/" \
   --content-type "text/html; charset=utf-8" \
   --region "$REGION"
 
-# ── CSS / JS assets (long TTL — update filenames when content changes) ────────
-echo "→ CSS files (max-age=31536000)..."
+# ── CSS / JS assets (1-day TTL — no content-hash filenames yet) ──────────────
+echo "→ CSS/JS files (max-age=86400)..."
 aws s3 sync "$SITE_DIR/assets/" "s3://$BUCKET/$S3_PREFIX/assets/" \
   --exclude "*.map" \
-  --cache-control "max-age=31536000, public, immutable" \
+  --cache-control "max-age=86400, public" \
   --region "$REGION"
 
 # ── Data JSON (daily Lambda overwrites these, so 24h TTL is fine) ─────────────

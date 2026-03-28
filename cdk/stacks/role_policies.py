@@ -957,6 +957,27 @@ def operational_data_reconciliation() -> list[iam.PolicyStatement]:
     ]
 
 
+def operational_og_image_generator() -> list[iam.PolicyStatement]:
+    """OG image generator: reads public_stats.json, writes PNG images to S3, invalidates CloudFront."""
+    return [
+        iam.PolicyStatement(
+            sid="S3Read",
+            actions=["s3:GetObject"],
+            resources=_s3("site/data/*"),
+        ),
+        iam.PolicyStatement(
+            sid="S3Write",
+            actions=["s3:PutObject"],
+            resources=_s3("site/assets/images/*"),
+        ),
+        iam.PolicyStatement(
+            sid="CloudFrontInvalidation",
+            actions=["cloudfront:CreateInvalidation"],
+            resources=["*"],
+        ),
+    ]
+
+
 def operational_site_stats_refresh() -> list[iam.PolicyStatement]:
     """Site stats refresh: invokes ingestion Lambdas, reads DDB, reads+writes public_stats.json."""
     return [
