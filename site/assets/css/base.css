@@ -1432,7 +1432,7 @@ body::after {
 @media (max-width: 640px) { .pulse-feed__item { grid-template-columns: 6px 1fr; } .pulse-feed__time { display: none; } .pulse-feed__spark { display: none; } }
 
 /* ── Phase 2: Guided Path Progress Bar ─────────────────── */
-.guided-path { position: sticky; top: var(--nav-height, 56px); z-index: 99; background: var(--bg); border-bottom: 1px solid var(--border); padding: 0 var(--page-padding); height: 36px; display: flex; align-items: center; justify-content: center; gap: var(--space-6); transition: opacity 0.3s ease, transform 0.3s ease; }
+.guided-path { position: sticky; top: var(--nav-height, 56px); z-index: 100; background: rgba(8,12,10,0.95); border-bottom: 1px solid var(--border); padding: 0 var(--page-padding); height: 36px; display: flex; align-items: center; justify-content: center; gap: var(--space-6); transition: opacity 0.3s ease, transform 0.3s ease; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .guided-path--hidden { opacity: 0; transform: translateY(-100%); pointer-events: none; }
 .guided-path__step { display: flex; align-items: center; gap: var(--space-2); font-family: var(--font-nav); font-weight: 600; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-faint); text-decoration: none; transition: color 0.15s; }
 .guided-path__step:hover { color: var(--text-muted); }
@@ -1466,8 +1466,8 @@ body::after {
 .obs-thisweek__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
 .obs-thisweek__col { padding: 0 var(--space-4); }
 .obs-thisweek__col:not(:last-child) { border-right: 1px solid var(--border); }
-.obs-thisweek__col:first-child { padding-left: 0; }
-.obs-thisweek__col:last-child { padding-right: 0; }
+.obs-thisweek__col:first-child { padding-left: var(--space-4); }
+.obs-thisweek__col:last-child { padding-right: var(--space-4); }
 .obs-thisweek__value { font-family: var(--font-display); font-size: clamp(28px, 3vw, 36px); line-height: 1; margin-bottom: var(--space-1); }
 .obs-thisweek__label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-3); }
 .obs-thisweek__detail { font-size: var(--text-sm); color: var(--text-faint); line-height: 1.6; }
