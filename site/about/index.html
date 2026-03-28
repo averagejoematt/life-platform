@@ -195,6 +195,7 @@
 
 <div id="amj-nav"></div>
 
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">&rsaquo;</span><span class="breadcrumb__current">About</span></nav>
 
 
 
@@ -240,7 +241,7 @@
     <!-- A-2: Mission Brief Dossier -->
     <div class="animate-in" style="border:1px solid var(--border);background:var(--surface);overflow:hidden;">
       <div style="padding:var(--space-4) var(--space-5);border-bottom:1px solid var(--border);background:var(--bg);">
-        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent);">// mission brief</div>
+        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent);">Mission brief</div>
         <div style="font-family:var(--font-display);font-size:20px;color:var(--text);letter-spacing:var(--ls-display);margin-top:var(--space-1);">What Does Done Look Like?</div>
       </div>
 
@@ -322,7 +323,7 @@
 
 <section style="padding:var(--space-10) var(--page-padding);max-width:var(--content-width);margin:0 auto;border-bottom:1px solid var(--border);">
   <div style="border-left:2px solid var(--accent);padding:var(--space-5) var(--space-6);background:var(--accent-bg-subtle);max-width:var(--prose-width);">
-    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">// Why not just use Apple Health?</div>
+    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">Why not just use Apple Health?</div>
     <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body)">
       Apple Health aggregates data but doesn't analyze it. There's no AI coaching layer, no cross-source correlation engine, no character sheet, no public accountability system, and no weekly narrative journalism. The value of this platform isn't the data collection — it's the intelligence layer on top: the part that notices your HRV dropped the same week you stopped journaling, and asks you why.
     </p>
@@ -377,7 +378,7 @@
   </div>
   <div class="stack-row">
     <span class="stack-row__label">Test coverage</span>
-    <span class="stack-row__value"><strong><span data-const="platform.test_count">83</span>/<span data-const="platform.test_count">83</span></strong> tests passing. Architecture Review #<span data-const="platform.review_count">17</span>: grade <span data-const="platform.review_grade">A-</span>. CI/CD pipeline with auto-rollback.</span>
+    <span class="stack-row__value"><strong><span data-const="platform.test_count">83</span> tests, all passing.</strong> Architecture Review #<span data-const="platform.review_count">17</span>: grade <span data-const="platform.review_grade">A-</span>. CI/CD pipeline with auto-rollback.</span>
   </div>
   <div class="stack-row">
     <span class="stack-row__label">Cost</span>
@@ -396,7 +397,7 @@
   margin: 0 auto;
   border-top: 1px solid var(--border);
 ">
-  <div class="eyebrow">// get in touch</div>
+  <div class="eyebrow">Get in touch</div>
   <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-8)">If You Want to <span style="color:var(--accent)">Connect</span></h2>
 
   <div style="
@@ -413,7 +414,7 @@
 
   <div style="display:flex;align-items:center;gap:var(--space-6)">
     <a href="mailto:matt@averagejoematt.com" class="btn btn--primary">Say hello</a>
-    <span style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono)">// matt@averagejoematt.com</span>
+    <span style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono)">matt@averagejoematt.com</span>
   </div>
 </section>
 
@@ -427,18 +428,18 @@
   background: var(--surface);
   text-align: center;
 ">
-  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
+  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">The Measured Life</p>
   <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
     Real numbers from 19 data sources. No highlight reel. Every win and every failure, in your inbox on Wednesdays.
   </p>
   <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
     <input id="about-email" type="email" placeholder="your@email.com" style="
-      flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);
+      flex:1;background:var(--bg);border:1px solid var(--cta);color:var(--text);
       font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);
       outline:none;
     ">
-    <button id="about-subscribe-btn" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap">Subscribe</button>
+    <button id="about-subscribe-btn" class="btn btn--cta" style="white-space:nowrap">Subscribe</button>
   </div>
   <p id="about-subscribe-msg" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
 </section>

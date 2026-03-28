@@ -29,12 +29,23 @@
   --c-surface-2:      #141f17;
   --c-surface-3:      #1a2c1e;
 
-  /* Signal green (primary accent) */
-  --c-green-500:      #00e5a0;
-  --c-green-400:      #00c88a;
-  --c-green-300:      #00a370;
-  --c-green-100:      rgba(0, 229, 160, 0.12);
-  --c-green-050:      rgba(0, 229, 160, 0.06);
+  /* SLOP-1 ROLLBACK: Original neon green values
+     --c-green-500: #00e5a0;
+     --c-green-400: #00c98c;
+     --c-green-300: #00a370;
+     --c-green-200: #007a50;
+     --c-green-100: rgba(0, 229, 160, 0.12);
+     --c-green-050: rgba(0, 229, 160, 0.06);
+     --accent-rgb: 0, 229, 160;
+     To rollback: replace current values with these originals */
+
+  /* Signal green (primary accent) — SLOP-1: desaturated warm teal */
+  --c-green-500:      #3db88a;
+  --c-green-400:      #2fa37a;
+  --c-green-300:      #258a68;
+  --c-green-200:      #1a6b50;
+  --c-green-100:      rgba(61, 184, 138, 0.12);
+  --c-green-050:      rgba(61, 184, 138, 0.06);
 
   /* Journal amber (journal/blog accent) */
   --c-amber-500:      #c8843a;
@@ -53,7 +64,7 @@
 
   /* Text scale */
   --c-text-primary:   #e8ede9;
-  --c-text-secondary: #7a9080;
+  --c-text-secondary: #8aaa90;  /* PRE-5 ROLLBACK: was #7a9080 */
   --c-text-muted:     #4a6050;
   --c-text-disabled:  #2a3c30;
 
@@ -64,7 +75,7 @@
   --c-border-neutral: rgba(255, 255, 255, 0.06);
 
   /* RGB triplets for rgba() usage */
-  --accent-rgb:       0, 229, 160;
+  --accent-rgb:       61, 184, 138;  /* SLOP-1: was 0, 229, 160 */
   --amber-rgb:        200, 132, 58;
 
   /* Status */
@@ -122,12 +133,12 @@
   --c-surface-2:      #e8e5e0;
   --c-surface-3:      #dddad4;
 
-  /* Signal green — darker for legibility on light bg (AA contrast ≥4.5:1) */
-  --c-green-500:      #008f5f;  /* DB-05: brighter than old #006c4a, 4.7:1 on #fafaf8 ✅ */
-  --c-green-400:      #007a50;
-  --c-green-300:      #006545;
-  --c-green-100:      rgba(0, 143, 95, 0.10);
-  --c-green-050:      rgba(0, 143, 95, 0.05);
+  /* Signal green — SLOP-1: desaturated warm teal for light mode (was #008f5f) */
+  --c-green-500:      #2a8a62;
+  --c-green-400:      #237a55;
+  --c-green-300:      #1c6a48;
+  --c-green-100:      rgba(42, 138, 98, 0.10);
+  --c-green-050:      rgba(42, 138, 98, 0.05);
 
   /* Journal amber — richer for light mode */
   --c-amber-500:      #a06820;
@@ -157,7 +168,7 @@
   --c-border-neutral: rgba(0, 0, 0, 0.10);
 
   /* RGB triplets — light mode */
-  --accent-rgb:       0, 143, 95;
+  --accent-rgb:       42, 138, 98;  /* SLOP-1: was 0, 143, 95 */
   --amber-rgb:        160, 104, 32;
 
   /* Status — adjusted for light bg readability */

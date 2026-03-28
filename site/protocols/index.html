@@ -280,33 +280,7 @@
       letter-spacing: var(--ls-label);
     }
 
-    /* ── PROTO-4: Pipeline nav ───────────────────────────────── */
-    .pipeline-nav {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-      padding: var(--space-4) var(--page-padding);
-      border-bottom: 1px solid var(--border);
-      background: var(--surface);
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: var(--ls-tag);
-      overflow-x: auto;
-    }
-    .pipeline-nav__step {
-      color: var(--text-faint);
-      text-decoration: none;
-      text-transform: uppercase;
-      white-space: nowrap;
-      padding: var(--space-1) var(--space-3);
-      border: 1px solid transparent;
-    }
-    .pipeline-nav__step:hover { color: var(--text-muted); }
-    .pipeline-nav__step.active {
-      color: var(--accent);
-      border-color: var(--accent-dim);
-    }
-    .pipeline-nav__arrow { color: var(--border); }
+    /* pipeline-nav styles injected by components.js */
 
     /* ── PROTO-2: Experiment badge ───────────────────────────── */
     .exp-badge {
@@ -404,7 +378,7 @@
 <!-- Quick-glance outcome snapshot -->
 <div class="proto-outcomes reveal">
   <div class="proto-outcomes__box">
-    <div class="proto-outcomes__heading">// is this working? &mdash; snapshot</div>
+    <div class="proto-outcomes__heading">Is this working? — snapshot</div>
     <div class="proto-outcomes__grid">
       <div class="proto-outcomes__row">
         <div class="proto-outcomes__protocol">Sleep protocol</div>
@@ -431,7 +405,7 @@
         <div class="proto-outcomes__value" id="outcomes-adh-strength">&mdash;</div>
       </div>
     </div>
-    <div class="proto-outcomes__footer">// static snapshot &mdash; live adherence loads within each card below</div>
+    <div class="proto-outcomes__footer">Static snapshot — live adherence loads within each card below</div>
   </div>
 </div>
 
@@ -439,7 +413,7 @@
 <div class="experiment-thread">Protocols are the inputs → <a href="/live/">See the results →</a></div>
 <div class="proto-body" id="proto-body">
   <!-- Data-driven: rendered from /api/protocols -->
-  <div style="padding:var(--space-12) 0;text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">// loading protocols from API&hellip;</div>
+  <div style="padding:var(--space-12) 0;text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">Loading protocols from API&hellip;</div>
 </div><!-- /proto-body -->
 
 <!-- Discipline streaks cross-link (moved to Accountability) -->
@@ -568,7 +542,7 @@
       var protocols = data.protocols || [];
       var body = document.getElementById('proto-body');
       if (!protocols.length) {
-        body.innerHTML = '<div style="padding:var(--space-12) 0;text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">// no protocols found</div>';
+        body.innerHTML = '<div style="padding:var(--space-12) 0;text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">No protocols found</div>';
         return;
       }
       var pullQuote = '<div style="max-width:var(--max-width);margin:var(--space-6) auto;padding:var(--space-6) var(--page-padding);border-left:3px solid var(--accent);font-family:var(--font-display);font-size:var(--text-lg);color:var(--text-muted);line-height:var(--lh-body);font-style:italic;">&ldquo;The protocols aren&rsquo;t the interesting part. The interesting part is whether they survive contact with real data.&rdquo;</div>';
@@ -584,7 +558,7 @@
       loadExperimentBadges(protocols);
     })
     .catch(function() {
-      document.getElementById('proto-body').innerHTML = '<div style="padding:var(--space-12) 0;text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">// could not load protocols &mdash; try refreshing</div>';
+      document.getElementById('proto-body').innerHTML = '<div style="padding:var(--space-12) 0;text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">Could not load protocols — try refreshing</div>';
     });
 
   // ── Load adherence data ──

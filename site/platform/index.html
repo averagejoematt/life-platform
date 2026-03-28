@@ -309,7 +309,8 @@
   <div>
     <div class="eyebrow">The Build</div>
     <h1 class="page-header__title">The<br><span>Platform</span></h1>
-    <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);margin-top:var(--space-5);max-width:420px">A single-person health intelligence system, built entirely on AWS serverless.</p>
+    <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body);margin-top:var(--space-5);max-width:420px">One person's answer to: what if AI could see the full picture?</p>
+    <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body);margin-top:var(--space-4);max-width:480px;font-style:italic;">The question from the Story page &mdash; can a system catch what willpower can&rsquo;t? &mdash; led to this.</p>
   </div>
   <div class="page-header__meta">
     <div class="meta-stat">
@@ -331,15 +332,31 @@
   </div>
 </div>
 
+<!-- 26b: Tweetable stats -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border-bottom:1px solid var(--border);">
+  <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+    <div style="font-family:var(--font-display);font-size:42px;color:var(--accent);line-height:1;">$13</div>
+    <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-top:var(--space-2)">Per month to operate</div>
+  </div>
+  <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+    <div style="font-family:var(--font-display);font-size:42px;color:var(--c-amber-500);line-height:1;">0</div>
+    <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-top:var(--space-2)">Engineers on team</div>
+  </div>
+  <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
+    <div style="font-family:var(--font-display);font-size:42px;color:var(--text);line-height:1;" data-const="platform.data_sources">19</div>
+    <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-top:var(--space-2)">Data sources integrated</div>
+  </div>
+</div>
+
 <!-- PLAT-3: Zone 1 divider -->
 <div class="zone-divider">
-  <span class="zone-divider__num">// ZONE 01</span>
+  <span class="zone-divider__num">ZONE 01</span>
   <span class="zone-divider__label">The Pipeline</span>
   <span class="zone-divider__sub">architecture · ingest · compute · intelligence · tech stack</span>
 </div>
 
 <!-- PLAT-2: Architecture diagram SVG -->
-<section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);overflow:hidden;">
+<section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);overflow-x:auto;">
   <div class="eyebrow">Architecture</div>
   <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">The system — every component</h2>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">19 data sources → 13 ingest Lambdas → S3 + DynamoDB → 5 compute Lambdas → 4 output channels. All on AWS. Costs ~$13/month. Built by a non-engineer using AI assistance.</p>
@@ -518,7 +535,7 @@
     <div style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);">
       <div style="width:10px;height:2px;background:rgba(109,186,109,0.5)"></div> MCP / Claude
     </div>
-    <span style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);">// Region: us-west-2 (us-east-1 for Site API)</span>
+    <span style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);">Region: us-west-2 (us-east-1 for Site API)</span>
   </div>
 </section>
 
@@ -646,7 +663,7 @@
     </div>
   </div>
   <div>
-    <div class="label label-accent" style="margin-bottom:var(--space-4)">// sample tools</div>
+    <div class="label label-accent" style="margin-bottom:var(--space-4)">Sample tools</div>
     <div class="ai-tools-sample">
       <div class="tool-row"><span class="tool-name">get_health</span><span class="tool-desc">Morning briefing + risk profile</span></div>
       <div class="tool-row"><span class="tool-name">get_cross_source_correlation</span><span class="tool-desc">Pearson r between any two metrics</span></div>
@@ -710,7 +727,7 @@
 
 <!-- PLAT-3: Zone 2 divider -->
 <div class="zone-divider">
-  <span class="zone-divider__num">// ZONE 02</span>
+  <span class="zone-divider__num">ZONE 02</span>
   <span class="zone-divider__label">The Guarantees</span>
   <span class="zone-divider__sub">security · cost · architecture reviews</span>
 </div>
@@ -820,7 +837,7 @@
 
 <!-- PLAT-3: Zone 3 divider -->
 <div class="zone-divider">
-  <span class="zone-divider__num">// ZONE 03</span>
+  <span class="zone-divider__num">ZONE 03</span>
   <span class="zone-divider__label">The Surfaces</span>
   <span class="zone-divider__sub">every page · every data stream · every tool</span>
 </div>

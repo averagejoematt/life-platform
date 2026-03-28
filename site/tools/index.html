@@ -291,7 +291,16 @@
     @media (max-width: 768px) {
       .calc-layout { grid-template-columns: 1fr; }
       .tool-section__header { grid-template-columns: 1fr; }
-      .matthew-badge { display: none; }
+      .matthew-badge {
+        display: flex;
+        flex-direction: row;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-3);
+        font-size: var(--text-2xs);
+        margin-top: var(--space-3);
+      }
+      .matthew-badge__label { display: none; }
+      .matthew-badge__val { font-size: var(--text-xs); }
       .checklist { grid-template-columns: 1fr; }
       .protein-meal { grid-template-columns: 70px 1fr 50px; }
     }
@@ -302,8 +311,7 @@
 <div id="amj-nav"></div>
 </div>
 
-
-
+<nav class="breadcrumb"><a href="/">Home</a><span class="breadcrumb__sep">›</span><a href="/platform/" class="breadcrumb__section">The Build</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Tools</span></nav>
 
 
 
@@ -323,7 +331,7 @@
   <div class="tool-section reveal">
     <div class="tool-section__header">
       <div>
-        <div class="tool-section__tag">// Tool 01 — Aerobic Training</div>
+        <div class="tool-section__tag">Tool 01 — Aerobic Training</div>
         <div class="tool-section__title">Zone 2 Heart Rate Calculator</div>
         <div class="tool-section__sub">Find your personal Zone 2 training range — the cardiac efficiency zone that drives fat adaptation and aerobic base.</div>
       </div>
@@ -366,6 +374,7 @@
       <div class="calc-results" id="z2-results">
         <div class="result-placeholder">Enter your age and resting HR to calculate your Zone 2 range.</div>
       </div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);">Formula: Karvonen method (ACSM Guidelines, 11th ed.)</div>
     </div>
   </div>
 
@@ -373,7 +382,7 @@
   <div class="tool-section reveal">
     <div class="tool-section__header">
       <div>
-        <div class="tool-section__tag">// Tool 02 — Recovery Intelligence</div>
+        <div class="tool-section__tag">Tool 02 — Recovery Intelligence</div>
         <div class="tool-section__title">HRV Baseline Interpreter</div>
         <div class="tool-section__sub">Enter your HRV and get training readiness guidance based on population norms and recovery science.</div>
       </div>
@@ -417,6 +426,7 @@
       <div class="calc-results" id="hrv-results">
         <div class="result-placeholder">Enter your age and HRV to get your readiness interpretation.</div>
       </div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);">Norms: HRV4Training population data, Whoop research</div>
     </div>
   </div>
 
@@ -424,7 +434,7 @@
   <div class="tool-section reveal">
     <div class="tool-section__header">
       <div>
-        <div class="tool-section__tag">// Tool 03 — Nutrition Protocol</div>
+        <div class="tool-section__tag">Tool 03 — Nutrition Protocol</div>
         <div class="tool-section__title">Protein Timing Calculator</div>
         <div class="tool-section__sub">Calculate your total protein target and optimal distribution across meals for maximum muscle protein synthesis.</div>
       </div>
@@ -469,6 +479,7 @@
       <div class="calc-results" id="prot-results">
         <div class="result-placeholder">Enter your weight and training frequency to get a protein distribution plan.</div>
       </div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);">Target: leucine threshold MPS research (Morton et al., 2018)</div>
     </div>
   </div>
 
@@ -476,7 +487,7 @@
   <div class="tool-section reveal">
     <div class="tool-section__header">
       <div>
-        <div class="tool-section__tag">// Tool 04 &mdash; Sleep Quality</div>
+        <div class="tool-section__tag">Tool 04 — Sleep Quality</div>
         <div class="tool-section__title">Sleep Efficiency Scorer</div>
         <div class="tool-section__sub">Calculate how efficiently you're sleeping. Time in bed vs. time actually asleep &mdash; the metric sleep researchers care about most.</div>
       </div>
@@ -525,7 +536,7 @@
   <div class="tool-section reveal">
     <div class="tool-section__header">
       <div>
-        <div class="tool-section__tag">// Tool 05 &mdash; Weight Loss</div>
+        <div class="tool-section__tag">Tool 05 — Weight Loss</div>
         <div class="tool-section__title">Deficit Sustainability Calculator</div>
         <div class="tool-section__sub">Are you cutting too aggressively? Calculate your deficit percentage and get a timeline for sustainable fat loss without muscle wasting.</div>
       </div>
@@ -576,13 +587,13 @@
   <div class="tool-section reveal">
     <div class="tool-section__header">
       <div>
-        <div class="tool-section__tag">// Tool 06 &mdash; Cardiorespiratory Fitness</div>
+        <div class="tool-section__tag">Tool 06 — Cardiorespiratory Fitness</div>
         <div class="tool-section__title">VO2max Estimator</div>
         <div class="tool-section__sub">Estimate your VO2max from a 1-mile walk test (Rockport method). No lab required. Compare against age-group percentiles.</div>
       </div>
       <div class="matthew-badge">
         <div class="matthew-badge__label">Matthew&rsquo;s VO2max</div>
-        <div class="matthew-badge__value">~42</div>
+        <div class="matthew-badge__value">~42 (estimated from Garmin)</div>
       </div>
     </div>
     <div class="calc-layout">
@@ -631,6 +642,7 @@
       <div class="calc-results" id="vo2-results">
         <div class="result-placeholder">Walk 1 mile briskly, record your time and ending heart rate.</div>
       </div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);">Estimated VO2max from walk/run tests has ±10-15% error. Lab testing (metabolic cart) is the gold standard.</div>
     </div>
   </div>
 
@@ -638,7 +650,7 @@
   <div class="tool-section reveal">
     <div class="tool-section__header">
       <div>
-        <div class="tool-section__tag">// Tool 04 — Getting Started</div>
+        <div class="tool-section__tag">Tool 07 — Getting Started</div>
         <div class="tool-section__title">Start Your Own N=1 Experiment</div>
         <div class="tool-section__sub">What to track first. The minimum viable personal health data setup — before you build anything complex.</div>
       </div>
@@ -649,7 +661,7 @@
         <div class="check-item__num">01</div>
         <div>
           <div class="check-item__title">Daily weight (with trend, not single readings)</div>
-          <div class="check-item__desc">// start here — cheapest signal, highest information density per dollar</div>
+          <div class="check-item__desc">Start here — cheapest signal, highest information density per dollar</div>
           <div class="check-item__example">tool: Withings Body Comp ($99) or any wifi scale. Track 30-day trend, not daily swings.</div>
         </div>
       </div>
@@ -657,7 +669,7 @@
         <div class="check-item__num">02</div>
         <div>
           <div class="check-item__title">Overnight HRV + resting HR</div>
-          <div class="check-item__desc">// recovery signal that changes behavior — skip training when red, push when green</div>
+          <div class="check-item__desc">Recovery signal that changes behavior — skip training when red, push when green</div>
           <div class="check-item__example">tool: Whoop ($30/mo) or Oura Ring ($299 + $6/mo). Wear it every night.</div>
         </div>
       </div>
@@ -665,7 +677,7 @@
         <div class="check-item__num">03</div>
         <div>
           <div class="check-item__title">Daily habits (3–5 non-negotiables)</div>
-          <div class="check-item__desc">// track what you're actually doing before optimizing anything</div>
+          <div class="check-item__desc">Track what you're actually doing before optimizing anything</div>
           <div class="check-item__example">tool: Habitify or Streaks. Start with 3 habits maximum. Add when all 3 are consistent.</div>
         </div>
       </div>
@@ -673,7 +685,7 @@
         <div class="check-item__num">04</div>
         <div>
           <div class="check-item__title">Food logging for 30 days (not forever)</div>
-          <div class="check-item__desc">// one month of honest logging teaches your baseline better than any guide</div>
+          <div class="check-item__desc">One month of honest logging teaches your baseline better than any guide</div>
           <div class="check-item__example">tool: MacroFactor (adaptive TDEE) or Cronometer. Stop after 30 days if stressful.</div>
         </div>
       </div>
@@ -681,7 +693,7 @@
         <div class="check-item__num">05</div>
         <div>
           <div class="check-item__title">One baseline blood panel</div>
-          <div class="check-item__desc">// know your starting biomarkers before you try to change them</div>
+          <div class="check-item__desc">Know your starting biomarkers before you try to change them</div>
           <div class="check-item__example">service: Function Health, Marek Health, or your GP. Ask for: lipids, glucose, HbA1c, CBC, TSH.</div>
         </div>
       </div>
@@ -689,7 +701,7 @@
         <div class="check-item__num">06</div>
         <div>
           <div class="check-item__title">Write down one hypothesis</div>
-          <div class="check-item__desc">// "if I do X for 30 days, I expect to see Y in metric Z" — N=1 needs a thesis</div>
+          <div class="check-item__desc">"If I do X for 30 days, I expect to see Y in metric Z" — N=1 needs a thesis</div>
           <div class="check-item__example">example: "If I sleep before 10:30pm for 30 days, my 30d avg HRV will increase by 5ms."</div>
         </div>
       </div>

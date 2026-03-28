@@ -305,7 +305,7 @@
       // Why it matters
       if (exp.why_it_matters) {
         html += '<div class="detail-section">';
-        html += '<div class="detail-section__title">// Why it matters</div>';
+        html += '<div class="detail-section__title">Why it matters</div>';
         html += '<div class="detail-section__body">' + exp.why_it_matters + '</div>';
         html += '</div>';
       }
@@ -313,7 +313,7 @@
       // Evidence
       if (exp.evidence_summary || exp.evidence_citation) {
         html += '<div class="detail-section">';
-        html += '<div class="detail-section__title">// Evidence</div>';
+        html += '<div class="detail-section__title">Evidence</div>';
         html += '<div class="detail-section__body">';
         if (exp.evidence_summary) html += '<p>' + exp.evidence_summary + '</p>';
         if (exp.evidence_citation) html += '<p style="font-style:italic;color:var(--text-faint);margin-top:var(--space-3)">— ' + exp.evidence_citation + '</p>';
@@ -323,7 +323,7 @@
       // Protocol template
       if (exp.protocol_template) {
         html += '<div class="detail-section">';
-        html += '<div class="detail-section__title">// Protocol</div>';
+        html += '<div class="detail-section__title">Protocol</div>';
         html += '<div class="detail-section__body">' + exp.protocol_template + '</div>';
         html += '</div>';
       }
@@ -331,7 +331,7 @@
       // Hypothesis template
       if (exp.hypothesis_template) {
         html += '<div class="detail-section">';
-        html += '<div class="detail-section__title">// Hypothesis template</div>';
+        html += '<div class="detail-section__title">Hypothesis template</div>';
         html += '<div class="detail-section__body" style="font-style:italic">' + exp.hypothesis_template + '</div>';
         html += '</div>';
       }
@@ -340,7 +340,7 @@
       var metrics = (exp.metrics_measurable || []).concat(exp.metrics_behavioral || []);
       if (metrics.length) {
         html += '<div class="detail-section">';
-        html += '<div class="detail-section__title">// Metrics tracked</div>';
+        html += '<div class="detail-section__title">Metrics tracked</div>';
         html += '<div class="detail-section__body">' + metrics.join(' · ') + '</div>';
         html += '</div>';
       }
@@ -349,7 +349,7 @@
       var runs = exp.runs || [];
       if (runs.length) {
         html += '<div class="detail-runs">';
-        html += '<div class="detail-section__title" style="margin-bottom:var(--space-6)">// Past runs (' + runs.length + ')</div>';
+        html += '<div class="detail-section__title" style="margin-bottom:var(--space-6)">Past runs (' + runs.length + ')</div>';
         runs.forEach(function(run, i) {
           var statusClass = run.status === 'active' ? 'active' : run.status === 'completed' ? 'completed' : 'abandoned';
           var gradeStr = run.grade ? (' · ' + run.grade) : '';
@@ -400,14 +400,14 @@
         html += '</div>';
       } else {
         html += '<div class="detail-section">';
-        html += '<div class="detail-section__title">// Runs</div>';
+        html += '<div class="detail-section__title">Runs</div>';
         html += '<div class="detail-section__body">This experiment hasn\'t been run yet. Vote to move it up the queue!</div>';
         html += '</div>';
       }
 
       // CTA
       html += '<div style="text-align:center;margin-top:var(--space-12);padding:var(--space-8);border:1px solid var(--border);background:var(--surface)">';
-      html += '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent-dim);letter-spacing:var(--ls-label);text-transform:uppercase;margin-bottom:var(--space-3)">// Try it yourself</div>';
+      html += '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent-dim);letter-spacing:var(--ls-label);text-transform:uppercase;margin-bottom:var(--space-3)">Try it yourself</div>';
       html += '<div style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body)">No app needed. Follow the protocol above for ' + (exp.suggested_duration_days || 30) + ' days and track what changes.</div>';
       html += '</div>';
 

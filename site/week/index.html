@@ -495,7 +495,7 @@ async function loadWeek() {
       const b = top.label_b || top.field_b;
       const dir = top.r > 0 ? 'higher' : 'lower';
       document.getElementById('week-discovery').innerHTML = `
-        <div class="discovery-callout__eyebrow">// Strongest signal this week &mdash; ${top.source_a} × ${top.source_b}</div>
+        <div class="discovery-callout__eyebrow">Strongest signal this week — ${top.source_a} × ${top.source_b}</div>
         <div class="discovery-callout__finding">${a} → ${dir} ${b}</div>
         <div class="discovery-callout__stat">
           r = <strong>${top.r > 0 ? '+' : ''}${top.r.toFixed(3)}</strong> &middot;

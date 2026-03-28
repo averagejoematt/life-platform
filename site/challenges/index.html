@@ -86,12 +86,8 @@
       margin-top: var(--space-1);
     }
 
-    /* ── Pipeline Nav ── */
-    .pipeline-nav { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-4) var(--page-padding); border-bottom:1px solid var(--border); background:var(--surface); font-family:var(--font-mono); font-size:var(--text-2xs); letter-spacing:var(--ls-tag); overflow-x:auto; }
-    .pipeline-nav__step { color:var(--text-faint); text-decoration:none; text-transform:uppercase; white-space:nowrap; padding:var(--space-1) var(--space-3); border:1px solid transparent; }
-    .pipeline-nav__step:hover { color:var(--text-muted); }
+    /* pipeline-nav base styles injected by components.js; arena active override below */
     .pipeline-nav__step.active { color:var(--ar); border-color:var(--ar-dim); }
-    .pipeline-nav__arrow { color:var(--border); }
 
     /* ── Active Hero Zone ── */
     .hero-zone {
@@ -794,7 +790,7 @@
 
 <!-- ── Active Challenge Hero ── -->
 <div class="hero-zone" id="hero-zone">
-  <div class="zone-label">// active now</div>
+  <div class="zone-label">Active now</div>
   <div id="hero-content">
     <div class="hero-empty">
       <div class="hero-empty__text">No active challenge — pick one from the wall below</div>
@@ -824,7 +820,7 @@
 
 <!-- ── Board Recommends ── -->
 <div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-6) var(--page-padding);border-bottom:1px solid var(--border);">
-  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--ar);margin-bottom:var(--space-4);">// Board recommends</div>
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--ar);margin-bottom:var(--space-4);">Board recommends</div>
   <div id="board-picks" style="display:flex;gap:var(--space-4);overflow-x:auto;padding-bottom:var(--space-3);"></div>
 </div>
 
@@ -837,7 +833,7 @@
 
 <!-- ── Completed Record ── -->
 <div class="record-zone" id="record-zone" style="display:none">
-  <div class="zone-label">// completed</div>
+  <div class="zone-label">Completed</div>
   <div id="record-list"></div>
 </div>
 
@@ -1144,7 +1140,7 @@
 
     var bodyHtml = '';
     if (ch.protocol) {
-      bodyHtml += '<div class="detail-field"><div class="detail-field__label">// The Protocol</div><div class="detail-field__value">' + esc(ch.protocol) + '</div></div>';
+      bodyHtml += '<div class="detail-field"><div class="detail-field__label">The Protocol</div><div class="detail-field__value">' + esc(ch.protocol) + '</div></div>';
     }
     // Mechanism / "Why it works" — use evidence_summary as the science basis
     var mechanismText = ch.mechanism || ch.science || ch.evidence_summary || '';
@@ -1157,13 +1153,13 @@
     // Metric targets
     var targets = CATEGORY_TARGETS[ch.category] || '';
     if (targets) {
-      bodyHtml += '<div class="detail-field" style="margin-top:var(--space-4)"><div class="detail-field__label">// Expected Impact</div><div class="detail-field__value">Targets: ' + targets + '</div></div>';
+      bodyHtml += '<div class="detail-field" style="margin-top:var(--space-4)"><div class="detail-field__label">Expected Impact</div><div class="detail-field__value">Targets: ' + targets + '</div></div>';
     }
     if (ch.evidence_summary && ch.evidence_summary !== mechanismText) {
-      bodyHtml += '<div class="detail-field"><div class="detail-field__label">// The Evidence</div><div class="detail-field__value">' + esc(ch.evidence_summary) + '</div></div>';
+      bodyHtml += '<div class="detail-field"><div class="detail-field__label">The Evidence</div><div class="detail-field__value">' + esc(ch.evidence_summary) + '</div></div>';
     }
     if (ch.board_recommender && ch.board_quote) {
-      bodyHtml += '<div class="detail-field"><div class="detail-field__label">// Board Recommendation</div>' +
+      bodyHtml += '<div class="detail-field"><div class="detail-field__label">Board Recommendation</div>' +
         '<div class="detail-board-quote">' +
           '<div class="detail-board-quote__text">"' + esc(ch.board_quote) + '"</div>' +
           '<div class="detail-board-quote__attr">— ' + esc(ch.board_recommender) + '</div>' +
@@ -1171,7 +1167,7 @@
     }
     if (ch.source_type === 'podcast') {
       bodyHtml += '<div class="detail-field">' +
-        '<div class="detail-field__label">// Discovered Via Podcast</div>' +
+        '<div class="detail-field__label">Discovered Via Podcast</div>' +
         '<div class="detail-field__value">' +
           '\uD83C\uDFA4 <strong>' + esc(ch.source_podcast) + '</strong>' +
           (ch.source_episode ? ' — ' + esc(ch.source_episode) : '') +

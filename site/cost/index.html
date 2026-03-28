@@ -242,7 +242,7 @@
 <div id="amj-nav"></div>
 </div>
 
-
+<nav class="breadcrumb"><a href="/">Home</a><span class="breadcrumb__sep">&rsaquo;</span><a href="/platform/" class="breadcrumb__section">The Build</a><span class="breadcrumb__sep">&rsaquo;</span><span class="breadcrumb__current">Cost</span></nav>
 
 
 
@@ -255,13 +255,14 @@
     <span data-const="platform.lambdas">50</span> Lambda functions. <span data-const="platform.data_sources">19</span> data source integrations. <span data-const="platform.mcp_tools">95</span> AI tools. A public website serving live health data.
     Here&rsquo;s the actual AWS bill, every line item, with the architectural decisions that keep it this low.
   </p>
+  <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body);margin-top:var(--space-5);max-width:560px;">I publish the bill because the enterprise health world obscures costs. Meaningful health intelligence doesn&rsquo;t require a budget.</p>
 </header>
 
 <!-- Headline cost comparison -->
 <div class="headline-cost reveal">
   <div class="cost-hero">
     <div class="cost-hero__amount">$13</div>
-    <div class="cost-hero__label">// per month to operate</div>
+    <div class="cost-hero__label">Per month to operate</div>
     <div class="cost-hero__note">Average since launch. Varies $8&ndash;$18 depending on Claude API usage.</div>
   </div>
   <div class="cost-context">
@@ -289,6 +290,9 @@
     <div class="compare-row" style="border-bottom:none">
       <span class="compare-row__name"><strong>This platform (full stack, automated)</strong></span>
       <span class="compare-row__cost mine"><strong>~$13/mo</strong></span>
+    </div>
+    <div style="margin-top:var(--space-6);padding:var(--space-4) var(--space-5);border:1px solid var(--border);background:var(--surface);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body);">
+      <strong style="color:var(--text)">Full picture:</strong> Infrastructure: ~$13/month. Wearable subscriptions (Whoop, Eight Sleep, etc.): additional ~$50&ndash;80/month &mdash; these are health device costs, not platform costs.
     </div>
   </div>
 </div>
@@ -416,7 +420,7 @@
   </p>
   <div class="decisions-grid">
     <div class="decision-card">
-      <div class="decision-card__tag">// compute</div>
+      <div class="decision-card__tag">Compute</div>
       <div class="decision-card__title">No always-on servers</div>
       <div class="decision-card__desc">
         Every computation is event-driven Lambda. Ingestion runs on a cron (14 Lambdas × once/day).
@@ -425,7 +429,7 @@
       <div class="decision-card__saving">Saves ~$40&ndash;$80/mo vs always-on EC2 or ECS</div>
     </div>
     <div class="decision-card">
-      <div class="decision-card__tag">// cdn caching</div>
+      <div class="decision-card__tag">CDN caching</div>
       <div class="decision-card__title">CloudFront TTL on every API route</div>
       <div class="decision-card__desc">
         The site API has 5-minute TTL on /api/vitals and 1-hour on /api/journey.
@@ -435,7 +439,7 @@
       <div class="decision-card__saving">50,000 hits = $0.33 total vs $25+ without caching</div>
     </div>
     <div class="decision-card">
-      <div class="decision-card__tag">// database</div>
+      <div class="decision-card__tag">Database</div>
       <div class="decision-card__title">DynamoDB single-table, on-demand</div>
       <div class="decision-card__desc">
         One table, composite PK/SK. On-demand billing — you pay per read/write, not for provisioned capacity.
@@ -444,7 +448,7 @@
       <div class="decision-card__saving">$0.48/mo vs $15+/mo provisioned RDS</div>
     </div>
     <div class="decision-card">
-      <div class="decision-card__tag">// ai model selection</div>
+      <div class="decision-card__tag">AI model selection</div>
       <div class="decision-card__title">Haiku for production, Sonnet for dev</div>
       <div class="decision-card__desc">
         The daily brief and site Q&amp;A use Claude Haiku (smallest, cheapest model).
@@ -454,7 +458,7 @@
       <div class="decision-card__saving">4x cheaper than using Sonnet for everything</div>
     </div>
     <div class="decision-card">
-      <div class="decision-card__tag">// static hosting</div>
+      <div class="decision-card__tag">Static hosting</div>
       <div class="decision-card__title">S3 + CloudFront for the entire site</div>
       <div class="decision-card__desc">
         averagejoematt.com is entirely static HTML/CSS/JS hosted on S3 and distributed via CloudFront.
@@ -464,7 +468,7 @@
       <div class="decision-card__saving">$0.07/mo vs $10&ndash;$30/mo for managed hosting</div>
     </div>
     <div class="decision-card">
-      <div class="decision-card__tag">// secrets</div>
+      <div class="decision-card__tag">Secrets</div>
       <div class="decision-card__title">Lambda-level in-memory caching</div>
       <div class="decision-card__desc">
         Each Lambda caches its Secrets Manager response after the first call (warm container reuse).
