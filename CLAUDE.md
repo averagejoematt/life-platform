@@ -67,7 +67,7 @@ python3 mcp_bridge.py
 
 **Site API is read-only** — the site-api Lambda must never write to DynamoDB. This is a hard constraint.
 
-**Rate limiting is in-memory** — `ask` (3 anon/20 subscriber per hour), `board_ask` (5 per IP per hour). No DynamoDB writes for rate state.
+**Rate limiting is in-memory** — `ask` (5 anon/20 subscriber per hour), `board_ask` (5 per IP per hour). No DynamoDB writes for rate state.
 
 **EventBridge crons use fixed UTC** — no DST drift. All schedules in `cdk/stacks/` must be UTC-fixed.
 

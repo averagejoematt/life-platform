@@ -345,6 +345,21 @@
     .proto-links__link { color: var(--accent-dim); text-decoration: none; border-bottom: 1px dotted var(--accent-dim); }
     .proto-links__link:hover { color: var(--accent); }
 
+    /* ── Tier badges ─────────────────────────────────────────── */
+    .proto-tier-badge {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border: 1px solid;
+      font-weight: 600;
+    }
+    .proto-tier-badge.tier-foundation  { color: var(--accent); border-color: var(--accent-dim); background: rgba(0,200,100,0.06); }
+    .proto-tier-badge.tier-measurement { color: var(--c-cyan-400, #22d3ee); border-color: var(--c-cyan-300, #67e8f9); background: rgba(34,211,238,0.06); }
+    .proto-tier-badge.tier-intervention { color: var(--c-amber-500); border-color: var(--c-amber-300, #fbbf24); background: rgba(245,158,11,0.06); }
+    .proto-tier-badge.tier-supporting  { color: var(--text-muted); border-color: var(--border); background: rgba(200,200,200,0.04); }
+
     /* ── Mobile adjustments ──────────────────────────────────── */
     @media (max-width: 768px) {
       .proto-detail { grid-template-columns: 1fr; }
@@ -357,24 +372,32 @@
 <body class="body-signal">
 <div id="amj-nav"></div>
 
-<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">Method</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Protocols</span></nav>
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><a href="/stack/" class="breadcrumb__section">The Practice</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Protocols</span></nav>
 
 <div id="amj-hierarchy-nav"></div>
 
 <header class="proto-header reveal">
-  <div class="eyebrow" style="margin-bottom:var(--space-4)">The Science</div>
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">The Practice</div>
   <h1 class="proto-header__title">What I&rsquo;m <span>actually doing</span></h1>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:560px;line-height:var(--lh-body)">
-    The specific protocols behind the transformation &mdash; and whether the data says they&rsquo;re working.
-    Each card shows the pillar it feeds, the rationale, adherence, and current signal.
+    A protocol is what I&rsquo;m operating now. It earned its place through evidence &mdash; either from a completed experiment, published literature, or enough accumulated data to justify the commitment. Protocols are reviewed every 90 days. Negative or absent signal for 90 days means paused or retired. Nothing stays here on faith alone.
   </p>
 </header>
+
+<!-- Signal state legend (17e) -->
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-4) var(--page-padding) 0;">
+  <div style="display:flex;gap:var(--space-6);flex-wrap:wrap;font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;">
+    <span><span style="color:var(--accent);">&#9679;</span> Positive &mdash; data confirms working</span>
+    <span><span style="color:var(--c-amber-500);">&#9679;</span> Pending &mdash; insufficient data</span>
+    <span><span style="color:var(--text-faint);">&#9679;</span> No signal &mdash; not enough time</span>
+  </div>
+</div>
 
 <!-- Through-line thread -->
 <div class="proto-thread reveal">
   <div class="proto-thread__bar">
     <span style="color:var(--text-faint);font-family:var(--font-mono)">//</span>
-    Protocols are the inputs &rarr; <a href="/live/">See the results &rarr;</a>
+    Protocols are the inputs &rarr; <a href="/live/">Today&rsquo;s results &rarr;</a> &middot; <a href="/experiments/">Where they come from &rarr;</a> &middot; <a href="/supplements/">The pharmacy &rarr;</a>
   </div>
 </div>
 
@@ -419,25 +442,12 @@
   <div style="padding:var(--space-12) 0;text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">// loading protocols from API&hellip;</div>
 </div><!-- /proto-body -->
 
-<!-- Vice Tracking Section -->
-<div class="vice-section reveal">
-  <div class="vice-section__heading"><span>//</span> Clean Streaks &mdash; current status</div>
-  <div class="vice-chips">
-    <div class="vice-chip">
-      <div class="vice-chip__label">No Alcohol</div>
-      <div class="vice-chip__value loading" id="streak-alcohol">—</div>
-      <div class="vice-chip__unit">days clean</div>
-    </div>
-    <div class="vice-chip">
-      <div class="vice-chip__label">Caloric Target Met</div>
-      <div class="vice-chip__value" id="streak-calories">Loading&hellip;</div>
-      <div class="vice-chip__unit" id="streak-calories-unit">days streak</div>
-    </div>
-  </div>
-  <div class="vice-note">
-    <span>// Privacy note:</span> Vice tracking is filtered for privacy &mdash; only clean streaks shown publicly.
-    Full compliance data is private and used internally by the platform.
-  </div>
+<!-- Discipline streaks cross-link (moved to Accountability) -->
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);" class="reveal">
+  <a href="/accountability/" style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-4) var(--space-6);border:1px solid var(--border);background:var(--surface);text-decoration:none;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);letter-spacing:var(--ls-label);">
+    <span style="color:var(--accent-dim);">//</span>
+    <span>See discipline streaks &rarr; <strong style="color:var(--accent);">Accountability</strong></span>
+  </a>
 </div>
 
 <!-- N=1 disclaimer -->
@@ -468,6 +478,32 @@
 (function(){
   'use strict';
 
+  // ── Static metadata mappings (17b: origin, 17f: rationale, 17g: tier) ──
+  var ORIGIN_MAP = {
+    'sleep':       'Published literature (Walker, 2017; Huberman, 2021)',
+    'zone2':       'Published literature (Seiler 80/20 polarized model)',
+    'deficit':     'Published literature (MacroFactor adaptive TDEE)',
+    'cgm':         'Personal conviction \u2014 glucose anxiety \u2192 data as resolution',
+    'if':          'N=1 experiment (Week 3 \u2014 proved out)',
+    'supplements': 'Composite \u2014 individual supplements evidence-rated'
+  };
+  var RATIONALE_MAP = {
+    'sleep':       'Optimizes slow-wave sleep for HGH release, memory consolidation, and metabolic recovery',
+    'zone2':       'Builds mitochondrial density and fat oxidation capacity below VT1',
+    'deficit':     'Sustained moderate deficit (~500 kcal) preserves lean mass during weight loss',
+    'cgm':         'Continuous glucose data reveals individual meal responses invisible to standard blood panels',
+    'if':          '16:8 window aligns eating with circadian rhythm and extends overnight fat oxidation',
+    'supplements': 'Evidence-rated inputs supporting sleep, recovery, deficit protection, and longevity'
+  };
+  var TIER_MAP = {
+    'sleep':       { label: 'FOUNDATION',   cls: 'tier-foundation' },
+    'zone2':       { label: 'FOUNDATION',   cls: 'tier-foundation' },
+    'deficit':     { label: 'INTERVENTION',  cls: 'tier-intervention' },
+    'cgm':         { label: 'MEASUREMENT',   cls: 'tier-measurement' },
+    'if':          { label: 'INTERVENTION',  cls: 'tier-intervention' },
+    'supplements': { label: 'SUPPORTING',    cls: 'tier-supporting' }
+  };
+
   // ── Render protocol cards from API ──
   function renderCard(p) {
     var statusCls = p.status === 'active' ? 'active' : p.status === 'testing' ? 'testing' : 'paused';
@@ -477,7 +513,12 @@
 
     var html = '<div class="proto-card reveal is-visible" id="card-' + p.slug + '" data-tags="' + (p.experiment_tags || []).join(',') + '">';
     // Header
+    var tier = TIER_MAP[p.slug];
     html += '<div class="proto-card__header">';
+    if (tier) {
+      html += '<span class="proto-tier-badge ' + tier.cls + '">' + tier.label + '</span>';
+      html += '<span class="proto-card__sep">&middot;</span>';
+    }
     html += '<span class="proto-card__category">' + p.category + '</span>';
     html += '<span class="proto-card__sep">&middot;</span>';
     html += '<a href="/character/" class="proto-card__pillar-link">' + p.pillar_link + ' &rarr;</a>';
@@ -491,6 +532,12 @@
     html += '<div class="proto-detail"><span class="proto-detail__label">Key metrics</span><span class="proto-detail__value">' + (p.key_metrics || []).join(', ') + '</span></div>';
     if (p.key_finding) {
       html += '<div class="proto-detail"><span class="proto-detail__label">Key finding</span><span class="proto-detail__value">' + p.key_finding + '</span></div>';
+    }
+    if (ORIGIN_MAP[p.slug]) {
+      html += '<div class="proto-detail"><span class="proto-detail__label">Origin</span><span class="proto-detail__value">' + ORIGIN_MAP[p.slug] + '</span></div>';
+    }
+    if (RATIONALE_MAP[p.slug]) {
+      html += '<div class="proto-detail"><span class="proto-detail__label">Mechanism</span><span class="proto-detail__value">' + RATIONALE_MAP[p.slug] + '</span></div>';
     }
     // Stats
     html += '<div class="proto-stats">';
@@ -524,7 +571,14 @@
         body.innerHTML = '<div style="padding:var(--space-12) 0;text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">// no protocols found</div>';
         return;
       }
-      body.innerHTML = protocols.map(renderCard).join('');
+      var pullQuote = '<div style="max-width:var(--max-width);margin:var(--space-6) auto;padding:var(--space-6) var(--page-padding);border-left:3px solid var(--accent);font-family:var(--font-display);font-size:var(--text-lg);color:var(--text-muted);line-height:var(--lh-body);font-style:italic;">&ldquo;The protocols aren&rsquo;t the interesting part. The interesting part is whether they survive contact with real data.&rdquo;</div>';
+      var cards = protocols.map(renderCard);
+      if (cards.length > 3) {
+        cards.splice(3, 0, pullQuote);
+      } else {
+        cards.push(pullQuote);
+      }
+      body.innerHTML = cards.join('');
       // After cards rendered, load adherence + experiment badges
       loadAdherence(protocols);
       loadExperimentBadges(protocols);

@@ -336,7 +336,22 @@
     .lib-tile--completed { opacity: 0.85; }
     .lib-tile--failed { opacity: 0.6; }
 
-    .lib-tile__top { display: flex; justify-content: space-between; align-items: start; }
+    /* Evidence tier left-border accents */
+    .lib-tile--tier-strong { border-left: 3px solid var(--accent); }
+    .lib-tile--tier-moderate { border-left: 3px solid var(--c-amber-500); }
+    .lib-tile--tier-emerging { border-left: 3px solid var(--text-faint); }
+
+    /* Pillar icon anchor */
+    .lib-tile__pillar-icon {
+      font-size: 20px;
+      line-height: 1;
+      flex-shrink: 0;
+      width: 28px;
+      text-align: center;
+    }
+
+    .lib-tile__top { display: flex; justify-content: space-between; align-items: start; gap: var(--space-3); }
+    .lib-tile__top-left { display: flex; align-items: start; gap: var(--space-3); min-width: 0; }
     .lib-tile__name {
       font-family: var(--font-display);
       font-size: 16px;
@@ -357,6 +372,19 @@
       color: var(--text-muted);
       line-height: var(--lh-mono);
     }
+    .lib-tile__source {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+    }
+    .lib-tile__learn {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--accent-dim);
+      line-height: var(--lh-mono);
+    }
+    .lib-tile__learn em { color: var(--accent); font-style: normal; }
     .lib-tile__meta {
       display: flex; gap: var(--space-3); flex-wrap: wrap;
       font-family: var(--font-mono);
@@ -371,6 +399,45 @@
       padding-top: var(--space-3);
       border-top: 1px solid var(--border);
     }
+
+    /* Click-to-expand tile */
+    .lib-tile { cursor: pointer; }
+    .lib-tile__expanded {
+      display: none;
+      flex-direction: column;
+      gap: var(--space-3);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--border);
+    }
+    .lib-tile.expanded .lib-tile__expanded { display: flex; }
+    .lib-tile.expanded { border-color: var(--accent-dim); }
+    .lib-tile__expand-field {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: var(--space-3);
+    }
+    .lib-tile__expand-label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      padding-top: 2px;
+    }
+    .lib-tile__expand-value {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-mono);
+    }
+    .lib-tile__share-link {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      text-decoration: none;
+      border-bottom: 1px solid var(--border);
+    }
+    .lib-tile__share-link:hover { color: var(--accent-dim); border-color: var(--accent-dim); }
     .lib-status {
       display: inline-flex; align-items: center; gap: var(--space-2);
       padding: var(--space-1) var(--space-3);
@@ -664,6 +731,7 @@
       .mc-card__top { grid-template-columns: 1fr; }
       .progress-ring { margin: 0 auto var(--space-4); }
       .pillar-grid { grid-template-columns: 1fr; }
+      #start-here-picks { grid-template-columns: 1fr !important; }
     }
   </style>
 </head>
@@ -671,15 +739,15 @@
 
 <div id="amj-nav"></div>
 
-<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">Method</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Experiments</span></nav>
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><a href="/stack/" class="breadcrumb__section">The Practice</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Experiments</span></nav>
 
 <div id="amj-hierarchy-nav"></div>
 
 <!-- Page Header -->
 <div class="page-header animate-in">
-  <div class="page-header__kicker">The Science</div>
+  <div class="page-header__kicker">The Practice</div>
   <h1 class="page-header__title"><span>Experiments</span></h1>
-  <p class="page-header__sub">52 evidence-based experiments across 7 pillars. Vote on what I test next. Every result published — including the failures.</p>
+  <p class="page-header__sub">Why am I experimenting on myself? Because population studies tell you what works for the average person. With 19 dense data sources tracking one person continuously, N=1 experiments reveal what works for <em>this</em> body. 52 experiments across 7 pillars. Vote on what I test next. Every result published &mdash; including the failures.</p>
   <div class="page-header__meta">
     <div class="meta-stat">
       <div class="meta-stat__label">In the library</div>
@@ -719,12 +787,41 @@
   </div>
 </div>
 
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-4) var(--page-padding);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);border-bottom:1px solid var(--border);">
+  Experiments that prove out become <a href="/protocols/" style="color:var(--accent);text-decoration:none;">Protocols</a>. Failed experiments are published in full in <a href="/discoveries/" style="color:var(--accent);text-decoration:none;">Discoveries</a>.
+</div>
+
 <!-- Zone 1: Mission Control -->
 <div class="mission-control" id="mission-control">
   <div class="zone-heading">// currently running</div>
   <div class="mc-grid" id="mc-grid">
     <div class="mc-empty"><div class="mc-empty__title">Loading…</div></div>
   </div>
+</div>
+
+<!-- 19i: Launch roadmap -->
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-6) var(--page-padding);border-bottom:1px solid var(--border);">
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-4);">// Launch roadmap</div>
+  <div style="display:flex;gap:var(--space-6);flex-wrap:wrap;">
+    <div style="border:1px solid var(--border);padding:var(--space-4);flex:1;min-width:150px;">
+      <div style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--accent);">Week 1</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);margin-top:var(--space-1);">First experiment launches. Top-voted from library.</div>
+    </div>
+    <div style="border:1px solid var(--border);padding:var(--space-4);flex:1;min-width:150px;">
+      <div style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--text-muted);">Week 2-3</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);margin-top:var(--space-1);">Second batch launches. Results from Week 1 published.</div>
+    </div>
+    <div style="border:1px solid var(--border);padding:var(--space-4);flex:1;min-width:150px;">
+      <div style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--text-muted);">Month 2+</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);margin-top:var(--space-1);">First graduations to Protocol. Community experiment suggestions open.</div>
+    </div>
+  </div>
+</div>
+
+<!-- 19g: Start here — recommended experiments -->
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-6) var(--page-padding);border-bottom:1px solid var(--border);">
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent);margin-bottom:var(--space-4);">// Start here — 3 recommended experiments</div>
+  <div id="start-here-picks" style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4);"></div>
 </div>
 
 <!-- Zone 2: The Library -->
@@ -740,6 +837,25 @@
   </div>
   <div id="library-grid">
     <div class="empty-state"><div class="empty-state__title">Loading library…</div></div>
+  </div>
+</div>
+
+<!-- How the library grows -->
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border);">
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-4);">// How the library grows</div>
+  <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body);max-width:560px;margin-bottom:var(--space-6);">
+    AI monitors journals and podcasts for testable claims. The Board reviews each for safety and testability before it enters the library. Every experiment traces back to a source.
+  </p>
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-3);">Monitored sources</div>
+  <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);">
+    <span style="padding:var(--space-1) var(--space-3);border:1px solid var(--border);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);">PubMed Alerts</span>
+    <span style="padding:var(--space-1) var(--space-3);border:1px solid var(--border);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);">Huberman Lab</span>
+    <span style="padding:var(--space-1) var(--space-3);border:1px solid var(--border);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);">The Drive (Attia)</span>
+    <span style="padding:var(--space-1) var(--space-3);border:1px solid var(--border);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);">Examine.com</span>
+    <span style="padding:var(--space-1) var(--space-3);border:1px solid var(--border);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);">ISSN Position Stands</span>
+    <span style="padding:var(--space-1) var(--space-3);border:1px solid var(--border);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);">Cochrane Reviews</span>
+    <span style="padding:var(--space-1) var(--space-3);border:1px solid var(--border);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);">FoundMyFitness</span>
+    <span style="padding:var(--space-1) var(--space-3);border:1px solid var(--border);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);">Barbell Medicine</span>
   </div>
 </div>
 
@@ -771,8 +887,8 @@
   </div>
   <div id="record-list">
     <div class="empty-state">
-      <div class="empty-state__title">No completed experiments yet</div>
-      <div class="empty-state__sub">Results will appear here once the first experiment completes.</div>
+      <div class="empty-state__title">No results yet</div>
+      <div class="empty-state__sub">Every experiment — including the failures — will be published here in full. First results expected by mid-April.</div>
     </div>
   </div>
 </div>
@@ -807,7 +923,7 @@
   function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
   var API = 'https://averagejoematt.com/api';
-  var PILLAR_ICONS = {sleep:'☾',movement:'◎',nutrition:'⚘',supplements:'⬡',mental:'◈',social:'◇',discipline:'▣'};
+  var PILLAR_ICONS = {sleep:'☾',movement:'◎',nutrition:'⚘',supplements:'⬡',mental:'◈',social:'◇',discipline:'☰',body:'◈',recovery:'♡',mind:'◇'};
   var EVIDENCE_DOTS = {strong:'●●●',moderate:'●●',emerging:'●'};
   var EVIDENCE_LABEL = {strong:'Strong',moderate:'Moderate',emerging:'Emerging'};
   var votedSet = {};
@@ -829,7 +945,7 @@
     var active = experiments.filter(function(e) { return e.status === 'active'; });
     var grid = document.getElementById('mc-grid');
     if (!active.length) {
-      grid.innerHTML = '<div class="mc-empty"><div class="mc-empty__title">Experiments begin on Day 1</div><div class="mc-empty__sub">N=1 experiments launch after April 1, 2026. Each tests one variable at a time with a minimum 14-day window. Vote below to pick what I test first.</div></div>';
+      grid.innerHTML = '<div class="mc-empty"><div class="mc-empty__title">The lab opens April 1</div><div class="mc-empty__sub">The first experiments launch the week of April 1. Each tests one variable with a minimum 14-day window and dense data from 19 sources. Vote below to decide what runs first.</div></div>';
       return;
     }
     grid.innerHTML = active.map(function(exp) {
@@ -922,22 +1038,40 @@
 
         var evidDots = EVIDENCE_DOTS[exp.evidence_tier] || '●';
         var evidLabel = EVIDENCE_LABEL[exp.evidence_tier] || exp.evidence_tier;
-        var tileClass = 'lib-tile lib-tile--' + statusClass;
+        var tierClass = exp.evidence_tier ? ' lib-tile--tier-' + exp.evidence_tier : '';
+        var tileClass = 'lib-tile lib-tile--' + statusClass + tierClass;
         var isVoted = votedSet[exp.id];
+        var pillarIcon = PILLAR_ICONS[pillar.id] || '◆';
 
-        html += '<div class="' + tileClass + '">';
+        html += '<div class="' + tileClass + '" data-tile-id="' + exp.id + '" onclick="handleTileExpand(this, event)">';
+
+        // Collapsed state: pillar icon, title, evidence tier, one-line desc, vote count
         html += '<div class="lib-tile__top">';
+        html += '<div class="lib-tile__top-left">';
+        html += '<div class="lib-tile__pillar-icon">' + pillarIcon + '</div>';
         html += '<div class="lib-tile__name">' + esc(exp.name) + '</div>';
+        html += '</div>';
         html += '<div class="lib-tile__evidence">' + evidDots + ' ' + esc(evidLabel) + '</div>';
         html += '</div>';
         html += '<div class="lib-tile__desc">' + esc(exp.description) + '</div>';
-        if (exp.source_type === 'podcast') {
-          html += '<div class="lib-tile__podcast" style="font-family:var(--font-mono);font-size:10px;color:var(--accent-dim);margin-top:var(--space-1)">' +
-            '\uD83C\uDFA4 ' + esc(exp.source_podcast) +
-            (exp.source_speaker ? ' \u00B7 ' + esc(exp.source_speaker) : '') +
-            (exp.source_episode ? ' \u00B7 <em>' + esc(exp.source_episode) + '</em>' : '') +
-          '</div>';
+
+        // P-4: Graduated badge — if experiment became a protocol
+        if (exp.graduated_to) {
+          html += '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:#2EA98F;border:1px solid rgba(46,169,143,0.3);background:rgba(46,169,143,0.06);padding:2px var(--space-3);display:inline-flex;align-items:center;gap:var(--space-2);">\u2192 Graduated to Protocol: ' + esc(exp.graduated_to) + '</div>';
         }
+
+        // Source provenance
+        if (exp.source) {
+          html += '<div class="lib-tile__source">Source: ' + esc(exp.source) + '</div>';
+        } else if (exp.source_type === 'podcast' && exp.source_podcast) {
+          html += '<div class="lib-tile__source">Source: ' + esc(exp.source_podcast) + '</div>';
+        }
+
+        // "What we'd learn" line
+        if (exp.hypothesis) {
+          html += '<div class="lib-tile__learn"><em>What we\'d learn:</em> ' + esc(exp.hypothesis) + '</div>';
+        }
+
         html += '<div class="lib-tile__meta">';
         html += '<span>' + exp.suggested_duration_days + ' days</span>';
         html += '<span>' + esc(exp.difficulty || 'medium') + '</span>';
@@ -946,13 +1080,54 @@
         html += '<div class="lib-tile__bottom">';
         html += '<span class="lib-status lib-status--' + statusClass + '"><span class="lib-status__dot"></span>' + statusLabel + '</span>';
         html += '<span style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">';
-        html += '<a href="/experiments/detail/?id=' + exp.id + '" class="vote-btn" style="text-decoration:none">Details</a>';
-        html += '<button class="follow-btn" data-follow-id="' + exp.id + '" onclick="handleFollow(this)">✉ Follow</button>';
         html += '<button class="vote-btn' + (isVoted ? ' voted' : '') + '" data-lib-id="' + exp.id + '" onclick="handleVote(this)">';
         html += '<span class="vote-btn__arrow">▲</span> ' + (exp.votes || 0);
         html += '</button>';
         html += '</span>';
         html += '</div>';
+
+        // Expanded state (hidden by default, shown on click)
+        html += '<div class="lib-tile__expanded">';
+        if (exp.hypothesis) {
+          html += '<div class="lib-tile__expand-field"><div class="lib-tile__expand-label">Hypothesis</div><div class="lib-tile__expand-value">' + esc(exp.hypothesis) + '</div></div>';
+        }
+        if (exp.mechanism) {
+          html += '<div class="lib-tile__expand-field"><div class="lib-tile__expand-label">Mechanism</div><div class="lib-tile__expand-value">' + esc(exp.mechanism) + '</div></div>';
+        }
+        if (exp.source || (exp.source_type === 'podcast' && exp.source_podcast)) {
+          var sourceDetail = exp.source || '';
+          if (exp.source_type === 'podcast') {
+            sourceDetail = exp.source_podcast || '';
+            if (exp.source_speaker) sourceDetail += ' \u00B7 ' + exp.source_speaker;
+            if (exp.source_episode) sourceDetail += ' \u00B7 ' + exp.source_episode;
+          }
+          html += '<div class="lib-tile__expand-field"><div class="lib-tile__expand-label">Source</div><div class="lib-tile__expand-value">' + esc(sourceDetail) + '</div></div>';
+        }
+        if (exp.metrics_tracked && exp.metrics_tracked.length) {
+          html += '<div class="lib-tile__expand-field"><div class="lib-tile__expand-label">Metrics</div><div class="lib-tile__expand-value">' + exp.metrics_tracked.map(function(m) { return esc(m); }).join(', ') + '</div></div>';
+        }
+        if (exp.hypothesis) {
+          html += '<div class="lib-tile__expand-field"><div class="lib-tile__expand-label">We\'d learn</div><div class="lib-tile__expand-value" style="color:var(--accent-dim)">' + esc(exp.hypothesis) + '</div></div>';
+        }
+        // 19e: "If successful, this becomes:" field
+        var successOutcome = exp.success_becomes || (function() {
+          var pillarMap = {sleep:'New Protocol',movement:'New Protocol',nutrition:'New Protocol',supplements:'Supplement addition',mental:'New Habit',social:'New Habit',discipline:'New Habit',body:'Stack change',recovery:'New Protocol',mind:'New Habit'};
+          return pillarMap[pillar.id] || 'New Protocol';
+        })();
+        html += '<div class="lib-tile__expand-field"><div class="lib-tile__expand-label">If successful</div><div class="lib-tile__expand-value" style="color:var(--accent-dim)">' + esc(successOutcome) + '</div></div>';
+        // P-4: Graduated badge in expanded state
+        if (exp.graduated_to) {
+          html += '<div class="lib-tile__expand-field"><div class="lib-tile__expand-label">Graduated</div><div class="lib-tile__expand-value" style="color:#2EA98F">\u2192 Now a Protocol: ' + esc(exp.graduated_to) + '</div></div>';
+        }
+        html += '<div style="display:flex;gap:var(--space-3);align-items:center;padding-top:var(--space-2)">';
+        html += '<button class="vote-btn' + (isVoted ? ' voted' : '') + '" data-lib-id="' + exp.id + '" onclick="handleVote(this)">';
+        html += '<span class="vote-btn__arrow">▲</span> Vote · ' + (exp.votes || 0);
+        html += '</button>';
+        html += '<button class="follow-btn" data-follow-id="' + exp.id + '" onclick="handleFollow(this)">✉ Follow</button>';
+        html += '<a href="/experiments/detail/?id=' + exp.id + '" class="lib-tile__share-link" onclick="event.stopPropagation()">Share link →</a>';
+        html += '</div>';
+        html += '</div>';
+
         html += '</div>';
       });
 
@@ -1002,6 +1177,17 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ library_id: libId, email: email })
     }).catch(function() {});
+  };
+
+  // Tile expand/collapse handler
+  window.handleTileExpand = function(tile, event) {
+    // Don't toggle if clicking a button, link, or interactive element
+    var target = event.target;
+    while (target && target !== tile) {
+      if (target.tagName === 'BUTTON' || target.tagName === 'A' || target.tagName === 'SELECT') return;
+      target = target.parentElement;
+    }
+    tile.classList.toggle('expanded');
   };
 
   // ── Zone 3: The Record ──
@@ -1136,6 +1322,33 @@
       document.getElementById('stat-library').textContent = data.total_experiments || 52;
       document.getElementById('stat-votes').textContent = data.total_votes || 0;
       renderLibrary();
+
+      // 19g: Populate "Start here" picks — top 3 by votes across all pillars
+      var allExps = [];
+      (data.pillars || []).forEach(function(p) {
+        (p.experiments || []).forEach(function(e) { e._pillarId = p.id; allExps.push(e); });
+      });
+      allExps.sort(function(a, b) { return (b.votes || 0) - (a.votes || 0); });
+      var picks = allExps.slice(0, 3);
+      var picksHtml = picks.map(function(exp) {
+        var icon = PILLAR_ICONS[exp._pillarId] || '\u25C6';
+        var evidDots = EVIDENCE_DOTS[exp.evidence_tier] || '\u25CF';
+        var evidLabel = EVIDENCE_LABEL[exp.evidence_tier] || exp.evidence_tier || '';
+        return '<div style="border:1px solid var(--accent-dim);background:var(--surface);padding:var(--space-5);display:flex;flex-direction:column;gap:var(--space-2);">' +
+          '<div style="display:flex;align-items:center;gap:var(--space-2);">' +
+            '<span style="font-size:16px;">' + icon + '</span>' +
+            '<span style="font-family:var(--font-display);font-size:16px;color:var(--text);letter-spacing:var(--ls-display);">' + esc(exp.name) + '</span>' +
+          '</div>' +
+          '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-mono);">' + esc(exp.description || '') + '</div>' +
+          '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);display:flex;gap:var(--space-3);">' +
+            '<span>' + evidDots + ' ' + esc(evidLabel) + '</span>' +
+            '<span>' + (exp.suggested_duration_days || '?') + ' days</span>' +
+            '<span>\u25B2 ' + (exp.votes || 0) + ' votes</span>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+      var picksEl = document.getElementById('start-here-picks');
+      if (picksEl && picks.length) picksEl.innerHTML = picksHtml;
     })
     .catch(function() {
       document.getElementById('library-grid').innerHTML = '<div class="empty-state"><div class="empty-state__title">Could not load library</div></div>';

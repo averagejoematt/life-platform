@@ -105,12 +105,17 @@
 <body>
 
 <div id="amj-nav"></div>
-</div>
+
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><a href="/chronicle/" class="breadcrumb__section">The Chronicle</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Weekly Snapshots</span></nav>
 
 <div class="snap-header animate-in">
-  <div class="snap-header__kicker">The Data</div>
+  <div class="snap-header__kicker">The Chronicle</div>
   <h1 class="snap-header__title">Weekly <span>Snapshots</span></h1>
   <p class="snap-header__sub">Walk the entire journey, one week at a time. The empty weeks tell the story as much as the full ones.</p>
+</div>
+
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-3) var(--page-padding);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);border-bottom:1px solid var(--border);">
+  The data companion to <a href="/chronicle/" style="color:var(--accent);text-decoration:none;">The Chronicle</a>. Same week, different lens. &middot; <a href="/subscribe/" style="color:var(--accent);text-decoration:none;">Get both weekly</a>
 </div>
 
 <div class="week-nav" id="week-nav">
@@ -128,6 +133,13 @@
 
   <!-- 7-day heatmap strip -->
   <div class="heat-strip" id="heat-strip" style="display:none"></div>
+
+  <div id="heat-legend" style="max-width:var(--max-width);margin:0 auto;padding:0 var(--page-padding) var(--space-4);display:flex;gap:var(--space-4);font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);">
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--accent);vertical-align:middle;margin-right:3px;"></span> All core habits</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--c-yellow-status);vertical-align:middle;margin-right:3px;"></span> Partial</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--c-red-status);vertical-align:middle;margin-right:3px;"></span> Missed / poor recovery</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--surface-raised);vertical-align:middle;margin-right:3px;"></span> No data</span>
+  </div>
 
   <!-- Pillar scores -->
   <div class="snap-section" id="pillars-section" style="display:none">
@@ -148,6 +160,16 @@
   <div class="snap-section" id="events-section" style="display:none">
     <div class="snap-section__header"><div class="snap-section__title">Notable Events</div></div>
     <div class="snap-section__body" id="events-body"></div>
+  </div>
+
+  <!-- Rest / Sick Days -->
+  <div class="snap-section" id="sick-days-section" style="display:none">
+    <div class="snap-section__header">
+      <div class="snap-section__title">Rest / Sick Days</div>
+    </div>
+    <div class="snap-section__body" id="sick-days-body">
+      <p>No sick or rest days this week.</p>
+    </div>
   </div>
 
   <!-- Empty week state -->
@@ -292,12 +314,36 @@
 
       if (weight || hrv || sleep || recovery) hasData = true;
 
+      // Compute week-over-week deltas from snapshot averages if available
+      var prevWeight = (snap && snap.vitals && snap.vitals.prev_weight_lbs) ? snap.vitals.prev_weight_lbs : null;
+      var prevHrv = (snap && snap.vitals && snap.vitals.prev_hrv_ms) ? snap.vitals.prev_hrv_ms : null;
+      var prevSleep = (snap && snap.vitals && snap.vitals.prev_sleep_hours) ? snap.vitals.prev_sleep_hours : null;
+      var prevRecovery = (snap && snap.vitals && snap.vitals.prev_recovery_pct) ? snap.vitals.prev_recovery_pct : null;
+
+      function deltaHtml(current, previous, unit, decimals, invertColor) {
+        if (current == null) return '<div class="key-num__delta neutral">\u2014</div>';
+        if (previous == null) return '<div class="key-num__delta neutral">no prior week</div>';
+        var diff = current - previous;
+        var sign = diff > 0 ? '+' : '';
+        var formatted = sign + diff.toFixed(decimals) + (unit || '');
+        // invertColor: true means lower is better (e.g. weight)
+        var cls = 'neutral';
+        if (Math.abs(diff) > 0.01) {
+          if (invertColor) {
+            cls = diff < 0 ? 'up' : 'down';
+          } else {
+            cls = diff > 0 ? 'up' : 'down';
+          }
+        }
+        return '<div class="key-num__delta ' + cls + '">' + formatted + ' vs last week</div>';
+      }
+
       if (hasData) {
         keyNums.innerHTML =
-          '<div class="key-num"><div class="key-num__value accent">' + (weight ? weight.toFixed(1) : '\u2014') + '</div><div class="key-num__label">Weight (lbs)</div></div>' +
-          '<div class="key-num"><div class="key-num__value">' + (hrv ? hrv.toFixed(0) : '\u2014') + '</div><div class="key-num__label">HRV (ms)</div></div>' +
-          '<div class="key-num"><div class="key-num__value">' + (sleep ? sleep.toFixed(1) : '\u2014') + '</div><div class="key-num__label">Sleep (hrs)</div></div>' +
-          '<div class="key-num"><div class="key-num__value">' + (recovery ? recovery.toFixed(0) + '%' : '\u2014') + '</div><div class="key-num__label">Recovery</div></div>';
+          '<div class="key-num"><div class="key-num__value accent">' + (weight ? weight.toFixed(1) : '\u2014') + '</div>' + deltaHtml(weight, prevWeight, ' lbs', 1, true) + '<div class="key-num__label">Avg Weight (lbs)</div></div>' +
+          '<div class="key-num"><div class="key-num__value">' + (hrv ? hrv.toFixed(0) : '\u2014') + '</div>' + deltaHtml(hrv, prevHrv, ' ms', 0, false) + '<div class="key-num__label">Avg HRV (ms)</div></div>' +
+          '<div class="key-num"><div class="key-num__value">' + (sleep ? sleep.toFixed(1) : '\u2014') + '</div>' + deltaHtml(sleep, prevSleep, ' hrs', 1, false) + '<div class="key-num__label">Avg Sleep (hrs)</div></div>' +
+          '<div class="key-num"><div class="key-num__value">' + (recovery ? recovery.toFixed(0) + '%' : '\u2014') + '</div>' + deltaHtml(recovery, prevRecovery, '%', 0, false) + '<div class="key-num__label">Avg Recovery</div></div>';
         keyNums.style.display = '';
       } else {
         keyNums.style.display = 'none';
@@ -339,9 +385,9 @@
       if (hasData && weight) {
         var progressPct = journey.progress_pct ? journey.progress_pct.toFixed(1) : '?';
         var weeklyRate = journey.weekly_rate_lbs ? journey.weekly_rate_lbs.toFixed(1) : '?';
-        var summaryText = '<p><strong>Weight:</strong> ' + (weight ? weight.toFixed(1) + ' lbs' : 'No reading') +
+        var summaryText = '<p><strong>Average weight:</strong> ' + (weight ? weight.toFixed(1) + ' lbs' : 'No reading') +
           ' (' + progressPct + '% to goal). Weekly rate: ' + weeklyRate + ' lbs/week.</p>';
-        if (hrv) summaryText += '<p><strong>Recovery:</strong> HRV ' + hrv.toFixed(0) + 'ms, recovery ' + (recovery||0).toFixed(0) + '%, sleep ' + (sleep||0).toFixed(1) + 'h.</p>';
+        if (hrv) summaryText += '<p><strong>Weekly recovery avg:</strong> HRV ' + hrv.toFixed(0) + 'ms, recovery ' + (recovery||0).toFixed(0) + '%, average sleep ' + (sleep||0).toFixed(1) + 'h.</p>';
         if (charData.level) summaryText += '<p><strong>Character:</strong> Level ' + Math.floor(charData.level) + ' (' + (charData.tier||'Foundation') + ').</p>';
         document.getElementById('summary-body').innerHTML = summaryText;
         summarySection.style.display = '';
@@ -351,6 +397,37 @@
 
       // Events section (placeholder)
       document.getElementById('events-section').style.display = 'none';
+
+      // Rest / Sick Days section
+      var sickSection = document.getElementById('sick-days-section');
+      var sickBody = document.getElementById('sick-days-body');
+      var sickDays = (snap && snap.sick_days) ? snap.sick_days : [];
+      // Also check for rest_days key as alternative
+      if (!sickDays.length && snap && snap.rest_days) sickDays = snap.rest_days;
+      // Check within waveform data for sick/rest markers
+      if (!sickDays.length && wave && wave.days) {
+        wave.days.filter(function(d) {
+          return d.date >= startStr && d.date <= endStr && (d.tag === 'sick' || d.tag === 'rest');
+        }).forEach(function(d) {
+          sickDays.push({ date: d.date, type: d.tag || 'rest', note: d.note || '' });
+        });
+      }
+      if (sickDays.length > 0) {
+        hasData = true;
+        var sickHtml = sickDays.map(function(d) {
+          var typeLabel = (d.type === 'sick') ? 'Sick day' : 'Rest day';
+          var note = d.note ? ' \u2014 ' + d.note : '';
+          return '<p><strong>' + d.date + ':</strong> ' + typeLabel + note + '</p>';
+        }).join('');
+        sickBody.innerHTML = sickHtml;
+        sickSection.style.display = '';
+      } else if (hasData) {
+        // Show section with "none" message when there IS data for the week
+        sickBody.innerHTML = '<p>No sick or rest days this week.</p>';
+        sickSection.style.display = '';
+      } else {
+        sickSection.style.display = 'none';
+      }
 
       // Empty week
       document.getElementById('empty-week').style.display = hasData ? 'none' : '';
