@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="74 biomarkers tracked across 7 blood draws — lipids, metabolic, thyroid, hormones, inflammation, and more. Real lab results, not reference ranges.">
+  <meta property="og:title" content="Labs — Matthew">
+  <meta property="og:description" content="Bloodwork data: 74 biomarkers, 7 draws, 9 flagged values. Tracked honestly.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/labs/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>Labs — averagejoematt.com</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    :root {
+      --lb-accent: #06b6d4;
+      --lb-accent-dim: rgba(6,182,212,0.15);
+      --lb-accent-glow: rgba(6,182,212,0.06);
+      --lb-green: #3ecf8e;
+      --lb-amber: #f59e0b;
+      --lb-red: #ef4444;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Hero ── */
+    .lb-hero {
+      padding: var(--space-16) var(--page-padding) var(--space-10);
+      position: relative;
+      overflow: hidden;
+      max-width: var(--max-width);
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+    .lb-hero__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--lb-accent);
+      margin-bottom: var(--space-4);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.1s forwards;
+    }
+    .lb-hero__eyebrow::before {
+      content: '';
+      width: 32px;
+      height: 1px;
+      background: var(--lb-accent);
+    }
+    .lb-hero__title {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 5vw, 52px);
+      color: var(--text);
+      line-height: 1.05;
+      max-width: 640px;
+      margin-bottom: var(--space-6);
+      opacity: 0;
+      animation: fadeUp 0.6s 0.2s forwards;
+    }
+    .lb-hero__title em {
+      font-style: normal;
+      color: var(--lb-accent);
+    }
+    .lb-hero__sub {
+      font-family: var(--font-serif, Georgia, serif);
+      font-size: var(--text-lg);
+      color: var(--text-muted);
+      max-width: 580px;
+      line-height: 1.8;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.3s forwards;
+      margin-bottom: var(--space-6);
+    }
+
+    /* ── Hero stats row ── */
+    .lb-hero-stats {
+      display: flex;
+      gap: var(--space-6);
+      flex-wrap: wrap;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.4s forwards;
+    }
+    .lb-hero-stat {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+    }
+    .lb-hero-stat strong {
+      color: var(--text);
+      font-weight: 400;
+    }
+    .lb-hero-stat .sep { color: var(--border); margin: 0 var(--space-2); }
+
+    /* ── Section header ── */
+    .lb-section-header {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .lb-section-header::after {
+      content: '\2014\2014';
+      color: var(--text-faint);
+      opacity: 0.4;
+      flex-shrink: 0;
+    }
+
+    /* ── Summary cards ── */
+    .lb-summary {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .lb-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+    .lb-summary-card {
+      background: var(--surface);
+      padding: var(--space-6) var(--space-5);
+      text-align: center;
+    }
+    .lb-summary-card__value {
+      font-family: var(--font-display);
+      font-size: clamp(28px, 3vw, 36px);
+      line-height: 1;
+      margin-bottom: var(--space-2);
+    }
+    .lb-summary-card__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    /* ── Category accordion ── */
+    .lb-categories {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+    }
+    .lb-category {
+      border: 1px solid var(--border);
+      margin-bottom: var(--space-3);
+      background: var(--surface);
+    }
+    .lb-category__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-4) var(--space-5);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .lb-category__header:hover { background: rgba(255,255,255,0.02); }
+    .lb-category__name {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text);
+    }
+    .lb-category__meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+    .lb-category__count {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+    }
+    .lb-category__flag-count {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--lb-amber);
+    }
+    .lb-category__chevron {
+      color: var(--text-faint);
+      font-size: 12px;
+      transition: transform 0.2s;
+    }
+    .lb-category.open .lb-category__chevron { transform: rotate(90deg); }
+    .lb-category__body {
+      display: none;
+      border-top: 1px solid var(--border);
+    }
+    .lb-category.open .lb-category__body { display: block; }
+
+    /* ── Biomarker table ── */
+    .lb-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .lb-table th {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-align: left;
+      padding: var(--space-3) var(--space-5);
+      border-bottom: 1px solid var(--border);
+    }
+    .lb-table td {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      padding: var(--space-3) var(--space-5);
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      line-height: 1.5;
+    }
+    .lb-table tr:last-child td { border-bottom: none; }
+    .lb-table td:first-child { color: var(--text); }
+    .lb-table td.mono { font-family: var(--font-mono); font-size: var(--text-xs); }
+
+    /* ── Flag badges ── */
+    .lb-flag {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      display: inline-block;
+    }
+    .lb-flag--high { color: var(--lb-amber); background: rgba(245,158,11,0.12); }
+    .lb-flag--low { color: var(--lb-amber); background: rgba(245,158,11,0.12); }
+    .lb-flag--ok { color: var(--lb-green); }
+
+    /* ── Disclaimer ── */
+    .lb-disclaimer {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .lb-disclaimer__inner {
+      border-left: 3px solid var(--lb-accent);
+      padding: var(--space-5) var(--space-6);
+      background: var(--surface);
+    }
+    .lb-disclaimer__title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--lb-accent);
+      margin-bottom: var(--space-3);
+    }
+    .lb-disclaimer__body {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    /* ── Protocol link ── */
+    .lb-protocol-link {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      text-align: center;
+    }
+    .lb-protocol-link a {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--lb-accent);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-decoration: none;
+    }
+    .lb-protocol-link a:hover { text-decoration: underline; }
+
+    /* ── Loading ── */
+    .lb-loading {
+      text-align: center;
+      padding: var(--space-16);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .lb-summary-grid { grid-template-columns: repeat(2, 1fr); }
+      .lb-table { font-size: var(--text-xs); }
+      .lb-table th, .lb-table td { padding: var(--space-2) var(--space-3); }
+      .lb-hero-stats { gap: var(--space-3); }
+    }
+    @media (max-width: 480px) {
+      .lb-summary-grid { grid-template-columns: 1fr 1fr; }
+      .lb-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+
+<!-- Hero -->
+<section class="lb-hero">
+  <div class="lb-hero__eyebrow">Bloodwork Intelligence</div>
+  <h1 class="lb-hero__title">The <em>Labs</em></h1>
+  <p class="lb-hero__sub">
+    Bloodwork is the ground truth. Wearables estimate — labs measure. Every draw adds another data point to the longitudinal picture.
+  </p>
+  <div class="lb-hero-stats">
+    <span class="lb-hero-stat"><strong id="lb-biomarker-count">—</strong> biomarkers</span>
+    <span class="lb-hero-stat"><span class="sep">·</span> <strong id="lb-draw-count">—</strong> draws</span>
+    <span class="lb-hero-stat"><span class="sep">·</span> Last draw: <strong id="lb-last-draw">—</strong></span>
+    <span class="lb-hero-stat"><span class="sep">·</span> <strong id="lb-flagged-count">—</strong> flagged</span>
+    <span class="lb-hero-stat"><span class="sep">·</span> Lab: <strong id="lb-provider">—</strong></span>
+  </div>
+</section>
+
+<!-- Loading -->
+<div class="lb-loading" id="lb-loading">Loading lab data...</div>
+
+<!-- Content (hidden until data loads) -->
+<div id="lb-content" style="display:none">
+
+  <!-- Summary cards -->
+  <section class="lb-summary">
+    <div class="lb-section-header">Panel summary</div>
+    <div class="lb-summary-grid" id="lb-summary-grid"></div>
+  </section>
+
+  <!-- Categories -->
+  <section class="lb-categories">
+    <div class="lb-section-header">Biomarkers by category</div>
+    <div id="lb-categories"></div>
+  </section>
+
+  <!-- Disclaimer -->
+  <section class="lb-disclaimer">
+    <div class="lb-disclaimer__inner">
+      <div class="lb-disclaimer__title">Disclaimer</div>
+      <div class="lb-disclaimer__body">
+        These are personal lab results for tracking purposes only.
+        Reference ranges are standard laboratory ranges — not optimized targets.
+        Not medical advice. Consult a physician for interpretation.
+      </div>
+    </div>
+  </section>
+
+  <!-- Protocol link -->
+  <div class="lb-protocol-link">
+    <a href="/protocols/">See how I'm addressing flagged values &rarr;</a>
+  </div>
+
+</div>
+
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+<div id="amj-reading-path"></div>
+<div id="amj-footer"></div>
+
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+<script src="/assets/js/reveal.js"></script>
+<script>
+(async function() {
+  'use strict';
+
+  var loading = document.getElementById('lb-loading');
+  var content = document.getElementById('lb-content');
+
+  try {
+    var resp = await fetch('/api/labs');
+    if (!resp.ok) throw new Error(resp.status);
+    var data = await resp.json();
+    var labs = data.labs;
+    if (!labs || !labs.biomarkers || !labs.biomarkers.length) {
+      loading.textContent = 'No lab data available yet.';
+      return;
+    }
+
+    // Hero stats
+    document.getElementById('lb-biomarker-count').textContent = labs.biomarkers.length;
+    document.getElementById('lb-draw-count').textContent = labs.total_draws || '—';
+    document.getElementById('lb-last-draw').textContent = labs.latest_draw_date || '—';
+    document.getElementById('lb-flagged-count').textContent = labs.flagged_count || 0;
+    document.getElementById('lb-provider').textContent = labs.lab_provider || '—';
+
+    // Group by category
+    var categories = {};
+    var catOrder = [];
+    labs.biomarkers.forEach(function(b) {
+      var cat = b.category || 'Other';
+      if (!categories[cat]) {
+        categories[cat] = [];
+        catOrder.push(cat);
+      }
+      categories[cat].push(b);
+    });
+
+    // Summary cards
+    var flaggedH = labs.biomarkers.filter(function(b) { return b.flag === 'H'; }).length;
+    var flaggedL = labs.biomarkers.filter(function(b) { return b.flag === 'L'; }).length;
+    var normal = labs.biomarkers.length - flaggedH - flaggedL;
+
+    var summaryHtml = '';
+    summaryHtml += '<div class="lb-summary-card"><div class="lb-summary-card__value" style="color:var(--text)">' + labs.biomarkers.length + '</div><div class="lb-summary-card__label">Biomarkers</div></div>';
+    summaryHtml += '<div class="lb-summary-card"><div class="lb-summary-card__value" style="color:var(--lb-green)">' + normal + '</div><div class="lb-summary-card__label">In range</div></div>';
+    summaryHtml += '<div class="lb-summary-card"><div class="lb-summary-card__value" style="color:var(--lb-amber)">' + (flaggedH + flaggedL) + '</div><div class="lb-summary-card__label">Flagged</div></div>';
+    summaryHtml += '<div class="lb-summary-card"><div class="lb-summary-card__value" style="color:var(--lb-accent)">' + catOrder.length + '</div><div class="lb-summary-card__label">Categories</div></div>';
+    document.getElementById('lb-summary-grid').innerHTML = summaryHtml;
+
+    // Render categories
+    var catHtml = '';
+    catOrder.forEach(function(cat) {
+      var markers = categories[cat];
+      var catFlagged = markers.filter(function(b) { return b.flag === 'H' || b.flag === 'L'; }).length;
+      var openClass = catFlagged > 0 ? ' open' : '';
+
+      catHtml += '<div class="lb-category' + openClass + '">';
+      catHtml += '<div class="lb-category__header" onclick="this.parentElement.classList.toggle(\'open\')">';
+      catHtml += '<span class="lb-category__name">' + cat + '</span>';
+      catHtml += '<span class="lb-category__meta">';
+      if (catFlagged > 0) catHtml += '<span class="lb-category__flag-count">' + catFlagged + ' flagged</span>';
+      catHtml += '<span class="lb-category__count">' + markers.length + '</span>';
+      catHtml += '<span class="lb-category__chevron">&#9654;</span>';
+      catHtml += '</span></div>';
+
+      catHtml += '<div class="lb-category__body"><div class="lb-table-wrap"><table class="lb-table">';
+      catHtml += '<thead><tr><th>Biomarker</th><th>Value</th><th>Unit</th><th>Range</th><th>Status</th></tr></thead>';
+      catHtml += '<tbody>';
+      markers.forEach(function(b) {
+        var flagHtml = '';
+        if (b.flag === 'H') flagHtml = '<span class="lb-flag lb-flag--high">High</span>';
+        else if (b.flag === 'L') flagHtml = '<span class="lb-flag lb-flag--low">Low</span>';
+        else flagHtml = '<span class="lb-flag lb-flag--ok">&check;</span>';
+
+        var val = b.value != null ? b.value : '—';
+        catHtml += '<tr>';
+        catHtml += '<td>' + (b.name || '—') + '</td>';
+        catHtml += '<td class="mono">' + val + '</td>';
+        catHtml += '<td class="mono">' + (b.unit || '') + '</td>';
+        catHtml += '<td class="mono">' + (b.range || b.ref_text || '') + '</td>';
+        catHtml += '<td>' + flagHtml + '</td>';
+        catHtml += '</tr>';
+      });
+      catHtml += '</tbody></table></div></div></div>';
+    });
+    document.getElementById('lb-categories').innerHTML = catHtml;
+
+    loading.style.display = 'none';
+    content.style.display = 'block';
+  } catch (e) {
+    loading.textContent = 'Lab data temporarily unavailable.';
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>

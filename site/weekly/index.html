@@ -242,6 +242,15 @@
   }
 
   var weeks = allWeeks();
+  if (!weeks.length) {
+    var startD = new Date(JOURNEY_START + 'T12:00:00');
+    document.getElementById('week-label').textContent = 'Not yet started';
+    document.getElementById('week-dates').textContent = 'The journey begins ' + startD.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    document.getElementById('btn-prev').disabled = true;
+    document.getElementById('btn-next').disabled = true;
+    document.getElementById('empty-week').style.display = '';
+    return;
+  }
   var currentIdx = weeks.length - 1;
 
   // UI refs

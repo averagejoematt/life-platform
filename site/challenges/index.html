@@ -1241,7 +1241,7 @@
       .then(function(r) { return r.ok ? r.json() : Promise.reject('catalog'); })
       .then(function(data) {
         categories = data.categories || [];
-        allChallenges = data.challenges || [];
+        allChallenges = (data.challenges || []).filter(function(c) { return c.public !== false; });
         document.getElementById('stat-total').textContent = allChallenges.length;
         renderCatBar();
         renderTiles();
