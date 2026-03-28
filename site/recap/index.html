@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The Weekly Recap — vital signs, domain highlights, and platform observations from the past 7 days.">
+  <meta property="og:title" content="Weekly Recap — averagejoematt.com">
+  <meta property="og:description" content="One week of health data, distilled. Weight, HRV, sleep, training, nutrition — what moved and why.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/recap/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>Weekly Recap — averagejoematt.com</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    :root {
+      --rc-accent: var(--c-amber-500, #f59e0b);
+      --rc-accent-dim: rgba(245,158,11,0.15);
+    }
+
+    .rc-hero {
+      padding: var(--space-16) var(--page-padding) var(--space-10);
+      max-width: var(--max-width);
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+    .rc-hero__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--rc-accent);
+      margin-bottom: var(--space-4);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .rc-hero__eyebrow::before { content: ''; width: 32px; height: 1px; background: var(--rc-accent); }
+    .rc-hero__title {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 5vw, 52px);
+      color: var(--text);
+      line-height: 1.05;
+      max-width: 700px;
+      margin-bottom: var(--space-4);
+    }
+    .rc-hero__sub {
+      font-family: var(--font-serif, Georgia, serif);
+      font-size: var(--text-lg);
+      color: var(--text-muted);
+      max-width: 580px;
+      line-height: 1.8;
+      margin-bottom: var(--space-6);
+    }
+    .rc-hero__period {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      letter-spacing: 0.1em;
+    }
+
+    /* Section header */
+    .rc-section-header {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .rc-section-header::after { content: '\2014\2014'; color: var(--text-faint); opacity: 0.4; flex-shrink: 0; }
+
+    /* Vital signs delta grid */
+    .rc-deltas {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .rc-delta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+    }
+    .rc-delta-col {
+      padding: 0 var(--space-5);
+      text-align: center;
+    }
+    .rc-delta-col:not(:last-child) { border-right: 1px solid var(--border); }
+    .rc-delta-col:first-child { padding-left: 0; }
+    .rc-delta-col:last-child { padding-right: 0; }
+    .rc-delta__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-3);
+    }
+    .rc-delta__value {
+      font-family: var(--font-display);
+      font-size: clamp(24px, 3vw, 36px);
+      line-height: 1;
+      margin-bottom: var(--space-2);
+    }
+    .rc-delta__change {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: var(--space-3);
+    }
+
+    /* Domain highlights */
+    .rc-domains {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .rc-domain-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+    }
+    .rc-domain-card {
+      border: 1px solid var(--border);
+      border-top: 2px solid var(--rc-accent);
+      padding: var(--space-5);
+      background: var(--surface);
+      text-decoration: none;
+      transition: border-color 0.15s;
+    }
+    .rc-domain-card:hover { border-color: var(--rc-accent); }
+    .rc-domain-card__domain {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--rc-accent);
+      margin-bottom: var(--space-3);
+    }
+    .rc-domain-card__headline {
+      font-family: var(--font-display);
+      font-size: var(--text-base);
+      color: var(--text);
+      line-height: 1.3;
+      margin-bottom: var(--space-2);
+    }
+    .rc-domain-card__detail {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Looking ahead */
+    .rc-forecast {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .rc-forecast__body {
+      border-left: 2px solid var(--rc-accent);
+      padding-left: var(--space-6);
+      max-width: 640px;
+    }
+    .rc-forecast__text {
+      font-family: var(--font-serif, 'Lora', Georgia, serif);
+      font-size: var(--text-base);
+      font-style: italic;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    /* Share + subscribe */
+    .rc-share {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      text-align: center;
+    }
+    .rc-share__cta {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--rc-accent);
+      text-decoration: none;
+    }
+    .rc-share__cta:hover { text-decoration: underline; }
+
+    /* Loading */
+    .rc-loading {
+      text-align: center;
+      padding: var(--space-16);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .rc-delta-grid { grid-template-columns: repeat(2, 1fr); row-gap: var(--space-4); }
+      .rc-delta-col:nth-child(2) { border-right: none; }
+      .rc-delta-col:nth-child(3) { padding-left: 0; border-top: 1px solid var(--border); padding-top: var(--space-4); }
+      .rc-delta-col:nth-child(4) { border-top: 1px solid var(--border); padding-top: var(--space-4); }
+      .rc-domain-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+
+<!-- Hero -->
+<section class="rc-hero">
+  <div class="rc-hero__eyebrow">The Weekly Recap</div>
+  <h1 class="rc-hero__title" id="rc-headline">This Week in Numbers</h1>
+  <p class="rc-hero__sub" id="rc-subtitle">The week's vital signs, domain highlights, and what the platform noticed.</p>
+  <div class="rc-hero__period" id="rc-period">Loading...</div>
+</section>
+
+<!-- Loading -->
+<div class="rc-loading" id="rc-loading">Compiling this week's data...</div>
+
+<!-- Content (hidden until loaded) -->
+<div id="rc-content" style="display:none">
+
+  <!-- Vital Signs Delta -->
+  <section class="rc-deltas">
+    <div class="rc-section-header">Vital signs</div>
+    <div class="rc-delta-grid" id="rc-delta-grid"></div>
+  </section>
+
+  <!-- Domain Highlights -->
+  <section class="rc-domains">
+    <div class="rc-section-header">Domain highlights</div>
+    <div class="rc-domain-grid" id="rc-domain-grid"></div>
+  </section>
+
+  <!-- Looking Ahead -->
+  <section class="rc-forecast" id="rc-forecast" style="display:none">
+    <div class="rc-section-header">Looking ahead</div>
+    <div class="rc-forecast__body">
+      <p class="rc-forecast__text" id="rc-forecast-text"></p>
+    </div>
+  </section>
+
+  <!-- Share + Subscribe -->
+  <section class="rc-share">
+    <a href="/subscribe/" class="rc-share__cta">Get this every Wednesday &rarr;</a>
+  </section>
+
+</div>
+
+<!-- Reading path -->
+<div class="reading-path-v2">
+  <a href="/chronicle/" class="reading-path-v2__prev">
+    <span class="reading-path-v2__label">Chronicle Archive</span>
+    <span class="reading-path-v2__title">&larr; All Weeks</span>
+  </a>
+  <a href="/subscribe/" class="reading-path-v2__next">
+    <span class="reading-path-v2__label">Never miss a week</span>
+    <span class="reading-path-v2__title">Subscribe &rarr;</span>
+  </a>
+</div>
+
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+<div id="amj-footer"></div>
+
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+<script src="/assets/js/engagement.js"></script>
+<script>
+(async function() {
+  'use strict';
+
+  var loading = document.getElementById('rc-loading');
+  var content = document.getElementById('rc-content');
+
+  try {
+    // Fetch data from multiple endpoints in parallel
+    var results = await Promise.all([
+      fetch('/api/snapshot').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
+      fetch('/api/observatory_week?domain=sleep').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
+      fetch('/api/observatory_week?domain=nutrition').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
+      fetch('/api/observatory_week?domain=training').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
+    ]);
+
+    var snapshot = results[0];
+    var sleepWeek = results[1];
+    var nutritionWeek = results[2];
+    var trainingWeek = results[3];
+
+    if (!snapshot) {
+      loading.textContent = 'No data available yet.';
+      return;
+    }
+
+    var vitals = (snapshot.vitals || {}).vitals || snapshot.vitals || {};
+    var journey = (snapshot.journey || {}).journey || snapshot.journey || {};
+
+    // Period
+    var now = new Date();
+    var weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
+    var fmtOpts = { month: 'short', day: 'numeric' };
+    document.getElementById('rc-period').textContent =
+      weekAgo.toLocaleDateString('en-US', fmtOpts) + ' \u2013 ' +
+      now.toLocaleDateString('en-US', fmtOpts) + ', ' + now.getFullYear();
+
+    // Headline
+    var weight = vitals.weight_lbs;
+    var hrv = vitals.hrv_ms;
+    var sleep = vitals.sleep_hours;
+    var headline = 'This Week in Numbers';
+    if (weight && journey.lost_lbs) {
+      headline = Math.round(journey.lost_lbs) + ' lbs down. Day ' + (journey.days_in || '?') + '.';
+    }
+    document.getElementById('rc-headline').textContent = headline;
+
+    // Delta grid
+    var deltaHtml = '';
+    var metrics = [
+      { label: 'Weight', value: weight ? weight.toFixed(1) + ' lbs' : '\u2014', change: vitals.weight_delta_30d ? (vitals.weight_delta_30d > 0 ? '+' : '') + vitals.weight_delta_30d.toFixed(1) + ' lbs (30d)' : '', spark: null },
+      { label: 'HRV', value: hrv ? Math.round(hrv) + 'ms' : '\u2014', change: vitals.hrv_trend || '', spark: null },
+      { label: 'Sleep', value: sleep ? sleep.toFixed(1) + 'h' : '\u2014', change: sleepWeek && sleepWeek.summary ? sleepWeek.summary.primary.delta_label : '', spark: sleepWeek && sleepWeek.summary ? sleepWeek.summary.primary.sparkline : null },
+      { label: 'Recovery', value: vitals.recovery_pct ? Math.round(vitals.recovery_pct) + '%' : '\u2014', change: vitals.recovery_status || '', spark: null },
+    ];
+
+    metrics.forEach(function(m) {
+      deltaHtml += '<div class="rc-delta-col">';
+      deltaHtml += '<div class="rc-delta__label">' + m.label + '</div>';
+      deltaHtml += '<div class="rc-delta__value">' + m.value + '</div>';
+      if (m.change) deltaHtml += '<div class="rc-delta__change">' + m.change + '</div>';
+      if (m.spark && typeof amjSparkline === 'function') {
+        deltaHtml += '<div>' + amjSparkline(m.spark, { width: 80, height: 20, color: 'var(--c-amber-500)' }) + '</div>';
+      }
+      deltaHtml += '</div>';
+    });
+    document.getElementById('rc-delta-grid').innerHTML = deltaHtml;
+
+    // Domain highlights
+    var domainHtml = '';
+    var domains = [
+      { name: 'Sleep', data: sleepWeek, link: '/sleep/', color: '#60a5fa' },
+      { name: 'Nutrition', data: nutritionWeek, link: '/nutrition/', color: '#f59e0b' },
+      { name: 'Training', data: trainingWeek, link: '/training/', color: '#ef4444' },
+    ];
+
+    domains.forEach(function(d) {
+      var s = d.data && d.data.summary ? d.data.summary : null;
+      domainHtml += '<a href="' + d.link + '" class="rc-domain-card" style="border-top-color:' + d.color + '">';
+      domainHtml += '<div class="rc-domain-card__domain" style="color:' + d.color + '">' + d.name + '</div>';
+      if (s && s.primary) {
+        domainHtml += '<div class="rc-domain-card__headline">' + s.primary.value + ' ' + s.primary.unit + ' avg</div>';
+        domainHtml += '<div class="rc-domain-card__detail">' + (s.primary.delta_label || '') + '</div>';
+      } else {
+        domainHtml += '<div class="rc-domain-card__headline">No data this week</div>';
+      }
+      if (d.data && d.data.notable) {
+        domainHtml += '<div class="rc-domain-card__detail" style="margin-top:var(--space-2);color:' + d.color + '">\u25B8 ' + d.data.notable + '</div>';
+      }
+      domainHtml += '</a>';
+    });
+    document.getElementById('rc-domain-grid').innerHTML = domainHtml;
+
+    // Forecast (simple heuristic based on trends)
+    if (weight && journey.weekly_rate_lbs) {
+      var projected = weight + (journey.weekly_rate_lbs * 1);
+      document.getElementById('rc-forecast-text').textContent =
+        'At the current rate (' + journey.weekly_rate_lbs.toFixed(1) + ' lbs/week), next week should land around ' +
+        projected.toFixed(1) + ' lbs. ' + (vitals.hrv_trend === 'improving' ? 'HRV is climbing \u2014 recovery capacity is building.' : 'Recovery is the metric to watch.');
+      document.getElementById('rc-forecast').style.display = '';
+    }
+
+    loading.style.display = 'none';
+    content.style.display = 'block';
+  } catch (e) {
+    loading.textContent = 'Could not load recap data.';
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>
