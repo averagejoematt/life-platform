@@ -809,6 +809,18 @@ fetch('/api/subscriber_count').then(r=>r.ok?r.json():null).then(d=>{if(d&&d.coun
   <a href="/live/" class="btn btn--ghost">Today's Pulse &rarr;</a>
 </div>
 
+<!-- Phase 1: Reading path -->
+<div class="reading-path-v2">
+  <a href="/" class="reading-path-v2__prev">
+    <span class="reading-path-v2__label">Home</span>
+    <span class="reading-path-v2__title">&larr; Back</span>
+  </a>
+  <a href="/live/" class="reading-path-v2__next">
+    <span class="reading-path-v2__label">See where the numbers are right now</span>
+    <span class="reading-path-v2__title">Today&rsquo;s Data &rarr;</span>
+  </a>
+</div>
+
 <!-- Mobile bottom nav -->
 <div id="amj-bottom-nav"></div>
 

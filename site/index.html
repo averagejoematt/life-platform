@@ -695,6 +695,9 @@
   </div>
 </section>
 
+<!-- Phase 1: Since Your Last Visit (populated by engagement.js) -->
+<div id="amj-since-last-visit"></div>
+
 <!-- WR-33: Day 1 vs. Today — 4-dimension comparison (HOME-3) -->
 <section class="reveal" style="border-bottom:1px solid var(--border);padding:var(--space-12) var(--page-padding);text-align:center;">
   <div class="eyebrow" style="margin-bottom:var(--space-6)">Progress</div>
@@ -1319,6 +1322,15 @@
 
 
 
+<!-- Phase 1: Reading path -->
+<div class="reading-path-v2">
+  <div></div>
+  <a href="/story/" class="reading-path-v2__next">
+    <span class="reading-path-v2__label">Read the story behind the numbers</span>
+    <span class="reading-path-v2__title">The Story &rarr;</span>
+  </a>
+</div>
+
 <!-- U13: Subscribe CTA — simplified to single clear action, nav Subscribe is primary -->
 <div id="amj-subscribe"></div><!-- Mobile bottom nav -->
 <div id="amj-bottom-nav"></div>
@@ -1678,6 +1690,8 @@
 <script src="/assets/js/countdown.js"></script>
 <script src="/assets/js/components.js"></script>
 <script src="/assets/js/nav.js"></script>
+<script src="/assets/js/engagement.js"></script>
+<script>initSinceLastVisit();</script>
 <script>
 // Hide prequel banner after experiment launch (belt-and-suspenders)
 (function() {

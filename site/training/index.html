@@ -1144,7 +1144,16 @@
       </div>
     </div>
   </div>
+  <div class="obs-freshness" id="obs-freshness" style="display:none">
+    <div>
+      <span class="obs-freshness__label">Last data: <span id="obs-fresh-time">—</span></span>
+      <span class="obs-freshness__sub">Updated daily</span>
+    </div>
+    <span class="obs-freshness__dot obs-freshness__dot--live" id="obs-fresh-dot"></span>
+  </div>
 </div>
+
+<div id="obs-thisweek" style="display:none"></div>
 
 <div id="t-loading" class="t-loading">LOADING TRAINING DATA&hellip;</div>
 <div id="t-content" style="display:none">
@@ -1563,6 +1572,8 @@
 
 </div><!-- /t-content -->
 
+<div class="obs-insight" id="obs-insight"></div>
+
 <!-- ════════════════════════════════════════════════════════════
      CROSS-LINKS
      ════════════════════════════════════════════════════════════ -->
@@ -1609,6 +1620,16 @@
   </div>
 </section>
 
+<nav class="reading-path-v2">
+  <a href="/nutrition/" class="reading-path-v2__link">
+    <span class="reading-path-v2__dir">&larr; Nutrition</span>
+  </a>
+  <a href="/mind/" class="reading-path-v2__link reading-path-v2__link--next">
+    <span class="reading-path-v2__label">The hardest pillar to measure</span>
+    <span class="reading-path-v2__dir">Inner Life &rarr;</span>
+  </a>
+</nav>
+
 <div id="amj-subscribe"></div>
 <div id="amj-bottom-nav"></div>
 <div id="amj-reading-path"></div>
@@ -1616,6 +1637,13 @@
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
 <script src="/assets/js/nav.js"></script>
+<script src="/assets/js/engagement.js"></script>
+<script>
+  initObservatoryWeek('training', 'obs-thisweek');
+  fetch('/api/observatory_week?domain=training').then(r=>r.json()).then(d=>{
+    if(d.last_updated) initObsFreshness(d.last_updated);
+  }).catch(function(){});
+</script>
 <script src="/assets/js/reveal.js"></script>
 <script>
 (async function(){
