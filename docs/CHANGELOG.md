@@ -1,3 +1,31 @@
+## v4.3.1 — 2026-03-28: R18 Architecture Review Remediation
+
+### Documentation (R18-F01, R18-F08)
+- Reconciled all doc headers with AWS audit: 59 Lambdas, 116 MCP tools, 66 pages, 25 data sources, 7 CDK stacks
+- Added freeze label to INTELLIGENCE_LAYER.md (stale since v3.7.68, flagged 5 consecutive reviews)
+- Created `deploy/audit_system_state.sh` for pre-review system state verification
+
+### CI/CD (R18-F03)
+- Updated lambda_map.json with og-image-generator and email-subscriber entries
+- Added CI lint step for orphan Lambda source files not in lambda_map.json
+
+### Monitoring (R18-F04)
+- CloudWatch error alarm script for: og-image-generator, food-delivery-ingestion, challenge-generator, email-subscriber
+- Food delivery freshness check with 90-day per-source stale threshold override
+
+### Security (R18-F06)
+- WAF endpoint-specific rate rule script: /api/ask (100/5min), /api/board_ask (100/5min)
+
+### Operations (R18-F05)
+- Created `deploy/deploy_site.sh` — canonical site deploy with link validation + sync + invalidation
+
+### R17 Cleanup
+- R17-F07 (CORS): already implemented via CORS_HEADERS dict + OPTIONS handler
+- R17-F08 (google_calendar): retired file only, not in any active SOURCES list
+- R17-F10 (model strings): already using os.environ.get() pattern
+
+---
+
 ## R18 Architecture Review — 2026-03-28 (v4.3.0)
 
 ### Architecture Review
