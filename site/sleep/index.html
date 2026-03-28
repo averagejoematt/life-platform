@@ -1239,7 +1239,16 @@
       <div class="s-gauge__label">Recovery</div>
     </div>
   </div>
+  <div class="obs-freshness" id="obs-freshness" style="display:none">
+    <div>
+      <span class="obs-freshness__label">Last data: <span id="obs-fresh-time">—</span></span>
+      <span class="obs-freshness__sub">Updated daily</span>
+    </div>
+    <span class="obs-freshness__dot obs-freshness__dot--live" id="obs-fresh-dot"></span>
+  </div>
 </div>
+
+<div id="obs-thisweek" style="display:none"></div>
 
 <!-- ════════════════════════════════════════════════════════════
      8m: DIFFERENTIATORS CALLOUT
@@ -1626,6 +1635,8 @@
 
 </div><!-- /s-content -->
 
+<div class="obs-insight" id="obs-insight"></div>
+
 <!-- ════════════════════════════════════════════════════════════
      CROSS-LINKS
      ════════════════════════════════════════════════════════════ -->
@@ -1715,6 +1726,17 @@
   </a>
 </nav>
 
+<div class="reading-path-v2">
+  <a href="/live/" class="reading-path-v2__prev">
+    <span class="reading-path-v2__label">Live Data</span>
+    <span class="reading-path-v2__title">&larr; Today</span>
+  </a>
+  <a href="/character/" class="reading-path-v2__next">
+    <span class="reading-path-v2__label">See how everything scores together</span>
+    <span class="reading-path-v2__title">The Score &rarr;</span>
+  </a>
+</div>
+
 <div id="amj-subscribe"></div>
 <div id="amj-bottom-nav"></div>
 <div id="amj-reading-path"></div>
@@ -1723,6 +1745,14 @@
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
 <script src="/assets/js/nav.js"></script>
+<script src="/assets/js/engagement.js"></script>
+<script>
+  initObservatoryWeek('sleep', 'obs-thisweek');
+  // Freshness is set from the observatory_week response
+  fetch('/api/observatory_week?domain=sleep').then(r=>r.json()).then(d=>{
+    if(d.last_updated) initObsFreshness(d.last_updated);
+  }).catch(function(){});
+</script>
 <script src="/assets/js/reveal.js"></script>
 <script>
 (async function() {
