@@ -1,3 +1,54 @@
+## v4.2.3 — 2026-03-28: Discord Community Integration — Strategy, Assets, Spec
+
+Pre-launch advisory session. No Lambda code shipped. Discord community strategy defined, server icon designed (two iterations), integration spec written. All assets ready for deployment.
+
+### Discord Community Strategy (Product Board)
+
+**Launch timing:** April 1 confirmed (board unanimous). Two conditions: homepage human thesis above fold + mobile verified. Post on April 2 for social (April Fools' risk).
+
+**Organic reader acquisition:** r/QuantifiedSelf, r/MacroFactor, r/whoop as primary channels. Inner Life page = highest-value share asset. One narrative entry piece (Substack/Medium) as stranger entry point. BL-01 (For Builders) reaffirmed as organic growth asset.
+
+**Community structure:** Discord confirmed right fit for obesity/weight loss subreddit audience. Same-day server creation, drop link only if post gets traction. 3 channels max: `#welcome`, `#average-joe-updates`, `#your-journey`.
+
+**Privacy/sharing analysis:** Coworkers — caution, Inner Life page carries asymmetric professional risk. Family — lower risk but preview Inner Life before sharing.
+
+### Discord Server Icon (v2 — final)
+
+Progress-fill arc: bright amber for journey so far, dimmed amber (22% opacity) for remaining arc, glowing dot at current position (default 62% fill). "AJ" bold monogram + "AVG·JOE" monospace wordmark. Dark background #08090e.
+
+Files: `average-joe-community-512px.png` + `average-joe-community.svg`
+
+**Pending S3 upload (Matthew runs):**
+```bash
+aws s3 cp ~/Downloads/average-joe-community.svg s3://matthew-life-platform/assets/images/logos/average-joe-community.svg --content-type image/svg+xml --cache-control "public, max-age=31536000"
+aws s3 cp ~/Downloads/average-joe-community-512px.png s3://matthew-life-platform/assets/images/logos/average-joe-community-512px.png --content-type image/png --cache-control "public, max-age=31536000"
+```
+
+Permanent URLs once uploaded:
+- `https://averagejoematt.com/assets/images/logos/average-joe-community.svg`
+- `https://averagejoematt.com/assets/images/logos/average-joe-community-512px.png`
+
+### Discord Integration Spec (`docs/DISCORD_INTEGRATION_SPEC.md`)
+
+Three components, all deployed at launch (no staged rollout):
+- **Component A (Footer Pill):** All pages, footer "Follow" column. `⌗ Join the community ↗`
+- **Component B (Understated Card):** Inner Life, Chronicle entries, Accountability, Story pages
+- **Component C (Section Break CTA):** Inner Life only, after mood/psychological patterns section
+
+Constraints: Discord purple (#5865F2) never used. Word "Discord" never in copy. Homepage and observatory pages get nothing.
+
+### Files This Session
+
+| File | Status |
+|---|---|
+| `docs/DISCORD_INTEGRATION_SPEC.md` | NEW — cp from Downloads |
+| `handovers/HANDOVER_v4.2.3.md` | NEW |
+| `handovers/HANDOVER_LATEST.md` | UPDATED |
+| `average-joe-community.svg` | Asset — needs S3 upload |
+| `average-joe-community-512px.png` | Asset — needs S3 upload |
+
+---
+
 ## v4.2.2 — 2026-03-28: Offsite Day 2 — Story/About Punch List + Status Page Spec + Food Delivery Spec
 
 Full-day offsite session (Day 2). Three board sessions convened. Three implementation specs written and committed. Story/About pages implemented directly. Food delivery CSV analyzed (1,598 transactions, 15 years). No Lambda code shipped — specs and site page implementations ready for Claude Code handoff.
@@ -44,19 +95,6 @@ Full-day offsite session (Day 2). Three board sessions convened. Three implement
 - Waveform empty state: 30 ghost bars at 12% opacity with "Signal emerging" label
 - Ghost bars hide when real waveform data renders
 - Subscribe CTA moved directly after Chapter 5 ("You're welcome to watch.")
-
-### Spec Documents Committed (commit 32a3035)
-
-| Doc | Path |
-|---|---|
-| Status Page Spec | `docs/STATUS_PAGE_SPEC.md` |
-| Story/About Review | `docs/STORY_ABOUT_REVIEW_SPEC.md` |
-| Food Delivery Spec | `docs/FOOD_DELIVERY_SPEC.md` |
-
-### Challenges Catalog — 83 challenges total
-- 17 new entries with custom `icon_svg` fields added
-- Two embargoed (public: false): `no-weed-30`, `no-porn-30`
-- Synced to S3 + committed
 
 ### Commits This Session
 - `49f4723` — fix: story + about pre-launch punch list
@@ -115,94 +153,31 @@ Final session of 4-part pre-launch offsite board meeting. All 30+ pages reviewed
 - Home re-review (33): 13 recs — curate "What's Inside" cards, auto-hide prequel banner, verify /chronicle/sample/
 - Builders (34): 18 recs — **CIO audit: rewrite 4 lessons**, remove "Senior Director", reconcile stats, add builder CTA
 
-### Meta-Discussions Resolved
-- Build Section Consolidation: all 7 pages stay standalone. Builders candidate for top-level nav.
-- Board Persona Compromise: fictional names + "inspired by" attribution pattern approved
-- Mobile Audit (M-series): 11 recs — real-device QA critical, Tools badges + Cost column fixes
-- Visual Design (VIS-series): 12 recs — subscribe button color, Sleep/Glucose observatory alignment, OG images
-- AI Slop Differentiation (SLOP-series): 5 recs — change accent color + retire // labels (with rollback)
-- General Feedback (GEN-series): 8 post-launch ideas — "Your Day 1" page, reader observation pipeline, "start here" reading order
-- Pre-Launch Questions (PRE-series): 16 recs — graceful degradation, WCAG contrast fix, sitemap, privacy review
-
-### Critical Items for April 1 (12)
-28a cost reconciliation, 29a days tracked, 30a/30b board personas, 31b mobile badges, 34b stat reconciliation, SLOP-1 accent color, PRE-1 degradation audit, PRE-5 contrast fix, M-1 device QA, PRE-9 sitemap, PRE-13 data privacy review
-
-### Guardrails Set (cumulative: 5)
-16q no Considering section, 19t no downvotes, 22-S1 one subscription, 22-S4 no reader streaks, 30c real-experts editorial only
-
 ---
 
 ## v3.9.41 — 2026-03-27: Pre-Launch Content Review (Product Board Editorial Session)
 
-Full editorial review across Home, Story, and About pages with Product Board content panel. Matthew provided page-by-page feedback; board aligned and added catches.
-
-### Home Page
-- Hero tagline: "For real this time" → "One person. Nineteen data sources. Every week, publicly."
-- Hero narrative broadened beyond weight (apps/podcasts/reels framing)
-- "Why I'm doing this in public" rewritten (disappearing pattern, honesty)
-- "Senior Director" removed, ticker updated, meta/OG/title tags updated
-- Fixed 4 duplicate bugs (subscribe line, sample link, social proof script, redirect)
-
-### Story Page (All 5 Chapters Rewritten)
-- Ch 1: "Multiple times", gym/diet leads, slide rewritten (gentleman's agreement), "disappointment" not "disgust", promise elaboration (covenant, trust)
-- Ch 2: De-doxxed, added athletics + isolation trigger, limbic system/purpose framing
-- Ch 3: Product journey focus (AI therapy → data idea → spiral), removed "Senior Director"/"terrifying"
-- Ch 4: Simplified to forward-looking (10yr logs, stock-ticker pattern, mind data gap)
-- Ch 5: Cheerleader passage removed, replaced with disappearing pattern + honesty
-- Waveform moved between Ch 1 and Ch 2, renamed "The Pattern"
-
-### About Page
-- "Senior Director" removed throughout (meta, header, bio, sidebar)
-- Press/media section → warm "If You Want to Connect" section
-- Media kit/speaking/bios/talk topics removed entirely (60 lines)
-- Sidebar: "Day job: Sr. Director" → "Background: IT Career"
-
-### Bug Fixes
-- Duplicate dark mode toggle in nav.js removed (components.js is source of truth)
-- Stray `</div>` tags removed from story + about pages
+Full editorial review across Home, Story, and About pages with Product Board content panel.
 
 ---
 
 ## v3.9.40 — 2026-03-27: Nav Spacer Architecture + Catalog Fix + UX Cleanup
 
-Tech Board–approved nav spacer architecture (5-1-1 vote), Product Board–approved hierarchy tab removal (7-0 vote). Fixed challenge catalog format bug that broke all 65 tiles. Swept Arena/Lab naming to Challenges/Experiments everywhere. Centered home page comparison. Fixed dropdown headings. 37-file nav-height sweep.
-
-### Architecture (Tech Board Approved — 5-1-1)
-- **Nav spacer pattern**: components.js injects `.nav-spacer` div after nav — single source of truth for fixed-nav clearance
-- `.nav-spacer` CSS class in base.css (height: var(--nav-height))
-- `deploy/nav_spacer_sweep.sh` — automated 3-pattern sweep across all 37 page files
-
-### UX (Product Board Approved — 7-0)
-- **Hierarchy tab bar removed** from all method pages — breadcrumb + main nav sufficient for wayfinding
-
-### Fixes
-- **Challenge catalog format**: v3.9.39 expansion rewrote JSON as flat list instead of `{categories, challenges}` dict — API crashed, only DynamoDB active records showed. Rebuilt with proper wrapper — all 65 tiles restored
-- **S3 path mismatch**: challenge catalog + experiment library uploaded to `config/` but Lambda reads `site/config/` — fixed
-- **Name consistency**: "The Arena" → "Challenges" and "The Lab" → "Experiments" in breadcrumbs, `<title>`, `<h1>`, OG tags, pipeline navs
-
 ---
 
 ## v3.9.39 — 2026-03-27: Pre-Launch Sweep — Nav Fixes, Mobile Scroll, Catalog Expansion
-
-Consolidated all undone items from 10+ sessions into action plan. Fixed nav naming (Arena→Challenges), mobile menu scroll bug, verified subscribe flow, built baseline capture script, expanded challenge catalog 34→66 and experiment library 58→71.
 
 ---
 
 ## v3.9.38 — 2026-03-26: Visual Asset System — 65 SVGs + 3-Page Integration
 
-Product Board visual strategy session → creative direction document → 65 SVG assets generated → wired into milestones, live, and character pages → deployed to CloudFront.
-
 ---
 
 ## v3.9.37 — 2026-03-26: Product Board Pre-Launch Punch List (23 items)
 
-All 23 items from the Product Board pre-launch review, preparing for April 1 go-live.
-
 ---
 
 ## v3.9.36 — 2026-03-26: Signal Doctrine Tier 2
-
-5-section nav restructure, observatory pillar accent colors, home sparklines, Podcast Intelligence Phase 2 Lambda.
 
 ---
 
@@ -375,4 +350,3 @@ All 23 items from the Product Board pre-launch review, preparing for April 1 go-
 ---
 
 ## v3.7.80 — 2026-03-19: WR-24 subscriber gate, S2-T2-2 /board/ page, sprint plan cleanup
-
