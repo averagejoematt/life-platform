@@ -373,14 +373,18 @@
   }
 
   function buildHierarchyNav() {
-    // Pipeline nav for Practice pages + context blurb for all hierarchy pages
-    var html = buildPipelineNav();
-    var contextText = HIER_CONTEXT[path];
-    if (contextText) {
-      html += '<div style="margin:12px var(--page-padding);padding:10px 14px;border-left:2px solid var(--accent);background:var(--surface);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body);">';
-      html += '<span style="font-size:var(--text-2xs);font-weight:500;color:var(--accent);letter-spacing:0.04em;text-transform:uppercase;">Where this fits</span><br>';
-      html += contextText;
-      html += '</div>';
+    // Pipeline nav for Practice pages; context blurb only for non-Practice hierarchy pages
+    var pipelineHtml = buildPipelineNav();
+    var html = pipelineHtml;
+    // Skip "Where this fits" blurb on Practice pages — pipeline nav already provides context
+    if (!pipelineHtml) {
+      var contextText = HIER_CONTEXT[path];
+      if (contextText) {
+        html += '<div style="margin:12px var(--page-padding);padding:10px 14px;border-left:2px solid var(--accent);background:var(--surface);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body);">';
+        html += '<span style="font-size:var(--text-2xs);font-weight:500;color:var(--accent);letter-spacing:0.04em;text-transform:uppercase;">Where this fits</span><br>';
+        html += contextText;
+        html += '</div>';
+      }
     }
     return html;
   }
