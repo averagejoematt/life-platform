@@ -155,6 +155,7 @@
   var BADGE_MAP = {
     '/':           ['/story/', '/about/', '/achievements/'],
     '/sleep/':     ['/sleep/', '/glucose/', '/nutrition/', '/training/', '/mind/', '/benchmarks/', '/explorer/'],
+    '/stack/':     ['/stack/', '/protocols/', '/supplements/', '/experiments/', '/challenges/', '/discoveries/'],
     '/live/':      ['/live/', '/character/', '/habits/', '/accountability/'],
     '/chronicle/': ['/chronicle/', '/chronicle/archive/', '/weekly/', '/ask/', '/subscribe/'],
   };

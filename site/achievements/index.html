@@ -525,7 +525,7 @@
 <!-- Badge sections (populated by JS) -->
 <div id="badge-sections">
   <div class="badge-loading">
-    <div class="badge-loading__text">// loading achievements from live data…</div>
+    <div class="badge-loading__text">Loading achievements from live data…</div>
   </div>
 </div>
 
@@ -905,7 +905,7 @@
       console.warn('[milestones] API error:', err);
       document.getElementById('badge-sections').innerHTML =
         '<div class="badge-loading">' +
-          '<div class="badge-loading__text">// could not load achievements — try refreshing</div>' +
+          '<div class="badge-loading__text">Could not load achievements — try refreshing</div>' +
         '</div>';
     });
 

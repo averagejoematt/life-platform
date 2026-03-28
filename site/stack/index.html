@@ -277,7 +277,7 @@
 
 <!-- Lifecycle Pipeline Visualization (P-1, 18b, P-5) -->
 <div class="stack-pipeline reveal" style="max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border);">
-  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-6);">// The Lifecycle</div>
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-6);">The Lifecycle</div>
   <div style="display:flex;align-items:center;gap:var(--space-4);flex-wrap:wrap;justify-content:center;">
     <a href="/challenges/" style="text-decoration:none;text-align:center;padding:var(--space-4) var(--space-6);border:1px solid var(--border);background:var(--surface);min-width:120px;transition:border-color .15s;">
       <div style="font-family:var(--font-display);font-size:28px;color:var(--c-amber-500);line-height:1;" id="pl-challenges">66</div>
@@ -314,12 +314,12 @@
 </div>
 
 <div class="stack-body" id="domains-container">
-  <div style="padding:var(--space-12);text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);letter-spacing:var(--ls-tag);animation:pulse 1.5s ease-in-out infinite">// loading domains from API…</div>
+  <div style="padding:var(--space-12);text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);letter-spacing:var(--ls-tag);animation:pulse 1.5s ease-in-out infinite">Loading domains from API…</div>
 </div>
 
 <!-- Reading order / deep dive links -->
 <div class="stack-reading-order reveal">
-  <div class="reading-order__heading">// go deeper — lifecycle order</div>
+  <div class="reading-order__heading">Go deeper — lifecycle order</div>
   <div class="reading-order__grid">
     <a href="/protocols/" class="reading-order__card">
       <div class="reading-order__card-name">Protocols</div>
@@ -456,7 +456,7 @@
       return html;
     }).join('');
   }).catch(function(){
-    document.getElementById('domains-container').innerHTML = '<div style="padding:var(--space-12);text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">// could not load domains</div>';
+    document.getElementById('domains-container').innerHTML = '<div style="padding:var(--space-12);text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">Could not load domains</div>';
   });
 })();
 </script>
