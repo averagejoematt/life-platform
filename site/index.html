@@ -1594,19 +1594,16 @@
 (function(){
   var bar = document.getElementById('sticky-subscribe');
   if (!bar) return;
-  var hero = document.getElementById('experiment');
   var dismissed = localStorage.getItem('sticky-sub-dismissed');
   var subscribed = localStorage.getItem('amj-subscribed');
   if (dismissed && Date.now() - parseInt(dismissed) < 7*86400000) return;
   if (subscribed) return;
 
-  var timeReady = false;
-  setTimeout(function(){ timeReady = true; }, 60000);
-
   function checkScroll() {
-    if (!hero || !timeReady) return;
-    var rect = hero.getBoundingClientRect();
-    if (rect.bottom < 0) {
+    // Show after 50% page scroll, hide if already subscribed
+    if (localStorage.getItem('amj-subscribed')) { bar.style.display = 'none'; return; }
+    var scrollPct = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
+    if (scrollPct >= 0.5) {
       bar.style.display = 'flex';
     } else {
       bar.style.display = 'none';

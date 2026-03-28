@@ -28,8 +28,8 @@ window.AMJ = {
   // ── Platform ───────────────────────────────────────────────
   platform: {
     data_sources:   19,
-    mcp_tools:      95,
-    lambdas:        50,
+    mcp_tools:      105,
+    lambdas:        52,
     monthly_cost:   '~$13',
     review_grade:   'A-',
     review_count:   17,
@@ -41,8 +41,8 @@ window.AMJ = {
 
   // ── Bios (press kit / about page) ─────────────────────────
   bios: {
-    fifty_word: 'Matthew Walker is a Senior IT Director who built a personal health intelligence platform from scratch using AI — no engineering degree required. 19 data sources, 95 AI tools, 50 AWS Lambda functions, running for under $15/month. He publishes every number, every failure, every week.',
-    hundred_word: 'Matthew Walker is a Senior IT Director at a Seattle SaaS company and the creator of Life Platform — a personal health intelligence system built entirely with AI assistance. With no formal engineering background, Matthew used Claude as a development partner to build 19 data integrations, 95 intelligence tools, and a fully automated daily coaching brief that runs on AWS for under $15/month. He documents every result publicly — wins, failures, and everything in between. His work is both a personal transformation project and a live proof-of-concept for enterprise AI adoption by non-engineers.',
+    fifty_word: 'Matthew Walker is a Senior IT Director who built a personal health intelligence platform from scratch using AI — no engineering degree required. 19 data sources, 105 AI tools, 52 AWS Lambda functions, running for ~$13/month. He publishes every number, every failure, every week.',
+    hundred_word: 'Matthew Walker is a Senior IT Director at a Seattle SaaS company and the creator of Life Platform — a personal health intelligence system built entirely with AI assistance. With no formal engineering background, Matthew used Claude as a development partner to build 19 data integrations, 105 intelligence tools, and a fully automated daily coaching brief that runs on AWS for ~$13/month. He documents every result publicly — wins, failures, and everything in between. His work is both a personal transformation project and a live proof-of-concept for enterprise AI adoption by non-engineers.',
   },
 
   // ── OG / meta descriptions ─────────────────────────────────
@@ -51,7 +51,7 @@ window.AMJ = {
     live:        'Real-time metrics from 19 data sources. Weight, HRV, recovery, habits, and the full transformation timeline.',
     story:       '302 lbs. And a decision to stop optimizing in the dark.',
     about:       'IT leader by day. Solo engineer by night. Building the infrastructure to change everything.',
-    platform:    '50 Lambda functions. 95 AI tools. 19 data sources. $13/month. A single-person health intelligence system on AWS serverless.',
+    platform:    '52 Lambda functions. 105 AI tools. 19 data sources. $13/month. A single-person health intelligence system on AWS serverless.',
     character:   '7-pillar scoring system: Sleep, Movement, Nutrition, Mind, Metabolic, Consistency, Relationships.',
     methodology: 'Pearson r, Benjamini-Hochberg FDR, 19 data sources. The statistical framework behind the experiment.',
   },
