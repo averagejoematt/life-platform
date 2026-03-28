@@ -1,2 +1,2 @@
 # Latest Handover Pointer
-→ See [handover-2026-03-28-implementation.md](handover-2026-03-28-implementation.md)
+→ See [HANDOVER_v4.3.0.md](HANDOVER_v4.3.0.md)

@@ -1,3 +1,55 @@
+## v4.3.0 — 2026-03-28: Reader Engagement, Labs Page, OG Images, Architectural Fixes
+
+Major implementation session. 4-phase reader engagement rollout, new pages, new Lambdas, privacy fixes, and architectural cleanup.
+
+### New Pages
+- **`/labs/`** (BL-02) — Bloodwork observatory with 74 biomarkers across 18 categories, accordion UI, flag badges
+- **`/recap/`** (Phase 3) — Weekly recap page compiling vital signs deltas, domain highlights, forward forecast
+
+### New API Endpoints
+- **`/api/labs`** — Reads clinical.json from S3, returns lab biomarkers
+- **`/api/changes-since?ts=EPOCH`** — Delta summary for "Since Your Last Visit" homepage card
+- **`/api/observatory_week?domain=X`** — 7-day domain summary with sparklines (sleep, glucose, nutrition, training, mind)
+
+### New Lambda
+- **`og-image-generator`** — Generates 6 data-driven 1200x630 PNG OG images daily using Pillow. EventBridge cron 19:30 UTC. Pillow layer published.
+
+### Reader Engagement (Phases 1-4)
+- **Phase 1:** Freshness indicators on 5 observatories, "This Week" summary cards, sparkline JS utility, "Since Your Last Visit" homepage card, reading-order links across 8 pages
+- **Phase 2:** Guided 5-stop progress bar for first-time visitors, dynamic observatory selection, enhanced subscribe CTA on Character page
+- **Phase 3:** Weekly Recap page at `/recap/` with vital signs, domain highlights, forecast
+- **Phase 4:** Living Pulse feed on homepage with domain-colored pips, editorial headlines, sparklines
+
+### HP-12: Elena Hero Line
+- Wire `elena_hero_line` from `tldr_guidance` through to `write_public_stats()`. Appears in `public_stats.json` after next daily brief.
+
+### HP-13: Dynamic OG Images
+- 6 page-specific OG images (home, sleep, glucose, training, character, nutrition) with live stats. Meta tags updated on all 6 pages.
+
+### Privacy & Security
+- Filter `public: false` challenges (cannabis/porn) server-side + client-side
+- Add `isBlocked` keyword filter to mind page vice streak rendering
+- Remove behavioral signals group from status page (food delivery streak is health data, not system status)
+
+### Architectural Fixes
+- Fix CSS/JS cache from 1-year to 1-day (`max-age=86400`) — filenames have no content hash
+- Add OG image Lambda to CDK operational stack (was CLI-created, causing drift)
+- Add missing S3_BUCKET, S3_REGION, CORS_ORIGIN env vars to site-api CDK config
+- Gitignore CLAUDE_CODE_BRIEF session files
+
+### Bug Fixes
+- Weekly snapshots: fix crash when JOURNEY_START is in the future
+- Pulse feed: rename `.pulse` to `.pulse-feed` to avoid CSS conflict with nav status dot
+- Sleep "This Week" dates: fix `[:5]` → `[5:]` truncation (showed "2026-" instead of "03-22")
+- "This Week" card: fix flush-left alignment with proper column padding
+- Duplicate reading paths: remove extras from observatory pages
+
+### Platform Stats (v4.3.0)
+- 61 Lambdas, 110 MCP tools, 26 data sources, 7 CDK stacks
+- New: Pillow Lambda layer (v1), engagement.js shared utility
+
+---
+
 ## v4.2.3 — 2026-03-28: Discord Community Integration — Strategy, Assets, Spec
 
 Pre-launch advisory session. No Lambda code shipped. Discord community strategy defined, server icon designed (two iterations), integration spec written. All assets ready for deployment.
