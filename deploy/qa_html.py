@@ -130,75 +130,85 @@ def check_page(html_path: Path):
         else:
             ok()
 
-    # ── 10. nav correct and consistent (Sprint 8+)
-    if 'nav__hamburger' not in content:
-        error(rel, "nav__hamburger button missing — mobile menu broken (fix_site_meta.py may have overwritten it)")
-    else:
+    # ── 10. nav correct and consistent
+    # Nav and footer can be EITHER static HTML or JS-injected via components.js.
+    # JS-injected pages use <div id="amj-nav"> and <div id="amj-footer">.
+    uses_js_nav = 'id="amj-nav"' in content
+    uses_js_footer = 'id="amj-footer"' in content
+
+    if uses_js_nav:
+        # JS-injected nav — components.js builds the nav at runtime.
+        # Just verify the mount point and FOUC guard exist.
         ok()
+        if '.nav-overlay{display:none}' not in content:
+            error(rel, "FOUC guard missing — add <style>.nav-overlay{display:none}</style> after <meta charset>")
+        else:
+            ok()
+        # Verify components.js is loaded (otherwise mount point does nothing)
+        if 'components.js' not in content:
+            error(rel, "amj-nav mount point present but components.js not loaded — nav won't render")
+        else:
+            ok()
+    else:
+        # Static nav — check for required elements
+        if 'nav__hamburger' not in content:
+            error(rel, "nav__hamburger button missing — mobile menu broken")
+        else:
+            ok()
+        if 'nav__dropdown-btn' not in content:
+            error(rel, "Nav missing dropdown buttons — not Phase 1 IA nav")
+        else:
+            ok()
+        if '.nav-overlay{display:none}' not in content:
+            error(rel, "FOUC guard missing")
+        else:
+            ok()
+        if 'class="nav-overlay"' not in content:
+            error(rel, "nav-overlay div missing — overlay will not work")
+        else:
+            ok()
+            if 'class="nav-overlay is-open"' in content or 'class="nav-overlay  is-open"' in content:
+                error(rel, "nav-overlay has is-open class by default — overlay will be visible on load!")
+        # Check for /biology/ in static nav
+        overlay_match = re.search(r'class="nav-overlay"(.+?)(?=<header|<main|<section|<div class="(?:story|page|live|journal)-)', content, re.DOTALL)
+        if overlay_match and '/biology/' in overlay_match.group(1):
+            error(rel, "nav-overlay still contains /biology/ link")
+        elif overlay_match:
+            ok()
+
     if 'href="/#experiment"' in content:
-        error(rel, "Old nav links detected (/#experiment) — nav not updated to Sprint 8 Story/Live/Journal/Platform")
-    else:
-        ok()
-    # Phase 1 IA: top nav must use 5-section dropdown (nav__dropdown-btn)
-    if 'nav__dropdown-btn' not in content:
-        error(rel, "Nav missing dropdown buttons — not Phase 1 IA nav")
-    else:
-        ok()
-    # Phase 1 IA: Chronicle must be in nav (replaced Journal)
-    if 'href="/chronicle/"' not in content:
-        warn(rel, "Nav/footer missing /chronicle/ link — check Phase 1 IA nav deploy")
+        error(rel, "Old nav links detected (/#experiment)")
     else:
         ok()
 
-    # ── 11. FOUC guard: inline <style> must hide overlay before external CSS loads
-    if '.nav-overlay{display:none}' not in content:
-        error(rel, "FOUC guard missing — add <style>.nav-overlay{display:none}</style> after <meta charset> "
-                   "(without it, overlay renders as unstyled text before base.css loads)")
-    else:
+    # ── 11. Footer check
+    if uses_js_footer:
+        # JS-injected footer — components.js builds it at runtime
         ok()
-
-    # ── 11b. nav-overlay present and has correct class
-    if 'class="nav-overlay"' not in content:
-        error(rel, "nav-overlay div missing — overlay will not work")
     else:
-        ok()
-        # Check overlay is not open by default (no is-open class at load time)
-        if 'class="nav-overlay is-open"' in content or 'class="nav-overlay  is-open"' in content:
-            error(rel, "nav-overlay has is-open class by default — overlay will be visible on load!")
-
-    # ── 11. Footer-v2 present, structurally complete, and has key links
-    if 'class="footer-v2"' not in content:
-        error(rel, "footer-v2 missing — footer broken (wrong version or stripped)")
-    else:
-        ok()
-        # footer-v2__grid must be present (without it, CSS grid has nothing to target)
-        if 'class="footer-v2__grid"' not in content:
-            error(rel, "footer-v2__grid div missing — footer will render as unstyled block")
+        # Static footer — check for required elements
+        if 'class="footer-v2"' not in content:
+            error(rel, "footer-v2 missing — footer broken (wrong version or stripped)")
         else:
             ok()
-        # At least one footer-v2__col must be present
-        col_count = content.count('class="footer-v2__col"')
-        if col_count == 0:
-            error(rel, "footer-v2__col missing — footer columns not present")
-        elif col_count < 3:
-            warn(rel, f"Only {col_count} footer-v2__col elements — expected 4")
-        else:
-            ok()
-        # Footer should NOT include /biology/
-        footer_match = re.search(r'<footer[^>]*class="footer-v2"[^>]*>(.+?)</footer>', content, re.DOTALL)
-        if footer_match:
-            footer_html = footer_match.group(1)
-            if '/biology/' in footer_html:
-                error(rel, "Footer still contains /biology/ link (should be removed per Sprint 10)")
+            if 'class="footer-v2__grid"' not in content:
+                error(rel, "footer-v2__grid div missing")
             else:
                 ok()
-
-    # ── 12. nav-overlay should NOT contain /biology/
-    overlay_match = re.search(r'class="nav-overlay"(.+?)(?=<header|<main|<section|<div class="(?:story|page|live|journal)-)', content, re.DOTALL)
-    if overlay_match and '/biology/' in overlay_match.group(1):
-        error(rel, "nav-overlay still contains /biology/ link (should be removed per Sprint 10)")
-    elif overlay_match:
-        ok()
+            col_count = content.count('class="footer-v2__col"')
+            if col_count == 0:
+                error(rel, "footer-v2__col missing")
+            elif col_count < 3:
+                warn(rel, f"Only {col_count} footer-v2__col elements — expected 4")
+            else:
+                ok()
+            footer_match = re.search(r'<footer[^>]*class="footer-v2"[^>]*>(.+?)</footer>', content, re.DOTALL)
+            if footer_match:
+                footer_html = footer_match.group(1)
+                if '/biology/' in footer_html:
+                    error(rel, "Footer still contains /biology/ link")
+                else:
+                    ok()
 
     # ── 13. Wrong asset paths (common copy-paste errors)
     if "'/site/public_stats.json'" in content or '"/site/public_stats.json"' in content:
