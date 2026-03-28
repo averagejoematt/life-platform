@@ -153,7 +153,7 @@
 
   // Bottom nav → which paths it owns (6-section IA, Decision 1c)
   var BADGE_MAP = {
-    '/':           ['/story/', '/about/', '/achievements/'],
+    '/':           ['/story/', '/about/', '/achievements/', '/first-person/'],
     '/sleep/':     ['/sleep/', '/glucose/', '/nutrition/', '/training/', '/mind/', '/benchmarks/', '/explorer/'],
     '/stack/':     ['/stack/', '/protocols/', '/supplements/', '/experiments/', '/challenges/', '/discoveries/'],
     '/live/':      ['/live/', '/character/', '/habits/', '/accountability/'],
