@@ -1406,30 +1406,30 @@ body::after {
 .community-url a:hover { text-decoration: underline; }
 
 /* ── Phase 4: The Pulse Feed ────────────────────────────── */
-.pulse { max-width: var(--max-width); margin: 0 auto; padding: var(--space-8) var(--page-padding); }
-.pulse__header { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-faint); margin-bottom: var(--space-6); display: flex; align-items: center; gap: 12px; }
-.pulse__header::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-.pulse__item { display: grid; grid-template-columns: 6px 80px 1fr auto; gap: var(--space-4); align-items: start; padding: var(--space-5) 0; border-bottom: 1px solid var(--border); text-decoration: none; transition: background 0.15s; }
-.pulse__item:first-child { border-top: 1px solid var(--border); }
-.pulse__item:hover { background: rgba(255,255,255,0.02); }
-.pulse__pip { width: 6px; height: 6px; border-radius: 50%; margin-top: 6px; }
-.pulse__pip--body { background: var(--c-amber-500, #f59e0b); }
-.pulse__pip--sleep { background: #60a5fa; }
-.pulse__pip--glucose { background: #2dd4bf; }
-.pulse__pip--training { background: #ef4444; }
-.pulse__pip--nutrition { background: #f59e0b; }
-.pulse__pip--mind { background: #818cf8; }
-.pulse__pip--story { background: var(--c-amber-500, #f59e0b); }
-.pulse__pip--science { background: #a78bfa; }
-.pulse__time { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text-faint); margin-top: 2px; }
-.pulse__headline { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.04em; color: var(--text); margin-bottom: var(--space-1); }
-.pulse__detail { font-size: var(--text-sm); color: var(--text-muted); line-height: 1.5; }
-.pulse__spark { margin-top: 2px; }
-.pulse__fade { height: 60px; background: linear-gradient(to bottom, transparent, var(--bg)); pointer-events: none; margin-top: -60px; position: relative; z-index: 1; }
-.pulse__load-more { text-align: center; padding: var(--space-4) 0; }
-.pulse__load-more button { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: 0.1em; text-transform: uppercase; color: var(--c-amber-500); background: none; border: 1px solid var(--border); padding: var(--space-2) var(--space-6); cursor: pointer; transition: border-color 0.15s; }
-.pulse__load-more button:hover { border-color: var(--c-amber-500); }
-@media (max-width: 640px) { .pulse__item { grid-template-columns: 6px 1fr; } .pulse__time { display: none; } .pulse__spark { display: none; } }
+.pulse-feed { max-width: var(--max-width); margin: 0 auto; padding: var(--space-8) var(--page-padding); }
+.pulse-feed__header { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-faint); margin-bottom: var(--space-6); display: flex; align-items: center; gap: 12px; }
+.pulse-feed__header::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.pulse-feed__item { display: grid; grid-template-columns: 6px 80px 1fr auto; gap: var(--space-4); align-items: start; padding: var(--space-5) 0; border-bottom: 1px solid var(--border); text-decoration: none; transition: background 0.15s; }
+.pulse-feed__item:first-child { border-top: 1px solid var(--border); }
+.pulse-feed__item:hover { background: rgba(255,255,255,0.02); }
+.pulse-feed__pip { width: 6px; height: 6px; border-radius: 50%; margin-top: 6px; }
+.pulse-feed__pip--body { background: var(--c-amber-500, #f59e0b); }
+.pulse-feed__pip--sleep { background: #60a5fa; }
+.pulse-feed__pip--glucose { background: #2dd4bf; }
+.pulse-feed__pip--training { background: #ef4444; }
+.pulse-feed__pip--nutrition { background: #f59e0b; }
+.pulse-feed__pip--mind { background: #818cf8; }
+.pulse-feed__pip--story { background: var(--c-amber-500, #f59e0b); }
+.pulse-feed__pip--science { background: #a78bfa; }
+.pulse-feed__time { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text-faint); margin-top: 2px; }
+.pulse-feed__headline { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.04em; color: var(--text); margin-bottom: var(--space-1); }
+.pulse-feed__detail { font-size: var(--text-sm); color: var(--text-muted); line-height: 1.5; }
+.pulse-feed__spark { margin-top: 2px; }
+.pulse-feed__fade { height: 60px; background: linear-gradient(to bottom, transparent, var(--bg)); pointer-events: none; margin-top: -60px; position: relative; z-index: 1; }
+.pulse-feed__load-more { text-align: center; padding: var(--space-4) 0; }
+.pulse-feed__load-more button { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: 0.1em; text-transform: uppercase; color: var(--c-amber-500); background: none; border: 1px solid var(--border); padding: var(--space-2) var(--space-6); cursor: pointer; transition: border-color 0.15s; }
+.pulse-feed__load-more button:hover { border-color: var(--c-amber-500); }
+@media (max-width: 640px) { .pulse-feed__item { grid-template-columns: 6px 1fr; } .pulse-feed__time { display: none; } .pulse-feed__spark { display: none; } }
 
 /* ── Phase 2: Guided Path Progress Bar ─────────────────── */
 .guided-path { position: sticky; top: var(--nav-height, 56px); z-index: 99; background: var(--bg); border-bottom: 1px solid var(--border); padding: 0 var(--page-padding); height: 36px; display: flex; align-items: center; justify-content: center; gap: var(--space-6); transition: opacity 0.3s ease, transform 0.3s ease; }
