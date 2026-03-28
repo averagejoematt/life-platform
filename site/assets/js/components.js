@@ -376,12 +376,24 @@
     // Don't show sub-nav if section has fewer than 3 pages or we're on the homepage
     if (items.length < 3 || path === '/') return '';
 
-    var html = '<style>.section-nav{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-4) var(--page-padding);border-bottom:1px solid var(--border);background:var(--surface);font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);overflow-x:auto;-webkit-overflow-scrolling:touch}.section-nav__step{color:var(--text-faint);text-decoration:none;text-transform:uppercase;white-space:nowrap;padding:var(--space-1) var(--space-3);border:1px solid transparent;transition:color .15s}.section-nav__step:hover{color:var(--text-muted)}.section-nav__step.active{color:var(--accent);border-color:var(--accent-dim)}.section-nav__sep{color:var(--border)}</style>';
+    // Phase 2: Track visited pages in localStorage
+    var VISITED_KEY = 'amj_visited_pages';
+    var visited = {};
+    try { visited = JSON.parse(localStorage.getItem(VISITED_KEY) || '{}'); } catch(e) {}
+    if (!visited[path]) {
+      visited[path] = Date.now();
+      localStorage.setItem(VISITED_KEY, JSON.stringify(visited));
+    }
+
+    var html = '<style>.section-nav{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-4) var(--page-padding);border-bottom:1px solid var(--border);background:var(--surface);font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);overflow-x:auto;-webkit-overflow-scrolling:touch}.section-nav__step{color:var(--text-faint);text-decoration:none;text-transform:uppercase;white-space:nowrap;padding:var(--space-1) var(--space-3);border:1px solid transparent;transition:color .15s}.section-nav__step:hover{color:var(--text-muted)}.section-nav__step.active{color:var(--accent);border-color:var(--accent-dim)}.section-nav__step.visited::before{content:"\2713 ";font-size:9px;opacity:0.6}.section-nav__sep{color:var(--border)}</style>';
     html += '<nav class="section-nav" aria-label="' + currentSection.label + '">';
     items.forEach(function(item, i) {
       if (i > 0) html += '<span class="section-nav__sep">\u00B7</span>';
       var isActive = isItemActive(item.href, path);
-      var cls = 'section-nav__step' + (isActive ? ' active' : '');
+      var isVisited = !isActive && visited[item.href];
+      var cls = 'section-nav__step';
+      if (isActive) cls += ' active';
+      else if (isVisited) cls += ' visited';
       html += '<a href="' + item.href + '" class="' + cls + '">' + item.text + '</a>';
     });
     html += '</nav>';
@@ -404,67 +416,6 @@
     spacer.className = 'nav-spacer';
     navMount.parentNode.insertBefore(spacer, navMount.nextSibling);
   }
-  // ── GUIDED PATH (Phase 2) — first-visit progress bar ──────
-  (function() {
-    var GUIDED_KEY = 'amj_guided_path';
-    var DISMISSED_KEY = 'amj_guided_dismissed';
-    var LAST_VISIT = 'amj_last_visit';
-
-    // Only show for first-time visitors who haven't dismissed
-    if (localStorage.getItem(LAST_VISIT) && localStorage.getItem(GUIDED_KEY) && JSON.parse(localStorage.getItem(GUIDED_KEY)).length >= 5) return;
-    if (sessionStorage.getItem(DISMISSED_KEY)) return;
-
-    var PATH_STEPS = [
-      { id: 'story', label: 'Story', path: '/story/' },
-      { id: 'live', label: 'Live', path: '/live/' },
-      { id: 'sleep', label: 'Explore', path: '/sleep/' },
-      { id: 'character', label: 'Score', path: '/character/' },
-      { id: 'subscribe', label: 'Subscribe', path: '/subscribe/' },
-    ];
-
-    var completed = [];
-    try { completed = JSON.parse(localStorage.getItem(GUIDED_KEY) || '[]'); } catch(e) {}
-
-    // Mark current page as completed
-    var currentPath = window.location.pathname;
-    var currentStep = null;
-    for (var si = 0; si < PATH_STEPS.length; si++) {
-      if (currentPath === PATH_STEPS[si].path || currentPath.startsWith(PATH_STEPS[si].path)) {
-        currentStep = PATH_STEPS[si];
-        break;
-      }
-    }
-    // Home counts as visited for story context
-    if (currentPath === '/' || currentPath === '/index.html') {
-      currentStep = currentStep || { id: 'home' };
-    }
-
-    if (currentStep && PATH_STEPS.some(function(s) { return s.id === currentStep.id; }) && completed.indexOf(currentStep.id) === -1) {
-      completed.push(currentStep.id);
-      localStorage.setItem(GUIDED_KEY, JSON.stringify(completed));
-    }
-
-    // Build the bar
-    var barHtml = '<div class="guided-path" id="amj-guided-path">';
-    PATH_STEPS.forEach(function(step) {
-      var isCompleted = completed.indexOf(step.id) > -1;
-      var isCurrent = currentStep && step.id === currentStep.id;
-      var cls = 'guided-path__step';
-      if (isCompleted && !isCurrent) cls += ' guided-path__step--completed';
-      else if (isCurrent) cls += ' guided-path__step--current';
-      else cls += ' guided-path__step--future';
-      barHtml += '<a href="' + step.path + '" class="' + cls + '">' + step.label + '</a>';
-    });
-    barHtml += '<button class="guided-path__dismiss" onclick="this.parentElement.classList.add(\'guided-path--hidden\');sessionStorage.setItem(\'' + DISMISSED_KEY + '\',\'1\')" aria-label="Dismiss">\u00D7</button>';
-    barHtml += '</div>';
-
-    // Inject after nav spacer
-    var spacerEl = document.querySelector('.nav-spacer');
-    if (spacerEl) {
-      spacerEl.insertAdjacentHTML('afterend', barHtml);
-    }
-  })();
-
   if (hierNavMount)   hierNavMount.innerHTML = buildSectionNav();
   if (subscribeMount) subscribeMount.innerHTML = buildSubscribeCTA();
   if (bottomNavMount) bottomNavMount.innerHTML = buildBottomNav();
