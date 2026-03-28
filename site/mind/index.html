@@ -1535,14 +1535,12 @@
   /* 12k: vice streak why-lines — connect each to the reason */
   var viceWhyMap = {
     'alcohol': 'Not because it\u2019s forbidden, but because sleep quality drops 23% on drinking nights.',
-    'cannabis': 'Clarity matters more than calm. The rebound anxiety isn\u2019t worth the temporary quiet.',
     'sugar': 'Glucose spikes feed the anxiety loop. Stable blood sugar, stable mood.',
     'fast food': 'Inflammation is the hidden cost. Every skip is a vote for lower CRP.',
     'social media': 'Comparison is the thief of contentment. Every day off is a day the algorithm loses.',
     'caffeine after 12pm': 'Adenosine debt compounds. Afternoon caffeine steals tomorrow\u2019s recovery.',
     'nicotine': 'The calm it promises is the calm it stole. Breaking the cycle, not managing it.',
     'gambling': 'Dopamine hijacking dressed as entertainment. Real stakes are in the other pillars.',
-    'porn': 'Connection can\u2019t be simulated. Investing in real relationships instead.',
     'junk food': 'Gut inflammation feeds brain fog. Clean fuel, clear thinking.',
     'energy drinks': 'Borrowed energy with compounding interest. Sleep is the only real source.',
     'vaping': 'Lung capacity matters for training. Every day clear is a day the cardiovascular system heals.',
@@ -1562,7 +1560,9 @@
     var resp = await fetch(API + '/api/mind_overview');
     if (!resp.ok) throw new Error(resp.status);
     var data = await resp.json();
-    var m = data.mind, vices = data.vice_streaks || [], mood = data.mood_trend || [];
+    var BLOCKED_KW = ['porn','pornography','marijuana','cannabis','weed','thc'];
+    function isBlocked(t){ if(!t)return false; var l=t.toLowerCase(); return BLOCKED_KW.some(function(k){return l.indexOf(k)!==-1}); }
+    var m = data.mind, vices = (data.vice_streaks || []).filter(function(v){ return !isBlocked(v.name); }), mood = data.mood_trend || [];
     if (!m) { loading.textContent = 'No inner life data yet.'; return; }
 
     /* ── Hero gauges ── */

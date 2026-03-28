@@ -879,59 +879,6 @@ def handle_status() -> dict:
         {"id": "dlq",             "name": "Dead-letter queue",       "description": "life-platform-ingestion-dlq",    "status": "green", "comment": None},
     ]
 
-    # Behavioral signals — food delivery streak
-    def _build_behavioral_components():
-        """Build behavioral signal components for the status page."""
-        components = []
-        try:
-            resp = table.get_item(Key={
-                'pk': f'{USER_PREFIX}food_delivery',
-                'sk': 'STREAK#current'
-            })
-            streak = resp.get('Item')
-            if streak:
-                streak_days = int(streak.get('streak_days', 0))
-                last_order = streak.get('last_order_date', '')
-                if streak_days >= 7:
-                    status = "green"
-                    comment = f"Delivery-free streak: {streak_days} days"
-                elif streak_days > 0:
-                    status = "yellow"
-                    comment = f"Delivery-free streak: {streak_days} days"
-                else:
-                    status = "yellow"
-                    comment = f"Last order: {last_order}" if last_order else "No streak data"
-                components.append({
-                    "id": "food_delivery_streak",
-                    "name": "Food Delivery Streak",
-                    "description": "Delivery-free days · nutrition modifier",
-                    "status": status,
-                    "last_sync_relative": f"{streak_days}d streak",
-                    "uptime_90d": [],
-                    "comment": comment,
-                })
-            else:
-                components.append({
-                    "id": "food_delivery_streak",
-                    "name": "Food Delivery Streak",
-                    "description": "Delivery-free days · nutrition modifier",
-                    "status": "gray",
-                    "last_sync_relative": "no data",
-                    "uptime_90d": [],
-                    "comment": "No food delivery data imported yet",
-                })
-        except Exception:
-            components.append({
-                "id": "food_delivery_streak",
-                "name": "Food Delivery Streak",
-                "description": "Delivery-free days · nutrition modifier",
-                "status": "gray",
-                "last_sync_relative": "error",
-                "uptime_90d": [],
-                "comment": "Could not read food delivery data",
-            })
-        return components
-
     # Exclude blue (manual import) and onetime from overall health — they're not system issues
     all_statuses = [c["status"] for c in ds_components + compute_components + email_components
                     if c["status"] not in ("blue",)]
@@ -950,7 +897,6 @@ def handle_status() -> dict:
             {"id": "compute",       "label": "Compute layer",  "subtitle": "character sheet · metrics · insights · adaptive mode", "components": compute_components},
             {"id": "email",         "label": "Email & digests", "subtitle": "7 scheduled senders", "components": email_components},
             {"id": "infrastructure","label": "Infrastructure",  "subtitle": "CloudFront · DynamoDB · SES · DLQ", "components": infra},
-            {"id": "behavioral",     "label": "Behavioral signals", "subtitle": "Non-wearable behavioral data", "components": _build_behavioral_components()},
         ]
     }
 
@@ -3587,11 +3533,13 @@ def handle_challenge_catalog() -> dict:
 
     # Inject votes into each challenge (deep copy to avoid mutating the cache)
     result = copy.deepcopy(_challenge_catalog_cache)
-    challenges = result.get("challenges", [])
+    # Filter out private challenges (public: false)
+    challenges = [ch for ch in result.get("challenges", []) if ch.get("public", True) is not False]
     total_votes = 0
     for ch in challenges:
         ch["votes"] = vote_counts.get(ch.get("id", ""), 0)
         total_votes += ch["votes"]
+    result["challenges"] = challenges
     result["total_votes"] = total_votes
 
     return _ok(result, cache_seconds=900)
@@ -4416,6 +4364,23 @@ def handle_mind_overview() -> dict:
     }, cache_seconds=3600)
 
 
+# ── BL-02: Bloodwork/Labs endpoint ─────────────────────────────
+def handle_labs() -> dict:
+    """GET /api/labs — Returns lab biomarkers from clinical.json in S3."""
+    try:
+        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+        s3 = boto3.client("s3", region_name=S3_REGION)
+        resp = s3.get_object(Bucket=S3_BUCKET, Key=f"dashboard/{USER_ID}/clinical.json")
+        data = json.loads(resp["Body"].read())
+        labs = data.get("labs", {})
+        if not labs or not labs.get("biomarkers"):
+            return _error(404, "No lab data available.")
+        return _ok({"labs": labs}, cache_seconds=3600)
+    except Exception as e:
+        logger.warning(f"[labs] Failed to load clinical.json: {e}")
+        return _error(503, "Lab data temporarily unavailable.")
+
+
 # ── Benchmark trends endpoint ─────────────────────────────────
 def handle_benchmark_trends() -> dict:
     """GET /api/benchmark_trends — Returns benchmark progress data."""
@@ -4550,6 +4515,8 @@ ROUTES = {
     "/api/nutrition_overview":  handle_nutrition_overview,
     "/api/training_overview":   handle_training_overview,
     "/api/mind_overview":       handle_mind_overview,
+    # BL-02: Bloodwork/Labs
+    "/api/labs":                handle_labs,
     # Benchmark trends + meal responses (stub endpoints)
     "/api/benchmark_trends":    handle_benchmark_trends,
     "/api/meal_responses":      handle_meal_responses,
