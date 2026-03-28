@@ -91,7 +91,7 @@
   function sectionOwnsPath(section, p) {
     if (section.label === 'The Story' && p === '/') return true;
     return getSectionItems(section).some(function(item) {
-      return p === item.href || p.startsWith(item.href);
+      return p === item.href || (item.href !== '/' && p.startsWith(item.href));
     });
   }
 
