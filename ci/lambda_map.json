@@ -170,7 +170,8 @@
       "lambdas/acwr_compute_lambda.py",
       "lambdas/circadian_compliance_lambda.py",
       "lambdas/sleep_reconciler_lambda.py",
-      "lambdas/email_subscriber_lambda.py"
+      "lambdas/email_subscriber_lambda.py",
+      "lambdas/podcast_scanner_lambda.py"
     ]
   }
 }
