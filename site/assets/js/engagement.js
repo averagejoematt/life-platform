@@ -333,4 +333,179 @@
     cta.style.display = '';
   };
 
+  // ── Phase 4: The Pulse Feed ────────────────────────────
+  var _pulseItems = [];
+  var _pulseOffset = 0;
+  var PULSE_PAGE = 10;
+
+  window.loadMorePulse = function() {
+    var list = document.getElementById('pulse-list');
+    var loadMore = document.getElementById('pulse-load-more');
+    if (!list || !_pulseItems.length) return;
+
+    var batch = _pulseItems.slice(_pulseOffset, _pulseOffset + PULSE_PAGE);
+    batch.forEach(function(item) {
+      list.insertAdjacentHTML('beforeend', _renderPulseItem(item));
+    });
+    _pulseOffset += PULSE_PAGE;
+
+    if (_pulseOffset >= _pulseItems.length && loadMore) {
+      loadMore.style.display = 'none';
+    }
+  };
+
+  function _renderPulseItem(item) {
+    var pipCls = 'pulse__pip pulse__pip--' + (item.domain || 'body');
+    var timeStr = '';
+    if (item.date) {
+      var d = new Date(item.date + 'T12:00:00');
+      timeStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+    var sparkHtml = '';
+    if (item.sparkline && typeof amjSparkline === 'function') {
+      var pipColors = { body: '#f59e0b', sleep: '#60a5fa', glucose: '#2dd4bf', training: '#ef4444', mind: '#818cf8', nutrition: '#f59e0b', story: '#f59e0b', science: '#a78bfa' };
+      sparkHtml = '<div class="pulse__spark">' + amjSparkline(item.sparkline, { width: 80, height: 20, color: pipColors[item.domain] || '#f59e0b' }) + '</div>';
+    }
+
+    return '<a href="' + (item.link || '#') + '" class="pulse__item">' +
+      '<span class="' + pipCls + '"></span>' +
+      '<span class="pulse__time">' + timeStr + '</span>' +
+      '<div class="pulse__content">' +
+        '<div class="pulse__headline">' + (item.headline || '') + '</div>' +
+        '<div class="pulse__detail">' + (item.detail || '') + '</div>' +
+      '</div>' +
+      sparkHtml +
+    '</a>';
+  }
+
+  window.initPulseFeed = async function() {
+    var section = document.getElementById('amj-pulse-section');
+    if (!section) return;
+
+    try {
+      // Build pulse items from multiple data sources
+      var items = [];
+
+      // Source 1: Pulse endpoint (pre-computed daily signal)
+      var pulseResp = await fetch('/api/pulse').catch(function() { return null; });
+      if (pulseResp && pulseResp.ok) {
+        var pulseData = await pulseResp.json();
+        var p = pulseData.pulse || pulseData;
+        if (p && p.narrative) {
+          items.push({
+            domain: 'body',
+            date: p.date || new Date().toISOString().split('T')[0],
+            headline: 'Day ' + (p.day_number || '?') + ' \u2014 ' + (p.status || 'quiet'),
+            detail: p.narrative,
+            link: '/live/',
+            sparkline: null,
+          });
+        }
+        // Add glyph-based items
+        var glyphs = p.glyphs || {};
+        if (glyphs.scale && glyphs.scale.value) {
+          items.push({
+            domain: 'body',
+            date: p.date,
+            headline: 'Weight: ' + glyphs.scale.value + ' lbs' + (glyphs.scale.delta ? ' (' + (glyphs.scale.delta > 0 ? '+' : '') + glyphs.scale.delta + ')' : ''),
+            detail: glyphs.scale.direction === 'down' ? 'Trending down' : glyphs.scale.direction === 'up' ? 'Trending up' : 'Holding steady',
+            link: '/live/',
+            sparkline: glyphs.scale.sparkline_7d,
+          });
+        }
+        if (glyphs.recovery && glyphs.recovery.recovery_pct) {
+          items.push({
+            domain: 'training',
+            date: p.date,
+            headline: 'Recovery: ' + Math.round(glyphs.recovery.recovery_pct) + '%',
+            detail: 'HRV ' + Math.round(glyphs.recovery.hrv_ms || 0) + 'ms \u00B7 RHR ' + Math.round(glyphs.recovery.rhr_bpm || 0) + 'bpm',
+            link: '/training/',
+            sparkline: glyphs.recovery.sparkline_7d,
+          });
+        }
+        if (glyphs.sleep && glyphs.sleep.hours) {
+          items.push({
+            domain: 'sleep',
+            date: p.date,
+            headline: 'Sleep: ' + glyphs.sleep.hours.toFixed(1) + 'h' + (glyphs.sleep.score ? ' \u00B7 Score ' + glyphs.sleep.score : ''),
+            detail: '',
+            link: '/sleep/',
+            sparkline: glyphs.sleep.sparkline_7d,
+          });
+        }
+        if (glyphs.movement && glyphs.movement.zone2_week_min) {
+          items.push({
+            domain: 'training',
+            date: p.date,
+            headline: 'Zone 2: ' + Math.round(glyphs.movement.zone2_week_min) + ' min this week',
+            detail: glyphs.movement.zone2_week_min >= 150 ? 'Target met \u2713' : Math.round(150 - glyphs.movement.zone2_week_min) + ' min to go',
+            link: '/training/',
+            sparkline: glyphs.movement.sparkline_7d,
+          });
+        }
+        if (glyphs.journal && glyphs.journal.streak_days) {
+          items.push({
+            domain: 'mind',
+            date: p.date,
+            headline: 'Journal streak: ' + glyphs.journal.streak_days + ' days',
+            detail: glyphs.journal.written_today ? 'Written today' : 'Not yet today',
+            link: '/mind/',
+            sparkline: null,
+          });
+        }
+      }
+
+      // Source 2: Snapshot for journey milestones
+      var snapResp = await fetch('/api/snapshot').catch(function() { return null; });
+      if (snapResp && snapResp.ok) {
+        var snap = await snapResp.json();
+        var journey = (snap.journey || {}).journey || snap.journey || {};
+        if (journey.lost_lbs && journey.lost_lbs > 0) {
+          items.push({
+            domain: 'body',
+            date: new Date().toISOString().split('T')[0],
+            headline: Math.round(journey.lost_lbs) + ' lbs lost from ' + Math.round(journey.start_weight_lbs || 302) + ' lbs',
+            detail: Math.round(journey.progress_pct || 0) + '% to goal \u00B7 Day ' + (journey.days_in || '?'),
+            link: '/live/',
+            sparkline: null,
+          });
+        }
+        var character = (snap.character || {}).character || {};
+        if (character.level) {
+          items.push({
+            domain: 'story',
+            date: new Date().toISOString().split('T')[0],
+            headline: 'Character Level ' + Math.floor(character.level) + (character.tier ? ' \u2014 ' + character.tier : ''),
+            detail: 'Gamified health score across 7 pillars',
+            link: '/character/',
+            sparkline: null,
+          });
+        }
+      }
+
+      // Governance check: minimum 8 items
+      if (items.length < 5) return; // Not enough content yet
+
+      _pulseItems = items;
+      _pulseOffset = 0;
+
+      // Show first batch
+      var list = document.getElementById('pulse-list');
+      var batch = _pulseItems.slice(0, PULSE_PAGE);
+      list.innerHTML = '';
+      batch.forEach(function(item) {
+        list.insertAdjacentHTML('beforeend', _renderPulseItem(item));
+      });
+      _pulseOffset = PULSE_PAGE;
+
+      if (_pulseItems.length > PULSE_PAGE) {
+        document.getElementById('pulse-load-more').style.display = '';
+      }
+
+      section.style.display = '';
+    } catch (e) {
+      console.warn('Pulse feed unavailable:', e);
+    }
+  };
+
 })();
