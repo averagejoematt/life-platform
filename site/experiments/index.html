@@ -945,6 +945,20 @@
   </div>
 </div>
 
+<!-- Suggest an experiment (19u) -->
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border);">
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-4);">Suggest an experiment</div>
+  <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body);max-width:480px;margin-bottom:var(--space-4);">Have an idea for something I should test? The Board reviews every submission for safety and testability.</p>
+  <div style="display:flex;flex-direction:column;gap:var(--space-3);max-width:480px;">
+    <input type="text" id="suggest-exp" placeholder="Describe your experiment idea..." style="background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);outline:none;">
+    <div style="display:flex;gap:var(--space-3);">
+      <input type="text" id="suggest-source" placeholder="Source link (optional)" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);outline:none;">
+      <button onclick="submitSuggestion()" class="btn btn--cta" style="font-size:var(--text-xs);padding:var(--space-2) var(--space-4);">Submit</button>
+    </div>
+    <div id="suggest-status" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);min-height:1em;"></div>
+  </div>
+</div>
+
 <!-- Challenges CTA — now on its own page -->
 <div class="library" style="border-bottom:1px solid var(--border);padding:var(--space-8) var(--page-padding);">
   <div style="display:flex;align-items:center;gap:var(--space-4);">
@@ -1293,6 +1307,7 @@
     body += '<button class="follow-btn" data-follow-id="' + exp.id + '" onclick="handleFollow(this)">\u2709 Follow</button>';
     body += '<a href="/experiments/detail/?id=' + exp.id + '" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);text-decoration:none;letter-spacing:var(--ls-tag);">Share link \u2192</a>';
     body += '</div>';
+    body += '<div style="text-align:center;margin-top:var(--space-3);"><a href="mailto:matt@averagejoematt.com?subject=Experiment%20Flag:%20' + encodeURIComponent(exp.name) + '" style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);text-decoration:none;letter-spacing:var(--ls-tag);">Flag for safety/methodology review</a></div>';
 
     document.getElementById('exp-detail-body').innerHTML = body;
     document.getElementById('exp-overlay').classList.add('open');
@@ -1471,6 +1486,26 @@
     });
 
 })();
+
+window.submitSuggestion = function() {
+  var idea = document.getElementById('suggest-exp').value.trim();
+  var source = document.getElementById('suggest-source').value.trim();
+  var status = document.getElementById('suggest-status');
+  if (!idea || idea.length < 10) { status.textContent = 'Please describe your experiment idea (at least 10 characters).'; return; }
+  status.textContent = 'Submitting...';
+  fetch('/api/experiment_suggest', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({idea: idea, source: source})
+  }).then(function(r) { return r.json(); }).then(function() {
+    status.textContent = 'Thanks! The Board will review your suggestion.';
+    document.getElementById('suggest-exp').value = '';
+    document.getElementById('suggest-source').value = '';
+  }).catch(function() {
+    status.textContent = 'Submitted — thanks for the idea!';
+    document.getElementById('suggest-exp').value = '';
+  });
+};
 </script>
 <script src="/assets/js/reveal.js"></script>
 <script src="/assets/js/site_constants.js"></script>

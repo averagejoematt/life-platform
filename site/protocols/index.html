@@ -375,37 +375,14 @@
   </div>
 </div>
 
-<!-- Quick-glance outcome snapshot -->
+<!-- Quick-glance outcome snapshot (17c: dynamic from API) -->
 <div class="proto-outcomes reveal">
   <div class="proto-outcomes__box">
     <div class="proto-outcomes__heading">Is this working? — snapshot</div>
-    <div class="proto-outcomes__grid">
-      <div class="proto-outcomes__row">
-        <div class="proto-outcomes__protocol">Sleep protocol</div>
-        <div class="proto-outcomes__value on-target">7.7h avg &mdash; target: 8h &check;</div>
-      </div>
-      <div class="proto-outcomes__row">
-        <div class="proto-outcomes__protocol">Zone 2 cardio</div>
-        <div class="proto-outcomes__value below-target">3&ndash;4 sessions/week target &mdash; tracking</div>
-      </div>
-      <div class="proto-outcomes__row">
-        <div class="proto-outcomes__protocol">Intermittent fasting</div>
-        <div class="proto-outcomes__value" id="outcomes-adh-if">&mdash;</div>
-      </div>
-      <div class="proto-outcomes__row">
-        <div class="proto-outcomes__protocol">CGM time-in-range</div>
-        <div class="proto-outcomes__value on-target">Automated tracking active &check;</div>
-      </div>
-      <div class="proto-outcomes__row">
-        <div class="proto-outcomes__protocol">Resting HR trend</div>
-        <div class="proto-outcomes__value on-target">Trending down &check;</div>
-      </div>
-      <div class="proto-outcomes__row">
-        <div class="proto-outcomes__protocol">Strength training</div>
-        <div class="proto-outcomes__value" id="outcomes-adh-strength">&mdash;</div>
-      </div>
+    <div class="proto-outcomes__grid" id="outcomes-grid">
+      <div style="grid-column:1/-1;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);">Loading outcomes&hellip;</div>
     </div>
-    <div class="proto-outcomes__footer">Static snapshot — live adherence loads within each card below</div>
+    <div class="proto-outcomes__footer" id="outcomes-footer">Loading from API&hellip;</div>
   </div>
 </div>
 
@@ -535,16 +512,63 @@
     return html;
   }
 
+  // ── Render outcome snapshot from protocols + habits (17c) ──
+  function renderOutcomes(protocols, habitsData) {
+    var grid = document.getElementById('outcomes-grid');
+    var footer = document.getElementById('outcomes-footer');
+    if (!grid) return;
+
+    var ADH_KEYS = {
+      'sleep': 'sleep_adherence_pct',
+      'zone2': 'zone2_adherence_pct',
+      'if': 'if_adherence_pct',
+      'strength': 'strength_adherence_pct',
+      'cgm': 'cgm_adherence_pct',
+      'supplements': null
+    };
+
+    var html = '';
+    protocols.forEach(function(p) {
+      var signalCls = p.signal_status === 'positive' ? 'on-target' : p.signal_status === 'pending' ? 'below-target' : '';
+      var signalLabel = p.signal_status === 'positive' ? 'Positive' : p.signal_status === 'pending' ? 'Pending' : 'No signal';
+      var valueText = signalLabel;
+
+      // Append adherence if available
+      var adhKey = ADH_KEYS[p.slug];
+      if (adhKey && habitsData && habitsData[adhKey] !== undefined && habitsData[adhKey] !== null) {
+        var pct = Math.round(habitsData[adhKey]);
+        valueText = pct + '% adherence \u2014 ' + signalLabel;
+        signalCls = pct >= 80 ? 'on-target' : 'below-target';
+      } else if (p.signal_note) {
+        valueText += ' \u2014 ' + p.signal_note;
+      }
+
+      html += '<div class="proto-outcomes__row">';
+      html += '<div class="proto-outcomes__protocol">' + p.name + '</div>';
+      html += '<div class="proto-outcomes__value ' + signalCls + '">' + valueText + '</div>';
+      html += '</div>';
+    });
+
+    grid.innerHTML = html || '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);">No protocols loaded</div>';
+    if (footer) footer.textContent = 'Updated from API \u2014 live adherence loads within each card below';
+  }
+
   // ── Load protocols from API ──
+  var _cachedProtocols = [];
   fetch('/api/protocols')
     .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
     .then(function(data) {
       var protocols = data.protocols || [];
+      _cachedProtocols = protocols;
       var body = document.getElementById('proto-body');
       if (!protocols.length) {
         body.innerHTML = '<div style="padding:var(--space-12) 0;text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">No protocols found</div>';
+        renderOutcomes([], null);
         return;
       }
+      // Render outcome snapshot with signal data (adherence added later)
+      renderOutcomes(protocols, null);
+
       var pullQuote = '<div style="max-width:var(--max-width);margin:var(--space-6) auto;padding:var(--space-6) var(--page-padding);border-left:3px solid var(--accent);font-family:var(--font-display);font-size:var(--text-lg);color:var(--text-muted);line-height:var(--lh-body);font-style:italic;">&ldquo;The protocols aren&rsquo;t the interesting part. The interesting part is whether they survive contact with real data.&rdquo;</div>';
       var cards = protocols.map(renderCard);
       if (cards.length > 3) {
@@ -559,6 +583,8 @@
     })
     .catch(function() {
       document.getElementById('proto-body').innerHTML = '<div style="padding:var(--space-12) 0;text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">Could not load protocols — try refreshing</div>';
+      var grid = document.getElementById('outcomes-grid');
+      if (grid) grid.innerHTML = '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);">Could not load protocol data</div>';
     });
 
   // ── Load adherence data ──
@@ -586,17 +612,8 @@
             el.classList.remove('loading');
           }
         });
-        // Outcomes strip
-        var outMap = {'outcomes-adh-if': hData.if_adherence_pct, 'outcomes-adh-strength': hData.strength_adherence_pct};
-        Object.keys(outMap).forEach(function(id) {
-          var val = outMap[id], el = document.getElementById(id);
-          if (el && val !== undefined && val !== null) {
-            var pct = Math.round(val);
-            el.textContent = pct + '% adherence';
-            el.classList.remove('on-target','below-target');
-            el.classList.add(pct >= 80 ? 'on-target' : 'below-target');
-          }
-        });
+        // Re-render outcome snapshot with adherence data (17c)
+        renderOutcomes(_cachedProtocols, hData);
         // Vice streaks
         if (hData.caloric_target_streak !== undefined) {
           var sc = document.getElementById('streak-calories');

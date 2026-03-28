@@ -233,7 +233,10 @@
       .cost-context { border-left: none; border-top: 1px solid var(--border); padding-left: 0; padding-top: var(--space-8); }
       .decisions-grid { grid-template-columns: 1fr; }
       .cost-hero__amount { font-size: 72px; }
-      .cost-table .td-why { display: none; }
+      .cost-table thead .td-why { display: none; }
+      .cost-table tbody tr { display: block; margin-bottom: var(--space-4); border-bottom: 1px solid var(--border-subtle); }
+      .cost-table tbody td { display: block; padding: var(--space-2) var(--space-4); border-bottom: none; }
+      .cost-table tbody .td-why { display: block; padding-top: 0; font-style: italic; }
     }
   </style>
 </head>

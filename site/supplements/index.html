@@ -351,6 +351,7 @@
   .ev-legend { padding: var(--space-4) var(--page-padding-sm); gap: var(--space-3); }
   .rx-card__watch { grid-template-columns: 1fr; }
   .rx-genome__snp { grid-template-columns: 1fr; }
+  .rx-timing-grid { grid-template-columns: 1fr !important; }
 }
 
 /* ── Reveal ── */
@@ -412,6 +413,28 @@
   </div>
   <div style="margin-top:var(--space-4);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);">Part of <a href="/stack/" style="color:var(--accent);text-decoration:none;">The Stack</a> — the complete operating system</div>
 </header>
+
+<!-- Daily Timing Timeline (16c) -->
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border);">
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-6);">Daily Timing</div>
+  <div class="rx-timing-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-6);">
+    <div style="border:1px solid var(--border);padding:var(--space-5);">
+      <div style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--accent);margin-bottom:var(--space-2);">AM Stack</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);margin-bottom:var(--space-3);">With breakfast</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:2;">Omega-3 · Vitamin D3 · Creatine · AG1 · Electrolytes</div>
+    </div>
+    <div style="border:1px solid var(--border);padding:var(--space-5);">
+      <div style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--accent);margin-bottom:var(--space-2);">Pre-Training</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);margin-bottom:var(--space-3);">30 min before workout</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:2;">Whey Protein · Creatine (if missed AM)</div>
+    </div>
+    <div style="border:1px solid var(--border);padding:var(--space-5);">
+      <div style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--accent);margin-bottom:var(--space-2);">PM Stack</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);margin-bottom:var(--space-3);">Before bed</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:2;">Magnesium L-Threonate · Apigenin · L-Theanine · Glycine</div>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════ EVIDENCE LEGEND ═══════ -->
 <div class="ev-legend reveal">
@@ -640,6 +663,9 @@ function buildCard(s) {
         '<div class="rx-card__watch-label">What I\'m watching</div>' +
         '<div class="rx-card__watch-val">'+esc(s.watching)+'</div>' +
       '</div>' +
+    '</div>' +
+    '<div style="margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--border)">' +
+      '<button onclick="navigator.clipboard.writeText(window.location.href+\'#\'+\''+s.key+'\');this.textContent=\'Copied!\';setTimeout(()=>this.textContent=\'Share this supplement\',2000)" style="background:none;border:1px solid var(--border);color:var(--text-faint);font-family:var(--font-mono);font-size:var(--text-2xs);padding:var(--space-1) var(--space-3);cursor:pointer;letter-spacing:var(--ls-tag);">Share this supplement</button>' +
     '</div>' +
   '</div>';
 }
