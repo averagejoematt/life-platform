@@ -1,3 +1,38 @@
+## v4.2.1 — 2026-03-28: Full Offsite Implementation (548 Recommendations)
+
+Implemented all 4 parts of the pre-launch offsite board review in a single session. 20 commits, 60+ files changed.
+
+### Major Releases
+- **v4.1.0**: Decisions 16-24 + Part 3 meta-decisions (~170 features across 9 pages)
+- **v4.2.0**: Decisions 25-34 + Part 4 meta-discussions (~210 features across 10 pages)
+- **v4.2.1**: Audit sweep — all remaining should-haves + gap fixes
+
+### Highlights
+- Shared pipeline nav on all 6 Practice pages
+- "The Weekly Signal" → "The Measured Life" site-wide
+- Board personas: removed real public figures as chatbots, replaced with fictional advisors
+- Accent color: neon #00e5a0 → desaturated #3db88a (rollback available)
+- Retired // comment labels from 35+ pages
+- Dark mode text contrast fixed (WCAG AA)
+- Builders lessons rewritten for CIO credibility
+- CI/CD pipeline fixed (QA updated for JS-injected nav)
+- First Person page created (/first-person/)
+- Experiment detail overlay (mirrors challenges popup)
+- Supplement registry migrated from hardcoded JS to S3 config + API
+- 3 missing API endpoints added (benchmark_trends, meal_responses, experiment_suggest)
+- /api/subscriber_count endpoint added
+- Genome privacy guardrails on Chronicle + MCP tools
+- PubMed/Cochrane source links on 5 supplement cards
+- Breadcrumbs added to 9+ content pages
+- Sitemap expanded to 47 URLs
+- Nav highlight bug fixed (The Story no longer always green)
+- Redundant nav clutter removed from Practice pages
+
+### Deferred to Post-Launch
+PRE-13 (data publication review), 23a/23b (weekly snapshot Lambda), VIS-2 (Sleep/Glucose editorial), VIS-4 (OG images), 20p (reader challenge tracking), 21m (transformation timeline)
+
+---
+
 ## v3.9.41-offsite-p4 — 2026-03-27: Pre-Launch Offsite Part 4 Complete (Planning)
 
 Final session of 4-part pre-launch offsite board meeting. All 30+ pages reviewed. 34 decisions, ~548 total recommendations. No code shipped — planning session only.
