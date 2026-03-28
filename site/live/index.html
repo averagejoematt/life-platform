@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="The Pulse — daily glanceable state from 19 data sources. Scale, water, movement, lift, recovery, sleep, journal, mind.">
+  <meta name="description" content="The Pulse — daily glanceable state from 25 data sources. Scale, water, movement, lift, recovery, sleep, journal, mind.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta property="og:title" content="The Pulse — Matthew Walker">
-  <meta property="og:description" content="Live health dashboard — weight, HRV, sleep, habits, glucose from 19 data sources. Updated daily.">
-  <title>The Pulse — Matthew Walker</title>
+  <meta property="og:title" content="The Pulse — Matthew">
+  <meta property="og:description" content="Live health dashboard — weight, HRV, sleep, habits, glucose from 25 data sources. Updated daily.">
+  <title>The Pulse — Matthew</title>
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="stylesheet" href="/assets/css/tokens.css">
@@ -393,7 +393,7 @@
 </head>
 <body>
   <div id="amj-nav"></div>
-<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">The Pulse</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Today</span></nav>
+<div id="amj-hierarchy-nav"></div>
 
   <!-- ═══ LAYER 1: THE PULSE HEADLINE ═══ -->
   <section class="pulse-hero" id="pulse-hero">
@@ -845,7 +845,7 @@
     var API_BASE = (typeof AMJ !== 'undefined' && AMJ.API_BASE) ? AMJ.API_BASE : '';
 
     fetch(API_BASE + '/api/pulse')
-      .then(function(r) { return r.json(); })
+      .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
       .then(function(data) {
         var pulse = data.pulse || data;
         _lastPulse = pulse;

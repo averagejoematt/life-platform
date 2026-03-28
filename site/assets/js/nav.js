@@ -12,8 +12,16 @@
   var overlay = document.querySelector('.nav-overlay');
   var overlayClose = document.querySelector('.nav-overlay__close');
   var body = document.body;
+  var html = document.documentElement;
 
   var savedScrollY = 0;
+
+  // iOS Safari scroll-lock: prevent touchmove on anything outside the overlay
+  function blockBackgroundTouch(e) {
+    if (!overlay.contains(e.target)) {
+      e.preventDefault();
+    }
+  }
 
   function openMenu() {
     if (overlay) {
@@ -27,6 +35,8 @@
       body.style.top = '-' + savedScrollY + 'px';
       body.style.left = '0';
       body.style.right = '0';
+      html.style.overflow = 'hidden';
+      document.addEventListener('touchmove', blockBackgroundTouch, { passive: false });
     }
   }
   function closeMenu() {
@@ -37,6 +47,8 @@
       body.style.top = '';
       body.style.left = '';
       body.style.right = '';
+      html.style.overflow = '';
+      document.removeEventListener('touchmove', blockBackgroundTouch);
       window.scrollTo(0, savedScrollY);
       setTimeout(function() {
         if (!overlay.classList.contains('is-open')) {

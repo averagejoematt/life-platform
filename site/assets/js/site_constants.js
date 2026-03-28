@@ -16,18 +16,18 @@ window.AMJ = {
   journey: {
     start_weight:  302,
     goal_weight:   185,
-    start_date:    '2026-02-22',
+    start_date:    '2026-04-01',
     experiment_start: '2026-04-01',  // Day 1 of the public experiment
     phase:         'Launch',
     hero_tagline:  'Day 1. For real this time.',
-    hero_short:    '302 → 185. 19 data sources. Every number public.',
+    hero_short:    '302 → 185. 25 data sources. Every number public.',
     hero_copy:     'I built an AI health platform, got sick, fell off the wagon, and the system I built didn\'t catch me. So I\'m starting over — publicly. April 1, 2026 is Day 1. Every number, every failure, no filter.',
     cta_sub:       '302 lbs. A relapse. A relaunch. Day 1.',
   },
 
   // ── Platform ───────────────────────────────────────────────
   platform: {
-    data_sources:   19,
+    data_sources:   25,
     mcp_tools:      105,
     lambdas:        52,
     monthly_cost:   '~$13',
@@ -41,19 +41,19 @@ window.AMJ = {
 
   // ── Bios (press kit / about page) ─────────────────────────
   bios: {
-    fifty_word: 'Matthew Walker is a Senior IT Director who built a personal health intelligence platform from scratch using AI — no engineering degree required. 19 data sources, 105 AI tools, 52 AWS Lambda functions, running for ~$13/month. He publishes every number, every failure, every week.',
-    hundred_word: 'Matthew Walker is a Senior IT Director at a Seattle SaaS company and the creator of Life Platform — a personal health intelligence system built entirely with AI assistance. With no formal engineering background, Matthew used Claude as a development partner to build 19 data integrations, 105 intelligence tools, and a fully automated daily coaching brief that runs on AWS for ~$13/month. He documents every result publicly — wins, failures, and everything in between. His work is both a personal transformation project and a live proof-of-concept for enterprise AI adoption by non-engineers.',
+    fifty_word: 'Matthew is a Senior IT Director who built a personal health intelligence platform from scratch using AI — no engineering degree required. 25 data sources, 105 AI tools, 52 AWS Lambda functions, running for ~$13/month. He publishes every number, every failure, every week.',
+    hundred_word: 'Matthew is a Senior IT Director at a Seattle SaaS company and the creator of Life Platform — a personal health intelligence system built entirely with AI assistance. With no formal engineering background, Matthew used Claude as a development partner to build 19 data integrations, 105 intelligence tools, and a fully automated daily coaching brief that runs on AWS for ~$13/month. He documents every result publicly — wins, failures, and everything in between. His work is both a personal transformation project and a live proof-of-concept for enterprise AI adoption by non-engineers.',
   },
 
   // ── OG / meta descriptions ─────────────────────────────────
   meta: {
-    home:        'Day 1: April 1, 2026. 302 lbs. 19 data sources. An AI health platform. Every number public, every failure included.',
-    live:        'Real-time metrics from 19 data sources. Weight, HRV, recovery, habits, and the full transformation timeline.',
+    home:        'Day 1: April 1, 2026. 302 lbs. 25 data sources. An AI health platform. Every number public, every failure included.',
+    live:        'Real-time metrics from 25 data sources. Weight, HRV, recovery, habits, and the full transformation timeline.',
     story:       '302 lbs. And a decision to stop optimizing in the dark.',
     about:       'IT leader by day. Solo engineer by night. Building the infrastructure to change everything.',
-    platform:    '52 Lambda functions. 105 AI tools. 19 data sources. $13/month. A single-person health intelligence system on AWS serverless.',
+    platform:    '52 Lambda functions. 105 AI tools. 25 data sources. $13/month. A single-person health intelligence system on AWS serverless.',
     character:   '7-pillar scoring system: Sleep, Movement, Nutrition, Mind, Metabolic, Consistency, Relationships.',
-    methodology: 'Pearson r, Benjamini-Hochberg FDR, 19 data sources. The statistical framework behind the experiment.',
+    methodology: 'Pearson r, Benjamini-Hochberg FDR, 25 data sources. The statistical framework behind the experiment.',
   },
 
   // ── Reading paths (nav.js consumes these) ──────────────────

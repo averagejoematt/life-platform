@@ -51,7 +51,7 @@ HERO_WHY_PARAGRAPH = (
 )
 
 # Journey start date — used for "X days on journey" counter
-JOURNEY_START_DATE = "2026-02-22"
+JOURNEY_START_DATE = "2026-04-01"
 JOURNEY_START_WEIGHT = 302.0
 GOAL_WEIGHT = 185.0
 

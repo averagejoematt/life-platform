@@ -4,15 +4,15 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Data Explorer — cross-domain intelligence from 19 data sources. Discover what predicts what.">
-  <meta property="og:title" content="Data Explorer — Matthew Walker">
-  <meta property="og:description" content="Cross-domain intelligence — pick any two health metrics and see the real correlation. N=1 data science from 19 live sources.">
+  <meta name="description" content="Data Explorer — cross-domain intelligence from 25 data sources. Discover what predicts what.">
+  <meta property="og:title" content="Data Explorer — Matthew">
+  <meta property="og:description" content="Cross-domain intelligence — pick any two health metrics and see the real correlation. N=1 data science from 25 live sources.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <meta property="og:type" content="website">
-  <title>Data Explorer — Matthew Walker</title>
+  <title>Data Explorer — Matthew</title>
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <meta name="theme-color" content="#080c0a">
@@ -466,41 +466,15 @@
 <body class="body-signal">
 
 <div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
 
-<!-- 14a: Hero editorial feature cards -->
+<!-- 14a: Hero feature cards — populated dynamically from /api/correlations -->
 <section class="hero-findings animate-in">
   <div class="hero-findings__kicker">Start here</div>
   <h2 class="hero-findings__title">What the Data <span>Actually Says</span></h2>
-  <div class="hero-grid">
-    <div class="hero-card">
-      <div class="hero-card__headline">Sleep before 10 pm predicts 15% higher HRV</div>
-      <div class="hero-card__evidence">r = +0.52 | FDR significant | 90-day window</div>
-      <div class="hero-card__so-what">Earlier bedtimes consistently correlate with better next-day recovery scores. This is one of the strongest predictive relationships in the dataset.</div>
-      <a href="/sleep/" class="hero-card__link">Explore Sleep Observatory &rarr;</a>
-    </div>
-    <div class="hero-card">
-      <div class="hero-card__headline">Protein intake above 160 g tracks with better sleep quality</div>
-      <div class="hero-card__evidence">r = +0.41 | FDR significant | 14+ data points</div>
-      <div class="hero-card__so-what">High-protein days are followed by deeper sleep. The mechanism is unclear, but the signal is consistent across 90 days of paired data.</div>
-      <a href="/nutrition/" class="hero-card__link">Explore Nutrition Observatory &rarr;</a>
-    </div>
-    <div class="hero-card">
-      <div class="hero-card__headline">Strength training days show 12% lower next-day glucose variability</div>
-      <div class="hero-card__evidence">r = -0.47 | 1-day lag | FDR significant</div>
-      <div class="hero-card__so-what">Resistance exercise today means more stable blood sugar tomorrow. This cross-domain finding connects the gym to the CGM.</div>
-      <a href="/glucose/" class="hero-card__link">Explore Glucose Observatory &rarr;</a>
-    </div>
-    <div class="hero-card">
-      <div class="hero-card__headline">Journal entries on low-recovery days are 40% longer</div>
-      <div class="hero-card__evidence">r = -0.38 | same-day | FDR significant</div>
-      <div class="hero-card__so-what">When recovery is poor, reflection goes deeper. The inner life and the body are more connected than expected.</div>
-      <a href="/journal/" class="hero-card__link">Explore Journal &rarr;</a>
-    </div>
-    <div class="hero-card">
-      <div class="hero-card__headline">HRV above personal baseline predicts higher next-day training output</div>
-      <div class="hero-card__evidence">r = +0.44 | 1-day lag | FDR significant</div>
-      <div class="hero-card__so-what">Recovery score is not just a number -- it actually predicts performance. Resting when HRV is low appears to pay off.</div>
-      <a href="/training/" class="hero-card__link">Explore Training Observatory &rarr;</a>
+  <div class="hero-grid" id="hero-grid">
+    <div style="grid-column:1/-1;text-align:center;padding:var(--space-10) 0">
+      <div class="loading-pulse" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">Loading top findings&hellip;</div>
     </div>
   </div>
 </section>
@@ -527,14 +501,13 @@
   </div>
 </section>
 
-<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">&rsaquo;</span><span class="breadcrumb__section">Evidence</span><span class="breadcrumb__sep">&rsaquo;</span><span class="breadcrumb__current">Data Explorer</span></nav>
 
 <!-- 14k: Subtitle under title reflecting new framing -->
 <div class="exp-header animate-in">
   <div class="exp-header__kicker">The Data</div>
   <h1 class="exp-header__title">Data <span>Explorer</span></h1>
   <div class="exp-header__subtitle">Cross-Domain Intelligence &mdash; What Predicts What</div>
-  <p class="exp-header__sub">Every metric pair tells a story. Pick two variables and see what the data says. 90-day rolling correlations, FDR-corrected, from 19 live data sources.</p>
+  <p class="exp-header__sub">Every metric pair tells a story. Pick two variables and see what the data says. 90-day rolling correlations, FDR-corrected, from 25 live data sources.</p>
   <div class="exp-stats">
     <div class="exp-stat"><div class="exp-stat__label">Metric pairs</div><div class="exp-stat__value" id="stat-pairs">&mdash;</div></div>
     <div class="exp-stat"><div class="exp-stat__label">Significant</div><div class="exp-stat__value" id="stat-sig">&mdash;</div></div>
@@ -548,7 +521,7 @@
   <div class="cross-domain-callout">
     <div class="cross-domain-callout__kicker">Why this matters</div>
     <div class="cross-domain-callout__text">
-      <strong>Cross-domain findings are what single-tracker apps cannot show.</strong> Your Whoop cannot tell you that your sleep predicts your glucose response. Your CGM does not know about your training load. This explorer connects 19 data sources to surface relationships that no single device can see.
+      <strong>Cross-domain findings are what single-tracker apps cannot show.</strong> Your Whoop cannot tell you that your sleep predicts your glucose response. Your CGM does not know about your training load. This explorer connects 25 data sources to surface relationships that no single device can see.
     </div>
   </div>
 
@@ -687,6 +660,46 @@
     'weight': '/biology/', 'body_fat': '/biology/', 'muscle_mass': '/biology/',
     'supplements': '/supplements/', 'creatine': '/supplements/', 'magnesium': '/supplements/'
   };
+
+  // 14a: Render hero cards from top correlations
+  function renderHeroCards(pairs) {
+    var grid = document.getElementById('hero-grid');
+    if (!grid) return;
+
+    // Pick the top 5 significant correlations by |r|, preferring cross-domain pairs
+    var significant = pairs.filter(function(p) { return p.fdr_significant; });
+    significant.sort(function(a, b) { return Math.abs(b.r) - Math.abs(a.r); });
+
+    // Prefer cross-domain: source_a !== source_b
+    var crossDomain = significant.filter(function(p) { return p.source_a !== p.source_b; });
+    var pool = crossDomain.length >= 5 ? crossDomain : significant;
+    var top = pool.slice(0, 5);
+
+    if (top.length === 0) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:var(--space-8) 0;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">Not enough significant correlations yet. Check back after the next weekly compute.</div>';
+      return;
+    }
+
+    grid.innerHTML = top.map(function(p) {
+      var a = prettyLabel(p.label_a);
+      var b = prettyLabel(p.label_b);
+      var dir = p.r > 0 ? 'positively' : 'inversely';
+      var lagNote = p.correlation_type === 'lagged' ? ' (' + p.lag_days + '-day lag)' : '';
+      var rSign = p.r > 0 ? '+' : '';
+      var headline = a + ' ' + dir + ' correlates with ' + b + lagNote;
+      var evidence = 'r = ' + rSign + p.r.toFixed(2) + ' | ' + (p.fdr_significant ? 'FDR significant' : 'not significant') + ' | n=' + p.n + ' days';
+      var soWhat = p.description || interpret(p);
+      var obsLink = getObsLink(p.label_a) || getObsLink(p.label_b);
+      var linkHtml = obsLink ? '<a href="' + obsLink + '" class="hero-card__link">Explore data &rarr;</a>' : '';
+
+      return '<div class="hero-card">' +
+        '<div class="hero-card__headline">' + headline + '</div>' +
+        '<div class="hero-card__evidence">' + evidence + '</div>' +
+        '<div class="hero-card__so-what">' + soWhat + '</div>' +
+        linkHtml +
+        '</div>';
+    }).join('');
+  }
 
   function getObsLink(label) {
     var key = label.toLowerCase().replace(/\s+/g, '_');
@@ -938,6 +951,9 @@
       document.getElementById('stat-pairs').textContent = corr.count || allPairs.length;
       document.getElementById('stat-sig').textContent = allPairs.filter(function(p){return p.fdr_significant;}).length;
       document.getElementById('stat-week').textContent = corr.week || '\u2014';
+
+      // 14a: Populate hero cards from live data
+      renderHeroCards(allPairs);
 
       // 14c: Default filter is now 'significant'
       applyFilter('significant');

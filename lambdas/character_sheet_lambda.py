@@ -294,6 +294,33 @@ def load_raw_score_histories(yesterday_str, window=21):
 
 
 # ==============================================================================
+# FOOD DELIVERY MODIFIER — adjusts Nutrition pillar based on delivery streak
+# ==============================================================================
+
+def get_food_delivery_modifier():
+    """Returns a multiplier (0.85-1.10) for the Nutrition pillar based on delivery streak."""
+    try:
+        resp = table.get_item(Key={
+            'pk': 'USER#matthew#SOURCE#food_delivery',
+            'sk': 'STREAK#current'
+        })
+        streak = resp.get('Item', {})
+        if not streak:
+            return 1.0
+        streak_days = int(streak.get('streak_days', 0))
+        last_order = streak.get('last_order_date', '')
+        from datetime import datetime
+        if last_order == datetime.utcnow().strftime('%Y-%m-%d'):
+            return 0.85
+        if streak_days >= 30: return 1.10
+        if streak_days >= 14: return 1.05
+        if streak_days >= 7:  return 1.02
+        return 1.0
+    except Exception:
+        return 1.0
+
+
+# ==============================================================================
 # LAMBDA HANDLER
 # ==============================================================================
 
@@ -402,6 +429,15 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.error(f"[character] compute_character_sheet failed: {e}")
         return {"statusCode": 500, "body": f"Computation failed: {e}"}
+
+    # ── Food delivery modifier — adjust Nutrition pillar raw_score ──
+    fd_modifier = get_food_delivery_modifier()
+    if fd_modifier != 1.0 and "pillar_nutrition" in record:
+        _nut = record["pillar_nutrition"]
+        _orig = float(_nut.get("raw_score", 0))
+        _nut["raw_score"] = round(max(0, min(100, _orig * fd_modifier)), 1)
+        _nut["food_delivery_modifier"] = fd_modifier
+        logger.info(f"[character] Food delivery modifier {fd_modifier} applied to nutrition: {_orig} → {_nut['raw_score']}")
 
     char_level = record.get("character_level", 1)
     char_tier = record.get("character_tier", "Foundation")
@@ -584,7 +620,7 @@ def lambda_handler(event, context):
                 "level_events_count": len(events),
                 "next_tier":          "Momentum",
                 "next_tier_level":    21,
-                "started_date":       "2026-02-22",
+                "started_date":       "2026-04-01",
                 "challenge_bonus_xp": {k: v for k, v in (record.get("challenge_bonus_xp") or {}).items()},
             },
             pillars=pillars_for_site,

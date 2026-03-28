@@ -45,6 +45,11 @@ from mcp.tools_challenges import (
     tool_checkin_challenge, tool_list_challenges,
     tool_complete_challenge,
 )
+from mcp.tools_protocols import (
+    tool_create_protocol, tool_update_protocol,
+    tool_list_protocols, tool_retire_protocol,
+)
+from mcp.tools_food_delivery import tool_get_food_delivery
 
 TOOLS = {
     "get_sources": {
@@ -2466,6 +2471,134 @@ TOOLS = {
                     "reflection":   {"type": "string", "description": "What I'd do differently."},
                 },
                 "required": ["challenge_id"],
+            },
+        },
+    },
+
+    # ── Protocols ────────────────────────────────────────────────────────
+    "create_protocol": {
+        "fn": tool_create_protocol,
+        "schema": {
+            "name": "create_protocol",
+            "description": (
+                "Create a new health protocol. Protocols are the strategy layer — each defines an intervention, "
+                "its rationale, key metrics, related habits/supplements, and adherence target. "
+                "Use for: 'add a sleep protocol', 'create a new nutrition protocol', 'track my fasting protocol'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "name":                {"type": "string", "description": "Protocol name (e.g. 'Sleep Protocol')."},
+                    "slug":                {"type": "string", "description": "URL-safe ID. Auto-generated from name if omitted."},
+                    "domain":              {"type": "string", "description": "Domain: sleep, movement, nutrition, supplements, mental, social, discipline, metabolic, general."},
+                    "category":            {"type": "string", "description": "Display category (defaults to domain name)."},
+                    "pillar":              {"type": "string", "description": "Character sheet pillar this feeds."},
+                    "status":              {"type": "string", "description": "'active' (default), 'paused', or 'retired'."},
+                    "start_date":          {"type": "string", "description": "Start date YYYY-MM-DD (defaults to today)."},
+                    "description":         {"type": "string", "description": "Short description of the protocol."},
+                    "why":                 {"type": "string", "description": "Rationale — why this protocol matters."},
+                    "key_metrics":         {"type": "array", "items": {"type": "string"}, "description": "Metrics tracked by this protocol."},
+                    "key_finding":         {"type": "string", "description": "Most important finding so far."},
+                    "tracked_by":          {"type": "array", "items": {"type": "string"}, "description": "Data sources tracking this protocol."},
+                    "related_habits":      {"type": "array", "items": {"type": "string"}, "description": "Daily habits that execute this protocol."},
+                    "related_supplements": {"type": "array", "items": {"type": "string"}, "description": "Supplements supporting this protocol."},
+                    "experiment_tags":     {"type": "array", "items": {"type": "string"}, "description": "Tags linking to related experiments."},
+                    "adherence_target":    {"type": "integer", "description": "Target adherence percentage (default 90)."},
+                    "signal_status":       {"type": "string", "description": "'positive', 'neutral', 'negative', or 'pending'."},
+                    "signal_note":         {"type": "string", "description": "Short note on current signal."},
+                },
+                "required": ["name"],
+            },
+        },
+    },
+    "update_protocol": {
+        "fn": tool_update_protocol,
+        "schema": {
+            "name": "update_protocol",
+            "description": (
+                "Update fields on an existing protocol. Pass only the fields you want to change. "
+                "Use for: 'update sleep protocol signal', 'add a supplement to my fasting protocol', "
+                "'change protocol status to paused'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "protocol_id":         {"type": "string", "description": "Protocol ID (slug) to update."},
+                    "name":                {"type": "string", "description": "New name."},
+                    "description":         {"type": "string", "description": "New description."},
+                    "why":                 {"type": "string", "description": "New rationale."},
+                    "status":              {"type": "string", "description": "'active', 'paused', or 'retired'."},
+                    "domain":              {"type": "string", "description": "New domain."},
+                    "category":            {"type": "string", "description": "New category."},
+                    "pillar":              {"type": "string", "description": "New pillar."},
+                    "key_finding":         {"type": "string", "description": "Updated key finding."},
+                    "signal_status":       {"type": "string", "description": "'positive', 'neutral', 'negative', or 'pending'."},
+                    "signal_note":         {"type": "string", "description": "Updated signal note."},
+                    "key_metrics":         {"type": "array", "items": {"type": "string"}, "description": "Updated metrics list."},
+                    "tracked_by":          {"type": "array", "items": {"type": "string"}, "description": "Updated data sources."},
+                    "related_habits":      {"type": "array", "items": {"type": "string"}, "description": "Updated related habits."},
+                    "related_supplements": {"type": "array", "items": {"type": "string"}, "description": "Updated related supplements."},
+                    "experiment_tags":     {"type": "array", "items": {"type": "string"}, "description": "Updated experiment tags."},
+                    "adherence_target":    {"type": "integer", "description": "Updated adherence target percentage."},
+                },
+                "required": ["protocol_id"],
+            },
+        },
+    },
+    "list_protocols": {
+        "fn": tool_list_protocols,
+        "schema": {
+            "name": "list_protocols",
+            "description": (
+                "List all protocols, optionally filtered by status or domain. "
+                "Use for: 'show my protocols', 'list active protocols', 'what sleep protocols do I have?'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "description": "Filter by status: active, paused, retired."},
+                    "domain": {"type": "string", "description": "Filter by domain: sleep, movement, nutrition, etc."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "retire_protocol": {
+        "fn": tool_retire_protocol,
+        "schema": {
+            "name": "retire_protocol",
+            "description": (
+                "Retire a protocol — sets status to 'retired' and records the end date. "
+                "Use for: 'retire my fasting protocol', 'stop tracking CGM protocol'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "protocol_id": {"type": "string", "description": "Protocol ID (slug) to retire."},
+                    "reason":      {"type": "string", "description": "Why this protocol is being retired."},
+                },
+                "required": ["protocol_id"],
+            },
+        },
+    },
+    "get_food_delivery": {
+        "fn": tool_get_food_delivery,
+        "schema": {
+            "name": "get_food_delivery",
+            "description": (
+                "Food delivery behavioral intelligence — the platform's strongest non-wearable behavioral signal. "
+                "Views: dashboard (streak, this month, index trend), history (monthly timeline), "
+                "binge (multi-order days), streaks (clean periods), annual (year-by-year). "
+                "PRIVACY: Never surface raw dollar amounts in public-facing responses."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "view": {"type": "string", "enum": ["dashboard", "history", "binge", "streaks", "annual"],
+                             "description": "Which view to return. Default: dashboard."},
+                    "months": {"type": "integer", "description": "Months of history for history view. Default 12."},
+                },
+                "required": [],
             },
         },
     },

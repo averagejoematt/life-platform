@@ -38,7 +38,7 @@ MEM_CACHE_TTL   = 600  # 10 minutes
 # Fields stripped in lean queries
 _LEAN_STRIP = {"activities", "sport_types", "pk", "sk", "ingested_at", "source"}
 
-SOURCES = ["whoop", "withings", "strava", "todoist", "apple_health", "hevy", "eightsleep", "chronicling", "macrofactor", "garmin", "habitify", "notion", "labs", "dexa", "genome", "weather", "supplements", "state_of_mind", "habit_scores"]
+SOURCES = ["whoop", "withings", "strava", "todoist", "apple_health", "eightsleep", "chronicling", "macrofactor", "garmin", "habitify", "notion", "labs", "dexa", "genome", "weather", "supplements", "state_of_mind", "habit_scores", "health_auto_export", "dropbox_poll"]
 
 # ── Source-of-truth domain ownership ──
 _DEFAULT_SOURCE_OF_TRUTH = {
@@ -88,3 +88,4 @@ EXPOSURES_PK    = f"USER#{USER_ID}#SOURCE#exposures"
 FOOD_RESPONSES_PK = f"USER#{USER_ID}#SOURCE#food_responses"
 ANNOTATIONS_PK   = f"USER#{USER_ID}#SOURCE#discovery_annotations"
 CHALLENGES_PK    = f"USER#{USER_ID}#SOURCE#challenges"
+PROTOCOLS_PK     = f"USER#{USER_ID}#SOURCE#protocols"

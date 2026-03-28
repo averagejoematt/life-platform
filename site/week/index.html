@@ -5,7 +5,7 @@
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="This week by the numbers — weight, HRV, recovery, sleep, streak. Live data from Matthew's personal health OS.">
-  <meta property="og:title" content="This Week — Matthew Walker">
+  <meta property="og:title" content="This Week — Matthew">
   <meta property="og:description" content="Weekly snapshot: every metric that moved, every pillar scored, the best discovery of the week.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com/week/">
@@ -13,10 +13,10 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="This Week — Matthew Walker">
+  <meta name="twitter:title" content="This Week — Matthew">
   <meta name="twitter:description" content="Weekly snapshot: every metric that moved, every pillar scored.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <title>This Week — Matthew Walker</title>
+  <title>This Week — Matthew</title>
     <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
@@ -260,7 +260,7 @@
   <div>
     <div class="eyebrow" style="margin-bottom:var(--space-4)">The Data</div>
     <h1 class="week-header__title">This week, <span>by the numbers</span></h1>
-    <div class="week-header__sub">Live data from 19 sources &mdash; updated daily. Every metric visible, nothing filtered.</div>
+    <div class="week-header__sub">Live data from 25 sources &mdash; updated daily. Every metric visible, nothing filtered.</div>
   </div>
   <div class="week-header__date">
     <div class="week-header__week-label" id="week-label">Week —</div>
@@ -361,7 +361,7 @@
         if (weight && weight.textContent && weight.textContent !== '—') {
           var wText = weight.textContent.replace(/[^0-9.]/g,'');
           var weekText = wLabel ? wLabel.textContent : '';
-          var tweet = weekText + ': ' + wText + ' lbs, tracking 302→185 with 19 data sources + AI health OS. Every number public. averagejoematt.com/week/';
+          var tweet = weekText + ': ' + wText + ' lbs, tracking 302→185 with 25 data sources + AI health OS. Every number public. averagejoematt.com/week/';
           btn.href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(tweet);
         }
       }
@@ -375,7 +375,7 @@
 <aside style="max-width:var(--prose-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-top:1px solid var(--border-subtle);">
   <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-body);letter-spacing:var(--ls-label)">
     <span style="color:var(--accent-dim)">// N=1 DISCLAIMER</span><br>
-    All data is from Matthew Walker&rsquo;s personal health tracking system. Published weekly without filtering.
+    All data is from Matthew&rsquo;s personal health tracking system. Published weekly without filtering.
     Nothing here is medical advice.
   </p>
 </aside>
@@ -405,7 +405,7 @@ function deltaArrow(val, isGoodDown) {
 
 async function loadWeek() {
   // Week number
-  const start = new Date('2026-02-09');
+  const start = new Date('2026-04-01');
   const today = new Date();
   const days = Math.floor((today - start) / 86400000);
   const weekNum = Math.ceil(days / 7);

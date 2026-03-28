@@ -5,7 +5,7 @@
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="How I run a personal AI health operating system on AWS for ~$13/month. Real cost breakdown with receipts.">
-  <meta property="og:title" content="The $13/Month AI Health OS — Matthew Walker">
+  <meta property="og:title" content="The $13/Month AI Health OS — Matthew">
   <meta property="og:description" content="Lambda, DynamoDB, S3, CloudFront, Claude API. Real AWS numbers. How to build and run this for almost nothing.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com/cost/">
@@ -13,10 +13,10 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="The $13/Month AI Health OS — Matthew Walker">
-  <meta name="twitter:description" content="Real AWS cost breakdown. 19 data sources. 50 Lambdas. 95 AI tools. $13/month.">
+  <meta name="twitter:title" content="The $13/Month AI Health OS — Matthew">
+  <meta name="twitter:description" content="Real AWS cost breakdown. 25 data sources. 50 Lambdas. 95 AI tools. $13/month.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <title>The $13/Month Story — Matthew Walker</title>
+  <title>The $13/Month Story — Matthew</title>
     <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
@@ -88,7 +88,48 @@
       color: var(--text);
       margin-bottom: var(--space-4);
     }
-    .compare-row {
+    .stack-layer {
+      padding: var(--space-5) var(--space-6);
+      border: 1px solid var(--border-subtle);
+      margin-bottom: var(--space-3);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .stack-layer:last-child { margin-bottom: 0; }
+    .stack-layer__label {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .stack-layer__label strong { color: var(--text); }
+    .stack-layer__detail {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      margin-top: var(--space-1);
+    }
+    .stack-layer__cost {
+      font-family: var(--font-display);
+      font-size: 22px;
+      white-space: nowrap;
+      margin-left: var(--space-6);
+    }
+    .stack-layer--sources { background: var(--surface); }
+    .stack-layer--sources .stack-layer__cost { color: var(--text-muted); }
+    .stack-layer--infra { background: var(--surface); }
+    .stack-layer--infra .stack-layer__cost { color: var(--accent); }
+    .stack-total {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-5) var(--space-6);
+      border-top: 2px solid var(--border);
+      margin-top: var(--space-3);
+    }
+    .stack-total__label { font-family: var(--font-display); font-size: var(--text-h3); color: var(--text); }
+    .stack-total__cost { font-family: var(--font-display); font-size: 28px; color: var(--text); }
+    .replaces-section { margin-top: var(--space-8); }
+    .replaces-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -96,10 +137,8 @@
       border-bottom: 1px solid var(--border-subtle);
       font-size: var(--text-sm);
     }
-    .compare-row__name { color: var(--text-muted); }
-    .compare-row__cost { font-family: var(--font-mono); }
-    .compare-row__cost.theirs { color: var(--c-red-status); }
-    .compare-row__cost.mine { color: var(--accent); }
+    .replaces-row__name { color: var(--text-muted); }
+    .replaces-row__cost { font-family: var(--font-mono); color: var(--text-muted); }
 
     /* Cost table */
     .cost-section {
@@ -243,9 +282,9 @@
 <body>
 
 <div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
 </div>
 
-<nav class="breadcrumb"><a href="/">Home</a><span class="breadcrumb__sep">&rsaquo;</span><a href="/platform/" class="breadcrumb__section">The Build</a><span class="breadcrumb__sep">&rsaquo;</span><span class="breadcrumb__current">Cost</span></nav>
 
 
 
@@ -261,41 +300,53 @@
   <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body);margin-top:var(--space-5);max-width:560px;">I publish the bill because the enterprise health world obscures costs. Meaningful health intelligence doesn&rsquo;t require a budget.</p>
 </header>
 
-<!-- Headline cost comparison -->
+<!-- Headline cost + honest stack breakdown -->
 <div class="headline-cost reveal">
   <div class="cost-hero">
     <div class="cost-hero__amount">$13</div>
-    <div class="cost-hero__label">Per month to operate</div>
-    <div class="cost-hero__note">Average since launch. Varies $8&ndash;$18 depending on Claude API usage.</div>
+    <div class="cost-hero__label">Per month for the intelligence layer</div>
+    <div class="cost-hero__note">The infrastructure that connects, analyzes, and publishes all health data. Varies $8&ndash;$18 depending on Claude API usage.</div>
   </div>
   <div class="cost-context">
-    <div class="cost-context__compare">What the enterprise equivalent costs</div>
-    <div class="compare-row">
-      <span class="compare-row__name">Whoop + Apple Health coach app</span>
-      <span class="compare-row__cost theirs">$30/mo</span>
+    <div class="cost-context__compare">What the full stack actually costs</div>
+    <p style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-5);line-height:var(--lh-body);">The $13 doesn&rsquo;t replace the devices &mdash; it&rsquo;s what makes them talk to each other.</p>
+    <div class="stack-layer stack-layer--sources">
+      <div class="stack-layer__label">
+        <strong>Data sources</strong>
+        <div class="stack-layer__detail">Whoop, Eight Sleep, Garmin, MacroFactor, Levels CGM, etc.</div>
+      </div>
+      <span class="stack-layer__cost">~$65/mo</span>
     </div>
-    <div class="compare-row">
-      <span class="compare-row__name">Personal health analytics platform (Heads Up)</span>
-      <span class="compare-row__cost theirs">$60/mo</span>
+    <div class="stack-layer stack-layer--infra">
+      <div class="stack-layer__label">
+        <strong>Intelligence layer</strong>
+        <div class="stack-layer__detail">AWS Lambda, DynamoDB, CloudFront, Claude API &mdash; everything on this page</div>
+      </div>
+      <span class="stack-layer__cost">~$13/mo</span>
     </div>
-    <div class="compare-row">
-      <span class="compare-row__name">AI personal trainer app (Future)</span>
-      <span class="compare-row__cost theirs">$149/mo</span>
+    <div class="stack-total">
+      <span class="stack-total__label">Total monthly investment</span>
+      <span class="stack-total__cost">~$78/mo</span>
     </div>
-    <div class="compare-row">
-      <span class="compare-row__name">Custom health data engineer (hourly)</span>
-      <span class="compare-row__cost theirs">$200+/hr</span>
-    </div>
-    <div class="compare-row">
-      <span class="compare-row__name">DIY with ChatGPT + spreadsheets</span>
-      <span class="compare-row__cost" style="color:var(--text-muted)">Free <span style="font-size:var(--text-2xs);color:var(--text-faint)">(~10 hrs/week manual)</span></span>
-    </div>
-    <div class="compare-row" style="border-bottom:none">
-      <span class="compare-row__name"><strong>This platform (full stack, automated)</strong></span>
-      <span class="compare-row__cost mine"><strong>~$13/mo</strong></span>
-    </div>
-    <div style="margin-top:var(--space-6);padding:var(--space-4) var(--space-5);border:1px solid var(--border);background:var(--surface);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body);">
-      <strong style="color:var(--text)">Full picture:</strong> Infrastructure: ~$13/month. Wearable subscriptions (Whoop, Eight Sleep, etc.): additional ~$50&ndash;80/month &mdash; these are health device costs, not platform costs.
+
+    <div class="replaces-section">
+      <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-label);text-transform:uppercase;margin-bottom:var(--space-3);">What the $13 intelligence layer replaces</p>
+      <div class="replaces-row">
+        <span class="replaces-row__name">Personal health analytics platform (Heads Up, etc.)</span>
+        <span class="replaces-row__cost">$60&ndash;$150/mo</span>
+      </div>
+      <div class="replaces-row">
+        <span class="replaces-row__name">Custom health data engineer (contract)</span>
+        <span class="replaces-row__cost">$200+/hr</span>
+      </div>
+      <div class="replaces-row">
+        <span class="replaces-row__name">Concierge health coaching with data synthesis</span>
+        <span class="replaces-row__cost">$300&ndash;$500/mo</span>
+      </div>
+      <div class="replaces-row" style="border-bottom:none;">
+        <span class="replaces-row__name">DIY with ChatGPT + spreadsheets</span>
+        <span class="replaces-row__cost">Free <span style="font-size:var(--text-2xs);color:var(--text-faint)">(~10 hrs/week manual)</span></span>
+      </div>
     </div>
   </div>
 </div>

@@ -429,7 +429,7 @@ def build_week_state_summary(health_data, profile):
 
 def _compute_week_num(profile):
     try:
-        start = datetime.strptime(profile.get("journey_start_date", "2026-02-22"), "%Y-%m-%d").date()
+        start = datetime.strptime(profile.get("journey_start_date", "2026-04-01"), "%Y-%m-%d").date()
         today = datetime.now(timezone.utc).date()
         return max(1, ((today - start).days + 6) // 7)
     except Exception:
@@ -766,6 +766,23 @@ def build_email_html(ai_content, week_state, today_str):
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
 
+
+def record_email_send(table, lambda_name):
+    """Write a completion record so the status page can track last send."""
+    import time as _time
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        table.put_item(Item={
+            "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
+            "sk": f"DATE#{today}",
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+            "status": "success",
+            "ttl": int(_time.time()) + 86400 * 90
+        })
+    except Exception as e:
+        print(f"[status-tracking] Non-fatal write failure: {e}")
+
+
 def lambda_handler(event, context):
     logger.info("Monday Compass v1.0.0 starting...")
 
@@ -858,6 +875,7 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.warning(f"IC-15 failed (non-fatal): {e}")
 
+    record_email_send(table, "monday_compass")
     return {
         "statusCode": 200,
         "body": json.dumps({

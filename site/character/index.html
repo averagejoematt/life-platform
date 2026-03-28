@@ -16,7 +16,7 @@
   <meta property="og:title" content="Character Sheet — Level Up Your Life, Publicly">
   <meta property="og:description" content="RPG-style 7-pillar Character Score tracking physical, mental, and behavioral health. Real data.">
   <meta property="og:type" content="website">
-  <title>Character Sheet — Matthew Walker</title>
+  <title>Character Sheet — Matthew</title>
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
@@ -1235,7 +1235,7 @@
 <body data-tier="foundation">
 
 <div id="amj-nav"></div>
-<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">The Pulse</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">The Score</span></nav>
+<div id="amj-hierarchy-nav"></div>
 
 <!-- ═══ SECTION: IDENTITY (Decision 4k) ═══ -->
 <div class="section-label">Identity</div>
@@ -1249,7 +1249,7 @@
       </div>
       <div class="tc-identity">
         <div class="tc-class" id="tc-class">Foundation · Level 2</div>
-        <div class="tc-name">Matthew Walker</div>
+        <div class="tc-name">Matthew</div>
         <div class="tc-subtitle" id="tc-subtitle">// 20 days active · 38 total XP</div>
       </div>
       <div class="tc-composite" style="padding:var(--space-2);border-left:1px solid var(--border-subtle)">
@@ -1596,10 +1596,7 @@ const DEFAULTS = {
     { name:'consistency', emoji:'🎯', level:2, raw_score:14.3, xp_delta:-1, trend:'neutral' }
   ],
   timeline: [
-    { date:'2026-02-22', character_level:1, event:'Platform activated' },
-    { date:'2026-02-26', character_level:2, event:'First level up — all pillars' },
-    { date:'2026-02-28', character_level:2, event:'Nutrition joins the board' },
-    { date:'2026-03-11', character_level:2, event:'Second tier cycle complete' }
+    { date:'2026-04-01', character_level:1, event:'Day 1 — the experiment begins' }
   ],
   tiers: [
     { name:'Foundation', emoji:'🔨', min_level:1, max_level:20, status:'current' },
@@ -2100,7 +2097,7 @@ function hydrateBadges() {
     if (status) status.textContent = hint;
   }
 
-  fetch('https://averagejoematt.com/api/achievements')
+  fetch('/api/achievements')
     .then(r => r.ok ? r.json() : Promise.reject())
     .then(data => {
       const badges = (data && data.achievements) || (data && data.badges) || [];
@@ -2115,9 +2112,9 @@ function hydrateBadges() {
     .catch(() => {
       // Fallback: manual checks
       Promise.all([
-        fetch('https://averagejoematt.com/api/vitals').then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch('https://averagejoematt.com/api/character').then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch('https://averagejoematt.com/api/habit_streaks').then(r => r.ok ? r.json() : null).catch(() => null)
+        fetch('/api/vitals').then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch('/api/character').then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch('/api/habit_streaks').then(r => r.ok ? r.json() : null).catch(() => null)
       ]).then(([vitals, char, habits]) => {
         const streak = (habits?.habit_streaks || {}).aggregate_streak || 0;
         if (streak >= 7) earnBadge('badge-week-warrior');

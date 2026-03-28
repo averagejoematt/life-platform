@@ -222,7 +222,10 @@
         { href: '/weekly/', text: 'Weekly Snapshots' },
         { href: '/ask/', text: 'Ask the Data' },
         { href: '/subscribe/', text: 'Subscribe' },
-        { href: '/rss.xml', text: 'RSS' },
+      ]},
+      { heading: 'Internal', links: [
+        { href: '/status/', text: 'System Status', id: 'footer-status-link' },
+        { href: '/rss.xml', text: 'RSS Feed' },
         { href: '/privacy/', text: 'Privacy' },
       ]},
     ];
@@ -231,7 +234,11 @@
       html += '<div class="footer-v2__col">';
       html += '<div class="footer-v2__heading">' + col.heading + '</div>';
       col.links.forEach(function(link) {
-        html += '<a href="' + link.href + '" class="footer-v2__link">' + link.text + '</a>';
+        var linkId = link.id ? ' id="' + link.id + '"' : '';
+        var lockIcon = link.locked
+          ? ' <svg style="width:10px;height:10px;opacity:.45;vertical-align:middle;margin-left:2px" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="8" height="6" rx="1"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5"/></svg>'
+          : '';
+        html += '<a href="' + link.href + '" class="footer-v2__link"' + linkId + '>' + link.text + lockIcon + '</a>';
       });
       html += '</div>';
     });
@@ -273,7 +280,7 @@
     var slug = path.replace(/\//g, '').replace(/-/g, '') || 'home';
 
     var ctaHeadline = 'Get the data, every week.';
-    var ctaBody = 'Real numbers from <span data-const="platform.data_sources">19</span> data sources. No highlight reel. Every Wednesday, in your inbox.';
+    var ctaBody = 'Real numbers from <span data-const="platform.data_sources">25</span> data sources. No highlight reel. Every Wednesday, in your inbox.';
     if (path.startsWith('/chronicle') || path.startsWith('/journal')) {
       ctaHeadline = "Follow Elena's weekly chronicle.";
       ctaBody = 'Every Wednesday, a new dispatch. The real week \u2014 including the bad ones.';
@@ -282,7 +289,7 @@
       ctaBody = 'The story continues every week. Subscribe for the next chapter.';
     } else if (path === '/' || path === '/index.html') {
       ctaHeadline = 'Follow the experiment from Day 1.';
-      ctaBody = 'Real numbers from <span data-const="platform.data_sources">19</span> data sources. No highlight reel. Every Wednesday, in your inbox.';
+      ctaBody = 'Real numbers from <span data-const="platform.data_sources">25</span> data sources. No highlight reel. Every Wednesday, in your inbox.';
     } else if (path.startsWith('/sleep') || path.startsWith('/glucose') || path.startsWith('/nutrition') || path.startsWith('/training') || path.startsWith('/live') || path.startsWith('/character') || path.startsWith('/explorer')) {
       ctaHeadline = 'Get AI-powered insights weekly.';
       ctaBody = 'This data feeds a weekly digest with board commentary. No noise, just signal.';
@@ -308,11 +315,13 @@
     window.amjSubscribe = async function(slug) {
       var email = document.getElementById('cta-email-' + slug).value.trim();
       var msg = document.getElementById('cta-msg-' + slug);
+      var btn = document.querySelector('#amj-subscribe button, [onclick*="amjSubscribe"]');
       if (!email || !email.includes('@')) {
         msg.textContent = 'Enter a valid email address.';
         msg.style.color = 'var(--c-yellow-status)';
         return;
       }
+      if (btn) btn.disabled = true;
       msg.textContent = 'Subscribing\u2026';
       msg.style.color = 'var(--text-muted)';
       try {
@@ -333,59 +342,37 @@
       } catch (e) {
         msg.textContent = 'Network error \u2014 try again.';
         msg.style.color = 'var(--c-yellow-status)';
+      } finally {
+        if (btn) btn.disabled = false;
       }
     };
   }
 
-  // ── PIPELINE NAV — shared Practice section component (P-SHARED) ──
-  var PIPELINE_STEPS = [
-    { href: '/stack/',       label: 'Stack' },
-    { href: '/protocols/',   label: 'Protocols' },
-    { href: '/supplements/', label: 'Supplements' },
-    { href: '/experiments/', label: 'Experiments' },
-    { href: '/challenges/',  label: 'Challenges' },
-    { href: '/discoveries/', label: 'Discoveries' },
-  ];
-
-  var HIER_CONTEXT = {
-    '/stack/':        'The complete picture \u2014 every protocol, habit, experiment, and supplement organized by domain.',
-    '/protocols/':    'Protocols are the <strong>strategy layer</strong>. Each one contains <a href="/habits/">daily habits</a> that execute it, and may spawn <a href="/experiments/">experiments</a> to test variations.',
-    '/habits/':       'Habits are the <strong>daily execution layer</strong> of each <a href="/protocols/">protocol</a>. Sustained habits unlock <a href="/achievements/">milestones</a> and feed your <a href="/character/">character score</a>.',
-    '/experiments/':  'Experiments are <strong>time-bounded tests</strong> of <a href="/protocols/">protocol</a> variations. Each has a hypothesis, defined duration, and produces data that becomes a <a href="/discoveries/">discovery</a>.',
-    '/challenges/':   'Challenges are <strong>action-oriented goals</strong> generated from journal patterns, data signals, and confirmed <a href="/experiments/">experiments</a>. Complete them to earn XP and level up your <a href="/character/">character</a>.',
-    '/discoveries/':  'Discoveries are <strong>validated insights</strong> from completed <a href="/experiments/">experiments</a>. Confirmed findings feed back into <a href="/protocols/">protocols</a>.',
-    '/supplements/':  'Supplements <strong>support the protocols</strong>. Each one has a rationale, evidence tier, and links to the <a href="/protocols/">protocol</a> it serves.',
-    '/achievements/': 'Milestones are <strong>thresholds unlocked</strong> by sustained <a href="/habits/">habit</a> execution, <a href="/experiments/">experiment</a> completion, and <a href="/character/">character</a> growth. Computed from live data.',
-  };
-
-  function buildPipelineNav() {
-    var isPracticePage = PIPELINE_STEPS.some(function(s) { return s.href === path; });
-    if (!isPracticePage) return '';
-    var html = '<style>.pipeline-nav{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-4) var(--page-padding);border-bottom:1px solid var(--border);background:var(--surface);font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);overflow-x:auto}.pipeline-nav__step{color:var(--text-faint);text-decoration:none;text-transform:uppercase;white-space:nowrap;padding:var(--space-1) var(--space-3);border:1px solid transparent;transition:color .15s}.pipeline-nav__step:hover{color:var(--text-muted)}.pipeline-nav__step.active{color:var(--accent);border-color:var(--accent-dim)}.pipeline-nav__arrow{color:var(--border)}</style>';
-    html += '<nav class="pipeline-nav" aria-label="Practice lifecycle">';
-    PIPELINE_STEPS.forEach(function(step, i) {
-      if (i > 0) html += '<span class="pipeline-nav__arrow">\u2192</span>';
-      var cls = 'pipeline-nav__step' + (step.href === path ? ' active' : '');
-      html += '<a href="' + step.href + '" class="' + cls + '">' + step.label + '</a>';
-    });
-    html += '</nav>';
-    return html;
-  }
-
-  function buildHierarchyNav() {
-    // Pipeline nav for Practice pages; context blurb only for non-Practice hierarchy pages
-    var pipelineHtml = buildPipelineNav();
-    var html = pipelineHtml;
-    // Skip "Where this fits" blurb on Practice pages — pipeline nav already provides context
-    if (!pipelineHtml) {
-      var contextText = HIER_CONTEXT[path];
-      if (contextText) {
-        html += '<div style="margin:12px var(--page-padding);padding:10px 14px;border-left:2px solid var(--accent);background:var(--surface);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body);">';
-        html += '<span style="font-size:var(--text-2xs);font-weight:500;color:var(--accent);letter-spacing:0.04em;text-transform:uppercase;">Where this fits</span><br>';
-        html += contextText;
-        html += '</div>';
+  // ── SECTION SUB-NAV — consistent across all sections ──────
+  function buildSectionNav() {
+    // Find which section owns the current path
+    var currentSection = null;
+    for (var i = 0; i < SECTIONS.length; i++) {
+      if (sectionOwnsPath(SECTIONS[i], path)) {
+        currentSection = SECTIONS[i];
+        break;
       }
     }
+    if (!currentSection) return '';
+
+    var items = getSectionItems(currentSection);
+    // Don't show sub-nav if section has fewer than 3 pages or we're on the homepage
+    if (items.length < 3 || path === '/') return '';
+
+    var html = '<style>.section-nav{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-4) var(--page-padding);border-bottom:1px solid var(--border);background:var(--surface);font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);overflow-x:auto;-webkit-overflow-scrolling:touch}.section-nav__step{color:var(--text-faint);text-decoration:none;text-transform:uppercase;white-space:nowrap;padding:var(--space-1) var(--space-3);border:1px solid transparent;transition:color .15s}.section-nav__step:hover{color:var(--text-muted)}.section-nav__step.active{color:var(--accent);border-color:var(--accent-dim)}.section-nav__sep{color:var(--border)}</style>';
+    html += '<nav class="section-nav" aria-label="' + currentSection.label + '">';
+    items.forEach(function(item, i) {
+      if (i > 0) html += '<span class="section-nav__sep">\u00B7</span>';
+      var isActive = isItemActive(item.href, path);
+      var cls = 'section-nav__step' + (isActive ? ' active' : '');
+      html += '<a href="' + item.href + '" class="' + cls + '">' + item.text + '</a>';
+    });
+    html += '</nav>';
     return html;
   }
 
@@ -405,7 +392,7 @@
     spacer.className = 'nav-spacer';
     navMount.parentNode.insertBefore(spacer, navMount.nextSibling);
   }
-  if (hierNavMount)   hierNavMount.innerHTML = buildHierarchyNav();
+  if (hierNavMount)   hierNavMount.innerHTML = buildSectionNav();
   if (subscribeMount) subscribeMount.innerHTML = buildSubscribeCTA();
   if (bottomNavMount) bottomNavMount.innerHTML = buildBottomNav();
   if (footerMount)    footerMount.innerHTML = buildFooter();
@@ -460,5 +447,27 @@
     cdScript.async = false;
     document.body.appendChild(cdScript);
   }
+
+  // ── Status dot: fetch /api/status/summary and update footer link ──
+  (function() {
+    var statusLink = document.getElementById('footer-status-link');
+    if (!statusLink) return;
+
+    var dot = document.createElement('span');
+    dot.style.cssText = 'display:inline-block;width:6px;height:6px;border-radius:50%;background:#888780;margin-right:5px;vertical-align:middle;transition:background .3s';
+    statusLink.insertBefore(dot, statusLink.firstChild);
+
+    fetch('/api/status/summary')
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        if (!data) return;
+        var colors = { green: '#639922', yellow: '#BA7517', red: '#E24B4A' };
+        dot.style.background = colors[data.overall] || '#888780';
+        dot.title = data.overall === 'green' ? 'All systems operational'
+                  : data.overall === 'yellow' ? 'Degraded performance'
+                  : 'Service disruption';
+      })
+      .catch(function() {});
+  })();
 
 })();

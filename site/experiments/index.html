@@ -816,7 +816,6 @@
 
 <div id="amj-nav"></div>
 
-<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><a href="/stack/" class="breadcrumb__section">The Practice</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Experiments</span></nav>
 
 <div id="amj-hierarchy-nav"></div>
 
@@ -859,7 +858,7 @@
   <div class="explainer__item">
     <div class="explainer__num">D</div>
     <div class="explainer__label">Data</div>
-    <div class="explainer__desc">Results from 19 live data sources — sleep, HRV, glucose, body composition, habits. Compared against pre-experiment baseline.</div>
+    <div class="explainer__desc">Results from 25 live data sources — sleep, HRV, glucose, body composition, habits. Compared against pre-experiment baseline.</div>
   </div>
 </div>
 
@@ -970,8 +969,8 @@
   <div class="methodology__label">On the methodology</div>
   <div class="methodology__text">
     <p>These are <strong>N=1 experiments</strong> — single-subject self-experiments with no control group. The scientific limitations are real: no blinding, no randomization, seasonal confounders, regression to the mean. Results apply to me specifically and may not generalize.</p>
-    <p>What makes them useful anyway: <strong>consistency of measurement</strong>. With 19 live data sources running continuously, the baseline data is dense enough that meaningful signal can emerge from even a single-person study — particularly for outcomes with low day-to-day variance like resting HRV and fasting glucose.</p>
-    <p>The library experiments are <strong>graded by evidence tier</strong>: ●●● Strong (multiple RCTs), ●● Moderate (observational studies), ● Emerging (preclinical or anecdotal). And each experiment is classified as <strong>Measurable</strong> (has a biomarker endpoint from my 19 data sources) or <strong>Behavioral</strong> (compliance tracking is the outcome).</p>
+    <p>What makes them useful anyway: <strong>consistency of measurement</strong>. With 25 live data sources running continuously, the baseline data is dense enough that meaningful signal can emerge from even a single-person study — particularly for outcomes with low day-to-day variance like resting HRV and fasting glucose.</p>
+    <p>The library experiments are <strong>graded by evidence tier</strong>: ●●● Strong (multiple RCTs), ●● Moderate (observational studies), ● Emerging (preclinical or anecdotal). And each experiment is classified as <strong>Measurable</strong> (has a biomarker endpoint from my 25 data sources) or <strong>Behavioral</strong> (compliance tracking is the outcome).</p>
   </div>
 </div>
 
@@ -1044,7 +1043,7 @@
     var active = experiments.filter(function(e) { return e.status === 'active'; });
     var grid = document.getElementById('mc-grid');
     if (!active.length) {
-      grid.innerHTML = '<div class="mc-empty"><div class="mc-empty__title">The lab opens April 1</div><div class="mc-empty__sub">The first experiments launch the week of April 1. Each tests one variable with a minimum 14-day window and dense data from 19 sources. Vote below to decide what runs first.</div></div>';
+      grid.innerHTML = '<div class="mc-empty"><div class="mc-empty__title">The lab opens April 1</div><div class="mc-empty__sub">The first experiments launch the week of April 1. Each tests one variable with a minimum 14-day window and dense data from 25 sources. Vote below to decide what runs first.</div></div>';
       return;
     }
     grid.innerHTML = active.map(function(exp) {
@@ -1273,19 +1272,19 @@
     if (exp.mechanism) {
       body += '<div class="exp-field"><div class="exp-field__label">Mechanism</div><div class="exp-field__value">' + esc(exp.mechanism) + '</div></div>';
     }
-    // Source
-    var srcText = '';
-    if (exp.source_type === 'podcast' && exp.source_podcast) {
-      srcText = exp.source_podcast;
-      if (exp.source_speaker) srcText += ' \u00B7 ' + exp.source_speaker;
-      if (exp.source_episode) srcText += ' \u00B7 ' + exp.source_episode;
-    } else if (exp.source) {
-      srcText = exp.source;
-    }
-    if (srcText) {
-      body += '<div class="exp-field"><div class="exp-field__label">Source</div><div class="exp-field__value">' + esc(srcText);
-      if (exp.source_url) body += '<br><a href="' + esc(exp.source_url) + '" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;">View source \u2192</a>';
-      body += '</div></div>';
+    // Sources
+    if (exp.sources && exp.sources.length) {
+      var srcHtml = exp.sources.map(function(s) {
+        var icon = s.type === 'podcast' ? '\uD83C\uDFA7' : s.type === 'book' ? '\uD83D\uDCDA' : '\uD83D\uDCCE';
+        var label = s.type === 'paper' ? 'PubMed' : s.type === 'scholar' ? 'Google Scholar' : s.type === 'podcast' ? 'Podcast' : s.type === 'book' ? 'Book' : 'Source';
+        return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener" style="display:block;color:var(--text-muted);text-decoration:none;padding:var(--space-2) 0;border-bottom:1px solid var(--border-subtle);font-size:var(--text-xs);line-height:var(--lh-body)">' +
+          '<span style="margin-right:var(--space-2)">' + icon + '</span>' +
+          '<span style="color:var(--text)">' + esc(s.title) + '</span>' +
+          '<span style="color:var(--accent);margin-left:var(--space-2);font-size:var(--text-2xs)">' + label + ' \u2192</span></a>';
+      }).join('');
+      body += '<div class="exp-field"><div class="exp-field__label">Sources</div><div class="exp-field__value">' + srcHtml + '</div></div>';
+    } else if (exp.evidence_citation) {
+      body += '<div class="exp-field"><div class="exp-field__label">Source</div><div class="exp-field__value">' + esc(exp.evidence_citation) + '</div></div>';
     }
     if (exp.metrics_tracked && exp.metrics_tracked.length) {
       body += '<div class="exp-field"><div class="exp-field__label">Tracked Metrics</div><div class="exp-field__value">' + exp.metrics_tracked.map(function(m) { return esc(m); }).join(', ') + '</div></div>';

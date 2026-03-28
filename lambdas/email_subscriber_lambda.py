@@ -224,7 +224,7 @@ def _send_confirmation_email(email: str, confirm_url: str) -> None:
 def handle_confirm(token: str, email_hash_prefix: str) -> dict:
     """Validate token, confirm subscription, send welcome email."""
     if not token or len(token) != 64:
-        return _redirect(f"{SITE_URL}/subscribe?error=invalid_token")
+        return _redirect(f"{SITE_URL}/subscribe/confirm/?error=invalid_token")
 
     # Find record by scanning for matching token (DDB has no GSI — acceptable
     # given low subscriber volume at launch; add GSI if >10K subs)
@@ -241,11 +241,11 @@ def handle_confirm(token: str, email_hash_prefix: str) -> dict:
         items = resp.get("Items", [])
     except Exception as exc:
         logger.error("confirm: DDB query failed: %s", exc)
-        return _redirect(f"{SITE_URL}/subscribe?error=server_error")
+        return _redirect(f"{SITE_URL}/subscribe/confirm/?error=server_error")
 
     if not items:
         logger.warning("confirm: no record for token %s", token[:8])
-        return _redirect(f"{SITE_URL}/subscribe?error=invalid_token")
+        return _redirect(f"{SITE_URL}/subscribe/confirm/?error=invalid_token")
 
     record = items[0]
     email  = record.get("email", "")
@@ -254,11 +254,11 @@ def handle_confirm(token: str, email_hash_prefix: str) -> dict:
     expires = record.get("token_expires", "")
     if expires and datetime.now(timezone.utc).isoformat() > expires:
         logger.warning("confirm: expired token for %s", record.get("email_hash", "")[:8])
-        return _redirect(f"{SITE_URL}/subscribe?error=token_expired")
+        return _redirect(f"{SITE_URL}/subscribe/confirm/?error=token_expired")
 
     # Already confirmed
     if record.get("status") == "confirmed":
-        return _redirect(f"{SITE_URL}/subscribe?confirmed=already")
+        return _redirect(f"{SITE_URL}/subscribe/confirm/?confirmed=already")
 
     # Confirm
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -271,11 +271,11 @@ def handle_confirm(token: str, email_hash_prefix: str) -> dict:
         )
     except Exception as exc:
         logger.error("confirm: DDB update failed: %s", exc)
-        return _redirect(f"{SITE_URL}/subscribe?error=server_error")
+        return _redirect(f"{SITE_URL}/subscribe/confirm/?error=server_error")
 
     logger.info("confirmed subscriber: %s", record.get("email_hash", "")[:8])
     _send_welcome_email(email)
-    return _redirect(f"{SITE_URL}/subscribe?confirmed=true")
+    return _redirect(f"{SITE_URL}/subscribe/confirm/?confirmed=true")
 
 
 def _send_welcome_email(email: str) -> None:
@@ -347,10 +347,10 @@ def handle_unsubscribe(email: str) -> dict:
     existing = _get_record(email_hash)
     if not existing:
         # Not found — return success silently (don't leak subscription status)
-        return _redirect(f"{SITE_URL}/subscribe?unsubscribed=true")
+        return _redirect(f"{SITE_URL}/subscribe/confirm/?unsubscribed=true")
 
     if existing.get("status") == "unsubscribed":
-        return _redirect(f"{SITE_URL}/subscribe?unsubscribed=already")
+        return _redirect(f"{SITE_URL}/subscribe/confirm/?unsubscribed=already")
 
     try:
         table.update_item(
@@ -361,10 +361,10 @@ def handle_unsubscribe(email: str) -> dict:
         )
     except Exception as exc:
         logger.error("unsubscribe: DDB update failed: %s", exc)
-        return _redirect(f"{SITE_URL}/subscribe?error=server_error")
+        return _redirect(f"{SITE_URL}/subscribe/confirm/?error=server_error")
 
     logger.info("unsubscribed: %s", email_hash[:8])
-    return _redirect(f"{SITE_URL}/subscribe?unsubscribed=true")
+    return _redirect(f"{SITE_URL}/subscribe/confirm/?unsubscribed=true")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -393,7 +393,7 @@ def lambda_handler(event, context):
     if action == "unsubscribe":
         email = params.get("email", "")
         if not email:
-            return _redirect(f"{SITE_URL}/subscribe?error=missing_email")
+            return _redirect(f"{SITE_URL}/subscribe/confirm/?error=missing_email")
         return handle_unsubscribe(email)
 
     # Default: subscribe (POST body)
