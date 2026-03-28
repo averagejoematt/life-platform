@@ -73,6 +73,7 @@
     { label: 'The Chronicle', items: [
       { href: '/chronicle/', text: 'Chronicle Archive' },
       { href: '/weekly/',    text: 'Weekly Snapshots' },
+      { href: '/recap/',     text: 'Weekly Recap' },
       { href: '/ask/',       text: 'Ask the Data' },
       { href: '/subscribe/', text: 'Subscribe' },
     ]},
@@ -222,6 +223,7 @@
       { heading: 'The Chronicle', links: [
         { href: '/chronicle/', text: 'Chronicle Archive' },
         { href: '/weekly/', text: 'Weekly Snapshots' },
+        { href: '/recap/', text: 'Weekly Recap' },
         { href: '/ask/', text: 'Ask the Data' },
         { href: '/subscribe/', text: 'Subscribe' },
       ]},
