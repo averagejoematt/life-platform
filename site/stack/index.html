@@ -245,15 +245,14 @@
 <body>
 <div id="amj-nav"></div>
 
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">The Practice</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">The Stack</span></nav>
 <div id="amj-hierarchy-nav"></div>
 
 <header class="stack-hero reveal">
-  <div class="eyebrow" style="margin-bottom:var(--space-4)">The Method</div>
+  <div class="eyebrow" style="margin-bottom:var(--space-4)">The Practice</div>
   <h1 class="stack-hero__title">The <em>Stack</em></h1>
   <p class="stack-hero__sub">
-    Everything I do &mdash; every protocol, daily habit, experiment, and supplement &mdash;
-    organized by domain. The complete picture in one place.
-    Tap any card to go deeper.
+    I run my health like a lab. Here&rsquo;s the complete operating system &mdash; every protocol, supplement, experiment, and daily habit organized by domain. The stack evolves: challenges become experiments, experiments become protocols, protocols become the daily operating system. What you see here is what survived.
   </p>
   <div class="stack-hero__stats">
     <div class="stack-stat">
@@ -273,7 +272,46 @@
       <div class="stack-stat__val">19</div>
     </div>
   </div>
+  <div style="margin-top:var(--space-6);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);">Tracked by 19 independent data sources. No self-reporting. Every claim verifiable.</div>
 </header>
+
+<!-- Lifecycle Pipeline Visualization (P-1, 18b, P-5) -->
+<div class="stack-pipeline reveal" style="max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border);">
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-6);">// The Lifecycle</div>
+  <div style="display:flex;align-items:center;gap:var(--space-4);flex-wrap:wrap;justify-content:center;">
+    <a href="/challenges/" style="text-decoration:none;text-align:center;padding:var(--space-4) var(--space-6);border:1px solid var(--border);background:var(--surface);min-width:120px;transition:border-color .15s;">
+      <div style="font-family:var(--font-display);font-size:28px;color:var(--c-amber-500);line-height:1;" id="pl-challenges">66</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-top:var(--space-2);">Challenges</div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);margin-top:2px;">the dare</div>
+    </a>
+    <div style="font-family:var(--font-mono);color:var(--border);font-size:var(--text-xs);">&rarr;</div>
+    <a href="/experiments/" style="text-decoration:none;text-align:center;padding:var(--space-4) var(--space-6);border:1px solid var(--border);background:var(--surface);min-width:120px;transition:border-color .15s;">
+      <div style="font-family:var(--font-display);font-size:28px;color:var(--accent);line-height:1;" id="pl-experiments">52</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-top:var(--space-2);">Experiments</div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);margin-top:2px;">the controlled test</div>
+    </a>
+    <div style="font-family:var(--font-mono);color:var(--border);font-size:var(--text-xs);">&rarr;</div>
+    <a href="/protocols/" style="text-decoration:none;text-align:center;padding:var(--space-4) var(--space-6);border:1px solid var(--border);background:var(--surface);min-width:120px;transition:border-color .15s;">
+      <div style="font-family:var(--font-display);font-size:28px;color:var(--accent);line-height:1;">6</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-top:var(--space-2);">Protocols</div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);margin-top:2px;">the validated intervention</div>
+    </a>
+    <div style="font-family:var(--font-mono);color:var(--border);font-size:var(--text-xs);">&rarr;</div>
+    <div style="text-align:center;padding:var(--space-4) var(--space-6);border:2px solid var(--accent);background:rgba(0,229,160,0.04);min-width:120px;">
+      <div style="font-family:var(--font-display);font-size:28px;color:var(--accent);line-height:1;">The Stack</div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);margin-top:var(--space-2);">current configuration</div>
+    </div>
+    <div style="font-family:var(--font-mono);color:var(--border);font-size:var(--text-xs);">&rarr;</div>
+    <a href="/discoveries/" style="text-decoration:none;text-align:center;padding:var(--space-4) var(--space-6);border:1px solid var(--border);background:var(--surface);min-width:120px;transition:border-color .15s;">
+      <div style="font-family:var(--font-display);font-size:28px;color:var(--accent);line-height:1;" id="pl-discoveries">&mdash;</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-top:var(--space-2);">Discoveries</div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);margin-top:2px;">the published result</div>
+    </a>
+  </div>
+  <p style="text-align:center;font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);margin-top:var(--space-4);letter-spacing:var(--ls-tag);">
+    Challenges become experiments. Experiments become protocols. Protocols become the stack. Discoveries are the output at every stage.
+  </p>
+</div>
 
 <div class="stack-body" id="domains-container">
   <div style="padding:var(--space-12);text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);letter-spacing:var(--ls-tag);animation:pulse 1.5s ease-in-out infinite">// loading domains from API…</div>
@@ -281,31 +319,31 @@
 
 <!-- Reading order / deep dive links -->
 <div class="stack-reading-order reveal">
-  <div class="reading-order__heading">// go deeper</div>
+  <div class="reading-order__heading">// go deeper — lifecycle order</div>
   <div class="reading-order__grid">
-    <a href="/habits/" class="reading-order__card">
-      <div class="reading-order__card-name">The Operating System</div>
-      <div class="reading-order__card-sub">37 habits &middot; RPG tier system &middot; heatmap</div>
+    <a href="/protocols/" class="reading-order__card">
+      <div class="reading-order__card-name">Protocols</div>
+      <div class="reading-order__card-sub">What I run daily &middot; adherence &middot; signal</div>
+    </a>
+    <a href="/supplements/" class="reading-order__card">
+      <div class="reading-order__card-name">The Pharmacy</div>
+      <div class="reading-order__card-sub">21 supplements &middot; evidence-rated &middot; genome-informed</div>
     </a>
     <a href="/experiments/" class="reading-order__card">
       <div class="reading-order__card-name">The Lab</div>
-      <div class="reading-order__card-sub">52 experiments &middot; vote &middot; challenges</div>
+      <div class="reading-order__card-sub">52 experiments &middot; vote on what runs next</div>
     </a>
-    <a href="/supplements/" class="reading-order__card">
-      <div class="reading-order__card-name">Supplements</div>
-      <div class="reading-order__card-sub">Full stack with data + rationale</div>
-    </a>
-    <a href="/achievements/" class="reading-order__card">
-      <div class="reading-order__card-name">Milestones</div>
-      <div class="reading-order__card-sub">Badge wall &middot; weight &middot; streaks &middot; levels</div>
-    </a>
-    <a href="/explorer/" class="reading-order__card">
-      <div class="reading-order__card-name">Data Explorer</div>
-      <div class="reading-order__card-sub">Pick any two metrics &middot; scatter plot</div>
+    <a href="/challenges/" class="reading-order__card">
+      <div class="reading-order__card-name">The Arena</div>
+      <div class="reading-order__card-sub">66 challenges &middot; daily check-in &middot; badges</div>
     </a>
     <a href="/discoveries/" class="reading-order__card">
       <div class="reading-order__card-name">Discoveries</div>
-      <div class="reading-order__card-sub">What the experiments proved</div>
+      <div class="reading-order__card-sub">What the process produced &middot; AI findings</div>
+    </a>
+    <a href="/habits/" class="reading-order__card">
+      <div class="reading-order__card-name">The Operating System</div>
+      <div class="reading-order__card-sub">37 habits &middot; RPG tier system &middot; heatmap</div>
     </a>
   </div>
 </div>
@@ -403,7 +441,7 @@
       dProtos.forEach(function(p){
         html += '<div class="proto-row"><div><div class="proto-row__name">' + p.name + '</div>';
         html += '<div class="proto-row__desc">' + p.description + '</div></div>';
-        html += '<div class="proto-row__links"><a href="/protocols/" class="proto-row__link">Details \u2192</a></div></div>';
+        html += '<div class="proto-row__links"><a href="/protocols/" class="proto-row__link">See on Protocols page \u2192</a></div></div>';
       });
       if(exps.length){
         html += '<div style="padding:var(--space-3) 0;display:flex;gap:var(--space-2);flex-wrap:wrap;">';

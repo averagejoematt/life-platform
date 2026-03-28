@@ -4272,10 +4272,10 @@ def lambda_handler(event, context):
             # WR-24: Check for valid subscriber token → higher rate limit
             sub_token = (event.get("headers") or {}).get("x-subscriber-token", "")
             is_subscriber = bool(sub_token) and _validate_subscriber_token(sub_token)
-            rate_limit = 20 if is_subscriber else 3
+            rate_limit = 20 if is_subscriber else 5
             allowed, remaining = _ask_rate_check(ip_hash, limit=rate_limit)
             if not allowed:
-                limit_msg = "20" if is_subscriber else "3"
+                limit_msg = "20" if is_subscriber else "5"
                 _emit_rate_limit_metric("ask")
                 return {
                     "statusCode": 429,

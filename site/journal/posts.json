@@ -9,6 +9,7 @@
       "excerpt": "Six days before Day 1. Elena Voss sits down with Matthew for the first time — no data cards, no board verdicts. Just a conversation about what went wrong, what he learned, and what April 1 actually means.",
       "word_count": 2200,
       "has_board_interview": true,
+      "badges": ["Board Interview", "Milestone"],
       "phase": "prequel"
     },
     {
@@ -20,6 +21,7 @@
       "excerpt": "He has nineteen data sources. He has a platform that generates a daily briefing, tracks his HRV to two decimal places, and maintains a gamified character sheet scoring seven dimensions of his health. He has, in other words, built an extraordinarily sophisticated apparatus for listening to his body.",
       "word_count": 1070,
       "has_board_interview": false,
+      "badges": ["Setback", "CGM Data"],
       "phase": "prequel"
     },
     {
@@ -31,6 +33,7 @@
       "excerpt": "Here is something I did not expect to find two weeks into this assignment: a man who has built twenty-seven automated programs to monitor his sleep, his blood glucose, his heart rate recovery, his gait symmetry, and whether he remembered to take his apigenin before bed — who has not written a single",
       "word_count": 1421,
       "has_board_interview": false,
+      "badges": ["Journal Excerpt"],
       "phase": "prequel"
     },
     {
@@ -42,6 +45,7 @@
       "excerpt": "The first thing you notice about Matthew's apartment is the charging cables.\n\nThere's one snaking from the nightstand — that's the Whoop strap, a fitness tracker that monitors his heart rate variability while he sleeps. Another on the bathroom counter feeds a Garmin Epix watch that measures his stre",
       "word_count": 1240,
       "has_board_interview": false,
+      "badges": [],
       "phase": "prequel"
     }
   ],

@@ -293,6 +293,132 @@
     }
     .cat-tab.active .cat-tab__count { background: var(--ar-bg); }
 
+    /* ── Duration / Difficulty Filter Row ── */
+    .filter-row {
+      display: flex;
+      gap: var(--space-2);
+      padding: var(--space-4) var(--page-padding);
+      max-width: var(--max-width);
+      margin: 0 auto;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--border);
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .filter-row__label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-right: var(--space-1);
+      white-space: nowrap;
+    }
+    .filter-row__sep {
+      width: 1px;
+      height: 20px;
+      background: var(--border);
+      margin: 0 var(--space-2);
+      flex-shrink: 0;
+    }
+    .filter-btn {
+      padding: var(--space-1) var(--space-3);
+      border: 1px solid var(--border);
+      background: transparent;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .filter-btn:hover { border-color: var(--ar-dim); color: var(--text); }
+    .filter-btn.active { border-color: var(--ar); color: var(--ar); background: var(--ar-bg-s); }
+
+    /* ── Board Picks Row ── */
+    .board-pick-card {
+      min-width: 160px;
+      max-width: 180px;
+      background: var(--surface);
+      border: 1px solid var(--ar-dim);
+      padding: var(--space-4);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: var(--space-2);
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.25s ease;
+      position: relative;
+    }
+    .board-pick-card:hover {
+      border-color: var(--ar);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(var(--ar-rgb), 0.2);
+    }
+    .board-pick-card__icon { font-size: 28px; line-height: 1; }
+    .board-pick-card__name {
+      font-family: var(--font-display);
+      font-size: 13px;
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      line-height: 1.3;
+    }
+    .board-pick-card__meta {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+    }
+    .board-pick-card__badge {
+      position: absolute;
+      top: var(--space-1);
+      right: var(--space-2);
+      font-family: var(--font-mono);
+      font-size: 8px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--ar);
+    }
+
+    /* ── Tile Target Line ── */
+    .tile__targets {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      color: var(--text-faint);
+      letter-spacing: var(--ls-label);
+      text-transform: uppercase;
+      width: 100%;
+      text-align: center;
+      padding-top: var(--space-1);
+      line-height: 1.3;
+    }
+
+    /* ── Mechanism line in detail ── */
+    .detail-mechanism {
+      padding: var(--space-3) var(--space-4);
+      background: var(--ar-bg-s);
+      border-left: 2px solid var(--ar-dim);
+      margin-top: var(--space-3);
+    }
+    .detail-mechanism__label {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--ar);
+      margin-bottom: var(--space-1);
+    }
+    .detail-mechanism__text {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-mono);
+    }
+
     /* ── Tile Grid ── */
     .tile-zone {
       max-width: var(--max-width);
@@ -621,9 +747,12 @@
       .tile-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-3); }
       .tile__name { font-size: 13px; }
       .tile__icon { font-size: 28px; }
+      .filter-row { gap: var(--space-1); }
+      .board-pick-card { min-width: 140px; }
     }
     @media (max-width: 480px) {
       .tile-grid { grid-template-columns: repeat(2, 1fr); }
+      .board-pick-card { min-width: 130px; max-width: 150px; }
     }
   </style>
 </head>
@@ -631,7 +760,7 @@
 
 <div id="amj-nav"></div>
 
-<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">Method</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Challenges</span></nav>
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><a href="/stack/" class="breadcrumb__section">The Practice</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Challenges</span></nav>
 <div id="amj-hierarchy-nav"></div>
 
 <div class="arena">
@@ -639,9 +768,9 @@
 <!-- ── Compact Header ── -->
 <header class="arena-header animate-in">
   <div>
-    <div class="arena-header__kicker">The Science</div>
+    <div class="arena-header__kicker">The Practice</div>
     <h1 class="arena-header__title"><span>Challenges</span></h1>
-    <p class="arena-header__sub">Pick a challenge. Track daily. Earn badges. Short-term provocations born from science and your data.</p>
+    <p class="arena-header__sub">What am I daring myself to do? Challenges are short-term provocations &mdash; 7 to 30 days &mdash; born from the data, the science, and sometimes just gut instinct. Pick one. Track daily. Earn badges.</p>
   </div>
   <div class="arena-stats">
     <div class="arena-stat">
@@ -659,7 +788,9 @@
   </div>
 </header>
 
-
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-4) var(--page-padding);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);border-bottom:1px solid var(--border);">
+  <strong style="color:var(--text);">Experiments are science. Challenges are action.</strong> Experiments test hypotheses with controlled variables over 14+ days. Challenges dare you to try something for a week. Both produce data. &rarr; <a href="/experiments/" style="color:var(--accent);text-decoration:none;">See experiments</a>
+</div>
 
 <!-- ── Active Challenge Hero ── -->
 <div class="hero-zone" id="hero-zone">
@@ -674,6 +805,27 @@
 <!-- ── Category Filter ── -->
 <div class="cat-bar" id="cat-bar">
   <button class="cat-tab active" data-cat="all"><span class="cat-tab__icon">⚡</span> All</button>
+</div>
+
+<!-- ── Duration / Difficulty Filters ── -->
+<div class="filter-row" id="filter-row">
+  <span class="filter-row__label">Duration:</span>
+  <button class="filter-btn active" data-dur="all">All</button>
+  <button class="filter-btn" data-dur="7">7-day</button>
+  <button class="filter-btn" data-dur="14">14-day</button>
+  <button class="filter-btn" data-dur="30">30-day</button>
+  <div class="filter-row__sep"></div>
+  <span class="filter-row__label">Difficulty:</span>
+  <button class="filter-btn active" data-diff="all">All</button>
+  <button class="filter-btn" data-diff="easy">Easy</button>
+  <button class="filter-btn" data-diff="medium">Medium</button>
+  <button class="filter-btn" data-diff="hard">Hard</button>
+</div>
+
+<!-- ── Board Recommends ── -->
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-6) var(--page-padding);border-bottom:1px solid var(--border);">
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--ar);margin-bottom:var(--space-4);">// Board recommends</div>
+  <div id="board-picks" style="display:flex;gap:var(--space-4);overflow-x:auto;padding-bottom:var(--space-3);"></div>
 </div>
 
 <!-- ── Tile Grid ── -->
@@ -745,9 +897,38 @@
   var allChallenges = [];
   var categories = [];
   var currentCat = 'all';
+  var currentDur = 'all';   // duration filter: 'all', '7', '14', '30'
+  var currentDiff = 'all';  // difficulty filter: 'all', 'easy', 'medium', 'hard'
   var dynamicStatus = {}; // challenge_id → {status, checkins, xp}
   var votedChallenges = {};
   try { votedChallenges = JSON.parse(localStorage.getItem('amj_ch_votes') || '{}'); } catch(e) {}
+
+  // Pillar → metric targets mapping (category-based since no pillar field)
+  var CATEGORY_TARGETS = {
+    movement: 'steps, VO2 max, active calories',
+    sleep: 'sleep score, HRV, sleep efficiency',
+    nutrition: 'glucose stability, energy, body composition',
+    mind: 'stress score, journal sentiment, focus',
+    social: 'social connections, mood, accountability',
+    discipline: 'consistency streak, habit score, XP'
+  };
+
+  // Difficulty label mapping
+  function difficultyBucket(d) {
+    if (d <= 2) return 'easy';
+    if (d <= 3) return 'medium';
+    return 'hard';
+  }
+
+  // Duration bucket matching
+  function durationMatch(days, filter) {
+    if (filter === 'all') return true;
+    var f = parseInt(filter);
+    if (f === 7) return days >= 1 && days <= 7;
+    if (f === 14) return days > 7 && days <= 14;
+    if (f === 30) return days > 14;
+    return true;
+  }
 
   // ── Evidence ring SVG ──
   function evRingSvg(tier) {
@@ -789,7 +970,15 @@
 
   // ── Render tile grid ──
   function renderTiles() {
-    var filtered = currentCat === 'all' ? allChallenges : allChallenges.filter(function(c) { return c.category === currentCat; });
+    var filtered = allChallenges.filter(function(c) {
+      // Category filter
+      if (currentCat !== 'all' && c.category !== currentCat) return false;
+      // Duration filter
+      if (currentDur !== 'all' && !durationMatch(c.duration_days || 0, currentDur)) return false;
+      // Difficulty filter
+      if (currentDiff !== 'all' && difficultyBucket(c.difficulty || 2) !== currentDiff) return false;
+      return true;
+    });
     // Sort: active first, then by difficulty desc
     filtered.sort(function(a, b) {
       var sa = getStatus(a.id); var sb = getStatus(b.id);
@@ -810,6 +999,7 @@
       var catObj = categories.find(function(c) { return c.id === ch.category; });
       var catColor = catObj ? catObj.color : 'var(--ar)';
       var durLabel = ch.duration_days ? ch.duration_days + 'd' : 'One-time';
+      var targets = CATEGORY_TARGETS[ch.category] || '';
 
       var isVoted = votedChallenges[ch.id];
       html += '<div class="' + cls + '" style="--tile-color:' + catColor + '" onclick="showDetail(\'' + ch.id + '\')">' +
@@ -824,9 +1014,10 @@
             '\uD83D\uDE4B ' + (ch.votes || 0) +
           '</button>' +
         '</div>' +
+        (targets ? '<div class="tile__targets">Targets: ' + targets + '</div>' : '') +
       '</div>';
     });
-    document.getElementById('tile-grid').innerHTML = html || '<div style="grid-column:1/-1;text-align:center;padding:var(--space-10);color:var(--text-faint)">No challenges in this category</div>';
+    document.getElementById('tile-grid').innerHTML = html || '<div style="grid-column:1/-1;text-align:center;padding:var(--space-10);color:var(--text-faint)">No challenges matching filters</div>';
   }
 
   function getStatus(id) {
@@ -887,6 +1078,51 @@
     '</div>';
   }
 
+  // ── Wire duration / difficulty filters ──
+  function wireFilters() {
+    document.querySelectorAll('#filter-row .filter-btn[data-dur]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        currentDur = btn.dataset.dur;
+        document.querySelectorAll('#filter-row .filter-btn[data-dur]').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        renderTiles();
+      });
+    });
+    document.querySelectorAll('#filter-row .filter-btn[data-diff]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        currentDiff = btn.dataset.diff;
+        document.querySelectorAll('#filter-row .filter-btn[data-diff]').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        renderTiles();
+      });
+    });
+  }
+  wireFilters();
+
+  // ── Board Recommends (top 6 by votes, then by evidence_tier) ──
+  function renderBoardPicks() {
+    var EV_RANK = {strong: 3, moderate: 2, emerging: 1};
+    var sorted = allChallenges.slice().sort(function(a, b) {
+      var va = (a.votes || 0), vb = (b.votes || 0);
+      if (vb !== va) return vb - va;
+      return (EV_RANK[b.evidence_tier] || 0) - (EV_RANK[a.evidence_tier] || 0);
+    });
+    var picks = sorted.slice(0, 6);
+    var html = '';
+    picks.forEach(function(ch) {
+      var catObj = categories.find(function(c) { return c.id === ch.category; });
+      var catColor = catObj ? catObj.color : 'var(--ar)';
+      html += '<div class="board-pick-card" style="--tile-color:' + catColor + '" onclick="showDetail(\'' + ch.id + '\')">' +
+        '<div class="board-pick-card__badge">\u2605</div>' +
+        '<div class="board-pick-card__icon">' + esc(ch.icon) + '</div>' +
+        '<div class="board-pick-card__name">' + esc(ch.name) + '</div>' +
+        '<div class="board-pick-card__meta">' + (ch.duration_days || '?') + 'd \u00B7 ' +
+          (ch.board_recommender ? esc(ch.board_recommender) : esc(ch.category)) + '</div>' +
+      '</div>';
+    });
+    document.getElementById('board-picks').innerHTML = html || '';
+  }
+
   // ── Detail overlay ──
   window.showDetail = function(id) {
     var ch = allChallenges.find(function(c) { return c.id === id; });
@@ -910,7 +1146,20 @@
     if (ch.protocol) {
       bodyHtml += '<div class="detail-field"><div class="detail-field__label">// The Protocol</div><div class="detail-field__value">' + esc(ch.protocol) + '</div></div>';
     }
-    if (ch.evidence_summary) {
+    // Mechanism / "Why it works" — use evidence_summary as the science basis
+    var mechanismText = ch.mechanism || ch.science || ch.evidence_summary || '';
+    if (mechanismText) {
+      bodyHtml += '<div class="detail-mechanism">' +
+        '<div class="detail-mechanism__label">Why it works</div>' +
+        '<div class="detail-mechanism__text">' + esc(mechanismText) + '</div>' +
+      '</div>';
+    }
+    // Metric targets
+    var targets = CATEGORY_TARGETS[ch.category] || '';
+    if (targets) {
+      bodyHtml += '<div class="detail-field" style="margin-top:var(--space-4)"><div class="detail-field__label">// Expected Impact</div><div class="detail-field__value">Targets: ' + targets + '</div></div>';
+    }
+    if (ch.evidence_summary && ch.evidence_summary !== mechanismText) {
       bodyHtml += '<div class="detail-field"><div class="detail-field__label">// The Evidence</div><div class="detail-field__value">' + esc(ch.evidence_summary) + '</div></div>';
     }
     if (ch.board_recommender && ch.board_quote) {
@@ -1002,6 +1251,7 @@
         document.getElementById('stat-total').textContent = allChallenges.length;
         renderCatBar();
         renderTiles();
+        renderBoardPicks();
       })
       .catch(function() {
         // Fallback: try challenges endpoint
@@ -1013,6 +1263,7 @@
               document.getElementById('stat-total').textContent = allChallenges.length;
               renderCatBar();
               renderTiles();
+              renderBoardPicks();
             }
           })
           .catch(function() {

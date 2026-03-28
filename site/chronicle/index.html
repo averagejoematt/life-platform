@@ -210,10 +210,22 @@
   </div>
 </div>
 
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">The Chronicle</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Archive</span></nav>
+
 <div class="journal-header animate-in reveal">
-  <div class="eyebrow">The Story</div>
+  <div class="eyebrow">The Chronicle</div>
   <h1 class="journal-header__title">Chronicle</h1>
   <p class="journal-header__sub">Narrative journalism on a real transformation. Every week, a new dispatch.</p>
+</div>
+
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-3) var(--page-padding);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);border-bottom:1px solid var(--border);">
+  The Chronicle is Elena&rsquo;s narrative. <a href="/weekly/" style="color:var(--accent);text-decoration:none;">Weekly Snapshots</a> are the raw data. Same week, two views. &middot; <a href="/ask/" style="color:var(--accent);text-decoration:none;">Ask about any week</a> &middot; <a href="/subscribe/" style="color:var(--accent);text-decoration:none;">Never miss an installment</a>
+</div>
+
+<div class="journal-list animate-in reveal" id="journal-list">
+  <div class="journal-placeholder">
+    <div class="jp-coming">Loading...</div>
+  </div>
 </div>
 
 <div class="series-intro animate-in reveal">
@@ -240,12 +252,6 @@
   </p>
 </div>
 
-<div class="journal-list animate-in reveal" id="journal-list">
-  <div class="journal-placeholder">
-    <div class="jp-coming">Loading...</div>
-  </div>
-</div>
-
 <script>
   fetch('/journal/posts.json')
     .then(r => r.ok ? r.json() : null)
@@ -258,24 +264,71 @@
         </div>`;
         return;
       }
-      list.innerHTML = data.posts.map(p => {
-        let date = '';
-        try {
-          const d = new Date(p.date + 'T12:00:00');
-          date = d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}).toUpperCase();
-        } catch(e) { date = p.date; }
-        const boardBadge = p.has_board_interview
-          ? `<span style="margin-left:16px;color:var(--accent-dim);">// Board interview</span>`
-          : '';
-        return `<a href="${p.url}" class="journal-post">
-          <div class="journal-post__date">${date}</div>
-          <div>
-            <div class="journal-post__tag">The Measured Life · Week ${p.week}${boardBadge}</div>
-            <div class="journal-post__title">&ldquo;${p.title}&rdquo;</div>
-            <div class="journal-post__excerpt">${p.stats_line || ''}</div>
-          </div>
-        </a>`;
-      }).join('');
+      // Sort newest first
+      const sorted = [...data.posts].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const latest = sorted[0];
+      let html = '';
+
+      // Hero treatment for latest post (21a)
+      const heroDate = new Date(latest.date + 'T12:00:00').toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'}).toUpperCase();
+      const readMin = latest.word_count ? Math.ceil(latest.word_count / 250) + ' min read' : '';
+      const heroBadge = latest.has_board_interview ? ' · Board Interview' : '';
+      html += `<a href="${latest.url}" class="chronicle-hero" style="display:block;padding:var(--space-12) 0;border-bottom:1px solid var(--border);text-decoration:none;">
+        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3);">Latest · Week ${latest.week}${heroBadge}</div>
+        <div style="font-family:var(--font-display);font-size:clamp(28px,4vw,48px);line-height:1.15;color:var(--text);margin-bottom:var(--space-4);letter-spacing:var(--ls-display);">&ldquo;${latest.title}&rdquo;</div>
+        <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body);max-width:600px;margin-bottom:var(--space-4);">${latest.excerpt || ''}</div>
+        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);">${heroDate} · ${readMin}</div>
+        <div style="margin-top:var(--space-4);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);letter-spacing:var(--ls-tag);">Read this installment →</div>
+      </a>`;
+
+      // Archive: group by phase (21c)
+      const rest = sorted.slice(1);
+      if (rest.length > 0) {
+        // Phase header
+        const phases = {};
+        rest.forEach(p => {
+          const phase = p.phase || (p.week < 0 ? 'prequel' : 'season1');
+          if (!phases[phase]) phases[phase] = [];
+          phases[phase].push(p);
+        });
+
+        const phaseLabels = {
+          'prequel': 'Prequels (Weeks −4 to −1)',
+          'season1': 'Season 1: The First Month',
+        };
+
+        Object.entries(phases).forEach(([phase, posts]) => {
+          html += `<div style="padding:var(--space-6) 0 var(--space-3);border-bottom:1px solid var(--border);">
+            <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);">${phaseLabels[phase] || phase}</div>
+          </div>`;
+
+          posts.forEach(p => {
+            let date = '';
+            try {
+              const d = new Date(p.date + 'T12:00:00');
+              date = d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}).toUpperCase();
+            } catch(e) { date = p.date; }
+            const badge = p.has_board_interview ? '<span style="display:inline-block;margin-left:var(--space-3);padding:1px var(--space-2);border:1px solid var(--accent-dim);font-size:var(--text-2xs);color:var(--accent-dim);letter-spacing:var(--ls-tag);text-transform:uppercase;">Board Interview</span>' : '';
+            const rm = p.word_count ? Math.ceil(p.word_count / 250) + ' min' : '';
+            html += `<a href="${p.url}" class="journal-post">
+              <div class="journal-post__date">${date}<br><span style="font-size:9px;color:var(--text-faint);">${rm}</span></div>
+              <div>
+                <div class="journal-post__tag">The Measured Life · Week ${p.week}${badge}</div>
+                <div class="journal-post__title" style="font-size:var(--text-lg);line-height:1.3;">&ldquo;${p.title}&rdquo;</div>
+                <div class="journal-post__excerpt">${p.excerpt || p.stats_line || ''}</div>
+              </div>
+            </a>`;
+          });
+        });
+      }
+
+      // Binge read entry point (21l)
+      html += `<div style="padding:var(--space-8) 0;text-align:center;border-top:1px solid var(--border);">
+        <a href="/journal/posts/week-00/" style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-display);">Start from the beginning →</a>
+        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);margin-top:var(--space-2);letter-spacing:var(--ls-tag);">${sorted.length} installments · ${sorted.reduce((a,p) => a + (p.word_count||0), 0).toLocaleString()} words</div>
+      </div>`;
+
+      list.innerHTML = html;
     })
     .catch(() => {
       document.getElementById('journal-list').innerHTML = `<div class="journal-placeholder">
