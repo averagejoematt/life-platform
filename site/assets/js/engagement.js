@@ -355,7 +355,7 @@
   };
 
   function _renderPulseItem(item) {
-    var pipCls = 'pulse__pip pulse__pip--' + (item.domain || 'body');
+    var pipCls = 'pulse-feed__pip pulse-feed__pip--' + (item.domain || 'body');
     var timeStr = '';
     if (item.date) {
       var d = new Date(item.date + 'T12:00:00');
@@ -364,15 +364,15 @@
     var sparkHtml = '';
     if (item.sparkline && typeof amjSparkline === 'function') {
       var pipColors = { body: '#f59e0b', sleep: '#60a5fa', glucose: '#2dd4bf', training: '#ef4444', mind: '#818cf8', nutrition: '#f59e0b', story: '#f59e0b', science: '#a78bfa' };
-      sparkHtml = '<div class="pulse__spark">' + amjSparkline(item.sparkline, { width: 80, height: 20, color: pipColors[item.domain] || '#f59e0b' }) + '</div>';
+      sparkHtml = '<div class="pulse-feed__spark">' + amjSparkline(item.sparkline, { width: 80, height: 20, color: pipColors[item.domain] || '#f59e0b' }) + '</div>';
     }
 
-    return '<a href="' + (item.link || '#') + '" class="pulse__item">' +
+    return '<a href="' + (item.link || '#') + '" class="pulse-feed__item">' +
       '<span class="' + pipCls + '"></span>' +
-      '<span class="pulse__time">' + timeStr + '</span>' +
-      '<div class="pulse__content">' +
-        '<div class="pulse__headline">' + (item.headline || '') + '</div>' +
-        '<div class="pulse__detail">' + (item.detail || '') + '</div>' +
+      '<span class="pulse-feed__time">' + timeStr + '</span>' +
+      '<div class="pulse-feed__content">' +
+        '<div class="pulse-feed__headline">' + (item.headline || '') + '</div>' +
+        '<div class="pulse-feed__detail">' + (item.detail || '') + '</div>' +
       '</div>' +
       sparkHtml +
     '</a>';

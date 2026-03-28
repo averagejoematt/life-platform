@@ -4517,9 +4517,9 @@ def handle_observatory_week(qs: dict = None) -> dict:
                 "primary": {"label": "Average Duration", "value": round(avg_dur, 1), "unit": "hrs",
                             "delta": round(avg_dur - prev_avg, 1), "delta_label": f"vs {round(prev_avg, 1)} last week",
                             "trend": "up" if avg_dur > prev_avg else "down", "sparkline": [round(d, 1) for d in durations]},
-                "highlight": {"label": "Best Night", "value": f"{best.get('sk', '').replace('DATE#', '')[:5]} · {round(float(best.get('sleep_duration_hours', 0)), 1)}h",
+                "highlight": {"label": "Best Night", "value": f"{best.get('sk', '').replace('DATE#', '')[5:]} · {round(float(best.get('sleep_duration_hours', 0)), 1)}h",
                               "detail": f"Recovery {round(float(best.get('recovery_score', 0)))}%"},
-                "lowlight": {"label": "Worst Night", "value": f"{worst.get('sk', '').replace('DATE#', '')[:5]} · {round(float(worst.get('sleep_duration_hours', 0)), 1)}h",
+                "lowlight": {"label": "Worst Night", "value": f"{worst.get('sk', '').replace('DATE#', '')[5:]} · {round(float(worst.get('sleep_duration_hours', 0)), 1)}h",
                              "detail": ""},
             }
             notable = f"Avg sleep {'improved' if avg_dur > prev_avg else 'declined'} {abs(round(avg_dur - prev_avg, 1))}h vs last week"
