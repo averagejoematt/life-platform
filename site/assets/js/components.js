@@ -225,6 +225,7 @@
       ]},
       { heading: 'Internal', links: [
         { href: '/status/', text: 'System Status', id: 'footer-status-link' },
+        { href: 'https://discord.gg/T4Ndt2WsU', text: 'Join the community', external: true, community: true },
         { href: '/rss.xml', text: 'RSS Feed' },
         { href: '/privacy/', text: 'Privacy' },
       ]},
@@ -234,11 +235,16 @@
       html += '<div class="footer-v2__col">';
       html += '<div class="footer-v2__heading">' + col.heading + '</div>';
       col.links.forEach(function(link) {
-        var linkId = link.id ? ' id="' + link.id + '"' : '';
-        var lockIcon = link.locked
-          ? ' <svg style="width:10px;height:10px;opacity:.45;vertical-align:middle;margin-left:2px" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="8" height="6" rx="1"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5"/></svg>'
-          : '';
-        html += '<a href="' + link.href + '" class="footer-v2__link"' + linkId + '>' + link.text + lockIcon + '</a>';
+        if (link.community) {
+          html += '<a href="' + link.href + '" class="footer-community-link" target="_blank" rel="noopener"><span class="community-glyph">\u2317</span>' + link.text + '</a>';
+        } else {
+          var linkId = link.id ? ' id="' + link.id + '"' : '';
+          var extAttrs = link.external ? ' target="_blank" rel="noopener"' : '';
+          var lockIcon = link.locked
+            ? ' <svg style="width:10px;height:10px;opacity:.45;vertical-align:middle;margin-left:2px" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="8" height="6" rx="1"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5"/></svg>'
+            : '';
+          html += '<a href="' + link.href + '" class="footer-v2__link"' + linkId + extAttrs + '>' + link.text + lockIcon + '</a>';
+        }
       });
       html += '</div>';
     });

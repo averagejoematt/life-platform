@@ -597,3 +597,74 @@ canvas.obs-chart {
   .obs-table { font-size: var(--text-xs); }
   .obs-table th, .obs-table td { padding: var(--space-2) var(--space-3); }
 }
+
+/* ── Discord Community Components ─────────────────────── */
+.footer-community-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #8c8a82;
+  text-decoration: none;
+  font-size: 13px;
+  transition: color 0.2s;
+}
+.footer-community-link:hover { color: #e8e6df; }
+.community-glyph { color: #EF9F27; font-size: 12px; }
+
+.discord-community-card {
+  border-left: 2px solid rgba(239,159,39,0.4);
+  background: #0f1117;
+  padding: 24px 28px;
+  margin: 40px 0;
+  border-radius: 0 4px 4px 0;
+  max-width: var(--prose-width, 680px);
+}
+.community-card-header {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #EF9F27;
+  letter-spacing: 3px;
+  margin-bottom: 14px;
+}
+.community-card-body {
+  font-size: 15px;
+  color: #8c8a82;
+  line-height: 1.7;
+  margin: 0 0 16px 0;
+}
+.community-card-cta {
+  font-size: 14px;
+  color: #EF9F27;
+  text-decoration: none;
+}
+.community-card-cta:hover { text-decoration: underline; }
+
+.discord-section-break {
+  padding: 32px 0;
+  text-align: center;
+}
+.community-rule {
+  border: none;
+  border-top: 1px solid rgba(239,159,39,0.15);
+  margin: 0;
+}
+.community-quote {
+  font-style: italic;
+  font-size: 16px;
+  color: #8c8a82;
+  line-height: 1.7;
+  margin: 24px auto;
+  max-width: 520px;
+}
+.community-url {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: #EF9F27;
+  letter-spacing: 2px;
+  margin: 0;
+}
+.community-url a {
+  color: #EF9F27;
+  text-decoration: none;
+}
+.community-url a:hover { text-decoration: underline; }
