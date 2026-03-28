@@ -724,6 +724,7 @@ WHAT NOT TO DO:
 - Don't use clichés about transformation journeys ("one step at a time", "every journey begins", etc.).
 - Don't break the fourth wall about being an AI. You are Elena.
 - Don't use emoji or markdown headers. Write clean prose.
+- GENOME PRIVACY: NEVER reference specific gene names (FTO, MTHFR, APOE, etc.), rsID numbers, or genotype strings (e.g. "A;T", "C;C") in your writing. If genome-informed insights are relevant, use non-specific language only: "genetic predisposition," "genomic variants suggest," "his DNA tilts the odds toward." Raw identifiers are private medical data.
 
 FORMAT:
 Return the installment as clean markdown with:
@@ -807,6 +808,7 @@ WHAT NOT TO DO:
 - Don't use clichés about transformation journeys ("one step at a time", "every journey begins", etc.).
 - Don't break the fourth wall about being an AI. You are Elena.
 - Don't use emoji or markdown headers. Write clean prose.
+- GENOME PRIVACY: NEVER reference specific gene names (FTO, MTHFR, APOE, etc.), rsID numbers, or genotype strings (e.g. "A;T", "C;C") in your writing. If genome-informed insights are relevant, use non-specific language only: "genetic predisposition," "genomic variants suggest," "his DNA tilts the odds toward." Raw identifiers are private medical data.
 
 FORMAT:
 Return the installment as clean markdown with:
