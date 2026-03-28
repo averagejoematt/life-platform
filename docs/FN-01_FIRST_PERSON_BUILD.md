@@ -1,0 +1,391 @@
+# FN-01: First Person Page — Build-Ready Implementation
+
+**Board**: Product Board (8-0 vote)
+**Priority**: P1 — pre-launch or Week 1 post-launch
+**Route**: `/first-person/`
+**Owner**: Tyrell (design), Mara (UX), Ava (content guardrails)
+
+---
+
+## WHAT THIS IS
+
+A raw, unfiltered blog page where Matthew writes directly to readers. No AI narration, no data visualization, no Elena Voss framing. Typos stay. Grammar quirks stay. No schedule, no obligation. The design should feel like "the same site, but the lights are lower and someone pulled up a chair."
+
+**This page exists to close the gap between the brand promise ("no filter") and the content reality (every other page is AI-structured).**
+
+---
+
+## FILES TO CREATE / MODIFY
+
+### 1. CREATE: `site/first-person/index.html`
+
+Full page file. Uses the standard site shell (`tokens.css`, `base.css`, `components.js`, `nav.js`) but with a distinctly different interior.
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="First Person — no narrator, no data, just Matthew. Unfiltered thoughts from inside the experiment.">
+  <meta property="og:title" content="First Person — Matthew Walker">
+  <meta property="og:description" content="No narrator. No data. Just me. Raw, unfiltered writing from inside the measured life experiment.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/first-person/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="First Person — Matthew Walker">
+  <meta name="twitter:description" content="No narrator. No data. Just me.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>First Person — Matthew Walker</title>
+  <link rel="alternate" type="application/rss+xml" title="First Person" href="/first-person/feed.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <!-- Lora serif — the "written" feel -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+  <style>
+    /* ── First Person: The Same Room, Different Light ──────── */
+
+    .fp-page {
+      max-width: 620px;
+      margin: 0 auto;
+      padding: var(--space-16) var(--page-padding) var(--space-20);
+    }
+
+    /* ── Page header ── */
+    .fp-header {
+      margin-bottom: var(--space-16);
+      position: relative;
+    }
+    .fp-header__title {
+      font-family: 'Lora', Georgia, 'Times New Roman', serif;
+      font-size: clamp(36px, 5vw, 52px);
+      font-weight: 400;
+      color: var(--text);
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      margin-bottom: var(--space-4);
+    }
+    .fp-header__subtitle {
+      font-family: 'Lora', Georgia, serif;
+      font-size: var(--text-base);
+      font-style: italic;
+      color: var(--text-faint);
+      line-height: 1.6;
+    }
+
+    /* ── RSS icon — quiet, top-right ── */
+    .fp-rss {
+      position: absolute;
+      top: 8px;
+      right: 0;
+      color: var(--text-faint);
+      text-decoration: none;
+      opacity: 0.4;
+      transition: opacity var(--dur-fast), color var(--dur-fast);
+    }
+    .fp-rss:hover {
+      opacity: 1;
+      color: var(--accent);
+    }
+    .fp-rss svg { width: 16px; height: 16px; }
+
+    /* ── "No AI Zone" stamp ── */
+    .fp-stamp {
+      display: inline-block;
+      margin-top: var(--space-4);
+      padding: var(--space-1) var(--space-3);
+      border: 1.5px solid var(--text-faint);
+      border-radius: 2px;
+      font-family: 'Lora', Georgia, serif;
+      font-size: 11px;
+      font-style: italic;
+      letter-spacing: 0.05em;
+      color: var(--text-faint);
+      transform: rotate(-1.5deg);
+      opacity: 0.6;
+    }
+
+    /* ── Entries ── */
+    .fp-entry {
+      margin-bottom: var(--space-12);
+    }
+    .fp-entry__date {
+      font-family: 'Lora', Georgia, serif;
+      font-size: var(--text-sm);
+      font-weight: 400;
+      color: var(--text-faint);
+      margin-bottom: var(--space-4);
+      letter-spacing: 0.02em;
+    }
+    .fp-entry__title {
+      font-family: 'Lora', Georgia, serif;
+      font-size: var(--text-xl);
+      font-weight: 500;
+      color: var(--text);
+      line-height: 1.3;
+      margin-bottom: var(--space-4);
+    }
+    .fp-entry__body {
+      font-family: 'Lora', Georgia, serif;
+      font-size: 17px;
+      color: var(--text-muted);
+      line-height: 1.85;
+    }
+    .fp-entry__body p {
+      margin-bottom: var(--space-5);
+    }
+    .fp-entry__body p:last-child {
+      margin-bottom: 0;
+    }
+    /* Matthew's natural emphasis — only when he uses it */
+    .fp-entry__body strong {
+      color: var(--text);
+      font-weight: 500;
+    }
+    .fp-entry__body em {
+      font-style: italic;
+    }
+    .fp-entry__body a {
+      color: var(--text-muted);
+      text-decoration: underline;
+      text-decoration-color: var(--border);
+      text-underline-offset: 3px;
+      transition: color var(--dur-fast), text-decoration-color var(--dur-fast);
+    }
+    .fp-entry__body a:hover {
+      color: var(--text);
+      text-decoration-color: var(--text-muted);
+    }
+
+    /* ── Hand-drawn separator between entries ── */
+    .fp-separator {
+      display: block;
+      margin: var(--space-10) auto;
+      width: 120px;
+      height: 8px;
+      opacity: 0.3;
+    }
+
+    /* ── Empty state (before first post) ── */
+    .fp-empty {
+      font-family: 'Lora', Georgia, serif;
+      font-size: var(--text-base);
+      font-style: italic;
+      color: var(--text-faint);
+      text-align: center;
+      padding: var(--space-20) 0;
+      line-height: 1.8;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 700px) {
+      .fp-page {
+        padding: var(--space-12) var(--page-padding) var(--space-16);
+      }
+      .fp-header__title {
+        font-size: 32px;
+      }
+      .fp-rss {
+        position: static;
+        display: inline-block;
+        margin-top: var(--space-3);
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div id="amj-nav"></div>
+
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="/" class="breadcrumb__section">Home</a>
+  <span class="breadcrumb__sep">&rsaquo;</span>
+  <a href="/story/" class="breadcrumb__section">Story</a>
+  <span class="breadcrumb__sep">&rsaquo;</span>
+  <span class="breadcrumb__current">First Person</span>
+</nav>
+
+<main class="fp-page">
+
+  <!-- Page header -->
+  <header class="fp-header">
+    <h1 class="fp-header__title">First Person</h1>
+    <p class="fp-header__subtitle">No narrator. No data. Just me.</p>
+
+    <!-- RSS -->
+    <a href="/first-person/feed.xml" class="fp-rss" title="RSS Feed">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 11a9 9 0 0 1 9 9"/>
+        <path d="M4 4a16 16 0 0 1 16 16"/>
+        <circle cx="5" cy="19" r="1"/>
+      </svg>
+    </a>
+
+    <!-- "No AI Zone" stamp -->
+    <div class="fp-stamp">written by a human</div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════
+       ENTRIES GO HERE — newest first
+       Matthew writes these himself. Claude never touches entry content.
+
+       ENTRY TEMPLATE (copy and paste above existing entries):
+
+       <article class="fp-entry">
+         <time class="fp-entry__date">March 28, 2026</time>
+         <!-- Title is optional. Delete this line if no title. -->
+         <h2 class="fp-entry__title">Optional Title Here</h2>
+         <div class="fp-entry__body">
+           <p>Your text here. Typos stay. Grammar quirks stay.</p>
+           <p>Second paragraph if needed.</p>
+         </div>
+       </article>
+
+       <svg class="fp-separator" viewBox="0 0 120 8" xmlns="http://www.w3.org/2000/svg">
+         <path d="M0 4 C10 2, 20 6, 30 4 S50 2, 60 4 S80 6, 90 4 S110 2, 120 4"
+               fill="none" stroke="currentColor" stroke-width="1.5"
+               stroke-linecap="round"/>
+       </svg>
+
+       ═══════════════════════════════════════════════════════ -->
+
+  <!-- EMPTY STATE — remove this block once the first real entry is added -->
+  <div class="fp-empty">
+    <p>Nothing here yet.</p>
+    <p>When I have something to say, it'll show up here.</p>
+    <p>No schedule. No obligation. Just whenever.</p>
+  </div>
+
+</main>
+
+<!-- Reading path -->
+<nav class="reading-path-v2">
+  <a href="/story/" class="reading-path-v2__link">
+    <span class="reading-path-v2__dir">&larr; Previous</span>
+    <span class="reading-path-v2__title">The Story</span>
+  </a>
+  <a href="/chronicle/" class="reading-path-v2__link reading-path-v2__link--next">
+    <span class="reading-path-v2__dir">Next &rarr;</span>
+    <span class="reading-path-v2__title">Chronicle</span>
+  </a>
+</nav>
+
+<!-- Mobile bottom nav -->
+<div id="amj-bottom-nav"></div>
+<div id="amj-footer"></div>
+
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>
+```
+
+---
+
+### 2. MODIFY: `site/assets/js/components.js`
+
+Add "First Person" to the **"The Story"** section in the `SECTIONS` array. Insert it after "My Story" and before "The Mission".
+
+**Find this block:**
+```javascript
+{ label: 'The Story', items: [
+      { href: '/',              text: 'Home' },
+      { href: '/story/',        text: 'My Story' },
+      { href: '/about/',        text: 'The Mission' },
+      { href: '/achievements/', text: 'Milestones' },
+    ]},
+```
+
+**Replace with:**
+```javascript
+{ label: 'The Story', items: [
+      { href: '/',               text: 'Home' },
+      { href: '/story/',         text: 'My Story' },
+      { href: '/first-person/',  text: 'First Person' },
+      { href: '/about/',         text: 'The Mission' },
+      { href: '/achievements/',  text: 'Milestones' },
+    ]},
+```
+
+---
+
+### 3. MODIFY: `site/assets/js/nav.js`
+
+Add `/first-person/` to the **BOTTOM_NAV_OWNS** mapping for `/` (home section).
+
+**Find:**
+```javascript
+'/':           ['/', '/story/', '/about/', '/achievements/'],
+```
+
+**Replace with:**
+```javascript
+'/':           ['/', '/story/', '/about/', '/achievements/', '/first-person/'],
+```
+
+---
+
+## DEPLOY COMMANDS
+
+```bash
+aws s3 cp site/first-person/index.html s3://matthew-life-platform/first-person/index.html --content-type "text/html"
+aws s3 cp site/assets/js/components.js s3://matthew-life-platform/assets/js/components.js --content-type "application/javascript"
+aws s3 cp site/assets/js/nav.js s3://matthew-life-platform/assets/js/nav.js --content-type "application/javascript"
+aws cloudfront create-invalidation --distribution-id E3S424OXQZ8NBE --paths "/first-person/*" "/assets/js/components.js" "/assets/js/nav.js"
+```
+
+---
+
+## DESIGN RATIONALE
+
+| Decision | Reason |
+|----------|--------|
+| **Lora serif** | Written feel without gimmick. Google Font, loads fast, pairs with Inter/JetBrains Mono. |
+| **620px max-width** | Narrower than any observatory page. The constraint itself says "one person talking." |
+| **No accent color** | Lives entirely in the base palette. The absence of teal/amber/crimson/violet IS the design statement. |
+| **Hand-drawn SVG separator** | A cubic bezier curve with slight irregularity — not a straight `<hr>`. One small analog imperfection. |
+| **"written by a human" stamp** | Small, slightly rotated, italic, low opacity. A quiet declaration, not a page title. |
+| **No JavaScript** | Zero Lambda, zero API, zero DynamoDB. The deploy process is `aws s3 cp`. That simplicity IS the feature. |
+| **No ticker** | This is the only subpage without the data ticker. Intentional — this page has no data. |
+| **No animations** | No `fadeUp`, no `reveal`, no stagger delays. Content just exists. |
+
+---
+
+## CONTENT GUARDRAILS (non-negotiable)
+
+1. **Matthew writes every word.** Claude builds the page shell. Claude NEVER writes entry content.
+2. **No cadence obligation.** No "posted weekly" language anywhere on the page.
+3. **No editing by AI.** Typos, grammar quirks, run-on sentences — all stay.
+4. **No performance metrics visible.** No view counts, no "X min read", no post counter.
+5. **Elena does NOT touch this page.** No narrator frame, no "Matthew reflects on..." wrapper.
+6. **If it ever feels like an obligation, stop.** The page can go months without a post.
+
+---
+
+## ACCEPTANCE CRITERIA
+
+- [ ] Page loads at `averagejoematt.com/first-person/`
+- [ ] Lora serif font renders for all text on the page
+- [ ] Page is max 620px wide, centered
+- [ ] "written by a human" stamp visible, slightly rotated
+- [ ] RSS icon visible in header
+- [ ] No data ticker on this page
+- [ ] No JavaScript errors in console
+- [ ] Nav dropdown under "The Story" shows "First Person" between "My Story" and "The Mission"
+- [ ] Bottom nav highlights Home section when on this page
+- [ ] Breadcrumb reads Home > Story > First Person
+- [ ] Dark mode and light mode both work correctly
+- [ ] Mobile responsive — single column, readable on phone
+- [ ] Empty state shows when no entries exist
+- [ ] Hand-drawn SVG separator renders between entries

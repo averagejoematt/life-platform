@@ -44,7 +44,7 @@
     }
 
     [data-tier="foundation"] {
-      --tier-accent: #00e5a0;
+      --tier-accent: var(--accent, #3db88a);
       --tier-glow: rgba(0,229,160,0.10);
       --tier-glow-strong: rgba(0,229,160,0.20);
       --tier-emblem-bg: rgba(0,229,160,0.04);
@@ -1235,6 +1235,7 @@
 <body data-tier="foundation">
 
 <div id="amj-nav"></div>
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">The Pulse</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">The Score</span></nav>
 
 <!-- ═══ SECTION: IDENTITY (Decision 4k) ═══ -->
 <div class="section-label">Identity</div>
@@ -1620,7 +1621,7 @@ function scoreColor(s) {
 /* ── Tier Emblem SVGs ──────────────────────────────────────── */
 function tierEmblem(tier, level) {
   const t = tier.toLowerCase();
-  const ac = getComputedStyle(document.documentElement).getPropertyValue('--tier-accent').trim() || '#00e5a0';
+  const ac = getComputedStyle(document.documentElement).getPropertyValue('--tier-accent').trim() || '#3db88a';
   const bg = 'var(--bg)';
 
   // Foundation: simple hexagon with level number
@@ -1983,7 +1984,7 @@ function renderRadar(pillars) {
     const p = pt((2*Math.PI*i)/N, r);
     return p.x+','+p.y;
   }).join(' ');
-  const poly = svgEl('polygon', { points:polyPts, fill:'rgba(0,229,160,0.10)', stroke:'#00e5a0', 'stroke-width':'1.5', 'stroke-linejoin':'round' });
+  const poly = svgEl('polygon', { points:polyPts, fill:'rgba(61,184,138,0.10)', stroke:getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#3db88a', 'stroke-width':'1.5', 'stroke-linejoin':'round' });
   poly.style.transformOrigin = cx+'px '+cy+'px';
   poly.style.transform = 'scale(0)';
   poly.style.transition = 'transform 0.8s cubic-bezier(0.34,1.56,0.64,1)';

@@ -239,7 +239,7 @@
 
     /* Category colors */
     .badge-section--streak  { --badge-color: #c8843a; }
-    .badge-section--level   { --badge-color: #00e5a0; }
+    .badge-section--level   { --badge-color: var(--accent, #3db88a); }
     .badge-section--milestone { --badge-color: #5ba4cf; }
     .badge-section--data    { --badge-color: #8b6cc1; }
     .badge-section--science { --badge-color: #e06060; }
@@ -445,6 +445,7 @@
 <body>
 
 <div id="amj-nav"></div>
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><a href="/story/" class="breadcrumb__section">The Story</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Milestones</span></nav>
 
 <div id="amj-hierarchy-nav"></div>
 
