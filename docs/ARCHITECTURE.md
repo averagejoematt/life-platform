@@ -1,12 +1,12 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-28 (v4.3.0 — 110 tools, 25-module MCP package, 26 data sources, 61 Lambdas, 7 CDK stacks deployed)
+Last updated: 2026-03-28 (v4.3.1 — 116 MCP tools, 25-module MCP package, 25 data sources, 59 platform Lambdas (55 us-west-2 + 4 us-east-1), 66 site pages, 7 CDK stacks)
 
 ---
 
 ## Overview
 
-The life platform is a personal health intelligence system built on AWS. It ingests data from nineteen sources (twelve scheduled + one webhook + three manual/periodic + two MCP-managed + one State of Mind via webhook), normalises everything into a single DynamoDB table, and surfaces it to Claude through a Lambda-backed MCP server. The design philosophy is: get data in automatically, store it cheaply, and make it queryable without a data engineering background.
+The life platform is a personal health intelligence system built on AWS. It ingests data from twenty-five sources (twelve scheduled + one webhook + three manual/periodic + two MCP-managed + one State of Mind via webhook), normalises everything into a single DynamoDB table, and surfaces it to Claude through a Lambda-backed MCP server. The design philosophy is: get data in automatically, store it cheaply, and make it queryable without a data engineering background.
 
 ---
 
