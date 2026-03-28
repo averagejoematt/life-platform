@@ -1214,8 +1214,20 @@
 
 <div id="amj-reading-path"></div>
 
+<!-- Phase 4: The Pulse — living activity feed -->
+<section id="amj-pulse-section" style="display:none">
+  <div class="pulse">
+    <div class="pulse__header">The Pulse</div>
+    <div class="pulse__list" id="pulse-list"></div>
+    <div class="pulse__fade"></div>
+    <div class="pulse__load-more" id="pulse-load-more" style="display:none">
+      <button onclick="loadMorePulse()">Load more</button>
+    </div>
+  </div>
+</section>
+
 <!-- Feature discovery cards -->
-<section class="reveal" style="border-bottom:1px solid var(--border);">
+<section class="reveal" id="amj-feature-cards" style="border-bottom:1px solid var(--border);">
   <div style="padding:var(--space-10) var(--page-padding) var(--space-6);border-bottom:1px solid var(--border);">
     <div class="eyebrow" style="margin-bottom:var(--space-3)">Explore the platform</div>
     <h2 class="text-h3" style="color:var(--text)">What's inside</h2>
@@ -1691,7 +1703,7 @@
 <script src="/assets/js/components.js"></script>
 <script src="/assets/js/nav.js"></script>
 <script src="/assets/js/engagement.js"></script>
-<script>initSinceLastVisit();</script>
+<script>initSinceLastVisit(); initPulseFeed();</script>
 <script>
 // Hide prequel banner after experiment launch (belt-and-suspenders)
 (function() {
