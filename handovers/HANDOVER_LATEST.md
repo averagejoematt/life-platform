@@ -1,2 +1,2 @@
 # Latest Handover Pointer
-→ See [HANDOVER_v3.9.41-offsite-p4.md](HANDOVER_v3.9.41-offsite-p4.md)
+→ See [HANDOVER_v4.2.2.md](HANDOVER_v4.2.2.md)
