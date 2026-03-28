@@ -566,7 +566,7 @@
 
   function getColor() {
     var s = getComputedStyle(document.documentElement);
-    var green = s.getPropertyValue('--c-green-status').trim() || '#00e5a0';
+    var green = s.getPropertyValue('--c-green-status').trim() || '#3db88a';
     var amber = s.getPropertyValue('--c-yellow-status').trim() || '#c8843a';
     var red = s.getPropertyValue('--c-red-status').trim() || '#ff5252';
     return recoveryPct >= 67 ? green : recoveryPct >= 34 ? amber : red;

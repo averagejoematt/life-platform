@@ -4126,6 +4126,83 @@ def handle_mind_overview() -> dict:
     }, cache_seconds=3600)
 
 
+# ── Benchmark trends endpoint ─────────────────────────────────
+def handle_benchmark_trends() -> dict:
+    """GET /api/benchmark_trends — Returns benchmark progress data."""
+    try:
+        resp = table.query(
+            KeyConditionExpression='pk = :pk',
+            ExpressionAttributeValues={':pk': 'USER#matthew#SOURCE#benchmarks'},
+            ScanIndexForward=False,
+            Limit=30
+        )
+        items = resp.get('Items', [])
+        return {
+            'statusCode': 200,
+            'headers': {**CORS_HEADERS, 'Cache-Control': 'max-age=300'},
+            'body': json.dumps({'trends': items}, default=str)
+        }
+    except Exception as e:
+        logger.warning(f"[site_api] benchmark_trends: {e}")
+        return {
+            'statusCode': 200,
+            'headers': {**CORS_HEADERS, 'Cache-Control': 'max-age=300'},
+            'body': json.dumps({'trends': []})
+        }
+
+
+# ── Meal responses endpoint ───────────────────────────────────
+def handle_meal_responses() -> dict:
+    """GET /api/meal_responses — Returns CGM x MacroFactor meal response data."""
+    try:
+        resp = table.query(
+            KeyConditionExpression='pk = :pk',
+            ExpressionAttributeValues={':pk': 'USER#matthew#SOURCE#meal_responses'},
+            ScanIndexForward=False,
+            Limit=50
+        )
+        items = resp.get('Items', [])
+        return {
+            'statusCode': 200,
+            'headers': {**CORS_HEADERS, 'Cache-Control': 'max-age=600'},
+            'body': json.dumps({'meals': items}, default=str)
+        }
+    except Exception as e:
+        logger.warning(f"[site_api] meal_responses: {e}")
+        return {
+            'statusCode': 200,
+            'headers': {**CORS_HEADERS, 'Cache-Control': 'max-age=600'},
+            'body': json.dumps({'meals': []})
+        }
+
+
+# ── Experiment suggestion POST handler ────────────────────────
+def _handle_experiment_suggest(event: dict) -> dict:
+    """POST /api/experiment_suggest — Store reader experiment suggestion."""
+    try:
+        body = json.loads(event.get('body', '{}'))
+        idea = body.get('idea', '').strip()
+        source = body.get('source', '').strip()
+        if not idea or len(idea) < 10:
+            return _error(400, 'Idea must be at least 10 characters')
+        table.put_item(Item={
+            'pk': 'USER#matthew#SOURCE#experiment_suggestions',
+            'sk': f'SUGGEST#{datetime.now(timezone.utc).isoformat()}',
+            'idea': idea,
+            'source': source,
+            'status': 'pending',
+            'created_at': datetime.now(timezone.utc).isoformat(),
+        })
+        return {
+            'statusCode': 200,
+            'headers': CORS_HEADERS,
+            'body': json.dumps({'status': 'received'})
+        }
+    except Exception as e:
+        logger.error(f"[site_api] experiment_suggest failed: {e}")
+        return _error(500, 'Failed to submit suggestion')
+
+
 ROUTES = {
     "/api/vitals":          handle_vitals,
     "/api/journey":         handle_journey,
@@ -4182,6 +4259,11 @@ ROUTES = {
     "/api/nutrition_overview":  handle_nutrition_overview,
     "/api/training_overview":   handle_training_overview,
     "/api/mind_overview":       handle_mind_overview,
+    # Benchmark trends + meal responses (stub endpoints)
+    "/api/benchmark_trends":    handle_benchmark_trends,
+    "/api/meal_responses":      handle_meal_responses,
+    # Experiment suggestion (POST)
+    "/api/experiment_suggest":  None,  # POST handler in lambda_handler
 }
 
 
@@ -4240,6 +4322,12 @@ def lambda_handler(event, context):
         if method != "POST":
             return _error(405, "Use POST method")
         return _handle_experiment_follow(event)
+
+    # Experiment Suggest (POST)
+    if path == "/api/experiment_suggest":
+        if method != "POST":
+            return _error(405, "Use POST method")
+        return _handle_experiment_suggest(event)
 
     # Challenge Check-in (POST)
     if path == "/api/challenge_checkin":
