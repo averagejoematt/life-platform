@@ -402,6 +402,67 @@
     spacer.className = 'nav-spacer';
     navMount.parentNode.insertBefore(spacer, navMount.nextSibling);
   }
+  // ── GUIDED PATH (Phase 2) — first-visit progress bar ──────
+  (function() {
+    var GUIDED_KEY = 'amj_guided_path';
+    var DISMISSED_KEY = 'amj_guided_dismissed';
+    var LAST_VISIT = 'amj_last_visit';
+
+    // Only show for first-time visitors who haven't dismissed
+    if (localStorage.getItem(LAST_VISIT) && localStorage.getItem(GUIDED_KEY) && JSON.parse(localStorage.getItem(GUIDED_KEY)).length >= 5) return;
+    if (sessionStorage.getItem(DISMISSED_KEY)) return;
+
+    var PATH_STEPS = [
+      { id: 'story', label: 'Story', path: '/story/' },
+      { id: 'live', label: 'Live', path: '/live/' },
+      { id: 'sleep', label: 'Explore', path: '/sleep/' },
+      { id: 'character', label: 'Score', path: '/character/' },
+      { id: 'subscribe', label: 'Subscribe', path: '/subscribe/' },
+    ];
+
+    var completed = [];
+    try { completed = JSON.parse(localStorage.getItem(GUIDED_KEY) || '[]'); } catch(e) {}
+
+    // Mark current page as completed
+    var currentPath = window.location.pathname;
+    var currentStep = null;
+    for (var si = 0; si < PATH_STEPS.length; si++) {
+      if (currentPath === PATH_STEPS[si].path || currentPath.startsWith(PATH_STEPS[si].path)) {
+        currentStep = PATH_STEPS[si];
+        break;
+      }
+    }
+    // Home counts as visited for story context
+    if (currentPath === '/' || currentPath === '/index.html') {
+      currentStep = currentStep || { id: 'home' };
+    }
+
+    if (currentStep && PATH_STEPS.some(function(s) { return s.id === currentStep.id; }) && completed.indexOf(currentStep.id) === -1) {
+      completed.push(currentStep.id);
+      localStorage.setItem(GUIDED_KEY, JSON.stringify(completed));
+    }
+
+    // Build the bar
+    var barHtml = '<div class="guided-path" id="amj-guided-path">';
+    PATH_STEPS.forEach(function(step) {
+      var isCompleted = completed.indexOf(step.id) > -1;
+      var isCurrent = currentStep && step.id === currentStep.id;
+      var cls = 'guided-path__step';
+      if (isCompleted && !isCurrent) cls += ' guided-path__step--completed';
+      else if (isCurrent) cls += ' guided-path__step--current';
+      else cls += ' guided-path__step--future';
+      barHtml += '<a href="' + step.path + '" class="' + cls + '">' + step.label + '</a>';
+    });
+    barHtml += '<button class="guided-path__dismiss" onclick="this.parentElement.classList.add(\'guided-path--hidden\');sessionStorage.setItem(\'' + DISMISSED_KEY + '\',\'1\')" aria-label="Dismiss">\u00D7</button>';
+    barHtml += '</div>';
+
+    // Inject after nav spacer
+    var spacerEl = document.querySelector('.nav-spacer');
+    if (spacerEl) {
+      spacerEl.insertAdjacentHTML('afterend', barHtml);
+    }
+  })();
+
   if (hierNavMount)   hierNavMount.innerHTML = buildSectionNav();
   if (subscribeMount) subscribeMount.innerHTML = buildSubscribeCTA();
   if (bottomNavMount) bottomNavMount.innerHTML = buildBottomNav();
