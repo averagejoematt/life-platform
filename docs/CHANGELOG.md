@@ -1,3 +1,36 @@
+## v3.9.41-offsite-p4 — 2026-03-27: Pre-Launch Offsite Part 4 Complete (Planning)
+
+Final session of 4-part pre-launch offsite board meeting. All 30+ pages reviewed. 34 decisions, ~548 total recommendations. No code shipped — planning session only.
+
+### Pages Reviewed (Decisions 25–34)
+- Story (25): 19 recs — fix CTA branding, add share mechanics, verify intersection cards, mobile milestone bar
+- Platform (26): 17 recs — add narrative intro, lead with $13/month, expand Tool of the Week, resolve Intelligence overlap
+- Intelligence (27): 17 recs — elevate Sample Daily Brief as hero, label live vs illustrative, add N=1 caveats
+- Cost (28): 16 recs — **CRITICAL: reconcile cost numbers across pages**, fix mobile "Why so low?" column
+- Methodology (29): 15 recs — **CRITICAL: fix "365+ Days Tracked"**, add 6th limitation, reconcile source cards
+- Board (30): 20 recs — **CRITICAL: replace personas with BoD fictional advisors + "inspired by" attribution**, remove real public figures as chatbots
+- Tools (31): 15 recs — reframe header, **CRITICAL: fix Matthew badges hidden on mobile**, add formula citations
+- About (32): 12 recs — fix test coverage binding, expand links section, fix subscribe branding
+- Home re-review (33): 13 recs — curate "What's Inside" cards, auto-hide prequel banner, verify /chronicle/sample/
+- Builders (34): 18 recs — **CIO audit: rewrite 4 lessons**, remove "Senior Director", reconcile stats, add builder CTA
+
+### Meta-Discussions Resolved
+- Build Section Consolidation: all 7 pages stay standalone. Builders candidate for top-level nav.
+- Board Persona Compromise: fictional names + "inspired by" attribution pattern approved
+- Mobile Audit (M-series): 11 recs — real-device QA critical, Tools badges + Cost column fixes
+- Visual Design (VIS-series): 12 recs — subscribe button color, Sleep/Glucose observatory alignment, OG images
+- AI Slop Differentiation (SLOP-series): 5 recs — change accent color + retire // labels (with rollback)
+- General Feedback (GEN-series): 8 post-launch ideas — "Your Day 1" page, reader observation pipeline, "start here" reading order
+- Pre-Launch Questions (PRE-series): 16 recs — graceful degradation, WCAG contrast fix, sitemap, privacy review
+
+### Critical Items for April 1 (12)
+28a cost reconciliation, 29a days tracked, 30a/30b board personas, 31b mobile badges, 34b stat reconciliation, SLOP-1 accent color, PRE-1 degradation audit, PRE-5 contrast fix, M-1 device QA, PRE-9 sitemap, PRE-13 data privacy review
+
+### Guardrails Set (cumulative: 5)
+16q no Considering section, 19t no downvotes, 22-S1 one subscription, 22-S4 no reader streaks, 30c real-experts editorial only
+
+---
+
 ## v3.9.41 — 2026-03-27: Pre-Launch Content Review (Product Board Editorial Session)
 
 Full editorial review across Home, Story, and About pages with Product Board content panel. Matthew provided page-by-page feedback; board aligned and added catches.
