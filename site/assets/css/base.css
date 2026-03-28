@@ -1345,3 +1345,35 @@ body::after {
   .reading-path-v2 { grid-template-columns: 1fr; }
   .reading-path-v2__link--next { text-align: left; }
 }
+
+/* ── Discord Community Components ─────────────────────── */
+.footer-community-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.footer-community-link:hover { color: var(--accent); }
+.community-glyph { color: var(--c-amber-500, #EF9F27); font-size: var(--text-xs); }
+.discord-community-card {
+  border-left: 2px solid rgba(239,159,39,0.4);
+  background: var(--surface);
+  padding: 24px 28px;
+  margin: 40px 0;
+  border-radius: 0 4px 4px 0;
+  max-width: var(--prose-width, 680px);
+}
+.community-card-header { font-family: var(--font-mono); font-size: 11px; color: var(--c-amber-500, #EF9F27); letter-spacing: 3px; margin-bottom: 14px; }
+.community-card-body { font-size: var(--text-sm); color: var(--text-muted); line-height: 1.7; margin: 0 0 16px 0; }
+.community-card-cta { font-size: var(--text-xs); color: var(--c-amber-500, #EF9F27); text-decoration: none; }
+.community-card-cta:hover { text-decoration: underline; }
+.discord-section-break { padding: 32px 0; text-align: center; }
+.community-rule { border: none; border-top: 1px solid rgba(239,159,39,0.15); margin: 0; }
+.community-quote { font-style: italic; font-size: var(--text-base); color: var(--text-muted); line-height: 1.7; margin: 24px auto; max-width: 520px; }
+.community-url { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--c-amber-500, #EF9F27); letter-spacing: 2px; margin: 0; }
+.community-url a { color: var(--c-amber-500, #EF9F27); text-decoration: none; }
+.community-url a:hover { text-decoration: underline; }
