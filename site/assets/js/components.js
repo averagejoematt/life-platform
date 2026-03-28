@@ -29,9 +29,9 @@
     { label: 'The Story', items: [
       { href: '/',               text: 'Home' },
       { href: '/story/',         text: 'My Story' },
-      { href: '/first-person/',  text: 'First Person' },
       { href: '/about/',         text: 'The Mission' },
       { href: '/achievements/',  text: 'Milestones' },
+      { href: '/first-person/',  text: 'First Person' },
     ]},
     { label: 'The Evidence', items: [
       { href: '/sleep/',       text: 'Sleep' },
