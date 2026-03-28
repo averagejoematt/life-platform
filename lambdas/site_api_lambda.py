@@ -4381,6 +4381,228 @@ def handle_labs() -> dict:
         return _error(503, "Lab data temporarily unavailable.")
 
 
+# ── Phase 1: Changes-Since endpoint ─────────────────────────────
+def handle_changes_since(qs: dict = None) -> dict:
+    """GET /api/changes-since?ts=EPOCH — Returns notable changes since timestamp."""
+    qs = qs or {}
+    ts_str = qs.get("ts", "")
+    if not ts_str:
+        return _error(400, "Missing ts parameter")
+
+    try:
+        since_ts = int(ts_str)
+    except (ValueError, TypeError):
+        return _error(400, "Invalid ts parameter")
+
+    from datetime import datetime, timezone, timedelta
+    since_dt = datetime.fromtimestamp(since_ts, tz=timezone.utc)
+    now = datetime.now(timezone.utc)
+    days_ago = max(1, (now - since_dt).days)
+    # Cap lookback to 30 days
+    if days_ago > 30:
+        since_dt = now - timedelta(days=30)
+        days_ago = 30
+
+    start_date = since_dt.strftime("%Y-%m-%d")
+    end_date = now.strftime("%Y-%m-%d")
+
+    # Fetch weight, HRV, sleep, character data
+    deltas = {}
+    try:
+        whoop_items = _query_source("whoop", start_date, end_date)
+        withings_items = _query_source("withings", start_date, end_date)
+
+        # Weight delta
+        weights = [float(i.get("weight_kg", 0)) * 2.20462 for i in withings_items
+                    if i.get("weight_kg") and float(i.get("weight_kg", 0)) > 0]
+        if len(weights) >= 2:
+            spark = weights[-7:] if len(weights) > 7 else weights
+            deltas["weight"] = {
+                "from": round(weights[0], 1), "to": round(weights[-1], 1),
+                "change": round(weights[-1] - weights[0], 1), "unit": "lbs",
+                "sparkline": [round(w, 1) for w in spark],
+            }
+
+        # HRV delta
+        hrvs = [float(i.get("hrv", 0)) for i in whoop_items if i.get("hrv") and float(i.get("hrv", 0)) > 0]
+        if len(hrvs) >= 2:
+            spark = hrvs[-7:] if len(hrvs) > 7 else hrvs
+            trend = "climbing" if hrvs[-1] > hrvs[0] else "declining" if hrvs[-1] < hrvs[0] else "stable"
+            deltas["hrv"] = {
+                "from": round(hrvs[0]), "to": round(hrvs[-1]),
+                "change": round(hrvs[-1] - hrvs[0]), "unit": "ms",
+                "trend": trend, "sparkline": [round(h) for h in spark],
+            }
+
+        # Sleep delta
+        sleeps = [float(i.get("sleep_duration_hours", 0)) for i in whoop_items
+                  if i.get("sleep_duration_hours") and float(i.get("sleep_duration_hours", 0)) > 0]
+        if len(sleeps) >= 2:
+            spark = sleeps[-7:] if len(sleeps) > 7 else sleeps
+            trend = "improving" if sleeps[-1] > sleeps[0] else "declining"
+            deltas["sleep"] = {
+                "from": round(sleeps[0], 1), "to": round(sleeps[-1], 1),
+                "change": round(sleeps[-1] - sleeps[0], 1), "unit": "hrs",
+                "trend": trend, "sparkline": [round(s, 1) for s in spark],
+            }
+    except Exception as e:
+        logger.warning(f"[changes-since] DynamoDB query failed: {e}")
+
+    # Character delta
+    try:
+        char_items = _query_source("character_sheet", start_date, end_date)
+        scores = [float(i.get("overall_score", 0)) for i in char_items if i.get("overall_score")]
+        if len(scores) >= 2:
+            deltas["character"] = {
+                "from": round(scores[0]), "to": round(scores[-1]),
+                "change": round(scores[-1] - scores[0]), "unit": "pts",
+                "sparkline": [round(s) for s in (scores[-7:] if len(scores) > 7 else scores)],
+            }
+    except Exception:
+        pass
+
+    # Events (experiments completed, chronicles published)
+    events_list = []
+    try:
+        exp_items = _query_source("experiments", start_date, end_date)
+        for e in exp_items:
+            if e.get("status") == "completed":
+                events_list.append({
+                    "type": "experiment_complete",
+                    "title": e.get("name", "Experiment"),
+                    "link": "/experiments/",
+                    "date": e.get("sk", "").replace("DATE#", ""),
+                })
+    except Exception:
+        pass
+
+    return _ok({
+        "since": since_dt.isoformat(),
+        "days_ago": days_ago,
+        "deltas": deltas,
+        "events": events_list[:5],
+    }, cache_seconds=300)
+
+
+# ── Phase 1: Observatory Week endpoint ─────────────────────────
+def handle_observatory_week(qs: dict = None) -> dict:
+    """GET /api/observatory_week?domain=sleep — Returns 7-day summary for a domain."""
+    qs = qs or {}
+    domain = (qs.get("domain") or "sleep").lower().strip()
+    valid_domains = {"sleep", "glucose", "nutrition", "training", "mind"}
+    if domain not in valid_domains:
+        return _error(400, f"Invalid domain. Use: {', '.join(sorted(valid_domains))}")
+
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    end_date = now.strftime("%Y-%m-%d")
+    start_date = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+    prev_start = (now - timedelta(days=14)).strftime("%Y-%m-%d")
+    prev_end = (now - timedelta(days=8)).strftime("%Y-%m-%d")
+
+    try:
+        if domain == "sleep":
+            items = _query_source("whoop", start_date, end_date)
+            prev_items = _query_source("whoop", prev_start, prev_end)
+
+            durations = [float(i.get("sleep_duration_hours", 0)) for i in items if i.get("sleep_duration_hours")]
+            prev_durations = [float(i.get("sleep_duration_hours", 0)) for i in prev_items if i.get("sleep_duration_hours")]
+            avg_dur = sum(durations) / len(durations) if durations else 0
+            prev_avg = sum(prev_durations) / len(prev_durations) if prev_durations else 0
+
+            best = max(items, key=lambda i: float(i.get("sleep_duration_hours", 0)), default={})
+            worst = min(items, key=lambda i: float(i.get("sleep_duration_hours", 99)), default={})
+
+            summary = {
+                "primary": {"label": "Average Duration", "value": round(avg_dur, 1), "unit": "hrs",
+                            "delta": round(avg_dur - prev_avg, 1), "delta_label": f"vs {round(prev_avg, 1)} last week",
+                            "trend": "up" if avg_dur > prev_avg else "down", "sparkline": [round(d, 1) for d in durations]},
+                "highlight": {"label": "Best Night", "value": f"{best.get('sk', '').replace('DATE#', '')[:5]} · {round(float(best.get('sleep_duration_hours', 0)), 1)}h",
+                              "detail": f"Recovery {round(float(best.get('recovery_score', 0)))}%"},
+                "lowlight": {"label": "Worst Night", "value": f"{worst.get('sk', '').replace('DATE#', '')[:5]} · {round(float(worst.get('sleep_duration_hours', 0)), 1)}h",
+                             "detail": ""},
+            }
+            notable = f"Avg sleep {'improved' if avg_dur > prev_avg else 'declined'} {abs(round(avg_dur - prev_avg, 1))}h vs last week"
+
+        elif domain == "nutrition":
+            items = _query_source("macrofactor", start_date, end_date)
+            prev_items = _query_source("macrofactor", prev_start, prev_end)
+
+            cals = [float(i.get("calories", 0)) for i in items if i.get("calories")]
+            prev_cals = [float(i.get("calories", 0)) for i in prev_items if i.get("calories")]
+            avg_cal = sum(cals) / len(cals) if cals else 0
+            prev_avg_cal = sum(prev_cals) / len(prev_cals) if prev_cals else 0
+            proteins = [float(i.get("protein_g", 0)) for i in items if i.get("protein_g")]
+            avg_protein = sum(proteins) / len(proteins) if proteins else 0
+
+            summary = {
+                "primary": {"label": "Avg Calories", "value": round(avg_cal), "unit": "kcal",
+                            "delta": round(avg_cal - prev_avg_cal), "delta_label": f"vs {round(prev_avg_cal)} last week",
+                            "trend": "up" if avg_cal > prev_avg_cal else "down", "sparkline": [round(c) for c in cals]},
+                "highlight": {"label": "Avg Protein", "value": f"{round(avg_protein)}g/day", "detail": ""},
+                "lowlight": {"label": "Logged Days", "value": f"{len(cals)}/7", "detail": ""},
+            }
+            notable = f"Protein averaged {round(avg_protein)}g/day this week"
+
+        elif domain == "training":
+            items = _query_source("whoop", start_date, end_date)
+            strains = [float(i.get("strain", 0)) for i in items if i.get("strain")]
+            recoveries = [float(i.get("recovery_score", 0)) for i in items if i.get("recovery_score")]
+            avg_strain = sum(strains) / len(strains) if strains else 0
+            avg_recovery = sum(recoveries) / len(recoveries) if recoveries else 0
+
+            summary = {
+                "primary": {"label": "Avg Strain", "value": round(avg_strain, 1), "unit": "",
+                            "delta": 0, "delta_label": "", "trend": "flat",
+                            "sparkline": [round(s, 1) for s in strains]},
+                "highlight": {"label": "Avg Recovery", "value": f"{round(avg_recovery)}%", "detail": ""},
+                "lowlight": {"label": "Active Days", "value": f"{len([s for s in strains if s > 5])}/7", "detail": ""},
+            }
+            notable = f"Average recovery {round(avg_recovery)}% this week"
+
+        elif domain == "glucose":
+            items = _query_source("dexcom", start_date, end_date)
+            tirs = [float(i.get("time_in_range_pct", 0)) for i in items if i.get("time_in_range_pct")]
+            avg_tir = sum(tirs) / len(tirs) if tirs else 0
+
+            summary = {
+                "primary": {"label": "Avg TIR", "value": round(avg_tir, 1), "unit": "%",
+                            "delta": 0, "delta_label": "", "trend": "flat",
+                            "sparkline": [round(t, 1) for t in tirs]},
+                "highlight": {"label": "Best Day", "value": f"{round(max(tirs))}% TIR" if tirs else "—", "detail": ""},
+                "lowlight": {"label": "Worst Day", "value": f"{round(min(tirs))}% TIR" if tirs else "—", "detail": ""},
+            }
+            notable = f"Average time-in-range {round(avg_tir)}% this week"
+
+        elif domain == "mind":
+            items = _query_source("journal", start_date, end_date)
+            moods = [float(i.get("mood_valence", 0)) for i in items if i.get("mood_valence") is not None]
+            avg_mood = sum(moods) / len(moods) if moods else 0
+
+            summary = {
+                "primary": {"label": "Avg Mood", "value": round(avg_mood, 2), "unit": "",
+                            "delta": 0, "delta_label": "", "trend": "flat",
+                            "sparkline": [round(m, 2) for m in moods]},
+                "highlight": {"label": "Journal Entries", "value": str(len(items)), "detail": "this week"},
+                "lowlight": {"label": "Energy", "value": "—", "detail": ""},
+            }
+            notable = f"{len(items)} journal entries this week"
+        else:
+            return _error(400, "Unsupported domain")
+
+        return _ok({
+            "domain": domain,
+            "period": {"start": start_date, "end": end_date},
+            "summary": summary,
+            "notable": notable,
+            "last_updated": now.isoformat(),
+        }, cache_seconds=900)
+
+    except Exception as e:
+        logger.warning(f"[observatory_week] {domain} failed: {e}")
+        return _error(503, f"Weekly {domain} data temporarily unavailable.")
+
+
 # ── Benchmark trends endpoint ─────────────────────────────────
 def handle_benchmark_trends() -> dict:
     """GET /api/benchmark_trends — Returns benchmark progress data."""
@@ -4522,6 +4744,9 @@ ROUTES = {
     "/api/meal_responses":      handle_meal_responses,
     # Experiment suggestion (POST)
     "/api/experiment_suggest":  None,  # POST handler in lambda_handler
+    # Phase 1: Reader engagement
+    "/api/changes-since":       None,  # GET with ?ts= query param
+    "/api/observatory_week":    None,  # GET with ?domain= query param
 }
 
 
@@ -4612,6 +4837,16 @@ def lambda_handler(event, context):
     # HP-06: Correlations with optional ?featured=true&limit=N
     if path == "/api/correlations":
         return handle_correlations(event)
+
+    # Phase 1: Changes-since (GET with query params)
+    if path == "/api/changes-since":
+        qs = event.get("queryStringParameters") or {}
+        return handle_changes_since(qs)
+
+    # Phase 1: Observatory week (GET with query params)
+    if path == "/api/observatory_week":
+        qs = event.get("queryStringParameters") or {}
+        return handle_observatory_week(qs)
 
     # Special handling: /api/ask accepts POST
     if path == "/api/ask":
