@@ -29,6 +29,7 @@ from mcp.labs_helpers import (
     _get_genome_cached, _query_all_lab_draws, _query_dexa_scans,
     _query_lab_meta, _genome_context_for_biomarkers,
 )
+from mcp.tools_labs import _GENOME_PRIVACY_NOTICE
 from mcp.strength_helpers import classify_exercise
 from mcp.tools_training import tool_get_training_load
 from mcp.helpers import normalize_whoop_sleep
@@ -1234,6 +1235,7 @@ def tool_get_health_risk_profile(args):
         lon["overall_assessment"] = "strong" if good >= 2 else "moderate"
         result["longevity"] = lon
 
+    result["_privacy"] = _GENOME_PRIVACY_NOTICE
     return result
 
 
@@ -1305,7 +1307,8 @@ def tool_get_next_lab_priorities(args):
         "total_recommendations": len(recs), "latest_draw": latest_date,
         "total_historical_draws": len(draws), "genome_snps_analyzed": len(genome_snps),
         "recommendations": sorted(recs, key=lambda r: priority_order.get(r.get("priority", "routine"), 3)),
-        "note": "Data-driven suggestions based on genome + lab history. Discuss with physician."}
+        "note": "Data-driven suggestions based on genome + lab history. Discuss with physician.",
+        "_privacy": _GENOME_PRIVACY_NOTICE}
 
 
 def tool_get_day_type_analysis(args):
