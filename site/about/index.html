@@ -4,19 +4,19 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="About Matthew Walker — the person behind the Life Platform experiment.">
-  <meta property="og:title" content="About — Matthew Walker">
-  <meta property="og:description" content="Career IT background. No engineering degree. Building the infrastructure to understand himself.">
+  <meta name="description" content="I've lost 100 pounds before. Multiple times. This platform is my attempt to understand why it keeps coming back.">
+  <meta property="og:title" content="The Mission — averagejoematt.com">
+  <meta property="og:description" content="IT career, no engineering degree. Building a 21-source AI health platform to catch what willpower can't. Starting April 1.">
   <meta property="og:type" content="profile">
   <meta property="og:url" content="https://averagejoematt.com/about/">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="About — Matthew Walker">
-  <meta name="twitter:description" content="Career IT background. No engineering degree. Building the infrastructure to understand himself.">
+  <meta name="twitter:title" content="The Mission — averagejoematt.com">
+  <meta name="twitter:description" content="IT career, no engineering degree. Building a 21-source AI health platform to catch what willpower can't. Starting April 1.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <title>About — Matthew Walker</title>
+  <title>The Mission — averagejoematt.com</title>
     <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
@@ -194,17 +194,11 @@
 <body class="body-story">
 
 <div id="amj-nav"></div>
-
-<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">&rsaquo;</span><span class="breadcrumb__current">About</span></nav>
-
-
-
-
-
+<div id="amj-hierarchy-nav"></div>
 
 <div class="page-header animate-in">
   <p class="page-header__kicker">The Story</p>
-  <h1 class="page-header__title">Matthew <span>Walker</span></h1>
+  <h1 class="page-header__title">The <span>Mission</span></h1>
   <p class="page-header__sub">
     IT career background. No engineering degree. Just systems thinking,
     a lot of reading, and Claude as a full-time engineering partner.
@@ -213,6 +207,10 @@
 
 <section class="bio-section">
   <div class="bio-prose animate-in">
+    <p>
+      I've lost 100 pounds before. Multiple times. This platform is my attempt to understand
+      why it keeps coming back — and whether a system can catch what willpower can't.
+    </p>
     <p>
       I've spent my career in IT — building teams, managing vendors, running infrastructure
       at scale. My job has always been making complex systems reliable and getting people to actually
@@ -251,19 +249,15 @@
         <div style="display:flex;flex-direction:column;gap:var(--space-2);">
           <div style="display:flex;justify-content:space-between;align-items:baseline;">
             <span style="font-size:var(--text-xs);color:var(--text-muted);">Weight</span>
-            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text);"><span data-const="journey.start_weight">302</span> &rarr; <span data-const="journey.goal_weight" style="color:var(--accent)">185</span> lbs</span>
+            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text);"><span id="about-weight" data-const="journey.start_weight">302</span> &rarr; <span data-const="journey.goal_weight" style="color:var(--accent)">185</span> lbs</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:baseline;">
-            <span style="font-size:var(--text-xs);color:var(--text-muted);">Run</span>
-            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text);">Half marathon baseline</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:baseline;">
-            <span style="font-size:var(--text-xs);color:var(--text-muted);">Strength</span>
-            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text);">300lb+ compound lifts</span>
+            <span style="font-size:var(--text-xs);color:var(--text-muted);">Lost so far</span>
+            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);" id="about-lost">— lbs</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:baseline;">
             <span style="font-size:var(--text-xs);color:var(--text-muted);">Movement</span>
-            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text);">Daily &mdash; rucks, walks, gym</span>
+            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text);">Walk, lift, run. Daily.</span>
           </div>
         </div>
       </div>
@@ -310,7 +304,7 @@
       <div style="padding:var(--space-4) var(--space-5);background:var(--bg);">
         <div style="display:flex;justify-content:space-between;align-items:baseline;">
           <span style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);">Status</span>
-          <span style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);">Day 1 &mdash; April 2026</span>
+          <span id="about-status-day" style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);">Launching April 1</span>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:var(--space-2);">
           <span style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);">Based in</span>
@@ -390,7 +384,7 @@
   </div>
 </section>
 
-<!-- Connect section (replaces WR-19 press/media + WR-45 media kit) -->
+<!-- Connect section -->
 <section style="
   padding: var(--space-16) var(--page-padding);
   max-width: var(--content-width);
@@ -418,8 +412,6 @@
   </div>
 </section>
 
-<!-- WR-45: Media kit removed per pre-launch content review (A-3). -->
-
 <!-- Subscribe CTA -->
 <section class="subscribe-cta" style="
   padding: var(--space-16) var(--page-padding);
@@ -444,22 +436,40 @@
   <p id="about-subscribe-msg" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
 </section>
 
-<!-- Mobile bottom nav -->
 <div id="amj-bottom-nav"></div>
-
 <div id="amj-reading-path"></div>
 <div id="amj-footer"></div>
 
 <script>
-// Load live weight
+// Load live weight + dynamic sidebar updates
 (async function() {
   try {
     const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
     if (!r.ok) return;
     const d = await r.json();
     const w = (d.vitals || {}).weight_lbs || (d.hero || {}).current_weight_lbs;
-    if (w) document.getElementById('about-weight').textContent = Math.round(w * 10) / 10 + ' lbs';
+    if (w) {
+      var rounded = Math.round(w * 10) / 10;
+      var el = document.getElementById('about-weight');
+      if (el) el.textContent = rounded;
+      var lostEl = document.getElementById('about-lost');
+      if (lostEl) {
+        var lost = Math.max(0, 302 - rounded);
+        if (lost > 0) lostEl.textContent = lost.toFixed(1) + ' lbs';
+      }
+    }
   } catch(e) {}
+})();
+
+// Live status day counter
+(function() {
+  var el = document.getElementById('about-status-day');
+  if (!el) return;
+  var msIn = Date.now() - new Date('2026-04-01T07:00:00-07:00').getTime();
+  if (msIn >= 0) {
+    var dayNum = Math.max(1, Math.floor(msIn / 86400000) + 1);
+    el.textContent = 'Day ' + dayNum + ' \u2014 Active';
+  }
 })();
 
 // Subscribe form
@@ -480,14 +490,14 @@ document.getElementById('about-subscribe-btn').addEventListener('click', async (
     });
     const data = await res.json();
     if (res.ok) {
-      msg.textContent = '✓ Check your inbox to confirm.';
+      msg.textContent = '\u2713 Check your inbox to confirm.';
       msg.style.color = 'var(--c-amber-500)';
       document.getElementById('about-email').value = '';
     } else {
       msg.textContent = data.error || 'Something went wrong.';
       msg.style.color = 'var(--c-yellow-status)';
     }
-  } catch { msg.textContent = 'Network error — try again.'; msg.style.color = 'var(--c-yellow-status)'; }
+  } catch { msg.textContent = 'Network error \u2014 try again.'; msg.style.color = 'var(--c-yellow-status)'; }
 });
 document.getElementById('about-email').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('about-subscribe-btn').click();
