@@ -593,9 +593,9 @@
 
       <div class="data-moment">
         <div class="data-moment__label">Current build stats</div>
-        <span class="highlight" id="story-lambda-count">48</span> Lambda functions &nbsp;&middot;&nbsp;
-        <span class="highlight" id="story-data-sources-stat">19</span> data sources &nbsp;&middot;&nbsp;
-        <span class="highlight" id="story-tools-count">95</span> intelligence tools &nbsp;&middot;&nbsp;
+        <span class="highlight" id="story-lambda-count" data-const="platform.lambdas">52</span> Lambda functions &nbsp;&middot;&nbsp;
+        <span class="highlight" id="story-data-sources-stat" data-const="platform.data_sources">19</span> data sources &nbsp;&middot;&nbsp;
+        <span class="highlight" id="story-tools-count" data-const="platform.mcp_tools">105</span> intelligence tools &nbsp;&middot;&nbsp;
         <span class="highlight">CI/CD pipeline</span> with auto-rollback &nbsp;&middot;&nbsp;
         <span class="highlight">~$13/mo</span> on AWS
       </div>
@@ -664,7 +664,7 @@
         That might sound suffocating. Maybe it will be. But I want to try it &mdash; because the alternative is disappearing again, and I know exactly where that leads.
       </p>
       <p>
-        Every week, an AI journalist named Elena Voss reads <span id="story-data-sources-1">19</span> data sources and writes a chronicle of what the numbers say.
+        Every week, an AI journalist named Elena Voss reads <span id="story-data-sources-1" data-const="platform.data_sources">19</span> data sources and writes a chronicle of what the numbers say.
         She doesn't soften bad weeks. She doesn't celebrate plateaus as progress.
         The point is that the data tells the truth, even when I don't want it to.
       </p>
@@ -741,7 +741,7 @@
   <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">The Measured Life</p>
   <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Follow the experiment.</h3>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
-    Real numbers from <span id="story-data-sources-2">19</span> data sources. Every Wednesday, in your inbox. No highlight reel &mdash; every failure included.
+    Real numbers from <span id="story-data-sources-2" data-const="platform.data_sources">19</span> data sources. Every Wednesday, in your inbox. No highlight reel &mdash; every failure included.
   </p>
   <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
     <input id="story-email" type="email" placeholder="your@email.com" style="
@@ -802,7 +802,7 @@ fetch('/api/subscriber_count').then(r=>r.ok?r.json():null).then(d=>{if(d&&d.coun
 // Journey Timeline (STORY-3)
 (function() {
   var TYPE_COLORS = {
-    'milestone':  '#00e5a0',
+    'milestone':  getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#3db88a',
     'weight':     '#f0a500',
     'level_up':   '#5ba4cf',
     'experiment': '#6dba6d',
