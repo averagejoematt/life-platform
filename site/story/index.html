@@ -432,6 +432,7 @@
 
 <div id="amj-nav"></div>
 
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">&rsaquo;</span><span class="breadcrumb__current">The Story</span></nav>
 
 
 
@@ -440,7 +441,7 @@
 
 <!-- Header -->
 <header class="story-header">
-  <p class="story-header__kicker">The Story</p>
+  <p class="story-header__kicker">The Story<span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-left:var(--space-4);">~10 min read</span></p>
   <h1 class="story-header__title"><span data-const="journey.start_weight">302</span> pounds.<br>One <span>decision</span>.</h1>
   <p class="story-header__lede">
     Most people optimize in the dark &mdash; gut feelings, Instagram advice, someone's podcast take.
@@ -512,11 +513,11 @@
 
   <!-- STORY-4: Emotional waveform (moved here for visual impact) -->
   <div class="waveform-section reveal" style="margin-bottom:var(--space-16)">
-    <div class="waveform-label">// the pulse of the journey</div>
+    <div class="waveform-label">The pulse of the journey</div>
     <div class="waveform-heading">The Pattern</div>
     <p class="waveform-sub">Each bar is one day. Height = combined pillar score across sleep, movement, nutrition, metabolic health, mind, consistency, and relationships.</p>
     <div class="waveform-chart" id="waveform-chart">
-      <div style="width:100%;height:40px;background:var(--surface-raised);border-radius:2px;opacity:0.3"></div>
+      <div style="width:100%;padding:var(--space-4);font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);text-align:center;">The pattern emerges as data accumulates &mdash; check back after Week 4</div>
     </div>
     <div class="waveform-legend">
       <div class="waveform-legend__item"><div class="waveform-legend__dot" style="background:var(--c-green-status,#22c55e)"></div>Momentum</div>
@@ -546,6 +547,8 @@
       <div class="pull-quote">
         &ldquo;Every previous attempt treated this as a weight problem. Calories in, calories out. But the weight was never the root issue. It was the coping mechanism.&rdquo;
       </div>
+
+      <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);line-height:var(--lh-body);margin-bottom:var(--space-6);">I work with a therapist alongside the data. The platform catches patterns; it doesn't replace professional support.</p>
 
       <p>
         Here's the pattern, if I'm honest about it: I can do the work. That's never been the issue. When I'm locked in, I'm relentless &mdash; 5am gym sessions, two-hour workouts, eating clean every day, no alcohol, running mountains on weekends. And maybe the fitness isn't just fitness. Maybe it's purpose. Maybe it puts everything else &mdash; the stress, the noise in my head &mdash; on standby. Because I don't notice it when I'm moving.
@@ -583,7 +586,7 @@
       </p>
 
       <div class="data-moment">
-        <div class="data-moment__label">// current build stats</div>
+        <div class="data-moment__label">Current build stats</div>
         <span class="highlight" id="story-lambda-count">48</span> Lambda functions &nbsp;&middot;&nbsp;
         <span class="highlight" id="story-data-sources-stat">19</span> data sources &nbsp;&middot;&nbsp;
         <span class="highlight" id="story-tools-count">95</span> intelligence tools &nbsp;&middot;&nbsp;
@@ -674,7 +677,7 @@
 
 <!-- Journey Timeline -->
 <div class="jtl-section reveal">
-  <div class="jtl-heading">// the experiment so far</div>
+  <div class="jtl-heading">The experiment so far</div>
   <div class="jtl-list" id="jtl-list">
     <div class="jtl-skeleton" id="jtl-skeleton">
       <div class="jtl-node">
@@ -697,23 +700,23 @@
 
 <!-- STORY-5: Tech / Life intersection cards -->
 <div class="intersection-section reveal">
-  <div class="intersection-label">// where the platform meets the person</div>
+  <div class="intersection-label">Where the platform meets the person</div>
   <div class="intersection-heading">The System Catches What I Miss</div>
   <div class="intersection-grid">
     <div class="intersection-card">
-      <div class="intersection-card__tech">// Daily AI Brief</div>
+      <div class="intersection-card__tech">Daily AI Brief</div>
       <div class="intersection-card__arrow">&darr;</div>
       <div class="intersection-card__life">Caught a sleep pattern I didn't see</div>
       <p class="intersection-card__body">The brief flagged that my 11pm&ndash;1am late window was costing me deep sleep stage time &mdash; not obvious from a single night, but visible across 3 weeks of data. Changed my schedule. HRV improved within days.</p>
     </div>
     <div class="intersection-card">
-      <div class="intersection-card__tech">// Character Sheet</div>
+      <div class="intersection-card__tech">Character Sheet</div>
       <div class="intersection-card__arrow">&darr;</div>
       <div class="intersection-card__life">Gamified accountability that actually works</div>
       <p class="intersection-card__body">Every behavior earns XP. Every pillar is visible. The moment I could see that my Relationships score was lagging, I called my family. The score is artificial; the call wasn't.</p>
     </div>
     <div class="intersection-card">
-      <div class="intersection-card__tech">// Public Website</div>
+      <div class="intersection-card__tech">Public Website</div>
       <div class="intersection-card__arrow">&darr;</div>
       <div class="intersection-card__life">You can't lie to yourself when everyone's watching</div>
       <p class="intersection-card__body">Publishing the data live &mdash; including the bad weeks &mdash; removes the option of private rationalization. The numbers are right there. I can't un-publish them. That's the design.</p>
@@ -729,18 +732,18 @@
   background: var(--surface);
   text-align: center;
 ">
-  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">// the weekly signal</p>
+  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">The Measured Life</p>
   <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Follow the experiment.</h3>
   <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
     Real numbers from <span id="story-data-sources-2">19</span> data sources. Every Wednesday, in your inbox. No highlight reel &mdash; every failure included.
   </p>
   <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
     <input id="story-email" type="email" placeholder="your@email.com" style="
-      flex:1;background:var(--bg);border:1px solid var(--c-amber-500);color:var(--text);
+      flex:1;background:var(--bg);border:1px solid var(--cta);color:var(--text);
       font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);
       outline:none;
     ">
-    <button id="story-subscribe-btn" class="btn btn--primary" style="background:var(--c-amber-500);border-color:var(--c-amber-500);white-space:nowrap">Subscribe</button>
+    <button id="story-subscribe-btn" class="btn btn--cta" style="white-space:nowrap">Subscribe</button>
   </div>
   <p id="story-subscribe-msg" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
 </section>
@@ -813,7 +816,7 @@
     if (skel) skel.remove();
 
     if (!events || !events.length) {
-      list.innerHTML = '<div style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono)">// timeline populates as the experiment runs</div>';
+      list.innerHTML = '<div style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono)">Timeline populates as the experiment runs</div>';
       return;
     }
 

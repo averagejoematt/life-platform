@@ -282,7 +282,7 @@
     <h1 class="subscribe-title">The<br>weekly<br><span>signal</span></h1>
     <p class="subscribe-desc">Real numbers from someone actually doing the work. Not a curated highlight reel — the full data, including the bad weeks.</p>
     <div class="what-you-get">
-      <div class="wyg-header">// what you get</div>
+      <div class="wyg-header">What you get</div>
       <div class="wyg-row">
         <div class="wyg-icon">📊</div>
         <div class="wyg-text"><strong>Weekly data report.</strong> Weight, HRV, recovery, sleep, glucose, habits — with AI coaching commentary from 6 advisors.</div>
@@ -304,7 +304,7 @@
 
   <div class="subscribe-right animate-in">
     <div class="form-block" id="form-block">
-      <div class="form-block__header">// join the experiment</div>
+      <div class="form-block__header">Join the experiment</div>
       <div class="form-block__body">
         <div class="form-field">
           <label class="form-label" for="email">Email address</label>
@@ -419,7 +419,7 @@
     const sb = document.getElementById('success-block');
     sb.style.display = 'block';
     sb.querySelector('.success-block__title').textContent = "You're in.";
-    sb.querySelector('.success-block__body').innerHTML = 'Subscription confirmed. You\'ll get the next weekly signal when it drops.<br><br><a href="/" style="color:var(--accent);font-size:var(--text-xs);letter-spacing:var(--ls-label);text-transform:uppercase;">← Back to the experiment</a>';
+    sb.querySelector('.success-block__body').innerHTML = 'Subscription confirmed. You\'ll get the next issue of The Measured Life when it drops.<br><br><a href="/" style="color:var(--accent);font-size:var(--text-xs);letter-spacing:var(--ls-label);text-transform:uppercase;">← Back to the experiment</a>';
   }
   if (action === 'unsubscribed') {
     document.getElementById('form-block').style.display = 'none';

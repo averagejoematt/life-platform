@@ -1666,7 +1666,7 @@ def _handle_verify_subscriber(event: dict) -> dict:
     GET /api/verify_subscriber?email=...
     Returns a 24hr token if the email is a confirmed subscriber.
     Frontend stores token in sessionStorage and sends as X-Subscriber-Token header
-    to unlock 20 questions/hr instead of the default 3.
+    to unlock 20 questions/hr instead of the default 5.
     """
     params = event.get("queryStringParameters") or {}
     email = (params.get("email") or "").strip().lower()
@@ -1697,6 +1697,27 @@ def _handle_verify_subscriber(event: dict) -> dict:
             "limit": 20,
         }),
     }
+
+
+def handle_subscriber_count() -> dict:
+    """
+    GET /api/subscriber_count
+    Returns count of confirmed subscribers (read-only query).
+    Used by homepage and subscribe page for social proof.
+    """
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}#SOURCE#subscribers"),
+            Select="COUNT",
+            FilterExpression="attribute_exists(#s) AND #s = :confirmed",
+            ExpressionAttributeNames={"#s": "status"},
+            ExpressionAttributeValues={":confirmed": "confirmed"},
+        )
+        count = resp.get("Count", 0)
+    except Exception as e:
+        logger.warning(f"[subscriber_count] DDB query failed: {e}")
+        count = 0
+    return _ok({"count": count}, cache_seconds=600)
 
 
 # ── S2-T2-2: Board Ask ────────────────────────────────────────────────────────
@@ -4155,6 +4176,8 @@ ROUTES = {
     "/api/habit_registry":     handle_habit_registry,
     # PULSE-A4: Daily pulse endpoint
     "/api/pulse":              handle_pulse,
+    # Subscriber count social proof (read-only)
+    "/api/subscriber_count":   handle_subscriber_count,
     # Observatory pages
     "/api/nutrition_overview":  handle_nutrition_overview,
     "/api/training_overview":   handle_training_overview,

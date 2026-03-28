@@ -65,12 +65,7 @@
       letter-spacing: var(--ls-display);
     }
 
-    /* ── Pipeline Nav ── */
-    .pipeline-nav { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-4) var(--page-padding); border-bottom:1px solid var(--border); background:var(--surface); font-family:var(--font-mono); font-size:var(--text-2xs); letter-spacing:var(--ls-tag); overflow-x:auto; }
-    .pipeline-nav__step { color:var(--text-faint); text-decoration:none; text-transform:uppercase; white-space:nowrap; padding:var(--space-1) var(--space-3); border:1px solid transparent; }
-    .pipeline-nav__step:hover { color:var(--text-muted); }
-    .pipeline-nav__step.active { color:var(--accent); border-color:var(--accent-dim); }
-    .pipeline-nav__arrow { color:var(--border); }
+    /* pipeline-nav styles injected by components.js */
 
     /* ── H/P/D Explainer ── */
     .explainer {
@@ -884,7 +879,7 @@
 
 <!-- Zone 1: Mission Control -->
 <div class="mission-control" id="mission-control">
-  <div class="zone-heading">// currently running</div>
+  <div class="zone-heading">Currently running</div>
   <div class="mc-grid" id="mc-grid">
     <div class="mc-empty"><div class="mc-empty__title">Loading…</div></div>
   </div>
@@ -892,7 +887,7 @@
 
 <!-- 19i: Launch roadmap -->
 <div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-6) var(--page-padding);border-bottom:1px solid var(--border);">
-  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-4);">// Launch roadmap</div>
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-4);">Launch roadmap</div>
   <div style="display:flex;gap:var(--space-6);flex-wrap:wrap;">
     <div style="border:1px solid var(--border);padding:var(--space-4);flex:1;min-width:150px;">
       <div style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--accent);">Week 1</div>
@@ -911,13 +906,13 @@
 
 <!-- 19g: Start here — recommended experiments -->
 <div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-6) var(--page-padding);border-bottom:1px solid var(--border);">
-  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent);margin-bottom:var(--space-4);">// Start here — 3 recommended experiments</div>
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent);margin-bottom:var(--space-4);">Start here — 3 recommended experiments</div>
   <div id="start-here-picks" style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4);"></div>
 </div>
 
 <!-- Zone 2: The Library -->
 <div class="library" id="library">
-  <div class="zone-heading">// experiment library — vote on what i test next</div>
+  <div class="zone-heading">Experiment library — vote on what I test next</div>
   <div class="library__filters" id="lib-filters">
     <button class="lib-filter active" data-pillar="all">All</button>
     <select class="lib-sort" id="lib-sort">
@@ -933,7 +928,7 @@
 
 <!-- How the library grows -->
 <div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border);">
-  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-4);">// How the library grows</div>
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-4);">How the library grows</div>
   <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body);max-width:560px;margin-bottom:var(--space-6);">
     AI monitors journals and podcasts for testable claims. The Board reviews each for safety and testability before it enters the library. Every experiment traces back to a source.
   </p>
@@ -969,7 +964,7 @@
 
 <!-- Zone 3: The Record -->
 <div class="record" id="record">
-  <div class="zone-heading">// the record — completed experiments</div>
+  <div class="zone-heading">The record — completed experiments</div>
   <div class="record__filters">
     <button class="lib-filter active" data-record="all">All</button>
     <button class="lib-filter" data-record="completed">Completed</button>
@@ -1260,10 +1255,10 @@
 
     var body = '';
     if (exp.hypothesis) {
-      body += '<div class="exp-field"><div class="exp-field__label">// Hypothesis</div><div class="exp-field__value">' + esc(exp.hypothesis) + '</div></div>';
+      body += '<div class="exp-field"><div class="exp-field__label">Hypothesis</div><div class="exp-field__value">' + esc(exp.hypothesis) + '</div></div>';
     }
     if (exp.mechanism) {
-      body += '<div class="exp-field"><div class="exp-field__label">// Mechanism</div><div class="exp-field__value">' + esc(exp.mechanism) + '</div></div>';
+      body += '<div class="exp-field"><div class="exp-field__label">Mechanism</div><div class="exp-field__value">' + esc(exp.mechanism) + '</div></div>';
     }
     // Source
     var srcText = '';
@@ -1275,22 +1270,22 @@
       srcText = exp.source;
     }
     if (srcText) {
-      body += '<div class="exp-field"><div class="exp-field__label">// Source</div><div class="exp-field__value">' + esc(srcText);
+      body += '<div class="exp-field"><div class="exp-field__label">Source</div><div class="exp-field__value">' + esc(srcText);
       if (exp.source_url) body += '<br><a href="' + esc(exp.source_url) + '" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;">View source \u2192</a>';
       body += '</div></div>';
     }
     if (exp.metrics_tracked && exp.metrics_tracked.length) {
-      body += '<div class="exp-field"><div class="exp-field__label">// Tracked Metrics</div><div class="exp-field__value">' + exp.metrics_tracked.map(function(m) { return esc(m); }).join(', ') + '</div></div>';
+      body += '<div class="exp-field"><div class="exp-field__label">Tracked Metrics</div><div class="exp-field__value">' + exp.metrics_tracked.map(function(m) { return esc(m); }).join(', ') + '</div></div>';
     }
     // If successful
     var successOutcome = exp.success_becomes || (function() {
       var pm = {sleep:'New Protocol',movement:'New Protocol',nutrition:'New Protocol',supplements:'Supplement addition',mental:'New Habit',social:'New Habit',discipline:'New Habit',body:'Stack change',recovery:'New Protocol',mind:'New Habit'};
       return pm[exp.pillar] || 'New Protocol';
     })();
-    body += '<div class="exp-field"><div class="exp-field__label">// If Successful</div><div class="exp-field__value" style="color:var(--accent-dim)">' + esc(successOutcome) + '</div></div>';
+    body += '<div class="exp-field"><div class="exp-field__label">If Successful</div><div class="exp-field__value" style="color:var(--accent-dim)">' + esc(successOutcome) + '</div></div>';
     // Graduated
     if (exp.graduated_to) {
-      body += '<div class="exp-field"><div class="exp-field__label">// Graduated</div><div class="exp-field__value" style="color:#2EA98F">\u2192 Now a Protocol: ' + esc(exp.graduated_to) + '</div></div>';
+      body += '<div class="exp-field"><div class="exp-field__label">Graduated</div><div class="exp-field__value" style="color:#2EA98F">\u2192 Now a Protocol: ' + esc(exp.graduated_to) + '</div></div>';
     }
     // Actions
     body += '<div style="display:flex;gap:var(--space-3);align-items:center;justify-content:center;padding-top:var(--space-4);flex-wrap:wrap">';
@@ -1360,7 +1355,7 @@
       var reflectionHtml = '';
       if (exp.reflection) {
         reflectionHtml = '<div class="exp-card__reflection">' +
-          '<div class="exp-card__reflection-label">// What I\'d do differently</div>' +
+          '<div class="exp-card__reflection-label">What I\'d do differently</div>' +
           '<div class="exp-card__reflection-text">"' + esc(exp.reflection) + '"</div>' +
         '</div>';
       }
@@ -1405,7 +1400,7 @@
         complianceHtml +
         outcomeHtml +
         (exp.mechanism ? '<div class="exp-card__mechanism"><div class="exp-card__mechanism-label">Mechanism</div><div class="exp-card__mechanism-text">' + esc(exp.mechanism) + '</div></div>' : '') +
-        (exp.key_finding ? '<div class="exp-card__finding"><div class="exp-card__finding-label">// Finding</div><div class="exp-card__finding-text">' + esc(exp.key_finding) + '</div></div>' : '') +
+        (exp.key_finding ? '<div class="exp-card__finding"><div class="exp-card__finding-label">Finding</div><div class="exp-card__finding-text">' + esc(exp.key_finding) + '</div></div>' : '') +
         reflectionHtml +
         ctaHtml +
       '</div>';

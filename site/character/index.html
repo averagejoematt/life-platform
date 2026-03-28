@@ -1331,7 +1331,7 @@
     </div>
     <div>
       <div class="tier-flavors" id="tier-flavors">
-        <div class="tier-flavors__header">// Tier progression</div>
+        <div class="tier-flavors__header">Tier progression</div>
         <div class="tf-row" id="tf-foundation">
           <div class="tf-row__icon">🔨</div>
           <div class="tf-row__name">Foundation</div>
@@ -1370,7 +1370,7 @@
   <div class="eyebrow">Pillar radar</div>
   <div class="radar-layout">
     <div class="radar-container">
-      <div class="radar-title">// seven pillars — live scores</div>
+      <div class="radar-title">Seven pillars — live scores</div>
       <svg id="radar-svg" viewBox="0 0 400 400" width="400" height="400" xmlns="http://www.w3.org/2000/svg" style="cursor:pointer;max-width:100%;"></svg>
     </div>
     <div>
@@ -1530,10 +1530,10 @@
     <div>
       <p>Each pillar's raw score (0–100) is computed nightly from real wearable, habit, and biometric data — not self-reported. Scores feed into an XP system that determines character level.</p>
       <p>Pillar weights are configurable but currently equal (14.3% each). The composite Character Score is the weighted average. Level progression uses a logarithmic XP curve — early levels come fast, higher levels require sustained performance.</p>
-      <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-label);margin-bottom:0">// Full algorithm: <a href="/platform/" style="color:var(--tier-accent);text-decoration:none;">see platform architecture</a></p>
+      <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-label);margin-bottom:0">Full algorithm: <a href="/platform/" style="color:var(--tier-accent);text-decoration:none;">see platform architecture</a></p>
     </div>
     <div class="sources-table">
-      <div class="sources-table__header">// pillar data sources</div>
+      <div class="sources-table__header">Pillar data sources</div>
       <div class="sources-row"><span class="sources-row__name">Sleep</span><span class="sources-row__desc">Whoop sleep score, Eight Sleep, duration + efficiency</span></div>
       <div class="sources-row"><span class="sources-row__name">Movement</span><span class="sources-row__desc">Strava/Garmin, Zone 2, ACWR, step count</span></div>
       <div class="sources-row"><span class="sources-row__name">Nutrition</span><span class="sources-row__desc">MacroFactor calories, protein target, deficit compliance</span></div>
@@ -1857,12 +1857,12 @@ function hydrate(data) {
     };
     nlGrid.innerHTML = `
       <div class="next-card bottleneck">
-        <div class="next-card__tag">// Bottleneck — highest leverage</div>
+        <div class="next-card__tag">Bottleneck — highest leverage</div>
         <div class="next-card__pillar">${bottleneck.emoji} ${bottleneck.name} — ${bottleneck.raw_score.toFixed(0)}/100</div>
         <div class="next-card__action">${ACTIONS[bottleneck.name] || 'Increase raw score by logging more data.'}</div>
       </div>
       <div class="next-card">
-        <div class="next-card__tag">// Second focus</div>
+        <div class="next-card__tag">Second focus</div>
         <div class="next-card__pillar">${second.emoji} ${second.name} — ${second.raw_score.toFixed(0)}/100</div>
         <div class="next-card__action">${ACTIONS[second.name] || 'Focus on consistent logging.'}</div>
       </div>
@@ -1896,7 +1896,7 @@ function hydrate(data) {
     const barW = Math.min(p.raw_score, 100);
     const isCalibrating = p.raw_score === 0 || (p.readings != null && p.readings < 3);
     let confHtml = '';
-    if (isCalibrating) confHtml = '<div class="pillar-calibrating">// calibrating…</div>';
+    if (isCalibrating) confHtml = '<div class="pillar-calibrating">Calibrating…</div>';
     else if (p.readings != null) {
       const cls = p.readings >= 30 ? 'pillar-confidence--high' : 'pillar-confidence--low';
       const lbl = p.readings >= 30 ? '✓ High' : '⚠ Low';
