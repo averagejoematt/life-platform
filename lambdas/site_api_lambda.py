@@ -88,19 +88,21 @@ _supp_metadata_cache = None
 
 
 def _load_supp_metadata() -> dict:
-    """Load supplement metadata from S3 config/supplement_metadata.json. Cached after first call."""
+    """Load supplement registry from S3 config/supplement_registry.json. Cached after first call.
+    Returns the full registry dict with 'groups' and 'genome_snps' keys."""
     global _supp_metadata_cache
     if _supp_metadata_cache is not None:
         return _supp_metadata_cache
     try:
         S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
         s3 = boto3.client("s3", region_name=S3_REGION)
-        resp = s3.get_object(Bucket=S3_BUCKET, Key="site/config/supplement_metadata.json")
+        resp = s3.get_object(Bucket=S3_BUCKET, Key="config/supplement_registry.json")
         data = json.loads(resp["Body"].read())
-        _supp_metadata_cache = data.get("supplements", {})
-        logger.info(f"[supp_metadata] Loaded: {len(_supp_metadata_cache)} supplements")
+        _supp_metadata_cache = data
+        total = sum(len(g.get("items", [])) for g in data.get("groups", {}).values())
+        logger.info(f"[supp_registry] Loaded: {total} supplements in {len(data.get('groups', {}))} groups")
     except Exception as e:
-        logger.warning(f"[supp_metadata] Failed to load from S3: {e}")
+        logger.warning(f"[supp_registry] Failed to load from S3: {e}")
         _supp_metadata_cache = {}
     return _supp_metadata_cache
 
@@ -746,81 +748,56 @@ def handle_timeline() -> dict:
 def handle_supplements() -> dict:
     """
     GET /api/supplements
-    Returns current supplement stack with dosage, timing, category.
-    Metadata is the authoritative source (all supplements); DynamoDB dose/timing
-    overrides metadata defaults when available.
-    Excludes medications and personal notes for privacy.
+    Returns full supplement registry (groups, items, genome SNPs) from S3 config.
+    Merges DynamoDB adherence data when available.
     Cache: 3600s (1 hr).
     """
-    import re as _re
+    registry = _load_supp_metadata()
+    if not registry or not registry.get("groups"):
+        return _error(503, "Supplement data not available")
 
-    today     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # Try to merge DynamoDB adherence data
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-
     pk = f"{USER_PREFIX}supplements"
     item = None
-    # Try today first, fall back to yesterday
     for date in (today, yesterday):
         resp = table.get_item(Key={"pk": pk, "sk": f"DATE#{date}"})
         item = _decimal_to_float(resp.get("Item"))
         if item:
             break
-
     if not item:
-        # Scan last 30 days for latest record
         resp = table.query(
             KeyConditionExpression=Key("pk").eq(pk),
-            ScanIndexForward=False,
-            Limit=30,
+            ScanIndexForward=False, Limit=5,
         )
         items = _decimal_to_float(resp.get("Items", []))
         item = items[0] if items else None
 
-    metadata = _load_supp_metadata()
-    if not metadata:
-        return _error(503, "Supplement data not available")
-
-    def _normalize_key(name: str) -> str:
-        return _re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
-
-    # Build a lookup from normalized name → DynamoDB supplement record
-    ddb_lookup = {}
+    # Build adherence lookup from DynamoDB
+    adherence_lookup = {}
     if item:
         for s in item.get("supplements", []):
-            if s.get("category") == "medication":
-                continue
-            ddb_lookup[_normalize_key(s.get("name", ""))] = s
+            name = s.get("name", "").lower().replace(" ", "_").replace("-", "_")
+            adherence_lookup[name] = s.get("adherence_pct")
 
     as_of_date = item.get("date", yesterday) if item else yesterday
 
-    # SUPP-1: Iterate metadata as authoritative list; merge DynamoDB dose/timing
-    public_sups = []
-    for key, meta in metadata.items():
-        ddb = ddb_lookup.get(key, {})
-        category = ddb.get("category", "supplement")
-        pub = {
-            "key":     key,
-            "name":    meta.get("display_name", key),
-            "dose":    ddb.get("dose") if ddb.get("dose") is not None else meta.get("default_dose"),
-            "unit":    ddb.get("unit") or meta.get("default_unit", ""),
-            "timing":  ddb.get("timing") or meta.get("default_timing", ""),
-            "category": category,
-            "adherence_pct": ddb.get("adherence_pct"),
-            "purpose_group":  meta.get("purpose_group"),
-            "evidence_tier":  meta.get("evidence_tier"),
-            "genome_snp":     meta.get("genome_snp"),
-            "rationale":      meta.get("rationale"),
-            "science_points": meta.get("science_points", []),
-            "watching":       meta.get("watching"),
-            "signal":         meta.get("signal"),
-            "linked_experiment_id": meta.get("linked_experiment_id"),
-        }
-        public_sups.append(pub)
+    # Merge adherence into registry groups
+    groups = registry.get("groups", {})
+    total_count = 0
+    for gkey, group in groups.items():
+        for supp in group.get("items", []):
+            total_count += 1
+            adh = adherence_lookup.get(supp.get("key", ""))
+            if adh is not None:
+                supp["adherence_pct"] = adh
 
     return _ok({
-        "as_of_date":  as_of_date,
-        "supplements": public_sups,
-        "total_count": len(public_sups),
+        "as_of_date": as_of_date,
+        "groups": groups,
+        "genome_snps": registry.get("genome_snps", []),
+        "total_count": total_count,
     }, cache_seconds=3600)
 
 
