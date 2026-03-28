@@ -1,6 +1,34 @@
 """
 Lab results, genome, DEXA tools.
 """
+# ── SEC-GENOME: Privacy guardrail for public content ─────────────────────────
+# Raw genome identifiers (gene names, rsIDs, genotypes) must NEVER appear
+# in any public-facing content: chronicle posts, daily brief excerpts,
+# public_stats.json, site API responses, or email digests.
+#
+# ALLOWED in public content:
+#   "genetic predisposition to obesity"
+#   "variants affecting vitamin D metabolism"
+#   "genomic data suggests elevated LDL baseline"
+#
+# NEVER in public content:
+#   "FTO rs9939609 A;T"
+#   "MTHFR compound heterozygous"
+#   "SLCO1B1 C;T — 4.5x statin myopathy risk"
+#
+# This notice is appended to all genome-bearing tool outputs.
+# ─────────────────────────────────────────────────────────────────────────────
+_GENOME_PRIVACY_NOTICE = (
+    "PRIVACY GUARDRAIL: This data contains raw genome identifiers (gene names, "
+    "rsIDs, genotypes). These must NEVER appear in any public-facing content "
+    "including chronicle posts, daily briefs, emails, site API responses, or "
+    "public_stats.json. When referencing genome insights in public content, use "
+    "non-specific language only (e.g. 'genetic predisposition to X', 'genomic "
+    "variants affecting Y metabolism'). Never publish specific gene names, "
+    "rsID numbers, or genotype strings (e.g. 'A;T', 'C;C'). This data is for "
+    "private MCP use and Matthew's personal reference only."
+)
+
 import json
 import math
 import re
@@ -329,6 +357,7 @@ def tool_get_genome_insights(args):
         result["risk_breakdown"] = dict(sorted(risks.items()))
         result["available_categories"] = sorted(cats.keys())
 
+    result["_privacy"] = _GENOME_PRIVACY_NOTICE
     return result
 
 
