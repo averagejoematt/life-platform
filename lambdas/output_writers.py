@@ -350,7 +350,7 @@ def write_public_stats_json(data, profile, streak_data=None):
     try:
         today = datetime.now(timezone.utc).date()
 
-        journey_start_date = profile.get("journey_start_date", "2026-01-22")
+        journey_start_date = profile.get("journey_start_date", "2026-04-01")
         journey_start_weight = float(profile.get("journey_start_weight_lbs", 302))
         goal_weight = float(profile.get("goal_weight_lbs", 185))
         current_weight = data.get("latest_weight")
@@ -1188,7 +1188,7 @@ def write_buddy_json(data, profile, yesterday, character_sheet=None):
             prompt = "No action needed. If you reach out, just be a mate — talk about life, not health."
 
         # Journey Stats
-        journey_start = profile.get("journey_start_date", "2026-02-22")
+        journey_start = profile.get("journey_start_date", "2026-04-01")
         goal_weight = _safe_float(profile, "goal_weight_lbs") or 185
         start_weight = _safe_float(profile, "start_weight_lbs") or 302
         try:

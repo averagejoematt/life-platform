@@ -521,6 +521,23 @@ def build_email_html(ai_content, dates, weight_info):
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
 
+
+def record_email_send(table, lambda_name):
+    """Write a completion record so the status page can track last send."""
+    import time as _time
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        table.put_item(Item={
+            "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
+            "sk": f"DATE#{today}",
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+            "status": "success",
+            "ttl": int(_time.time()) + 86400 * 90
+        })
+    except Exception as e:
+        print(f"[status-tracking] Non-fatal write failure: {e}")
+
+
 def lambda_handler(event, context):
     logger.info("The Weekly Plate v1.0.0 starting...")
 
@@ -621,4 +638,5 @@ def lambda_handler(event, context):
         except Exception as e:
             print(f"[WARN] IC-15 failed: {e}")
 
+    record_email_send(table, "weekly_plate")
     return {"statusCode": 200, "body": f"The Weekly Plate sent: {subject}"}

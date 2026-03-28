@@ -51,7 +51,8 @@
     "lambdas/chronicle_approve_lambda.py": { "function": "chronicle-approve" },
     "lambdas/site_api_lambda.py":              { "function": "life-platform-site-api" },
     "lambdas/site_stats_refresh_lambda.py":    { "function": "site-stats-refresh" },
-    "lambdas/challenge_generator_lambda.py":     { "function": "challenge-generator" }
+    "lambdas/challenge_generator_lambda.py":     { "function": "challenge-generator" },
+    "lambdas/food_delivery_lambda.py":           { "function": "food-delivery-ingestion" }
   },
 
   "mcp": {

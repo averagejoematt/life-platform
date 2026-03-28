@@ -707,6 +707,23 @@ def store_weekly_summary(dates, summary):
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
 
+
+def record_email_send(table, lambda_name):
+    """Write a completion record so the status page can track last send."""
+    import time as _time
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        table.put_item(Item={
+            "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
+            "sk": f"DATE#{today}",
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+            "status": "success",
+            "ttl": int(_time.time()) + 86400 * 90
+        })
+    except Exception as e:
+        print(f"[status-tracking] Non-fatal write failure: {e}")
+
+
 def lambda_handler(event, context):
     logger.info("Nutrition Review v1.0 starting...")
 
@@ -742,7 +759,7 @@ def lambda_handler(event, context):
 
     # P2: Dynamic journey context — panel must know stage for appropriate coaching
     try:
-        _start = datetime.strptime(profile.get("journey_start_date", "2026-02-22"), "%Y-%m-%d").date()
+        _start = datetime.strptime(profile.get("journey_start_date", "2026-04-01"), "%Y-%m-%d").date()
         _days_in = max(1, (datetime.now(timezone.utc).date() - _start).days + 1)
         _week_num = max(1, (_days_in + 6) // 7)
         _start_w = profile.get("journey_start_weight_lbs", 302)
@@ -829,4 +846,5 @@ def lambda_handler(event, context):
         except Exception as e:
             print(f"[WARN] IC-15 failed: {e}")
 
+    record_email_send(table, "nutrition_review")
     return {"statusCode": 200, "body": f"Nutrition review sent: {subject}"}

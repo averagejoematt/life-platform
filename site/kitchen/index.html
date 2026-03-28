@@ -5,11 +5,11 @@
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="The Kitchen — personalized meal recommendations built from CGM data, macro targets, and food preferences. Coming soon.">
-  <meta property="og:title" content="The Kitchen — Matthew Walker">
+  <meta property="og:title" content="The Kitchen — Matthew">
   <meta property="og:description" content="Meals scored by glucose response, protein density, and real eating patterns. CGM meets the dinner table.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com/kitchen/">
-  <title>The Kitchen — Matthew Walker</title>
+  <title>The Kitchen — Matthew</title>
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
@@ -332,6 +332,7 @@
 <body>
 
 <div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
 
 <!-- ════════════════════════════════════════════════════════════
      HERO
@@ -441,6 +442,7 @@
   <a href="/nutrition/">&larr; Back to Nutrition Observatory</a>
 </div>
 
+<div id="amj-bottom-nav"></div>
 <div id="amj-footer"></div>
 
 <script src="/assets/js/site_constants.js"></script>
@@ -471,7 +473,7 @@
 
         /* Attempt to POST to subscribe endpoint if available */
         try {
-          fetch('https://averagejoematt.com/api/subscribe', {
+          fetch('/api/subscribe', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: email, source: 'kitchen-teaser' })

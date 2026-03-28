@@ -315,7 +315,7 @@ def _build_journey_context(profile, current_date_str=None):
     Returns a dict with:
       week_num, days_in, stage, stage_label, coaching_principles (list[str])
     """
-    start_str = profile.get("journey_start_date", "2026-02-22")
+    start_str = profile.get("journey_start_date", "2026-04-01")
     try:
         start = _date_cls.fromisoformat(start_str)
         today = _date_cls.fromisoformat(current_date_str) if current_date_str else _date_cls.today()

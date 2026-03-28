@@ -37,6 +37,7 @@ SOURCES = {
     "macrofactor":     "MacroFactor nutrition",
     "garmin":          "Garmin biometrics",
     "habitify":        "Habitify habits",
+    "food_delivery":   "Food delivery behavioral signal",
     # google_calendar retired v3.7.46 — see ADR-030 in DECISIONS.md
 }
 

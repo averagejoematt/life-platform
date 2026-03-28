@@ -903,7 +903,7 @@ def call_haiku(data, profile, api_key):
 
     # P2: Dynamic journey context (replaces hardcoded 'Phase 1 Ignition')
     try:
-        _start = datetime.strptime(profile.get("journey_start_date", "2026-02-22"), "%Y-%m-%d").date()
+        _start = datetime.strptime(profile.get("journey_start_date", "2026-04-01"), "%Y-%m-%d").date()
         _days_in = max(1, (datetime.now(timezone.utc).date() - _start).days + 1)
         _week_num = max(1, (_days_in + 6) // 7)
         _start_w = profile.get("journey_start_weight_lbs", 302)
@@ -1515,6 +1515,52 @@ def build_html(data, commentary, profile):
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
 
+
+def get_food_delivery_digest_line():
+    """Returns a one-line summary for the weekly digest nutrition section.
+
+    Reads the food_delivery STREAK#current record and returns a contextual
+    digest line about the current delivery-free streak.
+    Non-fatal — returns None on any error.
+    """
+    try:
+        resp = table.get_item(Key={
+            'pk': f'USER#{USER_ID}#SOURCE#food_delivery',
+            'sk': 'STREAK#current'
+        })
+        streak = resp.get('Item')
+        if not streak:
+            return None
+        streak_days = int(streak.get('streak_days', 0))
+        if streak_days >= 30:
+            return f"Delivery-free streak: {streak_days} days (nutrition bonus 1.10x active)"
+        if streak_days >= 14:
+            return f"Delivery-free streak: {streak_days} days (nutrition bonus 1.05x active)"
+        if streak_days >= 7:
+            return f"Delivery-free streak: {streak_days} days (nutrition bonus 1.02x active)"
+        if streak_days > 0:
+            return f"Delivery-free streak: {streak_days} days"
+        return None
+    except Exception:
+        return None
+
+
+def record_email_send(table, lambda_name):
+    """Write a completion record so the status page can track last send."""
+    import time as _time
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        table.put_item(Item={
+            "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
+            "sk": f"DATE#{today}",
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+            "status": "success",
+            "ttl": int(_time.time()) + 86400 * 90
+        })
+    except Exception as e:
+        print(f"[status-tracking] Non-fatal write failure: {e}")
+
+
 def lambda_handler(event, context):
     print("[INFO] Weekly Digest v4.0 starting...")
     result = gather_all()
@@ -1582,4 +1628,5 @@ def lambda_handler(event, context):
         except Exception as e:
             print(f"[WARN] IC-15 insight write failed (non-fatal): {e}")
 
+    record_email_send(table, "weekly_digest")
     return {"statusCode": 200, "body": "Digest v4.0 sent."}

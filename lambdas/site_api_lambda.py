@@ -56,6 +56,7 @@ import json
 import logging
 import os
 import re
+import time
 import urllib.request
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
@@ -86,6 +87,31 @@ _content_filter_cache = None
 # ── Supplement metadata (S3-cached) ─────────────────────────
 _supp_metadata_cache = None
 
+# ── Status page (module-level cache) ───────────────────────
+_status_cache = {}
+_status_cache_ts = 0
+STATUS_CACHE_TTL = 300  # 5 minutes
+
+# ── Experiment start date — public Day 1 ───────────────────
+EXPERIMENT_START = "2026-04-01"
+
+# ── Profile (DynamoDB-cached per warm container) ────────────
+_profile_cache = None
+
+
+def _get_profile() -> dict:
+    """Read PROFILE#v1 from DynamoDB. Cached after first call in warm container."""
+    global _profile_cache
+    if _profile_cache is not None:
+        return _profile_cache
+    try:
+        resp = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
+        _profile_cache = _decimal_to_float(resp.get("Item", {}))
+    except Exception as e:
+        logger.warning("[profile] Failed to read profile: %s", e)
+        _profile_cache = {}
+    return _profile_cache
+
 
 def _load_supp_metadata() -> dict:
     """Load supplement registry from S3 config/supplement_registry.json. Cached after first call.
@@ -96,7 +122,7 @@ def _load_supp_metadata() -> dict:
     try:
         S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
         s3 = boto3.client("s3", region_name=S3_REGION)
-        resp = s3.get_object(Bucket=S3_BUCKET, Key="config/supplement_registry.json")
+        resp = s3.get_object(Bucket=S3_BUCKET, Key="site/config/supplement_registry.json")
         data = json.loads(resp["Body"].read())
         _supp_metadata_cache = data
         total = sum(len(g.get("items", [])) for g in data.get("groups", {}).values())
@@ -339,14 +365,15 @@ def handle_journey() -> dict:
                          or withings_latest.get("date", today))
             weight_series = [(last_date, float(withings_latest["weight_lbs"]))]
         else:
-            weight_series = [("2026-02-09", 302.0)]  # No data at all — show journey start
+            weight_series = [("2026-04-01", 302.0)]  # No data at all — show journey start
 
-    start_weight = 302.0   # Journey start (from profile)
-    goal_weight  = 185.0
+    _p = _get_profile()
+    start_weight = float(_p.get("journey_start_weight_lbs", 302.0))
+    goal_weight  = float(_p.get("goal_weight_lbs", 185.0))
     current_weight = weight_series[-1][1]
     lost_lbs     = round(start_weight - current_weight, 1)
     remaining    = round(current_weight - goal_weight, 1)
-    progress_pct = round(lost_lbs / (start_weight - goal_weight) * 100, 1)
+    progress_pct = round(lost_lbs / (start_weight - goal_weight) * 100, 1) if start_weight != goal_weight else 0
 
     # Recent rate (last 28 days regression)
     recent = [(d, w) for d, w in weight_series
@@ -383,7 +410,7 @@ def handle_journey() -> dict:
             "weekly_rate_lbs":    weekly_rate,
             "projected_goal_date": projected_goal_date,
             "days_to_goal":       days_to_goal,
-            "started_date":       "2026-02-09",
+            "started_date":       "2026-04-01",
         }
     }, cache_seconds=3600)
 
@@ -661,16 +688,286 @@ def handle_current_challenge() -> dict:
 
 def handle_status() -> dict:
     """
-    GET /api/status
-    Lightweight health check — confirms DynamoDB is reachable.
-    Cache: 60s.
+    GET /api/status — full system status for status page
+    GET /api/status/summary — lightweight overall status for footer dot
+    Cache: 300s (5 min) server-side, 60s client-side.
     """
-    try:
-        # Use GetItem (allowed by policy) rather than table.load() which triggers DescribeTable
-        table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
-        return _ok({"status": "ok", "platform": "life-platform"}, cache_seconds=60)
-    except Exception as e:
-        return _error(503, f"DynamoDB unavailable: {e}")
+    global _status_cache, _status_cache_ts
+
+    now_ts = time.time()
+    if now_ts - _status_cache_ts < STATUS_CACHE_TTL and _status_cache:
+        return _ok(_status_cache, cache_seconds=60)
+
+    today_dow = datetime.now(timezone.utc).weekday()
+
+    # (source_id, display_name, description, yellow_h, red_h, category)
+    # category: "auto" (default), "manual" (blue — infrequent file imports), "onetime" (green — never changes)
+    _DATA_SOURCES = [
+        # ── Daily automated feeds ──
+        ("whoop",              "Recovery & Sleep (Whoop)",           "HRV · recovery score · sleep staging",      25,  49, "auto"),
+        ("withings",           "Weigh In (Withings)",                "Weight · body composition · blood pressure", 25,  49, "auto"),
+        ("garmin",             "Activity Tracking (Garmin)",         "Steps · GPS routes · stress · body battery", 25,  49, "auto"),
+        ("strava",             "Cardio & Running (Strava)",          "Activities · segments · training load",      25,  49, "auto"),
+        ("habitify",           "Habit Tracking (Habitify)",          "P40 daily habits · day grades",              25,  49, "auto"),
+        ("eightsleep",         "Sleep Environment (Eight Sleep)",    "Sleep staging · bed temperature · HRV",      25,  49, "auto"),
+        ("macrofactor",        "Nutrition (MacroFactor)",            "Calories · macros · meal timing",            25,  49, "auto"),
+        ("notion",             "Daily Journal (Notion)",             "Journal entries · mood · reflections",       25,  49, "auto"),
+        ("todoist",            "To Do List Feed (Todoist)",          "Tasks · projects · completion rate",          25,  49, "auto"),
+        ("weather",            "Weather Conditions",                 "Daily temperature · conditions · humidity",   25,  49, "auto"),
+        ("supplements",        "Supplement Adherence",               "Daily supplement tracking & compliance",      25,  49, "auto"),
+        ("habit_scores",       "Habit Scores (Computed)",            "Aggregated daily habit grades & streaks",     25,  49, "auto"),
+        # ── Dropbox file drops (check downstream partitions) ──
+        ("macrofactor",        "Food Log (Dropbox)",                 "MacroFactor nutrition CSV via file drop",     25,  49, "auto"),
+        ("macrofactor_workouts","Exercise Log (Dropbox)",            "MacroFactor workout CSV via file drop",       48, 168, "auto"),
+        # ── Health Auto Export (check downstream apple_health partition) ──
+        ("apple_health",       "CGM Glucose (Dexcom Stelo)",        "Continuous glucose monitor readings",          25,  49, "auto"),
+        ("apple_health",       "Water Intake (Health Auto Export)",  "Daily water consumption tracking",            25,  49, "auto"),
+        ("apple_health",       "Blood Pressure (Health Auto Export)","Systolic · diastolic · pulse readings",       168, 336, "auto"),
+        ("apple_health",       "Breathwork (Breathwrk)",            "Breathing exercises · sessions · minutes",    48, 168, "auto"),
+        ("apple_health",       "Stretching (Pliability)",           "Flexibility sessions · recovery minutes",     48, 168, "auto"),
+        ("apple_health",       "Mindful Minutes (Meditation)",      "Meditation & mindfulness sessions",           48, 168, "auto"),
+        ("state_of_mind",      "State of Mind (How We Feel)",       "Mood valence · emotions · life associations", 25,  49, "auto"),
+        # ── Manual import ──
+        ("apple_health",       "Apple Health Import",                "Manual XML export · steps · workouts",       168, 336, "auto"),
+        # ── Infrequent manual (blue) ──
+        ("labs",               "Blood Tests",                        "Lab work · biomarkers · lipid panel",        4320, 8760, "manual"),
+        ("dexa",               "Bone Density & Body Comp (DEXA)",   "DEXA scan · bone density · lean mass",       4320, 8760, "manual"),
+        # ── One-time (green, never stale) ──
+        ("genome",             "Genome (one-time import)",           "Genetic variants · risk scores · SNPs",      999999, 999999, "onetime"),
+        ("food_delivery",      "Food Delivery Index (Behavioral)",  "Quarterly CSV import · delivery index 0-10", 2160, 2880, "auto"),
+    ]
+    _COMPUTE_SOURCES = [
+        ("character_sheet",  "Character sheet",  "Pillar scores · level · XP",         25, 49),
+        ("computed_metrics", "Daily metrics",    "Cross-domain computed signals",       25, 49),
+        ("insights",         "Daily insights",   "IC-8 intent vs execution",            25, 49),
+        ("adaptive_mode",    "Adaptive mode",    "Engagement scoring · brief mode",     25, 49),
+    ]
+    _EMAIL_LAMBDAS = [
+        ("daily_brief",         "Daily brief",         "11:00 AM daily · 18 sections",     -1, 25,  49),
+        ("weekly_digest",       "Weekly digest",       "Sunday 9:00 AM",                    6, 200, 400),
+        ("monday_compass",      "Monday compass",      "Monday 8:00 AM · forward planning", 0, 200, 400),
+        ("wednesday_chronicle", "Wednesday chronicle", "Wednesday 8:00 AM · Elena Voss",    2, 200, 400),
+        ("weekly_plate",        "Weekly plate",        "Friday 7:00 PM · nutrition",        4, 200, 400),
+        ("nutrition_review",    "Nutrition review",    "Saturday 10:00 AM",                 5, 200, 400),
+        ("anomaly_detector",    "Anomaly detector",    "9:05 AM daily · 15 metrics",       -1, 25,  49),
+    ]
+
+    def _last_sync(source_id):
+        try:
+            resp = table.query(
+                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source_id}") & Key("sk").begins_with("DATE#"),
+                ScanIndexForward=False, Limit=1, ProjectionExpression="sk",
+            )
+            items = resp.get("Items", [])
+            return items[0]["sk"].replace("DATE#", "")[:10] if items else None
+        except Exception:
+            return None
+
+    def _comp_status(last_date_str, yellow_h, red_h):
+        if not last_date_str:
+            return "red", "never", "No records found in DynamoDB"
+        last_dt = datetime.strptime(last_date_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        hours_ago = (datetime.now(timezone.utc) - last_dt).total_seconds() / 3600
+        if hours_ago < 1:
+            rel = "< 1h ago"
+        elif hours_ago < 24:
+            rel = f"{int(hours_ago)}h ago"
+        elif hours_ago < 48:
+            rel = "yesterday"
+        else:
+            rel = f"{int(hours_ago / 24)}d ago"
+        if hours_ago <= yellow_h:
+            return "green", rel, None
+        elif hours_ago <= red_h:
+            return "yellow", rel, f"Last sync {rel} — expected within {yellow_h}h"
+        else:
+            return "red", rel, f"STALE: last sync {rel}. Threshold exceeded ({red_h}h)."
+
+    def _uptime_90d(source_id):
+        try:
+            resp = table.query(
+                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source_id}") & Key("sk").begins_with("DATE#"),
+                ScanIndexForward=False, Limit=90, ProjectionExpression="sk",
+            )
+            present = {item["sk"].replace("DATE#", "")[:10] for item in resp.get("Items", [])}
+            today = datetime.now(timezone.utc).date()
+            return [1 if (today - timedelta(days=i)).isoformat() in present else 0 for i in range(89, -1, -1)]
+        except Exception:
+            return [0] * 90
+
+    def _sched_aware(status, rel, exp_dow):
+        if exp_dow < 0 or today_dow == exp_dow:
+            return status, rel
+        if status == "yellow":
+            names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+            return "gray", f"next: {names[exp_dow]}"
+        return status, rel
+
+    # Build data source components
+    ds_components = []
+    for row in _DATA_SOURCES:
+        sid, name, desc, yh, rh = row[0], row[1], row[2], row[3], row[4]
+        category = row[5] if len(row) > 5 else "auto"
+        last = _last_sync(sid)
+
+        if category == "onetime":
+            # Genome — check if ANY records exist (uses GENE# keys, not DATE#)
+            try:
+                _gene_resp = table.query(
+                    KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{sid}"),
+                    Limit=1, ProjectionExpression="sk",
+                )
+                has_data = len(_gene_resp.get("Items", [])) > 0
+            except Exception:
+                has_data = False
+            status = "green" if has_data else "red"
+            rel = "imported" if has_data else "not imported"
+            comment = "One-time data source — does not require refresh" if has_data else "Awaiting initial import"
+            uptime = [1] * 90 if has_data else [0] * 90
+        elif category == "manual":
+            # Labs / DEXA — blue status, show refresh recommendation
+            status_raw, rel, _ = _comp_status(last, yh, rh)
+            if last:
+                last_dt = datetime.strptime(last[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                months_ago = int((datetime.now(timezone.utc) - last_dt).days / 30)
+                if months_ago < 6:
+                    comment = f"Last updated {rel}. Next recommended: ~6 months"
+                elif months_ago < 12:
+                    comment = f"Last updated {rel}. Consider scheduling a refresh"
+                else:
+                    comment = f"Last updated {rel}. Overdue for refresh (>12 months)"
+                status = "blue"
+            else:
+                status, comment = "blue", "No data yet — schedule first appointment"
+            uptime = _uptime_90d(sid)
+        else:
+            status, rel, comment = _comp_status(last, yh, rh)
+            uptime = _uptime_90d(sid)
+
+        ds_components.append({"id": sid, "name": name, "description": desc,
+                              "status": status, "last_sync_relative": rel,
+                              "uptime_90d": uptime, "comment": comment})
+
+    # Compute components
+    compute_components = []
+    for sid, name, desc, yh, rh in _COMPUTE_SOURCES:
+        last = _last_sync(sid)
+        status, rel, comment = _comp_status(last, yh, rh)
+        uptime = _uptime_90d(sid)
+        compute_components.append({"id": sid, "name": name, "description": desc,
+                                   "status": status, "last_sync_relative": rel,
+                                   "uptime_90d": uptime, "comment": comment})
+
+    # Email components
+    email_components = []
+    for lid, name, desc, exp_dow, yh, rh in _EMAIL_LAMBDAS:
+        last = _last_sync(f"email_log#{lid}")
+        status, rel, comment = _comp_status(last, yh, rh)
+        status, rel = _sched_aware(status, rel, exp_dow)
+        uptime = _uptime_90d(f"email_log#{lid}")
+        email_components.append({"id": lid, "name": name, "description": desc,
+                                 "status": status, "last_sync_relative": rel,
+                                 "uptime_90d": uptime, "comment": comment})
+
+    # Infrastructure (static — always green unless manually updated)
+    infra = [
+        {"id": "cloudfront_main", "name": "averagejoematt.com",     "description": "CloudFront · 12 pages",         "status": "green", "comment": None},
+        {"id": "site_api",        "name": "Site API Lambda",         "description": "us-east-1 · public read-only",  "status": "green", "comment": None},
+        {"id": "mcp_server",      "name": "MCP server",              "description": "us-west-2 · 95+ tools",        "status": "green", "comment": None},
+        {"id": "dynamodb",        "name": "DynamoDB",                "description": "on-demand · PITR enabled",      "status": "green", "comment": None},
+        {"id": "ses",             "name": "SES email delivery",      "description": "Production mode · receipt rule", "status": "green", "comment": None},
+        {"id": "dlq",             "name": "Dead-letter queue",       "description": "life-platform-ingestion-dlq",    "status": "green", "comment": None},
+    ]
+
+    # Behavioral signals — food delivery streak
+    def _build_behavioral_components():
+        """Build behavioral signal components for the status page."""
+        components = []
+        try:
+            resp = table.get_item(Key={
+                'pk': f'{USER_PREFIX}food_delivery',
+                'sk': 'STREAK#current'
+            })
+            streak = resp.get('Item')
+            if streak:
+                streak_days = int(streak.get('streak_days', 0))
+                last_order = streak.get('last_order_date', '')
+                if streak_days >= 7:
+                    status = "green"
+                    comment = f"Delivery-free streak: {streak_days} days"
+                elif streak_days > 0:
+                    status = "yellow"
+                    comment = f"Delivery-free streak: {streak_days} days"
+                else:
+                    status = "yellow"
+                    comment = f"Last order: {last_order}" if last_order else "No streak data"
+                components.append({
+                    "id": "food_delivery_streak",
+                    "name": "Food Delivery Streak",
+                    "description": "Delivery-free days · nutrition modifier",
+                    "status": status,
+                    "last_sync_relative": f"{streak_days}d streak",
+                    "uptime_90d": [],
+                    "comment": comment,
+                })
+            else:
+                components.append({
+                    "id": "food_delivery_streak",
+                    "name": "Food Delivery Streak",
+                    "description": "Delivery-free days · nutrition modifier",
+                    "status": "gray",
+                    "last_sync_relative": "no data",
+                    "uptime_90d": [],
+                    "comment": "No food delivery data imported yet",
+                })
+        except Exception:
+            components.append({
+                "id": "food_delivery_streak",
+                "name": "Food Delivery Streak",
+                "description": "Delivery-free days · nutrition modifier",
+                "status": "gray",
+                "last_sync_relative": "error",
+                "uptime_90d": [],
+                "comment": "Could not read food delivery data",
+            })
+        return components
+
+    # Exclude blue (manual import) and onetime from overall health — they're not system issues
+    all_statuses = [c["status"] for c in ds_components + compute_components + email_components
+                    if c["status"] not in ("blue",)]
+    if "red" in all_statuses:
+        overall = "red"
+    elif "yellow" in all_statuses:
+        overall = "yellow"
+    else:
+        overall = "green"
+
+    result = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "overall": overall,
+        "groups": [
+            {"id": "data_sources",  "label": "Data sources",   "subtitle": f"{len(ds_components)} feeds — wearables · nutrition · labs · genome", "components": ds_components},
+            {"id": "compute",       "label": "Compute layer",  "subtitle": "character sheet · metrics · insights · adaptive mode", "components": compute_components},
+            {"id": "email",         "label": "Email & digests", "subtitle": "7 scheduled senders", "components": email_components},
+            {"id": "infrastructure","label": "Infrastructure",  "subtitle": "CloudFront · DynamoDB · SES · DLQ", "components": infra},
+            {"id": "behavioral",     "label": "Behavioral signals", "subtitle": "Non-wearable behavioral data", "components": _build_behavioral_components()},
+        ]
+    }
+
+    _status_cache = result
+    _status_cache_ts = now_ts
+    return _ok(result, cache_seconds=60)
+
+
+def handle_status_summary() -> dict:
+    """GET /api/status/summary — lightweight overall status for footer dot."""
+    # Ensure the cache is populated
+    if not _status_cache or (time.time() - _status_cache_ts >= STATUS_CACHE_TTL):
+        handle_status()
+    return _ok({
+        "overall": _status_cache.get("overall", "green"),
+        "generated_at": _status_cache.get("generated_at", ""),
+    }, cache_seconds=60)
 
 
 # ── BS-11: Timeline data ────────────────────────────────────────
@@ -683,7 +980,7 @@ def handle_timeline() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    start = "2026-02-09"
+    start = "2026-04-01"
 
     # Weight series (full journey)
     wt_items = _query_source("withings", start, today)
@@ -736,9 +1033,9 @@ def handle_timeline() -> dict:
             "life_events":  sorted(life_events, key=lambda x: x["date"]),
             "experiments":  sorted(experiments, key=lambda x: x["start"]),
             "level_ups":    level_events,
-            "journey_start": "2026-02-09",
-            "start_weight":  302.0,
-            "goal_weight":   185.0,
+            "journey_start": EXPERIMENT_START,
+            "start_weight":  float(_get_profile().get("journey_start_weight_lbs", 302.0)),
+            "goal_weight":   float(_get_profile().get("goal_weight_lbs", 185.0)),
         }
     }, cache_seconds=3600)
 
@@ -888,9 +1185,10 @@ def handle_journey_timeline() -> dict:
     Cache: 3600s (1 hr).
     """
     today           = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    start_date      = "2026-01-01"
-    start_weight    = 302.0
-    goal_weight     = 185.0
+    start_date      = EXPERIMENT_START
+    _p              = _get_profile()
+    start_weight    = float(_p.get("journey_start_weight_lbs", 302.0))
+    goal_weight     = float(_p.get("goal_weight_lbs", 185.0))
 
     events: list = []
 
@@ -1050,7 +1348,8 @@ def handle_journey_timeline() -> dict:
     except Exception as e:
         logger.warning("journey_timeline: correlation events failed (non-fatal): %s", e)
 
-    # Sort chronologically, deduplicate by date+title
+    # Exclude pre-experiment events and sort chronologically
+    events = [e for e in events if e["date"] >= start_date]
     events.sort(key=lambda e: e["date"])
     seen_evt: set = set()
     deduped = []
@@ -2021,7 +2320,7 @@ def handle_glucose() -> dict:
     Cache: 3600s (1h).
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
 
     records = _query_source("apple_health", d30, today)
     cgm_days = [
@@ -2089,7 +2388,7 @@ def handle_sleep_detail() -> dict:
     Cache: 3600s (1h).
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
 
     eight_days = _query_source("eightsleep", d30, today)
     whoop_days = _query_source("whoop", d30, today)
@@ -2217,7 +2516,7 @@ def handle_achievements() -> dict:
     # ── Weight milestones
     withings = _latest_item("withings")
     current_weight = float(withings.get("weight_lbs", 999)) if withings else 999.0
-    start_weight = 302.0
+    start_weight = float(_get_profile().get("journey_start_weight_lbs", 302.0))
     lost_lbs = round(start_weight - current_weight, 1) if current_weight < start_weight else 0
 
     # ── First experiment
@@ -3080,12 +3379,26 @@ def handle_pulse() -> dict:
 
 
 def handle_protocols() -> dict:
-    """GET /api/protocols — Return protocol definitions from S3 config."""
-    global _protocols_cache
-    if _protocols_cache is None:
-        _protocols_cache = _load_s3_json("site/config/protocols.json", "protocols")
-    protocols = _protocols_cache.get("protocols", [])
-    return _ok({"protocols": protocols, "count": len(protocols)}, cache_seconds=3600)
+    """GET /api/protocols — Return protocol definitions from DynamoDB."""
+    protocols_pk = f"{USER_PREFIX}protocols"
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(protocols_pk) & Key("sk").begins_with("PROTOCOL#"),
+            ScanIndexForward=True,
+        )
+        protocols = []
+        for item in _decimal_to_float(resp.get("Items", [])):
+            item.pop("pk", None)
+            item.pop("sk", None)
+            protocols.append(item)
+        return _ok({"protocols": protocols, "count": len(protocols)}, cache_seconds=3600)
+    except Exception as e:
+        logger.warning("handle_protocols: DynamoDB query failed, falling back to S3: %s", e)
+        global _protocols_cache
+        if _protocols_cache is None:
+            _protocols_cache = _load_s3_json("site/config/protocols.json", "protocols")
+        protocols = _protocols_cache.get("protocols", [])
+        return _ok({"protocols": protocols, "count": len(protocols)}, cache_seconds=3600)
 
 
 def _handle_challenge_vote(event: dict) -> dict:
@@ -3795,8 +4108,8 @@ def handle_nutrition_overview() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
-    d7 = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    d7 = max((datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d"), EXPERIMENT_START)
 
     items = _query_source("macrofactor", d30, today)
     if not items:
@@ -3878,8 +4191,8 @@ def handle_training_overview() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d90 = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
-    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    d90 = max((datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
 
     # Strava activities (90 days)
     strava_items = _query_source("strava", d90, today)
@@ -4185,6 +4498,7 @@ ROUTES = {
     "/api/journey":         handle_journey,
     "/api/character":       handle_character,
     "/api/status":          handle_status,
+    "/api/status/summary":  handle_status_summary,
     # BS-07: new public endpoints
     "/api/weight_progress": handle_weight_progress,
     "/api/character_stats": handle_character_stats,

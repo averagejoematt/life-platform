@@ -5,7 +5,7 @@
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Matthew's public accountability contract — every commitment tracked live. The unedited record. No hiding.">
-  <meta property="og:title" content="Accountability — Matthew Walker">
+  <meta property="og:title" content="Accountability — Matthew">
   <meta property="og:description" content="A public contract. Every commitment tracked. The unedited record.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com/accountability/">
@@ -13,10 +13,10 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Accountability — Matthew Walker">
+  <meta name="twitter:title" content="Accountability — Matthew">
   <meta name="twitter:description" content="A public contract. Every commitment tracked. The unedited record.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <title>Accountability — Matthew Walker</title>
+  <title>Accountability — Matthew</title>
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
@@ -722,7 +722,7 @@
 <body class="acct-page">
 
 <div id="amj-nav"></div>
-<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">The Pulse</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Accountability</span></nav>
+<div id="amj-hierarchy-nav"></div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!-- PART 1: THE COMMITMENT (6a, 6b)                           -->
@@ -733,7 +733,7 @@
   <div class="commitment-hero__inner">
     <blockquote>
       <p>I&rsquo;m doing this in public because accountability without witnesses is just intention. Every number on this page updates daily. There&rsquo;s nowhere to hide.</p>
-      <cite>// Matthew Walker &mdash; started Feb 9, 2026</cite>
+      <cite>// Matthew &mdash; started Feb 9, 2026</cite>
     </blockquote>
     <p class="commitment-hero__rule">
       <strong>The rule is simple:</strong> if the data says I slipped, this page shows it. No editing history, no hiding bad weeks, no narrative spin. The calendar doesn&rsquo;t lie and neither does the arc.
@@ -742,8 +742,13 @@
     <!-- 6f: Witness counter -->
     <div class="witness-counter">
       <div class="witness-counter__dot"></div>
-      <div class="witness-counter__text"><span class="witness-counter__number" id="witness-count">47</span> people are following this experiment</div>
+      <div class="witness-counter__text"><span class="witness-counter__number" id="witness-count">&mdash;</span> people are following this experiment</div>
     </div>
+    <script>
+    fetch('/api/subscriber_count').then(function(r){return r.ok?r.json():null}).then(function(d){
+      if(d&&d.count!=null)document.getElementById('witness-count').textContent=d.count;
+    }).catch(function(){});
+    </script>
 
     <!-- 6g: Comparative context -->
     <div class="comparative-context">
