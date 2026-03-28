@@ -286,7 +286,7 @@ def build_data_packet(data):
     packet.append(f"Week ending: {dates['end']}")
 
     # --- Compute week number from journey start ---
-    journey_start = profile.get("journey_start_date", "2026-02-22")
+    journey_start = profile.get("journey_start_date", "2026-04-01")
     try:
         js = datetime.strptime(journey_start, "%Y-%m-%d").date()
         end_date = datetime.strptime(dates["end"], "%Y-%m-%d").date()
@@ -1634,6 +1634,23 @@ def _send_preview_email(title, week_num, date_str, approval_token, email_html):
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
 
+
+def record_email_send(table, lambda_name):
+    """Write a completion record so the status page can track last send."""
+    import time as _time
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        table.put_item(Item={
+            "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
+            "sk": f"DATE#{today}",
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+            "status": "success",
+            "ttl": int(_time.time()) + 86400 * 90
+        })
+    except Exception as e:
+        print(f"[status-tracking] Non-fatal write failure: {e}")
+
+
 def lambda_handler(event, context):
     logger.info("Wednesday Chronicle v1.1.0 (Board Centralization) — The Measured Life — starting...")
 
@@ -1725,7 +1742,7 @@ def lambda_handler(event, context):
     _conf_reason = ""
     if _HAS_CONFIDENCE:
         try:
-            _journey_start = data.get("profile", {}).get("journey_start_date", "2026-02-09")
+            _journey_start = data.get("profile", {}).get("journey_start_date", "2026-04-01")
             _journey_days = (
                 datetime.strptime(data["dates"]["end"], "%Y-%m-%d") -
                 datetime.strptime(_journey_start, "%Y-%m-%d")
@@ -1862,6 +1879,7 @@ def lambda_handler(event, context):
         except Exception as e:
             print(f"[WARN] IC-15 failed: {e}")
 
+    record_email_send(table, "wednesday_chronicle")
     if PREVIEW_MODE:
         return {
             "statusCode": 200,

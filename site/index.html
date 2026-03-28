@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="One person. 19 data sources. An AI that reads my sleep, habits, mood, and relationships — and publishes what it finds every week. The Measured Life experiment.">
+  <meta name="description" content="One person. 25 data sources. An AI that reads my sleep, habits, mood, and relationships — and publishes what it finds every week. The Measured Life experiment.">
   <meta property="og:title" content="The Measured Life — AI Health Experiment | averagejoematt.com">
-  <meta property="og:description" content="One person. 19 data sources. An AI that reads my sleep, habits, mood, and relationships — and publishes what it finds every week. No filter.">
+  <meta property="og:description" content="One person. 25 data sources. An AI that reads my sleep, habits, mood, and relationships — and publishes what it finds every week. No filter.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
@@ -14,7 +14,7 @@
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="The Measured Life — AI Health Experiment">
-  <meta name="twitter:description" content="One person. 19 data sources. An AI that reads my sleep, habits, mood, and relationships — and publishes what it finds every week.">
+  <meta name="twitter:description" content="One person. 25 data sources. An AI that reads my sleep, habits, mood, and relationships — and publishes what it finds every week.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <title>The Measured Life — AI Health Experiment | averagejoematt.com</title>
@@ -379,7 +379,7 @@
 <section class="hero" id="experiment">
 
   <h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">
-    Matthew Walker — Quantified Self Health Experiment: 302 to 185 lbs with AI and 19 Data Sources — Launching April 1, 2026
+    Matthew — Quantified Self Health Experiment: 302 to 185 lbs with AI and 19 Data Sources — Launching April 1, 2026
   </h1>
 
   <p class="hero-label" style="margin-bottom:16px;">The Measured Life Experiment</p>
@@ -689,7 +689,7 @@
     <blockquote style="max-width:640px;margin:0;font-family:var(--font-serif);font-size:var(--text-base);font-style:italic;color:var(--text-muted);line-height:1.7;border-left:2px solid var(--accent-dim);padding-left:var(--space-4);">
       &ldquo;I used to be the protagonist of my own life. Somewhere along the way, I became a spectator.&rdquo;
       <footer style="margin-top:var(--space-2);font-family:var(--font-mono);font-size:var(--text-xs);font-style:normal;color:var(--accent-dim);letter-spacing:var(--ls-tag);">
-        &mdash; <a href="/story/" style="color:var(--accent-dim);text-decoration:none;">Matthew Walker</a>
+        &mdash; <a href="/story/" style="color:var(--accent-dim);text-decoration:none;">Matthew</a>
       </footer>
     </blockquote>
   </div>
@@ -839,7 +839,7 @@
         flex: 1;
       ">
         <p style="margin-bottom: var(--space-4);" id="brief-static-1">Every morning at 6 AM, Claude reads <span data-const="platform.data_sources">19</span> live data sources and writes a coaching brief. Recovery trends, habit adherence, sleep patterns, nutrition gaps — all synthesized into actionable guidance.</p>
-        <p style="margin-bottom: var(--space-4); color: var(--text-faint); font-style: italic;" id="brief-static-2">Today's brief loads here when the pipeline runs. <a href="/chronicle/sample/" style="color:var(--c-amber-400);text-decoration:none;">See a sample →</a></p>
+        <p style="margin-bottom: var(--space-4); color: var(--text-faint); font-style: italic;" id="brief-static-2">The daily brief updates every morning. <a href="/chronicle/sample/" style="color:var(--c-amber-400);text-decoration:none;">See a sample →</a></p>
         <p style="color: var(--text-faint); font-size: var(--text-xs); font-family: var(--font-mono);">Generated from live data by Claude. <a href="/subscribe/" style="color:var(--c-amber-500);text-decoration:none;">Subscribe to The Measured Life</a> for the full version every Wednesday.</p>
       </div>
       <div style="border-top: 1px solid var(--border-subtle); padding-top: var(--space-4); margin-top: var(--space-6); display: flex; gap: var(--space-4);">
@@ -915,7 +915,7 @@
       const briefExcerpt = d.brief_excerpt;
       if (briefExcerpt) {
         const el = document.getElementById('brief-content');
-        if (el) el.innerHTML = `<p style="margin-bottom:var(--space-4);color:var(--text);">${briefExcerpt}</p><p style="color:var(--text-faint);font-size:var(--text-xs);font-family:var(--font-mono);">Generated this morning from 19 live data sources by Claude.</p>`;
+        if (el) el.innerHTML = `<p style="margin-bottom:var(--space-4);color:var(--text);">${briefExcerpt}</p><p style="color:var(--text-faint);font-size:var(--text-xs);font-family:var(--font-mono);">Generated this morning from 25 live data sources by Claude.</p>`;
       }
 
       // HOME-5: What's new pulse
@@ -943,7 +943,7 @@
   // (fallback: already populated if public_stats has platform.tier0_streak)
   if (vitals === null || !document.getElementById('q-beh-val').textContent || document.getElementById('q-beh-val').textContent === '—') {
     try {
-      const hr = await fetch('https://averagejoematt.com/api/habit_streaks');
+      const hr = await fetch('/api/habit_streaks');
       if (hr.ok) {
         const hd = await hr.json();
         const hs = hd.habit_streaks || {};
@@ -972,7 +972,7 @@
 
   // ── Phase 3: mind from /api/character_stats ──
   try {
-    const cr = await fetch('https://averagejoematt.com/api/character_stats');
+    const cr = await fetch('/api/character_stats');
     if (cr.ok) {
       const cd = await cr.json();
       const cs = cd.character_stats || {};
@@ -1013,7 +1013,7 @@
   // Only fetch /api/weight_progress if public_stats weight is missing
   if (document.getElementById('q-body-val').textContent !== '—') return;
   try {
-    const wpRes = await fetch('https://averagejoematt.com/api/weight_progress');
+    const wpRes = await fetch('/api/weight_progress');
     if (wpRes.ok) {
       const wpData = await wpRes.json();
       const readings = (wpData.weight_progress || []).slice(-30);
@@ -1030,7 +1030,7 @@
   // HRV fallback if API vitals available
   if (document.getElementById('q-rec-val').textContent === '—') {
     try {
-      const vr = await fetch('https://averagejoematt.com/api/vitals');
+      const vr = await fetch('/api/vitals');
       if (vr.ok) {
         const vd = await vr.json();
         const vv = vd.vitals || {};
@@ -1450,7 +1450,7 @@
     if (pct     != null) setText('hero-progress-pct', (Math.round(pct * 10) / 10) + '%');
 
     // BS-02 Hero: stat chips
-    const _startDateStr = j.started_date || j.start_date || '2026-02-22';
+    const _startDateStr = j.started_date || j.start_date || '2026-04-01';
     const _journeyStart = new Date(_startDateStr + 'T12:00:00Z');
     const _daysInFallback = Math.floor((Date.now() - _journeyStart.getTime()) / 86400000);
     const daysIn = hero.days_on_journey ?? j.days_in ?? p.days_in ?? _daysInFallback;

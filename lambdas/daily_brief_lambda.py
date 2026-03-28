@@ -1219,6 +1219,55 @@ def _init_output_writers():
     )
 
 
+def get_food_delivery_brief_signal():
+    """Returns a one-line signal for the daily brief nutrition section.
+
+    Reads the food_delivery STREAK#current record and returns a contextual
+    message about the current delivery-free streak or recent order.
+    Non-fatal — returns None on any error.
+    """
+    try:
+        resp = table.get_item(Key={
+            'pk': f'USER#{USER_ID}#SOURCE#food_delivery',
+            'sk': 'STREAK#current'
+        })
+        streak = resp.get('Item')
+        if not streak:
+            return None
+        streak_days = int(streak.get('streak_days', 0))
+        last_order = streak.get('last_order_date', '')
+        today_str = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        if last_order == today_str:
+            return "Food delivery ordered today — nutrition score modifier applied (0.85x)."
+        if streak_days >= 30:
+            return f"Delivery-free streak: {streak_days} days — nutrition bonus active (1.10x)."
+        if streak_days >= 14:
+            return f"Delivery-free streak: {streak_days} days — nutrition bonus active (1.05x)."
+        if streak_days >= 7:
+            return f"Delivery-free streak: {streak_days} days — nutrition bonus active (1.02x)."
+        if streak_days > 0:
+            return f"Delivery-free streak: {streak_days} days."
+        return None
+    except Exception:
+        return None
+
+
+def record_email_send(table, lambda_name):
+    """Write a completion record so the status page can track last send."""
+    import time as _time
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        table.put_item(Item={
+            "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
+            "sk": f"DATE#{today}",
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+            "status": "success",
+            "ttl": int(_time.time()) + 86400 * 90
+        })
+    except Exception as e:
+        print(f"[status-tracking] Non-fatal write failure: {e}")
+
+
 def lambda_handler(event, context):
     _init_output_writers()  # late-bind; safe to call multiple times (idempotent)
 
@@ -1715,7 +1764,7 @@ def lambda_handler(event, context):
             # Journey start date → days_in
             try:
                 from datetime import date as _date
-                _started = profile.get("journey_start_date", "2026-02-09")
+                _started = profile.get("journey_start_date", "2026-04-01")
                 _days_in = (today.date() if hasattr(today, 'date') else today - _date(2026, 2, 9).toordinal()).days
                 _days_in = max(0, (_date.today() - _date.fromisoformat(_started)).days)
             except Exception:
@@ -1812,6 +1861,14 @@ def lambda_handler(event, context):
                         f"Time in range (70–140 mg/dL): {round(_tir)}% today"
                         + (" — on target." if _tir >= 70 else " — below target.")
                     )
+                # Food delivery streak signal (appended to nutrition narrative)
+                _fd_signal = get_food_delivery_brief_signal()
+                if _fd_signal:
+                    _existing_nut = _group_narratives.get("nutrition", "")
+                    if _existing_nut:
+                        _group_narratives["nutrition"] = _existing_nut + " " + _fd_signal
+                    else:
+                        _group_narratives["nutrition"] = _fd_signal
                 # Habits
                 _hab_pct = None
                 if streak_data:
@@ -1863,7 +1920,7 @@ def lambda_handler(event, context):
                     "progress_pct":       _prog_pct,
                     "weekly_rate_lbs":    _weekly_rate,
                     "projected_goal_date": profile.get("goal_date", "2026-07-31"),
-                    "started_date":       profile.get("journey_start_date", "2026-02-09"),
+                    "started_date":       profile.get("journey_start_date", "2026-04-01"),
                     "current_phase":      (get_current_phase(profile, _curr_wt) or {}).get("name", "Ignition") if _curr_wt else None,
                     "days_in":            _days_in,
                 },
@@ -1892,7 +1949,7 @@ def lambda_handler(event, context):
                 group_narratives=_group_narratives,
                 # D10: Day 1 baseline from profile — historical constants, not live data
                 baseline={
-                    "date":         profile.get("baseline_date") or profile.get("journey_start_date", "2026-02-22"),
+                    "date":         profile.get("baseline_date") or profile.get("journey_start_date", "2026-04-01"),
                     "weight_lbs":   float(profile.get("baseline_weight_lbs") or profile.get("journey_start_weight_lbs", 302.0)),
                     "hrv_ms":       float(profile.get("baseline_hrv_ms", 45)),
                     "rhr_bpm":      float(profile.get("baseline_rhr_bpm", 62)),
@@ -1947,4 +2004,5 @@ def lambda_handler(event, context):
         except Exception as _sw_e:
             print(f"[WARN] site_writer failed (non-fatal): {_sw_e}")
 
+    record_email_send(table, "daily_brief")
     return {"statusCode": 200, "body": "Daily brief v2.77.0 sent: " + subject}

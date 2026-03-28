@@ -5,9 +5,9 @@
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="The inner life of a health transformation — mood, willpower, connection, vice streaks, and the mental health signals most people never measure.">
-  <meta property="og:title" content="Inner Life — Matthew Walker">
+  <meta property="og:title" content="Inner Life — Matthew">
   <meta property="og:description" content="The hardest pillar. Mood, purpose, connection, willpower — tracked honestly.">
-  <title>Inner Life — Matthew Walker</title>
+  <title>Inner Life — Matthew</title>
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <meta name="theme-color" content="#080c0a">
   <link rel="stylesheet" href="/assets/css/tokens.css">
@@ -1023,7 +1023,7 @@
 </head>
 <body class="mind-page">
 <div id="amj-nav"></div>
-<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/" class="breadcrumb__section">Home</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__section">The Evidence</span><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Inner Life</span></nav>
+<div id="amj-hierarchy-nav"></div>
 <!-- Product Board Item 11: Day X context banner -->
 <div id="day-x-banner" style="
   margin:0 var(--page-padding);
@@ -1237,46 +1237,50 @@
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
-     12e: SOCIAL CONNECTION — intention-first redesign
+     12e: SOCIAL CONNECTION — live from DynamoDB via /api/challenges
      ════════════════════════════════════════════════════════════ -->
 <section class="m-connection-section reveal">
   <h2 class="m-connection-section__title">People I&rsquo;m <em>trying to reconnect with</em></h2>
   <div class="m-connection-threshold">MURTHY THRESHOLD: 150 hours/year for close friendship &mdash; that&rsquo;s ~3 hours/week per person</div>
-  <div class="m-connection-grid">
-    <div class="m-connection-intent">
-      <div class="m-connection-intent__who">Friend A</div>
-      <div class="m-connection-intent__text">Weekly calls restarted. Rebuilding a friendship I let fade during the years I was &ldquo;too busy building.&rdquo;</div>
-      <div class="m-connection-intent__progress">
-        <div class="m-connection-intent__bar"><div class="m-connection-intent__fill" id="conn-a-fill" style="width:0%"></div></div>
-        <div class="m-connection-intent__hours" id="conn-a-hours">0 / 150 hrs</div>
-      </div>
-    </div>
-    <div class="m-connection-intent">
-      <div class="m-connection-intent__who">Family member B</div>
-      <div class="m-connection-intent__text">Monthly visits. Proximity isn&rsquo;t connection &mdash; tracking actual quality time, not just coexistence.</div>
-      <div class="m-connection-intent__progress">
-        <div class="m-connection-intent__bar"><div class="m-connection-intent__fill" id="conn-b-fill" style="width:0%"></div></div>
-        <div class="m-connection-intent__hours" id="conn-b-hours">0 / 150 hrs</div>
-      </div>
-    </div>
-    <div class="m-connection-intent">
-      <div class="m-connection-intent__who">Friend C</div>
-      <div class="m-connection-intent__text">Training partner who became a real friend. Investing beyond the gym &mdash; the relationship that surprised me.</div>
-      <div class="m-connection-intent__progress">
-        <div class="m-connection-intent__bar"><div class="m-connection-intent__fill" id="conn-c-fill" style="width:0%"></div></div>
-        <div class="m-connection-intent__hours" id="conn-c-hours">0 / 150 hrs</div>
-      </div>
-    </div>
-    <div class="m-connection-intent">
-      <div class="m-connection-intent__who">Family member D</div>
-      <div class="m-connection-intent__text">The call I keep meaning to make. Data fills in here as evidence of effort, not just intent.</div>
-      <div class="m-connection-intent__progress">
-        <div class="m-connection-intent__bar"><div class="m-connection-intent__fill" id="conn-d-fill" style="width:0%"></div></div>
-        <div class="m-connection-intent__hours" id="conn-d-hours">0 / 150 hrs</div>
-      </div>
-    </div>
+  <div class="m-connection-grid" id="m-connection-grid">
+    <div style="grid-column:1/-1;text-align:center;padding:var(--space-8) 0;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">Loading connections&hellip;</div>
   </div>
 </section>
+<script>
+(function() {
+  fetch('/api/challenges')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (!data || !data.challenges) return;
+      var connections = data.challenges.filter(function(c) {
+        return c.challenge_type === 'connection' && c.status === 'active';
+      });
+      var grid = document.getElementById('m-connection-grid');
+      if (!grid || connections.length === 0) {
+        if (grid) grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:var(--space-8) 0;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">No active connections tracked yet.</div>';
+        return;
+      }
+      grid.innerHTML = connections.map(function(c) {
+        var target = c.target_hours || 150;
+        var checkins = c.daily_checkins || [];
+        var logged = 0;
+        checkins.forEach(function(ci) { logged += parseFloat(ci.hours || 0); });
+        var pct = Math.min(100, Math.round(logged / target * 100));
+        var label = c.public_label || c.name;
+        var desc = c.description || '';
+        return '<div class="m-connection-intent">' +
+          '<div class="m-connection-intent__who">' + label + '</div>' +
+          '<div class="m-connection-intent__text">' + desc + '</div>' +
+          '<div class="m-connection-intent__progress">' +
+            '<div class="m-connection-intent__bar"><div class="m-connection-intent__fill" style="width:' + pct + '%"></div></div>' +
+            '<div class="m-connection-intent__hours">' + logged + ' / ' + target + ' hrs</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    })
+    .catch(function() {});
+})();
+</script>
 
 <!-- ════════════════════════════════════════════════════════════
      MOOD CHART

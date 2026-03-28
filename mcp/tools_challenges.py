@@ -40,6 +40,7 @@ VALID_DOMAINS = [
     "social", "discipline", "metabolic", "general",
 ]
 VALID_VERIFICATION = ["self_report", "metric_auto", "hybrid"]
+VALID_CHALLENGE_TYPES = ["standard", "connection"]
 
 
 def _slug(name: str) -> str:
@@ -81,9 +82,16 @@ def tool_create_challenge(args):
     metric_targets   = args.get("metric_targets") or {}
     status           = (args.get("status") or "candidate").strip()
     verification     = (args.get("verification_method") or "self_report").strip()
+    challenge_type   = (args.get("challenge_type") or "standard").strip()
+    # Connection-type fields
+    public_label     = (args.get("public_label") or "").strip()
+    relationship_type = (args.get("relationship_type") or "").strip()
+    target_hours     = args.get("target_hours")
     related_experiment = (args.get("related_experiment_id") or "").strip()
     tags             = args.get("tags") or []
 
+    if challenge_type not in VALID_CHALLENGE_TYPES:
+        raise ValueError(f"Invalid challenge_type '{challenge_type}'. Valid: {VALID_CHALLENGE_TYPES}")
     if source not in VALID_SOURCES:
         raise ValueError(f"Invalid source '{source}'. Valid: {VALID_SOURCES}")
     if difficulty not in VALID_DIFFICULTIES:
@@ -124,6 +132,10 @@ def tool_create_challenge(args):
         "protocol":             protocol,
         "success_criteria":     success_criteria,
         "metric_targets":       metric_targets or {},
+        "challenge_type":       challenge_type,
+        "public_label":         public_label,
+        "relationship_type":    relationship_type,
+        "target_hours":         Decimal(str(float(target_hours))) if target_hours else 0,
         "status":               status,
         "verification_method":  verification,
         "tags":                 tags,
@@ -163,10 +175,11 @@ def tool_create_challenge(args):
         "name":           name,
         "status":         status,
         "source":         source,
-        "domain":         domain,
-        "difficulty":     difficulty,
-        "duration_days":  duration_days,
-        "protocol":       protocol,
+        "domain":          domain,
+        "challenge_type":  challenge_type,
+        "difficulty":      difficulty,
+        "duration_days":   duration_days,
+        "protocol":        protocol,
     }
 
 
@@ -344,6 +357,10 @@ def tool_checkin_challenge(args):
         "completed": completed,
         "logged_at": _now_iso(),
     }
+    # Connection-type challenges track hours per session
+    hours = args.get("hours")
+    if hours is not None:
+        checkin["hours"] = Decimal(str(float(hours)))
     if auto_result:
         checkin["auto_verification"] = auto_result
     if note:

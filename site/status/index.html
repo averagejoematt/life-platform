@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="System status for averagejoematt.com — 25 data sources, compute layer, email digests, infrastructure.">
+  <meta property="og:title" content="System Status — Matthew">
+  <title>System Status — Matthew</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    /* Status page specific */
+    .status-page { max-width: 860px; margin: 0 auto; padding: var(--space-8) var(--page-padding) var(--space-16); }
+
+    .overall-banner { border-radius: 8px; padding: 14px 18px; display: flex; align-items: center; gap: 12px; margin-bottom: var(--space-6); }
+    .overall-banner.green { background: rgba(61, 184, 138, 0.1); border: 1px solid rgba(61, 184, 138, 0.3); }
+    .overall-banner.yellow { background: rgba(245, 166, 35, 0.1); border: 1px solid rgba(245, 166, 35, 0.3); }
+    .overall-banner.red { background: rgba(255, 82, 82, 0.1); border: 1px solid rgba(255, 82, 82, 0.3); }
+    .overall-banner.loading { background: var(--surface); border: 1px solid var(--border); }
+    .overall-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .overall-banner.green .overall-dot { background: var(--accent); }
+    .overall-banner.yellow .overall-dot { background: var(--c-yellow-status); }
+    .overall-banner.red .overall-dot { background: var(--c-red-status); }
+    .overall-banner.loading .overall-dot { background: var(--text-faint); }
+    .overall-text { font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 500; color: var(--text); }
+    .overall-sub { font-family: var(--font-mono); font-size: var(--text-2xs); margin-left: auto; color: var(--text-muted); }
+    .overall-meta { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-4); }
+    .refresh-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse-dot 2s infinite; }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .status-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: var(--space-4); }
+    .sec-header { padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; }
+    .sec-title { font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: 500; color: var(--accent-dim); letter-spacing: var(--ls-tag); text-transform: uppercase; }
+    .sec-sub { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); }
+
+    .comp-row { display: grid; grid-template-columns: 200px 1fr 90px 100px; align-items: start; padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); }
+    .comp-row:last-child { border-bottom: none; }
+    .comp-row:hover { background: rgba(255,255,255,0.02); }
+    .comp-name { font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 500; color: var(--text); }
+    .comp-desc { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); margin-top: 2px; }
+
+    .uptime-wrap { padding: 2px 8px 0; }
+    .uptime-bar { display: flex; gap: 1.5px; }
+    .uptime-bar .bar { width: 5px; height: 16px; border-radius: 1.5px; flex-shrink: 0; }
+    .bar.up { background: var(--accent); opacity: 0.7; }
+    .bar.warn { background: var(--c-yellow-status); }
+    .bar.down { background: var(--c-red-status); opacity: 0.6; }
+    .bar.na { background: var(--border); }
+    .uptime-label { font-family: var(--font-mono); font-size: 9px; color: var(--text-faint); margin-top: 2px; }
+
+    .sync-time { text-align: right; }
+    .sync-time strong { display: block; font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted); }
+
+    .pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; font-family: var(--font-mono); font-size: 10px; font-weight: 500; white-space: nowrap; }
+    .pill::before { content: ''; width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+    .pill.green { background: rgba(61,184,138,0.12); color: var(--accent); }
+    .pill.green::before { background: var(--accent); }
+    .pill.yellow { background: rgba(245,166,35,0.12); color: var(--c-yellow-status); }
+    .pill.yellow::before { background: var(--c-yellow-status); }
+    .pill.red { background: rgba(255,82,82,0.12); color: var(--c-red-status); }
+    .pill.red::before { background: var(--c-red-status); }
+    .pill.gray { background: rgba(255,255,255,0.05); color: var(--text-faint); }
+    .pill.gray::before { background: var(--text-faint); }
+    .pill.blue { background: rgba(91,164,207,0.12); color: #5ba4cf; }
+    .pill.blue::before { background: #5ba4cf; }
+
+    .comment-strip { grid-column: 1 / -1; margin-top: 6px; font-family: var(--font-mono); font-size: 10px; background: rgba(245,166,35,0.08); color: var(--c-yellow-status); border-radius: 4px; padding: 5px 8px; line-height: 1.4; }
+    .comment-strip.red { background: rgba(255,82,82,0.08); color: var(--c-red-status); }
+    .comment-strip.blue { background: rgba(91,164,207,0.08); color: #5ba4cf; }
+
+    .infra-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 14px; }
+    .infra-card { background: var(--bg); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; }
+    .infra-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .infra-dot.green { background: var(--accent); }
+    .infra-dot.yellow { background: var(--c-yellow-status); }
+    .infra-dot.red { background: var(--c-red-status); }
+    .infra-label { font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: 500; color: var(--text); }
+    .infra-desc { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); margin-top: 1px; }
+
+    @media (max-width: 768px) {
+      .comp-row { grid-template-columns: 1fr auto; }
+      .uptime-wrap, .sync-time { display: none; }
+      .sec-sub { display: none; }
+      .infra-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+
+<div class="status-page">
+  <div class="overall-meta">
+    <div class="refresh-dot" id="refreshDot"></div>
+    <span id="lastUpdated">loading...</span>
+  </div>
+  <div class="overall-banner loading" id="overallBanner">
+    <div class="overall-dot"></div>
+    <div class="overall-text">Checking systems...</div>
+    <div class="overall-sub"></div>
+  </div>
+  <div id="statusGroups"></div>
+</div>
+
+<div id="amj-bottom-nav"></div>
+<div id="amj-footer"></div>
+
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+<script>
+(function() {
+  var STATUS_LABELS = { green: 'Operational', yellow: 'Stale', red: 'Critical', gray: 'Scheduled', blue: 'Manual import' };
+  var OVERALL_MESSAGES = { green: 'All systems operational', yellow: 'Degraded performance', red: 'Service disruption' };
+
+  function buildUptimeBar(arr) {
+    if (!arr || !arr.length) return '<div class="uptime-label">no data</div>';
+    var bars = arr.slice(-30).map(function(v) {
+      var cls = v === 1 ? 'up' : v === 2 ? 'warn' : v === 0 ? 'down' : 'na';
+      return '<div class="bar ' + cls + '"></div>';
+    }).join('');
+    return '<div class="uptime-bar">' + bars + '</div><div class="uptime-label">30 days</div>';
+  }
+
+  function buildComponentRow(c) {
+    var commentCls = c.status === 'red' ? 'red' : c.status === 'blue' ? 'blue' : '';
+    var commentIcon = c.status === 'blue' ? '&#128197; ' : '&#9888; ';
+    var comment = c.comment
+      ? '<div class="comment-strip ' + commentCls + '">' + commentIcon + c.comment + '</div>'
+      : '';
+    return '<div class="comp-row">' +
+      '<div><div class="comp-name">' + c.name + '</div><div class="comp-desc">' + c.description + '</div></div>' +
+      '<div class="uptime-wrap">' + buildUptimeBar(c.uptime_90d) + '</div>' +
+      '<div class="sync-time"><strong>' + (c.last_sync_relative || '\u2014') + '</strong></div>' +
+      '<div><span class="pill ' + c.status + '">' + (STATUS_LABELS[c.status] || c.status) + '</span></div>' +
+      comment +
+      '</div>';
+  }
+
+  function buildInfraCard(c) {
+    return '<div class="infra-card">' +
+      '<div class="infra-dot ' + c.status + '"></div>' +
+      '<div><div class="infra-label">' + c.name + '</div><div class="infra-desc">' + c.description + '</div></div>' +
+      '</div>';
+  }
+
+  function renderStatus(data) {
+    var banner = document.getElementById('overallBanner');
+    var groups = document.getElementById('statusGroups');
+    var total = data.groups.reduce(function(s, g) { return s + g.components.length; }, 0);
+
+    banner.className = 'overall-banner ' + data.overall;
+    banner.innerHTML =
+      '<div class="overall-dot"></div>' +
+      '<div class="overall-text">' + (OVERALL_MESSAGES[data.overall] || 'Status unknown') + '</div>' +
+      '<div class="overall-sub">' + total + ' components</div>';
+
+    var genAt = new Date(data.generated_at);
+    document.getElementById('lastUpdated').textContent =
+      'updated ' + genAt.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+
+    groups.innerHTML = '';
+    data.groups.forEach(function(group) {
+      var sec = document.createElement('div');
+      sec.className = 'status-section';
+      if (group.id === 'infrastructure') {
+        sec.innerHTML =
+          '<div class="sec-header"><span class="sec-title">' + group.label + '</span><span class="sec-sub">' + group.subtitle + '</span></div>' +
+          '<div class="infra-grid">' + group.components.map(buildInfraCard).join('') + '</div>';
+      } else {
+        sec.innerHTML =
+          '<div class="sec-header"><span class="sec-title">' + group.label + '</span><span class="sec-sub">' + group.subtitle + '</span></div>' +
+          group.components.map(buildComponentRow).join('');
+      }
+      groups.appendChild(sec);
+    });
+  }
+
+  function fetchStatus() {
+    var dot = document.getElementById('refreshDot');
+    dot.style.background = 'var(--c-yellow-status)';
+    fetch('/api/status')
+      .then(function(res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(data) {
+        renderStatus(data);
+        dot.style.background = 'var(--accent)';
+      })
+      .catch(function() {
+        dot.style.background = 'var(--c-red-status)';
+        document.getElementById('lastUpdated').textContent = 'update failed \u2014 retrying in 60s';
+      });
+  }
+
+  fetchStatus();
+  setInterval(fetchStatus, 60000);
+})();
+</script>
+</body>
+</html>

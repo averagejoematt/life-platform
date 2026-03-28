@@ -872,6 +872,23 @@ def send_alert_email(flagged, hypothesis, date_str):
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
 
+
+def record_email_send(table, lambda_name):
+    """Write a completion record so the status page can track last send."""
+    import time as _time
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        table.put_item(Item={
+            "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
+            "sk": f"DATE#{today}",
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+            "status": "success",
+            "ttl": int(_time.time()) + 86400 * 90
+        })
+    except Exception as e:
+        print(f"[status-tracking] Non-fatal write failure: {e}")
+
+
 def lambda_handler(event, context):
     print("[INFO] Anomaly Detector v2.3.0 starting (adaptive thresholds + travel + sustained tracking)...")
 
@@ -986,6 +1003,7 @@ def lambda_handler(event, context):
                          sustained_metrics=sustained_metrics,
                          sustained_alert_sent=sustained_alert_sent)
 
+    record_email_send(table, "anomaly_detector")
     return {
         "statusCode": 200,
         "body": json.dumps({
