@@ -1596,6 +1596,19 @@ def lambda_handler(event, context):
         except Exception as e:
             print("[WARN] TL;DR+Guidance failed: " + str(e))
 
+    # HP-12: Elena hero line for public_stats.json
+    _elena_hero_line = None
+    try:
+        _tldr = tldr_guidance.get("tldr", "") if tldr_guidance else ""
+        if _tldr:
+            if len(_tldr) <= 120:
+                _elena_hero_line = _tldr
+            else:
+                cutoff = _tldr[:120].rfind('. ')
+                _elena_hero_line = _tldr[:cutoff + 1] if cutoff > 0 else _tldr[:120] + "\u2026"
+    except Exception as _e:
+        print(f"[WARN] HP-12: elena_hero_line generation failed: {_e}")
+
     # AI-3: Validate all AI outputs before delivery
     if api_key and _HAS_AI_VALIDATOR:
         try:
@@ -1955,6 +1968,7 @@ def lambda_handler(event, context):
                     "rhr_bpm":      float(profile.get("baseline_rhr_bpm", 62)),
                     "recovery_pct": float(profile.get("baseline_recovery_pct", 55)),
                 },
+                elena_hero_line=_elena_hero_line,
             )
             print("[INFO] site_writer: public_stats.json written with baseline")
 
