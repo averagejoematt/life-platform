@@ -400,17 +400,99 @@
       border-top: 1px solid var(--border);
     }
 
-    /* Click-to-expand tile */
+    /* Click to open detail overlay */
     .lib-tile { cursor: pointer; }
-    .lib-tile__expanded {
+
+    /* ── Experiment Detail Overlay (mirrors challenge modal) ── */
+    .exp-overlay {
       display: none;
-      flex-direction: column;
-      gap: var(--space-3);
-      padding-top: var(--space-4);
-      border-top: 1px solid var(--border);
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-8);
     }
-    .lib-tile.expanded .lib-tile__expanded { display: flex; }
-    .lib-tile.expanded { border-color: var(--accent-dim); }
+    .exp-overlay.open { display: flex; }
+    .exp-detail {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      max-width: 560px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      position: relative;
+    }
+    .exp-detail__top {
+      padding: var(--space-8);
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .exp-detail__icon { font-size: 48px; margin-bottom: var(--space-3); }
+    .exp-detail__name {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-2);
+    }
+    .exp-detail__desc {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-mono);
+      max-width: 420px;
+      margin: 0 auto;
+    }
+    .exp-detail__meta {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-4);
+      margin-top: var(--space-4);
+    }
+    .exp-meta-item { text-align: center; }
+    .exp-meta-item__value {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--accent);
+    }
+    .exp-meta-item__label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: var(--ls-tag);
+    }
+    .exp-detail__body { padding: var(--space-6); }
+    .exp-field { margin-bottom: var(--space-5); }
+    .exp-field__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: var(--space-2);
+    }
+    .exp-field__value {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-mono);
+    }
+    .exp-detail__close {
+      position: absolute;
+      top: var(--space-4);
+      right: var(--space-4);
+      font-size: 24px;
+      color: var(--text-muted);
+      cursor: pointer;
+      background: none;
+      border: none;
+      z-index: 1001;
+    }
+    .exp-detail__close:hover { color: var(--text); }
+
     .lib-tile__expand-field {
       display: grid;
       grid-template-columns: 80px 1fr;
@@ -791,6 +873,15 @@
   Experiments that prove out become <a href="/protocols/" style="color:var(--accent);text-decoration:none;">Protocols</a>. Failed experiments are published in full in <a href="/discoveries/" style="color:var(--accent);text-decoration:none;">Discoveries</a>.
 </div>
 
+<!-- Experiment Detail Overlay -->
+<div class="exp-overlay" id="exp-overlay" onclick="if(event.target===this)closeExpDetail()">
+  <div class="exp-detail" id="exp-detail">
+    <button class="exp-detail__close" onclick="closeExpDetail()">&times;</button>
+    <div class="exp-detail__top" id="exp-detail-top"></div>
+    <div class="exp-detail__body" id="exp-detail-body"></div>
+  </div>
+</div>
+
 <!-- Zone 1: Mission Control -->
 <div class="mission-control" id="mission-control">
   <div class="zone-heading">// currently running</div>
@@ -1043,7 +1134,7 @@
         var isVoted = votedSet[exp.id];
         var pillarIcon = PILLAR_ICONS[pillar.id] || '◆';
 
-        html += '<div class="' + tileClass + '" data-tile-id="' + exp.id + '" onclick="handleTileExpand(this, event)">';
+        html += '<div class="' + tileClass + '" data-tile-id="' + exp.id + '" onclick="showExpDetail(\'' + exp.id + '\')">';
 
         // Collapsed state: pillar icon, title, evidence tier, one-line desc, vote count
         html += '<div class="lib-tile__top">';
@@ -1080,52 +1171,10 @@
         html += '<div class="lib-tile__bottom">';
         html += '<span class="lib-status lib-status--' + statusClass + '"><span class="lib-status__dot"></span>' + statusLabel + '</span>';
         html += '<span style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">';
-        html += '<button class="vote-btn' + (isVoted ? ' voted' : '') + '" data-lib-id="' + exp.id + '" onclick="handleVote(this)">';
+        html += '<button class="vote-btn' + (isVoted ? ' voted' : '') + '" data-lib-id="' + exp.id + '" onclick="event.stopPropagation();handleVote(this)">';
         html += '<span class="vote-btn__arrow">▲</span> ' + (exp.votes || 0);
         html += '</button>';
         html += '</span>';
-        html += '</div>';
-
-        // Expanded state (hidden by default, shown on click)
-        html += '<div class="lib-tile__expanded">';
-        if (exp.hypothesis) {
-          html += '<div class="lib-tile__expand-field"><div class="lib-tile__expand-label">Hypothesis</div><div class="lib-tile__expand-value">' + esc(exp.hypothesis) + '</div></div>';
-        }
-        if (exp.mechanism) {
-          html += '<div class="lib-tile__expand-field"><div class="lib-tile__expand-label">Mechanism</div><div class="lib-tile__expand-value">' + esc(exp.mechanism) + '</div></div>';
-        }
-        if (exp.source || (exp.source_type === 'podcast' && exp.source_podcast)) {
-          var sourceDetail = exp.source || '';
-          if (exp.source_type === 'podcast') {
-            sourceDetail = exp.source_podcast || '';
-            if (exp.source_speaker) sourceDetail += ' \u00B7 ' + exp.source_speaker;
-            if (exp.source_episode) sourceDetail += ' \u00B7 ' + exp.source_episode;
-          }
-          html += '<div class="lib-tile__expand-field"><div class="lib-tile__expand-label">Source</div><div class="lib-tile__expand-value">' + esc(sourceDetail) + '</div></div>';
-        }
-        if (exp.metrics_tracked && exp.metrics_tracked.length) {
-          html += '<div class="lib-tile__expand-field"><div class="lib-tile__expand-label">Metrics</div><div class="lib-tile__expand-value">' + exp.metrics_tracked.map(function(m) { return esc(m); }).join(', ') + '</div></div>';
-        }
-        if (exp.hypothesis) {
-          html += '<div class="lib-tile__expand-field"><div class="lib-tile__expand-label">We\'d learn</div><div class="lib-tile__expand-value" style="color:var(--accent-dim)">' + esc(exp.hypothesis) + '</div></div>';
-        }
-        // 19e: "If successful, this becomes:" field
-        var successOutcome = exp.success_becomes || (function() {
-          var pillarMap = {sleep:'New Protocol',movement:'New Protocol',nutrition:'New Protocol',supplements:'Supplement addition',mental:'New Habit',social:'New Habit',discipline:'New Habit',body:'Stack change',recovery:'New Protocol',mind:'New Habit'};
-          return pillarMap[pillar.id] || 'New Protocol';
-        })();
-        html += '<div class="lib-tile__expand-field"><div class="lib-tile__expand-label">If successful</div><div class="lib-tile__expand-value" style="color:var(--accent-dim)">' + esc(successOutcome) + '</div></div>';
-        // P-4: Graduated badge in expanded state
-        if (exp.graduated_to) {
-          html += '<div class="lib-tile__expand-field"><div class="lib-tile__expand-label">Graduated</div><div class="lib-tile__expand-value" style="color:#2EA98F">\u2192 Now a Protocol: ' + esc(exp.graduated_to) + '</div></div>';
-        }
-        html += '<div style="display:flex;gap:var(--space-3);align-items:center;padding-top:var(--space-2)">';
-        html += '<button class="vote-btn' + (isVoted ? ' voted' : '') + '" data-lib-id="' + exp.id + '" onclick="handleVote(this)">';
-        html += '<span class="vote-btn__arrow">▲</span> Vote · ' + (exp.votes || 0);
-        html += '</button>';
-        html += '<button class="follow-btn" data-follow-id="' + exp.id + '" onclick="handleFollow(this)">✉ Follow</button>';
-        html += '<a href="/experiments/detail/?id=' + exp.id + '" class="lib-tile__share-link" onclick="event.stopPropagation()">Share link →</a>';
-        html += '</div>';
         html += '</div>';
 
         html += '</div>';
@@ -1179,16 +1228,88 @@
     }).catch(function() {});
   };
 
-  // Tile expand/collapse handler
-  window.handleTileExpand = function(tile, event) {
-    // Don't toggle if clicking a button, link, or interactive element
-    var target = event.target;
-    while (target && target !== tile) {
-      if (target.tagName === 'BUTTON' || target.tagName === 'A' || target.tagName === 'SELECT') return;
-      target = target.parentElement;
+  // ── Experiment Detail Overlay ──
+  function getAllLibraryExperiments() {
+    if (!libraryData || !libraryData.pillars) return [];
+    var all = [];
+    libraryData.pillars.forEach(function(p) {
+      (p.experiments || []).forEach(function(e) { e.pillar = e.pillar || p.id; all.push(e); });
+    });
+    return all;
+  }
+
+  window.showExpDetail = function(id) {
+    var exp = getAllLibraryExperiments().find(function(e) { return e.id === id; });
+    if (!exp) return;
+    var pillarIcon = PILLAR_ICONS[exp.pillar] || '◆';
+    var evidLabel = EVIDENCE_LABEL[exp.evidence_tier] || exp.evidence_tier;
+    var evidClass = 'lib-tile--tier-' + (exp.evidence_tier || 'emerging');
+    var tierColor = exp.evidence_tier === 'strong' ? 'var(--accent)' : exp.evidence_tier === 'moderate' ? 'var(--c-amber-500)' : 'var(--text-faint)';
+    var isVoted = votedSet[exp.id];
+
+    document.getElementById('exp-detail-top').innerHTML =
+      '<div class="exp-detail__icon">' + pillarIcon + '</div>' +
+      '<div class="exp-detail__name">' + esc(exp.name) + '</div>' +
+      '<div class="exp-detail__desc">' + esc(exp.description) + '</div>' +
+      '<div class="exp-detail__meta">' +
+        '<div class="exp-meta-item"><div class="exp-meta-item__value">' + (exp.suggested_duration_days || '14') + 'd</div><div class="exp-meta-item__label">Duration</div></div>' +
+        '<div class="exp-meta-item"><div class="exp-meta-item__value">' + esc(exp.difficulty || 'Medium') + '</div><div class="exp-meta-item__label">Difficulty</div></div>' +
+        '<div class="exp-meta-item"><div class="exp-meta-item__value" style="color:' + tierColor + '">' + esc(evidLabel) + '</div><div class="exp-meta-item__label">Evidence</div></div>' +
+        '<div class="exp-meta-item"><div class="exp-meta-item__value">' + (exp.votes || 0) + '</div><div class="exp-meta-item__label">Votes</div></div>' +
+      '</div>';
+
+    var body = '';
+    if (exp.hypothesis) {
+      body += '<div class="exp-field"><div class="exp-field__label">// Hypothesis</div><div class="exp-field__value">' + esc(exp.hypothesis) + '</div></div>';
     }
-    tile.classList.toggle('expanded');
+    if (exp.mechanism) {
+      body += '<div class="exp-field"><div class="exp-field__label">// Mechanism</div><div class="exp-field__value">' + esc(exp.mechanism) + '</div></div>';
+    }
+    // Source
+    var srcText = '';
+    if (exp.source_type === 'podcast' && exp.source_podcast) {
+      srcText = exp.source_podcast;
+      if (exp.source_speaker) srcText += ' \u00B7 ' + exp.source_speaker;
+      if (exp.source_episode) srcText += ' \u00B7 ' + exp.source_episode;
+    } else if (exp.source) {
+      srcText = exp.source;
+    }
+    if (srcText) {
+      body += '<div class="exp-field"><div class="exp-field__label">// Source</div><div class="exp-field__value">' + esc(srcText);
+      if (exp.source_url) body += '<br><a href="' + esc(exp.source_url) + '" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;">View source \u2192</a>';
+      body += '</div></div>';
+    }
+    if (exp.metrics_tracked && exp.metrics_tracked.length) {
+      body += '<div class="exp-field"><div class="exp-field__label">// Tracked Metrics</div><div class="exp-field__value">' + exp.metrics_tracked.map(function(m) { return esc(m); }).join(', ') + '</div></div>';
+    }
+    // If successful
+    var successOutcome = exp.success_becomes || (function() {
+      var pm = {sleep:'New Protocol',movement:'New Protocol',nutrition:'New Protocol',supplements:'Supplement addition',mental:'New Habit',social:'New Habit',discipline:'New Habit',body:'Stack change',recovery:'New Protocol',mind:'New Habit'};
+      return pm[exp.pillar] || 'New Protocol';
+    })();
+    body += '<div class="exp-field"><div class="exp-field__label">// If Successful</div><div class="exp-field__value" style="color:var(--accent-dim)">' + esc(successOutcome) + '</div></div>';
+    // Graduated
+    if (exp.graduated_to) {
+      body += '<div class="exp-field"><div class="exp-field__label">// Graduated</div><div class="exp-field__value" style="color:#2EA98F">\u2192 Now a Protocol: ' + esc(exp.graduated_to) + '</div></div>';
+    }
+    // Actions
+    body += '<div style="display:flex;gap:var(--space-3);align-items:center;justify-content:center;padding-top:var(--space-4);flex-wrap:wrap">';
+    body += '<button class="vote-btn' + (isVoted ? ' voted' : '') + '" data-lib-id="' + exp.id + '" onclick="handleVote(this)"><span class="vote-btn__arrow">▲</span> Vote \u00B7 ' + (exp.votes || 0) + '</button>';
+    body += '<button class="follow-btn" data-follow-id="' + exp.id + '" onclick="handleFollow(this)">\u2709 Follow</button>';
+    body += '<a href="/experiments/detail/?id=' + exp.id + '" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);text-decoration:none;letter-spacing:var(--ls-tag);">Share link \u2192</a>';
+    body += '</div>';
+
+    document.getElementById('exp-detail-body').innerHTML = body;
+    document.getElementById('exp-overlay').classList.add('open');
   };
+
+  window.closeExpDetail = function() {
+    document.getElementById('exp-overlay').classList.remove('open');
+  };
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeExpDetail();
+  });
 
   // ── Zone 3: The Record ──
   var allExperiments = [];
