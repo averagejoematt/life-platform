@@ -41,6 +41,12 @@ SOURCES = {
     # google_calendar retired v3.7.46 — see ADR-030 in DECISIONS.md
 }
 
+# R18-F04: Per-source stale threshold overrides (hours). Sources not listed use STALE_HOURS default.
+# food_delivery is a quarterly CSV import — 90 days before stale alert.
+SOURCE_STALE_HOURS = {
+    "food_delivery": 90 * 24,  # 90 days
+}
+
 # Field-level completeness checks — key fields that should be non-null in a healthy record.
 # A source can be "fresh" (recent date) but have partial data (missing key metrics).
 # Missing fields here emit a PartialCompletenessCount metric and include source in alert.
@@ -114,7 +120,9 @@ def lambda_handler(event, context):
             last_date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
             age_hours = (now - last_date).total_seconds() / 3600
 
-            if last_date < stale_threshold:
+            source_stale_hrs = SOURCE_STALE_HOURS.get(source_name, STALE_HOURS)
+            source_stale_threshold = now - timedelta(hours=source_stale_hrs)
+            if last_date < source_stale_threshold:
                 stale_sources.append((source_name, f"Last update: {date_str} ({age_hours:.0f}h ago)"))
                 source_status.append(f"  ⚠️  {source_name}: {date_str} ({age_hours:.0f}h ago)")
             else:
