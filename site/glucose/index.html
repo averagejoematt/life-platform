@@ -1603,6 +1603,19 @@
   var currentFilter = 'all';
   var currentSort = { key: 'spike', asc: true };
 
+  // Try to load real meal × CGM data from API
+  (function() {
+    fetch('/api/meal_glucose')
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        if (data && data.meals && data.meals.length >= 3) {
+          mealData = data.meals;
+          renderMeals();
+        }
+      })
+      .catch(function() {});
+  })();
+
   // Mini glucose curve SVG
   function miniCurve(type) {
     var paths = {
