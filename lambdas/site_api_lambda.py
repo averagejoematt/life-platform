@@ -703,6 +703,41 @@ def handle_status() -> dict:
 
     today_dow = datetime.now(timezone.utc).weekday()
 
+    # ── CloudWatch alarm check — detect pipeline errors ──
+    cw_alarm_states = {}
+    try:
+        cw = boto3.client("cloudwatch", region_name=REGION)
+        alarms_resp = cw.describe_alarms(StateValue="ALARM", MaxRecords=50)
+        for alarm in alarms_resp.get("MetricAlarms", []):
+            # Map alarm name back to source ID (convention: ingestion-error-{source} or {source}-errors)
+            aname = alarm.get("AlarmName", "")
+            for dim in alarm.get("Dimensions", []):
+                if dim.get("Name") == "FunctionName":
+                    cw_alarm_states[dim["Value"]] = aname
+    except Exception as e:
+        logger.warning(f"[status] CloudWatch alarm check failed (non-fatal): {e}")
+
+    # Map Lambda function names to source IDs for alarm lookup
+    _LAMBDA_TO_SOURCE = {
+        "whoop-data-ingestion": "whoop", "withings-data-ingestion": "withings",
+        "garmin-data-ingestion": "garmin", "strava-data-ingestion": "strava",
+        "habitify-data-ingestion": "habitify", "eightsleep-data-ingestion": "eightsleep",
+        "macrofactor-data-ingestion": "macrofactor", "notion-journal-ingestion": "notion",
+        "todoist-data-ingestion": "todoist", "weather-data-ingestion": "weather",
+        "health-auto-export-webhook": "apple_health", "food-delivery-ingestion": "food_delivery",
+        "character-sheet-compute": "character_sheet", "daily-metrics-compute": "computed_metrics",
+        "daily-insight-compute": "insights", "adaptive-mode-compute": "adaptive_mode",
+        "daily-brief": "daily_brief", "weekly-digest": "weekly_digest",
+        "monday-compass": "monday_compass", "wednesday-chronicle": "wednesday_chronicle",
+        "weekly-plate": "weekly_plate", "nutrition-review": "nutrition_review",
+        "anomaly-detector": "anomaly_detector",
+    }
+    alarming_sources = set()
+    for fn_name, alarm_name in cw_alarm_states.items():
+        src = _LAMBDA_TO_SOURCE.get(fn_name)
+        if src:
+            alarming_sources.add(src)
+
     # (source_id, display_name, description, yellow_h, red_h, category)
     # category: "auto" (default), "manual" (blue — infrequent file imports), "onetime" (green — never changes)
     # activity_dependent: True = user must do something for data to flow (e.g., run, log habit)
@@ -874,6 +909,11 @@ def handle_status() -> dict:
                 comment = "Pipeline ready \u2014 no data recorded yet"
                 uptime = [1] * max(1, len(uptime))
 
+        # CloudWatch alarm override — if Lambda is actively erroring, show red
+        if sid in alarming_sources and status != "blue":
+            status = "red"
+            comment = f"CloudWatch alarm firing \u2014 Lambda errors detected"
+
         ds_components.append({"id": sid, "name": name, "description": desc,
                               "status": status, "last_sync_relative": rel,
                               "uptime_90d": uptime, "comment": comment,
@@ -891,6 +931,9 @@ def handle_status() -> dict:
             rel = "verified"
             comment = "Smoke-tested OK \u2014 awaiting first scheduled run (April 1+)"
             uptime = [1] * max(1, len(uptime))
+        if sid in alarming_sources:
+            status = "red"
+            comment = "CloudWatch alarm firing \u2014 Lambda errors detected"
         compute_components.append({"id": sid, "name": name, "description": desc,
                                    "status": status, "last_sync_relative": rel,
                                    "uptime_90d": uptime, "comment": comment})
@@ -908,6 +951,9 @@ def handle_status() -> dict:
             rel = "verified"
             comment = "Smoke-tested OK \u2014 awaiting first scheduled run"
             uptime = [1] * max(1, len(uptime))
+        if lid in alarming_sources:
+            status = "red"
+            comment = "CloudWatch alarm firing \u2014 Lambda errors detected"
         email_components.append({"id": lid, "name": name, "description": desc,
                                  "status": status, "last_sync_relative": rel,
                                  "uptime_90d": uptime, "comment": comment})
