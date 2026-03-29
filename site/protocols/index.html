@@ -460,11 +460,18 @@
     var signalText = signalLabel + (p.signal_note ? ' \u2014 ' + p.signal_note : '');
 
     var html = '<div class="proto-card reveal is-visible" id="card-' + p.slug + '" data-tags="' + (p.experiment_tags || []).join(',') + '">';
-    // Header
-    var tier = TIER_MAP[p.slug];
+    // Header — prefer API fields, fall back to static maps
+    var tierLabel = null, tierCls = null;
+    if (p.tier) {
+      tierLabel = p.tier.toUpperCase();
+      tierCls = 'tier-' + p.tier;
+    } else if (TIER_MAP[p.slug]) {
+      tierLabel = TIER_MAP[p.slug].label;
+      tierCls = TIER_MAP[p.slug].cls;
+    }
     html += '<div class="proto-card__header">';
-    if (tier) {
-      html += '<span class="proto-tier-badge ' + tier.cls + '">' + tier.label + '</span>';
+    if (tierLabel) {
+      html += '<span class="proto-tier-badge ' + tierCls + '">' + tierLabel + '</span>';
       html += '<span class="proto-card__sep">&middot;</span>';
     }
     html += '<span class="proto-card__category">' + p.category + '</span>';
@@ -481,11 +488,13 @@
     if (p.key_finding) {
       html += '<div class="proto-detail"><span class="proto-detail__label">Key finding</span><span class="proto-detail__value">' + p.key_finding + '</span></div>';
     }
-    if (ORIGIN_MAP[p.slug]) {
-      html += '<div class="proto-detail"><span class="proto-detail__label">Origin</span><span class="proto-detail__value">' + ORIGIN_MAP[p.slug] + '</span></div>';
+    var origin = p.origin || ORIGIN_MAP[p.slug];
+    var mechanism = p.mechanism || RATIONALE_MAP[p.slug];
+    if (origin) {
+      html += '<div class="proto-detail"><span class="proto-detail__label">Origin</span><span class="proto-detail__value">' + origin + '</span></div>';
     }
-    if (RATIONALE_MAP[p.slug]) {
-      html += '<div class="proto-detail"><span class="proto-detail__label">Mechanism</span><span class="proto-detail__value">' + RATIONALE_MAP[p.slug] + '</span></div>';
+    if (mechanism) {
+      html += '<div class="proto-detail"><span class="proto-detail__label">Mechanism</span><span class="proto-detail__value">' + mechanism + '</span></div>';
     }
     // Stats
     html += '<div class="proto-stats">';

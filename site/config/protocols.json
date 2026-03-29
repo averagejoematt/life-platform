@@ -1,7 +1,7 @@
 {
-  "_version": "1.0.0",
-  "_updated": "2026-03-25",
-  "_description": "Source of truth for all health protocols. Read by site-api (/api/protocols) and MCP tools.",
+  "_version": "1.1.0",
+  "_updated": "2026-03-29",
+  "_description": "Source of truth for all health protocols. Read by site-api (/api/protocols) and MCP tools. Seeded to DynamoDB via deploy/seed_protocols_to_dynamodb.sh.",
   "protocols": [
     {
       "id": "sleep",
@@ -23,7 +23,10 @@
       "experiment_tags": ["sleep", "recovery", "circadian"],
       "adherence_target": 90,
       "signal_status": "positive",
-      "signal_note": "7.7h avg, HRV stable"
+      "signal_note": "7.7h avg, HRV stable",
+      "origin": "Published literature (Walker, 2017; Huberman, 2021)",
+      "mechanism": "Optimizes slow-wave sleep for HGH release, memory consolidation, and metabolic recovery",
+      "tier": "foundation"
     },
     {
       "id": "zone2",
@@ -45,7 +48,10 @@
       "experiment_tags": ["zone2", "movement", "cardio"],
       "adherence_target": 80,
       "signal_status": "positive",
-      "signal_note": "RHR trending down"
+      "signal_note": "RHR trending down",
+      "origin": "Published literature (Seiler 80/20 polarized model)",
+      "mechanism": "Builds mitochondrial density and fat oxidation capacity below VT1",
+      "tier": "foundation"
     },
     {
       "id": "strength",
@@ -67,7 +73,10 @@
       "experiment_tags": ["strength", "body-composition", "muscle"],
       "adherence_target": 80,
       "signal_status": "pending",
-      "signal_note": "DEXA #2 scheduled"
+      "signal_note": "DEXA #2 scheduled",
+      "origin": "Published literature (Schoenfeld, 2010; Attia centenarian framework)",
+      "mechanism": "Sustained moderate deficit (~500 kcal) preserves lean mass during weight loss",
+      "tier": "foundation"
     },
     {
       "id": "intermittent_fasting",
@@ -89,7 +98,10 @@
       "experiment_tags": ["fasting", "intermittent-fasting", "nutrition"],
       "adherence_target": 80,
       "signal_status": "positive",
-      "signal_note": "Fasting glucose stable"
+      "signal_note": "Fasting glucose stable",
+      "origin": "N=1 experiment (Week 3 \u2014 proved out)",
+      "mechanism": "16:8 window aligns eating with circadian rhythm and extends overnight fat oxidation",
+      "tier": "intervention"
     },
     {
       "id": "cgm",
@@ -111,7 +123,10 @@
       "experiment_tags": ["cgm", "glucose", "metabolic"],
       "adherence_target": 95,
       "signal_status": "positive",
-      "signal_note": "Time-in-range on target"
+      "signal_note": "Time-in-range on target",
+      "origin": "Personal conviction \u2014 glucose anxiety \u2192 data as resolution",
+      "mechanism": "Continuous glucose data reveals individual meal responses invisible to standard blood panels",
+      "tier": "measurement"
     },
     {
       "id": "morning_sunlight",
@@ -133,7 +148,10 @@
       "experiment_tags": ["sunlight", "circadian", "light"],
       "adherence_target": 85,
       "signal_status": "pending",
-      "signal_note": "Tracking 30-day window"
+      "signal_note": "Tracking 30-day window",
+      "origin": "Published literature (Huberman, 2021; Satchin Panda circadian research)",
+      "mechanism": "Morning photon exposure sets the suprachiasmatic nucleus clock, improving melatonin timing by 1-2 hours",
+      "tier": "supporting"
     }
   ]
 }
