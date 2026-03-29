@@ -705,37 +705,39 @@ def handle_status() -> dict:
 
     # (source_id, display_name, description, yellow_h, red_h, category)
     # category: "auto" (default), "manual" (blue — infrequent file imports), "onetime" (green — never changes)
+    # activity_dependent: True = user must do something for data to flow (e.g., run, log habit)
+    # When stale AND activity_dependent, show "idle" (gray) instead of "red"
     _DATA_SOURCES = [
-        # (source_id, name, description, yellow_h, red_h, category, group)
+        # (source_id, name, description, yellow_h, red_h, category, group, activity_dependent)
         # ── API-Based (daily automated) ──
-        ("whoop",              "Recovery & Sleep (Whoop)",           "HRV · recovery score · sleep staging",      25,  49, "auto",    "API-Based"),
-        ("withings",           "Weigh In (Withings)",                "Weight · body composition · blood pressure", 25,  49, "auto",   "API-Based"),
-        ("garmin",             "Activity Tracking (Garmin)",         "Steps · GPS routes · stress · body battery", 25,  49, "auto",   "API-Based"),
-        ("strava",             "Cardio & Running (Strava)",          "Activities · segments · training load",      25,  49, "auto",    "API-Based"),
-        ("habitify",           "Habit Tracking (Habitify)",          "P40 daily habits · day grades",              25,  49, "auto",    "API-Based"),
-        ("eightsleep",         "Sleep Environment (Eight Sleep)",    "Sleep staging · bed temperature · HRV",      25,  49, "auto",    "API-Based"),
-        ("macrofactor",        "Nutrition (MacroFactor)",            "Calories · macros · meal timing",            25,  49, "auto",    "API-Based"),
-        ("notion",             "Daily Journal (Notion)",             "Journal entries · mood · reflections",       25,  49, "auto",    "API-Based"),
-        ("todoist",            "To Do List Feed (Todoist)",          "Tasks · projects · completion rate",          25,  49, "auto",   "API-Based"),
-        ("weather",            "Weather Conditions",                 "Daily temperature · conditions · humidity",   25,  49, "auto",   "API-Based"),
-        ("supplements",        "Supplement Adherence",               "Daily supplement tracking & compliance",      25,  49, "auto",   "API-Based"),
-        ("habit_scores",       "Habit Scores (Computed)",            "Aggregated daily habit grades & streaks",     25,  49, "auto",   "API-Based"),
-        ("state_of_mind",      "State of Mind (How We Feel)",       "Mood valence · emotions · life associations", 25,  49, "auto",   "API-Based"),
+        ("whoop",              "Recovery & Sleep (Whoop)",           "HRV · recovery score · sleep staging",      25,  49, "auto",    "API-Based", False),
+        ("withings",           "Weigh In (Withings)",                "Weight · body composition · blood pressure", 25,  49, "auto",   "API-Based", True),
+        ("garmin",             "Activity Tracking (Garmin)",         "Steps · GPS routes · stress · body battery", 25,  49, "auto",   "API-Based", True),
+        ("strava",             "Cardio & Running (Strava)",          "Activities · segments · training load",      25,  49, "auto",    "API-Based", True),
+        ("habitify",           "Habit Tracking (Habitify)",          "P40 daily habits · day grades",              25,  49, "auto",    "API-Based", True),
+        ("eightsleep",         "Sleep Environment (Eight Sleep)",    "Sleep staging · bed temperature · HRV",      25,  49, "auto",    "API-Based", False),
+        ("macrofactor",        "Nutrition (MacroFactor)",            "Calories · macros · meal timing",            25,  49, "auto",    "API-Based", True),
+        ("notion",             "Daily Journal (Notion)",             "Journal entries · mood · reflections",       25,  49, "auto",    "API-Based", True),
+        ("todoist",            "To Do List Feed (Todoist)",          "Tasks · projects · completion rate",          25,  49, "auto",   "API-Based", False),
+        ("weather",            "Weather Conditions",                 "Daily temperature · conditions · humidity",   25,  49, "auto",   "API-Based", False),
+        ("supplements",        "Supplement Adherence",               "Daily supplement tracking & compliance",      25,  49, "auto",   "API-Based", True),
+        ("habit_scores",       "Habit Scores (Computed)",            "Aggregated daily habit grades & streaks",     25,  49, "auto",   "API-Based", False),
+        ("state_of_mind",      "State of Mind (How We Feel)",       "Mood valence · emotions · life associations", 25,  49, "auto",   "API-Based", True),
         # ── Periodic Uploads (file drops, webhooks, manual) ──
-        ("macrofactor",        "Food Log (Dropbox)",                 "MacroFactor nutrition CSV via file drop",     25,  49, "auto",   "Periodic Uploads"),
-        ("macrofactor_workouts","Exercise Log (Dropbox)",            "MacroFactor workout CSV via file drop",       48, 168, "auto",   "Periodic Uploads"),
-        ("apple_health",       "CGM Glucose (Dexcom Stelo)",        "Continuous glucose monitor readings",          25,  49, "auto",  "Periodic Uploads"),
-        ("apple_health",       "Water Intake (Health Auto Export)",  "Daily water consumption tracking",            25,  49, "auto",   "Periodic Uploads"),
-        ("apple_health",       "Blood Pressure (Health Auto Export)","Systolic · diastolic · pulse readings",       168, 336, "auto",  "Periodic Uploads"),
-        ("apple_health",       "Breathwork (Breathwrk)",            "Breathing exercises · sessions · minutes",    48, 168, "auto",   "Periodic Uploads"),
-        ("apple_health",       "Stretching (Pliability)",           "Flexibility sessions · recovery minutes",     48, 168, "auto",   "Periodic Uploads"),
-        ("apple_health",       "Mindful Minutes (Meditation)",      "Meditation & mindfulness sessions",           48, 168, "auto",   "Periodic Uploads"),
-        ("apple_health",       "Apple Health Import",                "Manual XML export · steps · workouts",       168, 336, "auto",  "Periodic Uploads"),
-        ("food_delivery",      "Food Delivery Index (Behavioral)",  "Quarterly CSV import · delivery index 0-10", 2160, 2880, "auto", "Periodic Uploads"),
+        ("macrofactor",        "Food Log (Dropbox)",                 "MacroFactor nutrition CSV via file drop",     25,  49, "auto",   "Periodic Uploads", True),
+        ("macrofactor_workouts","Exercise Log (Dropbox)",            "MacroFactor workout CSV via file drop",       48, 168, "auto",   "Periodic Uploads", True),
+        ("apple_health",       "CGM Glucose (Dexcom Stelo)",        "Continuous glucose monitor readings",          25,  49, "auto",  "Periodic Uploads", True),
+        ("apple_health",       "Water Intake (Health Auto Export)",  "Daily water consumption tracking",            25,  49, "auto",   "Periodic Uploads", True),
+        ("apple_health",       "Blood Pressure (Health Auto Export)","Systolic · diastolic · pulse readings",       168, 336, "auto",  "Periodic Uploads", True),
+        ("apple_health",       "Breathwork (Breathwrk)",            "Breathing exercises · sessions · minutes",    48, 168, "auto",   "Periodic Uploads", True),
+        ("apple_health",       "Stretching (Pliability)",           "Flexibility sessions · recovery minutes",     48, 168, "auto",   "Periodic Uploads", True),
+        ("apple_health",       "Mindful Minutes (Meditation)",      "Meditation & mindfulness sessions",           48, 168, "auto",   "Periodic Uploads", True),
+        ("apple_health",       "Apple Health Import",                "Manual XML export · steps · workouts",       168, 336, "auto",  "Periodic Uploads", True),
+        ("food_delivery",      "Food Delivery Index (Behavioral)",  "Quarterly CSV import · delivery index 0-10", 2160, 2880, "auto", "Periodic Uploads", True),
         # ── Lab & Clinical (infrequent) ──
-        ("labs",               "Blood Tests",                        "Lab work · biomarkers · lipid panel",        4320, 8760, "manual", "Lab & Clinical"),
-        ("dexa",               "Bone Density & Body Comp (DEXA)",   "DEXA scan · bone density · lean mass",       4320, 8760, "manual", "Lab & Clinical"),
-        ("genome",             "Genome (one-time import)",           "Genetic variants · risk scores · SNPs",      999999, 999999, "onetime", "Lab & Clinical"),
+        ("labs",               "Blood Tests",                        "Lab work · biomarkers · lipid panel",        4320, 8760, "manual", "Lab & Clinical", True),
+        ("dexa",               "Bone Density & Body Comp (DEXA)",   "DEXA scan · bone density · lean mass",       4320, 8760, "manual", "Lab & Clinical", True),
+        ("genome",             "Genome (one-time import)",           "Genetic variants · risk scores · SNPs",      999999, 999999, "onetime", "Lab & Clinical", False),
     ]
     _COMPUTE_SOURCES = [
         ("character_sheet",  "Character sheet",  "Pillar scores · level · XP",         25, 49),
@@ -826,6 +828,7 @@ def handle_status() -> dict:
         sid, name, desc, yh, rh = row[0], row[1], row[2], row[3], row[4]
         category = row[5] if len(row) > 5 else "auto"
         group = row[6] if len(row) > 6 else "API-Based"
+        activity_dep = row[7] if len(row) > 7 else False
         last = _last_sync(sid)
 
         if category == "onetime":
@@ -861,6 +864,14 @@ def handle_status() -> dict:
         else:
             status, rel, comment = _comp_status(last, yh, rh)
             uptime = _uptime_90d(sid)
+
+            # Activity-dependent sources: show "idle" instead of "red" when stale
+            if activity_dep and status == "red" and last:
+                status = "gray"
+                comment = f"Pipeline ready \u2014 awaiting user activity. Last data: {rel}"
+            elif activity_dep and status == "red" and not last:
+                status = "gray"
+                comment = "Pipeline ready \u2014 no data recorded yet"
 
         ds_components.append({"id": sid, "name": name, "description": desc,
                               "status": status, "last_sync_relative": rel,
@@ -899,8 +910,9 @@ def handle_status() -> dict:
     ]
 
     # Exclude blue (manual import) and onetime from overall health — they're not system issues
+    # Exclude blue (manual) and gray (idle/activity-dependent) from overall health
     all_statuses = [c["status"] for c in ds_components + compute_components + email_components
-                    if c["status"] not in ("blue",)]
+                    if c["status"] not in ("blue", "gray")]
     if "red" in all_statuses:
         overall = "red"
     elif "yellow" in all_statuses:
