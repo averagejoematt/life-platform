@@ -46,8 +46,8 @@ The life platform is a personal health intelligence system built on AWS. It inge
 │  freshness-checker (9:45am) · insight-email-parser (S3 trig)│
 │                                                             │
 │  WEB LAYER                                                  │
-│  averagejoematt.com (12 pages) · CloudFront → S3 /site      │
-│  site-api Lambda (us-east-1): /api/ask · /api/board_ask     │
+│  averagejoematt.com (66 pages) · CloudFront → S3 /site      │
+│  site-api Lambda (us-west-2): /api/ask · /api/board_ask     │
 │  /api/verify_subscriber · /api/vitals · /api/journey        │
 │  /api/character · /api/timeline · /api/correlations         │
 │  dash.averagejoematt.com → S3 /dashboard (Lambda@Edge auth) │
@@ -186,9 +186,9 @@ Compute → store → read pattern. Standalone Lambdas run before Daily Brief, s
 
 **Data-gated next:** IC-4 (failure patterns, ~Apr 18), IC-5 (momentum warning, ~Apr 18), IC-26 (temporal mining, ~May), IC-27 (multi-resolution handoff, ~May).
 
-### Site API Lambda (us-east-1)
+### Site API Lambda (us-west-2)
 
-**Lambda:** `life-platform-site-api` | **Stack:** LifePlatformWeb | **Region:** us-east-1
+**Lambda:** `life-platform-site-api` | **Stack:** LifePlatformOperational | **Region:** us-west-2 (R17-09 migration)
 **Function URL:** `https://lxhjl2qvq2ystwp47464uhs2jti0hpdcq.lambda-url.us-east-1.on.aws/`
 **IAM:** Read-only — `dynamodb:GetItem, Query` + `kms:Decrypt` + `s3:GetObject` on `site/config/*`
 
