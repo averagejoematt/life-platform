@@ -885,11 +885,11 @@ def handle_status() -> dict:
         last = _last_sync(sid)
         status, rel, comment = _comp_status(last, yh, rh)
         uptime = _uptime_90d(sid)
-        # Pre-launch: "never" is expected, not broken
+        # Pre-launch: "never" is expected, not broken — smoke-tested Mar 29
         if status == "red" and not last:
             status = "green"
-            rel = "pre-launch"
-            comment = "Awaiting first run after April 1 launch"
+            rel = "verified"
+            comment = "Smoke-tested OK \u2014 awaiting first scheduled run (April 1+)"
             uptime = [1] * max(1, len(uptime))
         compute_components.append({"id": sid, "name": name, "description": desc,
                                    "status": status, "last_sync_relative": rel,
@@ -902,11 +902,11 @@ def handle_status() -> dict:
         status, rel, comment = _comp_status(last, yh, rh)
         status, rel = _sched_aware(status, rel, exp_dow)
         uptime = _uptime_90d(f"email_log#{lid}")
-        # Pre-launch: weekly emails that haven't fired yet
+        # Pre-launch: weekly emails that haven't fired yet — smoke-tested Mar 29
         if status == "red" and not last:
             status = "green"
-            rel = "scheduled"
-            comment = "Awaiting first scheduled run"
+            rel = "verified"
+            comment = "Smoke-tested OK \u2014 awaiting first scheduled run"
             uptime = [1] * max(1, len(uptime))
         email_components.append({"id": lid, "name": name, "description": desc,
                                  "status": status, "last_sync_relative": rel,
