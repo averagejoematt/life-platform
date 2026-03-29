@@ -200,6 +200,78 @@ def build_nutrition(stats):
     return img
 
 
+def build_mind(stats):
+    img, draw = _base_image()
+    _draw_header(draw, "Inner Life Observatory")
+    draw.text((48, 100), "INNER LIFE", fill=TEXT, font=_font(FONT_DISPLAY, 72))
+    draw.text((48, 180), "Mood, willpower, connection, vice streaks.",
+              fill=MUTED, font=_font(FONT_MONO, 14))
+    platform = stats.get("platform", {})
+    _draw_metric(draw, 48, 260, _fmt(platform.get("days_in"), 0), "DAYS TRACKED")
+    _draw_footer(draw, stats)
+    return img
+
+
+def build_labs(stats):
+    img, draw = _base_image()
+    _draw_header(draw, "Bloodwork Intelligence")
+    draw.text((48, 100), "THE LABS", fill=TEXT, font=_font(FONT_DISPLAY, 72))
+    draw.text((48, 180), "74 biomarkers. 7 draws. The ground truth.",
+              fill=MUTED, font=_font(FONT_MONO, 14))
+    _draw_metric(draw, 48, 260, "74", "BIOMARKERS")
+    _draw_metric(draw, 320, 260, "7", "DRAWS")
+    _draw_footer(draw, stats)
+    return img
+
+
+def build_chronicle(stats):
+    img, draw = _base_image()
+    _draw_header(draw, "The Measured Life")
+    draw.text((48, 100), "CHRONICLE", fill=TEXT, font=_font(FONT_DISPLAY, 72))
+    draw.text((48, 180), "Weekly dispatches from a health transformation.",
+              fill=MUTED, font=_font(FONT_MONO, 14))
+    draw.text((48, 260), "Every Wednesday. Real data. Every failure included.",
+              fill=FAINT, font=_font(FONT_MONO, 13))
+    _draw_footer(draw, stats)
+    return img
+
+
+def build_weekly(stats):
+    img, draw = _base_image()
+    _draw_header(draw, "Weekly Snapshots")
+    draw.text((48, 100), "THE WEEK", fill=TEXT, font=_font(FONT_DISPLAY, 72))
+    draw.text((48, 180), "Walk the journey one week at a time.",
+              fill=MUTED, font=_font(FONT_MONO, 14))
+    platform = stats.get("platform", {})
+    _draw_metric(draw, 48, 260, _fmt(platform.get("days_in"), 0), "DAYS IN")
+    _draw_footer(draw, stats)
+    return img
+
+
+def build_experiments(stats):
+    img, draw = _base_image()
+    _draw_header(draw, "N=1 Experiments")
+    draw.text((48, 100), "EXPERIMENTS", fill=TEXT, font=_font(FONT_DISPLAY, 72))
+    draw.text((48, 180), "Testing protocols against my own data.",
+              fill=MUTED, font=_font(FONT_MONO, 14))
+    _draw_footer(draw, stats)
+    return img
+
+
+def build_builders(stats):
+    img, draw = _base_image()
+    _draw_header(draw, "For Builders")
+    draw.text((48, 100), "THE BUILD", fill=TEXT, font=_font(FONT_DISPLAY, 72))
+    draw.text((48, 180), "How to build an AI health platform for $13/month.",
+              fill=MUTED, font=_font(FONT_MONO, 14))
+    platform = stats.get("platform", {})
+    _draw_metric(draw, 48, 260, "116", "MCP TOOLS")
+    _draw_metric(draw, 320, 260, "59", "LAMBDAS")
+    _draw_metric(draw, 560, 260, "$13", "MONTHLY COST")
+    _draw_footer(draw, stats)
+    return img
+
+
 PAGES = [
     ("og-home", build_home),
     ("og-sleep", build_sleep),
@@ -207,6 +279,12 @@ PAGES = [
     ("og-training", build_training),
     ("og-character", build_character),
     ("og-nutrition", build_nutrition),
+    ("og-mind", build_mind),
+    ("og-labs", build_labs),
+    ("og-chronicle", build_chronicle),
+    ("og-weekly", build_weekly),
+    ("og-experiments", build_experiments),
+    ("og-builders", build_builders),
 ]
 
 
