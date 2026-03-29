@@ -54,7 +54,8 @@
     "lambdas/challenge_generator_lambda.py":     { "function": "challenge-generator" },
     "lambdas/food_delivery_lambda.py":           { "function": "food-delivery-ingestion" },
     "lambdas/og_image_lambda.py":                { "function": "og-image-generator" },
-    "lambdas/email_subscriber_lambda.py":        { "function": "email-subscriber" }
+    "lambdas/email_subscriber_lambda.py":        { "function": "email-subscriber" },
+    "lambdas/subscriber_onboarding_lambda.py":   { "function": "subscriber-onboarding" }
   },
 
   "mcp": {
