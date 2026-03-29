@@ -90,7 +90,7 @@ _supp_metadata_cache = None
 # ── Status page (module-level cache) ───────────────────────
 _status_cache = {}
 _status_cache_ts = 0
-STATUS_CACHE_TTL = 300  # 5 minutes
+STATUS_CACHE_TTL = 60  # 1 minute — more dynamic status updates
 
 # ── Experiment start date — public Day 1 ───────────────────
 EXPERIMENT_START = "2026-04-01"
@@ -787,16 +787,25 @@ def handle_status() -> dict:
             return "red", rel, f"STALE: last sync {rel}. Threshold exceeded ({red_h}h)."
 
     def _uptime_90d(source_id):
+        """Uptime bars starting from platform launch prep (Mar 29, 2026)."""
         try:
+            # Start from Mar 29 to give a clean baseline for launch
+            epoch_start = datetime(2026, 3, 29, tzinfo=timezone.utc).date()
+            today = datetime.now(timezone.utc).date()
+            window_days = min(90, (today - epoch_start).days + 1)
+            if window_days < 1:
+                window_days = 1
+
             resp = table.query(
-                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source_id}") & Key("sk").begins_with("DATE#"),
-                ScanIndexForward=False, Limit=90, ProjectionExpression="sk",
+                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source_id}") & Key("sk").between(
+                    f"DATE#{epoch_start.isoformat()}", f"DATE#{today.isoformat()}"
+                ),
+                ProjectionExpression="sk",
             )
             present = {item["sk"].replace("DATE#", "")[:10] for item in resp.get("Items", [])}
-            today = datetime.now(timezone.utc).date()
-            return [1 if (today - timedelta(days=i)).isoformat() in present else 0 for i in range(89, -1, -1)]
+            return [1 if (today - timedelta(days=i)).isoformat() in present else 0 for i in range(window_days - 1, -1, -1)]
         except Exception:
-            return [0] * 90
+            return [0] * min(90, max(1, (datetime.now(timezone.utc).date() - datetime(2026, 3, 29, tzinfo=timezone.utc).date()).days + 1))
 
     def _sched_aware(status, rel, exp_dow):
         if exp_dow < 0 or today_dow == exp_dow:
