@@ -213,7 +213,7 @@ PAGES = [
 def lambda_handler(event, context):
     # Read public_stats.json
     try:
-        resp = s3.get_object(Bucket=S3_BUCKET, Key="site/data/public_stats.json")
+        resp = s3.get_object(Bucket=S3_BUCKET, Key="site/public_stats.json")
         stats = json.loads(resp["Body"].read())
     except Exception as e:
         print(f"[ERROR] Failed to read public_stats.json: {e}")
