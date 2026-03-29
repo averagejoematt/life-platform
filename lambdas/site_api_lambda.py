@@ -4384,6 +4384,101 @@ def handle_labs() -> dict:
         return _error(503, "Lab data temporarily unavailable.")
 
 
+# ── Frequent Meals endpoint ───────────────────────────────────
+def handle_frequent_meals() -> dict:
+    """GET /api/frequent_meals — Top meals by frequency from MacroFactor food logs."""
+    from datetime import datetime, timezone, timedelta
+    from collections import Counter, defaultdict
+    now = datetime.now(timezone.utc)
+    end_date = now.strftime("%Y-%m-%d")
+    start_date = (now - timedelta(days=30)).strftime("%Y-%m-%d")
+
+    try:
+        items = _query_source("macrofactor", start_date, end_date)
+        meal_counts = Counter()
+        meal_macros = defaultdict(lambda: {"cal": 0, "protein": 0, "carbs": 0, "fat": 0, "count": 0})
+
+        for day in items:
+            food_log = day.get("food_log") or []
+            for entry in food_log:
+                name = (entry.get("food_name") or "").strip()
+                if not name or len(name) < 3:
+                    continue
+                meal_counts[name] += 1
+                m = meal_macros[name]
+                m["cal"] += float(entry.get("calories_kcal") or 0)
+                m["protein"] += float(entry.get("protein_g") or 0)
+                m["carbs"] += float(entry.get("carbs_g") or 0)
+                m["fat"] += float(entry.get("fat_g") or 0)
+                m["count"] += 1
+
+        top_meals = []
+        for name, freq in meal_counts.most_common(8):
+            m = meal_macros[name]
+            cnt = m["count"] or 1
+            avg_cal = round(m["cal"] / cnt)
+            avg_pro = round(m["protein"] / cnt)
+            avg_carb = round(m["carbs"] / cnt)
+            ppc = round((avg_pro * 4 / avg_cal * 100)) if avg_cal > 0 else 0
+            top_meals.append({
+                "name": name,
+                "frequency": freq,
+                "avg_calories": avg_cal,
+                "avg_protein_g": avg_pro,
+                "avg_carbs_g": avg_carb,
+                "protein_cal_pct": ppc,
+            })
+
+        return _ok({"meals": top_meals, "period_days": 30}, cache_seconds=3600)
+    except Exception as e:
+        logger.warning(f"[frequent_meals] Failed: {e}")
+        return _error(503, "Meal data temporarily unavailable.")
+
+
+# ── Strength Benchmarks endpoint ──────────────────────────────
+def handle_strength_benchmarks() -> dict:
+    """GET /api/strength_benchmarks — Current 1RM and progress from Hevy data."""
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    end_date = now.strftime("%Y-%m-%d")
+    start_date = (now - timedelta(days=90)).strftime("%Y-%m-%d")
+
+    targets = {
+        "Deadlift": 315, "Squat": 265, "Bench Press": 185, "Overhead Press": 135,
+    }
+
+    try:
+        items = _query_source("hevy", start_date, end_date)
+        # Find max weight for each target lift
+        best = {}
+        for day in items:
+            exercises = day.get("exercises") or day.get("workout_exercises") or []
+            for ex in exercises:
+                name = ex.get("exercise_name") or ex.get("name") or ""
+                for target_name in targets:
+                    if target_name.lower() in name.lower():
+                        sets = ex.get("sets") or []
+                        for s in sets:
+                            w = float(s.get("weight_lbs") or s.get("weight") or 0)
+                            if w > best.get(target_name, 0):
+                                best[target_name] = w
+
+        benchmarks = []
+        for lift, target in targets.items():
+            current = best.get(lift, 0)
+            benchmarks.append({
+                "lift": lift,
+                "current_1rm": round(current),
+                "target": target,
+                "progress_pct": round((current / target) * 100) if target > 0 else 0,
+            })
+
+        return _ok({"benchmarks": benchmarks, "period_days": 90}, cache_seconds=3600)
+    except Exception as e:
+        logger.warning(f"[strength_benchmarks] Failed: {e}")
+        return _error(503, "Strength data temporarily unavailable.")
+
+
 # ── Phase 1: Changes-Since endpoint ─────────────────────────────
 def handle_changes_since(qs: dict = None) -> dict:
     """GET /api/changes-since?ts=EPOCH — Returns notable changes since timestamp."""
@@ -4742,6 +4837,8 @@ ROUTES = {
     "/api/mind_overview":       handle_mind_overview,
     # BL-02: Bloodwork/Labs
     "/api/labs":                handle_labs,
+    "/api/frequent_meals":      handle_frequent_meals,
+    "/api/strength_benchmarks": handle_strength_benchmarks,
     # Benchmark trends + meal responses (stub endpoints)
     "/api/benchmark_trends":    handle_benchmark_trends,
     "/api/meal_responses":      handle_meal_responses,
