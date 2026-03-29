@@ -231,8 +231,8 @@
       ]},
       { heading: 'Internal', links: [
         { href: '/status/', text: 'System Status', id: 'footer-status-link' },
-        { href: 'https://dash.averagejoematt.com/clinical.html', text: 'Clinician View', locked: true },
-        { href: '/accountability/', text: 'Buddy Dashboard', locked: true },
+        { href: 'https://dash.averagejoematt.com/clinical.html', text: 'Clinician View', locked: true, external: true },
+        { href: '/accountability/', text: 'Buddy Dashboard' },
         { href: 'https://discord.gg/T4Ndt2WsU', text: 'Join the community', external: true, community: true },
         { href: '/rss.xml', text: 'RSS Feed' },
         { href: '/privacy/', text: 'Privacy' },
@@ -244,7 +244,7 @@
       html += '<div class="footer-v2__heading">' + col.heading + '</div>';
       col.links.forEach(function(link) {
         if (link.community) {
-          html += '<a href="' + link.href + '" class="footer-community-link" target="_blank" rel="noopener"><span class="community-glyph">\u2317</span>' + link.text + '</a>';
+          html += '<a href="' + link.href + '" class="footer-community-link" target="_blank" rel="noopener" style="font-weight:600"><span class="community-glyph">\u2317</span>' + link.text + '</a>';
         } else {
           var linkId = link.id ? ' id="' + link.id + '"' : '';
           var extAttrs = link.external ? ' target="_blank" rel="noopener"' : '';
