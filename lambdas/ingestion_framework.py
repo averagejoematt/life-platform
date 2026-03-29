@@ -226,8 +226,8 @@ def _archive_raw(s3, config, date_str, raw_data):
             ContentType="application/json",
         )
     except Exception as e:
-        # S3 archive is non-fatal
-        print(f"[WARN] S3 archive failed for {config.source_name}/{date_str}: {e}")
+        # S3 archive is non-fatal but losing audit trail is concerning — log as ERROR
+        print(f"[ERROR] S3 archive failed for {config.source_name}/{date_str} — audit trail lost: {e}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

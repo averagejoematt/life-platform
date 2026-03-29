@@ -216,7 +216,8 @@ def evaluate_rewards(character_sheet):
                     "condition": condition,
                 })
             except Exception as e:
-                print("[WARN] failed to update reward " + str(item.get("reward_id")) + ": " + str(e))
+                print("[ERROR] Failed to update reward " + str(item.get("reward_id")) + ": " + str(e))
+                # Don't re-raise — other rewards may still succeed, but log as ERROR for monitoring
     return triggered
 
 
@@ -400,7 +401,8 @@ def write_public_stats_json(data, profile, streak_data=None):
         )
         print("[INFO] public_stats.json written")
     except Exception as e:
-        print("[WARN] write_public_stats_json failed: " + str(e))
+        print("[ERROR] CRITICAL: write_public_stats_json failed — website shows stale data: " + str(e))
+        raise  # Re-raise — stale public stats breaks homepage and OG images
 
 
 def write_dashboard_json(data, profile, day_grade_score, grade, component_scores,

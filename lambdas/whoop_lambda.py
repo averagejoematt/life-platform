@@ -378,14 +378,18 @@ def ingest_day(date_str, access_token, s3_client, table, verbose=True, call_dela
     for workout in workout_records:
         wid = workout["id"]
         wfields = extract_workout_fields(workout, log)
-        table.put_item(Item={
-            "pk": f"USER#{USER_ID}#SOURCE#whoop",
-            "sk": f"DATE#{date_str}#WORKOUT#{wid}",
-            "date": date_str,
-            "workout_id": wid,
-            **wfields,
-        })
-        log(f"[INFO] DynamoDB workout item written: {wid}")
+        try:
+            table.put_item(Item={
+                "pk": f"USER#{USER_ID}#SOURCE#whoop",
+                "sk": f"DATE#{date_str}#WORKOUT#{wid}",
+                "date": date_str,
+                "workout_id": wid,
+                **wfields,
+            })
+            log(f"[INFO] DynamoDB workout item written: {wid}")
+        except Exception as _we:
+            log(f"[ERROR] Failed to write workout {wid}: {_we}")
+            # Continue with other workouts — partial write is better than no write
 
     # Return all normalized fields as plain Python scalars (float/int/None)
     # so callers (Lambda handler, backfill script) can log or serialize them.
