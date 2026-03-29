@@ -1523,13 +1523,97 @@ def publish_to_blog(title, stats_line, body_html, week_num, date_str, all_instal
 # STORE INSTALLMENT
 # ══════════════════════════════════════════════════════════════════════════════
 
+def build_weekly_signal_data(data, week_num):
+    """Extract structured metrics for the Weekly Signal email template."""
+    BOARD_ROTATION = [
+        "sarah_chen", "marcus_webb", "lisa_park", "james_okafor",
+        "maya_rodriguez", "layne_norton", "rhonda_patrick", "peter_attia",
+        "andrew_huberman", "paul_conti", "vivek_murthy", "the_chair",
+        "margaret_calloway", "elena_voss",
+    ]
+    OBSERVATORY_ROTATION = [
+        {"slug": "sleep", "name": "Sleep Observatory", "hook": "How does recovery score connect to sleep architecture?"},
+        {"slug": "training", "name": "Training Observatory", "hook": "Zone 2 base, progressive overload, and the fitness-fatigue model."},
+        {"slug": "nutrition", "name": "Nutrition Observatory", "hook": "Macros, meal timing, and the protein distribution puzzle."},
+        {"slug": "glucose", "name": "Glucose Observatory", "hook": "What does the CGM reveal about real-time metabolic response?"},
+        {"slug": "mind", "name": "Inner Life Observatory", "hook": "Journal sentiment, mood trajectory, and the mind-body connection."},
+        {"slug": "character", "name": "Character Sheet", "hook": "The RPG-style score that tracks the whole transformation."},
+        {"slug": "benchmarks", "name": "Benchmarks", "hook": "Centenarian decathlon targets and where the numbers stand today."},
+    ]
+
+    profile = data.get("profile") or {}
+    withings = data.get("withings") or {}
+    whoop = data.get("whoop") or {}
+    sleep_data = data.get("sleep") or {}
+    strava = data.get("strava") or {}
+    habits = data.get("habits") or {}
+    grades = data.get("day_grades") or {}
+
+    # Weight
+    weight_lbs = None
+    if withings.get("weight_kg"):
+        weight_lbs = round(float(withings["weight_kg"]) * 2.20462, 1)
+    start_weight = float(profile.get("journey_start_weight_lbs", 302))
+    weight_delta = round(start_weight - weight_lbs, 1) if weight_lbs else None
+
+    # Sleep
+    sleep_hrs = float(sleep_data.get("sleep_duration_hours", 0) or 0)
+    sleep_eff = float(sleep_data.get("sleep_efficiency_pct", 0) or whoop.get("sleep_efficiency_pct", 0) or 0)
+
+    # Training
+    activities = strava.get("activities") or []
+    training_sessions = len(activities) if isinstance(activities, list) else int(activities or 0)
+
+    # Habits
+    habit_completed = int(habits.get("tier0_completed", 0) or 0)
+    habit_possible = int(habits.get("tier0_possible", 1) or 1)
+    habit_pct = round((habit_completed / habit_possible) * 100) if habit_possible > 0 else 0
+
+    # Recovery
+    recovery_pct = float(whoop.get("recovery_score", 0) or 0)
+    hrv_ms = float(whoop.get("hrv", 0) or whoop.get("hrv_yesterday", 0) or 0)
+
+    # Day grades
+    avg_grade = grades.get("avg_score") or grades.get("total_score") or 0
+
+    # Journey days
+    journey_start = profile.get("journey_start_date", "2026-04-01")
+    try:
+        start_dt = datetime.strptime(journey_start, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        journey_days = max(0, (datetime.now(timezone.utc) - start_dt).days)
+    except Exception:
+        journey_days = 0
+
+    featured_member_id = BOARD_ROTATION[(week_num - 1) % len(BOARD_ROTATION)]
+    featured_observatory = OBSERVATORY_ROTATION[(week_num - 1) % len(OBSERVATORY_ROTATION)]
+
+    return {
+        "weight_lbs": weight_lbs,
+        "weight_delta_journey_lbs": weight_delta,
+        "avg_sleep_hours": round(sleep_hrs, 1),
+        "avg_sleep_efficiency_pct": round(sleep_eff),
+        "training_sessions": training_sessions,
+        "habit_pct": habit_pct,
+        "habits_completed": habit_completed,
+        "habits_possible": habit_possible,
+        "avg_recovery_pct": round(recovery_pct),
+        "avg_hrv_ms": round(hrv_ms),
+        "avg_day_grade": round(float(avg_grade), 1) if avg_grade else 0,
+        "journey_days": journey_days,
+        "featured_member_id": featured_member_id,
+        "featured_observatory": featured_observatory,
+    }
+
+
 def store_installment(date_str, week_num, title, stats_line, raw_markdown,
                       body_html, themes, has_board, confidence_level="MEDIUM", confidence_badge_html="",  # BS-05
                       status="published", approval_token=None,
                       draft_blog_post_html=None, draft_blog_post_key=None,
                       draft_blog_index_html=None, draft_journal_post_html=None,
                       draft_journal_post_key=None, draft_journal_posts_json=None,
-                      draft_email_html=None):
+                      draft_email_html=None,
+                      weekly_signal_data=None, weekly_signal_wins_losses=None,
+                      weekly_signal_board_quote=None):
     """Store installment in DynamoDB for continuity and blog generation.
 
     FEAT-12: In preview mode, status="draft" with approval_token + pre-built HTML blobs stored
@@ -1572,6 +1656,12 @@ def store_installment(date_str, week_num, title, stats_line, raw_markdown,
             item["draft_journal_posts_json"] = draft_journal_posts_json
         if draft_email_html:
             item["draft_email_html"] = draft_email_html
+        if weekly_signal_data:
+            item["weekly_signal_data"] = json.dumps(weekly_signal_data) if isinstance(weekly_signal_data, dict) else weekly_signal_data
+        if weekly_signal_wins_losses:
+            item["weekly_signal_wins_losses"] = json.dumps(weekly_signal_wins_losses) if isinstance(weekly_signal_wins_losses, dict) else weekly_signal_wins_losses
+        if weekly_signal_board_quote:
+            item["weekly_signal_board_quote"] = weekly_signal_board_quote
         table.put_item(Item=item)
         logger.info(f"Installment stored: Week {week_num} (status={status})")
     except Exception as e:

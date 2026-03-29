@@ -134,41 +134,170 @@ def _get_confirmed_subscribers() -> list[dict]:
 # EMAIL BUILDER
 # ─────────────────────────────────────────────────────────────────────────────
 
+BOARD_MEMBERS = {
+    "sarah_chen":       {"name": "Dr. Sarah Chen",       "title": "Sports Scientist",                 "color": "#0ea5e9", "emoji": "\U0001F3CB\uFE0F"},
+    "marcus_webb":      {"name": "Dr. Marcus Webb",      "title": "Nutritionist",                     "color": "#22c55e", "emoji": "\U0001F957"},
+    "lisa_park":        {"name": "Dr. Lisa Park",        "title": "Sleep & Circadian Specialist",      "color": "#8b5cf6", "emoji": "\U0001F634"},
+    "james_okafor":     {"name": "Dr. James Okafor",     "title": "Longevity & Preventive Medicine",   "color": "#f59e0b", "emoji": "\U0001FA7A"},
+    "maya_rodriguez":   {"name": "Coach Maya Rodriguez",  "title": "Behavioural Performance Coach",    "color": "#ec4899", "emoji": "\U0001F9E0"},
+    "the_chair":        {"name": "The Chair",             "title": "Board Chair \u2014 Verdict & Priority", "color": "#6366f1", "emoji": "\U0001F3AF"},
+    "layne_norton":     {"name": "Dr. Layne Norton",      "title": "Macros, Protein & Adherence",      "color": "#10b981", "emoji": "\U0001F4AA"},
+    "rhonda_patrick":   {"name": "Dr. Rhonda Patrick",    "title": "Micronutrients & Longevity",       "color": "#8b5cf6", "emoji": "\U0001F9EC"},
+    "peter_attia":      {"name": "Dr. Peter Attia",       "title": "Metabolic Health & Longevity",     "color": "#f59e0b", "emoji": "\U0001F4CA"},
+    "andrew_huberman":  {"name": "Dr. Andrew Huberman",   "title": "Neuroscience & Protocols",         "color": "#06b6d4", "emoji": "\U0001F52C"},
+    "elena_voss":       {"name": "Elena Voss",            "title": "Embedded Journalist",              "color": "#94a3b8", "emoji": "\u270D\uFE0F"},
+    "paul_conti":       {"name": "Dr. Paul Conti",        "title": "Psychiatrist \u2014 Self-Structure",    "color": "#7c3aed", "emoji": "\U0001F9E0"},
+    "margaret_calloway":{"name": "Margaret Calloway",     "title": "Senior Editor \u2014 Longform",         "color": "#b45309", "emoji": "\u270F\uFE0F"},
+    "vivek_murthy":     {"name": "Dr. Vivek Murthy",      "title": "Social Connection & Loneliness",   "color": "#0891b2", "emoji": "\U0001F91D"},
+}
+
+
+def _extract_chronicle_preview(content_html: str, max_paragraphs: int = 3) -> str:
+    """Extract first N paragraphs from Chronicle HTML for email preview."""
+    import re
+    paragraphs = re.findall(r'<p>(.*?)</p>', content_html, re.DOTALL)
+    preview_paras = paragraphs[:max_paragraphs]
+    return "\n".join(f"<p>{p}</p>" for p in preview_paras) if preview_paras else "<p>This week's chronicle is available on the site.</p>"
+
+
 def _build_subscriber_email(installment: dict, subscriber: dict) -> tuple[str, str]:
-    """
-    Build the subscriber-facing Chronicle email.
-    Signal-branded (Ava Moreau directive). Newsletter format.
-    Includes personalized one-click unsubscribe link (CAN-SPAM).
-    Returns (subject, html).
-    """
+    """Build the 5-section Weekly Signal email. Returns (subject, html)."""
     title      = installment.get("title", "The Weekly Signal")
     week_num   = installment.get("week_number", "?")
-    stats_line = installment.get("stats_line", "")
-    body_html  = installment.get("content_html", "<p>No content available.</p>")
     date_str   = installment.get("date", "")
-    conf_badge = installment.get("_confidence_badge_html", "")
+    body_html  = installment.get("content_html", "")
 
-    subject = f'The Measured Life — Week {week_num}: "{title}"'
+    subject = f'The Measured Life \u2014 Week {week_num}: "{title}"'
 
-    unsub_url   = (
-        f"{SITE_URL}/api/subscribe"
-        f"?action=unsubscribe"
-        f"&email={urllib.parse.quote(subscriber_email)}"  # noqa: F821 — defined in enclosing scope
-    )
-    journal_url = f"{SITE_URL}/journal/"
+    sub_email = subscriber.get("email", "")
+    unsub_url = f"{SITE_URL}/api/subscribe?action=unsubscribe&email={urllib.parse.quote(sub_email)}"
 
     try:
         display_date = datetime.strptime(date_str, "%Y-%m-%d").strftime("%B %-d, %Y")
     except Exception:
         display_date = date_str
 
-    # BS-05: confidence badge row
-    badge_row = ""
-    if conf_badge:
-        badge_row = (
-            f'<p style="font-size:11px;color:#484f58;margin:0 0 24px;">'
-            f'Narrative confidence: {conf_badge}</p>'
-        )
+    # Parse weekly signal data
+    signal_data = {}
+    try:
+        raw = installment.get("weekly_signal_data", "{}")
+        signal_data = json.loads(raw) if isinstance(raw, str) else (raw or {})
+    except Exception:
+        pass
+
+    wins_losses = {}
+    try:
+        raw = installment.get("weekly_signal_wins_losses", "{}")
+        wins_losses = json.loads(raw) if isinstance(raw, str) else (raw or {})
+    except Exception:
+        pass
+
+    board_quote = installment.get("weekly_signal_board_quote", "")
+    featured_member_id = signal_data.get("featured_member_id", "the_chair")
+    featured_obs = signal_data.get("featured_observatory", {})
+    member = BOARD_MEMBERS.get(featured_member_id, BOARD_MEMBERS["the_chair"])
+
+    # Chronicle preview
+    preview_html = _extract_chronicle_preview(body_html)
+    chronicle_url = f"{SITE_URL}/chronicle/"
+
+    # ── Section 1: Week in Numbers ──
+    def _num(val, suffix=""):
+        return f"{val}{suffix}" if val else "\u2014"
+
+    s1 = ""
+    if signal_data:
+        s1 = f"""
+  <div style="background:#161b22;border-radius:8px;border:1px solid rgba(230,237,243,0.08);padding:24px 28px;margin-bottom:16px;">
+    <p style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#F0B429;margin:0 0 16px;">The Week in Numbers</p>
+    <table style="width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:13px;color:#c9d1d9;">
+      <tr>
+        <td style="padding:6px 0;color:#8b949e;">Weight</td>
+        <td style="padding:6px 0;text-align:right;"><a href="{SITE_URL}/live/" style="color:#E6EDF3;text-decoration:none;">{_num(signal_data.get('weight_lbs'), ' lbs')}</a></td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:#8b949e;">Sleep avg</td>
+        <td style="padding:6px 0;text-align:right;"><a href="{SITE_URL}/sleep/" style="color:#E6EDF3;text-decoration:none;">{_num(signal_data.get('avg_sleep_hours'), 'h')}</a></td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:#8b949e;">Recovery</td>
+        <td style="padding:6px 0;text-align:right;"><a href="{SITE_URL}/training/" style="color:#E6EDF3;text-decoration:none;">{_num(signal_data.get('avg_recovery_pct'), '%')}</a></td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:#8b949e;">HRV</td>
+        <td style="padding:6px 0;text-align:right;">{_num(signal_data.get('avg_hrv_ms'), ' ms')}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:#8b949e;">Training</td>
+        <td style="padding:6px 0;text-align:right;"><a href="{SITE_URL}/training/" style="color:#E6EDF3;text-decoration:none;">{_num(signal_data.get('training_sessions'))} sessions</a></td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:#8b949e;">Habits</td>
+        <td style="padding:6px 0;text-align:right;"><a href="{SITE_URL}/habits/" style="color:#E6EDF3;text-decoration:none;">{_num(signal_data.get('habit_pct'), '%')}</a></td>
+      </tr>
+      <tr style="border-top:1px solid rgba(230,237,243,0.08);">
+        <td style="padding:8px 0 0;color:#F0B429;font-size:11px;">Day {signal_data.get('journey_days', '?')}</td>
+        <td style="padding:8px 0 0;text-align:right;color:#F0B429;font-size:11px;">{_num(signal_data.get('weight_delta_journey_lbs'), ' lbs lost')}</td>
+      </tr>
+    </table>
+  </div>"""
+
+    # ── Section 2: Chronicle Preview ──
+    s2 = f"""
+  <div style="background:#161b22;border-radius:8px;border:1px solid rgba(230,237,243,0.08);padding:28px;margin-bottom:16px;">
+    <h2 style="font-size:20px;font-weight:700;color:#E6EDF3;line-height:1.3;margin:0 0 16px;">{title}</h2>
+    <div style="font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#c9d1d9;line-height:1.8;">
+      {preview_html}
+    </div>
+    <p style="margin:20px 0 0;">
+      <a href="{chronicle_url}" style="color:#F0B429;font-size:14px;font-weight:600;text-decoration:none;">Continue reading \u2192</a>
+    </p>
+  </div>"""
+
+    # ── Section 3: What Worked / What Didn't ──
+    s3 = ""
+    worked = wins_losses.get("worked", [])
+    didnt = wins_losses.get("didnt_work", [])
+    if worked or didnt:
+        items_html = ""
+        for w in worked[:3]:
+            items_html += f'<tr><td style="padding:6px 0;color:#22c55e;font-size:13px;vertical-align:top;width:20px;">\u2713</td><td style="padding:6px 0;font-size:13px;color:#c9d1d9;"><strong style="color:#E6EDF3;">{w.get("headline","")}</strong><br><span style="color:#8b949e;font-size:12px;">{w.get("detail","")}</span></td></tr>'
+        for d in didnt[:3]:
+            items_html += f'<tr><td style="padding:6px 0;color:#f87171;font-size:13px;vertical-align:top;width:20px;">\u2717</td><td style="padding:6px 0;font-size:13px;color:#c9d1d9;"><strong style="color:#E6EDF3;">{d.get("headline","")}</strong><br><span style="color:#8b949e;font-size:12px;">{d.get("detail","")}</span></td></tr>'
+        s3 = f"""
+  <div style="background:#161b22;border-radius:8px;border:1px solid rgba(230,237,243,0.08);padding:24px 28px;margin-bottom:16px;">
+    <p style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#F0B429;margin:0 0 16px;">What Worked / What Didn't</p>
+    <table style="width:100%;border-collapse:collapse;">{items_html}</table>
+  </div>"""
+
+    # ── Section 4: The Board Speaks ──
+    s4 = ""
+    if board_quote:
+        s4 = f"""
+  <div style="background:#161b22;border-radius:8px;border:1px solid rgba(230,237,243,0.08);padding:24px 28px;margin-bottom:16px;">
+    <p style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#F0B429;margin:0 0 16px;">The Board Speaks</p>
+    <div style="border-left:3px solid {member['color']};padding-left:16px;">
+      <p style="font-family:Georgia,'Times New Roman',serif;font-size:14px;font-style:italic;color:#c9d1d9;line-height:1.7;margin:0 0 12px;">
+        "{board_quote}"
+      </p>
+      <p style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b949e;margin:0;">
+        {member['emoji']} {member['name']} \u2014 {member['title']}
+      </p>
+    </div>
+  </div>"""
+
+    # ── Section 5: Explore the Observatory ──
+    s5 = ""
+    if featured_obs:
+        obs_slug = featured_obs.get("slug", "sleep")
+        obs_url = f"{SITE_URL}/{obs_slug}/"
+        s5 = f"""
+  <div style="background:#161b22;border-radius:8px;border:1px solid rgba(230,237,243,0.08);padding:24px 28px;margin-bottom:16px;">
+    <p style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#F0B429;margin:0 0 12px;">Explore the Observatory</p>
+    <p style="font-size:15px;color:#E6EDF3;font-weight:600;margin:0 0 8px;">{featured_obs.get('name', '')}</p>
+    <p style="font-size:13px;color:#8b949e;line-height:1.6;margin:0 0 16px;">{featured_obs.get('hook', '')}</p>
+    <a href="{obs_url}" style="color:#F0B429;font-size:13px;font-weight:600;text-decoration:none;">Explore the data \u2192</a>
+  </div>"""
 
     html = f"""<!DOCTYPE html>
 <html>
@@ -182,61 +311,25 @@ def _build_subscriber_email(installment: dict, subscriber: dict) -> tuple[str, s
 
   <!-- Header -->
   <div style="padding:32px 0 24px;">
-    <p style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:3px;
-              text-transform:uppercase;color:#F0B429;margin:0 0 8px;">
-      The Weekly Signal
-    </p>
-    <p style="font-size:12px;color:#484f58;margin:0;">
-      Week {week_num} &mdash; {display_date}
-    </p>
+    <p style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#F0B429;margin:0 0 8px;">The Weekly Signal</p>
+    <p style="font-size:12px;color:#484f58;margin:0;">Week {week_num} \u2014 {display_date}</p>
   </div>
 
-  <!-- Article card -->
-  <div style="background:#161b22;border-radius:8px;border:1px solid rgba(230,237,243,0.08);
-              padding:32px;margin-bottom:24px;">
-
-    <h1 style="font-size:26px;font-weight:700;color:#E6EDF3;line-height:1.3;margin:0 0 16px;">
-      {title}
-    </h1>
-
-    {badge_row}
-
-    {"" if not stats_line else (
-        '<p style="font-size:13px;color:#F0B429;font-family:\'JetBrains Mono\',monospace;'
-        'margin:0 0 24px;padding:10px 14px;background:rgba(240,180,41,0.06);'
-        'border-left:3px solid #F0B429;border-radius:0 4px 4px 0;line-height:1.5;">'
-        + stats_line +
-        '</p>'
-    )}
-
-    <div style="font-size:15px;color:#c9d1d9;line-height:1.8;
-                border-top:1px solid rgba(230,237,243,0.08);padding-top:24px;">
-      {body_html}
-    </div>
-
-  </div>
-
-  <!-- CTA -->
-  <div style="text-align:center;padding:8px 0 32px;">
-    <a href="{journal_url}"
-       style="display:inline-block;background:#F0B429;color:#0D1117;font-size:14px;
-              font-weight:600;padding:12px 28px;border-radius:8px;text-decoration:none;">
-      Read the full archive &rarr;
-    </a>
-    <p style="font-size:12px;color:#484f58;margin:16px 0 0;">
-      Written by Elena Voss &mdash; <em>The Measured Life</em>
-    </p>
-  </div>
+  {s1}
+  {s2}
+  {s3}
+  {s4}
+  {s5}
 
   <!-- Footer (CAN-SPAM) -->
   <div style="border-top:1px solid rgba(230,237,243,0.06);padding:20px 0 40px;">
     <p style="font-size:11px;color:#30363d;margin:0 0 8px;line-height:1.6;text-align:center;">
-      You subscribed to The Weekly Signal at averagejoematt.com.
+      You subscribed to The Weekly Signal at averagejoematt.com.<br>
       This is a real person's real data, published every Wednesday.
     </p>
     <p style="font-size:11px;text-align:center;margin:0;">
       <a href="{unsub_url}" style="color:#484f58;text-decoration:underline;">Unsubscribe</a>
-      &nbsp;&middot;&nbsp;
+      &nbsp;\u00B7&nbsp;
       <a href="{SITE_URL}" style="color:#484f58;text-decoration:underline;">averagejoematt.com</a>
     </p>
   </div>
