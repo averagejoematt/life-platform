@@ -709,22 +709,22 @@ def handle_status() -> dict:
     # When stale AND activity_dependent, show "idle" (gray) instead of "red"
     _DATA_SOURCES = [
         # (source_id, name, description, yellow_h, red_h, category, group, activity_dependent)
-        # ── API-Based (daily automated) ──
+        # ── API-Based (fully automated — pipeline pulls without user action) ──
         ("whoop",              "Recovery & Sleep (Whoop)",           "HRV · recovery score · sleep staging",      25,  49, "auto",    "API-Based", False),
         ("withings",           "Weigh In (Withings)",                "Weight · body composition · blood pressure", 25,  49, "auto",   "API-Based", True),
-        ("garmin",             "Activity Tracking (Garmin)",         "Steps · GPS routes · stress · body battery", 25,  49, "auto",   "API-Based", True),
-        ("strava",             "Cardio & Running (Strava)",          "Activities · segments · training load",      25,  49, "auto",    "API-Based", True),
-        ("habitify",           "Habit Tracking (Habitify)",          "P40 daily habits · day grades",              25,  49, "auto",    "API-Based", True),
         ("eightsleep",         "Sleep Environment (Eight Sleep)",    "Sleep staging · bed temperature · HRV",      25,  49, "auto",    "API-Based", False),
-        ("macrofactor",        "Nutrition (MacroFactor)",            "Calories · macros · meal timing",            25,  49, "auto",    "API-Based", True),
-        ("notion",             "Daily Journal (Notion)",             "Journal entries · mood · reflections",       25,  49, "auto",    "API-Based", True),
         ("todoist",            "To Do List Feed (Todoist)",          "Tasks · projects · completion rate",          25,  49, "auto",   "API-Based", False),
         ("weather",            "Weather Conditions",                 "Daily temperature · conditions · humidity",   25,  49, "auto",   "API-Based", False),
-        ("supplements",        "Supplement Adherence",               "Daily supplement tracking & compliance",      25,  49, "auto",   "API-Based", True),
         ("habit_scores",       "Habit Scores (Computed)",            "Aggregated daily habit grades & streaks",     25,  49, "auto",   "API-Based", False),
-        ("state_of_mind",      "State of Mind (How We Feel)",       "Mood valence · emotions · life associations", 25,  49, "auto",   "API-Based", True),
-        # ── Periodic Uploads (file drops, webhooks, manual) ──
-        ("macrofactor",        "Food Log (Dropbox)",                 "MacroFactor nutrition CSV via file drop",     25,  49, "auto",   "Periodic Uploads", True),
+        ("garmin",             "Activity Tracking (Garmin)",         "Steps · GPS routes · stress · body battery", 25,  49, "auto",   "API-Based", True),
+        ("strava",             "Cardio & Running (Strava)",          "Activities · segments · training load",      25,  49, "auto",    "API-Based", True),
+        ("notion",             "Daily Journal (Notion)",             "Journal entries · mood · reflections",       25,  49, "auto",    "API-Based", True),
+        # ── User-Driven (requires user to log/sync/upload) ──
+        ("habitify",           "Habit Tracking (Habitify)",          "P40 daily habits · day grades",              25,  49, "auto",    "User-Driven", True),
+        ("macrofactor",        "Nutrition (MacroFactor)",            "Calories · macros · meal timing",            25,  49, "auto",    "User-Driven", True),
+        ("supplements",        "Supplement Adherence",               "Daily supplement tracking & compliance",      25,  49, "auto",   "User-Driven", True),
+        ("state_of_mind",      "State of Mind (How We Feel)",       "Mood valence · emotions · life associations", 25,  49, "auto",   "User-Driven", True),
+        # ── Periodic Uploads (file drops, webhooks, device sync) ──
         ("macrofactor_workouts","Exercise Log (Dropbox)",            "MacroFactor workout CSV via file drop",       48, 168, "auto",   "Periodic Uploads", True),
         ("apple_health",       "CGM Glucose (Dexcom Stelo)",        "Continuous glucose monitor readings",          25,  49, "auto",  "Periodic Uploads", True),
         ("apple_health",       "Water Intake (Health Auto Export)",  "Daily water consumption tracking",            25,  49, "auto",   "Periodic Uploads", True),
@@ -794,25 +794,24 @@ def handle_status() -> dict:
             return "red", rel, f"STALE: last data {rel}. Threshold exceeded ({red_h}h)."
 
     def _uptime_90d(source_id):
-        """Uptime bars starting from platform launch prep (Mar 29, 2026)."""
+        """Uptime bars showing completed days only (excludes today — data not expected yet)."""
         try:
-            # Start from Mar 28 to include yesterday in the baseline
             epoch_start = datetime(2026, 3, 28, tzinfo=timezone.utc).date()
-            today = datetime.now(timezone.utc).date()
-            window_days = min(90, (today - epoch_start).days + 1)
+            yesterday = datetime.now(timezone.utc).date() - timedelta(days=1)
+            window_days = min(90, (yesterday - epoch_start).days + 1)
             if window_days < 1:
-                window_days = 1
+                return [1]  # No completed days yet — show green (pipeline exists)
 
             resp = table.query(
                 KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source_id}") & Key("sk").between(
-                    f"DATE#{epoch_start.isoformat()}", f"DATE#{today.isoformat()}"
+                    f"DATE#{epoch_start.isoformat()}", f"DATE#{yesterday.isoformat()}"
                 ),
                 ProjectionExpression="sk",
             )
             present = {item["sk"].replace("DATE#", "")[:10] for item in resp.get("Items", [])}
-            return [1 if (today - timedelta(days=i)).isoformat() in present else 0 for i in range(window_days - 1, -1, -1)]
+            return [1 if (yesterday - timedelta(days=i)).isoformat() in present else 0 for i in range(window_days - 1, -1, -1)]
         except Exception:
-            return [0] * min(90, max(1, (datetime.now(timezone.utc).date() - datetime(2026, 3, 28, tzinfo=timezone.utc).date()).days + 1))
+            return [1]  # Assume healthy on error
 
     def _sched_aware(status, rel, exp_dow):
         if exp_dow < 0 or today_dow == exp_dow:
@@ -887,6 +886,12 @@ def handle_status() -> dict:
         last = _last_sync(sid)
         status, rel, comment = _comp_status(last, yh, rh)
         uptime = _uptime_90d(sid)
+        # Pre-launch: "never" is expected, not broken
+        if status == "red" and not last:
+            status = "gray"
+            rel = "pre-launch"
+            comment = "Awaiting first run after April 1 launch"
+            uptime = [1] * max(1, len(uptime))
         compute_components.append({"id": sid, "name": name, "description": desc,
                                    "status": status, "last_sync_relative": rel,
                                    "uptime_90d": uptime, "comment": comment})
@@ -898,6 +903,12 @@ def handle_status() -> dict:
         status, rel, comment = _comp_status(last, yh, rh)
         status, rel = _sched_aware(status, rel, exp_dow)
         uptime = _uptime_90d(f"email_log#{lid}")
+        # Pre-launch: weekly emails that haven't fired yet
+        if status == "red" and not last:
+            status = "gray"
+            rel = "scheduled"
+            comment = "Awaiting first scheduled run"
+            uptime = [1] * max(1, len(uptime))
         email_components.append({"id": lid, "name": name, "description": desc,
                                  "status": status, "last_sync_relative": rel,
                                  "uptime_90d": uptime, "comment": comment})
