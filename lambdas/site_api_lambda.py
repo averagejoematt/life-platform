@@ -869,9 +869,12 @@ def handle_status() -> dict:
             if activity_dep and status == "red" and last:
                 status = "gray"
                 comment = f"Pipeline ready \u2014 awaiting user activity. Last data: {rel}"
+                # Show green bars for idle sources (pipeline IS healthy)
+                uptime = [1] * len(uptime)
             elif activity_dep and status == "red" and not last:
                 status = "gray"
                 comment = "Pipeline ready \u2014 no data recorded yet"
+                uptime = [1] * max(1, len(uptime))
 
         ds_components.append({"id": sid, "name": name, "description": desc,
                               "status": status, "last_sync_relative": rel,
