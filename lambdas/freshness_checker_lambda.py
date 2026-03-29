@@ -38,13 +38,15 @@ SOURCES = {
     "garmin":          "Garmin biometrics",
     "habitify":        "Habitify habits",
     "food_delivery":   "Food delivery behavioral signal",
+    "measurements":    "Tape measure check-ins",
     # google_calendar retired v3.7.46 — see ADR-030 in DECISIONS.md
 }
 
 # R18-F04: Per-source stale threshold overrides (hours). Sources not listed use STALE_HOURS default.
 # food_delivery is a quarterly CSV import — 90 days before stale alert.
 SOURCE_STALE_HOURS = {
-    "food_delivery": 90 * 24,  # 90 days
+    "food_delivery": 90 * 24,   # 90 days
+    "measurements": 60 * 24,    # 60 days — one missed session before alert
 }
 
 # Field-level completeness checks — key fields that should be non-null in a healthy record.
@@ -60,6 +62,7 @@ FIELD_COMPLETENESS_CHECKS: dict[str, list[str]] = {
     "eightsleep":      ["sleep_efficiency_pct", "sleep_duration_hours"],
     "withings":        ["weight_lbs"],
     "habitify":        ["total_completed"],
+    "measurements":    ["waist_navel_in", "waist_narrowest_in", "thigh_left_in"],
     "todoist":         ["tasks_completed"],
     # google_calendar removed — ADR-030
 }
