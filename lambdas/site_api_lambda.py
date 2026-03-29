@@ -761,7 +761,7 @@ def handle_status() -> dict:
         ("macrofactor_workouts","Exercise Log Data",                 "Workout CSV via file drop",                             48, 168, "auto",   "Periodic Uploads", True,  "MacroFactor via Dropbox"),
         ("apple_health",       "CGM Glucose Data",                   "Continuous glucose monitor readings",                   25,  49, "auto",  "Periodic Uploads", True,  "Dexcom Stelo via Health Exporter"),
         ("apple_health",       "Water Intake Data",                  "Daily water consumption tracking",                      25,  49, "auto",   "Periodic Uploads", True,  "Apple Health via Health Exporter"),
-        ("apple_health",       "Blood Pressure Data",                "Systolic \u00B7 diastolic \u00B7 pulse",               168, 336, "auto",  "Periodic Uploads", True,  "Apple Health via Health Exporter"),
+        ("bp_readings",        "Blood Pressure Data",                "Systolic \u00B7 diastolic \u00B7 pulse",               168, 336, "manual",  "Periodic Uploads", True,  "Apple Health via Health Exporter"),
         ("apple_health",       "Breathwork Data",                    "Breathing exercises \u00B7 sessions",                   48, 168, "auto",   "Periodic Uploads", True,  "Breathwrk via Health Exporter"),
         ("apple_health",       "Stretching Data",                    "Flexibility sessions \u00B7 recovery",                  48, 168, "auto",   "Periodic Uploads", True,  "Pliability via Health Exporter"),
         ("apple_health",       "Mindful Minutes Data",               "Meditation & mindfulness sessions",                     48, 168, "auto",   "Periodic Uploads", True,  "Apple Health via Health Exporter"),
@@ -891,7 +891,7 @@ def handle_status() -> dict:
         elif category == "manual":
             # Labs / DEXA / Food Delivery — due-date tracking
             # Board recommendation: labs every 6mo, DEXA every 12mo, food delivery every 3mo
-            DUE_MONTHS = {"labs": 6, "dexa": 12, "food_delivery": 3}
+            DUE_MONTHS = {"labs": 6, "dexa": 12, "food_delivery": 3, "bp_readings": 3}
             due_mo = DUE_MONTHS.get(sid, 6)
             if last:
                 last_dt = datetime.strptime(last[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
