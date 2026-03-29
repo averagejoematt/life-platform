@@ -768,7 +768,7 @@ def handle_status() -> dict:
         ("apple_health",       "Stretching (Pliability)",           "Flexibility sessions · recovery minutes",     48, 168, "auto",   "Periodic Uploads", True),
         ("apple_health",       "Mindful Minutes (Meditation)",      "Meditation & mindfulness sessions",           48, 168, "auto",   "Periodic Uploads", True),
         ("apple_health",       "Apple Health Import",                "Manual XML export · steps · workouts",       168, 336, "auto",  "Periodic Uploads", True),
-        ("food_delivery",      "Food Delivery Index (Behavioral)",  "Quarterly CSV import · delivery index 0-10", 2160, 2880, "auto", "Periodic Uploads", True),
+        ("food_delivery",      "Food Delivery Index (Behavioral)",  "Quarterly CSV import · delivery index 0-10", 2160, 2880, "manual", "Periodic Uploads", True),
         # ── Lab & Clinical (infrequent) ──
         ("labs",               "Blood Tests",                        "Lab work · biomarkers · lipid panel",        4320, 8760, "manual", "Lab & Clinical", True),
         ("dexa",               "Bone Density & Body Comp (DEXA)",   "DEXA scan · bone density · lean mass",       4320, 8760, "manual", "Lab & Clinical", True),
@@ -880,7 +880,7 @@ def handle_status() -> dict:
             comment = "One-time data source — does not require refresh" if has_data else "Awaiting initial import"
             uptime = [1] * 90 if has_data else [0] * 90
         elif category == "manual":
-            # Labs / DEXA — blue status, show refresh recommendation
+            # Labs / DEXA / Food Delivery Index — blue status, no daily bars
             status_raw, rel, _ = _comp_status(last, yh, rh)
             if last:
                 last_dt = datetime.strptime(last[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -893,8 +893,9 @@ def handle_status() -> dict:
                     comment = f"Last updated {rel}. Overdue for refresh (>12 months)"
                 status = "blue"
             else:
-                status, comment = "blue", "No data yet — schedule first appointment"
-            uptime = _uptime_90d(sid)
+                status, comment = "blue", "No data yet \u2014 schedule first appointment"
+            # No daily bars for infrequent sources — they don't make sense
+            uptime = []
         else:
             status, rel, comment = _comp_status(last, yh, rh)
             uptime = _uptime_90d(sid)
@@ -979,14 +980,42 @@ def handle_status() -> dict:
     else:
         overall = "green"
 
+    # ── Cost tracking (AWS Cost Explorer — free API) ──
+    cost_info = {}
+    try:
+        ce = boto3.client("ce", region_name="us-east-1")
+        now_date = datetime.now(timezone.utc)
+        month_start = now_date.strftime("%Y-%m-01")
+        today_str = now_date.strftime("%Y-%m-%d")
+        resp = ce.get_cost_and_usage(
+            TimePeriod={"Start": month_start, "End": today_str},
+            Granularity="MONTHLY",
+            Metrics=["UnblendedCost"],
+        )
+        mtd = float(resp["ResultsByTime"][0]["Total"]["UnblendedCost"]["Amount"])
+        days_elapsed = now_date.day
+        days_in_month = 30
+        projected = round((mtd / max(days_elapsed, 1)) * days_in_month, 2)
+        budget = 15.0
+        cost_info = {
+            "mtd": round(mtd, 2),
+            "projected": projected,
+            "budget": budget,
+            "status": "green" if projected <= budget else "yellow" if projected <= budget * 1.2 else "red",
+            "pct_of_budget": round((projected / budget) * 100),
+        }
+    except Exception as e:
+        logger.warning(f"[status] Cost Explorer failed (non-fatal): {e}")
+
     result = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "overall": overall,
+        "cost": cost_info,
         "groups": [
-            {"id": "data_sources",  "label": "Data sources",   "subtitle": f"{len(ds_components)} feeds — wearables · nutrition · labs · genome", "components": ds_components},
-            {"id": "compute",       "label": "Compute layer",  "subtitle": "character sheet · metrics · insights · adaptive mode", "components": compute_components},
+            {"id": "data_sources",  "label": "Data sources",   "subtitle": f"{len(ds_components)} feeds \u2014 wearables \u00B7 nutrition \u00B7 labs \u00B7 genome", "components": ds_components},
+            {"id": "compute",       "label": "Compute layer",  "subtitle": "character sheet \u00B7 metrics \u00B7 insights \u00B7 adaptive mode", "components": compute_components},
             {"id": "email",         "label": "Email & digests", "subtitle": "7 scheduled senders", "components": email_components},
-            {"id": "infrastructure","label": "Infrastructure",  "subtitle": "CloudFront · DynamoDB · SES · DLQ", "components": infra},
+            {"id": "infrastructure","label": "Infrastructure",  "subtitle": "CloudFront \u00B7 DynamoDB \u00B7 SES \u00B7 DLQ", "components": infra},
         ]
     }
 
