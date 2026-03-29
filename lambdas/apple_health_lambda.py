@@ -314,7 +314,11 @@ def save_day(date_str, day):
             logger.warning(f"[DATA-2] Validation warnings for apple_health/{date_str}: {_vr.warnings}")
     except ImportError:
         pass
-    table.put_item(Item=floats_to_decimal(db_item))
+    try:
+        table.put_item(Item=floats_to_decimal(db_item))
+    except Exception as e:
+        logger.error(f"[ERROR] CRITICAL: DynamoDB write failed for apple_health/{date_str}: {e}")
+        raise  # Re-raise — health data loss must be visible
 
 
 def lambda_handler(event, context):
