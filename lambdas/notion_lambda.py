@@ -186,21 +186,37 @@ def query_database(api_key, database_id, start_date=None, end_date=None,
             body["start_cursor"] = cursor
 
         # Date filter (unless full_sync)
+        # Use OR filter: entries with Date property in range OR created_time in range
+        # This catches entries that don't have a Date property set
         if not full_sync and (start_date or end_date):
-            date_filter = {"property": "Date", "date": {}}
+            date_filters = []
+            created_filters = []
             if start_date and end_date:
-                date_filter["and"] = [
+                date_filters = [
                     {"property": "Date", "date": {"on_or_after": start_date}},
                     {"property": "Date", "date": {"on_or_before": end_date}},
                 ]
-                body["filter"] = {"and": date_filter["and"]}
+                created_filters = [
+                    {"timestamp": "created_time", "created_time": {"on_or_after": start_date}},
+                    {"timestamp": "created_time", "created_time": {"on_or_before": end_date}},
+                ]
+                body["filter"] = {"or": [
+                    {"and": date_filters},
+                    {"and": created_filters},
+                ]}
             elif start_date:
-                body["filter"] = {"property": "Date", "date": {"on_or_after": start_date}}
+                body["filter"] = {"or": [
+                    {"property": "Date", "date": {"on_or_after": start_date}},
+                    {"timestamp": "created_time", "created_time": {"on_or_after": start_date}},
+                ]}
             elif end_date:
-                body["filter"] = {"property": "Date", "date": {"on_or_before": end_date}}
+                body["filter"] = {"or": [
+                    {"property": "Date", "date": {"on_or_before": end_date}},
+                    {"timestamp": "created_time", "created_time": {"on_or_before": end_date}},
+                ]}
 
-        # Sort by date descending (most recent first)
-        body["sorts"] = [{"property": "Date", "direction": "descending"}]
+        # Sort by created_time descending (works for all entries, not just those with Date)
+        body["sorts"] = [{"timestamp": "created_time", "direction": "descending"}]
 
         result = notion_post(f"/databases/{database_id}/query", api_key, body)
         all_pages.extend(result.get("results", []))
