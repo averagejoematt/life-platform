@@ -17,7 +17,7 @@
  * WHY: Editing nav/footer/CTA structure requires changing 1 file instead of 54.
  *
  * v4.0.0 — 2026-03-27 — Offsite Decision 1: 6-section IA
- *   The Story | The Evidence | The Pulse | The Practice | The Platform | The Chronicle
+ *   The Story | The Data | The Pulse | The Practice | The Platform | The Chronicle
  */
 (function() {
   'use strict';
@@ -33,7 +33,7 @@
       { href: '/achievements/',  text: 'Milestones' },
       { href: '/first-person/',  text: 'First Person' },
     ]},
-    { label: 'The Evidence', items: [
+    { label: 'The Data', items: [
       { href: '/sleep/',       text: 'Sleep' },
       { href: '/glucose/',     text: 'Glucose' },
       { href: '/nutrition/',   text: 'Nutrition' },
@@ -187,7 +187,7 @@
         { href: '/about/', text: 'The Mission' },
         { href: '/achievements/', text: 'Milestones' },
       ]},
-      { heading: 'The Evidence', links: [
+      { heading: 'The Data', links: [
         { href: '/sleep/', text: 'Sleep' },
         { href: '/glucose/', text: 'Glucose' },
         { href: '/nutrition/', text: 'Nutrition' },
