@@ -95,6 +95,7 @@ Where multiple sources measure the same thing:
 | Entity | sk format | Example |
 |--------|-----------|---------|
 | Daily record | `DATE#YYYY-MM-DD` | `DATE#2026-02-22` |
+| Whoop workout | `DATE#YYYY-MM-DD#WORKOUT#<id>` | `DATE#2026-03-29#WORKOUT#12345` |
 | Lab provider metadata | `PROVIDER#<provider>#<period>` | `PROVIDER#function_health#2025-spring` |
 | User profile | `PROFILE#v1` | `PROFILE#v1` |
 
