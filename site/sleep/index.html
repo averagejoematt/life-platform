@@ -180,11 +180,18 @@
        HERO — Merged narrative + gauge payoff (8b)
        ═══════════════════════════════════════════════════════ */
     .s-hero {
-      padding: var(--space-16) var(--page-padding) var(--space-10);
+      padding: var(--space-20) var(--page-padding) var(--space-16);
       position: relative;
       overflow: hidden;
+      border-bottom: 1px solid var(--border);
       max-width: var(--max-width);
       margin: 0 auto;
+    }
+    .s-hero-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-12);
+      align-items: center;
     }
     .s-hero__eyebrow {
       font-family: var(--font-mono);
@@ -237,16 +244,13 @@
       animation: fadeUp 0.6s 0.35s forwards;
     }
 
-    /* Gauge row — data payoff below narrative (8b) */
+    /* Gauge row — 2x2 grid in right column of hero */
     .s-gauge-row {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: var(--space-4);
       opacity: 0;
-      animation: fadeUp 0.6s 0.5s forwards;
-      margin-top: var(--space-10);
-      padding-top: var(--space-8);
-      border-top: 1px solid var(--border);
+      animation: fadeUp 0.6s 0.4s forwards;
     }
     .s-gauge {
       text-align: center;
@@ -1106,6 +1110,7 @@
        RESPONSIVE
        ═══════════════════════════════════════════════════════ */
     @media (max-width: 768px) {
+      .s-hero-grid { grid-template-columns: 1fr; }
       .s-gauge-row { grid-template-columns: repeat(2, 1fr); }
       .s-stage-grid { grid-template-columns: 1fr; }
       .s-stage-col:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
@@ -1164,20 +1169,21 @@
      8b: MERGED HERO — Narrative intro is the sole hero, gauges below
      ════════════════════════════════════════════════════════════ -->
 <div class="s-hero">
-  <div class="s-hero__eyebrow">Sleep Observatory</div>
-  <h1 class="s-hero__title">The thing I thought I was <em>good at.</em></h1>
-  <div class="s-hero__sub">
-    I always told myself I slept well. Eight hours, no alarm, out like a light.
-    Then I put a sensor on my wrist, a pod under my mattress, and a thermometer
-    in my bedroom — and discovered that <em>duration</em> and <em>quality</em>
-    are completely different metrics.
-  </div>
-  <p class="s-hero__sub-detail">
-    Data from Whoop, Eight Sleep, and Apple Health. Updated daily.
-  </p>
-
-  <!-- Gauge rings — data payoff directly below narrative -->
-  <div class="s-gauge-row">
+  <div class="s-hero-grid">
+    <div>
+      <div class="s-hero__eyebrow">Sleep Observatory</div>
+      <h1 class="s-hero__title">The thing I thought I was <em>good at.</em></h1>
+      <p class="s-hero__sub">
+        I always told myself I slept well. Eight hours, no alarm, out like a light.
+        Then I put a sensor on my wrist, a pod under my mattress, and a thermometer
+        in my bedroom — and discovered that <em>duration</em> and <em>quality</em>
+        are completely different metrics.
+      </p>
+      <p class="s-hero__sub-detail">
+        Data from Whoop, Eight Sleep, and Apple Health. Updated daily.
+      </p>
+    </div>
+    <div class="s-gauge-row">
     <div class="s-gauge">
       <div class="s-gauge__ring">
         <svg viewBox="0 0 88 88">
@@ -1239,6 +1245,7 @@
       <div class="s-gauge__label">Recovery</div>
     </div>
   </div>
+  </div><!-- /.s-hero-grid -->
   <div class="obs-freshness" id="obs-freshness" style="display:none">
     <div>
       <span class="obs-freshness__label">Last data: <span id="obs-fresh-time">—</span></span>

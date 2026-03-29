@@ -42,12 +42,18 @@
        HERO (merged narrative + gauges)
        ═══════════════════════════════════════════════════════ */
     .g-hero {
-      padding: var(--space-16) var(--page-padding) var(--space-12);
+      padding: var(--space-20) var(--page-padding) var(--space-16);
       position: relative;
       overflow: hidden;
       border-bottom: 1px solid var(--border);
       max-width: var(--max-width);
       margin: 0 auto;
+    }
+    .g-hero-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-12);
+      align-items: center;
     }
     .g-hero__eyebrow {
       font-family: var(--font-mono);
@@ -102,10 +108,10 @@
       animation: fadeUp 0.6s 0.35s forwards;
     }
 
-    /* Gauge row */
+    /* Gauge row — 2x2 grid in right column of hero */
     .g-gauge-row {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: var(--space-4);
       opacity: 0;
       animation: fadeUp 0.6s 0.4s forwards;
@@ -929,6 +935,7 @@
        RESPONSIVE
        ═══════════════════════════════════════════════════════ */
     @media (max-width: 768px) {
+      .g-hero-grid { grid-template-columns: 1fr; }
       .g-gauge-row { grid-template-columns: repeat(2, 1fr); }
       .g-tir-grid { grid-template-columns: 1fr; }
       .g-tir-col:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
@@ -986,31 +993,19 @@
      9b: MERGED HERO — narrative intro + gauges as payoff
      ════════════════════════════════════════════════════════════ -->
 <section class="g-hero">
-  <div class="g-hero__eyebrow">Glucose Observatory</div>
-  <h1 class="g-hero__title">The number that <em>quieted the anxiety.</em></h1>
-  <div class="g-hero__narrative">
-    <p>
-      At 302 pounds, I assumed my blood sugar was a disaster. I wore a
-      <dfn class="g-term" tabindex="0">CGM<span class="g-term__tip">Continuous Glucose Monitor. A small sensor worn on the arm that reads interstitial glucose every 5 minutes, producing 288 data points per day.</span></dfn>
-      expecting to confirm every fear I had about my metabolic health. Instead, I found out
-      I wasn&rsquo;t in the danger zone I&rsquo;d imagined &mdash; and that data changed my relationship
-      with the anxiety more than any reassurance ever could.
-    </p>
-    <p>
-      This page shows what my glucose actually does: time-in-range, variability,
-      meal responses, and the patterns that connect what I eat to how I feel
-      two hours later.
-    </p>
-  </div>
-  <div class="g-hero__meta">Data from Dexcom Stelo CGM. 30-day rolling window. 288 readings/day.</div>
-  <div class="obs-freshness" id="obs-freshness" style="display:none">
+  <div class="g-hero-grid">
     <div>
-      <span class="obs-freshness__label">Last data: <span id="obs-fresh-time">&mdash;</span></span>
-      <span class="obs-freshness__sub">Updated daily</span>
+      <div class="g-hero__eyebrow">Glucose Observatory</div>
+      <h1 class="g-hero__title">The number that <em>quieted the anxiety.</em></h1>
+      <p class="g-hero__sub">
+        At 302 pounds, I assumed my blood sugar was a disaster. I wore a CGM
+        expecting to confirm every fear. Instead, I found out I wasn't in the
+        danger zone I'd imagined — and that data changed my relationship with
+        the anxiety more than any reassurance ever could.
+      </p>
+      <p class="g-hero__meta">Data from Dexcom Stelo CGM. 30-day rolling window. 288 readings/day.</p>
     </div>
-    <span class="obs-freshness__dot obs-freshness__dot--live" id="obs-fresh-dot"></span>
-  </div>
-  <div class="g-gauge-row">
+    <div class="g-gauge-row">
     <div class="g-gauge">
       <div class="g-gauge__ring">
         <svg viewBox="0 0 88 88">
@@ -1077,6 +1072,14 @@
         <dfn class="g-term" tabindex="0">Optimal<span class="g-term__tip">Optimal Range: 70-120 mg/dL. A tighter window used in longevity medicine. Standard range is 70-180 mg/dL; optimal is where glucose, energy, and cognition are all stable.</span></dfn>
       </div>
     </div>
+  </div>
+  </div><!-- /.g-hero-grid -->
+  <div class="obs-freshness" id="obs-freshness" style="display:none">
+    <div>
+      <span class="obs-freshness__label">Last data: <span id="obs-fresh-time">&mdash;</span></span>
+      <span class="obs-freshness__sub">Updated daily</span>
+    </div>
+    <span class="obs-freshness__dot obs-freshness__dot--live" id="obs-fresh-dot"></span>
   </div>
 </section>
 
