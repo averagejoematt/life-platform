@@ -56,7 +56,8 @@
     "lambdas/og_image_lambda.py":                { "function": "og-image-generator" },
     "lambdas/email_subscriber_lambda.py":        { "function": "email-subscriber" },
     "lambdas/subscriber_onboarding_lambda.py":   { "function": "subscriber-onboarding" },
-    "lambdas/pipeline_health_check_lambda.py":   { "function": "pipeline-health-check" }
+    "lambdas/pipeline_health_check_lambda.py":   { "function": "pipeline-health-check" },
+    "lambdas/measurements_ingestion_lambda.py":  { "function": "measurements-ingestion" }
   },
 
   "mcp": {

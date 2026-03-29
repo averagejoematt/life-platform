@@ -789,6 +789,7 @@ def handle_status() -> dict:
         ("apple_health",       "Mindful Minutes Data",               "Meditation & mindfulness sessions",                     48, 168, "auto",   "Periodic Uploads", True,  "Apple Health via Health Exporter"),
         ("apple_health",       "Apple Health Import",                 "Manual XML export \u00B7 steps \u00B7 workouts",      168, 336, "auto",  "Periodic Uploads", True,  "Apple Health (manual)"),
         ("food_delivery",      "Food Delivery Index",                "Quarterly CSV import \u00B7 delivery index 0-10",     2160, 2880, "manual", "Periodic Uploads", True, "CSV upload"),
+        ("measurements",       "Body Tape Measurements",             "Periodic body measurements \u00B7 waist-to-height ratio", 1440, 2880, "manual", "Periodic Uploads", True, "CSV upload (Brittany)"),
         # ── Lab & Clinical (infrequent) ──
         ("labs",               "Blood Test Results",                  "Lab work \u00B7 biomarkers \u00B7 lipid panel",       4320, 8760, "manual", "Lab & Clinical", True,  "Function Health"),
         ("dexa",               "Bone Density & Body Comp",           "DEXA scan \u00B7 bone density \u00B7 lean mass",      4320, 8760, "manual", "Lab & Clinical", True,  "Clinical (manual)"),
@@ -913,7 +914,7 @@ def handle_status() -> dict:
         elif category == "manual":
             # Labs / DEXA / Food Delivery — due-date tracking
             # Board recommendation: labs every 6mo, DEXA every 12mo, food delivery every 3mo
-            DUE_MONTHS = {"labs": 6, "dexa": 12, "food_delivery": 3, "bp_readings": 3}
+            DUE_MONTHS = {"labs": 6, "dexa": 12, "food_delivery": 3, "bp_readings": 3, "measurements": 2}
             due_mo = DUE_MONTHS.get(sid, 6)
             if last:
                 last_dt = datetime.strptime(last[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)

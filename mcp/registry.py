@@ -26,6 +26,7 @@ from mcp.tools_habits import (
     tool_get_garmin_summary, tool_get_device_agreement,
 )
 from mcp.tools_labs import *
+from mcp.tools_measurements import *
 from mcp.tools_cgm import *
 from mcp.tools_journal import *
 from mcp.tools_journal import tool_get_journal_sentiment_trajectory  # BS-MP2
@@ -2597,6 +2598,46 @@ TOOLS = {
                     "view": {"type": "string", "enum": ["dashboard", "history", "binge", "streaks", "annual"],
                              "description": "Which view to return. Default: dashboard."},
                     "months": {"type": "integer", "description": "Months of history for history view. Default 12."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "get_measurements": {
+        "fn": tool_get_measurements,
+        "schema": {
+            "name": "get_measurements",
+            "description": (
+                "Body tape measurements — periodic sessions (every 4-8 weeks). "
+                "Returns raw measurements (neck, chest, waist, hips, arms, legs) and derived metrics "
+                "(waist-to-height ratio, bilateral symmetry, recomposition indicators). "
+                "Use for: 'body measurements', 'tape measure', 'waist-to-height ratio', 'body dimensions'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "latest_only": {"type": "boolean", "description": "Return only most recent session. Default false."},
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD. Default 12 months ago."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD. Default today."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "get_measurement_trends": {
+        "fn": tool_get_measurement_trends,
+        "schema": {
+            "name": "get_measurement_trends",
+            "description": (
+                "Cross-session body measurement analysis — deltas from baseline, rate of change, "
+                "recomposition score (trunk shrinking while limbs hold), waist-to-height ratio projection. "
+                "Requires >=2 sessions for trends. "
+                "Use for: 'measurement progress', 'body recomposition', 'waist ratio trend', 'am I losing in the right places?'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "include_projection": {"type": "boolean", "description": "Include W/H ratio goal projection. Default true."},
                 },
                 "required": [],
             },
