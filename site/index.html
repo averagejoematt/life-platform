@@ -25,305 +25,352 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
   <style>
-    /* About */
-    .about-section {
+    /* ── Homepage design tokens ─────────────────────────────── */
+    :root {
+      --h-accent: #22c55e;
+      --h-accent-dim: rgba(34,197,94,0.12);
+      --h-blue: #60a5fa;
+      --h-violet: #818cf8;
+      --h-amber: #f59e0b;
+      --h-teal: #2dd4bf;
+      --h-crimson: #ef4444;
+    }
+
+    /* ── Animations ─────────────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* ── HERO ───────────────────────────────────────────────── */
+    .h-hero {
       display: grid;
       grid-template-columns: 1fr 1fr;
+      min-height: 90vh;
       border-bottom: 1px solid var(--border);
     }
-    .about-left {
+    .h-hero__left {
       padding: var(--space-20) var(--page-padding);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
       border-right: 1px solid var(--border);
     }
-    .about-right { padding: var(--space-20) var(--page-padding); }
-    .sources-grid {
+    .h-hero__right {
+      padding: var(--space-16) var(--page-padding);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .h-hero__eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--h-accent);
+      margin-bottom: var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.05s;
+    }
+    .h-hero__eyebrow::before {
+      content: '';
+      display: block;
+      width: 32px;
+      height: 1px;
+      background: var(--h-accent);
+    }
+    .h-hero__title {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 4.5vw, 64px);
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      line-height: 1.08;
+      margin: 0 0 var(--space-6);
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.1s;
+    }
+    .h-hero__title em {
+      font-style: normal;
+      color: var(--h-accent);
+    }
+    .h-hero__subtitle {
+      font-family: var(--font-serif);
+      font-size: var(--text-lg);
+      color: var(--text-muted);
+      line-height: 1.7;
+      max-width: 520px;
+      margin: 0 0 var(--space-8);
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.15s;
+    }
+    .h-hero__stats {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      letter-spacing: 1px;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.2s;
+    }
+
+    /* ── Gauge grid ─────────────────────────────────────────── */
+    .h-gauge-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-8);
+      max-width: 320px;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.25s;
+    }
+    .h-gauge {
+      text-align: center;
+    }
+    .h-gauge__ring {
+      position: relative;
+      width: 100%;
+      max-width: 120px;
+      margin: 0 auto;
+    }
+    .h-gauge__ring svg { width: 100%; height: 100%; }
+    .h-gauge__center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    .h-gauge__num {
+      font-family: var(--font-display);
+      font-size: 22px;
+      letter-spacing: var(--ls-display);
+      line-height: 1;
+    }
+    .h-gauge__unit {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-faint);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+    .h-gauge__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      margin-top: var(--space-2);
+    }
+
+    /* ── Section headers ────────────────────────────────────── */
+    .h-section-header {
+      padding: var(--space-10) var(--page-padding) var(--space-6);
+      border-bottom: 1px solid var(--border);
+    }
+    .h-section-header__text {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--h-accent);
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+    .h-section-header__text::after {
+      content: '';
+      flex: 1;
+      max-width: 120px;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── 3-column data spread ───────────────────────────────── */
+    .h-data-spread {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 1px;
       background: var(--border);
-      border: 1px solid var(--border);
-      margin-top: var(--space-8);
+      border-bottom: 1px solid var(--border);
     }
-    .source-pill {
+    .h-data-col {
       background: var(--surface);
-      padding: var(--space-3) var(--space-4);
+      padding: var(--space-10) var(--page-padding);
+    }
+    .h-data-col__eyebrow {
+      font-family: var(--font-mono);
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-3);
+    }
+    .h-data-col__value {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 3.5vw, 52px);
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      line-height: 1;
+      margin-bottom: var(--space-1);
+    }
+    .h-data-col__sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
       color: var(--text-muted);
-      text-align: center;
-      transition: background var(--dur-fast), color var(--dur-fast);
+      letter-spacing: 0.5px;
+      margin-bottom: var(--space-4);
     }
-    .source-pill:hover { background: var(--surface-raised); color: var(--accent); }
+    .h-data-col__spark {
+      height: 28px;
+      margin-top: var(--space-3);
+    }
 
+    /* ── Pull quotes ────────────────────────────────────────── */
+    .h-pullquote {
+      padding: var(--space-16) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .h-pullquote--left  { padding-right: 20%; }
+    .h-pullquote--right { padding-left: 20%; text-align: right; }
+    .h-pullquote__text {
+      font-family: var(--font-serif);
+      font-size: clamp(20px, 2.2vw, 28px);
+      font-style: italic;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin: 0 0 var(--space-4);
+    }
+    .h-pullquote__badge {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--h-accent);
+    }
+
+    /* ── Observatory entry cards ─────────────────────────────── */
+    .h-obs-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .h-obs-card {
+      background: var(--surface);
+      padding: var(--space-8) var(--space-6);
+      text-decoration: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      transition: background var(--dur-fast);
+    }
+    .h-obs-card:hover { background: var(--surface-raised); }
+    .h-obs-card__name {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      line-height: 1.1;
+    }
+    .h-obs-card__metric {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      letter-spacing: 0.5px;
+    }
+    .h-obs-card__desc {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: 1.5;
+      flex: 1;
+    }
+    .h-obs-card__link {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      transition: color var(--dur-fast);
+    }
+    .h-obs-card:hover .h-obs-card__link { color: var(--h-accent); }
+
+    /* ── Chronicle entry card ───────────────────────────────── */
+    .h-chronicle-card {
+      display: block;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--h-accent);
+      padding: var(--space-8) var(--page-padding);
+      margin: 0 var(--page-padding) 0;
+      text-decoration: none;
+      transition: background var(--dur-fast), border-color var(--dur-fast);
+    }
+    .h-chronicle-card:hover {
+      background: var(--surface-raised);
+      border-left-color: var(--h-accent);
+    }
+    .h-chronicle-card__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--h-accent);
+      margin-bottom: var(--space-2);
+    }
+    .h-chronicle-card__title {
+      font-family: var(--font-display);
+      font-size: clamp(20px, 2vw, 28px);
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      line-height: 1.2;
+      margin-bottom: var(--space-2);
+    }
+    .h-chronicle-card__excerpt {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.6;
+      max-width: 600px;
+    }
+
+    /* ── Responsive ─────────────────────────────────────────── */
     @media (max-width: 900px) {
-      .about-section { grid-template-columns: 1fr; }
-      .about-left { border-right: none; border-bottom: 1px solid var(--border); }
-      .sources-grid { grid-template-columns: repeat(2, 1fr); }
+      .h-hero {
+        grid-template-columns: 1fr;
+        min-height: auto;
+      }
+      .h-hero__left {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: var(--space-16) var(--page-padding);
+      }
+      .h-hero__right {
+        padding: var(--space-12) var(--page-padding);
+      }
+      .h-gauge-grid {
+        max-width: 280px;
+      }
+      .h-obs-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      .h-pullquote--left  { padding-right: var(--page-padding); }
+      .h-pullquote--right { padding-left: var(--page-padding); }
     }
-  </style>
-
-  <!-- BS-02: Transformation story hero styles -->
-  <style>
-  /* ── BS-02 Hero ───────────────────────────────────────────────────────── */
-  .hero {
-    background: var(--bg);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 80px 24px 60px;
-    position: relative;
-    overflow: hidden;
-    border-bottom: none;
-  }
-  .hero::before {
-    content: '';
-    position: absolute;
-    top: -200px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 600px;
-    height: 600px;
-    background: radial-gradient(circle, rgba(var(--accent-rgb), 0.06) 0%, transparent 70%);
-    pointer-events: none;
-  }
-  .hero-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--c-amber-500);
-    margin: 0 0 32px;
-    opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.05s;
-  }
-  .weight-counter {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin: 0 0 32px;
-    opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.05s;
-  }
-  .weight-node { text-align: center; }
-  .weight-node .label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--text-faint);
-    display: block;
-    margin-bottom: 4px;
-  }
-  .weight-node .value {
-    font-family: 'Inter', -apple-system, sans-serif;
-    font-size: 36px;
-    font-weight: 700;
-    color: var(--text);
-    line-height: 1;
-  }
-  .weight-node.start .value  { color: var(--text-faint); }
-  .weight-node.current .value { color: var(--c-amber-500); }
-  .weight-node.goal .value   { color: var(--accent); }
-  .weight-arrow { color: var(--text-faint); font-size: 20px; margin-top: 18px; }
-  .progress-bar-wrap {
-    width: 100%;
-    max-width: 460px;
-    margin: 0 0 12px;
-    opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.08s;
-  }
-  .progress-bar-track {
-    background: var(--border);
-    border-radius: 4px;
-    height: 6px;
-    overflow: hidden;
-  }
-  .progress-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--c-amber-500), var(--accent));
-    border-radius: 4px;
-    transition: width 1s ease;
-    width: 0%;
-  }
-  .progress-meta {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 8px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: var(--text-faint);
-  }
-  .hero-why {
-    max-width: 560px;
-    font-family: 'Inter', -apple-system, sans-serif;
-    font-size: 18px;
-    font-weight: 400;
-    color: var(--text-muted);
-    line-height: 1.7;
-    text-align: center;
-    margin: 12px 0 40px;
-    opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.1s;
-  }
-  .hero-why strong { color: var(--text); font-weight: 600; }
-  .hero-below-fold {
-    display: flex;
-    gap: 24px;
-    flex-wrap: wrap;
-    justify-content: center;
-    max-width: 640px;
-    margin: 0 0 48px;
-    opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.12s;
-  }
-  .stat-chip {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px 20px;
-    text-align: center;
-    min-width: 140px;
-  }
-  .stat-chip .chip-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: var(--text-faint);
-    display: block;
-    margin-bottom: 6px;
-  }
-  .stat-chip .chip-value { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
-  .chronicle-teaser {
-    max-width: 500px;
-    background: var(--accent-journal-bg);
-    border: 1px solid var(--c-amber-100);
-    border-radius: 8px;
-    padding: 16px 20px;
-    margin: 0 0 48px;
-    opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.15s;
-    text-decoration: none;
-    display: block;
-  }
-  .chronicle-teaser:hover { background: var(--c-amber-100); border-color: var(--c-amber-300); }
-  .chronicle-teaser .teaser-kicker {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--c-amber-500);
-    display: block;
-    margin-bottom: 6px;
-  }
-  .chronicle-teaser .teaser-title { font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.4; }
-  /* WR-16: Dual-path CTAs */
-  .hero-dual-cta {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1px;
-    background: var(--border);
-    border: 1px solid var(--border);
-    margin-top: var(--space-10);
-  }
-  .dual-cta {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    padding: var(--space-6) var(--space-5);
-    background: var(--surface);
-    text-decoration: none;
-    transition: background var(--dur-fast);
-  }
-  .dual-cta:hover { background: var(--surface-raised); }
-  .dual-cta--journey:hover .dual-cta__title { color: var(--c-amber-400); }
-  .dual-cta--platform:hover .dual-cta__title { color: var(--accent); }
-  .dual-cta__label {
-    font-family: var(--font-mono);
-    font-size: var(--text-2xs);
-    letter-spacing: var(--ls-tag);
-    text-transform: uppercase;
-    color: var(--text-faint);
-  }
-  .dual-cta--journey .dual-cta__label { color: var(--c-amber-500); }
-  .dual-cta--platform .dual-cta__label { color: var(--accent-dim); }
-  .dual-cta__title {
-    font-family: var(--font-display);
-    font-size: var(--text-h3);
-    color: var(--text);
-    letter-spacing: var(--ls-display);
-    line-height: 1.1;
-    transition: color var(--dur-fast);
-  }
-  .dual-cta__sub {
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    font-family: var(--font-mono);
-    line-height: var(--lh-body);
-  }
-  .dual-cta__arrow {
-    font-size: var(--text-sm);
-    color: var(--text-faint);
-    margin-top: var(--space-2);
-  }
-
-  .scroll-invite {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    color: var(--text-faint);
-    letter-spacing: 1px;
-    opacity: 0;
-    animation: fadeUp 0.6s ease forwards 0.18s;
-    cursor: pointer;
-    transition: color 0.2s;
-  }
-  .scroll-invite:hover { color: var(--text-muted); }
-  .skeleton {
-    background: linear-gradient(90deg, var(--surface) 0%, var(--surface-raised) 50%, var(--surface) 100%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-    border-radius: 4px;
-    display: inline-block;
-  }
-  @keyframes shimmer {
-    0%   { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-  }
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(16px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  /* GR-02: Share buttons */
-  .disc-share {
-    margin-top: var(--space-3);
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--border-subtle);
-  }
-  .disc-share-btn {
-    background: none;
-    border: none;
-    font-family: var(--font-mono);
-    font-size: var(--text-2xs);
-    letter-spacing: var(--ls-tag);
-    text-transform: uppercase;
-    color: var(--text-faint);
-    cursor: pointer;
-    padding: var(--space-1) 0;
-    transition: color var(--dur-fast);
-  }
-  .disc-share-btn:hover { color: var(--accent); }
-  </style>
-  <style>
-    /* Item 14: Feature card hover via CSS */
-    .feature-card { transition: background var(--dur-fast); }
-    .feature-card:hover { background: var(--surface-raised) !important; }
-    /* Item 18: Vital quads single column on mobile */
-    @media (max-width: 480px) {
-      #vital-quads { grid-template-columns: 1fr !important; }
+    @media (max-width: 768px) {
+      .h-data-spread {
+        grid-template-columns: 1fr;
+      }
+    }
+    @media (max-width: 600px) {
+      .h-obs-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -331,447 +378,102 @@
 
 <div id="amj-nav"></div>
 
+<h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">
+  Matthew — Quantified Self Health Experiment: 302 to 185 lbs with AI and 25 Data Sources
+</h1>
 
-
-
-
-
-
-<!-- Ticker (Decision 2) — DAY N always leads (2g), terminal aesthetic (2f) -->
-<div class="ticker" style="margin-top:0">
-  <div class="ticker__inner">
-    <span class="ticker__item">DAY 1 — APRIL 1, 2026. THE EXPERIMENT BEGINS.</span>
-    <span class="ticker__item">⬥</span>
-    <span class="ticker__item">WEIGHT <strong id="tk-weight">— LBS</strong></span>
-    <span class="ticker__item">⬥</span>
-    <span class="ticker__item" title="Heart Rate Variability — higher is better. Measures autonomic nervous system recovery.">HRV <strong id="tk-hrv">— MS</strong></span>
-    <span class="ticker__item">⬥</span>
-    <span class="ticker__item" title="Whoop Recovery Score — percentage of physiological readiness (0-100%).">RECOVERY <strong id="tk-recovery">—%</strong></span>
-    <span class="ticker__item">⬥</span>
-    <span class="ticker__item" title="Sleep duration and efficiency from last night.">SLEEP <strong id="tk-sleep">—</strong></span>
-    <span class="ticker__item">⬥</span>
-    <span class="ticker__item" title="Consecutive days completing all Tier 0 (non-negotiable) habits.">STREAK <strong id="tk-streak">T0: 0%</strong></span>
-    <span class="ticker__item">⬥</span>
-    <span class="ticker__item">JOURNEY <strong id="tk-journey">12.2% TO GOAL</strong></span>
-    <span class="ticker__item">⬥</span>
-    <span class="ticker__item"><a href="/chronicle/" id="tk-chronicle" style="color:var(--c-amber-400);text-decoration:none;">LATEST: WEEK 1 →</a></span>
-    <span class="ticker__item">⬥</span>
-    <span class="ticker__item">DAY 1 — APRIL 1, 2026. THE EXPERIMENT BEGINS.</span>
-    <span class="ticker__item">⬥</span>
-    <span class="ticker__item">WEIGHT <strong id="tk-weight-2">— LBS</strong></span>
-    <span class="ticker__item">⬥</span>
-    <span class="ticker__item" title="Heart Rate Variability — higher is better. Measures autonomic nervous system recovery.">HRV <strong id="tk-hrv-2">— MS</strong></span>
-    <span class="ticker__item">⬥</span>
-    <span class="ticker__item" title="Whoop Recovery Score — percentage of physiological readiness (0-100%).">RECOVERY <strong id="tk-recovery-2">—%</strong></span>
-    <span class="ticker__item">⬥</span>
-    <span class="ticker__item" title="Sleep duration and efficiency from last night.">SLEEP <strong id="tk-sleep-2">—</strong></span>
-    <span class="ticker__item">⬥</span>
-    <span class="ticker__item" title="Consecutive days completing all Tier 0 (non-negotiable) habits.">STREAK <strong id="tk-streak-2">T0: 0%</strong></span>
-    <span class="ticker__item">⬥</span>
-    <span class="ticker__item">JOURNEY <strong id="tk-journey-2">12.2% TO GOAL</strong></span>
-    <span class="ticker__item">⬥</span>
-    <span class="ticker__item"><a href="/chronicle/" id="tk-chronicle-2" style="color:var(--c-amber-400);text-decoration:none;">LATEST: WEEK 1 →</a></span>
-    <span class="ticker__item">⬥</span>
-  </div>
-</div>
-
-<!-- BS-02: Transformation Story Hero -->
-<section class="hero" id="experiment">
-
-  <h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">
-    Matthew — Quantified Self Health Experiment: 302 to 185 lbs with AI and 19 Data Sources — Launching April 1, 2026
-  </h1>
-
-  <p class="hero-label" style="margin-bottom:16px;">The Measured Life Experiment</p>
-
-  <!-- Central countdown / Day N -->
-  <div class="experiment-counter" style="margin-bottom:24px;opacity:0;animation:fadeUp 0.6s ease forwards 0.08s;"></div>
-
-  <!-- The honest tagline -->
-  <p style="
-    font-family:var(--font-display);
-    font-size:clamp(28px, 4vw, 44px);
-    color:var(--text);
-    letter-spacing:var(--ls-display);
-    line-height:1.15;
-    text-align:center;
-    max-width:600px;
-    margin:0 0 12px;
-    opacity:0;
-    animation:fadeUp 0.6s ease forwards 0.12s;
-  ">One person. Nineteen data sources. <span style="color:var(--accent)">Every week, publicly.</span></p>
-
-  <!-- Weight counter: 302 → current → 185 -->
-  <div class="weight-counter" style="margin-bottom:20px;">
-    <div class="weight-node start">
-      <span class="label">Started</span>
-      <span class="value" data-const="journey.start_weight">302</span>
-    </div>
-    <span class="weight-arrow">&rarr;</span>
-    <div class="weight-node current">
-      <span class="label">Today</span>
-      <span class="value" id="hero-weight">—</span>
-    </div>
-    <span class="weight-arrow">&rarr;</span>
-    <div class="weight-node goal">
-      <span class="label">Goal</span>
-      <span class="value" data-const="journey.goal_weight">185</span>
-    </div>
-  </div>
-
-  <!-- Progress bar -->
-  <div class="progress-bar-wrap">
-    <div class="progress-bar-track">
-      <div class="progress-bar-fill" id="hero-progress-fill"></div>
-    </div>
-    <div class="progress-meta">
-      <span id="hero-lost-lbs">14.3 lbs lost</span>
-      <span id="hero-progress-pct">12.2%</span>
-    </div>
-  </div>
-
-  <!-- The narrative — honest, raw -->
-  <p class="hero-why" id="hero-why" style="max-width:520px;">
-    We&rsquo;re drowning in advice. Apps telling us to meditate. Podcasts on what to eat. Reels on the perfect morning routine. Everyone has an opinion on how I should live &mdash; except me.
-    So I connected <span data-const="platform.data_sources" id="prose-data-sources-5">19</span> data sources to a custom AI &mdash; not just for weight or diet, but for my sleep, my habits, my mental state, my relationships, my happiness.
-    <strong>Every week, I publish what it finds. No filter.</strong>
-  </p>
-
-  <!-- HP-12: Elena Voss hero one-liner -->
-  <div id="elena-hero-line" style="
-    max-width:500px;
-    margin:0 0 var(--space-4);
-    padding:var(--space-3) var(--space-5);
-    border-left:2px solid var(--c-amber-300);
-    font-family:var(--font-serif);
-    font-size:var(--text-sm);
-    font-style:italic;
-    color:var(--text-muted);
-    line-height:1.6;
-    opacity:0;
-    display:none;
-  ">
-    <span id="elena-line-text"></span>
-    <span style="font-family:var(--font-mono);font-size:var(--text-2xs);font-style:normal;color:var(--c-amber-500);margin-left:var(--space-2);">— Elena Voss</span>
-  </div>
-
-  <!-- Prequel context banner (hidden after April 1) -->
-  <div id="prequel-banner" style="
-    max-width:520px;
-    margin:0 0 var(--space-6);
-    padding:var(--space-4) var(--space-5);
-    background:rgba(var(--amber-rgb), 0.04);
-    border:1px solid rgba(var(--amber-rgb), 0.12);
-    border-radius:6px;
-    text-align:center;
-    opacity:0;
-    animation:fadeUp 0.6s ease forwards 0.24s;
-  ">
-    <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--c-amber-500);margin-bottom:6px;">Prequel Phase &middot; Baseline Period</div>
-    <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.5;">
-      Everything before April 1 is the testing window &mdash; kicking the tires,
-      building the infrastructure, and being honest about what didn't work.
-      <a href="/chronicle/" style="color:var(--c-amber-400);text-decoration:none;font-weight:600;">Read the prequel chronicles &rarr;</a>
-    </div>
-  </div>
-
-  <!-- Stat chips moved to /live/ — hero stays clean -->
-
-  <!-- Heartbeat canvas removed from hero for clarity -->
-
-  <!-- Latest Chronicle headline -->
-  <a class="chronicle-teaser" href="/chronicle/" id="chronicle-teaser" style="display:none;">
-    <span class="teaser-kicker">Latest: The Measured Life</span>
-    <span class="teaser-title" id="chronicle-teaser-title"></span>
-  </a>
-
-  <!-- "Read the story" is now the primary CTA in the dual-path section below -->
-
-  <!-- HP-03: Hero subscribe input -->
-  <div class="hero-subscribe" style="max-width:500px;opacity:0;animation:fadeUp 0.6s ease forwards 0.29s;">
-    <div class="hero-subscribe-label">The Measured Life</div>
-    <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-2);max-width:400px;text-align:center;line-height:1.5;">A weekly email. Real data, real failures, no filter.</div>
-    <div class="subscribe-row">
-      <input type="email" id="hero-email" class="subscribe-input" placeholder="your@email.com" autocomplete="email">
-      <button id="hero-subscribe-btn" class="btn btn--cta" style="font-size:var(--text-xs);white-space:nowrap;padding:var(--space-3) var(--space-5);">Subscribe</button>
-    </div>
-    <div id="subscribe-msg" class="hero-subscribe-note"></div>
-    <a href="/chronicle/sample/" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--c-amber-400);text-decoration:none;letter-spacing:var(--ls-tag);margin-top:var(--space-2);display:inline-block;">See a sample issue →</a>
-    <div id="subscriber-proof" style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-tag);margin-top:var(--space-2);display:none;"></div>
-    <script>
-    // Item 16: subscriber count social proof
-    (function(){
-      fetch('/api/subscriber_count').then(function(r){return r.ok?r.json():null}).then(function(d){
-        if(d&&d.count>5){
-          var el=document.getElementById('subscriber-proof');
-          if(el){el.textContent='Join '+d.count+' others following along';el.style.display='block';}
-        }
-      }).catch(function(){});
-    })();
-    </script>
-  </div>
-
-  <!-- WR-16: Dual-path navigation CTAs -->
-  <div class="hero-dual-cta">
-    <a href="/story/" class="dual-cta dual-cta--journey">
-      <span class="dual-cta__label">Start here</span>
-      <span class="dual-cta__title">Read My Story</span>
-      <span class="dual-cta__sub"><span data-const="journey.start_weight">302</span> lbs. A relapse. A relaunch. Why I built this.</span>
-      <span class="dual-cta__arrow">&darr;</span>
-    </a>
-    <a href="/platform/" class="dual-cta dual-cta--platform">
-      <span class="dual-cta__label">The technical side</span>
-      <span class="dual-cta__title">See the Platform</span>
-      <span class="dual-cta__sub"><span id="hero-lambdas" data-const="platform.lambdas">50</span> Lambdas. <span id="hero-tools" data-const="platform.mcp_tools">95</span> AI tools. <span data-const="platform.monthly_cost">~$13</span>/month. Built by a non-engineer.</span>
-      <span class="dual-cta__arrow">&darr;</span>
-    </a>
-  </div>
-
-  <!-- Scroll invitation -->
-  <p class="scroll-invite" onclick="document.getElementById('about').scrollIntoView({behavior:'smooth'})">
-    See the actual numbers below &darr;
-  </p>
-
-</section>
-
-<script>
-// WR-43: Heartbeat animation — disabled (canvas removed for hero simplification)
-(function() {
-  const canvas = document.getElementById('heartbeat-canvas');
-  if (!canvas) return; // exits immediately — canvas removed
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-  const W = 460, H = 54;
-  canvas.width = W; canvas.height = H;
-  const BASELINE = H * 0.62;
-  const AMP = H * 0.42;
-  const SCROLL = 72; // px per second
-
-  let rhr = 52, recoveryPct = 75, hrv = 66;
-  let startTs = null;
-
-  // Simplified ECG shape: normalized y in [-0.3, 1.0] for beat phase t in [0,1]
-  function ecgY(t) {
-    if (t < 0.08)  return 0;
-    if (t < 0.17)  return Math.sin((t - 0.08) / 0.09 * Math.PI) * 0.1;   // P wave
-    if (t < 0.26)  return 0;
-    if (t < 0.30)  return -(t - 0.26) / 0.04 * 0.18;                      // Q dip
-    if (t < 0.335) return -0.18 + (t - 0.30) / 0.035 * 1.18;              // R spike up
-    if (t < 0.375) return 1.0 - (t - 0.335) / 0.04 * 1.25;               // S down
-    if (t < 0.42)  return -0.25 + (t - 0.375) / 0.045 * 0.25;            // back to 0
-    if (t < 0.52)  return 0;
-    if (t < 0.65)  return Math.sin((t - 0.52) / 0.13 * Math.PI) * 0.2;   // T wave
-    return 0;
-  }
-
-  function getColor() {
-    var s = getComputedStyle(document.documentElement);
-    var green = s.getPropertyValue('--c-green-status').trim() || '#3db88a';
-    var amber = s.getPropertyValue('--c-yellow-status').trim() || '#c8843a';
-    var red = s.getPropertyValue('--c-red-status').trim() || '#ff5252';
-    return recoveryPct >= 67 ? green : recoveryPct >= 34 ? amber : red;
-  }
-
-  function frame(ts) {
-    if (!startTs) startTs = ts;
-    const elapsed = (ts - startTs) / 1000;
-    const bp = 60 / rhr; // beat period in seconds
-    const c = getColor();
-
-    ctx.clearRect(0, 0, W, H);
-
-    // Subtle baseline
-    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, BASELINE); ctx.lineTo(W, BASELINE); ctx.stroke();
-
-    // Compute y for each x pixel using scrolling time offset
-    const pts = Array.from({length: W}, (_, x) => {
-      const xTime = elapsed - (W - 1 - x) / SCROLL;
-      const phase = ((xTime % bp) + bp) % bp / bp;
-      return BASELINE - ecgY(phase) * AMP;
-    });
-
-    // Fill under curve
-    ctx.beginPath();
-    ctx.moveTo(0, BASELINE);
-    pts.forEach((y, i) => ctx.lineTo(i, y));
-    ctx.lineTo(W - 1, BASELINE);
-    ctx.closePath();
-    ctx.fillStyle = c + '18';
-    ctx.fill();
-
-    // Stroke ECG line
-    ctx.beginPath();
-    pts.forEach((y, i) => { if (i === 0) ctx.moveTo(0, y); else ctx.lineTo(i, y); });
-    ctx.strokeStyle = c;
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = 'round';
-    ctx.stroke();
-
-    // Glowing dot at leading edge
-    const ey = pts[W - 1];
-    const grd = ctx.createRadialGradient(W - 1, ey, 0, W - 1, ey, 8);
-    grd.addColorStop(0, c + 'cc');
-    grd.addColorStop(1, 'transparent');
-    ctx.beginPath(); ctx.arc(W - 1, ey, 8, 0, Math.PI * 2);
-    ctx.fillStyle = grd; ctx.fill();
-    ctx.beginPath(); ctx.arc(W - 1, ey, 3, 0, Math.PI * 2);
-    ctx.fillStyle = c; ctx.fill();
-
-    requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-
-  // Called by the data loader once public_stats.json is loaded
-  window.updateHeartbeat = function(raw) {
-    const v = (raw || {}).vitals || {};
-    if (v.rhr_bpm)      rhr = v.rhr_bpm;
-    if (v.recovery_pct) recoveryPct = v.recovery_pct;
-    if (v.hrv_ms)       hrv = Math.round(v.hrv_ms);
-    const c = getColor();
-    const s = document.getElementById('hb-status');
-    if (s) s.style.color = c;
-    const l = document.getElementById('hb-label');
-    if (l) l.textContent = 'HRV ' + hrv + 'ms · RHR ' + Math.round(rhr) + 'bpm · RECOVERY ' + Math.round(recoveryPct) + '%';
-  };
-})();
-</script>
-
-
-
-
-<section class="about-section reveal" id="about">
-  <div class="about-left">
-    <div class="eyebrow" style="margin-bottom:var(--space-6)">The experiment</div>
-    <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-6)">Why I'm doing this in public</h2>
-    <p style="font-size:var(--text-lg);color:var(--text-muted);line-height:var(--lh-body);max-width:480px">
-      I want to experiment with what happens when AI reads the full picture of my life &mdash; not just calories and steps, but sleep, stress, habits, relationships, how I&rsquo;m actually feeling. I want to be more curious about myself, and more honest.
-      <br><br>
-      The public part is simpler: <span style="color:var(--text)">when things get hard, I go quiet.</span> Publishing everything means the people who care about me can see when it&rsquo;s happening &mdash; and so can I.
-      <br><br>
-      Maybe someday it helps someone else. For now, it keeps me honest.
+<!-- ═══════════════════════════════════════════════════════════
+     1. EDITORIAL HERO (2-column)
+     ═══════════════════════════════════════════════════════════ -->
+<section class="h-hero">
+  <div class="h-hero__left">
+    <div class="h-hero__eyebrow">The Measured Life</div>
+    <div class="h-hero__title">One person. Twenty-five data sources. <em>Total transparency.</em></div>
+    <p class="h-hero__subtitle">
+      An AI reads my sleep, habits, mood, and relationships &mdash; and publishes what it finds every week. No filter.
     </p>
-    <div style="margin-top:var(--space-8);display:flex;gap:var(--space-4)">
-      <a href="/story/" class="btn btn--ghost">Read my story</a>
-      <a href="/chronicle/" class="btn btn--ghost">The chronicle</a>
-      <a href="/platform/" class="btn btn--ghost">See the platform</a>
+    <div class="h-hero__stats" id="h-hero-stats">
+      Day &mdash; &middot; &mdash; lbs &middot; Level &mdash;
     </div>
   </div>
-  <div class="about-right">
-    <div class="eyebrow" style="margin-bottom:var(--space-6)"><span id="prose-data-sources-4">19</span> data sources</div>
-    <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-6)">The stack</h2>
-    <div class="sources-grid">
-      <div class="source-pill">Whoop</div>
-      <div class="source-pill">Eight Sleep</div>
-      <div class="source-pill">Withings</div>
-      <div class="source-pill">Garmin</div>
-      <div class="source-pill">Strava</div>
-      <div class="source-pill">Apple Health</div>
-      <div class="source-pill">MacroFactor</div>
-      <div class="source-pill">Habitify</div>
-      <div class="source-pill">Notion</div>
-      <div class="source-pill">Todoist</div>
-      <div class="source-pill">Dexcom Stelo</div>
-      <div class="source-pill">Genome</div>
-      <div class="source-pill">Labs</div>
-      <div class="source-pill">DEXA</div>
-      <div class="source-pill">Weather</div>
-      <div class="source-pill">Travel</div>
-      <div class="source-pill">Blood Pressure</div>
-      <div class="source-pill">Supplements</div>
-      <div class="source-pill">+ more</div>
+  <div class="h-hero__right">
+    <div class="h-gauge-grid">
+      <!-- Weight gauge -->
+      <div class="h-gauge" id="h-g-weight">
+        <div class="h-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="h-g-weight-arc" cx="44" cy="44" r="35" fill="none" stroke="var(--h-accent)" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.4s"/>
+          </svg>
+          <div class="h-gauge__center">
+            <div class="h-gauge__num" id="h-g-weight-num" style="color:var(--h-accent)">&mdash;</div>
+            <div class="h-gauge__unit">lbs</div>
+          </div>
+        </div>
+        <div class="h-gauge__label">Weight</div>
+      </div>
+      <!-- HRV gauge -->
+      <div class="h-gauge" id="h-g-hrv">
+        <div class="h-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="h-g-hrv-arc" cx="44" cy="44" r="35" fill="none" stroke="var(--h-blue)" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.5s"/>
+          </svg>
+          <div class="h-gauge__center">
+            <div class="h-gauge__num" id="h-g-hrv-num" style="color:var(--h-blue)">&mdash;</div>
+            <div class="h-gauge__unit">ms</div>
+          </div>
+        </div>
+        <div class="h-gauge__label">HRV</div>
+      </div>
+      <!-- Sleep gauge -->
+      <div class="h-gauge" id="h-g-sleep">
+        <div class="h-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="h-g-sleep-arc" cx="44" cy="44" r="35" fill="none" stroke="var(--h-violet)" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.6s"/>
+          </svg>
+          <div class="h-gauge__center">
+            <div class="h-gauge__num" id="h-g-sleep-num" style="color:var(--h-violet)">&mdash;</div>
+            <div class="h-gauge__unit">hrs</div>
+          </div>
+        </div>
+        <div class="h-gauge__label">Sleep</div>
+      </div>
+      <!-- Character gauge -->
+      <div class="h-gauge" id="h-g-char">
+        <div class="h-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="h-g-char-arc" cx="44" cy="44" r="35" fill="none" stroke="var(--h-amber)" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.7s"/>
+          </svg>
+          <div class="h-gauge__center">
+            <div class="h-gauge__num" id="h-g-char-num" style="color:var(--h-amber)">&mdash;</div>
+            <div class="h-gauge__unit">level</div>
+          </div>
+        </div>
+        <div class="h-gauge__label">Character</div>
+      </div>
     </div>
-  </div>
-
-  <!-- HP-09: Quote embedded from standalone section -->
-  <div style="padding:var(--space-8) var(--page-padding);border-top:1px solid var(--border);">
-    <blockquote style="max-width:640px;margin:0;font-family:var(--font-serif);font-size:var(--text-base);font-style:italic;color:var(--text-muted);line-height:1.7;border-left:2px solid var(--accent-dim);padding-left:var(--space-4);">
-      &ldquo;I used to be the protagonist of my own life. Somewhere along the way, I became a spectator.&rdquo;
-      <footer style="margin-top:var(--space-2);font-family:var(--font-mono);font-size:var(--text-xs);font-style:normal;color:var(--accent-dim);letter-spacing:var(--ls-tag);">
-        &mdash; <a href="/story/" style="color:var(--accent-dim);text-decoration:none;">Matthew</a>
-      </footer>
-    </blockquote>
   </div>
 </section>
 
-<!-- Phase 1: Since Your Last Visit (populated by engagement.js) -->
+<!-- ═══════════════════════════════════════════════════════════
+     2. "Since Your Last Visit" placeholder
+     ═══════════════════════════════════════════════════════════ -->
 <div id="amj-since-last-visit"></div>
 
-<!-- WR-33: Day 1 vs. Today — 4-dimension comparison (HOME-3) -->
-<section class="reveal" style="border-bottom:1px solid var(--border);padding:var(--space-12) var(--page-padding);text-align:center;">
-  <div class="eyebrow" style="margin-bottom:var(--space-6)">Progress</div>
-  <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-8)">Day 1 vs. <span style="color:var(--accent)">Today</span></h2>
-  <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:1px;background:var(--border);border:1px solid var(--border);max-width:700px;margin:0 auto;text-align:left;">
-    <!-- Day 1 column -->
-    <div style="background:var(--surface);padding:var(--space-6);">
-      <div id="d1-date" style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);margin-bottom:var(--space-6)">Jan 1, 2026</div>
-      <!-- Weight -->
-      <div style="margin-bottom:var(--space-5);">
-        <div style="font-size:var(--text-2xs);color:var(--text-muted);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:2px">Weight</div>
-        <div id="d1-weight" style="font-family:var(--font-display);font-size:32px;color:var(--text-muted)">302.0</div>
-        <div style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono)">lbs · Day 1</div>
-      </div>
-      <!-- Habits -->
-      <div style="margin-bottom:var(--space-5);">
-        <div style="font-size:var(--text-2xs);color:var(--text-muted);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:2px">Habits</div>
-        <div id="d1-habits" style="font-family:var(--font-display);font-size:32px;color:var(--text-muted)">0</div>
-        <div style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono)">day streak</div>
-      </div>
-      <!-- Sleep -->
-      <div style="margin-bottom:var(--space-5);">
-        <div style="font-size:var(--text-2xs);color:var(--text-muted);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:2px">Sleep</div>
-        <div id="d1-sleep" style="font-family:var(--font-display);font-size:32px;color:var(--text-muted)">7.0</div>
-        <div style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono)">hrs avg</div>
-      </div>
-      <!-- Level -->
-      <div>
-        <div style="font-size:var(--text-2xs);color:var(--text-muted);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:2px">Level</div>
-        <div id="d1-level" style="font-family:var(--font-display);font-size:32px;color:var(--text-muted)">1</div>
-        <div style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono)">Foundation</div>
-      </div>
-    </div>
-    <!-- Arrow column -->
-    <div style="background:var(--bg);display:flex;align-items:center;justify-content:center;padding:0 var(--space-4);">
-      <div style="font-family:var(--font-display);font-size:28px;color:var(--accent);">&rarr;</div>
-    </div>
-    <!-- Today column -->
-    <div style="background:var(--surface);padding:var(--space-6);">
-      <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-6)" id="compare-date">Today</div>
-      <!-- Weight -->
-      <div style="margin-bottom:var(--space-5);">
-        <div style="font-size:var(--text-2xs);color:var(--text-muted);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:2px">Weight</div>
-        <div style="font-family:var(--font-display);font-size:32px;color:var(--accent)" id="compare-weight">Apr 1</div>
-        <div style="font-size:var(--text-2xs);color:var(--accent-dim);font-family:var(--font-mono)" id="compare-weight-journey">data starts Day 1</div>
-        <div style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono)" id="compare-weight-30d"></div>
-      </div>
-      <!-- Habits -->
-      <div style="margin-bottom:var(--space-5);">
-        <div style="font-size:var(--text-2xs);color:var(--text-muted);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:2px">Habits</div>
-        <div style="font-family:var(--font-display);font-size:32px;color:var(--accent)" id="compare-habits">0</div>
-        <div style="font-size:var(--text-2xs);color:var(--accent-dim);font-family:var(--font-mono)" id="compare-habits-label">day streak</div>
-      </div>
-      <!-- Sleep -->
-      <div style="margin-bottom:var(--space-5);">
-        <div style="font-size:var(--text-2xs);color:var(--text-muted);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:2px">Sleep</div>
-        <div style="font-family:var(--font-display);font-size:32px;color:var(--accent)" id="compare-sleep">—</div>
-        <div style="font-size:var(--text-2xs);color:var(--accent-dim);font-family:var(--font-mono)" id="compare-sleep-label">hrs avg (30d)</div>
-      </div>
-      <!-- Level -->
-      <div>
-        <div style="font-size:var(--text-2xs);color:var(--text-muted);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:2px">Level</div>
-        <div style="font-family:var(--font-display);font-size:32px;color:var(--accent)" id="compare-level">—</div>
-        <div style="font-size:var(--text-2xs);color:var(--accent-dim);font-family:var(--font-mono)" id="compare-level-label">tracking from Day 1</div>
-      </div>
-    </div>
-  </div>
-  <div style="margin-top:var(--space-4);display:flex;gap:var(--space-4);align-items:center;justify-content:center;">
-    <a href="/live/" class="btn btn--ghost" style="font-size:var(--text-xs);">Full timeline →</a>
-    <span style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono)">Updated daily from live data</span>
-  </div>
-</section>
-
-<!-- Phase 4: The Pulse — living activity feed -->
+<!-- ═══════════════════════════════════════════════════════════
+     3. Pulse Feed placeholder
+     ═══════════════════════════════════════════════════════════ -->
 <section id="amj-pulse-section" style="display:none">
   <div class="pulse-feed">
     <div class="pulse-feed__header">The Pulse</div>
@@ -783,556 +485,132 @@
   </div>
 </section>
 
-<!-- ── Trend Sparklines + AI Brief ────────────────────────── -->
-<section class="reveal" style="
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  border-bottom: 1px solid var(--border);
-" id="signals">
-  <!-- Left: 4-quadrant vital signs -->
-  <div style="padding: var(--space-12) var(--page-padding); border-right: 1px solid var(--border);">
-    <div class="eyebrow" style="margin-bottom: var(--space-6)">Live signals</div>
-    <h2 class="text-h2" style="color: var(--text); margin-bottom: var(--space-8)">The numbers <span style="color:var(--accent)">this month</span></h2>
+<!-- ═══════════════════════════════════════════════════════════
+     4. SECTION HEADER: The experiment
+     ═══════════════════════════════════════════════════════════ -->
+<div class="h-section-header reveal">
+  <div class="h-section-header__text">The experiment</div>
+</div>
 
-    <div id="vital-quads" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border);">
-      <!-- Body -->
-      <div id="q-body" style="background: var(--surface); padding: var(--space-5); border-left: 3px solid var(--border-subtle);">
-        <div style="font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-2);">Body</div>
-        <div id="q-body-val" style="font-family: var(--font-display); font-size: 28px; color: var(--accent); letter-spacing: var(--ls-display); line-height: 1.1;">—</div>
-        <div id="q-body-dir" style="font-size: var(--text-xs); color: var(--accent-dim); font-family: var(--font-mono); margin-top: var(--space-1);">weight</div>
-        <div id="q-body-sub" style="font-size: var(--text-2xs); color: var(--text-faint); margin-top: var(--space-2);">lbs</div>
-        <div class="home-sparkline" id="spark-body" style="height:24px;margin-top:var(--space-2);"></div>
-      </div>
-      <!-- Recovery -->
-      <div id="q-rec" style="background: var(--surface); padding: var(--space-5); border-left: 3px solid var(--border-subtle);">
-        <div style="font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-2);">Recovery</div>
-        <div id="q-rec-val" style="font-family: var(--font-display); font-size: 28px; color: var(--accent); letter-spacing: var(--ls-display); line-height: 1.1;">—</div>
-        <div id="q-rec-dir" style="font-size: var(--text-xs); color: var(--accent-dim); font-family: var(--font-mono); margin-top: var(--space-1);">HRV ms</div>
-        <div id="q-rec-sub" style="font-size: var(--text-2xs); color: var(--text-faint); margin-top: var(--space-2);">recovery %</div>
-        <div class="home-sparkline" id="spark-rec" style="height:24px;margin-top:var(--space-2);"></div>
-      </div>
-      <!-- Behavior -->
-      <div id="q-beh" style="background: var(--surface); padding: var(--space-5); border-left: 3px solid var(--border-subtle);">
-        <div style="font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-2);">Behavior</div>
-        <div id="q-beh-val" style="font-family: var(--font-display); font-size: 28px; color: var(--accent); letter-spacing: var(--ls-display); line-height: 1.1;">—</div>
-        <div id="q-beh-dir" style="font-size: var(--text-xs); color: var(--accent-dim); font-family: var(--font-mono); margin-top: var(--space-1);">day streak</div>
-        <div id="q-beh-sub" style="font-size: var(--text-2xs); color: var(--text-faint); margin-top: var(--space-2);">T0 completion</div>
-        <div class="home-sparkline" id="spark-beh" style="height:24px;margin-top:var(--space-2);"></div>
-      </div>
-      <!-- Mind -->
-      <div id="q-mind" style="background: var(--surface); padding: var(--space-5); border-left: 3px solid var(--border-subtle);">
-        <div style="font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-2);">Mind</div>
-        <div id="q-mind-val" style="font-family: var(--font-display); font-size: 28px; color: var(--accent); letter-spacing: var(--ls-display); line-height: 1.1;">—</div>
-        <div id="q-mind-dir" style="font-size: var(--text-xs); color: var(--accent-dim); font-family: var(--font-mono); margin-top: var(--space-1);">char score / 100</div>
-        <div id="q-mind-sub" style="font-size: var(--text-2xs); color: var(--text-faint); margin-top: var(--space-2);">level · tier</div>
-        <div class="home-sparkline" id="spark-mind" style="height:24px;margin-top:var(--space-2);"></div>
-      </div>
-    </div>
+<!-- ═══════════════════════════════════════════════════════════
+     5. 3-COLUMN DATA SPREAD
+     ═══════════════════════════════════════════════════════════ -->
+<div class="h-data-spread reveal">
+  <!-- Weight -->
+  <div class="h-data-col">
+    <div class="h-data-col__eyebrow">Weight</div>
+    <div class="h-data-col__value" id="h-spread-weight">&mdash;</div>
+    <div class="h-data-col__sub" id="h-spread-weight-sub">lbs &middot; current</div>
+    <div class="h-data-col__sub" id="h-spread-weight-delta" style="color:var(--h-accent)"></div>
+    <div class="h-data-col__spark" id="h-spark-weight"></div>
   </div>
-
-  <!-- Right: AI Brief excerpt -->
-  <div style="padding: var(--space-12) var(--page-padding); display: flex; flex-direction: column;">
-    <div class="eyebrow" style="margin-bottom: var(--space-6)">Today's AI brief</div>
-    <h2 class="text-h2" style="color: var(--text); margin-bottom: var(--space-8)">What <span style="color:var(--accent)">Claude</span> sees</h2>
-
-    <div id="ai-brief" style="
-      flex: 1;
-      border: 1px solid var(--border);
-      background: var(--surface);
-      padding: var(--space-8);
-      display: flex;
-      flex-direction: column;
-    ">
-      <div style="font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--accent-dim); margin-bottom: var(--space-4);">
-        // Daily Intelligence Brief
-      </div>
-      <div id="brief-content" style="
-        font-family: var(--font-serif);
-        font-size: 16px;
-        color: var(--text-muted);
-        line-height: 1.8;
-        flex: 1;
-      ">
-        <p style="margin-bottom: var(--space-4);" id="brief-static-1">Every morning at 6 AM, Claude reads <span data-const="platform.data_sources">19</span> live data sources and writes a coaching brief. Recovery trends, habit adherence, sleep patterns, nutrition gaps — all synthesized into actionable guidance.</p>
-        <p style="margin-bottom: var(--space-4); color: var(--text-faint); font-style: italic;" id="brief-static-2">The daily brief updates every morning. <a href="/chronicle/sample/" style="color:var(--c-amber-400);text-decoration:none;">See a sample →</a></p>
-        <p style="color: var(--text-faint); font-size: var(--text-xs); font-family: var(--font-mono);">Generated from live data by Claude. <a href="/subscribe/" style="color:var(--c-amber-500);text-decoration:none;">Subscribe to The Measured Life</a> for the full version every Wednesday.</p>
-      </div>
-      <div style="border-top: 1px solid var(--border-subtle); padding-top: var(--space-4); margin-top: var(--space-6); display: flex; gap: var(--space-4);">
-        <a href="/platform/" class="btn btn--ghost" style="font-size: var(--text-xs);">How it works →</a>
-        <a href="/ask/" class="btn btn--ghost" style="font-size: var(--text-xs); border-color: var(--accent-dim); color: var(--accent);">Ask the data →</a>
-      </div>
-    </div>
+  <!-- Sleep -->
+  <div class="h-data-col">
+    <div class="h-data-col__eyebrow">Sleep</div>
+    <div class="h-data-col__value" id="h-spread-sleep">&mdash;</div>
+    <div class="h-data-col__sub" id="h-spread-sleep-sub">hrs &middot; 30d avg</div>
+    <div class="h-data-col__sub" id="h-spread-sleep-eff" style="color:var(--h-violet)"></div>
+    <div class="h-data-col__spark" id="h-spark-sleep"></div>
   </div>
-</section>
-
-<style>
-  @media (max-width: 900px) {
-    #signals { grid-template-columns: 1fr !important; }
-    #signals > div:first-child { border-right: none !important; border-bottom: 1px solid var(--border); }
-  }
-</style>
-
-<script>
-// ── 4-Quadrant vital signs loader ───────────────────────────
-(async function() {
-  const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  const setBorder = (id, color) => { const el = document.getElementById(id); if (el) el.style.borderLeftColor = color; };
-  const C = { green: '#1D9E75', amber: '#BA7517', red: '#E24B4A', gray: '#4a6050' };
-
-  // ── Phase 1: static JSON (zero Lambda cost) ──
-  let vitals = null, trends = null;
-  try {
-    const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
-    if (r.ok) {
-      const d = await r.json();
-      vitals = d.vitals || {};
-      trends = d.trends || {};
-
-      // Body: weight
-      const wLbs = vitals.weight_lbs;
-      if (wLbs) {
-        setText('q-body-val', wLbs.toFixed(1));
-        const wAsOf = vitals.weight_as_of;
-        const dAgo = wAsOf ? Math.floor((Date.now() - new Date(wAsOf)) / 86400000) : 0;
-        setText('q-body-sub', dAgo > 3
-          ? 'as of ' + new Date(wAsOf).toLocaleDateString('en-US',{month:'short',day:'numeric'})
-          : 'lbs · updated today');
-      }
-      const wt = trends.weight_daily || [];
-      if (wt.length > 2) {
-        const wv = wt.map(r => r.lbs);
-        const delta = wv[wv.length-1] - wv[0];
-        setText('q-body-dir', (delta < 0 ? '↘ ' : delta > 0.5 ? '↗ +' : '→ ') + (delta <= 0 ? '' : '') + delta.toFixed(1) + ' lbs (30d)');
-        setBorder('q-body', delta < -0.5 ? C.green : delta > 1 ? C.red : C.amber);
-      }
-
-      // Recovery: HRV + recovery %
-      const hrv = vitals.hrv_ms;
-      if (hrv) {
-        setText('q-rec-val', Math.round(hrv));
-        const hd = trends.hrv_daily || [];
-        if (hd.length > 6) {
-          const hv = hd.map(r => r.ms);
-          const f7 = hv.slice(0,7).reduce((a,b)=>a+b,0)/7;
-          const l7 = hv.slice(-7).reduce((a,b)=>a+b,0)/7;
-          const t = l7 > f7*1.03 ? '↗ improving' : l7 < f7*0.97 ? '↘ declining' : '→ stable';
-          setText('q-rec-dir', 'HRV ms · ' + t);
-          setBorder('q-rec', l7 > f7*1.03 ? C.green : l7 < f7*0.97 ? C.amber : C.gray);
-        }
-      }
-      const rec = vitals.recovery_pct;
-      if (rec) {
-        const lbl = rec >= 67 ? 'green' : rec >= 34 ? 'yellow' : 'red';
-        setText('q-rec-sub', Math.round(rec) + '% recovery · ' + lbl);
-      }
-
-      // AI brief excerpt
-      const briefExcerpt = d.brief_excerpt;
-      if (briefExcerpt) {
-        const el = document.getElementById('brief-content');
-        if (el) el.innerHTML = `<p style="margin-bottom:var(--space-4);color:var(--text);">${briefExcerpt}</p><p style="color:var(--text-faint);font-size:var(--text-xs);font-family:var(--font-mono);">Generated this morning from 25 live data sources by Claude.</p>`;
-      }
-
-      // HOME-5: What's new pulse
-      const meta = d._meta || {};
-      if (meta.generated_at) {
-        const genDate = new Date(meta.generated_at);
-        const now = new Date();
-        const hoursAgo = Math.round((now - genDate) / 36e5);
-        const updEl = document.getElementById('pulse-updated');
-        if (updEl) updEl.textContent = hoursAgo < 24 ? `Updated ${hoursAgo}h ago` : `Updated ${Math.round(hoursAgo/24)}d ago`;
-      }
-      const chron = d.chronicle_latest;
-      if (chron && chron.title) {
-        const wk = chron.week_num || 0;
-        const linkEl = document.getElementById('pulse-chronicle-link');
-        if (linkEl) {
-          linkEl.textContent = `Week ${wk}: ${chron.title}`;
-          linkEl.href = `/journal/posts/week-${String(wk).padStart(2,'0')}/`;
-        }
-      }
-    }
-  } catch(e) {}
-
-  // ── Phase 2: behavior from /api/habit_streaks ──
-  // (fallback: already populated if public_stats has platform.tier0_streak)
-  if (vitals === null || !document.getElementById('q-beh-val').textContent || document.getElementById('q-beh-val').textContent === '—') {
-    try {
-      const hr = await fetch('/api/habit_streaks');
-      if (hr.ok) {
-        const hd = await hr.json();
-        const hs = hd.habit_streaks || {};
-        const streak = hs.aggregate_streak != null ? hs.aggregate_streak : 0;
-        const pct = hs.tier0_pct || 0;
-        setText('q-beh-val', streak);
-        setText('q-beh-dir', 'day T0 streak');
-        setText('q-beh-sub', pct + '% T0 completion today');
-        setBorder('q-beh', streak >= 7 ? C.green : streak >= 3 ? C.amber : C.gray);
-        // HOME-3: populate compare-habits
-        const chEl = document.getElementById('compare-habits');
-        if (chEl && chEl.textContent === '—') chEl.textContent = streak;
-        const chLbl = document.getElementById('compare-habits-label');
-        if (chLbl && streak !== null) chLbl.textContent = streak + ' day streak · ' + pct + '% T0';
-      }
-    } catch(e) {}
-  }
-
-  // Populate behavior from public_stats platform if already loaded
-  const ps = window.__amjStats;
-  if (ps && ps.platform && document.getElementById('q-beh-val').textContent === '—') {
-    const streak = ps.platform.tier0_streak || 0;
-    setText('q-beh-val', streak);
-    setBorder('q-beh', streak >= 7 ? C.green : streak >= 3 ? C.amber : C.gray);
-  }
-
-  // ── Phase 3: mind from /api/character_stats ──
-  try {
-    const cr = await fetch('/api/character_stats');
-    if (cr.ok) {
-      const cd = await cr.json();
-      const cs = cd.character_stats || {};
-      const level = Math.round(cs.level || 1);
-      const tier = cs.tier || 'Foundation';
-      // Composite score = average of pillar raw_scores
-      let score = 0;
-      if (cd.pillars) {
-        const vals = Object.values(cd.pillars).map(p => p.raw_score || 0);
-        score = Math.round(vals.reduce((a,b)=>a+b,0) / vals.length);
-      }
-      setText('q-mind-val', score || '—');
-      setText('q-mind-dir', 'char score / 100');
-      setText('q-mind-sub', 'Level ' + level + ' · ' + tier);
-      setBorder('q-mind', score >= 60 ? C.green : score >= 35 ? C.amber : C.gray);
-      // Also update feat-char-score if not yet populated
-      const fcs = document.getElementById('feat-char-score');
-      if (fcs && fcs.textContent === '—') fcs.textContent = score;
-      // HOME-3: populate compare-level
-      const clEl = document.getElementById('compare-level');
-      if (clEl) clEl.textContent = level;
-      const clLbl = document.getElementById('compare-level-label');
-      if (clLbl) clLbl.textContent = (cs.tier_emoji || '') + ' ' + tier;
-    }
-  } catch(e) {}
-
-  // ── Behavior fallback: populate from public_stats once loaded ──
-  // Re-check after async requests complete
-  if (document.getElementById('q-beh-val').textContent === '—' && window.__amjStats) {
-    const streak = (window.__amjStats.platform || {}).tier0_streak || 0;
-    setText('q-beh-val', streak);
-    setBorder('q-beh', streak >= 7 ? C.green : streak >= 3 ? C.amber : C.gray);
-  }
-})();
-
-// ── Legacy weight API fallback (kept for compare-weight-30d) ──
-(async function() {
-  // Only fetch /api/weight_progress if public_stats weight is missing
-  if (document.getElementById('q-body-val').textContent !== '—') return;
-  try {
-    const wpRes = await fetch('/api/weight_progress');
-    if (wpRes.ok) {
-      const wpData = await wpRes.json();
-      const readings = (wpData.weight_progress || []).slice(-30);
-      if (readings.length > 2) {
-        const vals = readings.map(r => r.weight_lbs);
-        const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-        setText('q-body-val', vals[vals.length - 1].toFixed(1));
-        const delta = vals[vals.length - 1] - vals[0];
-        setText('q-body-dir', (delta > 0 ? '+' : '') + delta.toFixed(1) + ' lbs (30d)');
-      }
-    }
-  } catch(e) {}
-
-  // HRV fallback if API vitals available
-  if (document.getElementById('q-rec-val').textContent === '—') {
-    try {
-      const vr = await fetch('/api/vitals');
-      if (vr.ok) {
-        const vd = await vr.json();
-        const vv = vd.vitals || {};
-        const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-        if (vv.hrv_ms) setText('q-rec-val', Math.round(vv.hrv_ms));
-        if (vv.recovery_pct) setText('q-rec-sub', Math.round(vv.recovery_pct) + '% recovery');
-      }
-    } catch(e) {}
-  }
-})();
-
-</script>
-
-<!-- HOME-5: What's new pulse -->
-
-<!-- HP-09: Merged What's New + Discoveries → "What the Data Found" -->
-<section class="reveal" style="border-bottom:1px solid var(--border);padding:var(--space-12) var(--page-padding);" id="discoveries">
-  <div class="eyebrow" style="margin-bottom:var(--space-6)">What the data says</div>
-  <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-3)">What the Data <span style="color:var(--accent)">Found</span></h2>
-  <div style="display:flex;align-items:center;gap:var(--space-4);flex-wrap:wrap;margin-bottom:var(--space-6);padding:var(--space-3) 0;border-bottom:1px solid var(--border);">
-    <span style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent);white-space:nowrap">Live</span>
-    <div style="display:flex;gap:var(--space-6);flex-wrap:wrap;align-items:center;">
-      <div id="pulse-updated" style="font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono)">Loading...</div>
-      <span style="color:var(--border);font-size:var(--text-xs)">·</span>
-      <div id="pulse-chronicle" style="font-size:var(--text-xs);color:var(--text-muted)">
-        Latest chronicle: <a id="pulse-chronicle-link" href="/chronicle/" style="color:var(--accent);text-decoration:none">—</a>
-      </div>
-    </div>
+  <!-- Habits -->
+  <div class="h-data-col">
+    <div class="h-data-col__eyebrow">Habits</div>
+    <div class="h-data-col__value" id="h-spread-streak">&mdash;</div>
+    <div class="h-data-col__sub" id="h-spread-streak-sub">day T0 streak</div>
+    <div class="h-data-col__sub" id="h-spread-days-in" style="color:var(--h-accent)"></div>
+    <div class="h-data-col__spark" id="h-spark-habits"></div>
   </div>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);margin-bottom:var(--space-8)">The platform runs weekly Pearson correlation analysis across 23 metric pairs with Benjamini-Hochberg FDR correction. These are real patterns from my data — not universal truths.</p>
-  <div id="discoveries-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
-    <!-- Narrative insight cards (real observations from interview, not fabricated stats) -->
-    <!-- Dynamic loader below will replace these with real FDR-significant correlations when available -->
-    <div class="disc-fallback" style="background:var(--surface);padding:var(--space-6);">
-      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">Supplements → Sleep architecture</div>
-      <p style="font-size:var(--text-sm);color:var(--text);line-height:var(--lh-body);margin-bottom:var(--space-3)">Measurable shifts in deep sleep duration tracked to specific changes in my evening supplement stack. Before the platform, I was taking them on faith.</p>
-      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">Personal observation · Platform-surfaced</div>
-    </div>
-    <div class="disc-fallback" style="background:var(--surface);padding:var(--space-6);">
-      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">CGM → Anxiety relief</div>
-      <p style="font-size:var(--text-sm);color:var(--text);line-height:var(--lh-body);margin-bottom:var(--space-3)">The continuous glucose monitor didn't reveal a dietary crisis. It showed me <strong style="color:var(--accent)">I'm not in the danger zone I'd feared.</strong> The data changed my relationship with the anxiety.</p>
-      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">Personal observation · CGM data</div>
-    </div>
-    <div class="disc-fallback" style="background:var(--surface);padding:var(--space-6);">
-      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">Platform → Didn't prevent relapse</div>
-      <p style="font-size:var(--text-sm);color:var(--text);line-height:var(--lh-body);margin-bottom:var(--space-3)"><span data-const="platform.data_sources">19</span> data sources. Daily AI briefs. Habit tracking. <strong style="color:var(--c-red-status)">The system watched the spiral happen</strong> without intervening. That gap is what Day 1 is designed to fix.</p>
-      <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">Honest assessment · <a href="/story/" style="color:var(--accent-dim);text-decoration:none">Read the full story</a></div>
-    </div>
-  </div>
-  <script>
-  // HP-06: Dynamic discoveries loader
-  (async function(){
-    try {
-      var r = await fetch('/api/correlations?featured=true&limit=3');
-      if (!r.ok) return; // keep fallback
-      var d = await r.json();
-      var corrs = d.correlations || d.featured || [];
-      if (!corrs.length) return; // keep fallback
-      var grid = document.getElementById('discoveries-grid');
-      if (!grid) return;
-      // Remove fallback cards
-      grid.querySelectorAll('.disc-fallback').forEach(function(el){ el.remove(); });
-      corrs.forEach(function(c){
-        var sigLabel = c.p > 0.05 ? ' (trending, not significant)' : '';
-        var strongColor = c.r < 0 ? 'var(--c-red-status)' : 'var(--accent)';
-        var card = document.createElement('div');
-        card.style.cssText = 'background:var(--surface);padding:var(--space-6);';
-        var shareText = (c.description || c.summary || '');
-        card.innerHTML =
-          '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">' + (c.metric_a || c.label || '') + ' → ' + (c.metric_b || '') + '</div>' +
-          '<p style="font-size:var(--text-sm);color:var(--text);line-height:var(--lh-body);margin-bottom:var(--space-3)">' + (c.description || c.summary || '') + '</p>' +
-          '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">r = ' + (c.r ? c.r.toFixed(2) : '?') + ' · p = ' + (c.p ? c.p.toFixed(2) : '?') + sigLabel + (c.n ? ' · n = ' + c.n : '') + '</div>' +
-          '<div class="disc-share"><button class="disc-share-btn" onclick="shareDiscovery(\'' + ((c.metric_a||'') + ' → ' + (c.metric_b||'')).replace(/'/g,'') + '\',\'' + shareText.replace(/'/g,'') + '\')">Share ↗</button></div>';
-        grid.appendChild(card);
-      });
-    } catch(e) { /* keep fallback cards */ }
-  })();
-  </script>
+</div>
 
-  <script>
-  // GR-02: Share utility
-  window.shareDiscovery = function(title, text) {
-    var fullText = text + ' From @averagejoematt\'s N=1 experiment: https://averagejoematt.com/explorer/';
-    if (navigator.share) {
-      navigator.share({title: title, text: fullText, url: 'https://averagejoematt.com/explorer/'}).catch(function(){});
-    } else if (navigator.clipboard) {
-      navigator.clipboard.writeText(fullText).then(function(){
-        var btn = event.target;
-        var orig = btn.textContent;
-        btn.textContent = '✓ Copied';
-        setTimeout(function(){ btn.textContent = orig; }, 2000);
-      });
-    }
-  };
-  </script>
-  <div style="margin-top:var(--space-4);display:flex;gap:var(--space-4);">
-    <a href="/explorer/" class="btn btn--ghost" style="font-size:var(--text-xs);">All correlations →</a>
-    <a href="/experiments/" class="btn btn--ghost" style="font-size:var(--text-xs);">N=1 experiments →</a>
-  </div>
-  <p style="font-size:var(--text-2xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-label);margin-top:var(--space-4)">// N=1 data. Correlations are not causation. BH FDR-corrected. See methodology on the <a href="/explorer/" style="color:var(--accent-dim);text-decoration:none">explorer page</a>.</p>
-</section>
+<!-- ═══════════════════════════════════════════════════════════
+     6. PULL-QUOTE #1 (left-offset)
+     ═══════════════════════════════════════════════════════════ -->
+<div class="h-pullquote h-pullquote--left reveal">
+  <blockquote class="h-pullquote__text">
+    &ldquo;I didn&rsquo;t start this to prove anything. I started it because I was 302 pounds and running out of excuses.&rdquo;
+  </blockquote>
+  <div class="h-pullquote__badge">Day 1 &middot; April 2026</div>
+</div>
 
-<!-- HP-14: Recent Chronicle entries -->
-<section class="reveal" style="border-bottom:1px solid var(--border);padding:var(--space-12) var(--page-padding);" id="chronicle-cards">
-  <div class="eyebrow" style="margin-bottom:var(--space-6)">The Measured Life</div>
-  <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-3)">Recent Chronicles</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:560px;line-height:var(--lh-body);margin-bottom:var(--space-8)">Every Wednesday, Elena Voss writes the week. Raw numbers, honest narrative, no filter.</p>
-  <div id="chronicle-cards-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
-    <!-- Populated by JS from public_stats.json chronicle_recent array -->
-    <!-- Fallback: hidden by default, shown only if JS fails or no data -->
-    <div class="chron-fallback" style="display:none;background:var(--surface);padding:var(--space-6);text-align:center;grid-column:1/-1;">
-      <p style="font-size:var(--text-sm);color:var(--text-muted);">Chronicles publish every Wednesday. <a href="/chronicle/" style="color:var(--accent);text-decoration:none;">Read the archive →</a></p>
-    </div>
-  </div>
-  <script>
-  // HP-14: Chronicle cards loader
-  (function(){
-    function renderChronicleCards(entries) {
-      var grid = document.getElementById('chronicle-cards-grid');
-      if (!grid || !entries || !entries.length) {
-        // Show fallback
-        var fb = grid && grid.querySelector('.chron-fallback');
-        if (fb) fb.style.display = 'block';
-        return;
-      }
-      // Clear fallback
-      grid.querySelectorAll('.chron-fallback').forEach(function(el){ el.remove(); });
-      entries.forEach(function(c){
-        var card = document.createElement('a');
-        card.href = c.url || '/chronicle/';
-        card.style.cssText = 'display:block;background:var(--surface);padding:var(--space-6);text-decoration:none;transition:background var(--dur-fast);';
-        card.onmouseover = function(){ this.style.background='var(--surface-raised)'; };
-        card.onmouseout = function(){ this.style.background='var(--surface)'; };
-        var weekLabel = c.week_num ? 'Week ' + c.week_num : '';
-        var dateLabel = c.date ? new Date(c.date + 'T12:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric'}) : '';
-        card.innerHTML =
-          '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-2)">' + weekLabel + (weekLabel && dateLabel ? ' · ' : '') + dateLabel + '</div>' +
-          '<div style="font-family:var(--font-display);font-size:16px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-3);line-height:1.4;">' + (c.title || 'Untitled') + '</div>' +
-          '<div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">' + (c.excerpt || '') + '</div>';
-        grid.appendChild(card);
-      });
-    }
-    // Try to get from already-loaded public_stats
-    function tryLoad() {
-      if (window.__amjStats && window.__amjStats.chronicle_recent) {
-        renderChronicleCards(window.__amjStats.chronicle_recent);
-        return true;
-      }
-      return false;
-    }
-    if (tryLoad()) return;
-    // Wait for main data loader, then try again
-    setTimeout(function(){
-      if (tryLoad()) return;
-      // Last resort: fetch public_stats.json directly
-      fetch('/public_stats.json', { cache: 'force-cache' })
-        .then(function(r){ return r.json(); })
-        .then(function(d){
-          renderChronicleCards(d.chronicle_recent || []);
-        })
-        .catch(function(){
-          var grid = document.getElementById('chronicle-cards-grid');
-          var fb = grid && grid.querySelector('.chron-fallback');
-          if (fb) fb.style.display = 'block';
-        });
-    }, 1200);
-  })();
-  </script>
-  <style>
-    @media (max-width: 768px) {
-      #chronicle-cards-grid { grid-template-columns: 1fr !important; }
-    }
-  </style>
-  <div style="margin-top:var(--space-4);">
-    <a href="/chronicle/" class="btn btn--ghost" style="font-size:var(--text-xs);">All chronicles →</a>
-  </div>
-</section>
+<!-- ═══════════════════════════════════════════════════════════
+     7. SECTION HEADER: The evidence
+     ═══════════════════════════════════════════════════════════ -->
+<div class="h-section-header reveal">
+  <div class="h-section-header__text">The evidence</div>
+</div>
 
-<!-- Feature discovery cards -->
-<section class="reveal" id="amj-feature-cards" style="border-bottom:1px solid var(--border);">
-  <div style="padding:var(--space-10) var(--page-padding) var(--space-6);border-bottom:1px solid var(--border);">
-    <div class="eyebrow" style="margin-bottom:var(--space-3)">Explore the platform</div>
-    <h2 class="text-h3" style="color:var(--text)">What's inside</h2>
-  </div>
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);">
+<!-- ═══════════════════════════════════════════════════════════
+     8. OBSERVATORY ENTRY CARDS (5 cards)
+     ═══════════════════════════════════════════════════════════ -->
+<div class="h-obs-grid reveal">
+  <!-- Sleep -->
+  <a href="/sleep/" class="h-obs-card" style="border-left:3px solid var(--h-blue);">
+    <div class="h-obs-card__name">SLEEP</div>
+    <div class="h-obs-card__metric" id="h-obs-sleep">&mdash;</div>
+    <div class="h-obs-card__desc">Eight Sleep x Whoop cross-referenced. Bed temp, staging, efficiency &mdash; what actually moves sleep quality.</div>
+    <div class="h-obs-card__link">Explore &rarr;</div>
+  </a>
+  <!-- Glucose -->
+  <a href="/glucose/" class="h-obs-card" style="border-left:3px solid var(--h-teal);">
+    <div class="h-obs-card__name">GLUCOSE</div>
+    <div class="h-obs-card__metric" id="h-obs-glucose">&mdash;</div>
+    <div class="h-obs-card__desc">Dexcom Stelo CGM. Time-in-range, variability, and what meals actually do to my blood sugar.</div>
+    <div class="h-obs-card__link">Explore &rarr;</div>
+  </a>
+  <!-- Nutrition -->
+  <a href="/nutrition/" class="h-obs-card" style="border-left:3px solid var(--h-amber);">
+    <div class="h-obs-card__name">NUTRITION</div>
+    <div class="h-obs-card__metric" id="h-obs-nutrition">&mdash;</div>
+    <div class="h-obs-card__desc">MacroFactor-tracked intake. Protein, calories, adherence &mdash; the gap between intention and behavior.</div>
+    <div class="h-obs-card__link">Explore &rarr;</div>
+  </a>
+  <!-- Training -->
+  <a href="/training/" class="h-obs-card" style="border-left:3px solid var(--h-crimson);">
+    <div class="h-obs-card__name">TRAINING</div>
+    <div class="h-obs-card__metric" id="h-obs-training">&mdash;</div>
+    <div class="h-obs-card__desc">Zone 2 cardio, compound strength, centenarian benchmarks. Four sources into one training layer.</div>
+    <div class="h-obs-card__link">Explore &rarr;</div>
+  </a>
+  <!-- Inner Life -->
+  <a href="/mind/" class="h-obs-card" style="border-left:3px solid var(--h-violet);">
+    <div class="h-obs-card__name">INNER LIFE</div>
+    <div class="h-obs-card__metric" id="h-obs-mind">&mdash;</div>
+    <div class="h-obs-card__desc">Journaling, mood, mental health tracking. The data behind the data &mdash; what numbers can&rsquo;t capture alone.</div>
+    <div class="h-obs-card__link">Explore &rarr;</div>
+  </a>
+</div>
 
-    <a href="/habits/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;border-left:3px solid #1D9E75;transition:background var(--dur-fast);" class="feature-card">
-      <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="4" y="14" width="4" height="10" rx="1"/><rect x="12" y="8" width="4" height="16" rx="1"/><rect x="20" y="4" width="4" height="20" rx="1"/></svg></div>
-      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">HABITS</div>
-      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;margin-bottom:var(--space-4);">52-week heatmap. Every habit tracked daily across <span id="prose-data-sources-2">19</span> sources.</div>
-      <div style="font-size:var(--text-xs);font-family:var(--font-mono);color:var(--accent-dim);">Current streak: <span id="feat-streak">0</span> days</div>
-    </a>
+<!-- ═══════════════════════════════════════════════════════════
+     9. PULL-QUOTE #2 (right-offset)
+     ═══════════════════════════════════════════════════════════ -->
+<div class="h-pullquote h-pullquote--right reveal">
+  <blockquote class="h-pullquote__text">
+    &ldquo;The weeks I&rsquo;m not logging, that&rsquo;s the report in itself.&rdquo;
+  </blockquote>
+  <div class="h-pullquote__badge">Elena Voss &middot; Chronicle narrator</div>
+</div>
 
-    <a href="/character/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" class="feature-card">
-      <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3L17 11H22L18 16L20 24L14 20L8 24L10 16L6 11H11Z"/></svg></div>
-      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">CHARACTER</div>
-      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;margin-bottom:var(--space-4);">RPG-style 7-pillar scoring: sleep, movement, nutrition, metabolic, mind, relationships, consistency.</div>
-      <div style="font-size:var(--text-xs);font-family:var(--font-mono);color:var(--accent-dim);">Score: <span id="feat-char-score">—</span> / 100</div>
-    </a>
+<!-- ═══════════════════════════════════════════════════════════
+     10. SECTION HEADER: The chronicle
+     ═══════════════════════════════════════════════════════════ -->
+<div class="h-section-header reveal">
+  <div class="h-section-header__text">The chronicle</div>
+</div>
 
-    <a href="/benchmarks/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" class="feature-card">
-      <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="14" cy="14" r="10"/><circle cx="14" cy="14" r="4"/><line x1="14" y1="4" x2="14" y2="10"/><line x1="14" y1="18" x2="14" y2="24"/></svg></div>
-      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">BENCHMARKS</div>
-      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">Where my numbers sit vs. population norms. Interactive calculator.</div>
-    </a>
+<!-- ═══════════════════════════════════════════════════════════
+     11. Latest chronicle entry card
+     ═══════════════════════════════════════════════════════════ -->
+<div style="padding:var(--space-10) 0;border-bottom:1px solid var(--border);" class="reveal">
+  <a href="/chronicle/" class="h-chronicle-card" id="h-chronicle-latest">
+    <div class="h-chronicle-card__eyebrow" id="h-chron-eyebrow">Latest Chronicle</div>
+    <div class="h-chronicle-card__title" id="h-chron-title">The Measured Life &rarr;</div>
+    <div class="h-chronicle-card__excerpt" id="h-chron-excerpt">Every Wednesday, Elena Voss writes the week. Raw numbers, honest narrative, no filter.</div>
+  </a>
+</div>
 
-    <a href="/discoveries/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" class="feature-card">
-      <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="14" cy="10" r="6"/><path d="M14 16V24"/><path d="M10 20H18"/><path d="M11 4L17 4"/></svg></div>
-      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">DISCOVERIES</div>
-      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">What the AI found in my data. Correlations, anomalies, patterns a human would miss.</div>
-    </a>
-
-    <a href="/intelligence/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" class="feature-card">
-      <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="8" width="16" height="14" rx="3"/><circle cx="11" cy="15" r="1.5"/><circle cx="17" cy="15" r="1.5"/><path d="M14 3V8"/><circle cx="14" cy="3" r="1.5"/><path d="M6 18H3"/><path d="M22 18H25"/></svg></div>
-      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">INTELLIGENCE</div>
-      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">AI coaching brief. What Claude is reading, predicting, and recommending each day.</div>
-    </a>
-
-
-    <a href="/glucose/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;border-left:3px solid #f59e0b;transition:background var(--dur-fast);" class="feature-card">
-      <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 18C4 18 8 14 10 10S14 4 14 4"/><path d="M14 4C14 4 16 8 18 10S24 18 24 18"/><path d="M4 18L24 18"/><path d="M4 22L24 22"/></svg></div>
-      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">GLUCOSE</div>
-      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">30-day CGM. Time-in-range, variability SD, Dexcom Stelo data.</div>
-    </a>
-
-    <a href="/sleep/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;border-left:3px solid #818cf8;transition:background var(--dur-fast);" class="feature-card">
-      <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 16A9 9 0 1 1 12 7C12 7 12 16 21 16Z"/></svg></div>
-      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">SLEEP</div>
-      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">Eight Sleep × Whoop cross-referenced. What bed temp actually does to sleep quality.</div>
-    </a>
-
-    <a href="/journal/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;border-left:3px solid #a78bfa;transition:background var(--dur-fast);" class="feature-card">
-      <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12l4 4v16H6V4z"/><path d="M18 4v4h4"/><line x1="10" y1="12" x2="18" y2="12"/><line x1="10" y1="16" x2="16" y2="16"/><line x1="10" y1="20" x2="14" y2="20"/></svg></div>
-      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">INNER LIFE</div>
-      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">Journaling, mood, mental health tracking. The data behind the data — what the numbers can't capture alone.</div>
-    </a>
-
-    <a href="/experiments/" style="display:block;background:var(--surface);padding:var(--space-8) var(--space-6);text-decoration:none;transition:background var(--dur-fast);" class="feature-card">
-      <div style="color:var(--accent-dim);margin-bottom:var(--space-3);transition:color var(--dur-fast);"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4V12L6 22H22L18 12V4"/><line x1="10" y1="4" x2="18" y2="4"/><path d="M9 16H19"/></svg></div>
-      <div style="font-family:var(--font-display);font-size:22px;color:var(--text);letter-spacing:var(--ls-display);margin-bottom:var(--space-2);">EXPERIMENTS</div>
-      <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;">N=1 trials with real controls. Testing supplements, routines, and protocols against my own data.</div>
-    </a>
-
-  </div>
-  <div style="padding:var(--space-5) var(--page-padding);border-top:1px solid var(--border);text-align:right;">
-    <a href="/platform/" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);letter-spacing:var(--ls-tag);text-transform:uppercase;text-decoration:none;">→ See all pages</a>
-  </div>
-  <style>
-    @media (max-width: 768px) {
-      #feat-grid { grid-template-columns: repeat(2,1fr) !important; }
-    }
-    @media (max-width: 480px) {
-      #feat-grid { grid-template-columns: 1fr !important; }
-    }
-  </style>
-  <script>
-  (function() {
-    // Populate live data from window.__amjStats if available (set by main data loader)
-    function populate(stats) {
-      var ch = (stats && stats.character) || {};
-      var streak = ch.consistency_streak || ch.streak_days;
-      var score = ch.total_score || ch.score;
-      var el;
-      el = document.getElementById('feat-streak');
-      // D3-FIX: fall back to public_stats.platform.tier0_streak; always show 0 not —
-      const featStreak = streak != null ? streak : (window.__amjStats && window.__amjStats.platform ? (window.__amjStats.platform.tier0_streak || 0) : 0);
-      if (el) el.textContent = featStreak;
-      el = document.getElementById('feat-char-score');
-      if (el && score != null) el.textContent = Math.round(score);
-    }
-    // Try immediately (main loader may have already run)
-    if (window.__amjStats) { populate(window.__amjStats); return; }
-    // Otherwise wait a moment then try API
-    setTimeout(function() {
-      if (window.__amjStats) { populate(window.__amjStats); return; }
-      fetch('/public_stats.json', { cache: 'force-cache' })
-        .then(function(r) { return r.json(); })
-        .then(populate)
-        .catch(function() {});
-    }, 800);
-  })();
-  </script>
-</section>
-
-
-
-<!-- Phase 1: Reading path -->
+<!-- ═══════════════════════════════════════════════════════════
+     12. Reading path
+     ═══════════════════════════════════════════════════════════ -->
 <div class="reading-path-v2">
   <div></div>
   <a href="/story/" class="reading-path-v2__next">
@@ -1341,388 +619,61 @@
   </a>
 </div>
 
-<!-- U13: Subscribe CTA — simplified to single clear action, nav Subscribe is primary -->
-<div id="amj-subscribe"></div><!-- Mobile bottom nav -->
+<!-- ═══════════════════════════════════════════════════════════
+     13. Subscribe + footer placeholders
+     ═══════════════════════════════════════════════════════════ -->
+<div id="amj-subscribe"></div>
 <div id="amj-bottom-nav"></div>
 <div id="amj-footer"></div>
 
-<script>
-// Unified data loader — fetches /site/public_stats.json once, populates ticker + BS-02 hero.
-(async function() {
-  // Helper: null-safe text setter
-  const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  const setWidth = (id, pct) => { const el = document.getElementById(id); if (el) el.style.width = pct; };
-
-  try {
-    const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
-    if (!r.ok) throw new Error('no data');
-    const raw = await r.json();
-    window.__amjStats = raw;
-
-    const v    = raw.vitals   || {};
-    const j    = raw.journey  || {};
-    const t    = raw.training || {};
-    const p    = raw.platform || {};
-    const hero = raw.hero     || {};
-    const meta = raw._meta    || {};
-
-    // WR-43: feed live vitals into heartbeat animation
-    if (window.updateHeartbeat) window.updateHeartbeat(raw);
-
-    // Nav date
-    const genAt = meta.generated_at || raw.updated_at;
-    if (genAt) {
-      const d = new Date(genAt);
-      setText('nav-date', d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-    }
-
-    // Ticker
-    const streak = p.tier0_streak != null ? p.tier0_streak : 0;
-
-    // G-3: Weight with staleness display — fall back to /api/vitals when public_stats has no weight.
-    let _wLbs = v.weight_lbs, _wAsOf = v.weight_as_of || null;
-    if (!_wLbs) {
-      try {
-        const _vr = await fetch('/api/vitals', {
-          signal: AbortSignal.timeout ? AbortSignal.timeout(3000) : undefined
-        });
-        if (_vr.ok) { const _vd = await _vr.json(); const _vv = (_vd.vitals || {}); _wLbs = _vv.weight_lbs; _wAsOf = _vv.weight_as_of; }
-      } catch (_e) { /* graceful degradation */ }
-    }
-    const _MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-    // 2d: Always show freshness date on weight
-    function _fmtWeight(lbs, asOf) {
-      if (!lbs) return '—';
-      const base = lbs.toFixed(1) + ' LBS';
-      if (!asOf) return base;
-      const parts = asOf.split('-');
-      return base + ' · ' + _MONTHS[parseInt(parts[1]) - 1] + ' ' + parseInt(parts[2]);
-    }
-    const _weightDisplay = _fmtWeight(_wLbs, _wAsOf);
-
-    // 2a: Directional arrows — compare current to 7-day avg from trends
-    const trends = raw.trends || {};
-    function _arrow(current, trendArr) {
-      if (!current || !trendArr || !trendArr.length) return '';
-      const vals = trendArr.slice(-7).map(function(d) { return d.pct || d.lbs || d.hrs || d.ms || d.value || 0; });
-      if (!vals.length) return '';
-      const avg = vals.reduce(function(a,b){ return a+b; }, 0) / vals.length;
-      const delta = (current - avg) / (Math.abs(avg) || 1);
-      if (delta > 0.03) return ' ↗';
-      if (delta < -0.03) return ' ↘';
-      return ' →';
-    }
-    const wArrow = _arrow(_wLbs, trends.weight_daily);
-    const hrvArrow = _arrow(v.hrv_ms, trends.hrv_daily || []);
-    const recArrow = _arrow(v.recovery_pct, trends.recovery_daily);
-
-    // 2e: Reframe streak < 5 as T0 percentage
-    function _fmtStreak(streakVal, pctVal) {
-      if (streakVal >= 5) return streakVal + 'D STREAK';
-      if (pctVal != null) return 'T0: ' + Math.round(pctVal) + '%';
-      return 'T0: ' + streakVal + 'D';
-    }
-    const _t0Pct = (p.tier0_adherence_pct != null) ? p.tier0_adherence_pct : null;
-    const _streakDisplay = _fmtStreak(streak, _t0Pct);
-
-    // 2b: Sleep ticker item
-    const _sleepHrs = v.sleep_hours;
-    const _sleepEff = v.sleep_efficiency_pct || v.sleep_quality_score;
-    const _sleepDisplay = _sleepHrs ? (_sleepHrs.toFixed(1) + 'H' + (_sleepEff ? ' · ' + Math.round(_sleepEff) + '%' : '')) : '—';
-
-    // 2c: Chronicle latest as clickable ticker item
-    const cl = raw.chronicle_latest || {};
-    const _chronicleText = cl.title ? ('LATEST: ' + cl.title.toUpperCase() + ' →') : '';
-
-    [
-      ['tk-weight',    _weightDisplay + wArrow],
-      ['tk-hrv',       v.hrv_ms       ? Math.round(v.hrv_ms) + ' MS' + hrvArrow             : '—'],
-      ['tk-recovery',  v.recovery_pct ? Math.round(v.recovery_pct) + '%' + recArrow          : '—'],
-      ['tk-sleep',     _sleepDisplay],
-      ['tk-streak',    _streakDisplay],
-      ['tk-journey',   j.progress_pct != null ? j.progress_pct.toFixed(1) + '% TO GOAL' : '—'],
-      ['tk-weight-2',  _weightDisplay + wArrow],
-      ['tk-hrv-2',     v.hrv_ms       ? Math.round(v.hrv_ms) + ' MS' + hrvArrow             : '—'],
-      ['tk-recovery-2',v.recovery_pct ? Math.round(v.recovery_pct) + '%' + recArrow          : '—'],
-      ['tk-sleep-2',   _sleepDisplay],
-      ['tk-streak-2',  _streakDisplay],
-      ['tk-journey-2', j.progress_pct != null ? j.progress_pct.toFixed(1) + '% TO GOAL' : '—'],
-    ].forEach(([id, val]) => setText(id, val));
-
-    // 2c: Chronicle latest link text + href
-    if (_chronicleText) {
-      ['tk-chronicle', 'tk-chronicle-2'].forEach(function(id) {
-        const el = document.getElementById(id);
-        if (el) {
-          el.textContent = _chronicleText;
-          if (cl.url) el.setAttribute('href', cl.url);
-        }
-      });
-    }
-
-    // BS-02 Hero: weight counter
-    const cw = hero.current_weight_lbs || j.current_weight_lbs || v.weight_lbs;
-    if (cw) setText('hero-weight', (Math.round(cw * 10) / 10).toString());
-
-    // BS-02 Hero: progress bar
-    const pct     = hero.progress_pct || j.progress_pct || 0;
-    const lostLbs = hero.lost_lbs     || j.lost_lbs;
-    setTimeout(() => setWidth('hero-progress-fill', Math.min(pct, 100) + '%'), 300);
-    if (lostLbs != null) setText('hero-lost-lbs', (Math.round(lostLbs * 10) / 10) + ' lbs lost');
-    if (pct     != null) setText('hero-progress-pct', (Math.round(pct * 10) / 10) + '%');
-
-    // BS-02 Hero: stat chips
-    const _startDateStr = j.started_date || j.start_date || '2026-04-01';
-    const _journeyStart = new Date(_startDateStr + 'T12:00:00Z');
-    const _daysInFallback = Math.floor((Date.now() - _journeyStart.getTime()) / 86400000);
-    const daysIn = hero.days_on_journey ?? j.days_in ?? p.days_in ?? _daysInFallback;
-    setText('hero-days', daysIn);
-    setText('hero-streak', 'Day ' + streak);
-    // D3-FIX: also update feat-streak from tier0_streak (0 not — when no streak)
-    const _featEl = document.getElementById('feat-streak');
-    if (_featEl) _featEl.textContent = streak;
-
-    // D5: Parameterize platform stats from public_stats.json
-    if (p.data_sources != null) {
-      setText('hero-data-sources', p.data_sources);
-      // Update all prose spans too
-      ['prose-data-sources-1','prose-data-sources-2','prose-data-sources-3',
-       'prose-data-sources-4','prose-data-sources-5'].forEach(function(id) {
-        setText(id, p.data_sources);
-      });
-    }
-    if (p.lambdas      != null) setText('hero-lambdas', p.lambdas);
-    if (p.mcp_tools    != null) setText('hero-tools', p.mcp_tools);
-
-    // BS-02 Hero: narrative paragraph (only if real — not placeholder)
-    if (hero.why_paragraph && !hero.paragraph_is_placeholder) {
-      const hw = document.getElementById('hero-why');
-      if (hw) hw.textContent = hero.why_paragraph;
-    }
-
-    // HOME-3: Day 1 vs Today — 4 dimensions
-    // Day 1 baseline (from public_stats.json baseline object)
-    const b = raw.baseline || {};
-    if (b.date) setText('d1-date', new Date(b.date + 'T12:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}));
-    if (b.weight_lbs) setText('d1-weight', b.weight_lbs.toFixed ? b.weight_lbs.toFixed(1) : b.weight_lbs);
-    if (b.sleep_hours) setText('d1-sleep', b.sleep_hours.toFixed(1));
-
-    // Today: Weight
-    if (v.weight_lbs) setText('compare-weight', v.weight_lbs.toFixed(1));
-    if (j.lost_lbs != null) {
-      setText('compare-weight-journey', (j.lost_lbs > 0 ? '▼ ' : '▲ ') + Math.abs(j.lost_lbs).toFixed(1) + ' lbs lost');
-    }
-    if (v.weight_delta_30d != null) {
-      const d30 = v.weight_delta_30d;
-      setText('compare-weight-30d', (d30 > 0 ? '+' : '') + d30.toFixed(1) + ' lbs last 30d');
-    }
-
-    // Today: Habits (streak from platform)
-    const cStreak = p.tier0_streak != null ? p.tier0_streak : null;
-    if (cStreak != null) {
-      setText('compare-habits', cStreak);
-      setText('compare-habits-label', cStreak === 1 ? '1 day streak' : cStreak + ' day streak');
-    }
-
-    // Today: Sleep (30d avg from vitals or trends)
-    const sleepAvg = v.sleep_hours_30d_avg || v.sleep_hours;
-    if (sleepAvg) {
-      setText('compare-sleep', sleepAvg.toFixed(1));
-      const sleepDelta = sleepAvg - (b.sleep_hours || 7.0);
-      setText('compare-sleep-label', (sleepDelta >= 0 ? '▲ +' : '▼ ') + sleepDelta.toFixed(1) + 'h vs Day 1');
-    }
-
-    // Today: date label
-    const compareDate = document.getElementById('compare-date');
-    if (compareDate) compareDate.textContent = new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
-
-    // Today: Level + Tier (populated by character_stats loader above if available)
-    // If already set by the quadrant loader, skip — otherwise mark as loading
-
-
-    // HP-12: Elena Voss hero one-liner
-    const elenaLine = raw.elena_hero_line || (hero && hero.elena_line);
-    if (elenaLine) {
-      const elEl = document.getElementById('elena-line-text');
-      const elWrap = document.getElementById('elena-hero-line');
-      if (elEl && elWrap) {
-        elEl.textContent = elenaLine;
-        elWrap.style.display = 'block';
-        elWrap.style.opacity = '1';
-        elWrap.style.animation = 'fadeUp 0.6s ease forwards 0.18s';
-      }
-    }
-
-    // BS-02 Hero: Chronicle teaser
-    const cl = raw.chronicle_latest;
-    if (cl && cl.title) {
-      setText('chronicle-teaser-title', 'Week ' + (cl.week_num || '?') + ': "' + cl.title + '"');
-      const ct = document.getElementById('chronicle-teaser');
-      if (ct) ct.style.display = 'block';
-    }
-
-  } catch(e) {
-    // Silent fail — static fallback content already visible
-  }
-
-  // Subscribe form — wires up only if form elements exist in page
-  const subBtn = document.getElementById('hero-subscribe-btn');
-  if (subBtn) {
-    subBtn.addEventListener('click', async () => {
-      const email = document.getElementById('hero-email').value.trim();
-      const msg   = document.getElementById('subscribe-msg');
-      if (!email || !email.includes('@')) {
-        msg.textContent = 'Enter a valid email address.';
-        msg.style.color = 'var(--c-yellow-status)';
-        return;
-      }
-      msg.textContent = 'Subscribing...';
-      try {
-        const res  = await fetch('/api/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, source: 'homepage' }),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          msg.textContent = '✓ Check your inbox to confirm.';
-          msg.style.color = 'var(--accent)';
-          document.getElementById('hero-email').value = '';
-          setTimeout(function(){ window.location.href = '/subscribe/confirm/'; }, 1500);
-        } else {
-          msg.textContent = data.error || 'Something went wrong.';
-          msg.style.color = 'var(--c-yellow-status)';
-        }
-      } catch { msg.textContent = 'Network error — try again.'; msg.style.color = 'var(--c-yellow-status)'; }
-    });
-    document.getElementById('hero-email').addEventListener('keydown', e => {
-      if (e.key === 'Enter') subBtn.click();
-    });
-  }
-})();
-</script>
-
-
-<!-- GR-01b: Sticky subscribe bar (shows after scrolling past hero) -->
-<div id="sticky-subscribe" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:99;
-  background:var(--surface);border-top:1px solid var(--border);padding:var(--space-3) var(--page-padding);
-  align-items:center;justify-content:center;gap:var(--space-3);transition:transform 0.3s ease;">
-  <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);white-space:nowrap;">Get The Measured Life</span>
-  <input type="email" id="sticky-email" class="subscribe-input" placeholder="your@email.com" style="max-width:220px;padding:var(--space-2) var(--space-3);">
-  <button id="sticky-sub-btn" class="btn btn--cta" style="font-size:var(--text-2xs);padding:var(--space-2) var(--space-4);white-space:nowrap;">Subscribe</button>
-  <button id="sticky-dismiss" style="background:none;border:none;color:var(--text-faint);font-size:16px;cursor:pointer;padding:var(--space-1);" aria-label="Dismiss">&times;</button>
-</div>
-<script>
-(function(){
-  var bar = document.getElementById('sticky-subscribe');
-  if (!bar) return;
-  var dismissed = localStorage.getItem('sticky-sub-dismissed');
-  var subscribed = localStorage.getItem('amj-subscribed');
-  if (dismissed && Date.now() - parseInt(dismissed) < 7*86400000) return;
-  if (subscribed) return;
-
-  function checkScroll() {
-    // Show after 50% page scroll, hide if already subscribed
-    if (localStorage.getItem('amj-subscribed')) { bar.style.display = 'none'; return; }
-    var scrollPct = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
-    if (scrollPct >= 0.5) {
-      bar.style.display = 'flex';
-    } else {
-      bar.style.display = 'none';
-    }
-  }
-  window.addEventListener('scroll', checkScroll, {passive:true});
-
-  document.getElementById('sticky-dismiss').addEventListener('click', function(){
-    bar.style.display = 'none';
-    localStorage.setItem('sticky-sub-dismissed', Date.now().toString());
-  });
-
-  document.getElementById('sticky-sub-btn').addEventListener('click', async function(){
-    var email = document.getElementById('sticky-email').value.trim();
-    if (!email || !email.includes('@')) return;
-    try {
-      var res = await fetch('/api/subscribe', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({email:email, source:'sticky_bar'})
-      });
-      if (res.ok) {
-        bar.innerHTML = '<span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);">\u2713 Check your inbox to confirm.</span>';
-        localStorage.setItem('amj-subscribed','1');
-        setTimeout(function(){ bar.style.display='none'; }, 3000);
-      }
-    } catch(e) {}
-  });
-  document.getElementById('sticky-email').addEventListener('keydown', function(e){
-    if (e.key === 'Enter') document.getElementById('sticky-sub-btn').click();
-  });
-})();
-</script>
-
-<!-- WEB-WCT: Weekly Challenge Ticker -->
+<!-- ═══════════════════════════════════════════════════════════
+     Weekly Challenge Bar
+     ═══════════════════════════════════════════════════════════ -->
 <div class="challenge-bar" id="challenge-bar" style="display:none">
   <span class="challenge-bar__pip"></span>
-  <span class="challenge-bar__label" id="cb-week">Week —</span>
+  <span class="challenge-bar__label" id="cb-week">Week &mdash;</span>
   <span class="challenge-bar__divider"></span>
-  <span class="challenge-bar__text" id="cb-challenge">Loading challenge…</span>
+  <span class="challenge-bar__text" id="cb-challenge">Loading challenge&hellip;</span>
   <span class="challenge-bar__divider"></span>
   <span class="challenge-bar__progress" id="cb-progress"></span>
 </div>
 <script>
 (function(){
-  const API = '/api/current_challenge';
-  fetch(API).then(r=>r.ok?r.json():null).then(data=>{
+  var API = '/api/current_challenge';
+  fetch(API).then(function(r){return r.ok?r.json():null}).then(function(data){
     if(!data||!data.current_challenge) return;
-    const c = data.current_challenge;
-    if(!c.week_num) return;  // no active challenge — keep bar hidden
-    const bar = document.getElementById('challenge-bar');
+    var c = data.current_challenge;
+    if(!c.week_num) return;
+    var bar = document.getElementById('challenge-bar');
     document.getElementById('cb-week').textContent = 'Week '+c.week_num+' Challenge';
-    if(c.challenge) document.getElementById('cb-challenge').innerHTML = '<strong>'+c.challenge+'</strong>'+(c.detail?' — '+c.detail:'');
+    if(c.challenge) document.getElementById('cb-challenge').innerHTML = '<strong>'+c.challenge+'</strong>'+(c.detail?' \u2014 '+c.detail:'');
     if(c.days_total) document.getElementById('cb-progress').textContent = (c.days_complete||0)+'/'+c.days_total+' days';
     bar.style.display = 'flex';
-  }).catch(()=>{});
+  }).catch(function(){});
 })();
 </script>
-<nav class="reading-path-v2">
-  <a href="/subscribe/" class="reading-path-v2__link">
-    <span class="reading-path-v2__dir">Subscribe</span>
-    <span class="reading-path-v2__title">The Measured Life</span>
-  </a>
-  <a href="/story/" class="reading-path-v2__link reading-path-v2__link--next">
-    <span class="reading-path-v2__dir">Start here →</span>
-    <span class="reading-path-v2__title">The Story</span>
-  </a>
-</nav>
 
-<script src="/assets/js/animations.js" defer></script>
-<script src="/assets/js/reveal.js"></script>
-<script src="/assets/js/site_constants.js"></script>
-<script src="/assets/js/countdown.js"></script>
-<script src="/assets/js/components.js"></script>
-<script src="/assets/js/nav.js"></script>
-<script src="/assets/js/engagement.js"></script>
-<script>initSinceLastVisit(); initPulseFeed();</script>
+<!-- ═══════════════════════════════════════════════════════════
+     DATA LOADING — /api/snapshot + public_stats.json
+     ═══════════════════════════════════════════════════════════ -->
 <script>
-// Hide prequel banner after experiment launch (belt-and-suspenders)
-(function() {
-  var isLive = (window.AMJ_EXPERIMENT && window.AMJ_EXPERIMENT.isLive) ||
-               (new Date() >= new Date('2026-04-01T00:00:00-07:00'));
-  if (isLive) {
-    var banner = document.getElementById('prequel-banner');
-    if (banner) banner.style.display = 'none';
+(async function(){
+  var setText = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+  var circ = 2 * Math.PI * 35;
+
+  function setArc(id, pct) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var len = (Math.min(pct, 100) / 100) * circ;
+    el.setAttribute('stroke-dasharray', len + ' ' + (circ - len));
   }
-})();
-</script>
 
-<script>
-// Tier 2: Home sparklines — render 7-day SVG sparklines in vital quadrants
-(function() {
   function miniSpark(containerId, values, color) {
     var el = document.getElementById(containerId);
     if (!el || !values || values.length < 2) return;
     var clean = values.filter(function(v){ return v !== null && v !== undefined; });
     if (clean.length < 2) return;
-    var W = el.offsetWidth || 120, H = 24;
+    var W = el.offsetWidth || 120, H = 28;
     var min = Math.min.apply(null, clean), max = Math.max.apply(null, clean);
     var range = max - min || 1;
     var step = W / (clean.length - 1);
@@ -1731,50 +682,183 @@
     });
     var svg = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">';
     svg += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>';
-    // Dot on last point
     var last = pts[pts.length - 1].split(',');
     svg += '<circle cx="' + last[0] + '" cy="' + last[1] + '" r="2.5" fill="' + color + '"/>';
     svg += '</svg>';
     el.innerHTML = svg;
   }
 
-  // Wait for public_stats to load, then render sparklines
-  function tryRender() {
-    var stats = window.__amjStats;
-    if (!stats || !stats.trends) return false;
-    var t = stats.trends;
-    var C = { green: '#1D9E75', amber: '#BA7517', gray: '#4a6050' };
-    
-    // Body: weight trend
-    if (t.weight_daily) {
-      var wv = t.weight_daily.map(function(r){ return r.lbs; }).slice(-7);
-      miniSpark('spark-body', wv, C.green);
-    }
-    // Recovery: HRV trend
-    if (t.hrv_daily) {
-      var hv = t.hrv_daily.map(function(r){ return r.ms; }).slice(-7);
-      miniSpark('spark-rec', hv, C.green);
-    }
-    return true;
-  }
+  try {
+    var r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('no data');
+    var raw = await r.json();
+    window.__amjStats = raw;
 
-  if (!tryRender()) {
-    setTimeout(function() { tryRender(); }, 1500);
+    var v = raw.vitals || {};
+    var j = raw.journey || {};
+    var p = raw.platform || {};
+    var hero = raw.hero || {};
+    var trends = raw.trends || {};
+    var meta = raw._meta || {};
+
+    // ── Hero stats line ──
+    var startDateStr = j.started_date || j.start_date || '2026-04-01';
+    var journeyStart = new Date(startDateStr + 'T12:00:00Z');
+    var daysIn = hero.days_on_journey != null ? hero.days_on_journey
+              : j.days_in != null ? j.days_in
+              : p.days_in != null ? p.days_in
+              : Math.floor((Date.now() - journeyStart.getTime()) / 86400000);
+    var wLbs = v.weight_lbs || hero.current_weight_lbs || j.current_weight_lbs;
+    var charLevel = 1;
+
+    var statsLine = 'Day ' + daysIn;
+    if (wLbs) statsLine += ' \u00b7 ' + wLbs.toFixed(1) + ' lbs';
+    var statsEl = document.getElementById('h-hero-stats');
+    if (statsEl) statsEl.textContent = statsLine;
+
+    // ── Gauge rings ──
+    // Weight: progress % toward goal (302 -> 185)
+    var progressPct = hero.progress_pct || j.progress_pct || 0;
+    if (wLbs) {
+      setText('h-g-weight-num', wLbs.toFixed(0));
+      setArc('h-g-weight-arc', Math.min(100, progressPct));
+    }
+
+    // HRV
+    if (v.hrv_ms) {
+      setText('h-g-hrv-num', Math.round(v.hrv_ms));
+      // Scale HRV: 0-120ms mapped to 0-100%
+      setArc('h-g-hrv-arc', Math.min(100, (v.hrv_ms / 120) * 100));
+    }
+
+    // Sleep
+    var sleepHrs = v.sleep_hours || v.sleep_hours_30d_avg;
+    if (sleepHrs) {
+      setText('h-g-sleep-num', sleepHrs.toFixed(1));
+      // Scale sleep: 0-9h mapped to 0-100%
+      setArc('h-g-sleep-arc', Math.min(100, (sleepHrs / 9) * 100));
+    }
+
+    // ── Data spread: Weight ──
+    if (wLbs) {
+      setText('h-spread-weight', wLbs.toFixed(1));
+      var startWeight = 302;
+      var lostLbs = startWeight - wLbs;
+      if (lostLbs > 0) {
+        setText('h-spread-weight-delta', '\u25bc ' + lostLbs.toFixed(1) + ' lbs from start');
+      }
+    }
+    if (trends.weight_daily) {
+      var wv = trends.weight_daily.map(function(r){ return r.lbs; }).slice(-14);
+      miniSpark('h-spark-weight', wv, '#22c55e');
+    }
+
+    // ── Data spread: Sleep ──
+    var sleepAvg = v.sleep_hours_30d_avg || sleepHrs;
+    if (sleepAvg) {
+      setText('h-spread-sleep', sleepAvg.toFixed(1));
+    }
+    var sleepEff = v.sleep_efficiency_pct || v.sleep_quality_score;
+    if (sleepEff) {
+      setText('h-spread-sleep-eff', Math.round(sleepEff) + '% efficiency');
+    }
+    if (trends.sleep_daily) {
+      var sv = trends.sleep_daily.map(function(r){ return r.hrs || r.hours; }).slice(-14);
+      miniSpark('h-spark-sleep', sv, '#818cf8');
+    }
+
+    // ── Data spread: Habits ──
+    var streak = p.tier0_streak != null ? p.tier0_streak : 0;
+    setText('h-spread-streak', streak);
+    setText('h-spread-days-in', daysIn + ' days in');
+
+    // ── Observatory card headline metrics ──
+    if (sleepHrs) setText('h-obs-sleep', sleepHrs.toFixed(1) + 'h avg \u00b7 ' + (sleepEff ? Math.round(sleepEff) + '% eff' : ''));
+    if (v.glucose_avg || v.time_in_range_pct) {
+      var gText = '';
+      if (v.glucose_avg) gText += Math.round(v.glucose_avg) + ' mg/dL avg';
+      if (v.time_in_range_pct) gText += (gText ? ' \u00b7 ' : '') + Math.round(v.time_in_range_pct) + '% TIR';
+      setText('h-obs-glucose', gText);
+    }
+    if (v.calories_avg || p.protein_avg) {
+      var nText = '';
+      if (v.calories_avg) nText += Math.round(v.calories_avg) + ' kcal';
+      if (p.protein_avg) nText += (nText ? ' \u00b7 ' : '') + Math.round(p.protein_avg) + 'g protein';
+      setText('h-obs-nutrition', nText);
+    }
+    if (v.workouts_30d || v.zone2_min_avg) {
+      var tText = '';
+      if (v.zone2_min_avg) tText += Math.round(v.zone2_min_avg) + ' min Z2';
+      if (v.workouts_30d) tText += (tText ? ' \u00b7 ' : '') + v.workouts_30d + ' sessions (30d)';
+      setText('h-obs-training', tText);
+    }
+
+    // ── Character stats (async) ──
+    try {
+      var cr = await fetch('/api/character_stats');
+      if (cr.ok) {
+        var cd = await cr.json();
+        var cs = cd.character_stats || {};
+        charLevel = Math.round(cs.level || 1);
+        var tier = cs.tier || 'Foundation';
+        var score = 0;
+        if (cd.pillars) {
+          var vals = Object.values(cd.pillars).map(function(p){ return p.raw_score || 0; });
+          score = Math.round(vals.reduce(function(a,b){return a+b;},0) / vals.length);
+        }
+        setText('h-g-char-num', charLevel);
+        // Scale character: level 1-20 mapped to 0-100%
+        setArc('h-g-char-arc', Math.min(100, (charLevel / 20) * 100));
+        setText('h-obs-mind', 'Level ' + charLevel + ' \u00b7 ' + tier + (score ? ' \u00b7 ' + score + '/100' : ''));
+        // Update hero stats line with level
+        if (statsEl) statsEl.textContent = 'Day ' + daysIn + (wLbs ? ' \u00b7 ' + wLbs.toFixed(1) + ' lbs' : '') + ' \u00b7 Level ' + charLevel;
+      }
+    } catch(e) {}
+
+    // ── Habit streaks (async) ──
+    try {
+      var hr = await fetch('/api/habit_streaks');
+      if (hr.ok) {
+        var hd = await hr.json();
+        var hs = hd.habit_streaks || {};
+        var aggStreak = hs.aggregate_streak != null ? hs.aggregate_streak : streak;
+        setText('h-spread-streak', aggStreak);
+        if (hs.tier0_pct) {
+          setText('h-spread-streak-sub', aggStreak + ' day T0 streak \u00b7 ' + hs.tier0_pct + '%');
+        }
+      }
+    } catch(e) {}
+
+    // ── Chronicle latest ──
+    var cl = raw.chronicle_latest;
+    if (cl && cl.title) {
+      setText('h-chron-eyebrow', 'Week ' + (cl.week_num || '?') + ' \u00b7 The Measured Life');
+      setText('h-chron-title', cl.title);
+      if (cl.excerpt) setText('h-chron-excerpt', cl.excerpt);
+      var chronLink = document.getElementById('h-chronicle-latest');
+      if (chronLink && cl.url) chronLink.href = cl.url;
+    }
+
+    // ── Nav date ──
+    var genAt = meta.generated_at || raw.updated_at;
+    if (genAt) {
+      var d = new Date(genAt);
+      setText('nav-date', d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+    }
+
+  } catch(e) {
+    // Silent fail — static fallback content already visible
   }
 })();
 </script>
 
-
+<!-- Count-up wiring -->
 <script>
-// Tier 2: Wire count-up on hero values after data loads
 (function() {
   function wireCountUp() {
     var stats = window.__amjStats;
     if (!stats) return false;
-    var j = stats.journey || {};
-    var p = stats.platform || {};
-    // Hero stat chips — if they have numeric content, add count-up
-    var chips = document.querySelectorAll('.chip-value, .j-stat__value');
+    var chips = document.querySelectorAll('.h-data-col__value');
     chips.forEach(function(el) {
       var val = parseFloat(el.textContent);
       if (!isNaN(val) && !el.hasAttribute('data-count-up')) {
@@ -1784,13 +868,21 @@
         el.textContent = '0';
       }
     });
-    // Re-init count-up observer if animations.js has loaded
     if (window.AMJ_REINIT_COUNTUP) window.AMJ_REINIT_COUNTUP();
     return true;
   }
   setTimeout(wireCountUp, 1200);
 })();
 </script>
+
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+<script src="/assets/js/engagement.js"></script>
+<script src="/assets/js/reveal.js"></script>
+<script src="/assets/js/animations.js" defer></script>
+<script src="/assets/js/countdown.js"></script>
+<script>initSinceLastVisit(); initPulseFeed();</script>
 
 </body>
 </html>
