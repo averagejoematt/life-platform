@@ -114,28 +114,68 @@ Ingestion methods: API polling (scheduled Lambda), S3 file triggers (manual expo
 ## Field Reference by Source
 
 ### whoop
+
+Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-DD#WORKOUT#<id>`).
+
+**Daily fields:**
 | Field | Type | Description |
 |-------|------|-------------|
 | `recovery_score` | number | 0–100 daily recovery |
 | `hrv` | number | Heart rate variability (ms) |
 | `resting_heart_rate` | number | RHR (bpm) |
-| `sleep_performance` | number | 0–100 |
 | `strain` | number | 0–21 daily strain |
+| `sleep_duration_hours` | number | Total sleep (hours) |
+| `sleep_quality_score` | number | 0–100 sleep quality |
+| `sleep_performance_percentage` | number | 0–100 sleep performance |
+| `sleep_efficiency_percentage` | number | Sleep efficiency % |
+| `sleep_consistency_percentage` | number | Circadian consistency % |
+| `rem_sleep_hours` | number | REM sleep (hours) |
+| `slow_wave_sleep_hours` | number | Deep/SWS sleep (hours) |
+| `light_sleep_hours` | number | Light sleep (hours) |
+| `time_awake_hours` | number | Time awake (hours) |
+| `disturbance_count` | number | Sleep disturbances |
+| `respiratory_rate` | number | Breaths/min |
+| `spo2_percentage` | number | Blood oxygen % |
+| `skin_temp_celsius` | number | Skin temperature °C |
+| `kilojoule` | number | Daily energy (kJ) |
+| `average_heart_rate` | number | Daily avg HR (bpm) |
+| `max_heart_rate` | number | Daily max HR (bpm) |
 | `sleep_start` | string | ISO timestamp |
 | `sleep_end` | string | ISO timestamp |
-| `total_sleep_seconds` | number | Raw sleep duration |
+| `sleep_onset_minutes` | number | Minutes from midnight to sleep onset |
+| `sleep_onset_consistency_7d` | number | 7-day onset consistency (std dev) |
+
+**Workout sub-items** (`sk = DATE#YYYY-MM-DD#WORKOUT#<id>`):
+| Field | Type | Description |
+|-------|------|-------------|
+| `workout_id` | number | Whoop workout ID |
+| `sport_id` | number | Whoop sport type ID |
+| `sport_name` | string | Human-readable sport name |
+| `start_time` | string | ISO timestamp |
+| `end_time` | string | ISO timestamp |
+| `strain` | number | Workout strain |
+| `average_heart_rate` | number | Avg HR during workout |
+| `max_heart_rate` | number | Max HR during workout |
+| `kilojoule` | number | Energy (kJ) |
+| `distance_meter` | number | Distance (meters) |
+| `zone_0_minutes` through `zone_5_minutes` | number | Time in each HR zone (minutes) |
 
 ### withings
 | Field | Type | Description |
 |-------|------|-------------|
-| `weight_lbs` | number | Body weight |
-| `fat_mass_lbs` | number | Fat mass |
-| `lean_mass_lbs` | number | Lean/muscle mass |
-| `body_fat_pct` | number | Body fat percentage |
-| `bmi` | number | Body mass index |
-| `muscle_mass_lbs` | number | Muscle mass |
-| `bone_mass_lbs` | number | Bone mass |
-| `hydration_pct` | number | Body hydration |
+| `weight_kg` | number | Body weight (kg, source of truth) |
+| `weight_lbs` | number | Body weight (lbs, derived) |
+| `fat_mass_lbs` | number | Fat mass (lbs) |
+| `fat_free_mass_lbs` | number | Fat-free/lean mass (lbs) |
+| `fat_ratio_percent` | number | Body fat percentage |
+| `muscle_mass_lbs` | number | Muscle mass (lbs) |
+| `bone_mass_lbs` | number | Bone mass (lbs) |
+| `hydration_percent` | number | Body hydration % |
+| `heart_pulse_bpm` | number | Heart rate at weigh-in |
+| `measurement_timestamp` | number | Unix epoch of measurement |
+| `measurement_time_utc` | string | ISO timestamp of measurement |
+| `lean_mass_delta_14d` | number | 14-day lean mass change (lbs) |
+| `fat_mass_delta_14d` | number | 14-day fat mass change (lbs) |
 
 ### strava
 Day-level aggregates (rolled up from individual activities):
@@ -182,9 +222,14 @@ Note: `search_activities` searches both `name` and `enriched_name` — keyword s
 ### todoist
 | Field | Type | Description |
 |-------|------|-------------|
-| `tasks_completed` | number | Tasks completed that day |
-| `tasks_added` | number | New tasks added |
-| `karma` | number | Todoist karma score |
+| `completed_count` | number | Tasks completed that day |
+| `active_count` | number | Active tasks at time of sync |
+| `overdue_count` | number | Overdue tasks |
+| `due_today_count` | number | Tasks due today |
+| `priority_breakdown` | object | Count by priority level (p1-p4) |
+| `completed_tasks` | list | List of completed task objects |
+| `completions_by_project` | object | Completion count per project |
+| `tasks_due_today` | list | List of today's due tasks |
 
 ### apple_health
 
@@ -288,15 +333,34 @@ Note: Individual BP readings stored in S3 at `raw/blood_pressure/YYYY/MM/DD.json
 ### eightsleep
 | Field | Type | Description |
 |-------|------|-------------|
-| `sleep_score` | number | Eight Sleep score |
-| `hrv` | number | HRV from Eight Sleep |
-| `resting_heart_rate` | number | RHR from Eight Sleep |
+| `sleep_score` | number | Eight Sleep sleep score |
+| `hrv_avg` | number | Average HRV (ms) |
+| `hr_avg` | number | Average heart rate (bpm) |
 | `respiratory_rate` | number | Breaths per minute |
-| `toss_and_turns` | number | Movement count |
-| `time_in_bed_seconds` | number | Total time in bed |
-| `total_sleep_seconds` | number | Time actually asleep |
-| `sleep_efficiency` | number | Efficiency percentage |
-| `bed_temp_f` | number | Pod temperature (F) |
+| `toss_turn_count` | number | Movement count |
+| `sleep_duration_hours` | number | Time actually asleep (hours) |
+| `time_in_bed_hours` | number | Total time in bed (hours, derived) |
+| `sleep_efficiency_pct` | number | Sleep efficiency % (derived) |
+| `waso_hours` | number | Wake after sleep onset (hours, derived) |
+| `rem_hours` | number | REM sleep (hours) |
+| `deep_hours` | number | Deep sleep (hours) |
+| `light_hours` | number | Light sleep (hours) |
+| `awake_hours` | number | Awake time (hours) |
+| `rem_pct` | number | REM % of total sleep (derived) |
+| `deep_pct` | number | Deep % of total sleep (derived) |
+| `light_pct` | number | Light % of total sleep (derived) |
+| `time_to_sleep_min` | number | Sleep onset latency (minutes) |
+| `bed_temp_c` | number | Pod temperature (°C) |
+| `bed_temp_f` | number | Pod temperature (°F) |
+| `room_temp_c` | number | Room temperature (°C) |
+| `room_temp_f` | number | Room temperature (°F) |
+| `temp_level_avg` | number | Temp level setting avg (-10 to +10) |
+| `temp_level_min` | number | Temp level min |
+| `temp_level_max` | number | Temp level max |
+| `bed_side` | string | Left or right side of bed |
+| `sleep_onset_hour` | number | Hour of sleep onset (derived) |
+| `wake_hour` | number | Hour of wake (derived) |
+| `sleep_midpoint_hour` | number | Midpoint hour (derived) |
 
 ### hevy (strength training)
 Hevy data is stored at the workout and set level, not day-level aggregates. Access via strength-specific MCP tools (`get_exercise_history`, `get_strength_prs`, etc.) rather than `get_date_range`.
@@ -311,10 +375,10 @@ Hevy data is stored at the workout and set level, not day-level aggregates. Acce
 | `total_fiber_g` | number | Fiber (grams) |
 | `total_sodium_mg` | number | Sodium (mg) |
 | `total_caffeine_mg` | number | Caffeine (mg) |
-| `total_omega3_g` | number | Omega-3 fatty acids (grams) |
+| `total_omega3_total_g` | number | Omega-3 fatty acids total (grams) |
 | `total_potassium_mg` | number | Potassium (mg) |
 | `total_magnesium_mg` | number | Magnesium (mg) |
-| `total_vitamin_d_iu` | number | Vitamin D (IU) |
+| `total_vitamin_d_mcg` | number | Vitamin D (mcg) |
 | `food_log` | list | Nested list of individual food entries with per-item macros and timestamps (HH:MM format) |
 | `protein_distribution_score` | number | % of meals (≥400 kcal) hitting ≥30g protein (Norton/Galpin MPS threshold) |
 | `meals_above_30g_protein` | number | Count of meals meeting ≥30g protein target |
@@ -324,6 +388,62 @@ Hevy data is stored at the workout and set level, not day-level aggregates. Acce
 | `micronutrient_avg_pct` | number | Average sufficiency across tracked nutrients (each capped at 100%) |
 
 Note: `food_log` is a nested list within each day record. Access via `get_food_log` tool rather than `get_date_range`.
+
+### food_delivery (behavioral signal)
+
+Quarterly CSV import with multiple item types per session. Source: `USER#matthew#SOURCE#food_delivery`.
+
+**Transaction items** (`sk = DATE#YYYY-MM-DD#TXN#NNN`):
+| Field | Type | Description |
+|-------|------|-------------|
+| `merchant` | string | Restaurant/service name |
+| `platform` | string | Delivery platform (DoorDash, UberEats, etc.) |
+| `amount` | number | Order amount ($) |
+| `orders_that_day` | number | Total orders that calendar day |
+| `is_binge_day` | boolean | True if 3+ orders in one day |
+
+**Monthly aggregates** (`sk = MONTH#YYYY-MM`):
+| Field | Type | Description |
+|-------|------|-------------|
+| `order_count` | number | Total orders that month |
+| `total_spend` | number | Total spend ($) |
+| `delivery_index` | number | 0-10 normalized index (10 = worst month) |
+| `binge_days` | number | Days with 3+ orders |
+
+**Streak record** (`sk = STREAK#current`):
+| Field | Type | Description |
+|-------|------|-------------|
+| `streak_days` | number | Current delivery-free streak |
+| `last_order_date` | string | Date of most recent order |
+| `longest_ever_streak` | number | All-time longest clean streak |
+
+### measurements (body tape measurements)
+
+Periodic (every 4-8 weeks) body tape measurements. Source: `USER#matthew#SOURCE#measurements`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `session_number` | number | Sequential session count |
+| `measured_by` | string | Person taking measurements |
+| `unit` | string | Always "in" (inches) |
+| `neck_in` | number | Neck circumference |
+| `chest_in` | number | Chest circumference |
+| `waist_narrowest_in` | number | Waist at narrowest point (Attia priority) |
+| `waist_navel_in` | number | Waist at navel (Attia priority — visceral fat proxy) |
+| `hips_in` | number | Hip circumference |
+| `bicep_relaxed_left_in` | number | Left bicep relaxed |
+| `bicep_relaxed_right_in` | number | Right bicep relaxed |
+| `bicep_flexed_left_in` | number | Left bicep flexed |
+| `bicep_flexed_right_in` | number | Right bicep flexed |
+| `calf_left_in` | number | Left calf |
+| `calf_right_in` | number | Right calf |
+| `thigh_left_in` | number | Left thigh (mid-thigh) |
+| `thigh_right_in` | number | Right thigh |
+| `waist_height_ratio` | number | Derived: waist_navel / height (target <0.5) |
+| `bilateral_symmetry_bicep_in` | number | Derived: abs(R-L) relaxed bicep |
+| `bilateral_symmetry_thigh_in` | number | Derived: abs(R-L) thigh |
+| `limb_avg_in` | number | Derived: avg of 4 limb measurements |
+| `trunk_sum_in` | number | Derived: waist_navel + waist_narrowest |
 
 ### macrofactor_workouts (strength training from MacroFactor)
 
