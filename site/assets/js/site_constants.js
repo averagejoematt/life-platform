@@ -14,7 +14,7 @@ window.AMJ = {
 
   // ── Journey ────────────────────────────────────────────────
   journey: {
-    start_weight:  302,
+    start_weight:  307,
     goal_weight:   185,
     start_date:    '2026-04-01',
     experiment_start: '2026-04-01',  // Day 1 of the public experiment
