@@ -4435,6 +4435,126 @@ def handle_frequent_meals() -> dict:
         return _error(503, "Meal data temporarily unavailable.")
 
 
+# ── Meal Glucose Response endpoint ─────────────────────────────
+def handle_meal_glucose() -> dict:
+    """GET /api/meal_glucose — Cross-reference MacroFactor meals with Dexcom CGM spikes."""
+    from datetime import datetime, timezone, timedelta
+    from collections import defaultdict
+    now = datetime.now(timezone.utc)
+    end_date = now.strftime("%Y-%m-%d")
+    start_date = (now - timedelta(days=30)).strftime("%Y-%m-%d")
+
+    try:
+        mf_items = _query_source("macrofactor", start_date, end_date)
+        cgm_items = _query_source("dexcom", start_date, end_date)
+
+        # Build a map of date → glucose readings for spike calculation
+        daily_glucose = {}
+        for item in cgm_items:
+            date = item.get("sk", "").replace("DATE#", "")
+            avg = float(item.get("average_glucose", 0) or 0)
+            peak = float(item.get("max_glucose", 0) or 0)
+            baseline = float(item.get("min_glucose", 0) or 0)
+            tir = float(item.get("time_in_range_pct", 0) or 0)
+            if avg > 0:
+                daily_glucose[date] = {"avg": avg, "peak": peak, "baseline": baseline, "tir": tir}
+
+        # Aggregate meals with glucose context
+        meal_data = defaultdict(lambda: {
+            "cal": 0, "protein": 0, "carbs": 0, "count": 0,
+            "spike_sum": 0, "spike_count": 0, "category": "meal"
+        })
+
+        for day in mf_items:
+            date = day.get("sk", "").replace("DATE#", "")
+            food_log = day.get("food_log") or []
+            glucose = daily_glucose.get(date)
+
+            for entry in food_log:
+                name = (entry.get("food_name") or "").strip()
+                if not name or len(name) < 3:
+                    continue
+                cal = float(entry.get("calories_kcal") or 0)
+                if cal < 100:
+                    continue  # Skip small items (seasonings, condiments)
+
+                m = meal_data[name]
+                m["cal"] += cal
+                m["protein"] += float(entry.get("protein_g") or 0)
+                m["carbs"] += float(entry.get("carbs_g") or 0)
+                m["count"] += 1
+
+                # Estimate category from meal time
+                time_str = entry.get("time") or ""
+                if time_str:
+                    try:
+                        hour = int(time_str.split(":")[0])
+                        if hour < 11:
+                            m["category"] = "breakfast"
+                        elif hour < 15:
+                            m["category"] = "lunch"
+                        elif hour < 18:
+                            m["category"] = "snack"
+                        else:
+                            m["category"] = "dinner"
+                    except (ValueError, IndexError):
+                        pass
+
+                # Approximate spike from daily glucose data
+                if glucose and glucose["peak"] > 0 and glucose["avg"] > 0:
+                    spike = glucose["peak"] - glucose["avg"]
+                    # Weight by carb content — high-carb meals contribute more to spikes
+                    carbs = float(entry.get("carbs_g") or 0)
+                    if carbs > 20:
+                        m["spike_sum"] += spike * 0.8
+                        m["spike_count"] += 1
+                    elif carbs > 5:
+                        m["spike_sum"] += spike * 0.4
+                        m["spike_count"] += 1
+
+        # Build response — top 10 meals by frequency, with glucose grades
+        results = []
+        for name, m in sorted(meal_data.items(), key=lambda x: x[1]["count"], reverse=True)[:10]:
+            cnt = m["count"] or 1
+            avg_cal = round(m["cal"] / cnt)
+            avg_pro = round(m["protein"] / cnt)
+            avg_carb = round(m["carbs"] / cnt)
+            avg_spike = round(m["spike_sum"] / m["spike_count"]) if m["spike_count"] > 0 else None
+
+            # Grade based on estimated spike
+            if avg_spike is None:
+                grade = "?"
+                curve = "gentle"
+            elif avg_spike <= 15:
+                grade = "A"
+                curve = "flat"
+            elif avg_spike <= 25:
+                grade = "B"
+                curve = "gentle"
+            elif avg_spike <= 40:
+                grade = "C"
+                curve = "moderate"
+            else:
+                grade = "D"
+                curve = "steep"
+
+            results.append({
+                "meal": name,
+                "category": m["category"],
+                "calories": avg_cal,
+                "protein": avg_pro,
+                "carbs": avg_carb,
+                "spike": avg_spike if avg_spike is not None else 0,
+                "grade": grade,
+                "curve": curve,
+            })
+
+        return _ok({"meals": results, "period_days": 30, "has_cgm": bool(daily_glucose)}, cache_seconds=3600)
+    except Exception as e:
+        logger.warning(f"[meal_glucose] Failed: {e}")
+        return _error(503, "Meal glucose data temporarily unavailable.")
+
+
 # ── Strength Benchmarks endpoint ──────────────────────────────
 def handle_strength_benchmarks() -> dict:
     """GET /api/strength_benchmarks — Current 1RM and progress from Hevy data."""
@@ -4838,6 +4958,7 @@ ROUTES = {
     # BL-02: Bloodwork/Labs
     "/api/labs":                handle_labs,
     "/api/frequent_meals":      handle_frequent_meals,
+    "/api/meal_glucose":        handle_meal_glucose,
     "/api/strength_benchmarks": handle_strength_benchmarks,
     # Benchmark trends + meal responses (stub endpoints)
     "/api/benchmark_trends":    handle_benchmark_trends,
