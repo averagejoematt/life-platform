@@ -1934,9 +1934,26 @@
       { key: 'bench_press', prefix: 'bp', defaultTarget: 185 },
       { key: 'overhead_press', prefix: 'ohp', defaultTarget: 135 }
     ];
+
+    // Try strength_benchmarks API for live Hevy data
+    function populateBenchmarks(data) {
+      var liftMap = { 'Deadlift': 'dl', 'Squat': 'sq', 'Bench Press': 'bp', 'Overhead Press': 'ohp' };
+      (data || []).forEach(function(b) {
+        var prefix = liftMap[b.lift];
+        if (!prefix) return;
+        setText('bench-' + prefix + '-current', b.current_1rm > 0 ? b.current_1rm + ' lb' : '\u2014');
+        setText('bench-' + prefix + '-target', b.target);
+        setWidth('bench-' + prefix + '-bar', Math.min(100, b.progress_pct));
+        setText('bench-' + prefix + '-pct', b.progress_pct > 0 ? b.progress_pct + '% of target' : '\u2014');
+      });
+    }
+
+    // Use training_overview data first, then fallback to strength_benchmarks API
+    var hasBenchData = false;
     lifts.forEach(function(lift) {
       var b = benchmarks[lift.key] || {};
       var current = b.current_1rm || 0;
+      if (current > 0) hasBenchData = true;
       var target = b.target || lift.defaultTarget;
       var pct = target > 0 ? Math.round((current / target) * 100) : 0;
       setText('bench-' + lift.prefix + '-current', current > 0 ? current + ' lb' : '\u2014');
@@ -1944,6 +1961,11 @@
       setWidth('bench-' + lift.prefix + '-bar', Math.min(100, pct));
       setText('bench-' + lift.prefix + '-pct', pct > 0 ? pct + '% of target' : '\u2014');
     });
+    if (!hasBenchData) {
+      fetch('/api/strength_benchmarks').then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(d) { if (d && d.benchmarks) populateBenchmarks(d.benchmarks); })
+        .catch(function() {});
+    }
 
     /* ── 11d: Compound lift progress sparklines ── */
     var liftHistory = t.lift_history || {};
