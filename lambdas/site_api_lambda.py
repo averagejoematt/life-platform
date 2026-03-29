@@ -706,38 +706,36 @@ def handle_status() -> dict:
     # (source_id, display_name, description, yellow_h, red_h, category)
     # category: "auto" (default), "manual" (blue — infrequent file imports), "onetime" (green — never changes)
     _DATA_SOURCES = [
-        # ── Daily automated feeds ──
-        ("whoop",              "Recovery & Sleep (Whoop)",           "HRV · recovery score · sleep staging",      25,  49, "auto"),
-        ("withings",           "Weigh In (Withings)",                "Weight · body composition · blood pressure", 25,  49, "auto"),
-        ("garmin",             "Activity Tracking (Garmin)",         "Steps · GPS routes · stress · body battery", 25,  49, "auto"),
-        ("strava",             "Cardio & Running (Strava)",          "Activities · segments · training load",      25,  49, "auto"),
-        ("habitify",           "Habit Tracking (Habitify)",          "P40 daily habits · day grades",              25,  49, "auto"),
-        ("eightsleep",         "Sleep Environment (Eight Sleep)",    "Sleep staging · bed temperature · HRV",      25,  49, "auto"),
-        ("macrofactor",        "Nutrition (MacroFactor)",            "Calories · macros · meal timing",            25,  49, "auto"),
-        ("notion",             "Daily Journal (Notion)",             "Journal entries · mood · reflections",       25,  49, "auto"),
-        ("todoist",            "To Do List Feed (Todoist)",          "Tasks · projects · completion rate",          25,  49, "auto"),
-        ("weather",            "Weather Conditions",                 "Daily temperature · conditions · humidity",   25,  49, "auto"),
-        ("supplements",        "Supplement Adherence",               "Daily supplement tracking & compliance",      25,  49, "auto"),
-        ("habit_scores",       "Habit Scores (Computed)",            "Aggregated daily habit grades & streaks",     25,  49, "auto"),
-        # ── Dropbox file drops (check downstream partitions) ──
-        ("macrofactor",        "Food Log (Dropbox)",                 "MacroFactor nutrition CSV via file drop",     25,  49, "auto"),
-        ("macrofactor_workouts","Exercise Log (Dropbox)",            "MacroFactor workout CSV via file drop",       48, 168, "auto"),
-        # ── Health Auto Export (check downstream apple_health partition) ──
-        ("apple_health",       "CGM Glucose (Dexcom Stelo)",        "Continuous glucose monitor readings",          25,  49, "auto"),
-        ("apple_health",       "Water Intake (Health Auto Export)",  "Daily water consumption tracking",            25,  49, "auto"),
-        ("apple_health",       "Blood Pressure (Health Auto Export)","Systolic · diastolic · pulse readings",       168, 336, "auto"),
-        ("apple_health",       "Breathwork (Breathwrk)",            "Breathing exercises · sessions · minutes",    48, 168, "auto"),
-        ("apple_health",       "Stretching (Pliability)",           "Flexibility sessions · recovery minutes",     48, 168, "auto"),
-        ("apple_health",       "Mindful Minutes (Meditation)",      "Meditation & mindfulness sessions",           48, 168, "auto"),
-        ("state_of_mind",      "State of Mind (How We Feel)",       "Mood valence · emotions · life associations", 25,  49, "auto"),
-        # ── Manual import ──
-        ("apple_health",       "Apple Health Import",                "Manual XML export · steps · workouts",       168, 336, "auto"),
-        # ── Infrequent manual (blue) ──
-        ("labs",               "Blood Tests",                        "Lab work · biomarkers · lipid panel",        4320, 8760, "manual"),
-        ("dexa",               "Bone Density & Body Comp (DEXA)",   "DEXA scan · bone density · lean mass",       4320, 8760, "manual"),
-        # ── One-time (green, never stale) ──
-        ("genome",             "Genome (one-time import)",           "Genetic variants · risk scores · SNPs",      999999, 999999, "onetime"),
-        ("food_delivery",      "Food Delivery Index (Behavioral)",  "Quarterly CSV import · delivery index 0-10", 2160, 2880, "auto"),
+        # (source_id, name, description, yellow_h, red_h, category, group)
+        # ── API-Based (daily automated) ──
+        ("whoop",              "Recovery & Sleep (Whoop)",           "HRV · recovery score · sleep staging",      25,  49, "auto",    "API-Based"),
+        ("withings",           "Weigh In (Withings)",                "Weight · body composition · blood pressure", 25,  49, "auto",   "API-Based"),
+        ("garmin",             "Activity Tracking (Garmin)",         "Steps · GPS routes · stress · body battery", 25,  49, "auto",   "API-Based"),
+        ("strava",             "Cardio & Running (Strava)",          "Activities · segments · training load",      25,  49, "auto",    "API-Based"),
+        ("habitify",           "Habit Tracking (Habitify)",          "P40 daily habits · day grades",              25,  49, "auto",    "API-Based"),
+        ("eightsleep",         "Sleep Environment (Eight Sleep)",    "Sleep staging · bed temperature · HRV",      25,  49, "auto",    "API-Based"),
+        ("macrofactor",        "Nutrition (MacroFactor)",            "Calories · macros · meal timing",            25,  49, "auto",    "API-Based"),
+        ("notion",             "Daily Journal (Notion)",             "Journal entries · mood · reflections",       25,  49, "auto",    "API-Based"),
+        ("todoist",            "To Do List Feed (Todoist)",          "Tasks · projects · completion rate",          25,  49, "auto",   "API-Based"),
+        ("weather",            "Weather Conditions",                 "Daily temperature · conditions · humidity",   25,  49, "auto",   "API-Based"),
+        ("supplements",        "Supplement Adherence",               "Daily supplement tracking & compliance",      25,  49, "auto",   "API-Based"),
+        ("habit_scores",       "Habit Scores (Computed)",            "Aggregated daily habit grades & streaks",     25,  49, "auto",   "API-Based"),
+        ("state_of_mind",      "State of Mind (How We Feel)",       "Mood valence · emotions · life associations", 25,  49, "auto",   "API-Based"),
+        # ── Periodic Uploads (file drops, webhooks, manual) ──
+        ("macrofactor",        "Food Log (Dropbox)",                 "MacroFactor nutrition CSV via file drop",     25,  49, "auto",   "Periodic Uploads"),
+        ("macrofactor_workouts","Exercise Log (Dropbox)",            "MacroFactor workout CSV via file drop",       48, 168, "auto",   "Periodic Uploads"),
+        ("apple_health",       "CGM Glucose (Dexcom Stelo)",        "Continuous glucose monitor readings",          25,  49, "auto",  "Periodic Uploads"),
+        ("apple_health",       "Water Intake (Health Auto Export)",  "Daily water consumption tracking",            25,  49, "auto",   "Periodic Uploads"),
+        ("apple_health",       "Blood Pressure (Health Auto Export)","Systolic · diastolic · pulse readings",       168, 336, "auto",  "Periodic Uploads"),
+        ("apple_health",       "Breathwork (Breathwrk)",            "Breathing exercises · sessions · minutes",    48, 168, "auto",   "Periodic Uploads"),
+        ("apple_health",       "Stretching (Pliability)",           "Flexibility sessions · recovery minutes",     48, 168, "auto",   "Periodic Uploads"),
+        ("apple_health",       "Mindful Minutes (Meditation)",      "Meditation & mindfulness sessions",           48, 168, "auto",   "Periodic Uploads"),
+        ("apple_health",       "Apple Health Import",                "Manual XML export · steps · workouts",       168, 336, "auto",  "Periodic Uploads"),
+        ("food_delivery",      "Food Delivery Index (Behavioral)",  "Quarterly CSV import · delivery index 0-10", 2160, 2880, "auto", "Periodic Uploads"),
+        # ── Lab & Clinical (infrequent) ──
+        ("labs",               "Blood Tests",                        "Lab work · biomarkers · lipid panel",        4320, 8760, "manual", "Lab & Clinical"),
+        ("dexa",               "Bone Density & Body Comp (DEXA)",   "DEXA scan · bone density · lean mass",       4320, 8760, "manual", "Lab & Clinical"),
+        ("genome",             "Genome (one-time import)",           "Genetic variants · risk scores · SNPs",      999999, 999999, "onetime", "Lab & Clinical"),
     ]
     _COMPUTE_SOURCES = [
         ("character_sheet",  "Character sheet",  "Pillar scores · level · XP",         25, 49),
@@ -770,21 +768,28 @@ def handle_status() -> dict:
         if not last_date_str:
             return "red", "never", "No records found in DynamoDB"
         last_dt = datetime.strptime(last_date_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        hours_ago = (datetime.now(timezone.utc) - last_dt).total_seconds() / 3600
-        if hours_ago < 1:
-            rel = "< 1h ago"
-        elif hours_ago < 24:
-            rel = f"{int(hours_ago)}h ago"
-        elif hours_ago < 48:
+        now = datetime.now(timezone.utc)
+        days_ago = (now.date() - last_dt.date()).days
+        hours_ago = (now - last_dt).total_seconds() / 3600
+
+        if days_ago == 0:
+            rel = "today"
+        elif days_ago == 1:
             rel = "yesterday"
+        elif days_ago < 7:
+            rel = f"{days_ago}d ago"
         else:
-            rel = f"{int(hours_ago / 24)}d ago"
-        if hours_ago <= yellow_h:
+            rel = f"{days_ago}d ago"
+
+        # For daily sources: today or yesterday = green, 2+ days = check thresholds
+        if days_ago <= 1:
             return "green", rel, None
+        elif days_ago <= 2:
+            return "yellow", rel, f"Last data {rel} — monitoring"
         elif hours_ago <= red_h:
-            return "yellow", rel, f"Last sync {rel} — expected within {yellow_h}h"
+            return "yellow", rel, f"Last data {rel} — expected within {red_h}h"
         else:
-            return "red", rel, f"STALE: last sync {rel}. Threshold exceeded ({red_h}h)."
+            return "red", rel, f"STALE: last data {rel}. Threshold exceeded ({red_h}h)."
 
     def _uptime_90d(source_id):
         """Uptime bars starting from platform launch prep (Mar 29, 2026)."""
@@ -820,6 +825,7 @@ def handle_status() -> dict:
     for row in _DATA_SOURCES:
         sid, name, desc, yh, rh = row[0], row[1], row[2], row[3], row[4]
         category = row[5] if len(row) > 5 else "auto"
+        group = row[6] if len(row) > 6 else "API-Based"
         last = _last_sync(sid)
 
         if category == "onetime":
@@ -858,7 +864,8 @@ def handle_status() -> dict:
 
         ds_components.append({"id": sid, "name": name, "description": desc,
                               "status": status, "last_sync_relative": rel,
-                              "uptime_90d": uptime, "comment": comment})
+                              "uptime_90d": uptime, "comment": comment,
+                              "group": group})
 
     # Compute components
     compute_components = []

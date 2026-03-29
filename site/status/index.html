@@ -35,6 +35,7 @@
     .sec-header { padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; }
     .sec-title { font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: 500; color: var(--accent-dim); letter-spacing: var(--ls-tag); text-transform: uppercase; }
     .sec-sub { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); }
+    .sub-group-header { padding: 8px 14px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-faint); background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border-subtle); border-top: 1px solid var(--border-subtle); }
 
     .comp-row { display: grid; grid-template-columns: 200px 1fr 90px 100px; align-items: start; padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); }
     .comp-row:last-child { border-bottom: none; }
@@ -171,6 +172,21 @@
         sec.innerHTML =
           '<div class="sec-header"><span class="sec-title">' + group.label + '</span><span class="sec-sub">' + group.subtitle + '</span></div>' +
           '<div class="infra-grid">' + group.components.map(buildInfraCard).join('') + '</div>';
+      } else if (group.id === 'data_sources') {
+        // Sub-group data sources by their group field
+        var subGroups = {};
+        var subOrder = [];
+        group.components.forEach(function(c) {
+          var g = c.group || 'Other';
+          if (!subGroups[g]) { subGroups[g] = []; subOrder.push(g); }
+          subGroups[g].push(c);
+        });
+        var innerHtml = '<div class="sec-header"><span class="sec-title">' + group.label + '</span><span class="sec-sub">' + group.subtitle + '</span></div>';
+        subOrder.forEach(function(sg) {
+          innerHtml += '<div class="sub-group-header">' + sg + '</div>';
+          innerHtml += subGroups[sg].map(buildComponentRow).join('');
+        });
+        sec.innerHTML = innerHtml;
       } else {
         sec.innerHTML =
           '<div class="sec-header"><span class="sec-title">' + group.label + '</span><span class="sec-sub">' + group.subtitle + '</span></div>' +
