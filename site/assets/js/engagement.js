@@ -328,7 +328,16 @@
           items.push({
             domain: 'body',
             date: p.date || new Date().toISOString().split('T')[0],
-            headline: 'Day ' + (p.day_number || '?') + ' \u2014 ' + (p.status || 'quiet'),
+            headline: (function() {
+              var launch = new Date('2026-04-01T00:00:00');
+              var now = new Date();
+              if (now < launch) {
+                var daysUntil = Math.ceil((launch - now) / 86400000);
+                return 'T-' + daysUntil + ' \u2014 ' + (p.status || 'quiet');
+              }
+              var daysSince = Math.floor((now - launch) / 86400000) + 1;
+              return 'Day ' + daysSince + ' \u2014 ' + (p.status || 'quiet');
+            })(),
             detail: p.narrative,
             link: '/live/',
             sparkline: null,
