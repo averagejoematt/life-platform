@@ -1031,16 +1031,20 @@ def handle_status() -> dict:
         {"id": "dlq",             "name": "Dead-letter queue",       "description": f"{dlq_depth} messages",               "status": dlq_status, "comment": dlq_comment},
     ]
 
-    # Overall status: only genuinely broken (red) sources affect it.
+    # Overall status: proportional to severity.
     # Exclude: blue (manual/infrequent), gray (idle), yellow (overdue labs etc.)
-    all_statuses = [c["status"] for c in ds_components + compute_components + email_components
-                    if c["status"] not in ("blue", "gray", "yellow")]
-    if "red" in all_statuses:
-        overall = "red"
-    elif "yellow" in all_statuses:
-        overall = "yellow"
-    else:
+    red_components = [c for c in ds_components + compute_components + email_components
+                      if c["status"] == "red"]
+    red_count = len(red_components)
+    total_active = len([c for c in ds_components + compute_components + email_components
+                        if c["status"] not in ("blue", "gray")])
+
+    if red_count == 0:
         overall = "green"
+    elif red_count >= 3 or (total_active > 0 and red_count / total_active > 0.2):
+        overall = "red"  # 3+ failures OR >20% of active pipelines down
+    else:
+        overall = "yellow"  # 1-2 failures = degraded, not down
 
     # ── Cost tracking (AWS Cost Explorer — free API) ──
     cost_info = {}
