@@ -315,6 +315,9 @@
     var section = document.getElementById('amj-pulse-section');
     if (!section) return;
 
+    // Don't show Pulse feed before launch
+    if (new Date() < new Date('2026-04-01T00:00:00')) return;
+
     try {
       // Build pulse items from multiple data sources
       var items = [];
