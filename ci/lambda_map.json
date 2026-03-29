@@ -36,7 +36,7 @@
     "lambdas/dashboard_refresh_lambda.py":   { "function": "dashboard-refresh" },
     "lambdas/data_export_lambda.py":         { "function": "data-export" },
     "lambdas/data_reconciliation_lambda.py": { "function": "data-reconciliation" },
-    "lambdas/dlq_consumer_lambda.py":        { "function": "dlq-consumer", "not_deployed": true },
+    "lambdas/dlq_consumer_lambda.py":        { "function": "life-platform-dlq-consumer" },
     "lambdas/canary_lambda.py":              { "function": "life-platform-canary" },
     "lambdas/qa_smoke_lambda.py":            { "function": "qa-smoke" },
     "lambdas/key_rotator_lambda.py":         { "function": "mcp-key-rotator" },
