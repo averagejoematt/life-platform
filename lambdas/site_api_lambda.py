@@ -205,6 +205,9 @@ CORS_HEADERS = {
     "Access-Control-Allow-Headers": "Content-Type, X-Subscriber-Token",
     "Access-Control-Max-Age":       "3600",
     "Content-Type":                 "application/json",
+    "X-Content-Type-Options":       "nosniff",
+    "X-Frame-Options":              "DENY",
+    "Strict-Transport-Security":    "max-age=31536000; includeSubDomains",
 }
 
 

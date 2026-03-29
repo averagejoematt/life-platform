@@ -494,4 +494,57 @@
       .catch(function() {});
   })();
 
+  // ── SEO: Canonical URL (injected on every page) ──────────
+  (function() {
+    if (document.querySelector('link[rel="canonical"]')) return;
+    var link = document.createElement('link');
+    link.rel = 'canonical';
+    link.href = 'https://averagejoematt.com' + window.location.pathname;
+    document.head.appendChild(link);
+  })();
+
+  // ── SEO: RSS feed discovery (ensure every page declares it) ──
+  (function() {
+    if (document.querySelector('link[type="application/rss+xml"]')) return;
+    var link = document.createElement('link');
+    link.rel = 'alternate';
+    link.type = 'application/rss+xml';
+    link.title = 'The Measured Life';
+    link.href = '/rss.xml';
+    document.head.appendChild(link);
+  })();
+
+  // ── Performance: Font preload for critical fonts ──────────
+  (function() {
+    var fonts = [
+      { href: '/assets/fonts/bebas-neue-400.woff2', type: 'font/woff2' },
+      { href: '/assets/fonts/space-mono-400.woff2', type: 'font/woff2' },
+    ];
+    fonts.forEach(function(f) {
+      var link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'font';
+      link.type = f.type;
+      link.href = f.href;
+      link.crossOrigin = 'anonymous';
+      document.head.appendChild(link);
+    });
+  })();
+
+  // ── Analytics: Google Analytics 4 ─────────────────────────
+  // Replace G-XXXXXXXXXX with your GA4 Measurement ID from analytics.google.com
+  (function() {
+    var GA_ID = 'G-XXXXXXXXXX';
+    if (GA_ID === 'G-XXXXXXXXXX') return; // placeholder — won't load until ID is set
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+    document.head.appendChild(s);
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { window.dataLayer.push(arguments); }
+    window.gtag = gtag;
+    gtag('js', new Date());
+    gtag('config', GA_ID, { send_page_view: true });
+  })();
+
 })();
