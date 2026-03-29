@@ -297,18 +297,26 @@ def _send_welcome_email(email: str) -> None:
   <p style="font-size:15px;color:#8b949e;line-height:1.65;margin:0 0 20px;">
     Every Wednesday you'll get one email &mdash; the actual data from the past week.
     Whoop recovery. Weight trend. Habit performance. What worked, what didn't.
-    Written by an AI journalist named Elena Voss who has unfettered access to everything.
+    Written by an AI journalist with unfettered access to everything.
+  </p>
+
+  <p style="font-size:14px;color:#8b949e;line-height:1.65;margin:0 0 12px;border-left:3px solid #F0B429;padding-left:12px;">
+    Each Wednesday: the week's real data, what worked, what didn't, and one honest verdict from the Board of Directors.
   </p>
 
   <p style="font-size:15px;color:#8b949e;line-height:1.65;margin:0 0 32px;">
     No filters. No "good news only." The bad weeks are in there too.
   </p>
 
-  <a href="{SITE_URL}/chronicle/"
+  <a href="{SITE_URL}/story/"
      style="display:inline-block;background:#F0B429;color:#0D1117;font-size:15px;font-weight:600;
             padding:14px 28px;border-radius:8px;text-decoration:none;">
-    Read the archive while you wait &rarr;
+    Read the story &rarr;
   </a>
+
+  <p style="font-size:13px;color:#484f58;margin:16px 0 0;">
+    <a href="{SITE_URL}/chronicle/" style="color:#8b949e;text-decoration:none;">Browse the Chronicle archive &rarr;</a>
+  </p>
 
   <p style="font-size:12px;color:#484f58;margin:28px 0 0;line-height:1.6;">
     Changed your mind?
