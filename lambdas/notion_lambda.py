@@ -58,10 +58,11 @@ TEMPLATE_SK = {
     "Weekly Reflection": "weekly",
     "Stressor": "stressor",       # numbered: stressor#1, stressor#2
     "Health Event": "health",     # numbered: health#1, health#2
+    "journal": "journal",         # fallback for unstructured entries without Template property
 }
 
 # Templates that allow multiple entries per day
-MULTI_PER_DAY = {"Stressor", "Health Event"}
+MULTI_PER_DAY = {"Stressor", "Health Event", "journal"}
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 secrets = boto3.client("secretsmanager", region_name="us-west-2")
@@ -367,18 +368,24 @@ def parse_page(page, api_key=None):
     """
     props = page.get("properties", {})
 
-    # Required: Date and Template
+    # Date: prefer explicit Date property, fall back to page created_time
     date_str = extract_date_prop(props, "Date")
+    if not date_str:
+        created = page.get("created_time", "")
+        if created:
+            date_str = created[:10]  # ISO format YYYY-MM-DD
+            logger.info(f"Page {page['id']}: no Date property, using created_time {date_str}")
+
+    if not date_str:
+        logger.warning(f"Skipping page {page['id']}: no Date property or created_time")
+        return None
+
+    # Template: prefer explicit Template property, fall back to "journal" for unstructured entries
     template = extract_select_prop(props, "Template")
-
-    if not date_str or not template:
-        logger.warning(f"Skipping page {page['id']}: missing Date or Template "
-                       f"(date={date_str}, template={template})")
-        return None
-
-    if template not in TEMPLATE_SK:
-        logger.warning(f"Skipping page {page['id']}: unknown template '{template}'")
-        return None
+    if not template or template not in TEMPLATE_SK:
+        if template:
+            logger.info(f"Page {page['id']}: unknown template '{template}', treating as journal entry")
+        template = "journal"
 
     # Base fields (all templates)
     item = {
