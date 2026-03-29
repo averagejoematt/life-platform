@@ -864,14 +864,13 @@ def handle_status() -> dict:
             status, rel, comment = _comp_status(last, yh, rh)
             uptime = _uptime_90d(sid)
 
-            # Activity-dependent sources: show "idle" instead of "red" when stale
+            # Activity-dependent sources: pipeline is healthy, just no user activity
             if activity_dep and status == "red" and last:
-                status = "gray"
+                status = "green"
                 comment = f"Pipeline ready \u2014 awaiting user activity. Last data: {rel}"
-                # Show green bars for idle sources (pipeline IS healthy)
                 uptime = [1] * len(uptime)
             elif activity_dep and status == "red" and not last:
-                status = "gray"
+                status = "green"
                 comment = "Pipeline ready \u2014 no data recorded yet"
                 uptime = [1] * max(1, len(uptime))
 
@@ -888,7 +887,7 @@ def handle_status() -> dict:
         uptime = _uptime_90d(sid)
         # Pre-launch: "never" is expected, not broken
         if status == "red" and not last:
-            status = "gray"
+            status = "green"
             rel = "pre-launch"
             comment = "Awaiting first run after April 1 launch"
             uptime = [1] * max(1, len(uptime))
@@ -905,7 +904,7 @@ def handle_status() -> dict:
         uptime = _uptime_90d(f"email_log#{lid}")
         # Pre-launch: weekly emails that haven't fired yet
         if status == "red" and not last:
-            status = "gray"
+            status = "green"
             rel = "scheduled"
             comment = "Awaiting first scheduled run"
             uptime = [1] * max(1, len(uptime))
