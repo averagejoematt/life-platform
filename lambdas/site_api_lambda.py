@@ -866,7 +866,7 @@ def handle_status() -> dict:
         last = _last_sync(sid)
 
         if category == "onetime":
-            # Genome — check if ANY records exist (uses GENE# keys, not DATE#)
+            # Genome — one-time import, no recurring tracking
             try:
                 _gene_resp = table.query(
                     KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{sid}"),
@@ -875,27 +875,35 @@ def handle_status() -> dict:
                 has_data = len(_gene_resp.get("Items", [])) > 0
             except Exception:
                 has_data = False
-            status = "green" if has_data else "red"
+            status = "green" if has_data else "blue"
             rel = "imported" if has_data else "not imported"
-            comment = "One-time data source — does not require refresh" if has_data else "Awaiting initial import"
-            uptime = [1] * 90 if has_data else [0] * 90
+            comment = "One-time import \u2014 data on file" if has_data else "Awaiting initial import"
+            uptime = []  # No daily bars for one-time sources
         elif category == "manual":
-            # Labs / DEXA / Food Delivery Index — blue status, no daily bars
-            status_raw, rel, _ = _comp_status(last, yh, rh)
+            # Labs / DEXA / Food Delivery — due-date tracking
+            # Board recommendation: labs every 6mo, DEXA every 12mo, food delivery every 3mo
+            DUE_MONTHS = {"labs": 6, "dexa": 12, "food_delivery": 3}
+            due_mo = DUE_MONTHS.get(sid, 6)
             if last:
                 last_dt = datetime.strptime(last[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-                months_ago = int((datetime.now(timezone.utc) - last_dt).days / 30)
-                if months_ago < 6:
-                    comment = f"Last updated {rel}. Next recommended: ~6 months"
-                elif months_ago < 12:
-                    comment = f"Last updated {rel}. Consider scheduling a refresh"
+                months_ago = (datetime.now(timezone.utc) - last_dt).days / 30.0
+                due_date = last_dt + timedelta(days=due_mo * 30)
+                due_str = due_date.strftime("%b %Y")
+                if months_ago < due_mo:
+                    status = "green"
+                    comment = f"Last: {rel}. Next due: {due_str}"
+                elif months_ago < due_mo * 1.5:
+                    status = "yellow"
+                    comment = f"Due for refresh ({due_str}). Last: {rel}"
                 else:
-                    comment = f"Last updated {rel}. Overdue for refresh (>12 months)"
-                status = "blue"
+                    status = "yellow"
+                    comment = f"Overdue \u2014 was due {due_str}. Last: {rel}"
+                rel = f"{int(months_ago)}mo ago"
             else:
-                status, comment = "blue", "No data yet \u2014 schedule first appointment"
-            # No daily bars for infrequent sources — they don't make sense
-            uptime = []
+                status = "blue"
+                rel = "never"
+                comment = "No data yet \u2014 schedule first appointment"
+            uptime = []  # No daily bars for infrequent sources
         else:
             status, rel, comment = _comp_status(last, yh, rh)
             uptime = _uptime_90d(sid)
