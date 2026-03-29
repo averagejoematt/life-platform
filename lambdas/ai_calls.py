@@ -1157,10 +1157,10 @@ def call_anthropic(prompt, api_key, max_tokens=200, system=None,
                 time.sleep(delay)
             else:
                 _emit_failure_metric()
-                # R17-16: graceful degradation — log and return "" so callers can
-                # still complete with degraded output rather than failing the Lambda.
-                print(f"[ERROR] Anthropic unavailable after {max_attempts} attempts (HTTP {e.code}). Returning empty.")
-                return ""
+                # R17-16: graceful degradation — return sentinel so callers know AI failed
+                # (not just empty output). Callers should check for AI_UNAVAILABLE.
+                print(f"[ERROR] Anthropic unavailable after {max_attempts} attempts (HTTP {e.code}).")
+                return "[AI_UNAVAILABLE]"
         except urllib.error.URLError as e:
             print(f"[WARN] Anthropic network error attempt {attempt}/{max_attempts}: {e}")
             if attempt < max_attempts:
@@ -1169,9 +1169,8 @@ def call_anthropic(prompt, api_key, max_tokens=200, system=None,
                 time.sleep(delay)
             else:
                 _emit_failure_metric()
-                # R17-16: graceful degradation — network failure after all retries.
-                print(f"[ERROR] Anthropic network unreachable after {max_attempts} attempts: {e}. Returning empty.")
-                return ""
+                print(f"[ERROR] Anthropic network unreachable after {max_attempts} attempts: {e}.")
+                return "[AI_UNAVAILABLE]"
 
 
 # ==============================================================================

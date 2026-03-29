@@ -145,8 +145,8 @@ def write_insight(
         logger.info("[insight_writer] Wrote insight: %s / %s / %s", digest_type, insight_type, thash)
         return item
     except Exception as e:
-        logger.warning("[insight_writer] Failed to write insight: %s", e)
-        return None
+        logger.error("[insight_writer] Failed to write insight — context degradation: %s", e)
+        return None  # Returns None so callers can count failures; logged as ERROR for monitoring
 
 
 def write_insights_batch(insights):

@@ -459,7 +459,11 @@ def store_computed_metrics(
         pass  # validator not bundled — proceed without check
     except Exception as ve:
         logger.warning("[DATA-2] validate_item failed (proceeding with write): %s", ve)
-    table.put_item(Item=item)
+    try:
+        table.put_item(Item=item)
+    except Exception as ddb_err:
+        logger.error(f"[ERROR] CRITICAL: computed_metrics DDB write failed: {ddb_err}")
+        raise
     logger.info(
         "Stored computed_metrics: %s — grade=%s (%s) readiness=%s (%s) "
         "T0_streak=%s TSB=%s",
@@ -827,7 +831,11 @@ def lambda_handler(event, context):
         if _vice_streaks:
             _sick_item["vice_streaks"] = {k: Decimal(str(v)) for k, v in _vice_streaks.items()}
 
-        table.put_item(Item=_sick_item)
+        try:
+            table.put_item(Item=_sick_item)
+        except Exception as ddb_err:
+            logger.error(f"[ERROR] Sick day record write failed: {ddb_err}")
+            raise
         logger.info(f"Sick day record stored for {yesterday_str} — streaks preserved (T0={_t0_streak} T01={_t01_streak})")
         return {
             "statusCode":       200,

@@ -985,7 +985,8 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights, alg
         table.put_item(Item=item)
         print("[INFO] Day grade stored: " + date_str + " -> " + str(total_score) + " (" + grade + ")")
     except Exception as e:
-        print("[WARN] Failed to store day grade: " + str(e))
+        print("[ERROR] CRITICAL: Failed to store day grade: " + str(e))
+        raise  # Re-raise — day grade loss cascades to character sheet + insights
 
 
 def store_habit_scores(date_str, component_details, component_scores, vice_streaks, profile):
@@ -1046,7 +1047,8 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
         table.put_item(Item=item)
         print("[INFO] Habit scores stored: " + date_str + " T0=" + str(t0.get("done", 0)) + "/" + str(t0.get("total", 0)))
     except Exception as e:
-        print("[WARN] Failed to store habit scores: " + str(e))
+        print("[ERROR] CRITICAL: Failed to store habit scores: " + str(e))
+        raise  # Re-raise — habit score loss corrupts character sheet progression
 
 
 # ==============================================================================
@@ -1265,7 +1267,8 @@ def record_email_send(table, lambda_name):
             "ttl": int(_time.time()) + 86400 * 90
         })
     except Exception as e:
-        print(f"[status-tracking] Non-fatal write failure: {e}")
+        print(f"[ERROR] Status tracking write failed — monitoring will be blind: {e}")
+        # Don't re-raise (email already sent) but log as ERROR for CloudWatch alarm
 
 
 def lambda_handler(event, context):
