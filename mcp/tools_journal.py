@@ -167,7 +167,7 @@ def tool_get_mood_trend(args):
     items = _query_journal(start, end)
 
     if not items:
-        return {"trend": [], "message": "No journal entries found for this period."}
+        return {"trend": [], "error": "No journal entries found for this period."}
 
     # Build daily scores (prefer enriched, fall back to structured)
     daily = {}  # date -> {mood, energy, stress, themes, sentiment}
@@ -278,7 +278,7 @@ def tool_get_journal_insights(args):
     items = _query_journal(start, end)
 
     if not items:
-        return {"message": "No journal entries found. Start journaling to unlock insights!"}
+        return {"error": "No journal entries found. Start journaling to unlock insights!"}
 
     # Aggregate enriched signals
     emotions_all = []
@@ -411,7 +411,7 @@ def tool_get_journal_correlations(args):
     # Get journal data
     journal_items = _query_journal(start, end)
     if not journal_items:
-        return {"message": "No journal entries found for correlation analysis."}
+        return {"error": "No journal entries found for correlation analysis."}
 
     # Build daily journal scores
     journal_by_date = {}

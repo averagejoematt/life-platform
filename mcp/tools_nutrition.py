@@ -722,9 +722,9 @@ def tool_get_deficit_sustainability(args):
     hrv_degraded = hrv_dir == "declining" and abs(hrv_delta) > 8
 
     # ── Channel 2: Sleep quality ──
-    eff_vals  = [float(w.get("sleep_efficiency", 0)) for w in whoop_items if w.get("sleep_efficiency")]
-    deep_vals = [float(w.get("deep_sleep_pct") or w.get("sws_pct", 0)) for w in whoop_items
-                 if w.get("deep_sleep_pct") or w.get("sws_pct")]
+    eff_vals  = [float(w.get("sleep_efficiency_pct") or w.get("sleep_efficiency_percentage", 0)) for w in whoop_items if w.get("sleep_efficiency_pct") or w.get("sleep_efficiency_percentage")]
+    deep_vals = [float(w.get("slow_wave_sleep_hours", 0)) / max(float(w.get("sleep_duration_hours", 1)), 1) * 100 for w in whoop_items
+                 if w.get("slow_wave_sleep_hours") and w.get("sleep_duration_hours")]
     eff_dir, eff_delta   = trend_direction(eff_vals)
     deep_dir, deep_delta = trend_direction(deep_vals)
     sleep_degraded = (eff_dir == "declining" and abs(eff_delta) > 3) or \

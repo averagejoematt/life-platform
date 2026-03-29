@@ -102,6 +102,10 @@ def tool_get_measurement_trends(args):
             "baseline": sessions[0],
             "latest": sessions[0],
             "sessions_count": 1,
+            "weeks_elapsed": 0,
+            "deltas_from_baseline": {},
+            "rate_of_change_per_4_weeks": {},
+            "recomposition_score": {"sessions": [], "recomposition_rate": 0, "verdict": "Baseline only — need session 2"},
             "note": "Trend analysis available after session 2. This is the baseline.",
         }
 

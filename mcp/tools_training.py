@@ -88,7 +88,7 @@ def tool_get_training_load(args):
         })
 
     if not result_rows:
-        return {"message": "No training data found for the requested window."}
+        return {"error": "No training data found for the requested window."}
 
     latest = result_rows[-1]
     peak_ctl = max(result_rows, key=lambda r: r["ctl_fitness"])

@@ -149,7 +149,7 @@ def tool_get_cgm_dashboard(args):
 
     return {
         "period": {"start": start_date, "end": end_date},
-        "summary": summary, "trend": trend, "clinical_flags": flags if flags else None, "daily": rows,
+        "summary": summary, "trend": trend, "clinical_flags": flags or [], "daily": rows,
         "note": "Targets: mean <100, SD <20, TIR >90%, fasting <90. Time above 140 triggers insulin + inflammation.",
     }
 

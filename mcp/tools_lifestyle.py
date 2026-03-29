@@ -166,7 +166,7 @@ def _fetch_weather_range(start_date, end_date):
 
             daily = data.get("daily", {})
             dates = daily.get("time", [])
-            table = boto3.resource("dynamodb", region_name=_REGION).Table(TABLE_NAME)  # noqa: F821
+            # Use module-level table from mcp.config (was broken: referenced undefined _REGION/TABLE_NAME)
 
             new_records = []
             for i, date_str in enumerate(dates):
@@ -395,7 +395,7 @@ def tool_log_supplement(args):
     # Remove None values
     entry = {k: v for k, v in entry.items() if v is not None and v != ""}
 
-    table = boto3.resource("dynamodb", region_name=_REGION).Table(TABLE_NAME)  # noqa: F821
+    # Use module-level table from mcp.config (was broken: referenced undefined _REGION/TABLE_NAME)
 
     # Try to append to existing record, or create new
     try:
@@ -925,7 +925,7 @@ def tool_get_social_connection_trend(args):
     health_correlations = []
     HEALTH_SOURCES = [
         ("whoop", "recovery_score", "Recovery"), ("whoop", "hrv", "HRV"),
-        ("whoop", "sleep_quality_score", "Sleep Score"), ("garmin", "avg_stress", "Stress"),
+        ("whoop", "sleep_score", "Sleep Score"), ("garmin", "avg_stress", "Stress"),
         ("garmin", "body_battery_high", "Body Battery"),
     ]
     health_data = {}
@@ -1062,7 +1062,7 @@ def tool_get_social_isolation_risk(args):
         pre_start = (ep_start - timedelta(days=7)).strftime("%Y-%m-%d")
         pre_end = (ep_start - timedelta(days=1)).strftime("%Y-%m-%d")
         impact = {"episode": ep, "health_deltas": {}}
-        for src, field, label in [("whoop","recovery_score","Recovery"),("whoop","hrv","HRV"),("whoop","sleep_quality_score","Sleep"),("garmin","avg_stress","Stress")]:
+        for src, field, label in [("whoop","recovery_score","Recovery"),("whoop","hrv","HRV"),("whoop","sleep_score","Sleep"),("garmin","avg_stress","Stress")]:
             pre_vals = [_sf(health_data.get(src,{}).get(d,{}).get(field)) for d in health_data.get(src,{}) if pre_start <= d <= pre_end]
             ep_vals = [_sf(health_data.get(src,{}).get(d,{}).get(field)) for d in health_data.get(src,{}) if ep["start"] <= d <= ep["end"]]
             pa, ea = _avg(pre_vals), _avg(ep_vals)
@@ -1151,8 +1151,8 @@ def tool_get_meditation_correlation(args):
     non_practice_dates = [d for d in all_dates if d not in daily_minutes]
     COMPARE_METRICS = [
         ("whoop","recovery_score","Recovery","higher_is_better"),("whoop","hrv","HRV","higher_is_better"),
-        ("whoop","resting_heart_rate","Resting HR","lower_is_better"),("whoop","sleep_quality_score","Sleep Score","higher_is_better"),
-        ("whoop","sleep_efficiency_percentage","Sleep Efficiency","higher_is_better"),("garmin","avg_stress","Stress","lower_is_better"),
+        ("whoop","resting_heart_rate","Resting HR","lower_is_better"),("whoop","sleep_score","Sleep Score","higher_is_better"),
+        ("whoop","sleep_efficiency_pct","Sleep Efficiency","higher_is_better"),("garmin","avg_stress","Stress","lower_is_better"),
         ("garmin","body_battery_high","Body Battery","higher_is_better"),
     ]
 
@@ -1448,8 +1448,8 @@ def tool_get_jet_lag_recovery(args):
         ("whoop", "recovery_score", "Recovery Score", True),
         ("whoop", "hrv", "HRV", True),
         ("whoop", "resting_heart_rate", "Resting HR", False),
-        ("whoop", "sleep_quality_score", "Sleep Score", True),
-        ("whoop", "sleep_efficiency_percentage", "Sleep Efficiency", True),
+        ("whoop", "sleep_score", "Sleep Score", True),
+        ("whoop", "sleep_efficiency_pct", "Sleep Efficiency", True),
         ("garmin", "body_battery_high", "Body Battery", True),
         ("garmin", "avg_stress", "Stress", False),
         ("apple_health", "steps", "Steps", True),
@@ -1948,8 +1948,8 @@ def tool_get_blood_pressure_correlation(args):
         ("Sodium (mg)",        mf_map, "total_sodium_mg"),
         ("Calories",           mf_map, "total_calories_kcal"),
         ("Caffeine (mg)",      ah_map, "caffeine_mg"),
-        ("Sleep Efficiency %", wh_map, "sleep_efficiency_percentage"),
-        ("Sleep Score",        wh_map, "sleep_quality_score"),
+        ("Sleep Efficiency %", wh_map, "sleep_efficiency_pct"),
+        ("Sleep Score",        wh_map, "sleep_score"),
         ("Recovery Score",     wh_map, "recovery_score"),
         ("HRV",               wh_map, "hrv"),
         ("Garmin Stress",      ga_map, "avg_stress"),
