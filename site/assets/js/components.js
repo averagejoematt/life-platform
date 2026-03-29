@@ -71,7 +71,7 @@
       { href: '/builders/',     text: 'For Builders' },
     ]},
     { label: 'The Chronicle', items: [
-      { href: '/chronicle/', text: 'Chronicle Archive' },
+      { href: '/chronicle/', text: 'Chronicle' },
       { href: '/weekly/',    text: 'Weekly Snapshots' },
       { href: '/recap/',     text: 'Weekly Recap' },
       { href: '/ask/',       text: 'Ask the Data' },
@@ -221,7 +221,7 @@
         { href: '/builders/', text: 'For Builders' },
       ]},
       { heading: 'The Chronicle', links: [
-        { href: '/chronicle/', text: 'Chronicle Archive' },
+        { href: '/chronicle/', text: 'Chronicle' },
         { href: '/weekly/', text: 'Weekly Snapshots' },
         { href: '/recap/', text: 'Weekly Recap' },
         { href: '/ask/', text: 'Ask the Data' },
@@ -230,7 +230,7 @@
       { heading: 'Internal', links: [
         { href: '/status/', text: 'System Status', id: 'footer-status-link' },
         { href: 'https://dash.averagejoematt.com', text: 'Clinician View', locked: true },
-        { href: 'https://buddy.averagejoematt.com', text: 'Buddy Dashboard', locked: true },
+        { href: '#', text: 'Buddy Dashboard', locked: true },
         { href: 'https://discord.gg/T4Ndt2WsU', text: 'Join the community', external: true, community: true },
         { href: '/rss.xml', text: 'RSS Feed' },
         { href: '/privacy/', text: 'Privacy' },
