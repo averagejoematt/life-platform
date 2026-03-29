@@ -584,7 +584,7 @@
      9. PULL-QUOTE #2 (right-offset)
      ═══════════════════════════════════════════════════════════ -->
 <div class="h-pullquote h-pullquote--right reveal">
-  <blockquote class="h-pullquote__text">
+  <blockquote class="h-pullquote__text" id="h-elena-quote">
     &ldquo;The weeks I&rsquo;m not logging, that&rsquo;s the report in itself.&rdquo;
   </blockquote>
   <div class="h-pullquote__badge">Elena Voss &middot; Chronicle narrator</div>
@@ -793,7 +793,18 @@
       setText('h-obs-training', tText);
     }
 
-    // ── Character stats (async) ──
+    // ── PB-R1: Character from public_stats.json (instant, no extra fetch) ──
+    var psChar = raw.character || {};
+    if (psChar.level) {
+      charLevel = Math.round(psChar.level);
+      setText('h-g-char-num', charLevel);
+      setArc('h-g-char-arc', Math.min(100, (charLevel / 20) * 100));
+      var psTier = psChar.tier || 'Foundation';
+      setText('h-obs-mind', 'Level ' + charLevel + ' \u00b7 ' + (psChar.tier_emoji || '') + ' ' + psTier);
+      if (statsEl) statsEl.textContent = 'Day ' + daysIn + (wLbs ? ' \u00b7 ' + wLbs.toFixed(1) + ' lbs' : '') + ' \u00b7 Level ' + charLevel;
+    }
+
+    // ── Character stats (async fallback — overrides above if API returns richer data) ──
     try {
       var cr = await fetch('/api/character_stats');
       if (cr.ok) {
@@ -837,6 +848,24 @@
       if (cl.excerpt) setText('h-chron-excerpt', cl.excerpt);
       var chronLink = document.getElementById('h-chronicle-latest');
       if (chronLink && cl.url) chronLink.href = cl.url;
+    }
+
+    // ── PB-R1: Elena's live read — replaces static pull-quote ──
+    var elenaLine = raw.elena_hero_line;
+    if (elenaLine) {
+      var elenaEl = document.getElementById('h-elena-quote');
+      if (elenaEl) elenaEl.innerHTML = '\u201c' + elenaLine + '\u201d';
+    }
+
+    // ── PB-R1: Updated timestamp on hero stats line ──
+    var refreshTs = meta.refreshed_at || meta.generated_at;
+    if (refreshTs && statsEl) {
+      try {
+        var rdt = new Date(refreshTs);
+        var diffH = Math.round((Date.now() - rdt.getTime()) / 3600000);
+        var updStr = diffH < 1 ? 'just now' : diffH < 24 ? diffH + 'h ago' : rdt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        statsEl.textContent = statsEl.textContent + ' \u00b7 Updated ' + updStr;
+      } catch(e2) {}
     }
 
     // ── Nav date ──

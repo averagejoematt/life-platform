@@ -195,7 +195,8 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
                        platform: dict = None, table_client=None, user_id: str = "matthew",
                        trends: dict = None, brief_excerpt: str = None,
                        baseline: dict = None, group_narratives: dict = None,
-                       elena_hero_line: str = None) -> bool:
+                       elena_hero_line: str = None,
+                       character: dict = None) -> bool:
     """
     Write public_stats.json to S3 from daily-brief-lambda data.
 
@@ -224,6 +225,10 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
                       Populated from profile fields or known journey-start readings.
         elena_hero_line: optional one-sentence Elena Voss observation for homepage
                       hero section. Updated weekly when Chronicle publishes.
+        character:    optional dict with character sheet headline data:
+                      { level, tier, tier_emoji, xp_total, composite_score,
+                        next_level_xp, xp_to_next, days_active }
+                      Populated from character_sheet_compute output.
 
     Returns:
         True on success, False on failure (non-fatal — never raise)
@@ -270,6 +275,8 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
             "elena_hero_line": elena_hero_line,
             # HP-14: Recent Chronicle entries for homepage cards
             "chronicle_recent": _json_safe(chronicle_recent) if chronicle_recent else [],
+            # PB-R1: Character sheet headline data for homepage heartbeat + nav badge
+            "character": _json_safe(character) if character else None,
         }
 
         s3_client.put_object(
@@ -279,7 +286,7 @@ def write_public_stats(s3_client, vitals: dict, journey: dict, training: dict,
             ContentType="application/json",
             CacheControl="max-age=3600",
         )
-        logger.info("[site_writer] public_stats.json written to S3 (hero + chronicle + baseline + elena + chronicle_recent)")
+        logger.info("[site_writer] public_stats.json written to S3 (hero + chronicle + baseline + elena + character + chronicle_recent)")
         return True
 
     except Exception as e:

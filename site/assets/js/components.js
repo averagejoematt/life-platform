@@ -105,6 +105,8 @@
   function buildNav() {
     var html = '<nav class="nav">';
     html += '<a href="/" class="nav__brand">AJM</a>';
+    // PB-R1: Character level badge — populated by JS after public_stats fetch
+    html += '<a href="/character/" class="nav__level" id="nav-level" style="display:none" title="Character Sheet"></a>';
     html += '<div class="nav__links">';
 
     SECTIONS.forEach(function(sec) {
@@ -549,6 +551,41 @@
     window.gtag = gtag;
     gtag('js', new Date());
     gtag('config', GA_ID, { send_page_view: true });
+  })();
+
+  // ── PB-R1: Populate nav level badge from public_stats ────
+  (function() {
+    function showBadge(level, emoji) {
+      var el = document.getElementById('nav-level');
+      if (!el || !level) return;
+      el.textContent = 'Lv ' + level + (emoji ? ' ' + emoji : '');
+      el.style.display = '';
+    }
+
+    function checkGlobal() {
+      // Homepage stores stats in window.__amjStats
+      if (window.__amjStats && window.__amjStats.character) {
+        var ch = window.__amjStats.character;
+        showBadge(ch.level, ch.tier_emoji);
+        return true;
+      }
+      return false;
+    }
+
+    // On non-homepage pages, fetch public_stats directly
+    if (!checkGlobal()) {
+      setTimeout(function() {
+        if (checkGlobal()) return;
+        fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' })
+          .then(function(r) { return r.ok ? r.json() : null; })
+          .then(function(d) {
+            if (d && d.character) {
+              showBadge(d.character.level, d.character.tier_emoji);
+            }
+          })
+          .catch(function() {});
+      }, 500);
+    }
   })();
 
 })();
