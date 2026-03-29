@@ -516,7 +516,7 @@ def lambda_handler(event, context):
           {"start": "...", "end": "..."}  → backfill date range
           {"full_sync": true}             → fetch ALL entries (initial load)
         """
-        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+        if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
         api_key, database_id = get_secrets()
 
         # Determine date range

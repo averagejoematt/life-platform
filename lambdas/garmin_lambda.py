@@ -783,7 +783,7 @@ def ingest_day(target_date: str, secret: dict, api=None) -> dict:
 def lambda_handler(event, context):
     try:
         import time as _time
-        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+        if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
 
         secret = get_secret()
 
