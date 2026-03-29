@@ -945,7 +945,7 @@ def lambda_handler(event, context):
       - Authorization: Bearer <api_key> header
     """
     _request_start = datetime.now(timezone.utc)
-    logger.set_date(_request_start.strftime("%Y-%m-%d"))  # OBS-1
+    if hasattr(logger, "set_date"): logger.set_date(_request_start.strftime("%Y-%m-%d"))  # OBS-1
     print(f"Health Auto Export webhook received")
 
     # ── Auth ──

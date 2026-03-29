@@ -433,7 +433,7 @@ def _ingest_single_day(date_str, secret):
 def lambda_handler(event, context):
     try:
         import time as _time
-        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+        if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
 
         # ── Mode 1: Explicit date (manual invoke / backfill) ──
         if "date" in event:
