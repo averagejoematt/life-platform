@@ -231,8 +231,8 @@
       ]},
       { heading: 'Internal', links: [
         { href: '/status/', text: 'System Status', id: 'footer-status-link' },
-        { href: 'https://dash.averagejoematt.com', text: 'Clinician View', locked: true },
-        { href: '#', text: 'Buddy Dashboard', locked: true },
+        { href: 'https://dash.averagejoematt.com/clinical.html', text: 'Clinician View', locked: true },
+        { href: '/accountability/', text: 'Buddy Dashboard', locked: true },
         { href: 'https://discord.gg/T4Ndt2WsU', text: 'Join the community', external: true, community: true },
         { href: '/rss.xml', text: 'RSS Feed' },
         { href: '/privacy/', text: 'Privacy' },
