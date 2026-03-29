@@ -828,13 +828,13 @@ def handle_status() -> dict:
             return "red", rel, f"STALE: last data {rel}. Threshold exceeded ({red_h}h)."
 
     def _uptime_90d(source_id):
-        """Uptime bars including today. Today/yesterday with data = green, without = neutral (2)."""
+        """Uptime bars including today. All sources use same window for visual alignment."""
         try:
             epoch_start = datetime(2026, 3, 28, tzinfo=timezone.utc).date()
             today = datetime.now(timezone.utc).date()
             window_days = min(90, (today - epoch_start).days + 1)
             if window_days < 1:
-                return [1]
+                return [2]  # pre-epoch: neutral
 
             resp = table.query(
                 KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source_id}") & Key("sk").between(
@@ -848,13 +848,13 @@ def handle_status() -> dict:
                 d = (today - timedelta(days=i)).isoformat()
                 if d in present:
                     bars.append(1)  # green — data exists
-                elif i == 0:
-                    bars.append(2)  # neutral — today, data may come later
+                elif i <= 1:
+                    bars.append(2)  # neutral — today or yesterday, data may come later
                 else:
-                    bars.append(0)  # red — past day with no data
+                    bars.append(0)  # red — older day with no data
             return bars
         except Exception:
-            return [1]
+            return [2]
 
     def _sched_aware(status, rel, exp_dow):
         if exp_dow < 0 or today_dow == exp_dow:
@@ -917,15 +917,17 @@ def handle_status() -> dict:
             status, rel, comment = _comp_status(last, yh, rh)
             uptime = _uptime_90d(sid)
 
-            # Activity-dependent sources: pipeline is healthy, just no user activity
-            if activity_dep and status == "red" and last:
-                status = "green"
-                comment = f"Pipeline ready \u2014 awaiting user activity. Last data: {rel}"
-                uptime = [1] * len(uptime)
-            elif activity_dep and status == "red" and not last:
-                status = "green"
-                comment = "Pipeline ready \u2014 no data recorded yet"
-                uptime = [1] * max(1, len(uptime))
+            # Activity-dependent sources: check if pipeline is actually healthy
+            # If there's an active CloudWatch alarm, the pipeline is broken — keep red
+            if activity_dep and status == "red" and sid not in alarming_sources:
+                if last:
+                    status = "green"
+                    comment = f"Pipeline ready \u2014 awaiting user activity. Last data: {rel}"
+                    uptime = [1] * len(uptime)
+                else:
+                    status = "green"
+                    comment = "Pipeline ready \u2014 no data recorded yet"
+                    uptime = [1] * max(1, len(uptime))
 
         # CloudWatch alarm override — if Lambda is actively erroring, show red
         if sid in alarming_sources and status != "blue":
@@ -1003,10 +1005,10 @@ def handle_status() -> dict:
         {"id": "dlq",             "name": "Dead-letter queue",       "description": f"{dlq_depth} messages",               "status": dlq_status, "comment": dlq_comment},
     ]
 
-    # Exclude blue (manual import) and onetime from overall health — they're not system issues
-    # Exclude blue (manual) and gray (idle/activity-dependent) from overall health
+    # Overall status: only genuinely broken (red) sources affect it.
+    # Exclude: blue (manual/infrequent), gray (idle), yellow (overdue labs etc.)
     all_statuses = [c["status"] for c in ds_components + compute_components + email_components
-                    if c["status"] not in ("blue", "gray")]
+                    if c["status"] not in ("blue", "gray", "yellow")]
     if "red" in all_statuses:
         overall = "red"
     elif "yellow" in all_statuses:
