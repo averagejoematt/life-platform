@@ -62,7 +62,7 @@ KNOWN_SECRETS = {
     "life-platform/ingestion-keys",
     "life-platform/webhook-key",
     "life-platform/mcp-api-key",
-    "life-platform/google-calendar",  # added v3.7.21
+    # life-platform/google-calendar removed — retired ADR-030 (v3.7.46)
 }
 
 # Secrets permanently deleted — any source reference is an SR2 violation.
