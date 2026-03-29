@@ -740,45 +740,44 @@ def handle_status() -> dict:
 
     # (source_id, display_name, description, yellow_h, red_h, category)
     # category: "auto" (default), "manual" (blue — infrequent file imports), "onetime" (green — never changes)
-    # activity_dependent: True = user must do something for data to flow (e.g., run, log habit)
-    # When stale AND activity_dependent, show "idle" (gray) instead of "red"
+    # Restructured: name is the DATA type, source app is separate
+    # (source_id, name, description, yellow_h, red_h, category, group, activity_dependent, source_app)
     _DATA_SOURCES = [
-        # (source_id, name, description, yellow_h, red_h, category, group, activity_dependent)
-        # ── API-Based (fully automated — pipeline pulls without user action) ──
-        ("whoop",              "Recovery & Sleep (Whoop)",           "HRV · recovery score · sleep staging",      25,  49, "auto",    "API-Based", False),
-        ("withings",           "Weigh In (Withings)",                "Weight · body composition · blood pressure", 25,  49, "auto",   "API-Based", True),
-        ("eightsleep",         "Sleep Environment (Eight Sleep)",    "Sleep staging · bed temperature · HRV",      25,  49, "auto",    "API-Based", False),
-        ("todoist",            "To Do List Feed (Todoist)",          "Tasks · projects · completion rate",          25,  49, "auto",   "API-Based", False),
-        ("weather",            "Weather Conditions",                 "Daily temperature · conditions · humidity",   25,  49, "auto",   "API-Based", False),
-        ("habit_scores",       "Habit Scores (Computed)",            "Aggregated daily habit grades & streaks",     25,  49, "auto",   "API-Based", False),
-        ("garmin",             "Activity Tracking (Garmin)",         "Steps · GPS routes · stress · body battery", 25,  49, "auto",   "API-Based", True),
-        ("strava",             "Cardio & Running (Strava)",          "Activities · segments · training load",      25,  49, "auto",    "API-Based", True),
-        ("notion",             "Daily Journal (Notion)",             "Journal entries · mood · reflections",       25,  49, "auto",    "API-Based", True),
-        # ── User-Driven (requires user to log/sync/upload) ──
-        ("habitify",           "Habit Tracking (Habitify)",          "P40 daily habits · day grades",              25,  49, "auto",    "User-Driven", True),
-        ("macrofactor",        "Nutrition (MacroFactor)",            "Calories · macros · meal timing",            25,  49, "auto",    "User-Driven", True),
-        ("supplements",        "Supplement Adherence",               "Daily supplement tracking & compliance",      25,  49, "auto",   "User-Driven", True),
-        ("state_of_mind",      "State of Mind (How We Feel)",       "Mood valence · emotions · life associations", 25,  49, "auto",   "User-Driven", True),
+        # ── API-Based (fully automated) ──
+        ("whoop",              "Recovery & Sleep Data",              "HRV \u00B7 recovery score \u00B7 sleep staging",      25,  49, "auto",    "API-Based", False, "Whoop"),
+        ("withings",           "Weight Data",                        "Weight \u00B7 body composition \u00B7 blood pressure", 25,  49, "auto",   "API-Based", True,  "Withings"),
+        ("eightsleep",         "Sleep Environment Data",             "Sleep staging \u00B7 bed temperature \u00B7 HRV",      25,  49, "auto",    "API-Based", False, "Eight Sleep"),
+        ("todoist",            "To Do Task Data",                    "Tasks \u00B7 projects \u00B7 completion rate",          25,  49, "auto",   "API-Based", False, "Todoist"),
+        ("weather",            "Weather Data",                       "Daily temperature \u00B7 conditions \u00B7 humidity",   25,  49, "auto",   "API-Based", "OpenWeather"),
+        ("garmin",             "Activity Tracking (1 of 2)",         "Steps \u00B7 GPS routes \u00B7 stress \u00B7 body battery", 25,  49, "auto",   "API-Based", True,  "Garmin"),
+        ("strava",             "Activity Tracking (2 of 2)",         "Activities \u00B7 segments \u00B7 training load",      25,  49, "auto",    "API-Based", True,  "Strava"),
+        ("notion",             "Journal Data",                       "Journal entries \u00B7 mood \u00B7 reflections",       25,  49, "auto",    "API-Based", True,  "Notion"),
+        # ── User-Driven (requires user to log/sync) ──
+        ("habitify",           "Habit Tracking Data",                "Daily habits \u00B7 day grades",                       25,  49, "auto",    "User-Driven", True,  "Habitify"),
+        ("macrofactor",        "Nutrition Data",                     "Calories \u00B7 macros \u00B7 meal timing",            25,  49, "auto",    "User-Driven", True,  "MacroFactor via Dropbox"),
+        ("supplements",        "Supplement Adherence",               "Daily supplement tracking & compliance",                25,  49, "auto",   "User-Driven", True,  "Habitify"),
+        ("state_of_mind",      "State of Mind Data",                 "Mood valence \u00B7 emotions \u00B7 life areas",      25,  49, "auto",   "User-Driven", True,  "Apple Health via Health Exporter"),
         # ── Periodic Uploads (file drops, webhooks, device sync) ──
-        ("macrofactor_workouts","Exercise Log (Dropbox)",            "MacroFactor workout CSV via file drop",       48, 168, "auto",   "Periodic Uploads", True),
-        ("apple_health",       "CGM Glucose (Dexcom Stelo)",        "Continuous glucose monitor readings",          25,  49, "auto",  "Periodic Uploads", True),
-        ("apple_health",       "Water Intake (Health Auto Export)",  "Daily water consumption tracking",            25,  49, "auto",   "Periodic Uploads", True),
-        ("apple_health",       "Blood Pressure (Health Auto Export)","Systolic · diastolic · pulse readings",       168, 336, "auto",  "Periodic Uploads", True),
-        ("apple_health",       "Breathwork (Breathwrk)",            "Breathing exercises · sessions · minutes",    48, 168, "auto",   "Periodic Uploads", True),
-        ("apple_health",       "Stretching (Pliability)",           "Flexibility sessions · recovery minutes",     48, 168, "auto",   "Periodic Uploads", True),
-        ("apple_health",       "Mindful Minutes (Meditation)",      "Meditation & mindfulness sessions",           48, 168, "auto",   "Periodic Uploads", True),
-        ("apple_health",       "Apple Health Import",                "Manual XML export · steps · workouts",       168, 336, "auto",  "Periodic Uploads", True),
-        ("food_delivery",      "Food Delivery Index (Behavioral)",  "Quarterly CSV import · delivery index 0-10", 2160, 2880, "manual", "Periodic Uploads", True),
+        ("macrofactor_workouts","Exercise Log Data",                 "Workout CSV via file drop",                             48, 168, "auto",   "Periodic Uploads", True,  "MacroFactor via Dropbox"),
+        ("apple_health",       "CGM Glucose Data",                   "Continuous glucose monitor readings",                   25,  49, "auto",  "Periodic Uploads", True,  "Dexcom Stelo via Health Exporter"),
+        ("apple_health",       "Water Intake Data",                  "Daily water consumption tracking",                      25,  49, "auto",   "Periodic Uploads", True,  "Apple Health via Health Exporter"),
+        ("apple_health",       "Blood Pressure Data",                "Systolic \u00B7 diastolic \u00B7 pulse",               168, 336, "auto",  "Periodic Uploads", True,  "Apple Health via Health Exporter"),
+        ("apple_health",       "Breathwork Data",                    "Breathing exercises \u00B7 sessions",                   48, 168, "auto",   "Periodic Uploads", True,  "Breathwrk via Health Exporter"),
+        ("apple_health",       "Stretching Data",                    "Flexibility sessions \u00B7 recovery",                  48, 168, "auto",   "Periodic Uploads", True,  "Pliability via Health Exporter"),
+        ("apple_health",       "Mindful Minutes Data",               "Meditation & mindfulness sessions",                     48, 168, "auto",   "Periodic Uploads", True,  "Apple Health via Health Exporter"),
+        ("apple_health",       "Apple Health Import",                 "Manual XML export \u00B7 steps \u00B7 workouts",      168, 336, "auto",  "Periodic Uploads", True,  "Apple Health (manual)"),
+        ("food_delivery",      "Food Delivery Index",                "Quarterly CSV import \u00B7 delivery index 0-10",     2160, 2880, "manual", "Periodic Uploads", True, "CSV upload"),
         # ── Lab & Clinical (infrequent) ──
-        ("labs",               "Blood Tests",                        "Lab work · biomarkers · lipid panel",        4320, 8760, "manual", "Lab & Clinical", True),
-        ("dexa",               "Bone Density & Body Comp (DEXA)",   "DEXA scan · bone density · lean mass",       4320, 8760, "manual", "Lab & Clinical", True),
-        ("genome",             "Genome (one-time import)",           "Genetic variants · risk scores · SNPs",      999999, 999999, "onetime", "Lab & Clinical", False),
+        ("labs",               "Blood Test Results",                  "Lab work \u00B7 biomarkers \u00B7 lipid panel",       4320, 8760, "manual", "Lab & Clinical", True,  "Function Health"),
+        ("dexa",               "Bone Density & Body Comp",           "DEXA scan \u00B7 bone density \u00B7 lean mass",      4320, 8760, "manual", "Lab & Clinical", True,  "Clinical (manual)"),
+        ("genome",             "Genome Data",                         "Genetic variants \u00B7 risk scores \u00B7 SNPs",    999999, 999999, "onetime", "Lab & Clinical", False, "23andMe (one-time)"),
     ]
     _COMPUTE_SOURCES = [
-        ("character_sheet",  "Character sheet",  "Pillar scores · level · XP",         25, 49),
-        ("computed_metrics", "Daily metrics",    "Cross-domain computed signals",       25, 49),
-        ("insights",         "Daily insights",   "IC-8 intent vs execution",            25, 49),
-        ("adaptive_mode",    "Adaptive mode",    "Engagement scoring · brief mode",     25, 49),
+        ("character_sheet",  "Character Sheet",        "Pillar scores \u00B7 level \u00B7 XP",         25, 49),
+        ("computed_metrics", "Daily Metrics",          "Cross-domain computed signals",                 25, 49),
+        ("habit_scores",     "Habit Score Aggregation", "Tier scores \u00B7 streaks \u00B7 grades",    25, 49),
+        ("insights",         "Daily Insights",         "IC-8 intent vs execution",                     25, 49),
+        ("adaptive_mode",    "Adaptive Mode",          "Engagement scoring \u00B7 brief mode",         25, 49),
     ]
     _EMAIL_LAMBDAS = [
         ("daily_brief",         "Daily brief",         "11:00 AM daily · 18 sections",     -1, 25,  49),
@@ -829,24 +828,33 @@ def handle_status() -> dict:
             return "red", rel, f"STALE: last data {rel}. Threshold exceeded ({red_h}h)."
 
     def _uptime_90d(source_id):
-        """Uptime bars showing completed days only (excludes today — data not expected yet)."""
+        """Uptime bars including today. Today/yesterday with data = green, without = neutral (2)."""
         try:
             epoch_start = datetime(2026, 3, 28, tzinfo=timezone.utc).date()
-            yesterday = datetime.now(timezone.utc).date() - timedelta(days=1)
-            window_days = min(90, (yesterday - epoch_start).days + 1)
+            today = datetime.now(timezone.utc).date()
+            window_days = min(90, (today - epoch_start).days + 1)
             if window_days < 1:
-                return [1]  # No completed days yet — show green (pipeline exists)
+                return [1]
 
             resp = table.query(
                 KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source_id}") & Key("sk").between(
-                    f"DATE#{epoch_start.isoformat()}", f"DATE#{yesterday.isoformat()}"
+                    f"DATE#{epoch_start.isoformat()}", f"DATE#{today.isoformat()}"
                 ),
                 ProjectionExpression="sk",
             )
             present = {item["sk"].replace("DATE#", "")[:10] for item in resp.get("Items", [])}
-            return [1 if (yesterday - timedelta(days=i)).isoformat() in present else 0 for i in range(window_days - 1, -1, -1)]
+            bars = []
+            for i in range(window_days - 1, -1, -1):
+                d = (today - timedelta(days=i)).isoformat()
+                if d in present:
+                    bars.append(1)  # green — data exists
+                elif i == 0:
+                    bars.append(2)  # neutral — today, data may come later
+                else:
+                    bars.append(0)  # red — past day with no data
+            return bars
         except Exception:
-            return [1]  # Assume healthy on error
+            return [1]
 
     def _sched_aware(status, rel, exp_dow):
         if exp_dow < 0 or today_dow == exp_dow:
@@ -863,6 +871,7 @@ def handle_status() -> dict:
         category = row[5] if len(row) > 5 else "auto"
         group = row[6] if len(row) > 6 else "API-Based"
         activity_dep = row[7] if len(row) > 7 else False
+        source_app = row[8] if len(row) > 8 else ""
         last = _last_sync(sid)
 
         if category == "onetime":
@@ -926,7 +935,7 @@ def handle_status() -> dict:
         ds_components.append({"id": sid, "name": name, "description": desc,
                               "status": status, "last_sync_relative": rel,
                               "uptime_90d": uptime, "comment": comment,
-                              "group": group})
+                              "group": group, "source_app": source_app})
 
     # Compute components
     compute_components = []
@@ -967,14 +976,31 @@ def handle_status() -> dict:
                                  "status": status, "last_sync_relative": rel,
                                  "uptime_90d": uptime, "comment": comment})
 
-    # Infrastructure (static — always green unless manually updated)
+    # Infrastructure
+    # DLQ depth check
+    dlq_depth = 0
+    dlq_status = "green"
+    dlq_comment = None
+    try:
+        sqs = boto3.client("sqs", region_name=REGION)
+        dlq_attrs = sqs.get_queue_attributes(
+            QueueUrl=f"https://sqs.{REGION}.amazonaws.com/205930651321/life-platform-ingestion-dlq",
+            AttributeNames=["ApproximateNumberOfMessages"],
+        )
+        dlq_depth = int(dlq_attrs["Attributes"]["ApproximateNumberOfMessages"])
+        if dlq_depth > 0:
+            dlq_status = "yellow" if dlq_depth < 10 else "red"
+            dlq_comment = f"{dlq_depth} messages in dead-letter queue"
+    except Exception:
+        pass
+
     infra = [
-        {"id": "cloudfront_main", "name": "averagejoematt.com",     "description": "CloudFront · 12 pages",         "status": "green", "comment": None},
-        {"id": "site_api",        "name": "Site API Lambda",         "description": "us-east-1 · public read-only",  "status": "green", "comment": None},
-        {"id": "mcp_server",      "name": "MCP server",              "description": "us-west-2 · 95+ tools",        "status": "green", "comment": None},
-        {"id": "dynamodb",        "name": "DynamoDB",                "description": "on-demand · PITR enabled",      "status": "green", "comment": None},
-        {"id": "ses",             "name": "SES email delivery",      "description": "Production mode · receipt rule", "status": "green", "comment": None},
-        {"id": "dlq",             "name": "Dead-letter queue",       "description": "life-platform-ingestion-dlq",    "status": "green", "comment": None},
+        {"id": "cloudfront_main", "name": "averagejoematt.com",     "description": "CloudFront \u00B7 66 pages",         "status": "green", "comment": None},
+        {"id": "site_api",        "name": "Site API Lambda",         "description": "us-west-2 \u00B7 60+ endpoints",    "status": "green", "comment": None},
+        {"id": "mcp_server",      "name": "MCP server",              "description": "us-west-2 \u00B7 116 tools",        "status": "green", "comment": None},
+        {"id": "dynamodb",        "name": "DynamoDB",                "description": "on-demand \u00B7 PITR enabled",      "status": "green", "comment": None},
+        {"id": "ses",             "name": "SES email delivery",      "description": "Production mode \u00B7 receipt rule", "status": "green", "comment": None},
+        {"id": "dlq",             "name": "Dead-letter queue",       "description": f"{dlq_depth} messages",               "status": dlq_status, "comment": dlq_comment},
     ]
 
     # Exclude blue (manual import) and onetime from overall health — they're not system issues

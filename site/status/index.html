@@ -136,7 +136,7 @@
   function buildUptimeBar(arr) {
     if (!arr || !arr.length) return '<div class="uptime-label">no data</div>';
     var bars = arr.slice(-30).map(function(v) {
-      var cls = v === 1 ? 'up' : v === 2 ? 'warn' : v === 0 ? 'down' : 'na';
+      var cls = v === 1 ? 'up' : v === 2 ? 'na' : v === 0 ? 'down' : 'na';
       return '<div class="bar ' + cls + '"></div>';
     }).join('');
     return '<div class="uptime-bar">' + bars + '</div><div class="uptime-label">30 days</div>';
@@ -148,8 +148,9 @@
     var comment = c.comment
       ? '<div class="comment-strip ' + commentCls + '">' + commentIcon + c.comment + '</div>'
       : '';
+    var sourceTag = c.source_app ? '<div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);margin-top:3px">Source: ' + c.source_app + '</div>' : '';
     return '<div class="comp-row">' +
-      '<div><div class="comp-name">' + c.name + '</div><div class="comp-desc">' + c.description + '</div></div>' +
+      '<div><div class="comp-name">' + c.name + '</div><div class="comp-desc">' + c.description + sourceTag + '</div></div>' +
       '<div class="uptime-wrap">' + buildUptimeBar(c.uptime_90d) + '</div>' +
       '<div class="sync-time"><strong>' + (c.last_sync_relative || '\u2014') + '</strong></div>' +
       '<div><span class="pill ' + c.status + '">' + (STATUS_LABELS[c.status] || c.status) + '</span></div>' +
@@ -179,25 +180,7 @@
     document.getElementById('lastUpdated').textContent =
       'updated ' + genAt.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
 
-    // Cost tracking section
-    if (data.cost && data.cost.mtd !== undefined) {
-      var c = data.cost;
-      var costHtml = '<div class="status-section" style="margin-bottom:var(--space-4)">';
-      costHtml += '<div class="sec-header"><span class="sec-title">AWS Cost</span><span class="sec-sub">$' + c.budget + '/mo budget</span></div>';
-      costHtml += '<div style="padding:14px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">';
-      costHtml += '<div style="font-family:var(--font-mono);font-size:13px;color:var(--text)">';
-      costHtml += '<strong>$' + c.mtd.toFixed(2) + '</strong> month-to-date';
-      costHtml += '</div>';
-      costHtml += '<div style="font-family:var(--font-mono);font-size:13px;color:var(--text-muted)">';
-      costHtml += 'Projected: <strong>$' + c.projected.toFixed(2) + '</strong>';
-      costHtml += '</div>';
-      costHtml += '<span class="pill ' + c.status + '">' + c.pct_of_budget + '% of budget</span>';
-      costHtml += '</div></div>';
-      groups.innerHTML = costHtml;
-    } else {
-      groups.innerHTML = '';
-    }
-
+    groups.innerHTML = '';
     data.groups.forEach(function(group) {
       var sec = document.createElement('div');
       sec.className = 'status-section';
@@ -227,6 +210,21 @@
       }
       groups.appendChild(sec);
     });
+
+    // Cost section — at the bottom
+    if (data.cost && data.cost.mtd !== undefined) {
+      var c = data.cost;
+      var costSec = document.createElement('div');
+      costSec.className = 'status-section';
+      costSec.innerHTML =
+        '<div class="sec-header"><span class="sec-title">AWS Cost</span><span class="sec-sub">$' + c.budget + '/mo budget</span></div>' +
+        '<div style="padding:14px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">' +
+        '<div style="font-family:var(--font-mono);font-size:13px;color:var(--text)"><strong>$' + c.mtd.toFixed(2) + '</strong> month-to-date</div>' +
+        '<div style="font-family:var(--font-mono);font-size:13px;color:var(--text-muted)">Projected: <strong>$' + c.projected.toFixed(2) + '</strong></div>' +
+        '<span class="pill ' + c.status + '">' + c.pct_of_budget + '% of budget</span>' +
+        '</div>';
+      groups.appendChild(costSec);
+    }
   }
 
   function fetchStatus() {
