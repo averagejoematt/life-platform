@@ -68,6 +68,21 @@
     .pill.blue { background: rgba(91,164,207,0.12); color: #5ba4cf; }
     .pill.blue::before { background: #5ba4cf; }
 
+    /* Light mode overrides — darker/richer colors for readability on white */
+    :root[data-theme="light"] .pill.green { background: rgba(5,150,60,0.12); color: #059640; }
+    :root[data-theme="light"] .pill.green::before { background: #059640; }
+    :root[data-theme="light"] .pill.red { background: rgba(220,30,30,0.12); color: #dc1e1e; }
+    :root[data-theme="light"] .pill.red::before { background: #dc1e1e; }
+    :root[data-theme="light"] .pill.yellow { background: rgba(180,120,0,0.12); color: #b47800; }
+    :root[data-theme="light"] .pill.yellow::before { background: #b47800; }
+    :root[data-theme="light"] .bar.up { background: #059640; opacity: 0.8; }
+    :root[data-theme="light"] .bar.down { background: #dc1e1e; opacity: 0.8; }
+    :root[data-theme="light"] .bar.warn { background: #b47800; }
+    :root[data-theme="light"] .overall-banner.green { background: rgba(5,150,60,0.08); border-color: rgba(5,150,60,0.3); }
+    :root[data-theme="light"] .overall-banner.red { background: rgba(220,30,30,0.08); border-color: rgba(220,30,30,0.3); }
+    :root[data-theme="light"] .overall-banner.green .overall-dot { background: #059640; }
+    :root[data-theme="light"] .overall-banner.red .overall-dot { background: #dc1e1e; }
+
     .comment-strip { grid-column: 1 / -1; margin-top: 6px; font-family: var(--font-mono); font-size: 10px; background: rgba(245,166,35,0.08); color: var(--c-yellow-status); border-radius: 4px; padding: 5px 8px; line-height: 1.4; }
     .comment-strip.red { background: rgba(255,77,77,0.08); color: var(--c-red-status); }
     .comment-strip.blue { background: rgba(91,164,207,0.08); color: #5ba4cf; }
