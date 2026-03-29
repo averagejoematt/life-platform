@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="I've lost 100 pounds before. Multiple times. This platform is my attempt to understand why it keeps coming back.">
+  <meta property="og:title" content="The Mission — averagejoematt.com">
+  <meta property="og:description" content="IT career, no engineering degree. Building a 25-source AI health platform to catch what willpower can't. Starting April 1.">
+  <meta property="og:type" content="profile">
+  <meta property="og:url" content="https://averagejoematt.com/about/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The Mission — averagejoematt.com">
+  <meta name="twitter:description" content="IT career, no engineering degree. Building a 25-source AI health platform to catch what willpower can't. Starting April 1.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <title>The Mission — averagejoematt.com</title>
+    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .page-header {
+      padding: var(--space-20) var(--page-padding) var(--space-16);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--content-width);
+      margin: 0 auto;
+    }
+    .page-header__kicker {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      margin-bottom: var(--space-6);
+    }
+    .page-header__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h1);
+      line-height: var(--lh-display);
+      color: var(--text);
+      letter-spacing: var(--ls-display);
+      margin-bottom: var(--space-8);
+    }
+    .page-header__title span { color: var(--accent); }
+    .page-header__sub {
+      font-size: var(--text-lg);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      max-width: var(--prose-width);
+    }
+
+    /* ── Bio section ── */
+    .bio-section {
+      padding: var(--space-20) var(--page-padding);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-16);
+      max-width: var(--content-width);
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+    .bio-prose {
+      font-size: var(--text-lg);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .bio-prose p { margin-bottom: var(--space-6); }
+    .bio-prose p:last-child { margin-bottom: 0; }
+    .bio-prose strong { color: var(--text); font-weight: 600; }
+    .bio-prose a { color: var(--accent); border-bottom: 1px solid var(--accent-dim); transition: border-color var(--dur-fast); }
+    .bio-prose a:hover { border-color: var(--accent); }
+
+    /* ── Sidebar stats ── */
+    .bio-sidebar {}
+    .sidebar-block {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: var(--space-6);
+      margin-bottom: var(--space-4);
+    }
+    .sidebar-block:last-child { margin-bottom: 0; }
+    .sidebar-block__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-3);
+    }
+    .sidebar-block__value {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--accent);
+      line-height: 1;
+      letter-spacing: var(--ls-display);
+    }
+    .sidebar-block__note {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      margin-top: var(--space-2);
+      line-height: var(--lh-body);
+    }
+
+    /* ── Links section ── */
+    .links-section {
+      padding: var(--space-16) var(--page-padding);
+      max-width: var(--content-width);
+      margin: 0 auto;
+    }
+    .links-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-top: var(--space-10);
+    }
+    .link-card {
+      background: var(--surface);
+      padding: var(--space-8) var(--space-6);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+      transition: background var(--dur-fast);
+      text-decoration: none;
+    }
+    .link-card:hover { background: var(--surface-raised); }
+    .link-card__label {
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+    }
+    .link-card__title {
+      font-family: var(--font-display);
+      font-size: var(--text-h3);
+      color: var(--text);
+      line-height: var(--lh-heading);
+    }
+    .link-card__desc {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+      flex: 1;
+    }
+    .link-card__arrow {
+      font-size: var(--text-xs);
+      color: var(--accent);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+    }
+
+    /* ── Stack section ── */
+    .stack-section {
+      padding: var(--space-16) var(--page-padding);
+      max-width: var(--content-width);
+      margin: 0 auto;
+      border-top: 1px solid var(--border);
+    }
+    .stack-row {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: var(--space-8);
+      padding: var(--space-5) 0;
+      border-bottom: 1px solid var(--border-subtle);
+      align-items: start;
+    }
+    .stack-row:first-of-type { border-top: 1px solid var(--border-subtle); }
+    .stack-row__label {
+      font-size: var(--text-xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--accent-dim);
+      padding-top: 2px;
+    }
+    .stack-row__value {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
+    .stack-row__value strong { color: var(--text); }
+
+    @media (max-width: 900px) {
+      .bio-section { grid-template-columns: 1fr; }
+      .links-grid { grid-template-columns: 1fr; }
+      .stack-row { grid-template-columns: 1fr; gap: var(--space-2); }
+    }
+  </style>
+</head>
+<body class="body-story">
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+
+<div class="page-header animate-in">
+  <p class="page-header__kicker">The Story</p>
+  <h1 class="page-header__title">The <span>Mission</span></h1>
+  <p class="page-header__sub">
+    IT career background. No engineering degree. Just systems thinking,
+    a lot of reading, and Claude as a full-time engineering partner.
+  </p>
+</div>
+
+<section class="bio-section">
+  <div class="bio-prose animate-in">
+    <p>
+      I've spent twenty years making complex systems reliable. In February 2026, I turned that thinking on myself — and built the platform this site runs on.
+    </p>
+    <p>
+      My job has always been making complex systems reliable and getting people to actually
+      use them. I'm not a developer by training — I'd never written and deployed production application code,
+      though I've shipped plenty of infrastructure changes, database updates, and network upgrades. But I understand systems, and I understand what it takes to change behavior.
+    </p>
+    <p>
+      In February 2026, I decided to apply that same thinking to myself.
+      Not a challenge. Not a hack. <strong>A proper system</strong> — with data sources,
+      intelligence layers, automated coaching, and public accountability.
+    </p>
+    <p>
+      I built the Life Platform as a solo project: <span data-const="platform.data_sources">19</span> data sources, <span data-const="platform.mcp_tools">95</span> intelligence tools,
+      <span data-const="platform.lambdas">50</span> Lambda functions, and an AI that writes me a coaching brief every morning.
+      The whole thing runs on AWS for <span data-const="platform.monthly_cost">~$13</span>/month. Every number is real.
+      Every failure is included.
+    </p>
+    <p>
+      This project also became a proof of concept for something I care about:
+      <strong>what happens when non-engineers get genuine access to AI development tools?</strong>
+      The answer, so far, is that they build things nobody expected &mdash; including themselves.
+    </p>
+  </div>
+
+  <div class="bio-sidebar">
+    <!-- A-2: Mission Brief Dossier -->
+    <div class="animate-in" style="border:1px solid var(--border);background:var(--surface);overflow:hidden;">
+      <div style="padding:var(--space-4) var(--space-5);border-bottom:1px solid var(--border);background:var(--bg);">
+        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent);">Mission brief</div>
+        <div style="font-family:var(--font-display);font-size:20px;color:var(--text);letter-spacing:var(--ls-display);margin-top:var(--space-1);">What Does Done Look Like?</div>
+      </div>
+
+      <!-- Physical -->
+      <div style="padding:var(--space-4) var(--space-5);border-bottom:1px solid var(--border-subtle);">
+        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-3);">Physical</div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-2);">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <span style="font-size:var(--text-xs);color:var(--text-muted);">Weight</span>
+            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text);"><span id="about-weight" data-const="journey.start_weight">302</span> &rarr; <span data-const="journey.goal_weight" style="color:var(--accent)">185</span> lbs</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <span style="font-size:var(--text-xs);color:var(--text-muted);">Lost so far</span>
+            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);" id="about-lost">— lbs</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <span style="font-size:var(--text-xs);color:var(--text-muted);">Movement</span>
+            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text);">Walk, lift, run. Daily.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mental & Social -->
+      <div style="padding:var(--space-4) var(--space-5);border-bottom:1px solid var(--border-subtle);">
+        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-violet-400, #a78bfa);margin-bottom:var(--space-3);">Mind &amp; Connection</div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-2);">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <span style="font-size:var(--text-xs);color:var(--text-muted);">Social</span>
+            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text);">Close friends, closer family</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <span style="font-size:var(--text-xs);color:var(--text-muted);">Mental health</span>
+            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text);">Less noise, more presence</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <span style="font-size:var(--text-xs);color:var(--text-muted);">Journaling</span>
+            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text);">Consistent &mdash; the data needs it</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <span style="font-size:var(--text-xs);color:var(--text-muted);">Satisfaction</span>
+            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text);">Content. Not performing it.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- System -->
+      <div style="padding:var(--space-4) var(--space-5);border-bottom:1px solid var(--border-subtle);">
+        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3);">The System</div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-2);">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <span style="font-size:var(--text-xs);color:var(--text-muted);">Character score</span>
+            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);">7 pillars &rarr; 80+/100</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <span style="font-size:var(--text-xs);color:var(--text-muted);">Consistency</span>
+            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text);">No more 5-month gaps</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Current status -->
+      <div style="padding:var(--space-4) var(--space-5);background:var(--bg);">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <span style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);">Status</span>
+          <span id="about-status-day" style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);">Launching April 1</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:var(--space-2);">
+          <span style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);">Based in</span>
+          <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);">Seattle, WA</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:var(--space-10) var(--page-padding);max-width:var(--content-width);margin:0 auto;border-bottom:1px solid var(--border);">
+  <div style="border-left:2px solid var(--accent);padding:var(--space-5) var(--space-6);background:var(--accent-bg-subtle);max-width:var(--prose-width);">
+    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3)">Why not just use Apple Health?</div>
+    <p style="font-size:var(--text-base);color:var(--text-muted);line-height:var(--lh-body)">
+      Apple Health aggregates data but doesn't analyze it. There's no AI coaching layer, no cross-source correlation engine, no character sheet, no public accountability system, and no weekly narrative journalism. The value of this platform isn't the data collection — it's the intelligence layer on top: the part that notices your HRV dropped the same week you stopped journaling, and asks you why.
+    </p>
+  </div>
+</section>
+
+<section class="links-section">
+  <div class="eyebrow">Explore the project</div>
+  <h2 class="text-h2" style="color:var(--text)">What I've built</h2>
+
+  <div class="links-grid">
+    <a href="/story/" class="link-card">
+      <span class="link-card__label">Origin</span>
+      <span class="link-card__title">The Story</span>
+      <span class="link-card__desc">Where this started, what the first 90 days actually looked like, and why I decided to do it in public.</span>
+      <span class="link-card__arrow">Read →</span>
+    </a>
+    <a href="/platform/" class="link-card">
+      <span class="link-card__label">Architecture</span>
+      <span class="link-card__title">The Platform</span>
+      <span class="link-card__desc"><span data-const="platform.lambdas">50</span> Lambda functions, <span data-const="platform.data_sources">19</span> data sources, <span data-const="platform.mcp_tools">95</span> intelligence tools. How the system actually works.</span>
+      <span class="link-card__arrow">See the stack →</span>
+    </a>
+    <a href="/chronicle/" class="link-card">
+      <span class="link-card__label">Weekly</span>
+      <span class="link-card__title">The Chronicle</span>
+      <span class="link-card__desc">An AI journalist named Elena Voss reads my data every week and writes about what she finds.</span>
+      <span class="link-card__arrow">Read the journal →</span>
+    </a>
+  </div>
+</section>
+
+<section class="stack-section">
+  <div class="eyebrow">Technical context</div>
+  <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-10)">The build</h2>
+
+  <div class="stack-row">
+    <span class="stack-row__label">Role</span>
+    <span class="stack-row__value">Solo developer. <strong>Claude</strong> handles all code generation; I handle architecture, product decisions, and every deploy.</span>
+  </div>
+  <div class="stack-row">
+    <span class="stack-row__label">Infrastructure</span>
+    <span class="stack-row__value"><strong>AWS</strong> — Lambda, DynamoDB, S3, CloudFront, EventBridge, SES, Secrets Manager. Single AWS account, us-west-2.</span>
+  </div>
+  <div class="stack-row">
+    <span class="stack-row__label">Intelligence</span>
+    <span class="stack-row__value"><strong>Anthropic Claude</strong> via MCP protocol — 95 tools exposed to Claude for live data access. Opus 4 for clinical reasoning, Sonnet 4 for structured outputs, Haiku 4 for lightweight daily compute.</span>
+  </div>
+  <div class="stack-row">
+    <span class="stack-row__label">Data sources</span>
+    <span class="stack-row__value"><strong>19 active</strong> — Whoop, Eight Sleep, Withings, Garmin, Strava, Apple Health, MacroFactor, Habitify, Notion, Todoist, Dexcom Stelo, genome, labs, DEXA, weather, travel, blood pressure, supplements, state of mind.</span>
+  </div>
+  <div class="stack-row">
+    <span class="stack-row__label">Test coverage</span>
+    <span class="stack-row__value"><strong><span data-const="platform.test_count">83</span> tests, all passing.</strong> Architecture Review #<span data-const="platform.review_count">17</span>: grade <span data-const="platform.review_grade">A-</span>. CI/CD pipeline with auto-rollback.</span>
+  </div>
+  <div class="stack-row">
+    <span class="stack-row__label">Cost</span>
+    <span class="stack-row__value"><strong>~$13/month</strong> on AWS. Anthropic API calls are the variable cost; Lambda compute is negligible.</span>
+  </div>
+  <div class="stack-row">
+    <span class="stack-row__label">Purpose</span>
+    <span class="stack-row__value">Personal health intelligence, accountability, and a live demonstration of what non-engineers can build with AI. Started February 2026.</span>
+  </div>
+</section>
+
+<!-- Connect section -->
+<section style="
+  padding: var(--space-16) var(--page-padding);
+  max-width: var(--content-width);
+  margin: 0 auto;
+  border-top: 1px solid var(--border);
+">
+  <div class="eyebrow">Get in touch</div>
+  <h2 class="text-h2" style="color:var(--text);margin-bottom:var(--space-8)">If You Want to <span style="color:var(--accent)">Connect</span></h2>
+
+  <div style="
+    border-left: 3px solid var(--accent);
+    padding: var(--space-6) var(--space-8);
+    background: var(--surface);
+    margin-bottom: var(--space-10);
+    max-width: var(--prose-width);
+  ">
+    <p style="font-size:var(--text-lg);color:var(--text);line-height:var(--lh-body)">
+      This started as a personal project, and I haven't deliberately built it for an audience beyond the people already in my life. But if something here resonates &mdash; if you're going through something similar, if you're curious about the platform, or if you just want to say hello &mdash; I'd genuinely love to hear from you.
+    </p>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:var(--space-6)">
+    <a href="mailto:matt@averagejoematt.com" class="btn btn--primary">Say hello</a>
+    <span style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono)">matt@averagejoematt.com</span>
+  </div>
+</section>
+
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+<div id="amj-reading-path"></div>
+<div id="amj-footer"></div>
+
+<script>
+// Load live weight + dynamic sidebar updates
+(async function() {
+  try {
+    const r = await fetch('/public_stats.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    const w = (d.vitals || {}).weight_lbs || (d.hero || {}).current_weight_lbs;
+    if (w) {
+      var rounded = Math.round(w * 10) / 10;
+      var el = document.getElementById('about-weight');
+      if (el) el.textContent = rounded;
+      var lostEl = document.getElementById('about-lost');
+      if (lostEl) {
+        var lost = Math.max(0, 302 - rounded);
+        if (lost > 0) lostEl.textContent = lost.toFixed(1) + ' lbs';
+      }
+    }
+  } catch(e) {}
+})();
+
+// Live status day counter
+(function() {
+  var el = document.getElementById('about-status-day');
+  if (!el) return;
+  var msIn = Date.now() - new Date('2026-04-01T07:00:00-07:00').getTime();
+  if (msIn >= 0) {
+    var dayNum = Math.max(1, Math.floor(msIn / 86400000) + 1);
+    el.textContent = 'Day ' + dayNum + ' \u2014 Active';
+  }
+})();
+
+// Subscribe handled by components.js via amj-subscribe placeholder
+</script>
+<nav class="reading-path-v2">
+  <a href="/story/" class="reading-path-v2__link">
+    <span class="reading-path-v2__dir">← Previous</span>
+    <span class="reading-path-v2__title">The Story</span>
+  </a>
+  <a href="/live/" class="reading-path-v2__link reading-path-v2__link--next">
+    <span class="reading-path-v2__dir">Next →</span>
+    <span class="reading-path-v2__title">Live Data</span>
+  </a>
+</nav>
+
+<script src="/assets/js/animations.js" defer></script>
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>
