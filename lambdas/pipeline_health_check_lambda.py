@@ -92,21 +92,28 @@ def lambda_handler(event, context):
     pass_count = 0
     fail_count = 0
 
-    for fn_name, display_name, source_id in PIPELINES:
+    # Run probes in parallel (was sequential — caused 480s+ worst case)
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def _run_probe(pipeline):
+        fn_name, display_name, source_id = pipeline
         logger.info(f"Probing {display_name} ({fn_name})...")
         result = _probe_lambda(fn_name)
         result["function_name"] = fn_name
         result["display_name"] = display_name
         result["source_id"] = source_id
-        results.append(result)
+        return result
 
-        if result["healthy"]:
-            pass_count += 1
-        else:
-            fail_count += 1
-            logger.warning(f"FAIL: {display_name} — {result.get('error_type')}: {result.get('error_message')}")
-
-        time.sleep(0.5)
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(_run_probe, p): p for p in PIPELINES}
+        for future in as_completed(futures):
+            result = future.result()
+            results.append(result)
+            if result["healthy"]:
+                pass_count += 1
+            else:
+                fail_count += 1
+                logger.warning(f"FAIL: {result['display_name']} — {result.get('error_type')}: {result.get('error_message')}")
 
     # Secret health check — detect deleted/missing secrets
     sm = boto3.client("secretsmanager", region_name=REGION)
