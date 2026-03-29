@@ -4201,6 +4201,27 @@ def handle_training_overview() -> dict:
     strain_vals = [float(w["strain"]) for w in whoop_30d if w.get("strain")]
     avg_strain = round(sum(strain_vals) / len(strain_vals), 1) if strain_vals else None
 
+    # Whoop workouts — per-workout HR zone data (enriches Strava)
+    whoop_workouts = []
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}whoop") & Key("sk").between(
+                f"DATE#{d30}#WORKOUT#", f"DATE#{today}#WORKOUT#~"
+            ),
+        )
+        whoop_workouts = _decimal_to_float(resp.get("Items", []))
+        # Add Whoop Z2 minutes from actual HR zones to the Z2 calculation
+        for ww in whoop_workouts:
+            z2_from_whoop = float(ww.get("zone_2_minutes", 0) or 0)
+            if z2_from_whoop > 0:
+                z2_minutes_30d += z2_from_whoop
+        # Recalculate Z2 weekly avg with Whoop data
+        if whoop_workouts:
+            z2_weekly_avg = round(z2_minutes_30d / 4.3)
+            z2_pct = round(z2_weekly_avg / z2_target * 100) if z2_target else 0
+    except Exception as e:
+        logger.warning(f"[training_overview] Whoop workout query failed (non-fatal): {e}")
+
     # Hevy — latest strength session info
     hevy_items = _query_source("hevy", d30, today)
     strength_sessions_30d = len(hevy_items)
@@ -4240,8 +4261,18 @@ def handle_training_overview() -> dict:
             "avg_strain": avg_strain,
             "strength_sessions_30d": strength_sessions_30d,
             "top_activities": [{"type": t, "count": c} for t, c in top_activities],
+            "whoop_workout_count": len(whoop_workouts),
         },
         "weekly_trend": weekly_trend,
+        "whoop_workouts": [{
+            "date": w.get("date"),
+            "sport_name": w.get("sport_name", "Activity"),
+            "strain": w.get("strain"),
+            "zone_2_minutes": w.get("zone_2_minutes"),
+            "zone_3_minutes": w.get("zone_3_minutes"),
+            "distance_meter": w.get("distance_meter"),
+            "average_heart_rate": w.get("average_heart_rate"),
+        } for w in whoop_workouts[:20]],
     }, cache_seconds=3600)
 
 
