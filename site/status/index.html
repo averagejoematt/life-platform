@@ -179,7 +179,25 @@
     document.getElementById('lastUpdated').textContent =
       'updated ' + genAt.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
 
-    groups.innerHTML = '';
+    // Cost tracking section
+    if (data.cost && data.cost.mtd !== undefined) {
+      var c = data.cost;
+      var costHtml = '<div class="status-section" style="margin-bottom:var(--space-4)">';
+      costHtml += '<div class="sec-header"><span class="sec-title">AWS Cost</span><span class="sec-sub">$' + c.budget + '/mo budget</span></div>';
+      costHtml += '<div style="padding:14px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">';
+      costHtml += '<div style="font-family:var(--font-mono);font-size:13px;color:var(--text)">';
+      costHtml += '<strong>$' + c.mtd.toFixed(2) + '</strong> month-to-date';
+      costHtml += '</div>';
+      costHtml += '<div style="font-family:var(--font-mono);font-size:13px;color:var(--text-muted)">';
+      costHtml += 'Projected: <strong>$' + c.projected.toFixed(2) + '</strong>';
+      costHtml += '</div>';
+      costHtml += '<span class="pill ' + c.status + '">' + c.pct_of_budget + '% of budget</span>';
+      costHtml += '</div></div>';
+      groups.innerHTML = costHtml;
+    } else {
+      groups.innerHTML = '';
+    }
+
     data.groups.forEach(function(group) {
       var sec = document.createElement('div');
       sec.className = 'status-section';
