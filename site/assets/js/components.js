@@ -291,21 +291,25 @@
   function buildSubscribeCTA() {
     var slug = path.replace(/\//g, '').replace(/-/g, '') || 'home';
 
-    var ctaHeadline = 'Get the data, every week.';
-    var ctaBody = 'Real numbers from <span data-const="platform.data_sources">25</span> data sources. No highlight reel. Every Wednesday, in your inbox.';
-    if (path.startsWith('/chronicle') || path.startsWith('/journal')) {
-      ctaHeadline = "Follow Elena's weekly chronicle.";
-      ctaBody = 'Every Wednesday, a new dispatch. The real week \u2014 including the bad ones.';
-    } else if (path.startsWith('/story/')) {
-      ctaHeadline = 'Follow the journey.';
-      ctaBody = 'The story continues every week. Subscribe for the next chapter.';
-    } else if (path === '/' || path === '/index.html') {
-      ctaHeadline = 'Follow the experiment from Day 1.';
-      ctaBody = 'Real numbers from <span data-const="platform.data_sources">25</span> data sources. No highlight reel. Every Wednesday, in your inbox.';
-    } else if (path.startsWith('/sleep') || path.startsWith('/glucose') || path.startsWith('/nutrition') || path.startsWith('/training') || path.startsWith('/live') || path.startsWith('/character') || path.startsWith('/explorer')) {
-      ctaHeadline = 'Get AI-powered insights weekly.';
-      ctaBody = 'This data feeds a weekly digest with board commentary. No noise, just signal.';
+    var ctaCopy = {
+      '/sleep/':       { h: 'Get sleep intelligence weekly.', b: 'Real architecture data from Whoop \u00D7 Eight Sleep. No sleep tips \u2014 sleep science.' },
+      '/glucose/':     { h: 'Get metabolic insights weekly.', b: 'CGM data, meal responses, and glucose patterns. What your metabolism is actually doing.' },
+      '/nutrition/':   { h: 'Get nutrition data weekly.', b: 'Macros, protein distribution, and adherence rates. The real food log.' },
+      '/training/':    { h: 'Get training intelligence weekly.', b: 'CTL, Zone 2, centenarian benchmarks. What training for longevity looks like.' },
+      '/mind/':        { h: 'Get inner life insights weekly.', b: 'Journal patterns, mood trajectories, and what the data says about the mind.' },
+      '/chronicle/':   { h: 'Follow the story weekly.', b: 'Every Wednesday, a new dispatch. The real week \u2014 including the bad ones.' },
+      '/experiments/': { h: 'Get experiment updates.', b: 'N=1 results as they happen. What worked, what didn\'t, and what\'s next.' },
+      '/labs/':        { h: 'Follow the biomarker journey.', b: 'Lab results over time. The ground truth behind the wearables.' },
+      '/builders/':    { h: 'Follow the build.', b: 'How one person built a 116-tool AI health platform with Claude. Real decisions, real cost.' },
+      '/story/':       { h: 'Follow the journey.', b: 'The story continues every week. Subscribe for the next chapter.' },
+    };
+    var match = null;
+    for (var p2 in ctaCopy) { if (path.startsWith(p2)) { match = ctaCopy[p2]; break; } }
+    if (path === '/' || path === '/index.html') {
+      match = { h: 'Follow the experiment from Day 1.', b: 'Real numbers from 25 data sources. No highlight reel. Every Wednesday, in your inbox.' };
     }
+    var ctaHeadline = match ? match.h : 'Get the data, every week.';
+    var ctaBody = match ? match.b : 'Real numbers from 25 data sources. No highlight reel. Every Wednesday, in your inbox.';
 
     var html = '<section class="email-cta-footer reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface);text-align:center;">';
     html += '<p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">The Measured Life</p>';
