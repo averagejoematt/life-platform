@@ -1969,8 +1969,19 @@ def lambda_handler(event, context):
                     "recovery_pct": float(profile.get("baseline_recovery_pct", 55)),
                 },
                 elena_hero_line=_elena_hero_line,
+                # PB-R1: Character sheet headline data for homepage heartbeat + nav badge
+                character={
+                    "level":          (character_sheet or {}).get("level") or (character_sheet or {}).get("character_level"),
+                    "tier":           (character_sheet or {}).get("tier") or (character_sheet or {}).get("tier_name"),
+                    "tier_emoji":     (character_sheet or {}).get("tier_emoji", "\U0001f528"),
+                    "xp_total":       (character_sheet or {}).get("xp_total"),
+                    "composite_score": (character_sheet or {}).get("composite_score"),
+                    "next_level_xp":  (character_sheet or {}).get("next_level_xp"),
+                    "xp_to_next":     (character_sheet or {}).get("xp_to_next"),
+                    "days_active":    (character_sheet or {}).get("days_active"),
+                } if character_sheet else None,
             )
-            print("[INFO] site_writer: public_stats.json written with baseline")
+            print("[INFO] site_writer: public_stats.json written with baseline + character")
 
             # PULSE-A1: Write pulse.json to S3 + DynamoDB for /api/pulse endpoint
             try:
