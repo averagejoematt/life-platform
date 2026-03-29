@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-Last updated: 2026-03-28 (v4.3.1 — 116 MCP tools, 25-module package, 59 Lambdas, 25 data sources, 66 site pages)
+Last updated: 2026-03-29 (v4.4.0 — 116 MCP tools, 25-module package, 59+ Lambdas, 26 data sources, 67 site pages)
 
 ---
 

@@ -1,3 +1,104 @@
+## v4.4.0 — 2026-03-29: Launch Readiness Session
+
+Massive 24-hour session covering pipeline validation, status page overhaul, reader engagement, subscriber email redesign, and pre-launch hardening. Platform version at session end: 67 pages, 60+ API endpoints, 116 MCP tools, 59 Lambdas.
+
+### Status Page Overhaul
+- **3-layer monitoring**: data freshness + CloudWatch alarm overlay + daily active health check Lambda
+- **Pipeline health check Lambda** (`pipeline-health-check`): daily at 6 AM PT, invokes every ingestion Lambda + checks all 11 secrets for deletion. Writes results to DynamoDB, status page reads and overlays failures.
+- **Proportional overall status**: green (0 red), yellow/degraded (1-2 red), red/outage (3+ red or >20%)
+- **Activity-dependent sources**: show green "Pipeline ready — awaiting user activity" instead of false red
+- **Data source sub-groups**: API-Based, User-Driven, Periodic Uploads, Lab & Clinical
+- **Source app attribution**: each source shows "Source: Whoop" / "Source: MacroFactor via Dropbox"
+- **Due-date tracking**: Labs (6mo), DEXA (12mo), Food Delivery (3mo), BP (3mo) with yellow when overdue
+- **Genome**: one-time import, no daily bars, "Data on file"
+- **Uptime bars**: include today as neutral, exclude from red count. All aligned from Mar 28.
+- **AWS cost tracking**: MTD spend, projected monthly, % of $15 budget (Cost Explorer API, free)
+- **DLQ depth monitoring**: shows dead-letter queue message count in infrastructure
+- **Light/dark mode colors**: vivid neon green/red in dark mode, rich forest green/red in light mode
+- **1-minute cache TTL** for near-real-time updates
+
+### Pipeline Fixes Found & Resolved
+- **Eight Sleep**: crashed for 10 days (`logger.set_date` bug). Fixed + re-authed after password change. 7 days backfilled.
+- **Dropbox**: secret deleted Mar 10 — entire MacroFactor nutrition chain was silently broken. Restored.
+- **Notion**: secret deleted — restored. Lambda now accepts entries without Template/Date properties.
+- **Health Auto Export**: `logger.set_date` crash. Fixed + redeployed.
+- **Garmin**: expired auth tokens + missing `garth`/`garminconnect` modules. Layer published. Auth pending (Garmin SSO rate limiting).
+- **logger.set_date bug**: fixed across all 14 Lambdas with `hasattr` guard
+
+### Reader Engagement (Phases 1-4)
+- Phase 1: freshness indicators, "This Week" cards, sparklines, trend arrows, "Since Your Last Visit", reading paths across 8 pages
+- Phase 2: guided path → replaced with section-nav checkmarks (less clutter)
+- Phase 3: Weekly Recap page at `/recap/`
+- Phase 4: Living Pulse feed on homepage (hidden until April 1)
+
+### New Pages & API Endpoints
+- `/labs/` — 74 biomarkers, accordion UI, `/api/labs` endpoint
+- `/recap/` — weekly recap from existing endpoints
+- `/mission/` — renamed from `/about/` (old URL kept for backwards compat)
+- `/api/frequent_meals` — MacroFactor food log aggregation
+- `/api/meal_glucose` — MacroFactor × Dexcom CGM cross-reference
+- `/api/strength_benchmarks` — Hevy 1RM data
+- `/api/changes-since` — delta summary for returning visitors
+- `/api/observatory_week` — 7-day domain summaries
+
+### Homepage Rewrite (Item #8)
+- Full editorial pattern: 2-column hero, gauge rings, data spread, pull-quotes, observatory entry cards
+- 1797 → 888 lines. Reads from `public_stats.json` for all live data.
+
+### Subscriber Email Redesign
+- Welcome email: CTA → /story/, Elena intro tightened, format expectations added
+- Weekly Signal: 5-section template (numbers table, chronicle preview, worked/didn't, board quote, observatory)
+- `build_weekly_signal_data()` with board/observatory rotation
+- Bug fix: `subscriber_email` undefined → `subscriber.get('email', '')`
+- Day 2 bridge email: new `subscriber-onboarding` Lambda with 3 curated installments
+
+### Sleep/Glucose Observatory
+- 2-column editorial hero matching Training page pattern
+- Nutrition page: hardcoded meals → API-driven from MacroFactor
+- Training page: strength benchmarks fallback from `/api/strength_benchmarks`
+
+### OG Images
+- 12 page-specific images generated daily (was 6)
+- Meta tags updated on all affected pages
+
+### Architectural Fixes
+- CSS/JS cache: 1-year → 1-day (no content-hash filenames)
+- OG image Lambda added to CDK operational stack
+- Site-api CDK env vars expanded
+- Security headers on API (nosniff, DENY, HSTS)
+- GA4 analytics activated (G-JTKC4L8EBN)
+- Canonical URLs + RSS discovery injected via components.js
+- `.well-known/security.txt` created
+- Protocols seeded to DynamoDB from config
+- Architecture diagram adapts to light mode (SVG fills use CSS variables)
+- Architecture reviews updated to R15-R18
+- Status page colors: brighter in dark mode, readable in light mode
+
+### R18 Remediation
+- All 9 findings addressed (doc reconciliation, lambda_map, alarms, WAF rules, deploy script)
+- R17 findings verified resolved (CORS, google_calendar, model strings)
+
+### Cleanup
+- 294 old handovers archived to `handovers/archive/`
+- Stale S3 objects deleted (.git/, tmp/, root index.html, old content prefixes)
+- Dead `observatory.css` deleted (17KB, zero pages loaded it)
+- Expired `deprecated_secrets.txt` entry removed
+- Google Calendar secret removed from test KNOWN_SECRETS
+
+### Data Corrections
+- Journey start weight: 302 → 307 (April 1 baseline, not Feb beta)
+- DynamoDB profile updated
+- Story page date: February → April 2026
+- Whoop workout enrichment wired into training overview API
+
+### Platform Stats (v4.4.0)
+- 67 pages, 60+ API endpoints, 116 MCP tools, 59 Lambdas
+- 26 data sources, 7 CDK stacks
+- Pillow layer (v1), garth+garminconnect layer (v2)
+- Daily health check: 16/17 pass (Garmin auth pending)
+
+---
+
 ## v4.3.2 — 2026-03-28: PB-R1 Character-as-Anchor + Homepage Heartbeat
 
 ### Product Board Review

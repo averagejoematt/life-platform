@@ -2,7 +2,7 @@
 
 **Table:** `life-platform` (us-west-2)  
 **Design:** Single-table with composite keys  
-**Last updated:** 2026-03-28 (v4.3.1 — 116 MCP tools, 25 data sources, 59 Lambdas)
+**Last updated:** 2026-03-29 (v4.4.0 — 116 MCP tools, 26 data sources, 59+ Lambdas)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
