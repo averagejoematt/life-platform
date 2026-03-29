@@ -249,6 +249,24 @@ body { padding-bottom: 36px; }
   color: var(--accent);
 }
 
+/* PB-R1: Character level badge in nav */
+.nav__level {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--text-faint);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  margin-left: var(--space-2);
+  transition: color var(--dur-fast), border-color var(--dur-fast);
+  white-space: nowrap;
+}
+.nav__level:hover {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+}
+
 .nav__links {
   display: flex;
   align-items: center;
@@ -629,6 +647,7 @@ body { padding-bottom: 36px; }
     --page-padding: var(--page-padding-sm);
   }
   .nav__links { display: none; }
+  .nav__level { display: none !important; }
   .footer { flex-direction: column; gap: var(--space-6); text-align: center; }
 }
 
@@ -908,6 +927,7 @@ body { padding-bottom: 36px; }
 @media (max-width: 768px) {
   .nav__hamburger { display: flex; }
   .nav__links { display: none; }
+  .nav__level { display: none !important; }
   .nav__status { display: none; }
   .bottom-nav { display: flex; }
   /* Shift challenge bar above bottom nav */

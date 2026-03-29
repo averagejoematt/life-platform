@@ -1,3 +1,28 @@
+## v4.3.2 — 2026-03-28: PB-R1 Character-as-Anchor + Homepage Heartbeat
+
+### Product Board Review
+- Full 8-panel blind audience workshop (simulated): Reddit, tech, general public, older, younger, AI-forward, AI-skeptic, tech leads, indie builders
+- Key finding: site is two products on one URL; Character Sheet should be the anchor score; return visitors need "what changed" signals
+- Board vote: launch April 1 as planned with 3 surgical changes
+
+### Backend (PB-R1)
+- `site_writer.py`: Added `character` parameter to `write_public_stats()` — embeds level, tier, emoji, XP, composite score in public_stats.json
+- `daily_brief_lambda.py`: Threads character_sheet data through to write_public_stats call
+- Eliminates separate `/api/character_stats` fetch on homepage — one payload serves all
+
+### Frontend (PB-R1)
+- Nav level badge: `Lv X 🔨` appears in top nav on all pages, links to Character Sheet, hidden on mobile
+- Elena live line: Pull-quote #2 on homepage dynamically replaces with `elena_hero_line` from public_stats.json
+- Updated timestamp: Hero stats line appends "Updated Xh ago" from `_meta.refreshed_at`
+- New homepage design (Claude Code): 888-line editorial layout replacing 1,700-line prior version — 4 gauge rings, 3-column data spread with sparklines, observatory entry cards, chronicle card
+
+### Deploy Notes
+- site_writer.py bundled as --extra-file in daily-brief zip (takes precedence over layer at runtime)
+- Shared layer rebuild via `deploy/build_layer.sh` prepares CDK layer-build directory; full CDK deploy will sync layer
+- Frontend: S3 direct upload + CloudFront invalidation
+
+---
+
 ## v4.3.1 — 2026-03-28: R18 Architecture Review Remediation
 
 ### Documentation (R18-F01, R18-F08)
