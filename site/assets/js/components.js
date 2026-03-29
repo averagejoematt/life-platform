@@ -29,7 +29,7 @@
     { label: 'The Story', items: [
       { href: '/',               text: 'Home' },
       { href: '/story/',         text: 'My Story' },
-      { href: '/about/',         text: 'The Mission' },
+      { href: '/mission/',       text: 'The Mission' },
       { href: '/achievements/',  text: 'Milestones' },
       { href: '/first-person/',  text: 'First Person' },
     ]},
@@ -186,7 +186,7 @@
       { heading: 'The Story', links: [
         { href: '/', text: 'Home' },
         { href: '/story/', text: 'My Story' },
-        { href: '/about/', text: 'The Mission' },
+        { href: '/mission/', text: 'The Mission' },
         { href: '/achievements/', text: 'Milestones' },
       ]},
       { heading: 'The Data', links: [
