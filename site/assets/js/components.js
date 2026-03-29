@@ -538,10 +538,10 @@
   })();
 
   // ── Analytics: Google Analytics 4 ─────────────────────────
-  // Replace G-XXXXXXXXXX with your GA4 Measurement ID from analytics.google.com
+  // Replace G-JTKC4L8EBN with your GA4 Measurement ID from analytics.google.com
   (function() {
-    var GA_ID = 'G-XXXXXXXXXX';
-    if (GA_ID === 'G-XXXXXXXXXX') return; // placeholder — won't load until ID is set
+    var GA_ID = 'G-JTKC4L8EBN';
+    if (GA_ID === 'G-JTKC4L8EBN') return; // placeholder — won't load until ID is set
     var s = document.createElement('script');
     s.async = true;
     s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
