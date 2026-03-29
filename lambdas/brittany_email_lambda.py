@@ -740,7 +740,7 @@ def build_html(data, commentary_text):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def lambda_handler(event, context):
-    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+    if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
     logger.info("Brittany Weekly Email v1.1.0 starting...")
     data = gather_all()
 

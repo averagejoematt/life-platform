@@ -138,7 +138,7 @@ def normalize_completed_task(task, project_map):
 
 
 def lambda_handler(event, context):
-    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+    if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
     # Date range handling
     if "start_date" in event and "end_date" in event:
         start_date = datetime.strptime(event["start_date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)

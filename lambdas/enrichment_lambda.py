@@ -287,7 +287,7 @@ def enrich_date_range(start_date: str, end_date: str):
 def lambda_handler(event, context):
     try:
         today     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        logger.set_date(today)  # OBS-1
+        if hasattr(logger, "set_date"): logger.set_date(today)  # OBS-1
         yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
         if event.get("backfill"):

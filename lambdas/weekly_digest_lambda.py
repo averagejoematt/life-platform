@@ -1575,7 +1575,7 @@ def lambda_handler(event, context):
     data["_raw_grades"] = raw_grades
 
     api_key = get_anthropic_key()
-    logger.set_date(dates.get("this_end", ""))  # OBS-1
+    if hasattr(logger, "set_date"): logger.set_date(dates.get("this_end", ""))  # OBS-1
     print("[INFO] Calling Haiku for Board commentary...")
     try:
         commentary = call_haiku(data, profile, api_key)

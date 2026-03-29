@@ -453,7 +453,7 @@ def archive_raw(bucket, source_key, content_bytes, subfolder=""):
 
 
 def lambda_handler(event, context):
-    logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+    if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
     print(f"Event: {json.dumps(event)}")
 
     if "Records" in event:

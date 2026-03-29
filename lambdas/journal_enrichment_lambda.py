@@ -433,7 +433,7 @@ def lambda_handler(event, context):
           {"full_sync": true}             → all entries
           {"force": true}                 → re-enrich already-enriched entries
         """
-        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+        if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
         force = event.get("force", False)
         full_sync = event.get("full_sync", False)
 

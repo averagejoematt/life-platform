@@ -174,7 +174,7 @@ def find_missing_dates(lookback_days=LOOKBACK_DAYS):
 def lambda_handler(event, context):
     try:
         import time as _time
-        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+        if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
 
         # Support date_override from EventBridge event payload
         # 'today' = pull today's data (for recovery refresh after wake)

@@ -368,7 +368,7 @@ def lambda_handler(event, context):
           {"start": "...", "end": "..."}    → backfill date range
         """
         import time as _time
-        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+        if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
 
         api_key = get_api_key()
         area_map = fetch_areas(api_key)
