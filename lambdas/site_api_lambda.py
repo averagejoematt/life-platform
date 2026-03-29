@@ -796,8 +796,8 @@ def handle_status() -> dict:
     def _uptime_90d(source_id):
         """Uptime bars starting from platform launch prep (Mar 29, 2026)."""
         try:
-            # Start from Mar 29 to give a clean baseline for launch
-            epoch_start = datetime(2026, 3, 29, tzinfo=timezone.utc).date()
+            # Start from Mar 28 to include yesterday in the baseline
+            epoch_start = datetime(2026, 3, 28, tzinfo=timezone.utc).date()
             today = datetime.now(timezone.utc).date()
             window_days = min(90, (today - epoch_start).days + 1)
             if window_days < 1:
@@ -812,7 +812,7 @@ def handle_status() -> dict:
             present = {item["sk"].replace("DATE#", "")[:10] for item in resp.get("Items", [])}
             return [1 if (today - timedelta(days=i)).isoformat() in present else 0 for i in range(window_days - 1, -1, -1)]
         except Exception:
-            return [0] * min(90, max(1, (datetime.now(timezone.utc).date() - datetime(2026, 3, 29, tzinfo=timezone.utc).date()).days + 1))
+            return [0] * min(90, max(1, (datetime.now(timezone.utc).date() - datetime(2026, 3, 28, tzinfo=timezone.utc).date()).days + 1))
 
     def _sched_aware(status, rel, exp_dow):
         if exp_dow < 0 or today_dow == exp_dow:
