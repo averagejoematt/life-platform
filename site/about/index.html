@@ -410,30 +410,6 @@
   </div>
 </section>
 
-<!-- Subscribe CTA -->
-<section class="subscribe-cta" style="
-  padding: var(--space-16) var(--page-padding);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  text-align: center;
-">
-  <p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">The Measured Life</p>
-  <h3 style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Get the data, every week.</h3>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
-    Real numbers from 25 data sources. No highlight reel. Every win and every failure, in your inbox on Wednesdays.
-  </p>
-  <div style="display:flex;gap:var(--space-2);max-width:400px;margin:0 auto">
-    <input id="about-email" type="email" placeholder="your@email.com" style="
-      flex:1;background:var(--bg);border:1px solid var(--cta);color:var(--text);
-      font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-3) var(--space-4);
-      outline:none;
-    ">
-    <button id="about-subscribe-btn" class="btn btn--cta" style="white-space:nowrap">Subscribe</button>
-  </div>
-  <p id="about-subscribe-msg" style="font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);min-height:1em"></p>
-</section>
-
 <div id="amj-subscribe"></div>
 <div id="amj-bottom-nav"></div>
 <div id="amj-reading-path"></div>
@@ -471,36 +447,7 @@
   }
 })();
 
-// Subscribe form
-document.getElementById('about-subscribe-btn').addEventListener('click', async () => {
-  const email = document.getElementById('about-email').value.trim();
-  const msg = document.getElementById('about-subscribe-msg');
-  if (!email || !email.includes('@')) {
-    msg.textContent = 'Enter a valid email address.';
-    msg.style.color = 'var(--c-yellow-status)';
-    return;
-  }
-  msg.textContent = 'Subscribing...';
-  try {
-    const res = await fetch('/api/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, source: 'about_page' }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      msg.textContent = '\u2713 Check your inbox to confirm.';
-      msg.style.color = 'var(--c-amber-500)';
-      document.getElementById('about-email').value = '';
-    } else {
-      msg.textContent = data.error || 'Something went wrong.';
-      msg.style.color = 'var(--c-yellow-status)';
-    }
-  } catch { msg.textContent = 'Network error \u2014 try again.'; msg.style.color = 'var(--c-yellow-status)'; }
-});
-document.getElementById('about-email').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('about-subscribe-btn').click();
-});
+// Subscribe handled by components.js via amj-subscribe placeholder
 </script>
 <nav class="reading-path-v2">
   <a href="/story/" class="reading-path-v2__link">
