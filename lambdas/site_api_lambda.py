@@ -90,6 +90,8 @@ _supp_metadata_cache = None
 # ── Status page (module-level cache) ───────────────────────
 _status_cache = {}
 _status_cache_ts = 0
+_cost_cache = {}
+_cost_cache_ts = 0
 STATUS_CACHE_TTL = 60  # 1 minute — more dynamic status updates
 
 # ── Experiment start date — public Day 1 ───────────────────
@@ -1047,32 +1049,38 @@ def handle_status() -> dict:
     else:
         overall = "yellow"  # 1-2 failures = degraded, not down
 
-    # ── Cost tracking (AWS Cost Explorer — free API) ──
+    # ── Cost tracking (cached 1h — Cost Explorer API is slow, 10-15s cross-region) ──
+    global _cost_cache, _cost_cache_ts
     cost_info = {}
-    try:
-        ce = boto3.client("ce", region_name="us-east-1")
-        now_date = datetime.now(timezone.utc)
-        month_start = now_date.strftime("%Y-%m-01")
-        today_str = now_date.strftime("%Y-%m-%d")
-        resp = ce.get_cost_and_usage(
-            TimePeriod={"Start": month_start, "End": today_str},
-            Granularity="MONTHLY",
-            Metrics=["UnblendedCost"],
-        )
-        mtd = float(resp["ResultsByTime"][0]["Total"]["UnblendedCost"]["Amount"])
-        days_elapsed = now_date.day
-        days_in_month = 30
-        projected = round((mtd / max(days_elapsed, 1)) * days_in_month, 2)
-        budget = 15.0
-        cost_info = {
-            "mtd": round(mtd, 2),
-            "projected": projected,
-            "budget": budget,
-            "status": "green" if projected <= budget else "yellow" if projected <= budget * 1.2 else "red",
-            "pct_of_budget": round((projected / budget) * 100),
-        }
-    except Exception as e:
-        logger.warning(f"[status] Cost Explorer failed (non-fatal): {e}")
+    if _cost_cache and (time.time() - _cost_cache_ts < 3600):
+        cost_info = _cost_cache
+    else:
+        try:
+            ce = boto3.client("ce", region_name="us-east-1")
+            now_date = datetime.now(timezone.utc)
+            month_start = now_date.strftime("%Y-%m-01")
+            today_str = now_date.strftime("%Y-%m-%d")
+            resp = ce.get_cost_and_usage(
+                TimePeriod={"Start": month_start, "End": today_str},
+                Granularity="MONTHLY",
+                Metrics=["UnblendedCost"],
+            )
+            mtd = float(resp["ResultsByTime"][0]["Total"]["UnblendedCost"]["Amount"])
+            days_elapsed = now_date.day
+            days_in_month = 30
+            projected = round((mtd / max(days_elapsed, 1)) * days_in_month, 2)
+            budget = 15.0
+            cost_info = {
+                "mtd": round(mtd, 2),
+                "projected": projected,
+                "budget": budget,
+                "status": "green" if projected <= budget else "yellow" if projected <= budget * 1.2 else "red",
+                "pct_of_budget": round((projected / budget) * 100),
+            }
+            _cost_cache = cost_info
+            _cost_cache_ts = time.time()
+        except Exception as e:
+            logger.warning(f"[status] Cost Explorer failed (non-fatal): {e}")
 
     result = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
