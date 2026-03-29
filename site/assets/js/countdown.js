@@ -62,9 +62,9 @@
     }
   });
 
-  // Inject persistent "Day N" badge into top nav if it exists
+  // Inject persistent "Day N" badge into top nav if it exists (once only)
   var nav = document.querySelector('.nav__links');
-  if (nav) {
+  if (nav && !document.querySelector('.nav-day-badge')) {
     var badge = document.createElement('span');
     badge.className = 'nav-day-badge';
     if (isLive) {
@@ -74,7 +74,6 @@
       badge.textContent = 'T-' + daysUntil;
       badge.title = daysUntil + ' days until launch';
     }
-    // Insert as first child of nav links
     nav.insertBefore(badge, nav.firstChild);
   }
 
