@@ -482,7 +482,7 @@ TOOLS = {
         "schema": {
             "name": "get_sleep_analysis",
             "description": (
-                "Clinical sleep analysis from Eight Sleep data. Goes beyond raw hours to surface the metrics a "
+                "Clinical sleep analysis from Whoop data. Goes beyond raw hours to surface the metrics a "
                 "sleep physician uses: sleep architecture percentages (REM/deep/light as % of TST with clinical "
                 "norms), sleep efficiency (sleep/TIB ×100, target ≥85%, CBT-I flag <80%), WASO (true "
                 "wake-after-sleep-onset), circadian timing (avg onset/wake/midpoint in local time), sleep "
@@ -649,7 +649,7 @@ TOOLS = {
         "schema": {
             "name": "get_readiness_score",
             "description": (
-                "Unified readiness score (0-100) synthesising Whoop recovery (35%), Eight Sleep score (25%), "
+                "Unified readiness score (0-100) synthesising Whoop recovery (35%), Whoop sleep quality (25%), "
                 "HRV 7-day trend vs 30-day baseline (20%), TSB training form (10%), and "
                 "Garmin Body Battery (10%) into a single GREEN / YELLOW / RED signal with a 1-line "
                 "actionable recommendation. Also includes a device_agreement section showing Whoop vs "
