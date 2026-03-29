@@ -106,8 +106,42 @@ def lambda_handler(event, context):
             fail_count += 1
             logger.warning(f"FAIL: {display_name} — {result.get('error_type')}: {result.get('error_message')}")
 
-        # Rate limit — don't hammer Lambda concurrency
         time.sleep(0.5)
+
+    # Secret health check — detect deleted/missing secrets
+    sm = boto3.client("secretsmanager", region_name=REGION)
+    REQUIRED_SECRETS = [
+        "life-platform/whoop", "life-platform/withings", "life-platform/strava",
+        "life-platform/eightsleep", "life-platform/garmin", "life-platform/habitify",
+        "life-platform/notion", "life-platform/dropbox", "life-platform/ai-keys",
+        "life-platform/site-api-ai-key", "life-platform/ingestion-keys",
+    ]
+    for secret_name in REQUIRED_SECRETS:
+        try:
+            desc = sm.describe_secret(SecretId=secret_name)
+            if desc.get("DeletedDate"):
+                fail_count += 1
+                results.append({
+                    "function_name": f"secret:{secret_name}",
+                    "display_name": f"Secret: {secret_name}",
+                    "source_id": secret_name.replace("life-platform/", ""),
+                    "healthy": False,
+                    "error_type": "SecretDeleted",
+                    "error_message": f"Secret {secret_name} is scheduled for deletion",
+                })
+                logger.warning(f"SECRET DELETED: {secret_name}")
+        except Exception as e:
+            if "ResourceNotFoundException" in str(e):
+                fail_count += 1
+                results.append({
+                    "function_name": f"secret:{secret_name}",
+                    "display_name": f"Secret: {secret_name}",
+                    "source_id": secret_name.replace("life-platform/", ""),
+                    "healthy": False,
+                    "error_type": "SecretMissing",
+                    "error_message": f"Secret {secret_name} does not exist",
+                })
+                logger.warning(f"SECRET MISSING: {secret_name}")
 
     # Write results to DynamoDB
     try:
