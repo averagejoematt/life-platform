@@ -703,6 +703,28 @@ def handle_status() -> dict:
 
     today_dow = datetime.now(timezone.utc).weekday()
 
+    # ── Pipeline health check results (active probe) ──
+    health_check_failures = set()
+    health_check_info = {}
+    try:
+        hc_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}health_check"),
+            ScanIndexForward=False, Limit=1,
+        )
+        hc_items = hc_resp.get("Items", [])
+        if hc_items:
+            hc = hc_items[0]
+            health_check_info = {
+                "checked_at": hc.get("checked_at", ""),
+                "passed": int(hc.get("passed", 0)),
+                "failed": int(hc.get("failed", 0)),
+            }
+            failures = json.loads(hc.get("failures", "[]"))
+            for f in failures:
+                health_check_failures.add(f.get("source_id", ""))
+    except Exception as e:
+        logger.warning(f"[status] Health check read failed (non-fatal): {e}")
+
     # ── CloudWatch alarm check — detect pipeline errors ──
     cw_alarm_states = {}
     try:
@@ -933,6 +955,10 @@ def handle_status() -> dict:
         if sid in alarming_sources and status != "blue":
             status = "red"
             comment = f"CloudWatch alarm firing \u2014 Lambda errors detected"
+        # Health check override — if daily probe failed, show red
+        elif sid in health_check_failures and status not in ("blue", "red"):
+            status = "red"
+            comment = f"Daily health check failed \u2014 pipeline error detected"
 
         ds_components.append({"id": sid, "name": name, "description": desc,
                               "status": status, "last_sync_relative": rel,
@@ -1047,6 +1073,7 @@ def handle_status() -> dict:
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "overall": overall,
         "cost": cost_info,
+        "health_check": health_check_info,
         "groups": [
             {"id": "data_sources",  "label": "Data sources",   "subtitle": f"{len(ds_components)} feeds \u2014 wearables \u00B7 nutrition \u00B7 labs \u00B7 genome", "components": ds_components},
             {"id": "compute",       "label": "Compute layer",  "subtitle": "character sheet \u00B7 metrics \u00B7 insights \u00B7 adaptive mode", "components": compute_components},
