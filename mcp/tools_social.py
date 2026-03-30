@@ -297,6 +297,7 @@ def tool_get_social_dashboard(args):
     flags = []
     if unique_people < 3:
         connection_health = "concerning"
+        # Murthy "Together" (2020): 3-5 close relationships minimum for wellbeing
         flags.append(f"Only {unique_people} unique connections — Murthy threshold is 3-5.")
     elif unique_people < 5:
         connection_health = "building"

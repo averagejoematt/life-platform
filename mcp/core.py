@@ -112,8 +112,15 @@ def ddb_cache_set(cache_key: str, data):
 
 # ── DynamoDB queries ──
 
+import re
+_SAFE_SOURCE = re.compile(r'^[a-zA-Z0-9_]+$')
+
+
 def query_source(source, start_date, end_date, lean=False):
     """Query DynamoDB by source + date range with full pagination."""
+    if not source or not _SAFE_SOURCE.match(source):
+        logger.warning(f"query_source: rejected invalid source name: {source!r}")
+        return []
     pk = f"{USER_PREFIX}{source}"
     kwargs = {
         "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(

@@ -48,7 +48,7 @@ except ImportError:
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 SECRET_NAME = os.environ.get("NOTION_SECRET_NAME", "life-platform/ingestion-keys")
 NOTION_API = "https://api.notion.com/v1"
-NOTION_VERSION = "2022-06-28"
+NOTION_VERSION = "2022-06-28"  # Pinned API version -- changing may alter property formats; test thoroughly before updating
 PK = "USER#matthew#SOURCE#notion"
 
 # Template → SK suffix mapping
@@ -529,6 +529,8 @@ def write_entries(entries_by_date):
 # ── Lambda handler ────────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
+    if event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     try:
         """
         Lambda entry point.

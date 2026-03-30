@@ -177,7 +177,7 @@ def fetch_activity_streams(strava_id: str, secret: dict) -> tuple:
         if not hr_data or not time_data or len(hr_data) < 60:
             return {}, secret
 
-        # Rolling 30s average for peak detection
+        # 30s rolling avg smooths HR sensor noise while preserving exercise peaks (sports science standard)
         rolling_avgs = []
         for i in range(len(hr_data)):
             start_idx = i
@@ -198,6 +198,7 @@ def fetch_activity_streams(strava_id: str, secret: dict) -> tuple:
         end_60s = sum(last_60s_vals) / len(last_60s_vals) if last_60s_vals else None
 
         recovery_intra = round(peak_rolling - end_60s, 1) if end_60s else None
+        # HR drop >15% from peak in final 60s = intentional cooldown (exercise physiology heuristic)
         has_cooldown = end_60s is not None and end_60s < peak_rolling * 0.85
 
         result = {
@@ -466,6 +467,8 @@ def save_to_dynamodb(date_str, activities):
 
 
 def lambda_handler(event, context):
+    if event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     try:
         if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
         if "start_date" in event and "end_date" in event:

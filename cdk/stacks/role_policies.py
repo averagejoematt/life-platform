@@ -1110,6 +1110,37 @@ def site_api() -> list[iam.PolicyStatement]:
     ]
 
 
+def site_api_ai() -> list[iam.PolicyStatement]:
+    """Site API AI Lambda: read-only DDB + S3 config + Secrets Manager for AI endpoints.
+
+    Handles /api/ask and /api/board_ask only. Separated from site_api() to isolate
+    AI endpoint concurrency from data endpoints (ADR-036 fix).
+    NO DDB writes — AI Lambda is strictly read-only.
+    """
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDBRead",
+            actions=["dynamodb:GetItem", "dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="S3ConfigRead",
+            actions=["s3:GetObject"],
+            resources=[f"{BUCKET_ARN}/config/*", f"{BUCKET_ARN}/site/config/*"],
+        ),
+        iam.PolicyStatement(
+            sid="AiKeySecret",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/site-api-ai-key")],
+        ),
+    ]
+
+
 # ═════════════════════════════════════════════════════════════════════════
 # BS-08 / BS-SL2 — Sleep Reconciler + Circadian Compliance
 # ═════════════════════════════════════════════════════════════════════════

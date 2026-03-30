@@ -358,6 +358,8 @@ def find_missing_dates(lookback_days=LOOKBACK_DAYS):
 
 
 def lambda_handler(event, context):
+    if event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     try:
         """
         Lambda entry point.

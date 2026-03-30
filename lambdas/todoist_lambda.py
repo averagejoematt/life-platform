@@ -138,6 +138,8 @@ def normalize_completed_task(task, project_map):
 
 
 def lambda_handler(event, context):
+    if event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
     # Date range handling
     if "start_date" in event and "end_date" in event:

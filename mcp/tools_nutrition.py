@@ -29,6 +29,7 @@ from mcp.helpers import (
 
 # ── MacroFactor reference data ──
 
+# RDA: NIH DRI for adult males 31-50. "optimal": longevity targets per Attia/Patrick (not official guidelines). "upper": NIH Tolerable Upper Intake Level.
 _MICRONUTRIENT_TARGETS = {
     "total_fiber_g":            {"rda": 38,    "optimal": 50,    "unit": "g",   "category": "Macros",     "score": True},
     "total_omega3_total_g":     {"rda": 1.6,   "optimal": 4.0,   "unit": "g",   "category": "Fatty Acids","score": True},
@@ -60,7 +61,9 @@ _MICRONUTRIENT_TARGETS = {
     "total_caffeine_mg":        {"rda": None,  "optimal": None,  "unit": "mg",  "category": "Other",      "upper_limit": 400},
 }
 _MICRO_CATEGORY_ORDER  = ["Macros", "Fatty Acids", "Minerals", "Vitamins", "B Vitamins", "Other"]
+# Simopoulos 2002; ratio approach debated — some authorities question its validity
 _OMEGA_RATIO_TARGET    = 4.0    # Attia / Simopoulos: keep O6:O3 < 4:1
+# Phillips 2016 MPS threshold; older adults may need 3g+ (anabolic resistance)
 _LEUCINE_MPS_THRESHOLD = 2.5    # g leucine per meal to trigger MPS (Phillips / Attia)
 
 
@@ -266,6 +269,7 @@ def tool_get_meal_timing(args):
         if gap < 0: gap += 24
         pre_sleep_gap = round(gap, 1)
 
+    # Panda/Salk 2018: 10h optimal TRF window; 12h minimum for metabolic benefit
     trf_flags = []
     if avg_win > 12:
         trf_flags.append(f"Average eating window is {avg_win}h — wider than the 10h TRF target. Try compressing to <10h for metabolic benefit.")
@@ -273,6 +277,7 @@ def tool_get_meal_timing(args):
         trf_flags.append(f"First bite time varies by {stdev(first_bites)}h SD — inconsistent circadian signalling. Aim for <1h variation.")
     if late_days > n * 0.3:
         trf_flags.append(f"Eating after 8pm on {late_days}/{n} days. Late eating suppresses melatonin-mediated metabolic signalling.")
+    # >=3h pre-sleep fasting allows GLP-1 clearance (Panda 2018, Huberman); <2.5h too close
     if pre_sleep_gap is not None and pre_sleep_gap < 2.5:
         trf_flags.append(f"Average last bite → sleep gap is only {pre_sleep_gap}h. Panda recommends ≥3h to allow GLP-1 clearance before sleep onset.")
 
@@ -447,6 +452,7 @@ def tool_get_nutrition_summary(args):
     averages["fiber_per_1000kcal"] = avg("fiber_per_1000kcal")
 
     # Reference targets (from profile / common goals)
+    # Matthew-specific targets: 2400 kcal deficit, 180g protein (~0.8g/lb BW)
     TARGETS = {
         "calories_kcal":    2400,
         "protein_g":        180,
@@ -505,14 +511,14 @@ def tool_get_macro_targets(args):
                 weight_lbs = float(wt_items_sorted[0].get("weight_lbs", 0))
                 # Mifflin-St Jeor BMR for male (approx for Matthew)
                 weight_kg = weight_lbs * 0.453592
-                # height 72in = 182.88cm, age ~35
+                # Matthew-specific fallback: height 72in = 182.88cm, age ~35; only used when profile lookup fails
                 bmr = 10 * weight_kg + 6.25 * 182.88 - 5 * 35 + 5
-                tdee_estimate = round(bmr * 1.55)  # moderate activity
+                tdee_estimate = round(bmr * 1.55)  # Moderate activity Harris-Benedict multiplier; Matthew-specific
                 calorie_target = calorie_target or tdee_estimate
         except Exception:
             pass
-    calorie_target = calorie_target or 2400
-    protein_target = protein_target or 180
+    calorie_target = calorie_target or 2400  # Matthew-specific targets: 2400 kcal deficit, 180g protein (~0.8g/lb BW)
+    protein_target = protein_target or 180  # Matthew-specific targets: 2400 kcal deficit, 180g protein (~0.8g/lb BW)
 
     daily_rows = []
     hits_cal  = hits_prot = hits_fiber = 0
@@ -676,10 +682,11 @@ def tool_get_deficit_sustainability(args):
         if wt_items:
             latest_wt = sorted(wt_items, key=lambda x: x.get("date", ""), reverse=True)[0]
             weight_kg = float(latest_wt.get("weight_lbs", 220)) * 0.453592
+            # Matthew-specific fallback: height 72in = 182.88cm, age ~35; only used when profile lookup fails
             bmr = 10 * weight_kg + 6.25 * 182.88 - 5 * 35 + 5
-            tdee_estimate = round(bmr * 1.55)
+            tdee_estimate = round(bmr * 1.55)  # Moderate activity Harris-Benedict multiplier; Matthew-specific
         else:
-            tdee_estimate = 2400
+            tdee_estimate = 2400  # Matthew-specific TDEE fallback for ~220lb moderately active male
 
     deficit_kcal = round(tdee_estimate - avg_cal)
     deficit_pct  = round(deficit_kcal / tdee_estimate * 100, 1) if tdee_estimate else 0
@@ -862,8 +869,9 @@ def tool_get_metabolic_adaptation(args):
     if not base_tdee:
         first_wt = sum(weekly_wt[weeks_sorted[0]]) / len(weekly_wt[weeks_sorted[0]])
         weight_kg = first_wt * 0.453592
+        # Matthew-specific fallback: height 72in = 182.88cm, age ~35; only used when profile lookup fails
         bmr = 10 * weight_kg + 6.25 * 182.88 - 5 * 35 + 5
-        base_tdee = round(bmr * 1.55)
+        base_tdee = round(bmr * 1.55)  # Moderate activity Harris-Benedict multiplier; Matthew-specific
 
     weekly_data = []
     for wk in weeks_sorted:

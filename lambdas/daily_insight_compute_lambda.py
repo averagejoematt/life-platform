@@ -79,6 +79,7 @@ table    = dynamodb.Table(TABLE_NAME)
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 # BS-MP3: Decision Fatigue Detector — proactive alert threshold
+# Empirical: Matthew's habit compliance drops above 15 active+overdue Todoist tasks
 DECISION_FATIGUE_THRESHOLD = int(os.environ.get("DECISION_FATIGUE_THRESHOLD", "15"))
 DECISION_FATIGUE_HABIT_THRESHOLD = float(os.environ.get("DECISION_FATIGUE_HABIT_THRESHOLD", "0.60"))
 
@@ -1069,7 +1070,7 @@ def _compute_slow_drift(yesterday_str, profile):
                 slope_per_day = _linreg_slope(weights_only)   # lbs/day
                 slope_per_week = slope_per_day * 7 if slope_per_day is not None else None
 
-                # Attia: plateau = slope > -0.2 lbs/week (insufficient loss)
+                # Attia: <0.2 lbs/week loss over 14d = plateau (insufficient rate for fat-loss goal)
                 if slope_per_week is not None and slope_per_week > -0.2:
                     # MacroFactor TDEE preferred; fallback to Apple Watch (Webb/Norton)
                     mf_tdee = None
@@ -1800,6 +1801,8 @@ def store_computed_insights(yesterday_str, payload):
 # ==============================================================================
 
 def lambda_handler(event, context):
+    if event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     logger.info("Daily Insight Compute v1.2.0 starting...")
 
     today         = datetime.now(timezone.utc).date()

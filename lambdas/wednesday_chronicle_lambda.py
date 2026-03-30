@@ -295,6 +295,7 @@ def build_data_packet(data):
         week_num = 1
     packet.append(f"Week number: {week_num}")
     packet.append(f"Journey start: {journey_start}")
+    # Matthew-specific fallback defaults; only used if profile fetch fails
     packet.append(f"Journey start weight: {profile.get('journey_start_weight_lbs', 302)} lbs")
     packet.append(f"Goal weight: {profile.get('goal_weight_lbs', 185)} lbs")
     packet.append(f"Age: {profile.get('age', 37)}")
@@ -315,7 +316,7 @@ def build_data_packet(data):
             if earliest_7d:
                 delta = latest[1] - earliest_7d[0][1]
                 packet.append(f"Week change: {delta:+.1f} lbs")
-        journey_start_w = profile.get("journey_start_weight_lbs", 302)
+        journey_start_w = profile.get("journey_start_weight_lbs", 302)  # Matthew-specific fallback
         total_lost = journey_start_w - latest[1]
         packet.append(f"Total journey loss: {total_lost:.1f} lbs")
     packet.append("")
@@ -1553,7 +1554,7 @@ def build_weekly_signal_data(data, week_num):
     weight_lbs = None
     if withings.get("weight_kg"):
         weight_lbs = round(float(withings["weight_kg"]) * 2.20462, 1)
-    start_weight = float(profile.get("journey_start_weight_lbs", 302))
+    start_weight = float(profile.get("journey_start_weight_lbs", 302))  # Matthew-specific fallback
     weight_delta = round(start_weight - weight_lbs, 1) if weight_lbs else None
 
     # Sleep

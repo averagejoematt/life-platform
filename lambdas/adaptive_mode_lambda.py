@@ -272,6 +272,8 @@ def compute_adaptive_mode(date_str):
 # ── Lambda handler ────────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
+    if event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     try:
         """
         Entry point. Accepts:

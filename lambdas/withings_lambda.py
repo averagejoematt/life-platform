@@ -38,7 +38,7 @@ WITHINGS_SIG_URL   = "https://wbsapi.withings.net/v2/signature"
 WITHINGS_OAUTH_URL = "https://wbsapi.withings.net/v2/oauth2"
 WITHINGS_MEAS_URL  = "https://wbsapi.withings.net/measure"
 
-# Measurement type codes
+# Withings API measurement type IDs -- see developer.withings.com/api-reference
 MEAS_TYPES = {
     1:  "weight_kg",
     5:  "fat_free_mass_kg",
@@ -298,58 +298,6 @@ def compute_body_comp_deltas(date_str, measurements):
 
 
 
-# ── Body composition delta helpers (derived metric A2) ─────────────────────
-
-def compute_body_comp_deltas(date_str, measurements):
-    """
-    Query the Withings record from ~14 days ago and compute lean/fat mass deltas.
-    Uses nearest record within a 7-day search window (days 11-17 before today).
-    Returns dict with delta fields to merge into measurements.
-    """
-    from boto3.dynamodb.conditions import Key
-
-    deltas = {}
-    current_lean = measurements.get("fat_free_mass_lbs")  # Withings calls lean mass "fat_free_mass"
-    current_fat = measurements.get("fat_mass_lbs")
-
-    if current_lean is None and current_fat is None:
-        return deltas
-
-    # Search window: 11-17 days ago (centered on 14)
-    target_dt = datetime.strptime(date_str, "%Y-%m-%d")
-    search_start = (target_dt - timedelta(days=17)).strftime("%Y-%m-%d")
-    search_end = (target_dt - timedelta(days=11)).strftime("%Y-%m-%d")
-
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(DYNAMO_PK)
-            & Key("sk").between(f"DATE#{search_start}", f"DATE#{search_end}"),
-        ProjectionExpression="fat_free_mass_lbs, fat_mass_lbs, #d",
-        ExpressionAttributeNames={"#d": "date"},
-        ScanIndexForward=False,  # newest first (closest to 14 days ago)
-        Limit=1,
-    )
-
-    items = resp.get("Items", [])
-    if not items:
-        print(f"  No Withings record found in {search_start} to {search_end} for delta")
-        return deltas
-
-    prev = items[0]
-    prev_date = prev.get("date", "?")
-
-    if current_lean is not None and prev.get("fat_free_mass_lbs") is not None:
-        delta = round(float(current_lean) - float(prev["fat_free_mass_lbs"]), 2)
-        deltas["lean_mass_delta_14d"] = delta
-        print(f"  lean_mass_delta_14d: {delta:+.2f} lbs (vs {prev_date})")
-
-    if current_fat is not None and prev.get("fat_mass_lbs") is not None:
-        delta = round(float(current_fat) - float(prev["fat_mass_lbs"]), 2)
-        deltas["fat_mass_delta_14d"] = delta
-        print(f"  fat_mass_delta_14d: {delta:+.2f} lbs (vs {prev_date})")
-
-    return deltas
-
-
 def save_to_dynamo(date_str: str, measurements: dict):
     if not measurements:
         print("No measurements to save to DynamoDB.")
@@ -431,6 +379,8 @@ def _ingest_single_day(date_str, secret):
 
 # ── Lambda handler ─────────────────────────────────────────────────────────────
 def lambda_handler(event, context):
+    if event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     try:
         import time as _time
         if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1

@@ -171,6 +171,7 @@ def process_blood_glucose(metric_data, units):
         value = float(qty)
         # Convert mmol/L to mg/dL if needed
         if units and "mmol" in units.lower():
+            # 1 mmol/L = 18.0182 mg/dL (molecular weight of glucose / 10)
             value = round(value * 18.0182, 1)
 
         daily_readings[date].append({
@@ -186,6 +187,7 @@ def process_blood_glucose(metric_data, units):
         avg = sum(values) / n
         std_dev = math.sqrt(sum((v - avg) ** 2 for v in values) / n) if n > 1 else 0
 
+        # 70-180 mg/dL: ADA standard Time in Range; 70-120: Attia metabolic optimal
         in_range = sum(1 for v in values if 70 <= v <= 180)
         in_optimal = sum(1 for v in values if 70 <= v <= 120)
         below_70 = sum(1 for v in values if v < 70)
@@ -193,6 +195,7 @@ def process_blood_glucose(metric_data, units):
 
         # Determine if CGM vs manual based on reading frequency
         # CGM: 5-min intervals = ~288/day; manual: 1-10/day
+        # 20+ readings/day = CGM (288/day at 5-min intervals); <20 likely manual fingerstick
         cgm_source = "dexcom_stelo" if n >= 20 else "manual"
 
         daily_agg[date] = {
@@ -417,6 +420,7 @@ def process_generic_metrics(metrics):
         # Water: convert fl_oz_us → mL (1 fl oz = 29.5735 mL)
         water_raw = fields.pop("water_intake_raw", None)
         if water_raw is not None:
+            # 1 US fluid ounce = 29.5735 mL
             fields["water_intake_ml"] = round(water_raw * 29.5735)
             fields["water_intake_oz"] = round(water_raw, 1)
 
@@ -647,6 +651,7 @@ def process_state_of_mind(payload):
             vc = raw.get("valenceClassification")
             if vc is not None:
                 try:
+                    # Convert HealthKit 1-7 scale to -1..+1: subtract midpoint (4), divide by range (3)
                     valence = (int(vc) - 4) / 3.0  # 1→-1.0, 4→0.0, 7→1.0
                 except (ValueError, TypeError):
                     pass
@@ -937,6 +942,8 @@ def save_raw_payload(payload):
 # ── Lambda Handler ─────────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
+    if event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     """
     Lambda Function URL handler for Health Auto Export webhooks.
 

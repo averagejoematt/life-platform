@@ -50,6 +50,7 @@ def tool_get_training_load(args):
         chrono.append((ds, load_by_date.get(ds, 0.0)))
         cur += timedelta(days=1)
 
+    # Banister 1991 Impulse-Response model: CTL 42-day, ATL 7-day
     ctl_series = compute_ewa(chrono, 42)
     atl_series = compute_ewa(chrono, 7)
 
@@ -62,6 +63,7 @@ def tool_get_training_load(args):
         acwr = round(atl / ctl, 2) if ctl > 0 else None
 
         risk = "low"
+        # Gabbett 2016: >1.3 moderate injury risk, >1.5 high; 0.8-1.3 is sweet spot
         if acwr is not None:
             if acwr > 1.5:
                 risk = "HIGH — injury risk elevated, consider reducing load"
@@ -1054,6 +1056,7 @@ def tool_get_training_recommendation(args):
     # Injury risk override
     if acwr is not None and acwr > 1.5:
         tier = "RED"
+    # Meeusen 2013: non-functional overreaching risk after 5+ consecutive training days
     if consecutive_training_days >= 5:
         tier = min(tier, "YELLOW") if tier == "GREEN" else tier
 
@@ -1288,6 +1291,7 @@ def tool_get_hr_recovery_trend(args):
             best_recovery = recovery_60s or recovery_intra
             if peak is None or best_recovery is None:
                 continue
+            # Cole et al. 1999 NEJM: <=12 bpm at 60s = 2x mortality risk
             if best_recovery >= 25: classification = "excellent"
             elif best_recovery >= 18: classification = "good"
             elif best_recovery >= 12: classification = "average"

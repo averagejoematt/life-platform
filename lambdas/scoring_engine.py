@@ -61,6 +61,7 @@ def score_sleep(data, profile):
         "duration_hrs": duration_hrs, "target_hrs": target_hrs,
         "deep_pct": deep_pct, "rem_pct": rem_pct, "light_pct": light_pct,
     }
+    # Sleep component: Whoop sleep score 40%, efficiency 30%, duration-vs-target 30%
     parts, weights = [], []
     if sleep_score is not None:
         parts.append(sleep_score * 0.40); weights.append(0.40)
@@ -109,6 +110,7 @@ def score_nutrition(data, profile):
         else:
             cal_score = 100 * (1 - (pct_off - cal_tolerance) / (cal_penalty - cal_tolerance))
         if cal > cal_target * (1 + cal_tolerance):
+            # Asymmetric: surplus directly stalls weight loss — penalized more than under-eating
             cal_score = max(0, cal_score - 15)
         cal_score = clamp(round(cal_score))
         parts.append(cal_score * 0.40); weights.append(0.40)
@@ -128,6 +130,7 @@ def score_nutrition(data, profile):
     if fat is not None and carbs is not None:
         fat_diff = abs(fat - fat_target) / fat_target if fat_target else 0
         carb_diff = abs(carbs - carb_target) / carb_target if carb_target else 0
+        # 50x multiplier: 100% off target on both macros = score 0
         macro_score = clamp(round(100 - (fat_diff + carb_diff) * 50))
         parts.append(macro_score * 0.20); weights.append(0.20)
         details["macro_score"] = macro_score
@@ -145,6 +148,7 @@ def score_movement(data, profile):
         act_count = safe_float(strava, "activity_count") or 0
         total_time = safe_float(strava, "total_moving_time_seconds") or 0
         if act_count > 0:
+            # Base 70 for showing up; +0.5/min means 60 min = 100. No exercise = 0
             exercise_score = min(100, 70 + (total_time / 60) * 0.5)
         else:
             exercise_score = 0
@@ -193,6 +197,7 @@ def score_habits_registry(data, profile):
     tier_scores = {0: [], 1: [], 2: []}
     tier_status = {0: {}, 1: {}, 2: {}}
     vice_status = {}
+    # T0 (non-negotiable) 3x: missing one T0 tanks the score; T2 (aspirational) 0.5x
     tier_weights = {0: 3.0, 1: 1.0, 2: 0.5}
 
     habitify_7d = data.get("habitify_7d") or []

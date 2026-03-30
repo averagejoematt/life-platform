@@ -99,6 +99,8 @@ def transform(raw, date_str):
 # ── Lambda entry point ────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
+    if event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     try:
         """Entry point — delegates entirely to the ingestion framework."""
         return run_ingestion(config, authenticate, fetch_day, transform, event, context)

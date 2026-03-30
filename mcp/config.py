@@ -32,7 +32,7 @@ PROFILE_PK      = f"USER#{USER_ID}"
 PROFILE_SK      = "PROFILE#v1"
 RAW_DAY_LIMIT   = 90
 CACHE_PK        = f"CACHE#{USER_ID}"
-CACHE_TTL_SECS  = 26 * 3600  # 26 hours
+CACHE_TTL_SECS  = 26 * 3600  # 26h: survives full day + 2h buffer for late-running ingestion pipelines
 MEM_CACHE_TTL   = 600  # 10 minutes
 
 # Fields stripped in lean queries

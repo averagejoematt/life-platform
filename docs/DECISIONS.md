@@ -2,7 +2,7 @@
 
 > Permanent log of significant architectural, design, and operational decisions.
 > Each ADR captures the decision, context, alternatives considered, and outcome.
-> Last updated: 2026-03-16 (v3.7.57)
+> Last updated: 2026-03-29 (v4.4.0)
 
 ---
 
@@ -57,6 +57,17 @@ When a significant decision is made — a design pattern chosen, an approach rej
 | ADR-031 | MCP Lambda deploy: always use full zip build (guard in deploy_lambda.sh) | ✅ Active | 2026-03-15 |
 | ADR-032 | S3 bucket policy: Deny DeleteObject on data prefixes for deploy user | ✅ Active | 2026-03-16 |
 | ADR-033 | Safe S3 sync: wrapper function with dryrun gate and root-block | ✅ Active | 2026-03-16 |
+| ADR-034 | Website content consistency architecture (component system + constants) | ✅ Active | 2026-03-24 |
+| ADR-035 | SIMP-1 tool consolidation: view-dispatchers over standalone tools | ✅ Active | 2026-03-09 |
+| ADR-036 | 3-layer status monitoring architecture | ✅ Active | 2026-03-29 |
+| ADR-037 | Site API read-only constraint | ✅ Active | 2026-02-27 |
+| ADR-038 | In-memory rate limiting over DynamoDB counters — backstopped by WAF | ✅ Active | 2026-03-20 |
+| ADR-039 | CSS/JS cache: content-hash filenames with 1-year immutable TTL | ✅ Active | 2026-03-29 |
+| ADR-040 | Board of Directors: fictional advisors over real public figures | ✅ Active | 2026-03-26 |
+| ADR-041 | Food delivery data: Delivery Index abstraction for privacy | ✅ Active | 2026-03-28 |
+| ADR-042 | OG image generation: Lambda + Pillow over external services | ✅ Active | 2026-03-28 |
+| ADR-043 | Challenge/Protocol/Experiment taxonomy: three behavioral tiers | ✅ Active | 2026-03-26 |
+| ADR-044 | Measurements ingestion via S3 trigger over EventBridge cron | ✅ Active | 2026-03-29 |
 
 ---
 
@@ -708,3 +719,216 @@ Supporting files: `data_sources.json` (source registry), `lint_site_content.py` 
 - **Find-and-replace scripts:** Brittle, doesn't handle prose context, no CI validation.
 
 **Outcome:** Foundation files committed. Pages migrate incrementally — each conversion replaces ~200 lines of duplicated nav/footer HTML with 5 mount-point divs. OG meta tags require a build-time sync step (JS can't modify meta tags for crawlers). Published archive content (chronicle/journal posts) is explicitly excluded from auto-updates per Dr. Lena Johansson's recommendation.
+
+---
+
+## ADR-035 — SIMP-1 Tool Consolidation: View-Dispatchers over Standalone Tools
+
+**Status:** Active
+**Date:** 2026-03-09 (v3.7.17–19)
+
+**Context:** The MCP server had grown to 116 tools. Claude's tool-selection accuracy degrades above ~80 tools — the model has to scan the full tool list on every call, and near-synonym tools (`get_habit_adherence` vs `get_habit_streaks` vs `get_habit_dashboard`) cause frequent misrouting. MCP spec imposes no hard limit, but usability suffers.
+
+**Decision:** Consolidate related tools into "view-dispatchers" — a single tool with a `view=` parameter that selects the analysis. 13 dispatchers replaced 30+ standalone tools (116 → 86).
+
+**Dispatchers created:** `get_daily_snapshot`, `get_longitudinal_summary`, `get_health`, `get_nutrition`, `get_labs`, `get_training`, `get_strength`, `get_character`, `get_cgm`, `get_mood`, `get_daily_metrics`, `get_todoist_snapshot`, `manage_sick_days`. Later (v4.4.0): `get_habits`.
+
+**Reasoning:**
+1. **Reduced tool-selection noise.** A single `get_health` with `view=dashboard|risk_profile|trajectory` is easier for Claude to route than three separate tools.
+2. **Shared parameter validation.** Date range handling, source validation, and cache checks are written once in the dispatcher.
+3. **Retained standalone for unique signatures.** `compare_periods` (4 required date params) and `search_activities` (unique filters) stayed standalone — forcing them into a dispatcher would degrade the schema.
+
+**Alternatives considered:**
+- **Nested tool categories in MCP schema:** MCP spec doesn't support tool grouping/namespacing.
+- **Separate MCP endpoints per domain:** Would require tool routing layer and break the single-endpoint assumption. See ADR-029.
+- **Aggressive reduction (target 50 tools):** Would force unnatural groupings and lose descriptive tool names.
+
+**Outcome:** 116 → 86 tools (SIMP-1 Phase 1). Post-v4.4.0 habit consolidation: 112 tools. Claude's routing accuracy improved noticeably.
+
+---
+
+## ADR-036 — 3-Layer Status Monitoring Architecture
+
+**Status:** Active
+**Date:** 2026-03-29 (v4.4.0)
+
+**Context:** The initial status page showed binary freshness (data exists today: green; no data: red). This produced false reds for activity-dependent sources (Strava on rest days) and false greens for silently broken pipelines (Dropbox secret deleted Mar 10 — Lambda returned "no files found" but the status page showed stale-but-present data as OK). Four pipelines were silently broken for up to 10 days before manual discovery.
+
+**Decision:** 3-layer monitoring with overlay pattern:
+1. **Layer 1 — Data freshness.** Per-source stale thresholds (Whoop: 48h, Strava: 72h, Labs: 180 days, etc.). Checks DynamoDB for most recent `DATE#` record per source.
+2. **Layer 2 — CloudWatch alarm overlay.** Site-api reads alarm state for every source's error alarm. If an alarm is in `ALARM` state, the source is marked red regardless of freshness.
+3. **Layer 3 — Pipeline health check.** Daily at 6 AM PT, a dedicated Lambda invokes every ingestion Lambda with `{}` payload and checks for `FunctionError`. Also checks all 11 Secrets Manager secrets for deletion. Results written to DynamoDB, overlaid by site-api.
+
+**Reasoning:** Each layer catches failures the others miss. Freshness catches "Lambda ran but wrote nothing." Alarms catch "Lambda threw errors." Health check catches "Lambda can't even start (missing secret, import error, auth expired)." The Dropbox incident proved that silent failures (Lambda returns 200 with empty results) bypass both freshness and alarm monitoring — only active probing would have caught it.
+
+**Alternatives considered:**
+- **CloudWatch Synthetics canaries:** $12/canary/month × 17 sources = $204/month. Disproportionate for a personal project.
+- **Step Functions workflow:** Orchestration overhead for a simple probe-and-report pattern.
+- **Alarm-only monitoring:** Misses silent failures (Lambda succeeds but writes no data).
+- **Freshness-only monitoring:** Misses configuration failures (deleted secrets, expired tokens).
+
+**Outcome:** 3-layer monitoring live. Caught the Dropbox, Notion, and Eight Sleep failures that the old system missed.
+
+**Update (v4.4.0):** Health check now sends `{"healthcheck": true}` payload. All 17 probed Lambdas have a 2-line early-return guard at the top of `lambda_handler` — they validate imports and module initialization, then return immediately without hitting external APIs, writing to DDB, or sending emails. The daily-brief probe no longer sends a duplicate email. The original `{}` full-invocation risk has been eliminated.
+
+---
+
+## ADR-037 — Site API Read-Only Constraint
+
+**Status:** Active
+**Date:** 2026-02-27 (established), formally documented 2026-03-29
+
+**Context:** `site_api_lambda.py` serves the public website at averagejoematt.com with 60+ endpoints. It has full DynamoDB read permissions to serve data. Should it have write permissions?
+
+**Decision:** The site API Lambda must never write to DynamoDB. This is a hard constraint. The Lambda's IAM role has `dynamodb:Query`, `dynamodb:GetItem`, `dynamodb:Scan` only — no `PutItem`, `UpdateItem`, or `DeleteItem`.
+
+**Reasoning:** The site API is the platform's only internet-facing endpoint with unauthenticated access (CloudFront → Lambda). Allowing writes would create a vector for data corruption via crafted requests. Even with input validation, the blast radius of a write-capable public endpoint is disproportionate to any benefit. All data ingestion flows through dedicated ingestion Lambdas with source-specific IAM roles. Rate limiting state is kept in-memory (ADR-038) specifically to avoid needing write permissions.
+
+**Alternatives considered:**
+- **Write-capable with strict input validation:** Increases attack surface. Input validation is defense-in-depth, not a primary control.
+- **Separate read/write endpoints:** Adds deployment complexity. No current use case requires public writes.
+
+**Outcome:** IAM role enforces read-only. In-memory rate limiting (ADR-038) was a downstream consequence.
+
+---
+
+## ADR-038 — In-Memory Rate Limiting over DynamoDB Counters
+
+**Status:** Active
+**Date:** 2026-03-20 (v3.7.84), formally documented 2026-03-29
+
+**Context:** The `/api/ask` (AI Q&A) and `/api/board_ask` (Board of Directors Q&A) endpoints need rate limiting. Options: DynamoDB atomic counters, Redis/ElastiCache, or in-Lambda memory.
+
+**Decision:** In-memory Python dict (`_RATE_LIMITS = {}`) in the site-api Lambda. 5 requests/hour anonymous, 20/hour subscriber for `/api/ask`; 5/hour per IP for `/api/board_ask`.
+
+**Reasoning:** The site-api Lambda is read-only (ADR-037) — adding DynamoDB write permissions for rate counters would break that constraint. ElastiCache requires VPC (rejected in ADR-008) and costs $13+/month minimum. In-memory counters are free, zero-latency, and sufficient for a single-Lambda, low-traffic personal site. The tradeoff is that counters reset on cold starts and are per-container — a determined abuser could hit the limit, wait for a new container, and get a fresh budget.
+
+**Defense in depth:** R18-F06 deployed WAF rate rules on the CloudFront distribution: 100 requests per 5 minutes on `/api/ask` and `/api/board_ask`. The WAF provides coarse-grained abuse prevention (hard ceiling regardless of Lambda containers). The in-memory limits provide fine-grained per-user UX guardrails (5/hour feels right for a personal Q&A feature). Together they form a two-layer defense: WAF stops bots, in-memory shapes human usage.
+
+**Outcome:** In-memory rate limiting live as UX layer. WAF rate rules live as security layer. Cost: $0 incremental (WAF WebACL already provisioned for other rules). No DynamoDB writes from site-api.
+
+---
+
+## ADR-039 — CSS/JS Cache: Content-Hash Filenames with 1-Year Immutable TTL
+
+**Status:** Active
+**Date:** 2026-03-29 (v4.4.0)
+
+**Context:** Site CSS/JS files were originally served with `max-age=31536000, immutable` but filenames had no content hash (`base.css` not `base.a1b2c3d4.css`). Returning visitors saw broken layouts after CSS changes. An interim fix changed TTL to 1 day, but this forced daily re-downloads of ~150KB.
+
+**Decision:** Content-hash filenames with 1-year immutable cache. The deploy script (`sync_site_to_s3.sh`) computes an 8-char MD5 hash per CSS/JS file, creates a hashed copy (e.g., `base.a1b2c3d4.css`), and rewrites all HTML `<script>`/`<link>` references to the hashed filename. Hashed files are uploaded with `max-age=31536000, immutable`. Original filenames are also uploaded with `max-age=86400` as a fallback for dynamic JS loads.
+
+**Build step:** The deploy script creates a temporary build directory, hashes files, updates HTML, syncs to S3, and cleans up. No permanent build artifacts. The `site/` directory in git remains unhashed — hashing happens at deploy time only.
+
+**Edge case:** `components.js` dynamically loads `countdown.js` at runtime via `document.createElement('script')`. This dynamic reference uses the original (unhashed) filename and gets the 1-day fallback cache. All other files are referenced via static HTML tags and get the full 1-year cache benefit.
+
+**Alternatives considered:**
+- **1-day TTL on all assets:** Simple but forces ~150KB re-download daily. Previous interim solution.
+- **Versioned query strings** (`base.css?v=4.4.0`): CloudFront cache policy may not include query strings in the cache key. Fragile.
+- **Full build tool (Vite/webpack):** Adds Node dependency and build pipeline. Overkill for 10 asset files.
+
+**Outcome:** Content-hash filenames live in `sync_site_to_s3.sh`. Returning visitors only re-download assets when content actually changes. Page load improved ~100ms for return visits.
+
+---
+
+## ADR-040 — Board of Directors: Fictional Advisors over Real Public Figures
+
+**Status:** Active
+**Date:** 2026-03-26 (v4.2.1, offsite Decision 30)
+
+**Context:** The Board of Directors originally used real public figures (Peter Attia, Andrew Huberman, Layne Norton, etc.) as AI personas — each board member spoke in the voice of the real person, generating health advice attributed to them.
+
+**Decision:** Replace all real public figures with fictional advisor characters. Real figures are referenced only as "inspired by" attributions and as evidence citations (e.g., "Dr. Attia's research on Zone 2").
+
+**Reasoning:**
+1. **Legal risk.** Generating AI text in a real person's voice and attributing health advice to them — especially medical advice — creates right-of-publicity and defamation exposure. The platform is public.
+2. **Accuracy risk.** An AI generating "Huberman says X" will inevitably produce advice that Huberman never said or wouldn't endorse. This erodes trust in both the platform and the cited expert.
+3. **Editorial independence.** Fictional advisors can evolve with the platform's needs. A "Dr. Sarah Chen" character can synthesize sleep research from multiple experts without being constrained to one real person's published positions.
+
+**Fictional panel (14 members):** Elena Voss (narrator), Sarah Chen (sleep), Marcus Rodriguez (behavioral), James Whitfield (training), Priya Nakamura (engineering), Viktor Sorokin (adversarial), Lena Johansson (editorial), Jin Park (data), Clara Okafor (nutrition), Tomás Delgado (metabolic), Diane Chowdhury (longevity), Alex Reeves (movement), Mia Tanaka (social), Rachel Adler (mind).
+
+**What was retained:** Evidence citations to real researchers remain throughout (e.g., "Attia benchmarks", "Huberman jet lag protocol", "Walker sleep debt"). These are factual references, not persona-generation.
+
+**Outcome:** All email Lambdas, MCP tools, and site pages use fictional advisors. Board config in `s3://matthew-life-platform/config/board_of_directors.json`.
+
+---
+
+## ADR-041 — Food Delivery Data: Delivery Index Abstraction for Privacy
+
+**Status:** Active
+**Date:** 2026-03-28 (v4.2.2)
+
+**Context:** 15 years of food delivery data (1,598 transactions, $61K total) is one of the platform's strongest behavioral signals — order frequency correlates with diet adherence, stress, and weight trends. But raw dollar amounts and order details are sensitive.
+
+**Decision:** Expose food delivery data publicly only through an abstracted "Delivery Index" (0-10 scale) and clean streak (days since last order). Never surface raw dollar amounts, specific restaurants, or order contents in public-facing contexts.
+
+**Reasoning:** The platform's editorial philosophy is radical transparency about health data, but financial spending patterns carry different privacy implications. A reader knowing "Matthew had a Delivery Index of 8.2 in August" conveys the behavioral signal without exposing "$3,674 in delivery charges." The Index is calibrated so that the worst historical month (Aug 2025: 68 orders, 24/31 days with delivery) = 10.0, using a divisor of 1.55.
+
+**Privacy boundary:** MCP tools and private dashboards show full detail (amounts, restaurants, order counts). The public site, API, and Chronicle emails only show Index + streak.
+
+**Outcome:** `get_food_delivery` MCP tool has full data. `/api/food_delivery` returns Index-only. Chronicle emails reference streak days, not dollars.
+
+---
+
+## ADR-042 — OG Image Generation: Lambda + Pillow over External Services
+
+**Status:** Active
+**Date:** 2026-03-28 (v4.3.0)
+
+**Context:** Each of the 67 site pages needs an Open Graph image for social sharing (Twitter cards, link previews). Options: static placeholder images, external OG image services (Cloudinary, og-image.vercel.app), or generate images programmatically.
+
+**Decision:** Dedicated Lambda (`og-image-generator`) runs daily at 11:30 AM PT, generates 12 page-specific 1200×630 PNG images using Pillow, uploads to S3. Pillow deployed as a Lambda Layer.
+
+**Reasoning:** External OG services charge per-image or per-render and add an external dependency. Static images don't reflect live data. Pillow in a Lambda Layer (~15MB) is free to run on the daily EventBridge schedule (well within free tier), produces images with live stats (weight, character level, HRV, etc.), and keeps all assets within the existing S3+CloudFront infrastructure. The daily cadence matches the data update frequency — health stats don't change intra-day.
+
+**Alternatives considered:**
+- **Static placeholder images:** No live data. Missed engagement opportunity.
+- **Cloudinary/Imgix dynamic URLs:** Per-render pricing. External dependency. URL complexity.
+- **Puppeteer/Playwright headless Chrome:** Heavier Lambda Layer (~50MB+), slower generation, more complex setup for rendering HTML to PNG.
+- **Build-time generation in deploy script:** Would need data access at build time. Currently the deploy pipeline has no data access.
+
+**Outcome:** 12 OG images generated daily. ~3s per image. Total Lambda cost: ~$0.001/day.
+
+---
+
+## ADR-043 — Challenge/Protocol/Experiment Taxonomy: Three Behavioral Tiers
+
+**Status:** Active
+**Date:** 2026-03-26 (v3.9.28–29, v4.4.0)
+
+**Context:** The platform needs to track behavioral interventions at different levels of formality. Users create "experiments" (N=1 with before/after metrics) and also want lighter-weight participation mechanisms.
+
+**Decision:** Three-tier taxonomy:
+1. **Protocols** — the strategy layer. Long-running (weeks to permanent). Defines the what and why of an ongoing health practice (e.g., "Sleep Protocol: no screens after 9pm"). Tracks adherence, key metrics, related habits. Status: active/paused/retired.
+2. **Experiments** — the science layer. Time-bounded (7-60 days). One variable changed, hypothesis stated upfront, 16 metrics auto-compared before vs during. Board evaluation. Status: active/completed/abandoned.
+3. **Challenges** — the engagement layer. Gamified, short-duration (7-30 days). Daily check-ins, XP awards, badge unlocks. Can graduate from experiments ("creatine worked → 30-day creatine challenge"). Status: candidate/active/completed/failed.
+
+**Reasoning:** Early design conflated experiments and challenges. Users would create an "experiment" to track a 7-day step challenge — but experiments require a hypothesis, minimum 14-day duration, and statistical comparison. The mismatch created friction. Separating the tiers means: protocols = "what I do," experiments = "what I'm testing," challenges = "what I'm playing." Each has appropriate tooling and lifecycle.
+
+**Alternatives considered:**
+- **Single "intervention" type with tags:** Simpler schema, but the lifecycle rules (experiments need hypotheses and baseline periods; challenges need daily check-ins and XP) are different enough that a unified type would need extensive conditional logic.
+- **Two tiers (experiments + challenges):** Protocols were added because many behavioral practices (fasting, sleep hygiene, supplement stacks) are indefinite — they don't fit the bounded timeline of experiments or challenges.
+
+**Outcome:** 4 protocol tools, 4 experiment tools, 5 challenge tools. All store to `SOURCE#protocols`, `SOURCE#experiments`, `SOURCE#challenges` partitions respectively.
+
+---
+
+## ADR-044 — Measurements Ingestion via S3 Trigger over EventBridge Cron
+
+**Status:** Active
+**Date:** 2026-03-29 (v4.4.0)
+
+**Context:** Body tape measurements are taken every 4-8 weeks (not daily). A CSV or XLSX file is uploaded to S3 after each session. Unlike the 13 API-based ingestion Lambdas that run on daily EventBridge cron schedules, measurements have no external API to poll.
+
+**Decision:** S3 event notification trigger on `s3://matthew-life-platform/imports/measurements/` prefix → invokes `measurements-ingestion` Lambda on file upload.
+
+**Reasoning:** EventBridge cron makes no sense for aperiodic data. The Lambda would run daily, find no new file 95% of the time, and waste invocations. An S3 trigger fires only when a file is actually uploaded, processing it immediately. The pattern also enables drag-and-drop workflows — upload a CSV, get results in DynamoDB within seconds.
+
+**Alternatives considered:**
+- **Daily cron scanning `imports/` for new files:** Wastes 350+ invocations per year. Adds delay between upload and processing.
+- **Manual Lambda invocation after upload:** Requires operator to remember to run the Lambda after every file upload. Error-prone.
+- **MCP tool that accepts inline data:** Would require pasting CSV data into a chat message. Awkward for 20+ measurements.
+
+**⚠️ Note:** The S3 bucket notification configuration was created but needs verification that it's wired correctly (the CDK stack may need updating to include the S3→Lambda trigger).
+
+**Outcome:** S3-trigger pattern established. Can be reused for any future aperiodic ingestion source (DEXA scans, genetic test results, etc.).

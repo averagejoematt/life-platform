@@ -48,6 +48,52 @@ aws s3api delete-bucket-policy --bucket matthew-life-platform
 
 ---
 
+## Common Mistakes (see also `docs/QUICKSTART.md`)
+
+| Mistake | Result | Fix |
+|---------|--------|-----|
+| Edit shared layer module, skip `build_layer.sh` | Dependent Lambdas run stale code silently | Run `bash deploy/build_layer.sh` first |
+| `deploy_lambda.sh life-platform-mcp` | MCP breaks — strips `mcp/` directory (ADR-031) | Use full zip build (see QUICKSTART) |
+| `aws s3 sync --delete s3://matthew-life-platform/` | Deletes 35K+ objects (ADR-032) | Always use `sync_site_to_s3.sh` |
+| Change Lambda env var in AWS Console | Next `cdk deploy` reverts it silently | Edit CDK stack code instead |
+| Add Lambda to CDK, forget `role_policies.py` | `AccessDenied` on first run | Add IAM policy to role_policies.py |
+| Use DST-aware cron in EventBridge | Schedule drifts 1 hour twice yearly | All crons must be fixed UTC |
+| Change pipeline schedule ordering | Compute reads yesterday's data; brief reads stale compute | Ingestion → Compute → Brief ordering is strict |
+
+---
+
+## OAuth Token Refresh Behavior
+
+Each OAuth-based ingestion Lambda refreshes its own tokens and writes them back to Secrets Manager. No dedicated rotation Lambda exists for OAuth tokens (only for the MCP API key via `key-rotator`).
+
+| Lambda | Auth Type | When It Refreshes | Writes to Secrets Manager | Concurrent Invocation Risk |
+|--------|-----------|-------------------|--------------------------|---------------------------|
+| whoop | OAuth refresh_token | Every invocation (unconditional) | Yes | High — no concurrency limit yet |
+| garmin | garth OAuth session | Every invocation (garth library) | Yes | High |
+| withings | OAuth refresh_token | On 401 response | Yes | Medium |
+| strava | OAuth expires_at | On expiration check (5-min buffer) | Yes | Medium |
+| eightsleep | Password grant | On 401 response | Yes | Low |
+
+**Note:** A concurrent invocation (manual invoke + cron overlap) could race on the token write. `ReservedConcurrentExecutions=1` is ready in CDK but commented out — requires account concurrency limit increase from 10 to 50+ (pending AWS Support request).
+
+---
+
+## Pipeline Ordering Constraint
+
+**All EventBridge cron expressions are fixed UTC.** The PT times below are for reference only — they shift by 1 hour when DST begins (March) and ends (November). The UTC times never change.
+
+The pipeline has strict ordering. Changing schedules without maintaining this sequence produces stale data:
+
+```
+06:45–09:00 AM PT   INGESTION    API pulls from Whoop, Withings, Strava, etc.
+09:05 AM PT         ANOMALY      Runs on freshly ingested data
+10:20–10:35 AM PT   COMPUTE      Insights, metrics, adaptive mode, character sheet
+11:00 AM PT         DAILY BRIEF  Reads computed results → sends email → writes public_stats.json
+11:30 AM PT         OG IMAGES    Reads public_stats.json → generates share images
+```
+
+---
+
 ## Daily Operations
 
 ### Scheduled ingestion times (Pacific Time)
@@ -482,8 +528,8 @@ aws dynamodb get-item --table-name life-platform \
 
 ## Cost Monitoring
 
-Monthly budget target: under $20  
-CloudWatch billing alarm fires at: $5  
+Monthly budget target: $15 (current actual ~$13). AWS Budget alert cap: $20.
+CloudWatch billing alarm fires at: $5
 
 Check current MTD spend:
 ```bash

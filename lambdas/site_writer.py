@@ -47,12 +47,12 @@ PULSE_KEY = "site/pulse.json"
 HERO_WHY_PARAGRAPH = (
     "Most people optimize in the dark — gut feelings, Instagram advice, someone's podcast take. "
     "I connect 19 data sources to a custom AI and publish every number, every week, without filtering. "
-    "302 lbs to 185. Every failure included. This is what systematic self-improvement actually looks like."
+    "307 lbs to 185. Every failure included. This is what systematic self-improvement actually looks like."
 )
 
 # Journey start date — used for "X days on journey" counter
 JOURNEY_START_DATE = "2026-04-01"
-JOURNEY_START_WEIGHT = 302.0
+JOURNEY_START_WEIGHT = 307.0  # April 1 baseline weight — matches profile and site_constants.js
 GOAL_WEIGHT = 185.0
 
 

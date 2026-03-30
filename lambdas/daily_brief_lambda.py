@@ -596,7 +596,7 @@ def score_nutrition(data, profile):
     protein = safe_float(mf, "total_protein_g")
     fat = safe_float(mf, "total_fat_g")
     carbs = safe_float(mf, "total_carbs_g")
-    cal_target = profile.get("calorie_target", 1800)
+    cal_target = profile.get("calorie_target", 1800)  # Matthew's cut-phase target (TDEE ~3300, 1500 cal deficit); override via profile
     protein_target = profile.get("protein_target_g", 190)
     protein_floor = profile.get("protein_floor_g", 170)
     cal_tolerance = profile.get("calorie_tolerance_pct", 10) / 100
@@ -622,8 +622,8 @@ def score_nutrition(data, profile):
         prot_score = clamp(round(prot_score))
         parts.append(prot_score * 0.40); weights.append(0.40)
         details["protein_score"] = prot_score
-    fat_target = profile.get("fat_target_g", 60)
-    carb_target = profile.get("carb_target_g", 125)
+    fat_target = profile.get("fat_target_g", 60)    # Matthew's cut-phase macro targets; override via profile
+    carb_target = profile.get("carb_target_g", 125)  # Matthew's cut-phase macro targets; override via profile
     if fat is not None and carbs is not None:
         fat_diff = abs(fat - fat_target) / fat_target if fat_target else 0
         carb_diff = abs(carbs - carb_target) / carb_target if carb_target else 0
@@ -643,6 +643,7 @@ def score_movement(data, profile):
     if strava:
         act_count = safe_float(strava, "activity_count") or 0
         total_time = safe_float(strava, "total_moving_time_seconds") or 0
+        # Base 70 for showing up; each minute adds 0.5 (60 min to reach 100)
         exercise_score = min(100, 70 + (total_time / 60) * 0.5) if act_count > 0 else 0
     else:
         exercise_score = 0
@@ -787,7 +788,7 @@ def _score_habits_mvp_legacy(data, profile):
 def score_hydration(data, profile):
     apple = data.get("apple")
     water_ml = safe_float(apple, "water_intake_ml") if apple else None
-    target_ml = profile.get("water_target_ml", 2957)
+    target_ml = profile.get("water_target_ml", 2957)  # 2957 ml = 100 fl oz -- Matthew's daily water target
     # Minimum 500ml to count as tracked.
     # HAE sync consistently delivers ~350ml artifacts when full data doesn't sync.
     if water_ml is None or water_ml < 500:
@@ -828,6 +829,7 @@ def score_glucose(data, profile):
     details = {"tir_pct": tir, "avg_glucose": avg_glucose, "std_dev": std_dev, "readings": readings}
     parts, weights = [], []
     if tir is not None:
+        # CGM TIR: >=95% optimal (athlete target), >=90% good, >=70% ADA standard for T2DM
         if tir >= 95: tir_score = 100
         elif tir >= 90: tir_score = 80 + (tir - 90) * 4
         elif tir >= 70: tir_score = max(0, 80 * (tir - 70) / 20)
@@ -835,6 +837,7 @@ def score_glucose(data, profile):
         parts.append(tir_score * 0.50); weights.append(0.50)
         details["tir_score"] = round(tir_score, 1)
     if avg_glucose is not None:
+        # Avg glucose: <95 optimal, <100 ADA normal boundary, >=140 ADA post-prandial threshold
         if avg_glucose < 95: glu_score = 100
         elif avg_glucose < 100: glu_score = 80 + (100 - avg_glucose) * 4
         elif avg_glucose < 140: glu_score = max(0, 80 * (140 - avg_glucose) / 40)
@@ -842,6 +845,7 @@ def score_glucose(data, profile):
         parts.append(glu_score * 0.30); weights.append(0.30)
         details["avg_score"] = round(glu_score, 1)
     if std_dev is not None:
+        # Glucose SD: <15 low variability (ideal), <20 acceptable, >=40 high variability (concern)
         if std_dev < 15: var_score = 100
         elif std_dev < 20: var_score = 80 + (20 - std_dev) * 4
         elif std_dev < 40: var_score = max(0, 80 * (40 - std_dev) / 20)
@@ -1272,6 +1276,8 @@ def record_email_send(table, lambda_name):
 
 
 def lambda_handler(event, context):
+    if event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     _init_output_writers()  # late-bind; safe to call multiple times (idempotent)
 
     # Regrade mode: recompute day grades without sending email
@@ -1604,11 +1610,11 @@ def lambda_handler(event, context):
     try:
         _tldr = tldr_guidance.get("tldr", "") if tldr_guidance else ""
         if _tldr:
-            if len(_tldr) <= 120:
+            if len(_tldr) <= 200:  # 200 chars fits the homepage pull-quote block without overflow
                 _elena_hero_line = _tldr
             else:
-                cutoff = _tldr[:120].rfind('. ')
-                _elena_hero_line = _tldr[:cutoff + 1] if cutoff > 0 else _tldr[:120] + "\u2026"
+                cutoff = _tldr[:200].rfind('. ')
+                _elena_hero_line = _tldr[:cutoff + 1] if cutoff > 0 else _tldr[:200] + "\u2026"
     except Exception as _e:
         print(f"[WARN] HP-12: elena_hero_line generation failed: {_e}")
 

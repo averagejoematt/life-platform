@@ -134,6 +134,7 @@ def tool_get_sleep_analysis(args):
         "nights_below_80pct":         pct_below(eff_pcts, 80),
     }
 
+    # 85%: AASM healthy target; 80%: CBT-I treatment threshold (Morin et al.)
     eff_alerts = []
     eff_avg = efficiency["avg_sleep_efficiency_pct"]
     if eff_avg and eff_avg < 80:
@@ -216,6 +217,7 @@ def tool_get_sleep_analysis(args):
         "weekend_nights_analyzed":  len(weekend_mids),
     }
 
+    # Wittmann 2006; wake stricter because it anchors the circadian clock more strongly
     circ_alerts = []
     if onset_sd and onset_sd > 1.0:
         circ_alerts.append(
@@ -261,6 +263,7 @@ def tool_get_sleep_analysis(args):
         "note": "Positive debt = below target. Research shows sleep debt accumulates and impairs cognition even when subjective sleepiness adapts.",
     }
 
+    # Van Dongen 2003: cognitive impairment at ~6h cumulative debt
     debt_alerts = []
     if cumulative_debt_7d and cumulative_debt_7d > 5:
         debt_alerts.append(
@@ -449,7 +452,7 @@ def tool_get_sleep_environment_analysis(args):
         eff = br.get("avg_efficiency") or 0
         dep = br.get("avg_deep_pct") or 0
         hrv_v = br.get("avg_hrv") or 0
-        # Normalize: efficiency 0-100, deep 0-30, HRV 0-200
+        # Composite: efficiency 40% (best-validated consumer metric), deep 30%, HRV 30%
         composite = eff / 100 * 40 + dep / 30 * 30 + min(hrv_v / 100, 1.0) * 30
         br["composite_score"] = round(composite, 1)
         if composite > best_composite:

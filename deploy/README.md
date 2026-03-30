@@ -1,7 +1,22 @@
 # Deploy Scripts — Reference Guide
 
 > Scripts in this directory are **run locally in Terminal**, never via Claude MCP tools.
-> Last updated: 2026-03-15 (v3.7.30)
+> Last updated: 2026-03-29 (v4.4.0)
+>
+> **First time deploying?** Read `docs/QUICKSTART.md` — it has a deploy decision tree and gotchas.
+
+---
+
+## Deploy Decision Tree
+
+**"I changed a file. Which script do I run?"** See `docs/QUICKSTART.md` for the full table. Key rules:
+
+1. **Lambda code only** → `deploy_lambda.sh` or `deploy_and_verify.sh`
+2. **Shared layer module** (ai_calls.py, scoring_engine.py, etc.) → `build_layer.sh` FIRST, then deploy dependents
+3. **MCP Lambda** → **NEVER `deploy_lambda.sh`** — use the full zip build (ADR-031). `deploy_lambda.sh` hard-rejects this.
+4. **CDK changes** (IAM, schedules, new Lambda) → `cd cdk && npx cdk deploy <StackName>`
+5. **Site content** → `sync_site_to_s3.sh`
+6. **S3 data** → NEVER `aws s3 sync --delete` without `safe_sync.sh` (ADR-032)
 
 ---
 
@@ -78,26 +93,23 @@ The standard flow for any code change:
 # 2. Deploy
 bash deploy/deploy_and_verify.sh <function-name>
 
-# If deploy_and_verify isn't suitable (e.g. MCP Lambda which needs special zip):
-bash deploy/deploy_lambda.sh life-platform-mcp
+# ⚠️  NEVER use deploy_lambda.sh for MCP — it strips the mcp/ directory (ADR-031)
+# See "MCP Lambda" section below for the correct procedure.
 
 # 3. Check logs
 # AWS Console → Lambda → <function> → Monitor → View CloudWatch Logs
 ```
 
-### MCP Lambda — special zip procedure
+### MCP Lambda — special zip procedure (ADR-031)
 
-The MCP Lambda requires bundling the entire `mcp/` package:
+**`deploy_lambda.sh` hard-rejects `life-platform-mcp`.** The MCP Lambda is a multi-module package — single-file deploy strips the `mcp/` directory and silently breaks all endpoints.
 
 ```bash
-# From project root:
-cd ..
-zip -r life-platform/mcp_server.zip \
-  life-platform/mcp_server.py \
-  life-platform/mcp/ \
-  -x "*.pyc" -x "*/__pycache__/*"
-cd life-platform
-bash deploy/deploy_lambda.sh life-platform-mcp
+# From project root — always use this exact procedure:
+ZIP=/tmp/mcp_deploy.zip && rm -f $ZIP
+zip -j $ZIP mcp_server.py mcp_bridge.py
+zip -r $ZIP mcp/ -x 'mcp/__pycache__/*' 'mcp/*.pyc'
+aws lambda update-function-code --function-name life-platform-mcp --zip-file fileb://$ZIP --region us-west-2
 ```
 
 ### Garmin Lambda — native deps

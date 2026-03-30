@@ -240,6 +240,7 @@ def tool_get_readiness_score(args):
     if hrv_7d_avg is not None and hrv_30d_avg is not None and hrv_30d_avg > 0:
         ratio     = hrv_7d_avg / hrv_30d_avg
         trend_pct = round((ratio - 1.0) * 100, 1)
+        # Base 60 (neutral readiness); +10% HRV above baseline = score 80, -10% = score 40
         hrv_score = _clamp(60.0 + (ratio - 1.0) * 200.0)
         components["hrv_trend"] = {
             "score":  round(hrv_score, 1),
@@ -262,6 +263,7 @@ def tool_get_readiness_score(args):
             recent7   = sum(hrv_7d_vals)  / len(hrv_7d_vals)
             ratio     = recent7 / baseline if baseline > 0 else 1.0
             trend_pct = round((ratio - 1.0) * 100, 1)
+            # Base 60 (neutral readiness); +10% HRV above baseline = score 80, -10% = score 40
             hrv_score = _clamp(60.0 + (ratio - 1.0) * 200.0)
             components["hrv_trend"] = {
                 "score":  round(hrv_score, 1),
@@ -282,6 +284,7 @@ def tool_get_readiness_score(args):
     # tool_get_training_load (which queries 264 days of Strava + runs Banister model).
     tsb_cm = float(_cm["tsb"]) if _cm.get("tsb") is not None else None
     if tsb_cm is not None:
+        # TSB +12 = 100 (peak form), TSB -28 = 0 (deeply fatigued)
         tsb_score = _clamp(70.0 + tsb_cm * 2.5)
         form = ("fresh — good for key sessions or race" if tsb_cm > 5
                 else "fatigued — accumulated training stress is high" if tsb_cm < -10
@@ -488,6 +491,7 @@ def tool_get_weight_loss_progress(args):
     def calc_bmi(weight_lbs, height_in):
         if not height_in:
             return None
+        # 703 converts imperial (lbs/in^2) to metric BMI (kg/m^2)
         return round(703 * weight_lbs / (height_in ** 2), 1)
 
     bmi_categories = [
@@ -531,6 +535,7 @@ def tool_get_weight_loss_progress(args):
                 weekly_rate = round((prior["weight_lbs"] - pt["weight_lbs"]) / days_diff * 7, 2)
                 pt["weekly_loss_rate_lbs"] = weekly_rate
                 weekly_rates.append(weekly_rate)
+                # >2.5 lbs/week exceeds ACSM safe rate; risk of lean mass catabolism (Helms 2014)
                 if weekly_rate > 2.5:
                     pt["rate_flag"] = "⚠️ Losing too fast (>2.5 lbs/wk) — risk of muscle loss. Check nutrition."
                 elif weekly_rate < 0:
@@ -576,6 +581,7 @@ def tool_get_weight_loss_progress(args):
     if len(recent_14) >= 3:
         wts = [pt["weight_lbs"] for pt in recent_14]
         spread = max(wts) - min(wts)
+        # <1.5lb range in 14d = plateau; accounts for ~2lb daily water fluctuation noise
         if spread < 1.5:
             plateau = {
                 "detected":  True,
@@ -683,6 +689,7 @@ def tool_get_body_composition_trend(args):
             if fat_change is not None and wt_change != 0:
                 pct_fat_of_loss = round(100 * fat_change / wt_change, 1)
                 summary["pct_of_loss_that_is_fat"] = pct_fat_of_loss
+                # <60% fat loss indicates excessive lean mass loss; target >75% (Hector & Phillips 2018)
                 if pct_fat_of_loss < 60:
                     summary["composition_alert"] = f"⚠️ Only {pct_fat_of_loss}% of weight lost is fat. Increase protein intake and resistance training to protect lean mass."
                 else:
@@ -696,6 +703,7 @@ def tool_get_body_composition_trend(args):
             continue
         if prev and "lean_mass_lbs" in prev:
             lean_delta = pt["lean_mass_lbs"] - prev["lean_mass_lbs"]
+            # -2.0 lb lean mass drop exceeds Withings scale error + water variation noise
             if lean_delta < -2.0:
                 lean_loss_events.append({
                     "date":           pt["date"],
@@ -771,7 +779,7 @@ def tool_get_energy_expenditure(args):
             age_years = (datetime.utcnow() - dob).days / 365.25
         except Exception:
             pass
-    age_years = age_years or 35
+    age_years = age_years or 35  # Matthew-specific fallback: age 35; only used when profile lookup fails
 
     if sex == "female":
         bmr = round(10 * weight_kg + 6.25 * height_cm - 5 * age_years - 161, 0)
@@ -982,8 +990,10 @@ def tool_get_body_composition_snapshot(args):
     weight_lb = bc.get("weight_lb", 0)
     weight_kg = weight_lb * 0.4536
 
+    # Height-normalized FFMI per VanItallie 1990; 6.1 correction factor, 1.80m reference height
     ffmi = round(lean_kg / (height_m ** 2), 1) if height_m > 0 else None
     ffmi_norm = round(ffmi + 6.1 * (1.80 - height_m), 1) if ffmi else None
+    # FFMI norms per Kouri 1995: 25 = natural muscle limit, 22 = advanced, 20 = above avg, 18 = avg male
     ffmi_class = None
     if ffmi:
         if ffmi >= 25: ffmi_class = "exceptional (near natural limit)"
@@ -1002,11 +1012,14 @@ def tool_get_body_composition_snapshot(args):
             "weight_lb": bc.get("weight_lb"), "body_fat_pct": bc.get("body_fat_pct"),
             "fat_mass_lb": bc.get("fat_mass_lb"), "lean_mass_lb": lean_lb,
             "visceral_fat_g": bc.get("visceral_fat_g"),
+            # DexaFit reference ranges
             "visceral_fat_category": "elite" if vat_g < 500 else ("normal" if vat_g < 1000 else "elevated"),
             "android_fat_pct": bc.get("android_fat_pct"), "gynoid_fat_pct": bc.get("gynoid_fat_pct"),
             "ag_ratio": bc.get("ag_ratio"),
+            # A/G ratio: <=1.0 favorable fat distribution; >1.2 elevated CVD risk
             "ag_status": "optimal" if ag <= 1.0 else ("slightly elevated" if ag <= 1.2 else "elevated"),
             "bmd_t_score": bc.get("bmd_t_score"),
+            # WHO: >=-1.0 normal, -1.0 to -2.5 osteopenia, <-2.5 osteoporosis
             "bmd_status": "excellent" if bmd_t >= 1.0 else ("normal" if bmd_t >= -1.0 else "low")},
         "derived_metrics": {
             "ffmi": ffmi, "ffmi_normalized": ffmi_norm, "ffmi_classification": ffmi_class,
@@ -1079,22 +1092,27 @@ def tool_get_health_risk_profile(args):
             apob = _get_bm(bms, "apolipoprotein_b"); crp = _get_bm(bms, "crp_hs")
 
             if isinstance(ldl, (int, float)):
+                # AHA guideline: <100 desirable; Attia longevity target: <100 (or <70 if high-risk)
                 cv["factors"].append({"marker": "LDL-C", "value": ldl, "unit": "mg/dL",
                     "risk": "elevated" if ldl >= 100 else "optimal",
                     "note": "Attia target <100; <70 if high-risk"})
             if isinstance(hdl, (int, float)):
+                # AHA: >=40 acceptable male; Attia longevity: >=50 optimal
                 cv["factors"].append({"marker": "HDL", "value": hdl, "unit": "mg/dL",
                     "risk": "optimal" if hdl >= 50 else "low"})
             if isinstance(tg, (int, float)) and isinstance(hdl, (int, float)) and hdl > 0:
                 r = round(tg / hdl, 2)
+                # Attia: <1.0 optimal insulin sensitivity; AHA: <2.0 acceptable
                 cv["factors"].append({"marker": "TG/HDL ratio", "value": r,
                     "risk": "optimal" if r < 1.0 else ("good" if r < 2.0 else "elevated"),
                     "note": "Insulin resistance proxy — target <1.0"})
             if isinstance(apob, (int, float)):
+                # Attia: <80 optimal; AHA/EAS consensus: <100 desirable, <80 aggressive
                 cv["factors"].append({"marker": "ApoB", "value": apob, "unit": "mg/dL",
                     "risk": "optimal" if apob < 80 else ("borderline" if apob < 100 else "elevated"),
                     "note": "Best single predictor of atherosclerotic CV risk"})
             if isinstance(crp, (int, float)):
+                # AHA: <1.0 low risk, 1-3 moderate, >3 high; Attia longevity: <1.0 target
                 cv["factors"].append({"marker": "hs-CRP", "value": crp, "unit": "mg/L",
                     "risk": "optimal" if crp < 1.0 else ("borderline" if crp < 3.0 else "elevated")})
 
@@ -1149,6 +1167,7 @@ def tool_get_health_risk_profile(args):
             glu = _get_bm(bms, "glucose"); a1c = _get_bm(bms, "hba1c")
 
             if isinstance(glu, (int, float)):
+                # ADA: <100 normal, 100-125 prediabetic; Attia longevity: <90 optimal
                 met["factors"].append({"marker": "Fasting glucose", "value": glu, "unit": "mg/dL",
                     "risk": "optimal" if glu < 90 else ("borderline" if glu < 100 else "elevated"),
                     "note": "Attia optimal <90"})
@@ -1158,6 +1177,7 @@ def tool_get_health_risk_profile(args):
                     met["factors"][-1]["trend"] = glu_trend
 
             if isinstance(a1c, (int, float)):
+                # ADA: <5.7 normal, 5.7-6.4 prediabetic, >=6.5 diabetic; Attia longevity: <5.4
                 met["factors"].append({"marker": "HbA1c", "value": a1c, "unit": "%",
                     "risk": "optimal" if a1c < 5.4 else ("borderline" if a1c < 5.7 else "prediabetic" if a1c < 6.5 else "diabetic"),
                     "note": "Attia optimal <5.4"})

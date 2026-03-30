@@ -123,7 +123,7 @@ def lambda_handler(event, context):
             last_date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
             age_hours = (now - last_date).total_seconds() / 3600
 
-            source_stale_hrs = SOURCE_STALE_HOURS.get(source_name, STALE_HOURS)
+            source_stale_hrs = SOURCE_STALE_HOURS.get(source_key, STALE_HOURS)
             source_stale_threshold = now - timedelta(hours=source_stale_hrs)
             if last_date < source_stale_threshold:
                 stale_sources.append((source_name, f"Last update: {date_str} ({age_hours:.0f}h ago)"))

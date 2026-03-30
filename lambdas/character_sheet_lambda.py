@@ -310,6 +310,7 @@ def get_food_delivery_modifier():
         streak_days = int(streak.get('streak_days', 0))
         last_order = streak.get('last_order_date', '')
         from datetime import datetime
+        # 15% penalty for ordering delivery; graduated bonus at 7/14/30 clean days
         if last_order == datetime.utcnow().strftime('%Y-%m-%d'):
             return 0.85
         if streak_days >= 30: return 1.10
@@ -325,6 +326,8 @@ def get_food_delivery_modifier():
 # ==============================================================================
 
 def lambda_handler(event, context):
+    if event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     t0 = time.time()
     logger.info("[character] Character Sheet Compute v1.1.0 starting...")
 
@@ -620,7 +623,7 @@ def lambda_handler(event, context):
                 "level_events_count": len(events),
                 "next_tier":          "Momentum",
                 "next_tier_level":    21,
-                "started_date":       "2026-04-01",
+                "started_date":       "2026-04-01",  # Hardcoded P40 journey start -- should read from profile.journey_start_date
                 "challenge_bonus_xp": {k: v for k, v in (record.get("challenge_bonus_xp") or {}).items()},
             },
             pillars=pillars_for_site,

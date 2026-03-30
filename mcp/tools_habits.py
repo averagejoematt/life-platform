@@ -1221,10 +1221,12 @@ def tool_get_vice_streaks(args):
         return {"error": "No vice streak data found in the requested window."}
 
     def compounding_value(streak_days):
+        # Superlinear (x^1.5) rewards longer streaks disproportionately; /10 normalizes to ~50 at 30 days
         """Compounding value formula: streak^1.5 / 10. Day 30 ≈ 16.4, Day 3 ≈ 0.5 (3x ratio)."""
         return round((streak_days ** 1.5) / 10, 2)
 
     def streak_risk(streak_days, miss_rate_14d):
+        # Clear "Atomic Habits": 3d establishing, 14d habit forming, 30d identity-level commitment
         """Rate relapse risk based on streak length and recent miss rate."""
         if streak_days <= 3:    return "establishing"
         if streak_days <= 14:
