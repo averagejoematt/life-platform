@@ -127,74 +127,99 @@ def save_secret(secret: dict):
 # ── Garmin auth ────────────────────────────────────────────────────────────────
 def get_garmin_client(secret: dict):
     """
-    Initialise garminconnect.Garmin using stored garth OAuth tokens.
+    Initialise garminconnect.Garmin using stored OAuth tokens from Secrets Manager.
 
-    Auth flow:
-      1. Load stored garth tokens from Secrets Manager
-      2. Wire garth client into garminconnect Garmin object
-      3. Resolve display_name via profile API (required for URL paths)
-      4. Save refreshed tokens back to Secrets Manager
+    Supports two token formats:
+      1. Browser-auth (2026+): garth_tokens contains JSON with oauth1/oauth2 objects.
+         Written by setup_garmin_browser_auth.py. Loaded via garth.resume() from /tmp.
+      2. Legacy: garth_tokens contains garth.client.dumps() blob.
+         Written by old setup_garmin_auth.py. Loaded via garth.client.loads().
 
-    NOTE: Lambda cannot do interactive garth.login() (no stdin for MFA).
-    If tokens are expired, re-run setup_garmin_auth.py locally.
-
-    The display_name is critical: garminconnect uses it in URL paths like
-    /usersummary/daily/{display_name}. If None, those calls return 403.
+    NOTE: Lambda cannot do interactive garth.login() (no stdin for MFA,
+    and Garmin blocks programmatic SSO since March 2026).
+    If tokens are expired, re-run setup_garmin_browser_auth.py locally.
     """
     import garth
     from garminconnect import Garmin
 
-    email    = secret["email"]
-    password = secret["password"]
-
-    # Step 1: Load stored garth tokens
     if not secret.get("garth_tokens"):
         raise RuntimeError(
             "No garth tokens in Secrets Manager. "
-            "Run setup_garmin_auth.py locally to authenticate."
+            "Run setup_garmin_browser_auth.py locally to authenticate."
         )
 
-    try:
-        garth.client.loads(secret["garth_tokens"])
-        print("Loaded stored garth OAuth tokens.")
-    except Exception as e:
-        raise RuntimeError(
-            f"Stored garth tokens invalid ({e}). "
-            "Run setup_garmin_auth.py locally to re-authenticate."
-        ) from e
+    # ── Detect token format and load accordingly ──
+    token_data = secret["garth_tokens"]
+    loaded = False
 
-    # Step 2: Wire garth into garminconnect
-    api = Garmin(email=email, password=password)
+    # Format 1: Browser-auth JSON (has oauth1/oauth2 keys)
+    try:
+        parsed = json.loads(token_data) if isinstance(token_data, str) else token_data
+        if isinstance(parsed, dict) and "oauth1" in parsed and "oauth2" in parsed:
+            import os, tempfile
+            garth_dir = os.path.join(tempfile.gettempdir(), ".garth_tokens")
+            os.makedirs(garth_dir, exist_ok=True)
+            with open(os.path.join(garth_dir, "oauth1_token.json"), "w") as f:
+                json.dump(parsed["oauth1"], f)
+            with open(os.path.join(garth_dir, "oauth2_token.json"), "w") as f:
+                json.dump(parsed["oauth2"], f)
+            garth.resume(garth_dir)
+            print("Loaded OAuth tokens (browser-auth format) via garth.resume()")
+            loaded = True
+    except (json.JSONDecodeError, TypeError, KeyError):
+        pass
+    except Exception as e:
+        print(f"Browser-auth token load failed: {e}, trying legacy format...")
+
+    # Format 2: Legacy garth.client.dumps() blob
+    if not loaded:
+        try:
+            garth.client.loads(token_data)
+            print("Loaded stored garth OAuth tokens (legacy format).")
+            loaded = True
+        except Exception as e:
+            raise RuntimeError(
+                f"Could not load garth tokens in any format ({e}). "
+                "Run setup_garmin_browser_auth.py locally to re-authenticate."
+            ) from e
+
+    # ── Wire garth into garminconnect ──
+    api = Garmin()
     api.garth = garth.client
 
-    # Step 3: Resolve display_name from profile API
-    for profile_path in [
-        "/userprofile-service/socialProfile",
-        "/userprofile-service/userdisplayname",
-    ]:
-        try:
-            profile = garth.client.connectapi(profile_path)
-            name = None
-            if isinstance(profile, dict):
-                name = (profile.get("displayName")
-                        or profile.get("userName")
-                        or profile.get("fullName"))
-            elif isinstance(profile, str):
-                name = profile.strip()
-            if name:
-                api.display_name = name
-                print(f"Resolved display_name: {name} (from {profile_path})")
-                break
-        except Exception as e:
-            print(f"Profile path {profile_path} failed: {e}")
+    # ── Resolve display_name ──
+    # Prefer pre-stored display_name from browser auth
+    if secret.get("display_name"):
+        api.display_name = secret["display_name"]
+        print(f"display_name from secret: {api.display_name}")
+    else:
+        for profile_path in [
+            "/userprofile-service/socialProfile",
+            "/userprofile-service/userdisplayname",
+        ]:
+            try:
+                profile = garth.client.connectapi(profile_path)
+                name = None
+                if isinstance(profile, dict):
+                    name = (profile.get("displayName")
+                            or profile.get("userName")
+                            or profile.get("fullName"))
+                elif isinstance(profile, str):
+                    name = profile.strip()
+                if name:
+                    api.display_name = name
+                    print(f"Resolved display_name: {name} (from {profile_path})")
+                    break
+            except Exception as e:
+                print(f"Profile path {profile_path} failed: {e}")
 
     if not api.display_name:
         raise RuntimeError(
             "Could not resolve Garmin display_name — tokens may be expired. "
-            "Run setup_garmin_auth.py locally to re-authenticate."
+            "Run setup_garmin_browser_auth.py locally to re-authenticate."
         )
 
-    # Step 4: Save refreshed tokens to Secrets Manager
+    # ── Save refreshed tokens back to Secrets Manager ──
     try:
         new_tokens = garth.client.dumps()
         if new_tokens and new_tokens != secret.get("garth_tokens"):
