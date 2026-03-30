@@ -1,0 +1,33 @@
+# Site API Route Metrics — CloudWatch Logs Insights Query
+# Log group: /aws/lambda/life-platform-site-api
+# Time range: adjust as needed (last 24h, 7d, etc.)
+
+# Top routes by request count + avg latency
+fields @timestamp, route, duration_ms, status
+| filter _type = "route_metric"
+| stats count(*) as requests, avg(duration_ms) as avg_ms, max(duration_ms) as max_ms, percentile(duration_ms, 95) as p95_ms, sum(status >= 500) as errors by route
+| sort requests desc
+
+# ---
+
+# Slow routes (p95 > 1s)
+# fields route, duration_ms, status
+# | filter _type = "route_metric" and duration_ms > 1000
+# | sort duration_ms desc
+# | limit 50
+
+# ---
+
+# Cold start impact
+# fields route, duration_ms, cold_start
+# | filter _type = "route_metric"
+# | stats count(*) as total, sum(cold_start = true) as cold_starts, avg(duration_ms) as avg_ms by route
+# | sort cold_starts desc
+
+# ---
+
+# Error routes
+# fields route, status, duration_ms, @timestamp
+# | filter _type = "route_metric" and status >= 400
+# | sort @timestamp desc
+# | limit 100
