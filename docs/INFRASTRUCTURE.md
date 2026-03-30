@@ -1,8 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-03-28 (v4.2.1 — 52 Lambdas, 9 active secrets, 105 MCP tools, ~49 alarms)
-> Note: `webhook-key` scheduled for deletion 2026-03-15 (7-day recovery window). Count reflects post-deletion state.
+> Last updated: 2026-03-30 (v4.5.0 — 60 Lambdas, 10 active secrets, 118 MCP tools, ~49 alarms)
 
 ---
 
@@ -56,7 +55,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Function URL (remote) | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/` |
 | Auth (remote) | HMAC Bearer token via `life-platform/mcp-api-key` secret (auto-rotates every 90 days) |
 | Auth (local) | `mcp_bridge.py` → `.config.json` → Function URL |
-| Tools | 105 across 32 modules |
+| Tools | 118 across 35 modules |
 | Cache warmer | 14 tools pre-computed nightly at 9:00 AM PT |
 
 ---
@@ -133,7 +132,7 @@ All DNS-validated via Route 53 CNAME records.
 
 ---
 
-## Secrets Manager (9 active secrets)
+## Secrets Manager (10 active secrets)
 
 All under prefix `life-platform/`. No values stored in this doc — access via AWS console or CLI.
 
@@ -148,30 +147,30 @@ All under prefix `life-platform/`. No values stored in this doc — access via A
 | `ingestion-keys` | JSON bundle | `notion_api_key` + `todoist_api_key` + `habitify_api_key` + `dropbox_app_key` + `health_auto_export_api_key`. COST-B pattern — single secret, per-service key fields. |
 | `habitify` | API key | Dedicated Habitify API token. Also present in `ingestion-keys` — see ADR-014 for governing principle. |
 | `mcp-api-key` | Rotation target | MCP server bearer token consumed by `ai-keys`. 90-day auto-rotation via `life-platform-key-rotator`. |
-| `google-calendar` | Google Calendar Lambda | OAuth2 refresh_token + client credentials. CMK-encrypted. Auto-refreshed by Lambda. Added v3.7.22. |
-| ~~`webhook-key`~~ | ~~Reserved~~ | ~~**SCHEDULED FOR DELETION 2026-03-15** (recovery window 7 days). No Lambda ever read this secret (LastAccessed: None). Saves ~$0.40/mo.~~ |
-| ~~`api-keys`~~ | ~~Legacy bundle~~ | ~~**PERMANENTLY DELETED 2026-03-14.** All Lambdas migrated to per-service secrets.~~ |
+| `site-api-ai-key` | API key | Subscriber validation key for site-api-ai Lambda (ADR-041). |
+
+**Deleted secrets (historical):** See ADR-030, ADR-014 for retirement decisions.
 
 ---
 
-## Lambdas (45)
+## Lambdas (60)
 
-43 CDK-managed (us-west-2) + 2 Lambda@Edge (us-east-1)
+58 CDK-managed (us-west-2) + 2 Lambda@Edge (us-east-1)
 
 ### Ingestion (14)
-`whoop-data-ingestion` · `eightsleep-data-ingestion` · `garmin-data-ingestion` · `strava-data-ingestion` · `withings-data-ingestion` · `habitify-data-ingestion` · `macrofactor-data-ingestion` · `notion-journal-ingestion` · `todoist-data-ingestion` · `weather-data-ingestion` · `health-auto-export-webhook` · `journal-enrichment` · `activity-enrichment` · `google-calendar-ingestion`
+`whoop-data-ingestion` · `eightsleep-data-ingestion` · `garmin-data-ingestion` · `strava-data-ingestion` · `withings-data-ingestion` · `habitify-data-ingestion` · `macrofactor-data-ingestion` · `notion-journal-ingestion` · `todoist-data-ingestion` · `weather-data-ingestion` · `health-auto-export-webhook` · `journal-enrichment` · `activity-enrichment` · `food-delivery-ingestion`
 
-### Email / Digest (9)
-`daily-brief` · `weekly-digest` · `monthly-digest` · `nutrition-review` · `wednesday-chronicle` · `weekly-plate` · `monday-compass` · `anomaly-detector` · `evening-nudge`
+### Email / Digest (11)
+`daily-brief` · `weekly-digest` · `monthly-digest` · `nutrition-review` · `wednesday-chronicle` · `weekly-plate` · `monday-compass` · `anomaly-detector` · `evening-nudge` · `chronicle-email-sender` · `subscriber-onboarding`
 
-### Compute (6)
-`character-sheet-compute` · `adaptive-mode-compute` · `daily-metrics-compute` · `daily-insight-compute` · `hypothesis-engine` · `weekly-correlation-compute`
+### Compute (9)
+`character-sheet-compute` · `adaptive-mode-compute` · `daily-metrics-compute` · `daily-insight-compute` · `hypothesis-engine` · `weekly-correlation-compute` · `acwr-compute` · `sleep-reconciler` · `circadian-compliance`
 
 > **Skeleton Lambdas (source written, NOT yet CDK-wired or EventBridge-scheduled — activate ~2026-05-01):**
 > `failure-pattern-compute` (IC-4, `lambdas/failure_pattern_compute_lambda.py`) · `momentum-warning-compute` (IC-5, `lambdas/momentum_warning_compute_lambda.py`)
 
-### Infrastructure (14)
-`life-platform-freshness-checker` · `dropbox-poll` · `insight-email-parser` · `life-platform-key-rotator` · `dashboard-refresh` · `life-platform-data-export` · `life-platform-qa-smoke` · `life-platform-mcp` · `life-platform-mcp-warmer` · `dlq-consumer` · `life-platform-canary` · `data-reconciliation` · `pip-audit` · `brittany-weekly-email`
+### Infrastructure / Operational (22)
+`life-platform-freshness-checker` · `dropbox-poll` · `insight-email-parser` · `life-platform-key-rotator` · `dashboard-refresh` · `life-platform-data-export` · `life-platform-qa-smoke` · `life-platform-mcp` · `life-platform-mcp-warmer` · `dlq-consumer` · `life-platform-canary` · `data-reconciliation` · `pip-audit` · `brittany-weekly-email` · `life-platform-site-api` · `life-platform-site-api-ai` · `site-stats-refresh` · `challenge-generator` · `og-image-generator` · `email-subscriber` · `pipeline-health-check` · `chronicle-approve`
 
 ### Lambda@Edge (us-east-1) — manually managed, outside CDK
 `life-platform-cf-auth` — attached to dashboard CloudFront (`EM5NPX6NJN095`), password-gates `dash.averagejoematt.com`
