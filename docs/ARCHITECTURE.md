@@ -1,12 +1,12 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-29 (v4.4.0 — 116 MCP tools, 25-module MCP package, 26 data sources, 59+ Lambdas, 67 site pages, 60+ API endpoints, 7 CDK stacks)
+Last updated: 2026-03-30 (v4.5.0 — 118 MCP tools, 26-module MCP package, 26 data sources, 60 Lambdas, 68 site pages, 65+ API endpoints, 8 CDK stacks)
 
 ---
 
 ## Overview
 
-The life platform is a personal health intelligence system built on AWS. It ingests data from twenty-five sources (twelve scheduled + one webhook + three manual/periodic + two MCP-managed + one State of Mind via webhook), normalises everything into a single DynamoDB table, and surfaces it to Claude through a Lambda-backed MCP server. The design philosophy is: get data in automatically, store it cheaply, and make it queryable without a data engineering background.
+The life platform is a personal health intelligence system built on AWS. It ingests data from twenty-six sources (thirteen scheduled + one webhook + three manual/periodic + two MCP-managed + one State of Mind via webhook), normalises everything into a single DynamoDB table, and surfaces it to Claude through a Lambda-backed MCP server. The design philosophy is: get data in automatically, store it cheaply, and make it queryable without a data engineering background.
 
 ---
 
@@ -29,7 +29,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
                          │ DynamoDB queries
 ┌────────────────────────▼────────────────────────────────────┐
 │  SERVE LAYER                                                │
-│  MCP Server Lambda (95 tools, 768 MB) + Lambda Function URL │
+│  MCP Server Lambda (118 tools, 768 MB) + Lambda Function URL │
 │  ← Claude Desktop + claude.ai + Claude mobile via remote MCP│
 │                                                             │
 │  COMPUTE LAYER (IC intelligence features)                   │
@@ -46,7 +46,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 │  freshness-checker (9:45am) · insight-email-parser (S3 trig)│
 │                                                             │
 │  WEB LAYER                                                  │
-│  averagejoematt.com (66 pages) · CloudFront → S3 /site      │
+│  averagejoematt.com (68 pages) · CloudFront → S3 /site      │
 │  site-api Lambda (us-west-2): /api/ask · /api/board_ask     │
 │  /api/verify_subscriber · /api/vitals · /api/journey        │
 │  /api/character · /api/timeline · /api/correlations         │
@@ -170,11 +170,11 @@ SK: DATE#YYYY-MM-DD
 
 ### MCP Server
 
-**Lambda:** `life-platform-mcp` | **Tools:** 95 | **Memory:** 768 MB | **Modules:** 31
+**Lambda:** `life-platform-mcp` | **Tools:** 118 | **Memory:** 768 MB | **Modules:** 35
 **Remote MCP:** `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws`
 **Auth:** `x-api-key` header check + OAuth 2.1/HMAC Bearer for remote MCP
 
-31-module package — see local project structure below.
+35-module package — see local project structure below.
 
 Cold start: ~700–800ms. Warm: 23–30ms. Cached tools: <100ms.
 
@@ -189,7 +189,7 @@ Compute → store → read pattern. Standalone Lambdas run before Daily Brief, s
 ### Site API Lambda (us-west-2)
 
 **Lambda:** `life-platform-site-api` | **Stack:** LifePlatformOperational | **Region:** us-west-2 (R17-09 migration)
-**Function URL:** `https://lxhjl2qvq2ystwp47464uhs2jti0hpdcq.lambda-url.us-east-1.on.aws/`
+**Function URL:** Routed through CloudFront (E3S424OXQZ8NBE). Lambda confirmed in us-west-2 (verified via AWS CLI 2026-03-30).
 **IAM:** Read-only — `dynamodb:GetItem, Query` + `kms:Decrypt` + `s3:GetObject` on `site/config/*`
 
 **Routes served via CloudFront → site-api:**
@@ -282,7 +282,7 @@ Target: under $25/month | Current: ~$13/month
 ~/Documents/Claude/life-platform/
   mcp_server.py                   ← MCP Lambda entry point
   mcp_bridge.py                   ← Local MCP adapter (Claude Desktop → Lambda HTTPS)
-  mcp/                            ← MCP server package (32 modules)
+  mcp/                            ← MCP server package (35 modules)
     handler.py, config.py, utils.py, core.py, helpers.py, warmer.py
     labs_helpers.py, strength_helpers.py, registry.py
     tools_sleep, tools_health, tools_training, tools_nutrition, tools_habits
@@ -309,7 +309,7 @@ Target: under $25/month | Current: ~$13/month
     output_writers.py             ← Shared: S3/DDB output utilities
     scoring_engine.py             ← Shared: Day grade scoring
 
-  site/                           ← 12-page static website (averagejoematt.com)
+  site/                           ← 68-page static website (averagejoematt.com)
     index.html                    ← Homepage
     story/, live/, journal/       ← Journey pages
     platform/, character/         ← Technical pages

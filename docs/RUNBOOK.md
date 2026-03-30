@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-Last updated: 2026-03-29 (v4.4.0 — 116 MCP tools, 25-module package, 59+ Lambdas, 26 data sources, 67 site pages)
+Last updated: 2026-03-30 (v4.5.0 — 118 MCP tools, 26-module package, 60 Lambdas, 26 data sources, 68 site pages)
 
 ---
 
@@ -59,6 +59,7 @@ aws s3api delete-bucket-policy --bucket matthew-life-platform
 | Add Lambda to CDK, forget `role_policies.py` | `AccessDenied` on first run | Add IAM policy to role_policies.py |
 | Use DST-aware cron in EventBridge | Schedule drifts 1 hour twice yearly | All crons must be fixed UTC |
 | Change pipeline schedule ordering | Compute reads yesterday's data; brief reads stale compute | Ingestion → Compute → Brief ordering is strict |
+| Secret scheduled for deletion goes unnoticed | Data pipeline silently breaks when 7-day recovery window expires | `pipeline-health-check` Lambda probes all secrets daily. Check status page. |
 
 ---
 

@@ -1,3 +1,43 @@
+## v4.5.0 — 2026-03-30: Observatory Upgrade + Usability Remediation
+
+Observatory Phase 1+2 implementation across Physical and Nutrition pages. Full usability study remediation (20 recommendations, 15 implemented). 68 pages, 65+ API endpoints, 118 MCP tools, 60 Lambdas.
+
+### Observatory Upgrade Phase 1
+- **Physical page**: modality deep-dive cards (replacing chips), walking & steps section (Garmin), breathwork section (Apple Health), weekly physical volume 7-day heatmap, running "coming soon" teaser, 2 new hero gauges (daily steps, active modalities)
+- **Nutrition page**: protein source breakdown, weekday vs weekend comparison, eating window stats, caloric periodization (training vs rest days), "What I Actually Eat" gallery
+- **New API endpoints**: `GET /api/weekly_physical_summary`, `GET /api/protein_sources`
+- **Extended APIs**: `training_overview` (modality_breakdown, walking, breathwork), `nutrition_overview` (weekday_vs_weekend, eating_window, periodization)
+
+### Observatory Upgrade Phase 2
+- **Physical page**: strength deep-dive section with exercise variety + volume from Hevy
+- **Nutrition page**: food delivery analysis, macro deep-dives (carbs/fats/fiber with targets + adherence)
+- **New API endpoints**: `GET /api/strength_deep_dive`, `GET /api/food_delivery_overview`
+- **Bug fix**: `_query_source` now guards against EXPERIMENT_START > today (pre-launch BETWEEN clause error)
+
+### Usability Study Remediation (20 items)
+- **P0-1**: Start Here visitor routing modal (3 audience paths, cookie-based)
+- **P0-2**: Board of Directors transparency banner on all 3 board pages
+- **P0-3**: Homepage hero rewrite — transformation-first framing + meta tag updates
+- **P0-4**: Labs observatory overhaul — 2-column hero with gauge ring, "What I'm Watching" flagged biomarkers, editorial pull-quote
+- **P1-1**: Builders page — meta-story section, AI partnership table, updated stats (59→60 Lambdas, 116→118 tools, 26 sources), extended timeline, subscribe CTA
+- **P1-2**: Elena Voss AI attribution — callout on chronicle landing + attribution on every entry
+- **P1-3**: Methodology page — AI governance model section, evidence badge system with confidence thresholds table
+- **P1-5**: Share button on every page (Web Share API + clipboard fallback)
+- **P2-2**: PubMed evidence links on protocol cards (6 protocols mapped)
+- **P2-3**: Community page at /community/ with Discord CTA
+- **MISC-1**: Protocols/Experiments inline definitions + cross-links
+- **MISC-2**: Mobile responsiveness rules for observatory pages
+- **MISC-3**: Elena Voss pull-quotes on all 6 observatory pages
+- **MISC-4**: Currently Testing experiment card on homepage
+- **MISC-6**: Matt bio element with monogram on homepage
+
+### Homepage Fixes
+- Hero layout changed from CSS Grid to Flexbox to eliminate vertical gap
+- Matt bio element fills space between hero and "The experiment" section
+- Transformation-first framing replaces tech-first framing
+
+---
+
 ## v4.4.0 — 2026-03-29: Launch Readiness Session
 
 Massive 24-hour session covering pipeline validation, status page overhaul, reader engagement, subscriber email redesign, and pre-launch hardening. Platform version at session end: 67 pages, 60+ API endpoints, 116 MCP tools, 59 Lambdas.

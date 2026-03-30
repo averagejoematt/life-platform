@@ -7,7 +7,7 @@
 
 ## What Is This?
 
-A personal health intelligence system built on AWS. It pulls data from 13 API-based sources (wearables, apps, webhooks) plus manual/periodic uploads, stores everything in a single DynamoDB table (26 source partitions total), and makes it queryable by Claude through a Lambda-backed MCP server with 112 tools.
+A personal health intelligence system built on AWS. It pulls data from 13 API-based sources (wearables, apps, webhooks) plus manual/periodic uploads, stores everything in a single DynamoDB table (26 source partitions total), and makes it queryable by Claude through a Lambda-backed MCP server with 118 tools.
 
 The end result: ask Claude a natural-language question about your health, and it queries real data rather than relying on memory or estimates.
 
@@ -25,7 +25,7 @@ The end result: ask Claude a natural-language question about your health, and it
 | `PROJECT_PLAN.md` | Active roadmap and backlog |
 | `CHANGELOG.md` | Version history (current 30 days) |
 | `PLATFORM_GUIDE.md` | How to use the platform + all MCP tools in conversation with Claude |
-| `MCP_TOOL_CATALOG.md` | Full catalog of all 112 tools |
+| `MCP_TOOL_CATALOG.md` | Full catalog of all 118 tools |
 | `deploy/README.md` | Guide to the deploy scripts |
 | `DEPENDENCY_GRAPH.md` | Full dependency map: Lambdas → DDB → MCP → website. SPOFs + critical path |
 | `DATA_FLOW_DIAGRAM.md` | Visual data flow (Mermaid diagrams) |
@@ -41,7 +41,7 @@ The end result: ask Claude a natural-language question about your health, and it
     ↓
 DynamoDB (single table) + S3 (raw backup)
     ↓
-MCP Lambda (112 tools) ← Claude queries this
+MCP Lambda (118 tools) ← Claude queries this
     ↓
 46 compute/email/operational Lambdas
     ↓
@@ -87,7 +87,7 @@ Never create Lambda roles, EventBridge rules, or alarms manually. Everything goe
 
 ### 5. Secrets are in Secrets Manager
 
-No credentials in code or environment variables. All secrets live under prefix `life-platform/` in Secrets Manager. 10 active secrets as of v3.9.4.
+No credentials in code or environment variables. All secrets live under prefix `life-platform/` in Secrets Manager. 11 active secrets as of v4.4.0.
 
 ---
 
@@ -193,7 +193,7 @@ Architecture reviews happen periodically. Run `python3 deploy/generate_review_bu
 
 | Term | Meaning |
 |------|---------|
-| **MCP** | Model Context Protocol — Claude's native tool interface. The MCP Lambda exposes 112 tools that Claude calls to query health data. |
+| **MCP** | Model Context Protocol — Claude's native tool interface. The MCP Lambda exposes 118 tools that Claude calls to query health data. |
 | **IC** | Intelligence Capability — the platform's computed health features (IC-1 through IC-30). Each IC is a specific analysis (e.g., IC-8 = intent vs execution, IC-18 = hypothesis engine). |
 | **DLQ** | Dead Letter Queue — failed async Lambda invocations land here. Consumed every 6 hours by `dlq-consumer` Lambda. |
 | **SOT** | Source of Truth — which device/service owns each health domain (e.g., Whoop owns sleep, MacroFactor owns nutrition). See `mcp/config.py`. |

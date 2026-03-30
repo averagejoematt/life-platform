@@ -1,8 +1,8 @@
 # Life Platform — Project Plan
 
 > Living document. For completed work and version history, see CHANGELOG.md / CHANGELOG_ARCHIVE.md.
-> Last update: 2026-03-25 (v3.9.14 — Experiments page evolution: 52-experiment library, community voting, 3-zone page redesign. Spec: docs/EXPERIMENTS_EVOLUTION_SPEC.md).
-> Prior update: 2026-03-23 (v3.9.4 — CI/CD pipeline activation. 3 blockers resolved (F821 lint, boto3 dep, pipefail crash). Shared layer v10 attached to 15 consumers. Pipeline passing lint + tests + plan. R13 #1 finding closing.)
+> Last update: 2026-03-30 (v4.5.0 — Observatory Upgrade Phase 1+2, full usability study remediation, 4 new API endpoints, homepage rewrite).
+> Prior update: 2026-03-29 (v4.4.0 — Launch readiness session, status page overhaul, reader engagement, pre-launch hardening).
 
 ---
 

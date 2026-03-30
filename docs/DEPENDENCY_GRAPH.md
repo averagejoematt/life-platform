@@ -1,7 +1,7 @@
 # Life Platform — Dependency Graph
 
 > Complete dependency map: which Lambdas depend on which DynamoDB partitions, which MCP tools depend on which data, which emails depend on which compute Lambdas.
-> Last updated: 2026-03-29 (v4.4.0)
+> Last updated: 2026-03-30 (v4.5.0)
 
 ---
 
@@ -70,7 +70,7 @@ Runs daily after ingestion completes. **Order matters** — see critical path be
 
 ## 4. MCP Tool Layer (DynamoDB → Claude)
 
-Read-only query layer. 112 tools across 18 modules.
+Read-only query layer. 118 tools across 26 modules.
 
 | MCP Module | DDB Partitions Read |
 |------------|-------------------|
@@ -105,11 +105,22 @@ Read-only query layer. 112 tools across 18 modules.
 | `dashboard.json` | daily_brief | dash.averagejoematt.com | Daily 11 AM |
 | `clinical.json` | daily_brief | /labs/ page | Daily 11 AM |
 | `buddy.json` | daily_brief | buddy.averagejoematt.com | Daily 11 AM |
-| Site HTML/CSS/JS | Manual deploy (`sync_site_to_s3.sh`) | All 67 pages | On deploy |
+| Site HTML/CSS/JS | Manual deploy (`sync_site_to_s3.sh`) | All 68 pages | On deploy |
 
 **Site-api Lambda** (separate from daily brief) serves real-time endpoints: `/api/vitals`, `/api/ask`, `/api/board_ask`, etc. Reads directly from DDB, not from S3 files.
 
 **Site-api-ai Lambda** (split from site-api) serves `/api/ask` and `/api/board_ask` only. Isolated concurrency.
+
+**Observatory API endpoints** (v4.5.0 — site-api Lambda):
+
+| Endpoint | DDB Partitions Read | Used By |
+|----------|-------------------|---------|
+| `/api/training_overview` | strava, whoop, hevy, garmin, apple_health | Training page |
+| `/api/nutrition_overview` | macrofactor, strava | Nutrition page |
+| `/api/weekly_physical_summary` | strava, garmin, apple_health | Training page |
+| `/api/protein_sources` | macrofactor | Nutrition page |
+| `/api/strength_deep_dive` | hevy | Training page |
+| `/api/food_delivery_overview` | food_delivery | Nutrition page |
 
 ---
 
