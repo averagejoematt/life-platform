@@ -1,3 +1,3 @@
-**[HANDOVER_v4.5.0.md](../handovers/HANDOVER_v4.5.0.md)**
+**[HANDOVER_v4.5.2.md](../handovers/HANDOVER_v4.5.2.md)**
 
-v4.5.0 | 2026-03-30 | Observatory Upgrade Phase 1+2, full usability study remediation (15/20 items), 4 new API endpoints, homepage hero rewrite, Start Here modal, community page
+v4.5.2 | 2026-03-30 | R19 remediation complete (Phases 1-6), Observatory Upgrade Phase 1+2, usability study (15/20), all Lambdas CDK-managed, PITR drill passed, 100% alarm coverage, /api/healthz, OPERATOR_GUIDE.md

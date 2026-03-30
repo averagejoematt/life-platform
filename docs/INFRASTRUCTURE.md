@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-03-30 (v4.5.0 — 60 Lambdas, 10 active secrets, 118 MCP tools, ~49 alarms)
+> Last updated: 2026-03-30 (v4.5.2 — 61 Lambdas, 10 active secrets, 118 MCP tools, ~66 alarms)
 
 ---
 
@@ -153,9 +153,9 @@ All under prefix `life-platform/`. No values stored in this doc — access via A
 
 ---
 
-## Lambdas (60)
+## Lambdas (61)
 
-58 CDK-managed (us-west-2) + 2 Lambda@Edge (us-east-1)
+59 CDK-managed (us-west-2) + 2 Lambda@Edge (us-east-1)
 
 ### Ingestion (14)
 `whoop-data-ingestion` · `eightsleep-data-ingestion` · `garmin-data-ingestion` · `strava-data-ingestion` · `withings-data-ingestion` · `habitify-data-ingestion` · `macrofactor-data-ingestion` · `notion-journal-ingestion` · `todoist-data-ingestion` · `weather-data-ingestion` · `health-auto-export-webhook` · `journal-enrichment` · `activity-enrichment` · `food-delivery-ingestion`

@@ -1,6 +1,6 @@
-## v4.5.1 — 2026-03-30: R19 Architecture Review Remediation (Phases 1-5)
+## v4.5.2 — 2026-03-30: R19 Architecture Review Remediation (Phases 1-6)
 
-R19 remediation bringing all dimensions from B+ toward A. 60 Lambdas, 118 MCP tools, 68 pages.
+R19 remediation bringing all dimensions from B+ to A. 61 Lambdas (all CDK-managed), 118 MCP tools, 68 pages.
 
 ### Phase 1: Documentation Sprint
 - INFRASTRUCTURE.md: full update (removed google-calendar, added 15 missing Lambdas, updated all counts)
@@ -25,8 +25,16 @@ R19 remediation bringing all dimensions from B+ toward A. 60 Lambdas, 118 MCP to
 - Verified life-platform-ops dashboard exists
 
 ### Phase 5: Operability
-- CHANGELOG updated with v4.5.1 entry
+- CHANGELOG updated
 - All doc headers consistent (verified by audit_system_state.sh)
+
+### Phase 6: A- to A
+- CDK adoption: 4 unmanaged Lambdas (food-delivery, measurements, pipeline-health-check, subscriber-onboarding) deleted and recreated via CDK with proper IAM roles, EventBridge rules, and alarms. Zero unmanaged Lambdas remaining.
+- CI dependency scanning: pip-audit added to ci-cd.yml (advisory/non-blocking)
+- /api/healthz endpoint: lightweight DDB latency + freshness + warm/cold check
+- INTELLIGENCE_LAYER.md: freeze label removed, updated to v4.5.1
+- OPERATOR_GUIDE.md: Day-1 onboarding guide created
+- ADR-045: 118 MCP tools accepted as operating state
 
 ---
 
