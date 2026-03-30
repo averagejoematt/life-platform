@@ -68,6 +68,7 @@ When a significant decision is made — a design pattern chosen, an approach rej
 | ADR-042 | OG image generation: Lambda + Pillow over external services | ✅ Active | 2026-03-28 |
 | ADR-043 | Challenge/Protocol/Experiment taxonomy: three behavioral tiers | ✅ Active | 2026-03-26 |
 | ADR-044 | Measurements ingestion via S3 trigger over EventBridge cron | ✅ Active | 2026-03-29 |
+| ADR-045 | SIMP-1 Phase 2: Accept 118 MCP tools as operating state | ✅ Active | 2026-03-30 |
 
 ---
 
@@ -932,3 +933,27 @@ Supporting files: `data_sources.json` (source registry), `lint_site_content.py` 
 **⚠️ Note:** The S3 bucket notification configuration was created but needs verification that it's wired correctly (the CDK stack may need updating to include the S3→Lambda trigger).
 
 **Outcome:** S3-trigger pattern established. Can be reused for any future aperiodic ingestion source (DEXA scans, genetic test results, etc.).
+
+---
+
+## ADR-045 — SIMP-1 Phase 2: Accept 118 MCP Tools as Operating State
+
+**Status:** Active
+**Date:** 2026-03-30 (v4.5.1)
+
+**Context:** The MCP server has grown from 85 tools (R16) to 118 tools (R19) over 4 consecutive architecture reviews. SIMP-1 Phase 1 (ADR-035, v3.7.17) consolidated ~30 tools into 13 view-dispatchers, reducing from 116 to 86. Since then, product expansion — observatory upgrades, food delivery, measurements, challenges, protocols, decisions — added 32 new tools, bringing the count to 118. The Technical Board (Viktor, 12-2 vote) directed: either execute Phase 2 (target ≤80) or formally accept the current state via ADR. Perpetual deferral is the worst outcome.
+
+**Decision:** Accept 118 tools as the operating state. Do not pursue further consolidation at this time.
+
+**Reasoning:**
+1. **Tool count maps to product breadth.** 118 tools across 26 data sources and 6 observatory domains is ~4.5 tools per source — a natural density for a platform with this scope.
+2. **Low-hanging fruit is already picked.** SIMP-1 Phase 1 consolidated the easy wins (summary/detail pairs, overlapping dashboards). Remaining tools serve genuinely distinct purposes.
+3. **No measured degradation.** Claude's tool selection accuracy has not measurably degraded. The MCP cache warmer pre-computes 14 high-frequency tools, reducing cold-start context pressure.
+4. **Consolidation cost exceeds benefit.** Merging the remaining tools into view-dispatchers (~38 tools to reach ≤80) would require ~1 week of work and reduce tool discoverability. Users would call `get_lifestyle_data(view="travel")` instead of `get_travel_data()` — a UX regression for a metric improvement.
+5. **Revisit trigger defined.** If tool selection accuracy degrades measurably (Claude consistently picks wrong tools) or MCP context window limits are hit, reopen this ADR and execute Phase 2.
+
+**Alternatives considered:**
+- **Execute Phase 2 (consolidate to ≤80):** ~1 week effort. Would merge tools_lifestyle (25 tools), tools_habits (16), tools_health (15) into view-dispatchers. Reduces count but degrades discoverability.
+- **Partial consolidation (target ~100):** Merge only the largest modules. Moderate effort for moderate reduction. Still doesn't hit 80.
+
+**Outcome:** Finding R17-F13/R18-F07/R19-F05 is formally closed. Tool count is accepted as a product-breadth indicator, not a deficiency. Monitor for selection accuracy degradation.
