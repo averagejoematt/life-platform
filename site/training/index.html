@@ -237,11 +237,12 @@
     /* Gauge row */
     .t-gauge-row {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: var(--space-4);
       opacity: 0;
       animation: fadeUp 0.6s 0.4s forwards;
     }
+    @media (max-width: 768px) { .t-gauge-row { grid-template-columns: repeat(2, 1fr); } }
     .t-gauge {
       text-align: center;
       padding: var(--space-5) var(--space-3);
@@ -364,6 +365,186 @@
       font-family: var(--font-display);
       font-size: 18px;
       color: var(--t-red);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       MODALITY DEEP-DIVE CARDS
+       ═══════════════════════════════════════════════════════ */
+    .t-modality-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+    }
+    @media (max-width: 768px) { .t-modality-grid { grid-template-columns: 1fr; } }
+    .t-modality-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--t-red);
+      padding: var(--space-5) var(--space-6);
+    }
+    .t-modality-card__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: var(--space-3);
+    }
+    .t-modality-card__name {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--t-red);
+    }
+    .t-modality-card__trend {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.06em;
+    }
+    .t-modality-card__stats {
+      display: flex;
+      gap: var(--space-6);
+      margin-bottom: var(--space-3);
+    }
+    .t-modality-stat__val {
+      font-family: var(--font-display);
+      font-size: 22px;
+      line-height: 1;
+    }
+    .t-modality-stat__label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-faint);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .t-modality-card__context {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      font-style: italic;
+      line-height: 1.5;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       WALKING SECTION — 3-column editorial
+       ═══════════════════════════════════════════════════════ */
+    .t-walking-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .t-walking-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+    }
+    @media (max-width: 768px) { .t-walking-grid { grid-template-columns: 1fr; } }
+    .t-walking-col {
+      padding: var(--space-6);
+    }
+    .t-walking-col:not(:last-child) {
+      border-right: 1px solid var(--border);
+    }
+    @media (max-width: 768px) {
+      .t-walking-col:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       BREATHWORK SECTION
+       ═══════════════════════════════════════════════════════ */
+    .t-breathwork-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .t-breathwork-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+    }
+    @media (max-width: 768px) { .t-breathwork-grid { grid-template-columns: 1fr; } }
+    .t-breathwork-card {
+      padding: var(--space-5) var(--space-6);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--t-blue);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       WEEKLY PHYSICAL VOLUME — 7-day heatmap
+       ═══════════════════════════════════════════════════════ */
+    .t-weekly-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .t-weekly-row {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: var(--space-2);
+    }
+    @media (max-width: 768px) { .t-weekly-row { grid-template-columns: repeat(4, 1fr); } }
+    .t-weekly-day {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: var(--space-3) var(--space-3);
+      text-align: center;
+      min-height: 90px;
+    }
+    .t-weekly-day__dow {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-2);
+    }
+    .t-weekly-day__total {
+      font-family: var(--font-display);
+      font-size: 18px;
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: var(--space-1);
+    }
+    .t-weekly-day__acts {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-faint);
+      line-height: 1.4;
+    }
+    .t-weekly-day__steps {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-muted);
+      margin-top: var(--space-1);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       RUNNING — COMING SOON TEASER
+       ═══════════════════════════════════════════════════════ */
+    .t-coming-soon {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+      text-align: center;
+    }
+    .t-coming-soon__title {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-3);
+    }
+    .t-coming-soon__body {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      max-width: 480px;
+      margin: 0 auto;
+      line-height: 1.7;
     }
 
     /* ═══════════════════════════════════════════════════════
@@ -1142,6 +1323,36 @@
         </div>
         <div class="t-gauge__label">Strength (30d)</div>
       </div>
+      <div class="t-gauge">
+        <div class="t-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-steps-arc" cx="44" cy="44" r="35" fill="none" stroke="#60a5fa" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.9s"/>
+          </svg>
+          <div class="t-gauge__center">
+            <div class="t-gauge__num" id="g-steps-num" style="color:#60a5fa">&mdash;</div>
+            <div class="t-gauge__unit">steps/day</div>
+          </div>
+        </div>
+        <div class="t-gauge__label">Daily Steps Avg</div>
+      </div>
+      <div class="t-gauge">
+        <div class="t-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-mod-arc" cx="44" cy="44" r="35" fill="none" stroke="#a78bfa" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 1.0s"/>
+          </svg>
+          <div class="t-gauge__center">
+            <div class="t-gauge__num" id="g-mod-num" style="color:#a78bfa">&mdash;</div>
+            <div class="t-gauge__unit">types</div>
+          </div>
+        </div>
+        <div class="t-gauge__label">Active Modalities</div>
+      </div>
     </div>
   </div>
   <div class="obs-freshness" id="obs-freshness" style="display:none">
@@ -1219,12 +1430,85 @@
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
-     ACTIVITY MIX
+     ACTIVITY DEEP-DIVE CARDS (replaces simple chips)
      ════════════════════════════════════════════════════════════ -->
 <section class="t-activity-section reveal">
-  <div class="t-section-header">Activity mix (30 days)</div>
-  <div class="t-activity-grid" id="t-activities"></div>
+  <div class="t-section-header">Activity breakdown (30 days)</div>
+  <div class="t-modality-grid" id="t-modalities"></div>
 </section>
+
+<!-- ════════════════════════════════════════════════════════════
+     WALKING & STEPS SECTION — editorial 3-column
+     ════════════════════════════════════════════════════════════ -->
+<section class="t-walking-section reveal">
+  <div class="t-section-header">Walking &amp; steps</div>
+  <div class="t-walking-grid">
+    <div class="t-walking-col">
+      <div class="t-z2-bar"><div class="t-z2-bar__fill" id="wbar-steps" style="width:0%;background:#60a5fa"></div></div>
+      <div class="t-z2-big" id="wval-steps" style="color:#60a5fa">&mdash;</div>
+      <div class="t-z2-name">Avg daily steps</div>
+      <div class="t-z2-detail">From Garmin. WHO recommends 7,000&ndash;10,000 steps/day for longevity benefits.</div>
+    </div>
+    <div class="t-walking-col">
+      <div class="t-z2-bar"><div class="t-z2-bar__fill" id="wbar-walks" style="width:0%;background:#3ecf8e"></div></div>
+      <div class="t-z2-big" id="wval-walks" style="color:#3ecf8e">&mdash;</div>
+      <div class="t-z2-name">Walking sessions (30d)</div>
+      <div class="t-z2-detail">
+        <span id="wval-miles">&mdash;</span> total miles.
+        Avg pace: <span id="wval-pace">&mdash;</span> min/mi.
+      </div>
+    </div>
+    <div class="t-walking-col">
+      <div class="t-z2-bar"><div class="t-z2-bar__fill" id="wbar-rucks" style="width:0%;background:#f59e0b"></div></div>
+      <div class="t-z2-big" id="wval-rucks" style="color:#f59e0b">&mdash;</div>
+      <div class="t-z2-name">Rucking sessions (30d)</div>
+      <div class="t-z2-detail">
+        <span id="wval-z2walk">&mdash;</span> min Zone 2 from walking.
+        Rucking yields the highest Z2 efficiency.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     BREATHWORK & RESPIRATORY SECTION
+     ════════════════════════════════════════════════════════════ -->
+<section class="t-breathwork-section reveal">
+  <div class="t-section-header">Breathwork</div>
+  <div class="t-breathwork-grid" id="t-breathwork-grid">
+    <div class="t-breathwork-card">
+      <div class="t-z2-bar"><div class="t-z2-bar__fill" id="bbar-sessions" style="width:0%;background:#60a5fa"></div></div>
+      <div class="t-z2-big" id="bval-sessions" style="color:#60a5fa">&mdash;</div>
+      <div class="t-z2-name">Sessions (30d)</div>
+      <div class="t-z2-detail">Captured via Apple Health breathwork integration.</div>
+    </div>
+    <div class="t-breathwork-card">
+      <div class="t-z2-bar"><div class="t-z2-bar__fill" id="bbar-minutes" style="width:0%;background:#60a5fa"></div></div>
+      <div class="t-z2-big" id="bval-minutes" style="color:#60a5fa">&mdash;</div>
+      <div class="t-z2-name">Total minutes (30d)</div>
+      <div class="t-z2-detail">Avg session: <span id="bval-avg">&mdash;</span> min.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     WEEKLY PHYSICAL VOLUME SUMMARY — 7-day heatmap
+     ════════════════════════════════════════════════════════════ -->
+<section class="t-weekly-section reveal">
+  <div class="t-section-header">This week&rsquo;s movement</div>
+  <div class="t-weekly-row" id="t-weekly-days"></div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     RUNNING — COMING SOON
+     ════════════════════════════════════════════════════════════ -->
+<div class="t-coming-soon reveal">
+  <div class="t-coming-soon__title">Running &mdash; Coming Soon</div>
+  <p class="t-coming-soon__body">
+    The data infrastructure is ready. When the first run happens, this section auto-populates
+    with pace trends, distance progression, and running-specific Zone 2 analysis.
+  </p>
+</div>
 
 <!-- ════════════════════════════════════════════════════════════
      PULL-QUOTE #2 — Rucking finding (staggered right)
@@ -1410,6 +1694,18 @@
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
+     STRENGTH DEEP-DIVE (Phase 2)
+     ════════════════════════════════════════════════════════════ -->
+<section class="t-activity-section reveal" id="t-strength-dive" style="display:none">
+  <div class="t-section-header">Strength deep-dive</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4);" id="t-strength-stats"></div>
+  <div style="margin-top:var(--space-6);">
+    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:var(--space-4);">Top exercises (30d)</div>
+    <div id="t-strength-exercises"></div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
      11f: Activity Diversity — Attia-Pillar Radar Chart
      ════════════════════════════════════════════════════════════ -->
 <section class="t-radar-section reveal">
@@ -1544,6 +1840,16 @@
 <!-- ════════════════════════════════════════════════════════════
      N=1 RULES — left-accent rule cards
      ════════════════════════════════════════════════════════════ -->
+<div class="t-pullquote t-pullquote--right reveal" style="border-bottom:1px solid var(--border);">
+  <blockquote class="t-pullquote__text">
+    &ldquo;Eight modalities in thirty days. Not because he&rsquo;s an athlete &mdash; because he&rsquo;s terrified of being sedentary at sixty.&rdquo;
+  </blockquote>
+  <div class="t-pullquote__attr">
+    <span class="t-pullquote__badge">Chronicle &middot; Elena Voss</span>
+    <span class="t-pullquote__source">AI narrative voice &mdash; <a href="/chronicle/" style="color:var(--t-red);text-decoration:none;">Read the chronicle &rarr;</a></span>
+  </div>
+</div>
+
 <section class="t-rules-section reveal">
   <div class="t-section-header">N=1 training rules &mdash; 30+ weeks of multi-source data</div>
   <div class="t-rule-grid">
@@ -1841,6 +2147,16 @@
     setText('g-str-num', strSessions);
     setArc('g-str-arc', Math.min(100, (strSessions / 15) * 100));
 
+    // Daily steps gauge
+    var avgSteps = t.avg_daily_steps || 0;
+    setText('g-steps-num', avgSteps >= 1000 ? (avgSteps / 1000).toFixed(1) + 'k' : avgSteps);
+    setArc('g-steps-arc', Math.min(100, (avgSteps / 10000) * 100));
+
+    // Active modalities gauge
+    var activeMod = t.active_modalities || 0;
+    setText('g-mod-num', activeMod);
+    setArc('g-mod-arc', Math.min(100, (activeMod / 8) * 100));
+
     /* ── Zone 2 editorial 3-col ── */
     setText('zval-z2', z2Avg + ' min');
     setWidth('zbar-z2', Math.min(100, (z2Avg / 200) * 100));
@@ -1853,15 +2169,100 @@
     setText('zval-wavg', weeklyAvg);
     setWidth('zbar-wavg', Math.min(100, (weeklyAvg / 7) * 100));
 
-    /* ── Activity chips ── */
-    var actGrid = document.getElementById('t-activities');
-    if (t.top_activities && t.top_activities.length) {
-      actGrid.innerHTML = t.top_activities.map(function(a) {
-        return '<div class="t-activity-chip"><span class="t-activity-chip__count">' + a.count + '</span> ' + a.type + '</div>';
+    /* ── Modality deep-dive cards ── */
+    var modGrid = document.getElementById('t-modalities');
+    var modalities = data.modality_breakdown || [];
+    if (modalities.length) {
+      var totalActs = modalities.reduce(function(s, m) { return s + m.count_30d; }, 0);
+      modGrid.innerHTML = modalities.map(function(m) {
+        var pct = totalActs > 0 ? Math.round(m.count_30d / totalActs * 100) : 0;
+        var trendStr = m.trend_vs_prior_30d > 0 ? '+' + m.trend_vs_prior_30d : m.trend_vs_prior_30d < 0 ? '' + m.trend_vs_prior_30d : '—';
+        var trendColor = m.trend_vs_prior_30d > 0 ? '#3ecf8e' : m.trend_vs_prior_30d < 0 ? '#ef4444' : 'var(--text-faint)';
+        var context = pct >= 30 ? 'Your highest-volume modality — ' + pct + '% of all sessions.'
+          : pct >= 15 ? 'A regular part of the rotation — ' + pct + '% of sessions.'
+          : 'Occasional modality — ' + pct + '% of sessions.';
+        return '<div class="t-modality-card">' +
+          '<div class="t-modality-card__header">' +
+            '<span class="t-modality-card__name">' + m.type + '</span>' +
+            '<span class="t-modality-card__trend" style="color:' + trendColor + '">' + trendStr + ' vs prior 30d</span>' +
+          '</div>' +
+          '<div class="t-modality-card__stats">' +
+            '<div><div class="t-modality-stat__val" style="color:var(--t-red)">' + m.count_30d + '</div><div class="t-modality-stat__label">sessions</div></div>' +
+            '<div><div class="t-modality-stat__val">' + m.total_minutes_30d + '</div><div class="t-modality-stat__label">total min</div></div>' +
+            '<div><div class="t-modality-stat__val">' + m.avg_duration_min + '</div><div class="t-modality-stat__label">avg min</div></div>' +
+            (m.avg_hr ? '<div><div class="t-modality-stat__val">' + m.avg_hr + '</div><div class="t-modality-stat__label">avg hr</div></div>' : '') +
+            (m.total_distance_mi > 0 ? '<div><div class="t-modality-stat__val">' + m.total_distance_mi + '</div><div class="t-modality-stat__label">miles</div></div>' : '') +
+          '</div>' +
+          '<div class="t-modality-card__context">' + context + '</div>' +
+        '</div>';
       }).join('');
     } else {
-      actGrid.innerHTML = '<div style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px">No activity data</div>';
+      modGrid.innerHTML = '<div style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px">No activity data</div>';
     }
+
+    /* ── Walking section ── */
+    var w = data.walking || {};
+    if (w.avg_daily_steps) {
+      setText('wval-steps', w.avg_daily_steps.toLocaleString());
+      setWidth('wbar-steps', Math.min(100, (w.avg_daily_steps / 10000) * 100));
+    }
+    setText('wval-walks', w.total_walks_30d || 0);
+    setWidth('wbar-walks', Math.min(100, ((w.total_walks_30d || 0) / 20) * 100));
+    setText('wval-rucks', w.total_rucks_30d || 0);
+    setWidth('wbar-rucks', Math.min(100, ((w.total_rucks_30d || 0) / 10) * 100));
+    setText('wval-miles', (w.total_miles_30d || 0) + ' mi');
+    setText('wval-pace', w.avg_pace_min_per_mi || '\u2014');
+    setText('wval-z2walk', (w.z2_minutes_walking || 0) + ' min');
+
+    /* ── Breathwork section ── */
+    var bw = data.breathwork || {};
+    setText('bval-sessions', bw.sessions_30d || 0);
+    setWidth('bbar-sessions', Math.min(100, ((bw.sessions_30d || 0) / 30) * 100));
+    setText('bval-minutes', (bw.total_minutes_30d || 0) + ' min');
+    setWidth('bbar-minutes', Math.min(100, ((bw.total_minutes_30d || 0) / 150) * 100));
+    setText('bval-avg', bw.avg_session_min || '\u2014');
+
+    /* ── Weekly physical volume ── */
+    (function loadWeekly() {
+      fetch(API + '/api/weekly_physical_summary').then(function(r) { return r.json(); }).then(function(wd) {
+        var days = wd.days || [];
+        var weekGrid = document.getElementById('t-weekly-days');
+        if (!weekGrid || !days.length) return;
+        weekGrid.innerHTML = days.map(function(d) {
+          var actList = (d.activities || []).map(function(a) {
+            return a.type + ' ' + a.minutes + 'm';
+          }).join('<br>');
+          return '<div class="t-weekly-day">' +
+            '<div class="t-weekly-day__dow">' + d.day_of_week + '</div>' +
+            '<div class="t-weekly-day__total">' + (d.total_active_minutes || 0) + '<span style="font-size:10px;color:var(--text-faint)">m</span></div>' +
+            '<div class="t-weekly-day__acts">' + (actList || '—') + '</div>' +
+            (d.steps ? '<div class="t-weekly-day__steps">' + d.steps.toLocaleString() + ' steps</div>' : '') +
+          '</div>';
+        }).join('');
+      }).catch(function() {});
+    })();
+
+    /* ── Strength deep-dive (Phase 2) ── */
+    (function() {
+      fetch(API + '/api/strength_deep_dive').then(function(r) { return r.json(); }).then(function(sd) {
+        var s = sd.strength;
+        if (!s || !s.sessions_30d) return;
+        var section = document.getElementById('t-strength-dive');
+        section.style.display = '';
+        var statsHtml = '<div class="t-modality-card" style="border-left-color:var(--t-violet);">' +
+          '<div class="t-modality-stat__val" style="color:var(--t-violet)">' + s.sessions_30d + '</div><div class="t-modality-stat__label">Sessions (30d)</div></div>' +
+          '<div class="t-modality-card" style="border-left-color:var(--t-violet);">' +
+          '<div class="t-modality-stat__val">' + s.distinct_exercises_30d + '</div><div class="t-modality-stat__label">Exercises</div></div>' +
+          '<div class="t-modality-card" style="border-left-color:var(--t-violet);">' +
+          '<div class="t-modality-stat__val">' + s.total_sets_30d + '</div><div class="t-modality-stat__label">Total sets</div></div>';
+        document.getElementById('t-strength-stats').innerHTML = statsHtml;
+        var exHtml = (sd.top_exercises || []).map(function(e) {
+          return '<div style="display:flex;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid rgba(255,255,255,0.03);font-size:var(--text-sm);color:var(--text-muted);">' +
+            '<span>' + e.name + '</span><span style="color:var(--text)">' + e.frequency + 'x</span></div>';
+        }).join('');
+        document.getElementById('t-strength-exercises').innerHTML = exHtml || '<div style="color:var(--text-faint);font-size:var(--text-xs)">No exercise data</div>';
+      }).catch(function() {});
+    })();
 
     /* ── 11a: CTL/ATL/TSB Banister model ── */
     var ctl = t.ctl_fitness, atl = t.atl_fatigue, tsb = t.tsb_form;

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Join the Average Joe community on Discord. Compare notes, share experiments, and follow the journey in real time.">
+  <meta property="og:title" content="Community — averagejoematt.com">
+  <meta property="og:description" content="Tracking your own patterns? Want to compare notes on what you're finding? There's a place for that.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/community/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>Community — averagejoematt.com</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .comm-hero {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-20) var(--page-padding) var(--space-16);
+      border-bottom: 1px solid var(--border);
+    }
+    .comm-hero__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--c-green-500);
+      margin-bottom: var(--space-4);
+    }
+    .comm-hero__title {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 5vw, 52px);
+      color: var(--text);
+      line-height: 1.05;
+      margin-bottom: var(--space-6);
+    }
+    .comm-hero__title em { font-style: normal; color: var(--c-green-500); }
+    .comm-hero__sub {
+      font-size: var(--text-lg);
+      color: var(--text-muted);
+      max-width: 600px;
+      line-height: 1.8;
+      margin-bottom: var(--space-8);
+    }
+    .comm-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-4) var(--space-8);
+      background: var(--c-green-500);
+      color: #080c0a;
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    .comm-cta:hover { opacity: 0.85; }
+    .comm-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .comm-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+      margin-top: var(--space-6);
+    }
+    @media (max-width: 768px) { .comm-grid { grid-template-columns: 1fr; } }
+    .comm-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--c-green-500);
+      padding: var(--space-6);
+    }
+    .comm-card__title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--c-green-500);
+      margin-bottom: var(--space-3);
+    }
+    .comm-card__body {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+  </style>
+</head>
+<body>
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+
+<section class="comm-hero reveal">
+  <div class="comm-hero__eyebrow">The Community</div>
+  <h1 class="comm-hero__title">Compare <em>notes.</em></h1>
+  <p class="comm-hero__sub">
+    Tracking your own patterns? Want to compare notes on what you're finding?
+    The Average Joe community is where self-trackers, health optimizers, and curious people share what their data actually shows.
+  </p>
+  <a href="https://discord.gg/T4Ndt2WsU" target="_blank" rel="noopener" class="comm-cta">Join the Discord &rarr;</a>
+</section>
+
+<section class="comm-section reveal">
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:0.15em;text-transform:uppercase;display:flex;align-items:center;gap:12px;">What happens there<span style="color:var(--text-faint);opacity:0.4;">&mdash;&mdash;</span></div>
+  <div class="comm-grid">
+    <div class="comm-card">
+      <div class="comm-card__title">Weekly check-ins</div>
+      <div class="comm-card__body">Share your week's data. What worked, what didn't, what surprised you. No highlight reels &mdash; real numbers.</div>
+    </div>
+    <div class="comm-card">
+      <div class="comm-card__title">Experiment discussions</div>
+      <div class="comm-card__body">Running your own N=1? Get feedback on your hypothesis, protocol design, and measurement approach.</div>
+    </div>
+    <div class="comm-card">
+      <div class="comm-card__title">Platform updates</div>
+      <div class="comm-card__body">First look at new features, observatory upgrades, and behind-the-scenes build decisions.</div>
+    </div>
+  </div>
+</section>
+
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+<div id="amj-footer"></div>
+
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+<script src="/assets/js/reveal.js"></script>
+
+</body>
+</html>

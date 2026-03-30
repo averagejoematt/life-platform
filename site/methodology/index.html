@@ -567,9 +567,86 @@
     </div>
   </div>
 
+  <!-- ── AI Governance Model ──────────────────────────────── -->
+  <div class="method-section reveal">
+    <div class="method-section__eyebrow">// 05 — AI governance</div>
+    <h2 class="method-section__title">AI Advisory System</h2>
+    <p class="method-section__body">
+      Every architecture decision, content strategy call, and health protocol change is reviewed
+      by a system of 34 AI-generated personas organized into three boards:
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);margin:var(--space-6) 0;">
+      <div style="background:var(--bg);padding:var(--space-5);">
+        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:var(--space-3);">Health Board</div>
+        <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.7;">6 personas. Advises on protocols, supplements, and health interpretation. Includes deliberate tension pairs (conservative vs aggressive, clinical vs holistic).</div>
+      </div>
+      <div style="background:var(--bg);padding:var(--space-5);">
+        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:var(--space-3);">Technical Board</div>
+        <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.7;">12 personas. Reviews every architecture decision, deploy, and data model change. 18 formal reviews completed. The friction is the quality control.</div>
+      </div>
+      <div style="background:var(--bg);padding:var(--space-5);">
+        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:var(--space-3);">Product Board</div>
+        <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.7;">8 personas. Advises on UX, audience, content engine, and growth. Personas fight about priorities so decisions aren&rsquo;t made by default.</div>
+      </div>
+    </div>
+    <p class="method-section__body">
+      When personas disagree, the throughline tiebreaker applies: <em>&ldquo;Does this help a visitor connect the story from any page to any other page?&rdquo;</em> If yes, it ships. If not, it waits.
+    </p>
+    <p class="method-section__body" style="margin-top:var(--space-2);">
+      <a href="/board/" style="color:var(--accent);text-decoration:none;">See the full advisory roster &rarr;</a>
+    </p>
+  </div>
+
+  <!-- ── Evidence Badge System ───────────────────────────── -->
+  <div class="method-section reveal">
+    <div class="method-section__eyebrow">// 06 — evidence badges</div>
+    <h2 class="method-section__title">Evidence Badge System</h2>
+    <p class="method-section__body">
+      Every claim on this site carries a badge indicating how much data backs it. The thresholds
+      follow the Henning Brandt standard: with N=1 research, observation count determines confidence.
+    </p>
+    <div style="margin:var(--space-6) 0;">
+      <table style="width:100%;border-collapse:collapse;font-size:var(--text-sm);">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);">
+            <th style="text-align:left;padding:var(--space-3);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:0.1em;text-transform:uppercase;">Observations</th>
+            <th style="text-align:left;padding:var(--space-3);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:0.1em;text-transform:uppercase;">Confidence</th>
+            <th style="text-align:left;padding:var(--space-3);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:0.1em;text-transform:uppercase;">Badge</th>
+          </tr>
+        </thead>
+        <tbody style="color:var(--text-muted);">
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.03);">
+            <td style="padding:var(--space-3);">&lt;12</td>
+            <td style="padding:var(--space-3);">Preliminary</td>
+            <td style="padding:var(--space-3);"><span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;color:var(--text-faint);background:rgba(255,255,255,0.04);padding:2px 8px;">N=1 &middot; PRELIMINARY</span></td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.03);">
+            <td style="padding:var(--space-3);">12&ndash;29</td>
+            <td style="padding:var(--space-3);">Low confidence</td>
+            <td style="padding:var(--space-3);"><span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;color:var(--c-amber-500,#f59e0b);background:rgba(245,158,11,0.08);padding:2px 8px;">N=1 &middot; EMERGING</span></td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.03);">
+            <td style="padding:var(--space-3);">30&ndash;59</td>
+            <td style="padding:var(--space-3);">Moderate confidence</td>
+            <td style="padding:var(--space-3);"><span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;color:var(--accent);background:rgba(61,184,138,0.08);padding:2px 8px;">N=1 &middot; CONFIRMED</span></td>
+          </tr>
+          <tr>
+            <td style="padding:var(--space-3);">60+</td>
+            <td style="padding:var(--space-3);">High confidence</td>
+            <td style="padding:var(--space-3);"><span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;color:var(--accent);background:rgba(61,184,138,0.12);padding:2px 8px;">N=1 &middot; ESTABLISHED</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="method-section__body">
+      Badges appear on pull-quotes, discovery cards, and protocol findings across the site. They&rsquo;re
+      a constant reminder that all findings on this platform are from a single person&rsquo;s data.
+    </p>
+  </div>
+
   <!-- ── The Value ─────────────────────────────────────────── -->
   <div class="method-section reveal">
-    <div class="method-section__eyebrow">// 05 — the point</div>
+    <div class="method-section__eyebrow">// 07 — the point</div>
     <h2 class="method-section__title">The Value Isn&rsquo;t in the Conclusions</h2>
     <p class="method-section__body">
       If you&rsquo;re reading this hoping to find a protocol you can copy, you will be

@@ -225,6 +225,8 @@ def _decimal_to_float(obj):
 
 def _query_source(source: str, start_date: str, end_date: str) -> list:
     """Query DynamoDB for a source within a date range."""
+    if start_date > end_date:
+        return []  # EXPERIMENT_START is in the future — no data yet
     pk = f"{USER_PREFIX}{source}"
     resp = table.query(
         KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(
@@ -3970,6 +3972,121 @@ def handle_nutrition_overview() -> dict:
             "fat_g": round(float(i["fat_g"]), 1) if i.get("fat_g") else None,
         })
 
+    # ── Weekday vs Weekend comparison ──
+    weekday_items = []
+    weekend_items = []
+    for i in items:
+        d = i.get("date") or i.get("sk", "").replace("DATE#", "")
+        try:
+            dow = datetime.strptime(d, "%Y-%m-%d").weekday()
+        except Exception:
+            continue
+        if dow >= 5:
+            weekend_items.append(i)
+        else:
+            weekday_items.append(i)
+
+    def _group_avg(group, field):
+        vals = [float(x[field]) for x in group if x.get(field) is not None]
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    weekday_vs_weekend = {
+        "weekday": {
+            "avg_calories": _group_avg(weekday_items, "calories"),
+            "avg_protein_g": _group_avg(weekday_items, "protein_g"),
+            "avg_carbs_g": _group_avg(weekday_items, "carbs_g"),
+            "avg_fat_g": _group_avg(weekday_items, "fat_g"),
+            "avg_fiber_g": _group_avg(weekday_items, "fiber_g"),
+            "days": len(weekday_items),
+            "protein_hit_pct": round(
+                sum(1 for x in weekday_items if float(x.get("protein_g") or 0) >= protein_target)
+                / len(weekday_items) * 100
+            ) if weekday_items else 0,
+        },
+        "weekend": {
+            "avg_calories": _group_avg(weekend_items, "calories"),
+            "avg_protein_g": _group_avg(weekend_items, "protein_g"),
+            "avg_carbs_g": _group_avg(weekend_items, "carbs_g"),
+            "avg_fat_g": _group_avg(weekend_items, "fat_g"),
+            "avg_fiber_g": _group_avg(weekend_items, "fiber_g"),
+            "days": len(weekend_items),
+            "protein_hit_pct": round(
+                sum(1 for x in weekend_items if float(x.get("protein_g") or 0) >= protein_target)
+                / len(weekend_items) * 100
+            ) if weekend_items else 0,
+        },
+    }
+
+    # ── Eating window (first/last meal time from food_log) ──
+    eating_windows = []
+    for i in items:
+        food_log = i.get("food_log") or []
+        times = []
+        for entry in food_log:
+            t = entry.get("time")
+            if t:
+                try:
+                    parts = t.split(":")
+                    hour_min = int(parts[0]) * 60 + int(parts[1])
+                    times.append(hour_min)
+                except (ValueError, IndexError):
+                    pass
+        if len(times) >= 2:
+            first = min(times)
+            last = max(times)
+            window_hrs = round((last - first) / 60, 1)
+            eating_windows.append({
+                "first_meal_min": first,
+                "last_meal_min": last,
+                "window_hrs": window_hrs,
+            })
+
+    eating_window = None
+    if eating_windows:
+        avg_first = round(sum(e["first_meal_min"] for e in eating_windows) / len(eating_windows))
+        avg_last = round(sum(e["last_meal_min"] for e in eating_windows) / len(eating_windows))
+        avg_window = round(sum(e["window_hrs"] for e in eating_windows) / len(eating_windows), 1)
+        eating_window = {
+            "avg_hours": avg_window,
+            "avg_first_meal": f"{avg_first // 60}:{avg_first % 60:02d}",
+            "avg_last_meal": f"{avg_last // 60}:{avg_last % 60:02d}",
+            "days_with_data": len(eating_windows),
+        }
+
+    # ── Caloric periodization (training days vs rest days) ──
+    strava_items_30d = _query_source("strava", d30, today)
+    training_dates = set()
+    for s in strava_items_30d:
+        d = s.get("date") or s.get("sk", "").replace("DATE#", "")
+        training_dates.add(d)
+
+    training_day_items = []
+    rest_day_items = []
+    for i in items:
+        d = i.get("date") or i.get("sk", "").replace("DATE#", "")
+        if d in training_dates:
+            training_day_items.append(i)
+        else:
+            rest_day_items.append(i)
+
+    periodization = {
+        "training_day": {
+            "avg_calories": _group_avg(training_day_items, "calories"),
+            "avg_protein_g": _group_avg(training_day_items, "protein_g"),
+            "count": len(training_day_items),
+        },
+        "rest_day": {
+            "avg_calories": _group_avg(rest_day_items, "calories"),
+            "avg_protein_g": _group_avg(rest_day_items, "protein_g"),
+            "count": len(rest_day_items),
+        },
+    }
+    # Compute deficit for each group if TDEE is available
+    if tdee:
+        for key in ("training_day", "rest_day"):
+            avg = periodization[key]["avg_calories"]
+            periodization[key]["avg_deficit"] = round(tdee - avg) if avg else None
+
     return _ok({
         "nutrition": {
             "avg_calories": round(sum(cal_vals) / len(cal_vals)) if cal_vals else None,
@@ -3990,6 +4107,9 @@ def handle_nutrition_overview() -> dict:
             "latest_protein_g": round(float(latest.get("protein_g", 0)), 1) if latest.get("protein_g") else None,
         },
         "nutrition_trend": trend,
+        "weekday_vs_weekend": weekday_vs_weekend,
+        "eating_window": eating_window,
+        "periodization": periodization,
     }, cache_seconds=3600)
 
 
@@ -4008,36 +4128,180 @@ def handle_training_overview() -> dict:
     strava_items = _query_source("strava", d90, today)
     strava_30d = [s for s in strava_items if (s.get("date") or s.get("sk", "").replace("DATE#", "")) >= d30]
 
-    total_workouts_90d = len(strava_items)
-    total_workouts_30d = len(strava_30d)
-    weekly_avg = round(total_workouts_30d / 4.3, 1) if total_workouts_30d else 0
-
     # Zone 2 detection: HR between 60-70% of max HR
     max_hr = 184  # Matthew's measured max HR — matches profile.max_heart_rate
     z2_low, z2_high = max_hr * 0.60, max_hr * 0.70
     z2_minutes_30d = 0
-    for s in strava_30d:
-        avg_hr = s.get("average_heartrate") or s.get("avg_hr")
-        duration = s.get("duration_minutes") or s.get("moving_time_minutes") or 0
-        if avg_hr and duration:
-            avg_hr = float(avg_hr)
-            duration = float(duration)
-            if z2_low <= avg_hr <= z2_high:
-                z2_minutes_30d += duration
-    z2_weekly_avg = round(z2_minutes_30d / 4.3)
+    # Z2 is recalculated after flattening activities below
     z2_target = 150  # minutes/week
-    z2_pct = round(z2_weekly_avg / z2_target * 100) if z2_target else 0
+
+    # Flatten nested activities lists from day-level Strava records
+    all_activities_30d = []
+    for s in strava_30d:
+        acts = s.get("activities") or []
+        if acts:
+            for a in acts:
+                a["_day_date"] = s.get("date") or s.get("sk", "").replace("DATE#", "")
+            all_activities_30d.extend(acts)
+        else:
+            # Fallback: treat day record itself as a single activity
+            s["_day_date"] = s.get("date") or s.get("sk", "").replace("DATE#", "")
+            all_activities_30d.append(s)
+
+    all_activities_90d = []
+    for s in strava_items:
+        acts = s.get("activities") or []
+        if acts:
+            for a in acts:
+                a["_day_date"] = s.get("date") or s.get("sk", "").replace("DATE#", "")
+            all_activities_90d.extend(acts)
+        else:
+            s["_day_date"] = s.get("date") or s.get("sk", "").replace("DATE#", "")
+            all_activities_90d.append(s)
+
+    total_workouts_90d = len(all_activities_90d)
+    total_workouts_30d = len(all_activities_30d)
+    weekly_avg = round(total_workouts_30d / 4.3, 1) if total_workouts_30d else 0
 
     # Activity type breakdown (30d)
     type_counts = {}
-    for s in strava_30d:
-        sport = s.get("sport_type") or s.get("type") or "Other"
+    for a in all_activities_30d:
+        sport = a.get("sport_type") or a.get("type") or "Other"
         type_counts[sport] = type_counts.get(sport, 0) + 1
-    top_activities = sorted(type_counts.items(), key=lambda x: -x[1])[:5]
+    top_activities = sorted(type_counts.items(), key=lambda x: -x[1])[:8]
 
     # Total training minutes and distance (30d)
-    total_minutes_30d = sum(float(s.get("duration_minutes") or s.get("moving_time_minutes") or 0) for s in strava_30d)
-    total_distance_mi = sum(float(s.get("distance_miles") or s.get("distance", 0)) / 1609.34 if s.get("distance") else float(s.get("distance_miles", 0)) for s in strava_30d)
+    def _act_minutes(a):
+        return float(a.get("duration_minutes") or a.get("moving_time_minutes") or
+                      (a.get("moving_time_seconds") or 0) / 60 or 0)
+
+    def _act_miles(a):
+        if a.get("distance_miles"):
+            return float(a["distance_miles"])
+        if a.get("distance_meters"):
+            return float(a["distance_meters"]) * 0.000621371
+        if a.get("distance"):
+            return float(a["distance"]) / 1609.34
+        return 0.0
+
+    total_minutes_30d = sum(_act_minutes(a) for a in all_activities_30d)
+    total_distance_mi = sum(_act_miles(a) for a in all_activities_30d)
+
+    # ── Modality breakdown (30d) — group by sport_type with per-modality stats ──
+    from collections import defaultdict as _dd2
+    modality_map = _dd2(lambda: {
+        "count": 0, "total_min": 0, "total_mi": 0, "total_elev_ft": 0,
+        "hr_sum": 0, "hr_count": 0, "z2_min": 0,
+    })
+    # Also compute prior 30d for trend (days 31-60)
+    d60 = max((datetime.now(timezone.utc) - timedelta(days=60)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    prior_30d_acts = []
+    for s in strava_items:
+        d = s.get("date") or s.get("sk", "").replace("DATE#", "")
+        if d60 <= d < d30:
+            acts = s.get("activities") or [s]
+            prior_30d_acts.extend(acts)
+    prior_type_counts = {}
+    for a in prior_30d_acts:
+        sport = a.get("sport_type") or a.get("type") or "Other"
+        prior_type_counts[sport] = prior_type_counts.get(sport, 0) + 1
+
+    for a in all_activities_30d:
+        sport = a.get("sport_type") or a.get("type") or "Other"
+        m = modality_map[sport]
+        m["count"] += 1
+        dur = _act_minutes(a)
+        m["total_min"] += dur
+        m["total_mi"] += _act_miles(a)
+        m["total_elev_ft"] += float(a.get("total_elevation_gain_feet") or 0)
+        avg_hr = a.get("average_heartrate") or a.get("avg_hr")
+        if avg_hr:
+            m["hr_sum"] += float(avg_hr)
+            m["hr_count"] += 1
+            if z2_low <= float(avg_hr) <= z2_high:
+                m["z2_min"] += dur
+
+    modality_breakdown = []
+    for sport, m in sorted(modality_map.items(), key=lambda x: -x[1]["count"]):
+        prior_count = prior_type_counts.get(sport, 0)
+        trend = m["count"] - prior_count  # positive = more active
+        modality_breakdown.append({
+            "type": sport,
+            "count_30d": m["count"],
+            "total_minutes_30d": round(m["total_min"]),
+            "avg_duration_min": round(m["total_min"] / m["count"]) if m["count"] else 0,
+            "avg_hr": round(m["hr_sum"] / m["hr_count"]) if m["hr_count"] else None,
+            "total_distance_mi": round(m["total_mi"], 1),
+            "total_elevation_ft": round(m["total_elev_ft"]),
+            "z2_minutes": round(m["z2_min"]),
+            "trend_vs_prior_30d": trend,
+        })
+
+    # Recalculate Z2 from all flattened activities
+    z2_minutes_30d = 0
+    for a in all_activities_30d:
+        avg_hr = a.get("average_heartrate") or a.get("avg_hr")
+        dur = _act_minutes(a)
+        if avg_hr and dur:
+            if z2_low <= float(avg_hr) <= z2_high:
+                z2_minutes_30d += dur
+    z2_weekly_avg = round(z2_minutes_30d / 4.3)
+    z2_pct = round(z2_weekly_avg / z2_target * 100) if z2_target else 0
+
+    # ── Walking stats (Garmin steps + Strava walks) ──
+    garmin_30d = _query_source("garmin", d30, today)
+    step_vals = [float(g["steps"]) for g in garmin_30d if g.get("steps")]
+    avg_daily_steps = round(sum(step_vals) / len(step_vals)) if step_vals else None
+    daily_steps_trend = []
+    for g in sorted(garmin_30d, key=lambda x: x.get("date") or x.get("sk", "")):
+        if g.get("steps"):
+            daily_steps_trend.append({
+                "date": g.get("date") or g.get("sk", "").replace("DATE#", ""),
+                "steps": int(float(g["steps"])),
+            })
+
+    walk_activities = [a for a in all_activities_30d if (a.get("sport_type") or "").lower() in ("walk", "hike")]
+    ruck_activities = [a for a in all_activities_30d if "ruck" in (a.get("name") or "").lower() or "ruck" in (a.get("sport_type") or "").lower()]
+    walking_data = {
+        "avg_daily_steps": avg_daily_steps,
+        "total_walks_30d": len(walk_activities),
+        "total_rucks_30d": len(ruck_activities),
+        "total_miles_30d": round(sum(_act_miles(a) for a in walk_activities), 1),
+        "avg_pace_min_per_mi": None,
+        "z2_minutes_walking": round(sum(
+            _act_minutes(a) for a in walk_activities
+            if a.get("average_heartrate") and z2_low <= float(a["average_heartrate"]) <= z2_high
+        )),
+        "daily_steps_trend": daily_steps_trend[-14:],  # last 14 days
+    }
+    # Avg walking pace (min/mi)
+    walk_w_speed = [a for a in walk_activities if a.get("average_speed_ms") and float(a["average_speed_ms"]) > 0]
+    if walk_w_speed:
+        avg_speed_ms = sum(float(a["average_speed_ms"]) for a in walk_w_speed) / len(walk_w_speed)
+        walking_data["avg_pace_min_per_mi"] = round(26.8224 / avg_speed_ms, 1) if avg_speed_ms > 0 else None
+
+    # ── Breathwork stats (Apple Health) ──
+    ah_30d = _query_source("apple_health", d30, today)
+    bw_sessions = sum(int(float(h.get("breathwork_sessions") or 0)) for h in ah_30d)
+    bw_minutes = sum(float(h.get("breathwork_minutes") or 0) for h in ah_30d)
+    bw_weekly_trend = []
+    bw_week_map = _dd2(lambda: {"sessions": 0, "minutes": 0.0})
+    for h in ah_30d:
+        d = h.get("date") or h.get("sk", "").replace("DATE#", "")
+        try:
+            wk = datetime.strptime(d, "%Y-%m-%d").strftime("%Y-W%V")
+        except Exception:
+            continue
+        bw_week_map[wk]["sessions"] += int(float(h.get("breathwork_sessions") or 0))
+        bw_week_map[wk]["minutes"] += float(h.get("breathwork_minutes") or 0)
+    for wk in sorted(bw_week_map):
+        bw_weekly_trend.append({"week": wk, **bw_week_map[wk]})
+    breathwork_data = {
+        "sessions_30d": bw_sessions,
+        "total_minutes_30d": round(bw_minutes, 1),
+        "avg_session_min": round(bw_minutes / bw_sessions, 1) if bw_sessions else None,
+        "weekly_trend": bw_weekly_trend[-8:],
+    }
 
     # Whoop strain (30d)
     whoop_30d = _query_source("whoop", d30, today)
@@ -4069,20 +4333,20 @@ def handle_training_overview() -> dict:
     hevy_items = _query_source("hevy", d30, today)
     strength_sessions_30d = len(hevy_items)
 
-    # Weekly trend (for chart)
+    # Weekly trend (for chart) — use flattened activities
     from collections import defaultdict as _dd
     week_buckets = _dd(lambda: {"workouts": 0, "minutes": 0, "z2_min": 0})
-    for s in strava_items:
-        d = s.get("date") or s.get("sk", "").replace("DATE#", "")
+    for a in all_activities_90d:
+        d = a.get("_day_date") or ""
         try:
             dt = datetime.strptime(d, "%Y-%m-%d")
             week_key = dt.strftime("%Y-W%V")
         except Exception:
             continue
         week_buckets[week_key]["workouts"] += 1
-        dur = float(s.get("duration_minutes") or s.get("moving_time_minutes") or 0)
+        dur = _act_minutes(a)
         week_buckets[week_key]["minutes"] += dur
-        avg_hr = s.get("average_heartrate") or s.get("avg_hr")
+        avg_hr = a.get("average_heartrate") or a.get("avg_hr")
         if avg_hr and z2_low <= float(avg_hr) <= z2_high:
             week_buckets[week_key]["z2_min"] += dur
 
@@ -4105,7 +4369,12 @@ def handle_training_overview() -> dict:
             "strength_sessions_30d": strength_sessions_30d,
             "top_activities": [{"type": t, "count": c} for t, c in top_activities],
             "whoop_workout_count": len(whoop_workouts),
+            "active_modalities": len(modality_breakdown),
+            "avg_daily_steps": walking_data["avg_daily_steps"],
         },
+        "modality_breakdown": modality_breakdown,
+        "walking": walking_data,
+        "breathwork": breathwork_data,
         "weekly_trend": weekly_trend,
         "whoop_workouts": [{
             "date": w.get("date"),
@@ -4116,6 +4385,115 @@ def handle_training_overview() -> dict:
             "distance_meter": w.get("distance_meter"),
             "average_heart_rate": w.get("average_heart_rate"),
         } for w in whoop_workouts[:20]],
+    }, cache_seconds=3600)
+
+
+def handle_weekly_physical_summary() -> dict:
+    """
+    GET /api/weekly_physical_summary
+    Returns: 7-day array with per-day modality breakdown (Strava + Garmin steps + breathwork).
+    Cache: 3600s.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d7 = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+
+    strava_items = _query_source("strava", d7, today)
+    garmin_items = _query_source("garmin", d7, today)
+    ah_items = _query_source("apple_health", d7, today)
+
+    # Build per-day maps
+    garmin_by_date = {(g.get("date") or g.get("sk", "").replace("DATE#", "")): g for g in garmin_items}
+    ah_by_date = {(h.get("date") or h.get("sk", "").replace("DATE#", "")): h for h in ah_items}
+
+    # Flatten Strava activities by day
+    from collections import defaultdict
+    day_activities = defaultdict(list)
+    for s in strava_items:
+        d = s.get("date") or s.get("sk", "").replace("DATE#", "")
+        acts = s.get("activities") or [s]
+        for a in acts:
+            sport = a.get("sport_type") or a.get("type") or "Other"
+            dur = float(a.get("duration_minutes") or a.get("moving_time_minutes") or
+                        (a.get("moving_time_seconds") or 0) / 60 or 0)
+            day_activities[d].append({"type": sport, "minutes": round(dur)})
+
+    # Build 7-day array
+    days = []
+    for i in range(7):
+        dt = datetime.now(timezone.utc) - timedelta(days=6 - i)
+        d = dt.strftime("%Y-%m-%d")
+        dow = dt.strftime("%a")
+        garmin = garmin_by_date.get(d, {})
+        ah = ah_by_date.get(d, {})
+        activities = day_activities.get(d, [])
+        total_active_min = sum(a["minutes"] for a in activities)
+        bw_min = float(ah.get("breathwork_minutes") or 0)
+        if bw_min > 0:
+            activities.append({"type": "Breathwork", "minutes": round(bw_min)})
+            total_active_min += bw_min
+        days.append({
+            "date": d,
+            "day_of_week": dow,
+            "steps": int(float(garmin.get("steps", 0))) if garmin.get("steps") else None,
+            "activities": activities,
+            "total_active_minutes": round(total_active_min),
+        })
+
+    return _ok({"days": days}, cache_seconds=3600)
+
+
+def handle_protein_sources() -> dict:
+    """
+    GET /api/protein_sources
+    Returns: Top protein sources from MacroFactor food_log, aggregated by food name.
+    Cache: 3600s.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+
+    items = _query_source("macrofactor", d30, today)
+    if not items:
+        return _error(503, "No nutrition data available.")
+
+    from collections import defaultdict
+    # Aggregate protein contribution by food name
+    food_protein = defaultdict(lambda: {"total_protein": 0.0, "frequency": 0, "total_cal": 0.0})
+    days_count = len(items)
+
+    for day in items:
+        food_log = day.get("food_log") or []
+        for entry in food_log:
+            name = (entry.get("food_name") or "").strip()
+            if not name or len(name) < 3:
+                continue
+            pro = float(entry.get("protein_g") or 0)
+            if pro < 1:
+                continue  # Skip items with negligible protein
+            f = food_protein[name]
+            f["total_protein"] += pro
+            f["frequency"] += 1
+            f["total_cal"] += float(entry.get("calories_kcal") or 0)
+
+    total_protein_all = sum(f["total_protein"] for f in food_protein.values())
+    sources = []
+    for name, f in sorted(food_protein.items(), key=lambda x: -x[1]["total_protein"]):
+        avg_daily = round(f["total_protein"] / days_count, 1) if days_count else 0
+        pct = round(f["total_protein"] / total_protein_all * 100, 1) if total_protein_all else 0
+        sources.append({
+            "food": name,
+            "avg_daily_g": avg_daily,
+            "pct_of_total": pct,
+            "frequency": f["frequency"],
+            "avg_protein_per_serving": round(f["total_protein"] / f["frequency"], 1) if f["frequency"] else 0,
+            "protein_cal_pct": round((f["total_protein"] * 4) / f["total_cal"] * 100) if f["total_cal"] > 0 else 0,
+        })
+        if len(sources) >= 12:
+            break
+
+    return _ok({
+        "protein_sources": sources,
+        "total_protein_30d_avg_g": round(total_protein_all / days_count, 1) if days_count else 0,
+        "days_analyzed": days_count,
     }, cache_seconds=3600)
 
 
@@ -4490,6 +4868,120 @@ def handle_strength_benchmarks() -> dict:
         return _error(503, "Strength data temporarily unavailable.")
 
 
+def handle_food_delivery_overview() -> dict:
+    """
+    GET /api/food_delivery_overview
+    Returns: 30-day food delivery stats from food_delivery DDB partition.
+    Cache: 3600s.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+
+    items = _query_source("food_delivery", d30, today)
+    if not items:
+        return _ok({"food_delivery": None}, cache_seconds=3600)
+
+    from collections import Counter, defaultdict
+    total_orders = len(items)
+    total_spend = sum(float(i.get("amount") or 0) for i in items)
+    platform_counts = Counter()
+    weekly_counts = defaultdict(int)
+    binge_days = 0
+
+    for i in items:
+        platform_counts[i.get("platform") or "Unknown"] += 1
+        if i.get("binge"):
+            binge_days += 1
+        d = i.get("date") or i.get("sk", "").replace("DATE#", "")
+        try:
+            wk = datetime.strptime(d, "%Y-%m-%d").strftime("%Y-W%V")
+            weekly_counts[wk] += 1
+        except Exception:
+            pass
+
+    weekly_trend = sorted([{"week": k, "orders": v} for k, v in weekly_counts.items()], key=lambda x: x["week"])
+
+    return _ok({
+        "food_delivery": {
+            "orders_30d": total_orders,
+            "avg_spend": round(total_spend / total_orders, 2) if total_orders else 0,
+            "total_spend_30d": round(total_spend, 2),
+            "binge_days_30d": binge_days,
+        },
+        "platform_breakdown": [{"platform": p, "count": c} for p, c in platform_counts.most_common()],
+        "weekly_trend": weekly_trend,
+    }, cache_seconds=3600)
+
+
+def handle_strength_deep_dive() -> dict:
+    """
+    GET /api/strength_deep_dive
+    Returns: volume load trend, exercise variety, session patterns from Hevy data.
+    Cache: 3600s.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d90 = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
+    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+
+    items = _query_source("hevy", d90, today)
+    if not items:
+        return _ok({"strength": None, "message": "No strength data available"}, cache_seconds=3600)
+
+    from collections import defaultdict, Counter
+
+    # Volume load per week (sets × reps × weight)
+    weekly_volume = defaultdict(float)
+    exercise_freq = Counter()
+    session_days = Counter()  # day of week
+    session_hours = Counter()  # hour of day
+    total_sets_30d = 0
+    exercises_30d = set()
+
+    for day in items:
+        d = day.get("date") or day.get("sk", "").replace("DATE#", "")
+        try:
+            dt = datetime.strptime(d, "%Y-%m-%d")
+            week_key = dt.strftime("%Y-W%V")
+        except Exception:
+            continue
+
+        exercises = day.get("exercises") or day.get("workout_exercises") or []
+        for ex in exercises:
+            name = ex.get("exercise_name") or ex.get("name") or "Unknown"
+            sets = ex.get("sets") or []
+            for s in sets:
+                w = float(s.get("weight_lbs") or s.get("weight") or 0)
+                r = int(s.get("reps") or 0)
+                weekly_volume[week_key] += w * r
+                total_sets_30d += 1 if d >= d30 else 0
+
+            if d >= d30:
+                exercise_freq[name] += 1
+                exercises_30d.add(name)
+
+        if d >= d30:
+            session_days[dt.strftime("%a")] += 1
+
+    volume_trend = sorted([
+        {"week": k, "volume_lbs": round(v)}
+        for k, v in weekly_volume.items()
+    ], key=lambda x: x["week"])[-12:]
+
+    top_exercises = [{"name": n, "frequency": c} for n, c in exercise_freq.most_common(10)]
+
+    return _ok({
+        "strength": {
+            "sessions_90d": len(items),
+            "sessions_30d": len([i for i in items if (i.get("date") or i.get("sk", "").replace("DATE#", "")) >= d30]),
+            "distinct_exercises_30d": len(exercises_30d),
+            "total_sets_30d": total_sets_30d,
+        },
+        "volume_trend": volume_trend,
+        "top_exercises": top_exercises,
+        "session_days": dict(session_days),
+    }, cache_seconds=3600)
+
+
 # ── Phase 1: Changes-Since endpoint ─────────────────────────────
 def handle_changes_since(qs: dict = None) -> dict:
     """GET /api/changes-since?ts=EPOCH — Returns notable changes since timestamp."""
@@ -4849,6 +5341,10 @@ ROUTES = {
     # BL-02: Bloodwork/Labs
     "/api/labs":                handle_labs,
     "/api/frequent_meals":      handle_frequent_meals,
+    "/api/protein_sources":     handle_protein_sources,
+    "/api/weekly_physical_summary": handle_weekly_physical_summary,
+    "/api/strength_deep_dive":      handle_strength_deep_dive,
+    "/api/food_delivery_overview":  handle_food_delivery_overview,
     "/api/meal_glucose":        handle_meal_glucose,
     "/api/strength_benchmarks": handle_strength_benchmarks,
     # Benchmark trends + meal responses (stub endpoints)

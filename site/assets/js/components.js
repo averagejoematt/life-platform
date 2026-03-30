@@ -588,4 +588,101 @@
     }
   })();
 
+  // ── P1-5: Share affordance ──────────────────────────────────
+  (function() {
+    var btn = document.createElement('button');
+    btn.className = 'amj-share-btn';
+    btn.innerHTML = '\u2197 Share';
+    btn.style.cssText = 'position:fixed;bottom:80px;right:24px;z-index:90;background:var(--surface,#111);border:1px solid var(--border,rgba(255,255,255,0.06));color:var(--text-faint,rgba(255,255,255,0.4));font-family:var(--font-mono,monospace);font-size:11px;letter-spacing:1px;padding:8px 14px;cursor:pointer;opacity:0;transition:opacity 0.3s,background 0.2s;';
+    document.body.appendChild(btn);
+    setTimeout(function() { btn.style.opacity = '1'; }, 2000);
+
+    btn.addEventListener('click', function() {
+      var title = document.title;
+      var url = window.location.href;
+      if (navigator.share) {
+        navigator.share({ title: title, url: url }).catch(function() {});
+      } else {
+        navigator.clipboard.writeText(url).then(function() {
+          btn.textContent = 'Copied!';
+          btn.style.color = 'var(--c-green-500,#22c55e)';
+          setTimeout(function() {
+            btn.innerHTML = '\u2197 Share';
+            btn.style.color = 'var(--text-faint,rgba(255,255,255,0.4))';
+          }, 2000);
+        }).catch(function() {});
+      }
+    });
+  })();
+
+  // ── P0-1: Start Here visitor routing modal ──────────────────
+  // Shows on first homepage visit if no amj_visited cookie exists.
+  (function() {
+    if (path !== '/' && path !== '/index.html') return;
+    if (document.cookie.indexOf('amj_visited=1') !== -1) return;
+
+    var overlay = document.createElement('div');
+    overlay.id = 'amj-start-here';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(8,12,10,0.95);display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;transition:opacity 0.4s ease;';
+
+    var content = '<div style="max-width:960px;width:100%;">' +
+      '<div style="text-align:center;margin-bottom:40px;">' +
+        '<div style="font-family:var(--font-mono,monospace);font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--c-green-500,#22c55e);margin-bottom:16px;">Welcome to The Measured Life</div>' +
+        '<div style="font-family:var(--font-display,Georgia,serif);font-size:clamp(24px,3.5vw,36px);color:#e8e8e8;line-height:1.2;">Where would you like to start?</div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;" id="amj-sh-cards">' +
+        // Card 1: The Journey
+        '<a href="/story/" class="amj-sh-card" style="display:block;padding:32px 24px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-left:3px solid var(--c-green-500,#22c55e);text-decoration:none;transition:border-color 0.2s,background 0.2s;">' +
+          '<div style="font-family:var(--font-display,Georgia,serif);font-size:20px;color:#e8e8e8;margin-bottom:8px;">The Journey</div>' +
+          '<div style="font-size:14px;color:rgba(255,255,255,0.5);line-height:1.6;">Follow one person\'s health transformation &mdash; honest, public, no filter.</div>' +
+          '<div style="margin-top:16px;font-family:var(--font-mono,monospace);font-size:11px;color:var(--c-green-500,#22c55e);letter-spacing:1px;">Start here &rarr;</div>' +
+        '</a>' +
+        // Card 2: The Data
+        '<a href="/explorer/" class="amj-sh-card" style="display:block;padding:32px 24px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-left:3px solid var(--c-amber-500,#f59e0b);text-decoration:none;transition:border-color 0.2s,background 0.2s;">' +
+          '<div style="font-family:var(--font-display,Georgia,serif);font-size:20px;color:#e8e8e8;margin-bottom:8px;">The Data</div>' +
+          '<div style="font-size:14px;color:rgba(255,255,255,0.5);line-height:1.6;">Explore 26 data sources, N=1 experiments, and live correlations.</div>' +
+          '<div style="margin-top:16px;font-family:var(--font-mono,monospace);font-size:11px;color:var(--c-amber-500,#f59e0b);letter-spacing:1px;">Explore &rarr;</div>' +
+        '</a>' +
+        // Card 3: How It's Built
+        '<a href="/builders/" class="amj-sh-card" style="display:block;padding:32px 24px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-left:3px solid var(--lb-accent,#06b6d4);text-decoration:none;transition:border-color 0.2s,background 0.2s;">' +
+          '<div style="font-family:var(--font-display,Georgia,serif);font-size:20px;color:#e8e8e8;margin-bottom:8px;">How It\'s Built</div>' +
+          '<div style="font-size:14px;color:rgba(255,255,255,0.5);line-height:1.6;">A non-engineer built this with Claude. See the full blueprint.</div>' +
+          '<div style="margin-top:16px;font-family:var(--font-mono,monospace);font-size:11px;color:var(--lb-accent,#06b6d4);letter-spacing:1px;">See the stack &rarr;</div>' +
+        '</a>' +
+      '</div>' +
+      '<div style="text-align:center;margin-top:32px;">' +
+        '<button id="amj-sh-skip" style="background:none;border:none;cursor:pointer;font-family:var(--font-mono,monospace);font-size:11px;color:rgba(255,255,255,0.3);letter-spacing:1px;padding:8px 16px;">Skip &mdash; take me to the homepage</button>' +
+      '</div>' +
+    '</div>';
+
+    overlay.innerHTML = content;
+    document.body.appendChild(overlay);
+
+    // Responsive: stack cards on mobile
+    var style = document.createElement('style');
+    style.textContent = '@media(max-width:768px){#amj-sh-cards{grid-template-columns:1fr !important;}}' +
+      '.amj-sh-card:hover{background:rgba(255,255,255,0.06) !important;border-color:rgba(255,255,255,0.12) !important;}';
+    document.head.appendChild(style);
+
+    // Fade in
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() { overlay.style.opacity = '1'; });
+    });
+
+    function dismiss() {
+      document.cookie = 'amj_visited=1;max-age=31536000;path=/;SameSite=Lax';
+      overlay.style.opacity = '0';
+      setTimeout(function() { overlay.remove(); }, 400);
+    }
+
+    // Dismiss on card click or skip
+    overlay.querySelectorAll('.amj-sh-card').forEach(function(card) {
+      card.addEventListener('click', function() {
+        document.cookie = 'amj_visited=1;max-age=31536000;path=/;SameSite=Lax';
+        // Navigation happens via href
+      });
+    });
+    document.getElementById('amj-sh-skip').addEventListener('click', dismiss);
+  })();
+
 })();

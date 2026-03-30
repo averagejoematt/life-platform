@@ -151,6 +151,25 @@
 
   .hide-mobile { display: none; }
   .show-mobile { display: block; }
+
+  /* Observatory pages — universal mobile rules */
+  [class*="-hero-grid"],
+  [class*="-hero"] > [style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  [class*="-pullquote--left"] { padding-left: var(--page-padding) !important; padding-right: var(--page-padding) !important; }
+  [class*="-pullquote--right"] { padding-left: var(--page-padding) !important; text-align: left !important; }
+  [class*="-gauge-row"] { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Share button — move above bottom nav on mobile */
+  .amj-share-btn { bottom: 100px !important; right: 16px !important; }
+
+  /* Homepage hero — single column */
+  .h-hero { flex-direction: column !important; }
+  .h-hero__left { border-right: none !important; border-bottom: 1px solid var(--border); }
+
+  /* Start Here modal — stack cards */
+  #amj-sh-cards { grid-template-columns: 1fr !important; }
 }
 
 /* ── sm: 480px (large phone) ─────────────────────────────── */

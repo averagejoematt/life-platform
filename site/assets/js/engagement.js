@@ -131,7 +131,12 @@
     }
 
     var daysSince = Math.floor((Date.now() - parseInt(lastTs)) / 86400000);
-    if (daysSince < 1) return;
+    // Guard: if timestamp is corrupted or way too old, reset and skip
+    if (daysSince < 1 || daysSince > 365) {
+      localStorage.setItem(LAST_VISIT_KEY, Date.now().toString());
+      if (daysSince > 365) return;
+      return;
+    }
 
     try {
       var resp = await fetch('/api/changes-since?ts=' + Math.floor(parseInt(lastTs) / 1000));
@@ -139,9 +144,11 @@
       var data = await resp.json();
       if (!data.deltas || Object.keys(data.deltas).length === 0) return;
 
+      var daysLabel = daysSince === 1 ? '1 day' : daysSince + ' days';
       var html = '<div class="since-last-visit reveal">';
       html += '<div class="since-last-visit__header">';
-      html += '<span class="since-last-visit__title">// Since your last visit \u00B7 ' + daysSince + ' day' + (daysSince > 1 ? 's' : '') + ' ago</span>';
+      html += '<div class="since-last-visit__heading">Since your last visit</div>';
+      html += '<div class="since-last-visit__sub">' + daysLabel + ' ago \u2014 here\u2019s what changed</div>';
       html += '<button class="since-last-visit__dismiss" onclick="this.closest(\'.since-last-visit\').remove()" aria-label="Dismiss">\u00D7</button>';
       html += '</div>';
       html += '<div class="since-last-visit__grid">';
@@ -181,10 +188,10 @@
       html += '</div>';
       container.innerHTML = html;
 
-      // Trigger reveal animation
+      // Trigger reveal animation — class must be 'is-visible' to match CSS
       setTimeout(function() {
         var el = container.querySelector('.since-last-visit');
-        if (el) el.classList.add('visible');
+        if (el) el.classList.add('is-visible');
       }, 100);
     } catch (e) {
       console.warn('Changes-since unavailable:', e);
