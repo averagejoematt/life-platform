@@ -1,13 +1,10 @@
-> **This document is frozen at v3.7.68 (2026-03-17).** The platform is now at v4.3.0+.
-> For IC changes after v3.7.68 — including signal doctrine, challenge system modifiers,
-> food delivery integration, and reader engagement signals — see CHANGELOG.md.
-> A full refresh is planned for ~May 2026.
-
 # Life Platform — Intelligence Layer
 
 > Documents the Intelligence Compounding (IC) features: how the platform learns, remembers, and improves over time.
 > For the IC roadmap and future phases, see PROJECT_PLAN.md (Tier 7).
-> Last updated: 2026-03-17 (v3.7.68)
+> Last updated: 2026-03-30 (v4.5.1)
+>
+> **Changes since v3.7.68:** Signal Doctrine (evidence badges, confidence tiers), Challenge System (XP modifiers, weekly cadence), Food Delivery integration (delivery index as IC input), Reader Engagement signals (freshness indicators, "Since Your Last Visit"), Elena Voss pull-quote pipeline across 6 observatory pages, ADR-045 (118 MCP tools accepted as operating state).
 
 ---
 

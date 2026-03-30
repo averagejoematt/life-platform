@@ -524,7 +524,7 @@
      ═══════════════════════════════════════════════════════════ -->
 <div class="h-pullquote h-pullquote--left reveal">
   <blockquote class="h-pullquote__text">
-    &ldquo;I didn&rsquo;t start this to prove anything. I started it because I was 302 pounds and running out of excuses.&rdquo;
+    &ldquo;I didn&rsquo;t start this to prove anything. I started it because I was 307 pounds and running out of excuses.&rdquo;
   </blockquote>
   <div class="h-pullquote__badge">Day 1 &middot; April 2026</div>
 </div>
@@ -737,9 +737,9 @@
     }
 
     // ── Data spread: Weight ──
-    if (wLbs) {
+    if (wLbs && wLbs > 0) {
       setText('h-spread-weight', wLbs.toFixed(1));
-      var startWeight = 302;
+      var startWeight = 307;
       var lostLbs = startWeight - wLbs;
       if (lostLbs > 0) {
         setText('h-spread-weight-delta', '\u25bc ' + lostLbs.toFixed(1) + ' lbs from start');
@@ -751,16 +751,42 @@
     }
 
     // ── Data spread: Sleep ──
-    var sleepAvg = v.sleep_hours_30d_avg || sleepHrs;
+    // Rolling avg from Apr 1 onwards (self-corrects: 3-day avg on day 3, 14-day avg on day 14, etc.)
+    var sleepAvg;
+    var sleepDaysUsed = 0;
+    var sleepLaunchDate = new Date('2026-04-01T00:00:00Z');
+    if (trends.sleep_daily && trends.sleep_daily.length > 0) {
+      var launchSleepEntries = trends.sleep_daily.filter(function(r) {
+        return r.date && new Date(r.date + 'T12:00:00Z') >= sleepLaunchDate;
+      });
+      var validSleepVals = launchSleepEntries
+        .map(function(r){ return r.hrs || r.hours || 0; })
+        .filter(function(h){ return h > 0; });
+      if (validSleepVals.length > 0) {
+        sleepAvg = validSleepVals.reduce(function(a,b){ return a+b; }, 0) / validSleepVals.length;
+        sleepDaysUsed = validSleepVals.length;
+      }
+    }
+    // Fallback: API 30d avg only if no trend data and value looks valid (>= 4h)
+    if (!sleepAvg && v.sleep_hours_30d_avg && v.sleep_hours_30d_avg >= 4) {
+      sleepAvg = v.sleep_hours_30d_avg;
+    }
     if (sleepAvg) {
       setText('h-spread-sleep', sleepAvg.toFixed(1));
+      if (sleepDaysUsed > 0) {
+        setText('h-spread-sleep-sub', 'hrs \u00b7 ' + sleepDaysUsed + '-day avg');
+      }
     }
     var sleepEff = v.sleep_efficiency_pct || v.sleep_quality_score;
     if (sleepEff) {
       setText('h-spread-sleep-eff', Math.round(sleepEff) + '% efficiency');
     }
     if (trends.sleep_daily) {
-      var sv = trends.sleep_daily.map(function(r){ return r.hrs || r.hours; }).slice(-14);
+      var sleepSparkEntries = trends.sleep_daily.filter(function(r) {
+        return r.date && new Date(r.date + 'T12:00:00Z') >= sleepLaunchDate;
+      });
+      var sv = (sleepSparkEntries.length > 1 ? sleepSparkEntries : trends.sleep_daily)
+        .map(function(r){ return r.hrs || r.hours; }).slice(-14);
       miniSpark('h-spark-sleep', sv, '#818cf8');
     }
 
@@ -817,7 +843,7 @@
         setText('h-g-char-num', charLevel);
         // Scale character: level 1-20 mapped to 0-100%
         setArc('h-g-char-arc', Math.min(100, (charLevel / 20) * 100));
-        setText('h-obs-mind', 'Level ' + charLevel + ' \u00b7 ' + tier + (score ? ' \u00b7 ' + score + '/100' : ''));
+        setText('h-obs-mind', 'Level ' + charLevel + ' \u00b7 ' + tier + (score && daysIn > 0 ? ' \u00b7 ' + score + '/100' : ''));
         // Update hero stats line with level
         if (statsEl) statsEl.textContent = 'Day ' + daysIn + (wLbs ? ' \u00b7 ' + wLbs.toFixed(1) + ' lbs' : '') + ' \u00b7 Level ' + charLevel;
       }
