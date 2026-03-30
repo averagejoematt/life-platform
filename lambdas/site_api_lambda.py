@@ -5394,6 +5394,35 @@ def lambda_handler(event, context):
     if method == "OPTIONS":
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
 
+    # /api/healthz — lightweight health check (no auth, no PII)
+    if path == "/api/healthz" and method == "GET":
+        try:
+            ddb_start = _time.time()
+            table.get_item(Key={"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2026-01-01"})
+            ddb_ms = round((_time.time() - ddb_start) * 1000)
+            ddb_ok = True
+        except Exception:
+            ddb_ms = -1
+            ddb_ok = False
+        try:
+            stats_obj = s3.get_object(Bucket=S3_BUCKET, Key="site/public_stats.json")
+            refreshed = json.loads(stats_obj["Body"].read()).get("_meta", {}).get("refreshed_at", "unknown")
+        except Exception:
+            refreshed = "unavailable"
+        total_ms = round((_time.time() - _req_start) * 1000)
+        health = {
+            "status": "ok" if ddb_ok else "degraded",
+            "version": "v4.5.1",
+            "checks": {
+                "dynamodb": {"status": "ok" if ddb_ok else "error", "latency_ms": ddb_ms},
+                "last_daily_refresh": refreshed,
+                "lambda_warm": not _COLD_START,
+            },
+            "response_ms": total_ms,
+        }
+        _emit_route_log(200)
+        return {"statusCode": 200, "headers": CORS_HEADERS, "body": json.dumps(health)}
+
     # SEC-04: Reject requests that didn't come through CloudFront (when secret is configured).
     if SITE_API_ORIGIN_SECRET:
         req_headers = event.get("headers") or {}
