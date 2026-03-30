@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# sync_site_to_s3.sh — Sync site/ to S3 and invalidate CloudFront
+# sync_site_to_s3.sh — Build content-hashed assets, sync to S3, invalidate CloudFront
 #
-# Handles three categories of files with appropriate cache-control headers:
-#   - HTML pages:     max-age=300   (5 min — allows quick content updates)
-#   - CSS/JS assets:  max-age=86400 (1 day — invalidate on deploy)
-#   - Data JSON:      max-age=86400 (1 day — Lambda overwrites daily anyway)
-#   - Everything else: max-age=3600
+# Content-hash strategy (ADR-039 fix):
+#   - CSS/JS files get an 8-char MD5 hash in their filename (base.css → base.a1b2c3d4.css)
+#   - Hashed files: max-age=31536000 (1 year, immutable) — browser never re-downloads
+#   - Original filenames still uploaded with max-age=86400 (fallback for dynamic JS loads)
+#   - HTML: max-age=300 (5 min) — references hashed filenames, updates quickly on deploy
+#   - Data JSON: max-age=86400 (Lambda overwrites daily)
 #
 # Usage:
 #   bash deploy/sync_site_to_s3.sh
 #   bash deploy/sync_site_to_s3.sh --dry-run   (preview only)
 #
-# ⚠️  Cost warning: CloudFront invalidations are free for the first 1000 paths/month.
-#     This script invalidates /* which counts as 1 wildcard path. Safe.
+# ⚠️  Cost: CloudFront invalidations free for first 1000 paths/month (we use 1 wildcard).
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -44,35 +44,86 @@ if [[ "$DRY_RUN" == "--dry-run" ]]; then
   exit 0
 fi
 
-echo "=== Syncing averagejoematt-site → s3://$BUCKET/$S3_PREFIX/ ==="
+# ── Phase 1: Build content-hashed assets in temp directory ─────────────────
+echo "=== Building content-hashed assets ==="
+BUILD_DIR=$(mktemp -d)
+trap 'rm -rf "$BUILD_DIR"' EXIT
+cp -r "$SITE_DIR"/* "$BUILD_DIR/"
+
+# Collect all CSS/JS files to hash
+SED_EXPR=""
+FILE_COUNT=0
+
+for f in "$BUILD_DIR"/assets/css/*.css "$BUILD_DIR"/assets/js/*.js; do
+  [[ -f "$f" ]] || continue
+  HASH=$(md5 -q "$f" | cut -c1-8)
+  BASE=$(basename "$f")
+  NAME="${BASE%.*}"
+  EXT="${BASE##*.}"
+  HASHED="${NAME}.${HASH}.${EXT}"
+
+  # Create hashed copy alongside the original
+  cp "$f" "$(dirname "$f")/${HASHED}"
+
+  # Build sed expression for this file
+  SED_EXPR="${SED_EXPR}s|${BASE}|${HASHED}|g;"
+
+  echo "  ${BASE} → ${HASHED}"
+  FILE_COUNT=$((FILE_COUNT + 1))
+done
+
+echo "  Hashed ${FILE_COUNT} files."
+
+# Update all HTML references to use hashed filenames
+if [[ -n "$SED_EXPR" ]]; then
+  echo "→ Updating HTML references..."
+  find "$BUILD_DIR" -name "*.html" -exec sed -i '' "$SED_EXPR" {} +
+  echo "  Done."
+fi
+
+echo ""
+echo "=== Syncing to s3://$BUCKET/$S3_PREFIX/ ==="
 echo ""
 
-# ── HTML pages (short TTL — supports fast content updates) ───────────────────
+# ── Phase 2: Sync to S3 ───────────────────────────────────────────────────
+
+# HTML pages — short TTL, references hashed asset filenames
 echo "→ HTML files (max-age=300)..."
-aws s3 sync "$SITE_DIR/" "s3://$BUCKET/$S3_PREFIX/" \
+aws s3 sync "$BUILD_DIR/" "s3://$BUCKET/$S3_PREFIX/" \
   --exclude "*" \
   --include "*.html" \
   --cache-control "max-age=300, public" \
   --content-type "text/html; charset=utf-8" \
   --region "$REGION"
 
-# ── CSS / JS assets (1-day TTL — no content-hash filenames yet) ──────────────
-echo "→ CSS/JS files (max-age=86400)..."
-aws s3 sync "$SITE_DIR/assets/" "s3://$BUCKET/$S3_PREFIX/assets/" \
+# Hashed CSS/JS — immutable 1-year cache (filename changes when content changes)
+echo "→ Hashed CSS/JS (max-age=31536000, immutable)..."
+aws s3 sync "$BUILD_DIR/assets/" "s3://$BUCKET/$S3_PREFIX/assets/" \
+  --exclude "*" \
+  --include "*.????????.css" \
+  --include "*.????????.js" \
+  --cache-control "max-age=31536000, public, immutable" \
+  --region "$REGION"
+
+# Original CSS/JS — 1-day cache (fallback for dynamic loads like countdown.js)
+echo "→ Original CSS/JS (max-age=86400, fallback)..."
+aws s3 sync "$BUILD_DIR/assets/" "s3://$BUCKET/$S3_PREFIX/assets/" \
+  --exclude "*.????????.css" \
+  --exclude "*.????????.js" \
   --exclude "*.map" \
   --cache-control "max-age=86400, public" \
   --region "$REGION"
 
-# ── Data JSON (daily Lambda overwrites these, so 24h TTL is fine) ─────────────
+# Data JSON — Lambda overwrites daily, 24h TTL is fine
 echo "→ Data JSON (max-age=86400)..."
-aws s3 sync "$SITE_DIR/data/" "s3://$BUCKET/$S3_PREFIX/data/" \
+aws s3 sync "$BUILD_DIR/data/" "s3://$BUCKET/$S3_PREFIX/data/" \
   --cache-control "max-age=86400, public" \
   --content-type "application/json" \
-  --region "$REGION"
+  --region "$REGION" 2>/dev/null || true
 
-# ── Everything else (DEPLOY.md etc) ──────────────────────────────────────────
+# Everything else (images, fonts, etc.)
 echo "→ Other files..."
-aws s3 sync "$SITE_DIR/" "s3://$BUCKET/$S3_PREFIX/" \
+aws s3 sync "$BUILD_DIR/" "s3://$BUCKET/$S3_PREFIX/" \
   --exclude "*.html" \
   --exclude "assets/*" \
   --exclude "data/*" \
@@ -84,7 +135,7 @@ aws s3 sync "$SITE_DIR/" "s3://$BUCKET/$S3_PREFIX/" \
 echo ""
 echo "✅ S3 sync complete."
 
-# ── CloudFront invalidation ───────────────────────────────────────────────────
+# ── Phase 3: CloudFront invalidation ──────────────────────────────────────
 if [[ -n "$CF_DIST_ID" ]]; then
   echo "Invalidating CloudFront distribution $CF_DIST_ID..."
   INVALIDATION_ID=$(aws cloudfront create-invalidation \

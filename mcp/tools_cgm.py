@@ -366,6 +366,7 @@ def tool_get_glucose_meal_response(args):
         return f"{h:02d}:{m:02d}"
 
     def score_spike(spike):
+        # Spike grading per Attia/Huberman/Lustig: <15 minimal, 15-30 normal, >30 insulin resistance driver
         """Grade a glucose spike magnitude."""
         if spike is None:
             return None
@@ -641,6 +642,7 @@ def tool_get_fasting_glucose_validation(args):
     # ── Parameters ────────────────────────────────────────────────────────
     nadir_start = float(args.get("nadir_start_hour", 0))      # midnight
     nadir_end   = float(args.get("nadir_end_hour", 6))        # 6 AM
+    # 2-5 AM avoids dawn phenomenon cortisol rise (4-7 AM per Attia/Patrick)
     deep_start  = float(args.get("deep_nadir_start_hour", 2)) # 2 AM
     deep_end    = float(args.get("deep_nadir_end_hour", 5))   # 5 AM
     min_readings = int(args.get("min_overnight_readings", 6))  # need ~30 min coverage
@@ -830,6 +832,7 @@ def tool_get_fasting_glucose_validation(args):
             bias["cgm_deep_nadir_mean"] = deep_stats["mean"]
             bias["lab_minus_cgm_deep"] = round(lab_mean - deep_stats["mean"], 1)
 
+        # Agreement bands per Dexcom Stelo MARD ~9% (FDA 510(k) K203370)
         diff = bias["lab_minus_cgm_overnight"]
         if abs(diff) <= 5:
             bias["interpretation"] = "Excellent agreement -- CGM overnight nadir closely matches lab fasting glucose."

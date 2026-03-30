@@ -126,7 +126,7 @@ def lambda_handler(event, context):
         subscribers = resp.get("Items", [])
     except Exception as e:
         logger.error(f"Failed to query subscribers: {e}")
-        return {"statusCode": 500, "body": str(e)}
+        return {"statusCode": 500, "body": "Internal server error"}
 
     sent_count = 0
     for sub in subscribers:

@@ -544,6 +544,7 @@ def extract_hr_zones(api, date_str: str) -> dict:
                 secs = z.get("secsInZone") or z.get("secondsInZone")
                 if secs is not None:
                     result[f"hr_zone_{i}_seconds"] = int(secs)
+            # Garmin zones are 0-indexed; zone index 1 = "Zone 2" (aerobic) in Garmin Connect UI
             z2 = result.get("hr_zone_1_seconds")
             if z2:
                 result["zone2_minutes"] = round(z2 / 60, 1)
@@ -566,6 +567,7 @@ def extract_intensity_minutes(api, date_str: str) -> dict:
             if vig is not None:
                 result["intensity_minutes_vigorous"] = int(vig)
             if mod is not None and vig is not None:
+                # WHO guidelines: 1 min vigorous = 2 min moderate for weekly activity targets
                 result["intensity_minutes_total"] = int(mod) + int(vig) * 2
         if result:
             print(f"Intensity minutes: mod={result.get('intensity_minutes_moderate')} vig={result.get('intensity_minutes_vigorous')}")
@@ -781,6 +783,8 @@ def ingest_day(target_date: str, secret: dict, api=None) -> dict:
 
 # ── Lambda handler ─────────────────────────────────────────────────────────────
 def lambda_handler(event, context):
+    if event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     try:
         import time as _time
         if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1

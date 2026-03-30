@@ -127,7 +127,7 @@ def _fetch_weather_range(start_date, end_date):
     Returns list of day records.
     """
     # Seattle coordinates
-    LAT, LON = 47.6062, -122.3321
+    LAT, LON = 47.6062, -122.3321  # Seattle, WA -- Matthew's home city for weather correlation
 
     # Check DynamoDB cache first
     cached = query_source("weather", start_date, end_date)
@@ -1865,6 +1865,7 @@ def tool_get_blood_pressure_dashboard(args):
     coaching = {}
     if avg_sys >= 130 or avg_dia >= 85:
         coaching["attia"] = "Sustained BP above 130/85 accelerates arterial aging. Sodium restriction (<2000mg), regular Zone 2, and sleep optimization are first-line interventions."
+    # SD >12 mmHg systolic: independent CVD risk factor (Stevens et al. 2016)
     if sys_sd > 12:
         coaching["huberman"] = f"High systolic variability (SD={sys_sd}). Consider consistent measurement timing, limiting caffeine before readings, and 5 min seated rest pre-measurement."
     if avg_class == "normal":

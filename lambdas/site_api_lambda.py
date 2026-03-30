@@ -370,7 +370,7 @@ def handle_journey() -> dict:
                          or withings_latest.get("date", today))
             weight_series = [(last_date, float(withings_latest["weight_lbs"]))]
         else:
-            weight_series = [("2026-04-01", 302.0)]  # No data at all — show journey start
+            weight_series = [("2026-04-01", 302.0)]  # Matthew's journey start weight fallback; only used when no Withings data exists
 
     _p = _get_profile()
     start_weight = float(_p.get("journey_start_weight_lbs", 302.0))
@@ -3940,7 +3940,7 @@ def handle_nutrition_overview() -> dict:
     fat_vals = [float(i["fat_g"]) for i in items if i.get("fat_g")]
     fiber_vals = [float(i["fiber_g"]) for i in items if i.get("fiber_g")]
 
-    protein_target = 180
+    protein_target = 190  # Matthew's protein target in grams — matches profile.protein_target_g
     protein_hit_days = sum(1 for v in pro_vals if v >= protein_target)
     protein_hit_pct = round(protein_hit_days / len(pro_vals) * 100) if pro_vals else 0
 
@@ -4012,8 +4012,8 @@ def handle_training_overview() -> dict:
     total_workouts_30d = len(strava_30d)
     weekly_avg = round(total_workouts_30d / 4.3, 1) if total_workouts_30d else 0
 
-    # Zone 2 detection: HR between 60-70% of max (assume max 190 if not in profile)
-    max_hr = 190
+    # Zone 2 detection: HR between 60-70% of max HR
+    max_hr = 184  # Matthew's measured max HR — matches profile.max_heart_rate
     z2_low, z2_high = max_hr * 0.60, max_hr * 0.70
     z2_minutes_30d = 0
     for s in strava_30d:
@@ -4454,6 +4454,7 @@ def handle_strength_benchmarks() -> dict:
     start_date = (now - timedelta(days=90)).strftime("%Y-%m-%d")
 
     targets = {
+        # Matthew's personal 1RM goals -- should migrate to profile.strength_targets
         "Deadlift": 315, "Squat": 265, "Bench Press": 185, "Overhead Press": 135,
     }
 

@@ -1522,6 +1522,33 @@ document.querySelectorAll('.sc-hero-card__input').forEach(inp => {
 /* ── Boot ─────────────────────────────────────────────── */
 setBar('bar-skill', 100);
 loadData();
+
+// Auto-fill hero quiz with Matthew's real data from APIs, then auto-grade
+(async function prefillHeroQuiz() {
+  try {
+    const [vitR, habR] = await Promise.all([
+      fetch(API+'/api/vitals').catch(()=>null),
+      fetch(API+'/api/habits').catch(()=>null),
+    ]);
+    if (vitR && vitR.ok) {
+      const v = (await vitR.json()).vitals || {};
+      if (v.sleep_hours) { var el = document.getElementById('sq-sleep'); if (el) el.value = v.sleep_hours.toFixed(1); }
+    }
+    if (habR && habR.ok) {
+      const h = await habR.json();
+      // Exercise: weekly active minutes from history
+      var hist = h.history || [];
+      if (hist.length >= 7) {
+        var recent = hist.slice(-7);
+        var exMin = recent.reduce(function(s,d) { return s + (d.exercise_minutes || 0); }, 0);
+        var el = document.getElementById('sq-exercise');
+        if (el) el.value = Math.round(exMin);
+      }
+    }
+    // Auto-run the grade check so the user sees their grades immediately
+    setTimeout(runHeroCheck, 500);
+  } catch(e) { /* non-critical */ }
+})();
 loadTrends();
 (function(){const el=document.getElementById('nav-date');if(el)el.textContent=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});})();
 </script>

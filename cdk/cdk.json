@@ -4,6 +4,7 @@
     "account": "205930651321",
     "region": "us-west-2",
     "site_api_fn_url_domain": "vo32hdpuucci34hxj6vuudtmdu0lhqyj.lambda-url.us-west-2.on.aws",
+    "site_api_ai_fn_url_domain": "dvvyqlibbn72ifpvcwrlb4eygu0izpju.lambda-url.us-west-2.on.aws",
     "user_id": "matthew",
     "email_recipient": "lifeplatform@mattsusername.com",
     "email_sender": "lifeplatform@mattsusername.com",

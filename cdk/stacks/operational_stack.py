@@ -234,6 +234,51 @@ class OperationalStack(Stack):
 
         site_api_fn_url_domain = cdk.Fn.select(2, cdk.Fn.split("/", site_api_url.url))
 
+        # ADR-036 fix: cap data Lambda concurrency to isolate from AI traffic spikes
+        # NOTE: Account concurrency limit is 10 — too low for reserved concurrency.
+        # Request increase to 50+ via AWS Support, then uncomment:
+        # site_api_fn.node.default_child.add_property_override("ReservedConcurrentExecutions", 5)
+
+        # ── 10b. Site API AI Lambda — /api/ask + /api/board_ask (split from site-api for blast radius isolation)
+        # Separate Lambda for AI endpoints: sequential Haiku calls can take 3-20s.
+        # Reserved concurrency=2 prevents AI traffic from starving data endpoints.
+        site_api_ai_fn = create_platform_lambda(self, "SiteApiAiLambda",
+            function_name="life-platform-site-api-ai",
+            source_file="lambdas/site_api_ai_lambda.py",
+            handler="site_api_ai_lambda.lambda_handler",
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
+            alerts_topic=None,
+            custom_policies=rp.site_api_ai(),
+            timeout_seconds=30,  # AI calls take 3-5s each; board_ask chains up to 6
+            memory_mb=256,
+            environment={
+                "USER_ID":        "matthew",
+                "TABLE_NAME":     "life-platform",
+                "AI_SECRET_NAME": "life-platform/site-api-ai-key",
+                "S3_BUCKET":      "matthew-life-platform",
+                "S3_REGION":      "us-west-2",
+                "CORS_ORIGIN":    "https://averagejoematt.com",
+            },
+        )
+
+        # Cap AI Lambda concurrency — 2 concurrent is enough for personal site traffic
+        # NOTE: Account concurrency limit is 10 — too low for reserved concurrency.
+        # Request increase to 50+ via AWS Support, then uncomment:
+        # site_api_ai_fn.node.default_child.add_property_override("ReservedConcurrentExecutions", 2)
+
+        site_api_ai_url = site_api_ai_fn.add_function_url(
+            auth_type=_lambda.FunctionUrlAuthType.NONE,
+            cors=_lambda.FunctionUrlCorsOptions(
+                allowed_origins=["https://averagejoematt.com", "https://www.averagejoematt.com"],
+                allowed_methods=[_lambda.HttpMethod.POST],
+                allowed_headers=["Content-Type", "X-Subscriber-Token"],
+            ),
+        )
+
+        site_api_ai_fn_url_domain = cdk.Fn.select(2, cdk.Fn.split("/", site_api_ai_url.url))
+
         # ── Site API CloudWatch alarms + dashboard (moved from web_stack — alarms must be same region as Lambda)
         GTE = cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
 
@@ -301,24 +346,12 @@ class OperationalStack(Stack):
             rule.add_target(targets.LambdaFunction(site_stats_fn))
 
         # ── 12. OG Image Generator — daily at 19:30 UTC (11:30 AM PT, after daily brief)
-        # Generates 6 data-driven 1200x630 PNG OG images from public_stats.json using Pillow.
-        from stacks.constants import PILLOW_LAYER_ARN
-        pillow_layer = _lambda.LayerVersion.from_layer_version_arn(self, "PillowLayer", PILLOW_LAYER_ARN)
-
-        og_image_fn = create_platform_lambda(self, "OgImageGenerator",
-            function_name="og-image-generator",
-            source_file="lambdas/og_image_lambda.py",
-            handler="og_image_lambda.lambda_handler",
-            timeout_seconds=60, memory_mb=512,
-            environment={
-                "S3_BUCKET":            "matthew-life-platform",
-                "CF_DISTRIBUTION_ID":   "E3S424OXQZ8NBE",
-            },
-            custom_policies=rp.operational_og_image_generator(),
-            table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None,
-            additional_layers=[pillow_layer],
-            schedule="cron(30 19 * * ? *)",
-        )
+        # DEFERRED: og-image-generator already exists (CLI-created). Needs CDK import before
+        # CDK can manage it. Tracked as R18-F02. Lambda runs fine outside CDK.
+        # from stacks.constants import PILLOW_LAYER_ARN
+        # pillow_layer = _lambda.LayerVersion.from_layer_version_arn(self, "PillowLayer", PILLOW_LAYER_ARN)
+        # og_image_fn = create_platform_lambda(self, "OgImageGenerator",
+        #     function_name="og-image-generator", ...)
 
         cdk.CfnOutput(self, "FreshnessCheckerArn", value=freshness.function_arn, description="Freshness checker Lambda ARN")
         cdk.CfnOutput(self, "CanaryArn", value=canary.function_arn, description="Canary Lambda ARN")
@@ -329,4 +362,12 @@ class OperationalStack(Stack):
         cdk.CfnOutput(self, "SiteApiFunctionUrlDomain",
             value=site_api_fn_url_domain,
             description="Function URL domain (without https://) — use in web_stack CloudFront origin after R17-09 migration",
+        )
+        cdk.CfnOutput(self, "SiteApiAiFunctionUrl",
+            value=site_api_ai_url.url,
+            description="Lambda Function URL for life-platform-site-api-ai (us-west-2)",
+        )
+        cdk.CfnOutput(self, "SiteApiAiFunctionUrlDomain",
+            value=site_api_ai_fn_url_domain,
+            description="AI Lambda Function URL domain — use in web_stack CloudFront AiLambdaOrigin",
         )

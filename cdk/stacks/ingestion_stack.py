@@ -47,13 +47,18 @@ class IngestionStack(Stack):
             shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_whoop(), **shared)
         # Second schedule: recovery refresh at 9:30 AM PT
+        # OAuth race prevention: max 1 concurrent invocation per OAuth Lambda (ADR-036 fix)
+        # NOTE: Requires account concurrency limit increase from 10 → 50+ before enabling.
+        # Request via AWS Support Console → Service Quotas → Lambda concurrent executions.
+        # whoop.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
+
         whoop_recovery = events.Rule(self, "WhoopRecoverySchedule",
             schedule=events.Schedule.expression("cron(30 17 * * ? *)"),
             description="Whoop recovery refresh — 9:30 AM PT")
         whoop_recovery.add_target(targets.LambdaFunction(whoop))
 
         # ── 2. Garmin — 6:00 AM PT daily
-        create_platform_lambda(self, "GarminIngestion",
+        garmin = create_platform_lambda(self, "GarminIngestion",
             function_name="garmin-data-ingestion",
             source_file="lambdas/garmin_lambda.py",
             handler="garmin_lambda.lambda_handler",
@@ -61,6 +66,7 @@ class IngestionStack(Stack):
             timeout_seconds=300, memory_mb=512, shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_garmin(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
+        # garmin.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
         # ── 3. Notion — 6:00 AM PT daily
         create_platform_lambda(self, "NotionIngestion",
@@ -75,7 +81,7 @@ class IngestionStack(Stack):
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 
         # ── 4. Withings — 6:15 AM PT daily
-        create_platform_lambda(self, "WithingsIngestion",
+        withings = create_platform_lambda(self, "WithingsIngestion",
             function_name="withings-data-ingestion",
             source_file="lambdas/withings_lambda.py",
             handler="withings_lambda.lambda_handler",
@@ -83,6 +89,7 @@ class IngestionStack(Stack):
             timeout_seconds=120, alarm_name="ingestion-error-withings",
             shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_withings(), **shared)
+        # withings.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
         # ── 5. Habitify — 6:15 AM PT daily
         create_platform_lambda(self, "HabitifyIngestion",
@@ -97,7 +104,7 @@ class IngestionStack(Stack):
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 
         # ── 6. Strava — 6:30 AM PT daily
-        create_platform_lambda(self, "StravaIngestion",
+        strava = create_platform_lambda(self, "StravaIngestion",
             function_name="strava-data-ingestion",
             source_file="lambdas/strava_lambda.py",
             handler="strava_lambda.lambda_handler",
@@ -105,6 +112,7 @@ class IngestionStack(Stack):
             timeout_seconds=300, alarm_name="ingestion-error-strava",
             shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_strava(), **shared)
+        # strava.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
         # ── 7. Journal Enrichment — 6:30 AM PT daily
         create_platform_lambda(self, "JournalEnrichment",
@@ -130,7 +138,7 @@ class IngestionStack(Stack):
             custom_policies=rp.ingestion_todoist(), **shared)
 
         # ── 9. Eight Sleep — 7:00 AM PT daily
-        create_platform_lambda(self, "EightsleepIngestion",
+        eightsleep = create_platform_lambda(self, "EightsleepIngestion",
             function_name="eightsleep-data-ingestion",
             source_file="lambdas/eightsleep_lambda.py",
             handler="eightsleep_lambda.lambda_handler",
@@ -138,6 +146,7 @@ class IngestionStack(Stack):
             timeout_seconds=120, alarm_name="ingestion-error-eightsleep",
             shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_eightsleep(), **shared)
+        # eightsleep.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
         # ── 10. Activity Enrichment — 7:30 AM PT daily
         create_platform_lambda(self, "ActivityEnrichment",
