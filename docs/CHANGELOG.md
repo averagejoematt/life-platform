@@ -1,3 +1,35 @@
+## v4.5.1 — 2026-03-30: R19 Architecture Review Remediation (Phases 1-5)
+
+R19 remediation bringing all dimensions from B+ toward A. 60 Lambdas, 118 MCP tools, 68 pages.
+
+### Phase 1: Documentation Sprint
+- INFRASTRUCTURE.md: full update (removed google-calendar, added 15 missing Lambdas, updated all counts)
+- ARCHITECTURE.md: body-section reconciliation (5+ internal contradictions fixed)
+- INCIDENT_LOG: added 5 v4.4.0 incidents + updated patterns section
+- Section 13b: R17+R18 finding dispositions added to generate_review_bundle.py
+- SLOs.md: removed Google Calendar, updated monitored sources
+- RUNBOOK.md: added secret deletion to Common Mistakes
+
+### Phase 2: Architecture Integrity
+- CDK adoption audit: 4 unmanaged Lambdas identified (food-delivery-ingestion, measurements-ingestion, pipeline-health-check, subscriber-onboarding)
+- ADR-045: Accept 118 MCP tools as operating state (closes 4-review-old finding)
+
+### Phase 3: Reliability & Security
+- PITR restore drill: PASSED (7th consecutive review — finally executed). Item counts match exactly.
+- Alarm coverage: 100% (was 71%). Created 17 missing alarms.
+- Security audit: security.txt, headers (DENY/nosniff/HSTS), WAF, IAM all verified.
+
+### Phase 4: Observability
+- Structured JSON route logging on site-api (zero cost — CloudWatch Logs)
+- Saved Logs Insights queries for route analytics
+- Verified life-platform-ops dashboard exists
+
+### Phase 5: Operability
+- CHANGELOG updated with v4.5.1 entry
+- All doc headers consistent (verified by audit_system_state.sh)
+
+---
+
 ## v4.5.0 — 2026-03-30: Observatory Upgrade + Usability Remediation
 
 Observatory Phase 1+2 implementation across Physical and Nutrition pages. Full usability study remediation (20 recommendations, 15 implemented). 68 pages, 65+ API endpoints, 118 MCP tools, 60 Lambdas.
