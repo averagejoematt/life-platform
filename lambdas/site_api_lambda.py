@@ -5358,13 +5358,37 @@ ROUTES = {
 }
 
 
+_COLD_START = True
+
+
 def lambda_handler(event, context):
     """
     Main Lambda handler. Supports both API Gateway HTTP API and Function URL events.
     """
+    global _COLD_START
+    import time as _time
+    _req_start = _time.time()
+
     path   = event.get("rawPath") or event.get("path", "/")
     method = (event.get("requestContext", {}).get("http", {}).get("method") or
               event.get("httpMethod", "GET")).upper()
+
+    def _emit_route_log(status_code):
+        """Emit structured JSON route metric to CloudWatch Logs (zero cost)."""
+        global _COLD_START
+        try:
+            duration_ms = round((_time.time() - _req_start) * 1000, 1)
+            print(json.dumps({
+                "_type": "route_metric",
+                "route": path,
+                "method": method,
+                "status": status_code,
+                "duration_ms": duration_ms,
+                "cold_start": _COLD_START,
+            }))
+        except Exception:
+            pass
+        _COLD_START = False
 
     # CORS preflight
     if method == "OPTIONS":
@@ -5538,10 +5562,14 @@ def lambda_handler(event, context):
 
     handler = ROUTES.get(path)
     if not handler:
+        _emit_route_log(404)
         return _error(404, "Not found")
 
     try:
-        return handler()
+        result = handler()
+        _emit_route_log(result.get("statusCode", 200))
+        return result
     except Exception as e:
         logger.error(f"[site_api] {path} failed: {e}")
+        _emit_route_log(500)
         return _error(500, "Internal error — check CloudWatch logs")
