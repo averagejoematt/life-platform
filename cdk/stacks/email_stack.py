@@ -133,5 +133,12 @@ class EmailStack(Stack):
         wednesday_chronicle.add_environment("PREVIEW_MODE",       _preview_mode)
         wednesday_chronicle.add_environment("APPROVE_LAMBDA_URL", approve_url_obj.url)
 
-        # ── Subscriber Onboarding — EXISTS as CLI-created Lambda. CDK import pending.
-        # See docs/audits/AUDIT_2026-03-30_cdk_adoption.md for full plan.
+        # ── Subscriber Onboarding — daily (Day 2 bridge email for new subscribers)
+        create_platform_lambda(self, "SubscriberOnboarding",
+            function_name="subscriber-onboarding",
+            source_file="lambdas/subscriber_onboarding_lambda.py",
+            handler="subscriber_onboarding_lambda.lambda_handler",
+            schedule="cron(0 17 * * ? *)",  # 10 AM PT daily
+            timeout_seconds=120, memory_mb=256,
+            environment=_email_env,
+            custom_policies=rp.subscriber_onboarding(), **shared)

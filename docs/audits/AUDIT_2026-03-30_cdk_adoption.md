@@ -12,12 +12,12 @@
 
 | Function | Created | Should Belong To | EventBridge? | Status |
 |----------|---------|------------------|-------------|--------|
-| `food-delivery-ingestion` | v4.2.x | LifePlatformIngestion | Yes (S3 trigger) | DEFERRED — CDK import blocked by "already exists" |
-| `measurements-ingestion` | v4.2.x | LifePlatformIngestion | No (manual trigger) | DEFERRED — CDK import blocked by "already exists" |
-| `pipeline-health-check` | v4.4.0 | LifePlatformOperational | Yes (daily 6 AM PT) | DEFERRED — CDK import blocked by "already exists" |
-| `subscriber-onboarding` | v4.3.x | LifePlatformEmail | Yes (daily 10 AM PT) | DEFERRED — CDK import blocked by "already exists" |
+| `food-delivery-ingestion` | v4.2.x | LifePlatformIngestion | Yes (S3 trigger) | ADOPTED |
+| `measurements-ingestion` | v4.2.x | LifePlatformIngestion | No (manual trigger) | ADOPTED |
+| `pipeline-health-check` | v4.4.0 | LifePlatformOperational | Yes (daily 6 AM PT) | ADOPTED |
+| `subscriber-onboarding` | v4.3.x | LifePlatformEmail | Yes (daily 10 AM PT) | ADOPTED |
 
-**Status:** CDK adoption attempted 2026-03-30. All 4 Lambdas exist as CLI-created resources. `cdk deploy` returns "already exists" error. `cdk import` requires zero pending changes on existing resources. IAM policies and CDK definitions are written and ready in `role_policies.py` and stack files (commented out). All 4 Lambdas function correctly outside CDK and have CloudWatch error alarms. CDK import can be completed in a dedicated session using `cdk import --force` after clearing pending updates.
+**Status:** All 4 Lambdas CDK-adopted on 2026-03-30. Procedure: CLI-created Lambdas deleted, CDK recreated them with proper IAM roles, EventBridge rules, and CloudWatch alarms. All verified functional post-deploy.
 
 ---
 

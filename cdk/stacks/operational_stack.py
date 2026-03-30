@@ -349,8 +349,15 @@ class OperationalStack(Stack):
         # DEFERRED: og-image-generator already exists (CLI-created). Needs CDK import before
         # CDK can manage it. Tracked as R18-F02. Lambda runs fine outside CDK.
 
-        # ── 13. Pipeline Health Check — EXISTS as CLI-created Lambda. CDK import pending.
-        # See docs/audits/AUDIT_2026-03-30_cdk_adoption.md for full plan.
+        # ── 13. Pipeline Health Check — daily at 13:00 UTC (6 AM PT)
+        create_platform_lambda(self, "PipelineHealthCheck",
+            function_name="pipeline-health-check",
+            source_file="lambdas/pipeline_health_check_lambda.py",
+            handler="pipeline_health_check_lambda.lambda_handler",
+            schedule="cron(0 13 * * ? *)",
+            timeout_seconds=300, memory_mb=256,
+            custom_policies=rp.pipeline_health_check(),
+            table=local_table, bucket=local_bucket, dlq=None, alerts_topic=local_alerts_topic)
 
         cdk.CfnOutput(self, "FreshnessCheckerArn", value=freshness.function_arn, description="Freshness checker Lambda ARN")
         cdk.CfnOutput(self, "CanaryArn", value=canary.function_arn, description="Canary Lambda ARN")

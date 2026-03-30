@@ -222,12 +222,27 @@ class IngestionStack(Stack):
         # All integration paths blocked by Smartsheet IT policy or macOS restrictions.
         # Lambda + EventBridge rule removed. See docs/DECISIONS.md ADR-030.
 
-        # ── 17. Food Delivery — EXISTS as CLI-created Lambda. CDK import pending.
-        # CDK adoption blocked: "already exists" error during deploy.
-        # These Lambdas function correctly outside CDK. Will import in dedicated session.
-        # See docs/audits/AUDIT_2026-03-30_cdk_adoption.md for full plan.
+        # ── 17. Food Delivery — S3 trigger on uploads/food_delivery/
+        food_delivery = create_platform_lambda(self, "FoodDeliveryIngestion",
+            function_name="food-delivery-ingestion",
+            source_file="lambdas/food_delivery_lambda.py",
+            handler="food_delivery_lambda.lambda_handler",
+            timeout_seconds=60,
+            shared_layer=shared_utils_layer,
+            custom_policies=rp.food_delivery_ingestion(), **shared)
+        food_delivery.add_permission("S3InvokeFoodDelivery",
+            principal=iam.ServicePrincipal("s3.amazonaws.com"),
+            source_arn=f"arn:aws:s3:::{S3_BUCKET}",
+            source_account=self.account)
 
-        # ── 18. Measurements — EXISTS as CLI-created Lambda. CDK import pending.
+        # ── 18. Measurements — manual/MCP-triggered (no schedule)
+        create_platform_lambda(self, "MeasurementsIngestion",
+            function_name="measurements-ingestion",
+            source_file="lambdas/measurements_ingestion_lambda.py",
+            handler="measurements_ingestion_lambda.lambda_handler",
+            timeout_seconds=60,
+            shared_layer=shared_utils_layer,
+            custom_policies=rp.measurements_ingestion(), **shared)
 
         cdk.CfnOutput(self, "WhoopFnArn", value=whoop.function_arn, description="Whoop ingestion Lambda ARN")
         cdk.CfnOutput(self, "HaeWebhookFnArn", value=hae.function_arn, description="Health Auto Export webhook Lambda ARN")
