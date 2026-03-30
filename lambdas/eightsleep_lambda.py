@@ -695,6 +695,8 @@ def _ingest_with_retry(wake_date, secret):
 
 
 def lambda_handler(event, context):
+    if event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     try:
         import time as _time
         if hasattr(logger, 'set_date'):

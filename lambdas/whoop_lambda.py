@@ -172,6 +172,8 @@ def find_missing_dates(lookback_days=LOOKBACK_DAYS):
 
 
 def lambda_handler(event, context):
+    if event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     try:
         import time as _time
         if hasattr(logger, "set_date"): logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
@@ -407,8 +409,6 @@ def ingest_day(date_str, access_token, s3_client, table, verbose=True, call_dela
         "nap_count", "nap_duration_hours",
         # cycle
         "strain", "kilojoule", "average_heart_rate", "max_heart_rate",
-        # derived metrics
-        "sleep_onset_minutes", "sleep_onset_consistency_7d",
         # derived metrics
         "sleep_onset_minutes", "sleep_onset_consistency_7d",
     ]

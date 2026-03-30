@@ -263,6 +263,7 @@ def compute_tsb(strava_60d, today):
 
 def compute_readiness(data):
     """Composite readiness: recovery (40%), sleep (30%), HRV trend (20%), TSB (10%)."""
+    # Readiness: recovery 40% (most actionable), sleep 30%, HRV trend 20%, TSB 10% (lagging)
     components = []
     whoop_today = data.get("whoop_today")
     whoop_yest  = data.get("whoop")
@@ -275,10 +276,12 @@ def compute_readiness(data):
     hrv_7d  = data["hrv"].get("hrv_7d")
     hrv_30d = data["hrv"].get("hrv_30d")
     if hrv_7d and hrv_30d and hrv_30d > 0:
+        # Maps 7d/30d ratio to 0-100: ratio=0.75->0, ratio=1.0->50, ratio=1.25->100
         hrv_score = clamp(round((hrv_7d / hrv_30d - 0.75) * 200))
         components.append(("hrv_trend", hrv_score, 0.20))
     tsb = data.get("tsb")
     if tsb is not None:
+        # TSB=0->score 60, TSB=-30->0, TSB=+20->100
         components.append(("tsb", clamp(round(60 + tsb * 2)), 0.10))
     if not components:
         return None, "gray"
@@ -755,6 +758,8 @@ def assemble_data(yesterday_str, profile):
 # ==============================================================================
 
 def lambda_handler(event, context):
+    if event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     t0 = time.time()
     logger.info("Daily Metrics Compute v1.0.0 starting...")
 

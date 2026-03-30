@@ -134,6 +134,7 @@ DOW_NORMALIZED_METRICS = {"steps", "tasks_completed", "completion_pct"}
 # Add a metric here only if its distribution is verifiably right-skewed from your data.
 LOG_TRANSFORM_METRICS = {"hrv"}
 
+# 4th element (low_is_bad): True=flag LOW values, False=flag HIGH, None=flag either direction
 METRICS = [
     ("whoop",       "recovery_score",       "Recovery Score",      True),
     ("whoop",       "hrv",                  "HRV",                 True),
@@ -890,6 +891,8 @@ def record_email_send(table, lambda_name):
 
 
 def lambda_handler(event, context):
+    if event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     print("[INFO] Anomaly Detector v2.3.0 starting (adaptive thresholds + travel + sustained tracking)...")
 
     today     = datetime.now(timezone.utc).date()

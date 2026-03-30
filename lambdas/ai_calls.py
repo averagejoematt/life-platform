@@ -328,6 +328,8 @@ def _build_journey_context(profile, current_date_str=None):
     start_weight = profile.get("journey_start_weight_lbs", 302)
     goal_weight  = profile.get("goal_weight_lbs", 185)
 
+    # Periodization: Foundation (1-4wk) habit formation, Momentum (5-12) progressive overload,
+    # Building (13-26) base, Advanced (27+) optimization
     if week_num <= 4:
         stage = "Foundation"
         principles = [
@@ -647,7 +649,8 @@ def _compute_surprise_scores(data):
         dev = abs(hrv_yesterday - hrv_7d) / hrv_7d
         direction = "up" if hrv_yesterday > hrv_7d else "down"
         surprises["hrv"] = {
-            "surprise": min(1.0, dev * 2.5),  # 40% deviation = surprise 1.0
+            # 2.5x: 40% HRV deviation = max surprise; HRV has high day-to-day variance
+            "surprise": min(1.0, dev * 2.5),
             "direction": direction,
             "detail": f"{hrv_yesterday:.0f}ms vs 7d avg {hrv_7d:.0f}ms ({'+' if direction == 'up' else '-'}{dev*100:.0f}%)",
         }
@@ -664,7 +667,8 @@ def _compute_surprise_scores(data):
                 dev = abs(sleep_score - avg_score) / avg_score
                 direction = "up" if sleep_score > avg_score else "down"
                 surprises["sleep"] = {
-                    "surprise": min(1.0, dev * 3.0),  # 33% deviation = surprise 1.0
+                    # 3.0x: 33% deviation = max surprise; sleep scores are more stable than HRV
+                    "surprise": min(1.0, dev * 3.0),
                     "direction": direction,
                     "detail": f"Score {sleep_score:.0f} vs 7d avg {avg_score:.0f} ({'+' if direction == 'up' else '-'}{dev*100:.0f}%)",
                 }
@@ -677,7 +681,8 @@ def _compute_surprise_scores(data):
         dev_from_target = abs(cal - cal_target) / cal_target
         direction = "up" if cal > cal_target else "down"
         surprises["nutrition"] = {
-            "surprise": min(1.0, dev_from_target * 2.0),  # 50% off target = surprise 1.0
+            # 2.0x: 50% off cal target = max surprise; generous due to MacroFactor logging gaps
+            "surprise": min(1.0, dev_from_target * 2.0),
             "direction": direction,
             "detail": f"{int(cal)} cal vs {cal_target} target ({'+' if direction == 'up' else '-'}{dev_from_target*100:.0f}%)",
         }
@@ -709,7 +714,8 @@ def _compute_surprise_scores(data):
                 dev = abs(glucose_avg - avg_gluc) / avg_gluc
                 direction = "up" if glucose_avg > avg_gluc else "down"
                 surprises["glucose"] = {
-                    "surprise": min(1.0, dev * 5.0),  # Glucose is tighter: 20% deviation = surprise 1.0
+                    # 5.0x: 20% deviation = max surprise; glucose is physiologically tight-regulated
+                    "surprise": min(1.0, dev * 5.0),
                     "direction": direction,
                     "detail": f"{glucose_avg:.0f} mg/dL vs 7d avg {avg_gluc:.0f} ({'+' if direction == 'up' else '-'}{dev*100:.0f}%)",
                 }

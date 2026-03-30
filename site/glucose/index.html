@@ -1586,20 +1586,9 @@
   /* ── 9c/9d: Meal Response Table ─────────────────────────── */
 
   // Static fallback data (9m: used when /api/meal_responses is unavailable)
-  var FALLBACK_MEALS = [
-    { meal: 'Protein shake only', category: 'snack', calories: 280, protein: 40, carbs: 12, spike: 6, grade: 'A', curve: 'flat' },
-    { meal: 'Oatmeal + protein', category: 'breakfast', calories: 420, protein: 28, carbs: 48, spike: 18, grade: 'A', curve: 'gentle' },
-    { meal: 'Sweet potato + chicken', category: 'lunch', calories: 510, protein: 42, carbs: 52, spike: 22, grade: 'B', curve: 'gentle' },
-    { meal: 'Salmon + rice bowl', category: 'lunch', calories: 580, protein: 38, carbs: 62, spike: 28, grade: 'B', curve: 'moderate' },
-    { meal: 'Steak + vegetables', category: 'dinner', calories: 650, protein: 52, carbs: 18, spike: 12, grade: 'A', curve: 'flat' },
-    { meal: 'White rice (1 cup)', category: 'dinner', calories: 380, protein: 8, carbs: 78, spike: 42, grade: 'C', curve: 'steep' },
-    { meal: 'Pizza (2 slices)', category: 'dinner', calories: 560, protein: 22, carbs: 64, spike: 55, grade: 'D', curve: 'steep' },
-    { meal: 'Greek yogurt + berries', category: 'breakfast', calories: 240, protein: 18, carbs: 28, spike: 14, grade: 'A', curve: 'flat' },
-    { meal: 'Burrito bowl', category: 'lunch', calories: 620, protein: 35, carbs: 58, spike: 32, grade: 'B', curve: 'moderate' },
-    { meal: 'Pasta (2 cups)', category: 'dinner', calories: 540, protein: 16, carbs: 82, spike: 48, grade: 'C', curve: 'steep' }
-  ];
-
-  var mealData = FALLBACK_MEALS;
+  // No fallback meals — only show real MacroFactor data paired with CGM readings.
+  // If the API returns no data, the table shows an honest "no data yet" message.
+  var mealData = [];
   var currentFilter = 'all';
   var currentSort = { key: 'spike', asc: true };
 
@@ -1641,6 +1630,10 @@
   function renderMeals() {
     var container = document.getElementById('meal-cards-container');
     if (!container) return;
+    if (!mealData || mealData.length === 0) {
+      container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:2rem 0;">Meal glucose data will appear here once MacroFactor food logs overlap with CGM readings.</p>';
+      return;
+    }
     var filtered = mealData.filter(function(m) {
       return currentFilter === 'all' || m.category === currentFilter;
     });

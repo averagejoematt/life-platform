@@ -1,13 +1,13 @@
 # Life Platform — Onboarding Guide
 
-> Start here. Everything else is reference material.
-> Last updated: 2026-03-24 (v3.9.8)
+> Start here. For your first day, also read `docs/QUICKSTART.md` (AWS setup, deploy commands, gotchas).
+> Last updated: 2026-03-29 (v4.4.0)
 
 ---
 
 ## What Is This?
 
-A personal health intelligence system built on AWS. It pulls data from 20 sources (wearables, apps, manual logs), stores everything in a single DynamoDB table, and makes it queryable by Claude through a Lambda-backed MCP server.
+A personal health intelligence system built on AWS. It pulls data from 13 API-based sources (wearables, apps, webhooks) plus manual/periodic uploads, stores everything in a single DynamoDB table (26 source partitions total), and makes it queryable by Claude through a Lambda-backed MCP server with 112 tools.
 
 The end result: ask Claude a natural-language question about your health, and it queries real data rather than relying on memory or estimates.
 
@@ -18,14 +18,16 @@ The end result: ask Claude a natural-language question about your health, and it
 | File | Purpose |
 |------|---------|
 | **ONBOARDING.md** (this file) | Start here — mental model + key concepts |
+| `QUICKSTART.md` | Your first day — AWS setup, deploy commands, gotchas |
 | `ARCHITECTURE.md` | Full system design, all AWS resources, data flows |
 | `RUNBOOK.md` | How to operate the platform (deploys, re-auth, troubleshooting) |
 | `SCHEMA.md` | Every DynamoDB field per source |
 | `PROJECT_PLAN.md` | Active roadmap and backlog |
 | `CHANGELOG.md` | Version history (current 30 days) |
 | `PLATFORM_GUIDE.md` | How to use the platform + all MCP tools in conversation with Claude |
-| `MCP_TOOL_CATALOG.md` | Full catalog of all 95 tools |
+| `MCP_TOOL_CATALOG.md` | Full catalog of all 112 tools |
 | `deploy/README.md` | Guide to the deploy scripts |
+| `DEPENDENCY_GRAPH.md` | Full dependency map: Lambdas → DDB → MCP → website. SPOFs + critical path |
 | `DATA_FLOW_DIAGRAM.md` | Visual data flow (Mermaid diagrams) |
 
 ---
@@ -33,15 +35,15 @@ The end result: ask Claude a natural-language question about your health, and it
 ## System at a Glance
 
 ```
-19 data sources
+13 API-based data sources (26 DDB partitions total)
     ↓
-13 ingestion Lambdas (scheduled + webhook)
+13 ingestion Lambdas (EventBridge cron + webhook + S3 trigger)
     ↓
 DynamoDB (single table) + S3 (raw backup)
     ↓
-MCP Lambda (95 tools) ← Claude queries this
+MCP Lambda (112 tools) ← Claude queries this
     ↓
-49 compute/email/operational Lambdas
+46 compute/email/operational Lambdas
     ↓
 Daily Brief email + Dashboard + Weekly emails + averagejoematt.com
 ```
@@ -183,4 +185,34 @@ Handovers live at `handovers/YYYY-MM-DD-session<N>-<slug>.md`. The latest is alw
 
 ## Architecture Review Schedule
 
-Architecture reviews happen periodically. Run `python3 deploy/generate_review_bundle.py` first — it creates the bundle Claude needs to conduct the review. Reviews are stored in `docs/reviews/`. The platform is at review R17 (grade A-). CI/CD pipeline active (v3.9.4).
+Architecture reviews happen periodically. Run `python3 deploy/generate_review_bundle.py` first — it creates the bundle Claude needs to conduct the review. Reviews are stored in `docs/reviews/`. The platform is at review R18 (grade B+). CI/CD pipeline active (v3.9.4).
+
+---
+
+## Glossary
+
+| Term | Meaning |
+|------|---------|
+| **MCP** | Model Context Protocol — Claude's native tool interface. The MCP Lambda exposes 112 tools that Claude calls to query health data. |
+| **IC** | Intelligence Capability — the platform's computed health features (IC-1 through IC-30). Each IC is a specific analysis (e.g., IC-8 = intent vs execution, IC-18 = hypothesis engine). |
+| **DLQ** | Dead Letter Queue — failed async Lambda invocations land here. Consumed every 6 hours by `dlq-consumer` Lambda. |
+| **SOT** | Source of Truth — which device/service owns each health domain (e.g., Whoop owns sleep, MacroFactor owns nutrition). See `mcp/config.py`. |
+| **PITR** | Point-in-Time Recovery — DynamoDB's 35-day rolling backup. Enables table restore to any second within the window. |
+| **CDK** | AWS Cloud Development Kit — Python-based infrastructure as code. 8 stacks in `cdk/stacks/` define all Lambda, IAM, EventBridge, and CloudWatch resources. |
+| **P40** | Protocol 40 — the 65-habit personal framework tracked via Habitify. Habits are grouped into 9 P40 groups with tier weighting (T0/T1/T2). |
+| **Character Sheet** | Gamified scoring system aggregating 7 health pillars (Sleep, Movement, Nutrition, Metabolic, Mind, Relationships, Consistency) into a level 1-100 with RPG-style tiers (Foundation → Elite). Computed daily. |
+| **Board of Directors** | 14 fictional AI advisor personas (not real people) that provide domain-specific coaching in emails and the website. Configured in `s3://matthew-life-platform/config/board_of_directors.json`. See ADR-040. |
+| **Day Grade** | Daily score (0-100, A-F letter grade) computed from sleep, nutrition, exercise, habits, hydration, and glucose. Drives the Character Sheet and daily brief email. |
+
+---
+
+## Key Architecture Assumptions
+
+Things that are true but not obvious from reading the code:
+
+1. **Single-user platform.** All DynamoDB keys are `USER#matthew#SOURCE#...`. IAM roles, secrets, schedules — everything assumes one user. Do not try to generalize without reading ADR-001.
+2. **Site-api is read-only.** The public API Lambda (`life-platform-site-api`) has no DynamoDB write permissions. This is enforced by IAM, not just convention. See ADR-037.
+3. **`public_stats.json` is the website heartbeat.** The homepage, story, mission, and observatory pages all read from this single S3 file, written by the daily brief Lambda at 11 AM PT. If the daily brief fails, the entire website shows stale data.
+4. **All EventBridge crons are fixed UTC.** Schedules don't drift with DST. The PT times in documentation are for human reference only.
+5. **Pipeline ordering is strict.** Ingestion (6:45-9 AM) must complete before Compute (10:20-10:35), which must complete before Daily Brief (11 AM). Changing schedules without maintaining this order produces stale computed results.
+6. **Budget is $15/month target, $20 AWS Budget cap.** Current actual spend is ~$13/month.

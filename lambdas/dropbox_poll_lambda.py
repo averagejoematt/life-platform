@@ -306,6 +306,8 @@ def upload_to_s3(filename, content_bytes):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def lambda_handler(event, context):
+    if event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     try:
         """
         Poll Dropbox for new MacroFactor CSVs.

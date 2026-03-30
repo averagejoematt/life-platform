@@ -341,6 +341,10 @@ class WebStack(Stack):
             fn_url_domain = _site_api_ctx_domain
             _site_api_fn_url_for_output = f"https://{_site_api_ctx_domain}/"
 
+        # ADR-036 fix: AI Lambda split — separate origin for /api/ask and /api/board_ask
+        # Set context "site_api_ai_fn_url_domain" from LifePlatformOperational output SiteApiAiFunctionUrlDomain
+        ai_fn_url_domain = self.node.try_get_context("site_api_ai_fn_url_domain") or fn_url_domain
+
         # ══════════════════════════════════════════════════════════════
         # R17-15: Security headers via CloudFront ResponseHeadersPolicy.
         # Defined here (before amj_dist) so .ref is available in distribution.
@@ -455,7 +459,19 @@ class WebStack(Stack):
                             origin_ssl_protocols=["TLSv1.2"],
                         ),
                     ),
-                    # Origin 3: email-subscriber Lambda Function URL (write, no cache)
+                    # Origin 4: site-api-ai Lambda Function URL (AI endpoints, no cache)
+                    # ADR-036 fix: separate origin isolates AI concurrency from data endpoints
+                    cloudfront.CfnDistribution.OriginProperty(
+                        domain_name=ai_fn_url_domain,
+                        id="AiLambdaOrigin",
+                        custom_origin_config=cloudfront.CfnDistribution.CustomOriginConfigProperty(
+                            http_port=80,
+                            https_port=443,
+                            origin_protocol_policy="https-only",
+                            origin_ssl_protocols=["TLSv1.2"],
+                        ),
+                    ),
+                    # Origin 5: email-subscriber Lambda Function URL (write, no cache)
                     cloudfront.CfnDistribution.OriginProperty(
                         domain_name=subscriber_url_domain,
                         id="SubscriberLambdaOrigin",
@@ -526,23 +542,23 @@ class WebStack(Stack):
                         default_ttl=0, max_ttl=0, min_ttl=0,
                         allowed_methods=["GET","HEAD","OPTIONS"], cached_methods=["GET","HEAD"],
                     ),
-                    # /api/board_ask — board persona AI. S2-T2-2.
+                    # /api/board_ask — board persona AI. S2-T2-2. ADR-036: routed to AI Lambda.
                     cloudfront.CfnDistribution.CacheBehaviorProperty(
                         path_pattern="/api/board_ask",
-                        target_origin_id="LambdaApiOrigin",
+                        target_origin_id="AiLambdaOrigin",
                         viewer_protocol_policy="https-only",
                         forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(query_string=False, headers=["Origin","Content-Type"]),
                         default_ttl=0, max_ttl=0, min_ttl=0,
                         allowed_methods=["GET","HEAD","OPTIONS","POST","PUT","PATCH","DELETE"], cached_methods=["GET","HEAD"],
                     ),
-                    # /api/ask — site-api Lambda (AI Q&A, POST only, no cache).
+                    # /api/ask — AI Q&A (POST only, no cache). ADR-036: routed to AI Lambda.
                     cloudfront.CfnDistribution.CacheBehaviorProperty(
                         path_pattern="/api/ask",
-                        target_origin_id="LambdaApiOrigin",
+                        target_origin_id="AiLambdaOrigin",
                         viewer_protocol_policy="https-only",
                         forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
                             query_string=False,
-                            headers=["Origin", "Content-Type"],
+                            headers=["Origin", "Content-Type", "X-Subscriber-Token"],
                         ),
                         default_ttl=0,   # never cache AI responses
                         max_ttl=0,
