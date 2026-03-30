@@ -308,10 +308,10 @@
     var match = null;
     for (var p2 in ctaCopy) { if (path.startsWith(p2)) { match = ctaCopy[p2]; break; } }
     if (path === '/' || path === '/index.html') {
-      match = { h: 'Follow the experiment from Day 1.', b: 'Real numbers from 25 data sources. No highlight reel. Every Wednesday, in your inbox.' };
+      match = { h: 'Follow the experiment from Day 1.', b: 'Real numbers from 26 data sources. No highlight reel. Every Wednesday, in your inbox.' };
     }
     var ctaHeadline = match ? match.h : 'Get the data, every week.';
-    var ctaBody = match ? match.b : 'Real numbers from 25 data sources. No highlight reel. Every Wednesday, in your inbox.';
+    var ctaBody = match ? match.b : 'Real numbers from 26 data sources. No highlight reel. Every Wednesday, in your inbox.';
 
     var html = '<section class="email-cta-footer reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface);text-align:center;">';
     html += '<p style="font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-500);margin-bottom:var(--space-4)">The Measured Life</p>';
