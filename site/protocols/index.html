@@ -356,6 +356,12 @@
   </p>
 </header>
 
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-3) var(--page-padding) var(--space-4);" class="reveal">
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:0.06em;line-height:1.8;">
+    Protocols are what I do consistently &mdash; the stable system. &rarr; <a href="/experiments/" style="color:var(--accent);text-decoration:none;">Experiments</a> test whether the system should change.
+  </div>
+</div>
+
 <!-- Signal state legend (17e) -->
 <div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-4) var(--page-padding) 0;">
   <div style="display:flex;gap:var(--space-6);flex-wrap:wrap;font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;">
@@ -443,6 +449,29 @@
     'if':          '16:8 window aligns eating with circadian rhythm and extends overnight fat oxidation',
     'supplements': 'Evidence-rated inputs supporting sleep, recovery, deficit protection, and longevity'
   };
+  var EVIDENCE_MAP = {
+    'sleep': [
+      { title: 'Walker (2017) — Why We Sleep: sleep architecture & metabolic regulation', url: 'https://pubmed.ncbi.nlm.nih.gov/28589901/' },
+      { title: 'Huberman (2021) — Temperature & light timing for circadian entrainment', url: 'https://pubmed.ncbi.nlm.nih.gov/34613461/' }
+    ],
+    'zone2': [
+      { title: 'Seiler & Kjerland (2006) — Polarized training intensity distribution', url: 'https://pubmed.ncbi.nlm.nih.gov/16558681/' },
+      { title: 'Valenzuela et al. (2023) — Zone 2 and mitochondrial function in longevity', url: 'https://pubmed.ncbi.nlm.nih.gov/36413997/' }
+    ],
+    'deficit': [
+      { title: 'Helms et al. (2014) — Evidence-based recommendations for contest prep', url: 'https://pubmed.ncbi.nlm.nih.gov/24864135/' },
+      { title: 'Mero et al. (2010) — Moderate energy restriction vs aggressive deficit', url: 'https://pubmed.ncbi.nlm.nih.gov/21558571/' }
+    ],
+    'cgm': [
+      { title: 'Zeevi et al. (2015) — Personalized glycemic responses in 800 participants', url: 'https://pubmed.ncbi.nlm.nih.gov/26590418/' }
+    ],
+    'if': [
+      { title: 'de Cabo & Mattson (2019) — Effects of intermittent fasting on health', url: 'https://pubmed.ncbi.nlm.nih.gov/31881139/' }
+    ],
+    'supplements': [
+      { title: 'Examine.com — Independent supplement research database', url: 'https://examine.com/' }
+    ]
+  };
   var TIER_MAP = {
     'sleep':       { label: 'FOUNDATION',   cls: 'tier-foundation' },
     'zone2':       { label: 'FOUNDATION',   cls: 'tier-foundation' },
@@ -504,6 +533,15 @@
     html += '<div class="proto-stat__value ' + signalCls + '">' + signalText + '</div></div>';
     html += '</div>';
     html += '<div class="proto-data-note"><span>// Tracked by:</span> ' + (p.tracked_by || []).join(' + ') + '</div>';
+    // Evidence references
+    var refs = p.references || EVIDENCE_MAP[p.slug];
+    if (refs && refs.length) {
+      html += '<div class="proto-detail" style="margin-top:var(--space-3);"><span class="proto-detail__label">Evidence</span><span class="proto-detail__value">';
+      refs.forEach(function(r) {
+        html += '<a href="' + r.url + '" target="_blank" rel="noopener" style="display:block;color:var(--accent);text-decoration:none;font-size:var(--text-xs);line-height:1.6;">' + r.title + ' \u2192</a>';
+      });
+      html += '</span></div>';
+    }
     html += '</div>';
     // Links
     var links = '';

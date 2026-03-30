@@ -637,6 +637,163 @@
     }
 
     /* ═══════════════════════════════════════════════════════
+       PROTEIN SOURCES — horizontal bar chart
+       ═══════════════════════════════════════════════════════ */
+    .n-prosrc-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .n-prosrc-bar {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .n-prosrc-bar__name {
+      width: 180px;
+      flex-shrink: 0;
+      font-size: var(--text-sm);
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .n-prosrc-bar__track {
+      flex: 1;
+      height: 14px;
+      background: rgba(255,255,255,0.03);
+      position: relative;
+      overflow: hidden;
+    }
+    .n-prosrc-bar__fill {
+      height: 100%;
+      background: var(--n-green);
+      transition: width 0.8s ease;
+    }
+    .n-prosrc-bar__val {
+      width: 70px;
+      flex-shrink: 0;
+      text-align: right;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    @media (max-width: 768px) {
+      .n-prosrc-bar__name { width: 120px; font-size: 12px; }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       WEEKDAY VS WEEKEND — side-by-side comparison
+       ═══════════════════════════════════════════════════════ */
+    .n-wvw-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .n-wvw-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+    @media (max-width: 768px) { .n-wvw-grid { grid-template-columns: 1fr; } }
+    .n-wvw-col {
+      padding: var(--space-6);
+    }
+    .n-wvw-col:first-child {
+      border-right: 1px solid var(--border);
+    }
+    @media (max-width: 768px) {
+      .n-wvw-col:first-child { border-right: none; border-bottom: 1px solid var(--border); }
+    }
+    .n-wvw-col__title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--n-amber);
+      margin-bottom: var(--space-4);
+    }
+    .n-wvw-stat {
+      display: flex;
+      justify-content: space-between;
+      padding: var(--space-2) 0;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .n-wvw-stat__label {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+    }
+    .n-wvw-stat__val {
+      font-family: var(--font-display);
+      font-size: 16px;
+      color: var(--text);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       EATING WINDOW
+       ═══════════════════════════════════════════════════════ */
+    .n-ew-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .n-ew-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+    }
+    @media (max-width: 768px) { .n-ew-grid { grid-template-columns: 1fr; } }
+    .n-ew-col {
+      padding: var(--space-6);
+      text-align: center;
+    }
+    .n-ew-col:not(:last-child) {
+      border-right: 1px solid var(--border);
+    }
+    @media (max-width: 768px) {
+      .n-ew-col:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
+    }
+    .n-ew-big {
+      font-family: var(--font-display);
+      font-size: clamp(28px, 3.5vw, 36px);
+      color: var(--n-amber);
+      line-height: 1;
+      margin-bottom: var(--space-2);
+    }
+    .n-ew-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       CALORIC PERIODIZATION — training vs rest day
+       ═══════════════════════════════════════════════════════ */
+    .n-period-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       RECENT MEALS GALLERY — "What I Actually Eat"
+       ═══════════════════════════════════════════════════════ */
+    .n-gallery-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ═══════════════════════════════════════════════════════
        TREND CHART
        ═══════════════════════════════════════════════════════ */
     .n-chart-section {
@@ -1555,6 +1712,124 @@
 </script>
 
 <!-- ════════════════════════════════════════════════════════════
+     PROTEIN SOURCE BREAKDOWN
+     ════════════════════════════════════════════════════════════ -->
+<section class="n-prosrc-section reveal">
+  <div class="n-section-header">Where does protein come from?</div>
+  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
+    Top protein sources from 30 days of food logs. Each bar shows average daily contribution.
+  </div>
+  <div id="n-prosrc-bars">
+    <div style="color:var(--text-faint);font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-4)">Loading protein sources...</div>
+  </div>
+</section>
+<script>
+(async function() {
+  try {
+    var resp = await fetch('/api/protein_sources');
+    if (!resp.ok) return;
+    var data = await resp.json();
+    var sources = data.protein_sources || [];
+    if (!sources.length) return;
+    var container = document.getElementById('n-prosrc-bars');
+    if (!container) return;
+    var maxG = sources[0].avg_daily_g || 1;
+    container.innerHTML = sources.map(function(s) {
+      return '<div class="n-prosrc-bar">' +
+        '<div class="n-prosrc-bar__name">' + s.food + '</div>' +
+        '<div class="n-prosrc-bar__track"><div class="n-prosrc-bar__fill" style="width:' + Math.round((s.avg_daily_g / maxG) * 100) + '%"></div></div>' +
+        '<div class="n-prosrc-bar__val">' + s.avg_daily_g + 'g/day (' + s.pct_of_total + '%)</div>' +
+      '</div>';
+    }).join('');
+  } catch(e) { console.warn('Protein sources unavailable:', e); }
+})();
+</script>
+
+<!-- ════════════════════════════════════════════════════════════
+     WEEKDAY VS WEEKEND COMPARISON
+     ════════════════════════════════════════════════════════════ -->
+<section class="n-wvw-section reveal">
+  <div class="n-section-header">Weekday vs weekend</div>
+  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none" id="n-wvw-narrative"></div>
+  <div class="n-wvw-grid">
+    <div class="n-wvw-col">
+      <div class="n-wvw-col__title">Weekday (Mon&ndash;Fri)</div>
+      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg calories</span><span class="n-wvw-stat__val" id="wvw-wd-cal">&mdash;</span></div>
+      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg protein</span><span class="n-wvw-stat__val" id="wvw-wd-pro">&mdash;</span></div>
+      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg carbs</span><span class="n-wvw-stat__val" id="wvw-wd-carb">&mdash;</span></div>
+      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg fat</span><span class="n-wvw-stat__val" id="wvw-wd-fat">&mdash;</span></div>
+      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Protein hit %</span><span class="n-wvw-stat__val" id="wvw-wd-hit">&mdash;</span></div>
+    </div>
+    <div class="n-wvw-col">
+      <div class="n-wvw-col__title">Weekend (Sat&ndash;Sun)</div>
+      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg calories</span><span class="n-wvw-stat__val" id="wvw-we-cal">&mdash;</span></div>
+      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg protein</span><span class="n-wvw-stat__val" id="wvw-we-pro">&mdash;</span></div>
+      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg carbs</span><span class="n-wvw-stat__val" id="wvw-we-carb">&mdash;</span></div>
+      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg fat</span><span class="n-wvw-stat__val" id="wvw-we-fat">&mdash;</span></div>
+      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Protein hit %</span><span class="n-wvw-stat__val" id="wvw-we-hit">&mdash;</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     EATING WINDOW
+     ════════════════════════════════════════════════════════════ -->
+<section class="n-ew-section reveal">
+  <div class="n-section-header">Eating window</div>
+  <div class="n-ew-grid">
+    <div class="n-ew-col">
+      <div class="n-ew-big" id="ew-window">&mdash;</div>
+      <div class="n-ew-label">Avg eating window</div>
+    </div>
+    <div class="n-ew-col">
+      <div class="n-ew-big" id="ew-first">&mdash;</div>
+      <div class="n-ew-label">First meal</div>
+    </div>
+    <div class="n-ew-col">
+      <div class="n-ew-big" id="ew-last">&mdash;</div>
+      <div class="n-ew-label">Last meal</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     CALORIC PERIODIZATION — Training vs Rest days
+     ════════════════════════════════════════════════════════════ -->
+<section class="n-period-section reveal">
+  <div class="n-section-header">Caloric periodization</div>
+  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
+    Are calories higher on training days? Cross-referencing MacroFactor with Strava activity dates.
+  </div>
+  <div class="n-wvw-grid">
+    <div class="n-wvw-col">
+      <div class="n-wvw-col__title">Training Days</div>
+      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg calories</span><span class="n-wvw-stat__val" id="pd-train-cal">&mdash;</span></div>
+      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg protein</span><span class="n-wvw-stat__val" id="pd-train-pro">&mdash;</span></div>
+      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Days</span><span class="n-wvw-stat__val" id="pd-train-count">&mdash;</span></div>
+    </div>
+    <div class="n-wvw-col">
+      <div class="n-wvw-col__title">Rest Days</div>
+      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg calories</span><span class="n-wvw-stat__val" id="pd-rest-cal">&mdash;</span></div>
+      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Avg protein</span><span class="n-wvw-stat__val" id="pd-rest-pro">&mdash;</span></div>
+      <div class="n-wvw-stat"><span class="n-wvw-stat__label">Days</span><span class="n-wvw-stat__val" id="pd-rest-count">&mdash;</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     "WHAT I ACTUALLY EAT" — Recent Meals Gallery
+     ════════════════════════════════════════════════════════════ -->
+<section class="n-gallery-section reveal">
+  <div class="n-section-header">What I actually eat</div>
+  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
+    The most recent distinct meals from the food log. Real entries, not curated.
+  </div>
+  <div class="n-meals-grid" id="n-recent-meals">
+    <div style="grid-column:1/-1;text-align:center;padding:var(--space-8);color:var(--text-faint);font-family:var(--font-mono);font-size:var(--text-xs)">Loading recent meals...</div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
      30-DAY TREND CHART (10g: em-dash header)
      ════════════════════════════════════════════════════════════ -->
 <section class="n-chart-section reveal">
@@ -1711,6 +1986,25 @@
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
+     FOOD DELIVERY ANALYSIS (Phase 2)
+     ════════════════════════════════════════════════════════════ -->
+<section class="n-macro-section reveal" id="n-delivery-section" style="display:none">
+  <div class="n-section-header">Restaurant &amp; takeout</div>
+  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none" id="n-delivery-context">
+    Real, relatable content. Where does Matthew actually order from?
+  </div>
+  <div class="n-macro-grid" id="n-delivery-grid"></div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     MACRO DEEP-DIVES: Carbs, Fats, Fiber (Phase 2)
+     ════════════════════════════════════════════════════════════ -->
+<section class="n-macro-section reveal" id="n-macro-deep" style="display:none">
+  <div class="n-section-header">Macro deep-dives &mdash; carbs, fats, fiber</div>
+  <div class="n-macro-grid" id="n-macro-deep-grid"></div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
      10j: HYDRATION — water intake and correlation with energy/recovery
      ════════════════════════════════════════════════════════════ -->
 <section class="n-hydration-section reveal">
@@ -1755,6 +2049,16 @@
 <!-- ════════════════════════════════════════════════════════════
      N=1 RULES — left-accent cards (10g: em-dash header)
      ════════════════════════════════════════════════════════════ -->
+<div class="n-pullquote n-pullquote--right reveal" style="border-bottom:1px solid var(--border);">
+  <blockquote class="n-pullquote__text">
+    &ldquo;He logs the bad days too. The 3,400-calorie Saturdays. The protein misses. That&rsquo;s what makes the data trustworthy &mdash; it includes the failures.&rdquo;
+  </blockquote>
+  <div class="n-pullquote__attr">
+    <span class="n-pullquote__badge">Chronicle &middot; Elena Voss</span>
+    <span class="n-pullquote__source">AI narrative voice &mdash; <a href="/chronicle/" style="color:var(--n-amber);text-decoration:none;">Read the chronicle &rarr;</a></span>
+  </div>
+</div>
+
 <section class="n-rules-section reveal">
   <div class="n-section-header">N=1 Nutrition Rules &mdash; 30+ Weeks of Data</div>
   <div class="n-rule-grid">
@@ -1959,6 +2263,127 @@
     if (pgNum) pgNum.style.color = hitPct >= 80 ? '#3ecf8e' : hitPct >= 50 ? '#f59e0b' : '#ef4444';
     setWidth('protein-fill', hitPct || 0);
     setText('protein-days', (n.protein_hit_days || 0) + ' of ' + (daysLogged || 0) + ' days');
+
+    /* ── Weekday vs Weekend ── */
+    var wvw = data.weekday_vs_weekend;
+    if (wvw) {
+      var wd = wvw.weekday || {}, we = wvw.weekend || {};
+      setText('wvw-wd-cal', wd.avg_calories ? Math.round(wd.avg_calories).toLocaleString() : '\u2014');
+      setText('wvw-wd-pro', wd.avg_protein_g ? Math.round(wd.avg_protein_g) + 'g' : '\u2014');
+      setText('wvw-wd-carb', wd.avg_carbs_g ? Math.round(wd.avg_carbs_g) + 'g' : '\u2014');
+      setText('wvw-wd-fat', wd.avg_fat_g ? Math.round(wd.avg_fat_g) + 'g' : '\u2014');
+      setText('wvw-wd-hit', wd.protein_hit_pct != null ? wd.protein_hit_pct + '%' : '\u2014');
+      setText('wvw-we-cal', we.avg_calories ? Math.round(we.avg_calories).toLocaleString() : '\u2014');
+      setText('wvw-we-pro', we.avg_protein_g ? Math.round(we.avg_protein_g) + 'g' : '\u2014');
+      setText('wvw-we-carb', we.avg_carbs_g ? Math.round(we.avg_carbs_g) + 'g' : '\u2014');
+      setText('wvw-we-fat', we.avg_fat_g ? Math.round(we.avg_fat_g) + 'g' : '\u2014');
+      setText('wvw-we-hit', we.protein_hit_pct != null ? we.protein_hit_pct + '%' : '\u2014');
+      // Narrative
+      var calDiff = Math.round((we.avg_calories || 0) - (wd.avg_calories || 0));
+      var proDiff = Math.round((wd.protein_hit_pct || 0) - (we.protein_hit_pct || 0));
+      var narEl = document.getElementById('n-wvw-narrative');
+      if (narEl && calDiff !== 0) {
+        var dir = calDiff > 0 ? 'more' : 'fewer';
+        narEl.textContent = 'Weekend Matthew eats ' + Math.abs(calDiff) + ' ' + dir + ' calories than Weekday Matthew.' +
+          (proDiff > 0 ? ' Protein compliance drops ' + proDiff + ' points.' : '');
+      }
+    }
+
+    /* ── Eating Window ── */
+    var ew = data.eating_window;
+    if (ew) {
+      setText('ew-window', ew.avg_hours + ' hrs');
+      setText('ew-first', ew.avg_first_meal);
+      setText('ew-last', ew.avg_last_meal);
+    }
+
+    /* ── Caloric Periodization ── */
+    var pd = data.periodization;
+    if (pd) {
+      var tr = pd.training_day || {}, rs = pd.rest_day || {};
+      setText('pd-train-cal', tr.avg_calories ? Math.round(tr.avg_calories).toLocaleString() : '\u2014');
+      setText('pd-train-pro', tr.avg_protein_g ? Math.round(tr.avg_protein_g) + 'g' : '\u2014');
+      setText('pd-train-count', tr.count || 0);
+      setText('pd-rest-cal', rs.avg_calories ? Math.round(rs.avg_calories).toLocaleString() : '\u2014');
+      setText('pd-rest-pro', rs.avg_protein_g ? Math.round(rs.avg_protein_g) + 'g' : '\u2014');
+      setText('pd-rest-count', rs.count || 0);
+    }
+
+    /* ── Recent Meals Gallery ── */
+    (function() {
+      fetch('/api/frequent_meals').then(function(r) { return r.json(); }).then(function(md) {
+        var meals = md.meals || [];
+        var gallery = document.getElementById('n-recent-meals');
+        if (!gallery || !meals.length) return;
+        gallery.innerHTML = meals.slice(0, 12).map(function(m) {
+          var ppc = m.protein_cal_pct || 0;
+          var ppcClass = ppc >= 30 ? 'n-meal-card__grade--a' : ppc >= 20 ? 'n-meal-card__grade--b' : 'n-meal-card__grade--c';
+          var mealSlot = m.avg_calories > 400 ? 'Meal' : 'Snack';
+          return '<div class="n-meal-card">' +
+            '<div class="n-meal-card__header"><div>' +
+              '<div class="n-meal-card__name">' + m.name + '</div>' +
+              '<div class="n-meal-card__freq">' + m.frequency + 'x &middot; ' + mealSlot + '</div>' +
+            '</div></div>' +
+            '<div class="n-meal-card__macros">' +
+              '<div class="n-meal-card__macro"><div class="n-meal-card__macro-val">' + m.avg_calories + '</div><div class="n-meal-card__macro-label">cal</div></div>' +
+              '<div class="n-meal-card__macro"><div class="n-meal-card__macro-val">' + m.avg_protein_g + 'g</div><div class="n-meal-card__macro-label">protein</div></div>' +
+              '<div class="n-meal-card__macro"><div class="n-meal-card__macro-val">' + (m.avg_carbs_g || 0) + 'g</div><div class="n-meal-card__macro-label">carbs</div></div>' +
+            '</div>' +
+            '<div class="n-meal-card__footer">' +
+              '<div class="n-meal-card__ppc">P/cal: <em>' + ppc + '%</em></div>' +
+              '<div class="n-meal-card__grade ' + ppcClass + '">' + (ppc >= 30 ? 'HIGH' : ppc >= 20 ? 'MOD' : 'LOW') + ' PROTEIN</div>' +
+            '</div></div>';
+        }).join('');
+      }).catch(function() {});
+    })();
+
+    /* ── Macro deep-dives (Phase 2) — carbs, fats, fiber targets ── */
+    if (n.avg_carbs_g || n.avg_fat_g || n.avg_fiber_g) {
+      var deepGrid = document.getElementById('n-macro-deep-grid');
+      var deepSection = document.getElementById('n-macro-deep');
+      if (deepGrid) {
+        var carbTarget = 250, fatTarget = 80, fiberTarget = 30;
+        deepGrid.innerHTML = '<div class="n-macro-col">' +
+          '<div class="n-macro-bar"><div class="n-macro-bar__fill" style="width:' + Math.min(100, ((n.avg_carbs_g || 0) / carbTarget) * 100) + '%;background:var(--n-amber)"></div></div>' +
+          '<div class="n-macro-big" style="color:var(--n-amber)">' + Math.round(n.avg_carbs_g || 0) + 'g</div>' +
+          '<div class="n-macro-name">Carbs</div>' +
+          '<div class="n-macro-detail">Target: ' + carbTarget + 'g &middot; ' + Math.round(((n.avg_carbs_g || 0) / carbTarget) * 100) + '% adherence</div></div>' +
+          '<div class="n-macro-col">' +
+          '<div class="n-macro-bar"><div class="n-macro-bar__fill" style="width:' + Math.min(100, ((n.avg_fat_g || 0) / fatTarget) * 100) + '%;background:var(--n-violet)"></div></div>' +
+          '<div class="n-macro-big" style="color:var(--n-violet)">' + Math.round(n.avg_fat_g || 0) + 'g</div>' +
+          '<div class="n-macro-name">Fat</div>' +
+          '<div class="n-macro-detail">Target: ' + fatTarget + 'g &middot; ' + Math.round(((n.avg_fat_g || 0) / fatTarget) * 100) + '% adherence</div></div>' +
+          '<div class="n-macro-col">' +
+          '<div class="n-macro-bar"><div class="n-macro-bar__fill" style="width:' + Math.min(100, ((n.avg_fiber_g || 0) / fiberTarget) * 100) + '%;background:var(--n-green)"></div></div>' +
+          '<div class="n-macro-big" style="color:var(--n-green)">' + Math.round(n.avg_fiber_g || 0) + 'g</div>' +
+          '<div class="n-macro-name">Fiber</div>' +
+          '<div class="n-macro-detail">Target: ' + fiberTarget + 'g+ &middot; ' + Math.round(((n.avg_fiber_g || 0) / fiberTarget) * 100) + '% adherence</div></div>';
+        deepSection.style.display = '';
+      }
+    }
+
+    /* ── Food delivery analysis (Phase 2) ── */
+    (function() {
+      fetch(API + '/api/food_delivery_overview').then(function(r) { return r.json(); }).then(function(fd) {
+        var d = fd.food_delivery;
+        if (!d || !d.orders_30d) return;
+        var section = document.getElementById('n-delivery-section');
+        var grid = document.getElementById('n-delivery-grid');
+        section.style.display = '';
+        grid.innerHTML = '<div class="n-macro-col">' +
+          '<div class="n-macro-big" style="color:var(--n-amber)">' + d.orders_30d + '</div>' +
+          '<div class="n-macro-name">Orders (30d)</div>' +
+          '<div class="n-macro-detail">$' + d.avg_spend + ' avg per order</div></div>' +
+          '<div class="n-macro-col">' +
+          '<div class="n-macro-big" style="color:var(--n-red)">' + d.binge_days_30d + '</div>' +
+          '<div class="n-macro-name">Binge-flagged days</div>' +
+          '<div class="n-macro-detail">Days where delivery correlated with calorie overshoot</div></div>' +
+          '<div class="n-macro-col">' +
+          '<div class="n-macro-big">$' + d.total_spend_30d + '</div>' +
+          '<div class="n-macro-name">Total spend</div>' +
+          '<div class="n-macro-detail">' + (fd.platform_breakdown || []).map(function(p) { return p.platform + ' (' + p.count + ')'; }).join(', ') + '</div></div>';
+      }).catch(function() {});
+    })();
 
     /* ── TDEE current (10e) ── */
     if (n.avg_tdee) {

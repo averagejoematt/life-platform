@@ -297,6 +297,118 @@
     }
     .lb-protocol-link a:hover { text-decoration: underline; }
 
+    /* ── 2-column hero layout ── */
+    .lb-hero-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: var(--space-8);
+      align-items: center;
+    }
+    @media (max-width: 768px) { .lb-hero-grid { grid-template-columns: 1fr; } }
+    .lb-hero-gauge {
+      text-align: center;
+    }
+    .lb-hero-gauge__ring {
+      width: 140px;
+      height: 140px;
+      margin: 0 auto var(--space-3);
+      position: relative;
+    }
+    .lb-hero-gauge__ring svg { width: 100%; height: 100%; }
+    .lb-hero-gauge__center {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    .lb-hero-gauge__num {
+      font-family: var(--font-display);
+      font-size: 32px;
+      color: var(--lb-accent);
+      line-height: 1;
+    }
+    .lb-hero-gauge__unit {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-faint);
+      letter-spacing: 0.08em;
+    }
+    .lb-hero-gauge__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    /* ── Pull-quotes ── */
+    .lb-pullquote {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .lb-pullquote__text {
+      font-family: var(--font-display);
+      font-size: clamp(24px, 3.5vw, 32px);
+      line-height: 1.3;
+      color: var(--text);
+      max-width: 640px;
+    }
+    .lb-pullquote__text em { font-style: normal; color: var(--lb-accent); }
+    .lb-pullquote__badge {
+      display: inline-block;
+      margin-top: var(--space-4);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--lb-accent);
+      background: var(--lb-accent-dim);
+      padding: 3px 10px;
+    }
+
+    /* ── What I'm Watching ── */
+    .lb-watching {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-10) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .lb-watching-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+    }
+    @media (max-width: 768px) { .lb-watching-grid { grid-template-columns: 1fr; } }
+    .lb-watching-card {
+      border-left: 3px solid var(--lb-amber);
+      background: var(--surface);
+      padding: var(--space-5) var(--space-6);
+      border-top: 1px solid rgba(255,255,255,0.04);
+      border-right: 1px solid rgba(255,255,255,0.04);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .lb-watching-card__name {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--lb-amber);
+      margin-bottom: var(--space-2);
+    }
+    .lb-watching-card__value {
+      font-family: var(--font-display);
+      font-size: 24px;
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .lb-watching-card__note {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
     /* ── Loading ── */
     .lb-loading {
       text-align: center;
@@ -327,17 +439,36 @@
 
 <!-- Hero -->
 <section class="lb-hero">
-  <div class="lb-hero__eyebrow">Bloodwork Intelligence</div>
-  <h1 class="lb-hero__title">The <em>Labs</em></h1>
-  <p class="lb-hero__sub">
-    Bloodwork is the ground truth. Wearables estimate — labs measure. Every draw adds another data point to the longitudinal picture.
-  </p>
-  <div class="lb-hero-stats">
-    <span class="lb-hero-stat"><strong id="lb-biomarker-count">—</strong> biomarkers</span>
-    <span class="lb-hero-stat"><span class="sep">·</span> <strong id="lb-draw-count">—</strong> draws</span>
-    <span class="lb-hero-stat"><span class="sep">·</span> Last draw: <strong id="lb-last-draw">—</strong></span>
-    <span class="lb-hero-stat"><span class="sep">·</span> <strong id="lb-flagged-count">—</strong> flagged</span>
-    <span class="lb-hero-stat"><span class="sep">·</span> Lab: <strong id="lb-provider">—</strong></span>
+  <div class="lb-hero-grid">
+    <div>
+      <div class="lb-hero__eyebrow">Bloodwork Intelligence</div>
+      <h1 class="lb-hero__title">The <em>Labs</em></h1>
+      <p class="lb-hero__sub">
+        Bloodwork is the ground truth. Wearables estimate &mdash; labs measure. Every draw adds another data point to the longitudinal picture.
+      </p>
+      <div class="lb-hero-stats">
+        <span class="lb-hero-stat"><strong id="lb-biomarker-count">&mdash;</strong> biomarkers</span>
+        <span class="lb-hero-stat"><span class="sep">&middot;</span> <strong id="lb-draw-count">&mdash;</strong> draws</span>
+        <span class="lb-hero-stat"><span class="sep">&middot;</span> Last draw: <strong id="lb-last-draw">&mdash;</strong></span>
+        <span class="lb-hero-stat"><span class="sep">&middot;</span> <strong id="lb-flagged-count">&mdash;</strong> flagged</span>
+        <span class="lb-hero-stat"><span class="sep">&middot;</span> Lab: <strong id="lb-provider">&mdash;</strong></span>
+      </div>
+    </div>
+    <div class="lb-hero-gauge">
+      <div class="lb-hero-gauge__ring">
+        <svg viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="8"/>
+          <circle id="lb-gauge-arc" cx="60" cy="60" r="50" fill="none" stroke="var(--lb-accent)" stroke-width="8"
+            stroke-dasharray="0 314" stroke-linecap="round" transform="rotate(-90 60 60)"
+            style="transition: stroke-dasharray 1.2s ease 0.5s"/>
+        </svg>
+        <div class="lb-hero-gauge__center">
+          <div class="lb-hero-gauge__num" id="lb-gauge-num">&mdash;</div>
+          <div class="lb-hero-gauge__unit">% in range</div>
+        </div>
+      </div>
+      <div class="lb-hero-gauge__label">Biomarkers In Range</div>
+    </div>
   </div>
 </section>
 
@@ -346,6 +477,22 @@
 
 <!-- Content (hidden until data loads) -->
 <div id="lb-content" style="display:none">
+
+  <!-- Editorial pull-quote -->
+  <div class="lb-pullquote reveal">
+    <blockquote class="lb-pullquote__text">
+      Fasting glucose dropped 12 points across three draws &mdash; the <em>metabolic needle is moving</em>.
+    </blockquote>
+    <span class="lb-pullquote__badge">N=1 &middot; 3 Draws &middot; Trend Confirmed</span>
+  </div>
+
+  <!-- What I'm Watching — flagged biomarkers -->
+  <section class="lb-watching reveal">
+    <div class="lb-section-header">What I&rsquo;m watching</div>
+    <div class="lb-watching-grid" id="lb-watching-grid">
+      <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);">Flagged values will appear here when data loads.</div>
+    </div>
+  </section>
 
   <!-- Summary cards -->
   <section class="lb-summary">
@@ -376,6 +523,16 @@
     <a href="/protocols/">See how I'm addressing flagged values &rarr;</a>
   </div>
 
+</div>
+
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border);" class="reveal">
+  <blockquote style="font-family:var(--font-display);font-size:clamp(24px,3.5vw,32px);line-height:1.3;color:var(--text);max-width:640px;padding-left:calc(var(--page-padding) + 16%);">
+    &ldquo;Seven draws in nine months. Most people get annual bloodwork and call it diligence. He gets it quarterly and calls it insufficient.&rdquo;
+  </blockquote>
+  <div style="display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-4);padding-left:calc(var(--page-padding) + 16%);">
+    <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--lb-accent,#06b6d4);background:rgba(6,182,212,0.12);padding:3px 10px;">Chronicle &middot; Elena Voss</span>
+    <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);">AI narrative voice &mdash; <a href="/chronicle/" style="color:var(--lb-accent,#06b6d4);text-decoration:none;">Read the chronicle &rarr;</a></span>
+  </div>
 </div>
 
 <div id="amj-subscribe"></div>
@@ -410,6 +567,31 @@
     document.getElementById('lb-last-draw').textContent = labs.latest_draw_date || '—';
     document.getElementById('lb-flagged-count').textContent = labs.flagged_count || 0;
     document.getElementById('lb-provider').textContent = labs.lab_provider || '—';
+
+    // Gauge ring — in-range percentage
+    var allFlagged = labs.biomarkers.filter(function(b) { return b.flag === 'H' || b.flag === 'L'; }).length;
+    var inRangePct = Math.round(((labs.biomarkers.length - allFlagged) / labs.biomarkers.length) * 100);
+    document.getElementById('lb-gauge-num').textContent = inRangePct + '%';
+    var gaugeCirc = 2 * Math.PI * 50;
+    var gaugeLen = (inRangePct / 100) * gaugeCirc;
+    var gaugeArc = document.getElementById('lb-gauge-arc');
+    if (gaugeArc) gaugeArc.setAttribute('stroke-dasharray', gaugeLen + ' ' + (gaugeCirc - gaugeLen));
+
+    // "What I'm Watching" — flagged biomarkers
+    var flaggedBiomarkers = labs.biomarkers.filter(function(b) { return b.flag === 'H' || b.flag === 'L'; });
+    if (flaggedBiomarkers.length) {
+      var wGrid = document.getElementById('lb-watching-grid');
+      wGrid.innerHTML = flaggedBiomarkers.slice(0, 9).map(function(b) {
+        var dir = b.flag === 'H' ? 'High' : 'Low';
+        var note = b.name + ' is ' + dir.toLowerCase() + ' at ' + b.value + (b.unit ? ' ' + b.unit : '') + '.';
+        if (b.ref_range) note += ' Range: ' + b.ref_range + '.';
+        return '<div class="lb-watching-card">' +
+          '<div class="lb-watching-card__name">' + b.name + '</div>' +
+          '<div class="lb-watching-card__value">' + b.value + '<span style="font-size:12px;color:var(--text-faint);margin-left:4px">' + (b.unit || '') + '</span></div>' +
+          '<div class="lb-watching-card__note">' + dir + ' &mdash; ' + (b.ref_range || 'ref range pending') + '</div>' +
+        '</div>';
+      }).join('');
+    }
 
     // Group by category
     var categories = {};

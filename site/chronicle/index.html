@@ -218,6 +218,14 @@
   <p class="journal-header__sub">Narrative journalism on a real transformation. Every week, a new dispatch.</p>
 </div>
 
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-4) var(--page-padding) var(--space-6);" class="reveal">
+  <div style="border-left:2px solid var(--accent);padding:var(--space-4) var(--space-6);background:rgba(61,184,138,0.03);">
+    <p style="font-family:var(--font-serif);font-size:var(--text-sm);color:var(--text-muted);line-height:1.8;margin:0;">
+      The Measured Life is narrated by Elena Voss, an AI-generated editorial voice. She writes weekly, drawing from Matthew&rsquo;s real data &mdash; wearables, journals, and lab results &mdash; to tell the story behind the numbers. <strong style="color:var(--text);">The data is real. The analysis is real. The voice is AI. The honesty is deliberate.</strong>
+    </p>
+  </div>
+</div>
+
 <div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-3) var(--page-padding);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);border-bottom:1px solid var(--border);">
   The Chronicle is Elena&rsquo;s narrative. <a href="/weekly/" style="color:var(--accent);text-decoration:none;">Weekly Snapshots</a> are the raw data. Same week, two views. &middot; <a href="/ask/" style="color:var(--accent);text-decoration:none;">Ask about any week</a> &middot; <a href="/subscribe/" style="color:var(--accent);text-decoration:none;">Never miss an installment</a>
 </div>
@@ -284,6 +292,7 @@
         <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body);max-width:600px;margin-bottom:var(--space-4);">${heroPost.excerpt || ''}</div>
         <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);">${heroDate} · ${readMin}</div>
         <div style="margin-top:var(--space-4);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);letter-spacing:var(--ls-tag);">Read this installment →</div>
+        <div style="margin-top:var(--space-3);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:0.06em;">Written by Elena Voss — an AI narrative voice created to chronicle Matthew's journey.</div>
       </a>`;
 
       // Archive: group by phase (21c)
@@ -321,6 +330,7 @@
                 <div class="journal-post__tag">The Measured Life · Week ${p.week}${badge}</div>
                 <div class="journal-post__title" style="font-size:var(--text-lg);line-height:1.3;">&ldquo;${p.title}&rdquo;</div>
                 <div class="journal-post__excerpt">${p.excerpt || p.stats_line || ''}</div>
+                <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:0.06em;margin-top:var(--space-2);">Written by Elena Voss — AI narrative voice</div>
               </div>
             </a>`;
           });

@@ -1488,6 +1488,8 @@ body::after {
 .since-last-visit { max-width: var(--max-width); margin: 0 auto; padding: var(--space-8) var(--page-padding); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); position: relative; }
 .since-last-visit__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6); }
 .since-last-visit__title { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-faint); }
+.since-last-visit__heading { font-family: var(--font-display); font-size: var(--text-h3); color: var(--text); line-height: 1.2; margin-bottom: var(--space-1); }
+.since-last-visit__sub { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: 0.1em; color: var(--text-faint); text-transform: uppercase; }
 .since-last-visit__dismiss { font-family: var(--font-mono); font-size: 14px; color: var(--text-faint); cursor: pointer; background: none; border: none; padding: var(--space-2); opacity: 0.5; transition: opacity 0.15s; }
 .since-last-visit__dismiss:hover { opacity: 1; }
 .since-last-visit__grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-bottom: var(--space-6); }
