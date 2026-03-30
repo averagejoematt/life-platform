@@ -222,5 +222,12 @@ class IngestionStack(Stack):
         # All integration paths blocked by Smartsheet IT policy or macOS restrictions.
         # Lambda + EventBridge rule removed. See docs/DECISIONS.md ADR-030.
 
+        # ── 17. Food Delivery — EXISTS as CLI-created Lambda. CDK import pending.
+        # CDK adoption blocked: "already exists" error during deploy.
+        # These Lambdas function correctly outside CDK. Will import in dedicated session.
+        # See docs/audits/AUDIT_2026-03-30_cdk_adoption.md for full plan.
+
+        # ── 18. Measurements — EXISTS as CLI-created Lambda. CDK import pending.
+
         cdk.CfnOutput(self, "WhoopFnArn", value=whoop.function_arn, description="Whoop ingestion Lambda ARN")
         cdk.CfnOutput(self, "HaeWebhookFnArn", value=hae.function_arn, description="Health Auto Export webhook Lambda ARN")

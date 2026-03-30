@@ -348,10 +348,9 @@ class OperationalStack(Stack):
         # ── 12. OG Image Generator — daily at 19:30 UTC (11:30 AM PT, after daily brief)
         # DEFERRED: og-image-generator already exists (CLI-created). Needs CDK import before
         # CDK can manage it. Tracked as R18-F02. Lambda runs fine outside CDK.
-        # from stacks.constants import PILLOW_LAYER_ARN
-        # pillow_layer = _lambda.LayerVersion.from_layer_version_arn(self, "PillowLayer", PILLOW_LAYER_ARN)
-        # og_image_fn = create_platform_lambda(self, "OgImageGenerator",
-        #     function_name="og-image-generator", ...)
+
+        # ── 13. Pipeline Health Check — EXISTS as CLI-created Lambda. CDK import pending.
+        # See docs/audits/AUDIT_2026-03-30_cdk_adoption.md for full plan.
 
         cdk.CfnOutput(self, "FreshnessCheckerArn", value=freshness.function_arn, description="Freshness checker Lambda ARN")
         cdk.CfnOutput(self, "CanaryArn", value=canary.function_arn, description="Canary Lambda ARN")
