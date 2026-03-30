@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-30 (v4.5.0 — 118 MCP tools, 26-module MCP package, 26 data sources, 60 Lambdas, 68 site pages, 65+ API endpoints, 8 CDK stacks)
+Last updated: 2026-03-30 (v4.5.2 — 118 MCP tools, 26-module MCP package, 26 data sources, 61 Lambdas, 68 site pages, 65+ API endpoints, 8 CDK stacks)
 
 ---
 
