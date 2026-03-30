@@ -132,3 +132,6 @@ class EmailStack(Stack):
         _preview_mode = self.node.try_get_context("chronicle_preview_mode") or "true"
         wednesday_chronicle.add_environment("PREVIEW_MODE",       _preview_mode)
         wednesday_chronicle.add_environment("APPROVE_LAMBDA_URL", approve_url_obj.url)
+
+        # ── Subscriber Onboarding — EXISTS as CLI-created Lambda. CDK import pending.
+        # See docs/audits/AUDIT_2026-03-30_cdk_adoption.md for full plan.

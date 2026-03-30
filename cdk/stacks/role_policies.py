@@ -1258,3 +1258,44 @@ def og_image() -> list[iam.PolicyStatement]:
         ),
     ]
 
+
+# ── R19 Phase 6 CDK adoption: 4 unmanaged Lambdas ──
+
+def food_delivery_ingestion() -> list[iam.PolicyStatement]:
+    """Food delivery: DDB write, S3 read from uploads/food_delivery/."""
+    return [
+        iam.PolicyStatement(sid="DynamoDB", actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query"], resources=[TABLE_ARN]),
+        iam.PolicyStatement(sid="KMS", actions=["kms:Decrypt", "kms:GenerateDataKey"], resources=[KMS_KEY_ARN]),
+        iam.PolicyStatement(sid="S3Read", actions=["s3:GetObject"], resources=[f"{BUCKET_ARN}/uploads/food_delivery/*"]),
+        iam.PolicyStatement(sid="DLQ", actions=["sqs:SendMessage"], resources=[DLQ_ARN]),
+    ]
+
+
+def measurements_ingestion() -> list[iam.PolicyStatement]:
+    """Measurements: DDB write, S3 read from imports/measurements/."""
+    return [
+        iam.PolicyStatement(sid="DynamoDB", actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query"], resources=[TABLE_ARN]),
+        iam.PolicyStatement(sid="KMS", actions=["kms:Decrypt", "kms:GenerateDataKey"], resources=[KMS_KEY_ARN]),
+        iam.PolicyStatement(sid="S3Read", actions=["s3:GetObject"], resources=[f"{BUCKET_ARN}/imports/measurements/*"]),
+    ]
+
+
+def pipeline_health_check() -> list[iam.PolicyStatement]:
+    """Pipeline health check: invoke Lambdas, read secrets, write DDB health_check."""
+    return [
+        iam.PolicyStatement(sid="DynamoDB", actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query"], resources=[TABLE_ARN]),
+        iam.PolicyStatement(sid="KMS", actions=["kms:Decrypt", "kms:GenerateDataKey"], resources=[KMS_KEY_ARN]),
+        iam.PolicyStatement(sid="LambdaInvoke", actions=["lambda:InvokeFunction"], resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:*"]),
+        iam.PolicyStatement(sid="SecretsRead", actions=["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"], resources=[f"arn:aws:secretsmanager:{REGION}:{ACCT}:secret:life-platform/*"]),
+    ]
+
+
+def subscriber_onboarding() -> list[iam.PolicyStatement]:
+    """Subscriber onboarding: DDB read, SES send, Secrets Manager read."""
+    return [
+        iam.PolicyStatement(sid="DynamoDB", actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:UpdateItem"], resources=[TABLE_ARN]),
+        iam.PolicyStatement(sid="KMS", actions=["kms:Decrypt", "kms:GenerateDataKey"], resources=[KMS_KEY_ARN]),
+        iam.PolicyStatement(sid="SES", actions=["ses:SendEmail", "ses:SendRawEmail"], resources=["*"]),
+        iam.PolicyStatement(sid="SecretsRead", actions=["secretsmanager:GetSecretValue"], resources=[f"arn:aws:secretsmanager:{REGION}:{ACCT}:secret:life-platform/ai-keys*"]),
+    ]
+
