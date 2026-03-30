@@ -6,10 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Deep documentation lives in `docs/`. Start here when context is needed:
 - `docs/ONBOARDING.md` — mental model, key concepts
-- `docs/ARCHITECTURE.md` — full system design, 59 Lambdas, 7 CDK stacks, data flows
+- `docs/ARCHITECTURE.md` — full system design, 60 Lambdas, 8 CDK stacks, data flows
 - `docs/SCHEMA.md` — DynamoDB field reference (authoritative)
 - `docs/RUNBOOK.md` — daily operations, troubleshooting
-- `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-035), why things are the way they are
+- `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-044), why things are the way they are
 
 ## Commands
 
@@ -48,7 +48,7 @@ python3 mcp_bridge.py
 2. **Store**: Raw JSON in S3 (`raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json`), normalized metrics in DynamoDB single-table (`life-platform`, PK `USER#matthew#SOURCE#{source}`, SK `DATE#{YYYY-MM-DD}`).
 
 3. **Serve/Compute**:
-   - **MCP Lambda** — 116 tools across 25 domain modules (`mcp/tools_*.py`), accessed via Claude Desktop and claude.ai
+   - **MCP Lambda** — 118 tools across 26 domain modules (`mcp/tools_*.py`), accessed via Claude Desktop and claude.ai
    - **Compute Lambdas** (5) — run before 11 AM daily: `character-sheet`, `adaptive-mode`, `daily-metrics-compute`, `daily-insight-compute`, `hypothesis-engine`; store pre-computed results to DynamoDB
    - **Email Lambdas** (7) — daily brief at 11 AM reads pre-computed results
    - **OG Image Lambda** — generates 6 data-driven PNG share cards daily at 11:30 AM PT using Pillow
@@ -84,7 +84,7 @@ The tool registry in `mcp/registry.py` wires all tools. `tests/test_wiring_cover
 
 ## CDK Structure
 
-7 stacks in `cdk/stacks/`: `ingestion`, `core`, `email`, `compute`, `mcp`, `operational`, `web`. Entry point: `cdk/app.py`. Each stack creates its own IAM roles (least-privilege, one role per Lambda).
+8 stacks in `cdk/stacks/`: `ingestion`, `core`, `email`, `compute`, `mcp`, `operational`, `web`, `monitoring`. Entry point: `cdk/app.py`. Each stack creates its own IAM roles (least-privilege, one role per Lambda).
 
 ## CI/CD
 
