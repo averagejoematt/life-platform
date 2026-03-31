@@ -143,7 +143,7 @@
     }
     .g-gauge__unit {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       color: var(--text-faint);
       letter-spacing: 0.08em;
     }
@@ -151,7 +151,7 @@
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-muted);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
     }
 
@@ -202,7 +202,7 @@
     .g-pullquote__badge {
       font-family: var(--font-mono);
       font-size: 10px;
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       color: var(--g-teal);
       background: var(--g-teal-dim);
@@ -213,7 +213,7 @@
       font-family: var(--font-mono);
       font-size: 11px;
       color: var(--text-faint);
-      letter-spacing: 0.06em;
+      letter-spacing:var(--ls-subtle);
     }
 
     /* ═══════════════════════════════════════════════════════
@@ -322,7 +322,7 @@
       font-family: var(--font-mono);
       font-size: 11px;
       color: var(--text-muted);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       margin-bottom: var(--space-3);
     }
@@ -354,7 +354,7 @@
     .g-meal-chip {
       font-family: var(--font-mono);
       font-size: 10px;
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       padding: 6px 14px;
       border: 1px solid var(--border);
@@ -452,7 +452,7 @@
       border: 1px solid var(--border);
       color: var(--text-faint);
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       letter-spacing: 0.08em;
       padding: 4px 8px;
       cursor: pointer;
@@ -469,7 +469,7 @@
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-faint);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       text-align: right;
       cursor: pointer;
@@ -564,7 +564,7 @@
       justify-content: space-between;
       padding: var(--space-2) var(--space-3) 0;
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       color: var(--text-faint);
       letter-spacing: 0.08em;
     }
@@ -583,7 +583,7 @@
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--g-teal);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       margin-bottom: var(--space-2);
     }
@@ -629,7 +629,7 @@
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--g-teal);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       margin-bottom: var(--space-3);
     }
@@ -653,7 +653,7 @@
       align-items: center;
       justify-content: center;
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       color: var(--text-faint);
       letter-spacing: 0.08em;
     }
@@ -808,7 +808,7 @@
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--g-teal);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       margin-bottom: var(--space-2);
     }
@@ -996,12 +996,12 @@
   <div class="g-hero-grid">
     <div>
       <div class="g-hero__eyebrow">Glucose Observatory</div>
-      <h1 class="g-hero__title">The number that <em>quieted the anxiety.</em></h1>
+      <h1 class="g-hero__title">The number that <em>changed what I eat.</em></h1>
       <p class="g-hero__sub">
-        At 302 pounds, I assumed my blood sugar was a disaster. I wore a CGM
-        expecting to confirm every fear. Instead, I found out I wasn't in the
-        danger zone I'd imagined — and that data changed my relationship with
-        the anxiety more than any reassurance ever could.
+        When continuous glucose monitors became available to non-diabetics at an
+        affordable price, I wanted to understand how my body actually responds to
+        specific foods. Not from a nutrition label &mdash; from my own bloodstream, in
+        real time. Every meal becomes a data point. Every spike tells a story.
       </p>
       <p class="g-hero__meta">Data from Dexcom Stelo CGM. 30-day rolling window. 288 readings/day.</p>
     </div>
@@ -1091,23 +1091,23 @@
 <!-- ════════════════════════════════════════════════════════════
      9a/9j: PULL-QUOTE #1 — staggered left, serif, editorial
      ════════════════════════════════════════════════════════════ -->
-<div class="g-pullquote g-pullquote--left reveal">
+<div class="g-pullquote g-pullquote--left reveal" id="g-pullquote-1">
   <div class="g-pullquote__watermark">01</div>
-  <div class="g-pullquote__text">
-    Protein shakes are my body&rsquo;s A+ food &mdash;
-    <em>+6&thinsp;mg/dL</em> glucose spike vs pizza at <em>+55&thinsp;mg/dL</em>.
+  <div class="g-pullquote__text" id="g-pq1-text">
+    The first CGM finding will appear here once enough meal &times; glucose data
+    is collected to identify <em>your body&rsquo;s best and worst foods</em>.
   </div>
   <div class="g-pullquote__attr">
-    <span class="g-pullquote__badge">N=1 &middot; CGM-confirmed</span>
-    <span class="g-pullquote__source">Dexcom Stelo continuous glucose data</span>
+    <span class="g-pullquote__badge">Pending data</span>
+    <span class="g-pullquote__source">Dexcom Stelo &times; MacroFactor cross-reference</span>
   </div>
 </div>
 
 <!-- 9k: narrative context sentence -->
 <p class="g-narrative-context reveal">
-  The CGM revealed something unexpected: the meals I feared weren&rsquo;t the problem.
-  The spikes came from foods I thought were safe, and the foods I&rsquo;d been avoiding
-  barely moved the needle.
+  Every meal logged in MacroFactor is cross-referenced against CGM glucose readings.
+  Over time, patterns emerge &mdash; which foods spike, which don&rsquo;t, and what
+  context (sleep, stress, timing) changes the curve.
 </p>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -1181,15 +1181,15 @@
 <!-- ════════════════════════════════════════════════════════════
      9j: DYNAMIC PULL-QUOTE #2 — staggered right, editorial
      ════════════════════════════════════════════════════════════ -->
-<div class="g-pullquote g-pullquote--right reveal">
+<div class="g-pullquote g-pullquote--right reveal" id="g-pullquote-2">
   <div class="g-pullquote__watermark">02</div>
-  <div class="g-pullquote__text">
-    A <em>10-minute walk</em> after eating consistently drops post-meal peak
-    by <em>15&ndash;25&thinsp;mg/dL</em> &mdash; muscle contraction drives glucose uptake independent of insulin.
+  <div class="g-pullquote__text" id="g-pq2-text">
+    The second finding &mdash; testing whether <em>post-meal walks</em> measurably
+    reduce glucose spikes &mdash; will appear once the experiment has enough paired data points.
   </div>
   <div class="g-pullquote__attr">
-    <span class="g-pullquote__badge">N=1 &middot; Reproducible</span>
-    <span class="g-pullquote__source">CGM &times; step data cross-reference</span>
+    <span class="g-pullquote__badge">Pending data</span>
+    <span class="g-pullquote__source">CGM &times; Garmin step data cross-reference</span>
   </div>
 </div>
 
@@ -1300,8 +1300,8 @@
       <div class="g-crossdomain-card__tag">Sleep &times; Glucose</div>
       <div class="g-crossdomain-card__title">Same meal, different sleep</div>
       <div class="g-crossdomain-card__desc">
-        Identical meals produce higher spikes after poor sleep. Cortisol from sleep
-        deprivation impairs insulin sensitivity the following day.
+        Hypothesis: identical meals produce higher spikes after poor sleep. Cortisol from sleep
+        deprivation may impair insulin sensitivity the following day. Testing with paired data.
       </div>
       <div class="g-crossdomain-card__placeholder">Comparison chart &mdash; populates with data</div>
     </div>
@@ -1309,8 +1309,8 @@
       <div class="g-crossdomain-card__tag">Movement &times; Glucose</div>
       <div class="g-crossdomain-card__title">With vs without post-meal walk</div>
       <div class="g-crossdomain-card__desc">
-        A 10-minute walk after eating consistently lowers the post-meal peak by 15&ndash;25 mg/dL.
-        Muscle contraction creates insulin-independent glucose uptake.
+        Hypothesis: a 10-minute walk after eating lowers the post-meal glucose peak.
+        Research suggests muscle contraction creates insulin-independent glucose uptake. Testing with paired data.
       </div>
       <div class="g-crossdomain-card__placeholder">Walk vs no-walk overlay &mdash; populates with data</div>
     </div>
@@ -1318,8 +1318,8 @@
       <div class="g-crossdomain-card__tag">Stress &times; Glucose</div>
       <div class="g-crossdomain-card__title">Glucose and stress level</div>
       <div class="g-crossdomain-card__desc">
-        High-stress days show elevated fasting glucose and wider variability,
-        even with identical food intake. The cortisol-glucose axis is real.
+        Hypothesis: high-stress days elevate fasting glucose and widen variability,
+        even with identical food intake. Testing the cortisol-glucose axis with paired data.
       </div>
       <div class="g-crossdomain-card__placeholder">Stress correlation &mdash; populates with data</div>
     </div>
@@ -1373,14 +1373,14 @@
 <!-- ════════════════════════════════════════════════════════════
      9j: PULL-QUOTE #4 — dynamic, staggered right
      ════════════════════════════════════════════════════════════ -->
-<div class="g-pullquote g-pullquote--right reveal">
+<div class="g-pullquote g-pullquote--right reveal" id="g-pullquote-4">
   <div class="g-pullquote__watermark">04</div>
-  <div class="g-pullquote__text">
-    The same bowl of oatmeal spikes <em>+18 mg/dL</em> after good sleep
-    and <em>+34 mg/dL</em> after a bad night &mdash; context changes the curve.
+  <div class="g-pullquote__text" id="g-pq4-text">
+    Testing whether <em>sleep quality</em> changes how the same meal affects glucose &mdash;
+    this requires repeated meals across different sleep conditions.
   </div>
   <div class="g-pullquote__attr">
-    <span class="g-pullquote__badge">N=1 &middot; Repeated</span>
+    <span class="g-pullquote__badge">Pending data</span>
     <span class="g-pullquote__source">Whoop sleep quality &times; Dexcom Stelo meal response</span>
   </div>
 </div>
@@ -1399,27 +1399,27 @@
 </div>
 
 <section class="g-rules-section reveal">
-  <div class="g-section-header">N=1 Glucose Rules &mdash; 30+ Weeks of CGM Data</div>
+  <div class="g-section-header">Glucose Hypotheses Under Test</div>
   <div class="g-rule-grid">
     <div class="g-rule">
-      <div class="g-rule__num">Rule 01</div>
+      <div class="g-rule__num">H-01</div>
       <div class="g-rule__finding">Protein-first meal ordering blunts post-meal glucose spikes</div>
-      <div class="g-rule__evidence">Protein + fat before carbs &rarr; <em>30&ndash;40% smaller spike</em> &rarr; <a href="/nutrition/">Nutrition</a></div>
+      <div class="g-rule__evidence">Research-backed &rarr; testing with paired CGM data &rarr; <a href="/nutrition/">Nutrition</a></div>
     </div>
     <div class="g-rule">
-      <div class="g-rule__num">Rule 02</div>
-      <div class="g-rule__finding">10-minute post-meal walk drops peak glucose by 15&ndash;25 mg/dL</div>
-      <div class="g-rule__evidence">Muscle contraction drives <em>insulin-independent glucose uptake</em></div>
+      <div class="g-rule__num">H-02</div>
+      <div class="g-rule__finding">Post-meal walking reduces peak glucose</div>
+      <div class="g-rule__evidence">Muscle contraction drives <em>insulin-independent glucose uptake</em> &rarr; testing with step data</div>
     </div>
     <div class="g-rule">
-      <div class="g-rule__num">Rule 03</div>
-      <div class="g-rule__finding">Fiber above 30g/day correlates with lower glucose variability</div>
-      <div class="g-rule__evidence">SD <em>14 vs 22</em> mg/dL on high vs low fiber days &rarr; <a href="/explorer/">Data Explorer</a></div>
+      <div class="g-rule__num">H-03</div>
+      <div class="g-rule__finding">Higher fiber intake correlates with lower glucose variability</div>
+      <div class="g-rule__evidence">Testing with MacroFactor fiber logs &times; CGM variability &rarr; <a href="/explorer/">Data Explorer</a></div>
     </div>
     <div class="g-rule">
-      <div class="g-rule__num">Rule 04</div>
-      <div class="g-rule__finding">Poor sleep elevates next-morning fasting glucose via cortisol</div>
-      <div class="g-rule__evidence"><em>r=0.52</em> &bull; fasting glucose &times; prior night sleep quality &rarr; <a href="/sleep/">Sleep</a></div>
+      <div class="g-rule__num">H-04</div>
+      <div class="g-rule__finding">Poor sleep elevates next-morning fasting glucose</div>
+      <div class="g-rule__evidence">Cortisol pathway &rarr; testing with Whoop sleep quality &times; morning CGM &rarr; <a href="/sleep/">Sleep</a></div>
     </div>
   </div>
 </section>
@@ -1718,7 +1718,12 @@
     var data = await resp.json();
     var g = data.glucose;
     var trend = data.glucose_trend || [];
-    if (!g) { loading.textContent = 'No CGM data yet.'; return; }
+    if (!g) {
+      loading.textContent = 'CGM data will appear here once Dexcom Stelo readings are imported.';
+      content.style.display = 'block';  // Show meal table even without CGM
+      renderMeals();
+      return;
+    }
 
     /* ── Hero gauges ── */
     var tir = g.time_in_range_pct || 0;

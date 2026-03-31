@@ -83,18 +83,34 @@
       line-height: var(--lh-body);
       margin-top: var(--space-2);
     }
+    .matthew-badges {
+      display: flex;
+      gap: var(--space-3);
+    }
     .matthew-badge {
       background: var(--c-green-050);
       border: 1px solid var(--c-green-100);
       padding: var(--space-3) var(--space-5);
       text-align: center;
       white-space: nowrap;
+      flex: 1;
+      min-width: 100px;
+    }
+    .matthew-badge--baseline {
+      background: var(--surface);
+      border-color: var(--border);
+    }
+    .matthew-badge--baseline .matthew-badge__value {
+      color: var(--text-muted);
     }
     .matthew-badge__label {
       font-size: var(--text-2xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       color: var(--accent-dim);
+    }
+    .matthew-badge--baseline .matthew-badge__label {
+      color: var(--text-faint);
     }
     .matthew-badge__value {
       font-family: var(--font-display);
@@ -291,6 +307,10 @@
     @media (max-width: 768px) {
       .calc-layout { grid-template-columns: 1fr; }
       .tool-section__header { grid-template-columns: 1fr; }
+      .matthew-badges {
+        flex-direction: column;
+        gap: var(--space-2);
+      }
       .matthew-badge {
         display: flex;
         flex-direction: row;
@@ -321,7 +341,7 @@
   <h1 class="page-header__title">Tools anyone can <span>use today</span></h1>
   <p class="page-header__sub">
     Six interactive calculators based on the same protocols Matthew uses. Enter your numbers, get personalized results.
-    Matthew&rsquo;s live data is shown alongside for comparison.
+    Matthew&rsquo;s Day 1 starting point and current values are shown alongside for comparison.
   </p>
 </header>
 
@@ -335,9 +355,15 @@
         <div class="tool-section__title">Zone 2 Heart Rate Calculator</div>
         <div class="tool-section__sub">Find your personal Zone 2 training range — the cardiac efficiency zone that drives fat adaptation and aerobic base.</div>
       </div>
-      <div class="matthew-badge">
-        <div class="matthew-badge__label">Matthew&rsquo;s RHR</div>
-        <div class="matthew-badge__value" id="z2-matthew">— bpm</div>
+      <div class="matthew-badges">
+        <div class="matthew-badge matthew-badge--baseline">
+          <div class="matthew-badge__label">Day 1 RHR</div>
+          <div class="matthew-badge__value" id="z2-baseline">—</div>
+        </div>
+        <div class="matthew-badge">
+          <div class="matthew-badge__label">Current RHR</div>
+          <div class="matthew-badge__value" id="z2-current">—</div>
+        </div>
       </div>
     </div>
 
@@ -374,7 +400,7 @@
       <div class="calc-results" id="z2-results">
         <div class="result-placeholder">Enter your age and resting HR to calculate your Zone 2 range.</div>
       </div>
-      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);">Formula: Karvonen method (ACSM Guidelines, 11th ed.)</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-3xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);">Formula: Karvonen method (ACSM Guidelines, 11th ed.)</div>
     </div>
   </div>
 
@@ -386,9 +412,15 @@
         <div class="tool-section__title">HRV Baseline Interpreter</div>
         <div class="tool-section__sub">Enter your HRV and get training readiness guidance based on population norms and recovery science.</div>
       </div>
-      <div class="matthew-badge">
-        <div class="matthew-badge__label">Matthew&rsquo;s HRV</div>
-        <div class="matthew-badge__value" id="hrv-matthew">— ms</div>
+      <div class="matthew-badges">
+        <div class="matthew-badge matthew-badge--baseline">
+          <div class="matthew-badge__label">Day 1 HRV</div>
+          <div class="matthew-badge__value" id="hrv-baseline">—</div>
+        </div>
+        <div class="matthew-badge">
+          <div class="matthew-badge__label">Current HRV</div>
+          <div class="matthew-badge__value" id="hrv-current">—</div>
+        </div>
       </div>
     </div>
 
@@ -426,7 +458,7 @@
       <div class="calc-results" id="hrv-results">
         <div class="result-placeholder">Enter your age and HRV to get your readiness interpretation.</div>
       </div>
-      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);">Norms: HRV4Training population data, Whoop research</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-3xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);">Norms: HRV4Training population data, Whoop research</div>
     </div>
   </div>
 
@@ -438,9 +470,15 @@
         <div class="tool-section__title">Protein Timing Calculator</div>
         <div class="tool-section__sub">Calculate your total protein target and optimal distribution across meals for maximum muscle protein synthesis.</div>
       </div>
-      <div class="matthew-badge">
-        <div class="matthew-badge__label">Matthew&rsquo;s target</div>
-        <div class="matthew-badge__value">~190g/day</div>
+      <div class="matthew-badges">
+        <div class="matthew-badge matthew-badge--baseline">
+          <div class="matthew-badge__label">Day 1 target</div>
+          <div class="matthew-badge__value">~190g</div>
+        </div>
+        <div class="matthew-badge">
+          <div class="matthew-badge__label">Current target</div>
+          <div class="matthew-badge__value">~190g</div>
+        </div>
       </div>
     </div>
 
@@ -479,7 +517,7 @@
       <div class="calc-results" id="prot-results">
         <div class="result-placeholder">Enter your weight and training frequency to get a protein distribution plan.</div>
       </div>
-      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);">Target: leucine threshold MPS research (Morton et al., 2018)</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-3xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);">Target: leucine threshold MPS research (Morton et al., 2018)</div>
     </div>
   </div>
 
@@ -491,9 +529,15 @@
         <div class="tool-section__title">Sleep Efficiency Scorer</div>
         <div class="tool-section__sub">Calculate how efficiently you're sleeping. Time in bed vs. time actually asleep &mdash; the metric sleep researchers care about most.</div>
       </div>
-      <div class="matthew-badge">
-        <div class="matthew-badge__label">Matthew&rsquo;s efficiency</div>
-        <div class="matthew-badge__value" id="sleep-matthew">&mdash;</div>
+      <div class="matthew-badges">
+        <div class="matthew-badge matthew-badge--baseline">
+          <div class="matthew-badge__label">Day 1 sleep</div>
+          <div class="matthew-badge__value" id="sleep-baseline">—</div>
+        </div>
+        <div class="matthew-badge">
+          <div class="matthew-badge__label">Current sleep</div>
+          <div class="matthew-badge__value" id="sleep-current">—</div>
+        </div>
       </div>
     </div>
     <div class="calc-layout">
@@ -540,9 +584,15 @@
         <div class="tool-section__title">Deficit Sustainability Calculator</div>
         <div class="tool-section__sub">Are you cutting too aggressively? Calculate your deficit percentage and get a timeline for sustainable fat loss without muscle wasting.</div>
       </div>
-      <div class="matthew-badge">
-        <div class="matthew-badge__label">Matthew&rsquo;s deficit</div>
-        <div class="matthew-badge__value">~15%</div>
+      <div class="matthew-badges">
+        <div class="matthew-badge matthew-badge--baseline">
+          <div class="matthew-badge__label">Day 1 weight</div>
+          <div class="matthew-badge__value" id="def-baseline">—</div>
+        </div>
+        <div class="matthew-badge">
+          <div class="matthew-badge__label">Current weight</div>
+          <div class="matthew-badge__value" id="def-current">—</div>
+        </div>
       </div>
     </div>
     <div class="calc-layout">
@@ -591,9 +641,15 @@
         <div class="tool-section__title">VO2max Estimator</div>
         <div class="tool-section__sub">Estimate your VO2max from a 1-mile walk test (Rockport method). No lab required. Compare against age-group percentiles.</div>
       </div>
-      <div class="matthew-badge">
-        <div class="matthew-badge__label">Matthew&rsquo;s VO2max</div>
-        <div class="matthew-badge__value">~42 (estimated from Garmin)</div>
+      <div class="matthew-badges">
+        <div class="matthew-badge matthew-badge--baseline">
+          <div class="matthew-badge__label">Day 1 VO2max</div>
+          <div class="matthew-badge__value">~42</div>
+        </div>
+        <div class="matthew-badge">
+          <div class="matthew-badge__label">Current VO2max</div>
+          <div class="matthew-badge__value">~42</div>
+        </div>
       </div>
     </div>
     <div class="calc-layout">
@@ -642,7 +698,7 @@
       <div class="calc-results" id="vo2-results">
         <div class="result-placeholder">Walk 1 mile briskly, record your time and ending heart rate.</div>
       </div>
-      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);">Estimated VO2max from walk/run tests has ±10-15% error. Lab testing (metabolic cart) is the gold standard.</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-3xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3);">Estimated VO2max from walk/run tests has ±10-15% error. Lab testing (metabolic cart) is the gold standard.</div>
     </div>
   </div>
 
@@ -734,19 +790,31 @@
 <script>
 const API = 'https://averagejoematt.com';
 
-// Load Matthew's live values for context
+// Load Matthew's baseline + current values for comparison badges
 async function loadMatthewValues() {
   try {
-    const res = await fetch(`${API}/api/vitals`);
+    const res = await fetch(`${API}/api/tools_baseline`);
     const d = await res.json();
-    const v = d.vitals;
-    if (v.rhr_bpm) {
-      // Show Matthew's RHR as context; Z2 range requires age (not stored in public API)
-      document.getElementById('z2-matthew').textContent = `RHR ${Math.round(v.rhr_bpm)} bpm`;
-    }
-    if (v.hrv_ms) {
-      document.getElementById('hrv-matthew').textContent = `${Math.round(v.hrv_ms)} ms`;
-    }
+    const b = d.baseline || {};
+    const c = d.current || {};
+
+    // Tool 1: RHR
+    if (b.rhr_bpm) document.getElementById('z2-baseline').textContent = `${Math.round(b.rhr_bpm)} bpm`;
+    if (c.rhr_bpm) document.getElementById('z2-current').textContent = `${Math.round(c.rhr_bpm)} bpm`;
+
+    // Tool 2: HRV
+    if (b.hrv_ms) document.getElementById('hrv-baseline').textContent = `${Math.round(b.hrv_ms)} ms`;
+    if (c.hrv_ms) document.getElementById('hrv-current').textContent = `${Math.round(c.hrv_ms)} ms`;
+
+    // Tool 4: Sleep (quality score or hours)
+    if (b.sleep_score) document.getElementById('sleep-baseline').textContent = `${Math.round(b.sleep_score)}%`;
+    else if (b.sleep_hours) document.getElementById('sleep-baseline').textContent = `${b.sleep_hours}h`;
+    if (c.sleep_score) document.getElementById('sleep-current').textContent = `${Math.round(c.sleep_score)}%`;
+    else if (c.sleep_hours) document.getElementById('sleep-current').textContent = `${c.sleep_hours}h`;
+
+    // Tool 5: Weight (deficit tool)
+    if (b.weight_lbs) document.getElementById('def-baseline').textContent = `${Math.round(b.weight_lbs)} lbs`;
+    if (c.weight_lbs) document.getElementById('def-current').textContent = `${Math.round(c.weight_lbs)} lbs`;
   } catch(e) {}
 }
 loadMatthewValues();

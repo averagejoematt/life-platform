@@ -106,7 +106,7 @@
       dominant-baseline: central;
     }
     .progress-ring__sub {
-      font-size: 9px;
+      font-size:var(--text-3xs);
       fill: var(--text-muted);
       text-anchor: middle;
       letter-spacing: 2px;
@@ -733,6 +733,7 @@
       dateHtml +
       progressHtml +
       '<div class="badge__status">' + statusText + '</div>' +
+      (window._ledgerIds && window._ledgerIds[badge.id] ? '<div style="font-size:11px;color:var(--text-muted);margin-top:var(--space-2);font-family:var(--font-mono);letter-spacing:0.04em"><a href="/ledger/" style="color:var(--accent);text-decoration:none">&rarr; The Ledger</a></div>' : '') +
     '</div>';
   }
 
@@ -896,6 +897,14 @@
     btn.classList.add('view-toggle__btn--active');
     renderBadges();
   });
+
+  // Load ledger source IDs for stake indicators
+  window._ledgerIds = {};
+  fetch('/api/ledger').then(function(r) { return r.ok ? r.json() : {}; }).then(function(ld) {
+    var all = (ld.by_event || {}).earned || [];
+    all = all.concat((ld.by_event || {}).reluctant || []);
+    all.forEach(function(e) { if (e.source_id) window._ledgerIds[e.source_id] = true; });
+  }).catch(function() {});
 
   // Fetch from API
   fetch('/api/achievements')

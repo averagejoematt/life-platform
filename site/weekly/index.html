@@ -58,7 +58,7 @@
     .heat-day.amber { background: var(--c-yellow-status); opacity: 0.8; }
     .heat-day.red { background: var(--c-red-status); opacity: 0.7; }
     .heat-day.gray { background: var(--surface-raised); }
-    .heat-day__label { position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--text-faint); font-family: var(--font-mono); letter-spacing: 0.05em; }
+    .heat-day__label { position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%); font-size:var(--text-3xs); color: var(--text-faint); font-family: var(--font-mono); letter-spacing: 0.05em; }
 
     /* Sections */
     .snap-section { border: 1px solid var(--border); background: var(--surface); margin-bottom: var(--space-6); }
@@ -134,7 +134,7 @@
   <!-- 7-day heatmap strip -->
   <div class="heat-strip" id="heat-strip" style="display:none"></div>
 
-  <div id="heat-legend" style="max-width:var(--max-width);margin:0 auto;padding:0 var(--page-padding) var(--space-4);display:flex;gap:var(--space-4);font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);">
+  <div id="heat-legend" style="max-width:var(--max-width);margin:0 auto;padding:0 var(--page-padding) var(--space-4);display:flex;gap:var(--space-4);font-family:var(--font-mono);font-size:var(--text-3xs);color:var(--text-faint);letter-spacing:var(--ls-tag);">
     <span><span style="display:inline-block;width:10px;height:10px;background:var(--accent);vertical-align:middle;margin-right:3px;"></span> All core habits</span>
     <span><span style="display:inline-block;width:10px;height:10px;background:var(--c-yellow-status);vertical-align:middle;margin-right:3px;"></span> Partial</span>
     <span><span style="display:inline-block;width:10px;height:10px;background:var(--c-red-status);vertical-align:middle;margin-right:3px;"></span> Missed / poor recovery</span>

@@ -414,7 +414,7 @@
     .tl-event__status-badge {
       display: inline-block;
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       padding: 2px 8px;
@@ -535,7 +535,7 @@
     }
     .annotation-flow__step-label {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       color: var(--text-faint);
@@ -710,54 +710,21 @@
   <div class="timeline-empty">Loading timeline&hellip;</div>
 </div>
 
-<!-- ── Active Hypotheses (15j) ────────────────────────────── -->
+<!-- ── Active Hypotheses (15j) — API-driven from /api/discoveries ── -->
 <div class="hypotheses-section reveal" id="hypotheses-section">
   <h2 class="hypotheses-section__title">What I'm Currently Testing</h2>
-  <p class="hypotheses-section__sub">Active hypotheses pulled from the hypothesis engine and running experiments.</p>
+  <p class="hypotheses-section__sub">Active experiments pulled from the experiment library. Each has defined metrics, protocols, and success criteria.</p>
   <div id="hypotheses-list">
-    <!-- Pre-seeded Day 1 hypotheses (15d) -->
-    <div class="hypothesis-card">
-      <div class="hypothesis-card__status">Active Hypothesis</div>
-      <div class="hypothesis-card__title">Sleep consistency matters more than sleep duration</div>
-      <div class="hypothesis-card__body">Testing whether a consistent bedtime/wake time (&plusmn;30 min) produces better HRV and recovery scores than simply logging more hours of variable-schedule sleep.</div>
-      <div class="hypothesis-card__meta">Started: Day 1 &middot; Source: Baseline literature review &middot; Metric: HRV, Recovery Score</div>
-    </div>
-    <div class="hypothesis-card">
-      <div class="hypothesis-card__status">Active Hypothesis</div>
-      <div class="hypothesis-card__title">Morning sunlight exposure improves evening sleep onset</div>
-      <div class="hypothesis-card__body">Hypothesis: 10+ minutes of outdoor light within 60 minutes of waking will reduce sleep onset latency by measurable amount within 2 weeks.</div>
-      <div class="hypothesis-card__meta">Started: Day 1 &middot; Source: Huberman protocol &middot; Metric: Sleep onset latency</div>
-    </div>
-    <div class="hypothesis-card">
-      <div class="hypothesis-card__status">Active Hypothesis</div>
-      <div class="hypothesis-card__title">Protein timing affects next-day recovery</div>
-      <div class="hypothesis-card__body">Testing whether consuming 30g+ protein within 2 hours of training produces measurably better next-day Whoop recovery vs. training days with delayed protein intake.</div>
-      <div class="hypothesis-card__meta">Started: Day 1 &middot; Source: Training protocol &middot; Metric: Whoop Recovery Score</div>
-    </div>
+    <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);padding:var(--space-6) 0;">Loading active experiments&hellip;</div>
   </div>
 </div>
 
-<!-- ── Inner Life Discoveries (15h) ──────────────────────── -->
+<!-- ── Inner Life Discoveries (15h) — API-driven from /api/discoveries ── -->
 <div class="inner-life-section reveal" id="inner-life-section">
   <h2 class="inner-life-section__title">Inner Life Discoveries</h2>
-  <p class="inner-life-section__sub">Journal breakthroughs, cognitive pattern shifts, and connection milestones. The inner life is the center.</p>
+  <p class="inner-life-section__sub">AI-surfaced observations from weekly chronicles, coaching insights, and nutrition patterns. Auto-generated from platform data.</p>
   <div id="inner-life-list">
-    <!-- Pre-seeded Day 1 content (15d) -->
-    <div class="inner-life-card">
-      <div class="inner-life-card__category">Journal Breakthrough</div>
-      <div class="inner-life-card__title">First journal entry: Why am I doing this?</div>
-      <div class="inner-life-card__body">Day 1 reflection on motivation. Not weight, not aesthetics &mdash; the question is whether I can build a system that makes invisible patterns visible. The hypothesis: self-knowledge is the prerequisite for change.</div>
-    </div>
-    <div class="inner-life-card">
-      <div class="inner-life-card__category">Cognitive Pattern</div>
-      <div class="inner-life-card__title">Baseline cognitive patterns established</div>
-      <div class="inner-life-card__body">Initial journal analysis identified recurring thought patterns around energy, motivation, and self-talk. These become the baseline for tracking cognitive shifts over time.</div>
-    </div>
-    <div class="inner-life-card">
-      <div class="inner-life-card__category">Connection Milestone</div>
-      <div class="inner-life-card__title">First public commitment made</div>
-      <div class="inner-life-card__body">Publishing the platform itself is the commitment device. Building in public creates accountability that private tracking never could. Day 1 of being observed.</div>
-    </div>
+    <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);padding:var(--space-6) 0;">Loading discoveries&hellip;</div>
   </div>
 </div>
 
@@ -1094,6 +1061,133 @@ async function loadTimeline() {
 }
 
 loadTimeline();
+
+// ── Discoveries API: active hypotheses + inner life + AI findings ──
+async function loadDiscoveries() {
+  try {
+    // ── Fetch experiments and discoveries in parallel ──
+    const [expRes, discRes] = await Promise.all([
+      fetch(API + '/api/experiments').catch(() => null),
+      fetch(API + '/api/discoveries').catch(() => null),
+    ]);
+
+    const expData = expRes && expRes.ok ? await expRes.json() : null;
+    const discData = discRes && discRes.ok ? await discRes.json() : null;
+
+    const hypList = document.getElementById('hypotheses-list');
+
+    // ── Experiments API is source of truth for "currently testing" ──
+    const activeExps = (expData && expData.experiments)
+      ? expData.experiments.filter(function(e) { return e.status === 'active'; })
+      : [];
+    const discHyps = (discData && discData.active_hypotheses) || [];
+
+    // Use experiments if available, fall back to discoveries API
+    const hyps = activeExps.length > 0
+      ? activeExps.map(function(e) {
+          var daysIn = e.start_date ? Math.max(1, Math.floor((Date.now() - new Date(e.start_date + 'T12:00:00Z').getTime()) / 86400000)) : null;
+          return {
+            name: e.name || e.title || 'Active Experiment',
+            hypothesis: e.hypothesis || e.description || '',
+            pillar: e.domain || e.category || '—',
+            metrics: e.metrics || [],
+            duration_days: e.duration_days || null,
+            evidence_tier: e.evidence_tier || 'emerging',
+            why: e.why || '',
+            days_in: daysIn,
+            _link: true,
+          };
+        })
+      : discHyps;
+
+    if (hyps.length === 0) {
+      hypList.innerHTML = '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);padding:var(--space-6) 0;">No active experiments yet. Check back soon.</div>';
+    } else {
+      hypList.innerHTML = hyps.map(function(h) {
+        var tierClass = h.evidence_tier === 'strong' ? 'accent' : (h.evidence_tier === 'moderate' ? 'c-amber-400' : 'text-faint');
+        var metrics = (h.metrics || []).join(' · ') || 'TBD';
+        var duration = h.duration_days ? h.duration_days + ' days' : 'ongoing';
+        var body = h.hypothesis || h.description || '';
+
+        // Evidence for/against
+        var evidenceHtml = '';
+        var eFor = h.evidence_for || [];
+        var eAgainst = h.evidence_against || [];
+        if (eFor.length || eAgainst.length) {
+          evidenceHtml += '<div style="margin-top:var(--space-4);padding-top:var(--space-3);border-top:1px dashed var(--border);font-size:var(--text-xs)">';
+          if (eFor.length) {
+            evidenceHtml += '<div style="margin-bottom:var(--space-3)"><div style="font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent);margin-bottom:var(--space-2)">Evidence for</div>';
+            eFor.forEach(function(e) {
+              var link = e.url ? '<a href="' + esc(e.url) + '" target="_blank" rel="noopener" style="color:var(--text-muted);text-decoration:none;border-bottom:1px solid var(--border)">' + esc(e.title) + '</a>' : esc(e.title);
+              evidenceHtml += '<div style="margin-bottom:var(--space-2)"><span style="color:var(--accent);font-size:var(--text-3xs)">●</span> ' + link + (e.summary ? '<div style="color:var(--text-faint);margin-top:2px;padding-left:14px">' + esc(e.summary) + '</div>' : '') + '</div>';
+            });
+            evidenceHtml += '</div>';
+          }
+          if (eAgainst.length) {
+            evidenceHtml += '<div style="margin-bottom:var(--space-3)"><div style="font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--c-amber-400);margin-bottom:var(--space-2)">Evidence against</div>';
+            eAgainst.forEach(function(e) {
+              var link = e.url ? '<a href="' + esc(e.url) + '" target="_blank" rel="noopener" style="color:var(--text-muted);text-decoration:none;border-bottom:1px solid var(--border)">' + esc(e.title) + '</a>' : esc(e.title);
+              evidenceHtml += '<div style="margin-bottom:var(--space-2)"><span style="color:var(--c-amber-400);font-size:var(--text-3xs)">○</span> ' + link + (e.summary ? '<div style="color:var(--text-faint);margin-top:2px;padding-left:14px">' + esc(e.summary) + '</div>' : '') + '</div>';
+            });
+            evidenceHtml += '</div>';
+          }
+          evidenceHtml += '</div>';
+        }
+
+        // Rationale
+        var rationaleHtml = h.rationale ? '<div style="margin-top:var(--space-3);padding:var(--space-3) var(--space-4);background:var(--accent-bg-subtle);border-left:2px solid var(--accent);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body)"><span style="color:var(--accent);font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:var(--ls-tag);text-transform:uppercase">Why I\'m testing anyway: </span>' + esc(h.rationale) + '</div>' : '';
+
+        return '<div class="hypothesis-card">' +
+          '<div class="hypothesis-card__status" style="color:var(--' + tierClass + ')">Active Experiment · ' + (h.evidence_tier || 'emerging') + ' evidence</div>' +
+          '<div class="hypothesis-card__title">' + esc(h.name) + '</div>' +
+          '<div class="hypothesis-card__body">' + esc(body) + '</div>' +
+          (h.why ? '<div style="margin-top:var(--space-2);font-size:var(--text-xs);color:var(--text-faint);font-style:italic">' + esc(h.why) + '</div>' : '') +
+          evidenceHtml +
+          rationaleHtml +
+          '<div class="hypothesis-card__meta">Pillar: ' + esc(h.pillar) + ' · Tracking: ' + esc(metrics) + ' · Duration: ' + duration + (h.days_in ? ' · Day ' + h.days_in + ' in' : '') + '</div>' +
+          (h._link ? '<div style="margin-top:var(--space-3);"><a href="/experiments/" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-tag);">Full experiment details →</a></div>' : '') +
+        '</div>';
+      }).join('');
+    }
+
+    // ── Render inner life discoveries ──
+    var inner = (discData && discData.inner_life) ? discData.inner_life : [];
+    // Also merge in AI findings
+    var findings = (discData && discData.ai_findings ? discData.ai_findings : []).map(function(f) {
+      return {
+        date: f.week,
+        category: 'AI Finding',
+        title: f.title,
+        body: f.body,
+      };
+    });
+    var allInner = inner.concat(findings);
+
+    var ilList = document.getElementById('inner-life-list');
+    if (allInner.length === 0) {
+      ilList.innerHTML = '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);padding:var(--space-6) 0;">The AI needs more data before discoveries surface. Observations will appear here as the platform analyzes weekly patterns from chronicles, coaching, and nutrition reviews.</div>';
+    } else {
+      ilList.innerHTML = allInner.map(function(il) {
+        var dateStr = il.date ? ' · ' + il.date : '';
+        return '<div class="inner-life-card">' +
+          '<div class="inner-life-card__category">' + esc(il.category) + dateStr + '</div>' +
+          '<div class="inner-life-card__title">' + esc(il.title) + '</div>' +
+          (il.body ? '<div class="inner-life-card__body">' + esc(il.body) + '</div>' : '') +
+        '</div>';
+      }).join('');
+    }
+  } catch(e) {
+    // Graceful fallback
+    document.getElementById('hypotheses-list').innerHTML =
+      '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);padding:var(--space-6) 0;">Experiment data unavailable. Check back soon.</div>';
+    document.getElementById('inner-life-list').innerHTML =
+      '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);padding:var(--space-6) 0;">Discovery data unavailable. Check back soon.</div>';
+  }
+}
+
+function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+loadDiscoveries();
 </script>
 <nav class="reading-path-v2">
   <a href="/experiments/" class="reading-path-v2__link">

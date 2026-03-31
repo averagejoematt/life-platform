@@ -21,6 +21,10 @@ from stacks.lambda_helpers import create_platform_lambda
 from stacks import role_policies as rp
 from stacks.constants import SHARED_LAYER_ARN, ACCT, REGION, TABLE_NAME, S3_BUCKET  # CONF-01
 
+# ── 5x daily ingestion schedule: 6am, 10am, 2pm, 6pm, 10pm PT (fixed UTC) ──
+# Cost: ~$0.01/month total. Ensures status page goes green within ~4 hours of any fix.
+INGEST_5X = "2,6,14,18,22"       # hours UTC = 6a/10a/2p/6p/10p PST
+
 INGESTION_DLQ_ARN    = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
 LIFE_PLATFORM_TABLE  = TABLE_NAME
 LIFE_PLATFORM_BUCKET = S3_BUCKET
@@ -37,12 +41,12 @@ class IngestionStack(Stack):
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
         shared = dict(table=local_table, bucket=local_bucket, dlq=local_dlq, alerts_topic=local_alerts_topic)
 
-        # ── 1. Whoop — daily ingestion + recovery refresh (two schedules)
+        # ── 1. Whoop — 5x daily ingestion + recovery refresh
         whoop = create_platform_lambda(self, "WhoopIngestion",
             function_name="whoop-data-ingestion",
             source_file="lambdas/whoop_lambda.py",
             handler="whoop_lambda.lambda_handler",
-            schedule="cron(0 14 * * ? *)",  # 6:00 AM PT daily
+            schedule=f"cron(0 {INGEST_5X} * * ? *)",
             timeout_seconds=300, alarm_name="ingestion-error-whoop",
             shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_whoop(), **shared)
@@ -57,58 +61,58 @@ class IngestionStack(Stack):
             description="Whoop recovery refresh — 9:30 AM PT")
         whoop_recovery.add_target(targets.LambdaFunction(whoop))
 
-        # ── 2. Garmin — 6:00 AM PT daily
+        # ── 2. Garmin — 5x daily
         garmin = create_platform_lambda(self, "GarminIngestion",
             function_name="garmin-data-ingestion",
             source_file="lambdas/garmin_lambda.py",
             handler="garmin_lambda.lambda_handler",
-            schedule="cron(0 14 * * ? *)",
+            schedule=f"cron(0 {INGEST_5X} * * ? *)",
             timeout_seconds=300, memory_mb=512, shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_garmin(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
         # garmin.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
-        # ── 3. Notion — 6:00 AM PT daily
+        # ── 3. Notion — 5x daily
         create_platform_lambda(self, "NotionIngestion",
             function_name="notion-journal-ingestion",
             source_file="lambdas/notion_lambda.py",
             handler="notion_lambda.lambda_handler",
-            schedule="cron(0 14 * * ? *)",
+            schedule=f"cron(0 {INGEST_5X} * * ? *)",
             timeout_seconds=120,
             environment={"NOTION_SECRET_NAME": "life-platform/ingestion-keys"},
             shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_notion(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 
-        # ── 4. Withings — 6:15 AM PT daily
+        # ── 4. Withings — 5x daily (:05 stagger)
         withings = create_platform_lambda(self, "WithingsIngestion",
             function_name="withings-data-ingestion",
             source_file="lambdas/withings_lambda.py",
             handler="withings_lambda.lambda_handler",
-            schedule="cron(15 14 * * ? *)",
+            schedule=f"cron(5 {INGEST_5X} * * ? *)",
             timeout_seconds=120, alarm_name="ingestion-error-withings",
             shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_withings(), **shared)
         # withings.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
-        # ── 5. Habitify — 6:15 AM PT daily
+        # ── 5. Habitify — 5x daily (:05 stagger)
         create_platform_lambda(self, "HabitifyIngestion",
             function_name="habitify-data-ingestion",
             source_file="lambdas/habitify_lambda.py",
             handler="habitify_lambda.lambda_handler",
-            schedule="cron(15 14 * * ? *)",
+            schedule=f"cron(5 {INGEST_5X} * * ? *)",
             timeout_seconds=180,
             environment={"HABITIFY_SECRET_NAME": "life-platform/habitify"},
             shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_habitify(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 
-        # ── 6. Strava — 6:30 AM PT daily
+        # ── 6. Strava — 5x daily (:10 stagger)
         strava = create_platform_lambda(self, "StravaIngestion",
             function_name="strava-data-ingestion",
             source_file="lambdas/strava_lambda.py",
             handler="strava_lambda.lambda_handler",
-            schedule="cron(30 14 * * ? *)",
+            schedule=f"cron(10 {INGEST_5X} * * ? *)",
             timeout_seconds=300, alarm_name="ingestion-error-strava",
             shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_strava(), **shared)
@@ -126,23 +130,23 @@ class IngestionStack(Stack):
             custom_policies=rp.ingestion_journal_enrichment(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 
-        # ── 8. Todoist — 6:45 AM PT daily
+        # ── 8. Todoist — 5x daily (:15 stagger)
         create_platform_lambda(self, "TodoistIngestion",
             function_name="todoist-data-ingestion",
             source_file="lambdas/todoist_lambda.py",
             handler="todoist_lambda.lambda_handler",
-            schedule="cron(45 14 * * ? *)",
+            schedule=f"cron(15 {INGEST_5X} * * ? *)",
             timeout_seconds=120, alarm_name="ingestion-error-todoist",
             environment={"SECRET_NAME": "life-platform/ingestion-keys"},
             shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_todoist(), **shared)
 
-        # ── 9. Eight Sleep — 7:00 AM PT daily
+        # ── 9. Eight Sleep — 5x daily (:15 stagger)
         eightsleep = create_platform_lambda(self, "EightsleepIngestion",
             function_name="eightsleep-data-ingestion",
             source_file="lambdas/eightsleep_lambda.py",
             handler="eightsleep_lambda.lambda_handler",
-            schedule="cron(0 15 * * ? *)",
+            schedule=f"cron(15 {INGEST_5X} * * ? *)",
             timeout_seconds=120, alarm_name="ingestion-error-eightsleep",
             shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_eightsleep(), **shared)
@@ -172,12 +176,12 @@ class IngestionStack(Stack):
             source_arn=f"arn:aws:s3:::{S3_BUCKET}",  # SEC-01: IAM level is bucket-scoped; prefix filtering enforced via S3 event notification filter on uploads/macrofactor/ prefix
             source_account=self.account)
 
-        # ── 12. Weather — 5:45 AM PT daily
+        # ── 12. Weather — 5x daily
         create_platform_lambda(self, "WeatherIngestion",
             function_name="weather-data-ingestion",
             source_file="lambdas/weather_handler.py",
             handler="weather_handler.lambda_handler",
-            schedule="cron(45 13 * * ? *)",
+            schedule=f"cron(0 {INGEST_5X} * * ? *)",
             timeout_seconds=60,
             shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_weather(),

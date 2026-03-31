@@ -4,16 +4,16 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="The Platform — a single-person health intelligence system built entirely on AWS serverless. 50 Lambda functions, 95 AI tools, 25 data sources, ~$13/month.">
+  <meta name="description" content="The Platform — a single-person health intelligence system built entirely on AWS serverless. 61 Lambda functions, 118 AI tools, 26 data sources, ~$19/month.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="The Platform — Matthew">
-  <meta name="twitter:description" content="50 Lambda functions. 95 AI tools. 25 data sources. $13/month. A single-person health intelligence system on AWS serverless.">
+  <meta name="twitter:description" content="61 Lambda functions. 118 AI tools. 26 data sources. $19/month. A single-person health intelligence system on AWS serverless.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:title" content="The Platform — Matthew">
-  <meta property="og:description" content="50 Lambda functions. 95 AI tools. 25 data sources. $13/month. A single-person health intelligence system on AWS serverless.">
+  <meta property="og:description" content="61 Lambda functions. 118 AI tools. 26 data sources. $19/month. A single-person health intelligence system on AWS serverless.">
   <meta property="og:type" content="website">
   <title>The Platform — Matthew</title>
     <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
@@ -51,7 +51,7 @@
     }
     .meta-stat__label { font-size: var(--text-2xs); letter-spacing: var(--ls-tag); text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-1); }
     .meta-stat__value { font-family: var(--font-display); font-size: 36px; color: var(--accent); line-height: 1; }
-    .meta-stat__unit { font-size: 13px; color: var(--text-muted); }
+    .meta-stat__unit { font-size: var(--text-sm); color: var(--text-muted); }
 
     /* Architecture diagram */
     .arch-section {
@@ -233,7 +233,7 @@
     .hub-card__icon { font-size: 20px; margin-bottom: var(--space-2); }
     .hub-card__title {
       font-family: var(--font-display);
-      font-size: 15px;
+      font-size: var(--text-base);
       color: var(--text);
       letter-spacing: var(--ls-display);
       margin-bottom: var(--space-1);
@@ -315,19 +315,19 @@
   <div class="page-header__meta">
     <div class="meta-stat">
       <div class="meta-stat__label">MCP tools</div>
-      <div class="meta-stat__value" id="plat-mcp-tools" data-const="platform.mcp_tools">95</div>
+      <div class="meta-stat__value" id="plat-mcp-tools" data-const="platform.mcp_tools">118</div>
     </div>
     <div class="meta-stat">
       <div class="meta-stat__label">Data sources</div>
-      <div class="meta-stat__value" id="plat-data-sources" data-const="platform.data_sources">19</div>
+      <div class="meta-stat__value" id="plat-data-sources" data-const="platform.data_sources">26</div>
     </div>
     <div class="meta-stat">
       <div class="meta-stat__label">AWS Lambdas</div>
-      <div class="meta-stat__value" id="plat-lambdas" data-const="platform.lambdas">50</div>
+      <div class="meta-stat__value" id="plat-lambdas" data-const="platform.lambdas">61</div>
     </div>
     <div class="meta-stat">
       <div class="meta-stat__label">Arch grade</div>
-      <div class="meta-stat__value" data-const="platform.review_grade">A-</div>
+      <div class="meta-stat__value" data-const="platform.review_grade">A</div>
     </div>
   </div>
 </div>
@@ -335,7 +335,7 @@
 <!-- 26b: Tweetable stats -->
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border-bottom:1px solid var(--border);">
   <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
-    <div style="font-family:var(--font-display);font-size:42px;color:var(--accent);line-height:1;">$13</div>
+    <div style="font-family:var(--font-display);font-size:42px;color:var(--accent);line-height:1;" data-const="platform.monthly_cost">$19</div>
     <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-top:var(--space-2)">Per month to operate</div>
   </div>
   <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
@@ -343,7 +343,7 @@
     <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-top:var(--space-2)">Engineers on team</div>
   </div>
   <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
-    <div style="font-family:var(--font-display);font-size:42px;color:var(--text);line-height:1;" data-const="platform.data_sources">19</div>
+    <div style="font-family:var(--font-display);font-size:42px;color:var(--text);line-height:1;" data-const="platform.data_sources">26</div>
     <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-top:var(--space-2)">Data sources integrated</div>
   </div>
 </div>
@@ -359,9 +359,9 @@
 <section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);overflow-x:auto;">
   <div class="eyebrow">Architecture</div>
   <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">The system — every component</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">25 data sources → 13 ingest Lambdas → S3 + DynamoDB → 5 compute Lambdas → 4 output channels. All on AWS. Costs ~$13/month. Built by a non-engineer using AI assistance.</p>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">26 data sources → 13 ingest Lambdas → S3 + DynamoDB → 5 compute Lambdas → 4 output channels. All on AWS. Costs ~$19/month. Built by one person using AI as a development partner.</p>
   <div style="border:1px solid var(--border);background:var(--surface);padding:var(--space-6);overflow-x:auto;">
-    <svg viewBox="0 0 1060 340" style="width:100%;min-width:900px;display:block;font-family:JetBrains Mono,monospace;" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 1060 340" style="width:100%;min-width:900px;display:block;font-family:'Space Mono','Courier New',monospace;" xmlns="http://www.w3.org/2000/svg">
 
       <!-- ── Zone headers ── -->
       <!-- Sources -->
@@ -472,7 +472,7 @@
       <!-- MCP server -->
       <rect x="648" y="119" width="155" height="64" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(109,186,109,0.4)" stroke-width="1"/>
       <text x="725" y="135" text-anchor="middle" fill="#6dba6d" font-size="9" letter-spacing="0.5">MCP Lambda</text>
-      <text x="725" y="149" text-anchor="middle" fill="#7a9080" font-size="8">95 tools · 31 modules</text>
+      <text x="725" y="149" text-anchor="middle" fill="#7a9080" font-size="8">118 tools · 35 modules</text>
       <text x="725" y="163" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">Claude Desktop + claude.ai</text>
       <text x="725" y="174" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">OAuth 2.1 · natural language</text>
       <!-- Email lambdas -->
@@ -492,7 +492,7 @@
       <rect x="848" y="30" width="155" height="48" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
       <text x="925" y="47" text-anchor="middle" fill="var(--accent)" font-size="9" letter-spacing="0.5">Daily Brief Email</text>
       <text x="925" y="61" text-anchor="middle" fill="#7a9080" font-size="8">11 AM · personal coaching</text>
-      <text x="925" y="70" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">25 sources → 1 insight</text>
+      <text x="925" y="70" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">26 sources → 1 insight</text>
       <!-- Public website -->
       <rect x="848" y="87" width="155" height="48" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(0,229,160,0.25)" stroke-width="1"/>
       <text x="925" y="104" text-anchor="middle" fill="var(--accent)" font-size="9" letter-spacing="0.5">averagejoematt.com</text>
@@ -501,7 +501,7 @@
       <!-- Claude MCP -->
       <rect x="848" y="144" width="155" height="48" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(109,186,109,0.4)" stroke-width="1"/>
       <text x="925" y="161" text-anchor="middle" fill="#6dba6d" font-size="9" letter-spacing="0.5">Claude Desktop / AI</text>
-      <text x="925" y="175" text-anchor="middle" fill="#7a9080" font-size="8">MCP protocol · 95 tools</text>
+      <text x="925" y="175" text-anchor="middle" fill="#7a9080" font-size="8">MCP protocol · 118 tools</text>
       <text x="925" y="186" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">natural language queries</text>
       <!-- Public API + subscribe -->
       <rect x="848" y="201" width="155" height="48" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(0,229,160,0.15)" stroke-width="1"/>
@@ -511,7 +511,7 @@
 
       <!-- ── Cost annotation ── -->
       <rect x="848" y="262" width="155" height="38" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(240,165,0,0.25)" stroke-width="1"/>
-      <text x="925" y="277" text-anchor="middle" fill="#c8843a" font-size="10" letter-spacing="0.5">~$13 / month</text>
+      <text x="925" y="277" text-anchor="middle" fill="#c8843a" font-size="10" letter-spacing="0.5">~$19 / month</text>
       <text x="925" y="293" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">DynamoDB + Lambda + S3 + CF</text>
 
       <!-- ── Schedule annotation ── -->
@@ -543,13 +543,13 @@
 <section class="arch-section reveal">
   <div class="eyebrow">System design</div>
   <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Five-layer architecture</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body)">All data converges to a single DynamoDB table (no GSIs, PK+SK only). Compute Lambdas pre-calculate intelligence results before the email delivery window. The MCP server exposes 95 tools to Claude over OAuth 2.1 — queries stay in natural language, not SQL.</p>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body)">All data converges to a single DynamoDB table (no GSIs, PK+SK only). Compute Lambdas pre-calculate intelligence results before the email delivery window. The MCP server exposes 118 tools to Claude over OAuth 2.1 — queries stay in natural language, not SQL.</p>
 
   <div class="arch-layers">
     <div class="arch-layer">
       <div class="arch-layer__label">
         <div class="arch-layer__name">INGEST</div>
-        <div class="arch-layer__sub">25 sources → DynamoDB</div>
+        <div class="arch-layer__sub">26 sources → DynamoDB</div>
       </div>
       <div class="arch-layer__content">
         <div class="arch-chips">
@@ -614,7 +614,7 @@
     <div class="arch-layer">
       <div class="arch-layer__label">
         <div class="arch-layer__name">SERVE</div>
-        <div class="arch-layer__sub">95 MCP tools → Claude</div>
+        <div class="arch-layer__sub">118 MCP tools → Claude</div>
       </div>
       <div class="arch-layer__content">
         <div class="arch-chips">
@@ -654,7 +654,7 @@
 <section class="ai-section reveal">
   <div>
     <div class="eyebrow">Intelligence layer</div>
-    <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-4)">95 tools across 31 domain modules</h2>
+    <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-4)">118 tools across 35 domain modules</h2>
     <div class="ai-section__body">
       <p>The MCP server is a Lambda-backed tool registry exposing direct read access to every metric in DynamoDB. Claude calls tools in natural language; the server handles query composition, DynamoDB projection expressions, and result formatting.</p>
       <p><strong>Domain modules</strong> cover sleep, training, nutrition, CGM, labs, journal, correlation, character, board, lifestyle, and strength — each with dedicated tools purpose-built for their data shapes.</p>
@@ -674,7 +674,7 @@
 <section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
   <div class="eyebrow">Tool spotlight</div>
   <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Tool of the week</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">One of 95 MCP tools that Claude uses to query health data. Inputs, outputs, and a representative finding.</p>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">One of <span data-const="platform.mcp_tools">118</span> MCP tools that Claude uses to query health data. Inputs, outputs, and a representative finding.</p>
   <div style="border:1px solid var(--border);background:var(--surface);">
     <div style="padding:var(--space-4) var(--space-6);border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;">
       <span style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--accent)">get_sleep_environment_analysis</span>
@@ -699,14 +699,14 @@
   <div class="stack-grid">
     <div class="stack-card">
       <div class="stack-card__category">Infrastructure</div>
-      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">AWS Lambda + CDK</div><div class="stack-item__desc"><span data-const="platform.lambdas">50</span> functions across <span data-const="platform.cdk_stacks">8</span> CDK stacks. All IAM roles dedicated and least-privilege. EventBridge scheduling on fixed UTC crons (no DST drift).</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">AWS Lambda + CDK</div><div class="stack-item__desc"><span data-const="platform.lambdas">61</span> functions across <span data-const="platform.cdk_stacks">8</span> CDK stacks. All IAM roles dedicated and least-privilege. EventBridge scheduling on fixed UTC crons (no DST drift).</div></div></div>
       <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">DynamoDB + S3</div><div class="stack-item__desc">Single-table design. On-demand billing. PITR 35-day. KMS CMK encryption. Raw JSON archived to S3 at <code>raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json</code>.</div></div></div>
       <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">SES + SNS + SQS</div><div class="stack-item__desc">Email delivery via SES, alert routing through SNS, dead-letter queues for failed Lambda invocations.</div></div></div>
     </div>
     <div class="stack-card">
       <div class="stack-card__category">AI / Intelligence</div>
       <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Claude (Anthropic)</div><div class="stack-item__desc">Sonnet for coaching and analysis, Haiku for classification. ~$3/month API cost. MCP protocol for tool calls.</div></div></div>
-      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">MCP Server (custom)</div><div class="stack-item__desc">95-tool Lambda backed by DynamoDB. OAuth 2.1 + HMAC auth. 31-module package. 26h TTL cache with nightly warmer across 13 high-cost tools.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">MCP Server (custom)</div><div class="stack-item__desc"><span data-const="platform.mcp_tools">118</span>-tool Lambda backed by DynamoDB. OAuth 2.1 + HMAC auth. 35-module package. 26h TTL cache with nightly warmer across 13 high-cost tools.</div></div></div>
       <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Hypothesis Engine</div><div class="stack-item__desc">Weekly Pearson correlation matrix (23 pairs, BH FDR correction) feeds Claude for biological hypothesis generation.</div></div></div>
     </div>
     <div class="stack-card">
@@ -768,11 +768,11 @@
 <section class="arch-section reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
   <div class="eyebrow">FinOps</div>
   <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">What it costs to run</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)"><span data-const="platform.lambdas">50</span> Lambda functions, DynamoDB on-demand, S3, CloudFront, SES, 7 AI-generated digests per week, and a public site with live data. All serverless — no EC2, no containers, no reserved capacity.</p>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)"><span data-const="platform.lambdas">61</span> Lambda functions, DynamoDB on-demand, S3, CloudFront, SES, 7 AI-generated digests per week, and a public site with live data. All serverless — no EC2, no containers, no reserved capacity.</p>
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
     <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
       <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">Total monthly</div>
-      <div style="font-family:var(--font-display);font-size:42px;color:var(--accent);line-height:1;">$13</div>
+      <div style="font-family:var(--font-display);font-size:42px;color:var(--accent);line-height:1;" data-const="platform.monthly_cost">$19</div>
       <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2)">/month</div>
     </div>
     <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
@@ -797,8 +797,8 @@
 <!-- Architecture reviews -->
 <section class="reviews-section reveal">
   <div class="eyebrow">Architecture reviews</div>
-  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Reviewed <span data-const="platform.review_count">18</span> times by a 14-member AI board</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-4)">Every major change triggers a structured architecture review. 14 expert AI personas — cloud architect, security lead, statistician, product architect, adversarial reviewer — vote, score, and issue findings against a fixed rubric.</p>
+  <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Reviewed <span data-const="platform.review_count">19</span> times by a <span data-const="platform.board_technical">12</span>-member AI board</h2>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-4)">Every major change triggers a structured architecture review. <span data-const="platform.board_technical">12</span> expert AI personas — cloud architect, security lead, statistician, product architect, adversarial reviewer — vote, score, and issue findings against a fixed rubric.</p>
   <p style="margin-bottom:var(--space-8)"><a href="/platform/reviews/" class="btn btn--ghost" style="font-size:var(--text-xs)">Read the latest review (R18: B+) →</a></p>
   <div class="review-grid">
     <div class="review-card">
@@ -806,6 +806,18 @@
       <div class="review-card__date">Mar 28, 2026</div>
       <div class="review-card__grade">B+</div>
       <div class="review-card__note">v4.3.0 sprint review. CDK drift + doc mismatch flagged. 9 findings, all remediated same session.</div>
+    </div>
+    <div class="review-card">
+      <div class="review-card__num">R19</div>
+      <div class="review-card__date">Mar 30, 2026</div>
+      <div class="review-card__grade">A</div>
+      <div class="review-card__note">Full 6-phase remediation. 100% CDK adoption, 100% alarm coverage, PITR drill passed, /api/healthz, OPERATOR_GUIDE.md.</div>
+    </div>
+    <div class="review-card">
+      <div class="review-card__num">R18</div>
+      <div class="review-card__date">Mar 28, 2026</div>
+      <div class="review-card__grade">B+</div>
+      <div class="review-card__note">Observatory upgrade, usability study. Doc staleness and alarm gaps flagged.</div>
     </div>
     <div class="review-card">
       <div class="review-card__num">R17</div>
@@ -842,32 +854,32 @@
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);max-width:800px;margin:0 auto;">
     <a href="/intelligence/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
       <div style="font-size:24px;margin-bottom:var(--space-2)">🤖</div>
-      <div style="font-family:var(--font-display);font-size:15px;color:var(--text);margin-bottom:var(--space-1)">The AI</div>
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">The AI</div>
       <div style="font-size:var(--text-2xs);color:var(--text-faint)">14 systems running daily</div>
     </a>
     <a href="/cost/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
-      <div style="font-family:var(--font-display);font-size:36px;color:var(--accent);line-height:1;margin-bottom:var(--space-2)">$13</div>
-      <div style="font-family:var(--font-display);font-size:15px;color:var(--text);margin-bottom:var(--space-1)">The Cost</div>
+      <div style="font-family:var(--font-display);font-size:36px;color:var(--accent);line-height:1;margin-bottom:var(--space-2)" data-const="platform.monthly_cost">$19</div>
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">The Cost</div>
       <div style="font-size:var(--text-2xs);color:var(--text-faint)">Every line item, explained</div>
     </a>
     <a href="/board/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
       <div style="font-size:24px;margin-bottom:var(--space-2)">🎯</div>
-      <div style="font-family:var(--font-display);font-size:15px;color:var(--text);margin-bottom:var(--space-1)">Ask the Board</div>
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Ask the Board</div>
       <div style="font-size:var(--text-2xs);color:var(--text-faint)">6 AI advisors, one question</div>
     </a>
     <a href="/methodology/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
       <div style="font-size:24px;margin-bottom:var(--space-2)">📏</div>
-      <div style="font-family:var(--font-display);font-size:15px;color:var(--text);margin-bottom:var(--space-1)">Methodology</div>
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Methodology</div>
       <div style="font-size:var(--text-2xs);color:var(--text-faint)">N=1 science, FDR correction</div>
     </a>
     <a href="/tools/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
       <div style="font-size:24px;margin-bottom:var(--space-2)">🔧</div>
-      <div style="font-family:var(--font-display);font-size:15px;color:var(--text);margin-bottom:var(--space-1)">Free Tools</div>
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Free Tools</div>
       <div style="font-size:var(--text-2xs);color:var(--text-faint)">Zone 2, HRV, protein calculators</div>
     </a>
     <a href="/ask/" style="background:var(--surface);padding:var(--space-6);text-decoration:none;text-align:center;transition:background var(--dur-fast);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='var(--surface)'">
       <div style="font-size:24px;margin-bottom:var(--space-2)">💬</div>
-      <div style="font-family:var(--font-display);font-size:15px;color:var(--text);margin-bottom:var(--space-1)">Ask the Data</div>
+      <div style="font-family:var(--font-display);font-size:var(--text-base);color:var(--text);margin-bottom:var(--space-1)">Ask the Data</div>
       <div style="font-size:var(--text-2xs);color:var(--text-faint)">Natural language queries</div>
     </a>
   </div>

@@ -208,6 +208,7 @@
   --text-sm:       12px;
   --text-xs:       11px;
   --text-2xs:      10px;
+  --text-3xs:      9px;
 
   /* DB-07: Two-mode body typography */
   --text-body-signal: 15px;
@@ -225,6 +226,8 @@
   --ls-display:    0.02em;
   --ls-heading:    0.01em;
   --ls-label:      0.12em;
+  --ls-wide:       0.1em;
+  --ls-subtle:     0.06em;
   --ls-tag:        0.2em;
 }
 

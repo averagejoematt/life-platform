@@ -163,7 +163,7 @@
 .rx-ring__bg { fill: none; stroke: var(--surface-raised); stroke-width: 3.5; }
 .rx-ring__fill { fill: none; stroke-width: 3.5; stroke-linecap: round; }
 .rx-ring__label {
-  font-family: var(--font-mono); font-size: 9px;
+  font-family: var(--font-mono); font-size:var(--text-3xs);
   text-anchor: middle; dominant-baseline: central;
 }
 .rx-card__info { flex: 1; min-width: 0; }
@@ -184,7 +184,7 @@
   padding: 0 var(--space-5) var(--space-3);
 }
 .rx-badge {
-  font-size: 9px; font-family: var(--font-mono);
+  font-size:var(--text-3xs); font-family: var(--font-mono);
   letter-spacing: 0.04em; padding: 2px 6px;
   border: 1px solid var(--border); color: var(--text-faint);
   display: inline-flex; align-items: center; gap: 3px;
@@ -198,7 +198,7 @@
 
 /* Tier badges */
 .rx-tier {
-  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em;
+  font-family: var(--font-mono); font-size:var(--text-3xs); letter-spacing: 0.08em;
   text-transform: uppercase; padding: 2px 6px; display: inline-block;
   margin-bottom: 4px;
 }
@@ -210,7 +210,7 @@
 .rx-card--paused { opacity: 0.55; border-left-color: var(--border) !important; }
 .rx-card--paused:hover { opacity: 0.75; }
 .rx-badge--paused {
-  font-size: 9px; font-family: var(--font-mono); letter-spacing: 0.06em;
+  font-size:var(--text-3xs); font-family: var(--font-mono); letter-spacing:var(--ls-subtle);
   padding: 2px 6px; border: 1px solid var(--c-amber-400);
   color: var(--c-amber-400); background: rgba(200,132,58,0.06);
   text-transform: uppercase;
@@ -339,6 +339,48 @@
 .rx-honest__name { font-size: var(--text-sm); color: var(--text); min-width: 120px; }
 .rx-honest__reason { font-size: var(--text-xs); color: var(--text-faint); line-height: 1.5; }
 
+/* ═══════ DISCONTINUED ═══════ */
+.rx-discontinued {
+  margin-top: var(--space-10);
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--border);
+}
+.rx-discontinued__title {
+  font-family: var(--font-display); font-size: 24px; color: var(--text);
+  margin-bottom: var(--space-2);
+}
+.rx-discontinued__title em { color: var(--text-faint); font-style: normal; }
+.rx-discontinued__sub {
+  font-size: var(--text-xs); color: var(--text-faint);
+  font-family: var(--font-mono); letter-spacing: var(--ls-label);
+  margin-bottom: var(--space-6); line-height: var(--lh-body);
+  max-width: 640px;
+}
+.rx-disc-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--text-faint);
+  padding: var(--space-5); margin-bottom: var(--space-3);
+  opacity: 0.8;
+}
+.rx-disc-card__head {
+  display: flex; align-items: center; gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+.rx-disc-card__name {
+  font-family: var(--font-display); font-size: 18px; color: var(--text);
+}
+.rx-disc-card__status {
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  letter-spacing: var(--ls-tag); text-transform: uppercase;
+  color: var(--text-faint); background: var(--surface-raised);
+  border: 1px solid var(--border); padding: 1px 8px;
+}
+.rx-disc-card__reason {
+  font-size: var(--text-sm); color: var(--text-muted);
+  line-height: var(--lh-body); padding-left: var(--space-4);
+  border-left: 2px solid var(--border);
+}
+
 /* ── Skeleton ── */
 .skel { animation: pulse 1.5s ease-in-out infinite; }
 @keyframes pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
@@ -370,7 +412,7 @@
   <h1 class="rx-hero__title"><em>The</em> Pharmacy</h1>
   <p class="rx-hero__sub">Every supplement rated by evidence strength, justified by purpose, and tracked against real data. Some have 30 years of RCTs. Some are honest experiments. You'll see which is which.</p>
 
-  <p class="rx-hero__sub" style="margin-top:var(--space-4);font-style:italic;color:var(--text-muted);">I used to take nothing. Then I took everything a podcast recommended. Now I take what the data justifies — 21 supplements with evidence ratings from Strong to Emerging. Some have 30 years of RCTs behind them. Some are honest experiments with n=1 tracking. You'll see which is which, including the ones I'm questioning.</p>
+  <p class="rx-hero__sub" style="margin-top:var(--space-4);font-style:italic;color:var(--text-muted);">I tend to trust people I find credible &mdash; Rhonda Patrick, researchers whose work has been stress-tested &mdash; and use their frameworks as a starting point. Occasionally I&rsquo;m more experimental: lions mane, ashwaganda, something that enough credentialed people have made a compelling case for. The goal now is to be more methodical. Every supplement here is evidence-rated and tracked against what the data says it&rsquo;s supposed to do.</p>
 
   <div class="rx-integrity">
     <span class="rx-integrity__icon">🚫</span>
@@ -417,7 +459,7 @@
     <div style="border:1px solid var(--border);padding:var(--space-5);">
       <div style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--accent);margin-bottom:var(--space-2);">AM Stack</div>
       <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);margin-bottom:var(--space-3);">With breakfast</div>
-      <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:2;">Omega-3 · Vitamin D3 · Creatine · AG1 · Electrolytes</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:2;">Omega-3 · Vitamin D3 · Creatine · Electrolytes</div>
     </div>
     <div style="border:1px solid var(--border);padding:var(--space-5);">
       <div style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--accent);margin-bottom:var(--space-2);">Pre-Training</div>
@@ -481,6 +523,22 @@
     <div class="rx-honest__title">Supplements I'm <em>Questioning</em></div>
     <div class="rx-honest__sub">Transparency most supplement sites will never show you</div>
     <div id="rx-honest-list"></div>
+  </div>
+
+  <!-- Discontinued -->
+  <div class="rx-discontinued reveal">
+    <div class="rx-discontinued__title">Supplements I've <em>Stopped Taking</em></div>
+    <div class="rx-discontinued__sub">Not everything makes the cut. These left the stack — and here's why.</div>
+
+    <div class="rx-disc-card">
+      <div class="rx-disc-card__head">
+        <div class="rx-disc-card__name">AG1 (Athletic Greens)</div>
+        <span class="rx-disc-card__status">Discontinued</span>
+      </div>
+      <div class="rx-disc-card__reason">
+        I genuinely enjoyed the routine — the ritual of it felt like a positive start to the morning. But the evidence for greens powders at this price point is thin. Independent analyses show most claimed benefits come from ingredients you can get for a fraction of the cost. At ~$3/day, that's $90/month better allocated toward whole foods, targeted supplements with strong evidence, or lab work that actually changes decisions.
+      </div>
+    </div>
   </div>
 
   <!-- N=1 disclaimer -->
@@ -559,13 +617,21 @@ function buildCard(s) {
     return '<div class="rx-card__sci-point">'+esc(p)+'</div>';
   }).join('');
   if (s.sources && s.sources.length) {
+    var forSources = s.sources.filter(function(x){ return x.stance === 'supports'; });
+    var againstSources = s.sources.filter(function(x){ return x.stance === 'challenges'; });
     sciHTML += '<div style="margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--border);">';
-    sciHTML += '<div style="font-family:var(--font-mono);font-size:9px;letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-faint);margin-bottom:var(--space-2);">Sources</div>';
-    s.sources.forEach(function(src) {
-      var icon = src.stance === 'supports' ? '&#9679;' : '&#9675;';
-      var color = src.stance === 'supports' ? 'var(--accent)' : 'var(--text-faint)';
-      sciHTML += '<div style="margin-bottom:var(--space-1);"><span style="color:' + color + ';font-size:9px;">' + icon + '</span> <a href="' + esc(src.url) + '" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);text-decoration:none;border-bottom:1px solid var(--border);">' + esc(src.title) + '</a></div>';
-    });
+    if (forSources.length) {
+      sciHTML += '<div style="font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent);margin-bottom:var(--space-2);">Evidence for</div>';
+      forSources.forEach(function(src) {
+        sciHTML += '<div style="margin-bottom:var(--space-2);padding-left:12px;border-left:2px solid var(--accent);"><a href="' + esc(src.url) + '" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);text-decoration:none;border-bottom:1px solid var(--border);">' + esc(src.title) + '</a></div>';
+      });
+    }
+    if (againstSources.length) {
+      sciHTML += '<div style="font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:#ef4444;margin-top:var(--space-3);margin-bottom:var(--space-2);">Evidence against</div>';
+      againstSources.forEach(function(src) {
+        sciHTML += '<div style="margin-bottom:var(--space-2);padding-left:12px;border-left:2px solid #ef4444;"><a href="' + esc(src.url) + '" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);text-decoration:none;border-bottom:1px solid var(--border);">' + esc(src.title) + '</a></div>';
+      });
+    }
     sciHTML += '</div>';
   }
 
@@ -606,6 +672,7 @@ function buildCard(s) {
       '<div class="rx-card__section-label" aria-expanded="false" onclick="(function(b){var body=b.nextElementSibling;body.classList.toggle(\'collapsed\');b.setAttribute(\'aria-expanded\',body.classList.contains(\'collapsed\')?\'false\':\'true\')})(this)"><span class="arrow">▶</span> What the science says</div>' +
       '<div class="rx-card__section-body collapsed">'+sciHTML+'</div>' +
     '</div>' +
+    (s.rationale ? '<div style="padding:var(--space-3) var(--space-5);border-top:1px solid var(--border);background:var(--accent-bg-subtle);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body)"><span style="color:var(--accent);font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:var(--ls-tag);text-transform:uppercase">Why I favor it: </span>' + esc(s.rationale) + '</div>' : '') +
     experimentLink +
     '<div class="rx-card__watch">' +
       '<div class="rx-card__watch-item">' +

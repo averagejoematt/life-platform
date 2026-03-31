@@ -948,6 +948,31 @@
       "related_protocols": [
         "supplement-stack"
       ],
+      "evidence_for": [
+        {
+          "title": "Effect of Tongkat Ali on stress hormones and psychological mood state",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/23615780/",
+          "summary": "Reduced cortisol 16% and increased testosterone 37% in moderately stressed adults over 4 weeks."
+        },
+        {
+          "title": "Eurycoma longifolia for male sexual health",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/26365449/",
+          "summary": "Systematic review found consistent testosterone-boosting effects across 5 human trials."
+        }
+      ],
+      "evidence_against": [
+        {
+          "title": "Industry funding bias in herbal supplement research",
+          "url": null,
+          "summary": "Most Tongkat Ali studies are funded by supplement manufacturers. Independent replication is limited."
+        },
+        {
+          "title": "Small sample sizes in testosterone studies",
+          "url": null,
+          "summary": "Largest human trial had only 76 participants. Effect sizes may be inflated."
+        }
+      ],
+      "rationale": "Small but consistent human trial data on cortisol/testosterone, and recovery score is easily measurable — low risk, clear validation metric.",
       "status": "active",
       "votes": 0,
       "promoted_date": "2026-02-09",
@@ -983,6 +1008,36 @@
         "supplement-stack",
         "longevity"
       ],
+      "evidence_for": [
+        {
+          "title": "NMN increases NAD+ biosynthesis in humans",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/36482258/",
+          "summary": "First human trial confirming oral NMN raises blood NAD+ levels in a dose-dependent manner."
+        },
+        {
+          "title": "NAD+ precursors in aging biology",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/29514064/",
+          "summary": "NAD+ decline is a hallmark of aging; precursor supplementation reverses age-related metabolic dysfunction in animal models."
+        }
+      ],
+      "evidence_against": [
+        {
+          "title": "David Sinclair conflicts of interest",
+          "url": null,
+          "summary": "Leading NMN proponent holds patents and equity in NMN companies. Scientific objectivity questioned."
+        },
+        {
+          "title": "NMN vs NR: no clear superiority established",
+          "url": null,
+          "summary": "Head-to-head comparisons show similar NAD+ elevation. NMN's premium price may not be justified."
+        },
+        {
+          "title": "Long-term safety data absent",
+          "url": null,
+          "summary": "No human trials beyond 12 weeks. Theoretical cancer promotion risk from enhanced cellular energy."
+        }
+      ],
+      "rationale": "NAD+ decline with age is well-established biology. Testing with measurable outcomes (HRV, recovery) rather than relying on biomarker-only claims.",
       "status": "active",
       "votes": 0,
       "promoted_date": "2026-02-09",
@@ -1018,6 +1073,31 @@
         "supplement-stack",
         "training"
       ],
+      "evidence_for": [
+        {
+          "title": "ISSN Position Stand on Creatine",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/28615996/",
+          "summary": "Most extensively studied ergogenic aid in history. Consistent benefits for strength, power, and lean mass across hundreds of studies."
+        },
+        {
+          "title": "Creatine supplementation and cognitive function",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/29704637/",
+          "summary": "Emerging evidence for neuroprotective effects and cognitive benefits, particularly under stress or sleep deprivation."
+        }
+      ],
+      "evidence_against": [
+        {
+          "title": "Creatine and kidney function concerns",
+          "url": null,
+          "summary": "Case reports of kidney stress exist, though systematic reviews in healthy populations show no risk. Monitoring recommended for pre-existing conditions."
+        },
+        {
+          "title": "Water retention confounds body composition claims",
+          "url": null,
+          "summary": "Initial weight gain is primarily water, not muscle. DEXA can differentiate but scale weight is misleading."
+        }
+      ],
+      "rationale": "Most evidence-backed supplement in existence with 500+ studies. Counter-arguments are well-addressed in the literature — kidney concerns debunked for healthy individuals.",
       "status": "active",
       "votes": 0,
       "promoted_date": "2026-02-14",
@@ -1053,6 +1133,36 @@
         "supplement-stack",
         "metabolic-health"
       ],
+      "evidence_for": [
+        {
+          "title": "Berberine vs metformin for type 2 diabetes",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/18442638/",
+          "summary": "Comparable glucose-lowering effects to metformin in diabetic patients. HbA1c reduction of 0.9%."
+        },
+        {
+          "title": "Berberine activates AMPK pathway",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/22198837/",
+          "summary": "Mechanistic evidence for metabolic benefits through AMPK activation — same pathway as exercise and metformin."
+        }
+      ],
+      "evidence_against": [
+        {
+          "title": "GI side effects are common",
+          "url": null,
+          "summary": "Up to 35% of users report nausea, diarrhea, or cramping. GI tolerance is a significant adherence barrier."
+        },
+        {
+          "title": "Most positive studies are in diabetic/pre-diabetic populations",
+          "url": null,
+          "summary": "Benefits in metabolically healthy individuals are less clear. May be solving a problem that doesn't exist."
+        },
+        {
+          "title": "Drug interactions with CYP enzymes",
+          "url": null,
+          "summary": "Berberine inhibits CYP3A4 and CYP2D6. Can amplify effects of statins, SSRIs, and other medications."
+        }
+      ],
+      "rationale": "CGM data provides direct, daily validation. If glucose disposal doesn't improve measurably within 30 days, the experiment ends.",
       "status": "active",
       "votes": 0,
       "promoted_date": "2026-02-09",

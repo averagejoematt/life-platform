@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A record of what I fight for — and what I reluctantly fund.">
+  <meta property="og:title" content="The Ledger — Matthew">
+  <meta property="og:description" content="Every achievement earned donates to a cause I care about. Every failure funds one I don't.">
+  <meta property="og:type" content="website">
+  <title>The Ledger — Matthew</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    .ledger-header {
+      padding: var(--space-16) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    .ledger-header__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: var(--space-3);
+    }
+    .ledger-header__title {
+      font-family: var(--font-display);
+      font-size: clamp(32px, 5vw, 48px);
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.1;
+      margin: 0 0 var(--space-4);
+    }
+    .ledger-header__sub {
+      font-family: var(--font-serif);
+      font-size: clamp(15px, 2vw, 17px);
+      line-height: 1.65;
+      color: var(--text-muted);
+      max-width: 560px;
+    }
+
+    /* Summary strip */
+    .ledger-summary {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-4);
+      border-bottom: 1px solid var(--border);
+    }
+    .ledger-stat {
+      text-align: center;
+      padding: var(--space-4);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+    .ledger-stat__num {
+      font-family: var(--font-display);
+      font-size: 24px;
+      color: var(--text);
+    }
+    .ledger-stat__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-top: var(--space-1);
+    }
+
+    /* View toggle */
+    .ledger-toggle {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-6) var(--page-padding);
+      display: flex;
+      gap: var(--space-2);
+      border-bottom: 1px solid var(--border);
+    }
+    .ledger-toggle__btn {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: var(--space-2) var(--space-5);
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+    .ledger-toggle__btn:hover { border-color: var(--accent); color: var(--text); }
+    .ledger-toggle__btn.active {
+      background: rgba(62,207,142,0.08);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Event cards */
+    .ledger-events {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+    }
+    .ledger-events__section-title {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: var(--space-4);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .ledger-events__section-title::after {
+      content: '\2014\2014';
+      color: var(--text-faint);
+      opacity: 0.4;
+    }
+    .ledger-events__grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-6);
+      margin-bottom: var(--space-8);
+    }
+    .ledger-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: var(--space-5);
+    }
+    .ledger-card--earned { border-left: 3px solid #3ecf8e; }
+    .ledger-card--reluctant { border-left: 3px solid #ef4444; opacity: 0.8; }
+    .ledger-card__name {
+      font-family: var(--font-display);
+      font-size: 15px;
+      color: var(--text);
+      margin-bottom: var(--space-2);
+    }
+    .ledger-card__meta {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.06em;
+      margin-bottom: var(--space-2);
+    }
+    .ledger-card__amount {
+      font-family: var(--font-display);
+      font-size: 18px;
+      margin-top: var(--space-2);
+    }
+    .ledger-card__amount--earned { color: #3ecf8e; }
+    .ledger-card__amount--reluctant { color: #ef4444; }
+    .ledger-card__cause {
+      font-family: var(--font-serif);
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: var(--space-2);
+    }
+
+    /* Cause cards (by cause view) */
+    .ledger-cause {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: var(--space-6);
+      margin-bottom: var(--space-6);
+    }
+    .ledger-cause--earned { border-left: 3px solid #3ecf8e; }
+    .ledger-cause--reluctant { border-left: 3px solid #ef4444; }
+    .ledger-cause__name {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: var(--text);
+    }
+    .ledger-cause__desc {
+      font-family: var(--font-serif);
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-top: var(--space-2);
+      line-height: 1.5;
+    }
+    .ledger-cause__total {
+      font-family: var(--font-display);
+      font-size: 28px;
+      margin-top: var(--space-4);
+    }
+    .ledger-cause__joke {
+      font-family: var(--font-serif);
+      font-size: 13px;
+      color: var(--text-faint);
+      font-style: italic;
+      margin-top: var(--space-3);
+    }
+
+    .ledger-empty {
+      text-align: center;
+      padding: var(--space-16);
+      font-family: var(--font-serif);
+      font-size: 15px;
+      color: var(--text-faint);
+      line-height: 1.6;
+    }
+
+    .ledger-loading {
+      text-align: center;
+      padding: var(--space-20);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+    }
+
+    @media (max-width: 768px) {
+      .ledger-summary { grid-template-columns: repeat(2, 1fr); }
+      .ledger-events__grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+
+<div class="ledger-header">
+  <div class="ledger-header__eyebrow">The Ledger</div>
+  <h1 class="ledger-header__title">What I fight for.<br>What I reluctantly fund.</h1>
+  <p class="ledger-header__sub">
+    Every achievement earned generates a real donation to a cause I care about.
+    Every challenge failed or experiment abandoned funds a cause I don't.
+    This is the full accounting.
+  </p>
+</div>
+
+<div class="ledger-summary" id="ledger-summary">
+  <div class="ledger-stat">
+    <div class="ledger-stat__num" id="ls-total">&mdash;</div>
+    <div class="ledger-stat__label">Total donated</div>
+  </div>
+  <div class="ledger-stat">
+    <div class="ledger-stat__num" id="ls-bounties" style="color:#3ecf8e">&mdash;</div>
+    <div class="ledger-stat__label">Earned (bounties)</div>
+  </div>
+  <div class="ledger-stat">
+    <div class="ledger-stat__num" id="ls-punishments" style="color:#ef4444">&mdash;</div>
+    <div class="ledger-stat__label">Reluctant (penalties)</div>
+  </div>
+  <div class="ledger-stat">
+    <div class="ledger-stat__num" id="ls-causes">&mdash;</div>
+    <div class="ledger-stat__label">Causes funded</div>
+  </div>
+</div>
+
+<div class="ledger-toggle">
+  <button class="ledger-toggle__btn active" data-view="event">By Event</button>
+  <button class="ledger-toggle__btn" data-view="cause">By Charity</button>
+</div>
+
+<div id="ledger-loading" class="ledger-loading">LOADING LEDGER&hellip;</div>
+
+<div id="view-event" style="display:none">
+  <div class="ledger-events" id="ledger-events"></div>
+</div>
+
+<div id="view-cause" style="display:none">
+  <div class="ledger-events" id="ledger-causes"></div>
+</div>
+
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+<div id="amj-footer"></div>
+
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+<script src="/assets/js/engagement.js"></script>
+<script>
+(async function() {
+  var loading = document.getElementById('ledger-loading');
+  var setText = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+
+  // Toggle logic
+  document.querySelectorAll('.ledger-toggle__btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.ledger-toggle__btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      var view = btn.dataset.view;
+      document.getElementById('view-event').style.display = view === 'event' ? '' : 'none';
+      document.getElementById('view-cause').style.display = view === 'cause' ? '' : 'none';
+    });
+  });
+
+  try {
+    var resp = await fetch('/api/ledger');
+    if (!resp.ok) throw new Error(resp.status);
+    var data = await resp.json();
+    var t = data.totals || {};
+
+    // Summary strip
+    setText('ls-total', '$' + (t.total_donated_usd || 0));
+    setText('ls-bounties', '$' + (t.total_bounties_usd || 0));
+    setText('ls-punishments', '$' + (t.total_punishments_usd || 0));
+    var causeCount = (data.by_cause.earned_causes || []).length + (data.by_cause.reluctant_causes || []).length;
+    setText('ls-causes', causeCount);
+
+    // View A: By Event
+    var eventsEl = document.getElementById('ledger-events');
+    var earned = data.by_event.earned || [];
+    var reluctant = data.by_event.reluctant || [];
+
+    if (earned.length === 0 && reluctant.length === 0) {
+      eventsEl.innerHTML = '<div class="ledger-empty">No ledger entries yet.<br>Entries appear when achievements are earned, challenges completed, or experiments concluded.</div>';
+    } else {
+      var html = '';
+      if (earned.length) {
+        html += '<div class="ledger-events__section-title">Earned</div><div class="ledger-events__grid">';
+        earned.forEach(function(e) {
+          html += '<div class="ledger-card ledger-card--earned">' +
+            '<div class="ledger-card__name">' + (e.source_name || e.source_id || 'Achievement') + '</div>' +
+            '<div class="ledger-card__meta">' + (e.date || '') + ' · ' + (e.source_type || '') + '</div>' +
+            '<div class="ledger-card__amount ledger-card__amount--earned">$' + (e.amount_usd || 0) + '</div>' +
+            '<div class="ledger-card__cause">&rarr; ' + (e.cause_name || e.cause_id || '') + '</div></div>';
+        });
+        html += '</div>';
+      }
+      if (reluctant.length) {
+        html += '<div class="ledger-events__section-title">Reluctantly funded</div><div class="ledger-events__grid">';
+        reluctant.forEach(function(e) {
+          html += '<div class="ledger-card ledger-card--reluctant">' +
+            '<div class="ledger-card__name">' + (e.source_name || e.source_id || 'Failure') + '</div>' +
+            '<div class="ledger-card__meta">' + (e.date || '') + ' · ' + (e.source_type || '') + '</div>' +
+            '<div class="ledger-card__amount ledger-card__amount--reluctant">$' + (e.amount_usd || 0) + '</div>' +
+            '<div class="ledger-card__cause">&rarr; ' + (e.cause_name || e.cause_id || '') + '</div></div>';
+        });
+        html += '</div>';
+      }
+      eventsEl.innerHTML = html;
+    }
+
+    // View B: By Cause
+    var causesEl = document.getElementById('ledger-causes');
+    var earnedCauses = data.by_cause.earned_causes || [];
+    var reluctantCauses = data.by_cause.reluctant_causes || [];
+
+    var causeHtml = '';
+    if (earnedCauses.length) {
+      causeHtml += '<div class="ledger-events__section-title">Causes I fight for</div>';
+      earnedCauses.forEach(function(c) {
+        causeHtml += '<div class="ledger-cause ledger-cause--earned">' +
+          '<div class="ledger-cause__name">' + c.name + '</div>' +
+          '<div class="ledger-cause__desc">' + (c.short_description || '') +
+          (c.why_i_care ? ' — ' + c.why_i_care : '') + '</div>' +
+          '<div class="ledger-cause__total" style="color:#3ecf8e">$' + (c.total_usd || 0) +
+          '<span style="font-size:14px;color:var(--text-faint);margin-left:8px">' + (c.count || 0) + ' donations</span></div>' +
+          (c.url ? '<a href="' + c.url + '" target="_blank" style="font-family:var(--font-mono);font-size:10px;color:var(--accent);text-decoration:none;margin-top:8px;display:block">' + c.url + ' &rarr;</a>' : '') +
+          '</div>';
+      });
+    }
+    if (reluctantCauses.length) {
+      causeHtml += '<div class="ledger-events__section-title">Causes I reluctantly fund</div>';
+      reluctantCauses.forEach(function(c) {
+        causeHtml += '<div class="ledger-cause ledger-cause--reluctant">' +
+          '<div class="ledger-cause__name">' + c.name + '</div>' +
+          '<div class="ledger-cause__desc">' + (c.short_description || '') + '</div>' +
+          '<div class="ledger-cause__total" style="color:#ef4444">$' + (c.total_usd || 0) +
+          '<span style="font-size:14px;color:var(--text-faint);margin-left:8px">' + (c.count || 0) + ' donations</span></div>' +
+          (c.joke_note ? '<div class="ledger-cause__joke">"' + c.joke_note + '"</div>' : '') +
+          (c.url ? '<a href="' + c.url + '" target="_blank" style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);text-decoration:none;margin-top:8px;display:block">' + c.url + ' &rarr;</a>' : '') +
+          '</div>';
+      });
+    }
+    if (!causeHtml) causeHtml = '<div class="ledger-empty">No causes funded yet.</div>';
+    causesEl.innerHTML = causeHtml;
+
+    loading.style.display = 'none';
+    document.getElementById('view-event').style.display = '';
+
+  } catch (e) {
+    loading.textContent = 'Could not load ledger data.';
+    console.error(e);
+  }
+})();
+</script>
+
+</body>
+</html>

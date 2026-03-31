@@ -260,7 +260,7 @@
   <div>
     <div class="eyebrow" style="margin-bottom:var(--space-4)">The Data</div>
     <h1 class="week-header__title">This week, <span>by the numbers</span></h1>
-    <div class="week-header__sub">Live data from 25 sources &mdash; updated daily. Every metric visible, nothing filtered.</div>
+    <div class="week-header__sub">Live data from <span data-const="platform.data_sources">26</span> sources &mdash; updated daily. Every metric visible, nothing filtered.</div>
   </div>
   <div class="week-header__date">
     <div class="week-header__week-label" id="week-label">Week —</div>
@@ -346,7 +346,7 @@
   </p>
   <!-- U08: Share this week button -->
   <div style="margin-top:var(--space-8);padding-top:var(--space-6);border-top:1px solid var(--border-subtle);">
-    <a id="share-tweet-btn" href="https://twitter.com/intent/tweet?text=This+week+by+the+numbers+%E2%80%94+tracking+302+%E2%86%92+185+lbs+with+19+data+sources+and+an+AI+health+OS.+Every+number+public%2C+no+filter.+%F0%9F%93%8A+averagejoematt.com%2Fweek%2F" target="_blank" rel="noopener" class="btn btn--ghost" style="display:inline-flex;align-items:center;gap:var(--space-2);">
+    <a id="share-tweet-btn" href="https://twitter.com/intent/tweet?text=This+week+by+the+numbers+%E2%80%94+tracking+307+%E2%86%92+185+lbs+with+26+data+sources+and+an+AI+health+OS.+Every+number+public%2C+no+filter.+%F0%9F%93%8A+averagejoematt.com%2Fweek%2F" target="_blank" rel="noopener" class="btn btn--ghost" style="display:inline-flex;align-items:center;gap:var(--space-2);">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.738l7.726-8.84L2.25 2.25h7.36l4.257 5.63 5.377-5.63Zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
       Share this week &rarr;
     </a>
@@ -361,7 +361,7 @@
         if (weight && weight.textContent && weight.textContent !== '—') {
           var wText = weight.textContent.replace(/[^0-9.]/g,'');
           var weekText = wLabel ? wLabel.textContent : '';
-          var tweet = weekText + ': ' + wText + ' lbs, tracking 302→185 with 25 data sources + AI health OS. Every number public. averagejoematt.com/week/';
+          var tweet = weekText + ': ' + wText + ' lbs, tracking 307→185 with 26 data sources + AI health OS. Every number public. averagejoematt.com/week/';
           btn.href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(tweet);
         }
       }

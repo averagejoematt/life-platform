@@ -2643,5 +2643,85 @@ TOOLS = {
             },
         },
     },
+    # ── BL-04: Field Notes ──────────────────────────────────────
+    "get_field_notes": {
+        "fn": tool_get_field_notes,
+        "schema": {
+            "name": "get_field_notes",
+            "description": (
+                "Retrieve the weekly Field Notes entry — AI Lab Notes (present/lookback/focus paragraphs) "
+                "and any existing Matthew response. Defaults to current week if no week specified. "
+                "Use for: 'show me this week's field notes', 'what did the AI say this week', "
+                "'read field notes for week 14', 'get my lab notebook'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "week": {"type": "string",
+                             "description": "ISO week e.g. '2026-W14'. Defaults to current week."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "log_field_note_response": {
+        "fn": tool_log_field_note_response,
+        "schema": {
+            "name": "log_field_note_response",
+            "description": (
+                "Write Matthew's response to the right page of a Field Notes entry. "
+                "The AI Lab Notes must already exist for that week. Uses update_item to never overwrite AI fields. "
+                "Use for: 'respond to field notes', 'write my side of the lab notebook', "
+                "'I disagree with the AI notes this week', 'add my response to week 14'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "week":      {"type": "string",
+                                  "description": "ISO week e.g. '2026-W14'. Required."},
+                    "notes":     {"type": "string",
+                                  "description": "Matthew's prose response. No length limit."},
+                    "agreement": {"type": "string", "enum": ["agree", "disagree", "mixed"],
+                                  "description": "Matthew's overall take on the AI notes."},
+                    "disputed":  {"type": "array", "items": {"type": "string"},
+                                  "description": "Specific AI claims Matthew pushes back on."},
+                    "added":     {"type": "string",
+                                  "description": "What Matthew noticed that the AI missed."},
+                },
+                "required": ["week", "notes"],
+            },
+        },
+    },
+    # ── BL-03: The Ledger / Snake Fund ──────────────────────────
+    "log_ledger_entry": {
+        "fn": tool_log_ledger_entry,
+        "schema": {
+            "name": "log_ledger_entry",
+            "description": (
+                "Record a charitable donation triggered by an achievement, challenge, or experiment outcome. "
+                "Auto-resolves the bounty/punishment amount and cause from the source record config. "
+                "Use for: 'I hit 280 lbs', 'completed the walking challenge', 'glucose experiment failed', "
+                "'log a ledger entry', 'record a Snake Fund donation'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "source_type": {"type": "string", "enum": ["achievement", "challenge", "experiment"],
+                                    "description": "Type of trigger."},
+                    "source_id":   {"type": "string",
+                                    "description": "ID of the achievement badge, challenge, or experiment. "
+                                                   "e.g. 'weight_280', '30_day_walk', 'glucose_exp_3'."},
+                    "outcome":     {"type": "string", "enum": ["earned", "passed", "failed", "abandoned"],
+                                    "description": "Result. Achievements use 'earned'. Challenges/experiments use "
+                                                   "'passed', 'failed', or 'abandoned'."},
+                    "date":        {"type": "string",
+                                    "description": "Date of outcome (YYYY-MM-DD). Defaults to today."},
+                    "notes":       {"type": "string",
+                                    "description": "Optional context about what happened."},
+                },
+                "required": ["source_type", "source_id", "outcome"],
+            },
+        },
+    },
 
 }

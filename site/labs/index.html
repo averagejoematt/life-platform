@@ -99,7 +99,7 @@
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       color: var(--text-muted);
-      letter-spacing: 0.06em;
+      letter-spacing:var(--ls-subtle);
     }
     .lb-hero-stat strong {
       color: var(--text);
@@ -155,7 +155,7 @@
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-muted);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
     }
 
@@ -183,7 +183,7 @@
     .lb-category__name {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       color: var(--text);
     }
@@ -223,7 +223,7 @@
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-faint);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       text-align: left;
       padding: var(--space-3) var(--space-5);
@@ -243,7 +243,7 @@
     /* ── Flag badges ── */
     .lb-flag {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       letter-spacing: 0.08em;
       text-transform: uppercase;
       padding: 2px 8px;
@@ -269,7 +269,7 @@
     .lb-disclaimer__title {
       font-family: var(--font-mono);
       font-size: 10px;
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       color: var(--lb-accent);
       margin-bottom: var(--space-3);
@@ -291,7 +291,7 @@
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       color: var(--lb-accent);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       text-decoration: none;
     }
@@ -329,7 +329,7 @@
     }
     .lb-hero-gauge__unit {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       color: var(--text-faint);
       letter-spacing: 0.08em;
     }
@@ -337,7 +337,7 @@
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-muted);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
     }
 
@@ -361,7 +361,7 @@
       margin-top: var(--space-4);
       font-family: var(--font-mono);
       font-size: 10px;
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       color: var(--lb-accent);
       background: var(--lb-accent-dim);
@@ -392,7 +392,7 @@
     .lb-watching-card__name {
       font-family: var(--font-mono);
       font-size: 11px;
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       color: var(--lb-amber);
       margin-bottom: var(--space-2);
@@ -416,7 +416,7 @@
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       color: var(--text-muted);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
     }
 
     /* ── Responsive ── */
@@ -481,9 +481,9 @@
   <!-- Editorial pull-quote -->
   <div class="lb-pullquote reveal">
     <blockquote class="lb-pullquote__text">
-      Fasting glucose dropped 12 points across three draws &mdash; the <em>metabolic needle is moving</em>.
+      Biomarker trends will appear here as lab draws accumulate. Each draw adds a data point to the <em>longitudinal picture</em>.
     </blockquote>
-    <span class="lb-pullquote__badge">N=1 &middot; 3 Draws &middot; Trend Confirmed</span>
+    <span class="lb-pullquote__badge">Pending data</span>
   </div>
 
   <!-- What I'm Watching — flagged biomarkers -->
@@ -527,11 +527,11 @@
 
 <div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border);" class="reveal">
   <blockquote style="font-family:var(--font-display);font-size:clamp(24px,3.5vw,32px);line-height:1.3;color:var(--text);max-width:640px;padding-left:calc(var(--page-padding) + 16%);">
-    &ldquo;Seven draws in nine months. Most people get annual bloodwork and call it diligence. He gets it quarterly and calls it insufficient.&rdquo;
+    &ldquo;He used to get his labs done at the finish line &mdash; when the weight was down and the story was flattering. This week, for the first time, he&rsquo;s getting them at the starting line.&rdquo;
   </blockquote>
   <div style="display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-4);padding-left:calc(var(--page-padding) + 16%);">
-    <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--lb-accent,#06b6d4);background:rgba(6,182,212,0.12);padding:3px 10px;">Chronicle &middot; Elena Voss</span>
-    <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);">AI narrative voice &mdash; <a href="/chronicle/" style="color:var(--lb-accent,#06b6d4);text-decoration:none;">Read the chronicle &rarr;</a></span>
+    <span style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--lb-accent,#06b6d4);background:rgba(6,182,212,0.12);padding:3px 10px;">Chronicle &middot; Elena Voss</span>
+    <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);">AI narrative voice &mdash; <a href="/chronicle/" style="color:var(--lb-accent,#06b6d4);text-decoration:none;">Read the chronicle &rarr;</a></span>
   </div>
 </div>
 

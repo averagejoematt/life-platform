@@ -1100,7 +1100,10 @@ def site_api() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="S3SiteConfigRead",
             actions=["s3:GetObject"],
-            resources=[f"{BUCKET_ARN}/site/config/*"],
+            resources=[
+                f"{BUCKET_ARN}/site/config/*",
+                f"{BUCKET_ARN}/config/*",
+            ],
         ),
         iam.PolicyStatement(
             sid="AiKeySecret",

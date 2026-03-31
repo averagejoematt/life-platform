@@ -74,7 +74,7 @@
   // Map bottom nav hrefs to the full set of paths each owns
   var BOTTOM_NAV_OWNS = {
     '/':           ['/', '/story/', '/about/', '/achievements/'],
-    '/sleep/':     ['/sleep/', '/glucose/', '/nutrition/', '/training/', '/mind/', '/benchmarks/', '/explorer/'],
+    '/sleep/':     ['/sleep/', '/glucose/', '/nutrition/', '/training/', '/physical/', '/mind/', '/benchmarks/', '/explorer/'],
     '/live/':      ['/live/', '/character/', '/habits/', '/accountability/'],
     '/chronicle/': ['/chronicle/', '/weekly/', '/ask/', '/subscribe/'],
   };
@@ -166,7 +166,7 @@
   // Bottom nav → which paths it owns (6-section IA, Decision 1c)
   var BADGE_MAP = {
     '/':           ['/story/', '/about/', '/achievements/', '/first-person/'],
-    '/sleep/':     ['/sleep/', '/glucose/', '/nutrition/', '/training/', '/mind/', '/benchmarks/', '/explorer/'],
+    '/sleep/':     ['/sleep/', '/glucose/', '/nutrition/', '/training/', '/physical/', '/mind/', '/benchmarks/', '/explorer/'],
     '/stack/':     ['/stack/', '/protocols/', '/supplements/', '/experiments/', '/challenges/', '/discoveries/'],
     '/live/':      ['/live/', '/character/', '/habits/', '/accountability/'],
     '/chronicle/': ['/chronicle/', '/chronicle/archive/', '/weekly/', '/ask/', '/subscribe/'],
@@ -213,7 +213,8 @@
     '/sleep/':              { href: '/glucose/',          title: 'Glucose Data \u2192',           sub: '30-day CGM time-in-range' },
     '/glucose/':            { href: '/nutrition/',        title: 'Nutrition Data \u2192',          sub: 'Macro tracking, protein targets, TDEE' },
     '/nutrition/':          { href: '/training/',         title: 'Training Data \u2192',           sub: 'Workouts, zone 2, strength progress' },
-    '/training/':           { href: '/mind/',             title: 'Inner Life \u2192',             sub: 'The pillar that determines all the others' },
+    '/training/':           { href: '/physical/',          title: 'Physical Data \u2192',           sub: 'Weight trajectory and body composition' },
+    '/physical/':           { href: '/mind/',             title: 'Inner Life \u2192',             sub: 'The pillar that determines all the others' },
     '/mind/':               { href: '/benchmarks/',       title: 'The Standards \u2192',           sub: 'How Matthew compares to population norms' },
     '/benchmarks/':         { href: '/explorer/',         title: 'Explore the Data \u2192',        sub: 'Cross-domain correlations and patterns' },
     '/explorer/':           { href: '/discoveries/',      title: 'Validated Discoveries \u2192',   sub: 'Correlations that survived scrutiny' },
@@ -235,14 +236,14 @@
     '/board/':              { href: '/board/technical/',  title: 'Technical Board \u2192',        sub: '12 personas keeping the architecture honest' },
     '/board/technical/':    { href: '/board/product/',    title: 'Product Board \u2192',          sub: '8 personas shaping what this site becomes' },
     '/board/product/':      { href: '/methodology/',      title: 'Methodology \u2192',            sub: 'How the science works' },
-    '/methodology/':        { href: '/cost/',             title: 'The Real Cost \u2192',          sub: 'Running a full health OS for ~$13/month' },
+    '/methodology/':        { href: '/cost/',             title: 'The Real Cost \u2192',          sub: 'Running a full health OS for $19/month' },
     '/cost/':               { href: '/tools/',            title: 'Tools \u2192',                  sub: 'Every tool in the platform' },
     '/tools/':              { href: '/builders/',         title: 'For Builders \u2192',           sub: 'Build your own health platform' },
     '/builders/':           { href: '/subscribe/',        title: 'Subscribe \u2192',              sub: 'Follow the experiment' },
     // The Chronicle flow
     '/chronicle/':          { href: '/chronicle/archive/', title: 'All Entries \u2192',           sub: 'The full chronicle archive' },
     '/chronicle/archive/':  { href: '/subscribe/',        title: 'Get the Weekly Brief \u2192',   sub: 'Delivered every week' },
-    '/weekly/':             { href: '/ask/',              title: 'Ask the Data \u2192',           sub: 'Query 19 sources of live data' },
+    '/weekly/':             { href: '/ask/',              title: 'Ask the Data \u2192',           sub: 'Query 26 sources of live data' },
     '/ask/':                { href: '/subscribe/',        title: 'Subscribe \u2192',              sub: 'Follow the experiment' },
   };
 

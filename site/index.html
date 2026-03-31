@@ -155,7 +155,7 @@
     }
     .h-gauge__unit {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       color: var(--text-faint);
       letter-spacing: 1px;
       text-transform: uppercase;
@@ -472,8 +472,8 @@
      1b. MATT BIO — human context
      ═══════════════════════════════════════════════════════════ -->
 <div id="amj-bio" style="max-width:var(--max-width);margin:0 auto;padding:var(--space-4) var(--page-padding);">
-  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);">Matthew &middot; Seattle, WA</div>
-  <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.7;margin-top:var(--space-1);">Started at 307 lbs. Built this entire platform with Claude. No engineering background.</div>
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--text-faint);">Matthew &middot; Seattle, WA</div>
+  <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.7;margin-top:var(--space-1);">Started at 307 lbs. Built this entire platform with Claude as a development partner.</div>
 </div>
 <div id="amj-since-last-visit"></div>
 <section id="amj-pulse-section" style="display:none"><div class="pulse-feed"><div class="pulse-feed__header">The Pulse</div><div class="pulse-feed__list" id="pulse-list"></div><div class="pulse-feed__fade"></div><div class="pulse-feed__load-more" id="pulse-load-more" style="display:none"><button onclick="loadMorePulse()">Load more</button></div></div></section>
@@ -714,7 +714,7 @@
     if (statsEl) statsEl.textContent = statsLine;
 
     // ── Gauge rings ──
-    // Weight: progress % toward goal (302 -> 185)
+    // Weight: progress % toward goal (307 -> 185)
     var progressPct = hero.progress_pct || j.progress_pct || 0;
     if (wLbs) {
       setText('h-g-weight-num', wLbs.toFixed(0));
@@ -904,24 +904,30 @@
 })();
 </script>
 
-<!-- Count-up wiring -->
+<!-- Count-up wiring — only zero values if IntersectionObserver will animate them back -->
 <script>
 (function() {
   function wireCountUp() {
     var stats = window.__amjStats;
-    if (!stats) return false;
+    if (!stats) return;
+    // Only wire count-up if animations.js has loaded and observer is available
+    if (!('IntersectionObserver' in window)) return;
     var chips = document.querySelectorAll('.h-data-col__value');
     chips.forEach(function(el) {
       var val = parseFloat(el.textContent);
-      if (!isNaN(val) && !el.hasAttribute('data-count-up')) {
+      if (!isNaN(val) && val > 0 && !el.hasAttribute('data-count-up')) {
         el.setAttribute('data-count-up', val);
         var suffix = el.textContent.replace(/[\d.,-]/g, '').trim();
         if (suffix) el.setAttribute('data-count-suffix', ' ' + suffix);
-        el.textContent = '0';
+        // Only zero if element is below fold (will animate on scroll)
+        var rect = el.getBoundingClientRect();
+        if (rect.top > window.innerHeight) {
+          el.textContent = '0';
+        }
+        // Otherwise leave the real value — no flash of 0
       }
     });
     if (window.AMJ_REINIT_COUNTUP) window.AMJ_REINIT_COUNTUP();
-    return true;
   }
   setTimeout(wireCountUp, 1200);
 })();
@@ -955,11 +961,11 @@
     }
     card.innerHTML = '<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-6) var(--page-padding);">' +
       '<div style="border-left:3px solid var(--h-accent);padding:var(--space-5) var(--space-6);background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--h-accent);">' +
-        '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:0.1em;text-transform:uppercase;color:var(--h-accent);margin-bottom:var(--space-3);">Currently Testing</div>' +
+        '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--h-accent);margin-bottom:var(--space-3);">Currently Testing</div>' +
         '<div style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--text);margin-bottom:var(--space-2);">' + (active.name || active.title || 'Active Experiment') + '</div>' +
         (dayCount ? '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);margin-bottom:var(--space-2);">' + dayCount + '</div>' : '') +
         (active.hypothesis ? '<div style="font-size:var(--text-sm);color:var(--text-faint);line-height:1.6;margin-bottom:var(--space-3);">' + active.hypothesis + '</div>' : '') +
-        '<a href="/experiments/" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--h-accent);text-decoration:none;letter-spacing:0.06em;">See experiment \u2192</a>' +
+        '<a href="/experiments/" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--h-accent);text-decoration:none;letter-spacing:var(--ls-subtle);">See experiment \u2192</a>' +
       '</div>' +
     '</div>';
     card.style.display = 'block';

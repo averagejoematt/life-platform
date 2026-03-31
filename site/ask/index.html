@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Ask the Platform — interrogate real health data from 25 sources with AI.">
+  <meta name="description" content="Ask the Platform — interrogate real health data from 26 sources with AI.">
   <meta property="og:title" content="Ask the Platform — Matthew">
-  <meta property="og:description" content="Ask questions about one person's health data. AI answers from 25 real data sources.">
+  <meta property="og:description" content="Ask questions about one person's health data. AI answers from 26 real data sources.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com/ask/">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
@@ -14,7 +14,7 @@
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Ask the Platform — Matthew">
-  <meta name="twitter:description" content="Ask questions about one person's health data. AI answers from 25 real data sources.">
+  <meta name="twitter:description" content="Ask questions about one person's health data. AI answers from 26 real data sources.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <title>Ask the Platform — Matthew</title>
     <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
@@ -262,10 +262,10 @@
   </div>
   <h1 class="ask-header__title">Ask <span>my data</span> anything</h1>
   <p class="ask-header__sub">
-    AI-powered answers from 25 live data sources. Ask about weight, sleep, HRV, habits, training, nutrition, or any pattern in the data. The platform answers from real numbers.
+    AI-powered answers from <span data-const="platform.data_sources">26</span> live data sources. Ask about weight, sleep, HRV, habits, training, nutrition, or any pattern in the data. The platform answers from real numbers.
   </p>
   <div style="margin-top:var(--space-4);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--accent-dim);letter-spacing:var(--ls-tag);text-transform:uppercase;">
-    25 sources · <span id="ask-days">—</span> days of data · 7 lab draws · 110 SNPs · 37 tracked habits
+    <span data-const="platform.data_sources">26</span> sources · <span id="ask-days">—</span> days of data · 7 lab draws · 110 SNPs · 37 tracked habits
   </div>
 </header>
 
@@ -292,7 +292,7 @@
   </div>
   <div class="data-strip__item">
     <div class="data-strip__label">Data sources</div>
-    <div class="data-strip__value" data-const="platform.data_sources">25</div>
+    <div class="data-strip__value" data-const="platform.data_sources">26</div>
   </div>
 </div>
 
@@ -303,25 +303,25 @@
 <div class="ask-container">
 
   <div id="suggestions">
-    <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2);margin-top:var(--space-4);">Sleep & Recovery</div>
+    <div style="font-family:var(--font-mono);font-size:var(--text-3xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2);margin-top:var(--space-4);">Sleep & Recovery</div>
     <div class="suggestions">
       <button class="suggestion-chip" data-q="How's my sleep trending over the last two weeks?">How's my sleep trending?</button>
       <button class="suggestion-chip" data-q="What predicts good HRV days?">What predicts good HRV?</button>
       <button class="suggestion-chip" data-q="What was the best night of sleep this month?">Best sleep this month?</button>
     </div>
-    <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2);margin-top:var(--space-4);">Nutrition & Body</div>
+    <div style="font-family:var(--font-mono);font-size:var(--text-3xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2);margin-top:var(--space-4);">Nutrition & Body</div>
     <div class="suggestions">
       <button class="suggestion-chip" data-q="Am I hitting my protein targets consistently?">Am I hitting protein targets?</button>
       <button class="suggestion-chip" data-q="What foods or meals spike my glucose the most?">What foods spike my glucose?</button>
       <button class="suggestion-chip" data-q="How has the weight trend looked over the last 30 days?">Weight trend this month?</button>
     </div>
-    <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2);margin-top:var(--space-4);">Training</div>
+    <div style="font-family:var(--font-mono);font-size:var(--text-3xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2);margin-top:var(--space-4);">Training</div>
     <div class="suggestions">
       <button class="suggestion-chip" data-q="How much Zone 2 training has Matthew done this week vs target?">How much Zone 2 this week?</button>
       <button class="suggestion-chip" data-q="Am I showing signs of overtraining based on recovery and HRV trends?">Am I overtraining?</button>
       <button class="suggestion-chip" data-q="What's the relationship between training load and next-day recovery?">Training load vs recovery?</button>
     </div>
-    <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2);margin-top:var(--space-4);">Cross-domain</div>
+    <div style="font-family:var(--font-mono);font-size:var(--text-3xs);color:var(--text-faint);letter-spacing:var(--ls-tag);text-transform:uppercase;margin-bottom:var(--space-2);margin-top:var(--space-4);">Cross-domain</div>
     <div class="suggestions" style="margin-bottom:var(--space-8);">
       <button class="suggestion-chip" data-q="What's the biggest health risk I should focus on right now?">What's my biggest risk right now?</button>
       <button class="suggestion-chip" data-q="Show me the strongest correlations across all my data.">Show my strongest correlations</button>
@@ -469,7 +469,7 @@ async function submitQuestion() {
 
   document.getElementById('suggestions').style.display = 'none';
   addMessage('user', question);
-  const loadingId = addMessage('ai', '<span class="typing-dots">Querying 25 data sources</span>', true);
+  const loadingId = addMessage('ai', '<span class="typing-dots">Querying 26 data sources</span>', true);
   document.getElementById('ask-btn').disabled = true;
 
   try {
