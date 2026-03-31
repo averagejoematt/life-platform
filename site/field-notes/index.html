@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Weekly lab notebook — AI synthesis of health data meets Matthew's honest response. The platform's autobiography, one week at a time.">
+  <meta property="og:title" content="Field Notes — Matthew">
+  <meta property="og:description" content="The AI writes its weekly analysis. Matthew writes back. This is the full record.">
+  <meta property="og:type" content="website">
+  <title>Field Notes — Matthew</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    :root {
+      --fn-accent: #a78bfa;
+      --fn-accent-dim: rgba(167,139,250,0.12);
+    }
+
+    .fn-header {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-16) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+    }
+    .fn-header__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--fn-accent);
+      margin-bottom: var(--space-3);
+    }
+    .fn-header__title {
+      font-family: var(--font-display);
+      font-size: clamp(32px, 5vw, 48px);
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.1;
+      margin: 0 0 var(--space-4);
+    }
+    .fn-header__sub {
+      font-family: var(--font-serif);
+      font-size: clamp(15px, 2vw, 17px);
+      line-height: 1.65;
+      color: var(--text-muted);
+      max-width: 560px;
+    }
+
+    /* ── List view ── */
+    .fn-list {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+    }
+    .fn-list__row {
+      display: grid;
+      grid-template-columns: 100px 1fr 120px 80px;
+      gap: var(--space-4);
+      align-items: center;
+      padding: var(--space-4) var(--space-3);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      text-decoration: none;
+      transition: background 0.15s;
+      cursor: pointer;
+    }
+    .fn-list__row:hover { background: rgba(255,255,255,0.02); }
+    .fn-list__week {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--fn-accent);
+      letter-spacing: 0.06em;
+    }
+    .fn-list__date {
+      font-family: var(--font-serif);
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .fn-list__tone {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .fn-list__response {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      text-align: right;
+    }
+
+    /* ── Entry view ── */
+    .fn-entry {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-8) var(--page-padding);
+    }
+    .fn-entry__nav {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: var(--space-6);
+    }
+    .fn-entry__nav a {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--fn-accent);
+      text-decoration: none;
+      letter-spacing: 0.06em;
+    }
+    .fn-entry__nav a:hover { text-decoration: underline; }
+    .fn-entry__week-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--fn-accent);
+      background: var(--fn-accent-dim);
+      padding: 3px 10px;
+      border-radius: 3px;
+      letter-spacing: 0.08em;
+      display: inline-block;
+      margin-bottom: var(--space-4);
+    }
+    .fn-notebook {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-6);
+      position: relative;
+    }
+    .fn-notebook::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: rgba(167,139,250,0.15);
+    }
+    .fn-page {
+      padding: var(--space-6);
+      position: relative;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 28px,
+        rgba(167,139,250,0.04) 28px,
+        rgba(167,139,250,0.04) 29px
+      );
+      min-height: 300px;
+    }
+    .fn-page__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-4);
+    }
+    .fn-page__label--ai { color: var(--fn-accent); }
+    .fn-page__label--matthew { color: #3ecf8e; }
+    .fn-page__body {
+      font-family: var(--font-serif);
+      font-size: 15px;
+      line-height: 1.75;
+      color: rgba(255,255,255,0.82);
+    }
+    .fn-page__body p { margin-top: var(--space-4); }
+    .fn-page__section-title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-top: var(--space-6);
+      margin-bottom: var(--space-2);
+    }
+    .fn-empty-response {
+      font-family: var(--font-serif);
+      font-size: 14px;
+      color: var(--text-faint);
+      font-style: italic;
+      line-height: 1.6;
+    }
+
+    .fn-loading {
+      text-align: center;
+      padding: var(--space-20);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+    }
+
+    @media (max-width: 768px) {
+      .fn-notebook { grid-template-columns: 1fr; }
+      .fn-notebook::before { display: none; }
+      .fn-list__row { grid-template-columns: 80px 1fr 60px; }
+      .fn-list__date { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+
+<div class="fn-header">
+  <div class="fn-header__eyebrow">Field Notes</div>
+  <h1 class="fn-header__title">The platform's autobiography.</h1>
+  <p class="fn-header__sub">
+    Every week, the AI synthesizes all data into a written opinion. Then Matthew writes back.
+    Over months and years, this archive becomes the honest record of a human-AI health advisor relationship.
+  </p>
+</div>
+
+<div id="fn-loading" class="fn-loading">LOADING FIELD NOTES&hellip;</div>
+<div id="fn-content" style="display:none"></div>
+
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+<div id="amj-footer"></div>
+
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+<script src="/assets/js/engagement.js"></script>
+<script>
+(async function() {
+  var loading = document.getElementById('fn-loading');
+  var content = document.getElementById('fn-content');
+
+  var TONE_COLORS = {
+    affirming: '#3ecf8e',
+    cautionary: '#f59e0b',
+    urgent: '#ef4444',
+    mixed: 'rgba(255,255,255,0.4)',
+  };
+
+  var weekParam = new URLSearchParams(window.location.search).get('week');
+
+  try {
+    if (weekParam) {
+      /* ── Entry view ── */
+      var resp = await fetch('/api/field_notes?week=' + encodeURIComponent(weekParam));
+      if (!resp.ok) throw new Error(resp.status);
+      var data = await resp.json();
+      var entry = data.entry;
+
+      if (!entry || !entry.ai_present) {
+        content.innerHTML = '<div class="fn-loading">No field notes for week ' + weekParam + '.</div>';
+        loading.style.display = 'none';
+        content.style.display = '';
+        return;
+      }
+
+      var toneColor = TONE_COLORS[entry.ai_tone] || TONE_COLORS.mixed;
+      var genDate = entry.ai_generated_at ? new Date(entry.ai_generated_at).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
+
+      var html = '<div class="fn-entry">';
+      html += '<div class="fn-entry__nav"><a href="/field-notes/">&larr; All weeks</a></div>';
+      html += '<div class="fn-entry__week-badge">' + entry.week + '</div>';
+      html += '<div style="font-family:var(--font-mono);font-size:10px;color:' + toneColor + ';letter-spacing:0.08em;text-transform:uppercase;margin-bottom:var(--space-6)">Tone: ' + (entry.ai_tone || 'mixed') + (genDate ? ' · Generated ' + genDate : '') + '</div>';
+
+      html += '<div class="fn-notebook">';
+
+      /* Left page: AI */
+      html += '<div class="fn-page">';
+      html += '<div class="fn-page__label fn-page__label--ai">AI Lab Notes</div>';
+      html += '<div class="fn-page__body">' + (entry.ai_present || '').split('\n\n').map(function(p) { return '<p>' + p + '</p>'; }).join('') + '</div>';
+      if (entry.ai_cautionary) {
+        html += '<div class="fn-page__section-title" style="color:#f59e0b">Cautionary</div>';
+        html += '<div class="fn-page__body">' + entry.ai_cautionary.split('\n\n').map(function(p) { return '<p>' + p + '</p>'; }).join('') + '</div>';
+      }
+      if (entry.ai_affirming) {
+        html += '<div class="fn-page__section-title" style="color:#3ecf8e">Affirming</div>';
+        html += '<div class="fn-page__body">' + entry.ai_affirming.split('\n\n').map(function(p) { return '<p>' + p + '</p>'; }).join('') + '</div>';
+      }
+      html += '</div>';
+
+      /* Right page: Matthew */
+      html += '<div class="fn-page">';
+      html += '<div class="fn-page__label fn-page__label--matthew">Matthew\'s Response</div>';
+      if (entry.matthew_agreement) {
+        var mDate = entry.matthew_logged_at ? new Date(entry.matthew_logged_at).toLocaleDateString('en-US', {month:'short', day:'numeric'}) : '';
+        html += '<div class="fn-page__body">' + entry.matthew_agreement.split('\n\n').map(function(p) { return '<p>' + p + '</p>'; }).join('') + '</div>';
+        if (mDate) html += '<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);margin-top:var(--space-4)">Logged ' + mDate + '</div>';
+      } else {
+        html += '<div class="fn-empty-response">Matthew hasn\'t responded to this week\'s notes yet. Responses are logged via Claude Desktop.</div>';
+      }
+      html += '</div>';
+
+      html += '</div>'; // notebook
+      html += '</div>'; // entry
+
+      content.innerHTML = html;
+
+    } else {
+      /* ── List view ── */
+      var resp = await fetch('/api/field_notes');
+      if (!resp.ok) throw new Error(resp.status);
+      var data = await resp.json();
+      var entries = data.entries || [];
+
+      if (entries.length === 0) {
+        content.innerHTML = '<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-16) var(--page-padding);text-align:center">' +
+          '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:0.15em;color:var(--fn-accent);text-transform:uppercase;margin-bottom:var(--space-4)">Coming Soon</div>' +
+          '<div style="font-family:var(--font-serif);font-size:18px;color:var(--text-muted);line-height:1.7;max-width:480px;margin:0 auto">' +
+            'The first Field Notes entry arrives <strong style="color:var(--text)">April 7, 2026</strong> &mdash; one week after the experiment begins. ' +
+            'Each Sunday, the platform synthesizes the week\'s data into a written analysis. Then Matthew writes back.' +
+          '</div>' +
+        '</div>';
+        loading.style.display = 'none';
+        content.style.display = '';
+        return;
+      }
+
+      var html = '<div class="fn-list">';
+      entries.forEach(function(e) {
+        var toneColor = TONE_COLORS[e.ai_tone] || TONE_COLORS.mixed;
+        var genDate = e.ai_generated_at ? new Date(e.ai_generated_at).toLocaleDateString('en-US', {month:'short', day:'numeric'}) : '';
+        html += '<div class="fn-list__row" onclick="window.location.href=\'/field-notes/?week=' + e.week + '\'">';
+        html += '<div class="fn-list__week">' + e.week + '</div>';
+        html += '<div class="fn-list__date">' + genDate + '</div>';
+        html += '<div class="fn-list__tone" style="color:' + toneColor + '">' + (e.ai_tone || 'mixed') + '</div>';
+        html += '<div class="fn-list__response">' + (e.has_matthew_response ? 'Responded' : '') + '</div>';
+        html += '</div>';
+      });
+      html += '</div>';
+
+      content.innerHTML = html;
+    }
+
+    loading.style.display = 'none';
+    content.style.display = '';
+
+  } catch (e) {
+    loading.textContent = 'Could not load field notes.';
+    console.error(e);
+  }
+})();
+</script>
+
+</body>
+</html>

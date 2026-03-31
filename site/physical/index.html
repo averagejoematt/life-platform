@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Weight trajectory, body composition, and physical transformation data — from 302 lbs to goal, tracked daily.">
+  <meta property="og:title" content="Physical Observatory — Matthew">
+  <meta property="og:description" content="Every weigh-in, every plateau, every milestone. The weight loss trajectory with no edits.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://averagejoematt.com/physical/">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-default.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>Physical Observatory — Matthew</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    :root {
+      --p-blue: #60a5fa;
+      --p-blue-dim: rgba(96,165,250,0.15);
+      --p-blue-glow: rgba(96,165,250,0.06);
+      --p-green: #3ecf8e;
+      --p-red: #ef4444;
+      --p-amber: #f59e0b;
+      --p-violet: #818cf8;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes ringDraw {
+      from { stroke-dasharray: 0 251; }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       EDITORIAL TEMPLATE — Monospace section headers with em-dashes
+       ═══════════════════════════════════════════════════════ */
+    .p-section-header {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-8);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .p-section-header::after {
+      content: '\2014\2014';
+      color: var(--text-faint);
+      opacity: 0.4;
+      flex-shrink: 0;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       HERO
+       ═══════════════════════════════════════════════════════ */
+    .p-hero {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-16) var(--page-padding) var(--space-12);
+      border-bottom: 1px solid var(--border);
+    }
+    .p-hero-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-8);
+      align-items: center;
+    }
+    .p-hero__eyebrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--p-blue);
+      margin-bottom: var(--space-3);
+      opacity: 0;
+      animation: fadeUp 0.6s 0.1s forwards;
+    }
+    .p-hero__title {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 5vw, 52px);
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.1;
+      margin: 0 0 var(--space-4);
+      opacity: 0;
+      animation: fadeUp 0.6s 0.2s forwards;
+    }
+    .p-hero__title em {
+      font-style: normal;
+      color: var(--p-blue);
+    }
+    .p-hero__sub {
+      font-family: var(--font-serif);
+      font-size: clamp(15px, 2vw, 17px);
+      line-height: 1.65;
+      color: var(--text-muted);
+      max-width: 520px;
+      margin: 0;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.3s forwards;
+    }
+    .p-hero__sub-detail {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      margin-top: var(--space-3);
+      letter-spacing: 0.04em;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.4s forwards;
+    }
+
+    /* Gauge rings */
+    .p-gauge-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+      opacity: 0;
+      animation: fadeUp 0.6s 0.4s forwards;
+    }
+    .p-gauge { text-align: center; }
+    .p-gauge__ring {
+      width: 88px;
+      height: 88px;
+      margin: 0 auto var(--space-3);
+      position: relative;
+    }
+    .p-gauge__ring svg { width: 100%; height: 100%; }
+    .p-gauge__center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    .p-gauge__num {
+      font-family: var(--font-display);
+      font-size: 22px;
+      line-height: 1;
+    }
+    .p-gauge__unit {
+      font-family: var(--font-mono);
+      font-size: var(--text-3xs);
+      color: var(--text-faint);
+      letter-spacing: 0.08em;
+    }
+    .p-gauge__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: var(--ls-wide);
+      text-transform: uppercase;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       WEIGHT TRAJECTORY CHART
+       ═══════════════════════════════════════════════════════ */
+    .p-trajectory-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .p-chart-wrap {
+      position: relative;
+      height: 360px;
+    }
+    .p-toggle-row {
+      display: flex;
+      gap: var(--space-2);
+      margin-bottom: var(--space-6);
+    }
+    .p-toggle {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: var(--space-2) var(--space-4);
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+    .p-toggle:hover { border-color: var(--p-blue); color: var(--text); }
+    .p-toggle.active {
+      background: var(--p-blue-dim);
+      border-color: var(--p-blue);
+      color: var(--p-blue);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       KEY METRICS ROW
+       ═══════════════════════════════════════════════════════ */
+    .p-metrics-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .p-metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: var(--space-4);
+    }
+    .p-metric {
+      text-align: center;
+      padding: var(--space-4);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+    .p-metric__num {
+      font-family: var(--font-display);
+      font-size: 24px;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    .p-metric__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-top: var(--space-2);
+    }
+    .p-metric__sub {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-faint);
+      margin-top: 2px;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       V2: DUAL-AXIS CORRELATION CHARTS
+       ═══════════════════════════════════════════════════════ */
+    .p-dual-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .p-dual-wrap {
+      position: relative;
+      height: 280px;
+    }
+    .p-dual-legend {
+      display: flex;
+      gap: var(--space-4);
+      margin-top: var(--space-3);
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+    .p-dual-legend__item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font: 10px monospace;
+      color: rgba(255,255,255,0.4);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       PULL-QUOTE
+       ═══════════════════════════════════════════════════════ */
+    .p-pullquote {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      position: relative;
+      border-bottom: 1px solid var(--border);
+      padding-left: calc(var(--page-padding) + 8%);
+    }
+    .p-pullquote__watermark {
+      position: absolute;
+      top: 24px;
+      right: var(--page-padding);
+      font-family: var(--font-display);
+      font-size: 120px;
+      color: rgba(96, 165, 250, 0.04);
+      line-height: 1;
+      pointer-events: none;
+    }
+    .p-pullquote__text {
+      font-family: var(--font-display);
+      font-size: clamp(24px, 3.5vw, 32px);
+      line-height: 1.3;
+      color: var(--text);
+      max-width: 640px;
+      position: relative;
+    }
+    .p-pullquote__text em {
+      font-style: normal;
+      color: var(--p-blue);
+    }
+    .p-pullquote__attr {
+      margin-top: var(--space-4);
+    }
+    .p-pullquote__badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--p-blue);
+      background: var(--p-blue-dim);
+      padding: 3px 10px;
+      border-radius: 3px;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       CROSS-LINKS + METHODOLOGY
+       ═══════════════════════════════════════════════════════ */
+    .p-xref {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+      border-bottom: 1px solid var(--border);
+    }
+    .p-xref-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--p-blue);
+      padding: var(--space-5);
+      text-decoration: none;
+      transition: border-color 0.2s;
+    }
+    .p-xref-card:hover { border-left-color: var(--p-green); }
+    .p-xref-card__title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--p-blue);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .p-xref-card__sub {
+      font-family: var(--font-serif);
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: var(--space-2);
+      line-height: 1.5;
+    }
+    .p-method {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .p-method-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-6);
+      margin-top: var(--space-4);
+    }
+    .p-method-col__title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--p-blue);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-2);
+    }
+    .p-method-col__text {
+      font-family: var(--font-serif);
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       DEXA BODY COMPOSITION
+       ═══════════════════════════════════════════════════════ */
+    .p-dexa-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .p-dexa-header-row {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      margin-bottom: var(--space-8);
+    }
+    .p-dexa-scan-line {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+    .p-dexa-scan-line .grade {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .p-dexa-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: var(--space-8);
+    }
+    .p-dexa-table th {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-align: left;
+      padding: var(--space-2) var(--space-3);
+      border-bottom: 1px solid var(--border);
+    }
+    .p-dexa-table td {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-muted);
+      padding: var(--space-3);
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .p-dexa-table td:first-child {
+      font-family: var(--font-serif);
+      color: var(--text);
+      font-size: 14px;
+    }
+    .p-dexa-table .delta-up-bad { color: var(--p-red); }
+    .p-dexa-table .delta-up-good { color: var(--p-green); }
+    .p-dexa-indices {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+      margin-bottom: var(--space-8);
+    }
+    .p-index-badge {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: var(--space-4);
+      text-align: center;
+    }
+    .p-index-badge__value {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--text);
+    }
+    .p-index-badge__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-top: var(--space-1);
+    }
+    .p-index-badge__sub {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      margin-top: 2px;
+    }
+    .p-bio-age-card {
+      border-left: 3px solid var(--p-blue);
+      padding: var(--space-5) var(--space-6);
+      background: rgba(255,255,255,0.02);
+      margin-bottom: var(--space-8);
+    }
+    .p-bio-age-card__text {
+      font-family: var(--font-serif);
+      font-size: 15px;
+      line-height: 1.65;
+      color: rgba(255,255,255,0.82);
+    }
+    .p-visceral-card {
+      border-left: 3px solid var(--p-red);
+      padding: var(--space-5) var(--space-6);
+      background: rgba(239,68,68,0.04);
+      margin-bottom: var(--space-6);
+    }
+    .p-visceral-card__title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--p-red);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-2);
+    }
+    .p-visceral-card__text {
+      font-family: var(--font-serif);
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-muted);
+    }
+    .p-bone-line {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: var(--space-3) 0;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       TAPE MEASUREMENTS
+       ═══════════════════════════════════════════════════════ */
+    .p-tape-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .p-tape-header {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+      margin-bottom: var(--space-6);
+    }
+    .p-tape-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-6);
+      margin-bottom: var(--space-8);
+    }
+    .p-tape-col__title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--p-blue);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-3);
+    }
+    .p-tape-item {
+      display: flex;
+      justify-content: space-between;
+      padding: var(--space-2) 0;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .p-tape-item__label {
+      font-family: var(--font-serif);
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .p-tape-item__value {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text);
+    }
+    .p-whr-card {
+      border: 1px solid rgba(239,68,68,0.2);
+      border-left: 3px solid var(--p-red);
+      padding: var(--space-5) var(--space-6);
+      background: rgba(239,68,68,0.04);
+      margin-bottom: var(--space-6);
+    }
+    .p-whr-card__title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--p-red);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-3);
+    }
+    .p-whr-card__ratio {
+      font-family: var(--font-display);
+      font-size: 28px;
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .p-whr-bar {
+      width: 100%;
+      height: 8px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 4px;
+      position: relative;
+      margin-bottom: var(--space-3);
+    }
+    .p-whr-bar__fill {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--p-green), var(--p-amber), var(--p-red));
+    }
+    .p-whr-bar__target {
+      position: absolute;
+      top: -4px;
+      width: 2px;
+      height: 16px;
+      background: var(--p-green);
+    }
+    .p-whr-card__text {
+      font-family: var(--font-serif);
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-muted);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       AI ANALYSIS CARD
+       ═══════════════════════════════════════════════════════ */
+    .p-ai-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       LOADING
+       ═══════════════════════════════════════════════════════ */
+    .p-loading {
+      text-align: center;
+      padding: var(--space-20);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: 0.15em;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       RESPONSIVE
+       ═══════════════════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      .p-hero-grid { grid-template-columns: 1fr; }
+      .p-gauge-row { grid-template-columns: repeat(2, 1fr); }
+      .p-metrics-grid { grid-template-columns: repeat(2, 1fr); }
+      .p-xref { grid-template-columns: 1fr; }
+      .p-method-grid { grid-template-columns: 1fr; }
+      .p-chart-wrap { height: 260px; }
+      .p-dual-wrap { height: 220px; }
+      .p-pullquote { padding-left: var(--page-padding); }
+      .p-dexa-indices { grid-template-columns: 1fr; }
+      .p-tape-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+
+  <style>
+    /* Observatory pillar accent */
+    :root {
+      --obs-accent: var(--p-blue);
+      --obs-accent-dim: rgba(96,165,250,0.4);
+      --obs-accent-bg: rgba(96,165,250,0.06);
+    }
+    .p-hero__eyebrow, .eyebrow { color: var(--obs-accent) !important; }
+  </style>
+</head>
+<body>
+
+<div id="amj-nav"></div>
+<div id="amj-hierarchy-nav"></div>
+<!-- Day X context banner -->
+<div id="day-x-banner" style="
+  margin:0 var(--page-padding);
+  padding:var(--space-3) var(--space-5);
+  background:rgba(96,165,250,0.06);
+  border:1px solid rgba(96,165,250,0.15);
+  border-radius:4px;
+  display:flex;
+  align-items:center;
+  gap:var(--space-3);
+  font-family:var(--font-mono);
+  font-size:var(--text-2xs);
+  letter-spacing:var(--ls-tag);
+">
+  <span class="experiment-counter" data-format="short" style="color:#60a5fa;font-weight:700;"></span>
+  <span style="color:var(--text-muted);"> — Early data. This page gets smarter every week.</span>
+  <a href="/subscribe/" style="color:#60a5fa;text-decoration:none;margin-left:auto;white-space:nowrap;">Follow along &rarr;</a>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     HERO — Weight journey narrative + gauge rings
+     ════════════════════════════════════════════════════════════ -->
+<div class="p-hero">
+  <div class="p-hero-grid">
+    <div>
+      <div class="p-hero__eyebrow">Physical Observatory</div>
+      <h1 class="p-hero__title">The number that <em>started it all.</em></h1>
+      <p class="p-hero__sub">
+        307 lbs on Day 1. If you look at the weight data going back to 2011,
+        a pattern emerges: long disappearances, a sharp reappearance at a high,
+        an aggressive drop, then the cycle repeats. The scale isn&rsquo;t a confession
+        &mdash; it&rsquo;s a pattern detector. This page is where I watch whether this time breaks it.
+      </p>
+      <p class="p-hero__sub-detail">
+        Data from Withings scale. Updated daily.
+      </p>
+    </div>
+    <div class="p-gauge-row">
+      <div class="p-gauge">
+        <div class="p-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-weight-arc" cx="44" cy="44" r="35" fill="none" stroke="#60a5fa" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.5s"/>
+          </svg>
+          <div class="p-gauge__center">
+            <div class="p-gauge__num" id="g-weight-num" style="color:#60a5fa">&mdash;</div>
+            <div class="p-gauge__unit">lbs</div>
+          </div>
+        </div>
+        <div class="p-gauge__label">Current weight</div>
+      </div>
+      <div class="p-gauge">
+        <div class="p-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-lost-arc" cx="44" cy="44" r="35" fill="none" stroke="#3ecf8e" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.6s"/>
+          </svg>
+          <div class="p-gauge__center">
+            <div class="p-gauge__num" id="g-lost-num" style="color:#3ecf8e">&mdash;</div>
+            <div class="p-gauge__unit">lbs lost</div>
+          </div>
+        </div>
+        <div class="p-gauge__label">Total lost</div>
+      </div>
+      <div class="p-gauge">
+        <div class="p-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-rate-arc" cx="44" cy="44" r="35" fill="none" stroke="#f59e0b" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.7s"/>
+          </svg>
+          <div class="p-gauge__center">
+            <div class="p-gauge__num" id="g-rate-num" style="color:#f59e0b">&mdash;</div>
+            <div class="p-gauge__unit">lbs/wk</div>
+          </div>
+        </div>
+        <div class="p-gauge__label">Weekly rate</div>
+      </div>
+      <div class="p-gauge">
+        <div class="p-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="g-pct-arc" cx="44" cy="44" r="35" fill="none" stroke="#818cf8" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.8s"/>
+          </svg>
+          <div class="p-gauge__center">
+            <div class="p-gauge__num" id="g-pct-num" style="color:#818cf8">&mdash;</div>
+            <div class="p-gauge__unit">%</div>
+          </div>
+        </div>
+        <div class="p-gauge__label">Progress</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="obs-freshness" style="display:none"></div>
+<div id="obs-thisweek" style="display:none"></div>
+
+<div id="p-loading" class="p-loading">LOADING PHYSICAL DATA&hellip;</div>
+<div id="p-content" style="display:none">
+
+<!-- ════════════════════════════════════════════════════════════
+     PULL-QUOTE
+     ════════════════════════════════════════════════════════════ -->
+<div class="p-pullquote reveal">
+  <div class="p-pullquote__watermark">01</div>
+  <div class="p-pullquote__text">
+    The scale is the <em>least interesting</em> number here.
+    The trajectory is the story.
+  </div>
+  <div class="p-pullquote__attr">
+    <span class="p-pullquote__badge">Observation &middot; Verified</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     WEIGHT TRAJECTORY CHART
+     ════════════════════════════════════════════════════════════ -->
+<section class="p-trajectory-section reveal" id="p-trajectory">
+  <div class="p-section-header">Weight trajectory</div>
+  <div class="p-toggle-row">
+    <button class="p-toggle" data-range="30">30d</button>
+    <button class="p-toggle" data-range="90">90d</button>
+    <button class="p-toggle active" data-range="all">Full Journey</button>
+  </div>
+  <div class="p-chart-wrap">
+    <canvas id="p-weight-canvas"></canvas>
+  </div>
+  <div style="display:flex;gap:var(--space-4);margin-top:var(--space-3);justify-content:flex-end;">
+    <div style="display:flex;align-items:center;gap:4px;font:10px monospace;color:rgba(255,255,255,0.4)"><div style="width:8px;height:2px;background:rgba(96,165,250,0.4)"></div> Daily</div>
+    <div style="display:flex;align-items:center;gap:4px;font:10px monospace;color:rgba(255,255,255,0.4)"><div style="width:12px;height:2px;background:#60a5fa"></div> 7d Avg</div>
+    <div style="display:flex;align-items:center;gap:4px;font:10px monospace;color:rgba(255,255,255,0.4)"><div style="width:12px;height:2px;background:rgba(239,68,68,0.3);border-top:1px dashed rgba(239,68,68,0.3)"></div> Start</div>
+    <div style="display:flex;align-items:center;gap:4px;font:10px monospace;color:rgba(255,255,255,0.4)"><div style="width:12px;height:2px;background:rgba(62,207,142,0.3);border-top:1px dashed rgba(62,207,142,0.3)"></div> Goal</div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     KEY METRICS
+     ════════════════════════════════════════════════════════════ -->
+<section class="p-metrics-section reveal" id="p-metrics">
+  <div class="p-section-header">Key metrics</div>
+  <div class="p-metrics-grid">
+    <div class="p-metric">
+      <div class="p-metric__num" id="m-start">&mdash;</div>
+      <div class="p-metric__label">Start weight</div>
+      <div class="p-metric__sub" id="m-start-date"></div>
+    </div>
+    <div class="p-metric">
+      <div class="p-metric__num" id="m-current">&mdash;</div>
+      <div class="p-metric__label">Current weight</div>
+    </div>
+    <div class="p-metric">
+      <div class="p-metric__num" id="m-goal">&mdash;</div>
+      <div class="p-metric__label">Goal weight</div>
+    </div>
+    <div class="p-metric">
+      <div class="p-metric__num" id="m-lost">&mdash;</div>
+      <div class="p-metric__label">Total lost</div>
+      <div class="p-metric__sub" id="m-remaining"></div>
+    </div>
+    <div class="p-metric">
+      <div class="p-metric__num" id="m-eta">&mdash;</div>
+      <div class="p-metric__label">Est. goal date</div>
+      <div class="p-metric__sub" id="m-days-to-go"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     V2: WEIGHT VS CALORIES — dual-axis chart
+     ════════════════════════════════════════════════════════════ -->
+<section class="p-dual-section reveal" id="p-dual-cal" style="display:none">
+  <div class="p-section-header">Weight vs. caloric intake</div>
+  <div class="p-dual-wrap">
+    <canvas id="p-dual-cal-canvas"></canvas>
+  </div>
+  <div class="p-dual-legend">
+    <div class="p-dual-legend__item"><div style="width:12px;height:2px;background:#60a5fa"></div> Weight (7d avg)</div>
+    <div class="p-dual-legend__item"><div style="width:8px;height:8px;border-radius:2px;background:rgba(245,158,11,0.5)"></div> Calories</div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     V2: WEIGHT VS TRAINING VOLUME — dual-axis chart
+     ════════════════════════════════════════════════════════════ -->
+<section class="p-dual-section reveal" id="p-dual-train" style="display:none">
+  <div class="p-section-header">Weight vs. training volume</div>
+  <div class="p-dual-wrap">
+    <canvas id="p-dual-train-canvas"></canvas>
+  </div>
+  <div class="p-dual-legend">
+    <div class="p-dual-legend__item"><div style="width:12px;height:2px;background:#60a5fa"></div> Weight (7d avg)</div>
+    <div class="p-dual-legend__item"><div style="width:8px;height:8px;border-radius:2px;background:rgba(239,68,68,0.4)"></div> Training min</div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     DEXA BODY COMPOSITION
+     ════════════════════════════════════════════════════════════ -->
+<section class="p-dexa-section reveal" id="p-dexa" style="display:none">
+  <div class="p-section-header">DEXA Body Composition</div>
+  <div class="p-dexa-header-row" id="p-dexa-header"></div>
+  <table class="p-dexa-table" id="p-dexa-table">
+    <thead><tr><th>Metric</th><th>Baseline</th><th>Change</th><th>Current</th></tr></thead>
+    <tbody id="p-dexa-tbody"></tbody>
+  </table>
+  <div class="p-dexa-indices" id="p-dexa-indices"></div>
+  <div class="p-bio-age-card" id="p-bio-age" style="display:none">
+    <div class="p-bio-age-card__text" id="p-bio-age-text"></div>
+  </div>
+  <div class="p-visceral-card" id="p-visceral" style="display:none">
+    <div class="p-visceral-card__title">Visceral Fat — Priority Target</div>
+    <div class="p-visceral-card__text" id="p-visceral-text"></div>
+  </div>
+  <div class="p-bone-line" id="p-bone-line"></div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     TAPE MEASUREMENTS
+     ════════════════════════════════════════════════════════════ -->
+<section class="p-tape-section reveal" id="p-tape" style="display:none">
+  <div class="p-section-header">Tape Measurements</div>
+  <div class="p-tape-header" id="p-tape-header"></div>
+  <div class="p-tape-grid" id="p-tape-grid"></div>
+  <div class="p-whr-card" id="p-whr" style="display:none">
+    <div class="p-whr-card__title">Waist-to-Height Ratio</div>
+    <div class="p-whr-card__ratio" id="p-whr-ratio"></div>
+    <div class="p-whr-bar">
+      <div class="p-whr-bar__fill" id="p-whr-fill"></div>
+      <div class="p-whr-bar__target" id="p-whr-target"></div>
+    </div>
+    <div class="p-whr-card__text" id="p-whr-text"></div>
+  </div>
+  <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:0.06em;margin-top:var(--space-4)" id="p-tape-trend-note"></div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     AI EXPERT ANALYSIS
+     ════════════════════════════════════════════════════════════ -->
+<section class="p-ai-section reveal">
+  <div class="p-section-header">Dr. Reyes's Assessment</div>
+  <div id="p-ai-analysis"></div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     CROSS-LINKS
+     ════════════════════════════════════════════════════════════ -->
+<div class="p-xref reveal">
+  <a href="/nutrition/" class="p-xref-card">
+    <div class="p-xref-card__title">Nutrition Observatory &rarr;</div>
+    <div class="p-xref-card__sub">Calories, protein adherence, and what fueling a deficit looks like.</div>
+  </a>
+  <a href="/training/" class="p-xref-card">
+    <div class="p-xref-card__title">Training Observatory &rarr;</div>
+    <div class="p-xref-card__sub">Zone 2, strength sessions, and the exercise that protects lean mass.</div>
+  </a>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     METHODOLOGY
+     ════════════════════════════════════════════════════════════ -->
+<div class="p-method reveal">
+  <div class="p-section-header">Methodology</div>
+  <div class="p-method-grid">
+    <div>
+      <div class="p-method-col__title">Withings Scale</div>
+      <div class="p-method-col__text">Daily weigh-ins via Withings Body+ smart scale. Weight synced to DynamoDB via API. Raw readings &mdash; no smoothing applied at ingestion.</div>
+    </div>
+    <div>
+      <div class="p-method-col__title">Moving Average</div>
+      <div class="p-method-col__text">7-day rolling average computed client-side from raw daily readings. Smooths water weight fluctuations to reveal the real trajectory.</div>
+    </div>
+    <div>
+      <div class="p-method-col__title">Weekly Rate</div>
+      <div class="p-method-col__text">Linear regression on the most recent 28 days of data. Projected goal date extrapolates from this rate assuming sustained adherence.</div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /p-content -->
+
+<div id="obs-insight"></div>
+
+<div id="amj-discord-section-break"></div>
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+<div id="amj-footer"></div>
+
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+<script src="/assets/js/engagement.js"></script>
+<script src="/assets/js/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(async function() {
+  var API = 'https://averagejoematt.com';
+  var loading = document.getElementById('p-loading');
+  var content = document.getElementById('p-content');
+  var setText = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+  var circ = 2 * Math.PI * 35;
+
+  function setArc(id, pct) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var len = (Math.min(pct, 100) / 100) * circ;
+    el.setAttribute('stroke-dasharray', len + ' ' + (circ - len));
+  }
+
+  try {
+    /* Fetch weight, journey, nutrition, training, and physical overview data in parallel */
+    var results = await Promise.all([
+      fetch(API + '/api/weight_progress').then(function(r) { return r.json(); }),
+      fetch(API + '/api/journey').then(function(r) { return r.json(); }),
+      fetch(API + '/api/nutrition_overview').then(function(r) { return r.json(); }).catch(function() { return {}; }),
+      fetch(API + '/api/training_overview').then(function(r) { return r.json(); }).catch(function() { return {}; }),
+      fetch(API + '/api/physical_overview').then(function(r) { return r.json(); }).catch(function() { return {}; })
+    ]);
+    var weightData = (results[0].weight_progress || []);
+    var j = results[1].journey;
+    var nutData = results[2];
+    var trainData = results[3];
+    var physData = results[4];
+
+    if (!j && weightData.length === 0) {
+      loading.textContent = 'No physical data yet.';
+      return;
+    }
+    if (!j) j = {};
+
+    /* ── Hero gauges ── */
+    var curW = j.current_weight_lbs || 0;
+    var startW = j.start_weight_lbs || 302;
+    var goalW = j.goal_weight_lbs || 185;
+    var lostLbs = j.lost_lbs || 0;
+    var totalToLose = startW - goalW;
+    var rate = j.weekly_rate_lbs || 0;
+    var progPct = j.progress_pct || 0;
+
+    setText('g-weight-num', curW ? Math.round(curW) : '\u2014');
+    setArc('g-weight-arc', curW ? Math.min(100, (1 - (curW - goalW) / (startW - goalW)) * 100) : 0);
+
+    setText('g-lost-num', lostLbs ? Math.round(lostLbs) : '\u2014');
+    setArc('g-lost-arc', totalToLose > 0 ? Math.min(100, (lostLbs / totalToLose) * 100) : 0);
+
+    setText('g-rate-num', rate ? Math.abs(rate).toFixed(1) : '\u2014');
+    setArc('g-rate-arc', Math.min(100, (Math.abs(rate) / 3) * 100));
+
+    setText('g-pct-num', progPct ? Math.round(progPct) : '\u2014');
+    setArc('g-pct-arc', progPct || 0);
+
+    /* ── Key Metrics ── */
+    setText('m-start', startW ? startW + ' lbs' : '\u2014');
+    setText('m-start-date', j.started_date || '');
+    setText('m-current', curW ? Math.round(curW * 10) / 10 + ' lbs' : '\u2014');
+    setText('m-goal', goalW ? goalW + ' lbs' : '\u2014');
+    setText('m-lost', lostLbs ? Math.round(lostLbs * 10) / 10 + ' lbs' : '\u2014');
+    setText('m-remaining', j.remaining_lbs ? Math.round(j.remaining_lbs) + ' lbs remaining' : '');
+    setText('m-eta', j.projected_goal_date || '\u2014');
+    setText('m-days-to-go', j.days_to_goal ? j.days_to_goal + ' days to go' : '');
+
+    /* ── Weight Trajectory Chart ── */
+    if (typeof Chart !== 'undefined' && weightData.length >= 3) {
+      Chart.defaults.color = 'rgba(255,255,255,0.5)';
+      Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+      Chart.defaults.font.family = 'monospace';
+
+      var allWeightData = weightData;
+      var weightChart = null;
+
+      function buildChart(data) {
+        var labels = data.map(function(d) { return d.date; });
+        var raw = data.map(function(d) { return d.weight_lbs; });
+
+        /* 7-day moving average */
+        var ma7 = raw.map(function(_, i, arr) {
+          if (i < 6) return null;
+          var sum = 0;
+          for (var k = i - 6; k <= i; k++) sum += arr[k];
+          return Math.round(sum / 7 * 10) / 10;
+        });
+
+        var datasets = [
+          {
+            label: 'Daily Weight', data: raw,
+            borderColor: 'rgba(96,165,250,0.4)', backgroundColor: 'rgba(96,165,250,0.05)',
+            borderWidth: 1, pointRadius: 1.5, pointBackgroundColor: 'rgba(96,165,250,0.5)',
+            fill: true, tension: 0, order: 2
+          },
+          {
+            label: '7-Day Average', data: ma7,
+            borderColor: '#60a5fa', borderWidth: 2.5,
+            pointRadius: 0, fill: false, tension: 0.3, spanGaps: true, order: 1
+          }
+        ];
+
+        /* Reference lines */
+        if (startW) {
+          datasets.push({
+            label: 'Start (' + startW + ')', data: Array(data.length).fill(startW),
+            borderColor: 'rgba(239,68,68,0.3)', borderWidth: 1, borderDash: [5, 5],
+            pointRadius: 0, fill: false, order: 0
+          });
+        }
+        if (goalW) {
+          datasets.push({
+            label: 'Goal (' + goalW + ')', data: Array(data.length).fill(goalW),
+            borderColor: 'rgba(62,207,142,0.3)', borderWidth: 1, borderDash: [5, 5],
+            pointRadius: 0, fill: false, order: 0
+          });
+        }
+
+        /* Compute y-axis range */
+        var allVals = raw.filter(function(v) { return v != null; });
+        if (startW) allVals.push(startW);
+        if (goalW) allVals.push(goalW);
+        var yMin = Math.floor(Math.min.apply(null, allVals) / 10) * 10 - 5;
+        var yMax = Math.ceil(Math.max.apply(null, allVals) / 10) * 10 + 5;
+
+        return {
+          type: 'line',
+          data: { labels: labels, datasets: datasets },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: function(ctx) { return ctx.dataset.label + ': ' + ctx.raw + ' lbs'; }
+                }
+              }
+            },
+            scales: {
+              x: {
+                ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, maxTicksLimit: 12, maxRotation: 45 },
+                grid: { color: 'rgba(255,255,255,0.03)' }
+              },
+              y: {
+                min: yMin, max: yMax,
+                ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 } },
+                grid: { color: 'rgba(255,255,255,0.03)' },
+                title: { display: true, text: 'lbs', color: 'rgba(255,255,255,0.25)', font: { size: 10 } }
+              }
+            }
+          }
+        };
+      }
+
+      function updateChart(data) {
+        if (weightChart) weightChart.destroy();
+        weightChart = new Chart(document.getElementById('p-weight-canvas'), buildChart(data));
+      }
+
+      /* Initial render — full journey */
+      updateChart(allWeightData);
+
+      /* Toggle buttons */
+      document.querySelectorAll('.p-toggle').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          document.querySelectorAll('.p-toggle').forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          var range = btn.dataset.range;
+          if (range === 'all') {
+            updateChart(allWeightData);
+          } else {
+            var days = parseInt(range);
+            var cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - days);
+            var filtered = allWeightData.filter(function(d) {
+              return new Date(d.date) >= cutoff;
+            });
+            updateChart(filtered.length >= 2 ? filtered : allWeightData);
+          }
+        });
+      });
+    }
+
+    /* ── V2: Weight vs Calories dual-axis chart ── */
+    var nutTrend = (nutData.nutrition_trend || []);
+    if (typeof Chart !== 'undefined' && weightData.length >= 7 && nutTrend.length >= 7) {
+      /* Align dates — only show days where both weight and nutrition data exist */
+      var weightByDate = {};
+      weightData.forEach(function(d) { weightByDate[d.date] = d.weight_lbs; });
+      var alignedCal = nutTrend.filter(function(d) { return weightByDate[d.date] != null && d.calories != null; });
+      if (alignedCal.length >= 5) {
+        document.getElementById('p-dual-cal').style.display = '';
+        var calDates = alignedCal.map(function(d) { return d.date.slice(5); });
+        var calWeights = alignedCal.map(function(d) { return weightByDate[d.date]; });
+        var calVals = alignedCal.map(function(d) { return d.calories; });
+        /* 7-day MA for weight */
+        var calWma = calWeights.map(function(_, i, arr) {
+          if (i < 6) return null;
+          var s = 0; for (var k = i - 6; k <= i; k++) s += arr[k]; return Math.round(s / 7 * 10) / 10;
+        });
+
+        new Chart(document.getElementById('p-dual-cal-canvas'), {
+          type: 'bar',
+          data: {
+            labels: calDates,
+            datasets: [
+              { label: 'Calories', data: calVals, backgroundColor: 'rgba(245,158,11,0.5)', borderRadius: 2, yAxisID: 'y1', order: 2 },
+              { label: 'Weight (7d avg)', type: 'line', data: calWma, borderColor: '#60a5fa', borderWidth: 2.5, pointRadius: 0, fill: false, tension: 0.3, spanGaps: true, yAxisID: 'y', order: 1 }
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, maxRotation: 45 }, grid: { display: false } },
+              y: { position: 'left', ticks: { color: '#60a5fa', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.03)' }, title: { display: true, text: 'lbs', color: '#60a5fa', font: { size: 10 } } },
+              y1: { position: 'right', ticks: { color: '#f59e0b', font: { size: 10 } }, grid: { display: false }, title: { display: true, text: 'cal', color: '#f59e0b', font: { size: 10 } } }
+            }
+          }
+        });
+      }
+    }
+
+    /* ── V2: Weight vs Training Volume dual-axis chart ── */
+    var modDaily = (trainData.daily_modality_minutes_30d || []);
+    if (typeof Chart !== 'undefined' && weightData.length >= 7 && modDaily.length >= 7) {
+      var alignedTrain = modDaily.filter(function(d) { return weightByDate && weightByDate[d.date] != null; });
+      if (alignedTrain.length >= 5) {
+        document.getElementById('p-dual-train').style.display = '';
+        var trainDates = alignedTrain.map(function(d) { return d.date.slice(5); });
+        var trainWeights = alignedTrain.map(function(d) { return weightByDate[d.date]; });
+        var trainMins = alignedTrain.map(function(d) { return d.total_min; });
+        var trainWma = trainWeights.map(function(_, i, arr) {
+          if (i < 6) return null;
+          var s = 0; for (var k = i - 6; k <= i; k++) s += arr[k]; return Math.round(s / 7 * 10) / 10;
+        });
+
+        new Chart(document.getElementById('p-dual-train-canvas'), {
+          type: 'bar',
+          data: {
+            labels: trainDates,
+            datasets: [
+              { label: 'Training min', data: trainMins, backgroundColor: 'rgba(239,68,68,0.4)', borderRadius: 2, yAxisID: 'y1', order: 2 },
+              { label: 'Weight (7d avg)', type: 'line', data: trainWma, borderColor: '#60a5fa', borderWidth: 2.5, pointRadius: 0, fill: false, tension: 0.3, spanGaps: true, yAxisID: 'y', order: 1 }
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, maxRotation: 45 }, grid: { display: false } },
+              y: { position: 'left', ticks: { color: '#60a5fa', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.03)' }, title: { display: true, text: 'lbs', color: '#60a5fa', font: { size: 10 } } },
+              y1: { position: 'right', ticks: { color: '#ef4444', font: { size: 10 } }, grid: { display: false }, title: { display: true, text: 'min', color: '#ef4444', font: { size: 10 } } }
+            }
+          }
+        });
+      }
+    }
+
+    /* ── DEXA Body Composition ── */
+    var latestDexa = physData.latest_dexa;
+    var baselineDexa = physData.baseline_dexa;
+    if (latestDexa) {
+      document.getElementById('p-dexa').style.display = '';
+
+      /* Header rows */
+      var headerEl = document.getElementById('p-dexa-header');
+      var lbc = latestDexa.body_composition || {};
+      var lbs = latestDexa.body_score || {};
+      var bbc = baselineDexa ? (baselineDexa.body_composition || {}) : {};
+      var bbs = baselineDexa ? (baselineDexa.body_score || {}) : {};
+
+      var latestDate = new Date(latestDexa.scan_date + 'T00:00:00');
+      var fmtDate = function(d) { return d.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'}).toUpperCase(); };
+      var gradeColor = function(g) {
+        if (!g) return '#888';
+        if (g.startsWith('A')) return '#3ecf8e';
+        if (g.startsWith('B')) return '#f59e0b';
+        return '#ef4444';
+      };
+      var hdr = '<div class="p-dexa-scan-line"><span style="color:var(--p-blue)">LATEST SCAN:</span> ' +
+        fmtDate(latestDate) + ' · Body Score: <span class="grade" style="background:' +
+        gradeColor(lbs.grade) + ';color:#000">' + (lbs.grade || '—') + '</span></div>';
+      if (baselineDexa) {
+        var bDate = new Date(baselineDexa.scan_date + 'T00:00:00');
+        hdr += '<div class="p-dexa-scan-line"><span style="color:var(--text-faint)">BASELINE:</span> ' +
+          fmtDate(bDate) + ' · Body Score: <span class="grade" style="background:' +
+          gradeColor(bbs.grade) + ';color:#000">' + (bbs.grade || '—') + '</span></div>';
+      }
+      headerEl.innerHTML = hdr;
+
+      /* Data table */
+      var rows = [
+        { label: 'Body Fat %', base: bbc.body_fat_pct, cur: lbc.body_fat_pct, unit: '%', bad: true },
+        { label: 'Fat Mass', base: bbc.fat_mass_lb, cur: lbc.fat_mass_lb, unit: ' lbs', bad: true },
+        { label: 'Lean Mass', base: bbc.lean_mass_lb, cur: lbc.lean_mass_lb, unit: ' lbs', bad: false },
+        { label: 'Visceral Fat', base: bbc.visceral_fat_lb, cur: lbc.visceral_fat_lb, unit: ' lbs', bad: true },
+        { label: 'Body Weight', base: bbc.total_mass_lb, cur: lbc.total_mass_lb, unit: ' lbs', bad: true },
+      ];
+      var tbody = document.getElementById('p-dexa-tbody');
+      tbody.innerHTML = rows.map(function(r) {
+        var delta = (r.base != null && r.cur != null) ? (r.cur - r.base) : null;
+        var deltaStr = delta != null ? ((delta >= 0 ? '↑ +' : '↓ ') + Math.abs(delta).toFixed(1) + r.unit) : '—';
+        var deltaClass = delta != null ? (delta > 0 ? (r.bad ? 'delta-up-bad' : 'delta-up-good') : (r.bad ? 'delta-up-good' : 'delta-up-bad')) : '';
+        return '<tr><td>' + r.label + '</td><td>' + (r.base != null ? r.base + r.unit : '—') +
+          '</td><td class="' + deltaClass + '">' + deltaStr + '</td><td style="color:var(--text)">' +
+          (r.cur != null ? r.cur + r.unit : '—') + '</td></tr>';
+      }).join('');
+
+      /* Indices badges */
+      var idx = latestDexa.indices;
+      if (idx) {
+        var idxEl = document.getElementById('p-dexa-indices');
+        var badges = [
+          { val: idx.almi_kg_m2, label: 'ALMI', sub: (idx.almi_percentile ? idx.almi_percentile + 'th percentile — elite' : ''), color: '#3ecf8e' },
+          { val: idx.ffmi_kg_m2, label: 'FFMI', sub: (idx.ffmi_rating || '').replace(/_/g, ' '), color: '#60a5fa' },
+          { val: idx.fmi_kg_m2, label: 'FMI', sub: (idx.fmi_rating || '').replace(/_/g, ' '), color: '#ef4444' },
+        ];
+        idxEl.innerHTML = badges.map(function(b) {
+          return '<div class="p-index-badge"><div class="p-index-badge__value" style="color:' + b.color + '">' +
+            (b.val || '—') + '</div><div class="p-index-badge__label">' + b.label + ' kg/m²</div>' +
+            '<div class="p-index-badge__sub" style="color:' + b.color + '">' + b.sub + '</div></div>';
+        }).join('');
+      }
+
+      /* Biological age */
+      var s360 = latestDexa.score_360;
+      if (s360 && s360.biological_age) {
+        var bioEl = document.getElementById('p-bio-age');
+        bioEl.style.display = '';
+        document.getElementById('p-bio-age-text').innerHTML =
+          '<span style="font-family:var(--font-mono);font-size:11px;color:var(--p-blue);letter-spacing:0.08em;text-transform:uppercase;display:block;margin-bottom:8px">Biological Age: ' +
+          s360.biological_age + '  ·  Chronological: ' + s360.chronological_age + '  ·  Delta: ' +
+          (s360.biological_age_delta > 0 ? '+' : '') + s360.biological_age_delta + ' years</span>' +
+          'Despite significant weight gain, lean mass indices remain elite — the foundation for transformation is already built.';
+      }
+
+      /* Visceral fat card */
+      if (lbc.visceral_fat_lb) {
+        var viscEl = document.getElementById('p-visceral');
+        viscEl.style.display = '';
+        var vfg = lbc.visceral_fat_g || Math.round(lbc.visceral_fat_lb * 453.592);
+        document.getElementById('p-visceral-text').innerHTML =
+          '<strong>Visceral fat: ' + lbc.visceral_fat_lb + ' lbs (' + vfg.toLocaleString() + 'g)</strong><br>' +
+          'Target: &lt; 1.00 lb (Attia: &lt;1,000g for metabolic health)<br>' +
+          'Elevated visceral fat is the highest-priority metabolic target. Responds rapidly to dietary intervention — typically within 8–12 weeks.';
+      }
+
+      /* Bone line */
+      var bone = latestDexa.bone || {};
+      if (bone.t_score != null) {
+        var baseBone = baselineDexa ? (baselineDexa.bone || {}) : {};
+        var boneLine = 'Bone mineral density: T-score ' + bone.t_score;
+        if (baseBone.t_score != null) boneLine += '  ·  Down from ' + baseBone.t_score + ' baseline';
+        boneLine += '  ·  Still elite (94th %tile)';
+        document.getElementById('p-bone-line').textContent = boneLine;
+      }
+    }
+
+    /* ── Tape Measurements ── */
+    var tape = physData.tape_measurements;
+    if (tape) {
+      document.getElementById('p-tape').style.display = '';
+      var tapeCount = physData.tape_session_count || 1;
+      document.getElementById('p-tape-header').innerHTML =
+        'SESSION ' + tape.session_number + ' OF ' + tapeCount +
+        '  ·  Captured: ' + new Date(tape.session_date + 'T00:00:00').toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'}) +
+        '  ·  Next session: ~May 2026';
+
+      var trunkItems = [
+        ['Waist (navel)', tape.waist_navel_in],
+        ['Waist (narrowest)', tape.waist_narrowest_in],
+        ['Hips', tape.hips_in],
+        ['Chest', tape.chest_in],
+        ['Neck', tape.neck_in],
+      ];
+      var limbItems = [
+        ['Bicep L (relaxed)', tape.bicep_relaxed_left_in],
+        ['Bicep R (relaxed)', tape.bicep_relaxed_right_in],
+        ['Bicep L (flexed)', tape.bicep_flexed_left_in],
+        ['Bicep R (flexed)', tape.bicep_flexed_right_in],
+        ['Thigh L', tape.thigh_left_in],
+        ['Thigh R', tape.thigh_right_in],
+        ['Calf', tape.calf_left_in || tape.calf_in],
+      ];
+      var makeItems = function(items) {
+        return items.filter(function(i) { return i[1] != null; }).map(function(i) {
+          return '<div class="p-tape-item"><span class="p-tape-item__label">' + i[0] +
+            '</span><span class="p-tape-item__value">' + i[1] + '"</span></div>';
+        }).join('');
+      };
+      document.getElementById('p-tape-grid').innerHTML =
+        '<div><div class="p-tape-col__title">Trunk</div>' + makeItems(trunkItems) + '</div>' +
+        '<div><div class="p-tape-col__title">Limbs</div>' + makeItems(limbItems) + '</div>';
+
+      /* WHR card */
+      var whr = tape.derived ? tape.derived.waist_height_ratio : null;
+      if (whr) {
+        document.getElementById('p-whr').style.display = '';
+        document.getElementById('p-whr-ratio').textContent = whr.toFixed(3);
+        var whrPct = Math.min(100, (whr / 1.0) * 100);
+        document.getElementById('p-whr-fill').style.width = whrPct + '%';
+        var targetPct = (0.5 / 1.0) * 100;
+        document.getElementById('p-whr-target').style.left = targetPct + '%';
+        document.getElementById('p-whr-text').innerHTML =
+          '<strong>Target: &lt; 0.500</strong><br>' +
+          'Dr. Peter Attia: This is the single most predictive anthropometric measurement for metabolic health and all-cause mortality. ' +
+          'Current ratio (' + whr.toFixed(3) + ') is ' +
+          (whr > 0.6 ? 'above the high-risk threshold of 0.600.' : whr > 0.5 ? 'above target but below the high-risk threshold.' : 'at or below target — excellent.');
+      }
+
+      if (tapeCount < 2) {
+        document.getElementById('p-tape-trend-note').textContent =
+          'Trend charts will appear after session 2 (~4–8 weeks).';
+      }
+    }
+
+    /* ── AI Expert Analysis Card ── */
+    var aiEl = document.getElementById('p-ai-analysis');
+    if (aiEl) {
+      aiEl.innerHTML = '<div style="font-family:monospace;font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:0.1em">LOADING DR. REYES\'S ASSESSMENT...</div>';
+      fetch(API + '/api/ai_analysis?expert=physical').then(function(r) { return r.json(); }).then(function(data) {
+        if (!data.analysis) {
+          aiEl.innerHTML = '<div style="font-family:var(--font-serif);font-size:13px;color:var(--text-faint)">Analysis generates weekly. Check back Monday.</div>';
+          return;
+        }
+        var date = data.generated_at ? new Date(data.generated_at).toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'}) : '';
+        aiEl.innerHTML = '<div style="border-left:3px solid var(--p-blue);padding:20px 24px;background:rgba(255,255,255,0.02)">' +
+          '<div style="font-family:monospace;font-size:11px;color:var(--p-blue);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:12px">Dr. Victor Reyes\'s Assessment</div>' +
+          '<div style="font-family:var(--font-serif);font-size:15px;line-height:1.75;color:rgba(255,255,255,0.82)">' +
+          data.analysis.split('\n\n').map(function(p) { return '<p style="margin-top:12px">' + p + '</p>'; }).join('') + '</div>' +
+          '<div style="margin-top:16px;font-family:monospace;font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:0.08em">' +
+          'Generated ' + date + ' · Based on DEXA, measurements, and weight trajectory</div></div>';
+      }).catch(function() {
+        aiEl.innerHTML = '<div style="font-family:var(--font-serif);font-size:13px;color:var(--text-faint)">Analysis unavailable.</div>';
+      });
+    }
+
+    loading.style.display = 'none';
+    content.style.display = 'block';
+
+  } catch (e) {
+    console.error('Physical data error:', e);
+    loading.textContent = 'Could not load physical data.';
+  }
+})();
+</script>
+
+</body>
+</html>

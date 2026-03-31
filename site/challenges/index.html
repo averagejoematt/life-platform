@@ -79,7 +79,7 @@
     }
     .arena-stat__label {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       color: var(--text-muted);
@@ -207,7 +207,7 @@
       border-radius: 50%;
       border: 2px solid var(--border);
       display: flex; align-items: center; justify-content: center;
-      font-size: 9px;
+      font-size:var(--text-3xs);
       color: var(--text-faint);
       flex-shrink: 0;
     }
@@ -285,7 +285,7 @@
       background: var(--surface-raised);
       padding: 1px 5px;
       border-radius: 8px;
-      font-size: 9px;
+      font-size:var(--text-3xs);
     }
     .cat-tab.active .cat-tab__count { background: var(--ar-bg); }
 
@@ -303,7 +303,7 @@
     }
     .filter-row__label {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       letter-spacing: var(--ls-tag);
       text-transform: uppercase;
       color: var(--text-faint);
@@ -358,14 +358,14 @@
     .board-pick-card__icon { font-size: 28px; line-height: 1; }
     .board-pick-card__name {
       font-family: var(--font-display);
-      font-size: 13px;
+      font-size: var(--text-sm);
       color: var(--text);
       letter-spacing: var(--ls-display);
       line-height: 1.3;
     }
     .board-pick-card__meta {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       color: var(--text-faint);
       letter-spacing: var(--ls-label);
     }
@@ -455,7 +455,7 @@
     .tile:hover .tile__icon { transform: scale(1.1); }
     .tile__name {
       font-family: var(--font-display);
-      font-size: 15px;
+      font-size: var(--text-base);
       color: var(--text);
       letter-spacing: var(--ls-display);
       line-height: 1.3;
@@ -476,7 +476,7 @@
     }
     .tile__duration {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       color: var(--text-faint);
       letter-spacing: var(--ls-label);
     }
@@ -600,7 +600,7 @@
     }
     .detail-meta-item__label {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: var(--ls-tag);
@@ -683,7 +683,7 @@
     .record-row__icon { font-size: 20px; text-align: center; }
     .record-row__name {
       font-family: var(--font-display);
-      font-size: 15px;
+      font-size: var(--text-base);
       color: var(--text);
     }
     .record-row__detail {
@@ -741,7 +741,7 @@
       .hero-active { grid-template-columns: 60px 1fr; }
       .hero-active__ring { display: none; }
       .tile-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-3); }
-      .tile__name { font-size: 13px; }
+      .tile__name { font-size: var(--text-sm); }
       .tile__icon { font-size: 28px; }
       .filter-row { gap: var(--space-1); }
       .board-pick-card { min-width: 140px; }
@@ -1009,6 +1009,7 @@
           '</button>' +
         '</div>' +
         (targets ? '<div class="tile__targets">Targets: ' + targets + '</div>' : '') +
+        (window._ledgerIds && window._ledgerIds[ch.id] ? '<div style="font-size:var(--text-xs,11px);color:var(--text-muted);margin-top:var(--space-2);font-family:var(--font-mono);letter-spacing:0.04em">This carries a stake &rarr; <a href="/ledger/" style="color:var(--accent);text-decoration:none">The Ledger</a></div>' : '') +
       '</div>';
     });
     document.getElementById('tile-grid').innerHTML = html || '<div style="grid-column:1/-1;text-align:center;padding:var(--space-10);color:var(--text-faint)">No challenges matching filters</div>';
@@ -1264,6 +1265,15 @@
             document.getElementById('tile-grid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:var(--space-10);color:var(--text-faint)">Could not load challenges — try refreshing</div>';
           });
       });
+
+    // Load ledger source IDs for stake indicators
+    window._ledgerIds = {};
+    fetch(API + '/ledger').then(function(r) { return r.ok ? r.json() : {}; }).then(function(ld) {
+      var all = (ld.by_event || {}).earned || [];
+      all = all.concat((ld.by_event || {}).reluctant || []);
+      all.forEach(function(e) { if (e.source_id) window._ledgerIds[e.source_id] = true; });
+      renderTiles();
+    }).catch(function() {});
 
     // Load dynamic status (active/completed from DynamoDB)
     fetch(API + '/challenges')

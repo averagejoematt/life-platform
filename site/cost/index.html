@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="How I run a personal AI health operating system on AWS for ~$13/month. Real cost breakdown with receipts.">
-  <meta property="og:title" content="The $13/Month AI Health OS — Matthew">
+  <meta name="description" content="How I run a personal AI health operating system on AWS for ~$19/month. Real cost breakdown with receipts.">
+  <meta property="og:title" content="The $19/Month AI Health OS — Matthew">
   <meta property="og:description" content="Lambda, DynamoDB, S3, CloudFront, Claude API. Real AWS numbers. How to build and run this for almost nothing.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com/cost/">
@@ -13,10 +13,10 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="The $13/Month AI Health OS — Matthew">
-  <meta name="twitter:description" content="Real AWS cost breakdown. 25 data sources. 50 Lambdas. 95 AI tools. $13/month.">
+  <meta name="twitter:title" content="The $19/Month AI Health OS — Matthew">
+  <meta name="twitter:description" content="Real AWS cost breakdown. 26 data sources. 61 Lambdas. 118 AI tools. $19/month.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
-  <title>The $13/Month Story — Matthew</title>
+  <title>The $19/Month Story — Matthew</title>
     <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
@@ -292,9 +292,9 @@
 
 <header class="page-header reveal">
   <div class="eyebrow" style="margin-bottom:var(--space-4)">The Build</div>
-  <h1 class="page-header__title">Running a personal AI health OS for <span>~$13/month</span></h1>
+  <h1 class="page-header__title">Running a personal AI health OS for <span>~<span data-const="platform.monthly_cost">$19</span>/month</span></h1>
   <p class="page-header__sub">
-    <span data-const="platform.lambdas">50</span> Lambda functions. <span data-const="platform.data_sources">19</span> data source integrations. <span data-const="platform.mcp_tools">95</span> AI tools. A public website serving live health data.
+    <span data-const="platform.lambdas">61</span> Lambda functions. <span data-const="platform.data_sources">26</span> data source integrations. <span data-const="platform.mcp_tools">118</span> AI tools. A public website serving live health data.
     Here&rsquo;s the actual AWS bill, every line item, with the architectural decisions that keep it this low.
   </p>
   <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body);margin-top:var(--space-5);max-width:560px;">I publish the bill because the enterprise health world obscures costs. Meaningful health intelligence doesn&rsquo;t require a budget.</p>
@@ -303,13 +303,13 @@
 <!-- Headline cost + honest stack breakdown -->
 <div class="headline-cost reveal">
   <div class="cost-hero">
-    <div class="cost-hero__amount">$13</div>
+    <div class="cost-hero__amount" data-const="platform.monthly_cost">$19</div>
     <div class="cost-hero__label">Per month for the intelligence layer</div>
-    <div class="cost-hero__note">The infrastructure that connects, analyzes, and publishes all health data. Varies $8&ndash;$18 depending on Claude API usage.</div>
+    <div class="cost-hero__note">The infrastructure that connects, analyzes, and publishes all health data. Varies $8&ndash;$22 depending on Claude API usage.</div>
   </div>
   <div class="cost-context">
     <div class="cost-context__compare">What the full stack actually costs</div>
-    <p style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-5);line-height:var(--lh-body);">The $13 doesn&rsquo;t replace the devices &mdash; it&rsquo;s what makes them talk to each other.</p>
+    <p style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-5);line-height:var(--lh-body);">The <span data-const="platform.monthly_cost">$19</span> doesn&rsquo;t replace the devices &mdash; it&rsquo;s what makes them talk to each other.</p>
     <div class="stack-layer stack-layer--sources">
       <div class="stack-layer__label">
         <strong>Data sources</strong>
@@ -322,15 +322,15 @@
         <strong>Intelligence layer</strong>
         <div class="stack-layer__detail">AWS Lambda, DynamoDB, CloudFront, Claude API &mdash; everything on this page</div>
       </div>
-      <span class="stack-layer__cost">~$13/mo</span>
+      <span class="stack-layer__cost">~$19/mo</span>
     </div>
     <div class="stack-total">
       <span class="stack-total__label">Total monthly investment</span>
-      <span class="stack-total__cost">~$78/mo</span>
+      <span class="stack-total__cost">~$84/mo</span>
     </div>
 
     <div class="replaces-section">
-      <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-label);text-transform:uppercase;margin-bottom:var(--space-3);">What the $13 intelligence layer replaces</p>
+      <p style="font-size:var(--text-xs);color:var(--text-faint);font-family:var(--font-mono);letter-spacing:var(--ls-label);text-transform:uppercase;margin-bottom:var(--space-3);">What the <span data-const="platform.monthly_cost">$19</span> intelligence layer replaces</p>
       <div class="replaces-row">
         <span class="replaces-row__name">Personal health analytics platform (Heads Up, etc.)</span>
         <span class="replaces-row__cost">$60&ndash;$150/mo</span>
@@ -370,7 +370,7 @@
     <tbody>
       <tr>
         <td class="td-service">AWS Lambda</td>
-        <td class="td-usage">~5,000 invocations/mo &middot; <span data-const="platform.lambdas">50</span> functions &middot; avg 800ms</td>
+        <td class="td-usage">~5,000 invocations/mo &middot; <span data-const="platform.lambdas">61</span> functions &middot; avg 800ms</td>
         <td class="td-cost">$0.12</td>
         <td class="td-why">// event-driven only — no idle cost; 400K free tier / mo</td>
       </tr>
@@ -577,7 +577,7 @@
 <div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border);text-align:center;">
   <p style="font-family:var(--font-display);font-size:var(--text-h3);color:var(--text);margin-bottom:var(--space-4)">Want the full technical picture?</p>
   <p style="font-size:var(--text-sm);color:var(--text-muted);max-width:480px;margin:0 auto var(--space-8);line-height:var(--lh-body)">
-    The platform page has the complete architecture: all <span data-const="platform.cdk_stacks">8</span> CDK stacks, <span data-const="platform.lambdas">50</span> Lambda functions, the DynamoDB single-table design, and how data flows from <span data-const="platform.data_sources">19</span> wearables to the AI.
+    The platform page has the complete architecture: all <span data-const="platform.cdk_stacks">8</span> CDK stacks, <span data-const="platform.lambdas">61</span> Lambda functions, the DynamoDB single-table design, and how data flows from <span data-const="platform.data_sources">26</span> wearables to the AI.
   </p>
   <a href="/platform/" class="btn">See the full architecture &rarr;</a>
 </div>

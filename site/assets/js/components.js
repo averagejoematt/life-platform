@@ -31,6 +31,7 @@
       { href: '/story/',         text: 'My Story' },
       { href: '/mission/',       text: 'The Mission' },
       { href: '/achievements/',  text: 'Milestones' },
+      { href: '/field-notes/',   text: 'Field Notes' },
       { href: '/first-person/',  text: 'First Person' },
     ]},
     { label: 'The Data', items: [
@@ -38,6 +39,7 @@
       { href: '/glucose/',     text: 'Glucose' },
       { href: '/nutrition/',   text: 'Nutrition' },
       { href: '/training/',    text: 'Training' },
+      { href: '/physical/',   text: 'Physical' },
       { href: '/mind/',        text: 'Inner Life' },
       { href: '/labs/',        text: 'Labs' },
       { href: '/benchmarks/',  text: 'Benchmarks' },
@@ -188,6 +190,7 @@
         { href: '/story/', text: 'My Story' },
         { href: '/mission/', text: 'The Mission' },
         { href: '/achievements/', text: 'Milestones' },
+        { href: '/field-notes/', text: 'Field Notes' },
       ]},
       { heading: 'The Data', links: [
         { href: '/sleep/', text: 'Sleep' },
@@ -235,6 +238,7 @@
         { href: '/accountability/', text: 'Buddy Dashboard' },
         { href: 'https://discord.gg/T4Ndt2WsU', text: 'Join the community', external: true, community: true },
         { href: '/rss.xml', text: 'RSS Feed' },
+        { href: '/ledger/', text: 'Snake Fund' },
         { href: '/privacy/', text: 'Privacy' },
       ]},
     ];
@@ -391,7 +395,7 @@
       localStorage.setItem(VISITED_KEY, JSON.stringify(visited));
     }
 
-    var html = '<style>.section-nav{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-4) var(--page-padding);border-bottom:1px solid var(--border);background:var(--surface);font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);overflow-x:auto;-webkit-overflow-scrolling:touch}.section-nav__step{color:var(--text-faint);text-decoration:none;text-transform:uppercase;white-space:nowrap;padding:var(--space-1) var(--space-3);border:1px solid transparent;transition:color .15s}.section-nav__step:hover{color:var(--text-muted)}.section-nav__step.active{color:var(--accent);border-color:var(--accent-dim)}.section-nav__step.visited::before{content:"\\2713 ";font-size:9px;opacity:0.6}.section-nav__sep{color:var(--border)}</style>';
+    var html = '<style>.section-nav{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-4) var(--page-padding);border-bottom:1px solid var(--border);background:var(--surface);font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);overflow-x:auto;-webkit-overflow-scrolling:touch}.section-nav__step{color:var(--text-faint);text-decoration:none;text-transform:uppercase;white-space:nowrap;padding:var(--space-1) var(--space-3);border:1px solid transparent;transition:color .15s}.section-nav__step:hover{color:var(--text-muted)}.section-nav__step.active{color:var(--accent);border-color:var(--accent-dim)}.section-nav__step.visited::before{content:"\\2713 ";font-size:var(--text-3xs);opacity:0.6}.section-nav__sep{color:var(--border)}</style>';
     html += '<nav class="section-nav" aria-label="' + currentSection.label + '">';
     items.forEach(function(item, i) {
       if (i > 0) html += '<span class="section-nav__sep">\u00B7</span>';
@@ -593,7 +597,7 @@
     var btn = document.createElement('button');
     btn.className = 'amj-share-btn';
     btn.innerHTML = '\u2197 Share';
-    btn.style.cssText = 'position:fixed;bottom:80px;right:24px;z-index:90;background:var(--surface,#111);border:1px solid var(--border,rgba(255,255,255,0.06));color:var(--text-faint,rgba(255,255,255,0.4));font-family:var(--font-mono,monospace);font-size:11px;letter-spacing:1px;padding:8px 14px;cursor:pointer;opacity:0;transition:opacity 0.3s,background 0.2s;';
+    btn.style.cssText = 'position:fixed;bottom:80px;right:24px;z-index:90;background:var(--surface,#111);border:1px solid var(--border,rgba(255,255,255,0.06));color:var(--text-faint,rgba(255,255,255,0.4));font-family:var(--font-mono,monospace);font-size:var(--text-xs,11px);letter-spacing:1px;padding:8px 14px;cursor:pointer;opacity:0;transition:opacity 0.3s,background 0.2s;';
     document.body.appendChild(btn);
     setTimeout(function() { btn.style.opacity = '1'; }, 2000);
 
@@ -627,31 +631,31 @@
 
     var content = '<div style="max-width:960px;width:100%;">' +
       '<div style="text-align:center;margin-bottom:40px;">' +
-        '<div style="font-family:var(--font-mono,monospace);font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--c-green-500,#22c55e);margin-bottom:16px;">Welcome to The Measured Life</div>' +
+        '<div style="font-family:var(--font-mono,monospace);font-size:var(--text-xs,11px);letter-spacing:3px;text-transform:uppercase;color:var(--c-green-500,#22c55e);margin-bottom:16px;">Welcome to The Measured Life</div>' +
         '<div style="font-family:var(--font-display,Georgia,serif);font-size:clamp(24px,3.5vw,36px);color:#e8e8e8;line-height:1.2;">Where would you like to start?</div>' +
       '</div>' +
       '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;" id="amj-sh-cards">' +
         // Card 1: The Journey
         '<a href="/story/" class="amj-sh-card" style="display:block;padding:32px 24px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-left:3px solid var(--c-green-500,#22c55e);text-decoration:none;transition:border-color 0.2s,background 0.2s;">' +
-          '<div style="font-family:var(--font-display,Georgia,serif);font-size:20px;color:#e8e8e8;margin-bottom:8px;">The Journey</div>' +
+          '<div style="font-family:var(--font-display,Georgia,serif);font-size:var(--text-xl,20px);color:#e8e8e8;margin-bottom:8px;">The Journey</div>' +
           '<div style="font-size:14px;color:rgba(255,255,255,0.5);line-height:1.6;">Follow one person\'s health transformation &mdash; honest, public, no filter.</div>' +
-          '<div style="margin-top:16px;font-family:var(--font-mono,monospace);font-size:11px;color:var(--c-green-500,#22c55e);letter-spacing:1px;">Start here &rarr;</div>' +
+          '<div style="margin-top:16px;font-family:var(--font-mono,monospace);font-size:var(--text-xs,11px);color:var(--c-green-500,#22c55e);letter-spacing:1px;">Start here &rarr;</div>' +
         '</a>' +
         // Card 2: The Data
         '<a href="/explorer/" class="amj-sh-card" style="display:block;padding:32px 24px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-left:3px solid var(--c-amber-500,#f59e0b);text-decoration:none;transition:border-color 0.2s,background 0.2s;">' +
-          '<div style="font-family:var(--font-display,Georgia,serif);font-size:20px;color:#e8e8e8;margin-bottom:8px;">The Data</div>' +
+          '<div style="font-family:var(--font-display,Georgia,serif);font-size:var(--text-xl,20px);color:#e8e8e8;margin-bottom:8px;">The Data</div>' +
           '<div style="font-size:14px;color:rgba(255,255,255,0.5);line-height:1.6;">Explore 26 data sources, N=1 experiments, and live correlations.</div>' +
-          '<div style="margin-top:16px;font-family:var(--font-mono,monospace);font-size:11px;color:var(--c-amber-500,#f59e0b);letter-spacing:1px;">Explore &rarr;</div>' +
+          '<div style="margin-top:16px;font-family:var(--font-mono,monospace);font-size:var(--text-xs,11px);color:var(--c-amber-500,#f59e0b);letter-spacing:1px;">Explore &rarr;</div>' +
         '</a>' +
         // Card 3: How It's Built
         '<a href="/builders/" class="amj-sh-card" style="display:block;padding:32px 24px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-left:3px solid var(--lb-accent,#06b6d4);text-decoration:none;transition:border-color 0.2s,background 0.2s;">' +
-          '<div style="font-family:var(--font-display,Georgia,serif);font-size:20px;color:#e8e8e8;margin-bottom:8px;">How It\'s Built</div>' +
-          '<div style="font-size:14px;color:rgba(255,255,255,0.5);line-height:1.6;">A non-engineer built this with Claude. See the full blueprint.</div>' +
-          '<div style="margin-top:16px;font-family:var(--font-mono,monospace);font-size:11px;color:var(--lb-accent,#06b6d4);letter-spacing:1px;">See the stack &rarr;</div>' +
+          '<div style="font-family:var(--font-display,Georgia,serif);font-size:var(--text-xl,20px);color:#e8e8e8;margin-bottom:8px;">How It\'s Built</div>' +
+          '<div style="font-size:14px;color:rgba(255,255,255,0.5);line-height:1.6;">One person built this with Claude. See the full blueprint.</div>' +
+          '<div style="margin-top:16px;font-family:var(--font-mono,monospace);font-size:var(--text-xs,11px);color:var(--lb-accent,#06b6d4);letter-spacing:1px;">See the stack &rarr;</div>' +
         '</a>' +
       '</div>' +
       '<div style="text-align:center;margin-top:32px;">' +
-        '<button id="amj-sh-skip" style="background:none;border:none;cursor:pointer;font-family:var(--font-mono,monospace);font-size:11px;color:rgba(255,255,255,0.3);letter-spacing:1px;padding:8px 16px;">Skip &mdash; take me to the homepage</button>' +
+        '<button id="amj-sh-skip" style="background:none;border:none;cursor:pointer;font-family:var(--font-mono,monospace);font-size:var(--text-xs,11px);color:rgba(255,255,255,0.3);letter-spacing:1px;padding:8px 16px;">Skip &mdash; take me to the homepage</button>' +
       '</div>' +
     '</div>';
 
@@ -686,3 +690,50 @@
   })();
 
 })();
+
+/**
+ * renderAIAnalysisCard — Reusable AI expert voice card for observatory pages.
+ * Fetches /api/ai_analysis?expert=<key> and renders a styled prose card.
+ */
+function renderAIAnalysisCard(containerId, expertKey, config) {
+  var el = document.getElementById(containerId);
+  if (!el) return;
+
+  var EXPERTS = {
+    mind:      { name: "Dr. Conti's Observations",       color: '#a78bfa' },
+    nutrition: { name: "Dr. Webb's Analysis",            color: '#f59e0b' },
+    training:  { name: "Coach's Notes — Dr. Sarah Chen", color: '#ef4444' },
+    physical:  { name: "Dr. Victor Reyes's Assessment",  color: '#60a5fa' }
+  };
+
+  var expert = EXPERTS[expertKey];
+  if (!expert) return;
+
+  el.innerHTML = '<div style="font-family:monospace;font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:0.1em">LOADING ' + expert.name.toUpperCase() + '...</div>';
+
+  fetch('/api/ai_analysis?expert=' + expertKey)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.analysis) {
+        el.innerHTML = '<div style="font-family:var(--font-serif);font-size:13px;color:rgba(255,255,255,0.3)">Analysis generates weekly. Check back Monday.</div>';
+        return;
+      }
+
+      var date = data.generated_at ? new Date(data.generated_at).toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'}) : '';
+      var dataSources = (config && config.dataSources) || '30 days of data';
+
+      el.innerHTML =
+        '<div style="border-left:3px solid ' + expert.color + ';padding:20px 24px;background:rgba(255,255,255,0.02)">' +
+          '<div style="font-family:monospace;font-size:11px;color:' + expert.color + ';letter-spacing:0.12em;text-transform:uppercase;margin-bottom:12px">' + expert.name + '</div>' +
+          '<div style="font-family:var(--font-serif);font-size:15px;line-height:1.75;color:rgba(255,255,255,0.82)">' +
+            data.analysis.split('\n\n').map(function(p) { return '<p style="margin-top:12px">' + p + '</p>'; }).join('') +
+          '</div>' +
+          '<div style="margin-top:16px;font-family:monospace;font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:0.08em">' +
+            'Generated ' + date + ' · Based on ' + dataSources +
+          '</div>' +
+        '</div>';
+    })
+    .catch(function() {
+      el.innerHTML = '<div style="font-family:var(--font-serif);font-size:13px;color:rgba(255,255,255,0.3)">Analysis unavailable.</div>';
+    });
+}

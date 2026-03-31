@@ -3071,3 +3071,333 @@ def tool_get_ruck_log(args):
         "max_ruck_weight_lbs": max_weight,
         "sessions": sessions,
     }
+
+
+# ==============================================================================
+# BL-04: FIELD NOTES — Weekly AI-vs-Matthew Lab Notebook
+# ==============================================================================
+
+FIELD_NOTES_PK = f"USER#{USER_ID}#SOURCE#field_notes"
+
+
+def tool_get_field_notes(args):
+    """Retrieve Field Notes for a specific ISO week (or current week).
+
+    Returns AI Lab Notes (present/lookback/focus paragraphs) and any
+    existing Matthew response. Used before log_field_note_response so
+    Matthew can read the AI notes and write back.
+    """
+    from datetime import timezone
+    week = args.get("week")
+    if not week:
+        now = datetime.now(timezone.utc)
+        year, wk, _ = now.isocalendar()
+        week = f"{year}-W{wk:02d}"
+
+    resp = table.get_item(Key={"pk": FIELD_NOTES_PK, "sk": f"WEEK#{week}"})
+    item = resp.get("Item")
+    if not item:
+        return {"status": "not_yet_generated", "week": week,
+                "message": f"No field notes found for {week}. The AI notes may not have been generated yet."}
+
+    item = decimal_to_float(item)
+    result = {
+        "week": item.get("week", week),
+        "week_label": item.get("week_label", ""),
+        "ai_present": item.get("ai_present", ""),
+        "ai_lookback": item.get("ai_lookback", ""),
+        "ai_focus": item.get("ai_focus", ""),
+        "ai_generated_at": item.get("ai_generated_at"),
+        "ai_tone": item.get("ai_tone"),
+        "ai_domains": item.get("ai_domains", []),
+        "ai_key_metrics": item.get("ai_key_metrics", {}),
+    }
+    # Include Matthew's response if present
+    if item.get("matthew_notes"):
+        result["matthew_notes"] = item["matthew_notes"]
+        result["matthew_notes_at"] = item.get("matthew_notes_at")
+        result["matthew_agreement"] = item.get("matthew_agreement")
+        result["matthew_disputed"] = item.get("matthew_disputed", [])
+        result["matthew_added"] = item.get("matthew_added")
+        result["has_matthew_response"] = True
+    else:
+        result["has_matthew_response"] = False
+        result["message"] = "AI notes are ready. Matthew hasn't responded yet."
+
+    return result
+
+
+def tool_log_field_note_response(args):
+    """Write Matthew's response to the right page of a Field Notes entry.
+
+    Uses update_item so Matthew's fields never overwrite the AI-generated fields.
+    The WEEK# record must already exist with ai_generated_at set.
+    """
+    from datetime import timezone
+    week = args.get("week", "").strip()
+    notes = args.get("notes", "").strip()
+    agreement = args.get("agreement")
+    disputed = args.get("disputed", [])
+    added = args.get("added", "")
+
+    if not week:
+        return {"error": "week is required (e.g. '2026-W14')"}
+    if not re.match(r"^\d{4}-W\d{2}$", week):
+        return {"error": f"Invalid week format '{week}'. Use YYYY-WNN (e.g. '2026-W14')"}
+    if not notes:
+        return {"error": "notes is required — write your response to the AI lab notes"}
+
+    sk = f"WEEK#{week}"
+    # Verify the record exists and has AI notes
+    existing = table.get_item(Key={"pk": FIELD_NOTES_PK, "sk": sk}).get("Item")
+    if not existing:
+        return {"error": f"No field notes record for {week}. AI notes must be generated first."}
+    if not existing.get("ai_generated_at"):
+        return {"error": f"AI notes for {week} haven't been generated yet. Can't respond to empty notes."}
+
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+    update_parts = [
+        "matthew_notes = :mn",
+        "matthew_notes_at = :mnat",
+    ]
+    expr_values = {
+        ":mn": notes,
+        ":mnat": ts,
+    }
+
+    if agreement:
+        update_parts.append("matthew_agreement = :ma")
+        expr_values[":ma"] = agreement
+
+    if disputed:
+        update_parts.append("matthew_disputed = :md")
+        expr_values[":md"] = disputed
+
+    if added:
+        update_parts.append("matthew_added = :madd")
+        expr_values[":madd"] = added
+
+    table.update_item(
+        Key={"pk": FIELD_NOTES_PK, "sk": sk},
+        UpdateExpression="SET " + ", ".join(update_parts),
+        ExpressionAttributeValues=expr_values,
+    )
+
+    week_label = existing.get("week_label", week)
+    word_count = len(notes.split())
+    ai_preview = (existing.get("ai_present") or "")[:80]
+
+    return {
+        "status": "saved",
+        "week": week,
+        "week_label": week_label,
+        "agreement": agreement,
+        "word_count": word_count,
+        "message": (
+            f"Field Notes response saved — {week_label}\n"
+            f"   Agreement: {agreement or 'not specified'}\n"
+            f"   The right page is now filled.\n\n"
+            f"   AI said: \"{ai_preview}...\"\n"
+            f"   You responded in {word_count} words."
+        ),
+    }
+
+
+# ==============================================================================
+# BL-03: THE LEDGER — Achievement-Linked Charitable Giving
+# ==============================================================================
+
+LEDGER_PK = f"USER#{USER_ID}#SOURCE#ledger"
+
+
+def tool_log_ledger_entry(args):
+    """Record a charitable donation triggered by an achievement, challenge,
+    or experiment outcome.
+
+    Auto-resolves the bounty/punishment amount and cause from the source
+    record or ledger.json config defaults. Writes both a LEDGER# transaction
+    record and updates the TOTALS#current running totals.
+    """
+    from datetime import timezone
+    source_type = args.get("source_type", "").strip()
+    source_id = args.get("source_id", "").strip()
+    outcome = args.get("outcome", "").strip()
+    date = args.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    notes = args.get("notes", "")
+
+    if not source_type or source_type not in ("achievement", "challenge", "experiment"):
+        return {"error": "source_type must be 'achievement', 'challenge', or 'experiment'"}
+    if not source_id:
+        return {"error": "source_id is required"}
+    if not outcome or outcome not in ("earned", "passed", "failed", "abandoned"):
+        return {"error": "outcome must be 'earned', 'passed', 'failed', or 'abandoned'"}
+
+    # Load ledger config from S3
+    try:
+        cfg_resp = s3_client.get_object(Bucket=S3_BUCKET, Key="config/ledger.json")
+        ledger_config = json.loads(cfg_resp["Body"].read())
+    except Exception as e:
+        return {"error": f"Could not load config/ledger.json: {e}"}
+
+    settings = ledger_config.get("settings", {})
+    default_bounty = settings.get("default_bounty_usd", 50)
+    default_punishment = settings.get("default_punishment_usd", 75)
+    active_earned_cause = settings.get("active_earned_cause", "")
+    active_reluctant_cause = settings.get("active_reluctant_cause_id", "")
+
+    # Resolve source record for name/amounts
+    source_name = source_id
+    badge_icon = {"achievement": "\U0001f3c6", "challenge": "\U0001f4aa", "experiment": "\U0001f52c"}.get(source_type, "\U0001f3c6")
+    source_bounty = None
+    source_punishment = None
+    source_cause_id = None
+
+    if source_type == "achievement":
+        # Load badge config
+        try:
+            badge_resp = s3_client.get_object(Bucket=S3_BUCKET, Key="config/achievement_badges.json")
+            badges = json.loads(badge_resp["Body"].read())
+            for b in badges:
+                if b.get("id") == source_id:
+                    source_name = b.get("label", source_id)
+                    source_bounty = b.get("bounty_usd")
+                    source_cause_id = b.get("cause_id")
+                    badge_icon = b.get("emoji", badge_icon)
+                    break
+        except Exception:
+            pass
+    elif source_type == "challenge":
+        try:
+            ch_resp = table.query(
+                KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}#SOURCE#challenges") & Key("sk").begins_with(f"CHALLENGE#{source_id}"),
+                Limit=1,
+            )
+            ch_items = ch_resp.get("Items", [])
+            if ch_items:
+                ch = ch_items[0]
+                source_name = ch.get("name", source_id)
+                source_bounty = ch.get("bounty_usd")
+                source_punishment = ch.get("punishment_usd")
+                source_cause_id = ch.get("cause_id")
+        except Exception:
+            pass
+    elif source_type == "experiment":
+        try:
+            exp_resp = table.query(
+                KeyConditionExpression=Key("pk").eq(EXPERIMENTS_PK) & Key("sk").begins_with(f"EXP#{source_id}"),
+                Limit=1,
+            )
+            exp_items = exp_resp.get("Items", [])
+            if exp_items:
+                exp = exp_items[0]
+                source_name = exp.get("name", source_id)
+                source_bounty = exp.get("bounty_usd")
+                source_punishment = exp.get("punishment_usd")
+                source_cause_id = exp.get("cause_id")
+        except Exception:
+            pass
+
+    # Resolve amount and cause
+    is_success = outcome in ("earned", "passed")
+    if is_success:
+        amount_usd = int(source_bounty or default_bounty)
+        cause_id = source_cause_id or active_earned_cause
+        tx_type = "bounty"
+    else:
+        amount_usd = int(source_punishment or default_punishment)
+        cause_id = active_reluctant_cause  # failures ALWAYS go to reluctant cause
+        tx_type = "punishment"
+
+    # Resolve cause name from config
+    cause_name = cause_id
+    all_causes = ledger_config.get("earned_causes", []) + ledger_config.get("reluctant_causes", [])
+    for c in all_causes:
+        if c.get("id") == cause_id:
+            cause_name = c.get("name", cause_id)
+            break
+
+    # Write transaction record
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    tx_sk = f"LEDGER#{ts}"
+    tx_item = {
+        "pk": LEDGER_PK,
+        "sk": tx_sk,
+        "ledger_id": ts,
+        "date": date,
+        "type": tx_type,
+        "amount_usd": Decimal(str(amount_usd)),
+        "cause_id": cause_id,
+        "cause_name": cause_name,
+        "source_type": source_type,
+        "source_id": source_id,
+        "source_name": source_name,
+        "source_badge_icon": badge_icon,
+        "outcome": outcome,
+        "logged_at": ts,
+    }
+    if notes:
+        tx_item["notes"] = notes[:500]
+    table.put_item(Item=tx_item)
+
+    # Update TOTALS#current (fetch → mutate → put)
+    totals_sk = "TOTALS#current"
+    existing = table.get_item(Key={"pk": LEDGER_PK, "sk": totals_sk}).get("Item", {})
+
+    by_cause = existing.get("by_cause", {})
+    if cause_id not in by_cause:
+        by_cause[cause_id] = {"amount_usd": Decimal("0"), "count": 0, "transactions": []}
+
+    entry = by_cause[cause_id]
+    entry["amount_usd"] = Decimal(str(entry.get("amount_usd", 0))) + Decimal(str(amount_usd))
+    entry["count"] = int(entry.get("count", 0)) + 1
+    entry.setdefault("transactions", []).append({
+        "date": date,
+        "source_name": source_name,
+        "source_type": source_type,
+        "source_badge_icon": badge_icon,
+        "amount_usd": Decimal(str(amount_usd)),
+        "outcome": outcome,
+    })
+
+    prev_donated = Decimal(str(existing.get("total_donated_usd", 0)))
+    prev_bounties = Decimal(str(existing.get("total_bounties_usd", 0)))
+    prev_punishments = Decimal(str(existing.get("total_punishments_usd", 0)))
+    prev_bounty_count = int(existing.get("bounty_count", 0))
+    prev_punishment_count = int(existing.get("punishment_count", 0))
+
+    new_total = prev_donated + Decimal(str(amount_usd))
+    new_bounties = prev_bounties + (Decimal(str(amount_usd)) if is_success else Decimal("0"))
+    new_punishments = prev_punishments + (Decimal(str(amount_usd)) if not is_success else Decimal("0"))
+    new_bounty_count = prev_bounty_count + (1 if is_success else 0)
+    new_punishment_count = prev_punishment_count + (1 if not is_success else 0)
+
+    table.put_item(Item={
+        "pk": LEDGER_PK,
+        "sk": totals_sk,
+        "total_donated_usd": new_total,
+        "total_bounties_usd": new_bounties,
+        "total_punishments_usd": new_punishments,
+        "bounty_count": new_bounty_count,
+        "punishment_count": new_punishment_count,
+        "cause_count": len(by_cause),
+        "by_cause": by_cause,
+        "last_updated": ts,
+    })
+
+    return {
+        "status": "logged",
+        "message": (
+            f"\u2705 Ledger entry logged\n"
+            f"   Type: {tx_type}\n"
+            f"   Source: {source_name} ({source_type})\n"
+            f"   Outcome: {outcome}\n"
+            f"   Amount: ${amount_usd} \u2192 {cause_name}\n"
+            f"   Running totals: ${int(new_bounties)} earned for good causes / ${int(new_punishments)} to reluctant causes"
+        ),
+        "ledger_id": ts,
+        "type": tx_type,
+        "amount_usd": amount_usd,
+        "cause_name": cause_name,
+        "source_name": source_name,
+    }

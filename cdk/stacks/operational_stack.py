@@ -354,7 +354,7 @@ class OperationalStack(Stack):
             function_name="pipeline-health-check",
             source_file="lambdas/pipeline_health_check_lambda.py",
             handler="pipeline_health_check_lambda.lambda_handler",
-            schedule="cron(0 13 * * ? *)",
+            schedule="cron(30 2,6,14,18,22 * * ? *)",  # 5x daily, 30 min after ingestion
             timeout_seconds=300, memory_mb=256,
             custom_policies=rp.pipeline_health_check(),
             table=local_table, bucket=local_bucket, dlq=None, alerts_topic=local_alerts_topic)
