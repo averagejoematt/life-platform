@@ -1,17 +1,21 @@
 {
   "_meta": {
-    "version": "1.0.0",
-    "description": "Character Sheet configuration: pillar weights, components, thresholds, tier definitions, cross-pillar effects",
-    "last_updated": "2026-03-02"
+    "version": "1.1.0",
+    "description": "Character Sheet v1.1.0: progressive difficulty, confidence scoring, XP-as-buffer, per-pillar EMA",
+    "last_updated": "2026-03-30",
+    "review_ref": "docs/reviews/REVIEW_CHARACTER_LEVELING_2026-03-30.md"
   },
   "baseline": {
     "start_date": "2026-04-01",
     "start_weight_lbs": 302,
-    "goal_weight_lbs": 185
+    "goal_weight_lbs": 185,
+    "weight_phase": "loss",
+    "maintenance_band_lbs": 3
   },
   "pillars": {
     "sleep": {
       "weight": 0.20,
+      "ema_lambda": 0.85,
       "owner": "Dr. Lisa Park",
       "components": {
         "duration_vs_target": { "weight": 0.25, "target_hours": 7.5 },
@@ -23,6 +27,7 @@
     },
     "movement": {
       "weight": 0.18,
+      "ema_lambda": 0.90,
       "owner": "Dr. Sarah Chen",
       "components": {
         "training_frequency": { "weight": 0.20, "target_sessions_week": 5 },
@@ -35,6 +40,7 @@
     },
     "nutrition": {
       "weight": 0.18,
+      "ema_lambda": 0.88,
       "owner": "Dr. Marcus Webb",
       "components": {
         "calorie_adherence": { "weight": 0.20, "tolerance_pct": 0.10 },
@@ -46,17 +52,19 @@
     },
     "metabolic": {
       "weight": 0.12,
+      "ema_lambda": 0.95,
       "owner": "Dr. Peter Attia",
       "components": {
         "body_fat_trajectory": { "weight": 0.25 },
         "cgm_glucose_control": { "weight": 0.25 },
-        "lab_biomarkers": { "weight": 0.30, "full_value_days": 30, "decay_period_days": 60, "floor_pct": 0.50 },
+        "lab_biomarkers": { "weight": 0.30, "full_value_days": 30, "decay_period_days": 60, "expiry_days": 180, "floor_pct": 0.0 },
         "blood_pressure": { "weight": 0.10 },
         "resting_heart_rate": { "weight": 0.10 }
       }
     },
     "mind": {
       "weight": 0.15,
+      "ema_lambda": 0.85,
       "owner": "Coach Maya Rodriguez",
       "components": {
         "t0_habit_compliance": { "weight": 0.30 },
@@ -69,6 +77,8 @@
     },
     "relationships": {
       "weight": 0.07,
+      "ema_lambda": 0.93,
+      "rolling_window_days": 14,
       "owner": "Social Connection",
       "components": {
         "social_interaction_frequency": { "weight": 0.40 },
@@ -79,6 +89,7 @@
     },
     "consistency": {
       "weight": 0.10,
+      "ema_lambda": 0.93,
       "owner": "The Chair",
       "components": {
         "cross_pillar_variance": { "weight": 0.40 },
@@ -94,7 +105,18 @@
     "level_up_streak_days": 5,
     "level_down_streak_days": 7,
     "tier_up_streak_days": 7,
-    "tier_down_streak_days": 10
+    "tier_down_streak_days": 10,
+    "level_step_threshold": 10,
+    "xp_per_level": 100,
+    "daily_xp_decay": 2,
+    "xp_buffer_threshold": 20,
+    "tier_streak_overrides": {
+      "Foundation":  { "up": 3,  "down": 5,  "tier_boundary_up": 5,  "tier_boundary_down": 7 },
+      "Momentum":    { "up": 5,  "down": 7,  "tier_boundary_up": 7,  "tier_boundary_down": 10 },
+      "Discipline":  { "up": 7,  "down": 10, "tier_boundary_up": 10, "tier_boundary_down": 14 },
+      "Mastery":     { "up": 10, "down": 14, "tier_boundary_up": 14, "tier_boundary_down": 21 },
+      "Elite":       { "up": 14, "down": 21, "tier_boundary_up": 21, "tier_boundary_down": 30 }
+    }
   },
   "xp_bands": [
     { "min_raw_score": 80, "xp": 3 },
@@ -111,12 +133,12 @@
     { "name": "Elite",      "emoji": "👑", "min_level": 81, "max_level": 100 }
   ],
   "cross_pillar_effects": [
-    { "name": "Sleep Drag",      "emoji": "🛏️", "condition": "sleep < 35",                         "targets": { "movement": -0.08, "mind": -0.05 } },
-    { "name": "Training Boost",  "emoji": "💪", "condition": "movement > 70",                      "targets": { "metabolic": 0.05 } },
-    { "name": "Focus Buff",      "emoji": "🧠", "condition": "mind > 70",                          "targets": { "consistency": 0.03 } },
-    { "name": "Synergy Bonus",   "emoji": "⚡",  "condition": "nutrition > 70 AND movement > 70",   "targets": { "metabolic": 0.08 } },
-    { "name": "Alignment Bonus", "emoji": "🌟", "condition": "all_pillars >= 41",                  "targets": { "_all": 2 } },
-    { "name": "Vice Shield",     "emoji": "🛡️", "condition": "any_vice_streak > 30",               "targets": { "mind": 0.03 } }
+    { "name": "Sleep Drag",      "emoji": "🛏️", "condition": "sleep < 35",                         "targets": { "movement": {"type": "multiplicative", "value": -0.08}, "mind": {"type": "multiplicative", "value": -0.05} } },
+    { "name": "Training Boost",  "emoji": "💪", "condition": "movement > 70",                      "targets": { "metabolic": {"type": "multiplicative", "value": 0.05} } },
+    { "name": "Focus Buff",      "emoji": "🧠", "condition": "mind > 70",                          "targets": { "consistency": {"type": "multiplicative", "value": 0.03} } },
+    { "name": "Synergy Bonus",   "emoji": "⚡",  "condition": "nutrition > 70 AND movement > 70",   "targets": { "metabolic": {"type": "multiplicative", "value": 0.08} } },
+    { "name": "Alignment Bonus", "emoji": "🌟", "condition": "all_pillars >= 41",                  "targets": { "_all": {"type": "multiplicative", "value": 0.03} } },
+    { "name": "Vice Shield",     "emoji": "🛡️", "condition": "any_vice_streak > 30",               "targets": { "mind": {"type": "multiplicative", "value": 0.03} } }
   ],
   "avatar": {
     "enabled": true,
