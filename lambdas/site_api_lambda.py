@@ -97,6 +97,29 @@ STATUS_CACHE_TTL = 60  # 1 minute — more dynamic status updates
 # ── Experiment start date — public Day 1 ───────────────────
 EXPERIMENT_START = "2026-04-01"
 
+# ── Platform stats — single source of truth for all site pages ──
+# Update these when Lambdas/tools/sources change. Every page reads from here.
+PLATFORM_STATS = {
+    "data_sources": 26,
+    "mcp_tools": 115,
+    "lambdas": 62,
+    "cdk_stacks": 8,
+    "alarms": 66,
+    "adrs": 45,
+    "monthly_cost": "$19",
+    "review_count": 19,
+    "review_grade": "A",
+    "active_secrets": 10,
+    "site_pages": 71,
+    "test_count": 1075,
+    "board_technical": 12,
+    "board_product": 8,
+    "start_weight": 307,
+    "goal_weight": 185,
+    "start_date": EXPERIMENT_START,
+    "build_date": "2026-02-22",
+}
+
 # ── Profile (DynamoDB-cached per warm container) ────────────
 _profile_cache = None
 
@@ -348,6 +371,320 @@ def handle_vitals() -> dict:
     }, cache_seconds=300)
 
 
+def handle_tools_baseline() -> dict:
+    """
+    GET /api/tools_baseline
+    Returns baseline (first week of experiment) and current values for the
+    Tools page comparison badges: RHR, HRV, sleep quality, weight.
+    Cache: 3600s — baseline is fixed, current shifts slowly.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # Baseline: first 7 days of the experiment
+    baseline_end = (datetime.strptime(EXPERIMENT_START, "%Y-%m-%d")
+                    + timedelta(days=7)).strftime("%Y-%m-%d")
+
+    # Current: last 7 days
+    d7 = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+
+    baseline_whoop = _query_source("whoop", EXPERIMENT_START, baseline_end)
+    current_whoop = _query_source("whoop", d7, today)
+
+    def first_val(records, field):
+        """First non-null value from sorted records."""
+        for r in sorted(records, key=lambda x: x.get("sk", "")):
+            if r.get(field) is not None:
+                return round(float(r[field]), 1)
+        return None
+
+    def avg_val(records, field):
+        """Average of non-null values."""
+        vals = [float(r[field]) for r in records if r.get(field) is not None]
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    baseline = {
+        "rhr_bpm": first_val(baseline_whoop, "resting_heart_rate"),
+        "hrv_ms": first_val(baseline_whoop, "hrv"),
+        "sleep_score": first_val(baseline_whoop, "sleep_quality_score"),
+        "sleep_hours": first_val(baseline_whoop, "sleep_duration_hours"),
+    }
+    current = {
+        "rhr_bpm": avg_val(current_whoop, "resting_heart_rate"),
+        "hrv_ms": avg_val(current_whoop, "hrv"),
+        "sleep_score": avg_val(current_whoop, "sleep_quality_score"),
+        "sleep_hours": avg_val(current_whoop, "sleep_duration_hours"),
+    }
+
+    # Weight — baseline from first week, current from latest
+    baseline_withings = _query_source("withings", EXPERIMENT_START, baseline_end)
+    baseline["weight_lbs"] = first_val(baseline_withings, "weight_lbs")
+
+    latest_withings = _latest_item("withings")
+    current["weight_lbs"] = (round(float(latest_withings["weight_lbs"]), 1)
+                             if latest_withings and latest_withings.get("weight_lbs")
+                             else None)
+
+    return _ok({
+        "baseline": baseline,
+        "baseline_date": EXPERIMENT_START,
+        "current": current,
+        "current_date": today,
+    }, cache_seconds=3600)
+
+
+def handle_platform_stats() -> dict:
+    """GET /api/platform_stats — authoritative platform counts for all site pages."""
+    return _ok(PLATFORM_STATS, cache_seconds=3600)
+
+
+def handle_ledger() -> dict:
+    """
+    GET /api/ledger
+    Returns: Ledger transactions (by event and by cause) + running totals.
+    Source: ledger DynamoDB partition + config/ledger.json from S3.
+    Cache: 3600s.
+    """
+    ledger_pk = f"{USER_PREFIX}ledger"
+
+    # 1. Fetch TOTALS#current
+    totals_resp = table.get_item(Key={"pk": ledger_pk, "sk": "TOTALS#current"})
+    totals_item = _decimal_to_float(totals_resp.get("Item", {}))
+
+    totals = {
+        "total_donated_usd": totals_item.get("total_donated_usd", 0),
+        "total_bounties_usd": totals_item.get("total_bounties_usd", 0),
+        "total_punishments_usd": totals_item.get("total_punishments_usd", 0),
+        "bounty_count": totals_item.get("bounty_count", 0),
+        "punishment_count": totals_item.get("punishment_count", 0),
+    }
+
+    # 2. Fetch LEDGER# transaction records
+    txn_resp = table.query(
+        KeyConditionExpression=Key("pk").eq(ledger_pk) & Key("sk").begins_with("LEDGER#"),
+        ScanIndexForward=False,
+        Limit=200,
+    )
+    txn_items = _decimal_to_float(txn_resp.get("Items", []))
+
+    earned = []
+    reluctant = []
+    for txn in txn_items:
+        entry = {
+            "ledger_id": txn.get("sk", "").replace("LEDGER#", ""),
+            "date": txn.get("date", ""),
+            "source_type": txn.get("source_type", ""),
+            "source_id": txn.get("source_id", ""),
+            "source_name": txn.get("source_name", ""),
+            "outcome": txn.get("outcome", ""),
+            "amount_usd": txn.get("amount_usd", 0),
+            "cause_id": txn.get("cause_id", ""),
+            "cause_name": txn.get("cause_name", ""),
+        }
+        if txn.get("type") == "punishment" or txn.get("outcome") in ("abandoned", "failed"):
+            reluctant.append(entry)
+        else:
+            earned.append(entry)
+
+    # 3. Fetch config/ledger.json from S3 for display metadata
+    try:
+        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+        s3_client = boto3.client("s3", region_name=S3_REGION)
+        s3_resp = s3_client.get_object(Bucket=S3_BUCKET, Key="config/ledger.json")
+        ledger_config = json.loads(s3_resp["Body"].read())
+    except Exception:
+        ledger_config = {"earned_causes": [], "reluctant_causes": []}
+
+    # 4. Build by_cause with merged metadata
+    by_cause_raw = totals_item.get("by_cause", {})
+    earned_causes = []
+    for cause_cfg in ledger_config.get("earned_causes", []):
+        cid = cause_cfg.get("id", "")
+        cause_data = by_cause_raw.get(cid, {})
+        earned_causes.append({
+            **cause_cfg,
+            "total_usd": cause_data.get("total_usd", 0),
+            "count": cause_data.get("count", 0),
+        })
+
+    reluctant_causes = []
+    for cause_cfg in ledger_config.get("reluctant_causes", []):
+        cid = cause_cfg.get("id", "")
+        cause_data = by_cause_raw.get(cid, {})
+        reluctant_causes.append({
+            **cause_cfg,
+            "total_usd": cause_data.get("total_usd", 0),
+            "count": cause_data.get("count", 0),
+        })
+
+    return _ok({
+        "totals": totals,
+        "by_event": {"earned": earned, "reluctant": reluctant},
+        "by_cause": {"earned_causes": earned_causes, "reluctant_causes": reluctant_causes},
+    }, cache_seconds=3600)
+
+
+def handle_discoveries() -> dict:
+    """
+    GET /api/discoveries
+    Returns structured content for the Discoveries page:
+    - active_hypotheses: from experiment_library S3 config (active experiments)
+    - inner_life: from insights partition (chronicle observations)
+    - ai_findings: from weekly_correlations (FDR-significant pairs)
+    Cache: 1800s (30 min).
+    """
+    # ── 1. Active hypotheses from experiment library ──
+    S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+    active_hypotheses = []
+    try:
+        s3_client = boto3.client("s3", region_name=S3_REGION)
+        obj = s3_client.get_object(Bucket=S3_BUCKET,
+                                   Key="config/experiment_library.json")
+        lib = json.loads(obj["Body"].read())
+        for exp in lib.get("experiments", []):
+            if exp.get("status") != "active":
+                continue
+            active_hypotheses.append({
+                "name": exp.get("name", ""),
+                "description": exp.get("description", ""),
+                "hypothesis": exp.get("hypothesis_template", ""),
+                "protocol": exp.get("protocol_template", ""),
+                "pillar": exp.get("pillar", ""),
+                "evidence_tier": exp.get("evidence_tier", ""),
+                "metrics": exp.get("metrics_measurable", []),
+                "duration_days": exp.get("suggested_duration_days"),
+                "why": exp.get("why_it_matters", ""),
+                "evidence_for": exp.get("evidence_for", []),
+                "evidence_against": exp.get("evidence_against", []),
+                "rationale": exp.get("rationale", ""),
+            })
+    except Exception as e:
+        logger.warning(f"[discoveries] experiment library read failed: {e}")
+
+    # ── 2. Inner life observations from insights partition ──
+    inner_life = []
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}insights"),
+            ScanIndexForward=False,
+            Limit=50,
+        )
+        for item in _decimal_to_float(resp.get("Items", [])):
+            digest_type = item.get("digest_type", "")
+            insight_type = item.get("insight_type", "")
+            date = item.get("date", "")
+            # Chronicle observations are AI narrative findings
+            if digest_type == "chronicle" and insight_type == "observation":
+                category = "Journal Breakthrough"
+            elif digest_type == "weekly_digest":
+                category = "Weekly Pattern"
+            elif digest_type == "monday_compass":
+                category = "Coaching Insight"
+            elif digest_type == "weekly_plate":
+                category = "Nutrition Pattern"
+            else:
+                continue
+
+            # Extract a clean title from the HTML text
+            text = item.get("text", "")
+            title = ""
+            # Try to find a heading in the HTML
+            import re
+            heading_match = re.search(
+                r'font-weight:\s*7[0-9]{2}[^>]*>([^<]{10,80})<', text)
+            if heading_match:
+                title = heading_match.group(1).strip()
+            if not title:
+                # Fall back to first substantial text
+                text_match = re.search(r'>([A-Z][^<]{20,100})<', text)
+                if text_match:
+                    title = text_match.group(1).strip()
+            if not title:
+                title = f"{category} — {date}"
+
+            # Extract a body snippet
+            body = ""
+            # Find first paragraph-like content
+            para_match = re.search(
+                r'font-size:\s*1[3-5]px[^>]*>([^<]{30,200})<', text)
+            if para_match:
+                body = para_match.group(1).strip()
+
+            inner_life.append({
+                "date": date,
+                "category": category,
+                "title": title,
+                "body": body,
+                "confidence": item.get("confidence", ""),
+                "actionable": item.get("actionable", False),
+                "pillars": item.get("pillars", []),
+            })
+
+        # Dedupe by title, keep most recent
+        seen_titles = set()
+        deduped = []
+        for il in inner_life:
+            if il["title"] not in seen_titles:
+                seen_titles.add(il["title"])
+                deduped.append(il)
+        inner_life = deduped[:12]  # Cap at 12 cards
+    except Exception as e:
+        logger.warning(f"[discoveries] insights read failed: {e}")
+
+    # ── 3. AI findings from weekly correlations ──
+    ai_findings = []
+    try:
+        corr_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(
+                f"{USER_PREFIX}weekly_correlations"),
+            ScanIndexForward=False,
+            Limit=4,
+        )
+        _LABELS = {
+            "hrv": "HRV", "recovery_score": "Recovery",
+            "sleep_duration": "Sleep Duration", "sleep_score": "Sleep Score",
+            "resting_hr": "Resting HR", "strain": "Strain",
+            "training_kj": "Training Load", "protein_g": "Protein",
+            "calories": "Calories", "steps": "Steps",
+            "habit_pct": "Habit Completion", "day_grade": "Day Grade",
+        }
+        for item in _decimal_to_float(corr_resp.get("Items", [])):
+            week = item.get("week", item.get("sk", "").replace("WEEK#", ""))
+            corrs = item.get("correlations", [])
+            if isinstance(corrs, str):
+                try:
+                    corrs = json.loads(corrs)
+                except (json.JSONDecodeError, TypeError):
+                    corrs = []
+            if not isinstance(corrs, list):
+                continue
+            for c in corrs:
+                if not (c.get("fdr_significant") or c.get("significant")):
+                    continue
+                a = _LABELS.get(c.get("metric_a", ""), c.get("metric_a", ""))
+                b = _LABELS.get(c.get("metric_b", ""), c.get("metric_b", ""))
+                r = c.get("r", 0)
+                direction = "positively" if r > 0 else "negatively"
+                ai_findings.append({
+                    "week": week,
+                    "metric_a": a,
+                    "metric_b": b,
+                    "r": round(r, 2) if r else 0,
+                    "n": c.get("n", 0),
+                    "title": f"{a} × {b}: {direction} correlated",
+                    "body": f"r={r:+.2f}, n={c.get('n', '?')} days. "
+                            f"FDR-corrected significant finding from {week}.",
+                })
+    except Exception as e:
+        logger.warning(f"[discoveries] correlations read failed: {e}")
+
+    return _ok({
+        "active_hypotheses": active_hypotheses,
+        "inner_life": inner_life,
+        "ai_findings": ai_findings,
+    }, cache_seconds=1800)
+
+
+
 def handle_journey() -> dict:
     """
     GET /api/journey
@@ -458,6 +795,19 @@ def handle_character() -> dict:
             "xp_delta":  float(pd.get("xp_delta", 0)),
         })
 
+    # Pre-experiment: show zeroed character (experiment hasn't started)
+    if date_str < EXPERIMENT_START:
+        return _ok({
+            "character": {
+                "level": 1, "tier": "Foundation", "tier_emoji": "\ud83d\udd28",
+                "xp_total": 0, "as_of_date": date_str,
+                "pre_experiment": True,
+            },
+            "pillars": [{"name": p, "emoji": PILLAR_EMOJI.get(p, ""),
+                         "level": 1, "raw_score": 0, "tier": "Foundation",
+                         "xp_delta": 0} for p in PILLAR_ORDER],
+        }, cache_seconds=900)
+
     return _ok({
         "character": {
             "level":      float(record.get("character_level", 1)),
@@ -522,6 +872,18 @@ def handle_character_stats() -> dict:
             "raw_score": float(pd.get("raw_score", 0)),
             "tier":      pd.get("tier", "Foundation"),
         }
+
+    # Pre-experiment: zeroed character
+    if date_str < EXPERIMENT_START:
+        PILLARS_ZERO = {p: {"level": 1, "raw_score": 0, "tier": "Foundation"}
+                        for p in PILLARS}
+        return _ok({
+            "character_stats": {
+                "level": 1, "tier": "Foundation", "tier_emoji": "\ud83d\udd28",
+                "xp_total": 0, "as_of_date": date_str, "pre_experiment": True,
+            },
+            "pillars": PILLARS_ZERO,
+        }, cache_seconds=3600)
 
     return _ok({
         "character_stats": {
@@ -922,9 +1284,19 @@ def handle_status() -> dict:
             due_mo = DUE_MONTHS.get(sid, 6)
             if last:
                 last_dt = datetime.strptime(last[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-                months_ago = (datetime.now(timezone.utc) - last_dt).days / 30.0
+                days_ago = (datetime.now(timezone.utc).date() - last_dt.date()).days
+                months_ago = days_ago / 30.0
                 due_date = last_dt + timedelta(days=due_mo * 30)
                 due_str = due_date.strftime("%b %Y")
+                # Human-readable relative time
+                if days_ago == 0:
+                    rel = "today"
+                elif days_ago == 1:
+                    rel = "yesterday"
+                elif days_ago < 30:
+                    rel = f"{days_ago}d ago"
+                else:
+                    rel = f"{int(months_ago)}mo ago"
                 if months_ago < due_mo:
                     status = "green"
                     comment = f"Last: {rel}. Next due: {due_str}"
@@ -934,7 +1306,6 @@ def handle_status() -> dict:
                 else:
                     status = "yellow"
                     comment = f"Overdue \u2014 was due {due_str}. Last: {rel}"
-                rel = f"{int(months_ago)}mo ago"
             else:
                 status = "blue"
                 rel = "never"
@@ -4255,9 +4626,15 @@ def handle_training_overview() -> dict:
     daily_steps_trend = []
     for g in sorted(garmin_30d, key=lambda x: x.get("date") or x.get("sk", "")):
         if g.get("steps"):
+            _step_date = g.get("date") or g.get("sk", "").replace("DATE#", "")
+            try:
+                _step_dow = datetime.strptime(_step_date, "%Y-%m-%d").weekday()
+            except Exception:
+                _step_dow = 0
             daily_steps_trend.append({
-                "date": g.get("date") or g.get("sk", "").replace("DATE#", ""),
+                "date": _step_date,
                 "steps": int(float(g["steps"])),
+                "is_weekend": _step_dow >= 5,
             })
 
     walk_activities = [a for a in all_activities_30d if (a.get("sport_type") or "").lower() in ("walk", "hike")]
@@ -4272,7 +4649,7 @@ def handle_training_overview() -> dict:
             _act_minutes(a) for a in walk_activities
             if a.get("average_heartrate") and z2_low <= float(a["average_heartrate"]) <= z2_high
         )),
-        "daily_steps_trend": daily_steps_trend[-14:],  # last 14 days
+        "daily_steps_trend": daily_steps_trend,
     }
     # Avg walking pace (min/mi)
     walk_w_speed = [a for a in walk_activities if a.get("average_speed_ms") and float(a["average_speed_ms"]) > 0]
@@ -4302,6 +4679,42 @@ def handle_training_overview() -> dict:
         "avg_session_min": round(bw_minutes / bw_sessions, 1) if bw_sessions else None,
         "weekly_trend": bw_weekly_trend[-8:],
     }
+
+    # ── V2: Daily modality minutes (30 days) for stacked bar chart ──
+    _MODALITY_MAP = {
+        "WeightTraining": "strength", "Workout": "strength",
+        "Walk": "walking", "Hike": "hiking",
+        "Ride": "cycling", "VirtualRide": "cycling",
+        "Stretch": "stretching", "Yoga": "stretching",
+        "Soccer": "soccer",
+        "Breathwork": "breathwork",
+    }
+    _daily_mod = _dd2(lambda: _dd2(float))
+    for a in all_activities_30d:
+        _dm_date = a.get("_day_date", "")
+        _dm_sport = a.get("sport_type") or a.get("type") or "Other"
+        _dm_mapped = _MODALITY_MAP.get(_dm_sport, "other")
+        _dm_dur = _act_minutes(a)
+        _daily_mod[_dm_date][_dm_mapped] += _dm_dur
+    # Add Apple Health breathwork minutes
+    for h in ah_30d:
+        _bw_d = h.get("date") or h.get("sk", "").replace("DATE#", "")
+        _bw_min = float(h.get("breathwork_minutes") or 0)
+        if _bw_min > 0:
+            _daily_mod[_bw_d]["breathwork"] += _bw_min
+    _mod_keys = ["strength", "walking", "cycling", "stretching", "soccer", "hiking", "breathwork", "other"]
+    daily_modality_minutes_30d = []
+    for i in range(30):
+        dt = datetime.now(timezone.utc) - timedelta(days=29 - i)
+        _dm_d = dt.strftime("%Y-%m-%d")
+        _dm_entry = {"date": _dm_d}
+        _dm_total = 0
+        for _mk in _mod_keys:
+            _mv = round(_daily_mod.get(_dm_d, {}).get(_mk, 0))
+            _dm_entry[_mk + "_min"] = _mv
+            _dm_total += _mv
+        _dm_entry["total_min"] = _dm_total
+        daily_modality_minutes_30d.append(_dm_entry)
 
     # Whoop strain (30d)
     whoop_30d = _query_source("whoop", d30, today)
@@ -4373,6 +4786,7 @@ def handle_training_overview() -> dict:
             "avg_daily_steps": walking_data["avg_daily_steps"],
         },
         "modality_breakdown": modality_breakdown,
+        "daily_modality_minutes_30d": daily_modality_minutes_30d,
         "walking": walking_data,
         "breathwork": breathwork_data,
         "weekly_trend": weekly_trend,
@@ -4497,6 +4911,237 @@ def handle_protein_sources() -> dict:
     }, cache_seconds=3600)
 
 
+def handle_physical_overview() -> dict:
+    """
+    GET /api/physical_overview
+    Returns: Latest + baseline DEXA scans, tape measurements, delta computations.
+    Source: dexa + measurements DynamoDB partitions.
+    Cache: 3600s.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # ── 1. DEXA scans (all, sorted ascending) ──
+    dexa_pk = f"{USER_PREFIX}dexa"
+    dexa_resp = table.query(
+        KeyConditionExpression=Key("pk").eq(dexa_pk),
+        ScanIndexForward=True,
+    )
+    dexa_items = _decimal_to_float(dexa_resp.get("Items", []))
+
+    # Baseline = most recent scan on or before EXPERIMENT_START (the starting point)
+    # Latest = most recent scan after EXPERIMENT_START (progress since Day 1)
+    latest_dexa = None
+    baseline_dexa = None
+    if dexa_items:
+        pre_experiment = [d for d in dexa_items if (d.get("scan_date") or "") <= EXPERIMENT_START]
+        post_experiment = [d for d in dexa_items if (d.get("scan_date") or "") > EXPERIMENT_START]
+        baseline_dexa = pre_experiment[-1] if pre_experiment else dexa_items[0]
+        if post_experiment:
+            latest_dexa = post_experiment[-1]
+        else:
+            # No post-experiment scan yet — show baseline as the current state
+            latest_dexa = baseline_dexa
+            baseline_dexa = None  # no comparison until a future scan exists
+
+    def _dexa_summary(item):
+        if not item:
+            return None
+        bc = item.get("body_composition", {})
+        bs = item.get("body_score", {})
+        bone = item.get("bone", {})
+        idx = item.get("indices", {})
+        s360 = item.get("score_360", {})
+        seg_fat = item.get("segmental_fat", {})
+        seg_lean = item.get("segmental_lean", {})
+        limbs = item.get("limbs", {})
+        targets = item.get("targets", {})
+        changes = item.get("changes_vs_baseline", {})
+        return {
+            "scan_date": item.get("scan_date", ""),
+            "body_composition": {
+                "total_mass_lb": bc.get("total_mass_lb"),
+                "body_fat_pct": bc.get("body_fat_pct"),
+                "fat_mass_lb": bc.get("fat_mass_lb"),
+                "lean_mass_lb": bc.get("lean_mass_lb"),
+                "visceral_fat_lb": bc.get("visceral_fat_lb"),
+                "visceral_fat_g": bc.get("visceral_fat_g"),
+                "android_fat_pct": bc.get("android_fat_pct"),
+                "gynoid_fat_pct": bc.get("gynoid_fat_pct"),
+                "ag_ratio": bc.get("ag_ratio"),
+            },
+            "body_score": {
+                "grade": bs.get("grade"),
+                "numeric": bs.get("numeric"),
+                "percentile": bs.get("percentile"),
+            },
+            "bone": {
+                "t_score": bone.get("t_score"),
+                "z_score": bone.get("z_score"),
+            },
+            "indices": {
+                "almi_kg_m2": idx.get("almi_kg_m2"),
+                "ffmi_kg_m2": idx.get("ffmi_kg_m2"),
+                "fmi_kg_m2": idx.get("fmi_kg_m2"),
+                "almi_percentile": idx.get("almi_percentile"),
+                "ffmi_rating": idx.get("ffmi_rating"),
+                "fmi_rating": idx.get("fmi_rating"),
+            } if idx else None,
+            "score_360": {
+                "score": s360.get("score"),
+                "biological_age": s360.get("biological_age"),
+                "chronological_age": s360.get("chronological_age"),
+                "biological_age_delta": s360.get("biological_age_delta"),
+            } if s360 else None,
+            "segmental_fat": {
+                "arms_pct": seg_fat.get("arms_pct"),
+                "trunk_pct": seg_fat.get("trunk_pct"),
+                "legs_pct": seg_fat.get("legs_pct"),
+            } if seg_fat else None,
+            "segmental_lean": {
+                "total_lb": seg_lean.get("total_lb"),
+                "arms_lb": seg_lean.get("arms_lb"),
+                "trunk_lb": seg_lean.get("trunk_lb"),
+                "legs_lb": seg_lean.get("legs_lb"),
+            } if seg_lean else None,
+            "targets": targets if targets else None,
+            "changes_vs_baseline": changes if changes else None,
+        }
+
+    # Days since latest DEXA
+    days_since_dexa = None
+    next_dexa_recommended = None
+    if latest_dexa:
+        try:
+            scan_dt = datetime.strptime(latest_dexa.get("scan_date", ""), "%Y-%m-%d")
+            days_since_dexa = (datetime.now(timezone.utc).replace(tzinfo=None) - scan_dt).days
+            next_dt = scan_dt + timedelta(days=90)
+            next_dexa_recommended = next_dt.strftime("%Y-%m-%d")
+        except Exception:
+            pass
+
+    # ── 2. Tape measurements (latest session) ──
+    meas_pk = f"{USER_PREFIX}measurements"
+    meas_resp = table.query(
+        KeyConditionExpression=Key("pk").eq(meas_pk),
+        ScanIndexForward=False,
+        Limit=1,
+    )
+    meas_items = _decimal_to_float(meas_resp.get("Items", []))
+    tape = None
+    tape_session_count = 0
+    if meas_items:
+        m = meas_items[0]
+        # Count total sessions
+        count_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(meas_pk),
+            Select="COUNT",
+        )
+        tape_session_count = count_resp.get("Count", 1)
+
+        # Build tape data from raw measurement fields
+        raw = {}
+        derived = {}
+        for k, v in m.items():
+            if k in ("pk", "sk", "ingested_at", "source_file", "unit", "measured_by", "date", "session_number"):
+                continue
+            if k in ("waist_height_ratio", "bilateral_symmetry_bicep_in", "bilateral_symmetry_thigh_in",
+                      "trunk_sum_in", "limb_avg_in"):
+                derived[k] = v
+            elif k.endswith("_in"):
+                raw[k] = v
+
+        tape = {
+            "session_date": m.get("date", m.get("sk", "").replace("DATE#", "")),
+            "session_number": m.get("session_number", 1),
+            **raw,
+            "derived": {
+                **derived,
+                "waist_height_ratio_target": 0.5,
+            },
+        }
+
+    return _ok({
+        "latest_dexa": _dexa_summary(latest_dexa),
+        "baseline_dexa": _dexa_summary(baseline_dexa),
+        "dexa_scan_count": len(dexa_items),
+        "days_since_dexa": days_since_dexa,
+        "next_dexa_recommended": next_dexa_recommended,
+        "tape_measurements": tape,
+        "tape_session_count": tape_session_count,
+    }, cache_seconds=3600)
+
+
+def handle_ai_analysis() -> dict:
+    """
+    GET /api/ai_analysis?expert=mind|nutrition|training|physical
+    Returns cached AI expert analysis from DynamoDB.
+    Cache: 300s.
+    """
+    # Note: query params handled in lambda_handler before ROUTES dispatch
+    # This function is not directly called via ROUTES; handled specially
+    pass
+
+
+def handle_journal_analysis() -> dict:
+    """
+    GET /api/journal_analysis
+    Returns 90-day journal theme analysis from cache partition.
+    Cache: 3600s.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d90 = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
+
+    ja_pk = f"{USER_PREFIX}journal_analysis"
+    resp = table.query(
+        KeyConditionExpression=Key("pk").eq(ja_pk) & Key("sk").between(f"DATE#{d90}", f"DATE#{today}"),
+        ScanIndexForward=True,
+    )
+    items = _decimal_to_float(resp.get("Items", []))
+
+    # Build theme frequency counts
+    theme_counts = {}
+    for item in items:
+        for theme in item.get("themes", []):
+            theme_counts[theme] = theme_counts.get(theme, 0) + 1
+
+    total = len(items)
+    top_themes = sorted(
+        [{"theme": k, "count": v, "pct": round(v / max(total, 1) * 100)} for k, v in theme_counts.items()],
+        key=lambda x: x["count"],
+        reverse=True,
+    )[:8]
+
+    # Sentiment trend — rolling 7-day average
+    sentiment_trend = []
+    daily_scores = [(item.get("date", ""), float(item.get("sentiment_score", 0))) for item in items]
+    for i, (date, _) in enumerate(daily_scores):
+        window = [s for _, s in daily_scores[max(0, i - 6):i + 1]]
+        sentiment_trend.append({
+            "date": date,
+            "avg_sentiment": round(sum(window) / len(window), 3) if window else 0,
+        })
+
+    daily_themes = []
+    for item in items:
+        daily_themes.append({
+            "date": item.get("date", item.get("sk", "").replace("DATE#", "")),
+            "dominant_theme": item.get("dominant_theme", "other"),
+            "themes": item.get("themes", []),
+            "sentiment_score": float(item.get("sentiment_score", 0)),
+            "sentiment_label": item.get("sentiment_label", "neutral"),
+            "word_count": item.get("word_count", 0),
+            "one_line_summary": item.get("one_line_summary", ""),
+        })
+
+    return _ok({
+        "daily_themes": daily_themes,
+        "top_themes": top_themes,
+        "total_analyzed": total,
+        "date_range": {"start": d90, "end": today},
+        "sentiment_trend": sentiment_trend,
+    }, cache_seconds=3600)
+
+
 def handle_mind_overview() -> dict:
     """
     GET /api/mind_overview
@@ -4617,6 +5262,52 @@ def handle_mind_overview() -> dict:
     except Exception:
         journal_count = 0
 
+    # ── 7. Meditation / breathwork (Apple Health) ──
+    ah_mind = _query_source("apple_health", d30, today)
+    meditation_sessions = []
+    med_total_min = 0
+    med_session_count = 0
+    for h in ah_mind:
+        _md = h.get("date") or h.get("sk", "").replace("DATE#", "")
+        _bw_min = float(h.get("breathwork_minutes") or 0)
+        _bw_sess = int(float(h.get("breathwork_sessions") or 0))
+        if _bw_min > 0 or _bw_sess > 0:
+            meditation_sessions.append({
+                "date": _md,
+                "minutes": round(_bw_min, 1),
+                "sessions": _bw_sess,
+            })
+            med_total_min += _bw_min
+            med_session_count += _bw_sess
+    meditation_sessions.sort(key=lambda x: x["date"])
+    meditation_data = {
+        "sessions_30d": med_session_count,
+        "total_minutes_30d": round(med_total_min, 1),
+        "avg_session_min": round(med_total_min / med_session_count, 1) if med_session_count else None,
+        "daily": meditation_sessions,
+    }
+
+    # ── 8. Vice streak timeline (30-day daily history) ──
+    hs_30d_resp = table.query(
+        KeyConditionExpression=Key("pk").eq(hs_pk) & Key("sk").between(f"DATE#{d30}", f"DATE#{today}"),
+        ScanIndexForward=True,
+    )
+    hs_30d_items = _decimal_to_float(hs_30d_resp.get("Items", []))
+    vice_timeline = []
+    for hs_day in hs_30d_items:
+        day_date = hs_day.get("date") or hs_day.get("sk", "").replace("DATE#", "")
+        raw_vs = hs_day.get("vice_streaks") or {}
+        day_entry = {"date": day_date, "held": int(hs_day.get("vices_held", 0)), "total": int(hs_day.get("vices_total", 0))}
+        # Include per-vice streaks (filtered)
+        if isinstance(raw_vs, dict):
+            streaks = {}
+            for name, val in raw_vs.items():
+                if name.lower().strip() in blocked_set:
+                    continue
+                streaks[name] = int(val or 0)
+            day_entry["streaks"] = streaks
+        vice_timeline.append(day_entry)
+
     return _ok({
         "mind": {
             "mind_pillar": mind_pillar,
@@ -4631,7 +5322,9 @@ def handle_mind_overview() -> dict:
             "depth_counts": depth_counts,
         },
         "vice_streaks": vice_data,
-        "mood_trend": mood_entries[-30:],  # last 30 entries for chart
+        "vice_timeline": vice_timeline,
+        "mood_trend": mood_entries[-30:],
+        "meditation": meditation_data,
     }, cache_seconds=3600)
 
 
@@ -5338,6 +6031,13 @@ ROUTES = {
     "/api/nutrition_overview":  handle_nutrition_overview,
     "/api/training_overview":   handle_training_overview,
     "/api/mind_overview":       handle_mind_overview,
+    "/api/physical_overview":   handle_physical_overview,
+    "/api/journal_analysis":    handle_journal_analysis,
+    "/api/ai_analysis":         None,  # GET with ?expert= query param, handled in lambda_handler
+    # BL-03: The Ledger / Snake Fund
+    "/api/ledger":              handle_ledger,
+    # BL-04: Field Notes
+    "/api/field_notes":         None,  # GET with optional ?week= query param, handled in lambda_handler
     # BL-02: Bloodwork/Labs
     "/api/labs":                handle_labs,
     "/api/frequent_meals":      handle_frequent_meals,
@@ -5350,6 +6050,12 @@ ROUTES = {
     # Benchmark trends + meal responses (stub endpoints)
     "/api/benchmark_trends":    handle_benchmark_trends,
     "/api/meal_responses":      handle_meal_responses,
+    # Tools page: baseline vs current comparison
+    "/api/tools_baseline":      handle_tools_baseline,
+    # Platform stats: single source of truth for all site pages
+    "/api/platform_stats":      handle_platform_stats,
+    # Discoveries page: active hypotheses + inner life + AI findings
+    "/api/discoveries":         handle_discoveries,
     # Experiment suggestion (POST)
     "/api/experiment_suggest":  None,  # POST handler in lambda_handler
     # Phase 1: Reader engagement
@@ -5508,6 +6214,61 @@ def lambda_handler(event, context):
     if path == "/api/observatory_week":
         qs = event.get("queryStringParameters") or {}
         return handle_observatory_week(qs)
+
+    # BL-04: Field Notes (GET with optional ?week= query param)
+    if path == "/api/field_notes":
+        qs = event.get("queryStringParameters") or {}
+        week_param = qs.get("week")
+        fn_pk = f"{USER_PREFIX}field_notes"
+
+        if week_param:
+            # Single entry mode
+            item = table.get_item(Key={"pk": fn_pk, "sk": f"WEEK#{week_param}"}).get("Item")
+            if not item:
+                return _ok({"entry": None, "week": week_param}, cache_seconds=300)
+            item = _decimal_to_float(item)
+            return _ok({"entry": {
+                "week": item.get("week", week_param),
+                "ai_present": item.get("ai_present", ""),
+                "ai_cautionary": item.get("ai_cautionary"),
+                "ai_affirming": item.get("ai_affirming"),
+                "ai_tone": item.get("ai_tone", "mixed"),
+                "ai_generated_at": item.get("ai_generated_at"),
+                "matthew_agreement": item.get("matthew_agreement"),
+                "matthew_logged_at": item.get("matthew_logged_at"),
+            }}, cache_seconds=300)
+        else:
+            # List mode — return all weeks (most recent first)
+            resp = table.query(
+                KeyConditionExpression=Key("pk").eq(fn_pk),
+                ScanIndexForward=False,
+                Limit=52,
+            )
+            items = _decimal_to_float(resp.get("Items", []))
+            entries = [{
+                "week": i.get("week", i.get("sk", "").replace("WEEK#", "")),
+                "ai_tone": i.get("ai_tone", "mixed"),
+                "ai_generated_at": i.get("ai_generated_at"),
+                "has_matthew_response": bool(i.get("matthew_agreement")),
+            } for i in items]
+            return _ok({"entries": entries, "count": len(entries)}, cache_seconds=300)
+
+    # AI Analysis (GET with ?expert= query param)
+    if path == "/api/ai_analysis":
+        qs = event.get("queryStringParameters") or {}
+        expert_key = qs.get("expert", "mind")
+        if expert_key not in ("mind", "nutrition", "training", "physical"):
+            return _error(400, "Invalid expert key")
+        ai_pk = f"{USER_PREFIX}ai_analysis"
+        ai_item = table.get_item(Key={"pk": ai_pk, "sk": f"EXPERT#{expert_key}"}).get("Item")
+        if not ai_item:
+            return _ok({"expert_key": expert_key, "analysis": None, "generated_at": None}, cache_seconds=300)
+        ai_item = _decimal_to_float(ai_item)
+        return _ok({
+            "expert_key": expert_key,
+            "analysis": ai_item.get("analysis", ""),
+            "generated_at": ai_item.get("generated_at", ""),
+        }, cache_seconds=300)
 
     # Special handling: /api/ask accepts POST
     if path == "/api/ask":

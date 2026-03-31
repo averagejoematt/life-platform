@@ -2,7 +2,7 @@
 
 **Table:** `life-platform` (us-west-2)  
 **Design:** Single-table with composite keys  
-**Last updated:** 2026-03-30 (v4.5.2 — 118 MCP tools, 26 data sources, 61 Lambdas)
+**Last updated:** 2026-03-31 (v4.7.0 — 115 MCP tools, 26 data sources, 62 Lambdas)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -1401,6 +1401,130 @@ Access via `log_decision`, `get_decision_journal`, `get_decision_effectiveness` 
 
 ---
 
+## Field Notes Partition (BL-04, v4.6.0)
+
+**pk:** `USER#matthew#SOURCE#field_notes`
+**sk:** `WEEK#<YYYY-WNN>` (e.g. `WEEK#2026-W14`)
+
+Weekly AI-vs-Matthew lab notebook. AI generates three paragraphs every Sunday; Matthew responds via MCP tool. Uses `update_item` for Matthew's fields to never overwrite AI-generated content.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `week` | string | ISO week identifier (e.g. `2026-W14`) |
+| `week_label` | string | Display label (e.g. `Week 14 · Apr 1–7, 2026`) |
+| `week_start` | string | YYYY-MM-DD (Monday) |
+| `week_end` | string | YYYY-MM-DD (Sunday) |
+| `week_number` | number | Week number within the year |
+| `ai_present` | string | Present-signal paragraph (~150 words) |
+| `ai_lookback` | string | Lookback paragraph (~120 words) |
+| `ai_focus` | string | Forward-focus paragraph (~100 words) |
+| `ai_generated_at` | string | ISO timestamp |
+| `ai_model` | string | Model used (e.g. `claude-sonnet-4-6`) |
+| `ai_tone` | string | `affirming`, `cautionary`, `mixed`, or `urgent` |
+| `ai_domains` | list | Domains with notable signals |
+| `ai_key_metrics` | map | Snapshot of key metrics for the week |
+| `matthew_notes` | string | Matthew's prose response |
+| `matthew_notes_at` | string | ISO timestamp of response |
+| `matthew_agreement` | string | `agree`, `disagree`, or `mixed` |
+| `matthew_disputed` | list | Specific AI claims Matthew disputes |
+| `matthew_added` | string | What Matthew noticed the AI missed |
+| `character_level` | number | Character level at end of week |
+| `day_grade_avg` | number | Average day grade 0–100 |
+| `platform_week` | number | Platform week number |
+
+Access via `get_field_notes`, `log_field_note_response` MCP tools.
+
+---
+
+## Ledger Partition (BL-03, v4.6.0)
+
+**pk:** `USER#matthew#SOURCE#ledger`
+
+Achievement-linked charitable giving. Two record types under the same partition:
+
+### Transaction Records
+
+**sk:** `LEDGER#<ISO-timestamp>` (e.g. `LEDGER#2026-03-30T14:22:01.000Z`)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ledger_id` | string | ISO timestamp (SK suffix) |
+| `date` | string | YYYY-MM-DD of the outcome |
+| `type` | string | `bounty` or `punishment` |
+| `amount_usd` | number | Dollar amount donated |
+| `cause_id` | string | Cause identifier from `config/ledger.json` |
+| `cause_name` | string | Denormalized cause name |
+| `source_type` | string | `achievement`, `challenge`, or `experiment` |
+| `source_id` | string | ID of the triggering record |
+| `source_name` | string | Human-readable name |
+| `source_badge_icon` | string | Emoji key |
+| `outcome` | string | `earned`, `passed`, `failed`, or `abandoned` |
+| `notes` | string | Optional context |
+| `logged_at` | string | ISO timestamp |
+
+### Running Totals Record
+
+**sk:** `TOTALS#current` (single record, updated on every transaction)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total_donated_usd` | number | Grand total across all causes |
+| `total_bounties_usd` | number | Total from successful outcomes |
+| `total_punishments_usd` | number | Total from failed outcomes |
+| `bounty_count` | number | Number of bounty transactions |
+| `punishment_count` | number | Number of punishment transactions |
+| `cause_count` | number | Distinct causes funded |
+| `by_cause` | map | Per-cause breakdown: `{cause_id: {amount_usd, count, transactions[]}}` |
+| `last_updated` | string | ISO timestamp |
+
+Access via `log_ledger_entry` MCP tool. Config in `config/ledger.json` (S3).
+
+---
+
+## Journal Analysis Partition (v4.7.0)
+
+**pk:** `USER#matthew#SOURCE#journal_analysis`
+**sk:** `DATE#YYYY-MM-DD`
+
+Cached theme/sentiment extraction from journal entries. Generated nightly by `journal-analyzer` Lambda using Claude Haiku. Auto-expires after 180 days via TTL.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `date` | string | Journal entry date (YYYY-MM-DD) |
+| `dominant_theme` | string | Primary theme: `personal_growth`, `relationships`, `health_body`, `work_ambition`, `anxiety_stress`, `gratitude`, `reflection`, `other` |
+| `themes` | list | Up to 5 theme tags |
+| `sentiment_score` | string | Float -1.0 to 1.0 (stored as string for DynamoDB) |
+| `sentiment_label` | string | `very_positive`, `positive`, `neutral`, `negative`, `very_negative` |
+| `energy_level` | string | `high`, `medium`, `low` |
+| `word_count` | number | Word count of source journal entry |
+| `one_line_summary` | string | Max 12-word factual summary |
+| `analyzed_at` | string | ISO timestamp |
+| `model` | string | AI model used (e.g. `claude-haiku-4-5-20251001`) |
+| `ttl` | number | DynamoDB TTL epoch (180 days from analysis) |
+
+Served via `GET /api/journal_analysis` (site API). Displayed on Mind observatory page as heatmap + charts.
+
+---
+
+## AI Analysis Partition (v4.7.0)
+
+**pk:** `USER#matthew#SOURCE#ai_analysis`
+**sk:** `EXPERT#mind` | `EXPERT#nutrition` | `EXPERT#training` | `EXPERT#physical`
+
+Cached weekly AI expert voice analyses. Generated Monday 6am PT by `ai-expert-analyzer` Lambda using Claude Sonnet. Auto-expires after 8 days via TTL.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `expert_key` | string | `mind`, `nutrition`, `training`, `physical` |
+| `analysis` | string | 2-3 paragraphs of prose analysis (~200 words) |
+| `generated_at` | string | ISO timestamp |
+| `data_snapshot` | string | JSON snapshot of input data (truncated to 5KB) |
+| `ttl` | number | DynamoDB TTL epoch (8 days from generation) |
+
+Served via `GET /api/ai_analysis?expert=<key>` (site API). Displayed on all 4 observatory pages via `renderAIAnalysisCard()`.
+
+---
+
 ## Hypotheses Partition (IC-18, v2.89.0)
 
 **pk:** `USER#matthew#SOURCE#hypotheses`  
@@ -1529,6 +1653,10 @@ DynamoDB TTL is enabled on the `life-platform` table using the `ttl` attribute.
 | `SOURCE#platform_memory` | ❌ No | ❌ No | ~90 days (policy, not enforced) | Query window limits (fetch_memory_records lookback) | Categories accumulate indefinitely in DDB; lookback windows (30–90 days) mean old records are never read. No cleanup needed until corpus exceeds 1,000 items. |
 | `SOURCE#insights` | ❌ No | ❌ No | ~180 days (policy, not enforced) | IC-16 lookback windows (30d for weekly, 90d for monthly) | Grows ~7 records/week (one per digest). At 180-day retention target: ~180 records. Low volume — no urgent cleanup need. Revisit when insight count exceeds 500 (trigger for Insights GSI, roadmap item #17). |
 | `SOURCE#decisions` | ❌ No | ❌ No | Indefinite | — | Low volume (manual or inferred). Retained permanently for trust-calibration dataset. |
+| `SOURCE#field_notes` | ❌ No | ❌ No | Indefinite | — | ~52 records/year (one per week). Retained permanently as longitudinal AI-human advisor relationship record. |
+| `SOURCE#ledger` | ❌ No | ❌ No | Indefinite | — | Low volume (one per achievement/challenge/experiment outcome + one TOTALS record). Retained permanently for charitable giving history. |
+| `SOURCE#journal_analysis` | ❌ No | ✅ Yes (180d) | 180 days TTL | — | One record per journal entry date. Claude Haiku theme/sentiment extraction. Auto-expires after 6 months; re-analyzed nightly. |
+| `SOURCE#ai_analysis` | ❌ No | ✅ Yes (8d) | 8 days TTL | — | 4 records (one per expert: mind/nutrition/training/physical). Weekly Claude Sonnet analysis. Auto-expires if Lambda fails. |
 | `SOURCE#anomalies` | ❌ No | ❌ No | Indefinite | — | One record per day. Grows at ~365 records/year. Lightweight — no cleanup needed. |
 | All raw ingestion partitions | ❌ No | ❌ No | Indefinite | — | `whoop`, `strava`, `garmin`, `macrofactor`, etc. Retained permanently for longitudinal trend analysis. This is the core data asset. |
 | All other derived partitions | ❌ No | ❌ No | Indefinite | — | `day_grade`, `character_sheet`, `computed_metrics`, `habit_scores`, `travel`, `supplements`, `journal`, `chronicle` — all retained permanently. |

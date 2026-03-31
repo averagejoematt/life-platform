@@ -109,7 +109,7 @@
     .s-pullquote__badge {
       font-family: var(--font-mono);
       font-size: 10px;
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       color: var(--s-blue);
       background: var(--s-blue-dim);
@@ -120,7 +120,7 @@
       font-family: var(--font-mono);
       font-size: 11px;
       color: var(--text-faint);
-      letter-spacing: 0.06em;
+      letter-spacing:var(--ls-subtle);
     }
 
     /* Dynamic pull-quotes — larger editorial callouts */
@@ -160,7 +160,7 @@
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--s-blue);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       margin-bottom: var(--space-2);
     }
@@ -279,7 +279,7 @@
     }
     .s-gauge__unit {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       color: var(--text-faint);
       letter-spacing: 0.08em;
     }
@@ -287,7 +287,7 @@
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-muted);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
     }
 
@@ -423,7 +423,7 @@
       font-family: var(--font-mono);
       font-size: 11px;
       color: var(--text-muted);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       margin-top: 4px;
     }
     .s-efficiency__label {
@@ -479,7 +479,7 @@
       font-family: var(--font-mono);
       font-size: 11px;
       color: var(--text-muted);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       margin-bottom: var(--space-3);
     }
@@ -555,7 +555,7 @@
     .s-consistency__label {
       font-family: var(--font-mono);
       font-size: 10px;
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       color: var(--text-faint);
       margin-bottom: var(--space-3);
@@ -646,7 +646,7 @@
       font-family: var(--font-mono);
       font-size: 11px;
       color: var(--text-muted);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       margin-top: 2px;
     }
     .s-temp-big__sub {
@@ -918,7 +918,7 @@
     .s-cross-card__from {
       font-family: var(--font-mono);
       font-size: 10px;
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       color: var(--s-blue);
       margin-bottom: var(--space-2);
@@ -961,7 +961,7 @@
     .s-agreement__icon {
       font-family: var(--font-mono);
       font-size: 10px;
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       color: var(--s-amber);
       padding: 3px 8px;
       background: rgba(245,158,11,0.1);
@@ -1001,7 +1001,7 @@
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--s-blue);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       margin-bottom: var(--space-2);
     }
@@ -1174,10 +1174,11 @@
       <div class="s-hero__eyebrow">Sleep Observatory</div>
       <h1 class="s-hero__title">The thing I thought I was <em>good at.</em></h1>
       <p class="s-hero__sub">
-        I always told myself I slept well. Eight hours, no alarm, out like a light.
-        Then I put a sensor on my wrist, a pod under my mattress, and a thermometer
-        in my bedroom — and discovered that <em>duration</em> and <em>quality</em>
-        are completely different metrics.
+        Sleep was never something I thought I needed to fix. Matthew Walker&rsquo;s work
+        made me pay closer attention. Then the Whoop and Eight Sleep started surfacing
+        numbers I couldn&rsquo;t ignore: sleep onset time, staging, the consistent shift to red
+        every time I drank. The score doesn&rsquo;t lie &mdash; and seeing it every morning
+        changed how I made decisions the night before.
       </p>
       <p class="s-hero__sub-detail">
         Data from Whoop, Eight Sleep, and Apple Health. Updated daily.
@@ -1267,7 +1268,7 @@
     <div class="s-differentiators__items">
       <span>Cross-device triangulation</span>
       <span>Cross-domain correlation</span>
-      <span>Accumulated N=1 rules</span>
+      <span>Hypotheses under test</span>
     </div>
   </div>
 </div>
@@ -1279,9 +1280,9 @@
   <div class="s-rule-teaser__inner">
     <div class="s-rule-teaser__number">#1</div>
     <div class="s-rule-teaser__content">
-      <div class="s-rule-teaser__label">Top N=1 Sleep Rule</div>
-      <div class="s-rule-teaser__finding">9pm screen-off drives measurable HRV improvement the following morning</div>
-      <div class="s-rule-teaser__evidence">+12% next-day HRV &bull; <em>r=0.61</em> &bull; 90-day window &bull; <a href="#s-rules-full" style="color:var(--s-blue);text-decoration:none;">See all rules →</a></div>
+      <div class="s-rule-teaser__label">Top Sleep Hypothesis</div>
+      <div class="s-rule-teaser__finding">Testing whether screens-off before 9pm improves next-day HRV</div>
+      <div class="s-rule-teaser__evidence">Tracking with Whoop data &bull; <em>Hypothesis under test</em> &bull; <a href="#s-rules-full" style="color:var(--s-blue);text-decoration:none;">See all hypotheses →</a></div>
     </div>
   </div>
 </div>
@@ -1295,10 +1296,10 @@
 <div class="s-pullquote s-pullquote--dynamic s-pullquote--left reveal">
   <div class="s-pullquote__watermark">01</div>
   <div class="s-pullquote__text" id="s-dynamic-quote-1">
-    Sleep before <em>10pm</em> predicts <em>15% higher HRV</em> the following morning.
+    Hypothesis: earlier bedtime correlates with <em>higher morning HRV</em>. Tracking across sleep sessions.
   </div>
   <div class="s-pullquote__attr">
-    <span class="s-pullquote__badge">N=1 &middot; Correlational</span>
+    <span class="s-pullquote__badge">Hypothesis &middot; Under test</span>
     <span class="s-pullquote__source">Cross-referenced: Whoop HRV &times; Eight Sleep bed time</span>
   </div>
 </div>
@@ -1429,7 +1430,7 @@
     </div>
   </div>
   <div class="s-context">
-    Circadian consistency matters as much as duration. A 30-minute bedtime variance produces +8% recovery compared to high-variance weeks. The body's clock does not understand weekends.
+    Circadian consistency matters as much as duration. Testing whether low bedtime variance improves Whoop recovery compared to high-variance weeks. The body's clock does not understand weekends.
   </div>
 </section>
 
@@ -1443,8 +1444,8 @@
     below 66&deg;F or above 70&deg;F, sleep score drops on both sides.
   </div>
   <div class="s-pullquote__attr">
-    <span class="s-pullquote__badge">N=1 &middot; Correlational</span>
-    <span class="s-pullquote__source">90+ nights of Eight Sleep pod data</span>
+    <span class="s-pullquote__badge">Hypothesis &middot; Under test</span>
+    <span class="s-pullquote__source">Tracking via Eight Sleep pod data</span>
   </div>
 </div>
 
@@ -1479,12 +1480,12 @@
 <div class="s-pullquote s-pullquote--dynamic s-pullquote--left reveal">
   <div class="s-pullquote__watermark">03</div>
   <div class="s-pullquote__text" id="s-dynamic-quote-2">
-    Any alcohol &mdash; even <em>one drink</em> &mdash; tanks sleep quality
-    by an average of <em>&minus;18 points</em> the following night.
+    Hypothesis: any alcohol &mdash; even <em>one drink</em> &mdash; measurably
+    reduces <em>sleep quality</em> the following night.
   </div>
   <div class="s-pullquote__attr">
-    <span class="s-pullquote__badge">N=1 &middot; Consistent</span>
-    <span class="s-pullquote__source">Consistent across all amounts tracked</span>
+    <span class="s-pullquote__badge">Hypothesis &middot; Under test</span>
+    <span class="s-pullquote__source">Tracking sleep quality on alcohol vs non-alcohol nights</span>
   </div>
 </div>
 
@@ -1513,7 +1514,7 @@
     <div class="s-chart-tooltip__whoop" id="s-tooltip-whoop"></div>
   </div>
   <div class="s-context">
-    The dual-line view reveals when Eight Sleep and Whoop agree — and when they diverge. Sustained scores above 85 correlate with next-day recovery above 70%. Look for patterns in the dips: most are traceable to late meals, alcohol, or inconsistent bed times.
+    The dual-line view reveals when Eight Sleep and Whoop agree — and when they diverge. Testing whether sustained scores above 85 predict next-day recovery. Look for patterns in the dips: most are traceable to late meals, alcohol, or inconsistent bed times.
   </div>
 </section>
 
@@ -1531,7 +1532,7 @@
         </div>
         <div class="s-adherence__pct" id="s-adh-bedtime-pct">70%</div>
       </div>
-      <div class="s-adherence__outcome">Adherent nights: HRV <em>+12ms</em> avg<br>Non-adherent: HRV &minus;8ms avg</div>
+      <div class="s-adherence__outcome">Tracking impact on HRV<br>Measuring adherent vs non-adherent nights</div>
     </div>
     <div class="s-adherence__card">
       <div class="s-adherence__name">Screen-off by 9pm</div>
@@ -1541,7 +1542,7 @@
         </div>
         <div class="s-adherence__pct" id="s-adh-screen-pct">62%</div>
       </div>
-      <div class="s-adherence__outcome">Adherent nights: sleep score <em>+8pts</em><br>Non-adherent: &minus;5pts avg</div>
+      <div class="s-adherence__outcome">Measuring effect on sleep score<br>Comparing screen-free vs screen nights</div>
     </div>
     <div class="s-adherence__card">
       <div class="s-adherence__name">Bed temp at 68°F</div>
@@ -1551,7 +1552,7 @@
         </div>
         <div class="s-adherence__pct" id="s-adh-temp-pct">88%</div>
       </div>
-      <div class="s-adherence__outcome">Adherent nights: deep sleep <em>+4%</em><br>Non-adherent: deep sleep &minus;6%</div>
+      <div class="s-adherence__outcome">Measuring effect on deep sleep %<br>Comparing optimal vs off-target temp nights</div>
     </div>
     <div class="s-adherence__card">
       <div class="s-adherence__name">No alcohol</div>
@@ -1561,7 +1562,7 @@
         </div>
         <div class="s-adherence__pct" id="s-adh-alcohol-pct">91%</div>
       </div>
-      <div class="s-adherence__outcome">Adherent nights: sleep score <em>+18pts</em><br>Non-adherent: &minus;18pts avg</div>
+      <div class="s-adherence__outcome">Measuring effect on sleep score<br>Comparing alcohol-free vs alcohol nights</div>
     </div>
   </div>
   <div class="s-context">
@@ -1583,27 +1584,27 @@
 </div>
 
 <section class="s-rules-section reveal" id="s-rules-full">
-  <div class="s-section-header">N=1 Sleep Rules &mdash; 30+ Weeks of Data</div>
+  <div class="s-section-header">Sleep Hypotheses Under Test</div>
   <div class="s-rule-grid">
     <div class="s-rule">
       <div class="s-rule__num">Rule 01</div>
-      <div class="s-rule__finding">9pm screen-off drives measurable HRV improvement</div>
-      <div class="s-rule__evidence">+12% next-day HRV &bull; <em>r=0.61</em> &bull; 90-day window</div>
+      <div class="s-rule__finding">9pm screen-off may improve next-day HRV</div>
+      <div class="s-rule__evidence">Testing: tracking HRV response to <em>screen-free evenings</em></div>
     </div>
     <div class="s-rule">
       <div class="s-rule__num">Rule 02</div>
-      <div class="s-rule__finding">Bed temp 68&deg;F is the personal peak &mdash; below 66&deg;F or above 70&deg;F both decline</div>
-      <div class="s-rule__evidence">Sleep score peaks at <em>68&deg;F</em> &bull; confirmed across 90+ nights</div>
+      <div class="s-rule__finding">Bed temp 68&deg;F may be the personal sweet spot &mdash; testing above and below</div>
+      <div class="s-rule__evidence">Testing: <em>Eight Sleep temperature</em> &times; sleep score correlation</div>
     </div>
     <div class="s-rule">
       <div class="s-rule__num">Rule 03</div>
-      <div class="s-rule__finding">Any alcohol &mdash; even one drink &mdash; tanks sleep quality the following night</div>
-      <div class="s-rule__evidence">&minus;18 pts avg sleep score &bull; <em>consistent across all amounts</em></div>
+      <div class="s-rule__finding">Any alcohol &mdash; even one drink &mdash; may reduce sleep quality the following night</div>
+      <div class="s-rule__evidence">Testing: tracking sleep quality on <em>alcohol vs non-alcohol nights</em></div>
     </div>
     <div class="s-rule">
       <div class="s-rule__num">Rule 04</div>
-      <div class="s-rule__finding">Consistent bed time (&plusmn;30 min) outperforms high-variance weeks</div>
-      <div class="s-rule__evidence">+8% recovery &bull; <em>low-variance vs high-variance</em> weeks</div>
+      <div class="s-rule__finding">Consistent bed time (&plusmn;30 min) may outperform high-variance weeks</div>
+      <div class="s-rule__evidence">Testing: <em>bedtime variance</em> &times; Whoop recovery correlation</div>
     </div>
   </div>
 </section>
@@ -1618,13 +1619,13 @@
       <div class="s-cross-card__arrow">SLEEP → RECOVERY</div>
       <div class="s-cross-card__from">Next-day recovery</div>
       <div class="s-cross-card__finding">Sleep score above 85 predicts recovery above 70% the following day</div>
-      <div class="s-cross-card__evidence"><em>r=0.72</em> &bull; Below 34% recovery triggers automatic training load reduction</div>
+      <div class="s-cross-card__evidence">Testing: <em>sleep score &times; recovery correlation</em> &bull; Below 34% recovery triggers automatic training load reduction</div>
     </a>
     <a href="/training/" class="s-cross-card">
       <div class="s-cross-card__arrow">SLEEP → TRAINING</div>
       <div class="s-cross-card__from">Training quality</div>
-      <div class="s-cross-card__finding">Poor sleep (&lt;7h or &lt;70 score) reduces next-day strain capacity by ~15%</div>
-      <div class="s-cross-card__evidence">Measured via Whoop strain &bull; <em>n=90+ sessions</em></div>
+      <div class="s-cross-card__finding">Poor sleep (&lt;7h or &lt;70 score) may reduce next-day strain capacity</div>
+      <div class="s-cross-card__evidence">Testing via Whoop strain &bull; <em>tracking effect</em></div>
     </a>
     <a href="/mind/" class="s-cross-card">
       <div class="s-cross-card__arrow">SLEEP → COGNITION</div>

@@ -98,7 +98,7 @@
     .t-pullquote__badge {
       font-family: var(--font-mono);
       font-size: 10px;
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       color: var(--t-red);
       background: var(--t-red-dim);
@@ -109,7 +109,7 @@
       font-family: var(--font-mono);
       font-size: 11px;
       color: var(--text-faint);
-      letter-spacing: 0.06em;
+      letter-spacing:var(--ls-subtle);
     }
 
     /* Dynamic pull-quotes — larger editorial callouts */
@@ -269,7 +269,7 @@
     }
     .t-gauge__unit {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       color: var(--text-faint);
       letter-spacing: 0.08em;
     }
@@ -277,7 +277,7 @@
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-muted);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
     }
 
@@ -325,7 +325,7 @@
       font-family: var(--font-mono);
       font-size: 11px;
       color: var(--text-muted);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       margin-bottom: var(--space-3);
     }
@@ -391,14 +391,14 @@
     .t-modality-card__name {
       font-family: var(--font-mono);
       font-size: 11px;
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       color: var(--t-red);
     }
     .t-modality-card__trend {
       font-family: var(--font-mono);
       font-size: 10px;
-      letter-spacing: 0.06em;
+      letter-spacing:var(--ls-subtle);
     }
     .t-modality-card__stats {
       display: flex;
@@ -412,7 +412,7 @@
     }
     .t-modality-stat__label {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       color: var(--text-faint);
       letter-spacing: 0.08em;
       text-transform: uppercase;
@@ -497,7 +497,7 @@
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-faint);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       margin-bottom: var(--space-2);
     }
@@ -510,13 +510,13 @@
     }
     .t-weekly-day__acts {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       color: var(--text-faint);
       line-height: 1.4;
     }
     .t-weekly-day__steps {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       color: var(--text-muted);
       margin-top: var(--space-1);
     }
@@ -639,7 +639,7 @@
     .t-banister-card__label {
       font-family: var(--font-mono);
       font-size: 10px;
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       color: var(--text-muted);
       margin-bottom: var(--space-2);
@@ -716,7 +716,7 @@
       justify-content: space-between;
       margin-top: var(--space-2);
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       color: var(--text-faint);
       letter-spacing: 0.05em;
     }
@@ -744,7 +744,7 @@
     .t-bench-card__lift {
       font-family: var(--font-mono);
       font-size: 11px;
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       color: var(--t-red);
       margin-bottom: var(--space-3);
@@ -807,7 +807,7 @@
     .t-lift-card__name {
       font-family: var(--font-mono);
       font-size: 10px;
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       color: var(--text-muted);
       margin-bottom: var(--space-3);
@@ -854,7 +854,7 @@
     .t-radar-pillar__name {
       font-family: var(--font-mono);
       font-size: 10px;
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       color: var(--text-muted);
       width: 80px;
@@ -1025,7 +1025,7 @@
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--t-red);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       margin-bottom: var(--space-2);
     }
@@ -1082,7 +1082,7 @@
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--t-red);
-      letter-spacing: 0.1em;
+      letter-spacing:var(--ls-wide);
       text-transform: uppercase;
       margin-bottom: var(--space-2);
     }
@@ -1183,6 +1183,22 @@
       letter-spacing: 0.04em;
       line-height: 1.7;
       opacity: 0.6;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       V2: STEP COUNT + MODALITY CHARTS
+       ═══════════════════════════════════════════════════════ */
+    .t-steps-chart-section,
+    .t-modality-chart-section {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-12) var(--page-padding);
+      border-bottom: 1px solid var(--border);
+    }
+    .t-steps-chart-wrap,
+    .t-modality-chart-wrap {
+      position: relative;
+      height: 260px;
     }
 
     /* ═══════════════════════════════════════════════════════
@@ -1370,13 +1386,25 @@
 <div id="t-content" style="display:none">
 
 <!-- ════════════════════════════════════════════════════════════
+     V2: 30-DAY DAILY EXERCISE MINUTES BY MODALITY
+     ════════════════════════════════════════════════════════════ -->
+<section class="t-modality-chart-section reveal" id="t-modality-chart">
+  <div class="t-section-header">Daily exercise minutes &mdash; 30 days</div>
+  <div class="t-modality-chart-wrap">
+    <canvas id="t-modality-canvas"></canvas>
+  </div>
+  <div class="t-chart-legend" id="t-modality-legend" style="display:flex;gap:var(--space-3);margin-top:var(--space-3);flex-wrap:wrap;justify-content:center;"></div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
      11c: Narrative intro — relationship with exercise
      ════════════════════════════════════════════════════════════ -->
 <div class="t-pullquote t-pullquote--dynamic reveal">
   <div class="t-pullquote__text">
-    My relationship with exercise has been a boom-bust cycle for twenty years.
-    Two months of intensity, then nothing for six. This time is different &mdash;
-    not because I suddenly found discipline, but because the <em>data won't let me forget</em>.
+    When I&rsquo;m in it, I&rsquo;m all in &mdash; 5am sessions, compound lifts, rucking mountains at the weekend.
+    The problem has never been the training. It&rsquo;s always been the fall &mdash; how fast
+    the void fills when routine breaks. The data doesn&rsquo;t stop that from happening.
+    But it makes the absence visible, and <em>visibility shortens the distance back</em>.
   </div>
 </div>
 
@@ -1386,11 +1414,11 @@
 <div class="t-pullquote t-pullquote--left reveal">
   <div class="t-pullquote__watermark">01</div>
   <div class="t-pullquote__text">
-    Zone 2 volume predicts next-week <em>recovery</em> better than any other variable &mdash;
-    <em>150+ min/week</em> yields 12% higher average recovery.
+    Hypothesis: Zone 2 volume above <em>150 min/week</em> predicts better recovery scores.
+    Tracking with Whoop &times; Strava data.
   </div>
   <div class="t-pullquote__attr">
-    <span class="t-pullquote__badge">N=1 &middot; Correlational</span>
+    <span class="t-pullquote__badge">Hypothesis &middot; Under test</span>
     <span class="t-pullquote__source">Whoop recovery &times; Strava Zone 2 minutes &mdash; 30+ weeks</span>
   </div>
 </div>
@@ -1467,6 +1495,23 @@
         Rucking yields the highest Z2 efficiency.
       </div>
     </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     V2: 30-DAY DAILY STEP COUNT CHART
+     ════════════════════════════════════════════════════════════ -->
+<section class="t-steps-chart-section reveal" id="t-steps-chart">
+  <div class="t-section-header">Daily steps &mdash; 30 days</div>
+  <div class="t-steps-chart-wrap">
+    <canvas id="t-steps-canvas"></canvas>
+  </div>
+  <div style="display:flex;gap:var(--space-4);margin-top:var(--space-3);justify-content:flex-end;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:4px;font:10px monospace;color:rgba(255,255,255,0.4)"><div style="width:8px;height:8px;border-radius:2px;background:#60a5fa"></div> Weekday</div>
+    <div style="display:flex;align-items:center;gap:4px;font:10px monospace;color:rgba(255,255,255,0.4)"><div style="width:8px;height:8px;border-radius:2px;background:rgba(96,165,250,0.4)"></div> Weekend</div>
+    <div style="display:flex;align-items:center;gap:4px;font:10px monospace;color:rgba(255,255,255,0.4)"><div style="width:12px;height:2px;background:#f59e0b"></div> 7d avg</div>
+    <div style="display:flex;align-items:center;gap:4px;font:10px monospace;color:rgba(255,255,255,0.4)"><div style="width:12px;height:1px;border-top:1px dashed rgba(245,158,11,0.3)"></div> 7.5k</div>
+    <div style="display:flex;align-items:center;gap:4px;font:10px monospace;color:rgba(255,255,255,0.4)"><div style="width:12px;height:1px;border-top:1px dashed rgba(62,207,142,0.3)"></div> 10k</div>
   </div>
 </section>
 
@@ -1699,8 +1744,14 @@
 <section class="t-activity-section reveal" id="t-strength-dive" style="display:none">
   <div class="t-section-header">Strength deep-dive</div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4);" id="t-strength-stats"></div>
+  <div style="margin-top:var(--space-8);">
+    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-wide);text-transform:uppercase;margin-bottom:var(--space-4);">Weekly volume load &mdash; 12 weeks</div>
+    <div style="position:relative;height:220px;">
+      <canvas id="t-volume-canvas"></canvas>
+    </div>
+  </div>
   <div style="margin-top:var(--space-6);">
-    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:var(--space-4);">Top exercises (30d)</div>
+    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-wide);text-transform:uppercase;margin-bottom:var(--space-4);">Top exercises (30d)</div>
     <div id="t-strength-exercises"></div>
   </div>
 </section>
@@ -1764,8 +1815,8 @@
 <section class="t-tod-section reveal">
   <div class="t-section-header">When I train</div>
   <p class="t-context" style="padding:0 0 var(--space-4) 0;max-width:none">
-    Morning sessions before 9am produce <strong>+6 pts better sleep scores</strong>.
-    The histogram shows where workouts actually land.
+    Distribution of training sessions by hour. As data accumulates, the platform
+    will cross-reference workout timing with sleep and recovery scores.
   </p>
   <div class="t-tod-grid" id="t-tod-grid"></div>
   <div class="t-tod-labels" id="t-tod-labels"></div>
@@ -1780,27 +1831,7 @@
     GPS traces from Strava activities. <strong>Minimalist outlines</strong> &mdash; distance and duration at a glance.
   </p>
   <div class="t-routes-grid" id="t-routes-grid">
-    <div class="t-route-card">
-      <div class="t-route-card__map">
-        <svg viewBox="0 0 100 60"><polyline points="10,50 25,30 40,45 55,20 70,35 90,15" fill="none" stroke="rgba(239,68,68,0.4)" stroke-width="2" stroke-linecap="round"/></svg>
-      </div>
-      <div class="t-route-card__label">Morning Ruck</div>
-      <div class="t-route-card__stat">3.2 mi &middot; 48 min</div>
-    </div>
-    <div class="t-route-card">
-      <div class="t-route-card__map">
-        <svg viewBox="0 0 100 60"><polyline points="10,30 30,45 50,25 65,40 80,20 95,35" fill="none" stroke="rgba(239,68,68,0.4)" stroke-width="2" stroke-linecap="round"/></svg>
-      </div>
-      <div class="t-route-card__label">Trail Run</div>
-      <div class="t-route-card__stat">4.1 mi &middot; 38 min</div>
-    </div>
-    <div class="t-route-card">
-      <div class="t-route-card__map">
-        <svg viewBox="0 0 100 60"><polyline points="15,40 30,20 50,50 70,15 85,45 95,25" fill="none" stroke="rgba(239,68,68,0.4)" stroke-width="2" stroke-linecap="round"/></svg>
-      </div>
-      <div class="t-route-card__label">Evening Walk</div>
-      <div class="t-route-card__stat">2.4 mi &middot; 35 min</div>
-    </div>
+    <div style="grid-column:1/-1;text-align:center;padding:var(--space-8) 0;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);letter-spacing:var(--ls-label)">Pending data &mdash; GPS routes appear here as outdoor activities are logged to Strava.</div>
   </div>
 </section>
 
@@ -1814,26 +1845,7 @@
     <strong>These are the moments the data became tangible.</strong>
   </p>
   <div class="t-timeline" id="t-timeline">
-    <div class="t-milestone">
-      <div class="t-milestone__date">Jan 2026</div>
-      <div class="t-milestone__title">First 5K without stopping</div>
-      <div class="t-milestone__detail">32:14 finish. Entirely in Zone 2. Proof that aerobic base works.</div>
-    </div>
-    <div class="t-milestone">
-      <div class="t-milestone__date">Feb 2026</div>
-      <div class="t-milestone__title">First 20-mile bike ride</div>
-      <div class="t-milestone__detail">Avg HR 128 bpm, 78% time in Zone 2. Fueled with 40g carbs.</div>
-    </div>
-    <div class="t-milestone">
-      <div class="t-milestone__date">Mar 2026</div>
-      <div class="t-milestone__title">First full soccer match</div>
-      <div class="t-milestone__detail">90 minutes. Whoop strain 16.8. No injury. Recovery 61% next morning.</div>
-    </div>
-    <div class="t-milestone">
-      <div class="t-milestone__date">Mar 2026</div>
-      <div class="t-milestone__title">Bodyweight deadlift</div>
-      <div class="t-milestone__detail">225 lb at 218 lb bodyweight. First centenarian benchmark crossed.</div>
-    </div>
+    <div style="text-align:center;padding:var(--space-8) 0;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);letter-spacing:var(--ls-label)">Milestones appear here as benchmarks are crossed and personal records are set.</div>
   </div>
 </section>
 
@@ -1851,29 +1863,37 @@
 </div>
 
 <section class="t-rules-section reveal">
-  <div class="t-section-header">N=1 training rules &mdash; 30+ weeks of multi-source data</div>
+  <div class="t-section-header">Training Hypotheses Under Test</div>
   <div class="t-rule-grid">
     <div class="t-rule">
-      <div class="t-rule__num">Rule 01</div>
+      <div class="t-rule__num">H-01</div>
       <div class="t-rule__finding">Zone 2 volume predicts next-week recovery better than any other variable</div>
-      <div class="t-rule__evidence">150+ min/week &rarr; <em>12% higher avg recovery</em></div>
+      <div class="t-rule__evidence">Testing: 150+ min/week target &rarr; tracking Whoop recovery correlation</div>
     </div>
     <div class="t-rule">
-      <div class="t-rule__num">Rule 02</div>
-      <div class="t-rule__finding">Back-to-back strain above 18 tanks HRV for 48 hours</div>
-      <div class="t-rule__evidence">HRV drops <em>20%</em> avg after consecutive high-strain days</div>
+      <div class="t-rule__num">H-02</div>
+      <div class="t-rule__finding">Back-to-back high strain days suppress HRV</div>
+      <div class="t-rule__evidence">Testing: consecutive strain &gt;18 &rarr; tracking HRV response over 48h</div>
     </div>
     <div class="t-rule">
-      <div class="t-rule__num">Rule 03</div>
-      <div class="t-rule__finding">Morning workouts before 9am produce better sleep scores than evening</div>
-      <div class="t-rule__evidence"><em>+6 pts</em> avg sleep score &bull; 90+ day dataset</div>
+      <div class="t-rule__num">H-03</div>
+      <div class="t-rule__finding">Morning workouts produce better sleep scores than evening sessions</div>
+      <div class="t-rule__evidence">Testing: workout time &times; Whoop sleep score &rarr; needs 90+ day dataset</div>
     </div>
     <div class="t-rule">
-      <div class="t-rule__num">Rule 04</div>
-      <div class="t-rule__finding">Rucking is the highest Zone 2 yield per hour of any activity</div>
-      <div class="t-rule__evidence"><em>92%</em> of ruck time in Zone 2 vs 61% walking</div>
+      <div class="t-rule__num">H-04</div>
+      <div class="t-rule__finding">Rucking yields the highest Zone 2 percentage per hour of any modality</div>
+      <div class="t-rule__evidence">Testing: comparing Z2% across Walk, Ruck, Ride, Run from Strava HR data</div>
     </div>
   </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     AI EXPERT ANALYSIS
+     ════════════════════════════════════════════════════════════ -->
+<section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal">
+  <div class="t-section-header">Coach's Notes</div>
+  <div id="t-ai-analysis"></div>
 </section>
 
 </div><!-- /t-content -->
@@ -1886,11 +1906,11 @@
 <div class="t-xref reveal">
   <a href="/nutrition/" class="t-xref-card">
     <div class="t-xref-card__tag">Training &times; Nutrition</div>
-    <div class="t-xref-card__text">Deficit depth directly impacts training quality. Strain drops 15% in weeks with &gt;1000 cal deficit.</div>
+    <div class="t-xref-card__text">Testing whether deficit depth impacts training quality. Cross-referencing MacroFactor intake with Whoop strain.</div>
   </a>
   <a href="/sleep/" class="t-xref-card">
     <div class="t-xref-card__tag">Training &times; Sleep</div>
-    <div class="t-xref-card__text">Morning workouts before 9am correlate with +6 pts avg sleep score. Recovery-gated intensity prevents overreach.</div>
+    <div class="t-xref-card__text">Testing whether workout timing affects sleep quality. Recovery-gated intensity prevents overreach.</div>
   </a>
 </div>
 
@@ -1950,6 +1970,7 @@
   }).catch(function(){});
 </script>
 <script src="/assets/js/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 (async function(){
   var API = 'https://averagejoematt.com';
@@ -2169,6 +2190,74 @@
     setText('zval-wavg', weeklyAvg);
     setWidth('zbar-wavg', Math.min(100, (weeklyAvg / 7) * 100));
 
+    /* ── V2: Daily Exercise Minutes by Modality Chart ── */
+    var dailyMod = data.daily_modality_minutes_30d || [];
+    if (typeof Chart !== 'undefined' && dailyMod.length >= 3) {
+      if (!window._chartDefaultsSet) {
+        Chart.defaults.color = 'rgba(255,255,255,0.5)';
+        Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+        Chart.defaults.font.family = 'monospace';
+        window._chartDefaultsSet = true;
+      }
+      var MOD_COLORS = {
+        strength: '#dc2626', walking: '#38bdf8', cycling: '#f59e0b', stretching: '#14b8a6',
+        soccer: '#fb923c', hiking: '#22c55e', breathwork: '#8b5cf6', other: '#6b7280'
+      };
+      var MOD_LABELS = {
+        strength: 'Strength', walking: 'Walking', cycling: 'Cycling', stretching: 'Stretching',
+        soccer: 'Soccer', hiking: 'Hiking', breathwork: 'Breathwork', other: 'Other'
+      };
+      var modKeys = ['strength', 'walking', 'cycling', 'stretching', 'soccer', 'hiking', 'breathwork', 'other'];
+      var activeModKeys = modKeys.filter(function(k) {
+        return dailyMod.some(function(d) { return d[k + '_min'] > 0; });
+      });
+      var modDatasets = activeModKeys.map(function(k) {
+        return {
+          label: MOD_LABELS[k],
+          data: dailyMod.map(function(d) { return d[k + '_min']; }),
+          backgroundColor: MOD_COLORS[k],
+          stack: 'modality', order: 2
+        };
+      });
+      modDatasets.push({
+        label: '60 min target', type: 'line',
+        data: Array(dailyMod.length).fill(60),
+        borderColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderDash: [4, 4],
+        pointRadius: 0, fill: false, order: 0
+      });
+
+      new Chart(document.getElementById('t-modality-canvas'), {
+        type: 'bar',
+        data: {
+          labels: dailyMod.map(function(d) { return d.date.slice(5); }),
+          datasets: modDatasets
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                title: function(ctx) { return dailyMod[ctx[0].dataIndex].date; },
+                afterTitle: function(ctx) { return 'Total: ' + dailyMod[ctx[0].dataIndex].total_min + ' min'; }
+              }
+            }
+          },
+          scales: {
+            x: { stacked: true, ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, maxRotation: 45 }, grid: { display: false } },
+            y: { stacked: true, ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.03)' }, title: { display: true, text: 'minutes', color: 'rgba(255,255,255,0.25)', font: { size: 10 } } }
+          }
+        }
+      });
+
+      var modLegendEl = document.getElementById('t-modality-legend');
+      if (modLegendEl) {
+        modLegendEl.innerHTML = activeModKeys.map(function(k) {
+          return '<div style="display:flex;align-items:center;gap:4px;font:10px monospace;color:rgba(255,255,255,0.4)"><div style="width:8px;height:8px;border-radius:2px;background:' + MOD_COLORS[k] + '"></div> ' + MOD_LABELS[k] + '</div>';
+        }).join('');
+      }
+    }
+
     /* ── Modality deep-dive cards ── */
     var modGrid = document.getElementById('t-modalities');
     var modalities = data.modality_breakdown || [];
@@ -2197,7 +2286,7 @@
         '</div>';
       }).join('');
     } else {
-      modGrid.innerHTML = '<div style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px">No activity data</div>';
+      modGrid.innerHTML = '<div style="color:var(--text-faint);font-family:var(--font-mono);font-size:var(--text-xs)">No activity data</div>';
     }
 
     /* ── Walking section ── */
@@ -2213,6 +2302,49 @@
     setText('wval-miles', (w.total_miles_30d || 0) + ' mi');
     setText('wval-pace', w.avg_pace_min_per_mi || '\u2014');
     setText('wval-z2walk', (w.z2_minutes_walking || 0) + ' min');
+
+    /* ── V2: Daily Step Count Chart ── */
+    var stepsData = (w.daily_steps_trend || []);
+    if (typeof Chart !== 'undefined' && stepsData.length >= 3) {
+      if (!window._chartDefaultsSet) {
+        Chart.defaults.color = 'rgba(255,255,255,0.5)';
+        Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+        Chart.defaults.font.family = 'monospace';
+        window._chartDefaultsSet = true;
+      }
+      var stepVals = stepsData.map(function(d) { return d.steps; });
+      var stepsMa7 = stepVals.map(function(_, i, arr) {
+        if (i < 6) return null;
+        var sum = 0;
+        for (var j = i - 6; j <= i; j++) sum += arr[j];
+        return Math.round(sum / 7);
+      });
+      var barColors = stepsData.map(function(d) {
+        if (d.steps < 7500) return 'rgba(239,68,68,0.5)';
+        return d.is_weekend ? 'rgba(96,165,250,0.4)' : '#60a5fa';
+      });
+
+      new Chart(document.getElementById('t-steps-canvas'), {
+        type: 'bar',
+        data: {
+          labels: stepsData.map(function(d) { return d.date.slice(5); }),
+          datasets: [
+            { label: 'Daily Steps', data: stepVals, backgroundColor: barColors, borderRadius: 2, order: 2 },
+            { label: '7-Day Average', type: 'line', data: stepsMa7, borderColor: '#f59e0b', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.3, spanGaps: true, order: 1 },
+            { label: '7,500', type: 'line', data: Array(stepsData.length).fill(7500), borderColor: 'rgba(245,158,11,0.2)', borderWidth: 1, borderDash: [4, 4], pointRadius: 0, fill: false, order: 0 },
+            { label: '10,000', type: 'line', data: Array(stepsData.length).fill(10000), borderColor: 'rgba(62,207,142,0.2)', borderWidth: 1, borderDash: [4, 4], pointRadius: 0, fill: false, order: 0 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { title: function(ctx) { return stepsData[ctx[0].dataIndex].date; } } } },
+          scales: {
+            x: { ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, maxRotation: 45 }, grid: { display: false } },
+            y: { ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k' : v; } }, grid: { color: 'rgba(255,255,255,0.03)' }, beginAtZero: true }
+          }
+        }
+      });
+    }
 
     /* ── Breathwork section ── */
     var bw = data.breathwork || {};
@@ -2234,7 +2366,7 @@
           }).join('<br>');
           return '<div class="t-weekly-day">' +
             '<div class="t-weekly-day__dow">' + d.day_of_week + '</div>' +
-            '<div class="t-weekly-day__total">' + (d.total_active_minutes || 0) + '<span style="font-size:10px;color:var(--text-faint)">m</span></div>' +
+            '<div class="t-weekly-day__total">' + (d.total_active_minutes || 0) + '<span style="font-size:var(--text-2xs);color:var(--text-faint)">m</span></div>' +
             '<div class="t-weekly-day__acts">' + (actList || '—') + '</div>' +
             (d.steps ? '<div class="t-weekly-day__steps">' + d.steps.toLocaleString() + ' steps</div>' : '') +
           '</div>';
@@ -2261,6 +2393,36 @@
             '<span>' + e.name + '</span><span style="color:var(--text)">' + e.frequency + 'x</span></div>';
         }).join('');
         document.getElementById('t-strength-exercises').innerHTML = exHtml || '<div style="color:var(--text-faint);font-size:var(--text-xs)">No exercise data</div>';
+
+        /* V2: Volume trend line chart */
+        var volTrend = sd.volume_trend || [];
+        if (typeof Chart !== 'undefined' && volTrend.length >= 3) {
+          var volLabels = volTrend.map(function(d) { return d.week; });
+          var volData = volTrend.map(function(d) { return d.volume_lbs || 0; });
+          new Chart(document.getElementById('t-volume-canvas'), {
+            type: 'bar',
+            data: {
+              labels: volLabels,
+              datasets: [{
+                label: 'Volume (lbs)',
+                data: volData,
+                backgroundColor: 'rgba(129,140,248,0.6)',
+                borderRadius: 3,
+              }]
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: function(ctx) { return ctx.raw.toLocaleString() + ' lbs'; } } }
+              },
+              scales: {
+                x: { ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, maxRotation: 45 }, grid: { display: false } },
+                y: { ticks: { color: 'rgba(255,255,255,0.25)', font: { size: 10 }, callback: function(v) { return v >= 1000 ? Math.round(v/1000) + 'k' : v; } }, grid: { color: 'rgba(255,255,255,0.03)' }, beginAtZero: true }
+              }
+            }
+          });
+        }
       }).catch(function() {});
     })();
 
@@ -2455,6 +2617,82 @@
 
     loading.style.display = 'none';
     content.style.display = 'block';
+
+    /* ── Auto-populate milestones from benchmarks + activity firsts ── */
+    (function loadMilestones() {
+      var milestones = [];
+
+      // Strength benchmark milestones (any lift at 100%+ of target)
+      fetch('/api/strength_benchmarks').then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(d) {
+          if (d && d.benchmarks) {
+            d.benchmarks.forEach(function(b) {
+              if (b.progress_pct >= 100) {
+                milestones.push({
+                  date: b.achieved_date || 'Recent',
+                  title: b.lift + ' — target reached',
+                  detail: b.current_1rm + ' lb (target: ' + b.target + '). Centenarian benchmark crossed.'
+                });
+              }
+            });
+          }
+
+          // Activity distance milestones from training overview
+          if (data.modality_breakdown) {
+            data.modality_breakdown.forEach(function(m) {
+              if (m.total_distance_mi >= 5 && m.type === 'Run') {
+                milestones.push({ date: 'Recent', title: 'First 5K+ run logged', detail: m.total_distance_mi + ' total miles running in 30 days.' });
+              }
+              if (m.total_distance_mi >= 20 && m.type === 'Ride') {
+                milestones.push({ date: 'Recent', title: '20+ mile cycling milestone', detail: m.total_distance_mi + ' total miles cycling in 30 days.' });
+              }
+            });
+          }
+
+          // Zone 2 milestone
+          if (z2Avg >= 150) {
+            milestones.push({ date: 'Current', title: 'Zone 2 target: 150 min/week', detail: z2Avg + ' min/week average. WHO + Attia longevity threshold met.' });
+          }
+
+          // Render
+          var tl = document.getElementById('t-timeline');
+          if (milestones.length > 0) {
+            tl.innerHTML = milestones.map(function(m) {
+              return '<div class="t-milestone">' +
+                '<div class="t-milestone__date">' + m.date + '</div>' +
+                '<div class="t-milestone__title">' + m.title + '</div>' +
+                '<div class="t-milestone__detail">' + m.detail + '</div>' +
+              '</div>';
+            }).join('');
+          }
+          // else: keep the "Milestones appear here..." placeholder
+        }).catch(function() {});
+
+      // Auto-populate GPS routes from Strava activities with polylines
+      if (data.modality_breakdown) {
+        fetch('/api/training_overview').then(function(r) { return r.json(); }).then(function(td) {
+          var routes = (td.recent_routes || []).slice(0, 6);
+          if (!routes.length) return;
+          var grid = document.getElementById('t-routes-grid');
+          grid.innerHTML = routes.map(function(rt) {
+            var svg = rt.polyline_svg || '';
+            return '<div class="t-route-card">' +
+              '<div class="t-route-card__map">' + (svg || '<svg viewBox="0 0 100 60"></svg>') + '</div>' +
+              '<div class="t-route-card__label">' + (rt.name || rt.type) + '</div>' +
+              '<div class="t-route-card__stat">' + (rt.distance_mi || '?') + ' mi &middot; ' + (rt.duration_min || '?') + ' min</div>' +
+            '</div>';
+          }).join('');
+        }).catch(function() {});
+      }
+    })();
+
+    /* ── AI Expert Analysis Card ── */
+    if (typeof renderAIAnalysisCard === 'function') {
+      renderAIAnalysisCard('t-ai-analysis', 'training', {
+        dataSources: '7 days of training sessions, step counts, and recovery data'
+      });
+    }
+
   } catch (e) {
     loading.textContent = 'Could not load training data.';
     console.error(e);

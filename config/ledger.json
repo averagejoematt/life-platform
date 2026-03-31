@@ -1,0 +1,30 @@
+{
+  "settings": {
+    "default_bounty_usd": 50,
+    "default_punishment_usd": 75,
+    "show_amounts_on_source_badges": false,
+    "active_earned_cause": "food_bank_seattle",
+    "active_reluctant_cause_id": "snake_sanctuary"
+  },
+  "earned_causes": [
+    {
+      "id": "food_bank_seattle",
+      "name": "Northwest Harvest",
+      "short_description": "Pacific NW food bank",
+      "url": "https://www.northwestharvest.org",
+      "badge_color": "teal",
+      "why_i_care": "Food insecurity in my backyard."
+    }
+  ],
+  "reluctant_causes": [
+    {
+      "id": "snake_sanctuary",
+      "name": "American Reptile Rescue",
+      "short_description": "Snake and reptile sanctuary",
+      "url": "https://americanreptilerescue.org",
+      "badge_color": "gray",
+      "joke_note": "I have funded this organization more than I care to admit.",
+      "is_active": true
+    }
+  ]
+}

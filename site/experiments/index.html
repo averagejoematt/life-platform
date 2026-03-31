@@ -172,7 +172,7 @@
     }
     .progress-ring__label {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: var(--ls-tag);
@@ -454,7 +454,7 @@
     }
     .exp-meta-item__label {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size:var(--text-3xs);
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: var(--ls-tag);
@@ -822,7 +822,7 @@
 <!-- Page Header -->
 <div class="page-header animate-in">
   <h1 class="page-header__title"><span>Experiments</span></h1>
-  <p class="page-header__sub">Why am I experimenting on myself? Because population studies tell you what works for the average person. With 19 dense data sources tracking one person continuously, N=1 experiments reveal what works for <em>this</em> body. 52 experiments across 7 pillars. Vote on what I test next. Every result published &mdash; including the failures.</p>
+  <p class="page-header__sub">Why am I experimenting on myself? Because population studies tell you what works for the average person. With 26 dense data sources tracking one person continuously, N=1 experiments reveal what works for <em>this</em> body. 52 experiments across 7 pillars. Vote on what I test next. Every result published &mdash; including the failures.</p>
   <div class="page-header__meta">
     <div class="meta-stat">
       <div class="meta-stat__label">In the library</div>
@@ -844,7 +844,7 @@
 </div>
 
 <div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-3) var(--page-padding) var(--space-4);" class="animate-in reveal">
-  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:0.06em;line-height:1.8;">
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-subtle);line-height:1.8;">
     Experiments are active tests with a hypothesis and measured outcome. &rarr; <a href="/protocols/" style="color:var(--accent);text-decoration:none;">Protocols</a> are the stable system experiments can change.
   </div>
 </div>
@@ -864,7 +864,7 @@
   <div class="explainer__item">
     <div class="explainer__num">D</div>
     <div class="explainer__label">Data</div>
-    <div class="explainer__desc">Results from 25 live data sources — sleep, HRV, glucose, body composition, habits. Compared against pre-experiment baseline.</div>
+    <div class="explainer__desc">Results from 26 live data sources — sleep, HRV, glucose, body composition, habits. Compared against pre-experiment baseline.</div>
   </div>
 </div>
 
@@ -975,8 +975,8 @@
   <div class="methodology__label">On the methodology</div>
   <div class="methodology__text">
     <p>These are <strong>N=1 experiments</strong> — single-subject self-experiments with no control group. The scientific limitations are real: no blinding, no randomization, seasonal confounders, regression to the mean. Results apply to me specifically and may not generalize.</p>
-    <p>What makes them useful anyway: <strong>consistency of measurement</strong>. With 25 live data sources running continuously, the baseline data is dense enough that meaningful signal can emerge from even a single-person study — particularly for outcomes with low day-to-day variance like resting HRV and fasting glucose.</p>
-    <p>The library experiments are <strong>graded by evidence tier</strong>: ●●● Strong (multiple RCTs), ●● Moderate (observational studies), ● Emerging (preclinical or anecdotal). And each experiment is classified as <strong>Measurable</strong> (has a biomarker endpoint from my 25 data sources) or <strong>Behavioral</strong> (compliance tracking is the outcome).</p>
+    <p>What makes them useful anyway: <strong>consistency of measurement</strong>. With 26 live data sources running continuously, the baseline data is dense enough that meaningful signal can emerge from even a single-person study — particularly for outcomes with low day-to-day variance like resting HRV and fasting glucose.</p>
+    <p>The library experiments are <strong>graded by evidence tier</strong>: ●●● Strong (multiple RCTs), ●● Moderate (observational studies), ● Emerging (preclinical or anecdotal). And each experiment is classified as <strong>Measurable</strong> (has a biomarker endpoint from my 26 data sources) or <strong>Behavioral</strong> (compliance tracking is the outcome).</p>
   </div>
 </div>
 
@@ -1049,7 +1049,7 @@
     var active = experiments.filter(function(e) { return e.status === 'active'; });
     var grid = document.getElementById('mc-grid');
     if (!active.length) {
-      grid.innerHTML = '<div class="mc-empty"><div class="mc-empty__title">The lab opens April 1</div><div class="mc-empty__sub">The first experiments launch the week of April 1. Each tests one variable with a minimum 14-day window and dense data from 25 sources. Vote below to decide what runs first.</div></div>';
+      grid.innerHTML = '<div class="mc-empty"><div class="mc-empty__title">The lab opens April 1</div><div class="mc-empty__sub">The first experiments launch the week of April 1. Each tests one variable with a minimum 14-day window and dense data from 26 sources. Vote below to decide what runs first.</div></div>';
       return;
     }
     grid.innerHTML = active.map(function(exp) {
@@ -1091,6 +1091,7 @@
           '<div class="mc-bar-label">' + pct + '%</div>' +
         '</div>' +
         '<div class="mc-card__chips">' + chips + '</div>' +
+        (window._ledgerIds && window._ledgerIds[exp.id] ? '<div style="font-size:11px;color:var(--text-muted);margin-top:var(--space-2);font-family:var(--font-mono);letter-spacing:0.04em">This carries a stake &rarr; <a href="/ledger/" style="color:var(--accent);text-decoration:none">The Ledger</a></div>' : '') +
       '</div>';
     }).join('');
   }
@@ -1189,6 +1190,9 @@
         html += '</button>';
         html += '</span>';
         html += '</div>';
+        if (window._ledgerIds && window._ledgerIds[exp.id]) {
+          html += '<div style="font-size:11px;color:var(--text-muted);padding:0 var(--space-4) var(--space-3);font-family:var(--font-mono);letter-spacing:0.04em">This carries a stake &rarr; <a href="/ledger/" style="color:var(--accent);text-decoration:none">The Ledger</a></div>';
+        }
 
         html += '</div>';
       });
@@ -1311,7 +1315,7 @@
     body += '<button class="follow-btn" data-follow-id="' + exp.id + '" onclick="handleFollow(this)">\u2709 Follow</button>';
     body += '<a href="/experiments/detail/?id=' + exp.id + '" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);text-decoration:none;letter-spacing:var(--ls-tag);">Share link \u2192</a>';
     body += '</div>';
-    body += '<div style="text-align:center;margin-top:var(--space-3);"><a href="mailto:matt@averagejoematt.com?subject=Experiment%20Flag:%20' + encodeURIComponent(exp.name) + '" style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);text-decoration:none;letter-spacing:var(--ls-tag);">Flag for safety/methodology review</a></div>';
+    body += '<div style="text-align:center;margin-top:var(--space-3);"><a href="mailto:matt@averagejoematt.com?subject=Experiment%20Flag:%20' + encodeURIComponent(exp.name) + '" style="font-family:var(--font-mono);font-size:var(--text-3xs);color:var(--text-faint);text-decoration:none;letter-spacing:var(--ls-tag);">Flag for safety/methodology review</a></div>';
 
     document.getElementById('exp-detail-body').innerHTML = body;
     document.getElementById('exp-overlay').classList.add('open');
@@ -1430,6 +1434,14 @@
   document.querySelectorAll('.record__filters .lib-filter').forEach(function(btn) {
     btn.addEventListener('click', function() { renderRecord(btn.dataset.record); });
   });
+
+  // Load ledger source IDs for stake indicators
+  window._ledgerIds = {};
+  fetch(API + '/ledger').then(function(r) { return r.ok ? r.json() : {}; }).then(function(ld) {
+    var all = (ld.by_event || {}).earned || [];
+    all = all.concat((ld.by_event || {}).reluctant || []);
+    all.forEach(function(e) { if (e.source_id) window._ledgerIds[e.source_id] = true; });
+  }).catch(function() {});
 
   // ── Fetch data ──
   // Active experiments (existing endpoint)

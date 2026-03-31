@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="System status for averagejoematt.com — 25 data sources, compute layer, email digests, infrastructure.">
+  <meta name="description" content="System status for averagejoematt.com — 26 data sources, compute layer, email digests, infrastructure.">
   <meta property="og:title" content="System Status — Matthew">
   <title>System Status — Matthew</title>
   <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
@@ -50,7 +50,7 @@
     .bar.warn { background: #ffc800; }
     .bar.down { background: #ff3232; opacity: 0.8; }
     .bar.na { background: var(--border); }
-    .uptime-label { font-family: var(--font-mono); font-size: 9px; color: var(--text-faint); margin-top: 2px; }
+    .uptime-label { font-family: var(--font-mono); font-size:var(--text-3xs); color: var(--text-faint); margin-top: 2px; }
 
     .sync-time { text-align: right; }
     .sync-time strong { display: block; font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted); }
@@ -134,7 +134,7 @@
   var OVERALL_MESSAGES = { green: 'All systems operational', yellow: 'Degraded performance', red: 'Service disruption' };
 
   function buildUptimeBar(arr) {
-    if (!arr || !arr.length) return '<div class="uptime-label">no data</div>';
+    if (!arr || !arr.length) return '<div class="uptime-label" style="color:var(--text-faint);font-style:italic">periodic source — not tracked daily</div>';
     var bars = arr.slice(-30).map(function(v) {
       var cls = v === 1 ? 'up' : v === 2 ? 'na' : v === 0 ? 'down' : 'na';
       return '<div class="bar ' + cls + '"></div>';
@@ -148,7 +148,7 @@
     var comment = c.comment
       ? '<div class="comment-strip ' + commentCls + '">' + commentIcon + c.comment + '</div>'
       : '';
-    var sourceTag = c.source_app ? '<div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);margin-top:3px">Source: ' + c.source_app + '</div>' : '';
+    var sourceTag = c.source_app ? '<div style="font-family:var(--font-mono);font-size:var(--text-3xs);color:var(--text-faint);margin-top:3px">Source: ' + c.source_app + '</div>' : '';
     return '<div class="comp-row">' +
       '<div><div class="comp-name">' + c.name + '</div><div class="comp-desc">' + c.description + sourceTag + '</div></div>' +
       '<div class="uptime-wrap">' + buildUptimeBar(c.uptime_90d) + '</div>' +
@@ -219,8 +219,8 @@
       costSec.innerHTML =
         '<div class="sec-header"><span class="sec-title">AWS Cost</span><span class="sec-sub">$' + c.budget + '/mo budget</span></div>' +
         '<div style="padding:14px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">' +
-        '<div style="font-family:var(--font-mono);font-size:13px;color:var(--text)"><strong>$' + c.mtd.toFixed(2) + '</strong> month-to-date</div>' +
-        '<div style="font-family:var(--font-mono);font-size:13px;color:var(--text-muted)">Projected: <strong>$' + c.projected.toFixed(2) + '</strong></div>' +
+        '<div style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--text)"><strong>$' + c.mtd.toFixed(2) + '</strong> month-to-date</div>' +
+        '<div style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--text-muted)">Projected: <strong>$' + c.projected.toFixed(2) + '</strong></div>' +
         '<span class="pill ' + c.status + '">' + c.pct_of_budget + '% of budget</span>' +
         '</div>';
       groups.appendChild(costSec);

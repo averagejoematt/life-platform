@@ -258,6 +258,28 @@ def gather_chronicle_data():
     except Exception as e:
         logger.warning(f"Previous installments: {e}")
 
+    # --- Field Notes (current week's AI analysis + Matthew response) ---
+    field_notes = None
+    try:
+        iso_year, iso_week, _ = today.isocalendar()
+        current_week = f"{iso_year}-W{iso_week:02d}"
+        fn_resp = table.get_item(Key={
+            "pk": f"USER#{USER_ID}#SOURCE#field_notes",
+            "sk": f"WEEK#{current_week}",
+        })
+        fn_item = d2f(fn_resp.get("Item"))
+        if fn_item and fn_item.get("ai_present"):
+            field_notes = {
+                "week": current_week,
+                "ai_tone": fn_item.get("ai_tone", "mixed"),
+                "ai_present": fn_item.get("ai_present", "")[:500],
+                "has_matthew_response": bool(fn_item.get("matthew_agreement")),
+                "matthew_agreement": (fn_item.get("matthew_agreement") or "")[:300],
+            }
+            logger.info(f"Field notes for {current_week}: tone={field_notes['ai_tone']}, matthew_responded={field_notes['has_matthew_response']}")
+    except Exception as e:
+        logger.warning(f"Field notes query: {e}")
+
     return {
         "whoop": whoop, "eightsleep": eightsleep, "garmin": garmin,
         "strava": strava, "withings": withings, "macrofactor": macrofactor,
@@ -268,6 +290,7 @@ def gather_chronicle_data():
         "anomalies": anomalies, "weather": weather,
         "character_sheet": character_sheet,
         "prev_installments": prev_installments, "profile": profile,
+        "field_notes": field_notes,
         "dates": {"start": start, "end": end},
     }
 
@@ -612,6 +635,19 @@ def build_data_packet(data):
         packet.append("crossing from Momentum to Discipline means sustained behavioral change.")
         packet.append("Level events are rare by design — each one represents 5+ days of consistent")
         packet.append("improvement. Use these as narrative anchors when they occur.")
+        packet.append("")
+
+    # --- Field Notes cross-reference ---
+    fn = data.get("field_notes")
+    if fn and fn.get("ai_present"):
+        packet.append("=== FIELD NOTES THIS WEEK ===")
+        packet.append(f"AI tone: {fn.get('ai_tone', 'mixed')}")
+        packet.append(f"AI preview: {fn.get('ai_present', '')[:300]}")
+        if fn.get("has_matthew_response") and fn.get("matthew_agreement"):
+            packet.append(f"Matthew's agreement: {fn['matthew_agreement'][:200]}")
+        packet.append("NOTE FOR ELENA: If the Field Notes raise a theme worth weaving into")
+        packet.append("this week's narrative, include a brief reference. This connects the")
+        packet.append("AI advisor's weekly analysis with your storytelling.")
         packet.append("")
 
     return "\n".join(packet), week_num

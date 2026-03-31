@@ -240,7 +240,7 @@
   <div class="series-intro__card">
     <div class="series-intro__label">The Series</div>
     <div class="series-intro__heading">The Measured Life</div>
-    <div class="series-intro__body">Matthew is attempting to transform his body and health using a custom-built platform that pulls data from <span data-const="platform.data_sources">19</span> sources. He started at <span data-const="journey.start_weight">302</span> lbs. The goal is <span data-const="journey.goal_weight">185</span>. This is the weekly account of what the data actually shows — not a highlight reel.</div>
+    <div class="series-intro__body">Matthew is attempting to transform his body and health using a custom-built platform that pulls data from <span data-const="platform.data_sources">26</span> sources. He started at <span data-const="journey.start_weight">307</span> lbs. The goal is <span data-const="journey.goal_weight">185</span>. This is the weekly account of what the data actually shows — not a highlight reel.</div>
     <a href="/journal/posts/week-00/" class="series-intro__start">Start from the beginning →</a>
   </div>
   <div class="series-intro__card">
@@ -292,7 +292,7 @@
         <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-body);max-width:600px;margin-bottom:var(--space-4);">${heroPost.excerpt || ''}</div>
         <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);">${heroDate} · ${readMin}</div>
         <div style="margin-top:var(--space-4);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);letter-spacing:var(--ls-tag);">Read this installment →</div>
-        <div style="margin-top:var(--space-3);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:0.06em;">Written by Elena Voss — an AI narrative voice created to chronicle Matthew's journey.</div>
+        <div style="margin-top:var(--space-3);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-subtle);">Written by Elena Voss — an AI narrative voice created to chronicle Matthew's journey.</div>
       </a>`;
 
       // Archive: group by phase (21c)
@@ -325,12 +325,12 @@
             const badge = p.has_board_interview ? '<span style="display:inline-block;margin-left:var(--space-3);padding:1px var(--space-2);border:1px solid var(--accent-dim);font-size:var(--text-2xs);color:var(--accent-dim);letter-spacing:var(--ls-tag);text-transform:uppercase;">Board Interview</span>' : '';
             const rm = p.word_count ? Math.ceil(p.word_count / 250) + ' min' : '';
             html += `<a href="${p.url}" class="journal-post">
-              <div class="journal-post__date">${date}<br><span style="font-size:9px;color:var(--text-faint);">${rm}</span></div>
+              <div class="journal-post__date">${date}<br><span style="font-size:var(--text-3xs);color:var(--text-faint);">${rm}</span></div>
               <div>
                 <div class="journal-post__tag">The Measured Life · Week ${p.week}${badge}</div>
                 <div class="journal-post__title" style="font-size:var(--text-lg);line-height:1.3;">&ldquo;${p.title}&rdquo;</div>
                 <div class="journal-post__excerpt">${p.excerpt || p.stats_line || ''}</div>
-                <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:0.06em;margin-top:var(--space-2);">Written by Elena Voss — AI narrative voice</div>
+                <div style="font-family:var(--font-mono);font-size:var(--text-3xs);color:var(--text-faint);letter-spacing:var(--ls-subtle);margin-top:var(--space-2);">Written by Elena Voss — AI narrative voice</div>
               </div>
             </a>`;
           });

@@ -1,3 +1,40 @@
+## v4.7.1 — 2026-03-31: Editorial content pass — replace fabricated copy with real narrative
+
+Replaced AI-fabricated placeholder copy across 8 pages with real, honest narrative sourced directly from Matthew's answers. No code logic changes — content-only edits to hero subtitles, intro blocks, pull quotes, and the Inner Life confessional.
+
+### Pages Updated
+
+**Sleep** (`site/sleep/index.html`)
+- Hero subtitle: replaced fabricated "eight hours, no alarm, out like a light" with real story — sleep was never a problem, Matthew Walker got attention, Whoop/Eight Sleep surfaced onset time and alcohol's red-shift impact; the score keeps him accountable
+
+**Nutrition** (`site/nutrition/index.html`)
+- Intro block: 2017 turning point (relocation, MBA, promotion, mum getting sick), eating as coping/convenience not hunger, MacroFactor makes invisible visible
+- Intro sub: lost 100lb before without tracking a calorie — it's about headspace not macros; when on it's second nature, when off even DoorDash breaks a streak
+
+**Training** (`site/training/index.html`)
+- Narrative pullquote: when in it you're all-in; the problem has never been training — it's the fall and how fast the void fills; data makes absence visible
+
+**Physical** (`site/physical/index.html`)
+- Corrected start weight: 302 lbs → **307 lbs**
+- Hero subtitle: replaced "first honest conversation" with pattern-detector framing — scale data since 2011 shows disappear/reappear-at-high/drop/repeat; this page watches whether it breaks
+
+**Inner Life** (`site/mind/index.html`)
+- Hero subtitle: old relapses came from living (fun, parties, travel); recent ones can't be explained; this page is where he tries to understand
+- Confessional (full rewrite, 4 paragraphs): real story — old relapses from abundance, recent disruptions from unknown source; intellectualizes over feels; never journaled, always powered through; not trying to return to old self but figuring out who he's becoming
+
+**Labs** (`site/labs/index.html`)
+- Elena Voss pull quote: replaced false "seven draws quarterly" with true story — used to get labs at the finish line when flattering; this week for the first time getting them at the starting line
+
+**Supplements** (`site/supplements/index.html`)
+- Hero para 2: replaced "podcast recommended" fiction with real process — trusts Rhonda Patrick and credentialed researchers as framework, occasionally experimental (lions mane, ashwaganda), goal is to be more methodical
+
+**Discoveries** (`site/discoveries/index.html`)
+- "What I'm Currently Testing": rewired from stale `/api/discoveries` to fetch live `/api/experiments` as source of truth (fallback to discoveries API); cards show days-in counter + link to experiments page; inner life section uses discData variable
+
+### Deploy
+- 8 S3 uploads, CloudFront invalidation `I5FR4CT201TTAZLM0D5DBR6INB`
+
+
 ## v1.1.0 — 2026-03-30: Character Engine Statistical Review (15 Findings)
 
 Board-led statistical review by Dr. Henning Brandt and 8 panelists identified 14 findings + F-15 progressive difficulty. All implemented.

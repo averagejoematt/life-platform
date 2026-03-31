@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-30 (v4.5.2 — 118 MCP tools, 26-module MCP package, 26 data sources, 61 Lambdas, 68 site pages, 65+ API endpoints, 8 CDK stacks)
+Last updated: 2026-03-31 (v4.7.0 — 115 MCP tools, 26-module MCP package, 26 data sources, 62 Lambdas, 71 site pages, 70+ API endpoints, 8 CDK stacks)
 
 ---
 
@@ -29,7 +29,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
                          │ DynamoDB queries
 ┌────────────────────────▼────────────────────────────────────┐
 │  SERVE LAYER                                                │
-│  MCP Server Lambda (118 tools, 768 MB) + Lambda Function URL │
+│  MCP Server Lambda (115 tools, 768 MB) + Lambda Function URL │
 │  ← Claude Desktop + claude.ai + Claude mobile via remote MCP│
 │                                                             │
 │  COMPUTE LAYER (IC intelligence features)                   │

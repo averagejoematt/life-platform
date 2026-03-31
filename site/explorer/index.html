@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Data Explorer — cross-domain intelligence from 25 data sources. Discover what predicts what.">
+  <meta name="description" content="Data Explorer — cross-domain intelligence from 26 data sources. Discover what predicts what.">
   <meta property="og:title" content="Data Explorer — Matthew">
-  <meta property="og:description" content="Cross-domain intelligence — pick any two health metrics and see the real correlation. N=1 data science from 25 live sources.">
+  <meta property="og:description" content="Cross-domain intelligence — pick any two health metrics and see the real correlation. N=1 data science from 26 live sources.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -491,12 +491,12 @@
   </div>
 </section>
 
-<!-- 14d: Narrative anchor -->
-<section class="narrative-anchor animate-in">
+<!-- 14d: Narrative anchor — auto-updates once findings accumulate -->
+<section class="narrative-anchor animate-in" id="narrative-anchor" style="display:none">
   <div class="narrative-anchor__inner">
     <div class="narrative-anchor__kicker">From Matthew</div>
-    <div class="narrative-anchor__text">
-      The finding that surprised me most was the <strong>sleep-glucose connection</strong>. I expected training to drive glucose stability, but it was sleep timing that mattered more. Since discovering this, I have shifted my bedtime target from 10:30 to 9:45 pm and seen measurable improvement. The <strong>journal-recovery correlation</strong> is one I am still investigating -- I do not know if low recovery causes more reflection, or if something deeper is going on.
+    <div class="narrative-anchor__text" id="narrative-anchor-text">
+      Commentary will appear here as findings emerge from the data. The experiment begins April 1 &mdash; the first correlations will compute after enough matched data points accumulate.
     </div>
   </div>
 </section>
@@ -507,7 +507,7 @@
   <div class="exp-header__kicker">The Data</div>
   <h1 class="exp-header__title">Data <span>Explorer</span></h1>
   <div class="exp-header__subtitle">Cross-Domain Intelligence &mdash; What Predicts What</div>
-  <p class="exp-header__sub">Every metric pair tells a story. Pick two variables and see what the data says. 90-day rolling correlations, FDR-corrected, from 25 live data sources.</p>
+  <p class="exp-header__sub">Every metric pair tells a story. Pick two variables and see what the data says. 90-day rolling correlations, FDR-corrected, from 26 live data sources.</p>
   <div class="exp-stats">
     <div class="exp-stat"><div class="exp-stat__label">Metric pairs</div><div class="exp-stat__value" id="stat-pairs">&mdash;</div></div>
     <div class="exp-stat"><div class="exp-stat__label">Significant</div><div class="exp-stat__value" id="stat-sig">&mdash;</div></div>
@@ -521,7 +521,7 @@
   <div class="cross-domain-callout">
     <div class="cross-domain-callout__kicker">Why this matters</div>
     <div class="cross-domain-callout__text">
-      <strong>Cross-domain findings are what single-tracker apps cannot show.</strong> Your Whoop cannot tell you that your sleep predicts your glucose response. Your CGM does not know about your training load. This explorer connects 25 data sources to surface relationships that no single device can see.
+      <strong>Cross-domain findings are what single-tracker apps cannot show.</strong> Your Whoop cannot tell you that your sleep predicts your glucose response. Your CGM does not know about your training load. This explorer connects 26 data sources to surface relationships that no single device can see.
     </div>
   </div>
 
@@ -955,6 +955,12 @@
       // 14a: Populate hero cards from live data
       renderHeroCards(allPairs);
 
+      // Show narrative anchor only when we have significant findings
+      var sigCount = allPairs.filter(function(p){return p.fdr_significant;}).length;
+      if (sigCount > 0) {
+        document.getElementById('narrative-anchor').style.display = '';
+      }
+
       // 14c: Default filter is now 'significant'
       applyFilter('significant');
 
@@ -965,10 +971,21 @@
       populateDropdowns(allPairs);
     })
     .catch(function() {
-      document.getElementById('corr-grid').innerHTML =
+      // Pre-launch / no data state
+      document.getElementById('hero-grid').innerHTML =
+        '<div style="grid-column:1/-1;text-align:center;padding:var(--space-10) 0">' +
+        '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:0.15em;color:var(--accent);text-transform:uppercase;margin-bottom:var(--space-4)">Coming Soon</div>' +
+        '<div style="font-family:var(--font-serif);font-size:18px;color:var(--text-muted);line-height:1.7;max-width:480px;margin:0 auto">' +
+        'Cross-domain findings will appear here as data accumulates from <strong style="color:var(--text)">April 1, 2026</strong>. ' +
+        'Correlations require a minimum of 14 matched data points &mdash; expect the first cards within 2&ndash;3 weeks.</div></div>';
+      document.getElementById('predictive-grid').innerHTML =
+        '<div style="grid-column:1/-1;text-align:center;padding:var(--space-8) 0;font-family:var(--font-serif);font-size:15px;color:var(--text-faint)">' +
+        'Predictive correlations will emerge once enough daily data has been collected.</div>';
+      var corrGrid = document.getElementById('corr-grid');
+      if (corrGrid) corrGrid.innerHTML =
         '<div style="grid-column:1/-1;text-align:center;padding:var(--space-20) 0">' +
         '<div style="font-family:var(--font-display);font-size:36px;color:var(--text-muted)">No correlation data yet</div>' +
-        '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);margin-top:var(--space-4)">Correlations are computed weekly. Check back soon.</div></div>';
+        '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);margin-top:var(--space-4)">The experiment begins April 1. First correlations compute after ~14 days of data.</div></div>';
     });
 })();
 </script>
