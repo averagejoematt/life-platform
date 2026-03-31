@@ -13,6 +13,7 @@ Usage:
     from character_engine import load_character_config, compute_character_sheet
 
 v1.0.0 — 2026-03-02
+v1.1.0 — 2026-03-30  (Statistical review: F-01 through F-15)
 """
 import json
 import logging
@@ -27,7 +28,12 @@ logger = logging.getLogger(__name__)
 _config_cache = {"data": None, "ts": 0}
 _CONFIG_TTL_S = 300  # 5 minutes
 
-ENGINE_VERSION = "1.0.0"
+ENGINE_VERSION = "1.1.0"
+
+# ── XP defaults (also in config) [F-02] ──
+DEFAULT_XP_PER_LEVEL = 100
+DEFAULT_DAILY_XP_DECAY = 2
+DEFAULT_XP_BUFFER_THRESHOLD = 20
 
 # ── Tier definitions (also in config, but hardcoded as fallback) ──
 _DEFAULT_TIERS = [
@@ -107,15 +113,16 @@ def _deviation_score(std_dev, ideal=0, worst=120):
 
 
 def _in_range_score(value, low, high, buffer=0.1):
-    """Score 0-100 for value within range. 100 if in range, drops outside."""
+    """Score 0-100 for value within range. 100 if in range, drops outside. [F-13]"""
     if value is None:
         return None
     if low <= value <= high:
         return 100.0
+    range_span = max(high - low, 1)  # avoid division by zero
     if value < low:
-        dist = (low - value) / (low * buffer) if low > 0 else (low - value) / 10
+        dist = (low - value) / (range_span * buffer)
         return _clamp(100.0 - dist * 100)
-    dist = (value - high) / (high * buffer) if high > 0 else (value - high) / 10
+    dist = (value - high) / (range_span * buffer)
     return _clamp(100.0 - dist * 100)
 
 
@@ -151,8 +158,8 @@ def get_tier(level, config=None):
     return tiers[-1] if level > 80 else tiers[0]
 
 
-def _compute_xp(raw_score, config):
-    """Compute XP delta from raw_score using config bands."""
+def _compute_xp(raw_score, previous_xp, config):
+    """Compute XP delta with daily decay. Returns (xp_earned, xp_delta, new_xp_total). [F-02]"""
     bands = config.get("xp_bands", [
         {"min_raw_score": 80, "xp": 3},
         {"min_raw_score": 60, "xp": 2},
@@ -160,10 +167,19 @@ def _compute_xp(raw_score, config):
         {"min_raw_score": 20, "xp": 0},
         {"min_raw_score": 0,  "xp": -1},
     ])
+    leveling = config.get("leveling", {})
+    daily_decay = leveling.get("daily_xp_decay", DEFAULT_DAILY_XP_DECAY)
+
+    earned = -1
     for band in bands:
         if raw_score >= band["min_raw_score"]:
-            return band["xp"]
-    return -1
+            earned = band["xp"]
+            break
+
+    xp_delta = earned - daily_decay
+    new_xp = max(0, (previous_xp or 0) + earned - daily_decay)
+
+    return earned, xp_delta, new_xp
 
 
 # ==============================================================================
@@ -325,6 +341,37 @@ def compute_movement_raw(data, config):
     return _weighted_pillar_score(scores, components)
 
 
+def _body_comp_score(current_weight, config):
+    """Two-phase body composition scoring: sigmoid during loss, band during maintenance. [F-04]"""
+    baseline = config.get("baseline", {})
+    start = baseline.get("start_weight_lbs", 302)
+    goal = baseline.get("goal_weight_lbs", 185)
+    maintenance_band = baseline.get("maintenance_band_lbs", 3)
+    phase = baseline.get("weight_phase", "loss")
+
+    if current_weight is None:
+        return None
+
+    if phase == "maintenance":
+        deviation = abs(current_weight - goal)
+        if deviation <= maintenance_band:
+            return 100.0
+        penalty_range = 20.0 - maintenance_band
+        if penalty_range <= 0:
+            return 0.0
+        score = 100.0 - ((deviation - maintenance_band) / penalty_range) * 100
+        return round(_clamp(score), 1)
+
+    # Loss phase: sigmoid curve
+    if start == goal:
+        return None
+    progress = (start - current_weight) / (start - goal)
+    progress = max(0, min(1.2, progress))
+    # Sigmoid: steeper in middle, rewards early momentum
+    score = 100 / (1 + math.exp(-8 * (progress - 0.5)))
+    return round(_clamp(score), 1)
+
+
 def compute_nutrition_raw(data, config):
     """Compute Nutrition pillar raw_score (0-100)."""
     pillar_cfg = config.get("pillars", {}).get("nutrition", {})
@@ -378,15 +425,8 @@ def compute_nutrition_raw(data, config):
     else:
         scores["consistency"] = None
 
-    # Body composition progress (302lb → 185lb)
-    start_weight = baseline_cfg.get("start_weight_lbs", 302)
-    goal_weight = baseline_cfg.get("goal_weight_lbs", 185)
-    current_weight = data.get("latest_weight")
-    if current_weight is not None and start_weight != goal_weight:
-        comp_score = ((start_weight - current_weight) / (start_weight - goal_weight)) * 100
-        scores["body_composition_progress"] = round(_clamp(comp_score), 1)
-    else:
-        scores["body_composition_progress"] = None
+    # Body composition progress — sigmoid loss / maintenance band [F-04]
+    scores["body_composition_progress"] = _body_comp_score(data.get("latest_weight"), config)
 
     return _weighted_pillar_score(scores, components)
 
@@ -453,13 +493,15 @@ def _compute_lab_score(labs, compute_date, lab_cfg):
     if days_since < 0:
         days_since = 0
 
-    # Decay: 1.0 for 30d, linear to 0.5 over next 60d
+    # Decay: 1.0 for 30d, to 0.5 at 90d, to 0.0 at 180d [F-07]
     if days_since <= 30:
         decay = 1.0
     elif days_since <= 90:
         decay = 1.0 - 0.5 * ((days_since - 30) / 60)
+    elif days_since <= 180:
+        decay = 0.5 - 0.5 * ((days_since - 90) / 90)
     else:
-        decay = 0.5
+        decay = 0.0  # Fully expired — no contribution from stale labs
 
     markers = {
         "apob": {"ideal_low": 40, "ideal_high": 90},
@@ -532,13 +574,16 @@ def compute_mind_raw(data, config):
         stress = _safe_float(whoop, "day_strain") or _safe_float(whoop, "strain")
         scores["stress_management"] = _in_range_score(stress, 6, 16, buffer=0.4) if stress else None
 
-    # Vice control
+    # Vice control — logarithmic curve [F-12]
     vice_streaks = data.get("vice_streaks") or {}
     if vice_streaks:
         streaks = [v for v in vice_streaks.values() if isinstance(v, (int, float))]
         if streaks:
             avg_streak = sum(streaks) / len(streaks)
-            scores["vice_control"] = _clamp(round((avg_streak / 30) * 100, 1))
+            # Log curve: day 7 ≈ 58, day 14 ≈ 77, day 30 = 100
+            scores["vice_control"] = _clamp(round(
+                100 * math.log(1 + avg_streak) / math.log(31), 1
+            ))
         else:
             scores["vice_control"] = None
     else:
@@ -638,73 +683,100 @@ def compute_consistency_raw(data, config, other_pillar_raw_scores):
 
 
 def _weighted_pillar_score(component_scores, components_config):
-    """Compute weighted average of component scores, handling missing data."""
+    """Weighted average with data completeness confidence penalty. [F-01]"""
     weighted_sum = 0.0
     total_weight = 0.0
+    max_possible_weight = 0.0
     details = {}
 
     for comp_name, score in component_scores.items():
-        weight = components_config.get(comp_name, {}).get("weight", 0)
-        if isinstance(components_config.get(comp_name), (int, float)):
-            weight = components_config[comp_name]
+        comp_cfg = components_config.get(comp_name, {})
+        weight = comp_cfg.get("weight", 0) if isinstance(comp_cfg, dict) else comp_cfg
+        max_possible_weight += weight
         details[comp_name] = {"score": score, "weight": weight}
         if score is not None and weight > 0:
             weighted_sum += score * weight
             total_weight += weight
 
     if total_weight == 0:
-        return 40.0, details  # neutral score when no data
+        details["_confidence"] = 0.0
+        details["_data_coverage"] = 0.0
+        return 50.0, details  # true neutral when no data [F-09]
 
-    raw_score = round(weighted_sum / total_weight, 1)
-    raw_score = _clamp(raw_score)
-    return raw_score, details
+    raw_score = weighted_sum / total_weight
+    data_coverage = total_weight / max_possible_weight if max_possible_weight > 0 else 0
+    confidence_threshold = 0.80  # full confidence at 80%+ data coverage
+    confidence = min(1.0, data_coverage / confidence_threshold)
+
+    # Blend toward neutral as confidence drops
+    adjusted_score = raw_score * confidence + 50.0 * (1.0 - confidence)
+
+    details["_confidence"] = round(confidence, 3)
+    details["_data_coverage"] = round(data_coverage, 3)
+
+    return round(_clamp(adjusted_score), 1), details
 
 
 # ==============================================================================
 # EMA + LEVEL COMPUTATION
 # ==============================================================================
 
-def compute_ema_level_score(raw_scores_history, config):
-    """Compute exponentially-weighted moving average of raw_scores."""
+def compute_ema_level_score(raw_scores_history, config, pillar_name=None):
+    """Compute EMA of raw scores. Uses per-pillar lambda if available. [F-03]"""
     leveling = config.get("leveling", {})
-    lam = leveling.get("ema_lambda", 0.85)
-    window = leveling.get("ema_window_days", 21)
 
+    # Per-pillar lambda override
+    if pillar_name:
+        pillar_cfg = config.get("pillars", {}).get(pillar_name, {})
+        lam = pillar_cfg.get("ema_lambda", leveling.get("ema_lambda", 0.85))
+    else:
+        lam = leveling.get("ema_lambda", 0.85)
+
+    window = leveling.get("ema_window_days", 21)
     recent = raw_scores_history[-window:] if len(raw_scores_history) > window else raw_scores_history
     if not recent:
-        return 40.0
+        return 50.0  # [F-09]
 
     weights = [lam ** i for i in range(len(recent))]
     weights.reverse()
 
     total = sum(r * w for r, w in zip(recent, weights))
     total_w = sum(weights)
-    return round(total / total_w, 1) if total_w > 0 else 40.0
+    return round(total / total_w, 1) if total_w > 0 else 50.0
 
 
 def evaluate_level_changes(pillar_name, current_level_score, previous_state, config):
-    """Determine if a level change should occur based on streak rules.
-
-    Level changes and tier transitions have SEPARATE streak thresholds:
-    - Level up: 5 consecutive days above target (default)
-    - Level down: 7 consecutive days below target (default)
-    - Tier up: 7 consecutive days (blocks level-up at tier boundary until met)
-    - Tier down: 10 consecutive days (blocks level-down at tier boundary until met)
-    """
+    """Level changes with progressive difficulty by tier. [F-15, F-10, F-11, F-02]"""
     leveling = config.get("leveling", {})
-    up_streak_needed = leveling.get("level_up_streak_days", 5)
-    down_streak_needed = leveling.get("level_down_streak_days", 7)
-    tier_up_streak_needed = leveling.get("tier_up_streak_days", 7)
-    tier_down_streak_needed = leveling.get("tier_down_streak_days", 10)
+
+    # Progressive streak overrides by tier [F-15]
+    tier_overrides = leveling.get("tier_streak_overrides", {})
 
     prev = previous_state or {
         "level": 1, "tier": "Foundation", "streak_above": 0,
         "streak_below": 0, "xp_total": 0
     }
     current_level = prev.get("level", 1)
+    current_tier_info = get_tier(current_level, config)
+    current_tier_name = current_tier_info["name"]
     streak_above = prev.get("streak_above", 0)
     streak_below = prev.get("streak_below", 0)
     xp_total = prev.get("xp_total", 0)
+
+    # Look up streak requirements for current tier
+    tier_cfg = tier_overrides.get(current_tier_name, {})
+    up_streak_needed = tier_cfg.get("up", leveling.get("level_up_streak_days", 5))
+    down_streak_needed = tier_cfg.get("down", leveling.get("level_down_streak_days", 7))
+    tier_up_streak_needed = tier_cfg.get("tier_boundary_up", leveling.get("tier_up_streak_days", 7))
+    tier_down_streak_needed = tier_cfg.get("tier_boundary_down", leveling.get("tier_down_streak_days", 10))
+
+    # Variable step size [F-10]
+    level_step_threshold = leveling.get("level_step_threshold", 10)
+
+    # XP buffer gate for level-down [F-02]
+    xp_per_level = leveling.get("xp_per_level", DEFAULT_XP_PER_LEVEL)
+    xp_buffer_threshold = leveling.get("xp_buffer_threshold", DEFAULT_XP_BUFFER_THRESHOLD)
+    xp_buffer = xp_total % xp_per_level if xp_per_level > 0 else 0
 
     target_level = max(1, min(100, round(current_level_score)))
     events = []
@@ -713,17 +785,17 @@ def evaluate_level_changes(pillar_name, current_level_score, previous_state, con
         streak_above += 1
         streak_below = 0
         if streak_above >= up_streak_needed:
-            # Check if this level-up would cross a tier boundary
             old_tier = get_tier(current_level, config)["name"]
             new_tier = get_tier(current_level + 1, config)["name"]
             would_cross_tier = old_tier != new_tier
 
-            # Tier transitions require longer sustained streak
             if would_cross_tier and streak_above < tier_up_streak_needed:
-                pass  # Hold — need more days to confirm tier transition
+                pass  # Hold — need longer streak for tier transition
             else:
                 old_level = current_level
-                current_level = min(current_level + 1, 100)
+                delta = target_level - current_level
+                step = 2 if delta > level_step_threshold else 1
+                current_level = min(current_level + step, 100)
                 streak_above = 0
                 events.append({
                     "type": "level_up", "pillar": pillar_name,
@@ -733,25 +805,27 @@ def evaluate_level_changes(pillar_name, current_level_score, previous_state, con
         streak_below += 1
         streak_above = 0
         if streak_below >= down_streak_needed:
-            # Check if this level-down would cross a tier boundary
-            old_tier = get_tier(current_level, config)["name"]
-            new_tier = get_tier(current_level - 1, config)["name"]
-            would_cross_tier = old_tier != new_tier
-
-            # Tier transitions require longer sustained streak
-            if would_cross_tier and streak_below < tier_down_streak_needed:
-                pass  # Hold — need more days to confirm tier demotion
+            # XP buffer gate: can't lose a level until XP buffer is depleted
+            if xp_buffer >= xp_buffer_threshold:
+                pass  # Buffer absorbs the pressure — hold level
             else:
-                old_level = current_level
-                current_level = max(current_level - 1, 1)
-                streak_below = 0
-                events.append({
-                    "type": "level_down", "pillar": pillar_name,
-                    "old_level": old_level, "new_level": current_level,
-                })
+                old_tier = get_tier(current_level, config)["name"]
+                new_tier = get_tier(current_level - 1, config)["name"]
+                would_cross_tier = old_tier != new_tier
+
+                if would_cross_tier and streak_below < tier_down_streak_needed:
+                    pass  # Hold — need longer streak for tier demotion
+                else:
+                    old_level = current_level
+                    current_level = max(current_level - 1, 1)
+                    streak_below = 0
+                    events.append({
+                        "type": "level_down", "pillar": pillar_name,
+                        "old_level": old_level, "new_level": current_level,
+                    })
     else:
-        streak_above = max(0, streak_above - 1)
-        streak_below = max(0, streak_below - 1)
+        # Equal day: hold streaks constant [F-11]
+        pass
 
     # Check tier transitions
     new_tier_info = get_tier(current_level, config)
@@ -770,7 +844,7 @@ def evaluate_level_changes(pillar_name, current_level_score, previous_state, con
         "level": current_level, "tier": current_tier,
         "tier_emoji": new_tier_info.get("emoji", "🔨"),
         "streak_above": streak_above, "streak_below": streak_below,
-        "xp_total": xp_total, "events": events,
+        "xp_total": xp_total, "xp_buffer": xp_buffer, "events": events,
     }
 
 
@@ -779,7 +853,7 @@ def evaluate_level_changes(pillar_name, current_level_score, previous_state, con
 # ==============================================================================
 
 def compute_cross_pillar_effects(pillar_levels, config):
-    """Evaluate cross-pillar effects. Returns (active_effects, modifier_dict)."""
+    """Evaluate cross-pillar effects. Returns (active_effects, modifier_dict). [F-05]"""
     effects_config = config.get("cross_pillar_effects", [])
     active = []
     modifiers = {}
@@ -793,12 +867,18 @@ def compute_cross_pillar_effects(pillar_levels, config):
                 "name": effect["name"], "emoji": effect.get("emoji", ""),
                 "condition": condition, "targets": targets,
             })
-            for target_pillar, mod in targets.items():
+            for target_pillar, mod_spec in targets.items():
+                # Support both old format (raw number) and new format (dict with type+value)
+                if isinstance(mod_spec, dict):
+                    mod_value = mod_spec.get("value", 0)
+                else:
+                    mod_value = mod_spec
+
                 if target_pillar == "_all":
                     for p in pillar_levels:
-                        modifiers[p] = modifiers.get(p, 0) + mod
+                        modifiers[p] = modifiers.get(p, 0) + mod_value
                 else:
-                    modifiers[target_pillar] = modifiers.get(target_pillar, 0) + mod
+                    modifiers[target_pillar] = modifiers.get(target_pillar, 0) + mod_value
 
     return active, modifiers
 
@@ -871,20 +951,20 @@ def compute_character_sheet(data, previous_day_state, raw_score_histories, confi
     pillar_raw_scores["consistency"] = consistency_raw
     pillar_details["consistency"] = consistency_details
 
-    # Step 3: EMA level scores
+    # Step 3: EMA level scores — per-pillar lambda [F-03]
     pillar_level_scores = {}
     for pillar_name in pillar_raw_scores:
         history = list(raw_score_histories.get(pillar_name, []))
         history.append(pillar_raw_scores[pillar_name])
-        pillar_level_scores[pillar_name] = compute_ema_level_score(history, config)
+        pillar_level_scores[pillar_name] = compute_ema_level_score(history, config, pillar_name)
 
-    # Step 4: Cross-pillar effects
+    # Step 4: Cross-pillar effects — ALL modifiers multiplicative [F-05]
     active_effects, modifiers = compute_cross_pillar_effects(pillar_level_scores, config)
     adjusted_level_scores = {}
     for pillar_name, ls in pillar_level_scores.items():
         mod = modifiers.get(pillar_name, 0)
-        if isinstance(mod, (int, float)) and mod != 0:
-            adjusted = ls * (1 + mod) if abs(mod) < 1 else ls + mod
+        if mod != 0:
+            adjusted = ls * (1 + mod)
             adjusted_level_scores[pillar_name] = round(_clamp(adjusted), 1)
         else:
             adjusted_level_scores[pillar_name] = ls
@@ -908,8 +988,9 @@ def compute_character_sheet(data, previous_day_state, raw_score_histories, confi
         level_state = evaluate_level_changes(
             pillar_name, adjusted_level_scores[pillar_name], prev_state, config)
 
-        xp_delta = _compute_xp(pillar_raw_scores[pillar_name], config)
-        level_state["xp_total"] = level_state.get("xp_total", 0) + xp_delta
+        prev_xp = prev_state.get("xp_total", 0) if prev_state else 0
+        xp_earned, xp_delta, new_xp = _compute_xp(pillar_raw_scores[pillar_name], prev_xp, config)
+        level_state["xp_total"] = new_xp
 
         pillar_results[pillar_name] = {
             "raw_score": pillar_raw_scores[pillar_name],
@@ -917,13 +998,17 @@ def compute_character_sheet(data, previous_day_state, raw_score_histories, confi
             "level": level_state["level"], "tier": level_state["tier"],
             "tier_emoji": level_state.get("tier_emoji", "🔨"),
             "xp_total": level_state["xp_total"], "xp_delta": xp_delta,
+            "xp_earned": xp_earned,
+            "confidence": pillar_details[pillar_name].get("_confidence"),
+            "data_coverage": pillar_details[pillar_name].get("_data_coverage"),
+            "xp_buffer": level_state.get("xp_buffer", 0),
             "streak_above": level_state["streak_above"],
             "streak_below": level_state["streak_below"],
             "components": pillar_details[pillar_name],
         }
         all_events.extend(level_state.get("events", []))
 
-    # Step 6: Overall Character Level
+    # Step 6: Overall Character Level — floor instead of round [F-14]
     weighted_level_sum = 0.0
     total_weight = 0.0
     for pillar_name, result in pillar_results.items():
@@ -931,7 +1016,7 @@ def compute_character_sheet(data, previous_day_state, raw_score_histories, confi
         weighted_level_sum += result["level"] * weight
         total_weight += weight
 
-    character_level = max(1, min(100, round(weighted_level_sum / total_weight))) if total_weight > 0 else 1
+    character_level = max(1, min(100, int(math.floor(weighted_level_sum / total_weight)))) if total_weight > 0 else 1
     character_tier = get_tier(character_level, config)
 
     prev_char_level = previous_day_state.get("character_level", 1) if previous_day_state else 1
@@ -942,12 +1027,20 @@ def compute_character_sheet(data, previous_day_state, raw_score_histories, confi
 
     total_xp = sum(pr["xp_total"] for pr in pillar_results.values())
 
+    # Confidence stats [F-01]
+    confidences = [pr.get("confidence") for pr in pillar_results.values()
+                   if pr.get("confidence") is not None]
+    min_confidence = round(min(confidences), 3) if confidences else 0.0
+    avg_confidence = round(sum(confidences) / len(confidences), 3) if confidences else 0.0
+
     record = {
         "date": compute_date,
         "character_level": character_level,
         "character_tier": character_tier["name"],
         "character_tier_emoji": character_tier.get("emoji", "🔨"),
         "character_xp": total_xp,
+        "min_confidence": min_confidence,
+        "avg_confidence": avg_confidence,
         "active_effects": active_effects,
         "level_events": all_events,
         "computed_at": datetime.now(timezone.utc).isoformat(),

@@ -1,3 +1,40 @@
+## v1.1.0 — 2026-03-30: Character Engine Statistical Review (15 Findings)
+
+Board-led statistical review by Dr. Henning Brandt and 8 panelists identified 14 findings + F-15 progressive difficulty. All implemented.
+
+### Engine Changes (`lambdas/character_engine.py`)
+- **F-01**: Confidence-weighted pillar scoring — blends toward neutral (50) when data is sparse instead of inflating from available-only components
+- **F-02**: XP decays daily (−2/day) and acts as level stability buffer — high XP absorbs level-down pressure
+- **F-03**: Per-pillar EMA smoothing rates — Sleep ~4-day half-life, Metabolic ~14-day half-life
+- **F-04**: Body composition uses sigmoid curve (loss phase) + maintenance band scoring (±3lb)
+- **F-05**: Cross-pillar effects use explicit `{"type":"multiplicative","value":N}` format — removes additive/multiplicative discontinuity
+- **F-07**: Lab biomarker decay extends to 0 at 180 days (was floored at 0.5 forever)
+- **F-09**: All "no data" defaults changed from 40.0 to 50.0 (true neutral)
+- **F-10**: Variable step size: +2 levels per streak cycle when target−current > 10
+- **F-11**: Equal-day streak hold — streaks no longer decay when target equals current
+- **F-12**: Vice control uses logarithmic curve (day 7 ≈ 58pts vs old linear 23pts)
+- **F-13**: `_in_range_score()` buffer uses range-span-based divisor
+- **F-14**: Character level uses `math.floor()` instead of `round()`
+- **F-15**: Progressive difficulty — Foundation 3-day streaks, Elite 14-day streaks
+
+### Config (`config/character_sheet.json` v1.1.0)
+- Added `baseline.weight_phase`, `maintenance_band_lbs`
+- Added per-pillar `ema_lambda` values (0.85–0.95)
+- Added `leveling.tier_streak_overrides` with 5 tiers
+- Added XP decay/buffer config: `xp_per_level`, `daily_xp_decay`, `xp_buffer_threshold`
+- Cross-pillar effects now use typed modifier format
+
+### Character Page (`site/character/index.html`)
+- Fixed methodology section: replaced incorrect "equal weights (14.3%)" with actual pillar weights
+- Fixed "The Math": replaced fabricated `level = floor(sqrt(xp_total / 5))` formula with accurate 6-step explanation
+- Updated tier descriptions with streak requirements
+- Removed all references to "logarithmic XP curve"
+
+### Tests
+- Added `tests/test_character_engine.py` — 29 tests covering all findings
+
+---
+
 ## v4.5.2 — 2026-03-30: R19 Architecture Review Remediation (Phases 1-6)
 
 R19 remediation bringing all dimensions from B+ to A. 61 Lambdas (all CDK-managed), 118 MCP tools, 68 pages.
