@@ -1198,20 +1198,22 @@ Queried by MCP tools: `get_habit_tier_report`, `get_vice_streak_history`.
 
 ---
 
-## Character Sheet Partition (v2.58.0)
+## Character Sheet Partition (v1.1.0)
 
-**pk:** `USER#matthew#SOURCE#character_sheet`  
+**pk:** `USER#matthew#SOURCE#character_sheet`
 **sk:** `DATE#YYYY-MM-DD`
 
-One item per day. Computed by the backfill script initially, then by the Daily Brief Lambda (Phase 2). Contains the full character state: overall level, all 7 pillar scores, XP, tier info, cross-pillar effects, and level events. Sequential dependency — each day's computation requires the previous day's state for streak tracking and level transitions.
+One item per day. Computed by the backfill script initially, then by the Daily Brief Lambda (Phase 2). Contains the full character state: overall level, all 7 pillar scores, XP, tier info, cross-pillar effects, and level events. Sequential dependency — each day's computation requires the previous day's state for streak tracking and level transitions. Engine v1.1.0 adds confidence scoring, XP decay, progressive difficulty, and per-pillar EMA smoothing.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `date` | string | YYYY-MM-DD |
-| `character_level` | number | Overall weighted level (1-100) |
+| `character_level` | number | Overall weighted level (1-100), uses `math.floor()` of weighted pillar average |
 | `character_tier` | string | Current tier name: Foundation / Momentum / Discipline / Mastery / Elite |
 | `character_tier_emoji` | string | Tier emoji |
 | `character_xp` | number | Cumulative total XP across all pillars |
+| `min_confidence` | number | Lowest pillar confidence (0.0–1.0). v1.1.0+ |
+| `avg_confidence` | number | Average pillar confidence (0.0–1.0). v1.1.0+ |
 | `active_effects` | list | Active cross-pillar effects (e.g., Sleep Drag, Training Boost) |
 | `level_events` | list | Events that occurred this day (level_up, level_down, tier_up, tier_down) |
 | `engine_version` | string | Version of character_engine.py that computed this record |
@@ -1230,14 +1232,18 @@ One item per day. Computed by the backfill script initially, then by the Daily B
 |-------|------|-------------|
 | `raw_score` | number | Today's unsmoothed score (0-100) |
 | `level_score` | number | EMA-smoothed score after cross-pillar effects |
-| `level` | number | Discrete level (1-100), changes subject to streak rules |
+| `level` | number | Discrete level (1-100), changes subject to progressive streak rules |
 | `tier` | string | Pillar tier name |
 | `tier_emoji` | string | Tier emoji |
-| `xp_total` | number | Cumulative XP for this pillar |
-| `xp_delta` | number | XP earned/lost today |
+| `xp_total` | number | Cumulative XP for this pillar (decays daily by `daily_xp_decay`) |
+| `xp_delta` | number | Net XP change today (earned − decay) |
+| `xp_earned` | number | Raw XP earned today before decay. v1.1.0+ |
+| `xp_buffer` | number | XP within current level (0 to xp_per_level). Protects against level-down. v1.1.0+ |
+| `confidence` | number | Data completeness confidence (0.0–1.0). v1.1.0+ |
+| `data_coverage` | number | Ratio of available to max component weight (0.0–1.0). v1.1.0+ |
 | `streak_above` | number | Consecutive days target_level > current_level |
 | `streak_below` | number | Consecutive days target_level < current_level |
-| `components` | map | Per-component scores: `{"component_name": {"score": N, "raw_value": V, "weight": W}}` |
+| `components` | map | Per-component scores: `{"component_name": {"score": N, "weight": W}, "_confidence": N, "_data_coverage": N}` |
 
 Config: `s3://matthew-life-platform/config/character_sheet.json`  
 Queried by MCP tools: `get_character_sheet`, `get_pillar_detail`, `get_level_history`.
