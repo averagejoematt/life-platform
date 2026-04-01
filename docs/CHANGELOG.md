@@ -1,3 +1,26 @@
+## v4.7.4 — 2026-04-01: Backlog cleanup — 6 items resolved
+
+### HP-12: Elena Hero Line — CLOSED
+- Already fully implemented (daily_brief → site_writer → public_stats.json → frontend). Removed from carry-forward lists.
+
+### get_nutrition positional args bug — CLOSED
+- 8 test cases written (`tests/test_get_nutrition_args.py`) covering all view dispatches. All pass. No bug reproducible.
+
+### DISC-7: Annotation seeding — DONE
+- MCP tools verified: `annotate_discovery` and `get_discovery_annotations` in `mcp/tools_social.py`
+- `seeds/seed_discoveries.py` created (idempotent) — 4 Day 1 events seeded to DynamoDB
+- Day 1 milestone annotation merges with journey_timeline correctly
+
+### BL-02: Labs page — ALREADY DONE (prior session)
+### BL-01: Builders page — ALREADY DONE (prior session)
+
+### HP-13: Share card — DONE
+- `twitter:image` updated to dynamic `og-home.png` (was static `og-image.png`)
+- Share button added to homepage hero (Web Share API mobile, clipboard desktop)
+- OG image Lambda (`og_image_lambda.py`) already generates 6 dynamic cards daily
+
+---
+
 ## v4.7.3 — 2026-04-01: Launch readiness + MCP fix + test fixes
 
 ### Launch Readiness (LAUNCH_READINESS_IMPL_SPEC.md)
