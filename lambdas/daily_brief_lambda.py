@@ -1874,8 +1874,7 @@ def lambda_handler(event, context):
             try:
                 from datetime import date as _date
                 _started = profile.get("journey_start_date", "2026-04-01")
-                _days_in = (today.date() if hasattr(today, 'date') else today - _date(2026, 2, 9).toordinal()).days
-                _days_in = max(0, (_date.today() - _date.fromisoformat(_started)).days)
+                _days_in = max(1, (_date.today() - _date.fromisoformat(_started)).days + 1)
             except Exception:
                 _days_in = 0
 

@@ -148,7 +148,8 @@ def lambda_handler(event, context):
             "generated_by":  "daily-brief-lambda",
         },
         "vitals":   fresh_vitals,
-        "platform": {**ep, "tier0_streak": fresh_streak},
+        "platform": {**ep, "tier0_streak": fresh_streak,
+                     "days_in": max(1, (date.today() - date.fromisoformat("2026-04-01")).days + 1) if date.today() >= date.fromisoformat("2026-04-01") else 0},
     }
 
     # ── 7. Write back ─────────────────────────────────────────────────────────

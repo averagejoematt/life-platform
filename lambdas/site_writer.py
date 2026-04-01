@@ -81,7 +81,7 @@ def _compute_hero(vitals: dict, journey: dict) -> dict:
     today = datetime.now(timezone.utc).date()
     try:
         start = datetime.strptime(JOURNEY_START_DATE, "%Y-%m-%d").date()
-        days_on_journey = (today - start).days
+        days_on_journey = max(1, (today - start).days + 1)
     except Exception:
         days_on_journey = 0
 
@@ -376,7 +376,7 @@ def _compute_pulse(vitals: dict, journey: dict, training: dict,
     try:
         from datetime import date as _date
         started = _date.fromisoformat(JOURNEY_START_DATE)
-        day_number = max(0, (_date.today() - started).days)
+        day_number = max(1, (_date.today() - started).days + 1)
     except Exception:
         day_number = 0
 
