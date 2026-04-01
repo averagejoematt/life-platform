@@ -178,7 +178,19 @@
 - **IC-4/IC-5** (failure pattern + momentum warning) — data gate ~May 1
 - **SIMP-1 Phase 2** — MCP tool consolidation (~April 13)
 
-## Platform Counts (v4.8.0)
+### Day 1 Pipeline Fixes (v4.8.1)
+- Withings Lambda: fixed measurement group selection bug — weight was silently dropped when BPM reading was newer
+- HAE: combined BP format handler, weight accepted as fallback, API key + IAM fixes
+- Ingestion lookback: all 5 Lambdas now include today in gap-fill check
+- Day counter: 0→1 fix across 4 files
+- EXPERIMENT_QUERY_START: 5 more endpoints clamped + `_experiment_date()` helper
+- Sleep API: deep sleep/REM/recovery/HRV/RHR added
+- Physical page: BP section with trend chart
+- Stats-refresh: expanded to update water, character, weight from HAE
+- Status page: pipeline auth failure detection for API-based sources
+- 4 experiments + 1 challenge activated for Day 1
+
+## Platform Counts (v4.8.1)
 - 115 MCP tools · 62 Lambdas · 72 site pages · 26 data sources · 8 CDK stacks
 - Shared layer: v18 · AI calls: 18 across 15 Lambdas · AI expert cards: 5 (daily)
 - New modules: labs_coaching.py, genome_coaching.py

@@ -721,7 +721,7 @@
       if (statsEl) statsEl.textContent = daysUntil + ' day' + (daysUntil === 1 ? '' : 's') + ' until launch';
     } else {
       var statsLine = 'Day ' + Math.max(1, daysIn);
-      if (wLbs) statsLine += ' \u00b7 ' + wLbs.toFixed(1) + ' lbs';
+      if (wLbs) statsLine += ' \u00b7 ' + Math.round(wLbs) + ' lbs';
       if (statsEl) statsEl.textContent = statsLine;
     }
 
@@ -750,7 +750,7 @@
 
     // ── Data spread: Weight ──
     if (wLbs && wLbs > 0) {
-      setText('h-spread-weight', wLbs.toFixed(1));
+      setText('h-spread-weight', Math.round(wLbs));
       var startWeight = 307;
       var lostLbs = startWeight - wLbs;
       if (lostLbs > 0) {
@@ -836,7 +836,7 @@
       setArc('h-g-char-arc', Math.min(100, (charLevel / 20) * 100));
       var psTier = psChar.tier || 'Foundation';
       setText('h-obs-mind', 'Level ' + charLevel + ' \u00b7 ' + (psChar.tier_emoji || '') + ' ' + psTier);
-      if (statsEl && daysIn >= 0) statsEl.textContent = 'Day ' + Math.max(1, daysIn) + (wLbs ? ' \u00b7 ' + wLbs.toFixed(1) + ' lbs' : '') + ' \u00b7 Level ' + charLevel;
+      if (statsEl && daysIn >= 0) statsEl.textContent = 'Day ' + Math.max(1, daysIn) + (wLbs ? ' \u00b7 ' + Math.round(wLbs) + ' lbs' : '') + ' \u00b7 Level ' + charLevel;
     }
 
     // ── Character stats (async fallback — overrides above if API returns richer data) ──
@@ -857,7 +857,7 @@
         setArc('h-g-char-arc', Math.min(100, (charLevel / 20) * 100));
         setText('h-obs-mind', 'Level ' + charLevel + ' \u00b7 ' + tier + (score && daysIn > 0 ? ' \u00b7 ' + score + '/100' : ''));
         // Update hero stats line with level
-        if (statsEl && daysIn >= 0) statsEl.textContent = 'Day ' + Math.max(1, daysIn) + (wLbs ? ' \u00b7 ' + wLbs.toFixed(1) + ' lbs' : '') + ' \u00b7 Level ' + charLevel;
+        if (statsEl && daysIn >= 0) statsEl.textContent = 'Day ' + Math.max(1, daysIn) + (wLbs ? ' \u00b7 ' + Math.round(wLbs) + ' lbs' : '') + ' \u00b7 Level ' + charLevel;
       }
     } catch(e) {}
 
