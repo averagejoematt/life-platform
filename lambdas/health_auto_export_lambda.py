@@ -1065,46 +1065,76 @@ def lambda_handler(event, context):
             fields_written.update(fields.keys())
         print(f"Other metrics: {other_days} days updated, fields: {sorted(fields_written)}")
 
-    # ── Process blood pressure individual readings (v1.4.0) ──
+    # ── Process blood pressure individual readings (v1.4.0 + v1.4.1 combined format) ──
     bp_readings_new = 0
+
+    # v1.4.1: Handle combined "blood_pressure" metric with nested systolic/diastolic
     for m in metrics:
-        if m.get("name") in ("Blood Pressure Systolic", "blood_pressure_systolic"):
-            bp_sys_data = m.get("data", [])
-            # Find matching diastolic and pulse data
-            bp_dia_data = []
-            bp_pulse_data = []
-            for m2 in metrics:
-                if m2.get("name") in ("Blood Pressure Diastolic", "blood_pressure_diastolic"):
-                    bp_dia_data = m2.get("data", [])
-                elif m2.get("name") in ("Blood Pressure Pulse", "blood_pressure_pulse"):
-                    bp_pulse_data = m2.get("data", [])
-
-            # Build per-day individual readings
+        if m.get("name") in ("blood_pressure", "Blood Pressure"):
+            bp_data = m.get("data", [])
             bp_daily = defaultdict(list)
-            dia_by_time = {parse_timestamp(r.get("date")): r.get("qty") for r in bp_dia_data if r.get("qty") is not None}
-            pulse_by_time = {parse_timestamp(r.get("date")): r.get("qty") for r in bp_pulse_data if r.get("qty") is not None}
-
-            for reading in bp_sys_data:
-                date = parse_date_str(reading.get("date"))
-                ts = parse_timestamp(reading.get("date"))
-                sys_val = reading.get("qty")
+            for reading in bp_data:
+                date = parse_date_str(reading.get("date") or reading.get("start"))
+                ts = parse_timestamp(reading.get("date") or reading.get("start"))
+                sys_val = reading.get("systolic") or reading.get("qty")
+                dia_val = reading.get("diastolic")
                 if not date or sys_val is None:
                     continue
                 bp_daily[date].append({
                     "time": ts,
                     "systolic": round(float(sys_val)),
-                    "diastolic": round(float(dia_by_time.get(ts, 0))) if dia_by_time.get(ts) else None,
-                    "pulse": round(float(pulse_by_time.get(ts, 0))) if pulse_by_time.get(ts) else None,
+                    "diastolic": round(float(dia_val)) if dia_val is not None else None,
+                    "pulse": round(float(reading.get("pulse", 0))) if reading.get("pulse") else None,
                 })
-
             for date_str, readings in bp_daily.items():
                 n = save_bp_readings_to_s3(date_str, readings)
                 bp_readings_new += n
-                # Also write readings count to DynamoDB
-                merge_day_to_dynamo(date_str, {"blood_pressure_readings_count": len(readings)})
-
+                avg_sys = round(sum(r["systolic"] for r in readings) / len(readings))
+                avg_dia = round(sum(r["diastolic"] for r in readings if r["diastolic"]) / max(1, len([r for r in readings if r["diastolic"]])))
+                merge_day_to_dynamo(date_str, {
+                    "bp_systolic": avg_sys,
+                    "bp_diastolic": avg_dia,
+                    "blood_pressure_systolic": avg_sys,
+                    "blood_pressure_diastolic": avg_dia,
+                    "blood_pressure_readings_count": len(readings),
+                })
             if bp_readings_new:
-                print(f"Blood Pressure: {bp_readings_new} new readings saved to S3")
+                print(f"Blood Pressure: {bp_readings_new} new readings saved (combined format)")
+            break
+
+    # v1.4.0: Handle separate systolic/diastolic metrics
+    if bp_readings_new == 0:
+        for m in metrics:
+            if m.get("name") in ("Blood Pressure Systolic", "blood_pressure_systolic"):
+                bp_sys_data = m.get("data", [])
+                bp_dia_data = []
+                bp_pulse_data = []
+                for m2 in metrics:
+                    if m2.get("name") in ("Blood Pressure Diastolic", "blood_pressure_diastolic"):
+                        bp_dia_data = m2.get("data", [])
+                    elif m2.get("name") in ("Blood Pressure Pulse", "blood_pressure_pulse"):
+                        bp_pulse_data = m2.get("data", [])
+                bp_daily = defaultdict(list)
+                dia_by_time = {parse_timestamp(r.get("date")): r.get("qty") for r in bp_dia_data if r.get("qty") is not None}
+                pulse_by_time = {parse_timestamp(r.get("date")): r.get("qty") for r in bp_pulse_data if r.get("qty") is not None}
+                for reading in bp_sys_data:
+                    date = parse_date_str(reading.get("date"))
+                    ts = parse_timestamp(reading.get("date"))
+                    sys_val = reading.get("qty")
+                    if not date or sys_val is None:
+                        continue
+                    bp_daily[date].append({
+                        "time": ts,
+                        "systolic": round(float(sys_val)),
+                        "diastolic": round(float(dia_by_time.get(ts, 0))) if dia_by_time.get(ts) else None,
+                        "pulse": round(float(pulse_by_time.get(ts, 0))) if pulse_by_time.get(ts) else None,
+                    })
+                for date_str, readings in bp_daily.items():
+                    n = save_bp_readings_to_s3(date_str, readings)
+                    bp_readings_new += n
+                    merge_day_to_dynamo(date_str, {"blood_pressure_readings_count": len(readings)})
+                if bp_readings_new:
+                    print(f"Blood Pressure: {bp_readings_new} new readings saved to S3")
             break
 
     # ── Process workouts (v1.6.0) ──
