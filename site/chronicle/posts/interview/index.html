@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>.nav-overlay{display:none}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The Interview — The eve of Day 1. Elena Voss sits down with Matthew the night before the experiment begins.">
+  <meta property="og:title" content="The Interview — The Measured Life">
+  <meta property="og:description" content="Special Edition · April 1, 2026 · The night before Day 1.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta property="og:type" content="article">
+  <title>The Interview — The Measured Life</title>
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#080c0a">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <style>
+    :root {
+      --accent: var(--c-amber-500);
+      --accent-dim: var(--c-amber-300);
+      --accent-bg: var(--c-amber-100);
+      --accent-bg-subtle: var(--c-amber-050);
+      --border: rgba(200,132,58,0.15);
+    }
+    .reading-progress { position:fixed;top:var(--nav-height);left:0;right:0;height:2px;background:var(--border-subtle);z-index:var(--z-overlay); }
+    .reading-progress__fill { height:100%;background:var(--accent);width:0%;transition:width 0.1s linear; }
+    .post-header { padding:var(--space-16) var(--page-padding) var(--space-10);border-bottom:1px solid var(--border);max-width:calc(var(--prose-width) + var(--page-padding) * 2);margin:0 auto; }
+    .post-header__series { font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3); }
+    .post-header__title { font-family:var(--font-serif);font-size:clamp(28px,4vw,46px);color:var(--text);line-height:1.15;font-weight:400;font-style:italic;margin-bottom:var(--space-5); }
+    .post-header__meta { display:flex;align-items:center;gap:var(--space-5);font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted); }
+    .post-header__stats { font-size:var(--text-xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3); }
+    .post-body { max-width:calc(var(--prose-width) + var(--page-padding) * 2);margin:0 auto;padding:var(--space-10) var(--page-padding) var(--space-20); }
+    .prose { font-family:var(--font-serif); }
+    .prose p { font-size:18px;line-height:1.85;color:var(--text);margin-bottom:var(--space-6); }
+    .prose p:first-of-type::first-letter { font-size:64px;line-height:0.8;float:left;margin-right:var(--space-3);margin-top:8px;color:var(--accent);font-family:var(--font-serif); }
+    .prose blockquote { border-left:2px solid var(--accent);padding:var(--space-4) var(--space-6);background:var(--accent-bg-subtle);margin:var(--space-8) 0;font-style:italic;font-size:17px;color:var(--text);line-height:1.7; }
+    .prose hr { border:none;border-top:1px solid var(--border);margin:var(--space-10) 0; }
+    .prose .signature { text-align:center;font-size:14px;color:var(--text-muted);font-style:italic; }
+    .prose strong { color:var(--text);font-weight:700; }
+    .post-nav { max-width:calc(var(--prose-width) + var(--page-padding) * 2);margin:0 auto;padding:var(--space-6) var(--page-padding) var(--space-16);border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:var(--space-6); }
+    .post-nav a { font-family:var(--font-serif);font-size:17px;color:var(--text);text-decoration:none;transition:color var(--dur-fast); }
+    .post-nav a:hover { color:var(--accent); }
+    .post-nav span { display:block;font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-1); }
+    .interview-note { font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);letter-spacing:var(--ls-tag);margin-bottom:var(--space-10);padding-bottom:var(--space-6);border-bottom:1px solid var(--border); }
+  </style>
+</head>
+<body>
+<div class="reading-progress"><div class="reading-progress__fill" id="rp"></div></div>
+<div id="amj-nav"></div>
+
+<div class="post-header">
+  <div class="post-header__series">The Measured Life &middot; Special Edition &middot; By Elena Voss</div>
+  <h1 class="post-header__title">&ldquo;The Interview&rdquo;</h1>
+  <div class="post-header__meta">
+    <span>April 1, 2026</span>
+    <span>&middot;</span>
+    <span>8 min read</span>
+  </div>
+  <div class="post-header__stats">Week 0 &middot; The eve of Day 1 &middot; 5:03 PM &middot; Seattle, WA</div>
+</div>
+
+<article class="post-body">
+  <div class="prose">
+
+    <p class="interview-note">This installment is drawn from a conversation conducted the evening before Day 1. The experiment begins tomorrow.</p>
+
+    <p>He wanted to do the interview the night before. Not after the first week, not once there was data to review &mdash; tonight, with tomorrow still unknowable and the numbers not yet started. I&rsquo;ve done enough of these to know that this is either a very good sign or a very bad one. The people who want to be on the record before they&rsquo;ve done anything tend to be the ones who understand exactly what they&rsquo;re walking into. They also tend to be the ones who have walked in before and know how it ends.</p>
+
+    <p>The website is live now. Anyone can go to averagejoematt.com and read Matthew&rsquo;s sleep data, his glucose trends, the observatory pages he spent weeks building. The chronicle archive is there for anyone who wants to trace the full arc of a prequel that turned out to be longer and more complicated than anyone planned. I asked him how it felt &mdash; not the rehearsed answer, the real one.</p>
+
+    <p>He was done, he said, with all of it. Done with the lethargy, the DoorDash guilt, the restless nights that came from a body left unregulated. Done with the low-grade aches, the feeling of being permanently slightly less than he should be, the incremental wardrobe expansions that each arrived with their own quiet admission. He was satiated &mdash; he had, he said, just finished his last supper. Then he paused, and added without ceremony that it was probably the 134th.</p>
+
+    <p>I stopped writing.</p>
+
+    <p>The 134th last supper. He said it the way you say a fact you have long since made peace with, which is either the most self-aware thing a person can do or the most dangerous. The man who can name the cycle is also the man who has been in it 133 times before. I asked him which version of that honesty this was &mdash; the kind that clears the path, or the kind that quietly excuses the next fall before it happens.</p>
+
+    <p>He sat with that for a moment longer than the question probably warranted. Then he said something worth keeping: the same guy describing this with such apparent composure was also the guy who could disappear for months and come back carrying a hundred pounds he&rsquo;d let accumulate without intervention. He knew that. He was backing himself anyway.</p>
+
+    <hr>
+
+    <p>The relapse &mdash; and I want to name it properly, because softening it would be dishonest &mdash; didn&rsquo;t begin with a failure of character. It began with a cold. Day fifteen of what had been a serious, disciplined start: he built a sick-day feature into the platform to handle exactly this contingency. One sick day became a few. A few became weeks. The sick-day feature, designed as a pause button, became something closer to an off switch.</p>
+
+    <p>What&rsquo;s worth understanding is that nothing else stopped. The career kept going. The hours went in. The professional life continued without any visible interruption. He simply put the rest of himself on hold &mdash; the logging, the habits, the daily brief he stopped opening even as it kept arriving in his inbox each morning. The machine ran. Nobody came to read it. A city keeping its lights on after everyone has gone home.</p>
+
+    <p>He has a theory about why, and it is characteristically precise. The first sixty days, he believes, are his most fragile window &mdash; the phase before a routine has calcified into identity, before the habits stop requiring willpower because they have become simply what he does. A cold on day fifteen is almost designed to undo him. A cold on day sixty, he thinks, would not have the same result. He stated this not as reassurance but as a hypothesis, which is the correct frame for it. Now he gets to find out if he&rsquo;s right.</p>
+
+    <p>What&rsquo;s different about April 1st, I asked, beyond the date? The platform exists. The website is public. But platforms and websites don&rsquo;t change the underlying person. What has?</p>
+
+    <p>Two things, he said. The first is accountability that lives outside the system &mdash; he&rsquo;s told his partner and a few close friends that today is the date, which means that unlike before, there is a small group of people for whom this is now a fact in the world. The second is the framing shift: where once the platform was a support structure running alongside a personal health journey, it is now its own co-protagonist. He built something real. April 1st is when he pressure-tests whether it works. The experiment and the experimenter are finally, properly, starting at the same time.</p>
+
+    <hr>
+
+    <p>I asked him what it means that the website is public. Not the data &mdash; data is reference points, values, numbers in a database. I was asking about the writing. The journal entries. The things he says to the system that the system processes and that find their way, in some form, into these pages.</p>
+
+    <p>He thought about this for longer than anything else we discussed. What strangers could extrapolate from his sleep scores or his glucose curves didn&rsquo;t trouble him much, he said. What troubled him &mdash; if trouble was even the right word, because he also described it as liberating &mdash; was the writing. Journal entries, interview answers, the observations that get fed into the system and returned as analysis: these gave a reader more genuine access to his inner life than most people in his orbit had ever had. More, possibly, than people who had known him for years.</p>
+
+    <p>He was putting that into the ether, publicly, on purpose. Because, he said, he used to be a main character in his own story.</p>
+
+    <p>Not in the contemporary sense of the phrase &mdash; he was careful about that. He meant something more literal. That there had been a version of his life in which he was a central figure in his own experience: present, engaged, moving through the world as a person to whom things were actively happening, who was actively causing things to happen. And that somewhere along the way, without quite noticing the transition, he had become a spectator of his own life. Watching. Coasting. Accumulating the kind of quiet regrets that don&rsquo;t arrive all at once but rather show up in small instalments, years before you&rsquo;re old enough to have expected them.</p>
+
+    <p>Putting all of this out in the open &mdash; the data, the writing, the chronicle, the website &mdash; was an attempt to put himself back in the centre of his own story. For better and worse. To stop spectating and see what happened when he made himself, in every measurable way, the subject again.</p>
+
+    <hr>
+
+    <p>I asked him what winning looks like by summer.</p>
+
+    <p>There is no winning in summer, he said. He was too late in the year to expect that. Summer would be maintenance and resistance &mdash; keeping exercise, nutrition, and mental health in the foreground through a season designed to disrupt all three. He talked about what summer could actually contain: cycling, walks, showing up to social things instead of withdrawing from them the way he sometimes did during what he called the aggressive windows. Not a Goggins cycle, he said. Just the new version of him, trying not to make the same deal with himself that he&rsquo;d been making all winter.</p>
+
+    <p>Winning in summer is not derailing. That&rsquo;s the whole ambition. I find it, as stated goals go, quietly radical.</p>
+
+    <hr>
+
+    <p>We wrapped up at half past five. The platform is ready. The observatory pages are live. Tomorrow morning, a baseline will be captured &mdash; weight, body composition, blood pressure, habit scores, vice streaks, all of it anchored to a single date from which every future measurement will be measured. No more ambiguity about when the data starts or what it&rsquo;s compared against. There is one Day 1. It is tomorrow. Whatever the numbers are, they are.</p>
+
+    <p>I&rsquo;ve been asked, in the weeks since this series began, whether I think it will work. I don&rsquo;t know. That&rsquo;s what I&rsquo;m here to find out. What I can say is that the man who sat across from me tonight was not performing confidence. He was holding confidence and doubt at the same time, acknowledging both without resolving either into something more comfortable. The 134 last suppers are in the record. So is the theory about the sixty-day window. So is the admission that he cannot fully explain the man who disappears &mdash; only that the man who disappears and the man who shows up tonight are the same person.</p>
+
+    <p>That honesty is either the thing that saves him or the thing that makes the fall familiar enough to survive again. By this time next week, there will be seven days of data to help tell the difference.</p>
+
+    <p>Tomorrow, the numbers begin.</p>
+
+    <hr>
+    <p class="signature"><em>Week 0 &mdash; The Measured Life. Day 1 begins April 1st.</em></p>
+
+  </div>
+</article>
+
+<div class="discord-community-card">
+  <div class="community-card-header">&sharp; COMMUNITY ──────────────</div>
+  <p class="community-card-body">Following along? The community is open &mdash; come talk about the data, the experiment, and what happens next.</p>
+  <a href="https://discord.gg/T4Ndt2WsU" target="_blank" rel="noopener" class="community-card-cta">Join Average Joe Community &rarr;</a>
+</div>
+
+<div class="post-nav">
+  <a href="/chronicle/"><span>&larr; All installments</span>The Measured Life archive</a>
+  <a href="/"><span>The experiment</span>averagejoematt.com &rarr;</a>
+</div>
+
+<div id="amj-bottom-nav"></div>
+<div id="amj-footer"></div>
+<script>
+  const rp = document.getElementById('rp');
+  window.addEventListener('scroll', () => {
+    const pct = window.scrollY / (document.body.scrollHeight - window.innerHeight) * 100;
+    rp.style.width = Math.min(pct, 100) + '%';
+  });
+</script>
+<script src="/assets/js/site_constants.js"></script>
+<script src="/assets/js/components.js"></script>
+<script src="/assets/js/nav.js"></script>
+</body>
+</html>

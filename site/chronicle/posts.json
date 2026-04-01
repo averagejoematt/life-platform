@@ -4,19 +4,19 @@
       "week": -1,
       "title": "The Interview",
       "date": "2026-04-01",
-      "stats_line": "Special Edition \u00b7 April 1, 2026 \u00b7 Seattle, WA",
-      "url": "/chronicle/",
-      "excerpt": "Six days before Day 1. Elena Voss sits down with Matthew for the first time \u2014 no data cards, no board verdicts. Just a conversation about what went wrong, what he learned, and what April 1 actually means.",
-      "word_count": 2200,
+      "stats_line": "Week 0 · April 1, 2026 · The eve of Day 1",
+      "url": "/chronicle/posts/interview/",
+      "excerpt": "Six days before Day 1. Elena Voss sits down with Matthew for the first time — no data cards, no board verdicts. Just a conversation about what went wrong, what he learned, and what April 1 actually means.",
+      "word_count": 1600,
       "has_board_interview": true,
       "phase": "prequel",
-      "coming_soon": true
+      "coming_soon": false
     },
     {
       "week": -3,
       "title": "The DoorDash Chronicle",
       "date": "2026-03-11",
-      "stats_line": "Prequel \u00b7 Week \u22123 \u00b7 Weight: tracking paused \u00b7 Grade: sick days logged",
+      "stats_line": "Prequel · Week −3 · Weight: tracking paused · Grade: sick days logged",
       "url": "/chronicle/posts/week-03/",
       "excerpt": "He has nineteen data sources. He has a platform that generates a daily briefing, tracks his HRV to two decimal places, and maintains a gamified character sheet scoring seven dimensions of his health. He has, in other words, built an extraordinarily sophisticated apparatus for listening to his body.",
       "word_count": 1070,
@@ -27,9 +27,9 @@
       "week": -4,
       "title": "The Empty Journal",
       "date": "2026-03-03",
-      "stats_line": "Prequel \u00b7 Week \u22124 \u00b7 February 25 \u2013 March 3, 2026 \u00b7 Seattle, WA",
+      "stats_line": "Prequel · Week −4 · February 25 – March 3, 2026 · Seattle, WA",
       "url": "/chronicle/posts/week-02/",
-      "excerpt": "Here is something I did not expect to find two weeks into this assignment: a man who has built twenty-seven automated programs to monitor his sleep, his blood glucose, his heart rate recovery, his gait symmetry, and whether he remembered to take his apigenin before bed \u2014 who has not written a single journal entry since the day he started.",
+      "excerpt": "Here is something I did not expect to find two weeks into this assignment: a man who has built twenty-seven automated programs to monitor his sleep, his blood glucose, his heart rate recovery, his gait symmetry, and whether he remembered to take his apigenin before bed — who has not written a single journal entry since the day he started.",
       "word_count": 1421,
       "has_board_interview": false,
       "phase": "prequel"
@@ -38,14 +38,14 @@
       "week": 0,
       "title": "Before the Numbers",
       "date": "2026-02-22",
-      "stats_line": "Prologue \u00b7 February 2026 \u00b7 Seattle, WA",
+      "stats_line": "Prologue · February 2026 · Seattle, WA",
       "url": "/chronicle/posts/week-00/",
-      "excerpt": "The first thing you notice about Matthew\u2019s apartment is the charging cables. There\u2019s one snaking from the nightstand \u2014 that\u2019s the Whoop strap, a fitness tracker that monitors his heart rate variability while he sleeps.",
+      "excerpt": "The first thing you notice about Matthew's apartment is the charging cables. There's one snaking from the nightstand — that's the Whoop strap, a fitness tracker that monitors his heart rate variability while he sleeps.",
       "word_count": 1240,
       "has_board_interview": false,
       "phase": "prequel"
     }
   ],
   "experiment_start": "2026-04-01",
-  "updated_at": "2026-03-30T19:00:00.000000+00:00"
+  "updated_at": "2026-03-31T17:00:00.000000+00:00"
 }
