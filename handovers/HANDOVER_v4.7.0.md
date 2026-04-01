@@ -156,16 +156,29 @@
 - **HP-13** share card: twitter:image fixed to dynamic `og-home.png`, share button added to homepage hero
 - Mobile nav: Internal links (Status, Buddy Dashboard, Discord, Snake Fund) added to hamburger menu
 
+### Self-Updating Site Audit (v4.7.6)
+- Removed all hardcoded dates across 8 pages (replaced with relative language)
+- Chronicle archive rewritten to auto-render from posts.json
+- Explorer AI commentary: new Dr. Brandt expert (biostatistician) renders on /explorer/
+
+### AI Insight Engine Overhaul (v4.8.0)
+- **Phase 1 (anti-repetition)**: Prior 3 days' guidance injected as "AVOID REPEATING" list. AI expert cards read prior analysis for fresh angles.
+- **Phase 2 (6 data sources wired)**: Journal enrichment (defense patterns, growth signals, avoidance, stress sources), character sheet tone, adaptive mode, state of mind, supplements, weather — all injected into coaching prompts
+- **Phase 3 (memory)**: what_worked conditions recorded on high-grade days. Weekly correlations (23 pairs) injected into context.
+- **Phase 4 (personalization)**: New `labs_coaching.py` (8 biomarker rules) and `genome_coaching.py` (7 SNP insights, weekly rotation)
+- Shared Lambda layer rebuilt v15 → v18, all 7 dependent Lambdas updated
+
+### CI/CD Fixes (v4.7.3–v4.7.5)
+- All non-AWS test failures resolved (19 → 0 local failures)
+- Shared layer v18 deployed to all Lambdas — CI layer version test passes
+- 1 remaining CI failure: MCP canary (local key unavailable — passes in CI environment)
+
 ## Not Done (Blocked)
-- **Breathwork × HRV correlation** — 0 breathwork records in apple_health partition; no data to correlate
+- **Breathwork × HRV correlation** — 0 breathwork records in apple_health partition
 - **IC-4/IC-5** (failure pattern + momentum warning) — data gate ~May 1
-- **2 AWS integration test failures** — layer version drift (v15→v17 reattach), MCP canary (local key unavailable)
+- **SIMP-1 Phase 2** — MCP tool consolidation (~April 13)
 
-## Lambda Count
-62 total (was 59: +ai-expert-analyzer, +journal-analyzer, +field-notes-generate)
-
-## MCP Tool Count
-115 tools registered (unchanged from registry — no new MCP tools this session)
-
-## Platform Counts (v4.7.5)
-- 115 MCP tools · 62 Lambdas · 72 site pages · 1075 tests · 26 data sources · 8 CDK stacks
+## Platform Counts (v4.8.0)
+- 115 MCP tools · 62 Lambdas · 72 site pages · 26 data sources · 8 CDK stacks
+- Shared layer: v18 · AI calls: 18 across 15 Lambdas · AI expert cards: 5 (daily)
+- New modules: labs_coaching.py, genome_coaching.py
