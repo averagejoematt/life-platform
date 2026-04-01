@@ -71,6 +71,7 @@ KNOWN_SECRETS = [
     "life-platform/site-api-ai-key", # R17-04: isolated Anthropic key for site-api (separate from main ai-keys)
     "life-platform/notion",          # Notion API key (also in ingestion-keys bundle)
     "life-platform/dropbox",         # Dropbox API key (also in ingestion-keys bundle)
+    "life-platform",                 # Wildcard prefix — pipeline_health_check reads all secrets to verify they exist
 ]
 
 # Secrets that have been permanently deleted — must not appear in IAM policies.
@@ -188,7 +189,7 @@ def test_s4_known_secrets_count_matches_architecture():
     """S4: The count of known secrets should match what ARCHITECTURE.md documents.
     Update KNOWN_SECRETS when adding or removing secrets."""
     # As of v3.7.84: 11 active secrets (R17-04 added life-platform/site-api-ai-key)
-    EXPECTED_COUNT = 13
+    EXPECTED_COUNT = 14
     actual = len(KNOWN_SECRETS)
     assert actual == EXPECTED_COUNT, (
         f"S4 FAIL: KNOWN_SECRETS has {actual} entries, expected {EXPECTED_COUNT}. "

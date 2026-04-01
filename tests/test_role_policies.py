@@ -73,6 +73,8 @@ WILDCARD_RESOURCE_ALLOWLIST = {
     "xray:getsamplingtargets",         # X-Ray does not support resource-level restrictions
     "secretsmanager:listsecrets",      # List operation — no resource-level support
     "lambda:listfunctions",            # List operation — no resource-level support
+    "cloudfront:createinvalidation",   # CloudFront invalidation requires * — no resource-level support
+    "ses:sendrawemail",                # SES SendRawEmail requires * — same as SendEmail
 }
 
 

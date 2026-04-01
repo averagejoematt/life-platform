@@ -17,6 +17,7 @@ def normalize_platform(merchant, statement):
     return 'other'
 
 def lambda_handler(event, context):
+  try:
     s3 = boto3.client('s3', region_name='us-west-2')
     dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
     table = dynamodb.Table('life-platform')
@@ -188,3 +189,6 @@ def lambda_handler(event, context):
 
     print(f'Ingested {written} food delivery transactions from {key}')
     return {'statusCode': 200, 'body': f'Ingested {written} records'}
+  except Exception as e:
+    print(f'Handler failed: {e}')
+    raise
