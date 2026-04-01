@@ -1266,10 +1266,10 @@
     </div>
     <div class="tc-footer">
       <div class="tc-footer__stats" id="tc-stats">
-        <div class="tc-stat"><div class="tc-stat__label">XP</div><div class="tc-stat__value" id="tc-xp">38</div></div>
-        <div class="tc-stat"><div class="tc-stat__label">Days</div><div class="tc-stat__value" id="tc-days">20</div></div>
-        <div class="tc-stat"><div class="tc-stat__label">Events</div><div class="tc-stat__value" id="tc-events">16</div></div>
-        <div class="tc-stat"><div class="tc-stat__label">Next Tier</div><div class="tc-stat__value" id="tc-nexttier">Lv 21</div></div>
+        <div class="tc-stat"><div class="tc-stat__label">XP</div><div class="tc-stat__value" id="tc-xp">0</div></div>
+        <div class="tc-stat"><div class="tc-stat__label">Days</div><div class="tc-stat__value" id="tc-days">0</div></div>
+        <div class="tc-stat"><div class="tc-stat__label">Next Level</div><div class="tc-stat__value" id="tc-nextlevel">Lv 2</div></div>
+        <div class="tc-stat"><div class="tc-stat__label">Tier Unlocks</div><div class="tc-stat__value" id="tc-nexttier">Lv 21</div></div>
       </div>
       <div class="tc-footer__tier-path" id="tc-tierpath">
         <!-- Tier dots injected by JS -->
@@ -1852,7 +1852,11 @@ function hydrate(data) {
   // Footer stats
   document.getElementById('tc-xp').textContent = character.xp_total;
   document.getElementById('tc-days').textContent = character.days_active;
-  document.getElementById('tc-events').textContent = character.level_events_count;
+  var _nextLv = (character.level || 1) + 1;
+  var _xpCurrent = character.xp_for_current_level || 0;
+  var _xpNext = character.xp_for_next_level || 60;
+  var _xpRemaining = Math.max(0, _xpNext - _xpCurrent);
+  document.getElementById('tc-nextlevel').textContent = `Lv ${_nextLv} (${_xpCurrent}/${_xpNext} XP)`;
   document.getElementById('tc-nexttier').textContent = `Lv ${character.next_tier_level}`;
 
   // Tier path dots
