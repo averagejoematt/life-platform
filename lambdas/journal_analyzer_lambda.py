@@ -72,6 +72,7 @@ def _decimal_to_float(obj):
 
 
 def lambda_handler(event, context):
+  try:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     start_date = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
 
@@ -222,3 +223,6 @@ Journal entry:
         "statusCode": 200,
         "body": json.dumps(result),
     }
+  except Exception as e:
+    logger.error(f"Handler failed: {e}")
+    raise

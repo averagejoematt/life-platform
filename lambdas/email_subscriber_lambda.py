@@ -356,38 +356,42 @@ def handle_unsubscribe(email: str) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
-    method = event.get("requestContext", {}).get("http", {}).get("method", "GET").upper()
-    params = event.get("queryStringParameters") or {}
-    action = params.get("action", "").lower()
+    try:
+        method = event.get("requestContext", {}).get("http", {}).get("method", "GET").upper()
+        params = event.get("queryStringParameters") or {}
+        action = params.get("action", "").lower()
 
-    # CORS preflight
-    if method == "OPTIONS":
-        return {"statusCode": 204, "headers": _cors_headers(), "body": ""}
+        # CORS preflight
+        if method == "OPTIONS":
+            return {"statusCode": 204, "headers": _cors_headers(), "body": ""}
 
-    source_ip = (
-        event.get("requestContext", {}).get("http", {}).get("sourceIp", "")
-        or event.get("requestContext", {}).get("identity", {}).get("sourceIp", "")
-    )
+        source_ip = (
+            event.get("requestContext", {}).get("http", {}).get("sourceIp", "")
+            or event.get("requestContext", {}).get("identity", {}).get("sourceIp", "")
+        )
 
-    if action == "confirm":
-        token          = params.get("token", "")
-        email_hash_pfx = params.get("h", "")
-        return handle_confirm(token, email_hash_pfx)
+        if action == "confirm":
+            token          = params.get("token", "")
+            email_hash_pfx = params.get("h", "")
+            return handle_confirm(token, email_hash_pfx)
 
-    if action == "unsubscribe":
-        email = params.get("email", "")
-        if not email:
-            return _redirect(f"{SITE_URL}/subscribe/confirm/?error=missing_email")
-        return handle_unsubscribe(email)
+        if action == "unsubscribe":
+            email = params.get("email", "")
+            if not email:
+                return _redirect(f"{SITE_URL}/subscribe/confirm/?error=missing_email")
+            return handle_unsubscribe(email)
 
-    # Default: subscribe (POST body)
-    if method == "POST":
-        try:
-            body  = json.loads(event.get("body") or "{}")
-            email = body.get("email", "").strip()
-        except Exception:
-            return _json_response(400, {"error": "Invalid request body."})
-        referrer = (event.get("headers") or {}).get("referer", "")
-        return handle_subscribe(email, source_ip=source_ip, referrer=referrer)
+        # Default: subscribe (POST body)
+        if method == "POST":
+            try:
+                body  = json.loads(event.get("body") or "{}")
+                email = body.get("email", "").strip()
+            except Exception:
+                return _json_response(400, {"error": "Invalid request body."})
+            referrer = (event.get("headers") or {}).get("referer", "")
+            return handle_subscribe(email, source_ip=source_ip, referrer=referrer)
 
-    return _json_response(405, {"error": "Method not allowed."})
+        return _json_response(405, {"error": "Method not allowed."})
+    except Exception as e:
+        logger.error(f"Handler failed: {e}")
+        raise
