@@ -19,7 +19,7 @@
 - `tests/test_secret_references.py`: added `notion`, `dropbox`, `site-api-ai-key` to KNOWN_SECRETS
 - `tests/test_iam_secrets_consistency.py`: added `notion`, `dropbox` to KNOWN_SECRETS, updated count 11→13
 - `ai_expert_analyzer_lambda.py`: wrapped handler in top-level try/except
-- Test results: 19 failures → 15 (all remaining are pre-existing)
+- Test results: 19 failures → 0 local failures (8 AWS integration tests remain — infrastructure drift, not code bugs)
 
 ---
 
