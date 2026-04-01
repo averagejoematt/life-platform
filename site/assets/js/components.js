@@ -175,6 +175,14 @@
       }
       html += '</div>';
     });
+    // Internal links
+    html += '<div class="nav-overlay__section">';
+    html += '<div class="nav-overlay__heading">Internal</div>';
+    html += '<a href="/status/" class="nav-overlay__link">System Status</a>';
+    html += '<a href="/accountability/" class="nav-overlay__link">Buddy Dashboard</a>';
+    html += '<a href="https://discord.gg/T4Ndt2WsU" class="nav-overlay__link" target="_blank" rel="noopener">Join the community</a>';
+    html += '<a href="/ledger/" class="nav-overlay__link">Snake Fund</a>';
+    html += '</div>';
     html += '</div></div>';
 
     return html;
