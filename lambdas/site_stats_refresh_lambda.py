@@ -139,7 +139,6 @@ def lambda_handler(event, context):
         "recovery_status":     rec_status if recovery else ev.get("recovery_status"),
         "sleep_hours":         round(sleep, 1) if sleep   else ev.get("sleep_hours"),
         "sleep_hours_30d_avg": ev.get("sleep_hours_30d_avg"),
-        "water_ml":            round(water_ml, 0) if water_ml else ev.get("water_ml"),
     }
 
     # ── 5. Update tier0_streak from habitify if available ────────────────────
@@ -149,6 +148,10 @@ def lambda_handler(event, context):
 
     # ── 5b. Water from apple_health ───────────────────────────────────────────
     water_ml = _safe_float(apple_health, "water_intake_ml")
+    if water_ml:
+        fresh_vitals["water_ml"] = round(water_ml, 0)
+    else:
+        fresh_vitals["water_ml"] = ev.get("water_ml")
 
     # ── 5c. Character level ────────────────────────────────────────────────
     char_level = _safe_float(character, "character_level") if character else None
