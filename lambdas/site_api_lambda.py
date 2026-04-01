@@ -2062,7 +2062,7 @@ def handle_habits() -> dict:
     Cache: 3600s (1 hr).
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    ninety_days_ago = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
+    ninety_days_ago = max((datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
 
     pk = f"{USER_PREFIX}habit_scores"
     resp = table.query(
@@ -3034,6 +3034,11 @@ def handle_sleep_detail() -> dict:
             "bed_temp_f":    round(float(r["bed_temp_f"]), 1) if r.get("bed_temp_f") else None,
             "hours":         round(float(w["sleep_duration_hours"]), 1) if w.get("sleep_duration_hours") else None,
             "whoop_quality": round(float(w["sleep_quality_score"]), 0) if w.get("sleep_quality_score") else None,
+            "deep_sleep_hours":  round(float(w["slow_wave_sleep_hours"]), 2) if w.get("slow_wave_sleep_hours") else None,
+            "rem_sleep_hours":   round(float(w["rem_sleep_hours"]), 2) if w.get("rem_sleep_hours") else None,
+            "recovery_score":    round(float(w["recovery_score"]), 0) if w.get("recovery_score") else None,
+            "hrv":               round(float(w["hrv"]), 1) if w.get("hrv") else None,
+            "rhr":               round(float(w["resting_heart_rate"]), 0) if w.get("resting_heart_rate") else None,
         })
 
     score_today = float(latest.get("sleep_score", 0))
@@ -3047,6 +3052,11 @@ def handle_sleep_detail() -> dict:
             "total_sleep_hours": round(float(latest.get("sleep_duration_hours", 0)), 1) if latest.get("sleep_duration_hours") else None,
             "whoop_quality":     round(float(whoop_latest.get("sleep_quality_score", 0)), 0) if whoop_latest.get("sleep_quality_score") else None,
             "whoop_hours":       round(float(whoop_latest.get("sleep_duration_hours", 0)), 1) if whoop_latest.get("sleep_duration_hours") else None,
+            "deep_sleep_hours":  round(float(whoop_latest.get("slow_wave_sleep_hours", 0)), 2) if whoop_latest.get("slow_wave_sleep_hours") else None,
+            "rem_sleep_hours":   round(float(whoop_latest.get("rem_sleep_hours", 0)), 2) if whoop_latest.get("rem_sleep_hours") else None,
+            "recovery_score":    round(float(whoop_latest.get("recovery_score", 0)), 0) if whoop_latest.get("recovery_score") else None,
+            "hrv":               round(float(whoop_latest.get("hrv", 0)), 1) if whoop_latest.get("hrv") else None,
+            "rhr":               round(float(whoop_latest.get("resting_heart_rate", 0)), 0) if whoop_latest.get("resting_heart_rate") else None,
             "score_status":      score_status,
             "optimal_temp_f":    optimal_temp,
             "30d_avg_score":     avg(score_vals),
