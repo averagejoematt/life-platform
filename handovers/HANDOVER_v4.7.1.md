@@ -63,7 +63,7 @@ These are now the canonical true answers for each page. Do not overwrite with AI
 - **DISC-7 annotation testing/seeding** — behavioral response annotations on timeline cards
 - **observatory.css consolidation** — self-contained `<style>` blocks → shared `observatory.css`
 - **Sleep and Glucose visual overhaul** — apply editorial pattern from Nutrition/Training/Inner Life
-- **HP-12** — `daily_brief_lambda.py` must pass `elena_hero_line` to `write_public_stats()`
+- ~~**HP-12**~~ — DONE: `elena_hero_line` already wired end-to-end (daily_brief → site_writer → public_stats.json → frontend)
 - **HP-13** — share card Lambda + dynamic OG image
 - **BL-01** — For Builders page
 - **BL-02** — Bloodwork/Labs page
