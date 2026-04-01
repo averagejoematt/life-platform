@@ -1,3 +1,38 @@
+## v4.8.1 — 2026-04-01: Day 1 Pipeline Fixes
+
+Critical fixes discovered during Day 1 go-live. Most issues traced to timing/sequencing assumptions that break on the first day of the experiment.
+
+### Data Pipeline Fixes
+- **Withings weight bug**: Lambda only processed most recent measurement group — BPM reading (heart_pulse) was newer than scale (weight), so weight was silently discarded. Fixed to iterate ALL groups.
+- **HAE blood pressure**: app sends combined `blood_pressure` metric with nested systolic/diastolic. Lambda only recognized separate metrics. Added v1.4.1 combined format handler.
+- **HAE weight accepted**: `body_mass` removed from SKIP_METRICS — weight now flows through HAE as Withings API fallback.
+- **HAE API key**: was missing from `ingestion-keys` secret. Added.
+- **HAE IAM**: added `s3:GetObject` + `s3:ListBucket` for CGM/BP deduplication reads.
+- **Withings IAM**: added `secretsmanager:PutSecretValue` for OAuth token persistence.
+- **Ingestion lookback**: all 5 API Lambdas now check today (`range(0, N)`) not just yesterday (`range(1, N)`).
+
+### Display/Data Fixes
+- **Day counter**: `days_in` showed 0 on Day 1. Fixed to `max(1, days + 1)` across 4 files.
+- **EXPERIMENT_QUERY_START clamp**: added to 5 more endpoints that leaked pre-experiment data (habits, journal count, mind overview, vice streaks, strength).
+- **`_experiment_date()` helper**: centralized clamp function replacing 16 inline `max()` calls.
+- **Sleep API**: added deep_sleep_hours, rem_sleep_hours, recovery_score, hrv, rhr to response.
+- **Character page**: reset stale DEFAULTS (was Level 2/38 XP from pre-launch), fixed "Next Tier Lv 21" → "Next Level: Lv 2 (0/60 XP)" + "Tier Unlocks: Lv 21".
+- **Stale fallbacks**: character_stats.json, site_config.json overwritten with Day 1 values.
+
+### New Features
+- **BP section on physical page**: systolic/diastolic card with status (normal/elevated/high), reference ranges, trend chart.
+- **Weight fallback**: `/api/vitals` and stats-refresh check apple_health for weight if Withings is stale.
+- **Stats-refresh expanded**: now updates water, character level, weight from HAE (was vitals-only).
+- **Status page pipeline detection**: API-based sources flag yellow when data stops for 2+ days (auth failure detection vs "awaiting activity").
+- **4 experiments activated**: Breathwork Before Sleep, Daily 8000+ Steps, 16:8 Fasting, No Alcohol.
+- **1 challenge activated**: No DoorDash for 30 Days.
+
+### Infrastructure
+- Shared Lambda layer: v18 → v19
+- API Gateway access logging enabled on HAE webhook
+
+---
+
 ## v4.8.0 — 2026-04-01: AI Insight Engine Overhaul — 4 phases
 
 Major overhaul of the AI coaching pipeline. Closes gaps where rich data was written to DynamoDB but never read by AI prompts. Adds memory to prevent repetition and compounds learning over time.
