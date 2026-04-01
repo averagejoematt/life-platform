@@ -1695,7 +1695,7 @@ def handle_vice_streaks() -> dict:
     Cache: 3600s (1 hr).
     """
     today           = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    ninety_days_ago = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
+    ninety_days_ago = max((datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
 
     content_filter = _load_content_filter()
     blocked_set    = set(v.lower().strip() for v in content_filter.get("blocked_vices", []))
@@ -4894,7 +4894,7 @@ def handle_weekly_physical_summary() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d7 = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    d7 = max((datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
 
     strava_items = _query_source("strava", d7, today)
     garmin_items = _query_source("garmin", d7, today)
@@ -5174,7 +5174,7 @@ def handle_journal_analysis() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d90 = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
+    d90 = max((datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
 
     ja_pk = f"{USER_PREFIX}journal_analysis"
     resp = table.query(
@@ -5237,7 +5237,7 @@ def handle_mind_overview() -> dict:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
     d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
-    d90 = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
+    d90 = max((datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
 
     # ── 1. Mind pillar from character_sheet ──
     mind_pillar = None
@@ -5698,7 +5698,7 @@ def handle_strength_deep_dive() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d90 = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
+    d90 = max((datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
     d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
 
     items = _query_source("hevy", d90, today)
