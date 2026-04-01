@@ -720,7 +720,7 @@ def find_missing_dates(lookback_days=LOOKBACK_DAYS):
     from boto3.dynamodb.conditions import Key
     today = datetime.now(timezone.utc).date()
     expected_dates = set()
-    for i in range(1, lookback_days + 1):
+    for i in range(0, lookback_days + 1):  # includes today
         expected_dates.add((today - timedelta(days=i)).strftime("%Y-%m-%d"))
 
     pk = f"USER#{USER_ID}#SOURCE#garmin"

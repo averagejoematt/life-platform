@@ -89,6 +89,8 @@ def lambda_handler(event, context):
     whoop    = _get_latest(table, "whoop")
     withings = _get_latest(table, "withings")
     habitify = _get_latest(table, "habitify")
+    apple_health = _get_latest(table, "apple_health")
+    character = _get_latest(table, "character_sheet")
 
     # ── 3. Read existing public_stats.json to preserve non-vitals sections ───
     try:
@@ -109,7 +111,13 @@ def lambda_handler(event, context):
     weight   = _safe_float(withings, "weight_lbs")
 
     weight_as_of = withings.get("sk", "").replace("DATE#", "") or None
-    if not weight:                         # scale not stepped on — keep last known
+    # v1.4.2: Check apple_health for more recent weight (HAE fallback)
+    ah_weight = _safe_float(apple_health, "weight_lbs")
+    ah_date = apple_health.get("sk", "").replace("DATE#", "") if apple_health else None
+    if ah_weight and (not weight or (ah_date and weight_as_of and ah_date > weight_as_of)):
+        weight = ah_weight
+        weight_as_of = ah_date
+    if not weight:
         weight       = ev.get("weight_lbs")
         weight_as_of = ev.get("weight_as_of")
 
@@ -131,6 +139,7 @@ def lambda_handler(event, context):
         "recovery_status":     rec_status if recovery else ev.get("recovery_status"),
         "sleep_hours":         round(sleep, 1) if sleep   else ev.get("sleep_hours"),
         "sleep_hours_30d_avg": ev.get("sleep_hours_30d_avg"),
+        "water_ml":            round(water_ml, 0) if water_ml else ev.get("water_ml"),
     }
 
     # ── 5. Update tier0_streak from habitify if available ────────────────────
@@ -138,9 +147,26 @@ def lambda_handler(event, context):
     fresh_streak = _safe_float(habitify, "tier0_streak")
     fresh_streak = int(fresh_streak) if fresh_streak is not None else ep.get("tier0_streak")
 
+    # ── 5b. Water from apple_health ───────────────────────────────────────────
+    water_ml = _safe_float(apple_health, "water_intake_ml")
+
+    # ── 5c. Character level ────────────────────────────────────────────────
+    char_level = _safe_float(character, "character_level") if character else None
+    char_tier = character.get("character_tier") if character else None
+
     # ── 6. Merge — preserve everything except vitals + streak + _meta ────────
+    # Update character in payload
+    existing_char = existing.get("character") or {}
+    if char_level is not None:
+        existing_char = {
+            "level": int(char_level),
+            "tier": char_tier or existing_char.get("tier"),
+            "tier_emoji": character.get("character_tier_emoji") or existing_char.get("tier_emoji"),
+        }
+
     payload = {
         **existing,
+        "character": existing_char or None,
         "_meta": {
             **existing.get("_meta", {}),
             "generated_at":  existing.get("_meta", {}).get("generated_at"),  # keep morning time

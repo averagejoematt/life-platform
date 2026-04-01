@@ -277,6 +277,8 @@ _METRIC_DEFS = [
     ({"Dietary Caffeine", "dietary_caffeine", "Caffeine", "caffeine"}, {"field": "caffeine_mg",            "agg": "sum",   "tier": 1}),
     # Mindful minutes (meditation/breathwork apps → Apple Health)
     ({"Mindful Minutes", "mindful_minutes", "Apple Mindfulness", "apple_mindfulness"},  {"field": "mindful_minutes",           "agg": "sum",         "tier": 1}),
+    # Body weight (Withings scale → Apple Health — v1.4.2 fallback for Withings API delays)
+    ({"Body Mass", "body_mass"},                          {"field": "weight_lbs",                "agg": "avg",         "tier": 1}),
     # Blood pressure (BP cuff → Apple Health — v1.4.0)
     ({"Blood Pressure Systolic", "blood_pressure_systolic"},   {"field": "blood_pressure_systolic",   "agg": "avg",         "tier": 1}),
     ({"Blood Pressure Diastolic", "blood_pressure_diastolic"}, {"field": "blood_pressure_diastolic",  "agg": "avg",         "tier": 1}),
@@ -306,8 +308,9 @@ SKIP_METRICS = {
     "Blood Glucose", "blood_glucose",
     # Sleep — Eight Sleep is SOT
     "sleep_analysis", "Sleep Analysis",
-    # Body comp — Withings is SOT
-    "body_mass", "Body Mass", "body_fat_percentage", "Body Fat Percentage",
+    # Body comp — Withings is primary, but accept body_mass from HAE as fallback
+    # "body_mass", "Body Mass",  # v1.4.2: accept weight from HAE (Withings API has sync delays)
+    "body_fat_percentage", "Body Fat Percentage",
     # Nutrition — MacroFactor is SOT (these flow into HealthKit from MF app)
     "dietary_energy", "Dietary Energy",
     "protein", "Protein",
