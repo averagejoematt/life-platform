@@ -96,6 +96,9 @@ STATUS_CACHE_TTL = 60  # 1 minute — more dynamic status updates
 
 # ── Experiment start date — public Day 1 ───────────────────
 EXPERIMENT_START = "2026-04-01"
+# Data query start: 1 day before experiment for sleep/recovery data
+# (sleep keyed to wake date — night of Mar 31 = record on Mar 31)
+EXPERIMENT_QUERY_START = "2026-03-31"
 
 # ── Platform stats — single source of truth for all site pages ──
 # Update these when Lambdas/tools/sources change. Every page reads from here.
@@ -2905,7 +2908,7 @@ def handle_glucose() -> dict:
     Cache: 3600s (1h).
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
 
     records = _query_source("apple_health", d30, today)
     cgm_days = [
@@ -2973,7 +2976,7 @@ def handle_sleep_detail() -> dict:
     Cache: 3600s (1h).
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
 
     eight_days = _query_source("eightsleep", d30, today)
     whoop_days = _query_source("whoop", d30, today)
@@ -4362,8 +4365,8 @@ def handle_nutrition_overview() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
-    d7 = max((datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
+    d7 = max((datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
 
     items = _query_source("macrofactor", d30, today)
     if not items:
@@ -4563,8 +4566,8 @@ def handle_training_overview() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d90 = max((datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"), EXPERIMENT_START)
-    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    d90 = max((datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
+    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
 
     # Strava activities (90 days)
     strava_items = _query_source("strava", d90, today)
@@ -4636,7 +4639,7 @@ def handle_training_overview() -> dict:
         "hr_sum": 0, "hr_count": 0, "z2_min": 0,
     })
     # Also compute prior 30d for trend (days 31-60)
-    d60 = max((datetime.now(timezone.utc) - timedelta(days=60)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    d60 = max((datetime.now(timezone.utc) - timedelta(days=60)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
     prior_30d_acts = []
     for s in strava_items:
         d = s.get("date") or s.get("sk", "").replace("DATE#", "")
@@ -4934,7 +4937,7 @@ def handle_protein_sources() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
 
     items = _query_source("macrofactor", d30, today)
     if not items:
@@ -5639,7 +5642,7 @@ def handle_food_delivery_overview() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
 
     items = _query_source("food_delivery", d30, today)
     if not items:
