@@ -513,6 +513,33 @@ def extract_journal_signals(entries):
             val = entry.get("stress_level")
             if val is not None:
                 stress_scores.append(float(val))
+    # Phase 2A: Extract enrichment fields for deeper coaching
+    all_cognitive_patterns, all_defense_patterns = [], []
+    all_avoidance_flags, all_growth_signals = [], []
+    social_quality_readings, ownership_readings = [], []
+    stress_sources = []
+    for entry in entries:
+        for cp in (entry.get("enriched_cognitive_patterns") or []):
+            all_cognitive_patterns.append(cp)
+        for dp in (entry.get("enriched_defense_patterns") or []):
+            all_defense_patterns.append(dp)
+        primary_defense = entry.get("enriched_primary_defense")
+        if primary_defense and primary_defense not in all_defense_patterns:
+            all_defense_patterns.insert(0, primary_defense)
+        for af in (entry.get("enriched_avoidance_flags") or []):
+            all_avoidance_flags.append(af)
+        for gs in (entry.get("enriched_growth_signals") or []):
+            all_growth_signals.append(gs)
+        sq = entry.get("enriched_social_quality")
+        if sq:
+            social_quality_readings.append(sq)
+        ow = entry.get("enriched_ownership")
+        if ow is not None:
+            ownership_readings.append(float(ow))
+        ss = entry.get("stress_source")
+        if ss:
+            stress_sources.append(ss)
+
     return {
         "mood_avg": round(sum(mood_scores)/len(mood_scores), 1) if mood_scores else None,
         "energy_avg": round(sum(energy_scores)/len(energy_scores), 1) if energy_scores else None,
@@ -521,6 +548,14 @@ def extract_journal_signals(entries):
         "emotions": list(dict.fromkeys(all_emotions))[:5],
         "notable_quote": notable_quote,
         "templates": templates_found,
+        # Phase 2A enrichment
+        "cognitive_patterns": list(dict.fromkeys(all_cognitive_patterns))[:3],
+        "defense_patterns": list(dict.fromkeys(all_defense_patterns))[:3],
+        "avoidance_flags": list(dict.fromkeys(all_avoidance_flags))[:3],
+        "growth_signals": list(dict.fromkeys(all_growth_signals))[:3],
+        "social_quality": social_quality_readings[-1] if social_quality_readings else None,
+        "ownership_avg": round(sum(ownership_readings)/len(ownership_readings), 1) if ownership_readings else None,
+        "stress_sources": list(dict.fromkeys(stress_sources))[:3],
     }
 
 
@@ -1562,6 +1597,41 @@ def lambda_handler(event, context):
             except Exception as e:
                 print("[WARN] store_habit_scores failed: " + str(e))
 
+    # Phase 4: Labs + genome personalization
+    _labs_ctx = ""
+    _genome_ctx = ""
+    try:
+        from labs_coaching import build_labs_coaching_context
+        _labs_ctx = build_labs_coaching_context(table, USER_PREFIX)
+        if _labs_ctx:
+            print(f"[INFO] Phase 4: Labs coaching context loaded ({len(_labs_ctx)} chars)")
+    except Exception as _lc_e:
+        print(f"[WARN] Phase 4: Labs coaching failed (non-fatal): {_lc_e}")
+    try:
+        from genome_coaching import build_genome_coaching_context
+        _genome_ctx = build_genome_coaching_context(table, USER_PREFIX)
+        if _genome_ctx:
+            print(f"[INFO] Phase 4: Genome coaching context loaded ({len(_genome_ctx)} chars)")
+    except Exception as _gc_e:
+        print(f"[WARN] Phase 4: Genome coaching failed (non-fatal): {_gc_e}")
+
+    # Phase 2: Inject additional data sources for richer AI prompts
+    data["character_sheet"] = character_sheet or {}
+    data["adaptive_mode"] = {"brief_mode": brief_mode, "engagement_score": engagement_score}
+    data["weather"] = data.get("weather_yesterday") or {}
+    data["supplements_recent"] = data.get("supplements_7d") or []
+    # State of Mind — fetch if available
+    try:
+        _som_data = fetch_date("state_of_mind", yesterday)
+        data["state_of_mind"] = _som_data or {}
+    except Exception:
+        data["state_of_mind"] = {}
+    # Journal signals (enrichment fields)
+    data["journal_signals"] = extract_journal_signals(data.get("journal_entries") or []) or {}
+    # Phase 4: Labs + genome context
+    data["labs_coaching_ctx"] = _labs_ctx
+    data["genome_coaching_ctx"] = _genome_ctx
+
     # AI calls (all optional — brief works without them)
     api_key = None
     try:
@@ -1604,6 +1674,23 @@ def lambda_handler(event, context):
             print("[INFO] TL;DR+Guidance: " + str(tldr_guidance.get("tldr", ""))[:80])
         except Exception as e:
             print("[WARN] TL;DR+Guidance failed: " + str(e))
+
+    # Phase 1B: Write guidance_given back to computed_insights for anti-repetition
+    try:
+        if tldr_guidance:
+            _guidance_items = tldr_guidance.get("guidance", [])
+            _tldr_text = tldr_guidance.get("tldr", "")
+            _guidance_given = [_tldr_text] + _guidance_items if _tldr_text else _guidance_items
+            if _guidance_given:
+                import json as _gg_json
+                table.update_item(
+                    Key={"pk": f"USER#{USER_ID}#SOURCE#computed_insights", "sk": f"DATE#{yesterday}"},
+                    UpdateExpression="SET guidance_given = :gg",
+                    ExpressionAttributeValues={":gg": _gg_json.dumps(_guidance_given)},
+                )
+                print(f"[INFO] Wrote {len(_guidance_given)} guidance items to computed_insights for anti-repetition")
+    except Exception as _gg_e:
+        print(f"[WARN] guidance_given write failed (non-fatal): {_gg_e}")
 
     # HP-12: Elena hero line for public_stats.json
     _elena_hero_line = None
