@@ -60,14 +60,14 @@ These are now the canonical true answers for each page. Do not overwrite with AI
 ## Next priorities (carry-forward)
 
 - **SIMP-1 Phase 2 + ADR-025 cleanup** — reduce MCP tools to ≤80 (~April 13)
-- **DISC-7 annotation testing/seeding** — behavioral response annotations on timeline cards
+- ~~**DISC-7 annotation testing/seeding**~~ — DONE v4.7.4: 4 Day 1 events seeded, MCP tools verified
 - **observatory.css consolidation** — self-contained `<style>` blocks → shared `observatory.css`
 - **Sleep and Glucose visual overhaul** — apply editorial pattern from Nutrition/Training/Inner Life
-- ~~**HP-12**~~ — DONE: `elena_hero_line` already wired end-to-end (daily_brief → site_writer → public_stats.json → frontend)
-- **HP-13** — share card Lambda + dynamic OG image
-- **BL-01** — For Builders page
-- **BL-02** — Bloodwork/Labs page
-- **get_nutrition MCP tool** — positional args bug carry-forward
+- ~~**HP-12**~~ — DONE: already wired end-to-end
+- ~~**HP-13**~~ — DONE v4.7.4: share button + twitter:image fix (OG Lambda already existed)
+- ~~**BL-01**~~ — DONE (built in prior session)
+- ~~**BL-02**~~ — DONE (built in prior session)
+- ~~**get_nutrition MCP tool**~~ — CLOSED v4.7.4: 8 tests pass, no bug reproducible
 
 ---
 
