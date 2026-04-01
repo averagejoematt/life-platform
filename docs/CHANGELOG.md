@@ -1,3 +1,16 @@
+## v4.7.5 — 2026-04-01: AWS integration test fixes (19→2 failures)
+
+- i1: DLQ consumer Lambda name mismatch fixed
+- i6: EventBridge rule names updated to CDK-generated names
+- i8: Removed `config/profile.json` expectation (profile lives in DynamoDB)
+- i9: Purged 21 stale DLQ messages
+- i12: Replaced deleted `get_data_freshness` tool probe with `get_weight_loss_progress`
+- i13: Case-insensitive source name matching in freshness check
+- AI expert analyzer switched from weekly to daily schedule ($0.80/month increase)
+- Remaining 2: layer version drift (v15→v17), MCP canary (local key unavailable)
+
+---
+
 ## v4.7.4 — 2026-04-01: Backlog cleanup — 6 items resolved
 
 ### HP-12: Elena Hero Line — CLOSED
