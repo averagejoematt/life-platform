@@ -1345,10 +1345,46 @@ def handle_status() -> dict:
             status, rel, comment = _comp_status(last, yh, rh, source_id=sid)
             uptime = _uptime_90d(sid, activity_dependent=activity_dep)
 
-            # Activity-dependent sources: if pipeline is healthy (no alarms) but data
-            # is stale, it's because the user hasn't done the activity — not a system issue.
+            # Activity-dependent sources: distinguish "user didn't log" vs "pipeline broke"
+            # If a source HAD regular data and suddenly stops, that's likely a pipeline issue
+            # (auth failure, webhook key mismatch) — not missing user activity.
             if activity_dep and status in ("red", "yellow") and sid not in alarming_sources:
+                # Check if this source had a consistent history that suddenly stopped
+                _was_regular = False
                 if last:
+                    try:
+                        _hist_resp = table.query(
+                            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{sid}") & Key("sk").begins_with("DATE#"),
+                            ScanIndexForward=False, Limit=14, ProjectionExpression="sk",
+                        )
+                        _hist_dates = [i["sk"].replace("DATE#", "")[:10] for i in _hist_resp.get("Items", [])]
+                        if len(_hist_dates) >= 7:
+                            # Had 7+ records in recent history — this source was flowing regularly
+                            # Check gap: if last record is 3+ days old but source had daily data, pipeline likely broke
+                            _last_dt = datetime.strptime(last[:10], "%Y-%m-%d")
+                            _gap_days = (now.date() - _last_dt.date()).days
+                            if _gap_days >= 3 and len(_hist_dates) >= 5:
+                                _was_regular = True
+                    except Exception:
+                        pass
+
+                # Also check: for API-based sources, if the Lambda ran today but wrote nothing,
+                # that's a pipeline issue (auth failure, not missing activity)
+                if not _was_regular and group == "API-Based" and last:
+                    try:
+                        _last_dt = datetime.strptime(last[:10], "%Y-%m-%d")
+                        _gap_days = (now.date() - _last_dt.date()).days
+                        # API sources should write daily — a 2+ day gap means the Lambda
+                        # ran but couldn't fetch data (auth expired, API down, etc.)
+                        if _gap_days >= 2:
+                            _was_regular = True
+                    except Exception:
+                        pass
+
+                if _was_regular:
+                    status = "yellow"
+                    comment = f"Pipeline may need attention \u2014 was flowing regularly but stopped {rel}. Check auth/webhook."
+                elif last:
                     status = "green"
                     comment = f"Pipeline ready \u2014 awaiting user activity. Last data: {rel}"
                 else:
