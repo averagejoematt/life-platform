@@ -3949,9 +3949,10 @@ def handle_pulse() -> dict:
     except Exception as e:
         if "NoSuchKey" in str(e):
             logger.warning("[pulse] pulse.json not found — not yet generated")
+            _pulse_day = max(1, (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1) if datetime.now(timezone.utc).strftime("%Y-%m-%d") >= EXPERIMENT_START else 0
             return _ok({
                 "pulse": {
-                    "day_number": 0,
+                    "day_number": _pulse_day,
                     "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                     "status": "quiet",
                     "status_color": "#3a5a48",
