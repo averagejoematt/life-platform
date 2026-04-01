@@ -143,7 +143,7 @@
 - Orphaned `site_api_ai_lambda.py` added to skip_deploy
 - 3 missing secrets added to test known-secrets lists
 - `ai_expert_analyzer_lambda.py` handler wrapped in try/except
-- Test failures: 19 → 15 (remaining are pre-existing)
+- Test failures: 19 → 0 local (8 AWS integration remain — infra drift, not code)
 
 ### Stale Stats Fix (v4.7.3)
 - HTML fallback values updated: 118→115 tools, 61→62 Lambdas across about/mission/platform/builders pages + meta tags
@@ -151,8 +151,7 @@
 ## Not Done (Blocked)
 - **Breathwork × HRV correlation** — 0 breathwork records in apple_health partition; no data to correlate
 - **IC-4/IC-5** (failure pattern + momentum warning) — data gate ~May 1
-- **4 handler try/except test failures** — pre-existing pattern in food_delivery, email_subscriber, journal_analyzer, field_notes
-- **2 role policy wildcard test failures** — pre-existing CDK policy issues
+- **8 AWS integration test failures** — infrastructure drift from manually-created Lambdas/EventBridge rules not yet CDK-managed
 
 ## Lambda Count
 62 total (was 59: +ai-expert-analyzer, +journal-analyzer, +field-notes-generate)
