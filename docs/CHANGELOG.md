@@ -1,3 +1,26 @@
+## v4.7.2 — 2026-04-01: Content review session — 15 editorial rewrites from Matthew
+
+Full content audit and rewrite pass across 13 pages. All placeholder/AI-generated editorial text replaced with Matthew's own voice. Changes applied verbatim from Claude Chat review session.
+
+### Pages Updated
+- **Character** — pull-quote rewritten (RPG metaphor → personal data philosophy)
+- **Habits** — hero subtitle rewritten (3 paragraphs on habit philosophy), removed duplicate streak description
+- **Challenges** — hero subtitle and source descriptions rewritten (sandbox framing, Brittany collaboration)
+- **Experiments** — hero subtitle refined, AI monitoring paragraph rewritten (informal experiments → scientific method)
+- **Intelligence** — subtitle simplified, hardcoded sample Daily Brief replaced with API placeholder
+- **Benchmarks** — fabricated VO2 max reflection replaced with deliberate trade-offs framing
+- **Supplements** — hero subtitle rewritten (honest about methodology history)
+- **Discoveries** — new paragraph inserted (intuition vs evidence)
+- **Protocols** — two placeholder paragraphs replaced with 3-paragraph honest assessment
+- **Methodology** — pull-quote rewritten ("My numbers won't tell you much about your body...")
+- **Cost** — opener rewritten (approachability framing)
+- **Mind** — hero subtitle simplified to one line
+- **Nutrition** — Elena Voss pull-quote replaced with Matthew attribution
+- **Sleep** — bed temperature pull-quote replaced with phone/doom-scrolling reflection
+- **Glucose** — health anxiety narrative replaced with CGM curiosity framing, pending-data pull-quote replaced
+
+---
+
 ## v4.7.1 — 2026-03-31: Editorial content pass — replace fabricated copy with real narrative
 
 Replaced AI-fabricated placeholder copy across 8 pages with real, honest narrative sourced directly from Matthew's answers. No code logic changes — content-only edits to hero subtitles, intro blocks, pull quotes, and the Inner Life confessional.
