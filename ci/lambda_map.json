@@ -180,7 +180,8 @@
       "lambdas/circadian_compliance_lambda.py",
       "lambdas/sleep_reconciler_lambda.py",
       "lambdas/email_subscriber_lambda.py",
-      "lambdas/podcast_scanner_lambda.py"
+      "lambdas/podcast_scanner_lambda.py",
+      "lambdas/site_api_ai_lambda.py"
     ]
   }
 }

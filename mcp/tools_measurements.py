@@ -3,7 +3,8 @@
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from mcp.core import query_source, get_table, get_user_id
+from mcp.core import query_source
+from mcp.config import table, USER_ID
 
 
 def _float(val):
@@ -16,10 +17,9 @@ def _float(val):
 def _get_sessions(start_date=None, end_date=None, latest_only=False):
     """Fetch measurement sessions from DynamoDB."""
     if latest_only:
-        table = get_table()
         import boto3.dynamodb.conditions as cond
         resp = table.query(
-            KeyConditionExpression=cond.Key("pk").eq(f"USER#{get_user_id()}#SOURCE#measurements"),
+            KeyConditionExpression=cond.Key("pk").eq(f"USER#{USER_ID}#SOURCE#measurements"),
             ScanIndexForward=False,
             Limit=1,
         )

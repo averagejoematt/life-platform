@@ -1,3 +1,28 @@
+## v4.7.3 — 2026-04-01: Launch readiness + MCP fix + test fixes
+
+### Launch Readiness (LAUNCH_READINESS_IMPL_SPEC.md)
+- Physical page: added `#obs-freshness` element + `initObsFreshness()` call (was the only observatory page missing it)
+- Homepage: Inner Life card elevated with `★ FEATURED` badge, violet-tinted background, hover callout
+- Homepage: "Made public because accountability needs an audience." added to `#amj-bio`
+- Email welcome: plain-text welcome email replacing HTML template — "You're in. Here's what you just signed up for."
+
+### MCP Lambda Fix (critical)
+- `mcp/tools_measurements.py`: fixed import — `get_table`/`get_user_id` (nonexistent in `mcp.core`) → `table`/`USER_ID` from `mcp.config`
+- MCP Lambda redeployed — resolves `slo-mcp-availability` alarm that had been firing continuously
+
+### Stale Platform Stats
+- Updated HTML fallback values 118→115 (tools) and 61→62 (Lambdas) in about, mission, platform, builders pages
+- Updated meta description tags in platform page
+
+### Test Fixes
+- `ci/lambda_map.json`: added `site_api_ai_lambda.py` to `skip_deploy` (orphaned file test)
+- `tests/test_secret_references.py`: added `notion`, `dropbox`, `site-api-ai-key` to KNOWN_SECRETS
+- `tests/test_iam_secrets_consistency.py`: added `notion`, `dropbox` to KNOWN_SECRETS, updated count 11→13
+- `ai_expert_analyzer_lambda.py`: wrapped handler in top-level try/except
+- Test results: 19 failures → 15 (all remaining are pre-existing)
+
+---
+
 ## v4.7.2 — 2026-04-01: Content review session — 15 editorial rewrites from Matthew
 
 Full content audit and rewrite pass across 13 pages. All placeholder/AI-generated editorial text replaced with Matthew's own voice. Changes applied verbatim from Claude Chat review session.
@@ -92,6 +117,71 @@ Board-led statistical review by Dr. Henning Brandt and 8 panelists identified 14
 
 ### Tests
 - Added `tests/test_character_engine.py` — 29 tests covering all findings
+
+---
+
+## v4.7.0 — 2026-03-31: Observatory V2 Remaining + Ledger/Field Notes + Status Page Fixes
+
+### Observatory V2 — Remaining Items
+- **Physical page DEXA + tape measurements**: `GET /api/physical_overview`, DEXA body composition section, tape measurement grid, WHR progress bar
+- **AI expert voice sections (4 pages)**: new `ai-expert-analyzer` Lambda (weekly Mon 6am PT), `GET /api/ai_analysis?expert=<key>`, `renderAIAnalysisCard()` in components.js, cards on Mind/Nutrition/Training/Physical
+- **Journal theme heatmap (Mind page)**: new `journal-analyzer` Lambda (nightly 2am PT), `GET /api/journal_analysis`, 30-day heatmap + top themes bar chart + sentiment trend line
+- **Vice streak timeline (Mind page)**: 30-day stacked bar chart (held vs broken), `vice_timeline` added to mind_overview API
+
+### BL-03: The Ledger — Phases 1–4
+- Phase 1: `GET /api/ledger` endpoint (totals, by_event, by_cause with S3 config metadata)
+- Phase 2: `site/ledger/index.html` — By Event / By Charity tab views, Snake Fund footer link
+- Phase 3: Stake indicators on challenge/experiment cards via client-side ledger fetch
+- Phase 4: Badge indicators on achievement cards
+
+### BL-04: Field Notes — Phases 1, 3, 4
+- Phase 1: new `field-notes-generate` Lambda (weekly Sun 10am PT), `GET /api/field_notes` with list + entry modes
+- Phase 3: `site/field-notes/index.html` — list view + two-panel notebook entry view, nav links added
+- Phase 4: Chronicle cross-reference in `wednesday_chronicle_lambda.py`
+
+### EventBridge Schedules
+- `life-platform-ai-expert-weekly` (Mon 14:00 UTC), `life-platform-journal-analyzer-nightly` (daily 10:00 UTC), `life-platform-field-notes-weekly` (Sun 18:00 UTC)
+
+### Placeholder Cleanup (pre-launch)
+- Explorer page: "Coming Soon" state replacing hardcoded findings narrative
+- Field Notes page: "Coming April 7" state replacing test records
+- Kitchen page: marketing copy stripped to clean "Coming Soon"
+- Chronicle posts week-02/03/04: fabricated Elena Voss narratives replaced with redirects
+- Chronicle sample email: fake data replaced with "Coming April 9" message
+- Physical page DEXA baseline: uses most recent scan before EXPERIMENT_START as baseline
+
+### Status Page Fixes
+- Eight Sleep / Whoop: 1-day lag accounted for (sleep data keyed by wake date shows "current" not "2d ago")
+- Activity-dependent sources: yellow/red → green when pipeline healthy but no user activity
+- Uptime bars: activity-dependent sources show gray (neutral) dots instead of red for missing days
+- Compute/email components: missing days shown as gray, not red (pre-launch expected)
+- Apple Health sub-source tracking: CGM, water, breathwork, stretching, mindful minutes, state of mind each tracked independently by field check
+- Todoist marked activity-dependent
+
+### Bug Fixes
+- Story page day counter: shows countdown pre-April 1 instead of "0"
+- PLATFORM_STATS corrected: mcp_tools 115, lambdas 62, site_pages 71, test_count 1075
+- Content audit file created: `docs/CONTENT_AUDIT.md`
+
+---
+
+## v4.6.0 — 2026-03-31: Observatory V2 Charts + Field Notes & Ledger Phase 0
+
+Data-first visual overhaul across 4 observatory pages. Introduces Chart.js via CDN. New Physical Observatory page. Field Notes and Ledger Phase 0 (MCP tools + DynamoDB partitions).
+
+### Charts
+- Physical Observatory (`site/physical/index.html`) — weight trajectory, 4 hero gauges, key metrics, dual-axis charts
+- Nutrition: 30-day calorie & macro stacked bar + donut chart
+- Training: daily exercise minutes by modality, step count, strength volume trend
+- Mind: state of mind sparkline + distribution donut, meditation calendar
+
+### API Extensions
+- `training_overview`: expanded daily_steps_trend to 30d, added `is_weekend`, added `daily_modality_minutes_30d`
+- `mind_overview`: added meditation field (breathwork data)
+
+### BL-03/BL-04 Phase 0
+- Field Notes: `get_field_notes`, `log_field_note_response` MCP tools + DynamoDB partition
+- Ledger: `log_ledger_entry` MCP tool + DynamoDB partition + `config/ledger.json` in S3
 
 ---
 

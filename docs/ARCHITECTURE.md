@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-03-31 (v4.7.0 — 115 MCP tools, 26-module MCP package, 26 data sources, 62 Lambdas, 71 site pages, 70+ API endpoints, 8 CDK stacks)
+Last updated: 2026-03-31 (v4.7.0 — 115 MCP tools, 26-module MCP package, 26 data sources, 62 Lambdas, 72 site pages, 70+ API endpoints, 8 CDK stacks)
 
 ---
 
@@ -46,7 +46,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 │  freshness-checker (9:45am) · insight-email-parser (S3 trig)│
 │                                                             │
 │  WEB LAYER                                                  │
-│  averagejoematt.com (68 pages) · CloudFront → S3 /site      │
+│  averagejoematt.com (71 pages) · CloudFront → S3 /site      │
 │  site-api Lambda (us-west-2): /api/ask · /api/board_ask     │
 │  /api/verify_subscriber · /api/vitals · /api/journey        │
 │  /api/character · /api/timeline · /api/correlations         │

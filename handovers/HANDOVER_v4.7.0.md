@@ -107,11 +107,58 @@
 - Injects AI tone, preview (300 chars), and Matthew's response (200 chars) into data packet
 - Elena can weave field notes themes into the weekly Chronicle narrative
 
+### Placeholder Cleanup (pre-launch)
+- Explorer page: hardcoded findings narrative → "Coming Soon" state
+- Field Notes page: test records deleted, → "Coming April 7" state
+- Kitchen page: 487 lines of AI marketing copy → clean "Coming Soon"
+- Chronicle posts week-02/03/04: fabricated Elena Voss narratives → redirects to /chronicle/
+- Chronicle sample email: fake Week 1 data → "Coming April 9" message
+- Physical page DEXA baseline: logic changed to use most recent pre-experiment scan as baseline
+
+### Status Page Fixes
+- Eight Sleep / Whoop: 1-day lag accounted for (`_LAGGED_SOURCES`), shows "current" not "2d ago"
+- Activity-dependent sources: yellow/red → green when pipeline healthy but no user activity
+- Uptime bars: activity-dependent sources show gray dots instead of red for missing days
+- Compute/email components: same gray-dot treatment for pre-launch gaps
+- Apple Health sub-source tracking: CGM (`blood_glucose_avg`), water (`water_intake_ml`), breathwork (`recovery_workout_minutes`), stretching (`flexibility_minutes`), mindful minutes, state of mind (`som_avg_valence`) — each tracked independently via `field_check` parameter
+- Todoist marked `activity_dependent: True`
+
+### Content Audit
+- Created `docs/CONTENT_AUDIT.md` — full audit of every page categorizing text as PLACEHOLDER, MATTHEW-VERIFY, REAL, or FABRICATED
+- v4.7.1: first editorial pass (8 pages rewritten from Matthew's answers)
+- v4.7.2: second editorial pass (15 changes across 13 pages from Claude Chat review session)
+
+### Launch Readiness (v4.7.3)
+- Physical page obs-freshness wired (was the only missing observatory page)
+- Homepage: Inner Life card `★ FEATURED` badge + violet tint + hover callout
+- Homepage: "Made public because accountability needs an audience." in `#amj-bio`
+- Email welcome rewritten: plain-text, Matthew's voice, three page links
+
+### MCP Lambda Fix (v4.7.3)
+- `mcp/tools_measurements.py` import error fixed: `get_table`/`get_user_id` → `table`/`USER_ID` from `mcp.config`
+- MCP Lambda redeployed — resolves `slo-mcp-availability` alarm
+- Root cause: `tools_measurements.py` referenced functions that never existed in `mcp.core`
+
+### Test Fixes (v4.7.3)
+- Orphaned `site_api_ai_lambda.py` added to skip_deploy
+- 3 missing secrets added to test known-secrets lists
+- `ai_expert_analyzer_lambda.py` handler wrapped in try/except
+- Test failures: 19 → 15 (remaining are pre-existing)
+
+### Stale Stats Fix (v4.7.3)
+- HTML fallback values updated: 118→115 tools, 61→62 Lambdas across about/mission/platform/builders pages + meta tags
+
 ## Not Done (Blocked)
 - **Breathwork × HRV correlation** — 0 breathwork records in apple_health partition; no data to correlate
+- **IC-4/IC-5** (failure pattern + momentum warning) — data gate ~May 1
+- **4 handler try/except test failures** — pre-existing pattern in food_delivery, email_subscriber, journal_analyzer, field_notes
+- **2 role policy wildcard test failures** — pre-existing CDK policy issues
 
 ## Lambda Count
 62 total (was 59: +ai-expert-analyzer, +journal-analyzer, +field-notes-generate)
 
 ## MCP Tool Count
 115 tools registered (unchanged from registry — no new MCP tools this session)
+
+## Platform Counts (v4.7.3)
+- 115 MCP tools · 62 Lambdas · 72 site pages · 1075 tests · 26 data sources · 8 CDK stacks

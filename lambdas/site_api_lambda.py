@@ -110,7 +110,7 @@ PLATFORM_STATS = {
     "review_count": 19,
     "review_grade": "A",
     "active_secrets": 10,
-    "site_pages": 71,
+    "site_pages": 72,
     "test_count": 1075,
     "board_technical": 12,
     "board_product": 8,
