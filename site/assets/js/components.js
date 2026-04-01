@@ -711,7 +711,8 @@ function renderAIAnalysisCard(containerId, expertKey, config) {
     mind:      { name: "Dr. Conti's Observations",       color: '#a78bfa' },
     nutrition: { name: "Dr. Webb's Analysis",            color: '#f59e0b' },
     training:  { name: "Coach's Notes — Dr. Sarah Chen", color: '#ef4444' },
-    physical:  { name: "Dr. Victor Reyes's Assessment",  color: '#60a5fa' }
+    physical:  { name: "Dr. Victor Reyes's Assessment",  color: '#60a5fa' },
+    explorer:  { name: "Dr. Brandt's Analysis",          color: '#f59e0b' }
   };
 
   var expert = EXPERTS[expertKey];
