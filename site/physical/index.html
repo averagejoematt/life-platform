@@ -757,7 +757,13 @@
   </div>
 </div>
 
-<div id="obs-freshness" style="display:none"></div>
+<div class="obs-freshness" id="obs-freshness" style="display:none">
+  <div>
+    <span class="obs-freshness__label">Last data: <span id="obs-fresh-time">&mdash;</span></span>
+    <span class="obs-freshness__sub">Updated daily</span>
+  </div>
+  <span class="obs-freshness__dot obs-freshness__dot--live" id="obs-fresh-dot"></span>
+</div>
 <div id="obs-thisweek" style="display:none"></div>
 
 <div id="p-loading" class="p-loading">LOADING PHYSICAL DATA&hellip;</div>
@@ -1402,6 +1408,11 @@
     loading.textContent = 'Could not load physical data.';
   }
 })();
+</script>
+<script>
+  fetch('/api/observatory_week?domain=physical').then(r=>r.json()).then(d=>{
+    if(d.last_updated) initObsFreshness(d.last_updated);
+  }).catch(function(){});
 </script>
 
 </body>

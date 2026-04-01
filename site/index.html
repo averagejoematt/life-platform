@@ -302,6 +302,9 @@
       transition: color var(--dur-fast);
     }
     .h-obs-card:hover .h-obs-card__link { color: var(--h-accent); }
+    .h-obs-card--featured { background: rgba(129, 140, 248, 0.04); }
+    .h-obs-card--featured:hover { background: rgba(129, 140, 248, 0.08); }
+    .h-obs-card--featured:hover .h-obs-card__callout { opacity: 1; }
 
     /* ── Chronicle entry card ───────────────────────────────── */
     .h-chronicle-card {
@@ -474,6 +477,7 @@
 <div id="amj-bio" style="max-width:var(--max-width);margin:0 auto;padding:var(--space-4) var(--page-padding);">
   <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--text-faint);">Matthew &middot; Seattle, WA</div>
   <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.7;margin-top:var(--space-1);">Started at 307 lbs. Built this entire platform with Claude as a development partner.</div>
+  <div style="font-size:var(--text-sm);color:var(--text-faint);line-height:1.7;margin-top:var(--space-1);font-style:italic;">Made public because accountability needs an audience.</div>
 </div>
 <div id="amj-since-last-visit"></div>
 <section id="amj-pulse-section" style="display:none"><div class="pulse-feed"><div class="pulse-feed__header">The Pulse</div><div class="pulse-feed__list" id="pulse-list"></div><div class="pulse-feed__fade"></div><div class="pulse-feed__load-more" id="pulse-load-more" style="display:none"><button onclick="loadMorePulse()">Load more</button></div></div></section>
@@ -569,10 +573,12 @@
     <div class="h-obs-card__link">Explore &rarr;</div>
   </a>
   <!-- Inner Life -->
-  <a href="/mind/" class="h-obs-card" style="border-left:3px solid var(--h-violet);">
+  <a href="/mind/" class="h-obs-card h-obs-card--featured" style="border-left:3px solid var(--h-violet);">
+    <div style="font-family:var(--font-mono);font-size:var(--text-3xs);letter-spacing:2px;text-transform:uppercase;color:var(--h-violet);margin-bottom:var(--space-1);opacity:0.8">&#9733; FEATURED</div>
     <div class="h-obs-card__name">INNER LIFE</div>
     <div class="h-obs-card__metric" id="h-obs-mind">&mdash;</div>
     <div class="h-obs-card__desc">Journaling, mood, mental health tracking. The data behind the data &mdash; what numbers can&rsquo;t capture alone.</div>
+    <div class="h-obs-card__callout" style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--h-violet);margin-top:var(--space-2);opacity:0.75;transition:opacity var(--dur-fast)">The only page like this on the internet.</div>
     <div class="h-obs-card__link">Explore &rarr;</div>
   </a>
 </div>
