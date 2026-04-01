@@ -299,22 +299,26 @@ def generate_and_cache(expert_key):
 
 
 def lambda_handler(event, context):
-    target = event.get("expert", "all")
-    experts_to_run = EXPERTS if target == "all" else [target]
-    results = {}
+    try:
+        target = event.get("expert", "all")
+        experts_to_run = EXPERTS if target == "all" else [target]
+        results = {}
 
-    for expert_key in experts_to_run:
-        if expert_key not in EXPERTS:
-            logger.warning(f"Unknown expert: {expert_key}")
-            continue
-        try:
-            text = generate_and_cache(expert_key)
-            results[expert_key] = {"status": "ok", "chars": len(text)}
-        except Exception as e:
-            logger.error(f"Failed to generate {expert_key}: {e}")
-            results[expert_key] = {"status": "error", "error": str(e)}
+        for expert_key in experts_to_run:
+            if expert_key not in EXPERTS:
+                logger.warning(f"Unknown expert: {expert_key}")
+                continue
+            try:
+                text = generate_and_cache(expert_key)
+                results[expert_key] = {"status": "ok", "chars": len(text)}
+            except Exception as e:
+                logger.error(f"Failed to generate {expert_key}: {e}")
+                results[expert_key] = {"status": "error", "error": str(e)}
 
-    return {
-        "statusCode": 200,
-        "body": json.dumps(results, default=str),
-    }
+        return {
+            "statusCode": 200,
+            "body": json.dumps(results, default=str),
+        }
+    except Exception as e:
+        logger.error(f"Handler failed: {e}")
+        raise

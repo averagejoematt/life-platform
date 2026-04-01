@@ -279,54 +279,30 @@ def handle_confirm(token: str, email_hash_prefix: str) -> dict:
 
 
 def _send_welcome_email(email: str) -> None:
-    """Ava directive: the first experience a subscriber has with your voice.
-    Warm, specific, on-brand. Not 'thanks for subscribing'."""
-    subject = "You're in. First signal arrives Wednesday."
-    html = f"""<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#0D1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-<div style="max-width:520px;margin:40px auto;padding:40px 32px;background:#161b22;border-radius:8px;border:1px solid rgba(230,237,243,0.08);">
+    """Welcome email — direct dispatch from Matthew. Sets honest expectations
+    and gives the subscriber one concrete thing to do right now."""
+    subject = "You're in. Here's what you just signed up for."
+    unsub_url = f"{SITE_URL}/api/subscribe?action=unsubscribe&email={urllib.parse.quote(email)}"
+    body_text = f"""Hey —
 
-  <p style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#F0B429;margin:0 0 24px;">The Weekly Signal</p>
+You just subscribed to The Measured Life. Every Wednesday, you'll get a dispatch from the experiment: what the data showed, what I tried, what surprised me, and what I'm thinking about next.
 
-  <h1 style="font-size:22px;font-weight:600;color:#E6EDF3;line-height:1.3;margin:0 0 16px;">
-    You're confirmed.
-  </h1>
+This is a real experiment with real data. Not a highlight reel. The weeks the numbers go the wrong direction are in there too.
 
-  <p style="font-size:15px;color:#8b949e;line-height:1.65;margin:0 0 20px;">
-    Every Wednesday you'll get one email &mdash; the actual data from the past week.
-    Whoop recovery. Weight trend. Habit performance. What worked, what didn't.
-    Written by an AI journalist with unfettered access to everything.
-  </p>
+Right now, the site is brand new and the data is just starting to accumulate. That's on purpose — I wanted you to be able to see the whole journey from the beginning, not just the polished version.
 
-  <p style="font-size:14px;color:#8b949e;line-height:1.65;margin:0 0 12px;border-left:3px solid #F0B429;padding-left:12px;">
-    Each Wednesday: the week's real data, what worked, what didn't, and one honest verdict from the Board of Directors.
-  </p>
+A few things worth looking at while you're here:
 
-  <p style="font-size:15px;color:#8b949e;line-height:1.65;margin:0 0 32px;">
-    No filters. No "good news only." The bad weeks are in there too.
-  </p>
+-> The Score (character sheet): {SITE_URL}/character/
+-> Inner Life Observatory: {SITE_URL}/mind/
+-> The Story (why I started): {SITE_URL}/story/
 
-  <a href="{SITE_URL}/story/"
-     style="display:inline-block;background:#F0B429;color:#0D1117;font-size:15px;font-weight:600;
-            padding:14px 28px;border-radius:8px;text-decoration:none;">
-    Read the story &rarr;
-  </a>
+See you Wednesday.
 
-  <p style="font-size:13px;color:#484f58;margin:16px 0 0;">
-    <a href="{SITE_URL}/chronicle/" style="color:#8b949e;text-decoration:none;">Browse the Chronicle archive &rarr;</a>
-  </p>
+— Matt
 
-  <p style="font-size:12px;color:#484f58;margin:28px 0 0;line-height:1.6;">
-    Changed your mind?
-    <a href="{SITE_URL}/api/subscribe?action=unsubscribe&email={urllib.parse.quote(email)}"
-       style="color:#484f58;">Unsubscribe here.</a>
-  </p>
-
-</div>
-</body>
-</html>"""
+averagejoematt.com
+Unsubscribe: {unsub_url}"""
 
     try:
         ses.send_email(
@@ -334,7 +310,7 @@ def _send_welcome_email(email: str) -> None:
             Destination={"ToAddresses": [email]},
             Content={"Simple": {
                 "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body":    {"Html": {"Data": html, "Charset": "UTF-8"}},
+                "Body":    {"Text": {"Data": body_text, "Charset": "UTF-8"}},
             }},
         )
         logger.info("welcome email sent")

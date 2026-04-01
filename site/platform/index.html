@@ -4,16 +4,16 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="The Platform — a single-person health intelligence system built entirely on AWS serverless. 61 Lambda functions, 118 AI tools, 26 data sources, ~$19/month.">
+  <meta name="description" content="The Platform — a single-person health intelligence system built entirely on AWS serverless. 62 Lambda functions, 115 AI tools, 26 data sources, ~$19/month.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="The Platform — Matthew">
-  <meta name="twitter:description" content="61 Lambda functions. 118 AI tools. 26 data sources. $19/month. A single-person health intelligence system on AWS serverless.">
+  <meta name="twitter:description" content="62 Lambda functions. 115 AI tools. 26 data sources. $19/month. A single-person health intelligence system on AWS serverless.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:title" content="The Platform — Matthew">
-  <meta property="og:description" content="61 Lambda functions. 118 AI tools. 26 data sources. $19/month. A single-person health intelligence system on AWS serverless.">
+  <meta property="og:description" content="62 Lambda functions. 115 AI tools. 26 data sources. $19/month. A single-person health intelligence system on AWS serverless.">
   <meta property="og:type" content="website">
   <title>The Platform — Matthew</title>
     <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
@@ -315,7 +315,7 @@
   <div class="page-header__meta">
     <div class="meta-stat">
       <div class="meta-stat__label">MCP tools</div>
-      <div class="meta-stat__value" id="plat-mcp-tools" data-const="platform.mcp_tools">118</div>
+      <div class="meta-stat__value" id="plat-mcp-tools" data-const="platform.mcp_tools">115</div>
     </div>
     <div class="meta-stat">
       <div class="meta-stat__label">Data sources</div>
@@ -323,7 +323,7 @@
     </div>
     <div class="meta-stat">
       <div class="meta-stat__label">AWS Lambdas</div>
-      <div class="meta-stat__value" id="plat-lambdas" data-const="platform.lambdas">61</div>
+      <div class="meta-stat__value" id="plat-lambdas" data-const="platform.lambdas">62</div>
     </div>
     <div class="meta-stat">
       <div class="meta-stat__label">Arch grade</div>
@@ -674,7 +674,7 @@
 <section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
   <div class="eyebrow">Tool spotlight</div>
   <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Tool of the week</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">One of <span data-const="platform.mcp_tools">118</span> MCP tools that Claude uses to query health data. Inputs, outputs, and a representative finding.</p>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">One of <span data-const="platform.mcp_tools">115</span> MCP tools that Claude uses to query health data. Inputs, outputs, and a representative finding.</p>
   <div style="border:1px solid var(--border);background:var(--surface);">
     <div style="padding:var(--space-4) var(--space-6);border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;">
       <span style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--accent)">get_sleep_environment_analysis</span>
@@ -699,14 +699,14 @@
   <div class="stack-grid">
     <div class="stack-card">
       <div class="stack-card__category">Infrastructure</div>
-      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">AWS Lambda + CDK</div><div class="stack-item__desc"><span data-const="platform.lambdas">61</span> functions across <span data-const="platform.cdk_stacks">8</span> CDK stacks. All IAM roles dedicated and least-privilege. EventBridge scheduling on fixed UTC crons (no DST drift).</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">AWS Lambda + CDK</div><div class="stack-item__desc"><span data-const="platform.lambdas">62</span> functions across <span data-const="platform.cdk_stacks">8</span> CDK stacks. All IAM roles dedicated and least-privilege. EventBridge scheduling on fixed UTC crons (no DST drift).</div></div></div>
       <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">DynamoDB + S3</div><div class="stack-item__desc">Single-table design. On-demand billing. PITR 35-day. KMS CMK encryption. Raw JSON archived to S3 at <code>raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json</code>.</div></div></div>
       <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">SES + SNS + SQS</div><div class="stack-item__desc">Email delivery via SES, alert routing through SNS, dead-letter queues for failed Lambda invocations.</div></div></div>
     </div>
     <div class="stack-card">
       <div class="stack-card__category">AI / Intelligence</div>
       <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Claude (Anthropic)</div><div class="stack-item__desc">Sonnet for coaching and analysis, Haiku for classification. ~$3/month API cost. MCP protocol for tool calls.</div></div></div>
-      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">MCP Server (custom)</div><div class="stack-item__desc"><span data-const="platform.mcp_tools">118</span>-tool Lambda backed by DynamoDB. OAuth 2.1 + HMAC auth. 35-module package. 26h TTL cache with nightly warmer across 13 high-cost tools.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">MCP Server (custom)</div><div class="stack-item__desc"><span data-const="platform.mcp_tools">115</span>-tool Lambda backed by DynamoDB. OAuth 2.1 + HMAC auth. 35-module package. 26h TTL cache with nightly warmer across 13 high-cost tools.</div></div></div>
       <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Hypothesis Engine</div><div class="stack-item__desc">Weekly Pearson correlation matrix (23 pairs, BH FDR correction) feeds Claude for biological hypothesis generation.</div></div></div>
     </div>
     <div class="stack-card">
@@ -768,7 +768,7 @@
 <section class="arch-section reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
   <div class="eyebrow">FinOps</div>
   <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">What it costs to run</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)"><span data-const="platform.lambdas">61</span> Lambda functions, DynamoDB on-demand, S3, CloudFront, SES, 7 AI-generated digests per week, and a public site with live data. All serverless — no EC2, no containers, no reserved capacity.</p>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)"><span data-const="platform.lambdas">62</span> Lambda functions, DynamoDB on-demand, S3, CloudFront, SES, 7 AI-generated digests per week, and a public site with live data. All serverless — no EC2, no containers, no reserved capacity.</p>
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">
     <div style="background:var(--surface);padding:var(--space-6);text-align:center;">
       <div style="font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-2)">Total monthly</div>
