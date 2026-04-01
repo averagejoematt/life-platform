@@ -100,6 +100,14 @@ EXPERIMENT_START = "2026-04-01"
 # (sleep keyed to wake date — night of Mar 31 = record on Mar 31)
 EXPERIMENT_QUERY_START = "2026-03-31"
 
+
+def _experiment_date(days_back=30):
+    """Compute a date N days ago, clamped to EXPERIMENT_QUERY_START.
+    Use this for ALL date range queries to prevent pre-experiment data leaking through."""
+    raw = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
+    return max(raw, EXPERIMENT_QUERY_START)
+
+
 # ── Platform stats — single source of truth for all site pages ──
 # Update these when Lambdas/tools/sources change. Every page reads from here.
 PLATFORM_STATS = {
@@ -337,8 +345,7 @@ def handle_vitals() -> dict:
         if second_avg < first_avg * 0.97: return "declining"
         return "stable"
 
-    # G-3: Latest weight from Withings — always use most-recent record regardless of date window.
-    # _latest_item queries with no date filter so it always returns something even if weeks old.
+    # G-3: Latest weight — check Withings first, fall back to Apple Health (HAE)
     withings_latest = _latest_item("withings")
     current_weight = None
     weight_as_of = None
@@ -348,6 +355,16 @@ def handle_vitals() -> dict:
             current_weight = float(wv)
             weight_as_of = (withings_latest.get("sk", "").replace("DATE#", "")
                             or withings_latest.get("date"))
+    # v1.4.2: Check apple_health for more recent weight (HAE fallback)
+    try:
+        ah_latest = _latest_item("apple_health")
+        if ah_latest and ah_latest.get("weight_lbs"):
+            ah_date = ah_latest.get("sk", "").replace("DATE#", "")[:10]
+            if not weight_as_of or ah_date > weight_as_of:
+                current_weight = float(ah_latest["weight_lbs"])
+                weight_as_of = ah_date
+    except Exception:
+        pass
 
     withings_30d = _query_source("withings", d30, today)
     weight_vals = [float(w["weight_lbs"]) for w in withings_30d if w.get("weight_lbs")]
@@ -1695,7 +1712,7 @@ def handle_vice_streaks() -> dict:
     Cache: 3600s (1 hr).
     """
     today           = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    ninety_days_ago = max((datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
+    ninety_days_ago = _experiment_date(90)
 
     content_filter = _load_content_filter()
     blocked_set    = set(v.lower().strip() for v in content_filter.get("blocked_vices", []))
@@ -2062,7 +2079,7 @@ def handle_habits() -> dict:
     Cache: 3600s (1 hr).
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    ninety_days_ago = max((datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
+    ninety_days_ago = _experiment_date(90)
 
     pk = f"{USER_PREFIX}habit_scores"
     resp = table.query(
@@ -2908,7 +2925,7 @@ def handle_glucose() -> dict:
     Cache: 3600s (1h).
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
+    d30 = _experiment_date(30)
 
     records = _query_source("apple_health", d30, today)
     cgm_days = [
@@ -2976,7 +2993,7 @@ def handle_sleep_detail() -> dict:
     Cache: 3600s (1h).
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
+    d30 = _experiment_date(30)
 
     eight_days = _query_source("eightsleep", d30, today)
     whoop_days = _query_source("whoop", d30, today)
@@ -4376,8 +4393,8 @@ def handle_nutrition_overview() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
-    d7 = max((datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
+    d30 = _experiment_date(30)
+    d7 = _experiment_date(7)
 
     items = _query_source("macrofactor", d30, today)
     if not items:
@@ -4577,8 +4594,8 @@ def handle_training_overview() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d90 = max((datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
-    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
+    d90 = _experiment_date(90)
+    d30 = _experiment_date(30)
 
     # Strava activities (90 days)
     strava_items = _query_source("strava", d90, today)
@@ -4650,7 +4667,7 @@ def handle_training_overview() -> dict:
         "hr_sum": 0, "hr_count": 0, "z2_min": 0,
     })
     # Also compute prior 30d for trend (days 31-60)
-    d60 = max((datetime.now(timezone.utc) - timedelta(days=60)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
+    d60 = _experiment_date(60)
     prior_30d_acts = []
     for s in strava_items:
         d = s.get("date") or s.get("sk", "").replace("DATE#", "")
@@ -4894,7 +4911,7 @@ def handle_weekly_physical_summary() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d7 = max((datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
+    d7 = _experiment_date(7)
 
     strava_items = _query_source("strava", d7, today)
     garmin_items = _query_source("garmin", d7, today)
@@ -4948,7 +4965,7 @@ def handle_protein_sources() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
+    d30 = _experiment_date(30)
 
     items = _query_source("macrofactor", d30, today)
     if not items:
@@ -5145,6 +5162,51 @@ def handle_physical_overview() -> dict:
             },
         }
 
+    # ── 3. Blood pressure (from apple_health) ──
+    bp_data = None
+    try:
+        ah_pk = f"{USER_PREFIX}apple_health"
+        ah_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(ah_pk) & Key("sk").begins_with("DATE#"),
+            FilterExpression="attribute_exists(bp_systolic) OR attribute_exists(blood_pressure_systolic)",
+            ScanIndexForward=False,
+            Limit=30,
+            ProjectionExpression="sk, bp_systolic, bp_diastolic, blood_pressure_systolic, blood_pressure_diastolic, blood_pressure_readings_count",
+        )
+        bp_items = _decimal_to_float(ah_resp.get("Items", []))
+        if bp_items:
+            latest_bp = bp_items[0]
+            sys_val = latest_bp.get("bp_systolic") or latest_bp.get("blood_pressure_systolic")
+            dia_val = latest_bp.get("bp_diastolic") or latest_bp.get("blood_pressure_diastolic")
+            bp_date = latest_bp.get("sk", "").replace("DATE#", "")
+            # Status classification
+            bp_status = "normal"
+            if sys_val and float(sys_val) >= 140 or (dia_val and float(dia_val) >= 90):
+                bp_status = "high"
+            elif sys_val and float(sys_val) >= 130 or (dia_val and float(dia_val) >= 80):
+                bp_status = "elevated"
+            # Build trend
+            bp_trend = []
+            for bpi in bp_items:
+                s = bpi.get("bp_systolic") or bpi.get("blood_pressure_systolic")
+                d = bpi.get("bp_diastolic") or bpi.get("blood_pressure_diastolic")
+                if s:
+                    bp_trend.append({
+                        "date": bpi.get("sk", "").replace("DATE#", ""),
+                        "systolic": float(s),
+                        "diastolic": float(d) if d else None,
+                    })
+            bp_data = {
+                "systolic": float(sys_val) if sys_val else None,
+                "diastolic": float(dia_val) if dia_val else None,
+                "date": bp_date,
+                "status": bp_status,
+                "readings_count": len(bp_items),
+                "trend": bp_trend[:14],
+            }
+    except Exception as _bp_e:
+        logger.warning(f"BP query failed (non-fatal): {_bp_e}")
+
     return _ok({
         "latest_dexa": _dexa_summary(latest_dexa),
         "baseline_dexa": _dexa_summary(baseline_dexa),
@@ -5153,6 +5215,7 @@ def handle_physical_overview() -> dict:
         "next_dexa_recommended": next_dexa_recommended,
         "tape_measurements": tape,
         "tape_session_count": tape_session_count,
+        "blood_pressure": bp_data,
     }, cache_seconds=3600)
 
 
@@ -5174,7 +5237,7 @@ def handle_journal_analysis() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d90 = max((datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
+    d90 = _experiment_date(90)
 
     ja_pk = f"{USER_PREFIX}journal_analysis"
     resp = table.query(
@@ -5237,7 +5300,7 @@ def handle_mind_overview() -> dict:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
     d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
-    d90 = max((datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
+    d90 = _experiment_date(90)
 
     # ── 1. Mind pillar from character_sheet ──
     mind_pillar = None
@@ -5653,7 +5716,7 @@ def handle_food_delivery_overview() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
+    d30 = _experiment_date(30)
 
     items = _query_source("food_delivery", d30, today)
     if not items:
@@ -5698,7 +5761,7 @@ def handle_strength_deep_dive() -> dict:
     Cache: 3600s.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d90 = max((datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"), EXPERIMENT_QUERY_START)
+    d90 = _experiment_date(90)
     d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
 
     items = _query_source("hevy", d90, today)
