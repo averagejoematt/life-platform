@@ -1602,7 +1602,9 @@ def build_ai_context_block(momentum_signal, this_week_avg, prev_week_avg, trend_
                             decision_fatigue_block="",
                             acwr_signal=None,
                             deficit_ceiling_block="",
-                            deficit_ceiling_tier=None):
+                            deficit_ceiling_tier=None,
+                            prior_guidance="",
+                            corr_ctx=""):
     """Assemble the compact text block injected into all Daily Brief AI prompts.
 
     Delegates to _build_prioritized_context_block() with priority-ranked signals.
@@ -1612,6 +1614,10 @@ def build_ai_context_block(momentum_signal, this_week_avg, prev_week_avg, trend_
     # Priority 1 = always included regardless of budget
     # Higher number = lower priority, first to be dropped if budget exceeded
     signals = []
+
+    # P0: Anti-repetition — prior guidance topics to avoid
+    if prior_guidance:
+        signals.append({"priority": 1, "content": prior_guidance, "token_estimate": 60})
 
     # P1: IC-5 Early Warning (always surfaces)
     if early_warning_block:
@@ -1729,6 +1735,10 @@ def build_ai_context_block(momentum_signal, this_week_avg, prev_week_avg, trend_
     # P10: Platform memory (coaching calibration)
     if memory_ctx:
         signals.append({"priority": 10, "content": memory_ctx, "token_estimate": 40})
+
+    # P10b: Phase 3B — Personal correlations from weekly compute
+    if corr_ctx:
+        signals.append({"priority": 10, "content": corr_ctx, "token_estimate": 40})
 
     # P11: Murthy — social quality flag when multiple drift signals + sparse journal
     if social_flag:
@@ -1924,6 +1934,92 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.warning("S2-T1-9 deficit ceiling failed (non-fatal): %s", e)
 
+    # ── 5j. Read prior 3 days' guidance to prevent repetition ──
+    prior_guidance = ""
+    try:
+        from boto3.dynamodb.conditions import Key as _PGKey
+        _pg_pk = USER_PREFIX + "computed_insights"
+        _pg_d3 = (datetime.strptime(yesterday_str, "%Y-%m-%d") - timedelta(days=3)).strftime("%Y-%m-%d")
+        _pg_resp = table.query(
+            KeyConditionExpression=_PGKey("pk").eq(_pg_pk) & _PGKey("sk").between(
+                f"DATE#{_pg_d3}", f"DATE#{yesterday_str}"
+            ),
+            ProjectionExpression="guidance_given",
+            ScanIndexForward=False,
+            Limit=3,
+        )
+        _pg_items = _pg_resp.get("Items", [])
+        _all_prior = []
+        for _pgi in _pg_items:
+            _gg = _pgi.get("guidance_given")
+            if _gg:
+                if isinstance(_gg, str):
+                    try:
+                        _gg = json.loads(_gg)
+                    except Exception:
+                        _gg = [_gg]
+                if isinstance(_gg, list):
+                    _all_prior.extend(_gg)
+        if _all_prior:
+            prior_guidance = "AVOID REPEATING (guidance given in last 3 days): " + "; ".join(_all_prior[:8])
+            logger.info(f"Prior guidance loaded: {len(_all_prior)} items")
+    except Exception as _pg_e:
+        logger.warning(f"Prior guidance read failed (non-fatal): {_pg_e}")
+
+    # ── 5k. Phase 3A: what_worked memory — record winning conditions on high-grade days ──
+    try:
+        if this_week_avg and float(this_week_avg) >= 85:
+            _ww_conditions = {
+                "date": yesterday_str,
+                "grade_avg": float(this_week_avg),
+                "declining": declining[:3],
+                "improving": improving[:3],
+                "strongest_habits": strongest[:3],
+                "weakest_habits": weakest[:3],
+            }
+            _ww_pk = USER_PREFIX + "platform_memory"
+            _ww_sk = f"MEMORY#what_worked#{yesterday_str}"
+            table.put_item(Item={
+                "pk": _ww_pk,
+                "sk": _ww_sk,
+                "category": "what_worked",
+                "conditions": json.dumps(_ww_conditions, default=str),
+                "recorded_at": datetime.now(timezone.utc).isoformat(),
+            })
+            logger.info(f"Phase 3A: Recorded what_worked for {yesterday_str} (grade avg={this_week_avg})")
+    except Exception as _ww_e:
+        logger.warning(f"Phase 3A: what_worked write failed (non-fatal): {_ww_e}")
+
+    # ── 5l. Phase 3B: Inject weekly correlations into context ──
+    _corr_ctx = ""
+    try:
+        from boto3.dynamodb.conditions import Key as _CKey
+        _corr_pk = USER_PREFIX + "weekly_correlations"
+        _corr_resp = table.query(
+            KeyConditionExpression=_CKey("pk").eq(_corr_pk),
+            ScanIndexForward=False,
+            Limit=1,
+        )
+        _corr_items = _corr_resp.get("Items", [])
+        if _corr_items:
+            _corr_rec = _corr_items[0]
+            _pairs = _corr_rec.get("pairs") or _corr_rec.get("significant_pairs") or []
+            if isinstance(_pairs, str):
+                _pairs = json.loads(_pairs)
+            # Extract top 3 significant pairs by |r|
+            _sig_pairs = sorted(_pairs, key=lambda p: abs(float(p.get("r", p.get("pearson_r", 0)))), reverse=True)[:3]
+            if _sig_pairs:
+                _pair_strs = []
+                for _sp in _sig_pairs:
+                    _a = _sp.get("label_a") or _sp.get("metric_a", "?")
+                    _b = _sp.get("label_b") or _sp.get("metric_b", "?")
+                    _r = float(_sp.get("r", _sp.get("pearson_r", 0)))
+                    _pair_strs.append(f"{_a} \u2194 {_b} (r={_r:.2f})")
+                _corr_ctx = "PERSONAL CORRELATIONS (90d): " + "; ".join(_pair_strs)
+                logger.info(f"Phase 3B: Injecting {len(_sig_pairs)} correlation pairs")
+    except Exception as _corr_e:
+        logger.warning(f"Phase 3B: correlation injection failed (non-fatal): {_corr_e}")
+
     # ── 6. Assemble AI context block ──
     ai_block = build_ai_context_block(
         momentum_signal, this_week_avg, prev_week_avg, trend_pct,
@@ -1935,7 +2031,9 @@ def lambda_handler(event, context):
         decision_fatigue_block=decision_fatigue_block,
         acwr_signal=acwr_signal,
         deficit_ceiling_block=deficit_ceiling_block,
-        deficit_ceiling_tier=deficit_ceiling_tier)
+        deficit_ceiling_tier=deficit_ceiling_tier,
+        prior_guidance=prior_guidance,
+        corr_ctx=_corr_ctx)
     logger.info(f"AI context block: {len(ai_block)} chars")
 
     # ── 7. Store ──

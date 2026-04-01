@@ -1,3 +1,36 @@
+## v4.8.0 — 2026-04-01: AI Insight Engine Overhaul — 4 phases
+
+Major overhaul of the AI coaching pipeline. Closes gaps where rich data was written to DynamoDB but never read by AI prompts. Adds memory to prevent repetition and compounds learning over time.
+
+### Phase 1: Anti-Repetition
+- `daily_insight_compute_lambda.py`: reads prior 3 days' `guidance_given` from computed_insights, injects "AVOID REPEATING" list into ai_context_block
+- `daily_brief_lambda.py`: writes `guidance_given` back to computed_insights after TL;DR generation
+- `ai_expert_analyzer_lambda.py`: reads prior analysis for same expert before generating — prompts AI to "find a different angle"
+
+### Phase 2: Wire 6 Unused Data Sources
+- **Journal enrichment** (16 fields → coaching): defense patterns, cognitive patterns, growth signals, avoidance flags, social quality, locus of control, stress sources now injected into journal coach prompt
+- **Character sheet → tone**: conscientiousness, resilience, growth mindset scores adapt coaching tone
+- **Adaptive mode → email tone**: flourishing/struggling classification changes guidance verbosity and framing
+- **State of Mind → emotional context**: low mood valence triggers nervous-system-reset priority over performance
+- **Supplements → nutrition coach**: active supplement list injected so AI accounts for nutrient adequacy
+- **Weather → training prescription**: daylight, barometric pressure, temperature inform training intensity
+
+### Phase 3: Build Memory
+- **what_worked**: when weekly grade avg ≥ 85, conditions are recorded to `platform_memory#what_worked` for future reference
+- **Weekly correlations**: top 3 significant Pearson r pairs (from 23 computed weekly) injected into coaching context
+- Coaching history deduplication infrastructure (guidance_given field tracks what was advised)
+
+### Phase 4: Labs + Genome Personalization
+- **New module** `lambdas/labs_coaching.py`: reads latest lab biomarkers, applies coaching rules (ferritin, vitamin D, hs-CRP, HbA1c, fasting insulin, ApoB, testosterone, TSH)
+- **New module** `lambdas/genome_coaching.py`: reads genome SNPs, maps to coaching deltas (CYP1A2/caffeine, MTHFR/methylation, FTO/satiety, BDNF/exercise timing, FADS/omega-3, VKORC1/vitamin K, MTNR1B/melatonin), rotates which insights surface each week
+- Both injected into daily brief TL;DR prompt as additional context
+
+### Infrastructure
+- Shared Lambda layer rebuilt: v15 → v18
+- daily-brief and daily-insight-compute updated to layer v18
+
+---
+
 ## v4.7.6 — 2026-04-01: Self-updating site audit — remove stale dates, add auto-content
 
 ### Stale Date Removal
