@@ -36,7 +36,7 @@ CACHE_PK = f"{USER_PREFIX}ai_analysis"
 AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
 AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
 
-EXPERTS = ["mind", "nutrition", "training", "physical"]
+EXPERTS = ["mind", "nutrition", "training", "physical", "explorer"]
 
 dynamodb = boto3.resource("dynamodb", region_name="us-west-2")
 table = dynamodb.Table(TABLE_NAME)
@@ -190,6 +190,37 @@ def gather_data_for_expert(expert_key):
                 data["waist_height_ratio"] = float(whr)
         return data
 
+    elif expert_key == "explorer":
+        # Cross-domain correlations + high-level experiment status
+        # Query weekly correlations if they exist
+        corr_items = _query_source("weekly_correlations", d30, today)
+        sig_pairs = []
+        for c in corr_items:
+            pairs = c.get("pairs") or c.get("significant_pairs") or []
+            if isinstance(pairs, list):
+                sig_pairs.extend(pairs)
+        # Active experiments
+        exp_pk = f"{USER_PREFIX}experiments"
+        try:
+            exp_resp = table.query(
+                KeyConditionExpression=Key("pk").eq(exp_pk),
+                ScanIndexForward=False,
+                Limit=10,
+            )
+            experiments = _decimal_to_float(exp_resp.get("Items", []))
+            active_exps = [e for e in experiments if e.get("status") == "active"]
+        except Exception:
+            active_exps = []
+
+        return {
+            "expert_key": "explorer",
+            "period": "last 30 days",
+            "significant_correlations": len(sig_pairs),
+            "top_pairs": sig_pairs[:5] if sig_pairs else [],
+            "active_experiments": len(active_exps),
+            "experiment_names": [e.get("name", "") for e in active_exps[:3]],
+        }
+
     return {"expert_key": expert_key, "note": "Unknown expert"}
 
 
@@ -217,6 +248,12 @@ EXPERT_PERSONAS = {
         "title": "Longevity physician specializing in body composition",
         "style": "clinically precise, optimistic but realistic, frames everything through longevity and health-span lens",
         "focus": "body composition trajectory, visceral fat reduction, lean mass preservation, metabolic markers",
+    },
+    "explorer": {
+        "name": "Dr. Henning Brandt",
+        "title": "Biostatistician and N=1 research methodologist",
+        "style": "rigorous but accessible, excited by unexpected findings, careful about causal claims",
+        "focus": "cross-domain correlations, surprising signal in the data, what pairs of metrics tell a story that single metrics cannot",
     },
 }
 

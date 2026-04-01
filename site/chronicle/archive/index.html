@@ -213,125 +213,12 @@
   </p>
 </header>
 
-<div class="archive-list">
-
+<div class="archive-list" id="archive-list">
   <div class="archive-meta">
-    <span><span class="archive-meta__count">5</span>&nbsp;installments published</span>
-    <span>Est. Feb 2026</span>
+    <span><span class="archive-meta__count" id="archive-count">&mdash;</span>&nbsp;installments published</span>
     <span>By Elena Voss</span>
   </div>
-
-  <!-- ── Phase divider: Week 1+ ──────────────────────────── -->
-  <div class="archive-coming">
-    <div class="archive-coming__date">Apr 1, 2026</div>
-    <div>
-      <div class="archive-coming__tag">The Measured Life &middot; Week 1</div>
-      <div class="archive-coming__title">Day 1. The experiment begins for real.</div>
-      <div class="archive-coming__note">New episodes every Wednesday starting Apr 9</div>
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════ -->
-  <!-- PREQUEL: The Testing Window (Feb 22 – Mar 31, 2026)   -->
-  <!-- ══════════════════════════════════════════════════════ -->
-
-  <div style="
-    font-family:var(--font-mono);
-    font-size:var(--text-2xs);
-    letter-spacing:var(--ls-tag);
-    text-transform:uppercase;
-    color:var(--text-faint);
-    padding:var(--space-8) 0 var(--space-3);
-    border-bottom:1px solid var(--border);
-    display:flex;
-    align-items:center;
-    gap:var(--space-4);
-  ">
-    <span style="color:var(--accent-dim);">Prequel</span>
-    <span>&mdash;</span>
-    <span>The Testing Window &middot; Feb &ndash; Mar 2026</span>
-  </div>
-
-  <!-- ── Prequel: Week -1 (The Interview) ────────────────── -->
-  <a href="/journal/posts/week-minus-1/" class="archive-post reveal">
-    <div class="archive-post__date">Mar 25, 2026</div>
-    <div>
-      <div class="archive-post__week">Prequel &middot; Week &minus;1</div>
-      <div class="archive-post__title">&ldquo;The Interview&rdquo;</div>
-      <div class="archive-post__desc">
-        Six days before Day 1. Elena Voss sits down with Matthew for the first time &mdash;
-        no data cards, no board verdicts. Just a conversation about what went wrong,
-        what he learned, and what April 1 actually means.
-      </div>
-    </div>
-  </a>
-
-  <!-- ── Prequel: Week -2 (The Silence in the Data) ──────── -->
-  <a href="/journal/posts/week-04/" class="archive-post reveal">
-    <div class="archive-post__date">Mar 17, 2026</div>
-    <div>
-      <div class="archive-post__week">Prequel &middot; Week &minus;2</div>
-      <div class="archive-post__title">&ldquo;The Silence in the Data&rdquo;</div>
-      <div class="archive-post__desc">
-        A week that arrived and departed without leaving much of a mark. No journal entries.
-        No nutrition logs. The body recovered beautifully. Matthew wasn&rsquo;t there to meet it.
-      </div>
-    </div>
-  </a>
-
-  <!-- ── Prequel: Week -3 (The DoorDash Chronicle) ───────── -->
-  <a href="/journal/posts/week-03/" class="archive-post reveal">
-    <div class="archive-post__date">Mar 11, 2026</div>
-    <div>
-      <div class="archive-post__week">Prequel &middot; Week &minus;3</div>
-      <div class="archive-post__title">&ldquo;The DoorDash Chronicle&rdquo;</div>
-      <div class="archive-post__desc">
-        Nineteen data sources. One missing signal. When Matthew got sick, his body spoke
-        in a dialect the platform couldn&rsquo;t read &mdash; and he kept going anyway.
-      </div>
-    </div>
-  </a>
-
-  <!-- ── Prequel: Week -4 (The Empty Journal) ────────────── -->
-  <a href="/journal/posts/week-02/" class="archive-post reveal">
-    <div class="archive-post__date">Mar 3, 2026</div>
-    <div>
-      <div class="archive-post__week">Prequel &middot; Week &minus;4</div>
-      <div class="archive-post__title">&ldquo;The Empty Journal&rdquo;</div>
-      <div class="archive-post__desc">
-        Twenty-seven automated programs tracking every metric imaginable. Not a single
-        journal entry written since day one. The infrastructure is immaculate. The page is blank.
-      </div>
-    </div>
-  </a>
-
-  <!-- ── Prequel: Week -5 (First Contact) ────────────────── -->
-  <a href="/journal/posts/week-01/" class="archive-post reveal">
-    <div class="archive-post__date">Feb 28, 2026</div>
-    <div>
-      <div class="archive-post__week">Prequel &middot; Week &minus;5</div>
-      <div class="archive-post__title">&ldquo;First Contact&rdquo;</div>
-      <div class="archive-post__desc">
-        The experiment begins. Sensors syncing, platform live, protocol locked.
-        What happens in the first week when the system meets real life.
-      </div>
-    </div>
-  </a>
-
-  <!-- ── Prequel: Prologue (Before the Numbers) ──────────── -->
-  <a href="/journal/posts/week-00/" class="archive-post reveal">
-    <div class="archive-post__date">Feb 22, 2026</div>
-    <div>
-      <div class="archive-post__week">Prequel &middot; Prologue</div>
-      <div class="archive-post__title">&ldquo;Before the Numbers&rdquo;</div>
-      <div class="archive-post__desc">
-        Nineteen data sources. Over a hundred daily metrics. A system of extraordinary
-        sophistication built to answer one question every morning: how did you do yesterday,
-        and what should you do today? Elena Voss arrives in Seattle to find out if it&rsquo;s working.
-      </div>
-    </div>
-  </a>
-
+  <div style="text-align:center;padding:var(--space-10);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">Loading archive&hellip;</div>
 </div>
 
 <!-- Email CTA -->
@@ -345,5 +232,40 @@
 <script src="/assets/js/countdown.js"></script>
 <script src="/assets/js/components.js"></script>
 <script src="/assets/js/nav.js"></script>
+<script>
+(function() {
+  fetch('/chronicle/posts.json')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (!data || !data.posts) return;
+      var posts = data.posts.filter(function(p) { return !p.coming_soon; });
+      var list = document.getElementById('archive-list');
+      document.getElementById('archive-count').textContent = posts.length;
+
+      var html = '<div class="archive-meta"><span><span class="archive-meta__count">' + posts.length + '</span>&nbsp;installments published</span><span>By Elena Voss</span></div>';
+
+      posts.forEach(function(p) {
+        var weekLabel = p.week >= 1 ? 'Week ' + p.week : (p.phase === 'prequel' ? 'Prequel' : 'Week ' + p.week);
+        html += '<a href="' + p.url + '" class="archive-post reveal">' +
+          '<div class="archive-post__date">' + p.date + '</div>' +
+          '<div>' +
+            '<div class="archive-post__week">' + weekLabel + '</div>' +
+            '<div class="archive-post__title">&ldquo;' + p.title + '&rdquo;</div>' +
+            '<div class="archive-post__desc">' + (p.excerpt || '') + '</div>' +
+          '</div></a>';
+      });
+
+      if (posts.length === 0) {
+        html += '<div style="text-align:center;padding:var(--space-10);font-family:var(--font-serif);font-size:15px;color:var(--text-faint)">The first chronicle installment will publish after the first full week of the experiment.</div>';
+      }
+
+      list.innerHTML = html;
+    })
+    .catch(function() {
+      document.getElementById('archive-list').innerHTML =
+        '<div style="text-align:center;padding:var(--space-10);font-family:var(--font-serif);font-size:15px;color:var(--text-faint)">Could not load archive.</div>';
+    });
+})();
+</script>
 </body>
 </html>

@@ -491,15 +491,21 @@
   </div>
 </section>
 
-<!-- 14d: Narrative anchor — auto-updates once findings accumulate -->
+<!-- 14d: AI commentary — auto-updates daily from ai-expert-analyzer -->
 <section class="narrative-anchor animate-in" id="narrative-anchor" style="display:none">
   <div class="narrative-anchor__inner">
-    <div class="narrative-anchor__kicker">From Matthew</div>
-    <div class="narrative-anchor__text" id="narrative-anchor-text">
-      Commentary will appear here as findings emerge from the data. The experiment begins April 1 &mdash; the first correlations will compute after enough matched data points accumulate.
-    </div>
+    <div class="narrative-anchor__kicker">Dr. Brandt's Analysis</div>
+    <div class="narrative-anchor__text" id="narrative-anchor-text"></div>
   </div>
 </section>
+<script>
+  fetch('/api/ai_analysis?expert=explorer').then(function(r){return r.json();}).then(function(d){
+    if(d.analysis){
+      document.getElementById('narrative-anchor').style.display='';
+      document.getElementById('narrative-anchor-text').innerHTML=d.analysis.split('\n\n').map(function(p){return '<p style="margin-top:12px">'+p+'</p>';}).join('');
+    }
+  }).catch(function(){});
+</script>
 
 
 <!-- 14k: Subtitle under title reflecting new framing -->
@@ -976,7 +982,7 @@
         '<div style="grid-column:1/-1;text-align:center;padding:var(--space-10) 0">' +
         '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:0.15em;color:var(--accent);text-transform:uppercase;margin-bottom:var(--space-4)">Coming Soon</div>' +
         '<div style="font-family:var(--font-serif);font-size:18px;color:var(--text-muted);line-height:1.7;max-width:480px;margin:0 auto">' +
-        'Cross-domain findings will appear here as data accumulates from <strong style="color:var(--text)">April 1, 2026</strong>. ' +
+        'Cross-domain findings will appear here as data accumulates. ' +
         'Correlations require a minimum of 14 matched data points &mdash; expect the first cards within 2&ndash;3 weeks.</div></div>';
       document.getElementById('predictive-grid').innerHTML =
         '<div style="grid-column:1/-1;text-align:center;padding:var(--space-8) 0;font-family:var(--font-serif);font-size:15px;color:var(--text-faint)">' +
@@ -985,7 +991,7 @@
       if (corrGrid) corrGrid.innerHTML =
         '<div style="grid-column:1/-1;text-align:center;padding:var(--space-20) 0">' +
         '<div style="font-family:var(--font-display);font-size:36px;color:var(--text-muted)">No correlation data yet</div>' +
-        '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);margin-top:var(--space-4)">The experiment begins April 1. First correlations compute after ~14 days of data.</div></div>';
+        '<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);margin-top:var(--space-4)">First correlations compute after ~14 days of data.</div></div>';
     });
 })();
 </script>

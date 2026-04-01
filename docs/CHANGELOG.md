@@ -1,3 +1,27 @@
+## v4.7.6 — 2026-04-01: Self-updating site audit — remove stale dates, add auto-content
+
+### Stale Date Removal
+- `privacy/index.html`: "March 2026" → "April 2026"
+- `builders/index.html`: "Five weeks later" → "Today it runs" (no time reference)
+- `cost/index.html`: "since February 2026" → "since launch"
+- `board/product/index.html`: "March 2026" → "Reviews quarterly"
+- `field-notes/index.html`: "April 7, 2026" → "after the first full week"
+- `explorer/index.html`: removed all "April 1, 2026" references
+- `chronicle/sample/index.html`: "April 1/9, 2026" → relative language
+- `first-person/index.html`: removed April 1 reference
+
+### Chronicle Archive Auto-Render
+- `chronicle/archive/index.html`: rewrote from hardcoded HTML to dynamic fetch from `/chronicle/posts.json`
+- New posts auto-appear every Wednesday when Elena publishes — zero manual maintenance
+
+### Explorer AI Commentary
+- Added `explorer` expert to `ai-expert-analyzer` Lambda (Dr. Henning Brandt, biostatistician)
+- Renders on `/explorer/` page when analysis exists — cross-domain correlation commentary
+- Updated `site_api_lambda.py` to accept `explorer` query param
+- Added to `components.js` renderAIAnalysisCard EXPERTS config
+
+---
+
 ## v4.7.5 — 2026-04-01: AWS integration test fixes (19→2 failures)
 
 - i1: DLQ consumer Lambda name mismatch fixed
