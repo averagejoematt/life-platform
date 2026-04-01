@@ -341,105 +341,20 @@
   <div class="k-hero__badge">Coming Soon</div>
   <h1 class="k-hero__title">The <em>Kitchen</em></h1>
   <p class="k-hero__sub">
-    Personalized meal recommendations built from continuous glucose monitoring, macro targets,
-    and your actual eating patterns. Not generic advice &mdash; your data, your meals, your body.
+    Personalized meal intelligence built from CGM data, macro tracking, and real eating patterns.
+    This page will go live once enough meal + glucose data has accumulated to generate meaningful recommendations.
   </p>
 </div>
 
-<!-- ════════════════════════════════════════════════════════════
-     CONCEPT — what makes The Kitchen different
-     ════════════════════════════════════════════════════════════ -->
-<section class="k-concept reveal">
-  <div class="k-concept__header">The Concept</div>
-  <div class="k-concept-grid">
-    <div class="k-concept-card">
-      <div class="k-concept-card__icon">&#x1F4C9;</div>
-      <div class="k-concept-card__title">CGM-scored meals</div>
-      <div class="k-concept-card__text">
-        Every meal you eat gets a glucose response grade from your Dexcom Stelo data.
-        The Kitchen learns which foods are <em>your body&rsquo;s A+ foods</em> &mdash; not population averages.
-      </div>
-    </div>
-    <div class="k-concept-card">
-      <div class="k-concept-card__icon">&#x1F3AF;</div>
-      <div class="k-concept-card__title">Macro-optimized</div>
-      <div class="k-concept-card__text">
-        Recommendations prioritize <em>protein density</em> and leucine thresholds.
-        Every suggestion hits your macro targets, not just calorie counts.
-      </div>
-    </div>
-    <div class="k-concept-card">
-      <div class="k-concept-card__icon">&#x1F504;</div>
-      <div class="k-concept-card__title">Built from your patterns</div>
-      <div class="k-concept-card__text">
-        The Kitchen doesn&rsquo;t suggest foods you&rsquo;ll never eat. It works with <em>meals you already love</em>,
-        optimizing timing, portions, and combinations.
-      </div>
-    </div>
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-16) var(--page-padding);text-align:center">
+  <div style="font-family:var(--font-serif);font-size:18px;color:var(--text-muted);line-height:1.7;max-width:520px;margin:0 auto">
+    The Kitchen needs real data to work. Once daily nutrition logging and CGM readings accumulate
+    over the first few weeks of the experiment, this page will surface meal-level glucose responses,
+    protein-efficient favorites, and pattern-based suggestions.
   </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     HOW IT WORKS
-     ════════════════════════════════════════════════════════════ -->
-<section class="k-how reveal">
-  <div class="k-how__header">How It Works</div>
-  <div class="k-how-steps">
-    <div class="k-how-step">
-      <div class="k-how-step__num">01</div>
-      <div class="k-how-step__text"><strong>Ingest your food log</strong> &mdash; MacroFactor data is pulled nightly. Every meal, every macro, every timestamp.</div>
-    </div>
-    <div class="k-how-step">
-      <div class="k-how-step__num">02</div>
-      <div class="k-how-step__text"><strong>Score against CGM</strong> &mdash; Each meal is matched to your Dexcom Stelo glucose response. Post-meal spike, AUC, and recovery time.</div>
-    </div>
-    <div class="k-how-step">
-      <div class="k-how-step__num">03</div>
-      <div class="k-how-step__text"><strong>Rank by protein efficiency</strong> &mdash; Protein-per-calorie ratio identifies meals that maximize muscle protein synthesis per unit of energy.</div>
-    </div>
-    <div class="k-how-step">
-      <div class="k-how-step__num">04</div>
-      <div class="k-how-step__text"><strong>Generate daily plans</strong> &mdash; Context-aware meal suggestions based on your training schedule, remaining macros, and time of day.</div>
-    </div>
-    <div class="k-how-step">
-      <div class="k-how-step__num">05</div>
-      <div class="k-how-step__text"><strong>Adapt continuously</strong> &mdash; As your TDEE shifts and food responses change, The Kitchen evolves with you.</div>
-    </div>
+  <div style="margin-top:var(--space-8)">
+    <a href="/nutrition/" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--k-amber);text-decoration:none;letter-spacing:var(--ls-tag)">&larr; Back to Nutrition Observatory</a>
   </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     PULLQUOTE
-     ════════════════════════════════════════════════════════════ -->
-<div class="k-pullquote reveal">
-  <div class="k-pullquote__text">
-    Most meal plans are built from population averages.
-    <em>The Kitchen</em> is built from your bloodstream.
-  </div>
-</div>
-
-<!-- ════════════════════════════════════════════════════════════
-     SUBSCRIBE — capture interest
-     ════════════════════════════════════════════════════════════ -->
-<section class="k-subscribe reveal">
-  <h2 class="k-subscribe__title">Get notified when The Kitchen launches</h2>
-  <p class="k-subscribe__sub">
-    Enter your email to be first in line. No spam, just one notification when
-    personalized meal recommendations go live.
-  </p>
-  <form class="k-subscribe__form" id="k-form" onsubmit="return false;">
-    <input type="email" class="k-subscribe__input" id="k-email" placeholder="you@example.com" required>
-    <button type="submit" class="k-subscribe__btn" id="k-btn">Notify Me</button>
-  </form>
-  <div class="k-subscribe__note">Your email is never shared. Unsubscribe anytime.</div>
-  <div class="k-subscribe__success" id="k-success">You&rsquo;re on the list. We&rsquo;ll be in touch.</div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     BACK LINK
-     ════════════════════════════════════════════════════════════ -->
-<div class="k-back">
-  <a href="/nutrition/">&larr; Back to Nutrition Observatory</a>
 </div>
 
 <div id="amj-bottom-nav"></div>
