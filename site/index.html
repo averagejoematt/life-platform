@@ -708,10 +708,15 @@
     var wLbs = v.weight_lbs || hero.current_weight_lbs || j.current_weight_lbs;
     var charLevel = 1;
 
-    var statsLine = 'Day ' + daysIn;
-    if (wLbs) statsLine += ' \u00b7 ' + wLbs.toFixed(1) + ' lbs';
     var statsEl = document.getElementById('h-hero-stats');
-    if (statsEl) statsEl.textContent = statsLine;
+    if (daysIn < 0) {
+      var daysUntil = Math.abs(daysIn);
+      if (statsEl) statsEl.textContent = daysUntil + ' day' + (daysUntil === 1 ? '' : 's') + ' until launch';
+    } else {
+      var statsLine = 'Day ' + Math.max(1, daysIn);
+      if (wLbs) statsLine += ' \u00b7 ' + wLbs.toFixed(1) + ' lbs';
+      if (statsEl) statsEl.textContent = statsLine;
+    }
 
     // ── Gauge rings ──
     // Weight: progress % toward goal (307 -> 185)
@@ -824,7 +829,7 @@
       setArc('h-g-char-arc', Math.min(100, (charLevel / 20) * 100));
       var psTier = psChar.tier || 'Foundation';
       setText('h-obs-mind', 'Level ' + charLevel + ' \u00b7 ' + (psChar.tier_emoji || '') + ' ' + psTier);
-      if (statsEl) statsEl.textContent = 'Day ' + daysIn + (wLbs ? ' \u00b7 ' + wLbs.toFixed(1) + ' lbs' : '') + ' \u00b7 Level ' + charLevel;
+      if (statsEl && daysIn >= 0) statsEl.textContent = 'Day ' + Math.max(1, daysIn) + (wLbs ? ' \u00b7 ' + wLbs.toFixed(1) + ' lbs' : '') + ' \u00b7 Level ' + charLevel;
     }
 
     // ── Character stats (async fallback — overrides above if API returns richer data) ──
@@ -845,7 +850,7 @@
         setArc('h-g-char-arc', Math.min(100, (charLevel / 20) * 100));
         setText('h-obs-mind', 'Level ' + charLevel + ' \u00b7 ' + tier + (score && daysIn > 0 ? ' \u00b7 ' + score + '/100' : ''));
         // Update hero stats line with level
-        if (statsEl) statsEl.textContent = 'Day ' + daysIn + (wLbs ? ' \u00b7 ' + wLbs.toFixed(1) + ' lbs' : '') + ' \u00b7 Level ' + charLevel;
+        if (statsEl && daysIn >= 0) statsEl.textContent = 'Day ' + Math.max(1, daysIn) + (wLbs ? ' \u00b7 ' + wLbs.toFixed(1) + ' lbs' : '') + ' \u00b7 Level ' + charLevel;
       }
     } catch(e) {}
 
