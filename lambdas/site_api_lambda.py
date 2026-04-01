@@ -1129,31 +1129,33 @@ def handle_status() -> dict:
     # (source_id, display_name, description, yellow_h, red_h, category)
     # category: "auto" (default), "manual" (blue — infrequent file imports), "onetime" (green — never changes)
     # Restructured: name is the DATA type, source app is separate
-    # (source_id, name, description, yellow_h, red_h, category, group, activity_dependent, source_app)
+    # (source_id, name, description, yellow_h, red_h, category, group, activity_dependent, source_app, field_check)
+    # field_check: if set, _last_sync filters by this field existing (for shared partitions like apple_health)
     _DATA_SOURCES = [
         # ── API-Based (fully automated) ──
-        ("whoop",              "Recovery & Sleep Data",              "HRV \u00B7 recovery score \u00B7 sleep staging",      25,  49, "auto",    "API-Based", False, "Whoop"),
-        ("withings",           "Weight Data",                        "Weight \u00B7 body composition \u00B7 blood pressure", 25,  49, "auto",   "API-Based", True,  "Withings"),
-        ("eightsleep",         "Sleep Environment Data",             "Sleep staging \u00B7 bed temperature \u00B7 HRV",      25,  49, "auto",    "API-Based", False, "Eight Sleep"),
-        ("todoist",            "To Do Task Data",                    "Tasks \u00B7 projects \u00B7 completion rate",          25,  49, "auto",   "API-Based", False, "Todoist"),
-        ("weather",            "Weather Data",                       "Daily temperature \u00B7 conditions \u00B7 humidity",   25,  49, "auto",   "API-Based", "OpenWeather"),
-        ("garmin",             "Activity Tracking (1 of 2)",         "Steps \u00B7 GPS routes \u00B7 stress \u00B7 body battery", 25,  49, "auto",   "API-Based", True,  "Garmin"),
-        ("strava",             "Activity Tracking (2 of 2)",         "Activities \u00B7 segments \u00B7 training load",      25,  49, "auto",    "API-Based", True,  "Strava"),
-        ("notion",             "Journal Data",                       "Journal entries \u00B7 mood \u00B7 reflections",       25,  49, "auto",    "API-Based", True,  "Notion"),
+        ("whoop",              "Recovery & Sleep Data",              "HRV \u00B7 recovery score \u00B7 sleep staging",      25,  49, "auto",    "API-Based", False, "Whoop", None),
+        ("withings",           "Weight Data",                        "Weight \u00B7 body composition \u00B7 blood pressure", 25,  49, "auto",   "API-Based", True,  "Withings", None),
+        ("eightsleep",         "Sleep Environment Data",             "Sleep staging \u00B7 bed temperature \u00B7 HRV",      25,  49, "auto",    "API-Based", False, "Eight Sleep", None),
+        ("todoist",            "To Do Task Data",                    "Tasks \u00B7 projects \u00B7 completion rate",          25,  49, "auto",   "API-Based", True,  "Todoist", None),
+        ("weather",            "Weather Data",                       "Daily temperature \u00B7 conditions \u00B7 humidity",   25,  49, "auto",   "API-Based", False, "OpenWeather", None),
+        ("garmin",             "Activity Tracking (1 of 2)",         "Steps \u00B7 GPS routes \u00B7 stress \u00B7 body battery", 25,  49, "auto",   "API-Based", True,  "Garmin", None),
+        ("strava",             "Activity Tracking (2 of 2)",         "Activities \u00B7 segments \u00B7 training load",      25,  49, "auto",    "API-Based", True,  "Strava", None),
+        ("notion",             "Journal Data",                       "Journal entries \u00B7 mood \u00B7 reflections",       25,  49, "auto",    "API-Based", True,  "Notion", None),
         # ── User-Driven (requires user to log/sync) ──
-        ("habitify",           "Habit Tracking Data",                "Daily habits \u00B7 day grades",                       25,  49, "auto",    "User-Driven", True,  "Habitify"),
-        ("macrofactor",        "Nutrition Data",                     "Calories \u00B7 macros \u00B7 meal timing",            25,  49, "auto",    "User-Driven", True,  "MacroFactor via Dropbox"),
-        ("supplements",        "Supplement Adherence",               "Daily supplement tracking & compliance",                25,  49, "auto",   "User-Driven", True,  "Habitify"),
-        ("state_of_mind",      "State of Mind Data",                 "Mood valence \u00B7 emotions \u00B7 life areas",      25,  49, "auto",   "User-Driven", True,  "Apple Health via Health Exporter"),
+        ("habitify",           "Habit Tracking Data",                "Daily habits \u00B7 day grades",                       25,  49, "auto",    "User-Driven", True,  "Habitify", None),
+        ("macrofactor",        "Nutrition Data",                     "Calories \u00B7 macros \u00B7 meal timing",            25,  49, "auto",    "User-Driven", True,  "MacroFactor via Dropbox", None),
+        ("supplements",        "Supplement Adherence",               "Daily supplement tracking & compliance",                25,  49, "auto",   "User-Driven", True,  "Habitify", None),
+        # State of Mind tracked via apple_health partition field check (som_avg_valence) in Periodic Uploads section
         # ── Periodic Uploads (file drops, webhooks, device sync) ──
-        ("macrofactor_workouts","Exercise Log Data",                 "Workout CSV via file drop",                             48, 168, "auto",   "Periodic Uploads", True,  "MacroFactor via Dropbox"),
-        ("apple_health",       "CGM Glucose Data",                   "Continuous glucose monitor readings",                   25,  49, "auto",  "Periodic Uploads", True,  "Dexcom Stelo via Health Exporter"),
-        ("apple_health",       "Water Intake Data",                  "Daily water consumption tracking",                      25,  49, "auto",   "Periodic Uploads", True,  "Apple Health via Health Exporter"),
-        ("bp_readings",        "Blood Pressure Data",                "Systolic \u00B7 diastolic \u00B7 pulse",               168, 336, "manual",  "Periodic Uploads", True,  "Apple Health via Health Exporter"),
-        ("apple_health",       "Breathwork Data",                    "Breathing exercises \u00B7 sessions",                   48, 168, "auto",   "Periodic Uploads", True,  "Breathwrk via Health Exporter"),
-        ("apple_health",       "Stretching Data",                    "Flexibility sessions \u00B7 recovery",                  48, 168, "auto",   "Periodic Uploads", True,  "Pliability via Health Exporter"),
-        ("apple_health",       "Mindful Minutes Data",               "Meditation & mindfulness sessions",                     48, 168, "auto",   "Periodic Uploads", True,  "Apple Health via Health Exporter"),
-        ("apple_health",       "Apple Health Import",                 "Manual XML export \u00B7 steps \u00B7 workouts",      168, 336, "auto",  "Periodic Uploads", True,  "Apple Health (manual)"),
+        ("macrofactor_workouts","Exercise Log Data",                 "Workout CSV via file drop",                             48, 168, "auto",   "Periodic Uploads", True,  "MacroFactor via Dropbox", None),
+        ("apple_health",       "CGM Glucose Data",                   "Continuous glucose monitor readings",                   25,  49, "auto",  "Periodic Uploads", True,  "Dexcom Stelo via Health Exporter", "blood_glucose_avg"),
+        ("apple_health",       "Water Intake Data",                  "Daily water consumption tracking",                      25,  49, "auto",   "Periodic Uploads", True,  "Apple Health via Health Exporter", "water_intake_ml"),
+        ("bp_readings",        "Blood Pressure Data",                "Systolic \u00B7 diastolic \u00B7 pulse",               168, 336, "manual",  "Periodic Uploads", True,  "Apple Health via Health Exporter", None),
+        ("apple_health",       "Breathwork Data",                    "Breathing exercises \u00B7 sessions",                   48, 168, "auto",   "Periodic Uploads", True,  "Breathwrk via Health Exporter", "recovery_workout_minutes"),
+        ("apple_health",       "Stretching Data",                    "Flexibility sessions \u00B7 recovery",                  48, 168, "auto",   "Periodic Uploads", True,  "Pliability via Health Exporter", "flexibility_minutes"),
+        ("apple_health",       "Mindful Minutes Data",               "Meditation & mindfulness sessions",                     48, 168, "auto",   "Periodic Uploads", True,  "Apple Health via Health Exporter", "mindful_minutes"),
+        ("apple_health",       "State of Mind Data (Health Export)",  "How We Feel mood check-ins via Health Exporter",       48, 168, "auto",   "Periodic Uploads", True,  "Apple Health via Health Exporter", "som_avg_valence"),
+        ("apple_health",       "Apple Health Import",                 "Steps \u00B7 activity \u00B7 walking metrics",        25,  49, "auto",  "Periodic Uploads", True,  "Health Auto Export", "steps"),
         ("food_delivery",      "Food Delivery Index",                "Quarterly CSV import \u00B7 delivery index 0-10",     2160, 2880, "manual", "Periodic Uploads", True, "CSV upload"),
         ("measurements",       "Body Tape Measurements",             "Periodic body measurements \u00B7 waist-to-height ratio", 1440, 2880, "manual", "Periodic Uploads", True, "CSV upload (Brittany)"),
         # ── Lab & Clinical (infrequent) ──
@@ -1178,45 +1180,70 @@ def handle_status() -> dict:
         ("anomaly_detector",    "Anomaly detector",    "9:05 AM daily · 15 metrics",       -1, 25,  49),
     ]
 
-    def _last_sync(source_id):
+    def _last_sync(source_id, field_check=None):
+        """Get the latest date for a source. If field_check is set, only count records
+        that have that specific field (for shared partitions like apple_health)."""
         try:
-            resp = table.query(
-                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source_id}") & Key("sk").begins_with("DATE#"),
-                ScanIndexForward=False, Limit=1, ProjectionExpression="sk",
-            )
-            items = resp.get("Items", [])
-            return items[0]["sk"].replace("DATE#", "")[:10] if items else None
+            if field_check:
+                # Must scan with filter — more expensive but necessary for sub-source tracking
+                from boto3.dynamodb.conditions import Attr
+                resp = table.query(
+                    KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source_id}") & Key("sk").begins_with("DATE#"),
+                    FilterExpression=Attr(field_check).exists(),
+                    ScanIndexForward=False,
+                    ProjectionExpression="sk",
+                    Limit=200,  # scan recent records to find one with the field
+                )
+                items = resp.get("Items", [])
+                return items[0]["sk"].replace("DATE#", "")[:10] if items else None
+            else:
+                resp = table.query(
+                    KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source_id}") & Key("sk").begins_with("DATE#"),
+                    ScanIndexForward=False, Limit=1, ProjectionExpression="sk",
+                )
+                items = resp.get("Items", [])
+                return items[0]["sk"].replace("DATE#", "")[:10] if items else None
         except Exception:
             return None
 
-    def _comp_status(last_date_str, yellow_h, red_h):
+    # Sources where data is inherently 1 day behind (keyed by wake date / previous day)
+    _LAGGED_SOURCES = {"eightsleep", "whoop"}
+
+    def _comp_status(last_date_str, yellow_h, red_h, source_id=None):
         if not last_date_str:
-            return "red", "never", "No records found in DynamoDB"
+            return "green" if source_id == "genome" else "red", "never", "No records found in DynamoDB" if source_id != "genome" else None
         last_dt = datetime.strptime(last_date_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
         now = datetime.now(timezone.utc)
         days_ago = (now.date() - last_dt.date()).days
-        hours_ago = (now - last_dt).total_seconds() / 3600
+
+        # Sleep/recovery sources are keyed by wake date — yesterday is current
+        effective_days = days_ago
+        if source_id in _LAGGED_SOURCES:
+            effective_days = max(0, days_ago - 1)
 
         if days_ago == 0:
             rel = "today"
         elif days_ago == 1:
             rel = "yesterday"
-        elif days_ago < 7:
-            rel = f"{days_ago}d ago"
         else:
             rel = f"{days_ago}d ago"
 
-        # For daily sources: today or yesterday = green, 2+ days = check thresholds
-        if days_ago <= 1:
+        # For lagged sources, show "current" instead of "2d ago" when data is actually fresh
+        if source_id in _LAGGED_SOURCES and effective_days <= 1 and days_ago >= 1:
+            rel = "current"
+
+        # Green: data is current (accounting for natural lag)
+        if effective_days <= 1:
             return "green", rel, None
-        elif days_ago <= 2:
+        elif effective_days <= 2:
             return "yellow", rel, f"Last data {rel} — monitoring"
-        elif hours_ago <= red_h:
-            return "yellow", rel, f"Last data {rel} — expected within {red_h}h"
         else:
+            hours_ago = (now - last_dt).total_seconds() / 3600
+            if hours_ago <= red_h:
+                return "yellow", rel, f"Last data {rel} — expected within {red_h}h"
             return "red", rel, f"STALE: last data {rel}. Threshold exceeded ({red_h}h)."
 
-    def _uptime_90d(source_id):
+    def _uptime_90d(source_id, activity_dependent=False):
         """Uptime bars including today. All sources use same window for visual alignment."""
         try:
             epoch_start = datetime(2026, 3, 28, tzinfo=timezone.utc).date()
@@ -1239,8 +1266,10 @@ def handle_status() -> dict:
                     bars.append(1)  # green — data exists
                 elif i <= 1:
                     bars.append(2)  # neutral — today or yesterday, data may come later
+                elif activity_dependent:
+                    bars.append(2)  # neutral — no user activity, not a system failure
                 else:
-                    bars.append(0)  # red — older day with no data
+                    bars.append(0)  # red — older day with no data (system issue)
             return bars
         except Exception:
             return [2]
@@ -1261,7 +1290,8 @@ def handle_status() -> dict:
         group = row[6] if len(row) > 6 else "API-Based"
         activity_dep = row[7] if len(row) > 7 else False
         source_app = row[8] if len(row) > 8 else ""
-        last = _last_sync(sid)
+        field_check = row[9] if len(row) > 9 else None
+        last = _last_sync(sid, field_check=field_check)
 
         if category == "onetime":
             # Genome — one-time import, no recurring tracking
@@ -1312,20 +1342,18 @@ def handle_status() -> dict:
                 comment = "No data yet \u2014 schedule first appointment"
             uptime = []  # No daily bars for infrequent sources
         else:
-            status, rel, comment = _comp_status(last, yh, rh)
-            uptime = _uptime_90d(sid)
+            status, rel, comment = _comp_status(last, yh, rh, source_id=sid)
+            uptime = _uptime_90d(sid, activity_dependent=activity_dep)
 
-            # Activity-dependent sources: check if pipeline is actually healthy
-            # If there's an active CloudWatch alarm, the pipeline is broken — keep red
-            if activity_dep and status == "red" and sid not in alarming_sources:
+            # Activity-dependent sources: if pipeline is healthy (no alarms) but data
+            # is stale, it's because the user hasn't done the activity — not a system issue.
+            if activity_dep and status in ("red", "yellow") and sid not in alarming_sources:
                 if last:
                     status = "green"
                     comment = f"Pipeline ready \u2014 awaiting user activity. Last data: {rel}"
-                    uptime = [1] * len(uptime)
                 else:
                     status = "green"
                     comment = "Pipeline ready \u2014 no data recorded yet"
-                    uptime = [1] * max(1, len(uptime))
 
         # CloudWatch alarm override — if Lambda is actively erroring, show red
         if sid in alarming_sources and status != "blue":
@@ -1345,14 +1373,17 @@ def handle_status() -> dict:
     compute_components = []
     for sid, name, desc, yh, rh in _COMPUTE_SOURCES:
         last = _last_sync(sid)
-        status, rel, comment = _comp_status(last, yh, rh)
-        uptime = _uptime_90d(sid)
-        # Pre-launch: "never" is expected, not broken — smoke-tested Mar 29
-        if status == "red" and not last:
-            status = "green"
-            rel = "verified"
-            comment = "Smoke-tested OK \u2014 awaiting first scheduled run (April 1+)"
-            uptime = [1] * max(1, len(uptime))
+        status, rel, comment = _comp_status(last, yh, rh, source_id=sid)
+        uptime = _uptime_90d(sid, activity_dependent=True)  # compute depends on ingestion — missing days aren't system failures
+        # Compute sources depend on ingestion data — if no new input, no new output is expected
+        if status in ("red", "yellow") and sid not in alarming_sources:
+            if not last:
+                status = "green"
+                rel = "verified"
+                comment = "Smoke-tested OK \u2014 awaiting first scheduled run (April 1+)"
+            else:
+                status = "green"
+                comment = f"Last computed: {rel} \u2014 runs daily when new data arrives"
         if sid in alarming_sources:
             status = "red"
             comment = "CloudWatch alarm firing \u2014 Lambda errors detected"
@@ -1364,9 +1395,13 @@ def handle_status() -> dict:
     email_components = []
     for lid, name, desc, exp_dow, yh, rh in _EMAIL_LAMBDAS:
         last = _last_sync(f"email_log#{lid}")
-        status, rel, comment = _comp_status(last, yh, rh)
+        status, rel, comment = _comp_status(last, yh, rh, source_id=lid)
         status, rel = _sched_aware(status, rel, exp_dow)
-        uptime = _uptime_90d(f"email_log#{lid}")
+        uptime = _uptime_90d(f"email_log#{lid}", activity_dependent=True)  # scheduled emails — gaps aren't system failures
+        # Weekly/scheduled emails: if they've run within their expected window, they're fine
+        if status in ("yellow",) and last and lid not in alarming_sources:
+            status = "green"
+            comment = f"Last sent: {rel} \u2014 next run scheduled"
         # Pre-launch: weekly emails that haven't fired yet — smoke-tested Mar 29
         if status == "red" and not last:
             status = "green"
