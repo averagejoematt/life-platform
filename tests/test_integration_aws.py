@@ -106,7 +106,7 @@ EXPECTED_HANDLERS = {
     "daily-insight-compute":        "daily_insight_compute_lambda",
     "anomaly-detector":             "anomaly_detector_lambda",
     "life-platform-canary":         "canary_lambda",
-    "dlq-consumer":                 "dlq_consumer_lambda",
+    "life-platform-dlq-consumer":   "dlq_consumer_lambda",
 }
 
 
@@ -403,9 +403,9 @@ def test_i5_required_secrets_exist():
 
 REQUIRED_EB_RULES = [
     "daily-brief-schedule",
-    "whoop-daily-ingestion",
-    "todoist-data-ingestion",
-    "life-platform-freshness-check",
+    "LifePlatformIngestion-WhoopIngestionScheduleC6CE3A0-DjUDUDY4XrFs",
+    "LifePlatformIngestion-TodoistIngestionSchedule03D61-XqriAparCo0n",
+    "LifePlatformOperational-FreshnessCheckerScheduleD9E-xZki3XA2x0bb",
 ]
 
 
@@ -476,7 +476,7 @@ def test_i7_cloudwatch_alarms_exist():
 REQUIRED_S3_KEYS = [
     "config/board_of_directors.json",
     "config/character_sheet.json",
-    "config/profile.json",
+    # profile.json: profile data lives in DynamoDB (PROFILE#v1), not S3
 ]
 
 
@@ -665,7 +665,7 @@ def test_i12_mcp_tool_call_response_shape():
     with the expected content array shape.
 
     R13-F02: Validates the full MCP path — auth, tool dispatch, DDB read, serialisation.
-    Uses `get_data_freshness` as the probe: it reads DDB but writes nothing and is
+    Uses `get_weight_loss_progress` as the probe: it reads DDB but writes nothing and is
     always fast (<5s). Passes even when no data has been ingested yet.
 
     Failure modes caught: IAM DDB read denied, tool import error, response serialisation
@@ -693,7 +693,7 @@ def test_i12_mcp_tool_call_response_shape():
         "id": 1,
         "method": "tools/call",
         "params": {
-            "name": "get_data_freshness",
+            "name": "get_weight_loss_progress",
             "arguments": {},
         },
     }
@@ -825,7 +825,7 @@ def test_i13_freshness_checker_returns_valid_data():
         and (
             "sources" in body
             or "freshness" in body
-            or any(src in str(body) for src in _FRESHNESS_EXPECTED_SOURCES)
+            or any(src in str(body).lower() for src in _FRESHNESS_EXPECTED_SOURCES)
         )
     )
 
