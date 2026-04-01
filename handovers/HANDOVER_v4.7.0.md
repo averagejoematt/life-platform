@@ -159,7 +159,7 @@
 ## Not Done (Blocked)
 - **Breathwork × HRV correlation** — 0 breathwork records in apple_health partition; no data to correlate
 - **IC-4/IC-5** (failure pattern + momentum warning) — data gate ~May 1
-- **8 AWS integration test failures** — infrastructure drift from manually-created Lambdas/EventBridge rules not yet CDK-managed
+- **2 AWS integration test failures** — layer version drift (v15→v17 reattach), MCP canary (local key unavailable)
 
 ## Lambda Count
 62 total (was 59: +ai-expert-analyzer, +journal-analyzer, +field-notes-generate)
@@ -167,5 +167,5 @@
 ## MCP Tool Count
 115 tools registered (unchanged from registry — no new MCP tools this session)
 
-## Platform Counts (v4.7.4)
+## Platform Counts (v4.7.5)
 - 115 MCP tools · 62 Lambdas · 72 site pages · 1075 tests · 26 data sources · 8 CDK stacks
