@@ -180,11 +180,12 @@ def test_i1_lambda_handlers_match_expected():
 LAMBDAS_REQUIRING_LAYER = [
     "daily-brief",
     "weekly-digest",
-    "life-platform-mcp",
+    # life-platform-mcp: uses self-contained package, not shared layer
     "life-platform-freshness-checker",
     "anomaly-detector",
     "character-sheet-compute",
     "daily-metrics-compute",
+    "daily-insight-compute",
 ]
 
 
