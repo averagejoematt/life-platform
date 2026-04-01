@@ -148,6 +148,14 @@
 ### Stale Stats Fix (v4.7.3)
 - HTML fallback values updated: 118→115 tools, 61→62 Lambdas across about/mission/platform/builders pages + meta tags
 
+### Backlog Cleanup (v4.7.4)
+- **HP-12** (Elena Hero Line): closed — already fully wired end-to-end. Removed from carry-forward.
+- **get_nutrition positional args**: closed — 8 test cases written, all pass, no bug reproducible
+- **DISC-7** annotation seeding: 4 Day 1 events seeded to DynamoDB, annotations merge with journey_timeline
+- **BL-01/BL-02** (Builders + Labs pages): confirmed already built in prior sessions
+- **HP-13** share card: twitter:image fixed to dynamic `og-home.png`, share button added to homepage hero
+- Mobile nav: Internal links (Status, Buddy Dashboard, Discord, Snake Fund) added to hamburger menu
+
 ## Not Done (Blocked)
 - **Breathwork × HRV correlation** — 0 breathwork records in apple_health partition; no data to correlate
 - **IC-4/IC-5** (failure pattern + momentum warning) — data gate ~May 1
@@ -159,5 +167,5 @@
 ## MCP Tool Count
 115 tools registered (unchanged from registry — no new MCP tools this session)
 
-## Platform Counts (v4.7.3)
+## Platform Counts (v4.7.4)
 - 115 MCP tools · 62 Lambdas · 72 site pages · 1075 tests · 26 data sources · 8 CDK stacks
