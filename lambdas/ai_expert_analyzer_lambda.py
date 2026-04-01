@@ -260,6 +260,8 @@ EXPERT_PERSONAS = {
 
 def build_prompt(expert_key, data):
     p = EXPERT_PERSONAS[expert_key]
+    prior_summary = data.pop("_prior_analysis_summary", "")
+    prior_block = f"Your previous analysis said: \"{prior_summary}...\" — find a different angle today." if prior_summary else ""
     data_json = json.dumps(data, indent=2, default=str)
 
     return f"""You are {p['name']}, {p['title']}.
@@ -284,13 +286,27 @@ Requirements:
 - Do NOT be sycophantic or overly positive — honest assessment serves Matthew better
 - Reference specific numbers from the data when you do so naturally
 - Tone: authoritative but human, like a trusted advisor's private note
+- If prior analysis is provided below, find a DIFFERENT angle — do not repeat the same observation or suggestion
 
+{prior_block}
 Write only the analysis text — no preamble, no "Here is my analysis:", just the paragraphs themselves."""
 
 
 def generate_and_cache(expert_key):
     logger.info(f"Generating analysis for expert: {expert_key}")
     data = gather_data_for_expert(expert_key)
+
+    # Read prior analysis to prevent repetition
+    prior_summary = ""
+    try:
+        prior = table.get_item(Key={"pk": CACHE_PK, "sk": f"EXPERT#{expert_key}"}).get("Item")
+        if prior and prior.get("analysis"):
+            prior_text = str(prior["analysis"])
+            prior_summary = prior_text[:300]
+    except Exception:
+        pass
+    if prior_summary:
+        data["_prior_analysis_summary"] = prior_summary
 
     prompt = build_prompt(expert_key, data)
     api_key = _get_api_key()

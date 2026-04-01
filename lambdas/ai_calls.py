@@ -1372,9 +1372,22 @@ def call_journal_coach(data, profile, api_key):
     # P2: Journey context in journal coach too
     jctx = _build_journey_context(profile, data.get("date"))
 
+    # Phase 2A: Journal enrichment context
+    j_signals = data.get("journal_signals") or {}
+    _defense_ctx = ""
+    if j_signals.get("defense_patterns"):
+        _defense_ctx = f"\nDEFENSE PATTERNS DETECTED: {', '.join(j_signals['defense_patterns'])}. Challenge one gently."
+    if j_signals.get("growth_signals"):
+        _defense_ctx += f"\nGROWTH SIGNALS: {', '.join(j_signals['growth_signals'])}. Acknowledge these."
+    if j_signals.get("avoidance_flags"):
+        _defense_ctx += f"\nAVOIDANCE FLAGS: {', '.join(j_signals['avoidance_flags'])}. Name what's being avoided."
+    if j_signals.get("stress_sources"):
+        _defense_ctx += f"\nSTRESS SOURCES: {', '.join(j_signals['stress_sources'])}."
+
     prompt = f"""You are a wise, warm-but-direct inner coach reading Matthew's journal from yesterday.
 He's 36, {jctx['stage_label']} of transformation ({weight_ctx}), battling: {obstacles_str}.
 His coaching tone: Jocko's discipline meets Attia's precision meets Brene Brown's vulnerability.
+{_defense_ctx}
 
 JOURNAL ENTRIES:
 {journal_text}
@@ -1688,8 +1701,75 @@ def call_tldr_and_guidance(data, profile, day_grade, grade, component_scores, co
     # IC-7: Cross-pillar trade-off reasoning
     tradeoff_ctx = _build_cross_pillar_tradeoffs(component_scores, data, profile)
 
+    # Phase 2B: Character sheet tone adaptation
+    _cs = data.get("character_sheet") or {}
+    _tone_ctx = ""
+    if _cs:
+        _consc = _cs.get("conscientiousness_score")
+        _resil = _cs.get("resilience_score")
+        _growth = _cs.get("growth_mindset_score")
+        if any(v is not None for v in [_consc, _resil, _growth]):
+            _tone_parts = []
+            if _consc and float(_consc) > 80:
+                _tone_parts.append("User responds well to structured, specific guidance")
+            if _resil and float(_resil) < 50:
+                _tone_parts.append("Resilience is low — use supportive tone, avoid shame-framing")
+            if _growth and float(_growth) > 70:
+                _tone_parts.append("Growth mindset is strong — frame challenges as opportunities")
+            if _tone_parts:
+                _tone_ctx = "\nTONE ADAPTATION: " + ". ".join(_tone_parts) + "."
+
+    # Phase 2C: Adaptive mode → email tone
+    _adaptive = data.get("adaptive_mode") or {}
+    _mode = _adaptive.get("brief_mode") or _adaptive.get("engagement_mode") or ""
+    _mode_ctx = ""
+    if _mode == "flourishing":
+        _mode_ctx = "\nENGAGEMENT MODE: Flourishing — push harder, suggest experiments, confident tone."
+    elif _mode == "struggling":
+        _mode_ctx = "\nENGAGEMENT MODE: Struggling — warm tone, max 2 guidance items, lead with validation not correction."
+
+    # Phase 2D: State of Mind emotional context
+    _som_ctx = ""
+    _som = data.get("state_of_mind") or {}
+    if _som:
+        _valence = _som.get("som_avg_valence") or _som.get("avg_valence")
+        if _valence is not None and float(_valence) < -0.3:
+            _som_ctx = "\nEMOTIONAL STATE: Low mood detected. Prioritize nervous system reset over performance push."
+        _assoc = _som.get("som_top_associations")
+        if _assoc and isinstance(_assoc, list):
+            _som_ctx += f"\nPrimary stressor context: {', '.join(_assoc[:2])}."
+
+    # Phase 2E: Supplements context
+    _supp_ctx = ""
+    _supps = data.get("supplements_recent") or []
+    if _supps:
+        _supp_names = list(set(s.get("name", "") for s in _supps if s.get("name")))[:6]
+        if _supp_names:
+            _supp_ctx = f"\nACTIVE SUPPLEMENTS: {', '.join(_supp_names)}. Account for these in nutrient adequacy."
+
+    # Phase 2F: Weather context
+    _weather_ctx = ""
+    _wx = data.get("weather") or {}
+    if _wx:
+        _dl = _wx.get("daylight_hours")
+        _press = _wx.get("pressure_hpa")
+        _temp = _wx.get("temp_high_f")
+        if _dl and float(_dl) < 10:
+            _weather_ctx += f"\nWEATHER: Short daylight ({_dl}h) — consider morning light exposure."
+        if _press and float(_press) < 1005:
+            _weather_ctx += f"\nWEATHER: Low barometric pressure ({_press} hPa) — expect lower energy."
+        if _temp and float(_temp) > 85:
+            _weather_ctx += f"\nWEATHER: High heat ({_temp}°F) — increase hydration, modify outdoor intensity."
+
+    # Phase 4: Labs + genome context
+    _labs_ctx = data.get("labs_coaching_ctx", "")
+    _genome_ctx = data.get("genome_coaching_ctx", "")
+
     prompt = f"""You are the intelligence engine behind Matthew's Life Platform daily brief.
 Your job: synthesize ALL of yesterday's data into (1) one TL;DR sentence and (2) 3-4 smart, personalized guidance items for TODAY.
+{_tone_ctx}{_mode_ctx}{_som_ctx}{_supp_ctx}{_weather_ctx}
+{_labs_ctx}
+{_genome_ctx}
 
 {journey_block}
 
