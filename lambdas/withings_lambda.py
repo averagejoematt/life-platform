@@ -195,28 +195,32 @@ def parse_measurements(raw_body: dict) -> dict:
     if not grps:
         return {}
 
-    # Sort by date descending, take most recent group
+    # Process ALL measurement groups for the day (not just the latest)
+    # Different devices (scale, BPM) produce separate groups at different times
     grps_sorted = sorted(grps, key=lambda g: g["date"], reverse=True)
-    latest_grp  = grps_sorted[0]
-    latest_ts   = latest_grp["date"]
+    latest_ts   = grps_sorted[0]["date"]
 
     result = {
         "measurement_timestamp": latest_ts,
         "measurement_time_utc":  datetime.fromtimestamp(latest_ts, tz=timezone.utc).isoformat(),
     }
 
-    for meas in latest_grp.get("measures", []):
-        mtype = meas["type"]
-        if mtype in MEAS_TYPES:
-            field_name = MEAS_TYPES[mtype]
-            # Withings stores values as integer * 10^unit
-            value = meas["value"] * (10 ** meas["unit"])
-            result[field_name] = round(value, 4)
-            # Add lbs alongside kg for weight fields
-            if field_name in ("weight_kg", "fat_mass_kg", "fat_free_mass_kg",
-                              "muscle_mass_kg", "bone_mass_kg"):
-                lbs_field = field_name.replace("_kg", "_lbs")
-                result[lbs_field] = round(value * 2.20462, 2)
+    for grp in grps_sorted:
+        for meas in grp.get("measures", []):
+            mtype = meas["type"]
+            if mtype in MEAS_TYPES:
+                field_name = MEAS_TYPES[mtype]
+                # Only take first (most recent) value per field
+                if field_name in result:
+                    continue
+                # Withings stores values as integer * 10^unit
+                value = meas["value"] * (10 ** meas["unit"])
+                result[field_name] = round(value, 4)
+                # Add lbs alongside kg for weight fields
+                if field_name in ("weight_kg", "fat_mass_kg", "fat_free_mass_kg",
+                                  "muscle_mass_kg", "bone_mass_kg"):
+                    lbs_field = field_name.replace("_kg", "_lbs")
+                    result[lbs_field] = round(value * 2.20462, 2)
 
     return result
 
