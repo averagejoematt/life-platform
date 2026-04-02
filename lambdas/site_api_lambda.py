@@ -3053,6 +3053,9 @@ def handle_sleep_detail() -> dict:
             "whoop_quality": round(float(w["sleep_quality_score"]), 0) if w.get("sleep_quality_score") else None,
             "deep_sleep_hours":  round(float(w["slow_wave_sleep_hours"]), 2) if w.get("slow_wave_sleep_hours") else None,
             "rem_sleep_hours":   round(float(w["rem_sleep_hours"]), 2) if w.get("rem_sleep_hours") else None,
+            "deep_pct":          round(float(r["deep_pct"]), 1) if r.get("deep_pct") else None,
+            "rem_pct":           round(float(r["rem_pct"]), 1) if r.get("rem_pct") else None,
+            "light_pct":         round(float(r["light_pct"]), 1) if r.get("light_pct") else None,
             "recovery_score":    round(float(w["recovery_score"]), 0) if w.get("recovery_score") else None,
             "hrv":               round(float(w["hrv"]), 1) if w.get("hrv") else None,
             "rhr":               round(float(w["resting_heart_rate"]), 0) if w.get("resting_heart_rate") else None,
@@ -3075,9 +3078,13 @@ def handle_sleep_detail() -> dict:
             "hrv":               round(float(whoop_latest.get("hrv", 0)), 1) if whoop_latest.get("hrv") else None,
             "rhr":               round(float(whoop_latest.get("resting_heart_rate", 0)), 0) if whoop_latest.get("resting_heart_rate") else None,
             "score_status":      score_status,
+            "deep_pct":          round(float(latest.get("deep_pct", 0)), 1) if latest.get("deep_pct") else None,
+            "rem_pct":           round(float(latest.get("rem_pct", 0)), 1) if latest.get("rem_pct") else None,
+            "light_pct":         round(float(latest.get("light_pct", 0)), 1) if latest.get("light_pct") else None,
+            "30d_avg_recovery":  avg([float(whoop_by_date.get(r.get("sk", "").replace("DATE#", ""), {}).get("recovery_score", 0)) for r in eight_with_data if whoop_by_date.get(r.get("sk", "").replace("DATE#", ""), {}).get("recovery_score")]) if whoop_by_date else None,
             "optimal_temp_f":    optimal_temp,
             "30d_avg_score":     avg(score_vals),
-            "30d_avg_efficiency": avg(eff_vals),  # from sleep_efficiency_pct field
+            "30d_avg_efficiency": avg(eff_vals),
             "30d_avg_temp":      avg(temp_vals),
             "days_tracked":      len(eight_with_data),
             "as_of_date":        latest_date,
@@ -3962,36 +3969,104 @@ def _load_s3_json(key, cache_name):
 def handle_pulse() -> dict:
     """
     GET /api/pulse
-    Returns the Pulse daily state: 8 glyph signals, status word, narrative.
-    Today: reads from S3 pulse.json (pre-computed by daily brief).
+    Returns live Pulse daily state computed from DynamoDB.
+    Reads latest records from each source for real-time glyphs.
     Cache: 300s (5 min).
     """
-    S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    _pulse_day = max(1, (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1) if today >= EXPERIMENT_START else 0
+
+    # Read latest data from each source
+    whoop = _latest_item("whoop") or {}
+    withings = _latest_item("withings") or {}
+    ah = None
     try:
-        s3_client = boto3.client("s3", region_name=S3_REGION)
-        resp = s3_client.get_object(Bucket=S3_BUCKET, Key="site/pulse.json")
-        pulse_data = json.loads(resp["Body"].read())
-        logger.info("[pulse] Loaded pulse.json from S3")
-        return _ok(pulse_data, cache_seconds=300)
-    except Exception as e:
-        if "NoSuchKey" in str(e):
-            logger.warning("[pulse] pulse.json not found — not yet generated")
-            _pulse_day = max(1, (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1) if datetime.now(timezone.utc).strftime("%Y-%m-%d") >= EXPERIMENT_START else 0
-            return _ok({
-                "pulse": {
-                    "day_number": _pulse_day,
-                    "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                    "status": "quiet",
-                    "status_color": "#3a5a48",
-                    "narrative": "Today's pulse generates at 11 AM PT.",
-                    "signals_reporting": 0,
-                    "signals_total": 8,
-                    "glyphs": {},
-                    "generated_at": None,
-                }
-            }, cache_seconds=60)
-        logger.error(f"[pulse] Failed: {e}")
-        return _error(503, "Pulse data not available")
+        ah_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}apple_health") & Key("sk").between(f"DATE#{yesterday}", f"DATE#{today}"),
+            ScanIndexForward=False, Limit=1,
+        )
+        ah = _decimal_to_float(ah_resp.get("Items", [{}])[0]) if ah_resp.get("Items") else {}
+    except Exception:
+        ah = {}
+    habitify = _latest_item("habit_scores") or {}
+
+    # Also check apple_health for weight fallback
+    w_val = float(withings.get("weight_lbs", 0)) if withings.get("weight_lbs") else None
+    ah_wt = float(ah.get("weight_lbs", 0)) if ah and ah.get("weight_lbs") else None
+    w_date = withings.get("sk", "").replace("DATE#", "")[:10] if withings else None
+    ah_date = ah.get("sk", "").replace("DATE#", "")[:10] if ah else None
+    if ah_wt and (not w_val or (ah_date and w_date and ah_date > w_date)):
+        w_val = ah_wt
+
+    _p = _get_profile()
+    start_weight = float(_p.get("journey_start_weight_lbs", 307))
+
+    recovery = float(whoop.get("recovery_score", 0)) if whoop.get("recovery_score") else None
+    sleep_hrs = float(whoop.get("sleep_duration_hours", 0)) if whoop.get("sleep_duration_hours") else None
+    steps = float(ah.get("steps", 0)) if ah and ah.get("steps") else None
+    water_ml = float(ah.get("water_intake_ml", 0)) if ah and ah.get("water_intake_ml") else None
+    water_l = round(water_ml / 1000, 2) if water_ml else None
+    t0_pct = float(habitify.get("tier0_pct", 0)) if habitify.get("tier0_pct") else None
+
+    def _glyph(key, val, target, unit, direction="down"):
+        if val is None:
+            return {"state": "gray", "value": None, "target": target, "label": None}
+        if direction == "down":
+            state = "green" if val <= target else ("amber" if val <= target * 1.1 else "red")
+        else:
+            state = "green" if val >= target else ("amber" if val >= target * 0.8 else "red")
+        return {"state": state, "value": round(val, 1), "target": target, "label": f"{round(val, 1)} {unit}"}
+
+    glyphs = {
+        "scale": {
+            "state": "green" if w_val and w_val <= start_weight else "red",
+            "value": round(w_val, 1) if w_val else None,
+            "direction": "down" if w_val and w_val < start_weight else "up",
+            "delta": round(w_val - start_weight, 1) if w_val else None,
+            "delta_label": f"{round(w_val - start_weight, 1):+.1f} lbs" if w_val else None,
+            "as_of": w_date or ah_date or today,
+        },
+        "water": {
+            "state": "green" if water_l and water_l >= 3.0 else ("amber" if water_l and water_l >= 1.5 else "gray"),
+            "liters": water_l,
+            "target": 3.0,
+            "label": f"{water_l}L" if water_l else None,
+            "as_of": today,
+        },
+        "movement": {
+            "state": "green" if steps and steps >= 8000 else ("amber" if steps and steps >= 5000 else "gray"),
+            "value": int(steps) if steps else None,
+            "target": 8000,
+            "label": f"{int(steps):,} steps" if steps else None,
+        },
+        "recovery": {
+            "state": "green" if recovery and recovery >= 67 else ("amber" if recovery and recovery >= 34 else "gray"),
+            "value": round(recovery) if recovery else None,
+            "label": f"{round(recovery)}%" if recovery else None,
+        },
+        "sleep": {
+            "state": "green" if sleep_hrs and sleep_hrs >= 7 else ("amber" if sleep_hrs and sleep_hrs >= 6 else "gray"),
+            "value": round(sleep_hrs, 1) if sleep_hrs else None,
+            "label": f"{round(sleep_hrs, 1)}h" if sleep_hrs else None,
+        },
+    }
+
+    signals_reporting = sum(1 for g in glyphs.values() if g.get("state") != "gray")
+    status = "green" if signals_reporting >= 4 else ("mixed" if signals_reporting >= 2 else "quiet")
+
+    return _ok({
+        "pulse": {
+            "day_number": _pulse_day,
+            "date": today,
+            "status": status,
+            "status_color": {"green": "#22c55e", "mixed": "#f5a623", "quiet": "#3a5a48"}.get(status, "#3a5a48"),
+            "signals_reporting": signals_reporting,
+            "signals_total": 8,
+            "glyphs": glyphs,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    }, cache_seconds=300)
 
 
 def handle_protocols() -> dict:
