@@ -1,3 +1,26 @@
+## v4.8.2 — 2026-04-01: Hourly Ingestion + Nutrition Fix + IAM Sweep
+
+### Ingestion Schedule
+- CDK: changed from 5x/day to hourly with 10pm-4am PST maintenance window (18 active hours)
+- Cost unchanged — gap-aware Lambdas short-circuit in <50ms when no new data
+
+### Pipeline Fixes
+- **Nutrition field mismatch**: API expected `calories`/`protein_g` but MacroFactor writes `total_calories_kcal`/`total_protein_g`. Added `_mf()` helper that checks both naming conventions.
+- **Pulse endpoint rewritten**: was reading stale S3 file (1x/day), now queries DynamoDB live (5-min cache)
+- **Sleep API**: added `deep_pct`, `rem_pct`, `light_pct` from Eight Sleep + `30d_avg_recovery` from Whoop
+- **Physical page**: BP section with systolic/diastolic card, status classification, trend chart
+- **Homepage**: 6-ring gauge grid (Weight, Lost, Total Progress, HRV, Sleep, Character)
+
+### IAM Sweep
+- **13 Lambdas**: added `s3:GetObject` + `s3:ListBucket` (were write-only)
+- **2 OAuth Lambdas** (Eight Sleep, Garmin): added `secretsmanager:PutSecretValue` for token persistence
+- **MacroFactor**: added `s3:GetObject` for `uploads/` prefix (was failing on Dropbox CSV reads)
+
+### Withings Bug Fix
+- Lambda only processed most recent measurement group — BPM reading was newer than scale, so weight was silently discarded. Fixed to iterate ALL groups.
+
+---
+
 ## v4.8.1 — 2026-04-01: Day 1 Pipeline Fixes
 
 Critical fixes discovered during Day 1 go-live. Most issues traced to timing/sequencing assumptions that break on the first day of the experiment.
