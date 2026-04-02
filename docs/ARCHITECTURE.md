@@ -90,25 +90,28 @@ The life platform is a personal health intelligence system built on AWS. It inge
 
 ### Scheduled ingestion (EventBridge → Lambda)
 
-Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire daily. All cron expressions use fixed UTC.
+Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire hourly with a 10pm–4am PST maintenance window. All cron expressions use fixed UTC.
 
-**Gap-aware backfill (v2.46.0):** All 6 API-based ingestion Lambdas implement self-healing gap detection. On each run, the Lambda queries DynamoDB for the last N days, identifies missing DATE# records, and fetches only those from the upstream API.
+**Gap-aware backfill (v2.46.0):** All API-based ingestion Lambdas implement self-healing gap detection. On each run, the Lambda queries DynamoDB for the last N days (including today), identifies missing DATE# records, and fetches only those from the upstream API. Cost is ~$0/month — Lambdas short-circuit in <50ms when no new data exists.
 
-| Source | Lambda | Cron (UTC) | PT (PDT) |
+**Schedule:** Hourly during active hours (4am–10pm PST). Maintenance window: 10pm–4am PST (UTC 6–11 skipped).
+
+| Source | Lambda | Schedule | Type |
 |---|---|---|---|
-| Whoop | `whoop-data-ingestion` | `cron(0 14 * * ? *)` | 07:00 AM |
-| Garmin | `garmin-data-ingestion` | `cron(0 14 * * ? *)` | 07:00 AM |
-| Notion Journal | `notion-journal-ingestion` | `cron(0 14 * * ? *)` | 07:00 AM |
-| Withings | `withings-data-ingestion` | `cron(15 14 * * ? *)` | 07:15 AM |
-| Habitify | `habitify-data-ingestion` | `cron(15 14 * * ? *)` | 07:15 AM |
-| Strava | `strava-data-ingestion` | `cron(30 14 * * ? *)` | 07:30 AM |
-| Journal Enrichment | `journal-enrichment` | `cron(30 14 * * ? *)` | 07:30 AM |
-| Todoist | `todoist-data-ingestion` | `cron(45 14 * * ? *)` | 07:45 AM |
-| Eight Sleep | `eightsleep-data-ingestion` | `cron(0 15 * * ? *)` | 08:00 AM |
-| Activity Enrichment | `activity-enrichment` | `cron(30 15 * * ? *)` | 08:30 AM |
-| MacroFactor | `macrofactor-data-ingestion` | `cron(0 16 * * ? *)` | 09:00 AM |
-| Weather | `weather-data-ingestion` | `cron(45 13 * * ? *)` | 06:45 AM |
-| Dropbox Poll | `dropbox-poll` | `rate(30 minutes)` | every 30m |
+| Whoop | `whoop-data-ingestion` | Hourly (active hours) | API pull |
+| Garmin | `garmin-data-ingestion` | Hourly (active hours) | API pull |
+| Eight Sleep | `eightsleep-data-ingestion` | Hourly (active hours) | API pull |
+| Withings | `withings-data-ingestion` | Hourly (active hours) | API pull |
+| Habitify | `habitify-data-ingestion` | Hourly (active hours) | API pull |
+| Strava | `strava-data-ingestion` | Hourly (active hours) | API pull |
+| Todoist | `todoist-data-ingestion` | Hourly (active hours) | API pull |
+| Notion Journal | `notion-journal-ingestion` | Hourly (active hours) | API pull |
+| Weather | `weather-data-ingestion` | Hourly (active hours) | API pull |
+| MacroFactor | `macrofactor-data-ingestion` | S3 trigger (Dropbox CSV) | File upload |
+| Dropbox Poll | `dropbox-poll` | `rate(30 minutes)` | File poll |
+| Journal Enrichment | `journal-enrichment` | Hourly | Compute |
+| Activity Enrichment | `activity-enrichment` | Hourly | Compute |
+| Apple Health (CGM, water, BP, SOM) | `health-auto-export-webhook` | Near real-time (webhook) | HAE push |
 
 ### Compute + Email Lambdas
 
