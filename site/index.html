@@ -124,9 +124,9 @@
     /* ── Gauge grid ─────────────────────────────────────────── */
     .h-gauge-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-8);
-      max-width: 320px;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: var(--space-6);
+      max-width: 420px;
       opacity: 0;
       animation: fadeUp 0.6s ease forwards 0.25s;
     }
@@ -359,7 +359,9 @@
         padding: var(--space-10) var(--page-padding);
       }
       .h-gauge-grid {
-        max-width: 280px;
+        grid-template-columns: 1fr 1fr 1fr;
+        max-width: 100%;
+        gap: var(--space-4);
       }
       .h-obs-grid {
         grid-template-columns: 1fr 1fr;
@@ -419,6 +421,38 @@
           </div>
         </div>
         <div class="h-gauge__label">Weight</div>
+      </div>
+      <!-- Lost gauge -->
+      <div class="h-gauge" id="h-g-lost">
+        <div class="h-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="h-g-lost-arc" cx="44" cy="44" r="35" fill="none" stroke="var(--h-accent)" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.45s"/>
+          </svg>
+          <div class="h-gauge__center">
+            <div class="h-gauge__num" id="h-g-lost-num" style="color:var(--h-accent)">&mdash;</div>
+            <div class="h-gauge__unit">lost</div>
+          </div>
+        </div>
+        <div class="h-gauge__label">Lost</div>
+      </div>
+      <!-- Progress gauge -->
+      <div class="h-gauge" id="h-g-progress">
+        <div class="h-gauge__ring">
+          <svg viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
+            <circle id="h-g-progress-arc" cx="44" cy="44" r="35" fill="none" stroke="var(--h-accent)" stroke-width="7"
+              stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
+              style="transition: stroke-dasharray 1.2s ease 0.5s"/>
+          </svg>
+          <div class="h-gauge__center">
+            <div class="h-gauge__num" id="h-g-progress-num" style="color:var(--h-accent)">&mdash;</div>
+            <div class="h-gauge__unit">%</div>
+          </div>
+        </div>
+        <div class="h-gauge__label">Progress</div>
       </div>
       <!-- HRV gauge -->
       <div class="h-gauge" id="h-g-hrv">
@@ -728,10 +762,24 @@
     // ── Gauge rings ──
     // Weight: progress % toward goal (307 -> 185)
     var progressPct = hero.progress_pct || j.progress_pct || 0;
+    var startWeight = hero.start_weight || j.start_weight_lbs || 307;
+    var goalWeight = hero.goal_weight || j.goal_weight_lbs || 185;
+    var lostLbs = Math.max(0, startWeight - (wLbs || startWeight));
+    var totalToLose = startWeight - goalWeight;
     if (wLbs) {
-      setText('h-g-weight-num', wLbs.toFixed(0));
-      setArc('h-g-weight-arc', Math.min(100, progressPct));
+      setText('h-g-weight-num', Math.round(wLbs));
+      // Weight ring: fills as weight decreases toward goal
+      setArc('h-g-weight-arc', Math.min(100, (1 - (wLbs - goalWeight) / totalToLose) * 100));
     }
+
+    // Lost
+    setText('h-g-lost-num', Math.round(lostLbs));
+    setArc('h-g-lost-arc', totalToLose > 0 ? Math.min(100, (lostLbs / totalToLose) * 100) : 0);
+
+    // Progress
+    var progVal = progressPct || (totalToLose > 0 ? Math.round(lostLbs / totalToLose * 100) : 0);
+    setText('h-g-progress-num', Math.round(progVal));
+    setArc('h-g-progress-arc', Math.min(100, progVal));
 
     // HRV
     if (v.hrv_ms) {
