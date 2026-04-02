@@ -43,7 +43,7 @@ python3 mcp_bridge.py
 
 **Ingest → Store → Serve** pipeline on AWS (us-west-2):
 
-1. **Ingest**: 13 Lambda functions pull from APIs on EventBridge cron schedules (06:45–11:00 AM PDT). Gap-aware backfill — each ingestion Lambda detects missing `DATE#` records and only fetches what's absent.
+1. **Ingest**: 13 Lambda functions pull from APIs on hourly EventBridge schedules (4am–10pm PST, maintenance window 10pm–4am). Gap-aware backfill — each ingestion Lambda detects missing `DATE#` records (including today) and only fetches what's absent. HAE webhook sources (CGM, water, BP, State of Mind) are near-real-time.
 
 2. **Store**: Raw JSON in S3 (`raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json`), normalized metrics in DynamoDB single-table (`life-platform`, PK `USER#matthew#SOURCE#{source}`, SK `DATE#{YYYY-MM-DD}`).
 

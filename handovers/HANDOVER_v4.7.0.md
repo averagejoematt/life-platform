@@ -190,7 +190,17 @@
 - Status page: pipeline auth failure detection for API-based sources
 - 4 experiments + 1 challenge activated for Day 1
 
-## Platform Counts (v4.8.1)
+### Hourly Ingestion + Final Pipeline Fixes (v4.8.2)
+- CDK: ingestion schedule changed from 5x/day to hourly (18 active hours, 10pm-4am PST maintenance window)
+- Nutrition API: field name mismatch fixed (`calories` vs `total_calories_kcal`)
+- Pulse: rewritten from stale S3 file to live DynamoDB queries
+- Sleep: deep_pct/rem_pct/light_pct + 30d_avg_recovery added
+- Physical: BP section built (card + trend chart)
+- Homepage: 6-ring gauge grid (Weight, Lost, Total Progress, HRV, Sleep, Character)
+- IAM sweep: 13 Lambdas S3 read permissions, 2 OAuth Lambdas token persistence
+- Withings: measurement group selection bug fixed (weight was dropped when BPM was newer)
+
+## Platform Counts (v4.8.2)
 - 115 MCP tools · 62 Lambdas · 72 site pages · 26 data sources · 8 CDK stacks
 - Shared layer: v18 · AI calls: 18 across 15 Lambdas · AI expert cards: 5 (daily)
 - New modules: labs_coaching.py, genome_coaching.py
