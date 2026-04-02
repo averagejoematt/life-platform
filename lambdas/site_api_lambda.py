@@ -4484,11 +4484,18 @@ def handle_nutrition_overview() -> dict:
     def safe_sum_avg(field):
         return safe_avg(field)
 
-    cal_vals = [float(i["calories"]) for i in items if i.get("calories")]
-    pro_vals = [float(i["protein_g"]) for i in items if i.get("protein_g")]
-    carb_vals = [float(i["carbs_g"]) for i in items if i.get("carbs_g")]
-    fat_vals = [float(i["fat_g"]) for i in items if i.get("fat_g")]
-    fiber_vals = [float(i["fiber_g"]) for i in items if i.get("fiber_g")]
+    # Support both old field names (calories) and new (total_calories_kcal)
+    def _mf(item, field, alt_field=None):
+        v = item.get(field) or item.get(alt_field or f"total_{field}")
+        if v is None and field == "calories":
+            v = item.get("total_calories_kcal")
+        return float(v) if v is not None else None
+
+    cal_vals = [_mf(i, "calories") for i in items if _mf(i, "calories") is not None]
+    pro_vals = [_mf(i, "protein_g", "total_protein_g") for i in items if _mf(i, "protein_g", "total_protein_g") is not None]
+    carb_vals = [_mf(i, "carbs_g", "total_carbs_g") for i in items if _mf(i, "carbs_g", "total_carbs_g") is not None]
+    fat_vals = [_mf(i, "fat_g", "total_fat_g") for i in items if _mf(i, "fat_g", "total_fat_g") is not None]
+    fiber_vals = [_mf(i, "fiber_g", "total_fiber_g") for i in items if _mf(i, "fiber_g", "total_fiber_g") is not None]
 
     protein_target = 190  # Matthew's protein target in grams — matches profile.protein_target_g
     protein_hit_days = sum(1 for v in pro_vals if v >= protein_target)
@@ -4500,8 +4507,8 @@ def handle_nutrition_overview() -> dict:
 
     # 7-day vs 30-day comparison
     items_7d = [i for i in items if (i.get("date") or i.get("sk", "").replace("DATE#", "")) >= d7]
-    cal_7d = [float(i["calories"]) for i in items_7d if i.get("calories")]
-    pro_7d = [float(i["protein_g"]) for i in items_7d if i.get("protein_g")]
+    cal_7d = [_mf(i, "calories") for i in items_7d if _mf(i, "calories") is not None]
+    pro_7d = [_mf(i, "protein_g", "total_protein_g") for i in items_7d if _mf(i, "protein_g", "total_protein_g") is not None]
 
     # TDEE estimate (if available in latest record)
     tdee = float(latest.get("tdee") or latest.get("expenditure") or 0) or None
@@ -4514,10 +4521,10 @@ def handle_nutrition_overview() -> dict:
         d = i.get("date") or i.get("sk", "").replace("DATE#", "")
         trend.append({
             "date": d,
-            "calories": round(float(i["calories"])) if i.get("calories") else None,
-            "protein_g": round(float(i["protein_g"]), 1) if i.get("protein_g") else None,
-            "carbs_g": round(float(i["carbs_g"]), 1) if i.get("carbs_g") else None,
-            "fat_g": round(float(i["fat_g"]), 1) if i.get("fat_g") else None,
+            "calories": round(_mf(i, "calories")) if _mf(i, "calories") is not None else None,
+            "protein_g": round(_mf(i, "protein_g", "total_protein_g"), 1) if _mf(i, "protein_g", "total_protein_g") is not None else None,
+            "carbs_g": round(_mf(i, "carbs_g", "total_carbs_g"), 1) if _mf(i, "carbs_g", "total_carbs_g") is not None else None,
+            "fat_g": round(_mf(i, "fat_g", "total_fat_g"), 1) if _mf(i, "fat_g", "total_fat_g") is not None else None,
         })
 
     # ── Weekday vs Weekend comparison ──
