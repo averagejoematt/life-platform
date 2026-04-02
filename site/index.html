@@ -449,10 +449,10 @@
           </svg>
           <div class="h-gauge__center">
             <div class="h-gauge__num" id="h-g-progress-num" style="color:var(--h-accent)">&mdash;</div>
-            <div class="h-gauge__unit">%</div>
+            <div class="h-gauge__unit"></div>
           </div>
         </div>
-        <div class="h-gauge__label">Progress</div>
+        <div class="h-gauge__label">Total Progress</div>
       </div>
       <!-- HRV gauge -->
       <div class="h-gauge" id="h-g-hrv">
@@ -778,7 +778,7 @@
 
     // Progress
     var progVal = progressPct || (totalToLose > 0 ? Math.round(lostLbs / totalToLose * 100) : 0);
-    setText('h-g-progress-num', Math.round(progVal));
+    setText('h-g-progress-num', Math.round(progVal) + '%');
     setArc('h-g-progress-arc', Math.min(100, progVal));
 
     // HRV
