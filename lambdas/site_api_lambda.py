@@ -7174,6 +7174,8 @@ def lambda_handler(event, context):
             resp_data["key_recommendation"] = ai_item["key_recommendation"]
         if ai_item.get("journaling_prompt"):
             resp_data["journaling_prompt"] = ai_item["journaling_prompt"]
+        if ai_item.get("elena_quote"):
+            resp_data["elena_quote"] = ai_item["elena_quote"]
         return _ok(resp_data, cache_seconds=300)
 
     # Special handling: /api/ask accepts POST

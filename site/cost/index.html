@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="How I run a personal AI health operating system on AWS for ~$19/month. Real cost breakdown with receipts.">
-  <meta property="og:title" content="The $19/Month AI Health OS — Matthew">
+  <meta name="description" content="How I run a personal AI health operating system on AWS for $11-$25/month. Real cost breakdown with receipts.">
+  <meta property="og:title" content="The $11-$25/Month AI Health OS — Matthew">
   <meta property="og:description" content="Lambda, DynamoDB, S3, CloudFront, Claude API. Real AWS numbers. How to build and run this for almost nothing.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com/cost/">
@@ -292,7 +292,7 @@
 
 <header class="page-header reveal">
   <div class="eyebrow" style="margin-bottom:var(--space-4)">The Build</div>
-  <h1 class="page-header__title">Running a personal AI health OS for <span>~<span data-const="platform.monthly_cost">$19</span>/month</span></h1>
+  <h1 class="page-header__title">Running a personal AI health OS for <span><span data-const="platform.monthly_cost">$11&ndash;$25</span>/month</span></h1>
   <p class="page-header__sub">
     <span data-const="platform.lambdas">62</span> Lambda functions. <span data-const="platform.data_sources">26</span> data source integrations. <span data-const="platform.mcp_tools">121</span> AI tools. A public website serving live health data.
     Here&rsquo;s the actual AWS bill, every line item, with the architectural decisions that keep it this low.
@@ -322,7 +322,7 @@
         <strong>Intelligence layer</strong>
         <div class="stack-layer__detail">AWS Lambda, DynamoDB, CloudFront, Claude API &mdash; everything on this page</div>
       </div>
-      <span class="stack-layer__cost">~$19/mo</span>
+      <span class="stack-layer__cost" data-const="platform.monthly_cost">$11&ndash;$25</span><span>/mo</span>
     </div>
     <div class="stack-total">
       <span class="stack-total__label">Total monthly investment</span>

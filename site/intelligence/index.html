@@ -753,8 +753,10 @@ async function init() {
 
     // Feature 04 — Character Engine
     const xp     = c.xp_total ? ` — ${c.xp_total.toLocaleString()} XP total` : '';
-    const pillars = c.pillars ? Object.entries(c.pillars).map(([k, v]) => `${k}: ${v}`).join(', ') : '';
-    const charEx  = `Level ${level} ${tier ? '(' + tier + ')' : ''}${xp}.${pillars ? ' Pillars: ' + pillars : ''}`;
+    const pillarText = Array.isArray(c.pillars)
+      ? c.pillars.map(p => `${(p.name || '').charAt(0).toUpperCase() + (p.name || '').slice(1)}: ${Math.round(p.raw_score || 0)}/100`).join(' \u00b7 ')
+      : '';
+    const charEx  = `Level ${level} ${tier ? '(' + tier + ')' : ''}${xp}.${pillarText ? ' ' + pillarText : ''}`;
     setEl('ex-character', charEx);
 
     // Feature 03 — Adaptive Mode

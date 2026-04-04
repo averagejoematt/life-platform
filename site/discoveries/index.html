@@ -920,7 +920,7 @@ function renderTimeline(events, filter) {
           shareHtml +
           '<div class="tl-event__type">' + icon + ' ' + typeLabel + statusHtml + '</div>' +
           '<div class="tl-event__title">' + e.title + '</div>' +
-          '<div class="tl-event__body">' + e.body + '</div>' +
+          '<div class="tl-event__body">' + (e.body || e.summary || e.finding || '<span style="color:var(--text-faint);font-style:italic">Analysis in progress</span>') + '</div>' +
           meta +
           link +
           explorerHtml +

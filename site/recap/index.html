@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- DPR-2.12: Redirect to Weekly Snapshots (Recap merged into Weekly) -->
+  <meta http-equiv="refresh" content="0;url=/weekly/">
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -335,7 +337,7 @@
     // Delta grid
     var deltaHtml = '';
     var metrics = [
-      { label: 'Weight', value: weight ? weight.toFixed(1) + ' lbs' : '\u2014', change: vitals.weight_delta_30d ? (vitals.weight_delta_30d > 0 ? '+' : '') + vitals.weight_delta_30d.toFixed(1) + ' lbs (30d)' : '', spark: null },
+      { label: 'Weight', value: weight ? weight.toFixed(1) + ' lbs' : '\u2014', change: journey.lost_lbs ? (journey.lost_lbs > 0 ? '\u2212' : '+') + Math.abs(journey.lost_lbs).toFixed(1) + ' lbs (from start)' : '', spark: null },
       { label: 'HRV', value: hrv ? Math.round(hrv) + 'ms' : '\u2014', change: vitals.hrv_trend || '', spark: null },
       { label: 'Sleep', value: sleep ? sleep.toFixed(1) + 'h' : '\u2014', change: sleepWeek && sleepWeek.summary ? sleepWeek.summary.primary.delta_label : '', spark: sleepWeek && sleepWeek.summary ? sleepWeek.summary.primary.sparkline : null },
       { label: 'Recovery', value: vitals.recovery_pct ? Math.round(vitals.recovery_pct) + '%' : '\u2014', change: vitals.recovery_status || '', spark: null },
