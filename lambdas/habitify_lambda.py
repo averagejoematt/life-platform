@@ -347,9 +347,12 @@ def write_to_dynamo(item):
 
 # ── Gap detection (v2.0) ──────────────────────────────────────────────────────
 def find_missing_dates(lookback_days=LOOKBACK_DAYS):
-    """Check DynamoDB for missing Habitify records in the lookback window."""
+    """Check DynamoDB for missing or stale Habitify records in the lookback window.
+    Always includes today — habits are checked off throughout the day so the
+    record needs to be refreshed on every hourly run, not just the first."""
     from boto3.dynamodb.conditions import Key
     today = datetime.now(timezone.utc).date()
+    today_str = today.strftime("%Y-%m-%d")
     check_dates = set()
     for i in range(0, lookback_days + 1):  # includes today
         check_dates.add((today - timedelta(days=i)).strftime("%Y-%m-%d"))
@@ -357,13 +360,24 @@ def find_missing_dates(lookback_days=LOOKBACK_DAYS):
     oldest = min(check_dates)
     resp = table.query(
         KeyConditionExpression=Key("pk").eq(PK)
-            & Key("sk").between(f"DATE#{oldest}", f"DATE#{today.strftime('%Y-%m-%d')}"),
+            & Key("sk").between(f"DATE#{oldest}", f"DATE#{today_str}"),
         ProjectionExpression="sk",
     )
     existing = {item["sk"][5:] for item in resp.get("Items", [])}
     missing = sorted(check_dates - existing)
+
+    # Always re-process today AND yesterday — habits are checked off throughout
+    # the day, and the UTC/PT boundary means early UTC runs capture incomplete
+    # PT-day data. Yesterday may also be incomplete if the last run was before
+    # the user finished checking off habits for the PT day.
+    yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
+    for refresh_date in [yesterday_str, today_str]:
+        if refresh_date not in missing and refresh_date >= oldest:
+            missing.append(refresh_date)
+    missing.sort()
+
     if missing:
-        print(f"[GAP-FILL] Found {len(missing)} missing dates in last {lookback_days} days: {missing}")
+        print(f"[GAP-FILL] Found {len(missing)} dates to process (including today refresh): {missing}")
     else:
         print(f"[GAP-FILL] No gaps in last {lookback_days} days")
     return missing

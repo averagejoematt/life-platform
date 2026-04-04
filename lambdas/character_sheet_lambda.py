@@ -572,11 +572,33 @@ def lambda_handler(event, context):
             for p in PILLAR_ORDER
         ]
 
+        def _build_event_description(ev):
+            pillar = (ev.get("pillar") or "overall").title()
+            etype = ev.get("type", "")
+            old_lv = ev.get("old_level", "?")
+            new_lv = ev.get("new_level", "?")
+            base = f"{pillar} \u2192 Level {new_lv}"
+            if "tier" in etype:
+                base = f"{pillar} tier {'up' if 'up' in etype else 'down'}: {ev.get('new_tier', '?')}"
+            # Add "why" context if available
+            parts = []
+            if ev.get("top_driver"):
+                parts.append(f"{ev['top_driver']}")
+                if ev.get("top_driver_value"):
+                    parts[-1] += f" at {ev['top_driver_value']}"
+            if ev.get("streak_days") and ev["streak_days"] > 1:
+                parts.append(f"{ev['streak_days']}-day streak")
+            if ev.get("xp_earned") and ev["xp_earned"] > 0:
+                parts.append(f"+{ev['xp_earned']} XP")
+            if parts:
+                base += f" \u2014 {', '.join(parts)}"
+            return base
+
         timeline_events = [
             {
                 "date":            ev.get("date", yesterday_str),
                 "character_level": float(ev.get("new_level", char_level)),
-                "event":           ev.get("description", f"{ev.get('pillar', 'overall')} level up"),
+                "event":           _build_event_description(ev),
             }
             for ev in (events or [])
         ]
