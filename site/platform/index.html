@@ -4,16 +4,16 @@
   <meta charset="UTF-8">
   <style>.nav-overlay{display:none}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="The Platform — a single-person health intelligence system built entirely on AWS serverless. 62 Lambda functions, 115 AI tools, 26 data sources, ~$19/month.">
+  <meta name="description" content="The Platform — a single-person health intelligence system built entirely on AWS serverless. 62 Lambda functions, 121 AI tools, 26 data sources, ~$19/month.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="The Platform — Matthew">
-  <meta name="twitter:description" content="62 Lambda functions. 115 AI tools. 26 data sources. $19/month. A single-person health intelligence system on AWS serverless.">
+  <meta name="twitter:description" content="62 Lambda functions. 121 AI tools. 26 data sources. $19/month. A single-person health intelligence system on AWS serverless.">
   <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-image.png">
   <meta property="og:title" content="The Platform — Matthew">
-  <meta property="og:description" content="62 Lambda functions. 115 AI tools. 26 data sources. $19/month. A single-person health intelligence system on AWS serverless.">
+  <meta property="og:description" content="62 Lambda functions. 121 AI tools. 26 data sources. $19/month. A single-person health intelligence system on AWS serverless.">
   <meta property="og:type" content="website">
   <title>The Platform — Matthew</title>
     <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
@@ -315,7 +315,7 @@
   <div class="page-header__meta">
     <div class="meta-stat">
       <div class="meta-stat__label">MCP tools</div>
-      <div class="meta-stat__value" id="plat-mcp-tools" data-const="platform.mcp_tools">115</div>
+      <div class="meta-stat__value" id="plat-mcp-tools" data-const="platform.mcp_tools">121</div>
     </div>
     <div class="meta-stat">
       <div class="meta-stat__label">Data sources</div>
@@ -472,7 +472,7 @@
       <!-- MCP server -->
       <rect x="648" y="119" width="155" height="64" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(109,186,109,0.4)" stroke-width="1"/>
       <text x="725" y="135" text-anchor="middle" fill="#6dba6d" font-size="9" letter-spacing="0.5">MCP Lambda</text>
-      <text x="725" y="149" text-anchor="middle" fill="#7a9080" font-size="8">115 tools · 35 modules</text>
+      <text x="725" y="149" text-anchor="middle" fill="#7a9080" font-size="8">121 tools · 35 modules</text>
       <text x="725" y="163" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="8">Claude Desktop + claude.ai</text>
       <text x="725" y="174" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">OAuth 2.1 · natural language</text>
       <!-- Email lambdas -->
@@ -501,7 +501,7 @@
       <!-- Claude MCP -->
       <rect x="848" y="144" width="155" height="48" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(109,186,109,0.4)" stroke-width="1"/>
       <text x="925" y="161" text-anchor="middle" fill="#6dba6d" font-size="9" letter-spacing="0.5">Claude Desktop / AI</text>
-      <text x="925" y="175" text-anchor="middle" fill="#7a9080" font-size="8">MCP protocol · 115 tools</text>
+      <text x="925" y="175" text-anchor="middle" fill="#7a9080" font-size="8">MCP protocol · 121 tools</text>
       <text x="925" y="186" text-anchor="middle" fill="var(--text-muted, #4a6050)" font-size="7">natural language queries</text>
       <!-- Public API + subscribe -->
       <rect x="848" y="201" width="155" height="48" rx="3" fill="var(--surface, #080c0a)" stroke="rgba(0,229,160,0.15)" stroke-width="1"/>
@@ -543,7 +543,7 @@
 <section class="arch-section reveal">
   <div class="eyebrow">System design</div>
   <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Five-layer architecture</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body)">All data converges to a single DynamoDB table (no GSIs, PK+SK only). Compute Lambdas pre-calculate intelligence results before the email delivery window. The MCP server exposes 115 tools to Claude over OAuth 2.1 — queries stay in natural language, not SQL.</p>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body)">All data converges to a single DynamoDB table (no GSIs, PK+SK only). Compute Lambdas pre-calculate intelligence results before the email delivery window. The MCP server exposes 121 tools to Claude over OAuth 2.1 — queries stay in natural language, not SQL.</p>
 
   <div class="arch-layers">
     <div class="arch-layer">
@@ -614,7 +614,7 @@
     <div class="arch-layer">
       <div class="arch-layer__label">
         <div class="arch-layer__name">SERVE</div>
-        <div class="arch-layer__sub">115 MCP tools → Claude</div>
+        <div class="arch-layer__sub">121 MCP tools → Claude</div>
       </div>
       <div class="arch-layer__content">
         <div class="arch-chips">
@@ -654,7 +654,7 @@
 <section class="ai-section reveal">
   <div>
     <div class="eyebrow">Intelligence layer</div>
-    <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-4)">115 tools across 35 domain modules</h2>
+    <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-4)">121 tools across 35 domain modules</h2>
     <div class="ai-section__body">
       <p>The MCP server is a Lambda-backed tool registry exposing direct read access to every metric in DynamoDB. Claude calls tools in natural language; the server handles query composition, DynamoDB projection expressions, and result formatting.</p>
       <p><strong>Domain modules</strong> cover sleep, training, nutrition, CGM, labs, journal, correlation, character, board, lifestyle, and strength — each with dedicated tools purpose-built for their data shapes.</p>
@@ -674,7 +674,7 @@
 <section class="reveal" style="padding:var(--space-16) var(--page-padding);border-top:1px solid var(--border);">
   <div class="eyebrow">Tool spotlight</div>
   <h2 class="text-h3" style="color:var(--text);margin-bottom:var(--space-3)">Tool of the week</h2>
-  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">One of <span data-const="platform.mcp_tools">115</span> MCP tools that Claude uses to query health data. Inputs, outputs, and a representative finding.</p>
+  <p style="font-size:var(--text-base);color:var(--text-muted);max-width:600px;line-height:var(--lh-body);margin-bottom:var(--space-8)">One of <span data-const="platform.mcp_tools">121</span> MCP tools that Claude uses to query health data. Inputs, outputs, and a representative finding.</p>
   <div style="border:1px solid var(--border);background:var(--surface);">
     <div style="padding:var(--space-4) var(--space-6);border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;">
       <span style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--accent)">get_sleep_environment_analysis</span>
@@ -706,7 +706,7 @@
     <div class="stack-card">
       <div class="stack-card__category">AI / Intelligence</div>
       <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Claude (Anthropic)</div><div class="stack-item__desc">Sonnet for coaching and analysis, Haiku for classification. ~$3/month API cost. MCP protocol for tool calls.</div></div></div>
-      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">MCP Server (custom)</div><div class="stack-item__desc"><span data-const="platform.mcp_tools">115</span>-tool Lambda backed by DynamoDB. OAuth 2.1 + HMAC auth. 35-module package. 26h TTL cache with nightly warmer across 13 high-cost tools.</div></div></div>
+      <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">MCP Server (custom)</div><div class="stack-item__desc"><span data-const="platform.mcp_tools">121</span>-tool Lambda backed by DynamoDB. OAuth 2.1 + HMAC auth. 35-module package. 26h TTL cache with nightly warmer across 13 high-cost tools.</div></div></div>
       <div class="stack-item"><div class="stack-item__bullet"></div><div><div class="stack-item__name">Hypothesis Engine</div><div class="stack-item__desc">Weekly Pearson correlation matrix (23 pairs, BH FDR correction) feeds Claude for biological hypothesis generation.</div></div></div>
     </div>
     <div class="stack-card">
