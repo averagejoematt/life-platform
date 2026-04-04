@@ -7158,7 +7158,7 @@ def lambda_handler(event, context):
     if path == "/api/ai_analysis":
         qs = event.get("queryStringParameters") or {}
         expert_key = qs.get("expert", "mind")
-        if expert_key not in ("mind", "nutrition", "training", "physical", "explorer", "labs"):
+        if expert_key not in ("mind", "nutrition", "training", "physical", "explorer", "labs", "glucose"):
             return _error(400, "Invalid expert key")
         ai_pk = f"{USER_PREFIX}ai_analysis"
         ai_item = table.get_item(Key={"pk": ai_pk, "sk": f"EXPERT#{expert_key}"}).get("Item")
