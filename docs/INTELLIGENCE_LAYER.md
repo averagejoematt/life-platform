@@ -4,7 +4,7 @@
 > For the IC roadmap and future phases, see PROJECT_PLAN.md (Tier 7).
 > Last updated: 2026-03-30 (v4.5.1)
 >
-> **Changes since v3.7.68:** Signal Doctrine (evidence badges, confidence tiers), Challenge System (XP modifiers, weekly cadence), Food Delivery integration (delivery index as IC input), Reader Engagement signals (freshness indicators, "Since Your Last Visit"), Elena Voss pull-quote pipeline across 6 observatory pages, ADR-045 (118 MCP tools accepted as operating state).
+> **Changes since v3.7.68:** Signal Doctrine (evidence badges, confidence tiers), Challenge System (XP modifiers, weekly cadence), Food Delivery integration (delivery index as IC input), Reader Engagement signals (freshness indicators, "Since Your Last Visit"), Elena Voss pull-quote pipeline across 6 observatory pages, ADR-045 (115 MCP tools accepted as operating state).
 
 ---
 

@@ -65,6 +65,7 @@ KNOWN_SECRETS = {
     "life-platform/notion",
     "life-platform/dropbox",
     "life-platform/site-api-ai-key",
+    "life-platform/eightsleep-client",
     # life-platform/google-calendar removed — retired ADR-030 (v3.7.46)
 }
 

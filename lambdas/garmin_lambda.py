@@ -727,9 +727,16 @@ def find_missing_dates(lookback_days=LOOKBACK_DAYS):
     oldest = min(expected_dates)
     resp = table.query(
         KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{oldest}", f"DATE#{today.strftime('%Y-%m-%d')}"),
-        ProjectionExpression="sk",
+        ProjectionExpression="sk, steps",
     )
-    existing = {item["sk"][5:] for item in resp.get("Items", [])}
+    # Only count records that have steps (critical field). Records without steps
+    # should be re-fetched (Garmin API may not have had full data on first attempt).
+    existing = set()
+    for item in resp.get("Items", []):
+        if item.get("steps") is not None:
+            existing.add(item["sk"][5:])
+        else:
+            print(f"[GAP-FILL] {item['sk'][5:]} exists but missing steps — will re-fetch")
     missing = sorted(expected_dates - existing)
     if missing:
         print(f"[GAP-FILL] Found {len(missing)} missing dates in last {lookback_days} days: {missing}")

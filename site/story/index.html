@@ -742,7 +742,7 @@
   </div>
 </section>
 <script>
-fetch('/api/subscriber_count').then(r=>r.ok?r.json():null).then(d=>{if(d&&d.count>50)document.getElementById('story-sub-count').textContent=d.count}).catch(()=>{});
+fetch('/api/sub_count').then(r=>r.ok?r.json():null).then(d=>{if(d&&d.count>50)document.getElementById('story-sub-count').textContent=d.count}).catch(()=>{});
 </script>
 
 
@@ -833,7 +833,7 @@ fetch('/api/subscriber_count').then(r=>r.ok?r.json():null).then(d=>{if(d&&d.coun
     if (!r.ok) return;
     const d = await r.json();
     const w = (d.vitals || {}).weight_lbs || (d.hero || {}).current_weight_lbs;
-    if (w) document.getElementById('story-weight').textContent = (Math.round(w * 10) / 10).toFixed(1);
+    if (w) document.getElementById('story-weight').textContent = Math.round(w);
     // STORY-2: Day X milestone
     var daysIn = (d.journey || {}).days_in || (d.platform || {}).days_in;
     var dxEl = document.getElementById('story-day-x');
@@ -927,7 +927,8 @@ fetch('/api/subscriber_count').then(r=>r.ok?r.json():null).then(d=>{if(d&&d.coun
   fetch('/api/journey_waveform')
     .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
     .then(function(d) {
-      var days = d.days || [];
+      var EXPERIMENT_START = '2026-04-01';
+      var days = (d.days || []).filter(function(day) { return day.date >= EXPERIMENT_START; });
       var maxScore = d.max_score || 1;
       var chart = document.getElementById('waveform-chart');
       if (!chart || !days.length) return;

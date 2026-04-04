@@ -31,13 +31,37 @@ SUBSCRIBERS_PK = f"USER#{USER_ID}#SOURCE#subscribers"
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table    = dynamodb.Table(TABLE_NAME)
 ses      = boto3.client("sesv2", region_name=REGION)
+s3       = boto3.client("s3", region_name=REGION)
+S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 
-# Best Chronicle installments (hardcoded initially — Matthew picks)
-BEST_INSTALLMENTS = [
-    {"week": 1, "title": "The Week Everything Started", "path": "/chronicle/posts/week-01/"},
-    {"week": 2, "title": "Finding the Baseline", "path": "/chronicle/posts/week-02/"},
-    {"week": 3, "title": "The First Real Test", "path": "/chronicle/posts/week-03/"},
+# Fallback pages when no Chronicle posts exist yet
+FALLBACK_PAGES = [
+    {"label": "The Story", "title": "Why I'm doing this — and what I'm tracking", "path": "/story/"},
+    {"label": "The Pulse", "title": "Live daily dashboard — weight, sleep, recovery, habits", "path": "/live/"},
+    {"label": "The Chronicle", "title": "Weekly dispatches from inside the experiment", "path": "/chronicle/"},
 ]
+
+
+def _get_published_posts(max_posts=3):
+    """Read posts.json from S3 to get actually-published Chronicle posts.
+    Returns list of dicts with label, title, path — or FALLBACK_PAGES if none exist."""
+    try:
+        resp = s3.get_object(Bucket=S3_BUCKET, Key="site/chronicle/posts.json")
+        data = json.loads(resp["Body"].read())
+        posts = data.get("posts", data) if isinstance(data, dict) else data
+        # Only include published posts with valid URLs
+        published = [p for p in posts if p.get("url") and p.get("status", "published") == "published"]
+        if not published:
+            return FALLBACK_PAGES
+        # Sort by week descending (most recent first), take top N
+        published.sort(key=lambda p: p.get("week", 0), reverse=True)
+        return [
+            {"label": f"Week {p.get('week', '?')}", "title": p["title"], "path": p["url"]}
+            for p in published[:max_posts]
+        ]
+    except Exception as e:
+        logger.warning(f"Could not load posts.json: {e}")
+        return FALLBACK_PAGES
 
 
 def _days_until_wednesday():
@@ -49,20 +73,23 @@ def _days_until_wednesday():
 
 def _build_onboarding_email(email: str) -> tuple[str, str]:
     """Build the Day 2 bridge email with curated installments."""
-    subject = "While you wait for your first Signal \u2014 three installments that define the journey"
+    subject = "Welcome to The Weekly Signal \u2014 here's what you're following"
 
     unsub_url = f"{SITE_URL}/api/subscribe?action=unsubscribe&email={urllib.parse.quote(email)}"
 
+    # Dynamically load published content — adapts as new posts are approved
+    featured_pages = _get_published_posts(max_posts=3)
+
     cards_html = ""
-    for inst in BEST_INSTALLMENTS:
+    for page in featured_pages:
         cards_html += f"""
     <div style="background:#161b22;border-radius:8px;border:1px solid rgba(230,237,243,0.08);
                 padding:20px 24px;margin-bottom:12px;">
       <p style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;
-                text-transform:uppercase;color:#F0B429;margin:0 0 8px;">Week {inst['week']}</p>
-      <p style="font-size:16px;font-weight:600;color:#E6EDF3;margin:0 0 8px;">{inst['title']}</p>
-      <a href="{SITE_URL}{inst['path']}" style="color:#F0B429;font-size:13px;font-weight:600;text-decoration:none;">
-        Read this installment \u2192
+                text-transform:uppercase;color:#F0B429;margin:0 0 8px;">{page['label']}</p>
+      <p style="font-size:16px;font-weight:600;color:#E6EDF3;margin:0 0 8px;">{page['title']}</p>
+      <a href="{SITE_URL}{page['path']}" style="color:#F0B429;font-size:13px;font-weight:600;text-decoration:none;">
+        Explore \u2192
       </a>
     </div>"""
 
@@ -80,8 +107,8 @@ def _build_onboarding_email(email: str) -> tuple[str, str]:
   </h1>
 
   <p style="font-size:15px;color:#8b949e;line-height:1.65;margin:0 0 24px;">
-    In the meantime, here are three installments that set the stage \u2014 the data,
-    the honesty, and the voice that defines this experiment.
+    While you wait, here's what this experiment is about \u2014 the data,
+    the honesty, and why accountability needs an audience.
   </p>
 
   {cards_html}

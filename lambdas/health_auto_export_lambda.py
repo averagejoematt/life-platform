@@ -109,18 +109,23 @@ dynamodb       = boto3.resource("dynamodb", region_name=REGION)
 table          = dynamodb.Table(DYNAMODB_TABLE)
 secrets_client = boto3.client("secretsmanager", region_name=REGION)
 
-# Cache the API key across invocations
-_cached_api_key = None
+# COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
+_secret_cache = {}
+
+
+def _cached_secret(client, secret_id):
+    import time as _t
+    entry = _secret_cache.get(secret_id)
+    if entry and _t.time() - entry[1] < 900:
+        return entry[0]
+    val = client.get_secret_value(SecretId=secret_id)["SecretString"]
+    _secret_cache[secret_id] = (val, _t.time())
+    return val
 
 
 def get_api_key():
-    global _cached_api_key
-    if _cached_api_key:
-        return _cached_api_key
-    resp = secrets_client.get_secret_value(SecretId=SECRET_NAME)
-    secret = json.loads(resp["SecretString"])
-    _cached_api_key = secret.get("health_auto_export_api_key") or secret.get("api_key")
-    return _cached_api_key
+    secret = json.loads(_cached_secret(secrets_client, SECRET_NAME))
+    return secret.get("health_auto_export_api_key") or secret.get("api_key")
 
 
 def floats_to_decimal(obj):
@@ -350,9 +355,17 @@ SKIP_METRICS = {
 # water is tracked via a dedicated water app → Apple Health, not MacroFactor.
 
 
+# Fields that need reading-level dedup (glass-by-glass logging)
+_DEDUP_FIELDS = {"water_intake_raw", "caffeine_mg"}
+
+
 def process_generic_metrics(metrics):
-    """Process non-glucose metrics into daily aggregates with source filtering."""
+    """Process non-glucose metrics into daily aggregates with source filtering.
+    Returns (daily_data, daily_timestamps) where daily_timestamps tracks
+    individual reading timestamps for dedup-able fields.
+    """
     daily_data = defaultdict(dict)
+    daily_timestamps = defaultdict(lambda: defaultdict(dict))  # date → field → {ts: qty}
     matched = []
     skipped_sot = []
     unmatched = []
@@ -401,6 +414,10 @@ def process_generic_metrics(metrics):
             if qty is not None:
                 day_values[date].append(float(qty))
                 kept += 1
+                # Track individual reading timestamps for dedup-able fields
+                if field in _DEDUP_FIELDS:
+                    ts_key = reading.get("date", "")  # full timestamp string as unique ID
+                    daily_timestamps[date][field][ts_key] = float(qty)
 
         if tier == 2 and dropped > 0:
             filtered_counts[name] = {"kept": kept, "dropped": dropped}
@@ -421,11 +438,16 @@ def process_generic_metrics(metrics):
             fields["total_calories_burned"] = round(ac + bc, 2)
 
         # Water: convert fl_oz_us → mL (1 fl oz = 29.5735 mL)
+        # oz is derived from ml after dedup, not tracked independently
         water_raw = fields.pop("water_intake_raw", None)
         if water_raw is not None:
-            # 1 US fluid ounce = 29.5735 mL
             fields["water_intake_ml"] = round(water_raw * 29.5735)
-            fields["water_intake_oz"] = round(water_raw, 1)
+            # Carry dedup timestamps from water_intake_raw → water_intake_ml
+            if date in daily_timestamps and "water_intake_raw" in daily_timestamps[date]:
+                raw_ts = daily_timestamps[date].pop("water_intake_raw")
+                daily_timestamps[date]["water_intake_ml"] = {
+                    ts: round(qty * 29.5735) for ts, qty in raw_ts.items()
+                }
 
     # ── Logging ──
     if matched:
@@ -438,18 +460,56 @@ def process_generic_metrics(metrics):
         for m, counts in filtered_counts.items():
             print(f"Source filter [{m}]: kept {counts['kept']} Apple readings, dropped {counts['dropped']} non-Apple")
 
-    return daily_data
+    return daily_data, dict(daily_timestamps)
 
 
 # ── DynamoDB Write ─────────────────────────────────────────────────────────────
 
-def merge_day_to_dynamo(date_str, fields):
+def merge_day_to_dynamo(date_str, fields, reading_timestamps=None):
     """
     Merge fields into existing DynamoDB record using update_item.
     Only updates specified fields — does NOT overwrite unrelated fields.
+
+    reading_timestamps: optional dict of {field_name: set_of_timestamp_strings}
+      for dedup-able fields (water, caffeine). Each reading's timestamp is tracked
+      in a DynamoDB String Set so re-sends of the same readings are not double-counted.
     """
     if not fields:
         return
+
+    # ── Dedup cumulative fields by reading timestamp ──
+    # Stores a map of {timestamp: quantity} in DynamoDB (_rd_{field}).
+    # On each sync, new readings are merged into the map (existing keys kept).
+    # The field total is always recomputed from the full deduplicated map.
+    # This handles both incremental syncs (1 glass) and full-day re-sends correctly.
+    if reading_timestamps:
+        try:
+            ts_fields = list(reading_timestamps.keys())
+            proj_names = {f"#rd{i}": f"_rd_{k}" for i, k in enumerate(ts_fields)}
+            existing = table.get_item(
+                Key={"pk": PK, "sk": f"DATE#{date_str}"},
+                ProjectionExpression=", ".join(proj_names.keys()),
+                ExpressionAttributeNames=proj_names,
+            ).get("Item", {})
+            for field_name, new_readings in reading_timestamps.items():
+                stored_map = existing.get(f"_rd_{field_name}", {})
+                # Convert Decimal values from DynamoDB to float
+                stored = {k: float(str(v)) for k, v in stored_map.items()} if stored_map else {}
+                # Merge: new readings added, existing keys NOT overwritten
+                merged = {**stored}
+                for ts, qty in new_readings.items():
+                    if ts not in merged:
+                        merged[ts] = qty
+                # Recompute total from full deduplicated map
+                fields[field_name] = round(sum(merged.values()), 2)
+                # Store merged map back (handled in write section below)
+                reading_timestamps[field_name] = merged
+        except Exception as e:
+            print(f"[DEDUP] Read failed (proceeding with full write): {e}")
+
+    # Derive oz from deduped ml (oz not tracked independently)
+    if "water_intake_ml" in fields:
+        fields["water_intake_oz"] = round(fields["water_intake_ml"] / 29.5735, 1)
 
     # Build update expression
     set_parts = []
@@ -464,6 +524,16 @@ def merge_day_to_dynamo(date_str, fields):
         set_parts.append(f"{attr_name} = {attr_val}")
         names[attr_name] = key
         values[attr_val] = floats_to_decimal(val)
+
+    # Store reading maps for dedup on next sync
+    if reading_timestamps:
+        for j, (field_name, merged_readings) in enumerate(reading_timestamps.items()):
+            rd_attr = f"#rd{j}"
+            rd_val = f":rd{j}"
+            rd_key = f"_rd_{field_name}"
+            set_parts.append(f"{rd_attr} = {rd_val}")
+            names[rd_attr] = rd_key
+            values[rd_val] = {ts: floats_to_decimal(qty) for ts, qty in merged_readings.items()}
 
     if not set_parts:
         return
@@ -1056,10 +1126,11 @@ def lambda_handler(event, context):
         print("No blood glucose data in payload")
 
     # ── Process other metrics ──
-    other_daily = process_generic_metrics(metrics)
+    other_daily, other_timestamps = process_generic_metrics(metrics)
     other_days = 0
     for date_str, fields in other_daily.items():
-        merge_day_to_dynamo(date_str, fields)
+        ts = other_timestamps.get(date_str)
+        merge_day_to_dynamo(date_str, fields, reading_timestamps=ts)
         other_days += 1
 
     if other_days:

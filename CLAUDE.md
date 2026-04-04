@@ -6,10 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Deep documentation lives in `docs/`. Start here when context is needed:
 - `docs/ONBOARDING.md` — mental model, key concepts
-- `docs/ARCHITECTURE.md` — full system design, 61 Lambdas, 8 CDK stacks, data flows
+- `docs/ARCHITECTURE.md` — full system design, 62 Lambdas, 8 CDK stacks, data flows
 - `docs/SCHEMA.md` — DynamoDB field reference (authoritative)
 - `docs/RUNBOOK.md` — daily operations, troubleshooting
-- `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-044), why things are the way they are
+- `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-045), why things are the way they are
 
 ## Commands
 
@@ -43,7 +43,7 @@ python3 mcp_bridge.py
 
 **Ingest → Store → Serve** pipeline on AWS (us-west-2):
 
-1. **Ingest**: 13 Lambda functions pull from APIs on hourly EventBridge schedules (4am–10pm PST, maintenance window 10pm–4am). Gap-aware backfill — each ingestion Lambda detects missing `DATE#` records (including today) and only fetches what's absent. HAE webhook sources (CGM, water, BP, State of Mind) are near-real-time.
+1. **Ingest**: 13 Lambda functions pull from APIs on EventBridge schedules (hourly 4am–10pm PST, except Garmin at 4x daily due to OAuth rate limits, Weather + Todoist at 2x daily). Gap-aware backfill — each ingestion Lambda detects missing `DATE#` records (including today) and only fetches what's absent. HAE webhook sources (CGM, water, BP, State of Mind) are near-real-time with reading-level dedup for cumulative fields.
 
 2. **Store**: Raw JSON in S3 (`raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json`), normalized metrics in DynamoDB single-table (`life-platform`, PK `USER#matthew#SOURCE#{source}`, SK `DATE#{YYYY-MM-DD}`).
 
@@ -72,7 +72,9 @@ python3 mcp_bridge.py
 
 **EventBridge crons use fixed UTC** — no DST drift. All schedules in `cdk/stacks/` must be UTC-fixed.
 
-**Lambda Layer** — shared modules (`ai_calls.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`) are deployed as a layer. Changes here require a layer rebuild (`bash deploy/build_layer.sh`) before deploying dependent functions.
+**Lambda Layer** — shared modules (`ai_calls.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`) are deployed as a layer (currently v22). Changes here require a layer rebuild (`bash deploy/build_layer.sh`) before deploying dependent functions.
+
+**Secret caching (COST-OPT-1)** — Lambdas cache Secrets Manager reads for 15 minutes via `secret_cache.py` in the shared layer. Reduces Secrets Manager API calls ~90%.
 
 **Flake8 config** — max 140 chars, ignores E501, W503, E402, E741. See `.flake8`.
 

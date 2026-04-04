@@ -325,7 +325,7 @@ def _build_journey_context(profile, current_date_str=None):
         days_in = 1
         week_num = 1
 
-    start_weight = profile.get("journey_start_weight_lbs", 302)
+    start_weight = profile.get("journey_start_weight_lbs", 307)
     goal_weight  = profile.get("goal_weight_lbs", 185)
 
     # Periodization: Foundation (1-4wk) habit formation, Momentum (5-12) progressive overload,
@@ -1185,7 +1185,7 @@ def call_anthropic(prompt, api_key, max_tokens=200, system=None,
 
 def _build_weight_context(data, profile):
     """Dynamic weight context for AI prompts."""
-    start_w = profile.get("journey_start_weight_lbs", 302)
+    start_w = profile.get("journey_start_weight_lbs", 307)
     goal_w = profile.get("goal_weight_lbs", 185)
     current_w = data.get("latest_weight")
     if current_w:
@@ -1443,7 +1443,7 @@ def _build_daily_bod_intro_from_config(data=None, profile=None):
         if feat_cfg.get("role") == "protocol_tips":
             protocol_note = f"\n{member['name']} provides: {feat_cfg.get('contribution', 'protocol recommendations')}"
 
-    weight_ctx = _build_weight_context(data, profile) if data and profile else "302->185 lbs"
+    weight_ctx = _build_weight_context(data, profile) if data and profile else "307->185 lbs"
     intro = f"""You are the Board of Directors for Project40 — {panel_desc} — unified.
 Speaking to Matthew, 36yo, weight loss journey ({weight_ctx}). Phase 1 Ignition: 3 lbs/week, 1500 kcal deficit, 1800 cal daily.
 Tone: direct, empathetic, no-BS.{protocol_note}"""
