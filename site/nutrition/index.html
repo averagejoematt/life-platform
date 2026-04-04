@@ -2735,17 +2735,18 @@
     })();
 
     /* ── AI Expert Analysis Card ── */
-    if (typeof renderAIAnalysisCard === 'function') {
-      renderAIAnalysisCard('n-ai-analysis', 'nutrition', {
-        dataSources: '30 days of macro tracking, calorie adherence, and meal patterns'
-      });
-    }
-
     // (content already shown above before chart rendering)
   } catch (e) {
     loading.textContent = 'Could not load nutrition data.';
     content.style.display = 'block';
     console.error(e);
+  }
+
+  /* ── AI Expert Analysis Card (outside try/catch — independent fetch) ── */
+  if (typeof renderAIAnalysisCard === 'function') {
+    renderAIAnalysisCard('n-ai-analysis', 'nutrition', {
+      dataSources: '30 days of macro tracking, calorie adherence, and meal patterns'
+    });
   }
 })();
 </script>

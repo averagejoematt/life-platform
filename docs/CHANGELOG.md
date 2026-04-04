@@ -21,7 +21,7 @@ Dedicated documentation session resolving all 7 R19 architecture review findings
 - Experiment date clamp: `_experiment_date()` now uses EXPERIMENT_START (Apr 1), not EXPERIMENT_QUERY_START (Mar 31)
 - Weight rounding: whole numbers across all endpoints (was 1 decimal)
 - Weight baseline: standardized to 307 lbs across 6 files (was 302 in 16 places)
-- Platform stats: synced site_constants.js to match API (115 tools, 62 Lambdas, 72 pages, 1075 tests)
+- Platform stats: synced site_constants.js to match API (121 tools, 62 Lambdas, 72 pages, 1075 tests)
 - "Launching April 1" → "Active" on about/mission pages
 - Chronicle sample: removed fabricated mock email, "April 8" → "next Wednesday"
 - Subscriber onboarding: dynamic content from posts.json (no more hardcoded links)

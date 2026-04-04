@@ -100,7 +100,6 @@ EXPECTED_HANDLERS = {
     "weekly-digest":                "weekly_digest_lambda",
     "life-platform-mcp":            "mcp_server",
     "life-platform-freshness-checker": "freshness_checker_lambda",
-    "google-calendar-ingestion":    "google_calendar_lambda",
     "character-sheet-compute":      "character_sheet_lambda",
     "daily-metrics-compute":        "daily_metrics_compute_lambda",
     "daily-insight-compute":        "daily_insight_compute_lambda",

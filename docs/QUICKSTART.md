@@ -140,4 +140,4 @@ If compute runs before ingestion completes, it uses yesterday's data. If the bri
 - **How the data model works**: `docs/SCHEMA.md`
 - **Why decisions were made**: `docs/DECISIONS.md` (44 ADRs)
 - **Daily operations**: `docs/RUNBOOK.md`
-- **MCP tool catalog**: `docs/MCP_TOOL_CATALOG.md` (115 tools)
+- **MCP tool catalog**: `docs/MCP_TOOL_CATALOG.md` (121 tools)
