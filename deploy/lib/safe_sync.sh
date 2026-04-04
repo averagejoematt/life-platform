@@ -14,17 +14,19 @@
 # Deleting them breaks the live site until the next Lambda run regenerates them.
 #
 # Source Lambdas:
+#   config/*                  → uploaded config files (supplements, experiments, challenges, etc.)
+#   data/*                    → Lambda-generated data files (character_stats.json, etc.)
 #   public_stats.json         → site-stats-refresh, daily-brief
 #   pulse.json                → daily-brief (site_writer)
-#   data/character_stats.json → character-sheet-compute (site_writer)
 #   assets/images/og-*.png    → og-image-generator (12 share cards)
 #   journal/posts/*           → wednesday-chronicle (weekly post HTML)
 #   avatar/*                  → character avatar assets (dashboard only)
 #   assets/life-platform-icon.svg → static asset not in site/
 SAFE_SYNC_EXCLUDES=(
+  "--exclude" "config/*"
+  "--exclude" "data/*"
   "--exclude" "public_stats.json"
   "--exclude" "pulse.json"
-  "--exclude" "data/character_stats.json"
   "--exclude" "assets/images/og-*.png"
   "--exclude" "journal/posts/*.html"
   "--exclude" "journal/posts/*/index.html"
