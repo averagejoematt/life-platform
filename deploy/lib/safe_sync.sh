@@ -13,6 +13,7 @@
 SAFE_SYNC_EXCLUDES=(
   "--exclude" "public_stats.json"
   "--exclude" "pulse.json"
+  "--exclude" "data/character_stats.json"
   "--exclude" "assets/images/og-*.png"
   "--exclude" "avatar/*"
   "--exclude" "assets/life-platform-icon.svg"
