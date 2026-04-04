@@ -4260,23 +4260,28 @@ def handle_pulse() -> dict:
 
     # --- Lift glyph: check for a strength session today (Hevy or Strava) ---
     trained_today = False
+    workout_type = None
     try:
         _hevy_today = table.query(
             KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}hevy") & Key("sk").between(f"DATE#{today_pt}", f"DATE#{today_pt}~"),
-            Limit=1, Select="COUNT",
+            Limit=1,
         )
-        if _hevy_today.get("Count", 0) > 0:
+        _hevy_items = _hevy_today.get("Items", [])
+        if _hevy_items:
             trained_today = True
+            workout_type = _hevy_items[0].get("routine_name") or _hevy_items[0].get("workout_name") or "Strength"
     except Exception:
         pass
     if not trained_today:
         try:
             _strava_today = table.query(
                 KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}strava") & Key("sk").between(f"DATE#{today_pt}", f"DATE#{today_pt}~"),
-                Limit=1, Select="COUNT",
+                Limit=1,
             )
-            if _strava_today.get("Count", 0) > 0:
+            _strava_items = _strava_today.get("Items", [])
+            if _strava_items:
                 trained_today = True
+                workout_type = _strava_items[0].get("activity_type") or _strava_items[0].get("type") or "Activity"
         except Exception:
             pass
 
@@ -4407,7 +4412,8 @@ def handle_pulse() -> dict:
         "lift": {
             "state": "green" if trained_today else "gray",
             "trained_today": trained_today,
-            "label": "Trained" if trained_today else "Rest day",
+            "workout_type": workout_type,
+            "label": workout_type or ("Trained" if trained_today else "Rest day"),
         },
         "mind": {
             "state": _mind_state(),

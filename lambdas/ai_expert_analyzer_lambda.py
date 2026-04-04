@@ -36,7 +36,7 @@ CACHE_PK = f"{USER_PREFIX}ai_analysis"
 AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
 AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
 
-EXPERTS = ["mind", "nutrition", "training", "physical", "explorer", "glucose"]
+EXPERTS = ["mind", "nutrition", "training", "physical", "explorer", "glucose", "labs"]
 
 dynamodb = boto3.resource("dynamodb", region_name="us-west-2")
 table = dynamodb.Table(TABLE_NAME)
@@ -91,9 +91,14 @@ def _latest_item(source):
     return items[0] if items else None
 
 
+EXPERIMENT_START = "2026-04-01"
+
+
 def gather_data_for_expert(expert_key):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    # Clamp lookback to experiment start — data before April 1 is pre-experiment
+    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    days_in_experiment = max(1, (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
 
     if expert_key == "mind":
         # Journal analysis + mood + vice streaks
@@ -117,7 +122,7 @@ def gather_data_for_expert(expert_key):
 
         return {
             "expert_key": "mind",
-            "period": "last 30 days",
+            "period": f"experiment days 1-{days_in_experiment}",
             "journal_entry_count": len(ja_items),
             "top_themes": [{"theme": t, "count": c} for t, c in top_themes],
             "avg_sentiment": avg_sentiment,
@@ -128,7 +133,7 @@ def gather_data_for_expert(expert_key):
     elif expert_key == "nutrition":
         items = _query_source("macrofactor", d30, today)
         if not items:
-            return {"expert_key": "nutrition", "period": "last 30 days", "note": "No nutrition data available"}
+            return {"expert_key": "nutrition", "period": f"experiment days 1-{days_in_experiment}", "note": "No nutrition data available"}
         cal_vals = [float(i["calories"]) for i in items if i.get("calories")]
         pro_vals = [float(i["protein_g"]) for i in items if i.get("protein_g")]
         avg_cal = round(sum(cal_vals) / len(cal_vals)) if cal_vals else 0
@@ -137,7 +142,7 @@ def gather_data_for_expert(expert_key):
         adherence = sum(1 for v in pro_vals if v >= protein_target) / max(len(pro_vals), 1) * 100
         return {
             "expert_key": "nutrition",
-            "period": "last 30 days",
+            "period": f"experiment days 1-{days_in_experiment}",
             "avg_calories": avg_cal,
             "avg_protein_g": avg_pro,
             "protein_target_g": protein_target,
@@ -158,7 +163,7 @@ def gather_data_for_expert(expert_key):
         total_min = sum(float(a.get("duration_min", 0) or a.get("moving_time_min", 0)) for a in activities)
         return {
             "expert_key": "training",
-            "period": "last 30 days",
+            "period": f"experiment days 1-{days_in_experiment}",
             "sessions_count": len(activities),
             "total_active_min": round(total_min),
             "avg_daily_steps": avg_steps,
@@ -175,7 +180,7 @@ def gather_data_for_expert(expert_key):
 
         data = {
             "expert_key": "physical",
-            "period": "last 30 days",
+            "period": f"experiment days 1-{days_in_experiment}",
             "current_weight_lb": current_weight,
             "weight_change_4wk": weight_4wk,
             "weight_readings": len(weights),
@@ -217,7 +222,7 @@ def gather_data_for_expert(expert_key):
 
         return {
             "expert_key": "explorer",
-            "period": "last 30 days",
+            "period": f"experiment days 1-{days_in_experiment}",
             "significant_correlations": len(sig_pairs),
             "top_pairs": sig_pairs[:5] if sig_pairs else [],
             "active_experiments": len(active_exps),
@@ -236,11 +241,32 @@ def gather_data_for_expert(expert_key):
             std_dev = round((sum((r - mean) ** 2 for r in readings) / len(readings)) ** 0.5, 1)
         return {
             "expert_key": "glucose",
-            "period": "last 30 days",
+            "period": f"experiment days 1-{days_in_experiment}",
             "total_readings": len(readings),
             "avg_glucose_mg_dl": avg_glucose,
             "time_in_range_pct": tir_pct,
             "std_dev": std_dev,
+        }
+
+    elif expert_key == "labs":
+        # Labs data spans all-time (not limited to experiment window — draws are periodic)
+        lab_items = _query_source("labs", "2019-01-01", today)
+        if not lab_items:
+            return {"expert_key": "labs", "period": "all draws", "note": "No lab data available"}
+        latest = lab_items[-1] if lab_items else {}
+        flagged = []
+        for key, val in latest.items():
+            if key.endswith("_flag") and val in ("H", "L"):
+                marker_name = key.replace("_flag", "").replace("_", " ").title()
+                marker_val = latest.get(key.replace("_flag", ""), "")
+                flagged.append(f"{marker_name}: {marker_val} ({val})")
+        return {
+            "expert_key": "labs",
+            "period": "most recent draw",
+            "draw_date": latest.get("sk", "").replace("DATE#", "")[:10],
+            "total_draws": len(lab_items),
+            "flagged_markers": flagged[:10],
+            "flagged_count": len(flagged),
         }
 
     return {"expert_key": expert_key, "note": "Unknown expert"}
@@ -277,6 +303,12 @@ EXPERT_PERSONAS = {
         "style": "rigorous but accessible, excited by unexpected findings, careful about causal claims",
         "focus": "cross-domain correlations, surprising signal in the data, what pairs of metrics tell a story that single metrics cannot",
     },
+    "labs": {
+        "name": "Dr. James Okafor",
+        "title": "Clinical pathologist specializing in preventive lab interpretation",
+        "style": "clinical but accessible, connects lab values to lifestyle context, identifies actionable patterns",
+        "focus": "flagged biomarkers in context of current nutrition, training, and supplement protocols — what the numbers mean and what to do about them",
+    },
     "glucose": {
         "name": "Dr. Rhonda Patrick",
         "title": "Metabolic health researcher specializing in continuous glucose monitoring",
@@ -286,8 +318,10 @@ EXPERT_PERSONAS = {
 }
 
 
-def build_prompt(expert_key, data):
+def build_prompt(expert_key, data, days_in_experiment=None):
     p = EXPERT_PERSONAS[expert_key]
+    if days_in_experiment is None:
+        days_in_experiment = max(1, (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
     prior_summary = data.pop("_prior_analysis_summary", "")
     prior_block = f"Your previous analysis said: \"{prior_summary}...\" — find a different angle today." if prior_summary else ""
     data_json = json.dumps(data, indent=2, default=str)
@@ -300,7 +334,12 @@ Your analytical focus: {p['focus']}.
 You are writing your weekly analysis section for Matthew's personal health data platform (averagejoematt.com).
 This section is public-facing — Matthew has chosen radical transparency about his health journey.
 
-Here is Matthew's recent data:
+CRITICAL CONTEXT: The experiment started on {EXPERIMENT_START}. Today is day {days_in_experiment} of the experiment.
+All data below is ONLY from the experiment period (day 1 onward). Do NOT reference "30 days" or any timeframe
+longer than the actual experiment duration. If there are {days_in_experiment} days of data, say "{days_in_experiment} days"
+not "30 days" or "this month." Frame everything relative to the experiment's actual age.
+
+Here is Matthew's data (experiment days 1-{days_in_experiment}):
 {data_json}
 
 Write a 2-3 paragraph analysis (approximately 180-250 words).
