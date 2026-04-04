@@ -1229,7 +1229,11 @@
       .pillar-ring-wrap { width: 140px; height: 140px; }
       .pillar-ring__score { font-size: 36px; }
     }
-
+    /* DPR-1.16: Composite delta */
+    .tc-composite__delta { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--ls-tag); margin-top: 2px; }
+    .delta-up { color: var(--c-green-500, #22c55e); }
+    .delta-down { color: var(--c-red-status, #ef4444); }
+    .delta-flat { color: var(--text-muted); }
   </style>
 </head>
 <body data-tier="foundation">
@@ -1277,6 +1281,7 @@
     </div>
   </div>
   <button class="tc-share" id="share-card">Share my card →</button>
+  <a href="#method-section" class="tc-explain" style="display:block;text-align:center;margin-top:var(--space-3);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);text-decoration:none;letter-spacing:var(--ls-tag)">New here? See how the score works &darr;</a>
 </section>
 
 <!-- ═══ LEVEL UP IMMINENT BANNER ═══ -->
@@ -1524,7 +1529,7 @@
 </section>
 
 <!-- ═══ METHODOLOGY ═══ -->
-<section class="method-section reveal">
+<section class="method-section reveal" id="method-section">
   <div class="eyebrow">Methodology</div>
   <h2 class="text-h3" style="color:var(--text)">How the score works</h2>
   <div class="method-grid">
@@ -1833,15 +1838,27 @@ function hydrate(data) {
   const composite = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
   document.getElementById('tc-score').textContent = composite.toFixed(0);
 
-  // Trading card pillar mini-bars
+  // DPR-1.16: Day-over-day composite delta
+  const delta = character.composite_delta_1d;
+  if (delta !== null && delta !== undefined) {
+    const scoreEl = document.getElementById('tc-score');
+    const arrow = delta > 0 ? '\u2191' : delta < 0 ? '\u2193' : '\u2192';
+    const cls = delta > 0 ? 'delta-up' : delta < 0 ? 'delta-down' : 'delta-flat';
+    scoreEl.insertAdjacentHTML('afterend',
+      `<div class="tc-composite__delta ${cls}">${arrow}${Math.abs(delta).toFixed(1)} from yesterday</div>`);
+  }
+
+  // Trading card pillar mini-bars (DPR-1.09: readable 3-letter abbreviations)
+  const PILLAR_ABBR = {sleep:'SLP',movement:'MOV',nutrition:'NUT',metabolic:'MET',mind:'MND',relationships:'SOC',consistency:'CON'};
   const tcPillars = document.getElementById('tc-pillars');
   tcPillars.innerHTML = pillars.map(p => {
     const col = scoreColor(p.raw_score);
     const xpSign = p.xp_delta >= 0 ? '+' : '';
     const xpClass = p.xp_delta >= 0 ? 'pos' : 'neg';
+    const abbr = PILLAR_ABBR[(p.name || '').toLowerCase()] || p.name.slice(0,3).toUpperCase();
     return `<div class="tc-pillar">
       <div class="tc-pillar__icon">${p.emoji}</div>
-      <div class="tc-pillar__name">${p.name.slice(0,5)}</div>
+      <div class="tc-pillar__name">${abbr}</div>
       <div class="tc-pillar__level">${p.level}</div>
       <div class="tc-pillar__bar"><div class="tc-pillar__bar-fill" data-w="${Math.min(p.raw_score,100)}" style="width:0%;background:${col}"></div></div>
       <div class="tc-pillar__score">${p.raw_score.toFixed(0)}/100</div>
@@ -2091,6 +2108,24 @@ function renderHeatmap(pillarHistory) {
   const EXPERIMENT_START = '2026-04-01';
   pillarHistory = pillarHistory.filter(week => (week.week_end || week.week_start || '') >= EXPERIMENT_START);
   if (!pillarHistory.length) return;
+
+  // DPR-1.11: Early-data state when < 4 weeks
+  if (pillarHistory.length < 4) {
+    grid.innerHTML = `
+      <div style="text-align:center;padding:var(--space-8) var(--space-4)">
+        <div style="font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--space-3)">
+          ${pillarHistory.length} of 4 weeks collected.
+        </div>
+        <p style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);max-width:420px;margin:0 auto;line-height:1.6">
+          The heatmap reveals pillar independence \u2014 which domains move together
+          and which operate on their own rhythm. Check back after 4 weeks of data.
+        </p>
+      </div>`;
+    section.style.display = '';
+    section.classList.add('is-visible');
+    return;
+  }
+
   const PILLARS = ['sleep','movement','nutrition','metabolic','mind','relationships','consistency'];
   const EMOJIS = {sleep:'😴',movement:'🏋️',nutrition:'🥗',metabolic:'📊',mind:'🧠',relationships:'💬',consistency:'🎯'};
   function heatColor(s) {

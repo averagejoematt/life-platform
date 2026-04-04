@@ -389,6 +389,42 @@
       .glyph__ring { width: 44px; height: 44px; }
       .detail-grid { grid-template-columns: 1fr; }
     }
+    /* DPR-1.10: First-time visitor context */
+    .pulse-context {
+      max-width: var(--content-width, 1200px);
+      margin: 0 auto var(--space-3);
+      padding: var(--space-2) var(--space-5);
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-faint);
+      letter-spacing: var(--ls-tag);
+    }
+    .pulse-context__legend { display: inline-flex; align-items: center; gap: var(--space-3); margin-left: var(--space-3); }
+    .pulse-context__dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 2px; vertical-align: middle; }
+    .pulse-context__dot--green { background: var(--c-green-500); }
+    .pulse-context__dot--amber { background: var(--c-yellow-status); }
+    .pulse-context__dot--red { background: var(--c-red-status); }
+    .pulse-context__dot--gray { background: var(--text-faint); }
+    /* DPR-1.14: Delta color coding */
+    .delta-up { color: var(--c-green-500); }
+    .delta-down { color: var(--c-red-status); }
+    .delta-flat { color: var(--text-muted); }
+    /* DPR-1.15: Notable signal banner */
+    .notable-banner {
+      max-width: var(--content-width, 1200px);
+      margin: 0 auto var(--space-4);
+      padding: var(--space-3) var(--space-5);
+      background: rgba(255, 82, 82, 0.06);
+      border: 1px solid rgba(255, 82, 82, 0.2);
+      border-left: 3px solid var(--c-red-status);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
   </style>
 </head>
 <body>
@@ -433,6 +469,25 @@
     <div class="glyph-strip__inner" id="glyph-container"></div>
   </section>
 
+  <!-- ═══ DPR-1.10: First-time visitor context ═══ -->
+  <div class="pulse-context" id="pulse-context" style="display:none">
+    <span class="pulse-context__text">
+      8 daily health signals from wearables and manual logs.
+      <span class="pulse-context__legend">
+        <span class="pulse-context__dot pulse-context__dot--green"></span> on track
+        <span class="pulse-context__dot pulse-context__dot--amber"></span> watch
+        <span class="pulse-context__dot pulse-context__dot--red"></span> attention needed
+        <span class="pulse-context__dot pulse-context__dot--gray"></span> no data yet
+      </span>
+    </span>
+  </div>
+
+  <!-- ═══ DPR-1.15: Notable Signal Banner ═══ -->
+  <div class="notable-banner" id="notable-banner" style="display:none">
+    <span class="notable-banner__icon">&#9888;</span>
+    <span class="notable-banner__text" id="notable-text"></span>
+  </div>
+
   <!-- ═══ LAYER 3: DETAIL CARDS ═══ -->
   <section class="detail-section" id="detail-section">
     <div class="detail-grid" id="detail-grid">
@@ -461,6 +516,16 @@
   <script>
   (function() {
     'use strict';
+
+    // ─── DPR-1.10: Show context for first-time visitors ──
+    (function() {
+      var KEY = 'amj_pulse_seen';
+      var ctx = document.getElementById('pulse-context');
+      if (ctx && !localStorage.getItem(KEY)) {
+        ctx.style.display = '';
+        localStorage.setItem(KEY, '1');
+      }
+    })();
 
     // ─── SVG Glyph Icons (custom icon set) ────────────────
     var GLYPH_ICON_MAP = {
@@ -713,21 +778,44 @@
       return 'End of day: ';
     }
 
-    // ─── 3e: Since yesterday delta line ──────────────────────
+    // ─── 3e: Since yesterday delta line (DPR-1.14: color-coded) ──
     function renderDelta(pulse) {
       var el = document.getElementById('p-delta');
       if (!el) return;
-      var deltas = pulse.since_yesterday || [];
-      if (deltas.length === 0 && pulse.glyphs) {
-        // Build deltas from glyph delta fields
+      var items = pulse.since_yesterday || [];
+      if (items.length === 0 && pulse.glyphs) {
         var g = pulse.glyphs;
-        if (g.scale && g.scale.delta_1d) deltas.push('Weight ' + (g.scale.delta_1d > 0 ? '+' : '') + g.scale.delta_1d.toFixed(1) + ' lbs');
-        if (g.recovery && g.recovery.delta_1d) deltas.push('Recovery ' + (g.recovery.delta_1d > 0 ? '+' : '') + g.recovery.delta_1d + '%');
-        if (g.sleep && g.sleep.delta_1d) deltas.push('Sleep ' + (g.sleep.delta_1d > 0 ? '+' : '') + g.sleep.delta_1d.toFixed(1) + 'h');
+        if (g.scale && g.scale.delta_1d != null) items.push({signal:'weight', text:'Weight ' + (g.scale.delta_1d > 0 ? '+' : '') + g.scale.delta_1d.toFixed(1) + ' lbs', delta:g.scale.delta_1d});
+        if (g.recovery && g.recovery.delta_1d != null) items.push({signal:'recovery', text:'Recovery ' + (g.recovery.delta_1d > 0 ? '+' : '') + g.recovery.delta_1d + '%', delta:g.recovery.delta_1d});
+        if (g.sleep && g.sleep.delta_1d != null) items.push({signal:'sleep', text:'Sleep ' + (g.sleep.delta_1d > 0 ? '+' : '') + g.sleep.delta_1d.toFixed(1) + 'h', delta:g.sleep.delta_1d});
       }
-      if (deltas.length > 0) {
-        el.textContent = 'Since yesterday: ' + deltas.join(' · ');
+      if (items.length > 0) {
+        var html = 'Since yesterday: ';
+        html += items.map(function(d) {
+          var txt = typeof d === 'string' ? d : d.text;
+          var delta = typeof d === 'object' ? d.delta : 0;
+          var sig = typeof d === 'object' ? d.signal : '';
+          // Weight: down is good. Recovery/sleep: up is good.
+          var good = sig === 'weight' ? delta < 0 : delta > 0;
+          var cls = delta === 0 ? 'delta-flat' : (good ? 'delta-up' : 'delta-down');
+          return '<span class="' + cls + '">' + txt + '</span>';
+        }).join(' <span style="opacity:0.3">\u00b7</span> ');
+        el.innerHTML = html;
+        el.style.display = '';
+      } else {
+        el.style.display = 'none';
       }
+    }
+
+    // ─── DPR-1.15: Notable signal banner ──────────────────────
+    function renderNotableBanner(pulse) {
+      var banner = document.getElementById('notable-banner');
+      if (!banner) return;
+      var signals = pulse.notable_signals || [];
+      if (signals.length === 0) { banner.style.display = 'none'; return; }
+      var first = signals[0];
+      document.getElementById('notable-text').textContent = first.message;
+      banner.style.display = '';
     }
 
     // ─── Render Layer 1: Headline (3i: time-of-day, 3a: multi-sentence) ──
@@ -742,9 +830,24 @@
       word.className = 'pulse-word pulse-word--' + status;
       word.textContent = status.charAt(0).toUpperCase() + status.slice(1);
 
-      // 3i: Prefix narrative with time-of-day context, 3a: display multi-sentence
+      // 3i + P1: Time-of-day responsive narrative
       var narrative = pulse.narrative || 'No signal yet.';
       var prefix = timeOfDayPrefix();
+      var h = new Date().getHours();
+      var g = pulse.glyphs || {};
+      // P1: Add time-context supplement
+      if (h < 10 && g.sleep && g.sleep.hours) {
+        // Morning: lead with sleep/recovery context
+        var morningNote = g.recovery && g.recovery.recovery_pct
+          ? (g.recovery.recovery_pct < 50 ? ' Consider easing into the day.' : ' Recovery supports a full day.')
+          : '';
+        narrative += morningNote;
+      } else if (h >= 18 && g.movement && g.movement.value) {
+        // Evening: add day-end reflection
+        var steps = g.movement.value;
+        var waterL = g.water && g.water.liters ? g.water.liters : 0;
+        if (steps < 4000 && waterL < 2) narrative += ' Still time for a walk and a glass of water.';
+      }
       document.getElementById('p-narrative').textContent = prefix + narrative;
 
       // 3e: Since yesterday
@@ -851,6 +954,7 @@
         _lastPulse = pulse;
         renderHeadline(pulse);
         renderGlyphs(pulse.glyphs || {});
+        renderNotableBanner(pulse);
         renderDetails(pulse.glyphs || {});
         renderJourney(pulse);
 
