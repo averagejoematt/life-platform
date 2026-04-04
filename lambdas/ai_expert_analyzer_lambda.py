@@ -359,6 +359,9 @@ Requirements:
 After your analysis paragraphs, on a new line, write exactly:
 KEY RECOMMENDATION: [one specific behavioral suggestion for the coming week, maximum 2 sentences]
 {"" if expert_key != "mind" else chr(10) + "Then on another new line, write exactly:" + chr(10) + "JOURNALING PROMPT: [a single sentence journaling prompt for this week — something Matthew can sit with before writing]"}
+Then on a final new line, write exactly:
+ELENA QUOTE: [A one-sentence observation in the voice of Elena Voss, an AI narrative journalist. She writes about Matthew in third person, noticing patterns with clinical precision but literary warmth. Format: observation + implication. Example style: "Three walks this week. Not a training log — a floor he's building." Never aspirational. Just noticing.]
+
 Write only the analysis text — no preamble, no "Here is my analysis:", just the paragraphs themselves followed by the KEY RECOMMENDATION line."""
 
 
@@ -407,6 +410,11 @@ def generate_and_cache(expert_key):
     # DPR-1.13: Extract KEY RECOMMENDATION if present
     key_recommendation = ""
     journaling_prompt = ""
+    elena_quote = ""
+    if "ELENA QUOTE:" in analysis_text:
+        parts = analysis_text.split("ELENA QUOTE:", 1)
+        analysis_text = parts[0].rstrip()
+        elena_quote = parts[1].strip().strip('"').strip('\u201c').strip('\u201d')
     if "JOURNALING PROMPT:" in analysis_text:
         parts = analysis_text.split("JOURNALING PROMPT:", 1)
         analysis_text = parts[0].rstrip()
@@ -432,6 +440,8 @@ def generate_and_cache(expert_key):
         item["key_recommendation"] = key_recommendation
     if journaling_prompt:
         item["journaling_prompt"] = journaling_prompt
+    if elena_quote:
+        item["elena_quote"] = elena_quote
     table.put_item(Item=item)
 
     logger.info(f"Cached analysis for {expert_key}: {len(analysis_text)} chars")

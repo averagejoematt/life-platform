@@ -203,7 +203,7 @@
 
     <!-- Subscriber count (22c) -->
     <div style="margin-top:var(--space-4);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);letter-spacing:var(--ls-tag);">
-      Join <span id="sub-count" style="color:var(--accent);">—</span> people following the experiment
+      Join <span id="sub-count" style="color:var(--accent);">&mdash;</span> <span id="sub-word">people</span> following the experiment
     </div>
 
     <!-- Timing urgency -->
@@ -312,9 +312,12 @@
     if (e.key === 'Enter') document.getElementById('submit-btn').click();
   });
 
-  // 22c: Fetch subscriber count
+  // 22c: Fetch subscriber count (DPR-2.02: pluralization fix)
   fetch('/api/sub_count').then(r => r.ok ? r.json() : null).then(d => {
-    if (d && d.count) document.getElementById('sub-count').textContent = d.count;
+    if (d && d.count != null) {
+      document.getElementById('sub-count').textContent = d.count;
+      document.getElementById('sub-word').textContent = d.count === 1 ? 'person' : 'people';
+    }
   }).catch(() => {});
 </script>
 <script src="/assets/js/site_constants.js"></script>

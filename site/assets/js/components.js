@@ -745,6 +745,23 @@ function renderAIAnalysisCard(containerId, expertKey, config) {
         keyRecEl.style.display = '';
       }
 
+      // DPR-2.11: Dynamic Elena Voss quote — update any page-level Elena pullquote
+      if (data.elena_quote) {
+        var elenaEls = document.querySelectorAll('.t-pullquote__text, .s-pullquote__text, .n-pullquote__text, .lb-pullquote__text');
+        // Update the FIRST Elena Voss pullquote on the page (if any)
+        var elenaBadges = document.querySelectorAll('.t-pullquote__badge, .s-pullquote__badge, .n-pullquote__badge, .lb-pullquote__badge');
+        for (var ei = 0; ei < elenaBadges.length; ei++) {
+          if (elenaBadges[ei].textContent.indexOf('Elena') >= 0 || elenaBadges[ei].textContent.indexOf('Chronicle') >= 0) {
+            var quoteEl = elenaBadges[ei].closest('.t-pullquote, .s-pullquote, .n-pullquote, .lb-pullquote');
+            if (quoteEl) {
+              var textEl = quoteEl.querySelector('blockquote') || quoteEl.querySelector('.t-pullquote__text, .s-pullquote__text');
+              if (textEl) textEl.innerHTML = '\u201c' + data.elena_quote + '\u201d';
+            }
+            break;
+          }
+        }
+      }
+
       // M1: Journaling prompt for mind expert
       if (data.journaling_prompt) {
         var promptEl = document.getElementById(containerId.split('-')[0] + '-journal-prompt');
