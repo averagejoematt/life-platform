@@ -1456,6 +1456,34 @@
     }
     .s-hero__eyebrow, .eyebrow { color: var(--obs-accent) !important; }
     .detail-card { border-left-color: var(--obs-accent); }
+    /* DPR-1.13: Key recommendation callout */
+    .coaching-key-rec {
+      border: 1px solid var(--obs-accent, var(--accent));
+      border-left: 4px solid var(--obs-accent, var(--accent));
+      background: linear-gradient(135deg, rgba(245,158,11,0.04), transparent 60%);
+      padding: var(--space-5) var(--space-6);
+      margin-bottom: var(--space-6);
+    }
+    .coaching-key-rec__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: var(--ls-tag);
+      text-transform: uppercase;
+      color: var(--obs-accent, var(--accent));
+      margin-bottom: var(--space-2);
+    }
+    .coaching-key-rec__text {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      color: var(--text);
+      line-height: 1.3;
+      margin-bottom: var(--space-2);
+    }
+    .coaching-key-rec__rationale {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      line-height: var(--lh-body);
+    }
   </style>
 </head>
 <body>
@@ -1540,6 +1568,7 @@
           </div>
         </div>
         <div class="n-gauge__label">Logged</div>
+        <div id="n-logged-last7" style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:0.06em;margin-top:2px"></div>
       </div>
       <div class="n-gauge">
         <div class="n-gauge__ring">
@@ -1616,6 +1645,11 @@
      ════════════════════════════════════════════════════════════ -->
 <section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal">
   <div class="n-section-header">Dr. Webb's Analysis</div>
+  <div class="coaching-key-rec" id="n-key-rec" style="display:none">
+    <div class="coaching-key-rec__label">This week's focus</div>
+    <div class="coaching-key-rec__text" id="n-key-rec-text"></div>
+    <div class="coaching-key-rec__rationale" id="n-key-rec-rationale"></div>
+  </div>
   <div id="n-ai-analysis"></div>
 </section>
 
@@ -2329,6 +2363,13 @@
     var daysLogged = n.days_logged || 0;
     setText('g-days-num', daysLogged);
     setArc('g-days-arc', Math.min(100, (daysLogged / 365) * 100));
+    // N1: Show "X of 7 days logged" from trend data
+    var _trendArr = n.daily_trend || n.trend || [];
+    var _d7ago = new Date(); _d7ago.setDate(_d7ago.getDate() - 7);
+    var _d7str = _d7ago.toISOString().slice(0,10);
+    var _last7 = _trendArr.filter(function(d) { return (d.date || '') >= _d7str && d.calories > 0; }).length;
+    var _l7el = document.getElementById('n-logged-last7');
+    if (_l7el) _l7el.textContent = _last7 + ' of last 7 days';
 
     var deficit = n.avg_deficit || (n.avg_tdee && n.avg_calories ? Math.round(n.avg_tdee - n.avg_calories) : 0);
     setText('g-def-num', deficit || '\u2014');

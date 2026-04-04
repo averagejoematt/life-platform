@@ -158,8 +158,10 @@ def get_tier(level, config=None):
     return tiers[-1] if level > 80 else tiers[0]
 
 
-def _compute_xp(raw_score, previous_xp, config):
-    """Compute XP delta with daily decay. Returns (xp_earned, xp_delta, new_xp_total). [F-02]"""
+def _compute_xp(raw_score, previous_xp, config, day_number=None):
+    """Compute XP delta with daily decay. Returns (xp_earned, xp_delta, new_xp_total). [F-02]
+    C2: Grace period — decay scales linearly over first 14 days to avoid
+    punishing new users before data stabilizes."""
     bands = config.get("xp_bands", [
         {"min_raw_score": 80, "xp": 3},
         {"min_raw_score": 60, "xp": 2},
@@ -169,6 +171,11 @@ def _compute_xp(raw_score, previous_xp, config):
     ])
     leveling = config.get("leveling", {})
     daily_decay = leveling.get("daily_xp_decay", DEFAULT_DAILY_XP_DECAY)
+
+    # C2: Grace period — scale decay linearly over first 14 days
+    grace_period = leveling.get("grace_period_days", 14)
+    if day_number is not None and day_number < grace_period:
+        daily_decay = daily_decay * min(1.0, day_number / grace_period)
 
     earned = -1
     for band in bands:
@@ -936,6 +943,11 @@ PILLAR_COMPUTERS = {
 def compute_character_sheet(data, previous_day_state, raw_score_histories, config):
     """Compute the full character sheet for a single day."""
     compute_date = data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    experiment_start = config.get("experiment_start", "2026-04-01")
+    try:
+        _day_number = max(1, (datetime.strptime(compute_date, "%Y-%m-%d") - datetime.strptime(experiment_start, "%Y-%m-%d")).days + 1)
+    except Exception:
+        _day_number = None
     pillar_configs = config.get("pillars", {})
 
     # Step 1: Raw scores for 6 primary pillars
@@ -989,7 +1001,7 @@ def compute_character_sheet(data, previous_day_state, raw_score_histories, confi
             pillar_name, adjusted_level_scores[pillar_name], prev_state, config)
 
         prev_xp = prev_state.get("xp_total", 0) if prev_state else 0
-        xp_earned, xp_delta, new_xp = _compute_xp(pillar_raw_scores[pillar_name], prev_xp, config)
+        xp_earned, xp_delta, new_xp = _compute_xp(pillar_raw_scores[pillar_name], prev_xp, config, day_number=_day_number)
         level_state["xp_total"] = new_xp
 
         pillar_results[pillar_name] = {

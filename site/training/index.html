@@ -1240,6 +1240,19 @@
     }
     .s-hero__eyebrow, .eyebrow { color: var(--obs-accent) !important; }
     .detail-card { border-left-color: var(--obs-accent); }
+    /* DPR-1.12: Awaiting compact placeholder */
+    .awaiting-compact {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      padding: var(--space-5) var(--space-6);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--border);
+      background: var(--surface);
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+    }
+    .awaiting-compact__icon { font-size: 20px; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -1872,7 +1885,7 @@
      ════════════════════════════════════════════════════════════ -->
 <div class="t-pullquote t-pullquote--right reveal" style="border-bottom:1px solid var(--border);">
   <blockquote class="t-pullquote__text">
-    &ldquo;Eight modalities in thirty days. Not because he&rsquo;s an athlete &mdash; because he&rsquo;s terrified of being sedentary at sixty.&rdquo;
+    &ldquo;Three walks in four days. Not impressive by any metric. But the system is counting, and that matters more than the mileage.&rdquo;
   </blockquote>
   <div class="t-pullquote__attr">
     <span class="t-pullquote__badge">Chronicle &middot; Elena Voss</span>
@@ -2567,6 +2580,20 @@
     drawLiftSpark('lift-svg-sq', liftHistory.squat, '#f59e0b');
     drawLiftSpark('lift-svg-bp', liftHistory.bench_press, '#818cf8');
     drawLiftSpark('lift-svg-ohp', liftHistory.overhead_press, '#3ecf8e');
+
+    /* ── DPR-1.12: Collapse empty sections into compact placeholders ── */
+    var hasLiftHistory = Object.values(liftHistory).some(function(arr) { return arr && arr.length > 0; });
+    function collapseEmpty(selector, icon, title, description) {
+      var el = document.querySelector(selector);
+      if (!el) return;
+      el.innerHTML = '<div class="awaiting-compact"><div class="awaiting-compact__icon">' + icon + '</div><div class="awaiting-compact__text"><strong>' + title + '</strong> \u2014 ' + description + '</div></div>';
+    }
+    if (!hasBenchData) {
+      collapseEmpty('.t-centenarian-section', '\uD83C\uDFCB\uFE0F', 'Centenarian Benchmarks', 'Deadlift, squat, bench, and OHP targets auto-populate after first logged strength session in Hevy.');
+    }
+    if (!hasLiftHistory) {
+      collapseEmpty('.t-lifts-section', '\uD83D\uDCC8', '1RM Progress', 'Lift progress charts appear after 2+ logged sessions per exercise.');
+    }
 
     /* ── 11f: Activity diversity radar ── */
     var pillars = t.training_pillars || {};
