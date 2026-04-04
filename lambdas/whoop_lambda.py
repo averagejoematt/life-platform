@@ -140,6 +140,19 @@ _s3 = boto3.client("s3", region_name=REGION)
 _dynamodb = boto3.resource("dynamodb", region_name=REGION)
 _table = _dynamodb.Table(DYNAMODB_TABLE)
 
+# COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
+_secret_cache = {}
+
+
+def _cached_secret(client, secret_id):
+    import time as _t
+    entry = _secret_cache.get(secret_id)
+    if entry and _t.time() - entry[1] < 900:
+        return entry[0]
+    val = client.get_secret_value(SecretId=secret_id)["SecretString"]
+    _secret_cache[secret_id] = (val, _t.time())
+    return val
+
 
 # ── Gap detection (v2.0) ──────────────────────────────────────────────────────
 def find_missing_dates(lookback_days=LOOKBACK_DAYS):
@@ -154,14 +167,18 @@ def find_missing_dates(lookback_days=LOOKBACK_DAYS):
     resp = _table.query(
         KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}#SOURCE#whoop")
             & Key("sk").between(f"DATE#{oldest}", f"DATE#{today.strftime('%Y-%m-%d')}"),
-        ProjectionExpression="sk",
+        ProjectionExpression="sk, recovery_score",
     )
-    # Only count base date records, not WORKOUT sub-items
+    # Only count base date records that have recovery_score (complete records).
+    # Records with only strain data (no recovery/sleep) should be re-fetched.
     existing = set()
     for item in resp.get("Items", []):
         sk = item["sk"]
         if sk.startswith("DATE#") and "#" not in sk[5:]:
-            existing.add(sk[5:])
+            if item.get("recovery_score") is not None:
+                existing.add(sk[5:])
+            else:
+                print(f"[GAP-FILL] {sk[5:]} exists but missing recovery — will re-fetch")
 
     missing = sorted(check_dates - existing)
     if missing:
@@ -187,7 +204,7 @@ def lambda_handler(event, context):
         # ── Auth (shared across all modes) ──
         print("[INFO] Reading credentials from Secrets Manager...")
         credentials = json.loads(
-            _secretsmanager.get_secret_value(SecretId=SECRET_NAME)["SecretString"]
+            _cached_secret(_secretsmanager, SECRET_NAME)
         )
         print("[INFO] Refreshing Whoop access token...")
         access_token, new_refresh_token = refresh_access_token(
@@ -202,6 +219,7 @@ def lambda_handler(event, context):
             SecretId=SECRET_NAME,
             SecretString=json.dumps(credentials),
         )
+        _secret_cache.pop(SECRET_NAME, None)  # Invalidate cache after token refresh
         print("[INFO] Tokens updated in Secrets Manager")
 
         # ── Mode 1: Explicit date override (recovery refresh or manual) ──

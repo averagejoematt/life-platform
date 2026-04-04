@@ -40,10 +40,22 @@ s3_client = boto3.client("s3", region_name=REGION)
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(DYNAMODB_TABLE)
 
+# COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
+_secret_cache = {}
+
+
+def _cached_secret(client, secret_id):
+    import time as _t
+    entry = _secret_cache.get(secret_id)
+    if entry and _t.time() - entry[1] < 900:
+        return entry[0]
+    val = client.get_secret_value(SecretId=secret_id)["SecretString"]
+    _secret_cache[secret_id] = (val, _t.time())
+    return val
+
 
 def get_secret():
-    response = secrets_client.get_secret_value(SecretId=SECRET_NAME)
-    return json.loads(response["SecretString"])
+    return json.loads(_cached_secret(secrets_client, SECRET_NAME))
 
 
 def save_secret(secret):
@@ -51,6 +63,7 @@ def save_secret(secret):
         SecretId=SECRET_NAME,
         SecretString=json.dumps(secret)
     )
+    _secret_cache.pop(SECRET_NAME, None)  # Invalidate cache after token refresh
 
 
 def refresh_token(secret):

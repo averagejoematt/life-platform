@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(*)",
-      "WebFetch(domain:averagejoematt.com)"
+      "WebFetch(domain:averagejoematt.com)",
+      "WebFetch(domain:www.averagejoematt.com)"
     ]
   }
 }

@@ -1458,6 +1458,14 @@
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
+     AI EXPERT ANALYSIS
+     ════════════════════════════════════════════════════════════ -->
+<section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal">
+  <div class="t-section-header">Coach's Notes</div>
+  <div id="t-ai-analysis"></div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
      ACTIVITY DEEP-DIVE CARDS (replaces simple chips)
      ════════════════════════════════════════════════════════════ -->
 <section class="t-activity-section reveal">
@@ -1571,9 +1579,19 @@
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
+     ADVANCED METRICS COLLAPSED PLACEHOLDER (shown when all 3 need 4+ weeks)
+     ════════════════════════════════════════════════════════════ -->
+<section class="t-banister-section reveal" id="t-advanced-collapsed" style="display:none">
+  <div class="t-section-header">Advanced Training Metrics</div>
+  <p class="t-context" style="padding:0 0 var(--space-4) 0;max-width:none;color:var(--text-muted)">
+    CTL/ATL/TSB, ACWR, and HR recovery trend require 4+ weeks of training data. These sections will populate automatically.
+  </p>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
      11a: CTL/ATL/TSB — Banister Fitness-Fatigue Model
      ════════════════════════════════════════════════════════════ -->
-<section class="t-banister-section reveal">
+<section class="t-banister-section reveal" id="t-banister-section">
   <div class="t-section-header">Fitness-fatigue model (Banister)</div>
   <p class="t-context" style="padding:0 0 var(--space-4) 0;max-width:none">
     The Banister model separates training load into <strong>fitness</strong> (slow-building, long-lasting) and
@@ -1608,7 +1626,7 @@
 <!-- ════════════════════════════════════════════════════════════
      11e: ACWR Injury Risk Indicator
      ════════════════════════════════════════════════════════════ -->
-<section class="t-acwr-section reveal">
+<section class="t-acwr-section reveal" id="t-acwr-section">
   <div class="t-section-header">Acute:Chronic workload ratio</div>
   <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
     ACWR compares this week's training load to the 4-week rolling average.
@@ -1800,7 +1818,7 @@
 <!-- ════════════════════════════════════════════════════════════
      11g: Heart Rate Recovery Trend
      ════════════════════════════════════════════════════════════ -->
-<section class="t-hr-section reveal">
+<section class="t-hr-section reveal" id="t-hr-section">
   <div class="t-section-header">Heart rate recovery trend</div>
   <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
     How quickly heart rate drops after peak exertion &mdash; the <strong>strongest exercise-derived mortality predictor</strong>.
@@ -1886,14 +1904,6 @@
       <div class="t-rule__evidence">Testing: comparing Z2% across Walk, Ruck, Ride, Run from Strava HR data</div>
     </div>
   </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     AI EXPERT ANALYSIS
-     ════════════════════════════════════════════════════════════ -->
-<section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal">
-  <div class="t-section-header">Coach's Notes</div>
-  <div id="t-ai-analysis"></div>
 </section>
 
 </div><!-- /t-content -->
@@ -2149,6 +2159,10 @@
     var t = data.training, trend = data.weekly_trend || [];
     if (!t) { loading.textContent = 'No training data yet.'; return; }
 
+    // Show content BEFORE chart rendering (canvas needs offsetWidth > 0)
+    loading.style.display = 'none';
+    content.style.display = 'block';
+
     /* ── Hero gauges ── */
     var z2Avg = t.z2_weekly_avg_min || 0;
     setText('g-z2-num', z2Avg);
@@ -2187,12 +2201,13 @@
     setWidth('zbar-total', Math.min(100, (totalMin / 2000) * 100));
 
     var weeklyAvg = t.weekly_avg || 0;
+    var expDays = Math.min(7, Math.max(1, Math.floor((Date.now() - new Date('2026-04-01').getTime()) / 86400000) + 1));
     setText('zval-wavg', weeklyAvg);
-    setWidth('zbar-wavg', Math.min(100, (weeklyAvg / 7) * 100));
+    setWidth('zbar-wavg', Math.min(100, (weeklyAvg / expDays) * 100));
 
     /* ── V2: Daily Exercise Minutes by Modality Chart ── */
     var dailyMod = data.daily_modality_minutes_30d || [];
-    if (typeof Chart !== 'undefined' && dailyMod.length >= 3) {
+    if (typeof Chart !== 'undefined' && dailyMod.length >= 1) {
       if (!window._chartDefaultsSet) {
         Chart.defaults.color = 'rgba(255,255,255,0.5)';
         Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
@@ -2305,7 +2320,7 @@
 
     /* ── V2: Daily Step Count Chart ── */
     var stepsData = (w.daily_steps_trend || []);
-    if (typeof Chart !== 'undefined' && stepsData.length >= 3) {
+    if (typeof Chart !== 'undefined' && stepsData.length >= 1) {
       if (!window._chartDefaultsSet) {
         Chart.defaults.color = 'rgba(255,255,255,0.5)';
         Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
@@ -2396,7 +2411,14 @@
 
         /* V2: Volume trend line chart */
         var volTrend = sd.volume_trend || [];
-        if (typeof Chart !== 'undefined' && volTrend.length >= 3) {
+        if (typeof Chart !== 'undefined' && volTrend.length < 1) {
+          var volCanvas = document.getElementById('t-volume-canvas');
+          if (volCanvas) {
+            volCanvas.style.display = 'none';
+            volCanvas.insertAdjacentHTML('afterend', '<div style="text-align:center;color:var(--text-faint);font-size:var(--text-sm);padding:var(--space-6) 0;font-family:var(--font-mono);letter-spacing:0.04em">Requires 3+ weeks of volume data.</div>');
+          }
+        }
+        if (typeof Chart !== 'undefined' && volTrend.length >= 1) {
           var volLabels = volTrend.map(function(d) { return d.week; });
           var volData = volTrend.map(function(d) { return d.volume_lbs || 0; });
           new Chart(document.getElementById('t-volume-canvas'), {
@@ -2435,6 +2457,8 @@
       else if (ctl < 30) setText('ctl-plain', 'Fitness base is building steadily.');
       else if (ctl < 60) setText('ctl-plain', 'Solid fitness foundation in place.');
       else setText('ctl-plain', 'Strong aerobic base established.');
+    } else {
+      setText('ctl-plain', 'Requires 4+ weeks of training data.');
     }
     if (atl != null) {
       setText('atl-val', atl.toFixed(1));
@@ -2442,6 +2466,8 @@
       else if (atl < 30) setText('atl-plain', 'Moderate fatigue. Training load is manageable.');
       else if (atl < 50) setText('atl-plain', 'Significant fatigue accumulating. Watch recovery.');
       else setText('atl-plain', 'High fatigue. Consider a deload week.');
+    } else {
+      setText('atl-plain', 'Requires 4+ weeks of training data.');
     }
     if (tsb != null) {
       setText('tsb-val', tsb.toFixed(1));
@@ -2449,11 +2475,13 @@
       else if (tsb > 0) setText('tsb-plain', 'Slightly positive form. Balanced load.');
       else if (tsb > -10) setText('tsb-plain', 'Slightly fatigued but adapting. Normal training.');
       else setText('tsb-plain', 'Accumulated fatigue. Performance may dip short-term.');
+    } else {
+      setText('tsb-plain', 'Requires 4+ weeks of training data.');
     }
 
     // Banister chart: draw CTL/ATL/TSB lines if trend data has them
     var banisterData = (data.banister_trend || []);
-    if (banisterData.length >= 3) {
+    if (banisterData.length >= 1) {
       var ctlVals = banisterData.map(function(d) { return d.ctl || 0; });
       var atlVals = banisterData.map(function(d) { return d.atl || 0; });
       var tsbVals = banisterData.map(function(d) { return d.tsb || 0; });
@@ -2469,10 +2497,10 @@
 
     /* ── 11e: ACWR injury risk indicator ── */
     var acwr = t.acwr;
+    var acwrLight = document.getElementById('acwr-light');
+    var acwrTitle = document.getElementById('acwr-title');
+    var acwrExplain = document.getElementById('acwr-explain');
     if (acwr != null) {
-      var acwrLight = document.getElementById('acwr-light');
-      var acwrTitle = document.getElementById('acwr-title');
-      var acwrExplain = document.getElementById('acwr-explain');
       acwrLight.textContent = acwr.toFixed(2);
       if (acwr < 1.2) {
         acwrLight.className = 't-acwr-light t-acwr-light--green';
@@ -2487,6 +2515,9 @@
         acwrTitle.textContent = 'Danger zone — injury risk elevated';
         acwrExplain.textContent = 'Your acute load significantly exceeds your chronic base. Research shows injury probability climbs sharply above 1.5. Consider scaling back this week.';
       }
+    } else {
+      acwrTitle.textContent = 'Requires 4+ weeks of data';
+      acwrExplain.textContent = 'ACWR compares acute (1-week) load to chronic (4-week) average. More training history needed to compute the ratio.';
     }
 
     /* ── 11b: Centenarian benchmark tracker ── */
@@ -2551,12 +2582,33 @@
 
     /* ── 11g: HR recovery trend ── */
     var hrRecovery = t.hr_recovery_trend || [];
-    if (hrRecovery.length >= 3) {
+    if (hrRecovery.length >= 1) {
       var hrVals = hrRecovery.map(function(d) { return d.bpm_drop || d.value || 0; });
       var hrMax = Math.max.apply(null, hrVals);
       drawLineChart('t-hr-canvas', [
         { data: hrVals, color: '#ef4444', fill: 'rgba(239,68,68,0.06)', yMin: 0 }
       ], hrMax * 1.2);
+    } else {
+      var hrCanvas = document.getElementById('t-hr-canvas');
+      if (hrCanvas) {
+        hrCanvas.style.display = 'none';
+        hrCanvas.insertAdjacentHTML('afterend', '<div style="text-align:center;color:var(--text-faint);font-size:var(--text-sm);padding:var(--space-8) 0;font-family:var(--font-mono);letter-spacing:0.04em">Requires 3+ data points. Populates as training sessions accumulate.</div>');
+      }
+    }
+
+    /* ── Collapse advanced metrics if all three lack data ── */
+    var banisterHasData = (ctl != null || atl != null || tsb != null);
+    var acwrHasData = (acwr != null);
+    var hrHasData = (hrRecovery.length >= 1);
+    if (!banisterHasData && !acwrHasData && !hrHasData) {
+      var bSec = document.getElementById('t-banister-section');
+      var aSec = document.getElementById('t-acwr-section');
+      var hSec = document.getElementById('t-hr-section');
+      var cSec = document.getElementById('t-advanced-collapsed');
+      if (bSec) bSec.style.display = 'none';
+      if (aSec) aSec.style.display = 'none';
+      if (hSec) hSec.style.display = 'none';
+      if (cSec) cSec.style.display = '';
     }
 
     /* ── 11h: Time-of-day distribution ── */
@@ -2573,7 +2625,14 @@
     }
 
     /* ── Weekly chart ── */
-    if (trend.length >= 3) {
+    if (trend.length < 1) {
+      var trendCanvas = document.getElementById('t-trend-canvas');
+      if (trendCanvas) {
+        trendCanvas.style.display = 'none';
+        trendCanvas.insertAdjacentHTML('afterend', '<div style="text-align:center;color:var(--text-faint);font-size:var(--text-sm);padding:var(--space-8) 0;font-family:var(--font-mono);letter-spacing:0.04em">Requires 3+ weeks of data. Chart populates as training weeks accumulate.</div>');
+      }
+    }
+    if (trend.length >= 1) {
       var canvas = document.getElementById('t-trend-canvas');
       var dpr = window.devicePixelRatio || 1;
       canvas.width = canvas.offsetWidth * dpr;
@@ -2615,8 +2674,7 @@
       });
     }
 
-    loading.style.display = 'none';
-    content.style.display = 'block';
+    // (content already shown above before chart rendering)
 
     /* ── Auto-populate milestones from benchmarks + activity firsts ── */
     (function loadMilestones() {

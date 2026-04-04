@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-04-01 (v4.8.1 — 115 MCP tools, 26-module MCP package, 26 data sources, 62 Lambdas, 72 site pages, 70+ API endpoints, 8 CDK stacks)
+Last updated: 2026-04-04 (v4.9.0 — 115 MCP tools, 35-module MCP package, 26 data sources, 62 Lambdas, 72 site pages, 70+ API endpoints, 8 CDK stacks, shared layer v22)
 
 ---
 
@@ -46,7 +46,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 │  freshness-checker (9:45am) · insight-email-parser (S3 trig)│
 │                                                             │
 │  WEB LAYER                                                  │
-│  averagejoematt.com (71 pages) · CloudFront → S3 /site      │
+│  averagejoematt.com (72 pages) · CloudFront → S3 /site      │
 │  site-api Lambda (us-west-2): /api/ask · /api/board_ask     │
 │  /api/verify_subscriber · /api/vitals · /api/journey        │
 │  /api/character · /api/timeline · /api/correlations         │
@@ -79,8 +79,8 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | CloudFront (buddy) | CDN (public) | `ETTJ44FT0Z4GO` → S3 `/buddy`, alias `buddy.averagejoematt.com` |
 | ACM Certificate | TLS | `arn:aws:acm:us-east-1:205930651321:certificate/e85e4b63-...` — `averagejoematt.com` (DNS-validated) |
 | SES Receipt Rule Set | Inbound email routing | `life-platform-inbound` (active) — rule `insight-capture` routes `insight@aws.mattsusername.com` → S3 |
-| CloudWatch | Alarms + logs | **~49 metric alarms**, all Lambdas monitored |
-| CDK | Infrastructure as Code | `cdk/` — 8 stacks deployed. CDK owns all 49 Lambda IAM roles + ~50 EventBridge rules. |
+| CloudWatch | Alarms + logs | **~66 metric alarms**, all Lambdas monitored |
+| CDK | Infrastructure as Code | `cdk/` — 8 stacks deployed. CDK owns all 62 Lambda IAM roles + ~50 EventBridge rules. |
 | CloudTrail | Audit logging | `life-platform-trail` → S3 |
 | AWS Budget | Cost guardrail | $20/mo cap, alerts at 25%/50%/100% |
 
@@ -94,19 +94,23 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 
 **Gap-aware backfill (v2.46.0):** All API-based ingestion Lambdas implement self-healing gap detection. On each run, the Lambda queries DynamoDB for the last N days (including today), identifies missing DATE# records, and fetches only those from the upstream API. Cost is ~$0/month — Lambdas short-circuit in <50ms when no new data exists.
 
-**Schedule:** Hourly during active hours (4am–10pm PST). Maintenance window: 10pm–4am PST (UTC 6–11 skipped).
+**Schedule:** Hourly during active hours (4am–10pm PST) for most sources. Exceptions: Garmin at 4x daily (OAuth rate limits), Weather + Todoist at 2x daily (COST-OPT). Maintenance window: 10pm–4am PST (UTC 6–11 skipped).
+
+**Shared Lambda Layer:** v22 — includes `ai_calls.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`. Rebuild with `bash deploy/build_layer.sh`. 16 dependent Lambdas consume the layer.
+
+**Secret caching (COST-OPT-1):** 15-min in-memory TTL cache via `secret_cache.py` in shared layer. Reduces Secrets Manager API calls ~90% across 9 Lambdas.
 
 | Source | Lambda | Schedule | Type |
 |---|---|---|---|
 | Whoop | `whoop-data-ingestion` | Hourly (active hours) | API pull |
-| Garmin | `garmin-data-ingestion` | Hourly (active hours) | API pull |
+| Garmin | `garmin-data-ingestion` | 4x daily (cron 0 0,6,14,22) | API pull |
 | Eight Sleep | `eightsleep-data-ingestion` | Hourly (active hours) | API pull |
 | Withings | `withings-data-ingestion` | Hourly (active hours) | API pull |
 | Habitify | `habitify-data-ingestion` | Hourly (active hours) | API pull |
 | Strava | `strava-data-ingestion` | Hourly (active hours) | API pull |
-| Todoist | `todoist-data-ingestion` | Hourly (active hours) | API pull |
+| Todoist | `todoist-data-ingestion` | 2x daily | API pull |
 | Notion Journal | `notion-journal-ingestion` | Hourly (active hours) | API pull |
-| Weather | `weather-data-ingestion` | Hourly (active hours) | API pull |
+| Weather | `weather-data-ingestion` | 2x daily | API pull |
 | MacroFactor | `macrofactor-data-ingestion` | S3 trigger (Dropbox CSV) | File upload |
 | Dropbox Poll | `dropbox-poll` | `rate(30 minutes)` | File poll |
 | Journal Enrichment | `journal-enrichment` | Hourly | Compute |
@@ -148,7 +152,7 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 
 ### Failure handling
 
-DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq`. CloudWatch: **~49 alarms** total. Alarm actions → SNS `life-platform-alerts`.
+DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq`. CloudWatch: **~66 alarms** total. Alarm actions → SNS `life-platform-alerts`.
 
 Additional safeguards: DLQ Consumer Lambda, Canary Lambda (synthetic health check every 30 min), item size guard.
 
@@ -173,7 +177,7 @@ SK: DATE#YYYY-MM-DD
 
 ### MCP Server
 
-**Lambda:** `life-platform-mcp` | **Tools:** 118 | **Memory:** 768 MB | **Modules:** 35
+**Lambda:** `life-platform-mcp` | **Tools:** 115 | **Memory:** 768 MB | **Modules:** 35
 **Remote MCP:** `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws`
 **Auth:** `x-api-key` header check + OAuth 2.1/HMAC Bearer for remote MCP
 
@@ -273,7 +277,7 @@ Target: under $25/month | Current: ~$13/month
 | DynamoDB (on-demand) | ~$1.00 |
 | S3 (~2.5 GB + requests) | ~$0.50 |
 | CloudFront (4 distributions) | ~$1.50 |
-| CloudWatch (49 alarms + logs) | ~$2.00 |
+| CloudWatch (66 alarms + logs) | ~$2.00 |
 | Anthropic API (Haiku + Sonnet) | ~$4.00 |
 | **Total** | **~$13** |
 
@@ -295,24 +299,35 @@ Target: under $25/month | Current: ~$13/month
     tools_data, tools_todoist
 
   lambdas/
-    # 13 ingestion Lambdas (whoop, withings, strava, garmin, habitify,
+    # 16 ingestion (whoop, withings, strava, garmin, habitify,
     #   eightsleep, macrofactor, notion, todoist, weather, apple_health,
-    #   health_auto_export, dropbox_poll)
-    # 2 enrichment (enrichment_lambda, journal_enrichment)
-    # 7 email/digest (daily_brief, weekly_digest_v2, monthly_digest,
-    #   nutrition_review, wednesday_chronicle, weekly_plate, monday_compass)
-    # 5 compute (character_sheet, adaptive_mode, daily_metrics_compute,
-    #   daily_insight_compute, hypothesis_engine)
-    # 9 operational (anomaly_detector, dashboard_refresh, freshness_checker,
-    #   insight_email_parser, data_export, qa_smoke, key_rotator, mcp_server,
-    #   site_api_lambda — public web API, us-east-1, CDK LifePlatformWeb)
+    #   health_auto_export, dropbox_poll, food_delivery, measurements,
+    #   journal_enrichment, activity_enrichment)
+    # 11 email/digest (daily_brief, weekly_digest, monthly_digest,
+    #   nutrition_review, wednesday_chronicle, weekly_plate, monday_compass,
+    #   anomaly_detector, evening_nudge, chronicle_email_sender,
+    #   subscriber_onboarding)
+    # 12 compute (character_sheet, adaptive_mode, daily_metrics_compute,
+    #   daily_insight_compute, hypothesis_engine, weekly_correlation_compute,
+    #   acwr_compute, sleep_reconciler, circadian_compliance,
+    #   ai_expert_analyzer, journal_analyzer, field_notes)
+    # 21 operational (freshness_checker, dashboard_refresh, data_export,
+    #   qa_smoke, key_rotator, mcp_server, insight_email_parser,
+    #   site_api_lambda — public web API, us-west-2,
+    #   site_stats_refresh, challenge_generator, og_image_generator,
+    #   email_subscriber, pipeline_health_check, chronicle_approve,
+    #   canary, dlq_consumer, data_reconciliation, pip_audit,
+    #   brittany_email, mcp_warmer)
+    # 2 Lambda@Edge (cf-auth, buddy-auth)
     board_loader.py               ← Shared: Board of Directors config loader
     ai_calls.py                   ← Shared: AI call utilities
     insight_writer.py             ← Shared: Insights ledger writer
     output_writers.py             ← Shared: S3/DDB output utilities
     scoring_engine.py             ← Shared: Day grade scoring
+    secret_cache.py               ← Shared: 15-min TTL secret cache (COST-OPT)
+    site_writer.py                ← Shared: Public stats S3 writer
 
-  site/                           ← 68-page static website (averagejoematt.com)
+  site/                           ← 72-page static website (averagejoematt.com)
     index.html                    ← Homepage
     story/, live/, journal/       ← Journey pages
     platform/, character/         ← Technical pages
@@ -325,6 +340,6 @@ Target: under $25/month | Current: ~$13/month
   docs/                           ← All documentation
   deploy/                         ← ~120 deploy scripts
   cdk/                            ← 8 CDK stacks
-  tests/                          ← 853+ passing tests, 8 CI linters
+  tests/                          ← 1075+ passing tests, 8 CI linters
   handovers/                      ← Session handover notes
 ```

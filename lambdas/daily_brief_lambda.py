@@ -1827,7 +1827,7 @@ def lambda_handler(event, context):
                     tldr_guidance=tldr_guidance,
                     training_nutrition=training_nutrition,
                     journal_coach_text=journal_coach_text,
-                    date=yesterday.isoformat(),
+                    date=yesterday,
                     component_scores=component_scores,
                 )
                 written = insight_writer.write_insights_batch(insights_list)

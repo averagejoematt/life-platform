@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-Last updated: 2026-03-30 (v4.5.2 — 118 MCP tools, 26-module package, 61 Lambdas, 26 data sources, 68 site pages)
+Last updated: 2026-04-04 (v4.9.0 — 115 MCP tools, 35-module package, 62 Lambdas, 26 data sources, 72 site pages)
 
 ---
 
@@ -63,6 +63,32 @@ aws s3api delete-bucket-policy --bucket matthew-life-platform
 
 ---
 
+## Shared Lambda Layer
+
+**Current version:** v22. Rebuild with `bash deploy/build_layer.sh`. 16 Lambdas consume the layer.
+
+Modules included: `ai_calls.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, `character_engine.py`, `digest_utils.py`, `insight_writer.py`, `retry_utils.py`, `ai_output_validator.py`, `platform_logger.py`, `ingestion_framework.py`, `ingestion_validator.py`, `item_size_guard.py`, `html_builder.py`.
+
+After rebuilding, update all dependent Lambdas to the new layer version. Check `ci/lambda_map.json` for the full list of layer consumers.
+
+---
+
+## Secret Caching (COST-OPT-1)
+
+Lambdas cache Secrets Manager reads for 15 minutes via `secret_cache.py` in the shared layer. This reduces Secrets Manager API calls by ~90% across 9 Lambdas. The cache is in-memory (per-Lambda instance), so a cold start always fetches fresh secrets.
+
+---
+
+## Gap-Fill Behavior
+
+**Whoop:** Gap-fill checks for `recovery_score` presence. If a record exists but `recovery_score` is missing, the Lambda re-fetches from the Whoop API (recovery data is often delayed ~2 hours after sleep ends).
+
+**Garmin:** Gap-fill checks for `steps` presence. If a record exists but `steps` is missing, the Lambda re-fetches from the Garmin API.
+
+All ingestion Lambdas include today in gap-fill checks (`range(0, N)`, not `range(1, N)`).
+
+---
+
 ## OAuth Token Refresh Behavior
 
 Each OAuth-based ingestion Lambda refreshes its own tokens and writes them back to Secrets Manager. No dedicated rotation Lambda exists for OAuth tokens (only for the MCP API key via `key-rotator`).
@@ -103,13 +129,13 @@ The pipeline has strict ordering. Changing schedules without maintaining this se
 | Source | Schedule | Lambda |
 |--------|----------|--------|
 | Whoop | 07:00 AM | whoop-data-ingestion |
-| Garmin | 07:00 AM | garmin-data-ingestion |
+| Garmin | 4x daily (cron 0 0,6,14,22 UTC) | garmin-data-ingestion |
 | Notion Journal | 07:00 AM | notion-journal-ingestion |
 | Withings | 07:15 AM | withings-data-ingestion |
 | Habitify | 07:15 AM | habitify-data-ingestion |
 | Strava | 07:30 AM | strava-data-ingestion |
 | Journal Enrichment | 07:30 AM | journal-enrichment |
-| Todoist | 07:45 AM | todoist-data-ingestion |
+| Todoist | 2x daily | todoist-data-ingestion |
 | Eight Sleep | 08:00 AM | eightsleep-data-ingestion |
 | Activity Enrichment | 08:30 AM | activity-enrichment |
 | MacroFactor | 09:00 AM | macrofactor-data-ingestion (EventBridge + S3 trigger) |
@@ -130,6 +156,7 @@ The pipeline has strict ordering. Changing schedules without maintaining this se
 | The Weekly Plate | 07:00 PM (Friday only) | weekly-plate (v1.0, Sonnet, food magazine email, ~63s) |
 | Dashboard Refresh | 02:00 PM | dashboard-refresh (lightweight, no AI — updates weight/glucose/zone2/TSB/buddy) |
 | Dashboard Refresh | 06:00 PM | dashboard-refresh (same as above, second daily run) |
+| Weather | 2x daily | weather-data-ingestion |
 | Dropbox Poll | Every 30 min | dropbox-poll |
 
 **MacroFactor** uses an automated Dropbox pipeline: phone export → Dropbox `/life-platform/` → `dropbox-poll` Lambda (every 30 min) → S3 → `macrofactor-data-ingestion`. Auto-detects nutrition vs workout CSVs. Manual S3 upload (`s3://matthew-life-platform/imports/macrofactor/`) still works as fallback.
@@ -179,7 +206,7 @@ aws lambda invoke \
 
 ## Cache Warmer
 
-12 tools are pre-computed nightly at 9:00 AM PT via EventBridge → MCP Lambda. Tools with cached results return in <100ms. Custom date ranges bypass cache and compute fresh.
+14 tools are pre-computed nightly at 9:00 AM PT via EventBridge → MCP Lambda. Tools with cached results return in <100ms. Custom date ranges bypass cache and compute fresh.
 
 Manually trigger warmer:
 ```bash
@@ -197,7 +224,7 @@ aws dynamodb query \
   --expression-attribute-values '{":pk":{"S":"CACHE#matthew"}}' \
   --query 'Count'
 ```
-Expected: 12 items.
+Expected: 14 items.
 
 ---
 

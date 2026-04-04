@@ -128,7 +128,7 @@ def lambda_handler(event, context):
     )
 
     fresh_vitals = {
-        "weight_lbs":          round(weight, 1) if weight else None,
+        "weight_lbs":          round(weight) if weight else None,
         "weight_as_of":        weight_as_of,
         "weight_delta_30d":    ev.get("weight_delta_30d"),   # preserved from morning
         "hrv_ms":              round(hrv, 1)  if hrv      else ev.get("hrv_ms"),
@@ -157,6 +157,55 @@ def lambda_handler(event, context):
     char_level = _safe_float(character, "character_level") if character else None
     char_tier = character.get("character_tier") if character else None
 
+    # ── 5d. Glucose average (CGM from apple_health) ──────────────────────
+    glucose_avg = _safe_float(apple_health, "blood_glucose_avg")
+    if glucose_avg:
+        fresh_vitals["glucose_avg"] = round(glucose_avg)
+    else:
+        fresh_vitals["glucose_avg"] = ev.get("glucose_avg")
+
+    # ── 5e. Nutrition summary (MacroFactor) ──────────────────────────────
+    macrofactor = _get_latest(table, "macrofactor")
+    mf_cal = _safe_float(macrofactor, "total_calories_kcal")
+    mf_pro = _safe_float(macrofactor, "total_protein_g")
+    fresh_vitals["nutrition_calories"] = round(mf_cal) if mf_cal else ev.get("nutrition_calories")
+    fresh_vitals["nutrition_protein_g"] = round(mf_pro) if mf_pro else ev.get("nutrition_protein_g")
+    # Aliases for homepage JS compatibility
+    fresh_vitals["calories_avg"] = fresh_vitals["nutrition_calories"]
+
+    # ── 5f. Training summary (average daily active minutes from Strava) ──
+    # Use the experiment start to compute avg daily training
+    exp_start = date.fromisoformat("2026-04-01")
+    days_in = max(1, (date.today() - exp_start).days + 1) if date.today() >= exp_start else 1
+    try:
+        _tr_resp = table.query(
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
+            ExpressionAttributeValues={
+                ":pk": f"USER#{USER_ID}#SOURCE#strava",
+                ":s": f"DATE#{exp_start.isoformat()}",
+                ":e": f"DATE#{date.today().isoformat()}",
+            },
+        )
+        _tr_items = _tr_resp.get("Items", [])
+        total_min = 0
+        for ti in _tr_items:
+            acts = ti.get("activities") or ti.get("activities_list") or []
+            if isinstance(acts, list):
+                for a in acts:
+                    dur = a.get("duration_minutes") or a.get("moving_time_seconds")
+                    if dur:
+                        d_val = float(str(dur))
+                        total_min += d_val if d_val < 1440 else d_val / 60  # handle seconds vs minutes
+        fresh_vitals["training_avg_daily_min"] = round(total_min / days_in) if total_min else ev.get("training_avg_daily_min")
+    except Exception:
+        fresh_vitals["training_avg_daily_min"] = ev.get("training_avg_daily_min")
+
+    # Homepage JS aliases (zone2_min_avg used for training tile)
+    fresh_vitals["zone2_min_avg"] = fresh_vitals.get("training_avg_daily_min")
+
+    # Protein avg in platform section for homepage JS compatibility
+    # (homepage reads p.protein_avg from platform, not vitals)
+
     # ── 6. Merge — preserve everything except vitals + streak + _meta ────────
     # Update character in payload
     existing_char = existing.get("character") or {}
@@ -178,6 +227,7 @@ def lambda_handler(event, context):
         },
         "vitals":   fresh_vitals,
         "platform": {**ep, "tier0_streak": fresh_streak,
+                     "protein_avg": fresh_vitals.get("nutrition_protein_g"),
                      "days_in": max(1, (date.today() - date.fromisoformat("2026-04-01")).days + 1) if date.today() >= date.fromisoformat("2026-04-01") else 0},
     }
 

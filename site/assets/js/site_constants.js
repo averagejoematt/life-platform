@@ -32,25 +32,25 @@ window.AMJ = {
   // ── Platform (fallbacks — overridden by /api/platform_stats) ──
   platform: {
     data_sources:   26,
-    mcp_tools:      118,
-    lambdas:        61,
+    mcp_tools:      115,
+    lambdas:        62,
     monthly_cost:   '$19',
     review_grade:   'A',
     review_count:   19,
-    test_count:     83,
+    test_count:     1075,
     cdk_stacks:     8,
     alarms:         66,
     active_secrets: 10,
     adrs:           45,
-    site_pages:     68,
+    site_pages:     72,
     board_technical: 12,
     board_product:  8,
   },
 
   // ── Bios (press kit / about page) ─────────────────────────
   bios: {
-    fifty_word: 'Matthew built a personal health intelligence platform from scratch using AI as a development partner. 26 data sources, 118 AI tools, 61 AWS Lambda functions, running for $19/month. He publishes every number, every failure, every week.',
-    hundred_word: 'Matthew is the creator of Life Platform — a personal health intelligence system built entirely with AI assistance. Using Claude as a development partner, Matthew built 26 data integrations, 118 intelligence tools, and a fully automated daily coaching brief that runs on AWS for $19/month. He documents every result publicly — wins, failures, and everything in between. His work is both a personal transformation project and a live proof-of-concept for what one person can build when AI removes the traditional barriers to software development.',
+    fifty_word: 'Matthew built a personal health intelligence platform from scratch using AI as a development partner. 26 data sources, 115 AI tools, 62 AWS Lambda functions, running for $19/month. He publishes every number, every failure, every week.',
+    hundred_word: 'Matthew is the creator of Life Platform — a personal health intelligence system built entirely with AI assistance. Using Claude as a development partner, Matthew built 26 data integrations, 115 intelligence tools, and a fully automated daily coaching brief that runs on AWS for $19/month. He documents every result publicly — wins, failures, and everything in between. His work is both a personal transformation project and a live proof-of-concept for what one person can build when AI removes the traditional barriers to software development.',
   },
 
   // ── OG / meta descriptions ─────────────────────────────────
@@ -59,7 +59,7 @@ window.AMJ = {
     live:        'Real-time metrics from 26 data sources. Weight, HRV, recovery, habits, and the full transformation timeline.',
     story:       '307 lbs. And a decision to stop optimizing in the dark.',
     about:       'IT leader by day. Solo engineer by night. Building the infrastructure to change everything.',
-    platform:    '61 Lambda functions. 118 AI tools. 26 data sources. $19/month. A single-person health intelligence system on AWS serverless.',
+    platform:    '62 Lambda functions. 115 AI tools. 26 data sources. $19/month. A single-person health intelligence system on AWS serverless.',
     character:   '7-pillar scoring system: Sleep, Movement, Nutrition, Mind, Metabolic, Consistency, Relationships.',
     methodology: 'Pearson r, Benjamini-Hochberg FDR, 26 data sources. The statistical framework behind the experiment.',
   },
