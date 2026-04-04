@@ -70,7 +70,7 @@ Runs daily after ingestion completes. **Order matters** — see critical path be
 
 ## 4. MCP Tool Layer (DynamoDB → Claude)
 
-Read-only query layer. 115 tools across 26 modules.
+Read-only query layer. 121 tools across 26 modules.
 
 | MCP Module | DDB Partitions Read |
 |------------|-------------------|

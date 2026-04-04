@@ -2391,18 +2391,18 @@
       });
     }
 
-    /* ── AI Expert Analysis Card ── */
-    if (typeof renderAIAnalysisCard === 'function') {
-      renderAIAnalysisCard('m-ai-analysis', 'mind', {
-        dataSources: '30 days of journal entries, mood logs, and behavioral data'
-      });
-    }
-
     // (content already shown above before chart rendering)
   } catch (e) {
     loading.textContent = 'Could not load inner life data.';
     content.style.display = 'block';
     console.error(e);
+  }
+
+  /* ── AI Expert Analysis Card (outside try/catch — independent fetch) ── */
+  if (typeof renderAIAnalysisCard === 'function') {
+    renderAIAnalysisCard('m-ai-analysis', 'mind', {
+      dataSources: '30 days of journal entries, mood logs, and behavioral data'
+    });
   }
 })();
 </script>

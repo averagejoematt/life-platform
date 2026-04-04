@@ -22,9 +22,8 @@
     "google_calendar": {
       "expected_prefix": "raw/google_calendar/",
       "iam_prefix": "raw/google_calendar/*",
-      "reason": "Google Calendar Lambda predates the raw/{USER_ID}/ convention — writes to raw/google_calendar/ directly (same pattern as todoist)",
-      "lambda_file": "lambdas/google_calendar_lambda.py",
-      "evidence": "role_policies.py:474 — _ingestion_base('google_calendar') s3_prefix='raw/google_calendar/*'"
+      "reason": "Google Calendar integration retired (ADR-030, secret deleted 2026-03-15). Lambda file removed. calendar_sync.py handles calendar data now.",
+      "retired": true
     }
   },
 

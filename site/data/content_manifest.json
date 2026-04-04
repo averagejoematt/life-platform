@@ -41,10 +41,10 @@
       "journey_sensitive": true,
       "sections": [
         { "type": "prose_with_facts", "element": ".bio-prose paragraph 2",     "contains": "March 2026, I decided..." },
-        { "type": "constant",         "element": "data-const bio stats",       "contains": "26 sources, 115 tools, 62 Lambdas, $19/month — all via data-const" },
+        { "type": "constant",         "element": "data-const bio stats",       "contains": "26 sources, 121 tools, 62 Lambdas, $19/month — all via data-const" },
         { "type": "constant",         "element": ".sidebar-block__note",       "contains": "Started at 307 lbs. Goal: 185." },
-        { "type": "constant",         "element": "#bio-50 (50-word bio)",      "contains": "307 → 185, 26 sources, 115 tools, 62 Lambdas, $19/month" },
-        { "type": "constant",         "element": "#bio-100 (100-word bio)",    "contains": "26 integrations, 115 tools, $19/month" },
+        { "type": "constant",         "element": "#bio-50 (50-word bio)",      "contains": "307 → 185, 26 sources, 121 tools, 62 Lambdas, $19/month" },
+        { "type": "constant",         "element": "#bio-100 (100-word bio)",    "contains": "26 integrations, 121 tools, $19/month" },
         { "type": "prose_with_facts", "element": "stack-row Test coverage",    "contains": "83 tests, Review #19: grade A — via data-const" }
       ]
     },
@@ -53,7 +53,7 @@
       "journey_sensitive": false,
       "platform_sensitive": true,
       "sections": [
-        { "type": "constant",         "element": "og:description meta tag",    "contains": "62 Lambda, 115 tools, 26 sources, $19/month" },
+        { "type": "constant",         "element": "og:description meta tag",    "contains": "62 Lambda, 121 tools, 26 sources, $19/month" },
         { "type": "constant",         "element": "data-const stats grid",      "contains": "tool count, source count, lambda count, grade — all via data-const" },
         { "type": "api_driven",       "element": "stats overridden by fetch",  "contains": "/api/platform_stats hydrates data-const on page load" },
         { "type": "prose_with_facts", "element": "AI section body",            "contains": "Sonnet for coaching, Haiku for classification" },
@@ -131,6 +131,9 @@
       "95 AI tools",
       "95 MCP tools",
       "105 tools",
+      "115 AI tools",
+      "115 MCP tools",
+      "115 tools",
       "50 Lambda",
       "52 Lambda",
       "$13/month",

@@ -130,7 +130,7 @@ def _experiment_date(days_back=30):
 # Update these when Lambdas/tools/sources change. Every page reads from here.
 PLATFORM_STATS = {
     "data_sources": 26,
-    "mcp_tools": 115,
+    "mcp_tools": 121,
     "lambdas": 62,
     "cdk_stacks": 8,
     "alarms": 66,
@@ -730,7 +730,7 @@ def handle_journey() -> dict:
     Cache: 3600s (1 hr) — weight changes slowly.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d120 = (datetime.now(timezone.utc) - timedelta(days=120)).strftime("%Y-%m-%d")
+    d120 = max((datetime.now(timezone.utc) - timedelta(days=120)).strftime("%Y-%m-%d"), EXPERIMENT_START)
 
     withings_all = _query_source("withings", d120, today)
     weight_series = sorted(
@@ -865,7 +865,7 @@ def handle_weight_progress() -> dict:
     Cache: 3600s (1 hr).
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d180  = (datetime.now(timezone.utc) - timedelta(days=180)).strftime("%Y-%m-%d")
+    d180  = max((datetime.now(timezone.utc) - timedelta(days=180)).strftime("%Y-%m-%d"), EXPERIMENT_START)
     items = _query_source("withings", d180, today)
 
     readings = sorted(
@@ -6281,9 +6281,9 @@ def handle_observatory_week(qs: dict = None) -> dict:
     from datetime import datetime, timezone, timedelta
     now = datetime.now(timezone.utc)
     end_date = now.strftime("%Y-%m-%d")
-    start_date = (now - timedelta(days=7)).strftime("%Y-%m-%d")
-    prev_start = (now - timedelta(days=14)).strftime("%Y-%m-%d")
-    prev_end = (now - timedelta(days=8)).strftime("%Y-%m-%d")
+    start_date = max((now - timedelta(days=7)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    prev_start = max((now - timedelta(days=14)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    prev_end = max((now - timedelta(days=8)).strftime("%Y-%m-%d"), EXPERIMENT_START)
 
     try:
         if domain == "sleep":

@@ -247,6 +247,13 @@ jobs:
           python3 -m pytest tests/test_layer_version_consistency.py -v --tb=short
           echo "::endgroup::"
 
+      - name: Full test suite
+        # R20-F01: Run the complete pytest suite (excluding AWS integration tests)
+        run: |
+          echo "::group::Full pytest suite"
+          python3 -m pytest tests/ -v --tb=short --ignore=tests/test_integration_aws.py
+          echo "::endgroup::"
+
   # ════════════════════════════════════════════════════════════════
   # Job 3: Plan — validate map, detect changes, build deploy plan
   # ════════════════════════════════════════════════════════════════

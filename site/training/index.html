@@ -2745,15 +2745,16 @@
     })();
 
     /* ── AI Expert Analysis Card ── */
-    if (typeof renderAIAnalysisCard === 'function') {
-      renderAIAnalysisCard('t-ai-analysis', 'training', {
-        dataSources: '7 days of training sessions, step counts, and recovery data'
-      });
-    }
-
   } catch (e) {
     loading.textContent = 'Could not load training data.';
     console.error(e);
+  }
+
+  /* ── AI Expert Analysis Card (outside try/catch — independent fetch) ── */
+  if (typeof renderAIAnalysisCard === 'function') {
+    renderAIAnalysisCard('t-ai-analysis', 'training', {
+      dataSources: '7 days of training sessions, step counts, and recovery data'
+    });
   }
 })();
 </script>

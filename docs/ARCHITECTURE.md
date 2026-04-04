@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-04-04 (v4.9.0 — 115 MCP tools, 35-module MCP package, 26 data sources, 62 Lambdas, 72 site pages, 70+ API endpoints, 8 CDK stacks, shared layer v22)
+Last updated: 2026-04-04 (v4.9.0 — 121 MCP tools, 35-module MCP package, 26 data sources, 62 Lambdas, 72 site pages, 70+ API endpoints, 8 CDK stacks, shared layer v22)
 
 ---
 
@@ -29,7 +29,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
                          │ DynamoDB queries
 ┌────────────────────────▼────────────────────────────────────┐
 │  SERVE LAYER                                                │
-│  MCP Server Lambda (115 tools, 768 MB) + Lambda Function URL │
+│  MCP Server Lambda (121 tools, 768 MB) + Lambda Function URL │
 │  ← Claude Desktop + claude.ai + Claude mobile via remote MCP│
 │                                                             │
 │  COMPUTE LAYER (IC intelligence features)                   │
@@ -177,7 +177,7 @@ SK: DATE#YYYY-MM-DD
 
 ### MCP Server
 
-**Lambda:** `life-platform-mcp` | **Tools:** 115 | **Memory:** 768 MB | **Modules:** 35
+**Lambda:** `life-platform-mcp` | **Tools:** 121 | **Memory:** 768 MB | **Modules:** 35
 **Remote MCP:** `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws`
 **Auth:** `x-api-key` header check + OAuth 2.1/HMAC Bearer for remote MCP
 
@@ -246,7 +246,7 @@ Each Lambda has a **dedicated, least-privilege IAM role** (49 roles total as of 
 
 ## Secrets Manager
 
-**9 active secrets** at $0.40/month each = **~$3.60/month**
+**10 active secrets** at $0.40/month each = **~$4.00/month**
 
 | Secret | Used By |
 |---|---|
@@ -272,7 +272,7 @@ Target: under $25/month | Current: ~$13/month
 
 | Driver | Monthly Cost |
 |---|---|
-| Secrets Manager (9 active secrets) | ~$3.60 |
+| Secrets Manager (10 active secrets) | ~$4.00 |
 | Lambda invocations (~2,000/mo) | ~$0.50 |
 | DynamoDB (on-demand) | ~$1.00 |
 | S3 (~2.5 GB + requests) | ~$0.50 |

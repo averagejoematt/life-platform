@@ -2,9 +2,11 @@
 
 > Documents the Intelligence Compounding (IC) features: how the platform learns, remembers, and improves over time.
 > For the IC roadmap and future phases, see PROJECT_PLAN.md (Tier 7).
-> Last updated: 2026-03-30 (v4.5.1)
+> Last updated: 2026-04-04 (v4.9.0)
 >
-> **Changes since v3.7.68:** Signal Doctrine (evidence badges, confidence tiers), Challenge System (XP modifiers, weekly cadence), Food Delivery integration (delivery index as IC input), Reader Engagement signals (freshness indicators, "Since Your Last Visit"), Elena Voss pull-quote pipeline across 6 observatory pages, ADR-045 (115 MCP tools accepted as operating state).
+> **Changes since v3.7.68:** Signal Doctrine (evidence badges, confidence tiers), Challenge System (XP modifiers, weekly cadence), Food Delivery integration (delivery index as IC input), Reader Engagement signals (freshness indicators, "Since Your Last Visit"), Elena Voss pull-quote pipeline across 6 observatory pages, ADR-045 (121 MCP tools accepted as operating state).
+>
+> **Changes in v4.8.0 (AI Insight Engine Overhaul):** Anti-repetition via `guidance_given` (prior 3-day dedup), 6 unused data sources wired into coaching prompts, `what_worked` memory pattern, weekly correlation injection, labs/genome personalization modules. See [v4.8.0 AI Overhaul](#v480-ai-insight-engine-overhaul-2026-04-01) section below.
 
 ---
 
@@ -33,6 +35,9 @@ The architecture decision (ADR-016) is explicit: no vector store, no embeddings,
 │           ├─ 7-day habit × outcome correlations              │
 │           ├─ leading indicator flags                         │
 │           ├─ platform_memory pull (relevant records)         │
+│           ├─ anti-repetition: prior 3-day guidance_given (v4.8)│
+│           ├─ what_worked: record conditions on grade ≥85 (v4.8)│
+│           ├─ weekly correlation top-3 injection (v4.8)       │
 │           └─ structured JSON handoff to Daily Brief          │
 │                                                              │
 │  SUNDAY 11:30 AM  weekly-correlation-compute                 │
@@ -62,6 +67,13 @@ The architecture decision (ADR-016) is explicit: no vector store, no embeddings,
 │  IC-17: Red Team / Contrarian Skeptic pass (anti-confirmation│
 │          bias, challenges correlation claims)                │
 │                                                              │
+│  v4.8.0 additions:                                           │
+│  - Anti-repetition: "AVOID REPEATING" from guidance_given    │
+│  - 6 data sources wired: journal, character, adaptive mode,  │
+│    State of Mind, supplements, weather                       │
+│  - Labs/genome coaching context (labs_coaching.py,            │
+│    genome_coaching.py) injected into TL;DR prompt            │
+│                                                              │
 │  W3: ai_output_validator wired to all 12 AI-output Lambdas  │
 │      (validates shape, required fields, disclaimer presence) │
 └─────────────────────────────────┬────────────────────────────┘
@@ -72,7 +84,8 @@ The architecture decision (ADR-016) is explicit: no vector store, no embeddings,
 │  insight_writer.py (shared module in Lambda Layer)           │
 │  → SOURCE#insights — universal write by all email Lambdas    │
 │  → SOURCE#platform_memory — failure patterns, milestones,    │
-│    intention tracking, what worked, coaching calibration      │
+│    intention tracking, what_worked (v4.8), coaching calib.    │
+│  → SOURCE#computed_insights — guidance_given feedback (v4.8)  │
 │  → SOURCE#decisions — platform decisions + outcomes          │
 │  → SOURCE#hypotheses — weekly cross-domain hypotheses        │
 │  → SOURCE#weekly_correlations — 23-pair FDR-corrected matrix │
@@ -81,14 +94,14 @@ The architecture decision (ADR-016) is explicit: no vector store, no embeddings,
 
 ---
 
-## IC Features (as of v3.7.48)
+## IC Features (as of v4.9.0)
 
 ### IC-1: platform_memory Partition
 **Status:** Live (v2.86.0)
 **What it does:** DDB partition `SOURCE#platform_memory`, SK `MEMORY#<category>#<date>`. The compounding substrate — structured memory written by compute Lambdas and digest Lambdas, read back into AI prompts as context. Enables "the last 4 weeks show X pattern" without re-querying raw data.
 
-**Memory categories live:** `milestone_architecture`, `intention_tracking`
-**Memory categories coming:** `failure_patterns` (Month 2), `what_worked` (Month 3), `coaching_calibration` (Month 3), `personal_curves` (Month 4)
+**Memory categories live:** `milestone_architecture`, `intention_tracking`, `what_worked` (v4.8.0), `coaching_calibration`
+**Memory categories coming:** `failure_patterns` (Month 2), `personal_curves` (Month 4)
 
 ### IC-2: Daily Insight Compute Lambda
 **Status:** Live (v2.86.0)
@@ -173,7 +186,7 @@ The architecture decision (ADR-016) is explicit: no vector store, no embeddings,
 ### IC-18: Hypothesis Engine v1.2.0
 **Status:** Live (v2.89.0 → v1.2.0 validation upgrade v3.7.x)
 **Lambda:** `hypothesis-engine` (Sunday 12:00 PM PT — runs 30 min after weekly-correlation-compute to consume fresh correlation data)
-**What it does:** Weekly Lambda pulls 14 days of all-pillar data plus the current week's correlation matrix. Prompts Claude to identify non-obvious cross-domain connections the existing 89 tools don't explicitly monitor. Writes hypothesis records to `SOURCE#hypotheses`. Subsequent insight compute + digest prompts told to watch for confirming/refuting evidence.
+**What it does:** Weekly Lambda pulls 14 days of all-pillar data plus the current week's correlation matrix. Prompts Claude to identify non-obvious cross-domain connections the existing 121 tools don't explicitly monitor. Writes hypothesis records to `SOURCE#hypotheses`. Subsequent insight compute + digest prompts told to watch for confirming/refuting evidence.
 
 **Validation rules (v1.2.0):**
 - Required fields + domains + numeric criteria must be present
@@ -204,7 +217,7 @@ Access: `get_active_hypotheses`, `evaluate_hypothesis`, `get_hypotheses`, `updat
 ### Weekly Correlation Compute (R8-LT9)
 **Status:** Live (v3.7.20)
 **Lambda:** `weekly-correlation-compute` (Sunday 11:30 AM PT — runs before hypothesis engine)
-**What it does:** Computes 23 Pearson correlation pairs weekly over a 90-day rolling window and writes results to `SOURCE#weekly_correlations | WEEK#<iso_week>`. Results feed directly into hypothesis engine context and are surfaced in `get_schedule_load` coaching notes.
+**What it does:** Computes 23 Pearson correlation pairs weekly over a 90-day rolling window and writes results to `SOURCE#weekly_correlations | WEEK#<iso_week>`. Results feed directly into hypothesis engine context, are surfaced in `get_schedule_load` coaching notes, and (since v4.8.0) the top 3 FDR-significant pairs are injected into the daily coaching context block.
 
 **Correlation pairs (v3.7.25):**
 - 20 cross-sectional pairs (sleep vs recovery, HRV vs performance, etc.)
@@ -221,24 +234,101 @@ Access: `get_active_hypotheses`, `evaluate_hypothesis`, `get_hypotheses`, `updat
 
 ---
 
+## v4.8.0 AI Insight Engine Overhaul (2026-04-01)
+
+Major overhaul of the AI coaching pipeline in four phases. Closes gaps where rich data was written to DynamoDB but never read by AI prompts. Adds memory to prevent repetition and compounds learning over time.
+
+### Phase 1: Anti-Repetition via `guidance_given`
+
+**Problem:** The Daily Brief could repeat the same coaching advice on consecutive days because AI calls had no memory of what was recently said.
+
+**Solution:** Three-layer anti-repetition system:
+
+1. **`daily_insight_compute_lambda.py`** (step 5j): Reads prior 3 days of `guidance_given` from `computed_insights` records. Builds an "AVOID REPEATING" list (up to 8 items) injected into `ai_context_block`. All 4 AI calls in the Daily Brief receive this list as negative guidance.
+
+2. **`daily_brief_lambda.py`**: After TL;DR generation, writes the current day's coaching points back to `computed_insights` as `guidance_given`. This creates the feedback loop — today's advice becomes tomorrow's "avoid" list.
+
+3. **`ai_expert_analyzer_lambda.py`**: Reads its own prior analysis for the same expert before generating a new one. Prompts the AI to "find a different angle," preventing the weekly expert panels from recycling the same observations.
+
+**DynamoDB path:** `SOURCE#computed_insights | DATE#<YYYY-MM-DD>` → `guidance_given` field (list of strings).
+
+### Phase 2: 6 Unused Data Sources Wired into Coaching
+
+Six data sources were already being ingested and stored in DynamoDB but were never read by AI coaching prompts. v4.8.0 wires all six into the appropriate coaching contexts:
+
+| Data Source | Wired Into | Fields Used |
+|-------------|-----------|-------------|
+| **Journal enrichment** (16 fields) | Journal coach prompt | Defense patterns, cognitive patterns, growth signals, avoidance flags, social quality, locus of control, stress sources |
+| **Character sheet** | Coaching tone adaptation | Conscientiousness, resilience, growth mindset scores — adjusts coaching directness and framing |
+| **Adaptive mode** | Email tone/verbosity | Flourishing/struggling classification changes guidance verbosity and emotional framing |
+| **State of Mind** (Apple Health) | Emotional context priority | Low mood valence triggers nervous-system-reset priority over performance optimization |
+| **Supplements** | Nutrition coach prompt | Active supplement list injected so AI accounts for nutrient adequacy (avoids recommending what's already supplemented) |
+| **Weather** | Training prescription | Daylight hours, barometric pressure, temperature inform training intensity and outdoor recommendations |
+
+### Phase 3: Memory — `what_worked` + Weekly Correlation Injection
+
+**`what_worked` pattern** (step 5k in `daily_insight_compute_lambda.py`):
+- When the weekly grade average >= 85, the Lambda records the current conditions to `MEMORY#what_worked#<date>` in `platform_memory`
+- Recorded conditions include: grade average, declining/improving metrics, strongest/weakest habits
+- `build_memory_context()` reads the most recent 2 `what_worked` records and injects them as "WHAT HAS WORKED (recent episodes)" into coaching context
+- Enables coaching like: "When your conditions looked like this before, here's what worked..."
+
+**Weekly correlation injection** (step 5l in `daily_insight_compute_lambda.py`):
+- Reads the most recent `weekly_correlations` record (top 3 significant Pearson r pairs by absolute value)
+- Injects as "WEEKLY CORRELATIONS (statistically significant)" into `ai_context_block`
+- Coaching AI references confirmed statistical relationships rather than speculating about connections
+- Only FDR-significant pairs with |r| >= threshold are surfaced (per BH correction in weekly-correlation-compute)
+
+**Coaching history deduplication:** The `guidance_given` field (Phase 1) doubles as a deduplication index — the platform can now track what was advised and avoid re-advising the same thing within a configurable window.
+
+### Phase 4: Labs + Genome Personalization Modules
+
+Two new coaching modules imported by `daily_brief_lambda.py`:
+
+**`lambdas/labs_coaching.py`** — Biomarker coaching rules:
+- Reads latest lab results from DynamoDB (`SOURCE#labs`)
+- 8 coaching rules with threshold-based triggers: ferritin (<40), vitamin D (<30), hs-CRP (>3.0), HbA1c (>5.6), fasting insulin (>10), ApoB (>90), testosterone (<400), TSH (>2.5)
+- Generates coaching delta strings injected into TL;DR prompt as `labs_coaching_ctx`
+- Only fires when biomarkers are out of range — silent when all values are optimal
+
+**`lambdas/genome_coaching.py`** — Genome-personalized guidance:
+- Reads genome SNP data from DynamoDB
+- 7 gene mappings: CYP1A2 (caffeine metabolism), MTHFR (methylation), FTO (satiety), BDNF (exercise timing), FADS1/FADS2 (omega-3 conversion), VKORC1 (vitamin K), MTNR1B (melatonin timing)
+- **Weekly rotation** — cycles which gene insights surface each week to prevent repetition
+- Generates coaching delta strings injected into TL;DR prompt as `genome_coaching_ctx`
+
+**Integration point:** Both modules are called by `daily_brief_lambda.py` before the TL;DR AI call. Their outputs flow through `ai_calls.py` via `data["labs_coaching_ctx"]` and `data["genome_coaching_ctx"]`.
+
+### Infrastructure Impact
+- Shared Lambda layer rebuilt: v15 -> v18 (3 version bumps during the overhaul)
+- `daily-brief` and `daily-insight-compute` Lambdas updated to layer v18
+- No new DynamoDB partitions — all writes use existing `platform_memory`, `computed_insights`, and `labs`/`genome` partitions
+
+---
+
 ## Prompt Architecture Standards
 
 All IC-era AI calls follow these structural standards:
 
 ### 1. Prompt Anatomy (all calls)
 ```
-[1] PERSONA / ROLE — who is speaking (Board member, Elena Voss, etc.)
-[2] JOURNEY CONTEXT — week number, stage label, stage-appropriate principles
-[3] DATA QUALITY BLOCK — per-source confidence flags (IC-24)
-[4] SURPRISE SCORES — which metrics are unusual today (IC-23)
-[5] PLATFORM MEMORY — relevant memory records (IC-1)
-[6] INSIGHT CONTEXT — recent high-value insights (IC-16, Progressive Context)
-[7] TODAY'S DATA — actual metrics, weighted by surprise score (IC-23)
-[8] INSTRUCTION — what to produce, including:
-    - Cross-pillar trade-off reasoning (IC-7)
-    - Correlative (not causal) framing (AI-2)
-    - Red Team challenge (IC-17)
-    - Health disclaimer footer (AI-1)
+[1]  PERSONA / ROLE — who is speaking (Board member, Elena Voss, etc.)
+[2]  JOURNEY CONTEXT — week number, stage label, stage-appropriate principles
+[3]  DATA QUALITY BLOCK — per-source confidence flags (IC-24)
+[4]  SURPRISE SCORES — which metrics are unusual today (IC-23)
+[5]  PLATFORM MEMORY — relevant memory records (IC-1), what_worked (v4.8.0)
+[6]  INSIGHT CONTEXT — recent high-value insights (IC-16, Progressive Context)
+[7]  ANTI-REPETITION — "AVOID REPEATING" list from prior 3 days (v4.8.0)
+[8]  WEEKLY CORRELATIONS — top 3 FDR-significant Pearson pairs (v4.8.0)
+[9]  LABS/GENOME CONTEXT — biomarker coaching deltas + genome SNP guidance (v4.8.0)
+[10] TODAY'S DATA — actual metrics, weighted by surprise score (IC-23),
+     enriched with journal analysis, character sheet, adaptive mode,
+     State of Mind, supplements, and weather context (v4.8.0)
+[11] INSTRUCTION — what to produce, including:
+     - Cross-pillar trade-off reasoning (IC-7)
+     - Correlative (not causal) framing (AI-2)
+     - Red Team challenge (IC-17)
+     - Health disclaimer footer (AI-1)
 ```
 
 ### 2. Chain-of-Thought Structure (BoD + TL;DR)
@@ -301,7 +391,7 @@ IC features are gated by how much data exists. Don't build IC features before th
 |---------|-----------------|-------------|
 | IC-4 Failure Pattern Recognition | 6-8 weeks behavioral data | ~May 2026 |
 | IC-5 Momentum / Early Warning | 6-8 weeks | ~May 2026 |
-| IC-9 Episodic Memory ("what worked") | Month 3 | ~June 2026 |
+| IC-9 Episodic Memory ("what worked") | ~~Month 3~~ | **Live (v4.8.0)** |
 | IC-10 Personal Response Curves | Month 4 | ~July 2026 |
 | IC-11 Coaching Calibration | Month 3 | ~June 2026 |
 | IC-12 Coaching Effectiveness Feedback | Month 5 | ~Aug 2026 |
@@ -545,4 +635,4 @@ These decisions are documented to prevent revisiting:
 
 ---
 
-*Last updated: 2026-03-17 (v3.7.69 — Board Summit #2 conducted. No new IC features this session. Sprint 5 planned: adaptive deficit ceiling (wires IC-29 into prescriptive coaching) + weekly habit review automation. IC-4/IC-5 activation approaching data gate ~Apr 5. Full Summit #2 record: `docs/reviews/BOARD_SUMMIT_2_2026-03-17.md`.)*
+*Last updated: 2026-04-04 (v4.9.0 — AI Insight Engine Overhaul (v4.8.0) fully documented: anti-repetition, 6 data source wiring, what_worked memory, weekly correlation injection, labs/genome personalization. IC-4/IC-5 activation approaching data gate ~Apr 5. 121 MCP tools, 62 Lambdas.)*
