@@ -2224,10 +2224,10 @@
           var cell = e.target.closest('.m-heatmap-cell');
           if (!cell || !cell.dataset.theme) return;
           tooltipEl.style.display = '';
-          tooltipEl.innerHTML = '<strong>' + cell.dataset.date + '</strong><br>' +
-            cell.dataset.theme.replace(/_/g, ' ') + '<br>' +
-            cell.dataset.words + ' words<br>' +
-            '<em>' + cell.dataset.summary + '</em>';
+          var _theme = (cell.dataset.theme || '').replace(/_/g, ' ');
+          var _wc = parseInt(cell.dataset.words || '0');
+          var _depth = _wc > 500 ? 'Deep entry' : _wc > 200 ? 'Medium entry' : 'Brief entry';
+          tooltipEl.innerHTML = '<strong>' + _theme + '</strong><br>' + _depth;
           tooltipEl.style.left = (e.clientX + 12) + 'px';
           tooltipEl.style.top = (e.clientY - 40) + 'px';
         });
