@@ -1018,6 +1018,19 @@ def compute_character_sheet(data, previous_day_state, raw_score_histories, confi
             "streak_below": level_state["streak_below"],
             "components": pillar_details[pillar_name],
         }
+        # Annotate level events with "why" context for the event log
+        for ev in level_state.get("events", []):
+            ev["raw_score"] = round(pillar_raw_scores[pillar_name], 1)
+            ev["level_score"] = round(adjusted_level_scores[pillar_name], 1)
+            ev["xp_earned"] = xp_earned
+            ev["streak_days"] = level_state.get("streak_above", 0) or level_state.get("streak_below", 0)
+            # Extract top contributing component (skip private keys)
+            components = {k: v for k, v in pillar_details[pillar_name].items()
+                         if not k.startswith("_") and isinstance(v, (int, float)) and v > 0}
+            if components:
+                top = max(components, key=components.get)
+                ev["top_driver"] = top.replace("_", " ").title()
+                ev["top_driver_value"] = round(components[top], 1)
         all_events.extend(level_state.get("events", []))
 
     # Step 6: Overall Character Level — floor instead of round [F-14]
