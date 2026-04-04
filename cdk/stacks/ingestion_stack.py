@@ -63,12 +63,12 @@ class IngestionStack(Stack):
             description="Whoop recovery refresh — 9:30 AM PT")
         whoop_recovery.add_target(targets.LambdaFunction(whoop))
 
-        # ── 2. Garmin — 5x daily
+        # ── 2. Garmin — 4x daily (Garmin API rate-limits OAuth token exchange at hourly frequency)
         garmin = create_platform_lambda(self, "GarminIngestion",
             function_name="garmin-data-ingestion",
             source_file="lambdas/garmin_lambda.py",
             handler="garmin_lambda.lambda_handler",
-            schedule=f"cron(0 {INGEST_HOURLY} * * ? *)",
+            schedule="cron(0 0,6,14,22 * * ? *)",
             timeout_seconds=300, memory_mb=512, shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_garmin(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
@@ -132,12 +132,12 @@ class IngestionStack(Stack):
             custom_policies=rp.ingestion_journal_enrichment(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
 
-        # ── 8. Todoist — 5x daily (:15 stagger)
+        # ── 8. Todoist — 2x daily (COST-OPT-2: low-frequency source, tasks logged in batches)
         create_platform_lambda(self, "TodoistIngestion",
             function_name="todoist-data-ingestion",
             source_file="lambdas/todoist_lambda.py",
             handler="todoist_lambda.lambda_handler",
-            schedule=f"cron(15 {INGEST_HOURLY} * * ? *)",
+            schedule="cron(15 14,2 * * ? *)",
             timeout_seconds=120, alarm_name="ingestion-error-todoist",
             environment={"SECRET_NAME": "life-platform/ingestion-keys"},
             shared_layer=shared_utils_layer,
@@ -178,12 +178,12 @@ class IngestionStack(Stack):
             source_arn=f"arn:aws:s3:::{S3_BUCKET}",  # SEC-01: IAM level is bucket-scoped; prefix filtering enforced via S3 event notification filter on uploads/macrofactor/ prefix
             source_account=self.account)
 
-        # ── 12. Weather — 5x daily
+        # ── 12. Weather — 2x daily (COST-OPT-2: weather doesn't change meaningfully hourly)
         create_platform_lambda(self, "WeatherIngestion",
             function_name="weather-data-ingestion",
             source_file="lambdas/weather_handler.py",
             handler="weather_handler.lambda_handler",
-            schedule=f"cron(0 {INGEST_HOURLY} * * ? *)",
+            schedule="cron(0 14,2 * * ? *)",
             timeout_seconds=60,
             shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_weather(),

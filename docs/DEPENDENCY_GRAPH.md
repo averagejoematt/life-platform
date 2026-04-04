@@ -70,7 +70,7 @@ Runs daily after ingestion completes. **Order matters** — see critical path be
 
 ## 4. MCP Tool Layer (DynamoDB → Claude)
 
-Read-only query layer. 118 tools across 26 modules.
+Read-only query layer. 115 tools across 26 modules.
 
 | MCP Module | DDB Partitions Read |
 |------------|-------------------|
@@ -105,7 +105,7 @@ Read-only query layer. 118 tools across 26 modules.
 | `dashboard.json` | daily_brief | dash.averagejoematt.com | Daily 11 AM |
 | `clinical.json` | daily_brief | /labs/ page | Daily 11 AM |
 | `buddy.json` | daily_brief | buddy.averagejoematt.com | Daily 11 AM |
-| Site HTML/CSS/JS | Manual deploy (`sync_site_to_s3.sh`) | All 68 pages | On deploy |
+| Site HTML/CSS/JS | Manual deploy (`sync_site_to_s3.sh`) | All 72 pages | On deploy |
 
 **Site-api Lambda** (separate from daily brief) serves real-time endpoints: `/api/vitals`, `/api/ask`, `/api/board_ask`, etc. Reads directly from DDB, not from S3 files.
 

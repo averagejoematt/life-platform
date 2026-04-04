@@ -837,7 +837,7 @@
 <div class="intel-zone reveal">
   <div class="zone-head">
     <div class="zone-head__title">Habit <em>Intelligence</em></div>
-    <div class="zone-head__sub">90 days of data — patterns, correlations, and the heatmap</div>
+    <div class="zone-head__sub">Since experiment start — patterns, correlations, and the heatmap</div>
   </div>
 
   <!-- Heatmap -->
@@ -1296,23 +1296,35 @@ function buildHorizon(){
 
 // ── Build Heatmap ──
 function buildHeatmap(history){
+  var EXPERIMENT_START = '2026-04-01';
   var byDate = {};
-  history.forEach(function(d){byDate[d.date]=d});
+  history.forEach(function(d){if(d.date>=EXPERIMENT_START) byDate[d.date]=d});
   var today = new Date();
-  var todayMon = (today.getDay()+6)%7;
-  var WEEKS = 52;
+  var expStart = new Date(EXPERIMENT_START + 'T00:00:00');
+  // Calculate total days from experiment start to today
+  var totalDays = Math.floor((today - expStart) / 86400000) + 1;
+  if(totalDays<1) totalDays = 1;
+  // Start from the Monday on or before experiment start
+  var expDow = (expStart.getDay()+6)%7; // 0=Mon
+  var gridStart = new Date(expStart);
+  gridStart.setDate(gridStart.getDate() - expDow);
+  // End on today
+  var todayDow = (today.getDay()+6)%7;
+  var WEEKS = Math.ceil((totalDays + expDow) / 7);
+  if(WEEKS<1) WEEKS = 1;
   var gridEl = document.getElementById('hm-grid');
   gridEl.innerHTML = '';
   for(var c=0;c<WEEKS;c++){
     var weekDiv = document.createElement('div');
     weekDiv.className = 'heatmap-week';
     for(var r=0;r<7;r++){
-      var off = (WEEKS-1-c)*7+(todayMon-r);
       var cell = document.createElement('div');
-      if(off<0){ cell.className='hm-cell empty'; }
-      else {
-        var dt = new Date(today); dt.setDate(dt.getDate()-off);
-        var iso = dt.toISOString().slice(0,10);
+      var dt = new Date(gridStart);
+      dt.setDate(dt.getDate() + c*7 + r);
+      var iso = dt.toISOString().slice(0,10);
+      if(iso < EXPERIMENT_START || dt > today){
+        cell.className='hm-cell empty';
+      } else {
         var day = byDate[iso];
         var pct = day ? (day.tier0_pct||0) : null;
         cell.className = 'hm-cell '+(pct!=null?cellClass(pct):'hm-0');
@@ -1374,7 +1386,7 @@ function buildDOW(data){
 
 // ── Build Fatigue ──
 function buildFatigue(history){
-  if(history.length<7) return;
+  if(history.length<1) return;
   var recent = history.slice(-14);
   var pcts = recent.map(function(d){return d.tier0_pct||0});
   var avg = pcts.reduce(function(a,b){return a+b},0)/pcts.length;

@@ -139,6 +139,7 @@ def ingestion_withings() -> list[iam.PolicyStatement]:
     return _ingestion_base(
         "withings",
         secret_name="life-platform/withings",
+        extra_secret_actions=["secretsmanager:PutSecretValue"],  # OAuth token refresh writes back to secret
     )
 
 
@@ -248,10 +249,11 @@ def ingestion_activity_enrichment() -> list[iam.PolicyStatement]:
 
 
 def ingestion_macrofactor() -> list[iam.PolicyStatement]:
-    """MacroFactor: DDB write + S3 raw/macrofactor, no API secret."""
+    """MacroFactor: DDB write + S3 raw/macrofactor, reads CSV from uploads/macrofactor/."""
     return _ingestion_base(
         "macrofactor",
         no_secret=True,
+        extra_s3_read=["uploads/macrofactor/*"],
     )
 
 
@@ -817,10 +819,9 @@ def operational_canary() -> list[iam.PolicyStatement]:
         ),
         iam.PolicyStatement(
             sid="Secrets",
-            # MCP check tries to fetch Bearer token — ai-keys is closest match
-            # Note: canary skips MCP gracefully if key unavailable (non-fatal)
+            # MCP check needs the Bearer token from life-platform/mcp-api-key
             actions=["secretsmanager:GetSecretValue"],
-            resources=[_secret_arn("life-platform/ai-keys")],
+            resources=[_secret_arn("life-platform/mcp-api-key")],
         ),
         iam.PolicyStatement(
             sid="SESAlert",
@@ -947,7 +948,7 @@ def operational_data_reconciliation() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="S3Write",
             actions=["s3:PutObject"],
-            resources=_s3("reports/*"),
+            resources=_s3("reconciliation/*"),
         ),
         iam.PolicyStatement(
             sid="SES",

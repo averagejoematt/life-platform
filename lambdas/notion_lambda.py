@@ -30,6 +30,7 @@ import json
 import logging
 import os
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
@@ -69,11 +70,23 @@ secrets = boto3.client("secretsmanager", region_name="us-west-2")
 dynamodb = boto3.resource("dynamodb", region_name="us-west-2")
 table = dynamodb.Table(TABLE_NAME)
 
+# COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
+_secret_cache = {}
+
+
+def _cached_secret(client, secret_id):
+    import time as _t
+    entry = _secret_cache.get(secret_id)
+    if entry and _t.time() - entry[1] < 900:
+        return entry[0]
+    val = client.get_secret_value(SecretId=secret_id)["SecretString"]
+    _secret_cache[secret_id] = (val, _t.time())
+    return val
+
 
 def get_secrets():
     """Fetch Notion API key and database ID from Secrets Manager."""
-    resp = secrets.get_secret_value(SecretId=SECRET_NAME)
-    secret = json.loads(resp["SecretString"])
+    secret = json.loads(_cached_secret(secrets, SECRET_NAME))
     return (secret.get("notion_api_key") or secret.get("api_key")), (secret.get("notion_database_id") or secret.get("database_id"))
 
 
@@ -188,9 +201,16 @@ def query_database(api_key, database_id, start_date=None, end_date=None,
         # Date filter (unless full_sync)
         # Use OR filter: entries with Date property in range OR created_time in range
         # This catches entries that don't have a Date property set
+        # NOTE: created_time end boundary extended +1 day because Notion stores
+        # created_time in UTC — a late-night PT entry (e.g. 10pm PT) crosses into
+        # the next UTC day and would be missed by an exact date boundary.
         if not full_sync and (start_date or end_date):
             date_filters = []
             created_filters = []
+            # Extend created_time end boundary by +1 day for UTC offset
+            created_end = end_date
+            if end_date:
+                created_end = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
             if start_date and end_date:
                 date_filters = [
                     {"property": "Date", "date": {"on_or_after": start_date}},
@@ -198,7 +218,7 @@ def query_database(api_key, database_id, start_date=None, end_date=None,
                 ]
                 created_filters = [
                     {"timestamp": "created_time", "created_time": {"on_or_after": start_date}},
-                    {"timestamp": "created_time", "created_time": {"on_or_before": end_date}},
+                    {"timestamp": "created_time", "created_time": {"on_or_before": created_end}},
                 ]
                 body["filter"] = {"or": [
                     {"and": date_filters},
@@ -212,7 +232,7 @@ def query_database(api_key, database_id, start_date=None, end_date=None,
             elif end_date:
                 body["filter"] = {"or": [
                     {"property": "Date", "date": {"on_or_before": end_date}},
-                    {"timestamp": "created_time", "created_time": {"on_or_before": end_date}},
+                    {"timestamp": "created_time", "created_time": {"on_or_before": created_end}},
                 ]}
 
         # Sort by created_time descending (works for all entries, not just those with Date)
@@ -389,8 +409,11 @@ def parse_page(page, api_key=None):
     if not date_str:
         created = page.get("created_time", "")
         if created:
-            date_str = created[:10]  # ISO format YYYY-MM-DD
-            logger.info(f"Page {page['id']}: no Date property, using created_time {date_str}")
+            # Convert UTC created_time to Pacific Time before extracting date
+            pt = ZoneInfo("America/Los_Angeles")
+            created_dt = datetime.fromisoformat(created.replace("Z", "+00:00")).astimezone(pt)
+            date_str = created_dt.strftime("%Y-%m-%d")
+            logger.info(f"Page {page['id']}: no Date property, using created_time {created} → PT date {date_str}")
 
     if not date_str:
         logger.warning(f"Skipping page {page['id']}: no Date property or created_time")
@@ -561,8 +584,7 @@ def lambda_handler(event, context):
             logger.info(f"Single date mode: {start_date}")
         else:
             # Default: last 2 days (captures late-night entries + today's morning)
-            pacific = timezone(timedelta(hours=-8))
-            now_pacific = datetime.now(pacific)
+            now_pacific = datetime.now(ZoneInfo("America/Los_Angeles"))
             end_date = now_pacific.strftime("%Y-%m-%d")
             start_date = (now_pacific - timedelta(days=1)).strftime("%Y-%m-%d")
             logger.info(f"Scheduled mode: {start_date} → {end_date}")

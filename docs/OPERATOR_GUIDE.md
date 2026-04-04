@@ -4,13 +4,13 @@
 > For architectural decisions: ARCHITECTURE.md
 > For emergency procedures: RUNBOOK.md
 > For deployment steps: QUICKSTART.md
-> Last updated: 2026-03-30 (v4.5.1)
+> Last updated: 2026-04-04 (v4.9.0)
 
 ---
 
 ## System in 60 Seconds
 
-The Life Platform is a personal health intelligence system. It pulls data from 26 sources (wearables, apps, food logs, labs), stores everything in DynamoDB, and makes it queryable by Claude through 118 MCP tools. A pipeline of 60 Lambdas runs daily: ingestion (6:45-9 AM PT) feeds compute (10:20-10:35 AM) which feeds the daily brief email + website update (11 AM). The public website at averagejoematt.com has 68 pages serving real-time health data.
+The Life Platform is a personal health intelligence system. It pulls data from 26 sources (wearables, apps, food logs, labs), stores everything in DynamoDB, and makes it queryable by Claude through 115 MCP tools. A pipeline of 62 Lambdas runs daily: ingestion (6:45-9 AM PT) feeds compute (10:20-10:35 AM) which feeds the daily brief email + website update (11 AM). The public website at averagejoematt.com has 72 pages serving real-time health data.
 
 Monthly cost: ~$19 (including WAF). All infrastructure is CDK-managed across 8 stacks.
 
@@ -113,7 +113,7 @@ Monthly cost: ~$19 (including WAF). All infrastructure is CDK-managed across 8 s
 The pipeline runs in strict order. Changing schedules without maintaining this order produces stale results.
 
 ```
-06:45-09:00 AM PT  →  Ingestion (13 Lambdas fetch from APIs)
+06:45-09:00 AM PT  →  Ingestion (16 Lambdas fetch from APIs)
 09:05 AM           →  Anomaly detector
 10:20-10:35 AM     →  Compute (metrics, day grade, character sheet, adaptive mode)
 11:00 AM           →  Daily brief (reads ALL computed + raw → 4 AI calls → email + 4 S3 files)

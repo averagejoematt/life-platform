@@ -1830,8 +1830,12 @@
       setText('sval-hrv', hrv.toFixed(0) + 'ms');
     }
 
+    // Show content BEFORE chart rendering (canvas needs offsetWidth > 0)
+    loading.style.display = 'none';
+    content.style.display = 'block';
+
     /* ── 8e: Sleep architecture trend (stacked area) ── */
-    if (trend.length >= 3) {
+    if (trend.length >= 1) {
       var svgEl = document.getElementById('s-arch-svg');
       var W = 800, H = 200;
       var nn = trend.length;
@@ -1933,6 +1937,13 @@
         setText('s-adh-alcohol-pct', adh.alcohol_pct + '%');
         setWidth('s-adh-alcohol-bar', adh.alcohol_pct);
       }
+    } else {
+      var adhGrid = document.querySelector('.s-adherence__grid');
+      if (adhGrid) {
+        adhGrid.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:var(--text-sm);padding:var(--space-8) 0;font-family:var(--font-mono);letter-spacing:0.04em;grid-column:1/-1">' +
+          'Sleep protocols will be configured to track adherence &mdash; bedtime consistency, caffeine cutoff, and screen time targets.' +
+        '</div>';
+      }
     }
 
     /* ── 8i: Dynamic pull-quotes from correlation data ── */
@@ -1951,7 +1962,7 @@
     var allTrend = trend; // store full dataset for time-window toggles
 
     function drawTrendChart(trendData) {
-      if (trendData.length < 3) return;
+      if (trendData.length < 1) return;
       var canvas = document.getElementById('s-trend-canvas');
       var dpr = window.devicePixelRatio || 1;
       canvas.width = canvas.offsetWidth * dpr;
@@ -2069,7 +2080,7 @@
       };
     }
 
-    drawTrendChart(allTrend);
+    drawTrendChart(allTrend.slice(-30));
 
     /* 8l: Time window toggle handler for trend chart */
     document.getElementById('s-trend-toggles').addEventListener('click', function(e) {

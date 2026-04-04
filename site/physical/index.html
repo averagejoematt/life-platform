@@ -837,6 +837,14 @@
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
+     AI EXPERT ANALYSIS
+     ════════════════════════════════════════════════════════════ -->
+<section class="p-ai-section reveal">
+  <div class="p-section-header">Dr. Reyes's Assessment</div>
+  <div id="p-ai-analysis"></div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
      V2: WEIGHT VS CALORIES — dual-axis chart
      ════════════════════════════════════════════════════════════ -->
 <section class="p-dual-section reveal" id="p-dual-cal" style="display:none">
@@ -910,14 +918,6 @@
 <section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal" id="p-bp" style="display:none">
   <div class="p-section-header">Blood Pressure</div>
   <div id="p-bp-content"></div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     AI EXPERT ANALYSIS
-     ════════════════════════════════════════════════════════════ -->
-<section class="p-ai-section reveal">
-  <div class="p-section-header">Dr. Reyes's Assessment</div>
-  <div id="p-ai-analysis"></div>
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -1038,7 +1038,11 @@
     setText('m-days-to-go', j.days_to_goal ? j.days_to_goal + ' days to go' : '');
 
     /* ── Weight Trajectory Chart ── */
-    if (typeof Chart !== 'undefined' && weightData.length >= 3) {
+    /* Show content early so Chart.js can read canvas dimensions */
+    loading.style.display = 'none';
+    content.style.display = 'block';
+
+    if (typeof Chart !== 'undefined' && weightData.length >= 2) {
       Chart.defaults.color = 'rgba(255,255,255,0.5)';
       Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
       Chart.defaults.font.family = 'monospace';
@@ -1155,12 +1159,12 @@
 
     /* ── V2: Weight vs Calories dual-axis chart ── */
     var nutTrend = (nutData.nutrition_trend || []);
-    if (typeof Chart !== 'undefined' && weightData.length >= 7 && nutTrend.length >= 7) {
+    if (typeof Chart !== 'undefined' && weightData.length >= 2 && nutTrend.length >= 2) {
       /* Align dates — only show days where both weight and nutrition data exist */
       var weightByDate = {};
       weightData.forEach(function(d) { weightByDate[d.date] = d.weight_lbs; });
       var alignedCal = nutTrend.filter(function(d) { return weightByDate[d.date] != null && d.calories != null; });
-      if (alignedCal.length >= 5) {
+      if (alignedCal.length >= 2) {
         document.getElementById('p-dual-cal').style.display = '';
         var calDates = alignedCal.map(function(d) { return d.date.slice(5); });
         var calWeights = alignedCal.map(function(d) { return weightByDate[d.date]; });
@@ -1195,9 +1199,9 @@
 
     /* ── V2: Weight vs Training Volume dual-axis chart ── */
     var modDaily = (trainData.daily_modality_minutes_30d || []);
-    if (typeof Chart !== 'undefined' && weightData.length >= 7 && modDaily.length >= 7) {
+    if (typeof Chart !== 'undefined' && weightData.length >= 2 && modDaily.length >= 2) {
       var alignedTrain = modDaily.filter(function(d) { return weightByDate && weightByDate[d.date] != null; });
-      if (alignedTrain.length >= 5) {
+      if (alignedTrain.length >= 2) {
         document.getElementById('p-dual-train').style.display = '';
         var trainDates = alignedTrain.map(function(d) { return d.date.slice(5); });
         var trainWeights = alignedTrain.map(function(d) { return weightByDate[d.date]; });
@@ -1455,8 +1459,7 @@
       });
     }
 
-    loading.style.display = 'none';
-    content.style.display = 'block';
+    /* content already shown before chart section */
 
   } catch (e) {
     console.error('Physical data error:', e);

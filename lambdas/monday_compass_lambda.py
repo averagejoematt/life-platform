@@ -408,7 +408,7 @@ def build_week_state_summary(health_data, profile):
     if pillar_scores:
         weakest_pillar = min(pillar_scores, key=lambda x: pillar_scores[x])
 
-    start_w  = profile.get("journey_start_weight_lbs", 302)
+    start_w  = profile.get("journey_start_weight_lbs", 307)
     goal_w   = profile.get("goal_weight_lbs", 185)
     week_num = _compute_week_num(profile)
 
@@ -598,7 +598,7 @@ def build_user_message(week_state, todoist_data, health_data, profile,
     today = datetime.now(timezone.utc).date()
 
     week_num = week_state.get("week_num", 1)
-    start_w = week_state.get("start_weight", 302)
+    start_w = week_state.get("start_weight", 307)
     goal_w  = week_state.get("goal_weight", 185)
     char_level = week_state.get("char_level", 1)
     char_tier  = week_state.get("char_tier", "Foundation")

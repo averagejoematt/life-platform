@@ -2,7 +2,7 @@
 
 **Table:** `life-platform` (us-west-2)  
 **Design:** Single-table with composite keys  
-**Last updated:** 2026-03-31 (v4.7.0 — 115 MCP tools, 26 data sources, 62 Lambdas)
+**Last updated:** 2026-04-03 (v4.9.0 — 115 MCP tools, 26 data sources, 62 Lambdas)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -329,6 +329,26 @@ Note: `cgm_source` auto-detects based on reading frequency. ≥20 readings/day i
 | `blood_pressure_readings_count` | number | Number of BP readings that day |
 
 Note: Individual BP readings stored in S3 at `raw/blood_pressure/YYYY/MM/DD.json` for morning vs evening analysis. DynamoDB holds daily averages only. Data path: BP cuff → Apple Health → Health Auto Export webhook → DynamoDB + S3.
+
+**Breathwork / mindfulness fields (webhook — via Breathwrk app → HealthKit → HAE):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mindful_minutes` | number | Breathwork/meditation minutes from Breathwrk via HAE |
+
+**Water intake fields (webhook — via water tracking app → HealthKit → HAE):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `water_intake_ml` | number | Daily water intake in milliliters (deduped from reading-level data) |
+| `_rd_water_intake_ml` | map | Reading-level dedup map {timestamp: quantity} — used for incremental sync deduplication |
+
+**Recovery / flexibility fields (webhook — via Apple Watch → HealthKit → HAE):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `recovery_workout_minutes` | number | Recovery workout minutes |
+| `flexibility_minutes` | number | Stretching/flexibility minutes |
 
 ### eightsleep
 | Field | Type | Description |

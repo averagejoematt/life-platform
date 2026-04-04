@@ -200,7 +200,22 @@
 - IAM sweep: 13 Lambdas S3 read permissions, 2 OAuth Lambdas token persistence
 - Withings: measurement group selection bug fixed (weight was dropped when BPM was newer)
 
-## Platform Counts (v4.8.2)
+### Day 1 Sweep + Pipeline Reliability (v4.8.3)
+- **Layer sync**: 6 Lambdas updated v18 → v19
+- **MCP canary**: secret mismatch fixed (was silently skipping MCP check). Now reports "115 tools, 202ms"
+- **Data reconciliation**: S3 prefix `reports/*` → `reconciliation/*`
+- **CI/CD**: 8 flake8 F821 errors fixed + `.nojekyll` added
+- **Garmin**: reduced from hourly to 4x daily (429 rate limit on OAuth exchange). Re-authed tokens.
+- **Withings**: re-authed OAuth. CDK PutSecretValue added permanently.
+- **Notion**: DST-aware timezone (`ZoneInfo`), created_time +1 day filter for late-night entries
+- **Site API PT conversion**: all user-facing dates use Pacific Time. Pulse day_number, challenge days_in.
+- **Pulse**: recovery/sleep from Whoop daily (not workout), Garmin steps (not Apple Health), journal glyph with streak
+- **Training**: WHOOP duplicate activity dedup, Apple Health step fallback
+- **HAE water dedup**: reading-level dedup via timestamp→quantity map. Handles incremental + full-day re-sends.
+- **Homepage mobile**: gauge grid 3→2 columns under 600px
+- **Challenge ID**: DynamoDB key fixed to match catalog ID
+
+## Platform Counts (v4.8.3)
 - 115 MCP tools · 62 Lambdas · 72 site pages · 26 data sources · 8 CDK stacks
-- Shared layer: v18 · AI calls: 18 across 15 Lambdas · AI expert cards: 5 (daily)
+- Shared layer: v19 · AI calls: 18 across 15 Lambdas · AI expert cards: 5 (daily)
 - New modules: labs_coaching.py, genome_coaching.py

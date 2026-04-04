@@ -106,11 +106,23 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
 
+# COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
+_secret_cache = {}
+
+
+def _cached_secret(client, secret_id):
+    import time as _t
+    entry = _secret_cache.get(secret_id)
+    if entry and _t.time() - entry[1] < 900:
+        return entry[0]
+    val = client.get_secret_value(SecretId=secret_id)["SecretString"]
+    _secret_cache[secret_id] = (val, _t.time())
+    return val
+
 
 def get_api_key():
     """Fetch Habitify API key from Secrets Manager."""
-    resp = secrets.get_secret_value(SecretId=SECRET_NAME)
-    secret = json.loads(resp["SecretString"])
+    secret = json.loads(_cached_secret(secrets, SECRET_NAME))
     return secret.get("habitify_api_key") or secret.get("api_key")
 
 

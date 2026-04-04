@@ -1,0 +1,134 @@
+[
+  {
+    "path": "/",
+    "status": "PASS",
+    "issues": []
+  },
+  {
+    "path": "/live/",
+    "status": "PASS",
+    "issues": []
+  },
+  {
+    "path": "/sleep/",
+    "status": "PASS",
+    "issues": []
+  },
+  {
+    "path": "/glucose/",
+    "status": "PASS",
+    "issues": []
+  },
+  {
+    "path": "/nutrition/",
+    "status": "PASS",
+    "issues": []
+  },
+  {
+    "path": "/training/",
+    "status": "PASS",
+    "issues": []
+  },
+  {
+    "path": "/physical/",
+    "status": "PASS",
+    "issues": []
+  },
+  {
+    "path": "/mind/",
+    "status": "PASS",
+    "issues": []
+  },
+  {
+    "path": "/character/",
+    "status": "WARN",
+    "issues": [
+      "Empty sections: ['section-label', 'section-label']"
+    ]
+  },
+  {
+    "path": "/habits/",
+    "status": "PASS",
+    "issues": []
+  },
+  {
+    "path": "/status/",
+    "status": "WARN",
+    "issues": [
+      "Suspect text: \"letion rate Source: Todoist 30 days yesterday Operational We\""
+    ]
+  },
+  {
+    "path": "/story/",
+    "status": "WARN",
+    "issues": [
+      "API errors: ['405 /api/subscriber_count']"
+    ]
+  },
+  {
+    "path": "/chronicle/",
+    "status": "PASS",
+    "issues": []
+  },
+  {
+    "path": "/experiments/",
+    "status": "PASS",
+    "issues": []
+  },
+  {
+    "path": "/challenges/",
+    "status": "PASS",
+    "issues": []
+  },
+  {
+    "path": "/achievements/",
+    "status": "WARN",
+    "issues": [
+      "Empty sections: ['badge-section__title']"
+    ]
+  },
+  {
+    "path": "/supplements/",
+    "status": "PASS",
+    "issues": []
+  },
+  {
+    "path": "/protocols/",
+    "status": "PASS",
+    "issues": []
+  },
+  {
+    "path": "/explorer/",
+    "status": "PASS",
+    "issues": []
+  },
+  {
+    "path": "/about/",
+    "status": "WARN",
+    "issues": [
+      "Suspect text: \", Habitify, Notion, Todoist, Dexcom Stelo, genome, labs, DEX\""
+    ]
+  },
+  {
+    "path": "/mission/",
+    "status": "WARN",
+    "issues": [
+      "Suspect text: \", Habitify, Notion, Todoist, Dexcom Stelo, genome, labs, DEX\""
+    ]
+  },
+  {
+    "path": "/stack/",
+    "status": "PASS",
+    "issues": []
+  },
+  {
+    "path": "/field-notes/",
+    "status": "PASS",
+    "issues": []
+  },
+  {
+    "path": "/ledger/",
+    "status": "PASS",
+    "issues": []
+  }
+]

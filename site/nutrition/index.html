@@ -1612,6 +1612,14 @@
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
+     AI EXPERT ANALYSIS
+     ════════════════════════════════════════════════════════════ -->
+<section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal">
+  <div class="n-section-header">Dr. Webb's Analysis</div>
+  <div id="n-ai-analysis"></div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
      PULL-QUOTE #1 — Breakfast protein finding (10g: staggered left)
      ════════════════════════════════════════════════════════════ -->
 <div class="n-pullquote n-pullquote--left reveal">
@@ -2066,14 +2074,6 @@
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
-     AI EXPERT ANALYSIS
-     ════════════════════════════════════════════════════════════ -->
-<section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal">
-  <div class="n-section-header">Dr. Webb's Analysis</div>
-  <div id="n-ai-analysis"></div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
      FOOD DELIVERY ANALYSIS (Phase 2)
      ════════════════════════════════════════════════════════════ -->
 <section class="n-macro-section reveal" id="n-delivery-section" style="display:none">
@@ -2313,6 +2313,10 @@
     var trend = data.nutrition_trend || [];
     if (!n) { loading.textContent = 'No nutrition data yet.'; return; }
 
+    // Show content BEFORE chart rendering (canvas needs offsetWidth > 0)
+    loading.style.display = 'none';
+    content.style.display = 'block';
+
     /* ── Hero gauges ── */
     var avgCal = n.avg_calories || 0;
     setText('g-cal-num', avgCal ? avgCal.toLocaleString() : '\u2014');
@@ -2331,7 +2335,7 @@
     setArc('g-def-arc', Math.min(100, (deficit / 1000) * 100));
 
     /* ── V2: Macro Stacked Bar + Donut ── */
-    if (typeof Chart !== 'undefined' && trend.length >= 3) {
+    if (typeof Chart !== 'undefined' && trend.length >= 1) {
       Chart.defaults.color = 'rgba(255,255,255,0.5)';
       Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
       Chart.defaults.font.family = 'monospace';
@@ -2587,7 +2591,7 @@
     }
 
     /* ── Trend chart ── */
-    if (trend.length >= 3) {
+    if (trend.length >= 1) {
       var canvas = document.getElementById('n-trend-canvas');
       var dpr = window.devicePixelRatio || 1;
       canvas.width = canvas.offsetWidth * dpr;
@@ -2737,10 +2741,10 @@
       });
     }
 
-    loading.style.display = 'none';
-    content.style.display = 'block';
+    // (content already shown above before chart rendering)
   } catch (e) {
     loading.textContent = 'Could not load nutrition data.';
+    content.style.display = 'block';
     console.error(e);
   }
 })();

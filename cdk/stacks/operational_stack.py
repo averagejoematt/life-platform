@@ -95,7 +95,7 @@ class OperationalStack(Stack):
             timeout_seconds=60, memory_mb=256,
             environment={
                 "MCP_FUNCTION_URL": "https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/",
-                "MCP_SECRET_NAME": "life-platform/ai-keys",
+                "MCP_SECRET_NAME": "life-platform/mcp-api-key",
             },
             custom_policies=rp.operational_canary(),
             table=local_table, bucket=local_bucket, dlq=None, alerts_topic=None,

@@ -1264,6 +1264,7 @@
           </div>
         </div>
         <div class="m-gauge__label">Resist rate</div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:0.04em;margin-top:var(--space-1)">Based on logged temptation events</div>
       </div>
       <div class="m-gauge">
         <div class="m-gauge__ring">
@@ -1394,6 +1395,14 @@
   <div class="m-sentiment-chart-wrap">
     <canvas id="m-sentiment-canvas"></canvas>
   </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     AI EXPERT ANALYSIS
+     ════════════════════════════════════════════════════════════ -->
+<section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal">
+  <div class="m-section-header">Dr. Conti's Observations</div>
+  <div id="m-ai-analysis"></div>
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -1681,6 +1690,7 @@
     </div>
     <div class="m-intelligence-card">
       <div class="m-intelligence-card__title">Mood-energy divergence</div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:0.04em;margin-bottom:var(--space-2)">Energy: derived from journal analysis</div>
       <div class="m-intelligence-placeholder">
         <svg width="80" height="80" viewBox="0 0 80 80">
           <line x1="8" y1="72" x2="72" y2="72" stroke="rgba(167,139,250,0.15)" stroke-width="1"/>
@@ -1706,14 +1716,6 @@
       <div class="m-intelligence-desc">Rolling sentiment from journal entries over time. Not daily mood &mdash; the deeper trend line. Are you getting more hopeful, more realistic, more resilient? The curve tells the story.</div>
     </div>
   </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     AI EXPERT ANALYSIS
-     ════════════════════════════════════════════════════════════ -->
-<section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal">
-  <div class="m-section-header">Dr. Conti's Observations</div>
-  <div id="m-ai-analysis"></div>
 </section>
 
 </div><!-- /m-content -->
@@ -1864,6 +1866,10 @@
     var m = data.mind, vices = (data.vice_streaks || []).filter(function(v){ return !isBlocked(v.name); }), mood = data.mood_trend || [];
     if (!m) { loading.textContent = 'No inner life data yet.'; return; }
 
+    // Show content BEFORE chart rendering (canvas needs offsetWidth > 0)
+    loading.style.display = 'none';
+    content.style.display = 'block';
+
     /* ── Hero gauges ── */
     if (m.mind_pillar) {
       var lvl = m.mind_pillar.level || 0;
@@ -1936,7 +1942,7 @@
     }
 
     /* ── Mood chart ── */
-    if (mood.length >= 3) {
+    if (mood.length >= 1) {
       document.getElementById('m-mood-section').style.display = '';
       var canvas = document.getElementById('m-mood-canvas');
       var dpr = window.devicePixelRatio || 1;
@@ -2012,7 +2018,7 @@
     }
 
     /* ── V2: State of Mind sparkline + distribution ── */
-    if (typeof Chart !== 'undefined' && mood.length >= 3) {
+    if (typeof Chart !== 'undefined' && mood.length >= 1) {
       Chart.defaults.color = 'rgba(255,255,255,0.5)';
       Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
       Chart.defaults.font.family = 'monospace';
@@ -2143,9 +2149,32 @@
         var topThemes = jData.top_themes || [];
         var sentimentTrend = jData.sentiment_trend || [];
 
-        if (dailyThemes.length === 0) return;
+        /* Derive top_themes from daily_themes if API didn't compute them */
+        if (topThemes.length === 0 && dailyThemes.length > 0) {
+          var themeCounts = {};
+          dailyThemes.forEach(function(d) {
+            var th = d.dominant_theme || 'other';
+            themeCounts[th] = (themeCounts[th] || 0) + 1;
+          });
+          var total = dailyThemes.length;
+          topThemes = Object.keys(themeCounts).map(function(k) {
+            return { theme: k, count: themeCounts[k], pct: Math.round((themeCounts[k] / total) * 100) };
+          }).sort(function(a, b) { return b.count - a.count; });
+        }
 
-        document.getElementById('m-journal-intel').style.display = '';
+        /* Derive sentiment_trend from daily_themes if API didn't compute it */
+        if (sentimentTrend.length === 0 && dailyThemes.length > 0) {
+          sentimentTrend = dailyThemes
+            .filter(function(d) { return d.sentiment != null; })
+            .map(function(d) { return { date: d.date, avg_sentiment: d.sentiment }; });
+        }
+
+        if (dailyThemes.length === 0 && topThemes.length === 0) return;
+
+        var journalIntelEl = document.getElementById('m-journal-intel');
+        journalIntelEl.style.display = '';
+        /* Force reveal visibility since section was display:none at page load */
+        journalIntelEl.classList.add('is-visible');
 
         /* ── 30-day heatmap ── */
         var heatmapEl = document.getElementById('m-heatmap');
@@ -2227,6 +2256,12 @@
               }
             }
           });
+        } else if (topThemes.length === 0) {
+          var themesCanvas = document.getElementById('m-themes-canvas');
+          if (themesCanvas) {
+            themesCanvas.style.display = 'none';
+            themesCanvas.insertAdjacentHTML('afterend', '<div style="text-align:center;color:var(--text-faint);font-size:var(--text-sm);padding:var(--space-6) 0;font-family:var(--font-mono);letter-spacing:0.04em">Theme distribution builds as journal entries accumulate.</div>');
+          }
         }
 
         /* ── Sentiment trend line ── */
@@ -2286,6 +2321,12 @@
               }
             }
           });
+        } else if (sentimentTrend.length === 0) {
+          var sentCanvas = document.getElementById('m-sentiment-canvas');
+          if (sentCanvas) {
+            sentCanvas.style.display = 'none';
+            sentCanvas.insertAdjacentHTML('afterend', '<div style="text-align:center;color:var(--text-faint);font-size:var(--text-sm);padding:var(--space-6) 0;font-family:var(--font-mono);letter-spacing:0.04em">Sentiment trend builds as journal entries accumulate over time.</div>');
+          }
         }
 
       }).catch(function(err) { console.warn('Journal analysis not available:', err); });
@@ -2293,7 +2334,7 @@
 
     /* ── Vice Streak Timeline Chart ── */
     var viceTimeline = data.vice_timeline || [];
-    if (typeof Chart !== 'undefined' && viceTimeline.length >= 3) {
+    if (typeof Chart !== 'undefined' && viceTimeline.length >= 1) {
       var vtSection = document.getElementById('m-vice-timeline-section');
       if (vtSection) vtSection.style.display = '';
 
@@ -2357,10 +2398,10 @@
       });
     }
 
-    loading.style.display = 'none';
-    content.style.display = 'block';
+    // (content already shown above before chart rendering)
   } catch (e) {
     loading.textContent = 'Could not load inner life data.';
+    content.style.display = 'block';
     console.error(e);
   }
 })();

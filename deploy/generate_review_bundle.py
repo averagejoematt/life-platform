@@ -406,6 +406,20 @@ def build_bundle():
 | R18-F09 | Cross-region split on 13+ routes | ✅ RESOLVED | v4.3.0 | Site-api confirmed us-west-2 (AWS CLI 2026-03-30). No cross-region reads. |
 """)
 
+    sections.append("""
+### R19 Findings (2026-03-30, v4.5.0)
+
+| ID | Finding | Status | Version | Proof |
+|----|---------|--------|---------|-------|
+| R19-F01 | INFRASTRUCTURE.md entirely stale (v4.2.1 state) | ✅ RESOLVED | v4.5.2 + v4.9.0 | Full update in v4.5.2 doc sprint. Second pass v4.9.0: Lambda categories reconciled (16+11+12+21+2=62), MCP 115, alarms ~66, missing Lambdas added. |
+| R19-F02 | ARCHITECTURE.md internal contradictions (5+ conflicts) | ✅ RESOLVED | v4.5.2 + v4.9.0 | Body-section counts reconciled in v4.5.2. Second pass v4.9.0: local project structure updated (Lambda categories, us-west-2 site-api, shared modules, 35-module MCP). |
+| R19-F03 | INCIDENT_LOG missing 5 v4.4.0 pipeline failures | ✅ RESOLVED | v4.5.2 | All 5 incidents added with P-levels, TTD, TTR. Patterns section updated with silent secret deletion class. |
+| R19-F04 | SLOs reference stale data sources | ✅ RESOLVED | v4.9.0 | Google Calendar removed. Monitored sources expanded from 10 to 13 (added Weather, Food Delivery, Measurements). |
+| R19-F05 | 118 MCP tools (4th consecutive review) | ✅ RESOLVED | v4.5.1 | ADR-045 formally accepts tool count as operating state. Current count: 115 (reduced from 118). |
+| R19-F06 | Site-API region contradicts Function URL | ✅ RESOLVED | v4.3.0 | AWS CLI verification confirmed us-west-2. Docs updated. |
+| R19-F07 | Section 13b not updated for R17/R18 | ✅ RESOLVED | v4.5.2 + v4.9.0 | R17, R18, R19 findings all added to generate_review_bundle.py Section 13b. |
+""")
+
     sections.append("\n---\n")
 
     # ══════════════════════════════════════════════════════════════

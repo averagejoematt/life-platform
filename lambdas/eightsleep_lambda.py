@@ -115,8 +115,7 @@ def _get_es_client_creds():
     if _es_client_cache is not None:
         return _es_client_cache
     try:
-        resp = secrets_client.get_secret_value(SecretId="life-platform/eightsleep-client")
-        _es_client_cache = json.loads(resp["SecretString"])
+        _es_client_cache = json.loads(_cached_secret(secrets_client, "life-platform/eightsleep-client"))
     except Exception as e:
         logger.warning(f"[eightsleep] Failed to load client creds from Secrets Manager: {e}")
         _es_client_cache = {}
@@ -145,6 +144,19 @@ s3_client      = boto3.client("s3",             region_name=REGION)
 dynamodb       = boto3.resource("dynamodb",      region_name=REGION)
 table          = dynamodb.Table(DYNAMODB_TABLE)
 
+# COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
+_secret_cache = {}
+
+
+def _cached_secret(client, secret_id):
+    import time as _t
+    entry = _secret_cache.get(secret_id)
+    if entry and _t.time() - entry[1] < 900:
+        return entry[0]
+    val = client.get_secret_value(SecretId=secret_id)["SecretString"]
+    _secret_cache[secret_id] = (val, _t.time())
+    return val
+
 
 # ── Serialisation ──────────────────────────────────────────────────────────────
 def floats_to_decimal(obj):
@@ -159,8 +171,7 @@ def floats_to_decimal(obj):
 
 # ── Secrets ────────────────────────────────────────────────────────────────────
 def get_secret():
-    resp = secrets_client.get_secret_value(SecretId=SECRET_NAME)
-    return json.loads(resp["SecretString"])
+    return json.loads(_cached_secret(secrets_client, SECRET_NAME))
 
 
 def save_secret(secret: dict):
@@ -168,6 +179,7 @@ def save_secret(secret: dict):
         SecretId=SECRET_NAME,
         SecretString=json.dumps(secret),
     )
+    _secret_cache.pop(SECRET_NAME, None)  # Invalidate cache after token refresh
 
 
 # ── Auth ───────────────────────────────────────────────────────────────────────

@@ -60,6 +60,7 @@ import time
 import urllib.request
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -72,6 +73,9 @@ TABLE_NAME  = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID     = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
+# All user-facing dates use Pacific Time (DST-aware).
+PT = ZoneInfo("America/Los_Angeles")
+
 # DynamoDB is always us-west-2 even when this Lambda runs in us-east-1 (web stack).
 # DYNAMODB_REGION env var injected by CDK; defaults to us-west-2.
 DDB_REGION = os.environ.get("DYNAMODB_REGION", "us-west-2")
@@ -81,6 +85,20 @@ S3_REGION = os.environ.get("S3_REGION", "us-west-2")
 # ── AWS clients (module-level for warm container reuse) ─────
 dynamodb = boto3.resource("dynamodb", region_name=DDB_REGION)
 table    = dynamodb.Table(TABLE_NAME)
+
+# COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
+_secret_cache = {}
+
+
+def _cached_secret(client, secret_id):
+    import time as _t
+    entry = _secret_cache.get(secret_id)
+    if entry and _t.time() - entry[1] < 900:
+        return entry[0]
+    val = client.get_secret_value(SecretId=secret_id)["SecretString"]
+    _secret_cache[secret_id] = (val, _t.time())
+    return val
+
 # ── Content safety filter (S3-cached) ───────────────────────
 _content_filter_cache = None
 
@@ -102,10 +120,10 @@ EXPERIMENT_QUERY_START = "2026-03-31"
 
 
 def _experiment_date(days_back=30):
-    """Compute a date N days ago, clamped to EXPERIMENT_QUERY_START.
+    """Compute a date N days ago, clamped to EXPERIMENT_START.
     Use this for ALL date range queries to prevent pre-experiment data leaking through."""
     raw = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
-    return max(raw, EXPERIMENT_QUERY_START)
+    return max(raw, EXPERIMENT_START)
 
 
 # ── Platform stats — single source of truth for all site pages ──
@@ -375,7 +393,7 @@ def handle_vitals() -> dict:
 
     return _ok({
         "vitals": {
-            "weight_lbs":       round(current_weight, 1) if current_weight is not None else None,
+            "weight_lbs":       round(current_weight) if current_weight is not None else None,
             "weight_as_of":     weight_as_of,
             "weight_delta_30d": weight_delta_30d,
             "hrv_ms":           round(float(latest.get("hrv", 0)), 1) if latest.get("hrv") else None,
@@ -440,7 +458,7 @@ def handle_tools_baseline() -> dict:
     baseline["weight_lbs"] = first_val(baseline_withings, "weight_lbs")
 
     latest_withings = _latest_item("withings")
-    current["weight_lbs"] = (round(float(latest_withings["weight_lbs"]), 1)
+    current["weight_lbs"] = (round(float(latest_withings["weight_lbs"]))
                              if latest_withings and latest_withings.get("weight_lbs")
                              else None)
 
@@ -729,10 +747,10 @@ def handle_journey() -> dict:
                          or withings_latest.get("date", today))
             weight_series = [(last_date, float(withings_latest["weight_lbs"]))]
         else:
-            weight_series = [("2026-04-01", 302.0)]  # Matthew's journey start weight fallback; only used when no Withings data exists
+            weight_series = [("2026-04-01", 307.0)]  # Matthew's journey start weight fallback; only used when no Withings data exists
 
     _p = _get_profile()
-    start_weight = float(_p.get("journey_start_weight_lbs", 302.0))
+    start_weight = float(_p.get("journey_start_weight_lbs", 307.0))
     goal_weight  = float(_p.get("goal_weight_lbs", 185.0))
     current_weight = weight_series[-1][1]
     lost_lbs     = round(start_weight - current_weight, 1)
@@ -767,7 +785,7 @@ def handle_journey() -> dict:
         "journey": {
             "start_weight_lbs":   start_weight,
             "goal_weight_lbs":    goal_weight,
-            "current_weight_lbs": round(current_weight, 1),
+            "current_weight_lbs": round(current_weight),
             "lost_lbs":           lost_lbs,
             "remaining_lbs":      remaining,
             "progress_pct":       progress_pct,
@@ -997,7 +1015,7 @@ def handle_experiments() -> dict:
         planned_duration = item.get("planned_duration_days")
         if status == "active" and start:
             try:
-                days_in = (datetime.now(timezone.utc).replace(tzinfo=None) - datetime.strptime(start, "%Y-%m-%d")).days
+                days_in = (datetime.now(PT).replace(tzinfo=None) - datetime.strptime(start, "%Y-%m-%d")).days
             except Exception:
                 pass
 
@@ -1114,7 +1132,7 @@ def handle_status() -> dict:
     # ── CloudWatch alarm check — detect pipeline errors ──
     cw_alarm_states = {}
     try:
-        cw = boto3.client("cloudwatch", region_name=REGION)
+        cw = boto3.client("cloudwatch", region_name=DDB_REGION)
         alarms_resp = cw.describe_alarms(StateValue="ALARM", MaxRecords=50)
         for alarm in alarms_resp.get("MetricAlarms", []):
             # Map alarm name back to source ID (convention: ingestion-error-{source} or {source}-errors)
@@ -1170,8 +1188,8 @@ def handle_status() -> dict:
         ("macrofactor_workouts","Exercise Log Data",                 "Workout CSV via file drop",                             48, 168, "auto",   "Periodic Uploads", True,  "MacroFactor via Dropbox", None),
         ("apple_health",       "CGM Glucose Data",                   "Continuous glucose monitor readings",                   25,  49, "auto",  "Periodic Uploads", True,  "Dexcom Stelo via Health Exporter", "blood_glucose_avg"),
         ("apple_health",       "Water Intake Data",                  "Daily water consumption tracking",                      25,  49, "auto",   "Periodic Uploads", True,  "Apple Health via Health Exporter", "water_intake_ml"),
-        ("bp_readings",        "Blood Pressure Data",                "Systolic \u00B7 diastolic \u00B7 pulse",               168, 336, "manual",  "Periodic Uploads", True,  "Apple Health via Health Exporter", None),
-        ("apple_health",       "Breathwork Data",                    "Breathing exercises \u00B7 sessions",                   48, 168, "auto",   "Periodic Uploads", True,  "Breathwrk via Health Exporter", "recovery_workout_minutes"),
+        ("apple_health",       "Blood Pressure Data",                "Systolic \u00B7 diastolic \u00B7 pulse",               168, 336, "manual",  "Periodic Uploads", True,  "Apple Health via Health Exporter", "blood_pressure_systolic"),
+        ("apple_health",       "Breathwork Data",                    "Breathwork mindful minutes \u00B7 sessions",                   48, 168, "auto",   "Periodic Uploads", True,  "Breathwrk via Apple Health", "mindful_minutes"),
         ("apple_health",       "Stretching Data",                    "Flexibility sessions \u00B7 recovery",                  48, 168, "auto",   "Periodic Uploads", True,  "Pliability via Health Exporter", "flexibility_minutes"),
         ("apple_health",       "Mindful Minutes Data",               "Meditation & mindfulness sessions",                     48, 168, "auto",   "Periodic Uploads", True,  "Apple Health via Health Exporter", "mindful_minutes"),
         ("apple_health",       "State of Mind Data (Health Export)",  "How We Feel mood check-ins via Health Exporter",       48, 168, "auto",   "Periodic Uploads", True,  "Apple Health via Health Exporter", "som_avg_valence"),
@@ -1303,6 +1321,7 @@ def handle_status() -> dict:
         return status, rel
 
     # Build data source components
+    now = datetime.now(timezone.utc)
     ds_components = []
     for row in _DATA_SOURCES:
         sid, name, desc, yh, rh = row[0], row[1], row[2], row[3], row[4]
@@ -1411,10 +1430,15 @@ def handle_status() -> dict:
                     status = "green"
                     comment = "Pipeline ready \u2014 no data recorded yet"
 
-        # CloudWatch alarm override — if Lambda is actively erroring, show red
+        # CloudWatch alarm override — if Lambda is actively erroring, escalate status
         if sid in alarming_sources and status != "blue":
-            status = "red"
-            comment = f"CloudWatch alarm firing \u2014 Lambda errors detected"
+            if status == "green":
+                # Data is fresh despite alarm — likely a stale 24h-window alarm that's recovering
+                status = "yellow"
+                comment = "CloudWatch alarm recovering \u2014 data still flowing"
+            else:
+                status = "red"
+                comment = "CloudWatch alarm firing \u2014 Lambda errors detected"
         # Health check override — if daily probe failed, show red
         elif sid in health_check_failures and status not in ("blue", "red"):
             status = "red"
@@ -1452,9 +1476,9 @@ def handle_status() -> dict:
     for lid, name, desc, exp_dow, yh, rh in _EMAIL_LAMBDAS:
         last = _last_sync(f"email_log#{lid}")
         status, rel, comment = _comp_status(last, yh, rh, source_id=lid)
-        status, rel = _sched_aware(status, rel, exp_dow)
         uptime = _uptime_90d(f"email_log#{lid}", activity_dependent=True)  # scheduled emails — gaps aren't system failures
         # Weekly/scheduled emails: if they've run within their expected window, they're fine
+        # Apply recovery BEFORE _sched_aware so yellow is not downgraded to gray first
         if status in ("yellow",) and last and lid not in alarming_sources:
             status = "green"
             comment = f"Last sent: {rel} \u2014 next run scheduled"
@@ -1467,6 +1491,10 @@ def handle_status() -> dict:
         if lid in alarming_sources:
             status = "red"
             comment = "CloudWatch alarm firing \u2014 Lambda errors detected"
+        # Apply schedule-aware downgrade AFTER recovery — green emails stay green,
+        # only genuinely stale emails get grayed out on off-days
+        if status not in ("green", "red"):
+            status, rel = _sched_aware(status, rel, exp_dow)
         email_components.append({"id": lid, "name": name, "description": desc,
                                  "status": status, "last_sync_relative": rel,
                                  "uptime_90d": uptime, "comment": comment})
@@ -1477,9 +1505,9 @@ def handle_status() -> dict:
     dlq_status = "green"
     dlq_comment = None
     try:
-        sqs = boto3.client("sqs", region_name=REGION)
+        sqs = boto3.client("sqs", region_name=DDB_REGION)
         dlq_attrs = sqs.get_queue_attributes(
-            QueueUrl=f"https://sqs.{REGION}.amazonaws.com/205930651321/life-platform-ingestion-dlq",
+            QueueUrl=f"https://sqs.{DDB_REGION}.amazonaws.com/205930651321/life-platform-ingestion-dlq",
             AttributeNames=["ApproximateNumberOfMessages"],
         )
         dlq_depth = int(dlq_attrs["Attributes"]["ApproximateNumberOfMessages"])
@@ -1639,7 +1667,7 @@ def handle_timeline() -> dict:
             "experiments":  sorted(experiments, key=lambda x: x["start"]),
             "level_ups":    level_events,
             "journey_start": EXPERIMENT_START,
-            "start_weight":  float(_get_profile().get("journey_start_weight_lbs", 302.0)),
+            "start_weight":  float(_get_profile().get("journey_start_weight_lbs", 307.0)),
             "goal_weight":   float(_get_profile().get("goal_weight_lbs", 185.0)),
         }
     }, cache_seconds=3600)
@@ -1792,7 +1820,7 @@ def handle_journey_timeline() -> dict:
     today           = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     start_date      = EXPERIMENT_START
     _p              = _get_profile()
-    start_weight    = float(_p.get("journey_start_weight_lbs", 302.0))
+    start_weight    = float(_p.get("journey_start_weight_lbs", 307.0))
     goal_weight     = float(_p.get("goal_weight_lbs", 185.0))
 
     events: list = []
@@ -1802,7 +1830,7 @@ def handle_journey_timeline() -> dict:
         "date":  start_date,
         "type":  "milestone",
         "title": "Day 1 — The Experiment Begins",
-        "body":  "Started at 302 lbs. Built the platform from scratch. Committed publicly.",
+        "body":  "Started at 307 lbs. Built the platform from scratch. Committed publicly.",
         "link":  "/story/",
     })
 
@@ -1836,7 +1864,7 @@ def handle_journey_timeline() -> dict:
             "date":  crossed[thr],
             "type":  "weight",
             "title": f"Crossed {thr} lbs — {int(lbs_lost)} lbs lost",
-            "body":  f"Down {int(lbs_lost)} lbs from 302. {round((lbs_lost / (start_weight - goal_weight)) * 100)}% of the way to goal.",
+            "body":  f"Down {int(lbs_lost)} lbs from 307. {round((lbs_lost / (start_weight - goal_weight)) * 100)}% of the way to goal.",
             "link":  "/live/",
         })
 
@@ -1850,17 +1878,26 @@ def handle_journey_timeline() -> dict:
             ScanIndexForward=True,
         )
         seen_levels: set = set()
+        _PILLAR_NAMES = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
         for item in _decimal_to_float(cs_resp.get("Items", [])):
             level = item.get("character_level")
             date_str = item.get("date") or item.get("sk", "").replace("DATE#", "")
             if level and level not in seen_levels:
                 seen_levels.add(level)
                 if level > 1:
+                    # Enrich with top-scoring pillars that drove the level-up
+                    top_pillars = []
+                    for p in _PILLAR_NAMES:
+                        pd = item.get(f"pillar_{p}", {})
+                        if isinstance(pd, dict) and pd.get("raw_score"):
+                            top_pillars.append((p.capitalize(), float(pd["raw_score"])))
+                    top_pillars.sort(key=lambda x: -x[1])
+                    drivers = ", ".join(f"{n} ({s:.0f})" for n, s in top_pillars[:3])
                     events.append({
                         "date":  date_str,
                         "type":  "level_up",
-                        "title": f"Reached Character Level {level}",
-                        "body":  f"Level {level} — {item.get('character_tier', '')}. Pillar scores converging.",
+                        "title": f"Reached Character Level {int(level)}",
+                        "body":  f"Driven by: {drivers}" if drivers else f"Level {int(level)} — {item.get('character_tier', '')}",
                         "link":  "/character/",
                     })
     except Exception:
@@ -2754,8 +2791,6 @@ def _handle_board_ask(event: dict) -> dict:
 
 # ── Ask the Platform (AI Q&A) ─────────────────────────────────────
 
-_anthropic_key_cache = None
-
 # In-memory rate limit stores (warm container state — resets on cold start, acceptable for rate limiting)
 # Maps ip_hash -> list of timestamps in the current hour
 _ask_rate_store: dict = {}
@@ -2771,15 +2806,10 @@ AI_MODEL_HAIKU  = os.environ.get("AI_MODEL_HAIKU",  "claude-haiku-4-5-20251001")
 
 
 def _get_anthropic_key():
-    """Fetch Anthropic API key from Secrets Manager (cached after first call)."""
-    global _anthropic_key_cache
-    if _anthropic_key_cache:
-        return _anthropic_key_cache
+    """Fetch Anthropic API key from Secrets Manager (cached with 15-min TTL)."""
     try:
         sm = boto3.client("secretsmanager", region_name="us-west-2")
-        resp = sm.get_secret_value(SecretId=AI_SECRET_NAME)
-        _anthropic_key_cache = resp["SecretString"]
-        return _anthropic_key_cache
+        return _cached_secret(sm, AI_SECRET_NAME)
     except Exception as e:
         logger.error(f"[ask] Failed to fetch API key from {AI_SECRET_NAME}: {e}")
         return None
@@ -2885,7 +2915,7 @@ def _ask_build_prompt(ctx: dict) -> str:
     return f"""You are the AI behind Matthew Walker's Life Platform — a personal health intelligence system tracking 19 data sources.
 
 CURRENT DATA:
-  Weight: {ctx.get('weight_lbs', '?')} lbs (started 302, goal 185)
+  Weight: {ctx.get('weight_lbs', '?')} lbs (started 307, goal 185)
   HRV: {ctx.get('hrv_ms', '?')} ms
   RHR: {ctx.get('rhr_bpm', '?')} bpm
   Recovery: {ctx.get('recovery_pct', '?')}%
@@ -2931,6 +2961,7 @@ def handle_glucose() -> dict:
     cgm_days = [
         r for r in records
         if r.get("blood_glucose_avg") is not None
+        and r.get("sk", "").replace("DATE#", "") >= EXPERIMENT_START
     ]
     cgm_days.sort(key=lambda x: x.get("sk", ""))
 
@@ -2964,6 +2995,19 @@ def handle_glucose() -> dict:
     std_today = float(latest.get("blood_glucose_std_dev", 99))
     variability_status = "low" if std_today < 15 else ("moderate" if std_today < 25 else "high")
 
+    # Best/worst day by TIR (or avg glucose if all 100% TIR)
+    best_day = None
+    worst_day = None
+    if len(cgm_days) >= 2:
+        sorted_by_tir = sorted(cgm_days, key=lambda r: (
+            float(r.get("blood_glucose_time_in_range_pct", 0)),
+            -float(r.get("blood_glucose_std_dev", 99))
+        ))
+        worst_r = sorted_by_tir[0]
+        best_r = sorted_by_tir[-1]
+        worst_day = {"date": worst_r.get("sk", "").replace("DATE#", ""), "avg": round(float(worst_r.get("blood_glucose_avg", 0)), 1), "tir": round(float(worst_r.get("blood_glucose_time_in_range_pct", 0)), 1)}
+        best_day = {"date": best_r.get("sk", "").replace("DATE#", ""), "avg": round(float(best_r.get("blood_glucose_avg", 0)), 1), "tir": round(float(best_r.get("blood_glucose_time_in_range_pct", 0)), 1)}
+
     return _ok({
         "glucose": {
             "avg_mg_dl":          round(float(latest.get("blood_glucose_avg", 0)), 1) if latest.get("blood_glucose_avg") else None,
@@ -2980,6 +3024,8 @@ def handle_glucose() -> dict:
             "30d_avg_std":        avg(std_vals),
             "days_tracked":       len(cgm_days),
             "as_of_date":         latest.get("sk", "").replace("DATE#", ""),
+            "best_day":           best_day,
+            "worst_day":          worst_day,
         },
         "glucose_trend": trend,
     }, cache_seconds=3600)
@@ -3006,7 +3052,12 @@ def handle_sleep_detail() -> dict:
     }
 
     eight_days.sort(key=lambda x: x.get("sk", ""))
-    eight_with_data = [r for r in eight_days if r.get("sleep_score") is not None]
+    # Filter to experiment window — EXPERIMENT_QUERY_START fetches 1 day early for sleep lookback,
+    # but we only display data from EXPERIMENT_START onwards
+    eight_with_data = [
+        r for r in eight_days
+        if r.get("sleep_score") is not None and r.get("sk", "").replace("DATE#", "") >= EXPERIMENT_START
+    ]
 
     if not eight_with_data:
         return _ok({"sleep_detail": None, "sleep_trend": []}, cache_seconds=3600)
@@ -3014,6 +3065,14 @@ def handle_sleep_detail() -> dict:
     latest = eight_with_data[-1]
     latest_date = latest.get("sk", "").replace("DATE#", "")
     whoop_latest = whoop_by_date.get(latest_date, {})
+    # If latest Eight Sleep record has no matching Whoop recovery, use most recent that does
+    if not whoop_latest.get("recovery_score"):
+        for r in reversed(eight_with_data):
+            _rd = r.get("sk", "").replace("DATE#", "")
+            _wm = whoop_by_date.get(_rd, {})
+            if _wm.get("recovery_score"):
+                whoop_latest = _wm
+                break
 
     # 30-day averages (actual field names: sleep_efficiency_pct, sleep_duration_hours)
     score_vals = [float(r["sleep_score"]) for r in eight_with_data if r.get("sleep_score")]
@@ -3039,10 +3098,12 @@ def handle_sleep_detail() -> dict:
     def avg(lst):
         return round(sum(lst) / len(lst), 1) if lst else None
 
-    # Daily trend
+    # Daily trend — filter to experiment start (EXPERIMENT_QUERY_START is 1 day early for sleep lookback)
     trend = []
     for r in eight_with_data:
         date = r.get("sk", "").replace("DATE#", "")
+        if date < EXPERIMENT_START:
+            continue  # Don't include pre-experiment days in trend output
         w = whoop_by_date.get(date, {})
         trend.append({
             "date":          date,
@@ -3063,6 +3124,49 @@ def handle_sleep_detail() -> dict:
 
     score_today = float(latest.get("sleep_score", 0))
     score_status = "excellent" if score_today >= 85 else ("good" if score_today >= 70 else "needs_attention")
+
+    # Compute bed time / wake time averages and social jet lag from Whoop sleep_start/end
+    bed_times_weekday = []
+    bed_times_weekend = []
+    wake_times = []
+    for w in whoop_days:
+        ss = w.get("sleep_start")
+        se = w.get("sleep_end")
+        if not ss or "#WORKOUT#" in w.get("sk", ""):
+            continue
+        try:
+            start_dt = datetime.fromisoformat(ss.replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(se.replace("Z", "+00:00"))
+            start_pt = start_dt.astimezone(PT)
+            end_pt = end_dt.astimezone(PT)
+            # Normalize bed hour: treat times after 6 PM as evening (18-30), before 6 AM as late night (24-30)
+            bed_hour = start_pt.hour + start_pt.minute / 60
+            if bed_hour < 6:
+                bed_hour += 24  # 1 AM → 25, so avg with 11 PM (23) works correctly
+            wake_hour = end_pt.hour + end_pt.minute / 60
+            wake_times.append(wake_hour)
+            if start_pt.weekday() in (4, 5):  # Fri/Sat night = weekend sleep
+                bed_times_weekend.append(bed_hour)
+            else:
+                bed_times_weekday.append(bed_hour)
+        except Exception:
+            continue
+
+    def _fmt_hour(h):
+        """Convert decimal hour to HH:MM AM/PM."""
+        h = h % 24
+        hr = int(h)
+        mn = int((h - hr) * 60)
+        ampm = "AM" if hr < 12 else "PM"
+        hr12 = hr % 12 or 12
+        return f"{hr12}:{mn:02d} {ampm}"
+
+    all_bed = bed_times_weekday + bed_times_weekend
+    avg_bed = round(sum(all_bed) / len(all_bed), 2) if all_bed else None
+    avg_bed_wd = round(sum(bed_times_weekday) / len(bed_times_weekday), 2) if bed_times_weekday else None
+    avg_bed_we = round(sum(bed_times_weekend) / len(bed_times_weekend), 2) if bed_times_weekend else None
+    avg_wake = round(sum(wake_times) / len(wake_times), 2) if wake_times else None
+    social_jet_lag_hrs = round(abs((avg_bed_wd or 0) - (avg_bed_we or 0)), 1) if avg_bed_wd is not None and avg_bed_we is not None else None
 
     return _ok({
         "sleep_detail": {
@@ -3088,6 +3192,11 @@ def handle_sleep_detail() -> dict:
             "30d_avg_temp":      avg(temp_vals),
             "days_tracked":      len(eight_with_data),
             "as_of_date":        latest_date,
+            "avg_bedtime":       _fmt_hour(avg_bed) if avg_bed is not None else None,
+            "avg_bedtime_weekday": _fmt_hour(avg_bed_wd) if avg_bed_wd is not None else None,
+            "avg_bedtime_weekend": _fmt_hour(avg_bed_we) if avg_bed_we is not None else None,
+            "avg_waketime":      _fmt_hour(avg_wake) if avg_wake is not None else None,
+            "social_jet_lag_hrs": social_jet_lag_hrs,
         },
         "sleep_trend": trend,
     }, cache_seconds=3600)
@@ -3138,7 +3247,7 @@ def handle_achievements() -> dict:
     # ── Weight milestones
     withings = _latest_item("withings")
     current_weight = float(withings.get("weight_lbs", 999)) if withings else 999.0
-    start_weight = float(_get_profile().get("journey_start_weight_lbs", 302.0))
+    start_weight = float(_get_profile().get("journey_start_weight_lbs", 307.0))
     lost_lbs = round(start_weight - current_weight, 1) if current_weight < start_weight else 0
 
     # ── First experiment
@@ -3324,7 +3433,7 @@ def handle_achievements() -> dict:
             "current_streak": current_streak,
             "days_tracked":   days_tracked,
             "current_level":  current_level,
-            "current_weight": round(current_weight, 1),
+            "current_weight": round(current_weight),
             "completed_challenges": completed_challenges,
             "perfect_challenges": perfect_challenges,
         },
@@ -3588,7 +3697,7 @@ def handle_experiment_library() -> dict:
             days_in = None
             if status == "active" and start:
                 try:
-                    days_in = (datetime.now(timezone.utc).replace(tzinfo=None) - datetime.strptime(start, "%Y-%m-%d")).days
+                    days_in = (datetime.now(PT).replace(tzinfo=None) - datetime.strptime(start, "%Y-%m-%d")).days
                 except Exception:
                     pass
 
@@ -3973,23 +4082,68 @@ def handle_pulse() -> dict:
     Reads latest records from each source for real-time glyphs.
     Cache: 300s (5 min).
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-    _pulse_day = max(1, (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1) if today >= EXPERIMENT_START else 0
+    today_pt = datetime.now(PT).strftime("%Y-%m-%d")
+    today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    yesterday_pt = (datetime.now(PT) - timedelta(days=1)).strftime("%Y-%m-%d")
+    # Display day number in PT; query DynamoDB covering both PT and UTC dates
+    _pulse_day = max(1, (datetime.now(PT).date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1) if today_pt >= EXPERIMENT_START else 0
+    # Query range covers yesterday(PT) through today(UTC) to catch timezone boundary records
+    q_start = min(yesterday_pt, today_pt)
+    q_end = max(today_pt, today_utc)
 
     # Read latest data from each source
-    whoop = _latest_item("whoop") or {}
+    # Whoop: skip workout sub-records (DATE#...#WORKOUT#...), get most recent daily record
+    whoop = None
+    try:
+        _w_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}whoop") & Key("sk").begins_with("DATE#"),
+            ScanIndexForward=False, Limit=5,
+        )
+        for _w_item in _decimal_to_float(_w_resp.get("Items", [])):
+            _w_sk = _w_item.get("sk", "")
+            if "#WORKOUT#" not in _w_sk and _w_item.get("recovery_score") is not None:
+                whoop = _w_item
+                break
+        if not whoop:
+            whoop = _decimal_to_float(_w_resp.get("Items", [{}]))[0] if _w_resp.get("Items") else {}
+    except Exception:
+        whoop = {}
     withings = _latest_item("withings") or {}
     ah = None
     try:
         ah_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}apple_health") & Key("sk").between(f"DATE#{yesterday}", f"DATE#{today}"),
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}apple_health") & Key("sk").between(f"DATE#{q_start}", f"DATE#{q_end}"),
             ScanIndexForward=False, Limit=1,
         )
         ah = _decimal_to_float(ah_resp.get("Items", [{}])[0]) if ah_resp.get("Items") else {}
     except Exception:
         ah = {}
     habitify = _latest_item("habit_scores") or {}
+
+    # Check for journal entry today + streak (single query for last 30 days)
+    journal_today = False
+    journal_streak = 0
+    try:
+        d30_ago = (datetime.now(PT) - timedelta(days=30)).strftime("%Y-%m-%d")
+        j_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}notion") & Key("sk").between(f"DATE#{d30_ago}", f"DATE#{q_end}~"),
+            ProjectionExpression="sk",
+        )
+        j_dates = set()
+        for item in j_resp.get("Items", []):
+            j_dates.add(item["sk"][:15])  # "DATE#YYYY-MM-DD"
+        # Check both PT and UTC dates for today's journal (entry may be stored under either)
+        journal_today = f"DATE#{today_pt}" in j_dates or f"DATE#{today_utc}" in j_dates
+        if journal_today:
+            journal_streak = 1
+            for days_back in range(1, 31):
+                check_sk = f"DATE#{(datetime.now(PT) - timedelta(days=days_back)).strftime('%Y-%m-%d')}"
+                if check_sk in j_dates:
+                    journal_streak += 1
+                else:
+                    break
+    except Exception:
+        pass
 
     # Also check apple_health for weight fallback
     w_val = float(withings.get("weight_lbs", 0)) if withings.get("weight_lbs") else None
@@ -4004,7 +4158,23 @@ def handle_pulse() -> dict:
 
     recovery = float(whoop.get("recovery_score", 0)) if whoop.get("recovery_score") else None
     sleep_hrs = float(whoop.get("sleep_duration_hours", 0)) if whoop.get("sleep_duration_hours") else None
-    steps = float(ah.get("steps", 0)) if ah and ah.get("steps") else None
+    # Steps: prefer Garmin (more accurate with watch), fall back to Apple Health
+    steps = None
+    try:
+        _g_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}garmin") & Key("sk").between(f"DATE#{yesterday_pt}", f"DATE#{q_end}"),
+            ScanIndexForward=False, Limit=1,
+        )
+        for _g in _g_resp.get("Items", []):
+            _gs = _g.get("steps")
+            if _gs:
+                steps = float(str(_gs))
+                break
+    except Exception:
+        pass
+    if not steps:
+        steps = float(ah.get("steps", 0)) if ah and ah.get("steps") else None
+    # Water: get the PT-date record specifically (user logs water throughout the day in their timezone)
     water_ml = float(ah.get("water_intake_ml", 0)) if ah and ah.get("water_intake_ml") else None
     water_l = round(water_ml / 1000, 2) if water_ml else None
     t0_pct = float(habitify.get("tier0_pct", 0)) if habitify.get("tier0_pct") else None
@@ -4025,14 +4195,14 @@ def handle_pulse() -> dict:
             "direction": "down" if w_val and w_val < start_weight else "up",
             "delta": round(w_val - start_weight, 1) if w_val else None,
             "delta_label": f"{round(w_val - start_weight, 1):+.1f} lbs" if w_val else None,
-            "as_of": w_date or ah_date or today,
+            "as_of": w_date or ah_date or today_pt,
         },
         "water": {
             "state": "green" if water_l and water_l >= 3.0 else ("amber" if water_l and water_l >= 1.5 else "gray"),
             "liters": water_l,
             "target": 3.0,
             "label": f"{water_l}L" if water_l else None,
-            "as_of": today,
+            "as_of": today_pt,
         },
         "movement": {
             "state": "green" if steps and steps >= 8000 else ("amber" if steps and steps >= 5000 else "gray"),
@@ -4043,12 +4213,22 @@ def handle_pulse() -> dict:
         "recovery": {
             "state": "green" if recovery and recovery >= 67 else ("amber" if recovery and recovery >= 34 else "gray"),
             "value": round(recovery) if recovery else None,
+            "recovery_pct": round(recovery) if recovery else None,
+            "hrv_ms": round(float(whoop.get("hrv", 0)), 1) if whoop.get("hrv") else None,
+            "rhr_bpm": round(float(whoop.get("resting_heart_rate", 0)), 1) if whoop.get("resting_heart_rate") else None,
             "label": f"{round(recovery)}%" if recovery else None,
         },
         "sleep": {
             "state": "green" if sleep_hrs and sleep_hrs >= 7 else ("amber" if sleep_hrs and sleep_hrs >= 6 else "gray"),
             "value": round(sleep_hrs, 1) if sleep_hrs else None,
+            "hours": round(sleep_hrs, 1) if sleep_hrs else None,
             "label": f"{round(sleep_hrs, 1)}h" if sleep_hrs else None,
+        },
+        "journal": {
+            "state": "green" if journal_today else "gray",
+            "written_today": journal_today,
+            "streak_days": journal_streak,
+            "label": "Journaled" if journal_today else "No entry yet",
         },
     }
 
@@ -4058,7 +4238,7 @@ def handle_pulse() -> dict:
     return _ok({
         "pulse": {
             "day_number": _pulse_day,
-            "date": today,
+            "date": today_pt,
             "status": status,
             "status_color": {"green": "#22c55e", "mixed": "#f5a623", "quiet": "#3a5a48"}.get(status, "#3a5a48"),
             "signals_reporting": signals_reporting,
@@ -4311,8 +4491,15 @@ def handle_challenges() -> dict:
             # Include active, candidate, and recently completed (last 30 days)
             if status in ("active", "candidate", "completed", "failed"):
                 ch = _decimal_to_float(item)
-                ch.pop("pk", None)
-                ch.pop("sk", None)
+                sk_raw = ch.pop("pk", "") or ""
+                sk_val = ch.pop("sk", "") or ""
+                # Derive catalog_id by stripping CHALLENGE# prefix and date suffix
+                # e.g. CHALLENGE#no-doordash-30d_2026-04-01 → no-doordash-30d → match catalog no-doordash-30
+                raw_id = sk_val.replace("CHALLENGE#", "")
+                ch["challenge_id"] = raw_id
+                # Strip date suffix (_YYYY-MM-DD) for catalog matching
+                import re as _re
+                ch["id"] = _re.sub(r'_\d{4}-\d{2}-\d{2}$', '', raw_id)
 
                 # Compute progress for active challenges
                 if status == "active":
@@ -4541,34 +4728,32 @@ def handle_nutrition_overview() -> dict:
         else:
             weekday_items.append(i)
 
-    def _group_avg(group, field):
-        vals = [float(x[field]) for x in group if x.get(field) is not None]
+    def _group_avg(group, field, alt_field=None):
+        vals = [_mf(x, field, alt_field) for x in group if _mf(x, field, alt_field) is not None]
         return round(sum(vals) / len(vals), 1) if vals else None
+
+    def _group_pro_hit(group):
+        hits = sum(1 for x in group if (_mf(x, "protein_g", "total_protein_g") or 0) >= protein_target)
+        return round(hits / len(group) * 100) if group else 0
 
     weekday_vs_weekend = {
         "weekday": {
             "avg_calories": _group_avg(weekday_items, "calories"),
-            "avg_protein_g": _group_avg(weekday_items, "protein_g"),
-            "avg_carbs_g": _group_avg(weekday_items, "carbs_g"),
-            "avg_fat_g": _group_avg(weekday_items, "fat_g"),
-            "avg_fiber_g": _group_avg(weekday_items, "fiber_g"),
+            "avg_protein_g": _group_avg(weekday_items, "protein_g", "total_protein_g"),
+            "avg_carbs_g": _group_avg(weekday_items, "carbs_g", "total_carbs_g"),
+            "avg_fat_g": _group_avg(weekday_items, "fat_g", "total_fat_g"),
+            "avg_fiber_g": _group_avg(weekday_items, "fiber_g", "total_fiber_g"),
             "days": len(weekday_items),
-            "protein_hit_pct": round(
-                sum(1 for x in weekday_items if float(x.get("protein_g") or 0) >= protein_target)
-                / len(weekday_items) * 100
-            ) if weekday_items else 0,
+            "protein_hit_pct": _group_pro_hit(weekday_items),
         },
         "weekend": {
             "avg_calories": _group_avg(weekend_items, "calories"),
-            "avg_protein_g": _group_avg(weekend_items, "protein_g"),
-            "avg_carbs_g": _group_avg(weekend_items, "carbs_g"),
-            "avg_fat_g": _group_avg(weekend_items, "fat_g"),
-            "avg_fiber_g": _group_avg(weekend_items, "fiber_g"),
+            "avg_protein_g": _group_avg(weekend_items, "protein_g", "total_protein_g"),
+            "avg_carbs_g": _group_avg(weekend_items, "carbs_g", "total_carbs_g"),
+            "avg_fat_g": _group_avg(weekend_items, "fat_g", "total_fat_g"),
+            "avg_fiber_g": _group_avg(weekend_items, "fiber_g", "total_fiber_g"),
             "days": len(weekend_items),
-            "protein_hit_pct": round(
-                sum(1 for x in weekend_items if float(x.get("protein_g") or 0) >= protein_target)
-                / len(weekend_items) * 100
-            ) if weekend_items else 0,
+            "protein_hit_pct": _group_pro_hit(weekend_items),
         },
     }
 
@@ -4627,12 +4812,12 @@ def handle_nutrition_overview() -> dict:
     periodization = {
         "training_day": {
             "avg_calories": _group_avg(training_day_items, "calories"),
-            "avg_protein_g": _group_avg(training_day_items, "protein_g"),
+            "avg_protein_g": _group_avg(training_day_items, "protein_g", "total_protein_g"),
             "count": len(training_day_items),
         },
         "rest_day": {
             "avg_calories": _group_avg(rest_day_items, "calories"),
-            "avg_protein_g": _group_avg(rest_day_items, "protein_g"),
+            "avg_protein_g": _group_avg(rest_day_items, "protein_g", "total_protein_g"),
             "count": len(rest_day_items),
         },
     }
@@ -4658,8 +4843,8 @@ def handle_nutrition_overview() -> dict:
             "cal_7d_avg": round(sum(cal_7d) / len(cal_7d)) if cal_7d else None,
             "pro_7d_avg": round(sum(pro_7d) / len(pro_7d), 1) if pro_7d else None,
             "latest_date": latest_date,
-            "latest_calories": round(float(latest.get("calories", 0))) if latest.get("calories") else None,
-            "latest_protein_g": round(float(latest.get("protein_g", 0)), 1) if latest.get("protein_g") else None,
+            "latest_calories": round(_mf(latest, "calories")) if _mf(latest, "calories") else None,
+            "latest_protein_g": round(_mf(latest, "protein_g", "total_protein_g"), 1) if _mf(latest, "protein_g", "total_protein_g") else None,
         },
         "nutrition_trend": trend,
         "weekday_vs_weekend": weekday_vs_weekend,
@@ -4703,6 +4888,25 @@ def handle_training_overview() -> dict:
             s["_day_date"] = s.get("date") or s.get("sk", "").replace("DATE#", "")
             all_activities_30d.append(s)
 
+    # Deduplicate WHOOP auto-detected activities that overlap with Garmin recordings.
+    # WHOOP pushes duplicate workouts to Strava (often with 0 distance). If a Garmin
+    # activity of the same sport_type exists on the same day, drop the WHOOP duplicate.
+    def _dedup_whoop(activities):
+        by_day_type = {}
+        for a in activities:
+            key = (a.get("_day_date", ""), (a.get("sport_type") or "").lower())
+            by_day_type.setdefault(key, []).append(a)
+        deduped = []
+        for key, group in by_day_type.items():
+            if len(group) > 1:
+                non_whoop = [a for a in group if (a.get("device_name") or "").upper() != "WHOOP"]
+                deduped.extend(non_whoop if non_whoop else [group[0]])
+            else:
+                deduped.extend(group)
+        return deduped
+
+    all_activities_30d = _dedup_whoop(all_activities_30d)
+
     all_activities_90d = []
     for s in strava_items:
         acts = s.get("activities") or []
@@ -4713,6 +4917,7 @@ def handle_training_overview() -> dict:
         else:
             s["_day_date"] = s.get("date") or s.get("sk", "").replace("DATE#", "")
             all_activities_90d.append(s)
+    all_activities_90d = _dedup_whoop(all_activities_90d)
 
     total_workouts_90d = len(all_activities_90d)
     total_workouts_30d = len(all_activities_30d)
@@ -4803,9 +5008,13 @@ def handle_training_overview() -> dict:
     z2_weekly_avg = round(z2_minutes_30d / 4.3)
     z2_pct = round(z2_weekly_avg / z2_target * 100) if z2_target else 0
 
-    # ── Walking stats (Garmin steps + Strava walks) ──
+    # ── Walking stats (Garmin steps + Apple Health fallback + Strava walks) ──
     garmin_30d = _query_source("garmin", d30, today)
     step_vals = [float(g["steps"]) for g in garmin_30d if g.get("steps")]
+    # Fallback: use Apple Health step data if Garmin has none
+    if not step_vals:
+        ah_step_data = _query_source("apple_health", d30, today)
+        step_vals = [float(h["steps"]) for h in ah_step_data if h.get("steps") and float(h["steps"]) > 0]
     avg_daily_steps = round(sum(step_vals) / len(step_vals)) if step_vals else None
     daily_steps_trend = []
     for g in sorted(garmin_30d, key=lambda x: x.get("date") or x.get("sk", "")):
@@ -4841,10 +5050,19 @@ def handle_training_overview() -> dict:
         avg_speed_ms = sum(float(a["average_speed_ms"]) for a in walk_w_speed) / len(walk_w_speed)
         walking_data["avg_pace_min_per_mi"] = round(26.8224 / avg_speed_ms, 1) if avg_speed_ms > 0 else None
 
-    # ── Breathwork stats (Apple Health) ──
+    # ── Breathwork stats (Apple Health — check both breathwork_minutes and mindful_minutes) ──
     ah_30d = _query_source("apple_health", d30, today)
-    bw_sessions = sum(int(float(h.get("breathwork_sessions") or 0)) for h in ah_30d)
-    bw_minutes = sum(float(h.get("breathwork_minutes") or 0) for h in ah_30d)
+    bw_sessions = 0
+    bw_minutes = 0.0
+    for h in ah_30d:
+        _bw = float(h.get("breathwork_minutes") or 0)
+        _bs = int(float(h.get("breathwork_sessions") or 0))
+        _mm = float(h.get("mindful_minutes") or 0)
+        if _mm > 0 and _bw == 0:
+            _bw = _mm
+            _bs = max(_bs, 1)
+        bw_sessions += _bs
+        bw_minutes += _bw
     bw_weekly_trend = []
     bw_week_map = _dd2(lambda: {"sessions": 0, "minutes": 0.0})
     for h in ah_30d:
@@ -4853,8 +5071,14 @@ def handle_training_overview() -> dict:
             wk = datetime.strptime(d, "%Y-%m-%d").strftime("%Y-W%V")
         except Exception:
             continue
-        bw_week_map[wk]["sessions"] += int(float(h.get("breathwork_sessions") or 0))
-        bw_week_map[wk]["minutes"] += float(h.get("breathwork_minutes") or 0)
+        _bw = float(h.get("breathwork_minutes") or 0)
+        _bs = int(float(h.get("breathwork_sessions") or 0))
+        _mm = float(h.get("mindful_minutes") or 0)
+        if _mm > 0 and _bw == 0:
+            _bw = _mm
+            _bs = max(_bs, 1)
+        bw_week_map[wk]["sessions"] += _bs
+        bw_week_map[wk]["minutes"] += _bw
     for wk in sorted(bw_week_map):
         bw_weekly_trend.append({"week": wk, **bw_week_map[wk]})
     breathwork_data = {
@@ -4888,8 +5112,11 @@ def handle_training_overview() -> dict:
             _daily_mod[_bw_d]["breathwork"] += _bw_min
     _mod_keys = ["strength", "walking", "cycling", "stretching", "soccer", "hiking", "breathwork", "other"]
     daily_modality_minutes_30d = []
-    for i in range(30):
-        dt = datetime.now(timezone.utc) - timedelta(days=29 - i)
+    _exp_start_date = datetime.strptime(EXPERIMENT_START, "%Y-%m-%d")
+    _days_since_exp = (datetime.now(timezone.utc) - _exp_start_date.replace(tzinfo=timezone.utc)).days + 1
+    _mod_range = min(30, _days_since_exp)
+    for i in range(_mod_range):
+        dt = datetime.now(timezone.utc) - timedelta(days=_mod_range - 1 - i)
         _dm_d = dt.strftime("%Y-%m-%d")
         _dm_entry = {"date": _dm_d}
         _dm_total = 0
@@ -5026,6 +5253,9 @@ def handle_weekly_physical_summary() -> dict:
         activities = day_activities.get(d, [])
         total_active_min = sum(a["minutes"] for a in activities)
         bw_min = float(ah.get("breathwork_minutes") or 0)
+        mm_min = float(ah.get("mindful_minutes") or 0)
+        if mm_min > 0 and bw_min == 0:
+            bw_min = mm_min
         if bw_min > 0:
             activities.append({"type": "Breathwork", "minutes": round(bw_min)})
             total_active_min += bw_min
@@ -5381,7 +5611,7 @@ def handle_mind_overview() -> dict:
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    d30 = _experiment_date(30)
     d90 = _experiment_date(90)
 
     # ── 1. Mind pillar from character_sheet ──
@@ -5410,6 +5640,17 @@ def handle_mind_overview() -> dict:
                 "valence": float(valence),
                 "label": s.get("label", ""),
             })
+    # Fallback: check apple_health partition for som_avg_valence (HAE writes here)
+    if not mood_entries:
+        ah_som = _query_source("apple_health", d30, today)
+        for s in ah_som:
+            valence = s.get("som_avg_valence")
+            if valence is not None:
+                mood_entries.append({
+                    "date": s.get("date") or s.get("sk", "").replace("DATE#", ""),
+                    "valence": float(valence),
+                    "label": "",
+                })
     mood_entries.sort(key=lambda x: x["date"])
     avg_valence = None
     if mood_entries:
@@ -5501,6 +5742,11 @@ def handle_mind_overview() -> dict:
         _md = h.get("date") or h.get("sk", "").replace("DATE#", "")
         _bw_min = float(h.get("breathwork_minutes") or 0)
         _bw_sess = int(float(h.get("breathwork_sessions") or 0))
+        # Also check mindful_minutes (Breathwrk app writes here via HAE)
+        _mm_min = float(h.get("mindful_minutes") or 0)
+        if _mm_min > 0 and _bw_min == 0:
+            _bw_min = _mm_min
+            _bw_sess = max(_bw_sess, 1)  # At least 1 session if we have minutes
         if _bw_min > 0 or _bw_sess > 0:
             meditation_sessions.append({
                 "date": _md,
@@ -5538,6 +5784,20 @@ def handle_mind_overview() -> dict:
             day_entry["streaks"] = streaks
         vice_timeline.append(day_entry)
 
+    # ── 9. Energy level from journal analysis (latest entry) ──
+    energy_level = None
+    try:
+        ja_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}journal_analysis") & Key("sk").between(f"DATE#{d30}", f"DATE#{today}"),
+            ScanIndexForward=False, Limit=5,
+        )
+        ja_items = _decimal_to_float(ja_resp.get("Items", []))
+        energy_vals = [i.get("energy_level") for i in ja_items if i.get("energy_level")]
+        if energy_vals:
+            energy_level = energy_vals[0]  # Most recent
+    except Exception:
+        pass
+
     return _ok({
         "mind": {
             "mind_pillar": mind_pillar,
@@ -5550,6 +5810,7 @@ def handle_mind_overview() -> dict:
             "total_interactions_30d": total_interactions,
             "meaningful_pct": meaningful_pct,
             "depth_counts": depth_counts,
+            "energy_level": energy_level,
         },
         "vice_streaks": vice_data,
         "vice_timeline": vice_timeline,
@@ -5633,20 +5894,20 @@ def handle_meal_glucose() -> dict:
     from collections import defaultdict
     now = datetime.now(timezone.utc)
     end_date = now.strftime("%Y-%m-%d")
-    start_date = (now - timedelta(days=30)).strftime("%Y-%m-%d")
+    start_date = _experiment_date(30)
 
     try:
         mf_items = _query_source("macrofactor", start_date, end_date)
-        cgm_items = _query_source("dexcom", start_date, end_date)
+        cgm_items = _query_source("apple_health", start_date, end_date)
 
         # Build a map of date → glucose readings for spike calculation
         daily_glucose = {}
         for item in cgm_items:
             date = item.get("sk", "").replace("DATE#", "")
-            avg = float(item.get("average_glucose", 0) or 0)
-            peak = float(item.get("max_glucose", 0) or 0)
-            baseline = float(item.get("min_glucose", 0) or 0)
-            tir = float(item.get("time_in_range_pct", 0) or 0)
+            avg = float(item.get("blood_glucose_avg", 0) or 0)
+            peak = float(item.get("blood_glucose_max", 0) or 0)
+            baseline = float(item.get("blood_glucose_min", 0) or 0)
+            tir = float(item.get("blood_glucose_time_in_range_pct", 0) or 0)
             if avg > 0:
                 daily_glucose[date] = {"avg": avg, "peak": peak, "baseline": baseline, "tir": tir}
 
@@ -6013,7 +6274,7 @@ def handle_observatory_week(qs: dict = None) -> dict:
     """GET /api/observatory_week?domain=sleep — Returns 7-day summary for a domain."""
     qs = qs or {}
     domain = (qs.get("domain") or "sleep").lower().strip()
-    valid_domains = {"sleep", "glucose", "nutrition", "training", "mind"}
+    valid_domains = {"sleep", "glucose", "nutrition", "training", "mind", "physical"}
     if domain not in valid_domains:
         return _error(400, f"Invalid domain. Use: {', '.join(sorted(valid_domains))}")
 
@@ -6052,11 +6313,11 @@ def handle_observatory_week(qs: dict = None) -> dict:
             items = _query_source("macrofactor", start_date, end_date)
             prev_items = _query_source("macrofactor", prev_start, prev_end)
 
-            cals = [float(i.get("calories", 0)) for i in items if i.get("calories")]
-            prev_cals = [float(i.get("calories", 0)) for i in prev_items if i.get("calories")]
+            cals = [float(i.get("total_calories_kcal") or i.get("calories") or 0) for i in items if i.get("total_calories_kcal") or i.get("calories")]
+            prev_cals = [float(i.get("total_calories_kcal") or i.get("calories") or 0) for i in prev_items if i.get("total_calories_kcal") or i.get("calories")]
             avg_cal = sum(cals) / len(cals) if cals else 0
             prev_avg_cal = sum(prev_cals) / len(prev_cals) if prev_cals else 0
-            proteins = [float(i.get("protein_g", 0)) for i in items if i.get("protein_g")]
+            proteins = [float(i.get("total_protein_g") or i.get("protein_g") or 0) for i in items if i.get("total_protein_g") or i.get("protein_g")]
             avg_protein = sum(proteins) / len(proteins) if proteins else 0
 
             summary = {
@@ -6111,6 +6372,30 @@ def handle_observatory_week(qs: dict = None) -> dict:
                 "lowlight": {"label": "Energy", "value": "—", "detail": ""},
             }
             notable = f"{len(items)} journal entries this week"
+
+        elif domain == "physical":
+            items = _query_source("withings", start_date, end_date)
+            weights = [float(i.get("weight_lbs", 0)) for i in items if i.get("weight_lbs")]
+            if weights:
+                start_w = weights[0]
+                end_w = weights[-1]
+                delta = round(end_w - start_w, 1)
+                summary = {
+                    "primary": {"label": "Weight Change", "value": round(end_w), "unit": "lbs",
+                                "delta": delta, "delta_label": f"{delta:+.1f} lbs this week",
+                                "trend": "down" if delta < 0 else "up", "sparkline": [round(w) for w in weights]},
+                    "highlight": {"label": "Weigh-ins", "value": str(len(weights)), "detail": "this week"},
+                    "lowlight": {"label": "Current", "value": f"{round(end_w)} lbs", "detail": ""},
+                }
+                notable = f"Weight {'dropped' if delta < 0 else 'gained'} {abs(delta)} lbs this week"
+            else:
+                summary = {
+                    "primary": {"label": "Weight", "value": None, "unit": "lbs", "delta": 0, "delta_label": "", "trend": "flat", "sparkline": []},
+                    "highlight": {"label": "Weigh-ins", "value": "0", "detail": "this week"},
+                    "lowlight": {"label": "", "value": "", "detail": ""},
+                }
+                notable = "No weigh-ins recorded this week"
+
         else:
             return _error(400, "Unsupported domain")
 
@@ -6255,8 +6540,8 @@ ROUTES = {
     "/api/habit_registry":     handle_habit_registry,
     # PULSE-A4: Daily pulse endpoint
     "/api/pulse":              handle_pulse,
-    # Subscriber count social proof (read-only)
-    "/api/subscriber_count":   handle_subscriber_count,
+    # Subscriber count social proof (read-only) — must NOT match /api/subscribe* CloudFront pattern
+    "/api/sub_count":          handle_subscriber_count,
     # Observatory pages
     "/api/nutrition_overview":  handle_nutrition_overview,
     "/api/training_overview":   handle_training_overview,
@@ -6301,7 +6586,6 @@ def lambda_handler(event, context):
     """
     Main Lambda handler. Supports both API Gateway HTTP API and Function URL events.
     """
-    global _COLD_START
     import time as _time
     _req_start = _time.time()
 
@@ -6341,7 +6625,8 @@ def lambda_handler(event, context):
             ddb_ms = -1
             ddb_ok = False
         try:
-            stats_obj = s3.get_object(Bucket=S3_BUCKET, Key="site/public_stats.json")
+            s3_client = boto3.client("s3", region_name=S3_REGION)
+            stats_obj = s3_client.get_object(Bucket=os.environ.get("S3_BUCKET", "matthew-life-platform"), Key="site/public_stats.json")
             refreshed = json.loads(stats_obj["Body"].read()).get("_meta", {}).get("refreshed_at", "unknown")
         except Exception:
             refreshed = "unavailable"

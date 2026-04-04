@@ -1,7 +1,7 @@
 # Life Platform — Service Level Objectives (SLOs)
 
 > OBS-3: Formal SLO definitions for critical platform paths.
-> Last updated: 2026-03-30 (v4.5.0)
+> Last updated: 2026-04-04 (v4.9.0)
 
 ---
 
@@ -41,8 +41,8 @@ All SLO alarms publish to `life-platform-alerts` SNS topic. The operational dash
 | **Metric** | `LifePlatform/Freshness::StaleSourceCount`, custom metric emitted by `freshness_checker_lambda.py` |
 | **Recovery** | Identify stale source → check ingestion Lambda logs → fix auth/API issue → manually invoke |
 
-**Monitored sources (10):** Whoop, Withings, Strava, Todoist, Apple Health, Eight Sleep, MacroFactor, Garmin, Habitify, Notion Journal.
-**Note:** Food Delivery, Labs, DEXA, Genome are periodic/manual — not subject to 48h freshness SLO. Google Calendar retired (ADR-030).
+**Monitored sources (13):** Whoop, Withings, Strava, Todoist, Apple Health, Eight Sleep, MacroFactor, Garmin, Habitify, Notion Journal, Weather, Food Delivery (90-day threshold), Measurements.
+**Note:** Labs, DEXA, and Genome are periodic/manual — not subject to 48h freshness SLO. Food Delivery uses a 90-day stale threshold instead of 48h.
 
 **Why 48h threshold:** Many sources only sync once daily. A 24h threshold would false-alarm on normal timezone drift. 48h catches genuine failures while tolerating expected gaps (e.g., no MacroFactor data on a day Matthew doesn't log food).
 

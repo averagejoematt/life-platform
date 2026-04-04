@@ -313,7 +313,7 @@
   });
 
   // 22c: Fetch subscriber count
-  fetch('/api/subscriber_count').then(r => r.ok ? r.json() : null).then(d => {
+  fetch('/api/sub_count').then(r => r.ok ? r.json() : null).then(d => {
     if (d && d.count) document.getElementById('sub-count').textContent = d.count;
   }).catch(() => {});
 </script>

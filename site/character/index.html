@@ -2088,6 +2088,9 @@ function renderHeatmap(pillarHistory) {
   const section = document.getElementById('heatmap-section');
   const grid = document.getElementById('hm-grid');
   if (!section || !grid || !pillarHistory || !pillarHistory.length) return;
+  const EXPERIMENT_START = '2026-04-01';
+  pillarHistory = pillarHistory.filter(week => (week.week_end || week.week_start || '') >= EXPERIMENT_START);
+  if (!pillarHistory.length) return;
   const PILLARS = ['sleep','movement','nutrition','metabolic','mind','relationships','consistency'];
   const EMOJIS = {sleep:'😴',movement:'🏋️',nutrition:'🥗',metabolic:'📊',mind:'🧠',relationships:'💬',consistency:'🎯'};
   function heatColor(s) {
@@ -2248,6 +2251,9 @@ function renderScoreHistory(pillarHistory) {
   const section = document.getElementById('score-history-section');
   const chart = document.getElementById('score-history-chart');
   if (!section || !chart || !pillarHistory || pillarHistory.length < 2) return;
+  const EXPERIMENT_START = '2026-04-01';
+  pillarHistory = pillarHistory.filter(week => (week.week_end || week.week_start || '') >= EXPERIMENT_START);
+  if (pillarHistory.length < 2) return;
 
   const PILLARS = ['sleep','movement','nutrition','metabolic','mind','relationships','consistency'];
   const composites = pillarHistory.map(week => {

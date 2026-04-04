@@ -551,7 +551,7 @@ def write_pulse_json(s3_client, vitals: dict, journey: dict, training: dict,
             today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             try:
                 pulse_json = json.dumps(pulse["pulse"], default=str)
-                pulse_item = json.loads(pulse_json, parse_float=lambda x: int(float(x)) if float(x) == int(float(x)) else float(x))
+                pulse_item = json.loads(pulse_json, parse_float=Decimal)
                 table_client.put_item(Item={"pk": "PULSE", "sk": f"DATE#{today_str}",
                                             "date": today_str,
                                             **{k: v for k, v in pulse_item.items() if v is not None}})

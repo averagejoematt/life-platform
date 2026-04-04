@@ -89,7 +89,8 @@
       "lambdas/ingestion_validator.py",
       "lambdas/item_size_guard.py",
       "lambdas/digest_utils.py",
-      "lambdas/site_writer.py"
+      "lambdas/site_writer.py",
+      "lambdas/secret_cache.py"
     ],
     "consumers": [
       "daily-brief", "weekly-digest", "monthly-digest",

@@ -362,10 +362,10 @@ class WebStack(Stack):
                             # static S3 site. Risk: low (no XSS vectors today). Revisit if
                             # user-generated content is ever added.
                             "default-src 'self'; "
-                            "script-src 'self' 'unsafe-inline'; "
+                            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
                             "style-src 'self' 'unsafe-inline'; "
                             "img-src 'self' data: https:; "
-                            "connect-src 'self'; "
+                            "connect-src 'self' https://averagejoematt.com; "
                             "font-src 'self' data:; "
                             "frame-ancestors 'none'; "
                             "base-uri 'self'; "

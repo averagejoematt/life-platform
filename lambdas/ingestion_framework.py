@@ -268,8 +268,12 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn,
     credentials = {}
     if config.secret_id and secrets_client:
         try:
-            raw_secret = secrets_client.get_secret_value(SecretId=config.secret_id)["SecretString"]
-            secret_data = json.loads(raw_secret)
+            try:
+                from secret_cache import get_secret_json
+                secret_data = get_secret_json(config.secret_id, secrets_client)
+            except ImportError:
+                raw_secret = secrets_client.get_secret_value(SecretId=config.secret_id)["SecretString"]
+                secret_data = json.loads(raw_secret)
         except Exception as e:
             logger.error(f"Failed to load secret {config.secret_id}: {e}")
             return {"statusCode": 500, "body": json.dumps({"error": f"Secret load failed: {e}"})}

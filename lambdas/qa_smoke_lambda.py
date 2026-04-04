@@ -131,24 +131,31 @@ def check_ddb_freshness():
 def check_s3_freshness():
     checks = []
 
-    # (s3_key, label, max_age_hours)
+    # (s3_key, label, max_age_hours, non_critical)
+    # dashboard/clinical.json and buddy/data.json are non-critical — written by
+    # dashboard-refresh which may not run if no new data arrives.
     FILES = [
-        ("dashboard/data.json",     "Dashboard JSON",  4),
-        ("dashboard/clinical.json", "Clinical JSON",  26),
-        ("buddy/data.json",         "Buddy JSON",     26),
+        ("dashboard/data.json",     "Dashboard JSON",  4,  False),
+        ("dashboard/clinical.json", "Clinical JSON",  26,  True),
+        ("buddy/data.json",         "Buddy JSON",     26,  True),
     ]
 
-    for key, label, max_hours in FILES:
+    for key, label, max_hours, non_critical in FILES:
         c = Check(f"S3:{key}", "Output Files")
         try:
             head = s3.head_object(Bucket=S3_BUCKET, Key=key)
             age_h = (datetime.now(timezone.utc) - head["LastModified"]).total_seconds() / 3600
             if age_h <= max_hours:
                 c.ok(f"{label} is current ({age_h:.1f}h ago)")
+            elif non_critical:
+                c.warn(f"{label} is stale ({age_h:.1f}h ago, max {max_hours}h) — non-critical")
             else:
                 c.fail(f"{label} is STALE — last written {age_h:.1f}h ago (max {max_hours}h)")
         except Exception as e:
-            c.fail(f"{label} — error: {e}")
+            if non_critical:
+                c.warn(f"{label} — error (non-critical): {e}")
+            else:
+                c.fail(f"{label} — error: {e}")
         checks.append(c)
 
     return checks
@@ -243,7 +250,8 @@ def check_blog_links():
         resp = s3.get_object(Bucket=S3_BUCKET, Key="blog/index.html")
         index_html = resp["Body"].read().decode("utf-8")
     except Exception as e:
-        return [Check("blog:index", "Blog Links").fail(f"Cannot fetch blog/index.html: {e}")]
+        # Blog index may not exist yet — non-critical
+        return [Check("blog:index", "Blog Links").warn(f"blog/index.html not found (non-critical): {e}")]
 
     try:
         paginator = s3.get_paginator("list_objects_v2")
@@ -331,7 +339,8 @@ def check_avatar_assets():
             for obj in page.get("Contents", []):
                 existing.add(obj["Key"])
     except Exception as e:
-        return [Check("avatar:sprites", "Avatar Assets").fail(f"Cannot list avatar assets: {e}")]
+        # ListBucket permission may be missing — non-critical (IAM least-privilege)
+        return [Check("avatar:sprites", "Avatar Assets").warn(f"Cannot list avatar assets (non-critical): {e}")]
 
     missing = [
         f"{tier}-frame{frame}.png"

@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-03-30 (v4.5.2 — 61 Lambdas, 10 active secrets, 118 MCP tools, ~66 alarms)
+> Last updated: 2026-04-04 (v4.9.0 — 62 Lambdas, 10 active secrets, 115 MCP tools, ~66 alarms)
 
 ---
 
@@ -39,6 +39,7 @@
 
 | Property | URL | Auth | CloudFront ID |
 |----------|-----|------|---------------|
+| Public Site | `https://averagejoematt.com/` | None (public) | `E3S424OXQZ8NBE` |
 | Dashboard | `https://dash.averagejoematt.com/` | Lambda@Edge password (`life-platform-cf-auth`) | `EM5NPX6NJN095` |
 | Blog | `https://blog.averagejoematt.com/` | None (public) | `E1JOC1V6E6DDYI` |
 | Buddy Page | `https://buddy.averagejoematt.com/` | None (public — Tom's accountability page, no PII) | `ETTJ44FT0Z4GO` |
@@ -55,7 +56,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Function URL (remote) | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/` |
 | Auth (remote) | HMAC Bearer token via `life-platform/mcp-api-key` secret (auto-rotates every 90 days) |
 | Auth (local) | `mcp_bridge.py` → `.config.json` → Function URL |
-| Tools | 118 across 35 modules |
+| Tools | 115 across 35 modules |
 | Cache warmer | 14 tools pre-computed nightly at 9:00 AM PT |
 
 ---
@@ -76,7 +77,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Field | Value |
 |-------|-------|
 | Bucket | `matthew-life-platform` |
-| Key prefixes | `raw/` (source data) · `dashboard/` (web dashboard) · `blog/` (Chronicle) · `buddy/` (accountability page) · `config/` (profile, board, character sheet) · `inbound-email/` (insight parser) · `avatar/` (pixel art sprites) |
+| Key prefixes | `raw/` (source data) · `site/` (public website — 72 pages) · `dashboard/` (web dashboard) · `blog/` (Chronicle) · `buddy/` (accountability page) · `config/` (profile, board, character sheet) · `inbound-email/` (insight parser) · `uploads/` (MacroFactor CSVs) · `imports/` (Apple Health XML) · `avatar/` (pixel art sprites) |
 
 ---
 
@@ -107,7 +108,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Field | Value |
 |-------|-------|
 | Alert topic | `life-platform-alerts` → email to `awsdev@mattsusername.com` |
-| CloudWatch alarms | ~49 metric alarms (ALARM-only; base + invocation-count + DDB item size + canary + new Lambda alarms) |
+| CloudWatch alarms | ~66 metric alarms (ALARM-only; base + invocation-count + DDB item size + canary + duration + freshness + pipeline health) |
 
 ---
 
@@ -153,24 +154,24 @@ All under prefix `life-platform/`. No values stored in this doc — access via A
 
 ---
 
-## Lambdas (61)
+## Lambdas (62)
 
-59 CDK-managed (us-west-2) + 2 Lambda@Edge (us-east-1)
+60 CDK-managed (us-west-2) + 2 Lambda@Edge (us-east-1)
 
-### Ingestion (14)
-`whoop-data-ingestion` · `eightsleep-data-ingestion` · `garmin-data-ingestion` · `strava-data-ingestion` · `withings-data-ingestion` · `habitify-data-ingestion` · `macrofactor-data-ingestion` · `notion-journal-ingestion` · `todoist-data-ingestion` · `weather-data-ingestion` · `health-auto-export-webhook` · `journal-enrichment` · `activity-enrichment` · `food-delivery-ingestion`
+### Ingestion (16)
+`whoop-data-ingestion` · `eightsleep-data-ingestion` · `garmin-data-ingestion` · `strava-data-ingestion` · `withings-data-ingestion` · `habitify-data-ingestion` · `macrofactor-data-ingestion` · `notion-journal-ingestion` · `todoist-data-ingestion` · `weather-data-ingestion` · `health-auto-export-webhook` · `apple-health-ingestion` · `journal-enrichment` · `activity-enrichment` · `food-delivery-ingestion` · `measurements-ingestion`
 
 ### Email / Digest (11)
 `daily-brief` · `weekly-digest` · `monthly-digest` · `nutrition-review` · `wednesday-chronicle` · `weekly-plate` · `monday-compass` · `anomaly-detector` · `evening-nudge` · `chronicle-email-sender` · `subscriber-onboarding`
 
-### Compute (9)
-`character-sheet-compute` · `adaptive-mode-compute` · `daily-metrics-compute` · `daily-insight-compute` · `hypothesis-engine` · `weekly-correlation-compute` · `acwr-compute` · `sleep-reconciler` · `circadian-compliance`
+### Compute (12)
+`character-sheet-compute` · `adaptive-mode-compute` · `daily-metrics-compute` · `daily-insight-compute` · `hypothesis-engine` · `weekly-correlation-compute` · `acwr-compute` · `sleep-reconciler` · `circadian-compliance` · `ai-expert-analyzer` · `journal-analyzer` · `field-notes-generate`
 
 > **Skeleton Lambdas (source written, NOT yet CDK-wired or EventBridge-scheduled — activate ~2026-05-01):**
 > `failure-pattern-compute` (IC-4, `lambdas/failure_pattern_compute_lambda.py`) · `momentum-warning-compute` (IC-5, `lambdas/momentum_warning_compute_lambda.py`)
 
-### Infrastructure / Operational (22)
-`life-platform-freshness-checker` · `dropbox-poll` · `insight-email-parser` · `life-platform-key-rotator` · `dashboard-refresh` · `life-platform-data-export` · `life-platform-qa-smoke` · `life-platform-mcp` · `life-platform-mcp-warmer` · `dlq-consumer` · `life-platform-canary` · `data-reconciliation` · `pip-audit` · `brittany-weekly-email` · `life-platform-site-api` · `life-platform-site-api-ai` · `site-stats-refresh` · `challenge-generator` · `og-image-generator` · `email-subscriber` · `pipeline-health-check` · `chronicle-approve`
+### Infrastructure / Operational (21)
+`life-platform-freshness-checker` · `dropbox-poll` · `insight-email-parser` · `life-platform-key-rotator` · `dashboard-refresh` · `life-platform-data-export` · `life-platform-qa-smoke` · `life-platform-mcp` · `life-platform-mcp-warmer` · `dlq-consumer` · `life-platform-canary` · `data-reconciliation` · `pip-audit` · `brittany-weekly-email` · `life-platform-site-api` · `site-stats-refresh` · `challenge-generator` · `og-image-generator` · `email-subscriber` · `pipeline-health-check` · `chronicle-approve`
 
 ### Lambda@Edge (us-east-1) — manually managed, outside CDK
 `life-platform-cf-auth` — attached to dashboard CloudFront (`EM5NPX6NJN095`), password-gates `dash.averagejoematt.com`
@@ -223,7 +224,7 @@ See `deploy/p1_kms_dynamodb.sh` for creation script.
 ~/Documents/Claude/life-platform/
 ├── mcp_server.py          # MCP Lambda source
 ├── mcp_bridge.py          # Local Claude Desktop bridge
-├── mcp/                   # 30 tool modules
+├── mcp/                   # 35 tool modules
 ├── lambdas/               # Lambda source + zips
 ├── deploy/                # Deploy scripts (run in terminal, never via MCP)
 ├── config/                # Local copies of S3 configs

@@ -1,3 +1,130 @@
+## v4.9.0-docs — Documentation Sprint: R19 Path to A- (2026-04-04)
+
+Dedicated documentation session resolving all 7 R19 architecture review findings. No code or deploy changes — docs only.
+
+### Documentation Updates (7 files)
+- **INFRASTRUCTURE.md**: MCP 118→115, alarms ~49→~66, Lambdas 61→62 (added 5 missing: apple-health-ingestion, measurements-ingestion, ai-expert-analyzer, journal-analyzer, field-notes-generate), category totals reconciled (16+11+12+21+2=62), added averagejoematt.com to Web Properties, S3 prefixes expanded, local project structure 30→35 modules
+- **ARCHITECTURE.md**: Header 26→35-module MCP package, local project structure rewritten with accurate Lambda categories + us-west-2 site-api, added secret_cache.py + site_writer.py to shared modules
+- **SLOs.md**: Removed Google Calendar, expanded monitored sources 10→13 (added Weather, Food Delivery, Measurements)
+- **generate_review_bundle.py**: Section 13b — added R19 findings table (7 items, all RESOLVED)
+- **RUNBOOK.md**: 26→35-module, cache warmer 12→14, shared layer modules 5→16
+- **OPERATOR_GUIDE.md**: Version v4.5.1→v4.9.0, pipeline ingestion 13→16
+- **INCIDENT_LOG.md**: Verified current, header date refreshed
+
+---
+
+## v4.9.0 — Day 3 QA Sweep + Cost Optimization (2026-04-03)
+
+### QA Sweep (57 issues identified, 51+ resolved)
+- CSP fix: added `cdn.jsdelivr.net` to script-src (was blocking ALL Chart.js charts)
+- Content-before-charts: fixed canvas offsetWidth=0 bug on 5 pages (glucose, sleep, nutrition, training, mind)
+- Experiment date clamp: `_experiment_date()` now uses EXPERIMENT_START (Apr 1), not EXPERIMENT_QUERY_START (Mar 31)
+- Weight rounding: whole numbers across all endpoints (was 1 decimal)
+- Weight baseline: standardized to 307 lbs across 6 files (was 302 in 16 places)
+- Platform stats: synced site_constants.js to match API (115 tools, 62 Lambdas, 72 pages, 1075 tests)
+- "Launching April 1" → "Active" on about/mission pages
+- Chronicle sample: removed fabricated mock email, "April 8" → "next Wednesday"
+- Subscriber onboarding: dynamic content from posts.json (no more hardcoded links)
+- Subscriber count: renamed /api/subscriber_count → /api/sub_count (CloudFront routing conflict)
+- Nutrition: field name mapping for weekday/periodization averages (total_calories_kcal, total_protein_g)
+- Glucose: food matching fixed (dexcom→apple_health partition, field name mapping), best/worst day added
+- Mind: mood falls back to apple_health som_avg_valence, energy from journal_analysis, breathwork from mindful_minutes
+- Training: breathwork queries mindful_minutes, modality chart clamped to experiment start, active days denominator
+- Sleep: bed time/wake time/social jet lag from Whoop sleep_start/end, HRV fallback to most recent with data
+- Pulse: recovery_pct, hrv_ms, rhr_bpm, hours fields added for frontend
+- Status page: breathwork field_check→mindful_minutes, email idle fix (_sched_aware ordering), alarm recovery logic
+- QA smoke: legacy checks made non-critical, MCP secret name fixed
+- Frontend: chart thresholds lowered from >=3/>=7 to >=1 for sparse data, AI cards moved up on 4 pages
+- Banister/ACWR/HR recovery: collapsed into single "requires 4+ weeks" card
+- Glucose daily curve section: hidden when no intraday data
+- Habits heatmap: dynamic grid from experiment start
+- Story: bar count filtered to experiment window
+- Character: heatmap filtered to post-experiment weeks, level-up events enriched with pillar drivers
+
+### Cost Optimization (COST-OPT)
+- Secret caching: 15-min TTL in-memory cache across 9 Lambdas (reduces Secrets Manager calls ~90%)
+- Tiered ingestion: Weather + Todoist reduced from hourly to 2x daily
+- Shared layer v22: includes secret_cache.py module
+
+### Pipeline Improvements
+- Whoop gap-fill: detects incomplete records (missing recovery_score) and re-fetches
+- Garmin gap-fill: detects incomplete records (missing steps) and re-fetches
+- Whoop data backfilled for Apr 2-3 (recovery/sleep was missing from initial ingestion)
+- Daily brief: IC-15 isoformat bug fixed, site_writer Float→Decimal fix
+- Notion Lambda: created_time converted to PT before date extraction
+
+### Testing
+- Playwright visual QA test: tests/visual_qa.py — 12-page sweep with deep scroll, canvas pixel checking, stale text detection
+- 985 pytest tests passing, 0 failures
+
+### Infrastructure
+- Shared Lambda layer: v19→v20→v21→v22 (4 rebuilds this session)
+- CDK: CSP updated to allow cdn.jsdelivr.net, Weather/Todoist cron updated
+- EventBridge: Weather + Todoist schedules updated to 2x daily
+- All 16 layer consumers updated to v22
+
+---
+
+## v4.8.3 — 2026-04-01: Day 1 Sweep + Pipeline Reliability
+
+### Critical Fixes (4 sweep items)
+- **6 Lambdas on stale layer v18** → updated to v19
+- **MCP canary secret mismatch**: was reading `life-platform/ai-keys` instead of `life-platform/mcp-api-key` — canary was silently non-functional since deployment. Fixed CDK + live IAM.
+- **Data reconciliation S3 prefix**: CDK had `reports/*` but Lambda writes to `reconciliation/*`. Fixed.
+- **DLQ stale message**: MacroFactor April 1 CSV (already reprocessed). Purged.
+
+### CI/CD Fixes
+- 8 flake8 F821 errors in `site_api_lambda.py`: undefined `REGION` (→ `DDB_REGION`), `now` out of scope, unused `global _COLD_START`, missing `s3`/`S3_BUCKET` in healthz handler
+- Added `.nojekyll` to prevent Jekyll from parsing `{{}}` in docs
+
+### Garmin Rate Limiting
+- Garmin API was 429-rate-limited on OAuth token exchange since March 30 (predated hourly switch)
+- Reduced Garmin schedule from hourly to 4x daily (`cron(0 0,6,14,22 * * ? *)`)
+- Re-authenticated Garmin + Withings OAuth tokens
+
+### Notion Timezone Fix
+- Replaced hardcoded `UTC-8` with DST-aware `ZoneInfo("America/Los_Angeles")`
+- Extended `created_time` filter end boundary by +1 day to catch late-night PT entries stored under next UTC day
+
+### Site API — Pacific Time Conversion
+- All user-facing dates now use `PT = ZoneInfo("America/Los_Angeles")` (module-level constant)
+- Pulse day_number, challenge/experiment days_in: switched from UTC to PT
+- Pulse queries use range covering both PT and UTC dates to catch timezone boundary records
+
+### Pulse Improvements
+- **Recovery/Sleep**: fixed `_latest_item("whoop")` returning workout sub-records instead of daily summary
+- **Steps**: Garmin steps as primary source (was Apple Health only — 84 vs 11,356)
+- **Journal glyph**: added with `written_today` + `streak_days` (checks both PT and UTC dates)
+- **Journal labels**: "open/closed" → "Journaled" / "No entry yet"
+
+### Training Page
+- WHOOP duplicate activity dedup: filters WHOOP-sourced activities when Garmin recorded same sport_type on same day
+- Apple Health steps as fallback when Garmin has no step data
+
+### Homepage Mobile
+- Gauge grid: 3-column → 2-column on screens under 600px
+
+### HAE Water Dedup
+- Reading-level deduplication using timestamp map (`_rd_water_intake_ml` in DynamoDB)
+- Each reading's timestamp + quantity stored; on re-sends, only new readings counted
+- Handles both hourly incremental syncs and manual full-day pushes without double-counting
+- `water_intake_oz` derived from deduped `water_intake_ml` (not tracked independently)
+
+### Challenge ID Fix
+- DynamoDB challenge key `no-doordash-30d_2026-04-01` didn't match catalog ID `no-doordash-30`
+- Fixed DynamoDB record + added date-suffix stripping in API response
+
+### Files Modified
+- `lambdas/site_api_lambda.py` — PT timezone, pulse journal/recovery/steps, WHOOP dedup, flake8 fixes
+- `lambdas/health_auto_export_lambda.py` — water dedup with timestamp map
+- `lambdas/notion_lambda.py` — DST-aware timezone, created_time +1 day filter
+- `cdk/stacks/role_policies.py` — canary secret ARN, reconciliation S3 prefix, Withings PutSecretValue
+- `cdk/stacks/ingestion_stack.py` — Garmin 4x daily schedule
+- `site/index.html` — mobile gauge grid responsive breakpoint
+- `.nojekyll` — new file
+
+---
+
 ## v4.8.2 — 2026-04-01: Hourly Ingestion + Nutrition Fix + IAM Sweep
 
 ### Ingestion Schedule

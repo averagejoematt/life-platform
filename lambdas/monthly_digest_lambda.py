@@ -277,7 +277,7 @@ def compute_annual_goals(cur, windows, profile=None):
     w = cur.get("withings")
     if w and w.get("weight_latest"):
         p = profile or {}
-        journey_start_weight = float(p.get("journey_start_weight_lbs", 300))
+        journey_start_weight = float(p.get("journey_start_weight_lbs", 307))
         goal_weight          = float(p.get("goal_weight_lbs", GOAL_WEIGHT_LBS))
         journey_start_date_str = str(p.get("journey_start_date", ""))
 

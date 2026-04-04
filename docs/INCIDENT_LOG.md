@@ -1,6 +1,6 @@
 # Life Platform — Incident Log
 
-Last updated: 2026-03-30 (v4.5.0)
+Last updated: 2026-04-04 (v4.9.0)
 
 > Tracks operational incidents, outages, and bugs that affected data flow or system behavior.
 > For full details on any incident, check the corresponding CHANGELOG entry or handover file.

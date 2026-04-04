@@ -30,7 +30,7 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 
 # Shared utils layer — update on every layer rebuild (bash deploy/build_layer.sh)
-SHARED_LAYER_VERSION = 10  # ADR-027: v10 adds stable mcp/ core modules
+SHARED_LAYER_VERSION = 22  # v22: weight baseline 307, secret_cache, site_writer Decimal fix
 
 SHARED_LAYER_ARN = (
     f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"

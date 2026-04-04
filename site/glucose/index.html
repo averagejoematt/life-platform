@@ -1215,7 +1215,7 @@
 <!-- ════════════════════════════════════════════════════════════
      9e: DAILY GLUCOSE CURVE — 288-reading day plot
      ════════════════════════════════════════════════════════════ -->
-<section class="g-daycurve-section reveal">
+<section class="g-daycurve-section reveal" id="g-daycurve-section" style="display:none">
   <div class="g-section-header">Daily Glucose Curve</div>
   <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.7;margin-bottom:var(--space-6);max-width:600px;">
     288 readings across 24 hours, with meal events overlaid. The ideal day stays within the
@@ -1238,6 +1238,7 @@
       <line x1="880" y1="10" x2="880" y2="240" stroke="rgba(255,255,255,0.04)"/>
       <!-- Placeholder glucose trace -->
       <path id="g-daycurve-path" d="" fill="none" stroke="var(--g-teal)" stroke-width="1.5" opacity="0.7"/>
+      <text x="460" y="135" fill="rgba(255,255,255,0.2)" font-size="12" font-family="monospace" text-anchor="middle" letter-spacing="0.08em">Individual glucose readings render here once intraday CGM data is available. Current data shows daily averages.</text>
       <!-- Meal event markers (placeholders) -->
       <g id="g-meal-markers">
         <line x1="245" y1="10" x2="245" y2="240" stroke="rgba(245,158,11,0.3)" stroke-dasharray="2"/>
@@ -1591,14 +1592,14 @@
   // If the API returns no data, the table shows an honest "no data yet" message.
   var mealData = [];
   var currentFilter = 'all';
-  var currentSort = { key: 'spike', asc: true };
+  var currentSort = { key: 'spike', asc: false };
 
   // Try to load real meal × CGM data from API
   (function() {
     fetch('/api/meal_glucose')
       .then(function(r) { return r.ok ? r.json() : null; })
       .then(function(data) {
-        if (data && data.meals && data.meals.length >= 3) {
+        if (data && data.meals && data.meals.length > 0) {
           mealData = data.meals;
           renderMeals();
         }
@@ -1746,8 +1747,19 @@
     setWidth('gbar-hi', hi);
     setText('gval-hi', hi.toFixed(1) + '%');
 
+    // Show content BEFORE chart rendering (canvas needs offsetWidth > 0)
+    loading.style.display = 'none';
+    content.style.display = 'block';
+
     /* ── 30-day trend chart ── */
-    if (trend.length >= 3) {
+    if (trend.length < 2) {
+      var gTrendCanvas = document.getElementById('g-trend-canvas');
+      if (gTrendCanvas) {
+        gTrendCanvas.style.display = 'none';
+        gTrendCanvas.insertAdjacentHTML('afterend', '<div style="text-align:center;color:var(--text-faint);font-size:var(--text-sm);padding:var(--space-8) 0;font-family:var(--font-mono);letter-spacing:0.04em">Requires 2+ days of CGM data. Trend builds as readings accumulate.</div>');
+      }
+    }
+    if (trend.length >= 2) {
       var canvas = document.getElementById('g-trend-canvas');
       var dpr = window.devicePixelRatio || 1;
       canvas.width = canvas.offsetWidth * dpr;
@@ -1831,11 +1843,10 @@
       });
     }
 
-    loading.style.display = 'none';
-    content.style.display = 'block';
+    // (content already shown above before chart rendering)
   } catch (e) {
     loading.textContent = 'Could not load glucose data.';
-    content.style.display = 'block'; // Still show meal table with fallback data
+    content.style.display = 'block';
     console.error(e);
   }
 })();
