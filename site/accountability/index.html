@@ -742,11 +742,15 @@
     <!-- 6f: Witness counter -->
     <div class="witness-counter">
       <div class="witness-counter__dot"></div>
-      <div class="witness-counter__text"><span class="witness-counter__number" id="witness-count">&mdash;</span> people are following this experiment</div>
+      <div class="witness-counter__text"><span class="witness-counter__number" id="witness-count">&mdash;</span> <span id="witness-word">people are</span> following this experiment</div>
     </div>
     <script>
     fetch('/api/sub_count').then(function(r){return r.ok?r.json():null}).then(function(d){
-      if(d&&d.count!=null)document.getElementById('witness-count').textContent=d.count;
+      if(d&&d.count!=null){
+        var c=d.count;
+        document.getElementById('witness-count').textContent=c;
+        document.getElementById('witness-word').textContent=c===1?'person is':'people are';
+      }
     }).catch(function(){});
     </script>
 
@@ -775,9 +779,12 @@
   <div class="calendar-30" id="calendar-grid">
     <div style="grid-column:1/-1;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint)">Loading calendar&hellip;</div>
   </div>
-  <!-- Compact milestone link -->
+  <!-- Compact milestone link with progression bar -->
   <div class="milestone-link" id="milestone-link">
     <div class="milestone-link__text">Current streak: <strong id="ml-streak">&mdash;</strong> days &middot; Next milestone: <strong id="ml-next">&mdash;</strong></div>
+    <div class="milestone-bar" id="ml-bar" style="display:none;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin:var(--space-2) 0;position:relative">
+      <div class="milestone-bar__fill" id="ml-bar-fill" style="height:100%;background:var(--acct-accent);border-radius:2px;transition:width 1s ease"></div>
+    </div>
     <a href="/achievements/" class="milestone-link__cta">All badges &rarr;</a>
   </div>
 </div>
@@ -819,6 +826,16 @@
   </div>
 </div>
 
+<!-- A3: Weekly accountability email preview -->
+<section class="acct-email-preview reveal" id="acct-email-preview" style="display:none;max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border)">
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--acct-accent);margin-bottom:var(--space-3)">Weekly accountability snapshot</div>
+  <div style="border:1px solid var(--border);border-radius:6px;padding:var(--space-6);background:var(--surface)">
+    <div style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--text);margin-bottom:var(--space-2)">This is what the email looks like</div>
+    <div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.6;margin-bottom:var(--space-4)">Every Sunday, a snapshot of the week gets emailed. No narrative spin. Just the numbers.</div>
+    <div id="acct-email-body" style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);line-height:2;border-top:1px solid var(--border);padding-top:var(--space-4)"></div>
+  </div>
+</section>
+
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!-- PART 3: YOUR TURN (6a, 6c, 6i, 6j, 6k)                   -->
 <!-- ═══════════════════════════════════════════════════════════ -->
@@ -834,15 +851,15 @@
   <!-- 6c, 6k: Social proof stats -->
   <div class="nudge-stats" id="nudge-stats">
     <div class="nudge-stat">
-      <div class="nudge-stat__value" id="nudge-week-count">&mdash;</div>
+      <div class="nudge-stat__value" id="nudge-week-count">Be the first &rarr;</div>
       <div class="nudge-stat__label">nudges this week</div>
     </div>
     <div class="nudge-stat">
-      <div class="nudge-stat__value" id="nudge-total-count">&mdash;</div>
+      <div class="nudge-stat__value" id="nudge-total-count">None yet</div>
       <div class="nudge-stat__label">all-time nudges</div>
     </div>
     <div class="nudge-stat">
-      <div class="nudge-stat__value" id="nudge-last-time">&mdash;</div>
+      <div class="nudge-stat__value" id="nudge-last-time">Waiting for you</div>
       <div class="nudge-stat__label">last nudge</div>
     </div>
   </div>
@@ -933,6 +950,16 @@
   </div>
 </div>
 
+<!-- A2: Community section (elevated from bottom) -->
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-bottom:1px solid var(--border)">
+  <div style="border-left:3px solid var(--acct-accent);padding:var(--space-6) var(--space-8);background:rgba(245,158,11,0.03)">
+    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--acct-accent);margin-bottom:var(--space-3)"># Community</div>
+    <h2 style="font-family:var(--font-display);font-size:var(--text-xl);color:var(--text);margin-bottom:var(--space-3)">You don't have to do this alone</h2>
+    <p style="font-size:var(--text-sm);color:var(--text-muted);line-height:var(--lh-body);margin-bottom:var(--space-5)">Going through something similar? Following along on your own journey? The Average Joe community is where people share their own accountability experiments.</p>
+    <a href="https://discord.gg/T4Ndt2WsU" target="_blank" rel="noopener" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--acct-accent);text-decoration:none;letter-spacing:var(--ls-tag)">Join the community &rarr;</a>
+  </div>
+</div>
+
 <!-- 6i: Reader reflection option -->
 <div class="reader-reflection">
   <div class="reader-reflection__inner">
@@ -945,12 +972,6 @@
       <button class="reader-reflection__btn" id="reflection-btn" onclick="submitReflection()">Share</button>
     </div>
   </div>
-</div>
-
-<div class="discord-community-card">
-  <div class="community-card-header">&sharp; COMMUNITY ──────────────</div>
-  <p class="community-card-body">Going through something similar? Following along on your own journey? Come say hi.</p>
-  <a href="https://discord.gg/T4Ndt2WsU" target="_blank" rel="noopener" class="community-card-cta">Join Average Joe Community &rarr;</a>
 </div>
 
 <!-- Subscribe CTA -->
@@ -1010,6 +1031,14 @@ function updateMilestoneLink(streak) {
     if (next) {
       var remaining = next - streak;
       nextEl.textContent = next + 'd (' + remaining + ' to go)';
+      // A1: Milestone progression bar
+      var bar = document.getElementById('ml-bar');
+      var fill = document.getElementById('ml-bar-fill');
+      if (bar && fill) {
+        var pct = Math.min(100, Math.round((streak / next) * 100));
+        fill.style.width = pct + '%';
+        bar.style.display = '';
+      }
     } else {
       nextEl.textContent = 'all reached \u2713';
     }
@@ -1037,6 +1066,22 @@ async function loadHabitStreaks() {
 
     // Update milestone link
     updateMilestoneLink(_cachedStreak || 0);
+
+    // A3: Populate email preview
+    var _emailBody = document.getElementById('acct-email-body');
+    var _emailSection = document.getElementById('acct-email-preview');
+    if (_emailBody && _emailSection) {
+      var _lines = [
+        'T0 STREAK: ' + (_cachedStreak || 0) + ' days',
+        'T0 COMPLETION: ' + (_cachedT0Done || 0) + '/' + (_cachedT0Total || 7) + ' (' + (_cachedT0Pct || 0) + '%)',
+        'WEEK STATUS: ' + (_cachedStreak > 0 ? 'Active' : 'Rebuilding'),
+        '---',
+        'This is the unedited record.',
+        'No narrative spin. Just the numbers.',
+      ];
+      _emailBody.innerHTML = _lines.join('<br>');
+      _emailSection.style.display = '';
+    }
   } catch(e) {
     var streakCtx = document.getElementById('streak-context');
     if (streakCtx) streakCtx.textContent = '0';

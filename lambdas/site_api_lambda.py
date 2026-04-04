@@ -391,6 +391,21 @@ def handle_vitals() -> dict:
     recovery_pct = float(latest.get("recovery_score", 0))
     recovery_status = "green" if recovery_pct >= 67 else ("yellow" if recovery_pct >= 34 else "red")
 
+    # DPR-1.20: Page freshness for nav badges
+    _today_iso = datetime.now(timezone.utc).isoformat()
+    _as_of = latest.get("sk", "").replace("DATE#", "") if latest else today
+    page_freshness = {
+        "/live": _today_iso,
+        "/character": _today_iso,
+        "/sleep": _as_of + "T12:00:00Z" if _as_of else _today_iso,
+        "/glucose": _today_iso,
+        "/nutrition": _today_iso,
+        "/training": _today_iso,
+        "/physical": weight_as_of + "T12:00:00Z" if weight_as_of else _today_iso,
+        "/habits": _today_iso,
+        "/explorer": _today_iso,
+    }
+
     return _ok({
         "vitals": {
             "weight_lbs":       round(current_weight) if current_weight is not None else None,
@@ -404,8 +419,9 @@ def handle_vitals() -> dict:
             "recovery_pct":     round(recovery_pct, 0),
             "recovery_status":  recovery_status,
             "sleep_hours":      round(float(latest.get("sleep_duration_hours", 0)), 1) if latest.get("sleep_duration_hours") else None,
-            "as_of_date":       latest.get("sk", "").replace("DATE#", "") if latest else None,
-        }
+            "as_of_date":       _as_of,
+        },
+        "page_freshness": page_freshness,
     }, cache_seconds=300)
 
 
@@ -846,6 +862,22 @@ def handle_character() -> dict:
                          "xp_delta": 0} for p in PILLAR_ORDER],
         }, cache_seconds=900)
 
+    # DPR-1.16: Compute composite delta from yesterday
+    composite = sum(p["raw_score"] for p in pillars) / max(len(pillars), 1)
+    composite_delta_1d = None
+    _yd = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    _d2 = (datetime.now(timezone.utc) - timedelta(days=2)).strftime("%Y-%m-%d")
+    for _check_d in [_yd, _d2]:
+        if _check_d == date_str:
+            continue
+        _yd_resp = table.get_item(Key={"pk": pk, "sk": f"DATE#{_check_d}"})
+        _yd_rec = _decimal_to_float(_yd_resp.get("Item"))
+        if _yd_rec:
+            _yd_scores = [float(_yd_rec.get(f"pillar_{p}", {}).get("raw_score", 0)) for p in PILLAR_ORDER]
+            _yd_composite = sum(_yd_scores) / max(len(_yd_scores), 1)
+            composite_delta_1d = round(composite - _yd_composite, 1)
+            break
+
     return _ok({
         "character": {
             "level":      float(record.get("character_level", 1)),
@@ -853,6 +885,8 @@ def handle_character() -> dict:
             "tier_emoji": record.get("character_tier_emoji", "🔨"),
             "xp_total":   float(record.get("character_xp", 0)),
             "as_of_date": date_str,
+            "composite_score": round(composite, 1),
+            "composite_delta_1d": composite_delta_1d,
         },
         "pillars": pillars,
     }, cache_seconds=900)
@@ -3303,10 +3337,10 @@ def handle_achievements() -> dict:
     except Exception as _ch_e:
         logger.warning("[achievements] Challenge query failed (non-fatal): %s", _ch_e)
 
-    def badge(id_, label, category, desc, earned, earned_date=None, unlock_hint=None):
+    def badge(id_, label, category, desc, earned, earned_date=None, unlock_hint=None, icon=None):
         return {
             "id": id_, "label": label, "category": category, "description": desc,
-            "earned": earned, "earned_date": earned_date, "unlock_hint": unlock_hint,
+            "earned": earned, "earned_date": earned_date, "icon": icon, "unlock_hint": unlock_hint,
         }
 
     achievements = [
@@ -3340,20 +3374,65 @@ def handle_achievements() -> dict:
               earned=current_level >= 10,
               unlock_hint=f"Level {current_level} → Level 10 needed" if current_level < 10 else None),
 
-        # ── Weight milestones
-        badge("lost_20", "−20 lbs", "milestone",
-              "Lost first 20 lbs",
-              earned=lost_lbs >= 20,
-              earned_date=today if lost_lbs >= 20 else None),
+        # ── Weight LOSS milestones (every 10 lbs)
+        badge("lost_10", "Lost 10 lbs", "milestone",
+              "Lost 10 lbs from starting weight",
+              earned=lost_lbs >= 10, icon="\u2696\ufe0f",
+              unlock_hint=f"{10 - lost_lbs:.0f} lbs to go" if lost_lbs < 10 else None),
+        badge("lost_20", "Lost 20 lbs", "milestone",
+              "Lost 20 lbs from starting weight",
+              earned=lost_lbs >= 20, icon="\u2696\ufe0f",
+              unlock_hint=f"{20 - lost_lbs:.0f} lbs to go" if lost_lbs < 20 else None),
+        badge("lost_30", "Lost 30 lbs", "milestone",
+              "Lost 30 lbs from starting weight",
+              earned=lost_lbs >= 30, icon="\u2696\ufe0f",
+              unlock_hint=f"{30 - lost_lbs:.0f} lbs to go" if lost_lbs < 30 else None),
+        badge("lost_40", "Lost 40 lbs", "milestone",
+              "Lost 40 lbs from starting weight",
+              earned=lost_lbs >= 40, icon="\u2696\ufe0f",
+              unlock_hint=f"{40 - lost_lbs:.0f} lbs to go" if lost_lbs < 40 else None),
+        badge("lost_50", "Lost 50 lbs", "milestone",
+              "Lost 50 lbs from starting weight",
+              earned=lost_lbs >= 50, icon="\u2696\ufe0f",
+              unlock_hint=f"{50 - lost_lbs:.0f} lbs to go" if lost_lbs < 50 else None),
+        badge("lost_60", "Lost 60 lbs", "milestone",
+              "Lost 60 lbs from starting weight",
+              earned=lost_lbs >= 60, icon="\u2696\ufe0f",
+              unlock_hint=f"{60 - lost_lbs:.0f} lbs to go" if lost_lbs < 60 else None),
+        badge("lost_70", "Lost 70 lbs", "milestone",
+              "Lost 70 lbs from starting weight",
+              earned=lost_lbs >= 70, icon="\u2696\ufe0f",
+              unlock_hint=f"{70 - lost_lbs:.0f} lbs to go" if lost_lbs < 70 else None),
+        badge("lost_80", "Lost 80 lbs", "milestone",
+              "Lost 80 lbs from starting weight",
+              earned=lost_lbs >= 80, icon="\u2696\ufe0f",
+              unlock_hint=f"{80 - lost_lbs:.0f} lbs to go" if lost_lbs < 80 else None),
+        badge("lost_90", "Lost 90 lbs", "milestone",
+              "Lost 90 lbs from starting weight",
+              earned=lost_lbs >= 90, icon="\u2696\ufe0f",
+              unlock_hint=f"{90 - lost_lbs:.0f} lbs to go" if lost_lbs < 90 else None),
+        badge("lost_100", "Lost 100 lbs", "milestone",
+              "Lost 100 lbs from starting weight",
+              earned=lost_lbs >= 100, icon="\u2696\ufe0f",
+              unlock_hint=f"{100 - lost_lbs:.0f} lbs to go" if lost_lbs < 100 else None),
+
+        # ── Weight TARGET milestones
         badge("sub_280", "Sub-280", "milestone",
               "Weight under 280 lbs",
-              earned=current_weight < 280,
-              earned_date=today if current_weight < 280 else None,
-              unlock_hint=f"{round(current_weight - 280, 1)} lbs to unlock" if current_weight >= 280 else None),
-        badge("sub_260", "Sub-260", "milestone",
-              "Weight under 260 lbs",
-              earned=current_weight < 260,
-              unlock_hint=f"{round(current_weight - 260, 1)} lbs to unlock" if current_weight >= 260 else None),
+              earned=current_weight < 280, icon="\ud83c\udfaf",
+              unlock_hint=f"{current_weight - 280:.0f} lbs to go" if current_weight >= 280 else None),
+        badge("sub_250", "Sub-250", "milestone",
+              "Weight under 250 lbs",
+              earned=current_weight < 250, icon="\ud83c\udfaf",
+              unlock_hint=f"{current_weight - 250:.0f} lbs to go" if current_weight >= 250 else None),
+        badge("sub_220", "Sub-220", "milestone",
+              "Weight under 220 lbs",
+              earned=current_weight < 220, icon="\ud83c\udfaf",
+              unlock_hint=f"{current_weight - 220:.0f} lbs to go" if current_weight >= 220 else None),
+        badge("sub_200", "Sub-200", "milestone",
+              "Weight under 200 lbs",
+              earned=current_weight < 200, icon="\ud83c\udfaf",
+              unlock_hint=f"{current_weight - 200:.0f} lbs to go" if current_weight >= 200 else None),
 
         # ── Data
         badge("100_days", "100 Days Tracked", "data",
@@ -3401,19 +3480,19 @@ def handle_achievements() -> dict:
               unlock_hint="Complete at least one experiment in each of the 7 pillars"),
 
         # ── Challenges
-        badge("first_challenge", "Arena Debut", "challenge",
+        badge("first_challenge", "First Challenge", "challenge",
               "Completed first challenge",
               earned=completed_challenges >= 1,
               earned_date=today if completed_challenges >= 1 else None),
-        badge("five_challenges", "Arena Regular", "challenge",
+        badge("five_challenges", "Challenge Regular", "challenge",
               "Completed 5 challenges",
               earned=completed_challenges >= 5,
               unlock_hint=f"{max(0, 5 - completed_challenges)} challenges to unlock" if completed_challenges < 5 else None),
-        badge("ten_challenges", "Arena Veteran", "challenge",
+        badge("ten_challenges", "Challenge Veteran", "challenge",
               "Completed 10 challenges",
               earned=completed_challenges >= 10,
               unlock_hint=f"{max(0, 10 - completed_challenges)} challenges to unlock" if completed_challenges < 10 else None),
-        badge("twenty_five_challenges", "Arena Legend", "challenge",
+        badge("twenty_five_challenges", "Challenge Legend", "challenge",
               "Completed 25 challenges",
               earned=completed_challenges >= 25,
               unlock_hint=f"{max(0, 25 - completed_challenges)} challenges to unlock" if completed_challenges < 25 else None),
@@ -4179,18 +4258,113 @@ def handle_pulse() -> dict:
     water_l = round(water_ml / 1000, 2) if water_ml else None
     t0_pct = float(habitify.get("tier0_pct", 0)) if habitify.get("tier0_pct") else None
 
-    def _glyph(key, val, target, unit, direction="down"):
-        if val is None:
-            return {"state": "gray", "value": None, "target": target, "label": None}
-        if direction == "down":
-            state = "green" if val <= target else ("amber" if val <= target * 1.1 else "red")
-        else:
-            state = "green" if val >= target else ("amber" if val >= target * 0.8 else "red")
-        return {"state": state, "value": round(val, 1), "target": target, "label": f"{round(val, 1)} {unit}"}
+    # --- Lift glyph: check for a strength session today (Hevy or Strava) ---
+    trained_today = False
+    try:
+        _hevy_today = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}hevy") & Key("sk").between(f"DATE#{today_pt}", f"DATE#{today_pt}~"),
+            Limit=1, Select="COUNT",
+        )
+        if _hevy_today.get("Count", 0) > 0:
+            trained_today = True
+    except Exception:
+        pass
+    if not trained_today:
+        try:
+            _strava_today = table.query(
+                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}strava") & Key("sk").between(f"DATE#{today_pt}", f"DATE#{today_pt}~"),
+                Limit=1, Select="COUNT",
+            )
+            if _strava_today.get("Count", 0) > 0:
+                trained_today = True
+        except Exception:
+            pass
+
+    # --- Mind glyph: State of Mind valence score ---
+    mind_score = None
+    try:
+        _som_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}state_of_mind") & Key("sk").between(f"DATE#{today_pt}", f"DATE#{today_pt}~"),
+            ScanIndexForward=False, Limit=1,
+        )
+        _som_items = _som_resp.get("Items", [])
+        if _som_items:
+            mind_score = float(_som_items[0].get("som_avg_valence", 0)) or None
+        if not mind_score:
+            # Fallback: apple_health partition
+            _ah_som = table.query(
+                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}apple_health") & Key("sk").between(f"DATE#{today_pt}", f"DATE#{today_pt}~"),
+                ScanIndexForward=False, Limit=1,
+            )
+            for _a in _ah_som.get("Items", []):
+                _sv = _a.get("som_avg_valence")
+                if _sv:
+                    mind_score = float(_sv)
+                    break
+    except Exception:
+        pass
+
+    # --- N2: Nutrition logging check (last 7 days) ---
+    nutrition_logged_7d = 0
+    try:
+        _d7 = (datetime.now(PT) - timedelta(days=7)).strftime("%Y-%m-%d")
+        _mf_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}macrofactor") & Key("sk").between(f"DATE#{_d7}", f"DATE#{today_pt}~"),
+        )
+        nutrition_logged_7d = sum(1 for i in _mf_resp.get("Items", []) if i.get("calories") and float(str(i["calories"])) > 0)
+    except Exception:
+        pass
+
+    # --- Glyph state classification (DPR-1.02) ---
+    # RULE: gray = genuinely no data (value is None/null/absent).
+    # If a value exists, it MUST be green, amber, or red — never gray.
+    def _scale_state():
+        if w_val is None:
+            return "gray"
+        delta = w_val - start_weight
+        if delta <= 0:
+            return "green"
+        return "amber" if delta <= 2 else "red"
+
+    def _water_state():
+        if water_l is None:
+            return "gray"
+        pct = water_l / 3.0
+        if pct >= 0.8:
+            return "green"
+        return "amber" if pct >= 0.3 else "red"
+
+    def _movement_state():
+        if steps is None:
+            return "gray"
+        if steps >= 8000:
+            return "green"
+        return "amber" if steps >= 4000 else "red"
+
+    def _recovery_state():
+        if recovery is None:
+            return "gray"
+        if recovery >= 67:
+            return "green"
+        return "amber" if recovery >= 34 else "red"
+
+    def _sleep_state():
+        if sleep_hrs is None:
+            return "gray"
+        if sleep_hrs >= 7:
+            return "green"
+        return "amber" if sleep_hrs >= 6 else "red"
+
+    def _mind_state():
+        if mind_score is None or mind_score == 0:
+            return "gray"
+        if mind_score >= 4:
+            return "green"
+        return "amber" if mind_score >= 2 else "red"
 
     glyphs = {
         "scale": {
-            "state": "green" if w_val and w_val <= start_weight else "red",
+            "state": _scale_state(),
             "value": round(w_val, 1) if w_val else None,
             "direction": "down" if w_val and w_val < start_weight else "up",
             "delta": round(w_val - start_weight, 1) if w_val else None,
@@ -4198,20 +4372,20 @@ def handle_pulse() -> dict:
             "as_of": w_date or ah_date or today_pt,
         },
         "water": {
-            "state": "green" if water_l and water_l >= 3.0 else ("amber" if water_l and water_l >= 1.5 else "gray"),
+            "state": _water_state(),
             "liters": water_l,
             "target": 3.0,
             "label": f"{water_l}L" if water_l else None,
             "as_of": today_pt,
         },
         "movement": {
-            "state": "green" if steps and steps >= 8000 else ("amber" if steps and steps >= 5000 else "gray"),
+            "state": _movement_state(),
             "value": int(steps) if steps else None,
             "target": 8000,
             "label": f"{int(steps):,} steps" if steps else None,
         },
         "recovery": {
-            "state": "green" if recovery and recovery >= 67 else ("amber" if recovery and recovery >= 34 else "gray"),
+            "state": _recovery_state(),
             "value": round(recovery) if recovery else None,
             "recovery_pct": round(recovery) if recovery else None,
             "hrv_ms": round(float(whoop.get("hrv", 0)), 1) if whoop.get("hrv") else None,
@@ -4219,7 +4393,7 @@ def handle_pulse() -> dict:
             "label": f"{round(recovery)}%" if recovery else None,
         },
         "sleep": {
-            "state": "green" if sleep_hrs and sleep_hrs >= 7 else ("amber" if sleep_hrs and sleep_hrs >= 6 else "gray"),
+            "state": _sleep_state(),
             "value": round(sleep_hrs, 1) if sleep_hrs else None,
             "hours": round(sleep_hrs, 1) if sleep_hrs else None,
             "label": f"{round(sleep_hrs, 1)}h" if sleep_hrs else None,
@@ -4230,23 +4404,222 @@ def handle_pulse() -> dict:
             "streak_days": journal_streak,
             "label": "Journaled" if journal_today else "No entry yet",
         },
+        "lift": {
+            "state": "green" if trained_today else "gray",
+            "trained_today": trained_today,
+            "label": "Trained" if trained_today else "Rest day",
+        },
+        "mind": {
+            "state": _mind_state(),
+            "score": mind_score,
+            "label": f"{mind_score:.1f}/5" if mind_score else None,
+        },
     }
 
     signals_reporting = sum(1 for g in glyphs.values() if g.get("state") != "gray")
-    status = "green" if signals_reporting >= 4 else ("mixed" if signals_reporting >= 2 else "quiet")
+    amber_or_red = sum(1 for g in glyphs.values() if g.get("state") in ("amber", "red"))
+    if signals_reporting == 0:
+        status = "quiet"
+    elif amber_or_red >= 2 or any(g.get("state") == "red" and g.get("recovery_pct") is not None and g["recovery_pct"] < 40 for g in glyphs.values()):
+        status = "mixed"
+    elif t0_pct and t0_pct >= 80 and recovery and recovery > 50:
+        status = "strong"
+    else:
+        status = "green" if signals_reporting >= 4 else "mixed"
+
+    # --- DPR-1.01: Narrative generator ---
+    # Build a natural-language daily brief headline from available signals.
+    narrative_parts = []
+    if w_val is not None:
+        delta_from_start = round(w_val - start_weight, 1)
+        dir_word = "down" if delta_from_start < 0 else "up" if delta_from_start > 0 else "flat"
+        narrative_parts.append(f"Day {_pulse_day}. {round(w_val, 1)} lbs \u2014 {dir_word} {abs(delta_from_start):.1f} from start.")
+    elif _pulse_day:
+        narrative_parts.append(f"Day {_pulse_day}.")
+    if sleep_hrs is not None:
+        s_part = f"Sleep: {round(sleep_hrs, 1)}h"
+        if sleep_hrs < 6:
+            s_part += " \u2014 short night"
+        elif sleep_hrs >= 7.5:
+            s_part += " \u2014 solid rest"
+        narrative_parts.append(s_part + ".")
+    if recovery is not None:
+        r_val = round(recovery)
+        if r_val < 34:
+            narrative_parts.append(f"Recovery low at {r_val}% \u2014 rest day suggested.")
+        elif r_val < 50:
+            narrative_parts.append(f"Recovery at {r_val}% \u2014 consider a lighter day.")
+        elif r_val >= 67:
+            narrative_parts.append(f"Recovery strong at {r_val}%.")
+        else:
+            narrative_parts.append(f"Recovery at {r_val}%.")
+    if journal_today:
+        narrative_parts.append("Journal logged.")
+    else:
+        narrative_parts.append("No journal entry yet.")
+    if nutrition_logged_7d > 0:
+        narrative_parts.append(f"Nutrition: {nutrition_logged_7d}/7 days logged.")
+    if not narrative_parts or signals_reporting == 0:
+        narrative = "No data reported today. Signals populate as wearables sync."
+    else:
+        narrative = " ".join(narrative_parts)
+
+    # --- DPR-1.14: Since yesterday deltas ---
+    since_yesterday = []
+    try:
+        _yd_whoop = None
+        for _w_item in _decimal_to_float(table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}whoop") & Key("sk").between(f"DATE#{yesterday_pt}", f"DATE#{yesterday_pt}~"),
+            Limit=5,
+        ).get("Items", [])):
+            if "#WORKOUT#" not in _w_item.get("sk", "") and _w_item.get("recovery_score") is not None:
+                _yd_whoop = _w_item
+                break
+        _yd_wt = None
+        _yd_wi = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}withings") & Key("sk").between(f"DATE#{yesterday_pt}", f"DATE#{yesterday_pt}~"),
+            Limit=1,
+        ).get("Items", [])
+        if _yd_wi and _yd_wi[0].get("weight_lbs"):
+            _yd_wt = float(_yd_wi[0]["weight_lbs"])
+        if not _yd_wt:
+            _yd_ah = table.query(
+                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}apple_health") & Key("sk").between(f"DATE#{yesterday_pt}", f"DATE#{yesterday_pt}~"),
+                Limit=1,
+            ).get("Items", [])
+            if _yd_ah and _yd_ah[0].get("weight_lbs"):
+                _yd_wt = float(_yd_ah[0]["weight_lbs"])
+        if w_val and _yd_wt:
+            d = round(w_val - _yd_wt, 1)
+            arrow = "\u2191" if d > 0 else "\u2193" if d < 0 else "\u2192"
+            since_yesterday.append({"signal": "weight", "text": f"Weight {arrow}{abs(d):.1f} lbs", "delta": d})
+            glyphs["scale"]["delta_1d"] = d
+        if recovery and _yd_whoop and _yd_whoop.get("recovery_score"):
+            d = round(recovery - float(_yd_whoop["recovery_score"]))
+            arrow = "\u2191" if d > 0 else "\u2193" if d < 0 else "\u2192"
+            since_yesterday.append({"signal": "recovery", "text": f"Recovery {arrow}{abs(d)}%", "delta": d})
+            glyphs["recovery"]["delta_1d"] = d
+        if sleep_hrs and _yd_whoop and _yd_whoop.get("sleep_duration_hours"):
+            d = round(sleep_hrs - float(_yd_whoop["sleep_duration_hours"]), 1)
+            arrow = "\u2191" if d > 0 else "\u2193" if d < 0 else "\u2192"
+            since_yesterday.append({"signal": "sleep", "text": f"Sleep {arrow}{abs(d):.1f}h", "delta": d})
+            glyphs["sleep"]["delta_1d"] = d
+    except Exception:
+        pass
+
+    # --- DPR-1.15: Notable signals ---
+    notable_signals = []
+    if recovery is not None and recovery < 40:
+        notable_signals.append({
+            "signal": "recovery",
+            "message": f"Recovery is low at {round(recovery)}%. Consider a rest day or light movement only.",
+            "severity": "warning",
+        })
+    if sleep_hrs is not None and sleep_hrs < 6:
+        notable_signals.append({
+            "signal": "sleep",
+            "message": f"Sleep was {round(sleep_hrs, 1)}h \u2014 below the 7h minimum. Prioritize an early bedtime tonight.",
+            "severity": "warning",
+        })
+    if w_val and since_yesterday:
+        _wt_d = next((s["delta"] for s in since_yesterday if s["signal"] == "weight"), None)
+        if _wt_d and _wt_d > 3:
+            notable_signals.append({
+                "signal": "weight",
+                "message": f"Weight up {_wt_d:.1f} lbs from yesterday. Likely water retention \u2014 check sodium and hydration.",
+                "severity": "info",
+            })
 
     return _ok({
         "pulse": {
             "day_number": _pulse_day,
             "date": today_pt,
             "status": status,
-            "status_color": {"green": "#22c55e", "mixed": "#f5a623", "quiet": "#3a5a48"}.get(status, "#3a5a48"),
+            "status_color": {"strong": "#22c55e", "green": "#22c55e", "mixed": "#f5a623", "quiet": "#3a5a48"}.get(status, "#3a5a48"),
             "signals_reporting": signals_reporting,
             "signals_total": 8,
+            "narrative": narrative,
+            "since_yesterday": since_yesterday,
+            "notable_signals": notable_signals,
             "glyphs": glyphs,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
     }, cache_seconds=300)
+
+
+def handle_pulse_history() -> dict:
+    """
+    GET /api/pulse_history
+    Returns daily pulse summaries from EXPERIMENT_START to today.
+    One item per day with weight, recovery, sleep, steps.
+    Cache: 3600s (1 hr) — historical data doesn't change.
+    """
+    today = datetime.now(PT).strftime("%Y-%m-%d")
+    whoop_items = _query_source("whoop", EXPERIMENT_START, today)
+    withings_items = _query_source("withings", EXPERIMENT_START, today)
+    garmin_items = _query_source("garmin", EXPERIMENT_START, today)
+
+    # Index by date
+    whoop_by_date = {}
+    for w in whoop_items:
+        d = w.get("sk", "").replace("DATE#", "")[:10]
+        if d and w.get("recovery_score") is not None:
+            whoop_by_date[d] = w
+    withings_by_date = {}
+    for w in withings_items:
+        d = w.get("sk", "").replace("DATE#", "")[:10]
+        if d and w.get("weight_lbs"):
+            withings_by_date[d] = w
+    garmin_by_date = {}
+    for g in garmin_items:
+        d = g.get("sk", "").replace("DATE#", "")[:10]
+        if d and g.get("steps"):
+            garmin_by_date[d] = g
+
+    # Build daily summaries
+    days = []
+    current = datetime.strptime(EXPERIMENT_START, "%Y-%m-%d")
+    end = datetime.strptime(today, "%Y-%m-%d")
+    _p = _get_profile()
+    start_weight = float(_p.get("journey_start_weight_lbs", 307))
+    day_num = 1
+
+    while current <= end:
+        d = current.strftime("%Y-%m-%d")
+        w = whoop_by_date.get(d, {})
+        wi = withings_by_date.get(d, {})
+        g = garmin_by_date.get(d, {})
+
+        weight = float(wi["weight_lbs"]) if wi.get("weight_lbs") else None
+        recovery = float(w["recovery_score"]) if w.get("recovery_score") else None
+        sleep_hrs = float(w["sleep_duration_hours"]) if w.get("sleep_duration_hours") else None
+        hrv = float(w["hrv"]) if w.get("hrv") else None
+        steps = int(float(str(g["steps"]))) if g.get("steps") else None
+
+        headline_parts = []
+        if weight:
+            delta = round(weight - start_weight, 1)
+            headline_parts.append(f"{round(weight)} lbs ({delta:+.1f})")
+        if recovery is not None:
+            headline_parts.append(f"Recovery {round(recovery)}%")
+        if sleep_hrs:
+            headline_parts.append(f"Sleep {round(sleep_hrs, 1)}h")
+
+        days.append({
+            "date": d,
+            "day_number": day_num,
+            "weight_lbs": round(weight, 1) if weight else None,
+            "weight_delta": round(weight - start_weight, 1) if weight else None,
+            "recovery_pct": round(recovery) if recovery is not None else None,
+            "sleep_hours": round(sleep_hrs, 1) if sleep_hrs else None,
+            "hrv_ms": round(hrv, 1) if hrv else None,
+            "steps": steps,
+            "headline": " · ".join(headline_parts) if headline_parts else "No data recorded",
+        })
+        current += timedelta(days=1)
+        day_num += 1
+
+    return _ok({"pulse_history": days}, cache_seconds=3600)
 
 
 def handle_protocols() -> dict:
@@ -6298,6 +6671,9 @@ def handle_observatory_week(qs: dict = None) -> dict:
             best = max(items, key=lambda i: float(i.get("sleep_duration_hours", 0)), default={})
             worst = min(items, key=lambda i: float(i.get("sleep_duration_hours", 99)), default={})
 
+            eff_vals = [float(i.get("sleep_quality_score", 0)) for i in items if i.get("sleep_quality_score")]
+            best_eff = max(eff_vals) if eff_vals else None
+
             summary = {
                 "primary": {"label": "Average Duration", "value": round(avg_dur, 1), "unit": "hrs",
                             "delta": round(avg_dur - prev_avg, 1), "delta_label": f"vs {round(prev_avg, 1)} last week",
@@ -6306,6 +6682,7 @@ def handle_observatory_week(qs: dict = None) -> dict:
                               "detail": f"Recovery {round(float(best.get('recovery_score', 0)))}%"},
                 "lowlight": {"label": "Worst Night", "value": f"{worst.get('sk', '').replace('DATE#', '')[5:]} · {round(float(worst.get('sleep_duration_hours', 0)), 1)}h",
                              "detail": ""},
+                "best_efficiency": round(best_eff) if best_eff else None,
             }
             notable = f"Avg sleep {'improved' if avg_dur > prev_avg else 'declined'} {abs(round(avg_dur - prev_avg, 1))}h vs last week"
 
@@ -6346,16 +6723,18 @@ def handle_observatory_week(qs: dict = None) -> dict:
             notable = f"Average recovery {round(avg_recovery)}% this week"
 
         elif domain == "glucose":
-            items = _query_source("dexcom", start_date, end_date)
-            tirs = [float(i.get("time_in_range_pct", 0)) for i in items if i.get("time_in_range_pct")]
+            items = _query_source("apple_health", start_date, end_date)
+            tirs = [float(i.get("blood_glucose_time_in_range_pct", 0)) for i in items if i.get("blood_glucose_time_in_range_pct")]
             avg_tir = sum(tirs) / len(tirs) if tirs else 0
+            avg_glucoses = [float(i.get("blood_glucose_avg", 0)) for i in items if i.get("blood_glucose_avg")]
+            avg_glucose = sum(avg_glucoses) / len(avg_glucoses) if avg_glucoses else 0
 
             summary = {
                 "primary": {"label": "Avg TIR", "value": round(avg_tir, 1), "unit": "%",
                             "delta": 0, "delta_label": "", "trend": "flat",
                             "sparkline": [round(t, 1) for t in tirs]},
-                "highlight": {"label": "Best Day", "value": f"{round(max(tirs))}% TIR" if tirs else "—", "detail": ""},
-                "lowlight": {"label": "Worst Day", "value": f"{round(min(tirs))}% TIR" if tirs else "—", "detail": ""},
+                "highlight": {"label": "Best Day", "value": f"{round(max(tirs))}% TIR" if tirs else "\u2014", "detail": f"Avg glucose {round(avg_glucose)} mg/dL" if avg_glucose else ""},
+                "lowlight": {"label": "Worst Day", "value": f"{round(min(tirs))}% TIR" if tirs else "\u2014", "detail": ""},
             }
             notable = f"Average time-in-range {round(avg_tir)}% this week"
 
@@ -6540,6 +6919,7 @@ ROUTES = {
     "/api/habit_registry":     handle_habit_registry,
     # PULSE-A4: Daily pulse endpoint
     "/api/pulse":              handle_pulse,
+    "/api/pulse_history":      handle_pulse_history,
     # Subscriber count social proof (read-only) — must NOT match /api/subscribe* CloudFront pattern
     "/api/sub_count":          handle_subscriber_count,
     # Observatory pages
@@ -6772,18 +7152,23 @@ def lambda_handler(event, context):
     if path == "/api/ai_analysis":
         qs = event.get("queryStringParameters") or {}
         expert_key = qs.get("expert", "mind")
-        if expert_key not in ("mind", "nutrition", "training", "physical", "explorer"):
+        if expert_key not in ("mind", "nutrition", "training", "physical", "explorer", "labs"):
             return _error(400, "Invalid expert key")
         ai_pk = f"{USER_PREFIX}ai_analysis"
         ai_item = table.get_item(Key={"pk": ai_pk, "sk": f"EXPERT#{expert_key}"}).get("Item")
         if not ai_item:
             return _ok({"expert_key": expert_key, "analysis": None, "generated_at": None}, cache_seconds=300)
         ai_item = _decimal_to_float(ai_item)
-        return _ok({
+        resp_data = {
             "expert_key": expert_key,
             "analysis": ai_item.get("analysis", ""),
             "generated_at": ai_item.get("generated_at", ""),
-        }, cache_seconds=300)
+        }
+        if ai_item.get("key_recommendation"):
+            resp_data["key_recommendation"] = ai_item["key_recommendation"]
+        if ai_item.get("journaling_prompt"):
+            resp_data["journaling_prompt"] = ai_item["journaling_prompt"]
+        return _ok(resp_data, cache_seconds=300)
 
     # Special handling: /api/ask accepts POST
     if path == "/api/ask":

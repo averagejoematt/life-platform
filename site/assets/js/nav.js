@@ -148,21 +148,7 @@
     navDate.textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  // ── GAM-01: Since Your Last Visit badges ─────────────────
-  var SECTION_LAST_UPDATED = {
-    '/chronicle/':         '2026-03-26',
-    '/chronicle/archive/': '2026-03-26',
-    '/week/':              '2026-03-26',
-    '/live/':              '2026-03-26',
-    '/character/':         '2026-03-26',
-    '/habits/':            '2026-03-26',
-    '/discoveries/':       '2026-03-26',
-    '/sleep/':             '2026-03-26',
-    '/glucose/':           '2026-03-26',
-    '/stack/':             '2026-03-26',
-    '/platform/':          '2026-03-26',
-  };
-
+  // ── GAM-01 / DPR-1.20: Since Your Last Visit badges (per-page tracking) ──
   // Bottom nav → which paths it owns (6-section IA, Decision 1c)
   var BADGE_MAP = {
     '/':           ['/story/', '/about/', '/achievements/', '/first-person/'],
@@ -173,34 +159,39 @@
   };
 
   try {
-    var lastVisitKey = 'amj_last_visit';
-    var lastVisit = localStorage.getItem(lastVisitKey);
-    var nowIso = new Date().toISOString();
+    var VISIT_KEY = 'amj_last_visits';
+    var lastVisits = JSON.parse(localStorage.getItem(VISIT_KEY) || '{}');
+    var currentPage = path.replace(/\/+$/, '') || '/';
 
-    if (lastVisit) {
-      var lastVisitDate = new Date(lastVisit);
-
+    // Fetch page freshness from API (non-blocking)
+    fetch('/api/vitals').then(function(r) { return r.ok ? r.json() : null; }).then(function(data) {
+      if (!data) return;
+      var freshness = data.page_freshness || {};
       Object.keys(BADGE_MAP).forEach(function(navHref) {
         var trackedPaths = BADGE_MAP[navHref];
         var hasNew = trackedPaths.some(function(p) {
-          var updated = SECTION_LAST_UPDATED[p];
-          return updated && new Date(updated) > lastVisitDate;
+          var pageKey = p.replace(/\/+$/, '') || '/';
+          var updated = freshness[pageKey] || freshness[p];
+          var lastSeen = lastVisits[pageKey] || '1970-01-01';
+          return updated && updated > lastSeen;
         });
         if (hasNew) {
           var navEl = document.querySelector('.bottom-nav__link[href="' + navHref + '"]');
           if (navEl) navEl.classList.add('has-badge');
         }
       });
-
+      // Clear badge for current section
       Object.keys(BADGE_MAP).forEach(function(navHref) {
         if (path.startsWith(navHref) && navHref !== '/') {
           var navEl = document.querySelector('.bottom-nav__link[href="' + navHref + '"]');
           if (navEl) navEl.classList.remove('has-badge');
         }
       });
-    }
+    }).catch(function() {});
 
-    localStorage.setItem(lastVisitKey, nowIso);
+    // Record visit for current page
+    lastVisits[currentPage] = new Date().toISOString();
+    localStorage.setItem(VISIT_KEY, JSON.stringify(lastVisits));
   } catch (e) { /* localStorage blocked */ }
 
   // ── GAM-02: Reading Path CTAs (Decision 1d — 6-section IA) ─

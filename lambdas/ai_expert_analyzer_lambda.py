@@ -36,7 +36,7 @@ CACHE_PK = f"{USER_PREFIX}ai_analysis"
 AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
 AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
 
-EXPERTS = ["mind", "nutrition", "training", "physical", "explorer"]
+EXPERTS = ["mind", "nutrition", "training", "physical", "explorer", "glucose"]
 
 dynamodb = boto3.resource("dynamodb", region_name="us-west-2")
 table = dynamodb.Table(TABLE_NAME)
@@ -93,7 +93,6 @@ def _latest_item(source):
 
 def gather_data_for_expert(expert_key):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d7 = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
     d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
 
     if expert_key == "mind":
@@ -147,15 +146,19 @@ def gather_data_for_expert(expert_key):
         }
 
     elif expert_key == "training":
-        # Strava/activity data
-        activities = _query_source("strava", d7, today)
-        steps_items = _query_source("apple_health", d7, today)
+        # Strava/activity data (30d for step averages to match hero metric)
+        activities = _query_source("strava", d30, today)
+        # Steps: prefer Garmin (more accurate with watch), fall back to Apple Health
+        garmin_items = _query_source("garmin", d30, today)
+        step_vals = [float(g["steps"]) for g in garmin_items if g.get("steps")]
+        if not step_vals:
+            steps_items = _query_source("apple_health", d30, today)
+            step_vals = [float(s["steps"]) for s in steps_items if s.get("steps") and float(s["steps"]) > 0]
+        avg_steps = round(sum(step_vals) / len(step_vals)) if step_vals else 0
         total_min = sum(float(a.get("duration_min", 0) or a.get("moving_time_min", 0)) for a in activities)
-        daily_steps = [float(s.get("steps", 0)) for s in steps_items if s.get("steps")]
-        avg_steps = round(sum(daily_steps) / max(len(daily_steps), 1)) if daily_steps else 0
         return {
             "expert_key": "training",
-            "period": "last 7 days",
+            "period": "last 30 days",
             "sessions_count": len(activities),
             "total_active_min": round(total_min),
             "avg_daily_steps": avg_steps,
@@ -221,6 +224,25 @@ def gather_data_for_expert(expert_key):
             "experiment_names": [e.get("name", "") for e in active_exps[:3]],
         }
 
+    elif expert_key == "glucose":
+        cgm_items = _query_source("dexcom", d30, today)
+        readings = [float(i.get("glucose_mg_dl", 0)) for i in cgm_items if i.get("glucose_mg_dl")]
+        avg_glucose = round(sum(readings) / len(readings), 1) if readings else None
+        in_range = sum(1 for r in readings if 70 <= r <= 140)
+        tir_pct = round(in_range / len(readings) * 100, 1) if readings else None
+        std_dev = None
+        if len(readings) > 1:
+            mean = sum(readings) / len(readings)
+            std_dev = round((sum((r - mean) ** 2 for r in readings) / len(readings)) ** 0.5, 1)
+        return {
+            "expert_key": "glucose",
+            "period": "last 30 days",
+            "total_readings": len(readings),
+            "avg_glucose_mg_dl": avg_glucose,
+            "time_in_range_pct": tir_pct,
+            "std_dev": std_dev,
+        }
+
     return {"expert_key": expert_key, "note": "Unknown expert"}
 
 
@@ -254,6 +276,12 @@ EXPERT_PERSONAS = {
         "title": "Biostatistician and N=1 research methodologist",
         "style": "rigorous but accessible, excited by unexpected findings, careful about causal claims",
         "focus": "cross-domain correlations, surprising signal in the data, what pairs of metrics tell a story that single metrics cannot",
+    },
+    "glucose": {
+        "name": "Dr. Rhonda Patrick",
+        "title": "Metabolic health researcher specializing in continuous glucose monitoring",
+        "style": "science-forward but practical, connects CGM data to dietary choices and metabolic patterns",
+        "focus": "glucose variability, time-in-range optimization, meal response patterns, nocturnal glucose behavior, and how metabolic health connects to longevity",
     },
 }
 
@@ -289,7 +317,10 @@ Requirements:
 - If prior analysis is provided below, find a DIFFERENT angle — do not repeat the same observation or suggestion
 
 {prior_block}
-Write only the analysis text — no preamble, no "Here is my analysis:", just the paragraphs themselves."""
+After your analysis paragraphs, on a new line, write exactly:
+KEY RECOMMENDATION: [one specific behavioral suggestion for the coming week, maximum 2 sentences]
+{"" if expert_key != "mind" else chr(10) + "Then on another new line, write exactly:" + chr(10) + "JOURNALING PROMPT: [a single sentence journaling prompt for this week — something Matthew can sit with before writing]"}
+Write only the analysis text — no preamble, no "Here is my analysis:", just the paragraphs themselves followed by the KEY RECOMMENDATION line."""
 
 
 def generate_and_cache(expert_key):
@@ -334,10 +365,22 @@ def generate_and_cache(expert_key):
         b["text"] for b in result.get("content", []) if b.get("type") == "text"
     )
 
+    # DPR-1.13: Extract KEY RECOMMENDATION if present
+    key_recommendation = ""
+    journaling_prompt = ""
+    if "JOURNALING PROMPT:" in analysis_text:
+        parts = analysis_text.split("JOURNALING PROMPT:", 1)
+        analysis_text = parts[0].rstrip()
+        journaling_prompt = parts[1].strip()
+    if "KEY RECOMMENDATION:" in analysis_text:
+        parts = analysis_text.split("KEY RECOMMENDATION:", 1)
+        analysis_text = parts[0].rstrip()
+        key_recommendation = parts[1].strip()
+
     now = datetime.now(timezone.utc)
     ttl = int((now + timedelta(days=8)).timestamp())
 
-    table.put_item(Item={
+    item = {
         "pk": CACHE_PK,
         "sk": f"EXPERT#{expert_key}",
         "expert_key": expert_key,
@@ -345,7 +388,12 @@ def generate_and_cache(expert_key):
         "generated_at": now.isoformat(),
         "data_snapshot": json.dumps(data, default=str)[:5000],
         "ttl": ttl,
-    })
+    }
+    if key_recommendation:
+        item["key_recommendation"] = key_recommendation
+    if journaling_prompt:
+        item["journaling_prompt"] = journaling_prompt
+    table.put_item(Item=item)
 
     logger.info(f"Cached analysis for {expert_key}: {len(analysis_text)} chars")
     return analysis_text

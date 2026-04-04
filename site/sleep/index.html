@@ -1198,7 +1198,8 @@
           <div class="s-gauge__unit">hrs</div>
         </div>
       </div>
-      <div class="s-gauge__label">Avg duration</div>
+      <div class="s-gauge__label">Last night</div>
+      <div class="s-gauge__note" id="g-dur-note" style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:0.06em;margin-top:2px"></div>
     </div>
     <div class="s-gauge">
       <div class="s-gauge__ring">
@@ -1320,15 +1321,23 @@
       <div class="s-accent-card__value" id="s-eff-30d">&mdash;</div>
       <div class="s-accent-card__note">Efficiency above 85% suggests good sleep hygiene. Below 75% may indicate environmental disruption or anxiety.</div>
     </div>
-    <div class="s-accent-card">
-      <div class="s-accent-card__label">Best night</div>
+    <div class="s-accent-card" id="s-best-night-card" style="cursor:pointer" onclick="this.classList.toggle('is-expanded')">
+      <div class="s-accent-card__label">Best night <span style="font-size:9px;opacity:0.5">(tap to expand)</span></div>
       <div class="s-accent-card__value" id="s-eff-best">&mdash;</div>
       <div class="s-accent-card__note">Peak efficiency nights typically correlate with 68°F bed temperature, no screens after 9pm, and consistent bed time.</div>
+      <div class="s-accent-card__expand" id="s-best-detail" style="display:none;margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--border);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);line-height:1.8"></div>
     </div>
   </div>
   <div class="s-context">
     Sleep efficiency is the ratio of actual sleep to time spent in bed. It strips away the illusion of "I was in bed for 8 hours" — revealing how much of that time was real, restorative sleep.
   </div>
+</section>
+
+<!-- S4: Last night's architecture breakdown -->
+<section class="s-lastnight-section reveal" id="s-lastnight" style="display:none;max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border)">
+  <div class="s-section-header">Last Night</div>
+  <div id="s-lastnight-bar" style="display:flex;height:24px;border-radius:4px;overflow:hidden;margin-bottom:var(--space-3)"></div>
+  <div id="s-lastnight-labels" style="display:flex;gap:var(--space-5);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted)"></div>
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -1786,6 +1795,8 @@
     var hours = s.whoop_hours || s.total_sleep_hours || 0;
     setText('g-dur-num', hours ? hours.toFixed(1) : '\u2014');
     setArc('g-dur-arc', Math.min(100, (hours / 9) * 100));
+    var _daysTracked = s.days_tracked || (trend ? trend.length : 0);
+    if (_daysTracked > 0) { var _dn = document.getElementById('g-dur-note'); if (_dn) _dn.textContent = _daysTracked + ' nights tracked'; }
 
     var avg30 = s['30d_avg_score'] || 0;
     setText('g-score-num', avg30 ? avg30.toFixed(0) : '\u2014');
@@ -1814,6 +1825,49 @@
     if (s.best_efficiency) {
       setText('s-eff-best', s.best_efficiency + '%');
     }
+    // S3: Best/worst night expandable detail from trend data
+    if (trend && trend.length > 1) {
+      var _bestNight = trend.reduce(function(a, b) { return (b.sleep_score || 0) > (a.sleep_score || 0) ? b : a; });
+      var _worstNight = trend.reduce(function(a, b) { return (b.sleep_score || 999) < (a.sleep_score || 999) ? b : a; });
+      var _detailEl = document.getElementById('s-best-detail');
+      if (_detailEl && _bestNight) {
+        var _parts = ['Date: ' + (_bestNight.date || '?')];
+        if (_bestNight.hours) _parts.push('Duration: ' + _bestNight.hours.toFixed(1) + 'h');
+        if (_bestNight.deep_pct) _parts.push('Deep: ' + _bestNight.deep_pct.toFixed(1) + '%');
+        if (_bestNight.rem_pct) _parts.push('REM: ' + _bestNight.rem_pct.toFixed(1) + '%');
+        if (_bestNight.recovery_score) _parts.push('Recovery: ' + Math.round(_bestNight.recovery_score) + '%');
+        if (_worstNight && _worstNight.date !== _bestNight.date) {
+          _parts.push('<br>Worst: ' + (_worstNight.date || '?') + ' \u2014 ' + (_worstNight.hours ? _worstNight.hours.toFixed(1) + 'h' : '') + ((_worstNight.sleep_score || 0) ? ', score ' + Math.round(_worstNight.sleep_score) : ''));
+        }
+        _detailEl.innerHTML = _parts.join(' \u00b7 ');
+      }
+    }
+    // CSS: show expanded detail when card has is-expanded
+    var _style = document.createElement('style');
+    _style.textContent = '.s-accent-card.is-expanded .s-accent-card__expand{display:block!important}';
+    document.head.appendChild(_style);
+
+    // S4: Last night's architecture breakdown
+    if (trend && trend.length > 0) {
+      var _last = trend[trend.length - 1];
+      var _dp = _last.deep_pct || 0, _rp = _last.rem_pct || 0, _lp = _last.light_pct || 0;
+      var _ap = Math.max(0, 100 - _dp - _rp - _lp);
+      if (_dp > 0 || _rp > 0) {
+        var _barEl = document.getElementById('s-lastnight-bar');
+        var _lblEl = document.getElementById('s-lastnight-labels');
+        _barEl.innerHTML =
+          '<div style="width:' + _dp + '%;background:#818cf8" title="Deep ' + _dp.toFixed(1) + '%"></div>' +
+          '<div style="width:' + _rp + '%;background:#3ecf8e" title="REM ' + _rp.toFixed(1) + '%"></div>' +
+          '<div style="width:' + _lp + '%;background:rgba(255,255,255,0.15)" title="Light ' + _lp.toFixed(1) + '%"></div>' +
+          '<div style="width:' + _ap + '%;background:rgba(255,82,82,0.3)" title="Awake ' + _ap.toFixed(1) + '%"></div>';
+        _lblEl.innerHTML =
+          '<span><span style="display:inline-block;width:8px;height:8px;background:#818cf8;border-radius:2px;margin-right:4px"></span>Deep ' + _dp.toFixed(1) + '%</span>' +
+          '<span><span style="display:inline-block;width:8px;height:8px;background:#3ecf8e;border-radius:2px;margin-right:4px"></span>REM ' + _rp.toFixed(1) + '%</span>' +
+          '<span><span style="display:inline-block;width:8px;height:8px;background:rgba(255,255,255,0.15);border-radius:2px;margin-right:4px"></span>Light ' + _lp.toFixed(1) + '%</span>' +
+          '<span><span style="display:inline-block;width:8px;height:8px;background:rgba(255,82,82,0.3);border-radius:2px;margin-right:4px"></span>Awake ' + _ap.toFixed(1) + '%</span>';
+        document.getElementById('s-lastnight').style.display = '';
+      }
+    }
 
     /* ── Sleep stage editorial ── */
     if (s.deep_pct != null) {
@@ -1828,6 +1882,15 @@
     if (hrv) {
       setWidth('sbar-hrv', Math.min(100, (hrv / 120) * 100));
       setText('sval-hrv', hrv.toFixed(0) + 'ms');
+    }
+
+    // S2: Data confidence note when < 14 nights
+    if (_daysTracked > 0 && _daysTracked < 14) {
+      var _confNote = document.createElement('div');
+      _confNote.style.cssText = 'max-width:var(--max-width);margin:0 auto;padding:var(--space-2) var(--page-padding);text-align:center;font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag)';
+      _confNote.textContent = 'Based on ' + _daysTracked + ' nights \u2014 patterns become reliable after ~14 nights';
+      var _heroEl = document.querySelector('.s-hero');
+      if (_heroEl && _heroEl.nextSibling) _heroEl.parentNode.insertBefore(_confNote, _heroEl.nextSibling);
     }
 
     // Show content BEFORE chart rendering (canvas needs offsetWidth > 0)

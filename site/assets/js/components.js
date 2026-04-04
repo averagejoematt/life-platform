@@ -646,19 +646,19 @@
         // Card 1: The Journey
         '<a href="/story/" class="amj-sh-card" style="display:block;padding:32px 24px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-left:3px solid var(--c-green-500,#22c55e);text-decoration:none;transition:border-color 0.2s,background 0.2s;">' +
           '<div style="font-family:var(--font-display,Georgia,serif);font-size:var(--text-xl,20px);color:#e8e8e8;margin-bottom:8px;">The Journey</div>' +
-          '<div style="font-size:14px;color:rgba(255,255,255,0.5);line-height:1.6;">Follow one person\'s health transformation &mdash; honest, public, no filter.</div>' +
+          '<div style="font-size:14px;color:var(--text-muted, rgba(255,255,255,0.5));line-height:1.6;">Follow one person\'s health transformation &mdash; honest, public, no filter.</div>' +
           '<div style="margin-top:16px;font-family:var(--font-mono,monospace);font-size:var(--text-xs,11px);color:var(--c-green-500,#22c55e);letter-spacing:1px;">Start here &rarr;</div>' +
         '</a>' +
         // Card 2: The Data
         '<a href="/explorer/" class="amj-sh-card" style="display:block;padding:32px 24px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-left:3px solid var(--c-amber-500,#f59e0b);text-decoration:none;transition:border-color 0.2s,background 0.2s;">' +
           '<div style="font-family:var(--font-display,Georgia,serif);font-size:var(--text-xl,20px);color:#e8e8e8;margin-bottom:8px;">The Data</div>' +
-          '<div style="font-size:14px;color:rgba(255,255,255,0.5);line-height:1.6;">Explore 26 data sources, N=1 experiments, and live correlations.</div>' +
+          '<div style="font-size:14px;color:var(--text-muted, rgba(255,255,255,0.5));line-height:1.6;">Explore 26 data sources, N=1 experiments, and live correlations.</div>' +
           '<div style="margin-top:16px;font-family:var(--font-mono,monospace);font-size:var(--text-xs,11px);color:var(--c-amber-500,#f59e0b);letter-spacing:1px;">Explore &rarr;</div>' +
         '</a>' +
         // Card 3: How It's Built
         '<a href="/builders/" class="amj-sh-card" style="display:block;padding:32px 24px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-left:3px solid var(--lb-accent,#06b6d4);text-decoration:none;transition:border-color 0.2s,background 0.2s;">' +
           '<div style="font-family:var(--font-display,Georgia,serif);font-size:var(--text-xl,20px);color:#e8e8e8;margin-bottom:8px;">How It\'s Built</div>' +
-          '<div style="font-size:14px;color:rgba(255,255,255,0.5);line-height:1.6;">One person built this with Claude. See the full blueprint.</div>' +
+          '<div style="font-size:14px;color:var(--text-muted, rgba(255,255,255,0.5));line-height:1.6;">One person built this with Claude. See the full blueprint.</div>' +
           '<div style="margin-top:16px;font-family:var(--font-mono,monospace);font-size:var(--text-xs,11px);color:var(--lb-accent,#06b6d4);letter-spacing:1px;">See the stack &rarr;</div>' +
         '</a>' +
       '</div>' +
@@ -712,13 +712,14 @@ function renderAIAnalysisCard(containerId, expertKey, config) {
     nutrition: { name: "Dr. Webb's Analysis",            color: '#f59e0b' },
     training:  { name: "Coach's Notes — Dr. Sarah Chen", color: '#ef4444' },
     physical:  { name: "Dr. Victor Reyes's Assessment",  color: '#60a5fa' },
-    explorer:  { name: "Dr. Brandt's Analysis",          color: '#f59e0b' }
+    explorer:  { name: "Dr. Brandt's Analysis",          color: '#f59e0b' },
+    labs:      { name: "Dr. Okafor's Interpretation",    color: '#06b6d4' }
   };
 
   var expert = EXPERTS[expertKey];
   if (!expert) return;
 
-  el.innerHTML = '<div style="font-family:monospace;font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:0.1em">LOADING ' + expert.name.toUpperCase() + '...</div>';
+  el.innerHTML = '<div style="font-family:monospace;font-size:10px;color:var(--text-faint, rgba(255,255,255,0.3));letter-spacing:0.1em">LOADING ' + expert.name.toUpperCase() + '...</div>';
 
   fetch('/api/ai_analysis?expert=' + expertKey)
     .then(function(r) { return r.json(); })
@@ -731,13 +732,36 @@ function renderAIAnalysisCard(containerId, expertKey, config) {
       var date = data.generated_at ? new Date(data.generated_at).toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'}) : '';
       var dataSources = (config && config.dataSources) || '30 days of data';
 
+      // DPR-1.13: Key recommendation callout (populate if container exists on page)
+      var keyRecEl = document.getElementById(containerId.replace('ai-analysis', 'key-rec'));
+      if (!keyRecEl) {
+        // Try generic pattern: n-key-rec, t-key-rec, p-key-rec, etc.
+        var prefix = containerId.split('-')[0];
+        keyRecEl = document.getElementById(prefix + '-key-rec');
+      }
+      if (keyRecEl && data.key_recommendation) {
+        var recText = document.getElementById(keyRecEl.id + '-text');
+        if (recText) recText.textContent = data.key_recommendation;
+        keyRecEl.style.display = '';
+      }
+
+      // M1: Journaling prompt for mind expert
+      if (data.journaling_prompt) {
+        var promptEl = document.getElementById(containerId.split('-')[0] + '-journal-prompt');
+        if (promptEl) {
+          var promptText = document.getElementById(promptEl.id + '-text');
+          if (promptText) promptText.textContent = data.journaling_prompt;
+          promptEl.style.display = '';
+        }
+      }
+
       el.innerHTML =
-        '<div style="border-left:3px solid ' + expert.color + ';padding:20px 24px;background:rgba(255,255,255,0.02)">' +
+        '<div style="border-left:3px solid ' + expert.color + ';padding:20px 24px;background:var(--surface-raised, rgba(255,255,255,0.02))">' +
           '<div style="font-family:monospace;font-size:11px;color:' + expert.color + ';letter-spacing:0.12em;text-transform:uppercase;margin-bottom:12px">' + expert.name + '</div>' +
-          '<div style="font-family:var(--font-serif);font-size:15px;line-height:1.75;color:rgba(255,255,255,0.82)">' +
+          '<div style="font-family:var(--font-serif);font-size:15px;line-height:1.75;color:var(--text, rgba(255,255,255,0.82))">' +
             data.analysis.split('\n\n').map(function(p) { return '<p style="margin-top:12px">' + p + '</p>'; }).join('') +
           '</div>' +
-          '<div style="margin-top:16px;font-family:monospace;font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:0.08em">' +
+          '<div style="margin-top:16px;font-family:monospace;font-size:10px;color:var(--text-muted, rgba(255,255,255,0.25));letter-spacing:0.08em">' +
             'Generated ' + date + ' · Based on ' + dataSources +
           '</div>' +
         '</div>';

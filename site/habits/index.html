@@ -768,6 +768,13 @@
   </div>
 </header>
 
+<!-- H1: Day N perspective banner (shown when < 21 days tracked) -->
+<div class="habits-perspective" id="habits-perspective" style="display:none">
+  <div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-3) var(--page-padding);font-family:var(--font-serif);font-size:var(--text-sm);color:var(--text-muted);text-align:center;border-bottom:1px solid var(--border);background:rgba(0,229,160,0.03)">
+    You're building the measurement system. Completion rates typically stabilize by Week 3.
+  </div>
+</div>
+
 <!-- ═══════ TIER CONTEXT ═══════ -->
 <div class="reveal" style="max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-5);">
   <div style="border-left:2px solid var(--accent);padding-left:var(--space-4);">
@@ -863,7 +870,7 @@
     </div>
     <div class="intel-card" id="dow-card" style="display:none">
       <div class="intel-card__title">Day of Week <em>Pattern</em></div>
-      <div class="intel-card__sub">T0 completion by day — last 90 days</div>
+      <div class="intel-card__sub" id="dow-sub">T0 completion by day</div>
       <div class="dow-bars" id="dow-bars"></div>
       <div id="dow-insight" style="font-size:var(--text-2xs);font-family:var(--font-mono);color:var(--text-faint);margin-top:var(--space-3)"></div>
     </div>
@@ -884,7 +891,7 @@
 <div class="journal-quote reveal">
   <blockquote>
     "The hardest habit wasn't the workout. It was the journal. Writing down what I was thinking meant I couldn't pretend I wasn't thinking it."
-    <cite>// from a morning journal entry, day 47</cite>
+    <cite>// from a previous attempt &mdash; the lesson that brought journaling into this system</cite>
   </blockquote>
 </div>
 
@@ -1366,6 +1373,11 @@ function buildDOW(data){
   var avgs = data.day_of_week_avgs;
   if(!avgs||!avgs.length) return;
   var DOW = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  var daysTracked = data.days_tracked || (data.history ? data.history.length : 0);
+  var subEl = document.getElementById('dow-sub');
+  if(subEl) subEl.textContent = daysTracked < 28
+    ? 'T0 completion by day \u2014 ' + daysTracked + ' days tracked \u2014 patterns emerge after 4+ weeks'
+    : 'T0 completion by day \u2014 last 90 days';
   var valid = avgs.map(function(v,i){return{i:i,v:v}}).filter(function(x){return x.v!=null});
   var bestI = valid.length ? valid.reduce(function(a,b){return a.v>b.v?a:b}).i : null;
   var worstI = valid.length ? valid.reduce(function(a,b){return a.v<b.v?a:b}).i : null;
@@ -1414,6 +1426,8 @@ function computeStats(data){
   document.getElementById('hero-avg').textContent = avg+'%';
   document.getElementById('hero-days').textContent = days;
   document.getElementById('streak-big').textContent = streak;
+  // H1: Show perspective banner when early
+  if (days < 21) { var _pp = document.getElementById('habits-perspective'); if (_pp) _pp.style.display = ''; }
 }
 
 // ── Domain Filter (5h) ──
@@ -1501,6 +1515,20 @@ async function load(){
     var history = data.history||[];
     computeStats(data);
     buildT0(history);
+    // H2: Best day highlight
+    (function() {
+      if (!history.length) return;
+      var best = history.reduce(function(a, b) { return (b.tier0_pct || 0) > (a.tier0_pct || 0) ? b : a; });
+      if (!best || !best.tier0_pct) return;
+      var d = new Date(best.date + 'T12:00:00');
+      var dow = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
+      var el = document.getElementById('habits-perspective');
+      if (!el) return;
+      var card = document.createElement('div');
+      card.style.cssText = 'max-width:var(--max-width);margin:0 auto;padding:var(--space-3) var(--page-padding);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);text-align:center;letter-spacing:var(--ls-tag)';
+      card.textContent = 'Your best day: ' + best.date + ' (' + dow + ') \u2014 ' + best.tier0_pct + '% T0 complete';
+      el.appendChild(card);
+    })();
     buildPurposeGroups(history);
     buildHorizon();
     buildHeatmap(history);

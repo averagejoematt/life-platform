@@ -1078,6 +1078,7 @@
     <div>
       <span class="obs-freshness__label">Last data: <span id="obs-fresh-time">&mdash;</span></span>
       <span class="obs-freshness__sub">Updated daily</span>
+      <span class="sensor-day" id="sensor-day" style="display:none;margin-left:var(--space-3,8px);font-family:var(--font-mono);font-size:var(--text-2xs,10px);letter-spacing:0.08em;color:var(--text-faint)"></span>
     </div>
     <span class="obs-freshness__dot obs-freshness__dot--live" id="obs-fresh-dot"></span>
   </div>
@@ -1154,6 +1155,10 @@
   <div class="g-section-header">Meal Response Table</div>
   <div class="g-meal-growing">This table grows over time &mdash; every logged meal adds a data point</div>
 
+  <!-- G2: Meal search -->
+  <div style="margin-bottom:var(--space-3)">
+    <input type="text" id="g-meal-search" placeholder="Search meals..." style="width:100%;max-width:320px;padding:var(--space-2) var(--space-4);font-family:var(--font-mono);font-size:var(--text-xs);background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;outline:none" />
+  </div>
   <!-- Filter chips -->
   <div class="g-meal-filters">
     <button class="g-meal-chip active" data-filter="all">All</button>
@@ -1543,6 +1548,12 @@
   </div>
 </section>
 
+<!-- G1: AI glucose personality analysis -->
+<section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal">
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--g-accent,#06b6d4);margin-bottom:var(--space-4)">Dr. Patrick's Metabolic Assessment</div>
+  <div id="g-ai-analysis"></div>
+</section>
+
 <nav class="reading-path-v2">
   <a href="/sleep/" class="reading-path-v2__link">
     <span class="reading-path-v2__dir">&larr; Previous</span>
@@ -1636,8 +1647,12 @@
       container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:2rem 0;">Meal glucose data will appear here once MacroFactor food logs overlap with CGM readings.</p>';
       return;
     }
+    var _searchTerm = (document.getElementById('g-meal-search') || {}).value || '';
+    _searchTerm = _searchTerm.toLowerCase().trim();
     var filtered = mealData.filter(function(m) {
-      return currentFilter === 'all' || m.category === currentFilter;
+      var matchFilter = currentFilter === 'all' || m.category === currentFilter;
+      var matchSearch = !_searchTerm || (m.name || '').toLowerCase().indexOf(_searchTerm) >= 0;
+      return matchFilter && matchSearch;
     });
     filtered.sort(function(a, b) {
       var va = a[currentSort.key], vb = b[currentSort.key];
@@ -1702,6 +1717,16 @@
   }
   renderMeals();
 
+  // G2: Wire search input with debounce
+  var _mealSearchEl = document.getElementById('g-meal-search');
+  if (_mealSearchEl) {
+    var _mealSearchTimer;
+    _mealSearchEl.addEventListener('input', function() {
+      clearTimeout(_mealSearchTimer);
+      _mealSearchTimer = setTimeout(renderMeals, 200);
+    });
+  }
+
   /* ── Main glucose data ─────────────────────────────────── */
 
   try {
@@ -1746,6 +1771,19 @@
     var hi = g.time_above_140_pct || 0;
     setWidth('gbar-hi', hi);
     setText('gval-hi', hi.toFixed(1) + '%');
+
+    // DPR-1.17: Sensor day indicator + freshness
+    if (g.latest_reading_date || g.as_of_date) {
+      var lastDate = g.latest_reading_date || g.as_of_date;
+      document.getElementById('obs-fresh-time').textContent = lastDate;
+      document.getElementById('obs-freshness').style.display = '';
+    }
+    var sensorDay = g.sensor_day || null;
+    if (sensorDay) {
+      var sdEl = document.getElementById('sensor-day');
+      sdEl.textContent = 'Sensor: Day ' + sensorDay + ' of 15';
+      sdEl.style.display = '';
+    }
 
     // Show content BEFORE chart rendering (canvas needs offsetWidth > 0)
     loading.style.display = 'none';
@@ -1848,6 +1886,12 @@
     loading.textContent = 'Could not load glucose data.';
     content.style.display = 'block';
     console.error(e);
+  }
+  // G1: Load AI glucose personality analysis
+  if (typeof renderAIAnalysisCard === 'function') {
+    renderAIAnalysisCard('g-ai-analysis', 'glucose', {
+      dataSources: '30 days of CGM readings and meal response data'
+    });
   }
 })();
 </script>

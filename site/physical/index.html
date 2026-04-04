@@ -478,7 +478,7 @@
       font-family: var(--font-serif);
       font-size: 15px;
       line-height: 1.65;
-      color: rgba(255,255,255,0.82);
+      color: var(--text);
     }
     .p-visceral-card {
       border-left: 3px solid var(--p-red);
@@ -648,6 +648,18 @@
       --obs-accent-bg: rgba(96,165,250,0.06);
     }
     .p-hero__eyebrow, .eyebrow { color: var(--obs-accent) !important; }
+    /* DPR-1.08: Goal date confidence caveat */
+    .projection-caveat {
+      margin-top: var(--space-3);
+      padding: var(--space-3) var(--space-5);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--text-muted);
+      background: rgba(245,158,11,0.06);
+      border: 1px solid rgba(245,158,11,0.15);
+      border-radius: 4px;
+    }
+    .projection-caveat__icon { margin-right: var(--space-2); }
   </style>
 </head>
 <body>
@@ -834,6 +846,7 @@
       <div class="p-metric__sub" id="m-days-to-go"></div>
     </div>
   </div>
+  <div class="projection-caveat" id="projection-caveat" style="display:none"></div>
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -891,6 +904,7 @@
     <div class="p-visceral-card__text" id="p-visceral-text"></div>
   </div>
   <div class="p-bone-line" id="p-bone-line"></div>
+  <div id="p-dexa-next" style="margin-top:var(--space-4);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag)"></div>
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -1036,6 +1050,15 @@
     setText('m-remaining', j.remaining_lbs ? Math.round(j.remaining_lbs) + ' lbs remaining' : '');
     setText('m-eta', j.projected_goal_date || '\u2014');
     setText('m-days-to-go', j.days_to_goal ? j.days_to_goal + ' days to go' : '');
+
+    // DPR-1.08: Goal date confidence caveat when data < 28 days
+    var dataDays = j.data_days || weightData.length || 0;
+    var caveatEl = document.getElementById('projection-caveat');
+    if (caveatEl && dataDays > 0 && dataDays < 28) {
+      var rateStr = rate ? Math.abs(rate).toFixed(1) + ' lbs/wk' : 'current rate';
+      caveatEl.innerHTML = '<span class="projection-caveat__icon">&#9889;</span> Projection based on <strong>' + dataDays + ' days</strong> \u2014 stabilizes after 4 weeks. Current rate (' + rateStr + ') is early-phase water weight loss, not sustained fat loss.';
+      caveatEl.style.display = '';
+    }
 
     /* ── Weight Trajectory Chart ── */
     /* Show content early so Chart.js can read canvas dimensions */
@@ -1265,6 +1288,13 @@
       }
       headerEl.innerHTML = hdr;
 
+      // PH1: DEXA timeline note
+      var _dexaNext = document.getElementById('p-dexa-next');
+      if (_dexaNext) {
+        var _daysSinceScan = Math.floor((new Date() - latestDate) / 86400000);
+        _dexaNext.textContent = 'Last scan: ' + _daysSinceScan + ' days ago. Next DEXA: 4\u20136 weeks. Delta from baseline will show real composition change.';
+      }
+
       /* Data table */
       var rows = [
         { label: 'Body Fat %', base: bbc.body_fat_pct, cur: lbc.body_fat_pct, unit: '%', bad: true },
@@ -1441,18 +1471,18 @@
     /* ── AI Expert Analysis Card ── */
     var aiEl = document.getElementById('p-ai-analysis');
     if (aiEl) {
-      aiEl.innerHTML = '<div style="font-family:monospace;font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:0.1em">LOADING DR. REYES\'S ASSESSMENT...</div>';
+      aiEl.innerHTML = '<div style="font-family:monospace;font-size:10px;color:var(--text-faint, rgba(255,255,255,0.3));letter-spacing:0.1em">LOADING DR. REYES\'S ASSESSMENT...</div>';
       fetch(API + '/api/ai_analysis?expert=physical').then(function(r) { return r.json(); }).then(function(data) {
         if (!data.analysis) {
           aiEl.innerHTML = '<div style="font-family:var(--font-serif);font-size:13px;color:var(--text-faint)">Analysis generates weekly. Check back Monday.</div>';
           return;
         }
         var date = data.generated_at ? new Date(data.generated_at).toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'}) : '';
-        aiEl.innerHTML = '<div style="border-left:3px solid var(--p-blue);padding:20px 24px;background:rgba(255,255,255,0.02)">' +
+        aiEl.innerHTML = '<div style="border-left:3px solid var(--p-blue);padding:20px 24px;background:var(--surface-raised, rgba(255,255,255,0.02))">' +
           '<div style="font-family:monospace;font-size:11px;color:var(--p-blue);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:12px">Dr. Victor Reyes\'s Assessment</div>' +
-          '<div style="font-family:var(--font-serif);font-size:15px;line-height:1.75;color:rgba(255,255,255,0.82)">' +
+          '<div style="font-family:var(--font-serif);font-size:15px;line-height:1.75;color:var(--text, rgba(255,255,255,0.82))">' +
           data.analysis.split('\n\n').map(function(p) { return '<p style="margin-top:12px">' + p + '</p>'; }).join('') + '</div>' +
-          '<div style="margin-top:16px;font-family:monospace;font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:0.08em">' +
+          '<div style="margin-top:16px;font-family:monospace;font-size:10px;color:var(--text-muted, rgba(255,255,255,0.25));letter-spacing:0.08em">' +
           'Generated ' + date + ' · Based on DEXA, measurements, and weight trajectory</div></div>';
       }).catch(function() {
         aiEl.innerHTML = '<div style="font-family:var(--font-serif);font-size:13px;color:var(--text-faint)">Analysis unavailable.</div>';

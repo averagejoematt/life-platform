@@ -1218,7 +1218,7 @@
 ">
   <span class="experiment-counter" data-format="short" style="color:var(--c-amber-500);font-weight:700;"></span>
   <span style="color:var(--text-muted);"> — Early data. This page gets smarter every week.</span>
-  <a href="/subscribe/" style="color:var(--c-amber-400);text-decoration:none;margin-left:auto;white-space:nowrap;">Follow along →</a>
+  <a href="/subscribe/?from=mind" style="color:var(--c-amber-400);text-decoration:none;margin-left:auto;white-space:nowrap;">Follow along →</a>
 </div>
 
 
@@ -1308,6 +1308,17 @@
 </div>
 
 <div id="obs-thisweek" style="display:none"></div>
+
+<!-- M2: Today's emotional word widget -->
+<div style="max-width:var(--max-width);margin:0 auto;padding:var(--space-6) var(--page-padding);text-align:center;border-bottom:1px solid var(--border)">
+  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--pillar-mind,#a78bfa);margin-bottom:var(--space-3)">One word. How are you feeling?</div>
+  <div id="m-emotional-word" style="font-family:var(--font-display);font-size:clamp(28px,4vw,40px);color:var(--text);min-height:48px" contenteditable="true" spellcheck="false" data-placeholder="type here"></div>
+  <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);margin-top:var(--space-2)">This stays in your browser. Nothing is sent anywhere.</div>
+</div>
+<style>
+  #m-emotional-word:empty::before { content: attr(data-placeholder); color: var(--text-faint); }
+  #m-emotional-word:focus { outline: none; border-bottom: 1px solid var(--pillar-mind, #a78bfa); }
+</style>
 
 <!-- ════════════════════════════════════════════════════════════
      12a: CONFESSIONAL NARRATIVE — vulnerability first
@@ -1402,6 +1413,11 @@
      ════════════════════════════════════════════════════════════ -->
 <section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal">
   <div class="m-section-header">Dr. Conti's Observations</div>
+  <!-- M1: Journaling prompt callout -->
+  <div id="m-journal-prompt" style="display:none;border:1px solid var(--pillar-mind,#a78bfa);border-left:4px solid var(--pillar-mind,#a78bfa);background:linear-gradient(135deg,rgba(167,139,250,0.04),transparent 60%);padding:var(--space-5) var(--space-6);margin-bottom:var(--space-6)">
+    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--pillar-mind,#a78bfa);margin-bottom:var(--space-2)">This week's journaling prompt</div>
+    <div id="m-journal-prompt-text" style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--text);line-height:1.3"></div>
+  </div>
   <div id="m-ai-analysis"></div>
 </section>
 
