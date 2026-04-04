@@ -407,36 +407,31 @@
         }
       }
 
-      // Source 2: Snapshot for journey milestones
-      var snapResp = await fetch('/api/snapshot').catch(function() { return null; });
-      if (snapResp && snapResp.ok) {
-        var snap = await snapResp.json();
-        var journey = (snap.journey || {}).journey || snap.journey || {};
-        if (journey.lost_lbs && journey.lost_lbs > 0) {
+      // Source 2: Pulse history — daily log from April 1 onward
+      var histResp = await fetch('/api/pulse_history').catch(function() { return null; });
+      if (histResp && histResp.ok) {
+        var histData = await histResp.json();
+        var history = (histData.pulse_history || []).reverse(); // most recent first
+        history.forEach(function(day) {
+          if (day.headline === 'No data recorded') return;
+          // Skip today — already covered by live pulse above
+          if (day.date === new Date().toISOString().split('T')[0]) return;
+          var detailParts = [];
+          if (day.hrv_ms) detailParts.push('HRV ' + day.hrv_ms + 'ms');
+          if (day.steps) detailParts.push(day.steps.toLocaleString() + ' steps');
           items.push({
-            domain: 'body',
-            date: new Date().toISOString().split('T')[0],
-            headline: Math.round(journey.lost_lbs) + ' lbs lost from ' + Math.round(journey.start_weight_lbs || 302) + ' lbs',
-            detail: Math.round(journey.progress_pct || 0) + '% to goal \u00B7 Day ' + (journey.days_in || '?'),
+            domain: day.recovery_pct && day.recovery_pct >= 67 ? 'training' : day.sleep_hours ? 'sleep' : 'body',
+            date: day.date,
+            headline: 'Day ' + day.day_number + ' \u2014 ' + day.headline,
+            detail: detailParts.join(' \u00B7 '),
             link: '/live/',
             sparkline: null,
           });
-        }
-        var character = (snap.character || {}).character || {};
-        if (character.level) {
-          items.push({
-            domain: 'story',
-            date: new Date().toISOString().split('T')[0],
-            headline: 'Character Level ' + Math.floor(character.level) + (character.tier ? ' \u2014 ' + character.tier : ''),
-            detail: 'Gamified health score across 7 pillars',
-            link: '/character/',
-            sparkline: null,
-          });
-        }
+        });
       }
 
-      // Governance check: minimum 8 items
-      if (items.length < 5) return; // Not enough content yet
+      // Governance check: minimum items to show section
+      if (items.length < 3) return;
 
       _pulseItems = items;
       _pulseOffset = 0;
