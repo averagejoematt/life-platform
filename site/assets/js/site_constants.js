@@ -34,7 +34,7 @@ window.AMJ = {
     data_sources:   26,
     mcp_tools:      121,
     lambdas:        62,
-    monthly_cost:   '$19',
+    monthly_cost:   '$11\u2013$25',
     review_grade:   'A',
     review_count:   19,
     test_count:     1075,

@@ -128,6 +128,13 @@
 </div>
 
 <div class="snap-body">
+  <!-- DPR-2.12: Week at a Glance (merged from Recap) -->
+  <div id="week-glance" style="display:none;max-width:var(--max-width);margin:0 auto;padding:var(--space-6) var(--page-padding) var(--space-8);border-bottom:1px solid var(--border)">
+    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent);margin-bottom:var(--space-3)">Week at a glance</div>
+    <div id="week-glance-headline" style="font-family:var(--font-display);font-size:var(--text-xl);color:var(--text);margin-bottom:var(--space-4)"></div>
+    <div id="week-glance-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--space-4)"></div>
+  </div>
+
   <!-- Key numbers -->
   <div class="key-nums" id="key-nums" style="display:none"></div>
 
@@ -322,6 +329,26 @@
       var recovery = vitals.recovery_pct;
 
       if (weight || hrv || sleep || recovery) hasData = true;
+
+      // DPR-2.12: Week at a Glance (merged from Recap)
+      if (hasData) {
+        var glance = document.getElementById('week-glance');
+        var glanceHL = document.getElementById('week-glance-headline');
+        var glanceGrid = document.getElementById('week-glance-grid');
+        var lost = journey.lost_lbs || 0;
+        glanceHL.textContent = lost > 0 ? Math.round(lost) + ' lbs down. Day ' + (journey.days_in || '?') + '.' : 'Week ' + currentWeek;
+        var cards = [];
+        if (weight) cards.push({label:'Weight', val:Math.round(weight*10)/10+' lbs', color:'var(--accent)'});
+        if (hrv) cards.push({label:'HRV', val:Math.round(hrv)+'ms', color:'#60a5fa'});
+        if (sleep) cards.push({label:'Sleep', val:sleep.toFixed(1)+'h', color:'#818cf8'});
+        if (recovery) cards.push({label:'Recovery', val:Math.round(recovery)+'%', color:recovery>=67?'var(--accent)':recovery>=34?'var(--c-yellow-status)':'var(--c-red-status)'});
+        glanceGrid.innerHTML = cards.map(function(c){
+          return '<div style="text-align:center;padding:var(--space-4);border:1px solid var(--border);background:var(--surface)">' +
+            '<div style="font-family:var(--font-display);font-size:var(--text-xl);color:'+c.color+'">'+c.val+'</div>' +
+            '<div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:2px">'+c.label+'</div></div>';
+        }).join('');
+        glance.style.display = '';
+      }
 
       // Compute week-over-week deltas from snapshot averages if available
       var prevWeight = (snap && snap.vitals && snap.vitals.prev_weight_lbs) ? snap.vitals.prev_weight_lbs : null;
