@@ -4,17 +4,17 @@
 **Platform version**: v4.5.0+
 **Author**: Product Board (8 personas) + Matthew — compiled from offsite reviews, HOME_EVOLUTION_SPEC.md, and codebase audit
 
-> **Purpose**: This document gives Claude Code everything it needs to implement 6 backlog items without needing to ask Matthew questions. Each item has: what to do, where to do it, acceptance criteria, and gotchas.
+> **Purpose**: This document gives Claude Code everything it needs to implement backlog items without needing to ask Matthew questions. Each item has: what to do, where to do it, acceptance criteria, and gotchas.
 
 ---
 
 ## Table of Contents
 
 1. [DISC-7 — Annotation Testing & Seeding](#disc-7)
-2. [HP-12 — Elena Hero Line Backend Caller](#hp-12)
-3. [HP-13 — Share Card Lambda + Dynamic OG Image](#hp-13)
-4. [BL-01 — For Builders Page](#bl-01)
-5. [BL-02 — Bloodwork/Labs Page](#bl-02)
+2. [HP-12 — Elena Hero Line Backend Caller](#hp-12) ✅ DONE
+3. [HP-13 — Share Card Lambda + Dynamic OG Image](#hp-13) ✅ DONE
+4. [BL-01 — For Builders Page](#bl-01) ✅ DONE
+5. [BL-02 — Bloodwork/Labs Page](#bl-02) ✅ DONE
 6. [get_nutrition — Positional Args Bug](#get-nutrition-bug)
 
 ---
@@ -150,12 +150,18 @@ After seeding, hit `https://averagejoematt.com/discoveries/` and confirm:
 <a name="hp-13"></a>
 ## 3. HP-13 — Share Card Lambda + Dynamic OG Image
 
-### Status
-- **No implementation exists.** This is greenfield.
-- Product Board spec exists in `docs/HOME_EVOLUTION_SPEC.md` (lines 264–280).
-- The home page OG tag currently points to a static `og-image.png`.
+### Status: ✅ ALREADY IMPLEMENTED — REMOVE FROM BACKLOG
 
-### What to Build
+**This item is done.** Two implementations exist:
+1. **Node.js SVG version** (`lambdas/og_image_lambda.mjs`) — deployed via CDK web stack, served through CloudFront OG image origin with 1hr cache.
+2. **Python/Pillow PNG version** (`lambdas/og_image_lambda.py`) — 12 page-specific builders (home, sleep, glucose, training, character, nutrition, mind, labs, chronicle, weekly, experiments, builders). Runs daily at 11:30 AM PT via `og-image-generator` Lambda.
+3. **Fonts** bundled in `lambdas/fonts/` (Bebas Neue, Space Mono).
+4. **OG meta tags** wired on all major pages (glucose, labs, recap, supplements, tools, week).
+5. **Pillow layer** (v1) published. CDK constants defined.
+
+**Minor carry-forward:** `og-image-generator` Lambda was CLI-created, not yet CDK-managed (tracked as R18-F02).
+
+### What to Build (COMPLETED — reference only)
 
 **Architecture Decision: Static S3 file, regenerated daily by the Daily Brief pipeline.**
 
@@ -303,10 +309,21 @@ function shareCard() {
 <a name="bl-01"></a>
 ## 4. BL-01 — For Builders Page
 
-### Status
-- Product Board unanimous #1 backlog pick (Raj, Jordan, Sofia).
-- Section outline in `docs/HOME_EVOLUTION_SPEC.md` (lines 294–316).
-- Detailed review produced 10 recommendations (Decision 34 from offsite Part 4).
+### Status: ✅ ALREADY IMPLEMENTED — REMOVE FROM BACKLOG
+
+**This item is done.** `site/builders/index.html` (704 lines) is live in production with 8 sections:
+- Section 00 — Meta-Story ("Who Built This")
+- Section 00b — The Partnership ("Claude wrote vs. Matt defined")
+- Section 01 — Audience ("Who This Is For")
+- Section 02 — Architecture Decisions (8 decision cards)
+- Section 03 — The Stack (Python 3.12, CDK, DynamoDB, etc.)
+- Section 04 — Lessons Learned (6 patterns with code examples)
+- Section 07 — Start Building ("Your First Weekend" 3-step MVP)
+- Section 08 — Why the Repo Is Private
+
+Nav integrated via `site/assets/js/nav.js`. Dynamic stats via `data-const` attributes from `site_constants.js`. Confirmed live in handover v4.7.1.
+
+**Original spec below retained for reference only.**
 - A separate `FN-01_FIRST_PERSON_BUILD.md` spec was created for a related "First Person" blog page — that is a different page, not this one.
 - No implementation exists. `/builders/` returns 404.
 
@@ -417,11 +434,15 @@ aws cloudfront create-invalidation --distribution-id E3S424OXQZ8NBE --paths "/bu
 <a name="bl-02"></a>
 ## 5. BL-02 — Bloodwork/Labs Page
 
-### Status
-- Board priority: P2, highest for credibility (Lena Johansson).
-- Data infrastructure exists: `get_labs` and `search_biomarker` MCP tools in `mcp/tools_labs.py`, plus `mcp/labs_helpers.py`.
-- DynamoDB has lab data: 107 biomarkers from 2 Function Health draws seeded in a prior session.
-- No page exists. No API endpoint for the public site.
+### Status: ✅ ALREADY IMPLEMENTED — REMOVE FROM BACKLOG
+
+**This item is done.** Frontend and backend are both complete:
+1. **Frontend** (`site/labs/index.html`) — hero stats, accordion biomarker categories (74 biomarkers, 18 categories), flagged values section, "What I'm Doing About It" action cards, AI expert analysis, staleness warning.
+2. **API** (`/api/labs` in `site_api_lambda.py:6222`) — reads `dashboard/{user}/clinical.json` from S3, returns lab biomarkers with 1hr cache.
+3. **Data pipeline** (`output_writers.py:write_clinical_json`) — generates `clinical.json` daily at 11 AM via daily brief Lambda.
+4. **IAM fix** (v5.1.0) — added `dashboard/*` S3 read to site-api role (was causing 503).
+
+**Original spec below retained for reference only.**
 - Product Board spec in `docs/HOME_EVOLUTION_SPEC.md` (lines 313–330).
 
 ### What to Build
