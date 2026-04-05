@@ -54,6 +54,12 @@
   - Shows delta with Henning Brandt confidence label when N<30
 - Falls back gracefully with insufficient data messages
 
+### Sleep AI Expert Analyzer — FIXED POST-SPRINT
+- `sleep` expert was missing from `ai_expert_analyzer_lambda.py` EXPERTS list
+- Added `gather_data_for_expert("sleep")` branch (reads Whoop + Eight Sleep data)
+- Added Dr. Lisa Park persona (sleep & circadian specialist)
+- Generated initial analysis (1503 chars). Dr. Park's card on sleep page now renders content.
+
 ### PB-08: Intelligence Page Rebuild — NOT STARTED (per plan)
 - Gated on SIMP-1 Phase 2 (~April 13)
 
@@ -66,6 +72,7 @@
 | `cdk/stacks/email_stack.py` | Added weekly-signal Lambda (PB-06) |
 | `cdk/stacks/role_policies.py` | Added `email_weekly_signal()` IAM policy |
 | `lambdas/weekly_signal_lambda.py` | NEW — Weekly Signal subscriber email |
+| `lambdas/ai_expert_analyzer_lambda.py` | Added sleep expert (data gather + persona) |
 | `lambdas/site_api_lambda.py` | Added `sleep` to AI analysis whitelist; added `sleep_start` to sleep trend |
 | `site/sleep/index.html` | AI expert card + data-driven protocol adherence |
 | `site/assets/js/components.js` | Added `sleep` + `glucose` to EXPERTS config |
@@ -96,7 +103,7 @@
 - **DPR-1 Phase 3** — not yet scoped
 - **PRE-13 Data Publication Review** — deferred
 - **PB-08 Intelligence Page Rebuild** — gated on SIMP-1 Phase 2 (~April 13)
-- **Sleep AI analysis** — expert analysis will be null until the AI expert analyzer generates content for the `sleep` key
+- **~~Sleep AI analysis~~** — FIXED. Added sleep expert to ai_expert_analyzer_lambda.py, generated initial content.
 
 ## Current System State
 
