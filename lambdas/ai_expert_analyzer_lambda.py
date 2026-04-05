@@ -36,7 +36,7 @@ CACHE_PK = f"{USER_PREFIX}ai_analysis"
 AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
 AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
 
-EXPERTS = ["mind", "nutrition", "training", "physical", "explorer", "glucose", "labs"]
+EXPERTS = ["mind", "nutrition", "training", "physical", "explorer", "glucose", "labs", "sleep"]
 
 dynamodb = boto3.resource("dynamodb", region_name="us-west-2")
 table = dynamodb.Table(TABLE_NAME)
@@ -269,6 +269,26 @@ def gather_data_for_expert(expert_key):
             "flagged_count": len(flagged),
         }
 
+    elif expert_key == "sleep":
+        whoop_items = _query_source("whoop", d30, today)
+        eight_items = _query_source("eightsleep", d30, today)
+        sleep_hours = [float(w["sleep_duration_hours"]) for w in whoop_items if w.get("sleep_duration_hours")]
+        recovery_vals = [float(w["recovery_score"]) for w in whoop_items if w.get("recovery_score")]
+        hrv_vals = [float(w["hrv"]) for w in whoop_items if w.get("hrv")]
+        score_vals = [float(e["sleep_score"]) for e in eight_items if e.get("sleep_score")]
+        deep_pcts = [float(e["deep_pct"]) for e in eight_items if e.get("deep_pct")]
+        avg = lambda lst: round(sum(lst) / len(lst), 1) if lst else None
+        return {
+            "expert_key": "sleep",
+            "period": f"experiment days 1-{days_in_experiment}",
+            "nights_tracked": len(whoop_items),
+            "avg_sleep_hours": avg(sleep_hours),
+            "avg_sleep_score": avg(score_vals),
+            "avg_recovery": avg(recovery_vals),
+            "avg_hrv": avg(hrv_vals),
+            "avg_deep_pct": avg(deep_pcts),
+        }
+
     return {"expert_key": expert_key, "note": "Unknown expert"}
 
 
@@ -308,6 +328,12 @@ EXPERT_PERSONAS = {
         "title": "Clinical pathologist specializing in preventive lab interpretation",
         "style": "clinical but accessible, connects lab values to lifestyle context, identifies actionable patterns",
         "focus": "flagged biomarkers in context of current nutrition, training, and supplement protocols — what the numbers mean and what to do about them",
+    },
+    "sleep": {
+        "name": "Dr. Lisa Park",
+        "title": "Sleep and circadian rhythm specialist",
+        "style": "warm but evidence-based, connects sleep architecture to next-day performance, attentive to consistency patterns",
+        "focus": "sleep duration and efficiency trends, deep sleep adequacy, HRV recovery correlation, sleep onset consistency, bed temperature optimization, and how sleep quality cascades into every other domain",
     },
     "glucose": {
         "name": "Dr. Rhonda Patrick",
