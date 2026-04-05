@@ -32,10 +32,12 @@
       });
       body.style.overflow = 'hidden';
       body.style.position = 'fixed';
+      body.style.width = '100%';
       body.style.top = '-' + savedScrollY + 'px';
       body.style.left = '0';
       body.style.right = '0';
       html.style.overflow = 'hidden';
+      html.style.touchAction = 'none';
       document.addEventListener('touchmove', blockBackgroundTouch, { passive: false });
     }
   }
@@ -44,10 +46,12 @@
       overlay.classList.remove('is-open');
       body.style.overflow = '';
       body.style.position = '';
+      body.style.width = '';
       body.style.top = '';
       body.style.left = '';
       body.style.right = '';
       html.style.overflow = '';
+      html.style.touchAction = '';
       document.removeEventListener('touchmove', blockBackgroundTouch);
       window.scrollTo(0, savedScrollY);
       setTimeout(function() {
