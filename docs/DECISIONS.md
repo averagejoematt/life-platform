@@ -2,7 +2,7 @@
 
 > Permanent log of significant architectural, design, and operational decisions.
 > Each ADR captures the decision, context, alternatives considered, and outcome.
-> Last updated: 2026-03-29 (v4.4.0)
+> Last updated: 2026-04-05 (v5.0.0)
 
 ---
 
@@ -957,3 +957,25 @@ Supporting files: `data_sources.json` (source registry), `lint_site_content.py` 
 - **Partial consolidation (target ~100):** Merge only the largest modules. Moderate effort for moderate reduction. Still doesn't hit 80.
 
 **Outcome:** Finding R17-F13/R18-F07/R19-F05 is formally closed. Tool count is accepted as a product-breadth indicator, not a deficiency. Monitor for selection accuracy degradation.
+
+---
+
+### ADR-046 — S3 Prefix Separation: Static vs Generated Content
+
+**Status:** Active
+**Date:** 2026-04-05 (v5.0.0)
+
+**Context:** Lambda-generated files (public_stats.json, character_stats.json, OG images, journal posts) were stored in the same S3 prefix (`site/`) as static HTML/CSS/JS files. When site deploys used `aws s3 sync --delete`, Lambda-generated files were deleted because they don't exist in the local `site/` directory. This broke the live site multiple times — home page gauges went blank, character page showed level 0, supplement data disappeared. A manual exclusion list in `safe_sync.sh` was added as mitigation but failed 3 times (missed files each time).
+
+**Decision:** Move all Lambda-generated files to a new `generated/` S3 prefix. Add a CloudFront origin (`S3GeneratedOrigin`) pointing at `/generated`. Route generated-file URL patterns to the new origin via 6 cache behaviors. Public URLs remain unchanged.
+
+**Reasoning:**
+1. **Structural impossibility of collision.** `aws s3 sync site/ --delete` physically cannot touch `generated/*` because the prefixes are disjoint. No exclusion list needed.
+2. **Same S3 bucket, zero cost increase.** Different prefix, not a different bucket.
+3. **Same public URLs.** CloudFront cache behaviors route `/public_stats.json`, `/data/character_stats.json`, `/assets/images/og-*`, `/journal/posts/*` to the `generated/` origin transparently.
+4. **Bucket policy protection.** `generated/*` added to the Deny DeleteObject statement for the deploy user, as defense-in-depth.
+5. **Different cache policies.** Generated content can have shorter TTLs (5 min for stats) while static content keeps the 1-hour default.
+
+**Files changed:** `site_writer.py`, `output_writers.py`, `site_stats_refresh_lambda.py`, `og_image_lambda.py`, `wednesday_chronicle_lambda.py`, `chronicle_approve_lambda.py`, `site_api_lambda.py` (S3 key constants), `web_stack.py` (CloudFront origin + behaviors), `role_policies.py` (IAM), `bucket_policy.json`.
+
+**Outcome:** Site deploys are now safe by design, not by exclusion list. The `safe_sync.sh` exclusion list was simplified to only `config/*` (manually-uploaded config files that still live under `site/`).
