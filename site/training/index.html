@@ -1988,8 +1988,8 @@
 <script src="/assets/js/engagement.js"></script>
 <script>
   initObservatoryWeek('training', 'obs-thisweek');
-  fetch('/api/observatory_week?domain=training').then(r=>r.json()).then(d=>{
-    if(d.last_updated) initObsFreshness(d.last_updated);
+  fetch('/api/observatory_week?domain=training').then(r=>r.ok?r.json():null).then(d=>{
+    if(d&&d.last_updated) initObsFreshness(d.last_updated);
   }).catch(function(){});
 </script>
 <script src="/assets/js/reveal.js"></script>
@@ -2384,7 +2384,8 @@
 
     /* ── Weekly physical volume ── */
     (function loadWeekly() {
-      fetch(API + '/api/weekly_physical_summary').then(function(r) { return r.json(); }).then(function(wd) {
+      fetch(API + '/api/weekly_physical_summary').then(function(r) { return r.ok ? r.json() : null; }).then(function(wd) {
+        if (!wd) return;
         var days = wd.days || [];
         var weekGrid = document.getElementById('t-weekly-days');
         if (!weekGrid || !days.length) return;
@@ -2404,7 +2405,8 @@
 
     /* ── Strength deep-dive (Phase 2) ── */
     (function() {
-      fetch(API + '/api/strength_deep_dive').then(function(r) { return r.json(); }).then(function(sd) {
+      fetch(API + '/api/strength_deep_dive').then(function(r) { return r.ok ? r.json() : null; }).then(function(sd) {
+        if (!sd) return;
         var s = sd.strength;
         if (!s || !s.sessions_30d) return;
         var section = document.getElementById('t-strength-dive');
@@ -2755,7 +2757,8 @@
 
       // Auto-populate GPS routes from Strava activities with polylines
       if (data.modality_breakdown) {
-        fetch('/api/training_overview').then(function(r) { return r.json(); }).then(function(td) {
+        fetch('/api/training_overview').then(function(r) { return r.ok ? r.json() : null; }).then(function(td) {
+          if (!td) return;
           var routes = (td.recent_routes || []).slice(0, 6);
           if (!routes.length) return;
           var grid = document.getElementById('t-routes-grid');

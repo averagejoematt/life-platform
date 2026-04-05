@@ -2398,8 +2398,9 @@ function buildBadgeCompact() {
 
 /* ── INIT ──────────────────────────────────────────────────── */
 fetch('../data/character_stats.json')
-  .then(r => r.json())
+  .then(r => r.ok ? r.json() : null)
   .then(data => {
+    if (!data) throw new Error('Failed to load character stats');
     hydrate(data);
     renderRadar(data.pillars || DEFAULTS.pillars);
     if (data.pillar_history && data.pillar_history.length) {

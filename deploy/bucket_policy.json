@@ -38,7 +38,9 @@
         "arn:aws:s3:::matthew-life-platform/deploys/*",
         "arn:aws:s3:::matthew-life-platform/cloudtrail/*",
         "arn:aws:s3:::matthew-life-platform/imports/*",
-        "arn:aws:s3:::matthew-life-platform/generated/*"
+        "arn:aws:s3:::matthew-life-platform/generated/*",
+        "arn:aws:s3:::matthew-life-platform/buddy/*",
+        "arn:aws:s3:::matthew-life-platform/blog/*"
       ]
     }
   ]

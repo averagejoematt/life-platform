@@ -138,7 +138,7 @@ class EmailStack(Stack):
             function_name="subscriber-onboarding",
             source_file="lambdas/subscriber_onboarding_lambda.py",
             handler="subscriber_onboarding_lambda.lambda_handler",
-            schedule="cron(0 17 * * ? *)",  # 10 AM PT daily
+            schedule="cron(5 17 * * ? *)",  # 10:05 AM PT daily (staggered from daily-brief)
             timeout_seconds=120, memory_mb=256,
             environment=_email_env,
             custom_policies=rp.subscriber_onboarding(), **shared)

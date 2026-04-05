@@ -809,7 +809,6 @@
     // ── Data spread: Weight ──
     if (wLbs && wLbs > 0) {
       setText('h-spread-weight', Math.round(wLbs));
-      var startWeight = 307;
       var lostLbs = startWeight - wLbs;
       if (lostLbs > 0) {
         setText('h-spread-weight-delta', '\u25bc ' + lostLbs.toFixed(1) + ' lbs from start');

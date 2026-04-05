@@ -559,7 +559,8 @@
   </div>
 </section>
 <script>
-  fetch('/api/ai_analysis?expert=explorer').then(function(r){return r.json();}).then(function(d){
+  fetch('/api/ai_analysis?expert=explorer').then(function(r){return r.ok?r.json():null;}).then(function(d){
+    if(!d) return;
     if(d.analysis){
       document.getElementById('narrative-anchor').style.display='';
       document.getElementById('narrative-anchor-text').innerHTML=d.analysis.split('\n\n').map(function(p){return '<p style="margin-top:12px">'+p+'</p>';}).join('');

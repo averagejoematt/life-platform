@@ -272,12 +272,12 @@
   }
   if (action === 'confirm' && token) {
     fetch('/api/subscribe?action=confirm&token=' + encodeURIComponent(token))
-      .then(r => r.json()).then(() => { window.location.search = '?action=confirmed'; })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(() => { window.location.search = '?action=confirmed'; })
       .catch(() => { document.getElementById('form-status').textContent = 'Confirmation failed — try the link again.'; });
   }
   if (action === 'unsubscribe' && token) {
     fetch('/api/subscribe?action=unsubscribe&token=' + encodeURIComponent(token))
-      .then(r => r.json()).then(() => { window.location.search = '?action=unsubscribed'; })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(() => { window.location.search = '?action=unsubscribed'; })
       .catch(() => { document.getElementById('form-status').textContent = 'Error — try again.'; });
   }
 
