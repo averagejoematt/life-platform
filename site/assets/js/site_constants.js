@@ -64,38 +64,6 @@ window.AMJ = {
     methodology: 'Pearson r, Benjamini-Hochberg FDR, 26 data sources. The statistical framework behind the experiment.',
   },
 
-  // ── Reading paths (nav.js consumes these) ──────────────────
-  reading_paths: {
-    '/story/':             { href: '/live/',            title: 'See Today\'s Data →',      sub: 'What the sensors say right now' },
-    '/about/':             { href: '/story/',           title: 'The Story →',              sub: 'Read the full transformation narrative' },
-    '/live/':              { href: '/character/',       title: 'The Score →',              sub: 'How it all adds up' },
-    '/character/':         { href: '/habits/',          title: 'The Habits →',             sub: 'The inputs that drive the score' },
-    '/habits/':            { href: '/experiments/',     title: 'Experiments →',            sub: 'What\'s being actively tested' },
-    '/accountability/':    { href: '/methodology/',     title: 'The Methodology →',        sub: 'How the science works' },
-    '/protocols/':         { href: '/live/',            title: 'The Results →',            sub: 'What these protocols produced' },
-    '/experiments/':       { href: '/discoveries/',     title: 'Discoveries →',            sub: 'What the data proved' },
-    '/discoveries/':       { href: '/intelligence/',    title: 'The Intelligence Layer →', sub: 'How the AI finds these patterns' },
-    '/sleep/':             { href: '/glucose/',         title: 'Glucose Data →',           sub: '30-day CGM time-in-range' },
-    '/glucose/':           { href: '/benchmarks/',      title: 'Benchmarks →',             sub: 'How Matthew compares to population norms' },
-    '/benchmarks/':        { href: '/subscribe/',       title: 'Get Weekly Updates →',     sub: 'New data every week' },
-    '/supplements/':       { href: '/protocols/',       title: 'All Protocols →',          sub: 'Sleep, training, nutrition, supplements' },
-    '/platform/':          { href: '/cost/',            title: 'The Real Cost →',          sub: 'Running a full health OS for $19/month' },
-    '/cost/':              { href: '/methodology/',     title: 'The Methodology →',        sub: 'How the science works' },
-    '/methodology/':       { href: '/intelligence/',    title: 'The Intelligence Layer →', sub: 'What the AI actually does' },
-    '/intelligence/':      { href: '/discoveries/',     title: 'Discoveries →',            sub: 'What the data revealed' },
-    '/board/':             { href: '/board/technical/', title: 'Technical Board →',        sub: '12 personas keeping the architecture honest' },
-    '/board/technical/':   { href: '/board/product/',   title: 'Product Board →',          sub: '8 personas shaping what this site becomes' },
-    '/board/product/':     { href: '/platform/',        title: 'How This Works →',         sub: 'The full platform architecture' },
-    '/data/':              { href: '/methodology/',     title: 'The Methodology →',        sub: 'How the data is processed' },
-    '/tools/':             { href: '/ask/',             title: 'Ask the Data →',           sub: 'Query 26 sources of live data' },
-    '/week/':              { href: '/subscribe/',       title: 'Get This Weekly →',        sub: 'Every week, in your inbox' },
-    '/chronicle/':         { href: '/chronicle/archive/', title: 'All Entries →',          sub: 'The full chronicle archive' },
-    '/chronicle/archive/': { href: '/subscribe/',       title: 'Get the Weekly Brief →',   sub: 'Delivered every week' },
-    '/ask/':               { href: '/platform/',        title: 'How This Works →',         sub: 'The platform behind the AI' },
-    '/explorer/':          { href: '/discoveries/',     title: 'Validated Discoveries →',  sub: 'Correlations that survived scrutiny' },
-    '/weekly/':            { href: '/explorer/',        title: 'Explore the Data →',       sub: 'Pick any two metrics and discover correlations' },
-    '/achievements/':      { href: '/character/',       title: 'The Character Sheet →',    sub: 'How it all adds up into one score' },
-  },
 };
 
 // ── Auto-inject constants into data-const elements ───────────
@@ -117,8 +85,9 @@ window.AMJ = {
 
   // Then hydrate from API — overrides stale defaults
   fetch('/api/platform_stats')
-    .then(function(r) { return r.json(); })
+    .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(stats) {
+      if (!stats) return;
       // Merge API stats into window.AMJ.platform
       Object.keys(stats).forEach(function(k) {
         if (stats[k] !== null && stats[k] !== undefined) {

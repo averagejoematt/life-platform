@@ -82,7 +82,7 @@ class McpStack(Stack):
             function_name=WARMER_FUNCTION_NAME,
             source_file="mcp_server.py",
             handler="mcp_server.lambda_handler",
-            schedule="cron(0 17 * * ? *)",  # 10:00 AM PT daily
+            schedule="cron(10 17 * * ? *)",  # 10:10 AM PT daily (staggered from daily-brief)
             timeout_seconds=300,
             memory_mb=768,  # R5: matched to MCP server power-tuned value
             alarm_name="mcp-warmer-error",

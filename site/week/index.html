@@ -414,13 +414,13 @@ async function loadWeek() {
 
   try {
     const [_vResult, _jResult] = await Promise.allSettled([
-      fetch(`${API}/api/vitals`).then(r => r.json()),
-      fetch(`${API}/api/journey`).then(r => r.json()),
+      fetch(`${API}/api/vitals`).then(r => r.ok ? r.json() : null),
+      fetch(`${API}/api/journey`).then(r => r.ok ? r.json() : null),
     ]);
-    const vData = _vResult.status === 'fulfilled' ? _vResult.value : {};
-    const jData = _jResult.status === 'fulfilled' ? _jResult.value : {};
-    const v = vData.vitals;
-    const j = jData.journey;
+    const vData = _vResult.status === 'fulfilled' && _vResult.value ? _vResult.value : {};
+    const jData = _jResult.status === 'fulfilled' && _jResult.value ? _jResult.value : {};
+    const v = vData.vitals || {};
+    const j = jData.journey || {};
 
     // Vitals
     document.getElementById('wk-weight').innerHTML = (v.weight_lbs ? v.weight_lbs.toFixed(1) : '—') + '<span class="stat-cell__unit">lbs</span>';
@@ -465,6 +465,7 @@ async function loadWeek() {
   // Pillar scores
   try {
     const cRes = await fetch(`${API}/api/character`);
+    if (!cRes.ok) throw new Error('API error ' + cRes.status);
     const cData = await cRes.json();
     const pillars = cData.pillars || [];
 
@@ -488,6 +489,7 @@ async function loadWeek() {
   // Best discovery
   try {
     const corRes = await fetch(`${API}/api/correlations`);
+    if (!corRes.ok) throw new Error('API error ' + corRes.status);
     const corData = await corRes.json();
     const top = (corData.correlations.pairs || [])[0];
     if (top) {

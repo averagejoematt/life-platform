@@ -2318,8 +2318,8 @@
 <script src="/assets/js/engagement.js"></script>
 <script>
   initObservatoryWeek('nutrition', 'obs-thisweek');
-  fetch('/api/observatory_week?domain=nutrition').then(r=>r.json()).then(d=>{
-    if(d.last_updated) initObsFreshness(d.last_updated);
+  fetch('/api/observatory_week?domain=nutrition').then(r=>r.ok?r.json():null).then(d=>{
+    if(d&&d.last_updated) initObsFreshness(d.last_updated);
   }).catch(function(){});
 </script>
 <script src="/assets/js/reveal.js"></script>
@@ -2548,7 +2548,8 @@
 
     /* ── Recent Meals Gallery ── */
     (function() {
-      fetch('/api/frequent_meals').then(function(r) { return r.json(); }).then(function(md) {
+      fetch('/api/frequent_meals').then(function(r) { return r.ok ? r.json() : null; }).then(function(md) {
+        if (!md) return;
         var meals = md.meals || [];
         var gallery = document.getElementById('n-recent-meals');
         if (!gallery || !meals.length) return;
@@ -2601,7 +2602,8 @@
 
     /* ── Food delivery analysis (Phase 2) ── */
     (function() {
-      fetch(API + '/api/food_delivery_overview').then(function(r) { return r.json(); }).then(function(fd) {
+      fetch(API + '/api/food_delivery_overview').then(function(r) { return r.ok ? r.json() : null; }).then(function(fd) {
+        if (!fd) return;
         var d = fd.food_delivery;
         if (!d || !d.orders_30d) return;
         var section = document.getElementById('n-delivery-section');

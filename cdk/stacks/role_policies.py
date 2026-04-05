@@ -705,7 +705,7 @@ def email_chronicle_approve() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="S3Write",
             actions=["s3:PutObject"],
-            resources=_s3("blog/*", "site/journal/*"),
+            resources=_s3("blog/*", "site/journal/*", "generated/journal/*"),
         ),
         iam.PolicyStatement(
             sid="CloudFrontInvalidate",
@@ -827,7 +827,7 @@ def operational_canary() -> list[iam.PolicyStatement]:
             sid="SESAlert",
             # Canary sends an SES alert email when checks fail
             actions=["ses:SendEmail"],
-            resources=["*"],
+            resources=[SES_IDENTITY],
         ),
     ]
 
@@ -964,17 +964,17 @@ def operational_og_image_generator() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="S3Read",
             actions=["s3:GetObject"],
-            resources=_s3("site/data/*"),
+            resources=_s3("generated/public_stats.json"),
         ),
         iam.PolicyStatement(
             sid="S3Write",
             actions=["s3:PutObject"],
-            resources=_s3("site/assets/images/*"),
+            resources=_s3("generated/assets/images/*"),
         ),
         iam.PolicyStatement(
             sid="CloudFrontInvalidation",
             actions=["cloudfront:CreateInvalidation"],
-            resources=["*"],
+            resources=[CF_DIST_ARN],
         ),
     ]
 
@@ -995,12 +995,12 @@ def operational_site_stats_refresh() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="S3Read",
             actions=["s3:GetObject"],
-            resources=_s3("site/*"),
+            resources=_s3("site/*", "generated/public_stats.json"),
         ),
         iam.PolicyStatement(
             sid="S3Write",
             actions=["s3:PutObject"],
-            resources=_s3("site/*"),
+            resources=_s3("site/*", "generated/public_stats.json"),
         ),
         iam.PolicyStatement(
             sid="InvokeIngestionLambdas",
@@ -1304,7 +1304,7 @@ def subscriber_onboarding() -> list[iam.PolicyStatement]:
     return [
         iam.PolicyStatement(sid="DynamoDB", actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:UpdateItem"], resources=[TABLE_ARN]),
         iam.PolicyStatement(sid="KMS", actions=["kms:Decrypt", "kms:GenerateDataKey"], resources=[KMS_KEY_ARN]),
-        iam.PolicyStatement(sid="SES", actions=["ses:SendEmail", "ses:SendRawEmail"], resources=["*"]),
+        iam.PolicyStatement(sid="SES", actions=["ses:SendEmail", "ses:SendRawEmail"], resources=[SES_IDENTITY]),
         iam.PolicyStatement(sid="SecretsRead", actions=["secretsmanager:GetSecretValue"], resources=[f"arn:aws:secretsmanager:{REGION}:{ACCT}:secret:life-platform/ai-keys*"]),
     ]
 

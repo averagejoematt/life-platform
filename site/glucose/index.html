@@ -1575,8 +1575,8 @@
 <script src="/assets/js/engagement.js"></script>
 <script>
   initObservatoryWeek('glucose', 'obs-thisweek');
-  fetch('/api/observatory_week?domain=glucose').then(r=>r.json()).then(d=>{
-    if(d.last_updated) initObsFreshness(d.last_updated);
+  fetch('/api/observatory_week?domain=glucose').then(r=>r.ok?r.json():null).then(d=>{
+    if(d&&d.last_updated) initObsFreshness(d.last_updated);
   }).catch(function(){});
 </script>
 <script src="/assets/js/reveal.js"></script>

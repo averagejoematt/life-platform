@@ -1827,8 +1827,8 @@
 <script src="/assets/js/engagement.js"></script>
 <script>
   initObservatoryWeek('mind', 'obs-thisweek');
-  fetch('/api/observatory_week?domain=mind').then(r=>r.json()).then(d=>{
-    if(d.last_updated) initObsFreshness(d.last_updated);
+  fetch('/api/observatory_week?domain=mind').then(r=>r.ok?r.json():null).then(d=>{
+    if(d&&d.last_updated) initObsFreshness(d.last_updated);
   }).catch(function(){});
 </script>
 <script src="/assets/js/reveal.js"></script>
@@ -2160,7 +2160,8 @@
         other:           'rgba(255,255,255,0.15)'
       };
 
-      fetch(API + '/api/journal_analysis').then(function(r) { return r.json(); }).then(function(jData) {
+      fetch(API + '/api/journal_analysis').then(function(r) { return r.ok ? r.json() : null; }).then(function(jData) {
+        if (!jData) return;
         var dailyThemes = jData.daily_themes || [];
         var topThemes = jData.top_themes || [];
         var sentimentTrend = jData.sentiment_trend || [];
