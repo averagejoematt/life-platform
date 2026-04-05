@@ -37,9 +37,10 @@ from decimal import Decimal
 logger = logging.getLogger(__name__)
 
 S3_BUCKET = "matthew-life-platform"
-PUBLIC_STATS_KEY = "site/public_stats.json"
-CHARACTER_STATS_KEY = "site/data/character_stats.json"
-PULSE_KEY = "site/pulse.json"
+# ADR-046: generated/ prefix isolates Lambda-written files from site deploy --delete
+PUBLIC_STATS_KEY = "generated/public_stats.json"
+CHARACTER_STATS_KEY = "generated/data/character_stats.json"
+PULSE_KEY = "generated/pulse.json"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # BS-02: Hero narrative copy (finalised v3.7.67)

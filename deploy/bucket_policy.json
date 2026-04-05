@@ -16,6 +16,13 @@
       "Resource": "arn:aws:s3:::matthew-life-platform/blog/*"
     },
     {
+      "Sid": "PublicReadGenerated",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::matthew-life-platform/generated/*"
+    },
+    {
       "Sid": "ProtectDataFromDeployScripts",
       "Effect": "Deny",
       "Principal": {
@@ -30,7 +37,8 @@
         "arn:aws:s3:::matthew-life-platform/exports/*",
         "arn:aws:s3:::matthew-life-platform/deploys/*",
         "arn:aws:s3:::matthew-life-platform/cloudtrail/*",
-        "arn:aws:s3:::matthew-life-platform/imports/*"
+        "arn:aws:s3:::matthew-life-platform/imports/*",
+        "arn:aws:s3:::matthew-life-platform/generated/*"
       ]
     }
   ]

@@ -1049,15 +1049,15 @@ def build_email_html(title, stats_line, body_html, week_num, date_str, blog_url)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # JOURNAL PUBLISHER (averagejoematt.com/journal/) — Signal aesthetic
-# Writes to site/journal/posts/week-{nn}/index.html + site/journal/posts.json
+# Writes to generated/journal/posts/week-{nn}/index.html + generated/journal/posts.json
 # ══════════════════════════════════════════════════════════════════════════════
 
 def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_installments, write_to_s3=True):
     """Publish installment to the Signal-themed journal on averagejoematt.com.
 
     Writes:
-      site/journal/posts/week-{nn}/index.html  — the post itself
-      site/journal/posts.json                   — manifest for the listing page
+      generated/journal/posts/week-{nn}/index.html  — the post itself
+      generated/journal/posts.json                   — manifest for the listing page
 
     Non-fatal: failure here never breaks the Chronicle email.
 
@@ -1202,7 +1202,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     logger.info(f"[journal] Post written: {post_key}")
 
     s3.put_object(
-        Bucket=S3_BUCKET, Key="site/journal/posts.json",
+        Bucket=S3_BUCKET, Key="generated/journal/posts.json",
         Body=posts_json_str.encode("utf-8"),
         ContentType="application/json",
         CacheControl="max-age=300",
