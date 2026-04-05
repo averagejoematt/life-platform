@@ -685,6 +685,43 @@ def email_chronicle_sender() -> list[iam.PolicyStatement]:
         ),
     ]
 
+def email_weekly_signal() -> list[iam.PolicyStatement]:
+    """Weekly Signal subscriber email (PB-06): reads DDB (insights + subscribers),
+    S3 (generated/public_stats.json, generated/journal/posts.json), KMS, SES send, DLQ.
+    No ai-keys — reads pre-computed data only.
+    """
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="S3Read",
+            actions=["s3:GetObject"],
+            resources=[
+                f"{BUCKET_ARN}/generated/public_stats.json",
+                f"{BUCKET_ARN}/generated/journal/*",
+            ],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="SES",
+            actions=["ses:SendEmail", "sesv2:SendEmail"],
+            resources=[SES_IDENTITY],
+        ),
+        iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ),
+    ]
+
+
 def email_chronicle_approve() -> list[iam.PolicyStatement]:
     """Chronicle approve Lambda (FEAT-12): reads + updates DDB draft, writes pre-built
     artifacts to S3, creates CloudFront invalidation, invokes chronicle-email-sender.

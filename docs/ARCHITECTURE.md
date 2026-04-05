@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-04-04 (v4.9.0 — 115 MCP tools, 35-module MCP package, 26 data sources, 62 Lambdas, 72 site pages, 70+ API endpoints, 8 CDK stacks, shared layer v26)
+Last updated: 2026-04-05 (v5.2.0 — 115 MCP tools, 35-module MCP package, 26 data sources, 63 Lambdas, 72 site pages, 70+ API endpoints, 8 CDK stacks, shared layer v26)
 
 ---
 
@@ -80,7 +80,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | ACM Certificate | TLS | `arn:aws:acm:us-east-1:205930651321:certificate/e85e4b63-...` — `averagejoematt.com` (DNS-validated) |
 | SES Receipt Rule Set | Inbound email routing | `life-platform-inbound` (active) — rule `insight-capture` routes `insight@aws.mattsusername.com` → S3 |
 | CloudWatch | Alarms + logs | **~66 metric alarms**, all Lambdas monitored |
-| CDK | Infrastructure as Code | `cdk/` — 8 stacks deployed. CDK owns all 62 Lambda IAM roles + ~50 EventBridge rules. |
+| CDK | Infrastructure as Code | `cdk/` — 8 stacks deployed. CDK owns all 63 Lambda IAM roles + ~50 EventBridge rules. |
 | CloudTrail | Audit logging | `life-platform-trail` → S3 |
 | AWS Budget | Cost guardrail | $20/mo cap, alerts at 25%/50%/100% |
 
@@ -135,6 +135,7 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 | Monthly Digest | `monthly-digest` | `cron(0 16 ? * 1#1 *)` | 1st Mon 9:00 AM |
 | Hypothesis Engine (IC-18) | `hypothesis-engine` | `cron(0 19 ? * SUN *)` | Sun 12:00 PM |
 | Weekly Correlation Compute | `weekly-correlation-compute` | `cron(30 18 ? * SUN *)` | Sun 11:30 AM |
+| Weekly Signal (PB-06) | `weekly-signal` | `cron(30 16 ? * SUN *)` | Sun 09:30 AM |
 
 ### File-triggered ingestion (S3 → Lambda)
 

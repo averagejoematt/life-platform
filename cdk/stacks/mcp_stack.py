@@ -44,6 +44,21 @@ class McpStack(Stack):
         local_bucket       = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
 
+        # ── MCP code asset ────────────────────────────────────────────────────
+        # MCP Lambda lives at repo root (mcp_server.py + mcp/ package), not
+        # in lambdas/. Stage just those files so CDK packages the correct code.
+        # Without this, cdk deploy bundles the lambdas/ directory which doesn't
+        # contain mcp_server or mcp/.
+        import shutil, os
+        _stage = os.path.join(os.path.dirname(__file__), "..", "_mcp_staging")
+        if os.path.exists(_stage):
+            shutil.rmtree(_stage)
+        os.makedirs(_stage)
+        shutil.copy2("../mcp_server.py", _stage)
+        shutil.copytree("../mcp", os.path.join(_stage, "mcp"),
+                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        mcp_code = _lambda.Code.from_asset(_stage)
+
         # ── MCP Server Lambda (request-serving) ───────────────────────────────
         # R13-XR: ACTIVE tracing enables X-Ray for every invocation.
         # Lambda runtime auto-instruments boto3 calls (DDB queries, Secrets reads)
@@ -54,6 +69,7 @@ class McpStack(Stack):
             function_name=MCP_FUNCTION_NAME,
             source_file="mcp_server.py",
             handler="mcp_server.lambda_handler",
+            code=mcp_code,
             timeout_seconds=300,
             memory_mb=768,  # R5: power-tuned — 768 MB is cost-optimal (AWS Lambda Power Tuning v4.4.0)
             tracing=_lambda.Tracing.ACTIVE,  # R13-XR: X-Ray active tracing
@@ -82,6 +98,7 @@ class McpStack(Stack):
             function_name=WARMER_FUNCTION_NAME,
             source_file="mcp_server.py",
             handler="mcp_server.lambda_handler",
+            code=mcp_code,
             schedule="cron(10 17 * * ? *)",  # 10:10 AM PT daily (staggered from daily-brief)
             timeout_seconds=300,
             memory_mb=768,  # R5: matched to MCP server power-tuned value

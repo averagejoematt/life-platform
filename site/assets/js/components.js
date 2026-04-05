@@ -713,7 +713,9 @@ function renderAIAnalysisCard(containerId, expertKey, config) {
     training:  { name: "Coach's Notes — Dr. Sarah Chen", color: '#ef4444' },
     physical:  { name: "Dr. Victor Reyes's Assessment",  color: '#60a5fa' },
     explorer:  { name: "Dr. Brandt's Analysis",          color: '#f59e0b' },
-    labs:      { name: "Dr. Okafor's Interpretation",    color: '#06b6d4' }
+    labs:      { name: "Dr. Okafor's Interpretation",    color: '#06b6d4' },
+    sleep:     { name: "Dr. Park's Sleep Analysis",      color: '#818cf8' },
+    glucose:   { name: "Dr. Patrick's Metabolic Assessment", color: '#2dd4bf' }
   };
 
   var expert = EXPERTS[expertKey];

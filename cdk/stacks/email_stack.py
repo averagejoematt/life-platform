@@ -7,10 +7,11 @@ v2.0 (v3.4.0): CDK-managed IAM roles replace existing_role_arn references.
 v2.1 (v3.7.62): BS-03 Chronicle Email Sender added.
 v2.2 (FEAT-12): chronicle-approve Lambda + preview-before-publish workflow.
 
-Lambdas (10):
+Lambdas (11):
   daily-brief, weekly-digest, monthly-digest, nutrition-review,
   wednesday-chronicle, weekly-plate, monday-compass, brittany-weekly-email,
-  evening-nudge, chronicle-email-sender (BS-03), chronicle-approve (FEAT-12)
+  evening-nudge, chronicle-email-sender (BS-03), chronicle-approve (FEAT-12),
+  weekly-signal (PB-06)
 
 """
 
@@ -77,6 +78,25 @@ class EmailStack(Stack):
         # R54: Evening nudge — checks supplements/journal/How We Feel completeness at 8 PM PT
         # cron(0 3 * * ? *) = 3:00 AM UTC = 8:00 PM PDT (UTC-7). Adjust after DST ends.
         create_platform_lambda(self, "EveningNudge", function_name="evening-nudge", handler="evening_nudge_lambda.lambda_handler", source_file="lambdas/evening_nudge_lambda.py", schedule="cron(0 3 * * ? *)", timeout_seconds=60, memory_mb=256, environment=_email_env, custom_policies=rp.email_evening_nudge(), **shared)
+
+        # PB-06: Weekly Signal — curated 5-section subscriber email every Sunday 9:30 AM PT.
+        # Reads pre-computed data from S3 + DynamoDB — no AI calls.
+        # Independent DLQ + alarm. timeout_seconds=300: headroom for rate-limited sends.
+        create_platform_lambda(
+            self, "WeeklySignal",
+            function_name="weekly-signal",
+            handler="weekly_signal_lambda.lambda_handler",
+            source_file="lambdas/weekly_signal_lambda.py",
+            schedule="cron(30 16 ? * SUN *)",  # Sunday 9:30 AM PT
+            timeout_seconds=300,
+            memory_mb=256,
+            environment={
+                "SITE_URL":          "https://averagejoematt.com",
+                "SEND_RATE_PER_SEC": "14.0",
+            },
+            custom_policies=rp.email_weekly_signal(),
+            **shared,
+        )
 
         # BS-03: Chronicle Email Sender — delivers Chronicle installment to confirmed subscribers.
         # Fires 10 min after wednesday-chronicle (cron(0 15 ? * WED *) = 8:00 AM PT).

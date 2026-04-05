@@ -3157,6 +3157,7 @@ def handle_sleep_detail() -> dict:
             "recovery_score":    round(float(w["recovery_score"]), 0) if w.get("recovery_score") else None,
             "hrv":               round(float(w["hrv"]), 1) if w.get("hrv") else None,
             "rhr":               round(float(w["resting_heart_rate"]), 0) if w.get("resting_heart_rate") else None,
+            "sleep_start":       w.get("sleep_start"),
         })
 
     score_today = float(latest.get("sleep_score", 0))
@@ -7179,7 +7180,7 @@ def lambda_handler(event, context):
     if path == "/api/ai_analysis":
         qs = event.get("queryStringParameters") or {}
         expert_key = qs.get("expert", "mind")
-        if expert_key not in ("mind", "nutrition", "training", "physical", "explorer", "labs", "glucose"):
+        if expert_key not in ("mind", "nutrition", "training", "physical", "explorer", "labs", "glucose", "sleep"):
             return _error(400, "Invalid expert key")
         ai_pk = f"{USER_PREFIX}ai_analysis"
         ai_item = table.get_item(Key={"pk": ai_pk, "sk": f"EXPERT#{expert_key}"}).get("Item")

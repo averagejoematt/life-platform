@@ -75,6 +75,8 @@ def create_platform_lambda(
     s3_write: bool = True,
     needs_ses: bool = False,
     ses_domain: str = None,
+    # ── Code override ──
+    code: _lambda.Code = None,  # Override code asset (default: Code.from_asset("../lambdas"))
     # ── Observability ──
     tracing: _lambda.Tracing = None,  # R13-XR: pass _lambda.Tracing.ACTIVE for X-Ray
 ) -> _lambda.Function:
@@ -195,7 +197,7 @@ def create_platform_lambda(
         function_name=function_name,
         runtime=_lambda.Runtime.PYTHON_3_12,
         handler=handler,
-        code=_lambda.Code.from_asset("../lambdas", exclude=_ASSET_EXCLUDES),
+        code=code if code else _lambda.Code.from_asset("../lambdas", exclude=_ASSET_EXCLUDES),
         role=role,
         timeout=Duration.seconds(timeout_seconds),
         memory_size=memory_mb,
