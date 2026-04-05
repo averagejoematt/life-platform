@@ -482,6 +482,19 @@ class WebStack(Stack):
                             origin_ssl_protocols=["TLSv1.2"],
                         ),
                     ),
+                    # Origin 6: S3 generated content (Lambda-written files)
+                    # ADR-046: separate prefix prevents deploy --delete from removing
+                    # Lambda-generated files (public_stats, character_stats, OG images, etc.)
+                    cloudfront.CfnDistribution.OriginProperty(
+                        domain_name=S3_WEBSITE_DOMAIN,
+                        id="S3GeneratedOrigin",
+                        origin_path="/generated",
+                        custom_origin_config=cloudfront.CfnDistribution.CustomOriginConfigProperty(
+                            http_port=80,
+                            https_port=443,
+                            origin_protocol_policy="http-only",
+                        ),
+                    ),
                 ],
                 # Default behaviour: S3 static pages
                 default_cache_behavior=cloudfront.CfnDistribution.DefaultCacheBehaviorProperty(
@@ -568,6 +581,58 @@ class WebStack(Stack):
                             "POST", "PUT", "PATCH", "DELETE",
                         ],
                         cached_methods=["GET", "HEAD"],
+                    ),
+                    # ── ADR-046: Generated content behaviors (Lambda-written files) ──
+                    # These route specific file patterns to S3GeneratedOrigin (/generated prefix)
+                    # instead of the default S3SiteOrigin (/site prefix), so deploy --delete
+                    # on /site can never touch Lambda-generated content.
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/public_stats.json",
+                        target_origin_id="S3GeneratedOrigin",
+                        viewer_protocol_policy="redirect-to-https",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(query_string=False),
+                        default_ttl=300, max_ttl=600, min_ttl=0,
+                        allowed_methods=["GET", "HEAD"], cached_methods=["GET", "HEAD"],
+                    ),
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/pulse.json",
+                        target_origin_id="S3GeneratedOrigin",
+                        viewer_protocol_policy="redirect-to-https",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(query_string=False),
+                        default_ttl=300, max_ttl=600, min_ttl=0,
+                        allowed_methods=["GET", "HEAD"], cached_methods=["GET", "HEAD"],
+                    ),
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/data/character_stats.json",
+                        target_origin_id="S3GeneratedOrigin",
+                        viewer_protocol_policy="redirect-to-https",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(query_string=False),
+                        default_ttl=3600, max_ttl=86400, min_ttl=0,
+                        allowed_methods=["GET", "HEAD"], cached_methods=["GET", "HEAD"],
+                    ),
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/journal/posts.json",
+                        target_origin_id="S3GeneratedOrigin",
+                        viewer_protocol_policy="redirect-to-https",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(query_string=False),
+                        default_ttl=300, max_ttl=3600, min_ttl=0,
+                        allowed_methods=["GET", "HEAD"], cached_methods=["GET", "HEAD"],
+                    ),
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/journal/posts/week-*",
+                        target_origin_id="S3GeneratedOrigin",
+                        viewer_protocol_policy="redirect-to-https",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(query_string=False),
+                        default_ttl=300, max_ttl=3600, min_ttl=0,
+                        allowed_methods=["GET", "HEAD"], cached_methods=["GET", "HEAD"],
+                    ),
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/assets/images/og-*",
+                        target_origin_id="S3GeneratedOrigin",
+                        viewer_protocol_policy="redirect-to-https",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(query_string=False),
+                        default_ttl=86400, max_ttl=86400, min_ttl=0,
+                        allowed_methods=["GET", "HEAD"], cached_methods=["GET", "HEAD"],
                     ),
                     # /api/* — site-api Lambda (all methods, query strings forwarded).
                     # POST endpoints (nudge, vote, follow, submit_finding) need POST.

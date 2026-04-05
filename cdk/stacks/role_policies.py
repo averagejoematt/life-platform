@@ -440,7 +440,7 @@ def compute_character_sheet() -> list[iam.PolicyStatement]:
         needs_kms=True,
         needs_s3_config=True,
         needs_ai_keys=True,
-        needs_s3_write=["site/*"],
+        needs_s3_write=["site/*", "generated/*"],
     )
 
 
@@ -577,7 +577,7 @@ def email_daily_brief() -> list[iam.PolicyStatement]:
     site/public_stats.json written via site_writer.py for averagejoematt.com.
     """
     return _email_base(
-        needs_s3_write=["dashboard/*", "buddy/*", "site/*"],
+        needs_s3_write=["dashboard/*", "buddy/*", "site/*", "generated/*"],
         extra_statements=[
             iam.PolicyStatement(
                 sid="CloudWatchMetrics",
@@ -607,7 +607,7 @@ def email_wednesday_chronicle() -> list[iam.PolicyStatement]:
     """Wednesday chronicle: DDB read, S3 config, ai-keys, SES, writes blog/* + site/journal/* to S3.
     site/journal/posts/week-{nn}/index.html + site/journal/posts.json written via publish_to_journal.
     """
-    return _email_base(needs_s3_write=["blog/*", "site/journal/*"])
+    return _email_base(needs_s3_write=["blog/*", "site/journal/*", "generated/journal/*"])
 
 
 def email_weekly_plate() -> list[iam.PolicyStatement]:
@@ -1253,12 +1253,17 @@ def mcp_server() -> list[iam.PolicyStatement]:
 # ═════════════════════════════════════════════════════════════════════════
 
 def og_image() -> list[iam.PolicyStatement]:
-    """OG Image Lambda: S3 read-only for public_stats.json."""
+    """OG Image Lambda: S3 read public_stats + write OG images to generated/."""
     return [
         iam.PolicyStatement(
             sid="S3ReadPublicStats",
             actions=["s3:GetObject"],
-            resources=[f"{BUCKET_ARN}/site/data/public_stats.json"],
+            resources=[f"{BUCKET_ARN}/generated/public_stats.json"],
+        ),
+        iam.PolicyStatement(
+            sid="S3WriteOgImages",
+            actions=["s3:PutObject"],
+            resources=[f"{BUCKET_ARN}/generated/assets/images/*"],
         ),
     ]
 

@@ -394,7 +394,7 @@ def write_public_stats_json(data, profile, streak_data=None):
 
         _s3.put_object(
             Bucket=_S3_BUCKET,
-            Key="site/public_stats.json",
+            Key="generated/public_stats.json",
             Body=json.dumps(stats, default=str),
             ContentType="application/json",
             CacheControl="max-age=300",

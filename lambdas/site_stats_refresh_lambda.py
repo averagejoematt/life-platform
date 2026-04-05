@@ -22,7 +22,7 @@ REGION       = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME   = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET    = os.environ.get("S3_BUCKET", "matthew-life-platform")
 USER_ID      = os.environ.get("USER_ID", "matthew")
-STATS_KEY    = "site/public_stats.json"
+STATS_KEY    = "generated/public_stats.json"  # ADR-046
 
 # Ingestion Lambdas to re-invoke before reading DynamoDB
 INGESTION_LAMBDAS = [
