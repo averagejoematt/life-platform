@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-04-04 (v4.9.0 — 121 MCP tools, 35-module MCP package, 26 data sources, 62 Lambdas, 72 site pages, 70+ API endpoints, 8 CDK stacks, shared layer v22)
+Last updated: 2026-04-04 (v4.9.0 — 115 MCP tools, 35-module MCP package, 26 data sources, 62 Lambdas, 72 site pages, 70+ API endpoints, 8 CDK stacks, shared layer v26)
 
 ---
 
@@ -29,7 +29,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
                          │ DynamoDB queries
 ┌────────────────────────▼────────────────────────────────────┐
 │  SERVE LAYER                                                │
-│  MCP Server Lambda (121 tools, 768 MB) + Lambda Function URL │
+│  MCP Server Lambda (115 tools, 768 MB) + Lambda Function URL │
 │  ← Claude Desktop + claude.ai + Claude mobile via remote MCP│
 │                                                             │
 │  COMPUTE LAYER (IC intelligence features)                   │
@@ -96,7 +96,7 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 
 **Schedule:** Hourly during active hours (4am–10pm PST) for most sources. Exceptions: Garmin at 4x daily (OAuth rate limits), Weather + Todoist at 2x daily (COST-OPT). Maintenance window: 10pm–4am PST (UTC 6–11 skipped).
 
-**Shared Lambda Layer:** v22 — includes `ai_calls.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`. Rebuild with `bash deploy/build_layer.sh`. 16 dependent Lambdas consume the layer.
+**Shared Lambda Layer:** v26 — includes `ai_calls.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`. Rebuild with `bash deploy/build_layer.sh`. 16 dependent Lambdas consume the layer.
 
 **Secret caching (COST-OPT-1):** 15-min in-memory TTL cache via `secret_cache.py` in shared layer. Reduces Secrets Manager API calls ~90% across 9 Lambdas.
 
@@ -125,8 +125,8 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 | Daily Metrics Compute | `daily-metrics-compute` | `cron(25 17 * * ? *)` | 10:25 AM |
 | Adaptive Mode Compute | `adaptive-mode-compute` | `cron(30 17 * * ? *)` | 10:30 AM |
 | Character Sheet Compute | `character-sheet-compute` | `cron(35 17 * * ? *)` | 10:35 AM |
-| Anomaly Detector | `anomaly-detector` | `cron(5 16 * * ? *)` | 09:05 AM |
-| Daily Brief | `daily-brief` | `cron(0 18 * * ? *)` | 11:00 AM |
+| Anomaly Detector | `anomaly-detector` | `cron(5 15 * * ? *)` | 08:05 AM |
+| Daily Brief | `daily-brief` | `cron(0 17 * * ? *)` | 10:00 AM |
 | Monday Compass | `monday-compass` | `cron(0 15 ? * MON *)` | Mon 08:00 AM |
 | Wednesday Chronicle | `wednesday-chronicle` | `cron(0 15 ? * WED *)` | Wed 08:00 AM |
 | The Weekly Plate | `weekly-plate` | `cron(0 2 ? * SAT *)` | Fri 07:00 PM |
@@ -177,7 +177,7 @@ SK: DATE#YYYY-MM-DD
 
 ### MCP Server
 
-**Lambda:** `life-platform-mcp` | **Tools:** 121 | **Memory:** 768 MB | **Modules:** 35
+**Lambda:** `life-platform-mcp` | **Tools:** 115 | **Memory:** 768 MB | **Modules:** 35
 **Remote MCP:** `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws`
 **Auth:** `x-api-key` header check + OAuth 2.1/HMAC Bearer for remote MCP
 
@@ -197,7 +197,7 @@ Compute → store → read pattern. Standalone Lambdas run before Daily Brief, s
 
 **Lambda:** `life-platform-site-api` | **Stack:** LifePlatformOperational | **Region:** us-west-2 (R17-09 migration)
 **Function URL:** Routed through CloudFront (E3S424OXQZ8NBE). Lambda confirmed in us-west-2 (verified via AWS CLI 2026-03-30).
-**IAM:** Read-only — `dynamodb:GetItem, Query` + `kms:Decrypt` + `s3:GetObject` on `site/config/*`
+**IAM:** Primarily read-only — `dynamodb:GetItem, Query, PutItem` + `kms:Decrypt` + `s3:GetObject` on `site/config/*`. Limited writes for interactive features (votes, follows, checkins).
 
 **Routes served via CloudFront → site-api:**
 - `GET /api/vitals` — weight, HRV, recovery (TTL 300s)
@@ -213,7 +213,7 @@ Compute → store → read pattern. Standalone Lambdas run before Daily Brief, s
 - `GET /api/verify_subscriber?email=` — HMAC token for subscriber gate (24hr)
 - `POST /api/subscribe` — email subscriber capture
 
-**Rate limiting:** In-memory sliding window (module-level dicts `_ask_rate_store`, `_board_rate_store`). No DDB writes — role is read-only by design (Yael directive, v3.7.82).
+**Rate limiting:** In-memory sliding window (module-level dicts `_ask_rate_store`, `_board_rate_store`). Vote/follow rate limits use DynamoDB atomic counters with TTL. Role is primarily read-only with limited writes for interactive features (votes, follows, checkins).
 
 ### Email / Intelligence cadence
 
@@ -239,7 +239,7 @@ Each Lambda has a **dedicated, least-privilege IAM role** (49 roles total as of 
 - **Email/digest roles (7):** DDB read/write, ai-keys, SES, S3 write
 - **Compute roles (5):** DDB read/write, ai-keys
 - **Operational roles (14):** scoped per function
-- **Site API role:** DDB read-only (`GetItem, Query`), `kms:Decrypt`, S3 `site/config/*`, Secrets read (`site-api-ai-key` only) — **NO PutItem, NO Scan**
+- **Site API role:** DDB primarily read-only (`GetItem, Query`) + limited `PutItem` for interactive features (votes, follows, checkins), `kms:Decrypt`, S3 `site/config/*`, Secrets read (`site-api-ai-key` only) — **NO Scan**
 - No role has `dynamodb:Scan` or cross-account permissions
 
 ---

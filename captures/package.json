@@ -1,0 +1,10 @@
+{
+  "name": "amj-page-capture",
+  "private": true,
+  "scripts": {
+    "capture": "node capture.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.44.0"
+  }
+}

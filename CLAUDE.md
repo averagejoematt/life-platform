@@ -48,7 +48,7 @@ python3 mcp_bridge.py
 2. **Store**: Raw JSON in S3 (`raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json`), normalized metrics in DynamoDB single-table (`life-platform`, PK `USER#matthew#SOURCE#{source}`, SK `DATE#{YYYY-MM-DD}`).
 
 3. **Serve/Compute**:
-   - **MCP Lambda** — 121 tools across 26 domain modules (`mcp/tools_*.py`), accessed via Claude Desktop and claude.ai
+   - **MCP Lambda** — 115 tools across 26 domain modules (`mcp/tools_*.py`), accessed via Claude Desktop and claude.ai
    - **Compute Lambdas** (5) — run before 11 AM daily: `character-sheet`, `adaptive-mode`, `daily-metrics-compute`, `daily-insight-compute`, `hypothesis-engine`; store pre-computed results to DynamoDB
    - **Email Lambdas** (7) — daily brief at 11 AM reads pre-computed results
    - **OG Image Lambda** — generates 6 data-driven PNG share cards daily at 11:30 AM PT using Pillow
@@ -74,7 +74,7 @@ python3 mcp_bridge.py
 
 **EventBridge crons use fixed UTC** — no DST drift. All schedules in `cdk/stacks/` must be UTC-fixed.
 
-**Lambda Layer** — shared modules (`ai_calls.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, `character_engine.py`) are deployed as a layer (currently v25). Changes here require a layer rebuild (`bash deploy/build_layer.sh`) before deploying dependent functions.
+**Lambda Layer** — shared modules (`ai_calls.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, `character_engine.py`) are deployed as a layer (currently v26). Changes here require a layer rebuild (`bash deploy/build_layer.sh`) before deploying dependent functions.
 
 **Secret caching (COST-OPT-1)** — Lambdas cache Secrets Manager reads for 15 minutes via `secret_cache.py` in the shared layer. Reduces Secrets Manager API calls ~90%.
 
