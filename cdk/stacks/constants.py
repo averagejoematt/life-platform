@@ -41,3 +41,9 @@ PILLOW_LAYER_VERSION = 1
 PILLOW_LAYER_ARN = (
     f"arn:aws:lambda:{REGION}:{ACCT}:layer:pillow-layer:{PILLOW_LAYER_VERSION}"
 )
+
+# Garth + garminconnect layer (Garmin OAuth — native deps, x86_64)
+GARTH_LAYER_VERSION = 2
+GARTH_LAYER_ARN = (
+    f"arn:aws:lambda:{REGION}:{ACCT}:layer:garth-layer:{GARTH_LAYER_VERSION}"
+)

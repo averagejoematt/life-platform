@@ -183,6 +183,50 @@ def get_garmin_client(secret: dict):
                 "Run setup_garmin_browser_auth.py locally to re-authenticate."
             ) from e
 
+    # ── Log token expiry for observability ──
+    try:
+        oauth2 = garth.client.oauth2_token
+        if oauth2 and hasattr(oauth2, "expires_at"):
+            print(f"OAuth2 token expires at: {oauth2.expires_at}")
+        if oauth2 and hasattr(oauth2, "expired"):
+            print(f"OAuth2 token expired: {oauth2.expired}")
+    except Exception:
+        pass
+
+    # ── Proactive token refresh (hit exchange endpoint at most once) ──
+    try:
+        if garth.client.oauth2_token and garth.client.oauth2_token.expired:
+            print("OAuth2 token expired — attempting single refresh...")
+            garth.client.refresh_oauth2()
+            print("OAuth2 token refreshed successfully.")
+    except Exception as e:
+        err_str = str(e)
+        if "429" in err_str or "Too Many Requests" in err_str:
+            logger.error(
+                "Garmin OAuth refresh rate-limited (429). "
+                "Aborting to avoid hammering exchange endpoint. "
+                "Will retry on next scheduled run."
+            )
+            raise RuntimeError("Garmin OAuth refresh rate-limited (429). Aborting.") from e
+        else:
+            raise RuntimeError(
+                f"Garmin OAuth refresh failed ({e}). "
+                "Run setup_garmin_browser_auth.py locally to re-authenticate."
+            ) from e
+
+    # ── Save refreshed tokens eagerly (before any data calls) ──
+    def _save_tokens():
+        try:
+            new_tokens = garth.client.dumps()
+            if new_tokens and new_tokens != secret.get("garth_tokens"):
+                secret["garth_tokens"] = new_tokens
+                save_secret(secret)
+                print("Refreshed OAuth tokens saved to Secrets Manager.")
+        except Exception as e:
+            print(f"Warning: could not save refreshed tokens ({e})")
+
+    _save_tokens()
+
     # ── Wire garth into garminconnect ──
     api = Garmin()
     api.garth = garth.client
@@ -219,15 +263,8 @@ def get_garmin_client(secret: dict):
             "Run setup_garmin_browser_auth.py locally to re-authenticate."
         )
 
-    # ── Save refreshed tokens back to Secrets Manager ──
-    try:
-        new_tokens = garth.client.dumps()
-        if new_tokens and new_tokens != secret.get("garth_tokens"):
-            secret["garth_tokens"] = new_tokens
-            save_secret(secret)
-            print("Refreshed OAuth tokens saved to Secrets Manager.")
-    except Exception as e:
-        print(f"Warning: could not save refreshed tokens ({e})")
+    # Save again after profile resolution (profile calls may have triggered a refresh)
+    _save_tokens()
 
     return api
 
@@ -845,14 +882,23 @@ def lambda_handler(event, context):
         # Auth once, reuse across all gap days
         api = get_garmin_client(secret)
         results = {}
+        consecutive_failures = 0
         for i, date_str in enumerate(missing_dates):
             print(f"[GAP-FILL] Ingesting {date_str} ({i+1}/{len(missing_dates)})")
             try:
                 result = ingest_day(date_str, secret, api=api)
                 results[date_str] = len(result) if result else 0
+                if result:
+                    consecutive_failures = 0
+                else:
+                    consecutive_failures += 1
             except Exception as e:
                 print(f"[GAP-FILL] ERROR on {date_str}: {e}")
                 results[date_str] = f"error: {e}"
+                consecutive_failures += 1
+            if consecutive_failures >= 2:
+                print(f"[GAP-FILL] Circuit breaker: {consecutive_failures} consecutive failures — aborting remaining days")
+                break
             if i < len(missing_dates) - 1:
                 _time.sleep(1)  # Rate limit pacing
 

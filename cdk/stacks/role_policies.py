@@ -1076,11 +1076,12 @@ def site_api() -> list[iam.PolicyStatement]:
     Serves averagejoematt.com real-time data endpoints.
     GET endpoints are read-only. POST endpoints (vote, follow, checkin, nudge,
     submit_finding) perform targeted DDB writes to specific partitions.
-    NO S3 write.
     Yael directive: never expose MCP endpoint publicly — this is a
     separate, minimal-permission Lambda.
     WEB-WCT: Added S3 site/config/* read for /api/current_challenge endpoint.
     R17-04: Added dedicated Secrets read for life-platform/site-api-ai-key (isolated from main ai-keys).
+    BL-02: Added S3 dashboard/* and generated/* read for /api/labs (clinical.json) and health check (public_stats.json).
+    BL-02: Added S3 generated/findings/* write for /api/submit_finding.
     """
     return [
         iam.PolicyStatement(
@@ -1104,7 +1105,14 @@ def site_api() -> list[iam.PolicyStatement]:
             resources=[
                 f"{BUCKET_ARN}/site/config/*",
                 f"{BUCKET_ARN}/config/*",
+                f"{BUCKET_ARN}/dashboard/*",
+                f"{BUCKET_ARN}/generated/*",
             ],
+        ),
+        iam.PolicyStatement(
+            sid="S3FindingsWrite",
+            actions=["s3:PutObject"],
+            resources=[f"{BUCKET_ARN}/generated/findings/*"],
         ),
         iam.PolicyStatement(
             sid="AiKeySecret",
