@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" fill="none">
+  <circle cx="36" cy="36" r="33" fill="none" stroke="#5ba4cf" stroke-width="1.5" opacity="0.3"/>
+  <circle cx="36" cy="36" r="27" fill="none" stroke="#5ba4cf" stroke-width="0.8" opacity="0.15"/>
+  <text x="36" y="32" text-anchor="middle" font-family="Space Mono,monospace" font-size="9" fill="#4a6050" text-decoration="line-through">250</text>
+  <text x="36" y="44" text-anchor="middle" font-family="Space Mono,monospace" font-size="7" fill="#5ba4cf">SUB</text>
+</svg>

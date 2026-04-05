@@ -1168,7 +1168,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
 </html>"""
 
     week_num = int(week_num)  # guard: DynamoDB Decimal → float after d2f
-    post_key = f"site/journal/posts/week-{week_num:02d}/index.html"
+    post_key = f"generated/journal/posts/week-{week_num:02d}/index.html"
 
     # Update posts.json manifest
     posts_manifest = []
