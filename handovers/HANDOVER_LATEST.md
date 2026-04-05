@@ -1,7 +1,7 @@
-# Handover — v5.1.0: Bug Bash + Documentation Overhaul
+# Handover — v5.1.1: Bug Bash + Documentation Overhaul + Pipeline Fixes
 
 **Date:** 2026-04-05
-**Scope:** Full-stack bug bash (32 fixes across 4 domains), ADR-046 CDK deploy, documentation audit + archive, 48 completed specs archived.
+**Scope:** Full-stack bug bash (32 fixes across 4 domains), ADR-046 CDK deploy, documentation audit + archive, 48 completed specs archived. Then: /api/labs IAM fix, Garmin layer + OAuth resilience, stale backlog cleanup.
 
 ## What Changed
 
@@ -58,6 +58,22 @@
 - Completed implementation specs, session briefs, one-time prompts, offsite build plans, usability studies, visual briefs
 - Git history preserved via `git mv`
 
+### v5.1.1 Fixes (same day, deployed)
+
+**`/api/labs` 503 — FIXED:**
+- Root cause: site-api IAM role lacked S3 `dashboard/*` read. `clinical.json` existed with 74 biomarkers but Lambda couldn't read it (AccessDenied → 503).
+- Fix: Added `dashboard/*` and `generated/*` S3 read + `generated/findings/*` write to `role_policies.py:site_api()`. Deployed via `LifePlatformOperational` stack.
+
+**Garmin ingestion broken — FIXED:**
+- Root cause 1: `garth-layer` (v2) not attached to Lambda. CDK redeploy on 2026-04-05 04:39 UTC dropped it. Fix: Added `GARTH_LAYER_ARN` to `constants.py`, wired `additional_layers=[garth_layer]` in `ingestion_stack.py`. Deployed via `LifePlatformIngestion` stack.
+- Root cause 2: Garmin OAuth 429 rate limit cascade. When OAuth2 token expired, garth tried to refresh on every API call (14 calls/day × 5 gap days = 70+ exchange endpoint hits). Fix: proactive single refresh attempt in `get_garmin_client()` with early bail on 429, circuit breaker (2 consecutive failures → abort gap-fill), eager token save to Secrets Manager. Deployed via `deploy_lambda.sh`.
+- Re-authed via `setup_garmin_browser_auth.py`. Backfilled 4 missing days (Mar 30, Apr 2-4). All Garmin data current.
+
+**Stale documentation — FIXED:**
+- `docs/BACKLOG_HANDOFF_CLAUDE_CODE.md`: Marked HP-13 (share cards), BL-01 (builders page), BL-02 (labs page) as ✅ DONE with implementation details. These were completed in prior sessions but backlog still listed them as greenfield.
+- `docs/INCIDENT_LOG.md`: Resolved open Garmin P3 incident (2026-03-19).
+- `docs/HANDOVER_LATEST.md` pointer updated from v4.7.0 to v5.1.1.
+
 ## What to Verify
 
 ### Smoke Tests
@@ -78,8 +94,8 @@
 
 ## Known Issues / Carry Forward
 
-- **Garmin not syncing steps** — no data for April 3-4. Movement glyph falls back to Apple Health (low count). May need Garmin re-auth via `setup_garmin_browser_auth.py`
-- **`/api/labs` returns 503** — reads from `dashboard/{user}/clinical.json` which doesn't exist. Labs page broken until this S3 file is populated
+- **~~Garmin not syncing~~** — FIXED and DEPLOYED. Layer attached, OAuth resilience added, re-authed, 4 days backfilled. All data current.
+- **~~`/api/labs` returns 503~~** — FIXED and DEPLOYED. IAM policy updated, endpoint returning 200.
 - **Protocol adherence on sleep page** — needs design decision
 - **TDEE tracking** — blocked (MacroFactor doesn't export)
 - **Glucose intraday curve** — blocked (no raw 5-min CGM readings from Apple Health)
@@ -99,7 +115,7 @@
 | Architecture Grade | A- (R20) |
 | CDK Stacks | 8 |
 | DynamoDB Table | life-platform (single-table, no GSIs) |
-| Version | v5.1.0 |
+| Version | v5.1.1 |
 
 ## Key Commits
 

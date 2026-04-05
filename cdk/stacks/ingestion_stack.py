@@ -19,7 +19,7 @@ from aws_cdk import (
 from constructs import Construct
 from stacks.lambda_helpers import create_platform_lambda
 from stacks import role_policies as rp
-from stacks.constants import SHARED_LAYER_ARN, ACCT, REGION, TABLE_NAME, S3_BUCKET  # CONF-01
+from stacks.constants import SHARED_LAYER_ARN, GARTH_LAYER_ARN, ACCT, REGION, TABLE_NAME, S3_BUCKET  # CONF-01
 
 # ── Hourly ingestion with 10pm-4am PST maintenance window ──
 # Active hours: 4am-10pm PST = UTC 12-6 (next day) = 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23
@@ -37,6 +37,7 @@ class IngestionStack(Stack):
     def __init__(self, scope, construct_id, table, bucket, dlq, alerts_topic, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
         shared_utils_layer = _lambda.LayerVersion.from_layer_version_arn(self, "SharedUtilsLayer", SHARED_LAYER_ARN)
+        garth_layer        = _lambda.LayerVersion.from_layer_version_arn(self, "GarthLayer", GARTH_LAYER_ARN)
         local_dlq          = sqs.Queue.from_queue_arn(self, "IngestionDLQ", INGESTION_DLQ_ARN)
         local_table        = dynamodb.Table.from_table_name(self, "LifePlatformTable", LIFE_PLATFORM_TABLE)
         local_bucket       = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
@@ -70,6 +71,7 @@ class IngestionStack(Stack):
             handler="garmin_lambda.lambda_handler",
             schedule="cron(0 0,6,14,22 * * ? *)",
             timeout_seconds=300, memory_mb=512, shared_layer=shared_utils_layer,
+            additional_layers=[garth_layer],
             custom_policies=rp.ingestion_garmin(),
             alerts_topic=None, **{k: v for k, v in shared.items() if k != "alerts_topic"})
         # garmin.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
