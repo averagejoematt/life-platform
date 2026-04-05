@@ -1,127 +1,110 @@
-# Handover — v5.0.0: Design & Product Review + Architecture A-
+# Handover — v5.1.0: Bug Bash + Documentation Overhaul
 
-**Date:** 2026-04-04
-**Scope:** DPR-1 (56 items across 2 phases), R20 architecture review (A- grade), ADR-046 S3 prefix separation, 27 production bug fixes, CI/CD improvements.
+**Date:** 2026-04-05
+**Scope:** Full-stack bug bash (32 fixes across 4 domains), ADR-046 CDK deploy, documentation audit + archive, 48 completed specs archived.
 
 ## What Changed
 
-### Architecture Review #20 (A- grade, findings F01-F05 resolved)
-- MCP tools count synced 115 to 121 (6 new tools added and registered)
-- Architecture docs updated to match live system state
-- `generate_review_bundle.py` Section 13b updated with R20 findings table
-- INFRASTRUCTURE.md, ARCHITECTURE.md, RUNBOOK.md all reconciled
+### ADR-046: CDK Deploy (CloudFormation Sync)
+- S3GeneratedOrigin + 6 cache behaviors now owned by CloudFormation (was manual CLI)
+- Future `cdk deploy` cannot accidentally revert the generated/ prefix routing
+- All 8 CDK stacks deployed successfully
 
-### DPR-1: Design & Product Review
-**Phase 1** (43 items, 13 pages):
-- Full visual + functional audit across 13 site pages
-- Engagement pulse history feed (`engagement.js`) with daily log from April 1
-- Field notes token display fix
-- Character event log detail enrichment
-- Habitify vice streak timing bug resolved
+### Bug Bash Round 1 (10 fixes, deployed)
+**Critical — data safety:**
+- Journal post HTML moved from `site/journal/` to `generated/journal/` (was being deleted by sync)
+- Findings S3 write moved from `site/findings/` to `generated/findings/`
+- Error responses now include `Cache-Control: no-cache, no-store` (503s were cached 5 min)
 
-**Phase 2** (13 items across Practice + Platform + Chronicle + Utility):
-- Practice, Platform, Chronicle, Utility page improvements
-- Mobile home page: gauge overflow fix, hamburger menu scroll lock
-- Achievements: 14 weight milestone badges (10 loss every 10 lbs + 4 target sub-280/250/220/200)
-- Achievements: Arena to Challenge badge rename
-- Active challenge status matching fix
+**High:**
+- Subscriber onboarding fixed: reads `generated/journal/posts.json` (was `site/chronicle/posts.json`)
+- Accountability page: replaced hardcoded Lambda Function URL with `/api/subscribe` (was bypassing CloudFront WAF)
+- Lift glyph: only counts strength activities (WeightTraining, Crossfit, HIIT, Yoga) — was showing green for walks
+- Site-api docstring + CLAUDE.md updated to reflect actual write capabilities
 
-### ADR-046: S3 Prefix Separation
-- `site/` for static assets, `generated/` for Lambda-written files
-- `safe_sync.sh` updated with complete exclude list for all Lambda-generated files
-- Bucket policy protects `config/*` and `data/*` directories from sync --delete
-- Prevents deploy-time deletion of Lambda-generated content
+**Medium:**
+- Platform counts in daily-brief: 95→121 MCP, 19→26 sources, 50→62 Lambdas
+- Challenge dynamic status stored by both full ID and stripped catalog ID
+- 10 missing weight milestone badge SVGs created (lost_10 through lost_100, sub_250)
 
-### New Endpoints & Features
-- `/api/pulse_history` endpoint — daily log feed from April 1
-- Sleep observatory: `best_efficiency` field added
-- Glucose observatory: source fixed `dexcom` to `apple_health`, field names corrected
-- Glucose added to allowed AI analysis expert keys
-- Observatory week + weight_progress: experiment date clamping to EXPERIMENT_START
+### Bug Bash Round 2 (22 files, deployed)
+**Infrastructure cleanup:**
+- Removed Phase 1 site-api Lambda + duplicate alarms from web_stack (131 lines)
+- Updated 3 IAM policies for `generated/` prefix (og-image, chronicle-approve, stats-refresh)
+- Staggered 3 concurrent cron schedules: daily-brief 17:00, subscriber-onboarding 17:05, mcp-warmer 17:10
+- Added `buddy/*` and `blog/*` to bucket policy deletion protection
+- Scoped SES permissions from wildcard to domain identity (subscriber-onboarding, canary)
+- Fixed CI smoke test Lambda name: `qa-smoke` → `life-platform-qa-smoke`
 
-### Production Bug Fixes (27 issues, 3 sweeps)
-- `safe_sync.sh`: Lambda-generated file exclusions (character_stats.json, etc.)
-- Config and data directory protection from S3 sync --delete
-- 8 user-reported issues (commit bad4a80)
-- 9 user-reported issues (commit 4980e23)
-- Achievements 10lb badge threshold
-- Challenges active status matching
+**Frontend safety:**
+- Added `r.ok` checks to ~20 fetch calls across 14 pages + 2 shared JS files
+- Removed duplicate `startWeight=307` on homepage (uses dynamic value)
+- Removed duplicate `.reading-path-v2` CSS definition
+- Removed dead `reading_paths` object from site_constants.js
 
-### Light Mode Compatibility
-- AI expert cards moved outside try/catch blocks
-- Light mode CSS variables added for AI expert card theming
+### Documentation Overhaul
+**Staleness fixes (11 files):**
+- MCP tools: 121 → 115 across 8 docs (CLAUDE.md, ARCHITECTURE, SCHEMA, RUNBOOK, ONBOARDING, INFRASTRUCTURE, OPERATOR_GUIDE, MCP_TOOL_CATALOG)
+- Lambda layer: v22/v25 → v26 (CLAUDE.md, constants.py, ARCHITECTURE, RUNBOOK)
+- Cron schedules corrected: daily-brief 18:00→17:00 UTC, anomaly 16:05→15:05 UTC
+- Site-api "read-only" → "primarily read-only" with limited writes noted
+- ADR-046 added to DECISIONS.md index table
+- Data sources 19 → 26 in ONBOARDING.md
+- Google Calendar removed from ONBOARDING (retired ADR-030)
+- `generated/` prefix added to INFRASTRUCTURE.md S3 section
+- deploy/MANIFEST.md marked as deprecated
 
-### Infrastructure & CI/CD
-- Shared Lambda layer: v22 to v25
-- Full pytest suite wired into CI/CD pipeline
-- Claude Code config: `/deploy` command, `/qa` command, `.mcp.json`
-- `google_calendar_lambda.py` deleted (ADR-030)
-- Product review prompt PR-1 added
-
-### Documentation
-- DPR-1 review documents (Phase 1 + Phase 2), implementation brief, execution prompt
-- CLAUDE.md updated for v5.0.0
-- DECISIONS.md updated with ADR-046
-- INTELLIGENCE_LAYER.md updated for v4.8.0 AI overhaul
+**Archived (48 files → docs/archive/):**
+- Completed implementation specs, session briefs, one-time prompts, offsite build plans, usability studies, visual briefs
+- Git history preserved via `git mv`
 
 ## What to Verify
 
 ### Smoke Tests
-- [ ] `bash deploy/deploy_and_verify.sh site-api` — full site API smoke
-- [ ] Visit averagejoematt.com and spot-check: pulse history feed, achievements page (weight badges), glucose observatory
-- [ ] Mobile viewport: home page gauges should not overflow, hamburger menu should lock scroll
-- [ ] Light mode toggle: AI expert cards should render with correct colors
-- [ ] `/api/pulse_history` returns entries from April 1 onward
-- [ ] Sleep observatory response includes `best_efficiency` field
-- [ ] Run `python3 -m pytest tests/ -v` — expect 1075+ tests passing
+- [ ] `curl https://averagejoematt.com/public_stats.json` — returns data (generated/ origin)
+- [ ] `curl https://averagejoematt.com/api/pulse` — lift glyph gray on non-strength days
+- [ ] `/api/challenges` — active challenge appears with correct status
+- [ ] Achievements page — all 14 weight milestone badges render with icons
+- [ ] Accountability subscribe form — uses `/api/subscribe` (not raw Lambda URL)
+- [ ] `curl -sI https://averagejoematt.com/api/nonexistent` — has `Cache-Control: no-cache`
 
-### Deploy Safety
-- [ ] `bash deploy/lib/safe_sync.sh` — confirm Lambda-generated files are excluded from --delete
-- [ ] S3 `config/*` and `data/*` prefixes are not deleted during deploy
-- [ ] Shared layer is at v25 — run `aws lambda get-layer-version --layer-name life-platform-shared --version-number 25`
+### CDK
+- [ ] `cdk diff --all` shows no changes (all 8 stacks deployed)
+- [ ] Layer version 26 in use: `aws lambda get-layer-version --layer-name life-platform-shared-utils --version-number 26`
+
+### Documentation
+- [ ] `docs/` directory — only active reference docs, operational docs, and future specs remain
+- [ ] `docs/archive/` — 48+ completed specs archived with git history
 
 ## Known Issues / Carry Forward
 
-- **sync_doc_metadata.py** — archived to `deploy/archive/onetime/`. Session close checklist in RUNBOOK still references it. May need cleanup.
+- **Garmin not syncing steps** — no data for April 3-4. Movement glyph falls back to Apple Health (low count). May need Garmin re-auth via `setup_garmin_browser_auth.py`
+- **`/api/labs` returns 503** — reads from `dashboard/{user}/clinical.json` which doesn't exist. Labs page broken until this S3 file is populated
 - **Protocol adherence on sleep page** — needs design decision
-- **TDEE tracking** — MacroFactor doesn't export TDEE; no current workaround
-- **Glucose intraday curve** — needs raw 5-min CGM readings (not available from Apple Health bridge)
+- **TDEE tracking** — blocked (MacroFactor doesn't export)
+- **Glucose intraday curve** — blocked (no raw 5-min CGM readings from Apple Health)
 - **IC-4/IC-5** (failure pattern + momentum warning) — data gate ~May 1
-- **SIMP-1 Phase 2** — accepted via ADR-045 (118 to 115, not pursuing <=80 tools)
-- **DPR-1 Phase 3** — not yet scoped; Phase 1+2 covered 56 of estimated total items
+- **DPR-1 Phase 3** — not yet scoped
+- **PRE-13 Data Publication Review** — genome/lab/supplement granularity deferred
+- **Strava walk steps** — movement glyph doesn't estimate steps from Strava walk distance (enhancement, not bug)
 
 ## Current System State
 
 | Metric | Value |
 |--------|-------|
-| MCP Tools | 121 |
+| MCP Tools | 115 |
 | Lambdas | 62 |
 | Site Pages | 72 |
-| Lambda Layer | v25 |
+| Lambda Layer | v26 |
 | Architecture Grade | A- (R20) |
-| Pytest Tests | 1075+ |
 | CDK Stacks | 8 |
 | DynamoDB Table | life-platform (single-table, no GSIs) |
-| Version | v5.0.0 |
+| Version | v5.1.0 |
 
-## Key Files Modified (18 commits)
+## Key Commits
 
-**Lambda / Backend:**
-- `deploy/lib/safe_sync.sh` — Lambda-generated file exclusions
-- `lambdas/site_api_lambda.py` — pulse_history, achievements, glucose, sleep observatory
-- `lambdas/google_calendar_lambda.py` — deleted (ADR-030)
-
-**Frontend:**
-- `site/engagement.js` — pulse history feed
-- `site/` — mobile fixes, light mode CSS, achievement badges
-
-**Infrastructure:**
-- `cdk/stacks/` — ADR-046 S3 prefix separation, IAM updates
-- `.mcp.json` — Claude Code MCP config
-
-**Documentation:**
-- `docs/CHANGELOG.md` — v5.0.0 entry
-- `docs/CLAUDE.md` — v5.0.0 conventions
-- `docs/DECISIONS.md` — ADR-046
-- `docs/INTELLIGENCE_LAYER.md` — v4.8.0 AI overhaul
-- `reviews/DPR-1*.md` — design & product review documents
+| Hash | Description |
+|------|-------------|
+| `78e56cb` | fix: bug bash — 10 fixes across data safety, API, and frontend |
+| `8f5de93` | fix: bug bash round 2 — infra cleanup, frontend safety, IAM hardening |
+| `e933949` | docs: fix staleness across 11 docs + archive 48 completed specs |
