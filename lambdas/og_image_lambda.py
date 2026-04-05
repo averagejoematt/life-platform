@@ -291,7 +291,7 @@ PAGES = [
 def lambda_handler(event, context):
     # Read public_stats.json
     try:
-        resp = s3.get_object(Bucket=S3_BUCKET, Key="site/public_stats.json")
+        resp = s3.get_object(Bucket=S3_BUCKET, Key="generated/public_stats.json")
         stats = json.loads(resp["Body"].read())
     except Exception as e:
         print(f"[ERROR] Failed to read public_stats.json: {e}")
@@ -307,7 +307,7 @@ def lambda_handler(event, context):
             buf.seek(0)
             s3.put_object(
                 Bucket=S3_BUCKET,
-                Key=f"site/assets/images/{name}.png",
+                Key=f"generated/assets/images/{name}.png",
                 Body=buf.read(),
                 ContentType="image/png",
                 CacheControl="max-age=86400",

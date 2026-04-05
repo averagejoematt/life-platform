@@ -155,18 +155,18 @@ def _publish_to_s3(item: dict) -> list[str]:
             CacheControl="max-age=300",
         )
         logger.info("S3: wrote %s", journal_post_key)
-        # /site/journal/posts/week-NN/index.html → /journal/posts/week-NN/*
-        week_dir = "/".join(journal_post_key.split("/")[1:-1])  # strip "site/" prefix and filename
+        # /generated/journal/posts/week-NN/index.html → /journal/posts/week-NN/*
+        week_dir = "/".join(journal_post_key.split("/")[1:-1])  # strip "generated/" prefix and filename
         invalidation_paths.append(f"/{week_dir}/*")
 
     if journal_posts_json:
         s3.put_object(
-            Bucket=S3_BUCKET, Key="site/journal/posts.json",
+            Bucket=S3_BUCKET, Key="generated/journal/posts.json",
             Body=journal_posts_json.encode("utf-8"),
             ContentType="application/json",
             CacheControl="max-age=300",
         )
-        logger.info("S3: wrote site/journal/posts.json")
+        logger.info("S3: wrote generated/journal/posts.json")
         invalidation_paths.append("/journal/posts.json")
 
     return invalidation_paths

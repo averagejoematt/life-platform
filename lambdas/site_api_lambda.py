@@ -7012,7 +7012,7 @@ def lambda_handler(event, context):
             ddb_ok = False
         try:
             s3_client = boto3.client("s3", region_name=S3_REGION)
-            stats_obj = s3_client.get_object(Bucket=os.environ.get("S3_BUCKET", "matthew-life-platform"), Key="site/public_stats.json")
+            stats_obj = s3_client.get_object(Bucket=os.environ.get("S3_BUCKET", "matthew-life-platform"), Key="generated/public_stats.json")
             refreshed = json.loads(stats_obj["Body"].read()).get("_meta", {}).get("refreshed_at", "unknown")
         except Exception:
             refreshed = "unavailable"

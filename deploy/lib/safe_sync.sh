@@ -9,29 +9,14 @@
 #   - og-*.png            (og-image-generator Lambda)
 #   - avatar/*            (character avatar assets)
 
-# Files to exclude from --delete (Lambda-generated, not in local site/)
-# These are written at runtime by Lambdas — they don't exist in local site/ dir.
-# Deleting them breaks the live site until the next Lambda run regenerates them.
-#
-# Source Lambdas:
-#   config/*                  → uploaded config files (supplements, experiments, challenges, etc.)
-#   data/*                    → Lambda-generated data files (character_stats.json, etc.)
-#   public_stats.json         → site-stats-refresh, daily-brief
-#   pulse.json                → daily-brief (site_writer)
-#   assets/images/og-*.png    → og-image-generator (12 share cards)
-#   journal/posts/*           → wednesday-chronicle (weekly post HTML)
-#   avatar/*                  → character avatar assets (dashboard only)
-#   assets/life-platform-icon.svg → static asset not in site/
+# ADR-046: Lambda-generated content now lives in generated/ prefix (not site/).
+# The only remaining exclude is config/ — manually-uploaded config files that
+# live in site/config/ but not in the local site/ directory.
+# All other generated files (public_stats, character_stats, OG images, journal
+# posts) are structurally isolated in generated/ and cannot be affected by
+# site/ deploys.
 SAFE_SYNC_EXCLUDES=(
   "--exclude" "config/*"
-  "--exclude" "data/*"
-  "--exclude" "public_stats.json"
-  "--exclude" "pulse.json"
-  "--exclude" "assets/images/og-*.png"
-  "--exclude" "journal/posts/*.html"
-  "--exclude" "journal/posts/*/index.html"
-  "--exclude" "avatar/*"
-  "--exclude" "assets/life-platform-icon.svg"
 )
 
 safe_sync() {
