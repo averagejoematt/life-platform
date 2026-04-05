@@ -9,7 +9,7 @@ Deep documentation lives in `docs/`. Start here when context is needed:
 - `docs/ARCHITECTURE.md` — full system design, 62 Lambdas, 8 CDK stacks, data flows
 - `docs/SCHEMA.md` — DynamoDB field reference (authoritative)
 - `docs/RUNBOOK.md` — daily operations, troubleshooting
-- `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-045), why things are the way they are
+- `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-046), why things are the way they are
 
 ## Commands
 
@@ -64,7 +64,9 @@ python3 mcp_bridge.py
 
 **Secrets Manager only** — all credentials at `life-platform/` prefix. Never `.env` files or hardcoded values.
 
-**S3 safety (ADR-032/033)** — never `aws s3 sync --delete` to bucket root. Use `deploy/lib/safe_sync.sh` wrapper. Bucket policy blocks `DeleteObject` on `raw/*`, `config/*`, `uploads/*` for `matthew-admin`.
+**S3 safety (ADR-032/033/046)** — never `aws s3 sync --delete` to bucket root. Use `deploy/lib/safe_sync.sh` wrapper. Bucket policy blocks `DeleteObject` on `raw/*`, `config/*`, `uploads/*`, `generated/*` for `matthew-admin`.
+
+**S3 prefix separation (ADR-046)** — Lambda-generated files (public_stats.json, character_stats.json, OG images, journal posts) live in `generated/` prefix, NOT `site/`. CloudFront routes generated-file URLs to S3GeneratedOrigin. This makes `aws s3 sync site/ --delete` structurally safe — it cannot touch generated content.
 
 **Site API is read-only** — the site-api Lambda must never write to DynamoDB. This is a hard constraint.
 
@@ -72,7 +74,7 @@ python3 mcp_bridge.py
 
 **EventBridge crons use fixed UTC** — no DST drift. All schedules in `cdk/stacks/` must be UTC-fixed.
 
-**Lambda Layer** — shared modules (`ai_calls.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`) are deployed as a layer (currently v22). Changes here require a layer rebuild (`bash deploy/build_layer.sh`) before deploying dependent functions.
+**Lambda Layer** — shared modules (`ai_calls.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, `character_engine.py`) are deployed as a layer (currently v25). Changes here require a layer rebuild (`bash deploy/build_layer.sh`) before deploying dependent functions.
 
 **Secret caching (COST-OPT-1)** — Lambdas cache Secrets Manager reads for 15 minutes via `secret_cache.py` in the shared layer. Reduces Secrets Manager API calls ~90%.
 
