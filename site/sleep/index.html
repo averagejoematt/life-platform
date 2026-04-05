@@ -1762,8 +1762,8 @@
 <script>
   initObservatoryWeek('sleep', 'obs-thisweek');
   // Freshness is set from the observatory_week response
-  fetch('/api/observatory_week?domain=sleep').then(r=>r.json()).then(d=>{
-    if(d.last_updated) initObsFreshness(d.last_updated);
+  fetch('/api/observatory_week?domain=sleep').then(r=>r.ok?r.json():null).then(d=>{
+    if(d&&d.last_updated) initObsFreshness(d.last_updated);
   }).catch(function(){});
 </script>
 <script src="/assets/js/reveal.js"></script>

@@ -38,7 +38,6 @@ from aws_cdk import (
     aws_sqs as sqs,
     aws_sns as sns,
     aws_cloudwatch as cloudwatch,
-    aws_cloudwatch_actions as cw_actions,
 )
 from constructs import Construct
 
@@ -199,34 +198,10 @@ class WebStack(Stack):
 
         # ══════════════════════════════════════════════════════════════
         # Site API Lambda — life-platform-site-api
-        # R17-09: Lambda moved to LifePlatformOperational (us-west-2) for same-region DynamoDB.
-        # Migration Phase 2: once LifePlatformOperational is deployed, set context
-        #   "site_api_fn_url_domain": "<domain-from-SiteApiFunctionUrlDomain-output>"
-        # in cdk.json, then redeploy LifePlatformWeb. Until then, Lambda remains here.
+        # R17-09 complete: Lambda lives in LifePlatformOperational (us-west-2).
+        # Function URL domain is passed via cdk.json context "site_api_fn_url_domain".
         # ══════════════════════════════════════════════════════════════
         _site_api_ctx_domain = self.node.try_get_context("site_api_fn_url_domain")
-
-        if not _site_api_ctx_domain:
-            # Phase 1: Lambda still in web_stack until R17-09 migration is complete
-            site_api_fn = create_platform_lambda(
-                self, "SiteApiLambda",
-                function_name="life-platform-site-api",
-                source_file="lambdas/site_api_lambda.py",
-                handler="site_api_lambda.lambda_handler",
-                table=local_table,
-                bucket=local_bucket,
-                dlq=None,
-                alerts_topic=None,
-                custom_policies=rp.site_api(),
-                timeout_seconds=15,
-                memory_mb=256,
-                environment={
-                    "USER_ID":         "matthew",
-                    "TABLE_NAME":      "life-platform",
-                    "DYNAMODB_REGION": "us-west-2",  # DDB is us-west-2; Lambda runs in us-east-1
-                    "AI_SECRET_NAME":  "life-platform/site-api-ai-key",
-                },
-            )
 
         # ══════════════════════════════════════════════════════════════
         # Email Subscriber Lambda — BS-03
@@ -325,21 +300,8 @@ class WebStack(Stack):
 
         og_image_url_domain = cdk.Fn.select(2, cdk.Fn.split("/", og_image_url.url))
 
-        if not _site_api_ctx_domain:
-            site_api_url = site_api_fn.add_function_url(
-                auth_type=_lambda.FunctionUrlAuthType.NONE,
-                cors=_lambda.FunctionUrlCorsOptions(
-                    allowed_origins=["https://averagejoematt.com", "https://www.averagejoematt.com"],
-                    allowed_methods=[_lambda.HttpMethod.GET, _lambda.HttpMethod.POST],
-                    allowed_headers=["Content-Type"],
-                ),
-            )
-            fn_url_domain = cdk.Fn.select(2, cdk.Fn.split("/", site_api_url.url))
-            _site_api_fn_url_for_output = site_api_url.url
-        else:
-            # Phase 2 (R17-09 complete): Lambda is in LifePlatformOperational (us-west-2)
-            fn_url_domain = _site_api_ctx_domain
-            _site_api_fn_url_for_output = f"https://{_site_api_ctx_domain}/"
+        fn_url_domain = _site_api_ctx_domain
+        _site_api_fn_url_for_output = f"https://{_site_api_ctx_domain}/"
 
         # ADR-036 fix: AI Lambda split — separate origin for /api/ask and /api/board_ask
         # Set context "site_api_ai_fn_url_domain" from LifePlatformOperational output SiteApiAiFunctionUrlDomain
@@ -685,100 +647,6 @@ class WebStack(Stack):
             description="WAF WebACL ARN for averagejoematt.com CloudFront distribution (R17-01/SEC-02)",
         )
 
-        # ══════════════════════════════════════════════════════════════
-        # R17-03: CloudWatch dashboard + alarms for life-platform-site-api
-        # Lambda is in us-east-1 (WebStack); alarms must be in same region.
-        # Alarms: error rate >5%, p95 latency >5s, invocations >1000/hr.
-        # ══════════════════════════════════════════════════════════════
-        GTE = cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
-
-        site_api_errors = cloudwatch.Metric(
-            namespace="AWS/Lambda",
-            metric_name="Errors",
-            dimensions_map={"FunctionName": "life-platform-site-api"},
-            period=Duration.minutes(5),
-            statistic="Sum",
-        )
-        site_api_invocations = cloudwatch.Metric(
-            namespace="AWS/Lambda",
-            metric_name="Invocations",
-            dimensions_map={"FunctionName": "life-platform-site-api"},
-            period=Duration.minutes(5),
-            statistic="Sum",
-        )
-        site_api_duration_p95 = cloudwatch.Metric(
-            namespace="AWS/Lambda",
-            metric_name="Duration",
-            dimensions_map={"FunctionName": "life-platform-site-api"},
-            period=Duration.minutes(5),
-            statistic="p95",
-        )
-        site_api_duration_p50 = cloudwatch.Metric(
-            namespace="AWS/Lambda",
-            metric_name="Duration",
-            dimensions_map={"FunctionName": "life-platform-site-api"},
-            period=Duration.minutes(5),
-            statistic="p50",
-        )
-
-        # Alarm: error rate — any errors in 5-min window
-        cloudwatch.Alarm(
-            self, "SiteApiErrors",
-            alarm_name="site-api-errors",
-            metric=site_api_errors,
-            threshold=1,
-            evaluation_periods=1,
-            comparison_operator=GTE,
-            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
-        )
-
-        # Alarm: p95 latency > 5000ms
-        cloudwatch.Alarm(
-            self, "SiteApiLatencyHigh",
-            alarm_name="site-api-p95-latency-high",
-            metric=site_api_duration_p95,
-            threshold=5000,
-            evaluation_periods=1,
-            comparison_operator=GTE,
-            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
-        )
-
-        # Alarm: invocation spike > 1000/hr (200 per 5-min window)
-        cloudwatch.Alarm(
-            self, "SiteApiInvocationSpike",
-            alarm_name="site-api-invocation-spike",
-            metric=site_api_invocations,
-            threshold=200,
-            evaluation_periods=1,
-            comparison_operator=GTE,
-            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
-        )
-
-        # Dashboard: invocations, errors, p50/p95 latency, duration
-        cloudwatch.Dashboard(
-            self, "SiteApiDashboard",
-            dashboard_name="life-platform-site-api",
-            widgets=[
-                [
-                    cloudwatch.GraphWidget(
-                        title="Invocations",
-                        left=[site_api_invocations],
-                        width=8,
-                    ),
-                    cloudwatch.GraphWidget(
-                        title="Errors",
-                        left=[site_api_errors],
-                        width=8,
-                    ),
-                    cloudwatch.GraphWidget(
-                        title="Duration (p50 / p95)",
-                        left=[site_api_duration_p50, site_api_duration_p95],
-                        width=8,
-                    ),
-                ],
-            ],
-        )
-
         # ── Outputs
         cdk.CfnOutput(self, "DashboardDistributionId",
             value="EM5NPX6NJN095",
@@ -817,6 +685,8 @@ class WebStack(Stack):
         # OBS-07: email-subscriber error alarm
         # Silent conversion failures would lose subscribers without any alert.
         # ══════════════════════════════════════════════════════════════
+        GTE = cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
+
         cloudwatch.Alarm(
             self, "SubscriberErrors",
             alarm_name="email-subscriber-errors",

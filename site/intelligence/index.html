@@ -737,14 +737,14 @@ function setElFallback(id, fallback) {
 
 async function init() {
   const [charRes, corrRes, expRes, vitalsRes] = await Promise.allSettled([
-    fetch(`${API}/api/character`).then(r => r.json()),
-    fetch(`${API}/api/correlations`).then(r => r.json()),
-    fetch(`${API}/api/experiments`).then(r => r.json()),
-    fetch(`${API}/api/vitals`).then(r => r.json()),
+    fetch(`${API}/api/character`).then(r => r.ok ? r.json() : null),
+    fetch(`${API}/api/correlations`).then(r => r.ok ? r.json() : null),
+    fetch(`${API}/api/experiments`).then(r => r.ok ? r.json() : null),
+    fetch(`${API}/api/vitals`).then(r => r.ok ? r.json() : null),
   ]);
 
   // ── Character ────────────────────────────────────────────
-  if (charRes.status === 'fulfilled') {
+  if (charRes.status === 'fulfilled' && charRes.value) {
     const c = charRes.value;
     const level = c.character_level || c.level || '—';
     const tier  = c.character_tier  || c.tier  || '';
@@ -777,7 +777,7 @@ async function init() {
   }
 
   // ── Correlations ─────────────────────────────────────────
-  if (corrRes.status === 'fulfilled') {
+  if (corrRes.status === 'fulfilled' && corrRes.value) {
     const corr = corrRes.value.correlations || corrRes.value;
     const pairs = corr.pairs || [];
     const count = corr.count || pairs.length || '—';
@@ -801,7 +801,7 @@ async function init() {
   }
 
   // ── Experiments / Hypotheses ─────────────────────────────
-  if (expRes.status === 'fulfilled') {
+  if (expRes.status === 'fulfilled' && expRes.value) {
     const exps = expRes.value.experiments || [];
     const activeExps = exps.filter(e => e.status === 'active' || e.status === 'in_progress');
     const completedExps = exps.filter(e => e.status === 'completed');
@@ -817,7 +817,7 @@ async function init() {
   }
 
   // ── Vitals / Training ────────────────────────────────────
-  if (vitalsRes.status === 'fulfilled') {
+  if (vitalsRes.status === 'fulfilled' && vitalsRes.value) {
     const v = vitalsRes.value;
     // Try to surface training load data from vitals
     const ctl   = v.ctl   || v.fitness  || null;

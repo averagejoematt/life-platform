@@ -1513,7 +1513,7 @@ window.submitSuggestion = function() {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({idea: idea, source: source})
-  }).then(function(r) { return r.json(); }).then(function() {
+  }).then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function() {
     status.textContent = 'Thanks! The Board will review your suggestion.';
     document.getElementById('suggest-exp').value = '';
     document.getElementById('suggest-source').value = '';

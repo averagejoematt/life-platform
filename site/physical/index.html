@@ -1002,11 +1002,11 @@
   try {
     /* Fetch weight, journey, nutrition, training, and physical overview data in parallel */
     var results = await Promise.all([
-      fetch(API + '/api/weight_progress').then(function(r) { return r.json(); }),
-      fetch(API + '/api/journey').then(function(r) { return r.json(); }),
-      fetch(API + '/api/nutrition_overview').then(function(r) { return r.json(); }).catch(function() { return {}; }),
-      fetch(API + '/api/training_overview').then(function(r) { return r.json(); }).catch(function() { return {}; }),
-      fetch(API + '/api/physical_overview').then(function(r) { return r.json(); }).catch(function() { return {}; })
+      fetch(API + '/api/weight_progress').then(function(r) { return r.ok ? r.json() : {}; }),
+      fetch(API + '/api/journey').then(function(r) { return r.ok ? r.json() : {}; }),
+      fetch(API + '/api/nutrition_overview').then(function(r) { return r.ok ? r.json() : {}; }).catch(function() { return {}; }),
+      fetch(API + '/api/training_overview').then(function(r) { return r.ok ? r.json() : {}; }).catch(function() { return {}; }),
+      fetch(API + '/api/physical_overview').then(function(r) { return r.ok ? r.json() : {}; }).catch(function() { return {}; })
     ]);
     var weightData = (results[0].weight_progress || []);
     var j = results[1].journey;
@@ -1472,7 +1472,8 @@
     var aiEl = document.getElementById('p-ai-analysis');
     if (aiEl) {
       aiEl.innerHTML = '<div style="font-family:monospace;font-size:10px;color:var(--text-faint, rgba(255,255,255,0.3));letter-spacing:0.1em">LOADING DR. REYES\'S ASSESSMENT...</div>';
-      fetch(API + '/api/ai_analysis?expert=physical').then(function(r) { return r.json(); }).then(function(data) {
+      fetch(API + '/api/ai_analysis?expert=physical').then(function(r) { return r.ok ? r.json() : null; }).then(function(data) {
+        if (!data) { aiEl.innerHTML = '<div style="font-family:var(--font-serif);font-size:13px;color:var(--text-faint)">Analysis unavailable.</div>'; return; }
         if (!data.analysis) {
           aiEl.innerHTML = '<div style="font-family:var(--font-serif);font-size:13px;color:var(--text-faint)">Analysis generates weekly. Check back Monday.</div>';
           return;
@@ -1498,8 +1499,8 @@
 })();
 </script>
 <script>
-  fetch('/api/observatory_week?domain=physical').then(r=>r.json()).then(d=>{
-    if(d.last_updated) initObsFreshness(d.last_updated);
+  fetch('/api/observatory_week?domain=physical').then(r=>r.ok?r.json():null).then(d=>{
+    if(d&&d.last_updated) initObsFreshness(d.last_updated);
   }).catch(function(){});
 </script>
 

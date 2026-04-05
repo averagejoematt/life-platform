@@ -722,9 +722,9 @@ function renderAIAnalysisCard(containerId, expertKey, config) {
   el.innerHTML = '<div style="font-family:monospace;font-size:10px;color:var(--text-faint, rgba(255,255,255,0.3));letter-spacing:0.1em">LOADING ' + expert.name.toUpperCase() + '...</div>';
 
   fetch('/api/ai_analysis?expert=' + expertKey)
-    .then(function(r) { return r.json(); })
+    .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(data) {
-      if (!data.analysis) {
+      if (!data || !data.analysis) {
         el.innerHTML = '<div style="font-family:var(--font-serif);font-size:13px;color:rgba(255,255,255,0.3)">Analysis generates weekly. Check back Monday.</div>';
         return;
       }
