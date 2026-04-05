@@ -1088,8 +1088,8 @@
         var datasets = [
           {
             label: 'Daily Weight', data: raw,
-            borderColor: 'rgba(96,165,250,0.4)', backgroundColor: 'rgba(96,165,250,0.05)',
-            borderWidth: 1, pointRadius: 1.5, pointBackgroundColor: 'rgba(96,165,250,0.5)',
+            borderColor: 'rgba(96,165,250,0.6)', backgroundColor: 'rgba(96,165,250,0.12)',
+            borderWidth: 1.5, pointRadius: 2, pointBackgroundColor: 'rgba(96,165,250,0.7)',
             fill: true, tension: 0, order: 2
           },
           {
@@ -1103,14 +1103,14 @@
         if (startW) {
           datasets.push({
             label: 'Start (' + startW + ')', data: Array(data.length).fill(startW),
-            borderColor: 'rgba(239,68,68,0.3)', borderWidth: 1, borderDash: [5, 5],
+            borderColor: 'rgba(239,68,68,0.5)', borderWidth: 1.5, borderDash: [5, 5],
             pointRadius: 0, fill: false, order: 0
           });
         }
         if (goalW) {
           datasets.push({
             label: 'Goal (' + goalW + ')', data: Array(data.length).fill(goalW),
-            borderColor: 'rgba(62,207,142,0.3)', borderWidth: 1, borderDash: [5, 5],
+            borderColor: 'rgba(62,207,142,0.5)', borderWidth: 1.5, borderDash: [5, 5],
             pointRadius: 0, fill: false, order: 0
           });
         }

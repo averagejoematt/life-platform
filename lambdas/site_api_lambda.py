@@ -469,9 +469,9 @@ def handle_tools_baseline() -> dict:
         "sleep_hours": avg_val(current_whoop, "sleep_duration_hours"),
     }
 
-    # Weight — baseline from first week, current from latest
-    baseline_withings = _query_source("withings", EXPERIMENT_START, baseline_end)
-    baseline["weight_lbs"] = first_val(baseline_withings, "weight_lbs")
+    # Weight — baseline uses configured journey start weight (307), not first weigh-in (302)
+    _p = _get_profile()
+    baseline["weight_lbs"] = float(_p.get("journey_start_weight_lbs", 307))
 
     latest_withings = _latest_item("withings")
     current["weight_lbs"] = (round(float(latest_withings["weight_lbs"]))
@@ -5609,13 +5609,20 @@ def handle_weekly_physical_summary() -> dict:
     garmin_by_date = {(g.get("date") or g.get("sk", "").replace("DATE#", "")): g for g in garmin_items}
     ah_by_date = {(h.get("date") or h.get("sk", "").replace("DATE#", "")): h for h in ah_items}
 
-    # Flatten Strava activities by day
+    # Flatten Strava activities by day, dedup by activity ID
     from collections import defaultdict
     day_activities = defaultdict(list)
+    _seen_activity_ids = set()
     for s in strava_items:
-        d = s.get("date") or s.get("sk", "").replace("DATE#", "")
+        d = s.get("date") or s.get("sk", "").replace("DATE#", "")[:10]
         acts = s.get("activities") or [s]
         for a in acts:
+            # Dedup: skip if we've already seen this activity ID
+            _aid = str(a.get("activity_id") or a.get("id") or a.get("strava_id") or "")
+            if _aid and _aid in _seen_activity_ids:
+                continue
+            if _aid:
+                _seen_activity_ids.add(_aid)
             sport = a.get("sport_type") or a.get("type") or "Other"
             dur = float(a.get("duration_minutes") or a.get("moving_time_minutes") or
                         (a.get("moving_time_seconds") or 0) / 60 or 0)
@@ -6677,7 +6684,8 @@ def handle_observatory_week(qs: dict = None) -> dict:
             best = max(items, key=lambda i: float(i.get("sleep_duration_hours", 0)), default={})
             worst = min(items, key=lambda i: float(i.get("sleep_duration_hours", 99)), default={})
 
-            eff_vals = [float(i.get("sleep_quality_score", 0)) for i in items if i.get("sleep_quality_score")]
+            eff_vals = [float(i.get("sleep_quality_score") or i.get("sleep_efficiency_pct") or 0)
+                       for i in items if i.get("sleep_quality_score") or i.get("sleep_efficiency_pct")]
             best_eff = max(eff_vals) if eff_vals else None
 
             summary = {
