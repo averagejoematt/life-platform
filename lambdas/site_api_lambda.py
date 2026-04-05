@@ -40,11 +40,14 @@ DEPLOYMENT:
     6. Add to CDK: compute_stack.py or new web_api_stack.py
 
 IAM ROLE:
-    Read-only:
+    Primary (read):
       dynamodb:GetItem, Query on life-platform table
-      s3:GetObject on matthew-life-platform/config/*
-    NO write permissions whatsoever.
-    NO access to Secrets Manager.
+      s3:GetObject on matthew-life-platform/config/*, generated/*
+    Limited writes (interactive features only):
+      dynamodb:PutItem, UpdateItem — scoped to vote/follow/checkin/suggestion records
+      s3:PutObject on matthew-life-platform/generated/findings/*
+    AI endpoints:
+      secretsmanager:GetSecretValue on life-platform/site-api-ai-key
     NO access to MCP server.
 
 v1.0.0 — 2026-03-16
@@ -321,7 +324,7 @@ def _ok(data: dict, cache_seconds: int = 300) -> dict:
 def _error(status: int, message: str) -> dict:
     return {
         "statusCode": status,
-        "headers": CORS_HEADERS,
+        "headers": {**CORS_HEADERS, "Cache-Control": "no-cache, no-store"},
         "body": json.dumps({"error": message}),
     }
 
@@ -3697,7 +3700,7 @@ def _handle_submit_finding(event: dict) -> dict:
 
     # Write to S3
     S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
-    s3_key = f"site/findings/{datetime.now(timezone.utc).strftime('%Y-%m-%d')}_{finding_id}.json"
+    s3_key = f"generated/findings/{datetime.now(timezone.utc).strftime('%Y-%m-%d')}_{finding_id}.json"
     try:
         s3_client = boto3.client("s3", region_name=S3_REGION)
         s3_client.put_object(
@@ -4280,8 +4283,18 @@ def handle_pulse() -> dict:
             )
             _strava_items = _strava_today.get("Items", [])
             if _strava_items:
-                trained_today = True
-                workout_type = _strava_items[0].get("activity_type") or _strava_items[0].get("type") or "Activity"
+                # Only count strength-type activities for the lift glyph — not walks/runs/rides
+                _LIFT_TYPES = {"WeightTraining", "Crossfit", "Workout", "HIIT", "Yoga", "RockClimbing"}
+                for _act in _strava_items[0].get("activities", []):
+                    _act_m = _act.get("M", _act) if isinstance(_act, dict) else _act
+                    _atype = (_act_m.get("sport_type", {}).get("S", "") if isinstance(_act_m.get("sport_type"), dict)
+                              else str(_act_m.get("sport_type", "")))
+                    if _atype in _LIFT_TYPES:
+                        trained_today = True
+                        _aname = (_act_m.get("name", {}).get("S", "") if isinstance(_act_m.get("name"), dict)
+                                  else str(_act_m.get("name", "")))
+                        workout_type = _aname or _atype or "Strength"
+                        break
         except Exception:
             pass
 
