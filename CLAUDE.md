@@ -68,9 +68,9 @@ python3 mcp_bridge.py
 
 **S3 prefix separation (ADR-046)** — Lambda-generated files (public_stats.json, character_stats.json, OG images, journal posts) live in `generated/` prefix, NOT `site/`. CloudFront routes generated-file URLs to S3GeneratedOrigin. This makes `aws s3 sync site/ --delete` structurally safe — it cannot touch generated content.
 
-**Site API is read-only** — the site-api Lambda must never write to DynamoDB. This is a hard constraint.
+**Site API is primarily read-only** — the site-api Lambda reads from DynamoDB/S3 for all data endpoints. Limited writes exist for interactive features only: experiment/challenge votes, follows, checkins, experiment suggestions, and user-submitted findings (S3). Core data queries must never write.
 
-**Rate limiting is in-memory** — `ask` (5 anon/20 subscriber per hour), `board_ask` (5 per IP per hour). No DynamoDB writes for rate state.
+**Rate limiting is in-memory** — `ask` (5 anon/20 subscriber per hour), `board_ask` (5 per IP per hour). Vote/follow rate limits use DynamoDB atomic counters with TTL.
 
 **EventBridge crons use fixed UTC** — no DST drift. All schedules in `cdk/stacks/` must be UTC-fixed.
 

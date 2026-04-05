@@ -2045,9 +2045,9 @@ def lambda_handler(event, context):
                     "zone2_target_min":     150,
                 },
                 platform={
-                    "mcp_tools":          95,
-                    "data_sources":       19,
-                    "lambdas":            50,
+                    "mcp_tools":          121,
+                    "data_sources":       26,
+                    "lambdas":            62,
                     "last_review_grade":  "A-",
                     "tier0_streak":       _tier0_streak,
                     "days_in":            _days_in,

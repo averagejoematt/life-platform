@@ -46,7 +46,7 @@ def _get_published_posts(max_posts=3):
     """Read posts.json from S3 to get actually-published Chronicle posts.
     Returns list of dicts with label, title, path — or FALLBACK_PAGES if none exist."""
     try:
-        resp = s3.get_object(Bucket=S3_BUCKET, Key="site/chronicle/posts.json")
+        resp = s3.get_object(Bucket=S3_BUCKET, Key="generated/journal/posts.json")
         data = json.loads(resp["Body"].read())
         posts = data.get("posts", data) if isinstance(data, dict) else data
         # Only include published posts with valid URLs
