@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-04-04 (v4.9.0 — 62 Lambdas, 10 active secrets, 115 MCP tools, ~66 alarms)
+> Last updated: 2026-04-05 (v5.2.0 — 63 Lambdas, 10 active secrets, 115 MCP tools, ~66 alarms)
 
 ---
 
@@ -154,7 +154,7 @@ All under prefix `life-platform/`. No values stored in this doc — access via A
 
 ---
 
-## Lambdas (62)
+## Lambdas (63)
 
 60 CDK-managed (us-west-2) + 2 Lambda@Edge (us-east-1)
 
