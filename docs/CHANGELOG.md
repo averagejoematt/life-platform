@@ -1,3 +1,68 @@
+## v5.0.0 — Design & Product Review + Architecture A- (2026-04-04)
+
+Major milestone: first full design and product review (DPR-1) across 56 items in two phases, architecture review R20 earning A- grade, S3 prefix separation (ADR-046), and 27 production bug fixes.
+
+### Architecture Review #20 (A- grade)
+- R20 findings F01–F05 all resolved in-session
+- MCP tools synced 115→121 (6 new tools registered)
+- Architecture docs, INFRASTRUCTURE.md, RUNBOOK.md updated to match reality
+- `generate_review_bundle.py` Section 13b updated with R20 findings table
+
+### DPR-1: Design & Product Review — Phase 1 (43 items, 13 pages)
+- Full visual and functional audit of 13 site pages
+- Engagement pulse history feed (`engagement.js`) with daily log entries from April 1
+- Field notes token display fix
+- Character event log detail enrichment
+- Habitify vice streak timing bug resolved
+
+### DPR-1: Design & Product Review — Phase 2 (13 items across Practice + Platform + Chronicle + Utility)
+- Practice, Platform, Chronicle, and Utility page improvements
+- Mobile home page fixes: gauge overflow on small screens, hamburger menu scroll lock
+- Achievements: 14 weight milestone badges (10 loss every 10 lbs + 4 target sub-280/250/220/200)
+- Achievements: Arena→Challenge badge rename
+- Active challenge status matching fix
+
+### ADR-046: S3 Prefix Separation
+- `site/` prefix for static site assets, `generated/` prefix for Lambda-written files
+- Prevents `safe_sync.sh --delete` from removing Lambda-generated files during deploys
+- Bucket policy updated to protect `config/*` and `data/*` directories
+
+### New Endpoints & Features
+- `/api/pulse_history` — daily log feed from April 1 onward
+- Sleep observatory: `best_efficiency` field added
+- Glucose observatory: fixed source `dexcom`→`apple_health`, corrected field names
+- Glucose: added to allowed AI analysis expert keys
+- Observatory week + weight_progress: experiment date clamping to EXPERIMENT_START
+
+### Production Bug Fixes (27 issues across 3 sweeps)
+- `safe_sync.sh`: excludes Lambda-generated files from `--delete` (character_stats.json and others)
+- `safe_sync.sh`: complete exclude list for all Lambda-generated files
+- Config and data directory protection from S3 sync `--delete`
+- 8 user-reported issues from production spot check (commit `bad4a80`)
+- 9 user-reported production issues (commit `4980e23`)
+- Achievements 10lb badge threshold fix
+- Challenges active status matching corrected
+
+### Light Mode Compatibility
+- AI expert cards: moved outside try/catch blocks
+- AI expert cards: light mode CSS variables added for proper theming
+
+### Infrastructure & CI/CD
+- Shared Lambda layer: v22→v25
+- Full pytest suite wired into CI/CD pipeline
+- Claude Code config: `/deploy` command, `/qa` command, `.mcp.json`
+- `google_calendar_lambda.py` deleted (ADR-030 — calendar integration removed)
+- Product review prompt PR-1 added, duplicate field notes spec removed
+
+### Documentation
+- DPR-1 review documents (Phase 1 + Phase 2), implementation brief, execution prompt
+- CLAUDE.md updated for v5.0.0 conventions
+- DECISIONS.md updated with ADR-046
+- INTELLIGENCE_LAYER.md updated for v4.8.0 AI overhaul
+- HANDOVER_LATEST.md refreshed
+
+---
+
 ## v4.9.0-docs — Documentation Sprint: R19 Path to A- (2026-04-04)
 
 Dedicated documentation session resolving all 7 R19 architecture review findings. No code or deploy changes — docs only.
