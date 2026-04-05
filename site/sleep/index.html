@@ -1531,15 +1531,15 @@
 <section class="s-adherence reveal">
   <div class="s-section-header">Protocol Adherence</div>
   <div class="s-adherence__grid">
-    <div class="s-adherence__card">
-      <div class="s-adherence__name">10pm bedtime window</div>
+    <div class="s-adherence__card" id="s-adh-onset-card">
+      <div class="s-adherence__name">Sleep Onset &lt; 11:00 PM</div>
       <div class="s-adherence__bar-row">
         <div class="s-adherence__bar-track">
-          <div class="s-adherence__bar-fill" id="s-adh-bedtime-bar" style="width:70%"></div>
+          <div class="s-adherence__bar-fill" id="s-adh-bedtime-bar" style="width:0%"></div>
         </div>
-        <div class="s-adherence__pct" id="s-adh-bedtime-pct">70%</div>
+        <div class="s-adherence__pct" id="s-adh-bedtime-pct">&mdash;</div>
       </div>
-      <div class="s-adherence__outcome">Tracking impact on HRV<br>Measuring adherent vs non-adherent nights</div>
+      <div class="s-adherence__outcome" id="s-adh-onset-outcome">Calculating from sleep data&hellip;</div>
     </div>
     <div class="s-adherence__card">
       <div class="s-adherence__name">Screen-off by 9pm</div>
@@ -1644,6 +1644,14 @@
   <div class="s-context">
     Sleep is the upstream variable. Every other domain in this system — training, nutrition, cognitive performance — is downstream of sleep quality. These connections are not theoretical; they are measured daily in this dataset.
   </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     AI EXPERT ANALYSIS — Dr. Park's Sleep Analysis
+     ════════════════════════════════════════════════════════════ -->
+<section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal">
+  <div class="s-section-header">Dr. Park's Sleep Analysis</div>
+  <div id="s-ai-analysis"></div>
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -1765,6 +1773,12 @@
   fetch('/api/observatory_week?domain=sleep').then(r=>r.ok?r.json():null).then(d=>{
     if(d&&d.last_updated) initObsFreshness(d.last_updated);
   }).catch(function(){});
+  // AI expert analysis card
+  if (typeof renderAIAnalysisCard === 'function') {
+    renderAIAnalysisCard('s-ai-analysis', 'sleep', {
+      dataSources: 'Whoop sleep data, Eight Sleep temperature data, and recovery metrics'
+    });
+  }
 </script>
 <script src="/assets/js/reveal.js"></script>
 <script>
@@ -2208,6 +2222,62 @@
       document.getElementById('s-arch-rem').setAttribute('d', aRemPath);
       document.getElementById('s-arch-light').setAttribute('d', aLightPath);
     });
+
+    /* ── PB-07: Protocol Adherence — Sleep Onset < 11pm PT ────────── */
+    (function calcOnsetAdherence() {
+      var TARGET_HOUR = 23; // 11:00 PM PT
+      var PT_OFFSET = -7;   // UTC-7 (PDT)
+      var met = 0, missed = 0;
+      var recMet = [], recMissed = [];
+
+      allTrend.forEach(function(day) {
+        if (!day.sleep_start) return;
+        // Convert UTC sleep_start to PT hour
+        var d = new Date(day.sleep_start);
+        var ptHour = d.getUTCHours() + PT_OFFSET;
+        if (ptHour < 0) ptHour += 24;
+        // Sleep starts in the evening (after noon PT) count; early morning is "missed" previous night
+        var onsetHour = ptHour;
+        if (ptHour < 12) onsetHour = ptHour + 24; // treat 1am as "25:00" = very late
+
+        if (onsetHour < TARGET_HOUR) {
+          met++;
+          if (day.recovery_score != null) recMet.push(day.recovery_score);
+        } else {
+          missed++;
+          if (day.recovery_score != null) recMissed.push(day.recovery_score);
+        }
+      });
+
+      var total = met + missed;
+      if (total === 0) return;
+
+      var pct = Math.round((met / total) * 100);
+      setText('s-adh-bedtime-pct', pct + '%');
+      setWidth('s-adh-bedtime-bar', pct);
+
+      // Build outcome text with recovery delta
+      var avgMet = recMet.length ? Math.round(recMet.reduce(function(a,b){return a+b},0) / recMet.length) : null;
+      var avgMissed = recMissed.length ? Math.round(recMissed.reduce(function(a,b){return a+b},0) / recMissed.length) : null;
+      var outcome = met + '/' + total + ' days met';
+
+      if (avgMet !== null && avgMissed !== null && recMet.length >= 3 && recMissed.length >= 3) {
+        var delta = avgMet - avgMissed;
+        var sign = delta >= 0 ? '+' : '';
+        outcome += '<br>When met: Avg recovery ' + avgMet + '%';
+        outcome += '<br>When missed: Avg recovery ' + avgMissed + '%';
+        outcome += '<br>Delta: ' + sign + delta + '% recovery';
+        if (total < 30) {
+          outcome += ' <span style="font-size:9px;color:var(--s-amber);letter-spacing:0.08em;">N=' + total + ', preliminary</span>';
+        }
+      } else if (total < 10) {
+        outcome += '<br><span style="font-size:9px;color:var(--s-amber);letter-spacing:0.08em;">Insufficient data for recovery comparison (N=' + total + ')</span>';
+      } else {
+        outcome += '<br>Recovery delta: calculating (need data on both sides)';
+      }
+
+      document.getElementById('s-adh-onset-outcome').innerHTML = outcome;
+    })();
 
     loading.style.display = 'none';
     content.style.display = 'block';

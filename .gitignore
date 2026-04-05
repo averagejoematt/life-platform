@@ -56,3 +56,4 @@ token*.json
 # Session briefs (ephemeral, regenerated per session)
 CLAUDE_CODE_BRIEF*.md
 docs/CLAUDE_CODE_BRIEF*.md
+cdk/_mcp_staging/

@@ -10,12 +10,12 @@
 
 ## Table of Contents
 
-1. [DISC-7 — Annotation Testing & Seeding](#disc-7)
+1. [DISC-7 — Annotation Testing & Seeding](#disc-7) ✅ DONE
 2. [HP-12 — Elena Hero Line Backend Caller](#hp-12) ✅ DONE
 3. [HP-13 — Share Card Lambda + Dynamic OG Image](#hp-13) ✅ DONE
 4. [BL-01 — For Builders Page](#bl-01) ✅ DONE
 5. [BL-02 — Bloodwork/Labs Page](#bl-02) ✅ DONE
-6. [get_nutrition — Positional Args Bug](#get-nutrition-bug)
+6. [get_nutrition — Positional Args Bug](#get-nutrition-bug) ✅ DONE
 
 ---
 
