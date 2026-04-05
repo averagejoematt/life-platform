@@ -10,7 +10,7 @@
 
 ## System in 60 Seconds
 
-The Life Platform is a personal health intelligence system. It pulls data from 26 sources (wearables, apps, food logs, labs), stores everything in DynamoDB, and makes it queryable by Claude through 121 MCP tools. A pipeline of 62 Lambdas runs daily: ingestion (6:45-9 AM PT) feeds compute (10:20-10:35 AM) which feeds the daily brief email + website update (11 AM). The public website at averagejoematt.com has 72 pages serving real-time health data.
+The Life Platform is a personal health intelligence system. It pulls data from 26 sources (wearables, apps, food logs, labs), stores everything in DynamoDB, and makes it queryable by Claude through 115 MCP tools. A pipeline of 62 Lambdas runs daily: ingestion (6:45-9 AM PT) feeds compute (10:20-10:35 AM) which feeds the daily brief email + website update (11 AM). The public website at averagejoematt.com has 72 pages serving real-time health data.
 
 Monthly cost: ~$19 (including WAF). All infrastructure is CDK-managed across 8 stacks.
 

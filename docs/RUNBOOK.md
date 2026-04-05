@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-Last updated: 2026-04-04 (v4.9.0 — 121 MCP tools, 35-module package, 62 Lambdas, 26 data sources, 72 site pages)
+Last updated: 2026-04-04 (v4.9.0 — 115 MCP tools, 35-module package, 62 Lambdas, 26 data sources, 72 site pages)
 
 ---
 
@@ -65,7 +65,7 @@ aws s3api delete-bucket-policy --bucket matthew-life-platform
 
 ## Shared Lambda Layer
 
-**Current version:** v22. Rebuild with `bash deploy/build_layer.sh`. 16 Lambdas consume the layer.
+**Current version:** v26. Rebuild with `bash deploy/build_layer.sh`. 16 Lambdas consume the layer.
 
 Modules included: `ai_calls.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, `character_engine.py`, `digest_utils.py`, `insight_writer.py`, `retry_utils.py`, `ai_output_validator.py`, `platform_logger.py`, `ingestion_framework.py`, `ingestion_validator.py`, `item_size_guard.py`, `html_builder.py`.
 

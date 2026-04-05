@@ -69,6 +69,7 @@ When a significant decision is made — a design pattern chosen, an approach rej
 | ADR-043 | Challenge/Protocol/Experiment taxonomy: three behavioral tiers | ✅ Active | 2026-03-26 |
 | ADR-044 | Measurements ingestion via S3 trigger over EventBridge cron | ✅ Active | 2026-03-29 |
 | ADR-045 | SIMP-1 Phase 2: Accept 115 MCP tools as operating state | ✅ Active | 2026-03-30 |
+| ADR-046 | S3 prefix separation: static vs generated content | ✅ Active | 2026-04-05 |
 
 ---
 

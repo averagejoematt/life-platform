@@ -1,3 +1,5 @@
+**DEPRECATED** -- This manifest is outdated. See docs/ARCHITECTURE.md for current Lambda inventory.
+
 # Deploy Manifest — Life Platform
 
 > Per PIR-2026-02-28 recommendation E. Documents handler, deps, IAM role, and deploy script for every Lambda.
