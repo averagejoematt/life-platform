@@ -18,6 +18,7 @@
   <meta name="theme-color" content="#080c0a">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/observatory-v3.css">
   <style>
     :root {
       --p-blue: #60a5fa;
@@ -687,22 +688,21 @@
 
 
 <!-- ════════════════════════════════════════════════════════════
-     HERO — Weight journey narrative + gauge rings
+     V3 Section 1: STATUS BAR — rendered by observatory-v3.js
      ════════════════════════════════════════════════════════════ -->
-<div class="p-hero">
+<div id="obs-v3-status"></div>
+
+<!-- ════════════════════════════════════════════════════════════
+     V3 Section 2: COACH ANALYSIS — rendered by observatory-v3.js
+     ════════════════════════════════════════════════════════════ -->
+<div id="obs-v3-coach"></div>
+
+<!-- ════════════════════════════════════════════════════════════
+     HERO — Gauge rings (data-driven, kept in main flow)
+     ════════════════════════════════════════════════════════════ -->
+<div class="p-hero" style="padding-top:var(--space-4);">
   <div class="p-hero-grid">
-    <div>
-      <div class="p-hero__eyebrow">Physical Observatory</div>
-      <h1 class="p-hero__title">The number that <em>started it all.</em></h1>
-      <p class="p-hero__sub">
-        307 lbs on Day 1. If you look at the weight data going back to 2011,
-        a pattern emerges: long disappearances, a sharp reappearance at a high,
-        an aggressive drop, then the cycle repeats. The scale isn&rsquo;t a confession
-        &mdash; it&rsquo;s a pattern detector. This page is where I watch whether this time breaks it.
-      </p>
-      <p class="p-hero__sub-detail">
-        Data from Withings scale. Updated daily.
-      </p>
+    <div style="display:none"><!-- Editorial moved to depth section -->
     </div>
     <div class="p-gauge-row">
       <div class="p-gauge">
@@ -781,19 +781,7 @@
 <div id="p-loading" class="p-loading">LOADING PHYSICAL DATA&hellip;</div>
 <div id="p-content" style="display:none">
 
-<!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE
-     ════════════════════════════════════════════════════════════ -->
-<div class="p-pullquote reveal">
-  <div class="p-pullquote__watermark">01</div>
-  <div class="p-pullquote__text">
-    The scale is the <em>least interesting</em> number here.
-    The trajectory is the story.
-  </div>
-  <div class="p-pullquote__attr">
-    <span class="p-pullquote__badge">Observation &middot; Verified</span>
-  </div>
-</div>
+<!-- Pull-quote moved to depth section -->
 
 <!-- ════════════════════════════════════════════════════════════
      WEIGHT TRAJECTORY CHART
@@ -849,13 +837,7 @@
   <div class="projection-caveat" id="projection-caveat" style="display:none"></div>
 </section>
 
-<!-- ════════════════════════════════════════════════════════════
-     AI EXPERT ANALYSIS
-     ════════════════════════════════════════════════════════════ -->
-<section class="p-ai-section reveal">
-  <div class="p-section-header">Dr. Reyes's Assessment</div>
-  <div id="p-ai-analysis"></div>
-</section>
+<!-- AI expert analysis now rendered by V3 coach at position 2 -->
 
 <!-- ════════════════════════════════════════════════════════════
      V2: WEIGHT VS CALORIES — dual-axis chart
@@ -935,39 +917,14 @@
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
-     CROSS-LINKS
+     V3 Section 5: CROSS-DOMAIN
      ════════════════════════════════════════════════════════════ -->
-<div class="p-xref reveal">
-  <a href="/nutrition/" class="p-xref-card">
-    <div class="p-xref-card__title">Nutrition Observatory &rarr;</div>
-    <div class="p-xref-card__sub">Calories, protein adherence, and what fueling a deficit looks like.</div>
-  </a>
-  <a href="/training/" class="p-xref-card">
-    <div class="p-xref-card__title">Training Observatory &rarr;</div>
-    <div class="p-xref-card__sub">Zone 2, strength sessions, and the exercise that protects lean mass.</div>
-  </a>
-</div>
+<div id="obs-v3-cross"></div>
 
 <!-- ════════════════════════════════════════════════════════════
-     METHODOLOGY
+     V3 Section 6: DEPTH (Collapsed)
      ════════════════════════════════════════════════════════════ -->
-<div class="p-method reveal">
-  <div class="p-section-header">Methodology</div>
-  <div class="p-method-grid">
-    <div>
-      <div class="p-method-col__title">Withings Scale</div>
-      <div class="p-method-col__text">Daily weigh-ins via Withings Body+ smart scale. Weight synced to DynamoDB via API. Raw readings &mdash; no smoothing applied at ingestion.</div>
-    </div>
-    <div>
-      <div class="p-method-col__title">Moving Average</div>
-      <div class="p-method-col__text">7-day rolling average computed client-side from raw daily readings. Smooths water weight fluctuations to reveal the real trajectory.</div>
-    </div>
-    <div>
-      <div class="p-method-col__title">Weekly Rate</div>
-      <div class="p-method-col__text">Linear regression on the most recent 28 days of data. Projected goal date extrapolates from this rate assuming sustained adherence.</div>
-    </div>
-  </div>
-</div>
+<div id="obs-v3-depth"></div>
 
 </div><!-- /p-content -->
 
@@ -980,11 +937,20 @@
 
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
+<script src="/assets/js/observatory-v3.js"></script>
 <script src="/assets/js/nav.js"></script>
 <script src="/assets/js/engagement.js"></script>
 <script src="/assets/js/reveal.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
+/* ── V3: Coach Analysis (position 2) — fires immediately ── */
+renderCoachAnalysis('obs-v3-coach', 'physical', {
+  name: 'Dr. Victor Reyes',
+  initials: 'VR',
+  title: 'Longevity physician — body composition specialist',
+  color: '#60a5fa'
+});
+
 (async function() {
   var API = 'https://averagejoematt.com';
   var loading = document.getElementById('p-loading');
@@ -1059,6 +1025,26 @@
       caveatEl.innerHTML = '<span class="projection-caveat__icon">&#9889;</span> Projection based on <strong>' + dataDays + ' days</strong> \u2014 stabilizes after 4 weeks. Current rate (' + rateStr + ') is early-phase water weight loss, not sustained fat loss.';
       caveatEl.style.display = '';
     }
+
+    /* ── V3 Status Bar (Section 1) ── */
+    renderStatusBar('obs-v3-status', [
+      {label: 'Current weight', value: curW ? Math.round(curW) : null, unit: 'lbs', delta: null, context: j.data_days ? j.data_days + ' days tracked' : ''},
+      {label: 'Total lost', value: lostLbs ? Math.round(lostLbs * 10) / 10 : null, unit: 'lbs', delta: null, context: 'Since ' + (j.started_date || 'Day 1')},
+      {label: 'Weekly rate', value: rate ? Math.abs(rate).toFixed(1) : null, unit: 'lbs/wk', delta: null, context: 'Goal: 1-2 lbs/wk'},
+      {label: 'Body fat', value: null, unit: '%', delta: null, context: 'Next DEXA pending'}
+    ], {});
+
+    /* ── V3 Cross-Domain (Section 5) ── */
+    renderCrossDomain('obs-v3-cross', [
+      {title: 'Physical → Nutrition', finding: 'Caloric deficit fueling the weight trajectory. Protein adherence protects lean mass.', link: '/nutrition/'},
+      {title: 'Physical → Training', finding: 'Zone 2 and strength sessions preserve lean mass during aggressive deficit.', link: '/training/'}
+    ]);
+
+    /* ── V3 Depth Sections (Section 6) ── */
+    renderDepth('obs-v3-depth', [
+      {label: 'About this observatory', id: 'about', content: '<h2 style="font-family:var(--font-display);font-size:24px;margin:0 0 12px;">The number that <em>started it all.</em></h2><p>307 lbs on Day 1. If you look at the weight data going back to 2011, a pattern emerges: long disappearances, a sharp reappearance at a high, an aggressive drop, then the cycle repeats. The scale isn\u2019t a confession \u2014 it\u2019s a pattern detector. This page is where I watch whether this time breaks it.</p><p style="font-style:italic;border-left:2px solid var(--text-faint);padding-left:16px;color:var(--text-muted);">The scale is the <em>least interesting</em> number here. The trajectory is the story.</p>'},
+      {label: 'Measurement protocol', id: 'protocol', content: '<p><strong>Withings Scale</strong> — Daily weigh-ins via Withings Body+ smart scale. Weight synced to DynamoDB via API. Raw readings \u2014 no smoothing applied at ingestion.</p><p><strong>Moving Average</strong> — 7-day rolling average computed client-side from raw daily readings. Smooths water weight fluctuations to reveal the real trajectory.</p><p><strong>Weekly Rate</strong> — Linear regression on the most recent 28 days of data. Projected goal date extrapolates from this rate assuming sustained adherence.</p>'}
+    ]);
 
     /* ── Weight Trajectory Chart ── */
     /* Show content early so Chart.js can read canvas dimensions */
@@ -1468,27 +1454,7 @@
       }
     }
 
-    /* ── AI Expert Analysis Card ── */
-    var aiEl = document.getElementById('p-ai-analysis');
-    if (aiEl) {
-      aiEl.innerHTML = '<div style="font-family:monospace;font-size:10px;color:var(--text-faint, rgba(255,255,255,0.3));letter-spacing:0.1em">LOADING DR. REYES\'S ASSESSMENT...</div>';
-      fetch(API + '/api/ai_analysis?expert=physical').then(function(r) { return r.ok ? r.json() : null; }).then(function(data) {
-        if (!data) { aiEl.innerHTML = '<div style="font-family:var(--font-serif);font-size:13px;color:var(--text-faint)">Analysis unavailable.</div>'; return; }
-        if (!data.analysis) {
-          aiEl.innerHTML = '<div style="font-family:var(--font-serif);font-size:13px;color:var(--text-faint)">Analysis generates weekly. Check back Monday.</div>';
-          return;
-        }
-        var date = data.generated_at ? new Date(data.generated_at).toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'}) : '';
-        aiEl.innerHTML = '<div style="border-left:3px solid var(--p-blue);padding:20px 24px;background:var(--surface-raised, rgba(255,255,255,0.02))">' +
-          '<div style="font-family:monospace;font-size:11px;color:var(--p-blue);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:12px">Dr. Victor Reyes\'s Assessment</div>' +
-          '<div style="font-family:var(--font-serif);font-size:15px;line-height:1.75;color:var(--text, rgba(255,255,255,0.82))">' +
-          data.analysis.split('\n\n').map(function(p) { return '<p style="margin-top:12px">' + p + '</p>'; }).join('') + '</div>' +
-          '<div style="margin-top:16px;font-family:monospace;font-size:10px;color:var(--text-muted, rgba(255,255,255,0.25));letter-spacing:0.08em">' +
-          'Generated ' + date + ' · Based on DEXA, measurements, and weight trajectory</div></div>';
-      }).catch(function() {
-        aiEl.innerHTML = '<div style="font-family:var(--font-serif);font-size:13px;color:var(--text-faint)">Analysis unavailable.</div>';
-      });
-    }
+    /* AI expert analysis now rendered by V3 coach at position 2 (renderCoachAnalysis above) */
 
     /* content already shown before chart section */
 

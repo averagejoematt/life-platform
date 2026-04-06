@@ -19,6 +19,7 @@
   <meta name="theme-color" content="#080c0a">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/observatory-v3.css">
   <style>
     :root {
       --g-teal: #2dd4bf;
@@ -990,20 +991,21 @@
 
 
 <!-- ════════════════════════════════════════════════════════════
+     V3 Section 1: STATUS BAR — rendered by observatory-v3.js
+     ════════════════════════════════════════════════════════════ -->
+<div id="obs-v3-status"></div>
+
+<!-- ════════════════════════════════════════════════════════════
+     V3 Section 2: COACH ANALYSIS — rendered by observatory-v3.js
+     ════════════════════════════════════════════════════════════ -->
+<div id="obs-v3-coach"></div>
+
+<!-- ════════════════════════════════════════════════════════════
      9b: MERGED HERO — narrative intro + gauges as payoff
      ════════════════════════════════════════════════════════════ -->
 <section class="g-hero">
   <div class="g-hero-grid">
-    <div>
-      <div class="g-hero__eyebrow">Glucose Observatory</div>
-      <h1 class="g-hero__title">The number that <em>changed what I eat.</em></h1>
-      <p class="g-hero__sub">
-        When continuous glucose monitors became available to non-diabetics at an
-        affordable price, I wanted to understand how my body actually responds to
-        specific foods. Not from a nutrition label &mdash; from my own bloodstream, in
-        real time. Every meal becomes a data point. Every spike tells a story.
-      </p>
-      <p class="g-hero__meta">Data from Dexcom Stelo CGM. 30-day rolling window. 288 readings/day.</p>
+    <div style="display:none"><!-- Editorial moved to depth section -->
     </div>
     <div class="g-gauge-row">
     <div class="g-gauge">
@@ -1465,94 +1467,18 @@
 </div><!-- /g-content -->
 
 <!-- ════════════════════════════════════════════════════════════
-     CROSS-LINKS
+     V3 Section 5: CROSS-DOMAIN
      ════════════════════════════════════════════════════════════ -->
-<div class="g-xref reveal">
-  <a href="/nutrition/" class="g-xref-card">
-    <div class="g-xref-card__tag">MacroFactor &times; Dexcom Stelo</div>
-    <div class="g-xref-card__text">Each meal scored against CGM glucose response. Protein-first meals consistently produce the lowest spikes.</div>
-  </a>
-  <a href="/character/" class="g-xref-card">
-    <div class="g-xref-card__tag">Metabolic Pillar &mdash; 1 of 7</div>
-    <div class="g-xref-card__text">Glucose variability and time-in-range factor into the Body pillar in the Character Sheet.</div>
-  </a>
-</div>
+<div id="obs-v3-cross"></div>
 
 <!-- ════════════════════════════════════════════════════════════
-     NARRATIVE
+     V3 Section 6: DEPTH (Collapsed)
      ════════════════════════════════════════════════════════════ -->
-<section class="g-narrative reveal">
-  <div>
-    <h2 class="g-narrative__title">288 readings per day<br>vs <em>one fasting number</em></h2>
-    <div class="g-narrative__body">
-      <p>A fasting glucose test gives you one snapshot taken after 8+ hours without food.
-      <strong>It captures none of the metabolic action</strong>: not what happens after meals,
-      not whether glucose spikes at 2am, not whether a salad or a steak drives different
-      post-meal curves in your body specifically.</p>
-      <p>A continuous glucose monitor reads glucose every 5 minutes, 24 hours a day.
-      The additional signal includes glucose variability, post-meal spike magnitude,
-      nocturnal patterns, and how specific foods interact with <strong>your individual
-      physiology</strong> &mdash; not population averages.</p>
-      <p>Time-in-range is now considered a more actionable metric than HbA1c because
-      it responds to intervention within days, not months.</p>
-    </div>
-  </div>
-  <div class="g-protocol-list">
-    <div class="g-protocol-item">
-      <div class="g-protocol-num">01</div>
-      <div class="g-protocol-text"><strong>Dexcom Stelo CGM</strong> &mdash; worn continuously, no prescription required. Replaced every 15 days. Syncs to life-platform automatically.</div>
-    </div>
-    <div class="g-protocol-item">
-      <div class="g-protocol-num">02</div>
-      <div class="g-protocol-text"><strong>Target TIR &gt;90%</strong> in the 70&ndash;180 mg/dL range and &gt;70% in the tighter 70&ndash;120 optimal window.</div>
-    </div>
-    <div class="g-protocol-item">
-      <div class="g-protocol-num">03</div>
-      <div class="g-protocol-text"><strong>Protein-first meals</strong> moved the needle most. Eating protein and fat before carbs blunts the spike by slowing gastric emptying.</div>
-    </div>
-    <div class="g-protocol-item">
-      <div class="g-protocol-num">04</div>
-      <div class="g-protocol-text"><strong>10-minute walk after eating</strong> consistently drops post-meal peak. Muscle contraction creates glucose uptake independent of insulin.</div>
-    </div>
-    <div class="g-protocol-item">
-      <div class="g-protocol-num">05</div>
-      <div class="g-protocol-text"><strong>Reducing refined carbs</strong> eliminated the majority of &gt;140 readings. Whole-food carbs with fiber produce much smaller spikes.</div>
-    </div>
-  </div>
-</section>
+<div id="obs-v3-depth"></div>
 
 <div class="obs-insight" id="obs-insight"></div>
 
-<!-- ════════════════════════════════════════════════════════════
-     METHODOLOGY
-     ════════════════════════════════════════════════════════════ -->
-<section class="g-method reveal">
-  <div class="g-section-header">Measurement Protocol</div>
-  <div class="g-method-grid">
-    <div class="g-method-item">
-      <strong>SENSOR</strong>
-      Dexcom Stelo OTC CGM. 15-day wear cycle. 5-minute reading interval.
-      No calibration required. 288 data points per day.
-    </div>
-    <div class="g-method-item">
-      <strong>TIME IN RANGE (TIR)</strong>
-      Standard: 70&ndash;180 mg/dL (ADA guideline). Optimal: 70&ndash;120 mg/dL (longevity medicine target).
-      Target: &gt;90% standard, &gt;70% optimal.
-    </div>
-    <div class="g-method-item">
-      <strong>VARIABILITY (SD)</strong>
-      Standard deviation of all 5-min readings in a 24-hour period.
-      SD &lt;15: excellent. 15&ndash;20: good. &gt;20: elevated metabolic stress.
-      N=1 data &mdash; individual baselines vary.
-    </div>
-  </div>
-</section>
-
-<!-- G1: AI glucose personality analysis -->
-<section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal">
-  <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--g-accent,#06b6d4);margin-bottom:var(--space-4)">Dr. Patrick's Metabolic Assessment</div>
-  <div id="g-ai-analysis"></div>
-</section>
+<!-- AI expert analysis now rendered by V3 coach at position 2 (renderCoachAnalysis above) -->
 
 <nav class="reading-path-v2">
   <a href="/sleep/" class="reading-path-v2__link">
@@ -1571,6 +1497,7 @@
 
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
+<script src="/assets/js/observatory-v3.js"></script>
 <script src="/assets/js/nav.js"></script>
 <script src="/assets/js/engagement.js"></script>
 <script>
@@ -1581,6 +1508,14 @@
 </script>
 <script src="/assets/js/reveal.js"></script>
 <script>
+/* ── V3: Coach Analysis (position 2) — fires immediately ── */
+renderCoachAnalysis('obs-v3-coach', 'glucose', {
+  name: 'Dr. Rhonda Patrick',
+  initials: 'RP',
+  title: 'Metabolic health researcher',
+  color: '#2dd4bf'
+});
+
 (async function() {
   var API = 'https://averagejoematt.com';
   var loading = document.getElementById('g-loading');
@@ -1882,17 +1817,36 @@
     }
 
     // (content already shown above before chart rendering)
+
+    /* ── V3 Status Bar (Section 1) ── */
+    renderStatusBar('obs-v3-status', [
+      {label: 'Time in range', value: tir ? tir.toFixed(1) : null, unit: '%', delta: null, context: '70\u2013180 mg/dL target \u226590%'},
+      {label: 'Avg glucose', value: avg ? avg.toFixed(0) : null, unit: 'mg/dL', delta: null, context: '30-day rolling mean'},
+      {label: 'Std deviation', value: sd ? sd.toFixed(1) : null, unit: 'mg/dL', delta: null, context: 'Target SD <15'},
+      {label: 'Optimal range', value: opt ? opt.toFixed(1) : null, unit: '%', delta: null, context: '70\u2013120 mg/dL target \u226570%'}
+    ], {});
+
+    /* ── V3 Cross-Domain (Section 5) ── */
+    renderCrossDomain('obs-v3-cross', [
+      {title: 'Glucose \u00d7 Nutrition', finding: 'Each meal scored against CGM glucose response. Protein-first meals consistently produce the lowest spikes.', link: '/nutrition/'},
+      {title: 'Glucose \u00d7 Sleep', finding: 'Poor sleep elevates next-morning fasting glucose via cortisol pathway. Testing with Whoop sleep quality data.', link: '/sleep/'},
+      {title: 'Glucose \u00d7 Character', finding: 'Glucose variability and time-in-range factor into the Body pillar in the Character Sheet.', link: '/character/'}
+    ]);
+
+    /* ── V3 Depth Sections (Section 6) ── */
+    renderDepth('obs-v3-depth', [
+      {label: 'About this observatory', id: 'about', content: '<h2 style="font-family:var(--font-display);font-size:24px;margin:0 0 12px;">The number that <em>changed what I eat.</em></h2><p>When continuous glucose monitors became available to non-diabetics at an affordable price, I wanted to understand how my body actually responds to specific foods. Not from a nutrition label \u2014 from my own bloodstream, in real time. Every meal becomes a data point. Every spike tells a story.</p><p style="font-style:italic;border-left:2px solid var(--text-faint);padding-left:16px;color:var(--text-muted);">Honestly? I don\u2019t expect to see much here while I\u2019m eating the way I should be. My glucose tends to stay stable when I\u2019m on. The interesting data will come later \u2014 when I reintroduce things, when life gets in the way, when the experiment gets messier. That\u2019s when the CGM earns its place.</p>'},
+      {label: '288 readings vs one fasting number', id: 'narrative', content: '<p>A fasting glucose test gives you one snapshot taken after 8+ hours without food. <strong>It captures none of the metabolic action</strong>: not what happens after meals, not whether glucose spikes at 2am, not whether a salad or a steak drives different post-meal curves in your body specifically.</p><p>A continuous glucose monitor reads glucose every 5 minutes, 24 hours a day. The additional signal includes glucose variability, post-meal spike magnitude, nocturnal patterns, and how specific foods interact with <strong>your individual physiology</strong> \u2014 not population averages.</p><p>Time-in-range is now considered a more actionable metric than HbA1c because it responds to intervention within days, not months.</p>'},
+      {label: 'Measurement protocol', id: 'protocol', content: '<p><strong>Dexcom Stelo CGM</strong> \u2014 worn continuously, no prescription required. Replaced every 15 days. 5-minute reading interval. 288 data points per day. Syncs to life-platform automatically.</p><p><strong>Time in Range (TIR)</strong> \u2014 Standard: 70\u2013180 mg/dL (ADA guideline). Optimal: 70\u2013120 mg/dL (longevity medicine target). Target: >90% standard, >70% optimal.</p><p><strong>Variability (SD)</strong> \u2014 Standard deviation of all 5-min readings in a 24-hour period. SD <15: excellent. 15\u201320: good. >20: elevated metabolic stress. N=1 data \u2014 individual baselines vary.</p>'},
+      {label: 'CGM protocols', id: 'protocols', content: '<p><strong>01 \u2014 Dexcom Stelo CGM</strong> worn continuously, no prescription required. Replaced every 15 days. Syncs to life-platform automatically.</p><p><strong>02 \u2014 Target TIR >90%</strong> in the 70\u2013180 mg/dL range and >70% in the tighter 70\u2013120 optimal window.</p><p><strong>03 \u2014 Protein-first meals</strong> moved the needle most. Eating protein and fat before carbs blunts the spike by slowing gastric emptying.</p><p><strong>04 \u2014 10-minute walk after eating</strong> consistently drops post-meal peak. Muscle contraction creates glucose uptake independent of insulin.</p><p><strong>05 \u2014 Reducing refined carbs</strong> eliminated the majority of >140 readings. Whole-food carbs with fiber produce much smaller spikes.</p>'}
+    ]);
+
   } catch (e) {
     loading.textContent = 'Could not load glucose data.';
     content.style.display = 'block';
     console.error(e);
   }
-  // G1: Load AI glucose personality analysis
-  if (typeof renderAIAnalysisCard === 'function') {
-    renderAIAnalysisCard('g-ai-analysis', 'glucose', {
-      dataSources: '30 days of CGM readings and meal response data'
-    });
-  }
+  /* AI expert analysis now rendered by V3 coach at position 2 (renderCoachAnalysis above) */
 })();
 </script>
 <script src="/assets/js/animations.js" defer></script>

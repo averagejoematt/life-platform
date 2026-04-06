@@ -19,6 +19,7 @@
   <meta name="theme-color" content="#080c0a">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/observatory-v3.css">
   <style>
     :root {
       --s-blue: #60a5fa;
@@ -1166,368 +1167,85 @@
 
 
 <!-- ════════════════════════════════════════════════════════════
-     8b: MERGED HERO — Narrative intro is the sole hero, gauges below
+     SECTION 1: V3 STATUS BAR — rendered by observatory-v3.js
      ════════════════════════════════════════════════════════════ -->
-<div class="s-hero">
-  <div class="s-hero-grid">
-    <div>
-      <div class="s-hero__eyebrow">Sleep Observatory</div>
-      <h1 class="s-hero__title">The thing I thought I was <em>good at.</em></h1>
-      <p class="s-hero__sub">
-        Sleep was never something I thought I needed to fix. Matthew Walker&rsquo;s work
-        made me pay closer attention. Then the Whoop and Eight Sleep started surfacing
-        numbers I couldn&rsquo;t ignore: sleep onset time, staging, the consistent shift to red
-        every time I drank. The score doesn&rsquo;t lie &mdash; and seeing it every morning
-        changed how I made decisions the night before.
-      </p>
-      <p class="s-hero__sub-detail">
-        Data from Whoop, Eight Sleep, and Apple Health. Updated daily.
-      </p>
-    </div>
-    <div class="s-gauge-row">
-    <div class="s-gauge">
-      <div class="s-gauge__ring">
-        <svg viewBox="0 0 88 88">
-          <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-          <circle id="g-dur-arc" cx="44" cy="44" r="35" fill="none" stroke="#60a5fa" stroke-width="7"
-            stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-            style="transition: stroke-dasharray 1.2s ease 0.5s"/>
-        </svg>
-        <div class="s-gauge__center">
-          <div class="s-gauge__num" id="g-dur-num" style="color:#60a5fa">&mdash;</div>
-          <div class="s-gauge__unit">hrs</div>
-        </div>
-      </div>
-      <div class="s-gauge__label">Last night</div>
-      <div class="s-gauge__note" id="g-dur-note" style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:0.06em;margin-top:2px"></div>
-    </div>
-    <div class="s-gauge">
-      <div class="s-gauge__ring">
-        <svg viewBox="0 0 88 88">
-          <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-          <circle id="g-score-arc" cx="44" cy="44" r="35" fill="none" stroke="#3ecf8e" stroke-width="7"
-            stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-            style="transition: stroke-dasharray 1.2s ease 0.6s"/>
-        </svg>
-        <div class="s-gauge__center">
-          <div class="s-gauge__num" id="g-score-num" style="color:#3ecf8e">&mdash;</div>
-          <div class="s-gauge__unit">/ 100</div>
-        </div>
-      </div>
-      <div class="s-gauge__label">Sleep score</div>
-    </div>
-    <div class="s-gauge">
-      <div class="s-gauge__ring">
-        <svg viewBox="0 0 88 88">
-          <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-          <circle id="g-deep-arc" cx="44" cy="44" r="35" fill="none" stroke="#818cf8" stroke-width="7"
-            stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-            style="transition: stroke-dasharray 1.2s ease 0.7s"/>
-        </svg>
-        <div class="s-gauge__center">
-          <div class="s-gauge__num" id="g-deep-num" style="color:#818cf8">&mdash;</div>
-          <div class="s-gauge__unit">%</div>
-        </div>
-      </div>
-      <div class="s-gauge__label">Deep sleep</div>
-    </div>
-    <div class="s-gauge">
-      <div class="s-gauge__ring">
-        <svg viewBox="0 0 88 88">
-          <circle cx="44" cy="44" r="35" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="7"/>
-          <circle id="g-recov-arc" cx="44" cy="44" r="35" fill="none" stroke="#f59e0b" stroke-width="7"
-            stroke-dasharray="0 220" stroke-linecap="round" transform="rotate(-90 44 44)"
-            style="transition: stroke-dasharray 1.2s ease 0.8s"/>
-        </svg>
-        <div class="s-gauge__center">
-          <div class="s-gauge__num" id="g-recov-num" style="color:#f59e0b">&mdash;</div>
-          <div class="s-gauge__unit">%</div>
-        </div>
-      </div>
-      <div class="s-gauge__label">Recovery</div>
-    </div>
-  </div>
-  </div><!-- /.s-hero-grid -->
-  <div class="obs-freshness" id="obs-freshness" style="display:none">
-    <div>
-      <span class="obs-freshness__label">Last data: <span id="obs-fresh-time">—</span></span>
-      <span class="obs-freshness__sub">Updated daily</span>
-    </div>
-    <span class="obs-freshness__dot obs-freshness__dot--live" id="obs-fresh-dot"></span>
-  </div>
-</div>
+<div id="obs-v3-status"></div>
 
-<div id="obs-thisweek" style="display:none"></div>
 
 <!-- ════════════════════════════════════════════════════════════
-     8m: DIFFERENTIATORS CALLOUT
+     SECTION 2: V3 COACH ANALYSIS — rendered by observatory-v3.js
      ════════════════════════════════════════════════════════════ -->
-<div class="s-differentiators reveal">
-  <div class="s-differentiators__inner">
-    <div class="s-differentiators__label">What makes this different</div>
-    <div class="s-diff-sep"></div>
-    <div class="s-differentiators__items">
-      <span>Cross-device triangulation</span>
-      <span>Cross-domain correlation</span>
-      <span>Hypotheses under test</span>
-    </div>
-  </div>
-</div>
+<div id="obs-v3-coach"></div>
+
 
 <!-- ════════════════════════════════════════════════════════════
-     8g: N=1 RULE TEASER — most important rule, elevated near top
+     SECTION 3: TRENDS — Architecture SVG + Score Trend canvas
      ════════════════════════════════════════════════════════════ -->
-<div class="s-rule-teaser reveal">
-  <div class="s-rule-teaser__inner">
-    <div class="s-rule-teaser__number">#1</div>
-    <div class="s-rule-teaser__content">
-      <div class="s-rule-teaser__label">Top Sleep Hypothesis</div>
-      <div class="s-rule-teaser__finding">Testing whether screens-off before 9pm improves next-day HRV</div>
-      <div class="s-rule-teaser__evidence">Tracking with Whoop data &bull; <em>Hypothesis under test</em> &bull; <a href="#s-rules-full" style="color:var(--s-blue);text-decoration:none;">See all hypotheses →</a></div>
-    </div>
+<section class="obs-trends" id="s-trends-section">
+  <div class="obs-trends__header">
+    <div class="obs-trends__title">Trends</div>
   </div>
-</div>
+  <div class="obs-trend-row">
 
+    <!-- Trend chart 1: Sleep Architecture (stacked area SVG) -->
+    <div class="obs-trend-chart">
+      <div class="obs-trend-chart__label">Sleep Architecture Trend</div>
+      <div class="s-chart-controls" style="margin-bottom:var(--space-3)">
+        <div class="s-time-toggles" id="s-arch-toggles">
+          <button class="s-time-toggle" data-days="7">7d</button>
+          <button class="s-time-toggle active" data-days="30">30d</button>
+          <button class="s-time-toggle" data-days="90">90d</button>
+        </div>
+      </div>
+      <div class="s-arch-chart" id="s-arch-chart">
+        <svg id="s-arch-svg" viewBox="0 0 800 200" preserveAspectRatio="none">
+          <!-- Deep sleep area -->
+          <path id="s-arch-deep" fill="rgba(129,140,248,0.3)" stroke="none" d=""/>
+          <!-- REM sleep area -->
+          <path id="s-arch-rem" fill="rgba(96,165,250,0.3)" stroke="none" d=""/>
+          <!-- Light sleep area -->
+          <path id="s-arch-light" fill="rgba(62,207,142,0.15)" stroke="none" d=""/>
+        </svg>
+      </div>
+      <div class="s-arch-legend">
+        <div class="s-arch-legend-item"><div class="s-arch-legend-dot" style="background:#818cf8"></div> Deep</div>
+        <div class="s-arch-legend-item"><div class="s-arch-legend-dot" style="background:#60a5fa"></div> REM</div>
+        <div class="s-arch-legend-item"><div class="s-arch-legend-dot" style="background:#3ecf8e"></div> Light</div>
+      </div>
+    </div>
+
+    <!-- Trend chart 2: Sleep Score Trend (canvas) -->
+    <div class="obs-trend-chart" style="position:relative">
+      <div class="obs-trend-chart__label">Sleep Score Trend</div>
+      <div class="s-chart-controls" style="margin-bottom:var(--space-3)">
+        <div class="s-time-toggles" id="s-trend-toggles">
+          <button class="s-time-toggle" data-days="7">7d</button>
+          <button class="s-time-toggle active" data-days="30">30d</button>
+          <button class="s-time-toggle" data-days="90">90d</button>
+        </div>
+        <div class="s-chart-legend">
+          <div class="s-legend-item"><div class="s-legend-dot" style="background:#60a5fa"></div> Eight Sleep score</div>
+          <div class="s-legend-item"><div class="s-legend-dot" style="background:rgba(255,255,255,0.4)"></div> Whoop quality</div>
+        </div>
+      </div>
+      <canvas class="s-chart" id="s-trend-canvas"></canvas>
+      <div class="s-chart-tooltip" id="s-chart-tooltip">
+        <div class="s-chart-tooltip__date" id="s-tooltip-date"></div>
+        <div class="s-chart-tooltip__score" id="s-tooltip-score"></div>
+        <div class="s-chart-tooltip__whoop" id="s-tooltip-whoop"></div>
+      </div>
+    </div>
+
+  </div><!-- /.obs-trend-row -->
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     PROTOCOL ADHERENCE — kept in main flow
+     ════════════════════════════════════════════════════════════ -->
 <div id="s-loading" class="s-loading">LOADING SLEEP DATA&hellip;</div>
 <div id="s-content" style="display:none">
 
-<!-- ════════════════════════════════════════════════════════════
-     8i: DYNAMIC PULL-QUOTE #1 — Correlation-driven callout
-     ════════════════════════════════════════════════════════════ -->
-<div class="s-pullquote s-pullquote--dynamic s-pullquote--left reveal">
-  <div class="s-pullquote__watermark">01</div>
-  <div class="s-pullquote__text" id="s-dynamic-quote-1">
-    Hypothesis: earlier bedtime correlates with <em>higher morning HRV</em>. Tracking across sleep sessions.
-  </div>
-  <div class="s-pullquote__attr">
-    <span class="s-pullquote__badge">Hypothesis &middot; Under test</span>
-    <span class="s-pullquote__source">Cross-referenced: Whoop HRV &times; Eight Sleep bed time</span>
-  </div>
-</div>
-
-<!-- ════════════════════════════════════════════════════════════
-     8d: SLEEP EFFICIENCY — prominent large number
-     ════════════════════════════════════════════════════════════ -->
-<section class="s-efficiency reveal">
-  <div class="s-section-header">Sleep Efficiency</div>
-  <div class="s-efficiency__grid">
-    <div class="s-efficiency__big">
-      <div class="s-efficiency__num" id="s-eff-num">&mdash;</div>
-      <div class="s-efficiency__unit">% efficiency</div>
-      <div class="s-efficiency__label">Actual sleep / time in bed</div>
-    </div>
-    <div class="s-accent-card">
-      <div class="s-accent-card__label">30-day average</div>
-      <div class="s-accent-card__value" id="s-eff-30d">&mdash;</div>
-      <div class="s-accent-card__note">Efficiency above 85% suggests good sleep hygiene. Below 75% may indicate environmental disruption or anxiety.</div>
-    </div>
-    <div class="s-accent-card" id="s-best-night-card" style="cursor:pointer" onclick="this.classList.toggle('is-expanded')">
-      <div class="s-accent-card__label">Best night <span style="font-size:9px;opacity:0.5">(tap to expand)</span></div>
-      <div class="s-accent-card__value" id="s-eff-best">&mdash;</div>
-      <div class="s-accent-card__note">Peak efficiency nights typically correlate with 68°F bed temperature, no screens after 9pm, and consistent bed time.</div>
-      <div class="s-accent-card__expand" id="s-best-detail" style="display:none;margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--border);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);line-height:1.8"></div>
-    </div>
-  </div>
-  <div class="s-context">
-    Sleep efficiency is the ratio of actual sleep to time spent in bed. It strips away the illusion of "I was in bed for 8 hours" — revealing how much of that time was real, restorative sleep.
-  </div>
-</section>
-
-<!-- S4: Last night's architecture breakdown -->
-<section class="s-lastnight-section reveal" id="s-lastnight" style="display:none;max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border)">
-  <div class="s-section-header">Last Night</div>
-  <div id="s-lastnight-bar" style="display:flex;height:24px;border-radius:4px;overflow:hidden;margin-bottom:var(--space-3)"></div>
-  <div id="s-lastnight-labels" style="display:flex;gap:var(--space-5);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted)"></div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     8a: SLEEP STAGE EDITORIAL — 3-column spread (8f: narrative woven in)
-     ════════════════════════════════════════════════════════════ -->
-<section class="s-stage-section reveal">
-  <div class="s-section-header">Sleep Architecture</div>
-  <div class="s-stage-grid">
-    <div class="s-stage-col">
-      <div class="s-stage-bar"><div class="s-stage-bar__fill" id="sbar-deep" style="width:0%;background:#818cf8"></div></div>
-      <div class="s-stage-big" id="sval-deep" style="color:#818cf8">&mdash;</div>
-      <div class="s-stage-name">Deep sleep</div>
-      <div class="s-stage-detail">Slow-wave sleep. HRV recovery happens here. Target &gt;20%. First half of the night, temperature-dependent.</div>
-    </div>
-    <div class="s-stage-col">
-      <div class="s-stage-bar"><div class="s-stage-bar__fill" id="sbar-rem" style="width:0%;background:#60a5fa"></div></div>
-      <div class="s-stage-big" id="sval-rem" style="color:#60a5fa">&mdash;</div>
-      <div class="s-stage-name">REM sleep</div>
-      <div class="s-stage-detail">Memory consolidation and emotional processing. Target &gt;20%. Dominates the second half of the night.</div>
-    </div>
-    <div class="s-stage-col">
-      <div class="s-stage-bar"><div class="s-stage-bar__fill" id="sbar-hrv" style="width:0%;background:#3ecf8e"></div></div>
-      <div class="s-stage-big" id="sval-hrv" style="color:#3ecf8e">&mdash;</div>
-      <div class="s-stage-name">HRV (ms)</div>
-      <div class="s-stage-detail">Heart rate variability. The primary Whoop recovery signal. Higher = more parasympathetic activity.</div>
-    </div>
-  </div>
-  <div class="s-context">
-    Deep and REM each need to clear 20% for a night to count as restorative. When deep sleep drops, bed temperature is the first variable to check. When REM drops, look at alcohol, late caffeine, or alarm-driven wake-ups cutting the night short.
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     8e: SLEEP ARCHITECTURE TREND — 30-day stacked area chart
-     ════════════════════════════════════════════════════════════ -->
-<section class="s-arch-section reveal">
-  <div class="s-chart-header">
-    <div class="s-chart-title">Sleep Architecture Trend</div>
-    <div class="s-chart-controls">
-      <div class="s-time-toggles" id="s-arch-toggles">
-        <button class="s-time-toggle" data-days="7">7d</button>
-        <button class="s-time-toggle active" data-days="30">30d</button>
-        <button class="s-time-toggle" data-days="90">90d</button>
-      </div>
-    </div>
-  </div>
-  <div class="s-arch-chart" id="s-arch-chart">
-    <svg id="s-arch-svg" viewBox="0 0 800 200" preserveAspectRatio="none">
-      <!-- Deep sleep area -->
-      <path id="s-arch-deep" fill="rgba(129,140,248,0.3)" stroke="none" d=""/>
-      <!-- REM sleep area -->
-      <path id="s-arch-rem" fill="rgba(96,165,250,0.3)" stroke="none" d=""/>
-      <!-- Light sleep area -->
-      <path id="s-arch-light" fill="rgba(62,207,142,0.15)" stroke="none" d=""/>
-    </svg>
-  </div>
-  <div class="s-arch-legend">
-    <div class="s-arch-legend-item"><div class="s-arch-legend-dot" style="background:#818cf8"></div> Deep</div>
-    <div class="s-arch-legend-item"><div class="s-arch-legend-dot" style="background:#60a5fa"></div> REM</div>
-    <div class="s-arch-legend-item"><div class="s-arch-legend-dot" style="background:#3ecf8e"></div> Light</div>
-  </div>
-  <div class="s-context">
-    The stacked view reveals architecture shifts over time. A healthy pattern shows stable deep sleep with REM filling 20-25% of total. Watch for deep sleep erosion — it often signals accumulated sleep debt or temperature drift.
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     8c: SLEEP CONSISTENCY / SOCIAL JETLAG
-     ════════════════════════════════════════════════════════════ -->
-<section class="s-consistency reveal">
-  <div class="s-section-header">Sleep Consistency</div>
-  <div class="s-consistency__grid">
-    <div class="s-consistency__card">
-      <div class="s-consistency__label">Weekday bedtime</div>
-      <div class="s-consistency__value" id="s-weekday-bed">10:15 PM</div>
-      <div class="s-consistency__detail">Average Mon-Fri lights-out</div>
-      <div class="s-consistency__bar">
-        <div class="s-consistency__bar-track">
-          <div class="s-consistency__bar-fill" id="s-weekday-bar" style="width:85%;background:var(--s-blue)"></div>
-        </div>
-        <div class="s-consistency__bar-label" id="s-weekday-var">&plusmn;18m</div>
-      </div>
-    </div>
-    <div class="s-consistency__card">
-      <div class="s-consistency__label">Weekend bedtime</div>
-      <div class="s-consistency__value" id="s-weekend-bed">11:30 PM</div>
-      <div class="s-consistency__detail">Average Sat-Sun lights-out</div>
-      <div class="s-consistency__bar">
-        <div class="s-consistency__bar-track">
-          <div class="s-consistency__bar-fill" id="s-weekend-bar" style="width:55%;background:var(--s-amber)"></div>
-        </div>
-        <div class="s-consistency__bar-label" id="s-weekend-var">&plusmn;42m</div>
-      </div>
-    </div>
-    <div class="s-consistency__card s-consistency__card--alert">
-      <div class="s-consistency__label">Social Jetlag</div>
-      <div class="s-consistency__value" id="s-jetlag-val" style="color:var(--s-amber)">~1.25 hrs</div>
-      <div class="s-consistency__detail" id="s-jetlag-desc">Weekend drift indicates social jetlag of ~1.25 hours. This is equivalent to flying one timezone east every Monday morning.</div>
-    </div>
-  </div>
-  <div class="s-context">
-    Circadian consistency matters as much as duration. Testing whether low bedtime variance improves Whoop recovery compared to high-variance weeks. The body's clock does not understand weekends.
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #2 — Temperature finding (staggered right)
-     ════════════════════════════════════════════════════════════ -->
-<div class="s-pullquote s-pullquote--right reveal">
-  <div class="s-pullquote__watermark">02</div>
-  <div class="s-pullquote__text">
-    I already know the phone is the problem. Everyone does. The question isn't whether doom scrolling before bed wrecks your sleep — it's why knowing that isn't enough to stop. That's what I'm actually tracking.
-  </div>
-  <div class="s-pullquote__attr">
-    <span class="s-pullquote__badge">&mdash; Matthew</span>
-  </div>
-</div>
-
-<!-- ════════════════════════════════════════════════════════════
-     TEMPERATURE DISCOVERY
-     ════════════════════════════════════════════════════════════ -->
-<section class="s-temp-section reveal" id="s-temp-section" style="display:none">
-  <div class="s-section-header">Temperature Discovery</div>
-  <div class="s-temp-card">
-    <div>
-      <div class="s-temp-card__title">Optimal bed temperature: <em id="s-temp-val">&mdash;</em></div>
-      <div class="s-temp-card__sub" id="s-temp-desc">
-        Core body temperature must drop 1&ndash;3&deg;F to initiate deep sleep.
-        The Eight Sleep pod enables precise cooling on a schedule.
-        This data shows the temperature that produces the highest average sleep scores.
-      </div>
-    </div>
-    <div class="s-temp-big">
-      <div class="s-temp-big__num" id="s-temp-big-num">&mdash;</div>
-      <div class="s-temp-big__unit">&deg;F optimal</div>
-      <div class="s-temp-big__sub" id="s-temp-days">&mdash; nights tracked</div>
-    </div>
-  </div>
-  <div class="s-context">
-    Temperature is the most underrated sleep variable. Most people sleep in rooms that are too warm. The Eight Sleep pod data confirms what the research suggests: cooler beds produce deeper sleep.
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     8i: DYNAMIC PULL-QUOTE #2 — Large editorial callout
-     ════════════════════════════════════════════════════════════ -->
-<div class="s-pullquote s-pullquote--dynamic s-pullquote--left reveal">
-  <div class="s-pullquote__watermark">03</div>
-  <div class="s-pullquote__text" id="s-dynamic-quote-2">
-    Hypothesis: any alcohol &mdash; even <em>one drink</em> &mdash; measurably
-    reduces <em>sleep quality</em> the following night.
-  </div>
-  <div class="s-pullquote__attr">
-    <span class="s-pullquote__badge">Hypothesis &middot; Under test</span>
-    <span class="s-pullquote__source">Tracking sleep quality on alcohol vs non-alcohol nights</span>
-  </div>
-</div>
-
-<!-- ════════════════════════════════════════════════════════════
-     30-DAY TREND CHART with time-window toggles (8l)
-     ════════════════════════════════════════════════════════════ -->
-<section class="s-chart-section reveal" style="position:relative;">
-  <div class="s-chart-header">
-    <div class="s-chart-title">Sleep Score Trend</div>
-    <div class="s-chart-controls">
-      <div class="s-time-toggles" id="s-trend-toggles">
-        <button class="s-time-toggle" data-days="7">7d</button>
-        <button class="s-time-toggle active" data-days="30">30d</button>
-        <button class="s-time-toggle" data-days="90">90d</button>
-      </div>
-      <div class="s-chart-legend">
-        <div class="s-legend-item"><div class="s-legend-dot" style="background:#60a5fa"></div> Eight Sleep score</div>
-        <div class="s-legend-item"><div class="s-legend-dot" style="background:rgba(255,255,255,0.4)"></div> Whoop quality</div>
-      </div>
-    </div>
-  </div>
-  <canvas class="s-chart" id="s-trend-canvas"></canvas>
-  <div class="s-chart-tooltip" id="s-chart-tooltip">
-    <div class="s-chart-tooltip__date" id="s-tooltip-date"></div>
-    <div class="s-chart-tooltip__score" id="s-tooltip-score"></div>
-    <div class="s-chart-tooltip__whoop" id="s-tooltip-whoop"></div>
-  </div>
-  <div class="s-context">
-    The dual-line view reveals when Eight Sleep and Whoop agree — and when they diverge. Testing whether sustained scores above 85 predict next-day recovery. Look for patterns in the dips: most are traceable to late meals, alcohol, or inconsistent bed times.
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     8h: PROTOCOL ADHERENCE LOOP
-     ════════════════════════════════════════════════════════════ -->
 <section class="s-adherence reveal">
   <div class="s-section-header">Protocol Adherence</div>
   <div class="s-adherence__grid">
@@ -1577,51 +1295,141 @@
   </div>
 </section>
 
-<!-- ════════════════════════════════════════════════════════════
-     N=1 RULES — full set (8a: left-accent rule cards)
-     ════════════════════════════════════════════════════════════ -->
-<div class="s-pullquote s-pullquote--right reveal" style="border-bottom:1px solid var(--border);">
-  <blockquote class="s-pullquote__text">
-    &ldquo;He sleeps like someone who&rsquo;s finally stopped fighting the data. The bed got colder, the phone went away, and the numbers quietly improved.&rdquo;
-  </blockquote>
-  <div class="s-pullquote__attr">
-    <span class="s-pullquote__badge">Chronicle &middot; Elena Voss</span>
-    <span class="s-pullquote__source">AI narrative voice &mdash; <a href="/chronicle/" style="color:var(--s-blue,#60a5fa);text-decoration:none;">Read the chronicle &rarr;</a></span>
-  </div>
-</div>
 
-<section class="s-rules-section reveal" id="s-rules-full">
-  <div class="s-section-header">Sleep Hypotheses Under Test</div>
-  <div class="s-rule-grid">
-    <div class="s-rule">
-      <div class="s-rule__num">Rule 01</div>
-      <div class="s-rule__finding">9pm screen-off may improve next-day HRV</div>
-      <div class="s-rule__evidence">Testing: tracking HRV response to <em>screen-free evenings</em></div>
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 4: V3 THIS WEEK'S DETAIL — rendered by observatory-v3.js
+     Efficiency, sleep stages, consistency, temperature, last night
+     ════════════════════════════════════════════════════════════ -->
+<div id="obs-v3-detail"></div>
+
+<!-- S4: Last night's architecture breakdown (populated by JS) -->
+<section class="s-lastnight-section reveal" id="s-lastnight" style="display:none;max-width:var(--max-width);margin:0 auto;padding:var(--space-8) var(--page-padding);border-bottom:1px solid var(--border)">
+  <div class="s-section-header">Last Night</div>
+  <div id="s-lastnight-bar" style="display:flex;height:24px;border-radius:4px;overflow:hidden;margin-bottom:var(--space-3)"></div>
+  <div id="s-lastnight-labels" style="display:flex;gap:var(--space-5);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted)"></div>
+</section>
+
+<!-- Efficiency detail section (data-driven, hidden until loaded) -->
+<section class="s-efficiency reveal" id="s-efficiency-section">
+  <div class="s-section-header">Sleep Efficiency</div>
+  <div class="s-efficiency__grid">
+    <div class="s-efficiency__big">
+      <div class="s-efficiency__num" id="s-eff-num">&mdash;</div>
+      <div class="s-efficiency__unit">% efficiency</div>
+      <div class="s-efficiency__label">Actual sleep / time in bed</div>
     </div>
-    <div class="s-rule">
-      <div class="s-rule__num">Rule 02</div>
-      <div class="s-rule__finding">Bed temp 68&deg;F may be the personal sweet spot &mdash; testing above and below</div>
-      <div class="s-rule__evidence">Testing: <em>Eight Sleep temperature</em> &times; sleep score correlation</div>
+    <div class="s-accent-card">
+      <div class="s-accent-card__label">30-day average</div>
+      <div class="s-accent-card__value" id="s-eff-30d">&mdash;</div>
+      <div class="s-accent-card__note">Efficiency above 85% suggests good sleep hygiene. Below 75% may indicate environmental disruption or anxiety.</div>
     </div>
-    <div class="s-rule">
-      <div class="s-rule__num">Rule 03</div>
-      <div class="s-rule__finding">Any alcohol &mdash; even one drink &mdash; may reduce sleep quality the following night</div>
-      <div class="s-rule__evidence">Testing: tracking sleep quality on <em>alcohol vs non-alcohol nights</em></div>
+    <div class="s-accent-card" id="s-best-night-card" style="cursor:pointer" onclick="this.classList.toggle('is-expanded')">
+      <div class="s-accent-card__label">Best night <span style="font-size:9px;opacity:0.5">(tap to expand)</span></div>
+      <div class="s-accent-card__value" id="s-eff-best">&mdash;</div>
+      <div class="s-accent-card__note">Peak efficiency nights typically correlate with 68°F bed temperature, no screens after 9pm, and consistent bed time.</div>
+      <div class="s-accent-card__expand" id="s-best-detail" style="display:none;margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--border);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);line-height:1.8"></div>
     </div>
-    <div class="s-rule">
-      <div class="s-rule__num">Rule 04</div>
-      <div class="s-rule__finding">Consistent bed time (&plusmn;30 min) may outperform high-variance weeks</div>
-      <div class="s-rule__evidence">Testing: <em>bedtime variance</em> &times; Whoop recovery correlation</div>
-    </div>
+  </div>
+  <div class="s-context">
+    Sleep efficiency is the ratio of actual sleep to time spent in bed. It strips away the illusion of "I was in bed for 8 hours" — revealing how much of that time was real, restorative sleep.
   </div>
 </section>
 
+<!-- Sleep stages detail -->
+<section class="s-stage-section reveal">
+  <div class="s-section-header">Sleep Architecture</div>
+  <div class="s-stage-grid">
+    <div class="s-stage-col">
+      <div class="s-stage-bar"><div class="s-stage-bar__fill" id="sbar-deep" style="width:0%;background:#818cf8"></div></div>
+      <div class="s-stage-big" id="sval-deep" style="color:#818cf8">&mdash;</div>
+      <div class="s-stage-name">Deep sleep</div>
+      <div class="s-stage-detail">Slow-wave sleep. HRV recovery happens here. Target &gt;20%. First half of the night, temperature-dependent.</div>
+    </div>
+    <div class="s-stage-col">
+      <div class="s-stage-bar"><div class="s-stage-bar__fill" id="sbar-rem" style="width:0%;background:#60a5fa"></div></div>
+      <div class="s-stage-big" id="sval-rem" style="color:#60a5fa">&mdash;</div>
+      <div class="s-stage-name">REM sleep</div>
+      <div class="s-stage-detail">Memory consolidation and emotional processing. Target &gt;20%. Dominates the second half of the night.</div>
+    </div>
+    <div class="s-stage-col">
+      <div class="s-stage-bar"><div class="s-stage-bar__fill" id="sbar-hrv" style="width:0%;background:#3ecf8e"></div></div>
+      <div class="s-stage-big" id="sval-hrv" style="color:#3ecf8e">&mdash;</div>
+      <div class="s-stage-name">HRV (ms)</div>
+      <div class="s-stage-detail">Heart rate variability. The primary Whoop recovery signal. Higher = more parasympathetic activity.</div>
+    </div>
+  </div>
+  <div class="s-context">
+    Deep and REM each need to clear 20% for a night to count as restorative. When deep sleep drops, bed temperature is the first variable to check. When REM drops, look at alcohol, late caffeine, or alarm-driven wake-ups cutting the night short.
+  </div>
+</section>
+
+<!-- Sleep consistency / social jetlag -->
+<section class="s-consistency reveal">
+  <div class="s-section-header">Sleep Consistency</div>
+  <div class="s-consistency__grid">
+    <div class="s-consistency__card">
+      <div class="s-consistency__label">Weekday bedtime</div>
+      <div class="s-consistency__value" id="s-weekday-bed">10:15 PM</div>
+      <div class="s-consistency__detail">Average Mon-Fri lights-out</div>
+      <div class="s-consistency__bar">
+        <div class="s-consistency__bar-track">
+          <div class="s-consistency__bar-fill" id="s-weekday-bar" style="width:85%;background:var(--s-blue)"></div>
+        </div>
+        <div class="s-consistency__bar-label" id="s-weekday-var">&plusmn;18m</div>
+      </div>
+    </div>
+    <div class="s-consistency__card">
+      <div class="s-consistency__label">Weekend bedtime</div>
+      <div class="s-consistency__value" id="s-weekend-bed">11:30 PM</div>
+      <div class="s-consistency__detail">Average Sat-Sun lights-out</div>
+      <div class="s-consistency__bar">
+        <div class="s-consistency__bar-track">
+          <div class="s-consistency__bar-fill" id="s-weekend-bar" style="width:55%;background:var(--s-amber)"></div>
+        </div>
+        <div class="s-consistency__bar-label" id="s-weekend-var">&plusmn;42m</div>
+      </div>
+    </div>
+    <div class="s-consistency__card s-consistency__card--alert">
+      <div class="s-consistency__label">Social Jetlag</div>
+      <div class="s-consistency__value" id="s-jetlag-val" style="color:var(--s-amber)">~1.25 hrs</div>
+      <div class="s-consistency__detail" id="s-jetlag-desc">Weekend drift indicates social jetlag of ~1.25 hours. This is equivalent to flying one timezone east every Monday morning.</div>
+    </div>
+  </div>
+  <div class="s-context">
+    Circadian consistency matters as much as duration. Testing whether low bedtime variance improves Whoop recovery compared to high-variance weeks. The body's clock does not understand weekends.
+  </div>
+</section>
+
+<!-- Temperature discovery -->
+<section class="s-temp-section reveal" id="s-temp-section" style="display:none">
+  <div class="s-section-header">Temperature Discovery</div>
+  <div class="s-temp-card">
+    <div>
+      <div class="s-temp-card__title">Optimal bed temperature: <em id="s-temp-val">&mdash;</em></div>
+      <div class="s-temp-card__sub" id="s-temp-desc">
+        Core body temperature must drop 1&ndash;3&deg;F to initiate deep sleep.
+        The Eight Sleep pod enables precise cooling on a schedule.
+        This data shows the temperature that produces the highest average sleep scores.
+      </div>
+    </div>
+    <div class="s-temp-big">
+      <div class="s-temp-big__num" id="s-temp-big-num">&mdash;</div>
+      <div class="s-temp-big__unit">&deg;F optimal</div>
+      <div class="s-temp-big__sub" id="s-temp-days">&mdash; nights tracked</div>
+    </div>
+  </div>
+  <div class="s-context">
+    Temperature is the most underrated sleep variable. Most people sleep in rooms that are too warm. The Eight Sleep pod data confirms what the research suggests: cooler beds produce deeper sleep.
+  </div>
+</section>
+
+
 <!-- ════════════════════════════════════════════════════════════
-     8j: CROSS-DOMAIN FINDINGS — Sleep → other domains
+     SECTION 5: CROSS-DOMAIN — V3 class names
      ════════════════════════════════════════════════════════════ -->
-<section class="s-cross-domain reveal">
+<section class="s-cross-domain obs-cross reveal">
   <div class="s-section-header">Cross-Domain Findings</div>
-  <div class="s-cross-domain__grid">
+  <div class="s-cross-domain__grid obs-cross-grid">
     <a href="/training/" class="s-cross-card">
       <div class="s-cross-card__arrow">SLEEP → RECOVERY</div>
       <div class="s-cross-card__from">Next-day recovery</div>
@@ -1646,25 +1454,201 @@
   </div>
 </section>
 
-<!-- ════════════════════════════════════════════════════════════
-     AI EXPERT ANALYSIS — Dr. Park's Sleep Analysis
-     ════════════════════════════════════════════════════════════ -->
-<section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal">
-  <div class="s-section-header">Dr. Park's Sleep Analysis</div>
-  <div id="s-ai-analysis"></div>
-</section>
 
 <!-- ════════════════════════════════════════════════════════════
-     8k: MEASUREMENT AGREEMENT NOTE
+     SECTION 6: DEPTH — Collapsed editorial, hypotheses, protocol
      ════════════════════════════════════════════════════════════ -->
-<div class="s-agreement reveal">
-  <div class="s-agreement__inner">
-    <div class="s-agreement__icon">NOTE</div>
-    <div class="s-agreement__text">
-      <strong>When Eight Sleep and Whoop scores diverge:</strong> Eight Sleep measures via mattress pressure sensors (body movement, respiration), while Whoop uses wrist-based optical sensors (heart rate, HRV, actigraphy). They typically agree within 5-8 points. Divergence &gt;15 points usually means one device mis-detected sleep onset or wake time. When they disagree, HRV-based metrics from Whoop tend to be more reliable for recovery assessment, while Eight Sleep is more accurate for bed temperature effects.
-    </div>
-  </div>
+<div id="obs-v3-depth" class="obs-depth" style="max-width:var(--max-width);margin:0 auto;padding:var(--space-10) var(--page-padding)">
+  <div class="obs-depth__title">Deep Dive</div>
+  <div class="obs-depth-grid">
+
+    <!-- Depth 1: About this observatory -->
+    <details class="obs-depth-section" id="depth-about">
+      <summary>About this observatory</summary>
+      <div class="obs-depth-section__body">
+        <div class="s-hero" style="padding:var(--space-8) 0;border-bottom:none;max-width:100%">
+          <div class="s-hero__eyebrow" style="opacity:1;animation:none">Sleep Observatory</div>
+          <h2 class="s-hero__title" style="opacity:1;animation:none;font-size:clamp(24px,3vw,32px)">The thing I thought I was <em>good at.</em></h2>
+          <p class="s-hero__sub" style="opacity:1;animation:none;font-size:var(--text-base)">
+            Sleep was never something I thought I needed to fix. Matthew Walker&rsquo;s work
+            made me pay closer attention. Then the Whoop and Eight Sleep started surfacing
+            numbers I couldn&rsquo;t ignore: sleep onset time, staging, the consistent shift to red
+            every time I drank. The score doesn&rsquo;t lie &mdash; and seeing it every morning
+            changed how I made decisions the night before.
+          </p>
+          <p class="s-hero__sub-detail" style="opacity:1;animation:none">
+            Data from Whoop, Eight Sleep, and Apple Health. Updated daily.
+          </p>
+        </div>
+
+        <!-- Dynamic pull-quote #1 -->
+        <div style="border-left:3px solid var(--s-blue);padding-left:var(--space-6);margin:var(--space-6) 0">
+          <div id="s-dynamic-quote-1" style="font-family:var(--font-display);font-size:clamp(18px,2.5vw,24px);line-height:1.3;color:var(--text)">
+            Hypothesis: earlier bedtime correlates with <em style="font-style:normal;color:var(--s-blue)">higher morning HRV</em>. Tracking across sleep sessions.
+          </div>
+          <div style="margin-top:var(--space-3);font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:0.1em">
+            HYPOTHESIS · UNDER TEST — Cross-referenced: Whoop HRV &times; Eight Sleep bed time
+          </div>
+        </div>
+
+        <!-- Pull-quote: Matthew's reflection -->
+        <div style="padding-left:16%;margin:var(--space-8) 0">
+          <p style="font-family:var(--font-display);font-size:clamp(18px,2.5vw,24px);line-height:1.3;color:var(--text);max-width:640px">
+            I already know the phone is the problem. Everyone does. The question isn't whether doom scrolling before bed wrecks your sleep — it's why knowing that isn't enough to stop. That's what I'm actually tracking.
+          </p>
+          <div style="margin-top:var(--space-3)">
+            <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--s-blue);background:var(--s-blue-dim);padding:3px 10px">&mdash; Matthew</span>
+          </div>
+        </div>
+
+        <!-- Dynamic pull-quote #2 -->
+        <div style="border-left:3px solid var(--s-blue);padding-left:var(--space-6);margin:var(--space-6) 0">
+          <div id="s-dynamic-quote-2" style="font-family:var(--font-display);font-size:clamp(18px,2.5vw,24px);line-height:1.3;color:var(--text)">
+            Hypothesis: any alcohol &mdash; even <em style="font-style:normal;color:var(--s-blue)">one drink</em> &mdash; measurably
+            reduces <em style="font-style:normal;color:var(--s-blue)">sleep quality</em> the following night.
+          </div>
+          <div style="margin-top:var(--space-3);font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:0.1em">
+            HYPOTHESIS · UNDER TEST — Tracking sleep quality on alcohol vs non-alcohol nights
+          </div>
+        </div>
+
+        <!-- Elena Voss chronicle quote -->
+        <div style="margin:var(--space-8) 0;padding-left:16%">
+          <blockquote style="font-family:var(--font-display);font-size:clamp(18px,2.5vw,24px);line-height:1.3;color:var(--text);max-width:640px;margin:0">
+            &ldquo;He sleeps like someone who&rsquo;s finally stopped fighting the data. The bed got colder, the phone went away, and the numbers quietly improved.&rdquo;
+          </blockquote>
+          <div style="margin-top:var(--space-3)">
+            <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--s-blue);background:var(--s-blue-dim);padding:3px 10px">Chronicle · Elena Voss</span>
+            <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);letter-spacing:var(--ls-subtle);margin-left:var(--space-3)">AI narrative voice — <a href="/chronicle/" style="color:var(--s-blue);text-decoration:none;">Read the chronicle →</a></span>
+          </div>
+        </div>
+
+        <!-- Differentiators -->
+        <div style="background:rgba(96,165,250,0.04);border:1px solid rgba(96,165,250,0.12);padding:var(--space-5) var(--space-6);display:flex;align-items:center;gap:var(--space-6);flex-wrap:wrap;margin:var(--space-6) 0">
+          <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--s-blue);white-space:nowrap">What makes this different</div>
+          <div style="width:1px;height:20px;background:var(--border);flex-shrink:0"></div>
+          <div style="display:flex;gap:var(--space-4);flex-wrap:wrap;font-size:var(--text-sm);color:var(--text-muted)">
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:4px;height:4px;background:var(--s-blue);border-radius:50%;flex-shrink:0"></span>Cross-device triangulation</span>
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:4px;height:4px;background:var(--s-blue);border-radius:50%;flex-shrink:0"></span>Cross-domain correlation</span>
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:4px;height:4px;background:var(--s-blue);border-radius:50%;flex-shrink:0"></span>Hypotheses under test</span>
+          </div>
+        </div>
+
+        <!-- Narrative: Sleep is the highest-leverage input -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-12);margin:var(--space-8) 0">
+          <div>
+            <h3 style="font-family:var(--font-display);font-size:var(--text-h2);color:var(--text);line-height:1.15;margin-bottom:var(--space-5)">Sleep is the<br>highest-leverage <em style="font-style:normal;color:var(--s-blue)">input</em></h3>
+            <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.8">
+              <p>Every other pillar depends on sleep. <strong style="color:var(--text)">HRV recovery, the primary signal Whoop uses to
+              score readiness, is built during deep sleep</strong> — specifically during the slow-wave stages
+              that dominate the first half of the night.</p>
+              <p>Cut sleep short and HRV drops, training adaptations stall, and appetite hormones shift
+              toward hunger. One bad night costs across all seven categories.</p>
+              <p>That&rsquo;s why this page cross-references Eight Sleep&rsquo;s mattress sensor with Whoop&rsquo;s
+              wrist data to find the conditions that reliably produce quality sleep, not just hours in bed.</p>
+            </div>
+          </div>
+          <div class="s-protocol-list">
+            <div class="s-protocol-item">
+              <div class="s-protocol-num">01</div>
+              <div class="s-protocol-text"><strong>Target 8 hours</strong> in bed — not 7. Buffer for sleep onset and one wake cycle still lands above 7h of actual sleep.</div>
+            </div>
+            <div class="s-protocol-item">
+              <div class="s-protocol-num">02</div>
+              <div class="s-protocol-text"><strong>Bed temperature 68°F</strong> via Eight Sleep pod. Core body temp must drop 1–3°F to initiate deep sleep.</div>
+            </div>
+            <div class="s-protocol-item">
+              <div class="s-protocol-num">03</div>
+              <div class="s-protocol-text"><strong>No screens 1 hour before bed.</strong> Blue light suppresses melatonin onset. Replaced with reading or audio.</div>
+            </div>
+            <div class="s-protocol-item">
+              <div class="s-protocol-num">04</div>
+              <div class="s-protocol-text"><strong>Consistent 10pm window.</strong> Circadian timing matters as much as duration. Irregular schedules fragment slow-wave.</div>
+            </div>
+            <div class="s-protocol-item">
+              <div class="s-protocol-num">05</div>
+              <div class="s-protocol-text"><strong>Magnesium glycinate before bed</strong> (genome-adjusted dose). Supports GABA pathways and muscle relaxation.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <!-- Depth 2: Hypotheses under test -->
+    <details class="obs-depth-section" id="depth-hypotheses">
+      <summary>Hypotheses under test</summary>
+      <div class="obs-depth-section__body">
+        <!-- Rule teaser -->
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:var(--space-6);align-items:center;border-left:3px solid var(--s-blue);padding:var(--space-5) var(--space-6);background:var(--surface);margin-bottom:var(--space-6)">
+          <div style="font-family:var(--font-display);font-size:48px;color:var(--s-blue);line-height:1;opacity:0.7">#1</div>
+          <div>
+            <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--s-blue);margin-bottom:var(--space-2)">Top Sleep Hypothesis</div>
+            <div style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--text);line-height:1.3;margin-bottom:var(--space-2)">Testing whether screens-off before 9pm improves next-day HRV</div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint)">Tracking with Whoop data &bull; <em style="font-style:normal;color:var(--s-blue)">Hypothesis under test</em></div>
+          </div>
+        </div>
+
+        <!-- Full rules grid -->
+        <div id="s-rules-full" class="s-rule-grid">
+          <div class="s-rule">
+            <div class="s-rule__num">Rule 01</div>
+            <div class="s-rule__finding">9pm screen-off may improve next-day HRV</div>
+            <div class="s-rule__evidence">Testing: tracking HRV response to <em>screen-free evenings</em></div>
+          </div>
+          <div class="s-rule">
+            <div class="s-rule__num">Rule 02</div>
+            <div class="s-rule__finding">Bed temp 68&deg;F may be the personal sweet spot — testing above and below</div>
+            <div class="s-rule__evidence">Testing: <em>Eight Sleep temperature</em> &times; sleep score correlation</div>
+          </div>
+          <div class="s-rule">
+            <div class="s-rule__num">Rule 03</div>
+            <div class="s-rule__finding">Any alcohol — even one drink — may reduce sleep quality the following night</div>
+            <div class="s-rule__evidence">Testing: tracking sleep quality on <em>alcohol vs non-alcohol nights</em></div>
+          </div>
+          <div class="s-rule">
+            <div class="s-rule__num">Rule 04</div>
+            <div class="s-rule__finding">Consistent bed time (&plusmn;30 min) may outperform high-variance weeks</div>
+            <div class="s-rule__evidence">Testing: <em>bedtime variance</em> &times; Whoop recovery correlation</div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <!-- Depth 3: Measurement protocol -->
+    <details class="obs-depth-section" id="depth-protocol">
+      <summary>Measurement protocol</summary>
+      <div class="obs-depth-section__body">
+        <div class="s-method-grid" style="margin-bottom:var(--space-6)">
+          <div class="s-method-item">
+            <strong>EIGHT SLEEP POD</strong>
+            Mattress-integrated sensor. Active cooling/heating. Sleep score 0–100.
+            Bed temp in °F. Efficiency = total sleep ÷ time in bed.
+          </div>
+          <div class="s-method-item">
+            <strong>WHOOP 4.0</strong>
+            Wrist-worn sensor. Sleep stages via actigraphy + optical HRV. Quality score 0–100.
+            Duration measured as actual sleep, not time in bed. Both synced nightly to DynamoDB.
+          </div>
+          <div class="s-method-item">
+            <strong>TEMPERATURE ANALYSIS</strong>
+            30-night pod temperature grouped into 2°F buckets. Average sleep score per bucket.
+            Highest-scoring bucket = empirical optimal. N=1 — individual results vary.
+          </div>
+        </div>
+
+        <!-- Measurement agreement note -->
+        <div style="background:var(--surface);border:1px solid var(--border);padding:var(--space-5) var(--space-6);display:grid;grid-template-columns:auto 1fr;gap:var(--space-4);align-items:start">
+          <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:var(--ls-wide);color:var(--s-amber);padding:3px 8px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.15);white-space:nowrap">NOTE</div>
+          <div style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.7">
+            <strong style="color:var(--text)">When Eight Sleep and Whoop scores diverge:</strong> Eight Sleep measures via mattress pressure sensors (body movement, respiration), while Whoop uses wrist-based optical sensors (heart rate, HRV, actigraphy). They typically agree within 5-8 points. Divergence &gt;15 points usually means one device mis-detected sleep onset or wake time. When they disagree, HRV-based metrics from Whoop tend to be more reliable for recovery assessment, while Eight Sleep is more accurate for bed temperature effects.
+          </div>
+        </div>
+      </div>
+    </details>
+
+  </div><!-- /.obs-depth-grid -->
 </div>
+
 
 </div><!-- /s-content -->
 
@@ -1684,69 +1668,9 @@
   </a>
 </div>
 
-<!-- ════════════════════════════════════════════════════════════
-     NARRATIVE
-     ════════════════════════════════════════════════════════════ -->
-<section class="s-narrative reveal">
-  <div>
-    <h2 class="s-narrative__title">Sleep is the<br>highest-leverage <em>input</em></h2>
-    <div class="s-narrative__body">
-      <p>Every other pillar depends on sleep. <strong>HRV recovery, the primary signal Whoop uses to
-      score readiness, is built during deep sleep</strong> &mdash; specifically during the slow-wave stages
-      that dominate the first half of the night.</p>
-      <p>Cut sleep short and HRV drops, training adaptations stall, and appetite hormones shift
-      toward hunger. One bad night costs across all seven categories.</p>
-      <p>That&rsquo;s why this page cross-references Eight Sleep&rsquo;s mattress sensor with Whoop&rsquo;s
-      wrist data to find the conditions that reliably produce quality sleep, not just hours in bed.</p>
-    </div>
-  </div>
-  <div class="s-protocol-list">
-    <div class="s-protocol-item">
-      <div class="s-protocol-num">01</div>
-      <div class="s-protocol-text"><strong>Target 8 hours</strong> in bed &mdash; not 7. Buffer for sleep onset and one wake cycle still lands above 7h of actual sleep.</div>
-    </div>
-    <div class="s-protocol-item">
-      <div class="s-protocol-num">02</div>
-      <div class="s-protocol-text"><strong>Bed temperature 68&deg;F</strong> via Eight Sleep pod. Core body temp must drop 1&ndash;3&deg;F to initiate deep sleep.</div>
-    </div>
-    <div class="s-protocol-item">
-      <div class="s-protocol-num">03</div>
-      <div class="s-protocol-text"><strong>No screens 1 hour before bed.</strong> Blue light suppresses melatonin onset. Replaced with reading or audio.</div>
-    </div>
-    <div class="s-protocol-item">
-      <div class="s-protocol-num">04</div>
-      <div class="s-protocol-text"><strong>Consistent 10pm window.</strong> Circadian timing matters as much as duration. Irregular schedules fragment slow-wave.</div>
-    </div>
-    <div class="s-protocol-item">
-      <div class="s-protocol-num">05</div>
-      <div class="s-protocol-text"><strong>Magnesium glycinate before bed</strong> (genome-adjusted dose). Supports GABA pathways and muscle relaxation.</div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     METHODOLOGY
-     ════════════════════════════════════════════════════════════ -->
-<section class="s-method reveal">
-  <div class="s-section-header">Measurement Protocol</div>
-  <div class="s-method-grid">
-    <div class="s-method-item">
-      <strong>EIGHT SLEEP POD</strong>
-      Mattress-integrated sensor. Active cooling/heating. Sleep score 0&ndash;100.
-      Bed temp in &deg;F. Efficiency = total sleep &divide; time in bed.
-    </div>
-    <div class="s-method-item">
-      <strong>WHOOP 4.0</strong>
-      Wrist-worn sensor. Sleep stages via actigraphy + optical HRV. Quality score 0&ndash;100.
-      Duration measured as actual sleep, not time in bed. Both synced nightly to DynamoDB.
-    </div>
-    <div class="s-method-item">
-      <strong>TEMPERATURE ANALYSIS</strong>
-      30-night pod temperature grouped into 2&deg;F buckets. Average sleep score per bucket.
-      Highest-scoring bucket = empirical optimal. N=1 &mdash; individual results vary.
-    </div>
-  </div>
-</section>
+<div id="amj-subscribe"></div>
+<div id="amj-bottom-nav"></div>
+<div id="amj-footer"></div>
 
 <nav class="reading-path-v2">
   <a href="/habits/" class="reading-path-v2__link">
@@ -1759,26 +1683,25 @@
   </a>
 </nav>
 
-<div id="amj-subscribe"></div>
-<div id="amj-bottom-nav"></div>
-<div id="amj-footer"></div>
-
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
 <script src="/assets/js/nav.js"></script>
 <script src="/assets/js/engagement.js"></script>
+<script src="/assets/js/observatory-v3.js"></script>
 <script>
+  // V3: Render coach analysis early (fetches async)
+  renderCoachAnalysis('obs-v3-coach', 'sleep', {
+    name: 'Dr. Lisa Park',
+    initials: 'LP',
+    title: 'Sleep & circadian specialist',
+    color: '#818cf8'
+  });
+
   initObservatoryWeek('sleep', 'obs-thisweek');
   // Freshness is set from the observatory_week response
   fetch('/api/observatory_week?domain=sleep').then(r=>r.ok?r.json():null).then(d=>{
     if(d&&d.last_updated) initObsFreshness(d.last_updated);
   }).catch(function(){});
-  // AI expert analysis card
-  if (typeof renderAIAnalysisCard === 'function') {
-    renderAIAnalysisCard('s-ai-analysis', 'sleep', {
-      dataSources: 'Whoop sleep data, Eight Sleep temperature data, and recovery metrics'
-    });
-  }
 </script>
 <script src="/assets/js/reveal.js"></script>
 <script>
@@ -1805,28 +1728,35 @@
     var trend = data.sleep_trend || [];
     if (!s) { loading.textContent = 'No sleep data yet.'; return; }
 
-    /* ── Hero gauges ── */
+    /* ── V3 Section 1: Status Bar ── */
     var hours = s.whoop_hours || s.total_sleep_hours || 0;
-    setText('g-dur-num', hours ? hours.toFixed(1) : '\u2014');
-    setArc('g-dur-arc', Math.min(100, (hours / 9) * 100));
-    var _daysTracked = s.days_tracked || (trend ? trend.length : 0);
-    if (_daysTracked > 0) { var _dn = document.getElementById('g-dur-note'); if (_dn) _dn.textContent = _daysTracked + ' nights tracked'; }
-
     var avg30 = s['30d_avg_score'] || 0;
-    setText('g-score-num', avg30 ? avg30.toFixed(0) : '\u2014');
-    setArc('g-score-arc', avg30);
-
     var deep = s.deep_pct || 0;
-    setText('g-deep-num', deep ? deep.toFixed(0) : '\u2014');
-    setArc('g-deep-arc', Math.min(100, (deep / 30) * 100));
-
     var recov = s['30d_avg_recovery'] || s.recovery_score || 0;
-    setText('g-recov-num', recov ? recov.toFixed(0) : '\u2014');
-    setArc('g-recov-arc', recov);
+    var _daysTracked = s.days_tracked || (trend ? trend.length : 0);
 
-    /* ── 8d: Sleep efficiency ── */
+    renderStatusBar('obs-v3-status', [
+      {label:'Last night', value: hours ? hours.toFixed(1) : null, unit:'hrs', delta:null, context: _daysTracked > 0 ? _daysTracked + ' nights tracked' : ''},
+      {label:'Sleep score', value: avg30 ? avg30.toFixed(0) : null, unit:'', delta:null, context:'30-day average'},
+      {label:'Deep sleep', value: deep ? deep.toFixed(0) : null, unit:'%', delta:null, context:'Target: >20%'},
+      {label:'Recovery', value: recov ? recov.toFixed(0) : null, unit:'%', delta:null, context:'Latest'},
+    ], {lastUpdated: data.last_updated || null});
+
+    /* ── V3 Section 4: This Week's Detail ── */
     var efficiency = s.sleep_efficiency || (s.total_sleep_hours && s.time_in_bed_hours
       ? Math.round((s.total_sleep_hours / s.time_in_bed_hours) * 100) : null);
+    var hrv = s.hrv_ms || s.hrv || 0;
+
+    renderWeekDetail('obs-v3-detail', [
+      {label:'Sleep efficiency', value: efficiency ? efficiency + '%' : null, context: s['30d_avg_efficiency'] ? '30d avg: ' + s['30d_avg_efficiency'] + '%' : ''},
+      {label:'Deep sleep', value: deep ? deep.toFixed(1) + '%' : null, context:'Target >20%'},
+      {label:'REM sleep', value: s.rem_pct ? s.rem_pct.toFixed(1) + '%' : null, context:'Target >20%'},
+      {label:'HRV', value: hrv ? hrv.toFixed(0) + 'ms' : null, context:'Parasympathetic recovery signal'},
+      {label:'Weekday bedtime', value: s.weekday_bedtime || '10:15 PM', context: s.weekday_variance_min ? '\u00B1' + s.weekday_variance_min + 'm variance' : ''},
+      {label:'Social jetlag', value: s.social_jetlag_hours ? '~' + s.social_jetlag_hours.toFixed(2) + ' hrs' : '~1.25 hrs', context:'Weekend drift from weekday schedule'},
+    ]);
+
+    /* ── 8d: Sleep efficiency ── */
     if (efficiency) {
       setText('s-eff-num', efficiency);
       var effColor = efficiency >= 85 ? 'var(--s-green)' : efficiency >= 75 ? 'var(--s-amber)' : 'var(--s-red)';
@@ -1892,7 +1822,6 @@
       setWidth('sbar-rem', (s.rem_pct / 30) * 100);
       setText('sval-rem', s.rem_pct.toFixed(1) + '%');
     }
-    var hrv = s.hrv_ms || s.hrv || 0;
     if (hrv) {
       setWidth('sbar-hrv', Math.min(100, (hrv / 120) * 100));
       setText('sval-hrv', hrv.toFixed(0) + 'ms');
@@ -1903,8 +1832,8 @@
       var _confNote = document.createElement('div');
       _confNote.style.cssText = 'max-width:var(--max-width);margin:0 auto;padding:var(--space-2) var(--page-padding);text-align:center;font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:var(--ls-tag)';
       _confNote.textContent = 'Based on ' + _daysTracked + ' nights \u2014 patterns become reliable after ~14 nights';
-      var _heroEl = document.querySelector('.s-hero');
-      if (_heroEl && _heroEl.nextSibling) _heroEl.parentNode.insertBefore(_confNote, _heroEl.nextSibling);
+      var _statusEl = document.getElementById('obs-v3-status');
+      if (_statusEl && _statusEl.nextSibling) _statusEl.parentNode.insertBefore(_confNote, _statusEl.nextSibling);
     }
 
     // Show content BEFORE chart rendering (canvas needs offsetWidth > 0)

@@ -19,6 +19,7 @@
   <meta name="theme-color" content="#080c0a">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/observatory-v3.css">
   <style>
     :root {
       --lb-accent: #06b6d4;
@@ -534,16 +535,8 @@
 <!-- Content (hidden until data loads) -->
 <div id="lb-content" style="display:none">
 
-  <!-- DPR-1.21: AI Expert Analysis (Dr. Okafor) -->
-  <section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-10) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal">
-    <div class="lb-section-header">Dr. Okafor&rsquo;s Interpretation</div>
-    <div class="coaching-key-rec" id="lb-key-rec" style="display:none">
-      <div class="coaching-key-rec__label">This draw's priority</div>
-      <div class="coaching-key-rec__text" id="lb-key-rec-text"></div>
-      <div class="coaching-key-rec__rationale" id="lb-key-rec-rationale"></div>
-    </div>
-    <div id="lb-ai-analysis"></div>
-  </section>
+  <!-- V3: Coach Analysis — Dr. Okafor at position 2 -->
+  <div id="obs-v3-coach"></div>
 
   <!-- Pull-quote #1 -->
   <div class="lb-pullquote reveal">
@@ -619,9 +612,18 @@
 
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
+<script src="/assets/js/observatory-v3.js"></script>
 <script src="/assets/js/nav.js"></script>
 <script src="/assets/js/reveal.js"></script>
 <script>
+/* V3: Coach Analysis — Dr. Okafor at position 2 */
+renderCoachAnalysis('obs-v3-coach', 'labs', {
+  name: 'Dr. James Okafor',
+  initials: 'JO',
+  title: 'Clinical pathologist — preventive lab interpretation',
+  color: '#06b6d4'
+});
+
 (async function() {
   'use strict';
 
@@ -770,12 +772,7 @@
     loading.style.display = 'none';
     content.style.display = 'block';
 
-    // DPR-1.21: Load AI expert analysis (labs/Dr. Okafor)
-    if (typeof renderAIAnalysisCard === 'function') {
-      renderAIAnalysisCard('lb-ai-analysis', 'labs', {
-        dataSources: 'most recent blood panel (' + (labs.latest_draw_date || 'date unknown') + ')'
-      });
-    }
+    /* AI expert now rendered by V3 coach at page init */
   } catch (e) {
     loading.textContent = 'Lab data temporarily unavailable.';
     console.error(e);

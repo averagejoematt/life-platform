@@ -14,6 +14,7 @@
   <meta name="theme-color" content="#080c0a">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/observatory-v3.css">
   <style>
     :root {
       --m-violet: #a78bfa;
@@ -1307,6 +1308,11 @@
   </div>
 </div>
 
+<!-- ════════════════════════════════════════════════════════════
+     V3 Section 2: COACH ANALYSIS — Dr. Conti (Approach C: after hero, not replacing it)
+     ════════════════════════════════════════════════════════════ -->
+<div id="obs-v3-coach"></div>
+
 <div id="obs-thisweek" style="display:none"></div>
 
 <!-- M2: Today's emotional word widget -->
@@ -1411,15 +1417,7 @@
 <!-- ════════════════════════════════════════════════════════════
      AI EXPERT ANALYSIS
      ════════════════════════════════════════════════════════════ -->
-<section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal">
-  <div class="m-section-header">Dr. Conti's Observations</div>
-  <!-- M1: Journaling prompt callout -->
-  <div id="m-journal-prompt" style="display:none;border:1px solid var(--pillar-mind,#a78bfa);border-left:4px solid var(--pillar-mind,#a78bfa);background:linear-gradient(135deg,rgba(167,139,250,0.04),transparent 60%);padding:var(--space-5) var(--space-6);margin-bottom:var(--space-6)">
-    <div style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--pillar-mind,#a78bfa);margin-bottom:var(--space-2)">This week's journaling prompt</div>
-    <div id="m-journal-prompt-text" style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--text);line-height:1.3"></div>
-  </div>
-  <div id="m-ai-analysis"></div>
-</section>
+<!-- AI expert analysis now rendered by V3 coach at position 2 (after hero per Conti Amendment) -->
 
 <!-- ════════════════════════════════════════════════════════════
      12c: DATA SPARSITY — the gap IS the data
@@ -1783,14 +1781,8 @@
 <!-- ════════════════════════════════════════════════════════════
      METHODOLOGY
      ════════════════════════════════════════════════════════════ -->
-<section class="m-method reveal">
-  <div class="m-method__title">Measurement protocol</div>
-  <div class="m-method-grid">
-    <div class="m-method-item"><strong>HOW WE FEEL</strong>Mood valence via Apple Health. Scale: -1 (very unpleasant) to +1 (very pleasant). Synced via webhook.</div>
-    <div class="m-method-item"><strong>JOURNAL ANALYSIS</strong>Notion entries enriched by Haiku: mood, energy, stress, cognitive patterns (CBT), themes, emotions, social quality (PERMA).</div>
-    <div class="m-method-item"><strong>VICE STREAKS</strong>Habitify-tracked behavioral commitments. Compounding value: streak^1.5/10. Identity threshold: day 30. N=1.</div>
-  </div>
-</section>
+<!-- Methodology moved to V3 depth section -->
+<div id="obs-v3-depth"></div>
 
 <div class="discord-community-card">
   <div class="community-card-header">&sharp; COMMUNITY ──────────────</div>
@@ -1823,9 +1815,23 @@
 <div id="amj-footer"></div>
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
+<script src="/assets/js/observatory-v3.js"></script>
 <script src="/assets/js/nav.js"></script>
 <script src="/assets/js/engagement.js"></script>
 <script>
+  /* V3: Coach Analysis — Dr. Conti at position 2 (after hero per Conti Amendment) */
+  renderCoachAnalysis('obs-v3-coach', 'mind', {
+    name: 'Dr. Paul Conti',
+    initials: 'PC',
+    title: 'Psychiatrist — internal systems & behavioral patterns',
+    color: '#a78bfa'
+  });
+
+  /* V3: Depth sections */
+  renderDepth('obs-v3-depth', [
+    {label: 'Measurement protocol', id: 'protocol', content: '<p><strong>HOW WE FEEL</strong> — Mood valence via Apple Health. Scale: -1 (very unpleasant) to +1 (very pleasant). Synced via webhook.</p><p><strong>JOURNAL ANALYSIS</strong> — Notion entries enriched by Haiku: mood, energy, stress, cognitive patterns (CBT), themes, emotions, social quality (PERMA).</p><p><strong>VICE STREAKS</strong> — Habitify-tracked behavioral commitments. Compounding value: streak^1.5/10. Identity threshold: day 30. N=1.</p>'}
+  ]);
+
   initObservatoryWeek('mind', 'obs-thisweek');
   fetch('/api/observatory_week?domain=mind').then(r=>r.ok?r.json():null).then(d=>{
     if(d&&d.last_updated) initObsFreshness(d.last_updated);
@@ -2415,12 +2421,7 @@
     console.error(e);
   }
 
-  /* ── AI Expert Analysis Card (outside try/catch — independent fetch) ── */
-  if (typeof renderAIAnalysisCard === 'function') {
-    renderAIAnalysisCard('m-ai-analysis', 'mind', {
-      dataSources: '30 days of journal entries, mood logs, and behavioral data'
-    });
-  }
+  /* AI expert analysis now rendered by V3 coach at position 2 */
 })();
 </script>
 </body>

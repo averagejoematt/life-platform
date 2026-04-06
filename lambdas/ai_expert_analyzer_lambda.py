@@ -1,8 +1,9 @@
 """
-AI Expert Analyzer Lambda — Observatory V2
+AI Expert Analyzer Lambda — Observatory V3
 
-Generates weekly AI expert voice analyses for 4 observatory pages.
-Each expert analyzes current data and produces 2-3 paragraphs of prose.
+Generates weekly AI expert voice analyses for 8 observatory pages.
+Each expert analyzes current data and produces 2-3 paragraphs of prose
+with a rotating analytical lens to prevent repetition.
 
 Trigger: EventBridge cron — weekly, Monday 6am PT (14:00 UTC)
 Can also be invoked manually with {"expert": "mind"} for a single expert.
@@ -10,9 +11,10 @@ Can also be invoked manually with {"expert": "mind"} for a single expert.
 DynamoDB cache:
   PK = USER#matthew#SOURCE#ai_analysis
   SK = EXPERT#mind | EXPERT#nutrition | EXPERT#training | EXPERT#physical
+       | EXPERT#explorer | EXPERT#glucose | EXPERT#labs | EXPERT#sleep
   TTL = 8 days (auto-expire if Lambda fails to run)
 
-v1.0.0 — 2026-03-31
+v2.0.0 — 2026-04-05 (V3 Observatory spec — PB-09)
 """
 
 import json
@@ -136,37 +138,52 @@ def gather_data_for_expert(expert_key):
             return {"expert_key": "nutrition", "period": f"experiment days 1-{days_in_experiment}", "note": "No nutrition data available"}
         cal_vals = [float(i["calories"]) for i in items if i.get("calories")]
         pro_vals = [float(i["protein_g"]) for i in items if i.get("protein_g")]
+        fiber_vals = [float(i["fiber_g"]) for i in items if i.get("fiber_g")]
         avg_cal = round(sum(cal_vals) / len(cal_vals)) if cal_vals else 0
         avg_pro = round(sum(pro_vals) / len(pro_vals), 1) if pro_vals else 0
+        avg_fiber = round(sum(fiber_vals) / len(fiber_vals), 1) if fiber_vals else None
         protein_target = 190
         adherence = sum(1 for v in pro_vals if v >= protein_target) / max(len(pro_vals), 1) * 100
+        zero_cal_days = sum(1 for i in items if i.get("calories") is not None and float(i.get("calories", 0)) == 0)
         return {
             "expert_key": "nutrition",
             "period": f"experiment days 1-{days_in_experiment}",
             "avg_calories": avg_cal,
             "avg_protein_g": avg_pro,
+            "avg_fiber_g": avg_fiber,
             "protein_target_g": protein_target,
             "protein_adherence_pct": round(adherence),
             "days_tracked": len(items),
+            "zero_calorie_days": zero_cal_days,
         }
 
     elif expert_key == "training":
-        # Strava/activity data (30d for step averages to match hero metric)
         activities = _query_source("strava", d30, today)
-        # Steps: prefer Garmin (more accurate with watch), fall back to Apple Health
         garmin_items = _query_source("garmin", d30, today)
+        whoop_items = _query_source("whoop", d30, today)
         step_vals = [float(g["steps"]) for g in garmin_items if g.get("steps")]
         if not step_vals:
             steps_items = _query_source("apple_health", d30, today)
             step_vals = [float(s["steps"]) for s in steps_items if s.get("steps") and float(s["steps"]) > 0]
         avg_steps = round(sum(step_vals) / len(step_vals)) if step_vals else 0
         total_min = sum(float(a.get("duration_min", 0) or a.get("moving_time_min", 0)) for a in activities)
+        recovery_vals = [float(w["recovery_score"]) for w in whoop_items if w.get("recovery_score")]
+        avg_recovery = round(sum(recovery_vals) / len(recovery_vals), 1) if recovery_vals else None
+        modalities = {}
+        for a in activities:
+            t = a.get("type", "unknown")
+            modalities[t] = modalities.get(t, 0) + 1
+        active_dates = set(a.get("sk", "")[:15] for a in activities if a.get("sk"))
+        rest_days = max(0, days_in_experiment - len(active_dates))
         return {
             "expert_key": "training",
             "period": f"experiment days 1-{days_in_experiment}",
             "sessions_count": len(activities),
             "total_active_min": round(total_min),
             "avg_daily_steps": avg_steps,
+            "avg_recovery": avg_recovery,
+            "rest_days": rest_days,
+            "modality_breakdown": modalities,
         }
 
     elif expert_key == "physical":
@@ -277,6 +294,9 @@ def gather_data_for_expert(expert_key):
         hrv_vals = [float(w["hrv"]) for w in whoop_items if w.get("hrv")]
         score_vals = [float(e["sleep_score"]) for e in eight_items if e.get("sleep_score")]
         deep_pcts = [float(e["deep_pct"]) for e in eight_items if e.get("deep_pct")]
+        rem_pcts = [float(e["rem_pct"]) for e in eight_items if e.get("rem_pct")]
+        bed_temps = [float(e["bed_temp_f"]) for e in eight_items if e.get("bed_temp_f")]
+        sleep_starts = [w.get("sleep_start") for w in whoop_items if w.get("sleep_start")]
         avg = lambda lst: round(sum(lst) / len(lst), 1) if lst else None
         return {
             "expert_key": "sleep",
@@ -287,6 +307,9 @@ def gather_data_for_expert(expert_key):
             "avg_recovery": avg(recovery_vals),
             "avg_hrv": avg(hrv_vals),
             "avg_deep_pct": avg(deep_pcts),
+            "avg_rem_pct": avg(rem_pcts),
+            "avg_bed_temp_f": avg(bed_temps),
+            "sleep_onset_times": sleep_starts[-7:],
         }
 
     return {"expert_key": expert_key, "note": "Unknown expert"}
@@ -344,75 +367,135 @@ EXPERT_PERSONAS = {
 }
 
 
-def build_prompt(expert_key, data, days_in_experiment=None):
+def build_prompt(expert_key, data, days_in_experiment=None, week_number=None):
     p = EXPERT_PERSONAS[expert_key]
     if days_in_experiment is None:
         days_in_experiment = max(1, (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
+    week_num = week_number or max(1, days_in_experiment // 7 + 1)
+
     prior_summary = data.pop("_prior_analysis_summary", "")
-    prior_block = f"Your previous analysis said: \"{prior_summary}...\" — find a different angle today." if prior_summary else ""
+    prior_recommendation = data.pop("_prior_recommendation", "")
     data_json = json.dumps(data, indent=2, default=str)
+
+    # Rotating analytical lens — prevents repetitive framing
+    lenses = [
+        "Focus on the most surprising or counterintuitive finding in this data.",
+        "Focus on what changed since last week and whether the direction matters.",
+        "Focus on what the data does NOT show — the gaps, the missing signal, the dog that didn't bark.",
+        "Focus on one specific number and explain why it matters more than it appears.",
+        "Focus on the interaction between two metrics that tells a story neither tells alone.",
+        "Focus on whether Matthew's current trajectory is sustainable for 3 more months.",
+        "Focus on what a clinician would flag if this were a patient chart review.",
+    ]
+    lens = lenses[(week_num - 1) % len(lenses)]
+
+    prior_block = ""
+    if prior_summary:
+        prior_block = f"""
+Your PREVIOUS analysis said: "{prior_summary[:300]}..."
+Your PREVIOUS recommendation was: "{prior_recommendation[:200]}..."
+
+CRITICAL: Do NOT repeat the same observation, angle, or recommendation. Find a genuinely
+different insight. If you previously discussed deep sleep percentage, discuss something else
+this week — consistency, efficiency, HRV trend, or a cross-domain connection. The reader
+has already read your last analysis and will notice repetition immediately.
+"""
+
+    labs_context = ""
+    if expert_key == "labs":
+        labs_context = f"""
+IMPORTANT: Lab data spans Matthew's full history, not just the current experiment.
+The data shows {data.get('total_draws', 0)} total blood draws, with the most recent
+on {data.get('draw_date', 'unknown')}. Do NOT describe this as "draws during the
+experiment" — these are periodic lab draws over time.
+"""
 
     return f"""You are {p['name']}, {p['title']}.
 
 Your communication style: {p['style']}.
 Your analytical focus: {p['focus']}.
 
-You are writing your weekly analysis section for Matthew's personal health data platform (averagejoematt.com).
-This section is public-facing — Matthew has chosen radical transparency about his health journey.
+You are writing your weekly analysis for Matthew's public health experiment (averagejoematt.com).
+This is Week {week_num} of the experiment (started {EXPERIMENT_START}, now day {days_in_experiment}).
+Your analysis is the CENTERPIECE of the observatory page — it appears at position 2,
+immediately after the key metrics. Returning readers come back specifically to read
+what you have to say this week. This is a weekly appointment, not a generic report.
 
-CRITICAL CONTEXT: The experiment started on {EXPERIMENT_START}. Today is day {days_in_experiment} of the experiment.
-All data below is ONLY from the experiment period (day 1 onward). Do NOT reference "30 days" or any timeframe
-longer than the actual experiment duration. If there are {days_in_experiment} days of data, say "{days_in_experiment} days"
-not "30 days" or "this month." Frame everything relative to the experiment's actual age.
+ANALYTICAL LENS FOR THIS WEEK: {lens}
+{labs_context}
 
-Here is Matthew's data (experiment days 1-{days_in_experiment}):
+Here is Matthew's current data:
 {data_json}
 
-Write a 2-3 paragraph analysis (approximately 180-250 words).
-
-Requirements:
-- Open with one specific, concrete observation from the data (not a generic statement)
-- Identify one pattern or trend that deserves attention — either positive or concerning
-- End with one specific, actionable suggestion for the coming week
-- Use first person as yourself (e.g., "What strikes me most..." or "From a clinical standpoint...")
-- Do NOT use bullet points or headers — this is flowing prose
-- Do NOT be sycophantic or overly positive — honest assessment serves Matthew better
-- Reference specific numbers from the data when you do so naturally
-- Tone: authoritative but human, like a trusted advisor's private note
-- If prior analysis is provided below, find a DIFFERENT angle — do not repeat the same observation or suggestion
-
 {prior_block}
-After your analysis paragraphs, on a new line, write exactly:
-KEY RECOMMENDATION: [one specific behavioral suggestion for the coming week, maximum 2 sentences]
-{"" if expert_key != "mind" else chr(10) + "Then on another new line, write exactly:" + chr(10) + "JOURNALING PROMPT: [a single sentence journaling prompt for this week — something Matthew can sit with before writing]"}
-Then on a final new line, write exactly:
-ELENA QUOTE: [A one-sentence observation in the voice of Elena Voss, an AI narrative journalist. She writes about Matthew in third person, noticing patterns with clinical precision but literary warmth. Format: observation + implication. Example style: "Three walks this week. Not a training log — a floor he's building." Never aspirational. Just noticing.]
 
-Write only the analysis text — no preamble, no "Here is my analysis:", just the paragraphs themselves followed by the KEY RECOMMENDATION line."""
+Write a 2-3 paragraph analysis (200-300 words). Requirements:
+
+STRUCTURE:
+- Paragraph 1: Open with ONE specific, concrete observation. Lead with the number
+  that caught your attention. Use "What strikes me most..." or "The figure I keep
+  returning to..." or "The pattern worth naming..." — vary your opening each week.
+- Paragraph 2: Interpret the pattern. What does it mean clinically/practically?
+  Connect to another domain if relevant (sleep affects glucose, training affects
+  recovery, etc.). Use your expertise to say something a dashboard cannot.
+- Paragraph 3: One specific, actionable suggestion for the coming week. Be concrete
+  enough that Matthew can do it tomorrow. Not "sleep more" but "try anchoring sleep
+  onset to within a 30-minute window each night."
+
+VOICE:
+- First person as yourself. You are a real expert having a weekly conversation.
+- Reference specific numbers naturally — don't list them, weave them into insight.
+- Be honest. If the data is concerning, say so. If it's encouraging, explain why
+  without being sycophantic. If it's too early to draw conclusions, say that.
+- Write as if Matthew and 500 subscribers are reading this on Wednesday morning
+  with their coffee. Be worth their time.
+- Do NOT use bullet points, headers, or formatting. Flowing prose only.
+- Vary sentence length. Mix short declarative sentences with longer analytical ones.
+
+FRESHNESS REQUIREMENTS:
+- Never open with "Looking at the data..." or "This week's data shows..." — these
+  are the equivalent of "Dear Sir/Madam" in a letter. Be specific immediately.
+- Each weekly analysis should feel like a different chapter, not a form letter.
+- If you find yourself writing a sentence that could appear in any week's analysis,
+  delete it and write something specific to THIS week.
+
+After your analysis, on separate lines write exactly:
+KEY RECOMMENDATION: [One specific behavioral action for this week. 1-2 sentences max. Concrete enough to act on tomorrow.]
+ELENA QUOTE: [One sentence in Elena Voss's voice — third person, clinical precision with literary warmth. She notices patterns, not outcomes. Example: "Five nights of data and his body is already telling a quieter story than the hours suggest." Never aspirational. Just noticing.]
+{"JOURNALING PROMPT: [A single reflective question for Matthew — something he can sit with before writing. Make it specific to what the data revealed this week.]" if expert_key == "mind" else ""}
+
+Write only the analysis — no preamble, no "Here is my analysis:", just paragraphs followed by the tagged lines."""
 
 
 def generate_and_cache(expert_key):
     logger.info(f"Generating analysis for expert: {expert_key}")
     data = gather_data_for_expert(expert_key)
 
-    # Read prior analysis to prevent repetition
+    # Read prior analysis + recommendation to prevent repetition
     prior_summary = ""
+    prior_recommendation = ""
     try:
         prior = table.get_item(Key={"pk": CACHE_PK, "sk": f"EXPERT#{expert_key}"}).get("Item")
-        if prior and prior.get("analysis"):
-            prior_text = str(prior["analysis"])
-            prior_summary = prior_text[:300]
+        if prior:
+            if prior.get("analysis"):
+                prior_summary = str(prior["analysis"])[:300]
+            if prior.get("key_recommendation"):
+                prior_recommendation = str(prior["key_recommendation"])[:200]
     except Exception:
         pass
     if prior_summary:
         data["_prior_analysis_summary"] = prior_summary
+    if prior_recommendation:
+        data["_prior_recommendation"] = prior_recommendation
 
-    prompt = build_prompt(expert_key, data)
+    days_in = max(1, (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
+    week_number = max(1, days_in // 7 + 1)
+    prompt = build_prompt(expert_key, data, days_in, week_number)
     api_key = _get_api_key()
 
     req_body = json.dumps({
         "model": AI_MODEL,
-        "max_tokens": 1000,
+        "max_tokens": 1200,
         "messages": [{"role": "user", "content": prompt}],
     })
 
@@ -460,6 +543,8 @@ def generate_and_cache(expert_key):
         "analysis": analysis_text,
         "generated_at": now.isoformat(),
         "data_snapshot": json.dumps(data, default=str)[:5000],
+        "week_number": week_number,
+        "days_in_experiment": days_in,
         "ttl": ttl,
     }
     if key_recommendation:
