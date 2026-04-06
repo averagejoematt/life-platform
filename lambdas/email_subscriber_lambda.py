@@ -113,11 +113,26 @@ def _redirect(url: str) -> dict:
 # SUBSCRIBE
 # ─────────────────────────────────────────────────────────────────────────────
 
+_BLOCKED_DOMAINS = {
+    "example.com", "example.org", "example.net", "test.com", "test.org",
+    "localhost", "invalid", "mailinator.com", "guerrillamail.com",
+    "tempmail.com", "throwaway.email", "yopmail.com", "sharklasers.com",
+    "guerrillamailblock.com", "grr.la", "dispostable.com",
+}
+
+
 def handle_subscribe(email: str, source_ip: str = "", referrer: str = "") -> dict:
     """Create/update pending record and send confirmation email."""
     email = email.strip().lower()
     if not email or "@" not in email or len(email) > 254:
         return _json_response(400, {"error": "Invalid email address."})
+
+    # Block fake/disposable domains to prevent SES bounces
+    domain = email.rsplit("@", 1)[-1]
+    if domain in _BLOCKED_DOMAINS:
+        logger.info("subscribe: blocked disposable domain %s", domain)
+        # Return success silently — don't reveal we blocked it
+        return _json_response(200, {"status": "pending_confirmation", "message": "Check your inbox."})
 
     email_hash = _email_hash(email)
     now_iso    = datetime.now(timezone.utc).isoformat()
