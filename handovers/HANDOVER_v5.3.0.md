@@ -1,7 +1,7 @@
-# Handover — v5.2.0: Product Board Sprint (PB-01 through PB-07)
+# Handover — v5.3.0: Product Board Sprint + V3 Observatory Redesign
 
 **Date:** 2026-04-05
-**Scope:** Product Board sprint — 7 items from planning session. Verification sweep (PB-01–03), Sleep/Glucose V2 visual alignment (PB-04–05), Weekly Signal subscriber email (PB-06), protocol adherence card (PB-07). Also: MCP Lambda 502 fix from canary failures.
+**Scope:** Product Board sprint (PB-01–07) + V3 Observatory redesign (PB-09). Verification sweep, Weekly Signal email, protocol adherence, then full coach-led dashboard restructure across 8 pages. Also: MCP Lambda 502 fix, AI expert analyzer V3 upgrade.
 
 ## What Changed
 
@@ -60,6 +60,11 @@
 - Added Dr. Lisa Park persona (sleep & circadian specialist)
 - Generated initial analysis (1503 chars). Dr. Park's card on sleep page now renders content.
 
+### V3 Observatory Redesign (PB-09) ✅
+- **Phase 1 (Foundation):** Created `observatory-v3.css` + `observatory-v3.js` shared module (6 named function exports). Upgraded `ai_expert_analyzer_lambda.py` to V3: rotating analytical lens, enhanced data gathering (sleep onset/temp/REM, training recovery/modality, nutrition fiber), labs context override, max_tokens 1200, week_number + prior_recommendation anti-repetition. Generated V3 analyses for all 8 experts (1700-2400 chars).
+- **Phase 2 (Observatory Pages):** Restructured Sleep, Physical, Training, Nutrition, Glucose (Approach B — status bar → coach → trends → detail → cross-domain → depth) and Mind (Approach C — Conti Amendment, hero stays visible).
+- **Phase 3 (Habits + Labs):** Habits V3-lite (editorial collapsed, T1/T2 collapsed). Labs: Dr. Okafor promoted to position 2.
+
 ### PB-08: Intelligence Page Rebuild — NOT STARTED (per plan)
 - Gated on SIMP-1 Phase 2 (~April 13)
 
@@ -72,7 +77,17 @@
 | `cdk/stacks/email_stack.py` | Added weekly-signal Lambda (PB-06) |
 | `cdk/stacks/role_policies.py` | Added `email_weekly_signal()` IAM policy |
 | `lambdas/weekly_signal_lambda.py` | NEW — Weekly Signal subscriber email |
-| `lambdas/ai_expert_analyzer_lambda.py` | Added sleep expert (data gather + persona) |
+| `lambdas/ai_expert_analyzer_lambda.py` | V3 prompts: rotating lens, enhanced data, max_tokens 1200, week_number, sleep expert |
+| `site/assets/css/observatory-v3.css` | NEW — shared V3 observatory stylesheet |
+| `site/assets/js/observatory-v3.js` | NEW — shared V3 rendering module (6 named exports) |
+| `site/sleep/index.html` | V3 restructure (Approach B) |
+| `site/physical/index.html` | V3 restructure (Approach B) |
+| `site/training/index.html` | V3 restructure (Approach B) |
+| `site/nutrition/index.html` | V3 restructure (Approach B) |
+| `site/glucose/index.html` | V3 restructure (Approach B) |
+| `site/mind/index.html` | V3 restructure (Approach C — Conti Amendment) |
+| `site/habits/index.html` | V3-lite (editorial + T1/T2 collapsed) |
+| `site/labs/index.html` | V3 coach promotion (Dr. Okafor at position 2) |
 | `lambdas/site_api_lambda.py` | Added `sleep` to AI analysis whitelist; added `sleep_start` to sleep trend |
 | `site/sleep/index.html` | AI expert card + data-driven protocol adherence |
 | `site/assets/js/components.js` | Added `sleep` + `glucose` to EXPERTS config |
@@ -115,4 +130,4 @@
 | Lambda Layer | v26 |
 | Architecture Grade | A- (R20) |
 | CDK Stacks | 8 |
-| Version | v5.2.0 |
+| Version | v5.3.0 |
