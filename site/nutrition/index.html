@@ -18,6 +18,7 @@
   <meta name="theme-color" content="#080c0a">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/observatory-v3.css">
   <style>
     :root {
       --n-amber: #f59e0b;
@@ -1511,17 +1512,21 @@
 
 
 <!-- ════════════════════════════════════════════════════════════
+     V3 Section 1: STATUS BAR — rendered by observatory-v3.js
+     ════════════════════════════════════════════════════════════ -->
+<div id="obs-v3-status"></div>
+
+<!-- ════════════════════════════════════════════════════════════
+     V3 Section 2: COACH ANALYSIS — rendered by observatory-v3.js
+     ════════════════════════════════════════════════════════════ -->
+<div id="obs-v3-coach"></div>
+
+<!-- ════════════════════════════════════════════════════════════
      HERO — B's 2-column layout + C's gauge row
      ════════════════════════════════════════════════════════════ -->
 <div class="n-hero">
-  <div class="n-hero-grid">
-    <div>
-      <div class="n-hero__eyebrow">Nutrition Observatory</div>
-      <h1 class="n-hero__title">The <em>fuel log</em> for a body in transformation</h1>
-      <p class="n-hero__sub">
-        30+ weeks of MacroFactor data. Every calorie logged within 30 minutes.
-        Cross-referenced with continuous glucose monitoring.
-      </p>
+  <div class="n-hero-grid" style="padding-top:var(--space-4);">
+    <div style="display:none"><!-- Editorial moved to depth section -->
     </div>
     <div class="n-gauge-row">
       <div class="n-gauge">
@@ -1640,18 +1645,7 @@
   </div>
 </section>
 
-<!-- ════════════════════════════════════════════════════════════
-     AI EXPERT ANALYSIS
-     ════════════════════════════════════════════════════════════ -->
-<section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal">
-  <div class="n-section-header">Dr. Webb's Analysis</div>
-  <div class="coaching-key-rec" id="n-key-rec" style="display:none">
-    <div class="coaching-key-rec__label">This week's focus</div>
-    <div class="coaching-key-rec__text" id="n-key-rec-text"></div>
-    <div class="coaching-key-rec__rationale" id="n-key-rec-rationale"></div>
-  </div>
-  <div id="n-ai-analysis"></div>
-</section>
+<!-- AI expert analysis now rendered by V3 coach at position 2 (renderCoachAnalysis above) -->
 
 <!-- ════════════════════════════════════════════════════════════
      PULL-QUOTE #1 — Breakfast protein finding (10g: staggered left)
@@ -2211,92 +2205,14 @@
 <div class="obs-insight" id="obs-insight"></div>
 
 <!-- ════════════════════════════════════════════════════════════
-     CROSS-LINKS (mid-page, contextual)
+     V3 Section 5: CROSS-DOMAIN
      ════════════════════════════════════════════════════════════ -->
-<div class="n-xref reveal">
-  <a href="/glucose/" class="n-xref-card">
-    <div class="n-xref-card__tag">MacroFactor &times; Dexcom Stelo</div>
-    <div class="n-xref-card__text">Each meal scored against CGM glucose response. Protein-first meals consistently produce the lowest spikes.</div>
-  </a>
-  <a href="/character/" class="n-xref-card">
-    <div class="n-xref-card__tag">Nutrition Pillar &mdash; 1 of 7</div>
-    <div class="n-xref-card__text">Protein adherence, calorie consistency, and fiber intake feed the Nutrition pillar in the Character Sheet.</div>
-  </a>
-</div>
+<div id="obs-v3-cross"></div>
 
 <!-- ════════════════════════════════════════════════════════════
-     10-kitchen: THE KITCHEN teaser
+     V3 Section 6: DEPTH (Collapsed)
      ════════════════════════════════════════════════════════════ -->
-<!-- DPR-2.09: Kitchen teaser hidden until feature is ready -->
-<div class="n-kitchen-teaser reveal" style="display:none">
-  <div class="n-kitchen-teaser__badge">Coming Soon</div>
-  <div class="n-kitchen-teaser__title">The <em>Kitchen</em></div>
-  <div class="n-kitchen-teaser__desc">
-    Personalized meal recommendations built from your CGM data, macro targets, and food preferences.
-    Every suggestion scored by glucose response, protein density, and how often you actually eat it.
-  </div>
-  <a href="/kitchen/" class="n-kitchen-teaser__link">Learn more &rarr;</a>
-</div>
-
-<!-- ════════════════════════════════════════════════════════════
-     NARRATIVE
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-narrative reveal">
-  <div>
-    <h2 class="n-narrative__title">Losing weight without<br>losing <em>muscle</em></h2>
-    <div class="n-narrative__body">
-      <p>The single biggest risk in aggressive weight loss is losing lean mass alongside fat.
-      <strong>Protein adequacy is the primary defense</strong> &mdash; 1.6&ndash;2.2g per kg of
-      lean body mass preserves muscle during a caloric deficit.</p>
-      <p>MacroFactor tracks every meal. The platform ingests this nightly and computes adherence
-      rates, TDEE estimates, and cross-references meals with <a href="/glucose/" style="color:var(--n-amber);text-decoration:none">CGM glucose data</a>
-      to score each food by its metabolic impact.</p>
-    </div>
-  </div>
-  <div class="n-protocol-list">
-    <div class="n-protocol-item">
-      <div class="n-protocol-num">01</div>
-      <div class="n-protocol-text"><strong>180g protein daily</strong> &mdash; non-negotiable. Leucine threshold (2.5g/meal) drives MPS even in deficit.</div>
-    </div>
-    <div class="n-protocol-item">
-      <div class="n-protocol-num">02</div>
-      <div class="n-protocol-text"><strong>500&ndash;750 cal deficit</strong> via adaptive TDEE. Aggressive enough for progress, conservative enough for training quality.</div>
-    </div>
-    <div class="n-protocol-item">
-      <div class="n-protocol-num">03</div>
-      <div class="n-protocol-text"><strong>Protein-first meal ordering</strong> &mdash; protein and fat before carbs. Blunts <a href="/glucose/" style="color:var(--n-amber);text-decoration:none">glucose spike</a>. CGM-confirmed.</div>
-    </div>
-    <div class="n-protocol-item">
-      <div class="n-protocol-num">04</div>
-      <div class="n-protocol-text"><strong>30g+ fiber daily</strong> for satiety, gut health, and glucose stability.</div>
-    </div>
-    <div class="n-protocol-item">
-      <div class="n-protocol-num">05</div>
-      <div class="n-protocol-text"><strong>Every meal logged</strong> within 30 minutes. No cheat meals go unrecorded.</div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     METHODOLOGY (10g: em-dash header)
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-method reveal">
-  <div class="n-method__title">Measurement Protocol</div>
-  <div class="n-method-grid">
-    <div class="n-method-item">
-      <strong>MACROFACTOR</strong>
-      AI-powered food logging with adaptive TDEE. Learns true energy expenditure from weight trends over 14+ days. Every meal logged within 30 minutes.
-    </div>
-    <div class="n-method-item">
-      <strong>PROTEIN TARGET</strong>
-      180g/day based on ~1g/lb goal bodyweight. Hit rate = days &ge;180g / total logged days. Leucine threshold: 2.5g per meal for MPS trigger.
-    </div>
-    <div class="n-method-item">
-      <strong>CGM CROSS-REFERENCE</strong>
-      Dexcom Stelo readings matched to meal timestamps. Post-meal spike, AUC, and time-to-baseline per meal. N=1 &mdash; individual responses vary.
-    </div>
-  </div>
-</section>
+<div id="obs-v3-depth"></div>
 
 <nav class="reading-path-v2">
   <a href="/glucose/" class="reading-path-v2__link">
@@ -2314,6 +2230,7 @@
 
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
+<script src="/assets/js/observatory-v3.js"></script>
 <script src="/assets/js/nav.js"></script>
 <script src="/assets/js/engagement.js"></script>
 <script>
@@ -2325,6 +2242,14 @@
 <script src="/assets/js/reveal.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
+/* ── V3: Coach Analysis (position 2) — fires immediately ── */
+renderCoachAnalysis('obs-v3-coach', 'nutrition', {
+  name: 'Dr. Marcus Webb',
+  initials: 'MW',
+  title: 'Nutrition scientist',
+  color: '#f59e0b'
+});
+
 (async function() {
   var API = 'https://averagejoematt.com';
   var loading = document.getElementById('n-loading');
@@ -2375,6 +2300,27 @@
     var deficit = n.avg_deficit || (n.avg_tdee && n.avg_calories ? Math.round(n.avg_tdee - n.avg_calories) : 0);
     setText('g-def-num', deficit || '\u2014');
     setArc('g-def-arc', Math.min(100, (deficit / 1000) * 100));
+
+    /* ── V3 Status Bar (Section 1) ── */
+    renderStatusBar('obs-v3-status', [
+      {label: 'Daily avg cal', value: avgCal ? Math.round(avgCal) : null, unit: 'cal', delta: null, context: 'MacroFactor 30-day avg'},
+      {label: 'Protein avg', value: n.avg_protein_g ? Math.round(n.avg_protein_g) : null, unit: 'g', delta: null, context: 'Target: 180g/day'},
+      {label: 'Protein hit rate', value: hitPct != null ? hitPct : null, unit: '%', delta: null, context: (n.protein_hit_days || 0) + ' of ' + (daysLogged || 0) + ' days'},
+      {label: 'Days logged', value: daysLogged || null, unit: 'days', delta: null, context: _last7 + ' of last 7 days'}
+    ], {});
+
+    /* ── V3 Cross-Domain (Section 5) ── */
+    renderCrossDomain('obs-v3-cross', [
+      {title: 'Nutrition \u00d7 Glucose', finding: 'Each meal scored against CGM glucose response. Protein-first meals consistently produce the lowest spikes.', link: '/glucose/'},
+      {title: 'Nutrition \u00d7 Character', finding: 'Protein adherence, calorie consistency, and fiber intake feed the Nutrition pillar in the Character Sheet.', link: '/character/'}
+    ]);
+
+    /* ── V3 Depth Sections (Section 6) ── */
+    renderDepth('obs-v3-depth', [
+      {label: 'About this observatory', id: 'about', content: '<h2 style="font-family:var(--font-display);font-size:24px;margin:0 0 12px;">The <em>fuel log</em> for a body in transformation</h2><p>30+ weeks of MacroFactor data. Every calorie logged within 30 minutes. Cross-referenced with continuous glucose monitoring.</p><p>Food and I have had a complicated relationship since my twenties. The real shift came around 2017 \u2014 relocation, an MBA, a promotion, my mum getting sick \u2014 when eating stopped being about hunger and started being about quieting everything else. Convenience. Something to fill a feeling. Food that wasn\u2019t even that good. MacroFactor didn\u2019t fix the psychology. But it made the invisible visible, and awareness is where the change starts.</p><p style="font-style:italic;color:var(--text-muted)">I\u2019ve lost 100 lbs before without tracking a single calorie. This isn\u2019t about macros \u2014 it\u2019s about where my head is. When I\u2019m on, this becomes second nature. When I\u2019m off, even a DoorDash order can break a streak. The data below captures both.</p><blockquote style="border-left:3px solid var(--n-amber);padding-left:16px;margin:16px 0;font-family:var(--font-display);font-size:18px;color:var(--text);">\u201cThe plan is to log everything \u2014 including the 3,400-calorie Saturdays. A gap in the data is data too. It usually means something happened worth paying attention to.\u201d</blockquote><p style="font-style:italic;border-left:2px solid var(--text-faint);padding-left:16px;color:var(--text-muted);">The hardest part of tracking nutrition isn\u2019t the math. It\u2019s the honesty. <em>Logging the bad days</em> is where the real data lives.</p>'},
+      {label: 'Nutrition protocol', id: 'protocol', content: '<p>Losing weight without losing <em>muscle</em>. The single biggest risk in aggressive weight loss is losing lean mass alongside fat. Protein adequacy is the primary defense \u2014 1.6\u20132.2g per kg of lean body mass preserves muscle during a caloric deficit.</p><p><strong>01.</strong> 180g protein daily \u2014 non-negotiable. Leucine threshold (2.5g/meal) drives MPS even in deficit.</p><p><strong>02.</strong> 500\u2013750 cal deficit via adaptive TDEE. Aggressive enough for progress, conservative enough for training quality.</p><p><strong>03.</strong> Protein-first meal ordering \u2014 protein and fat before carbs. Blunts glucose spike. CGM-confirmed.</p><p><strong>04.</strong> 30g+ fiber daily for satiety, gut health, and glucose stability.</p><p><strong>05.</strong> Every meal logged within 30 minutes. No cheat meals go unrecorded.</p>'},
+      {label: 'Measurement protocol', id: 'measurement', content: '<p><strong>MACROFACTOR</strong> \u2014 AI-powered food logging with adaptive TDEE. Learns true energy expenditure from weight trends over 14+ days. Every meal logged within 30 minutes.</p><p><strong>PROTEIN TARGET</strong> \u2014 180g/day based on ~1g/lb goal bodyweight. Hit rate = days \u2265180g / total logged days. Leucine threshold: 2.5g per meal for MPS trigger.</p><p><strong>CGM CROSS-REFERENCE</strong> \u2014 Dexcom Stelo readings matched to meal timestamps. Post-meal spike, AUC, and time-to-baseline per meal. N=1 \u2014 individual responses vary.</p>'}
+    ]);
 
     /* ── V2: Macro Stacked Bar + Donut ── */
     if (typeof Chart !== 'undefined' && trend.length >= 1) {
@@ -2786,12 +2732,7 @@
     console.error(e);
   }
 
-  /* ── AI Expert Analysis Card (outside try/catch — independent fetch) ── */
-  if (typeof renderAIAnalysisCard === 'function') {
-    renderAIAnalysisCard('n-ai-analysis', 'nutrition', {
-      dataSources: '30 days of macro tracking, calorie adherence, and meal patterns'
-    });
-  }
+  /* AI expert analysis now rendered by V3 coach at position 2 (renderCoachAnalysis above) */
 })();
 </script>
 </body>

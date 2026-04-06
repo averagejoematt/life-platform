@@ -24,6 +24,7 @@
   <meta name="theme-color" content="#080c0a">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/observatory-v3.css">
   <style>
 /* ═══════════════════════════════════════════════════════
    THE OPERATING SYSTEM — Habits Page
@@ -745,9 +746,14 @@
 <header class="os-hero reveal">
   <div class="os-hero__eyebrow">The Method</div>
   <h1 class="os-hero__title"><em>The Operating</em> System</h1>
-  <p class="os-hero__sub">I've read enough books and listened to enough podcasts to know that if I tried to do everything everyone recommends, I'd have no time to actually live. So I don't. I picked the habits that matter most — the ones I know work but consistently forget when life gets loud — and made them non-negotiable.</p>
-  <p class="os-hero__sub">The ones I kept skipping before were always the soft ones. Journaling. Breathing. Calling a friend. I left them off the scorecard and then wondered why nothing felt different. This time they're in the system. Not as a burden — as a reminder that this is bigger than the number on the scale.</p>
-  <p class="os-hero__sub">Everything else I just want to do more of. The goal isn't a perfect checklist. It's becoming someone who does most of this without thinking.</p>
+  <details class="obs-depth-section" style="margin-top:var(--space-4);border:1px solid var(--border);border-radius:4px;">
+    <summary style="font-family:var(--font-mono);font-size:12px;letter-spacing:0.08em;color:var(--text-muted);padding:var(--space-4) var(--space-5);cursor:pointer;">About this system</summary>
+    <div style="padding:0 var(--space-5) var(--space-5);font-family:var(--font-serif);font-size:14px;line-height:1.75;color:var(--text-muted);">
+      <p>I've read enough books and listened to enough podcasts to know that if I tried to do everything everyone recommends, I'd have no time to actually live. So I don't. I picked the habits that matter most — the ones I know work but consistently forget when life gets loud — and made them non-negotiable.</p>
+      <p>The ones I kept skipping before were always the soft ones. Journaling. Breathing. Calling a friend. I left them off the scorecard and then wondered why nothing felt different. This time they're in the system. Not as a burden — as a reminder that this is bigger than the number on the scale.</p>
+      <p>Everything else I just want to do more of. The goal isn't a perfect checklist. It's becoming someone who does most of this without thinking.</p>
+    </div>
+  </details>
   <div class="os-hero__stats">
     <div class="os-hero-stat">
       <div class="os-hero-stat__label">T0 Streak</div>
@@ -965,32 +971,34 @@
   <div class="compassion-note">Streaks reset but progress doesn't. Every day you showed up still counts. A break isn't failure — it's data.</div>
 </div>
 
-<!-- ═══════ ZONE 2: THE SYSTEM (T1 by purpose) ═══════ -->
-<div class="tier-banner tier-banner--t1 reveal">
-  <span class="tier-banner__dot"></span>
-  Zone 2 — The System · Daily Practice by Purpose
-</div>
-<div class="os-zone" id="zone-t1">
-  <div class="zone-head">
-    <div class="zone-head__title">The <em>System</em></div>
-    <div class="zone-head__sub">Tracked daily, grouped by purpose — not streak-critical but feeds your Character Score</div>
+<!-- ═══════ ZONE 2: THE SYSTEM (T1 by purpose) — V3-lite: collapsed by default ═══════ -->
+<details class="obs-depth-section" style="max-width:var(--max-width);margin:var(--space-4) auto;border:1px solid var(--border);border-radius:4px;">
+  <summary style="font-family:var(--font-mono);font-size:12px;letter-spacing:0.08em;color:var(--text-muted);padding:var(--space-4) var(--space-5);cursor:pointer;">Zone 2 — The System · Daily Practice by Purpose</summary>
+  <div style="padding:0 var(--space-5) var(--space-5);">
+    <div class="os-zone" id="zone-t1">
+      <div class="zone-head">
+        <div class="zone-head__title">The <em>System</em></div>
+        <div class="zone-head__sub">Tracked daily, grouped by purpose — not streak-critical but feeds your Character Score</div>
+      </div>
+      <div id="purpose-groups"></div>
+    </div>
   </div>
-  <div id="purpose-groups"></div>
-</div>
+</details>
 
-<!-- ═══════ ZONE 3: THE HORIZON (T2) ═══════ -->
-<div class="tier-banner tier-banner--t2 reveal">
-  <span class="tier-banner__dot"></span>
-  Zone 3 — The Horizon · Aspirational
-</div>
-<div class="os-zone" id="zone-t2">
-  <div class="zone-head">
-    <div class="zone-head__title">The <em>Horizon</em></div>
-    <div class="zone-head__sub">Queued for activation — these unlock when the foundation is solid</div>
+<!-- ═══════ ZONE 3: THE HORIZON (T2) — V3-lite: collapsed by default ═══════ -->
+<details class="obs-depth-section" style="max-width:var(--max-width);margin:var(--space-4) auto;border:1px solid var(--border);border-radius:4px;">
+  <summary style="font-family:var(--font-mono);font-size:12px;letter-spacing:0.08em;color:var(--text-muted);padding:var(--space-4) var(--space-5);cursor:pointer;">Zone 3 — The Horizon · Aspirational</summary>
+  <div style="padding:0 var(--space-5) var(--space-5);">
+    <div class="os-zone" id="zone-t2">
+      <div class="zone-head">
+        <div class="zone-head__title">The <em>Horizon</em></div>
+        <div class="zone-head__sub">Queued for activation — these unlock when the foundation is solid</div>
+      </div>
+      <div class="horizon-grid" id="horizon-grid"></div>
+      <div class="horizon-activation">Activates progressively when Tier 0 + Tier 1 consistency exceeds 90%</div>
+    </div>
   </div>
-  <div class="horizon-grid" id="horizon-grid"></div>
-  <div class="horizon-activation">Activates progressively when Tier 0 + Tier 1 consistency exceeds 90%</div>
-</div>
+</details>
 
 
 

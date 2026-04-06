@@ -14,6 +14,7 @@
   <meta name="theme-color" content="#080c0a">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/observatory-v3.css">
   <style>
     :root {
       --t-red: #ef4444;
@@ -1279,17 +1280,21 @@
 
 
 <!-- ════════════════════════════════════════════════════════════
+     V3 Section 1: STATUS BAR — rendered by observatory-v3.js
+     ════════════════════════════════════════════════════════════ -->
+<div id="obs-v3-status"></div>
+
+<!-- ════════════════════════════════════════════════════════════
+     V3 Section 2: COACH ANALYSIS — rendered by observatory-v3.js
+     ════════════════════════════════════════════════════════════ -->
+<div id="obs-v3-coach"></div>
+
+<!-- ════════════════════════════════════════════════════════════
      HERO — 2-column + gauge row
      ════════════════════════════════════════════════════════════ -->
 <div class="t-hero">
   <div class="t-hero-grid">
-    <div>
-      <div class="t-hero__eyebrow">Training Observatory</div>
-      <h1 class="t-hero__title">Training for <em>80</em>, not for 30</h1>
-      <p class="t-hero__sub">
-        Zone 2 cardio, compound strength, centenarian benchmarks. Four data sources
-        synthesized into one training intelligence layer.
-      </p>
+    <div style="display:none"><!-- Editorial moved to depth section -->
     </div>
     <div class="t-gauge-row">
       <div class="t-gauge">
@@ -1470,13 +1475,7 @@
   Zone 2 data is derived from Garmin heart rate zones during outdoor activities. No Strava Premium subscription is needed.
 </div>
 
-<!-- ════════════════════════════════════════════════════════════
-     AI EXPERT ANALYSIS
-     ════════════════════════════════════════════════════════════ -->
-<section style="max-width:var(--max-width);margin:0 auto;padding:var(--space-12) var(--page-padding);border-bottom:1px solid var(--border)" class="reveal">
-  <div class="t-section-header">Coach's Notes</div>
-  <div id="t-ai-analysis"></div>
-</section>
+<!-- AI expert now rendered by V3 coach at position 2 -->
 
 <!-- ════════════════════════════════════════════════════════════
      ACTIVITY DEEP-DIVE CARDS (replaces simple chips)
@@ -1924,50 +1923,14 @@
 <div class="obs-insight" id="obs-insight"></div>
 
 <!-- ════════════════════════════════════════════════════════════
-     CROSS-LINKS
+     V3 Section 5: CROSS-DOMAIN
      ════════════════════════════════════════════════════════════ -->
-<div class="t-xref reveal">
-  <a href="/nutrition/" class="t-xref-card">
-    <div class="t-xref-card__tag">Training &times; Nutrition</div>
-    <div class="t-xref-card__text">Testing whether deficit depth impacts training quality. Cross-referencing MacroFactor intake with Whoop strain.</div>
-  </a>
-  <a href="/sleep/" class="t-xref-card">
-    <div class="t-xref-card__tag">Training &times; Sleep</div>
-    <div class="t-xref-card__text">Testing whether workout timing affects sleep quality. Recovery-gated intensity prevents overreach.</div>
-  </a>
-</div>
+<div id="obs-v3-cross"></div>
 
 <!-- ════════════════════════════════════════════════════════════
-     NARRATIVE
+     V3 Section 6: DEPTH (Collapsed)
      ════════════════════════════════════════════════════════════ -->
-<section class="t-narrative reveal">
-  <div>
-    <h2 class="t-narrative__title">Training for the<br><em>centenarian decathlon</em></h2>
-    <div class="t-narrative__body">
-      <p>Most programs optimize for aesthetics at 30. This one optimizes for <strong>carrying groceries, climbing stairs, and getting off the floor at 85</strong>.</p>
-      <p>You lose 8&ndash;12% of strength per decade after 40. To deadlift your bodyweight at 85, you need <strong>~2x bodyweight now</strong>. Four data sources &mdash; Strava, Hevy, Garmin, Whoop &mdash; feed a single training load model that cross-references with <a href="/nutrition/">nutrition</a> and <a href="/sleep/">sleep</a> data.</p>
-    </div>
-  </div>
-  <div class="t-protocol-list">
-    <div class="t-protocol-item"><div class="t-protocol-num">01</div><div class="t-protocol-text"><strong>150+ min/week Zone 2</strong> &mdash; walking, cycling, rucking. HR 114&ndash;133. Highest-evidence longevity modality.</div></div>
-    <div class="t-protocol-item"><div class="t-protocol-num">02</div><div class="t-protocol-text"><strong>3x/week compound lifts</strong> &mdash; squat, deadlift, bench, OHP. Progressive overload toward centenarian benchmarks.</div></div>
-    <div class="t-protocol-item"><div class="t-protocol-num">03</div><div class="t-protocol-text"><strong>ACWR &lt;1.5</strong> &mdash; Acute:Chronic Workload Ratio guards against injury spikes.</div></div>
-    <div class="t-protocol-item"><div class="t-protocol-num">04</div><div class="t-protocol-text"><strong>Recovery-gated intensity</strong> &mdash; Whoop &lt;34% triggers deload suggestion in <a href="/character/">daily brief</a>.</div></div>
-    <div class="t-protocol-item"><div class="t-protocol-num">05</div><div class="t-protocol-text"><strong>80/20 polarization</strong> &mdash; 80% low intensity, 20% high. No Zone 3 junk miles.</div></div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     METHODOLOGY
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-method reveal">
-  <div class="t-section-header" style="margin-bottom:var(--space-6)">Measurement protocol</div>
-  <div class="t-method-grid">
-    <div class="t-method-item"><strong>STRAVA</strong>All cardio: runs, rides, walks, rucks. GPS + HR from Garmin. Duration, distance, avg HR synced daily.</div>
-    <div class="t-method-item"><strong>HEVY</strong>All strength: sets, reps, weight. 1RM via Brzycki. Volume load = sets &times; reps &times; weight.</div>
-    <div class="t-method-item"><strong>ZONE 2</strong>HR 60&ndash;70% max (114&ndash;133 bpm). Target: 150 min/week (WHO + Attia). N=1 thresholds.</div>
-  </div>
-</section>
+<div id="obs-v3-depth"></div>
 
 <nav class="reading-path-v2">
   <a href="/nutrition/" class="reading-path-v2__link">
@@ -1984,6 +1947,7 @@
 <div id="amj-footer"></div>
 <script src="/assets/js/site_constants.js"></script>
 <script src="/assets/js/components.js"></script>
+<script src="/assets/js/observatory-v3.js"></script>
 <script src="/assets/js/nav.js"></script>
 <script src="/assets/js/engagement.js"></script>
 <script>
@@ -1995,6 +1959,14 @@
 <script src="/assets/js/reveal.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
+/* ── V3: Coach Analysis (position 2) — fires immediately ── */
+renderCoachAnalysis('obs-v3-coach', 'training', {
+  name: 'Dr. Sarah Chen',
+  initials: 'SC',
+  title: 'Exercise physiologist & strength coach',
+  color: '#ef4444'
+});
+
 (async function(){
   var API = 'https://averagejoematt.com';
   var loading = document.getElementById('t-loading');
@@ -2204,6 +2176,26 @@
     var activeMod = t.active_modalities || 0;
     setText('g-mod-num', activeMod);
     setArc('g-mod-arc', Math.min(100, (activeMod / 8) * 100));
+
+    /* ── V3 Status Bar (Section 1) ── */
+    renderStatusBar('obs-v3-status', [
+      {label: 'Zone 2 min/wk', value: z2Avg || null, unit: 'min', delta: null, context: 'Target: 150 min/wk'},
+      {label: 'Sessions (30d)', value: wk30 || null, unit: '', delta: null, context: 'All modalities'},
+      {label: 'Avg strain', value: avgStrain != null ? avgStrain.toFixed(1) : null, unit: '', delta: null, context: 'Whoop daily strain'},
+      {label: 'Daily steps avg', value: avgSteps ? (avgSteps >= 1000 ? (avgSteps / 1000).toFixed(1) + 'k' : avgSteps) : null, unit: 'steps', delta: null, context: 'Garmin daily'}
+    ], {});
+
+    /* ── V3 Cross-Domain (Section 5) ── */
+    renderCrossDomain('obs-v3-cross', [
+      {title: 'Training \u2192 Recovery', finding: 'Zone 2 volume above 150 min/week predicts better recovery scores. Back-to-back high strain days suppress HRV for 48 hours.', link: '/sleep/'},
+      {title: 'Training \u2192 Nutrition', finding: 'Testing whether deficit depth impacts training quality. Cross-referencing MacroFactor intake with Whoop strain.', link: '/nutrition/'}
+    ]);
+
+    /* ── V3 Depth Sections (Section 6) ── */
+    renderDepth('obs-v3-depth', [
+      {label: 'About this observatory', id: 'about', content: '<h2 style="font-family:var(--font-display);font-size:24px;margin:0 0 12px;">Training for <em>80</em>, not for 30</h2><p>Zone 2 cardio, compound strength, centenarian benchmarks. Four data sources synthesized into one training intelligence layer.</p><p>Most programs optimize for aesthetics at 30. This one optimizes for <strong>carrying groceries, climbing stairs, and getting off the floor at 85</strong>. You lose 8\u201312% of strength per decade after 40. To deadlift your bodyweight at 85, you need <strong>~2x bodyweight now</strong>. Four data sources \u2014 Strava, Hevy, Garmin, Whoop \u2014 feed a single training load model that cross-references with nutrition and sleep data.</p><p style="font-style:italic;border-left:2px solid var(--text-faint);padding-left:16px;color:var(--text-muted);">When I\u2019m in it, I\u2019m all in \u2014 5am sessions, compound lifts, rucking mountains at the weekend. The problem has never been the training. It\u2019s always been the fall \u2014 how fast the void fills when routine breaks. The data doesn\u2019t stop that from happening. But it makes the absence visible, and <em>visibility shortens the distance back</em>.</p><p style="font-style:italic;border-left:2px solid var(--text-faint);padding-left:16px;color:var(--text-muted);">Rucking is the highest Zone 2 yield per hour \u2014 92% of ruck time in Zone 2 vs 61% walking.</p><div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;"><div style="display:flex;gap:12px;padding:8px 12px;background:var(--surface);border-left:2px solid var(--t-red);"><span style="font-family:var(--font-display);font-size:18px;color:var(--t-red);flex-shrink:0;width:24px;">01</span><span style="font-size:var(--text-sm);color:var(--text-muted);"><strong>150+ min/week Zone 2</strong> \u2014 walking, cycling, rucking. HR 114\u2013133. Highest-evidence longevity modality.</span></div><div style="display:flex;gap:12px;padding:8px 12px;background:var(--surface);border-left:2px solid var(--t-red);"><span style="font-family:var(--font-display);font-size:18px;color:var(--t-red);flex-shrink:0;width:24px;">02</span><span style="font-size:var(--text-sm);color:var(--text-muted);"><strong>3x/week compound lifts</strong> \u2014 squat, deadlift, bench, OHP. Progressive overload toward centenarian benchmarks.</span></div><div style="display:flex;gap:12px;padding:8px 12px;background:var(--surface);border-left:2px solid var(--t-red);"><span style="font-family:var(--font-display);font-size:18px;color:var(--t-red);flex-shrink:0;width:24px;">03</span><span style="font-size:var(--text-sm);color:var(--text-muted);"><strong>ACWR &lt;1.5</strong> \u2014 Acute:Chronic Workload Ratio guards against injury spikes.</span></div><div style="display:flex;gap:12px;padding:8px 12px;background:var(--surface);border-left:2px solid var(--t-red);"><span style="font-family:var(--font-display);font-size:18px;color:var(--t-red);flex-shrink:0;width:24px;">04</span><span style="font-size:var(--text-sm);color:var(--text-muted);"><strong>Recovery-gated intensity</strong> \u2014 Whoop &lt;34% triggers deload suggestion in daily brief.</span></div><div style="display:flex;gap:12px;padding:8px 12px;background:var(--surface);border-left:2px solid var(--t-red);"><span style="font-family:var(--font-display);font-size:18px;color:var(--t-red);flex-shrink:0;width:24px;">05</span><span style="font-size:var(--text-sm);color:var(--text-muted);"><strong>80/20 polarization</strong> \u2014 80% low intensity, 20% high. No Zone 3 junk miles.</span></div></div>'},
+      {label: 'Measurement protocol', id: 'protocol', content: '<p><strong>Strava</strong> \u2014 All cardio: runs, rides, walks, rucks. GPS + HR from Garmin. Duration, distance, avg HR synced daily.</p><p><strong>Hevy</strong> \u2014 All strength: sets, reps, weight. 1RM via Brzycki. Volume load = sets \u00d7 reps \u00d7 weight.</p><p><strong>Zone 2</strong> \u2014 HR 60\u201370% max (114\u2013133 bpm). Target: 150 min/week (WHO + Attia). N=1 thresholds.</p>'}
+    ]);
 
     /* ── Zone 2 editorial 3-col ── */
     setText('zval-z2', z2Avg + ' min');
@@ -2774,17 +2766,10 @@
       }
     })();
 
-    /* ── AI Expert Analysis Card ── */
+    /* AI expert analysis now rendered by V3 coach at position 2 (renderCoachAnalysis above) */
   } catch (e) {
     loading.textContent = 'Could not load training data.';
     console.error(e);
-  }
-
-  /* ── AI Expert Analysis Card (outside try/catch — independent fetch) ── */
-  if (typeof renderAIAnalysisCard === 'function') {
-    renderAIAnalysisCard('t-ai-analysis', 'training', {
-      dataSources: '7 days of training sessions, step counts, and recovery data'
-    });
   }
 })();
 </script>
