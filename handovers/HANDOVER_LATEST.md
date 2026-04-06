@@ -1,7 +1,7 @@
-# Handover — v5.3.0: Product Board Sprint + V3 Observatory Redesign
+# Handover — v5.4.0: Product Board Sprint + V3/V3.1 Observatory Redesign
 
 **Date:** 2026-04-05
-**Scope:** Product Board sprint (PB-01–07) + V3 Observatory redesign (PB-09). Verification sweep, Weekly Signal email, protocol adherence, then full coach-led dashboard restructure across 8 pages. Also: MCP Lambda 502 fix, AI expert analyzer V3 upgrade.
+**Scope:** Product Board sprint (PB-01–07), V3 Observatory redesign (PB-09), V3.1 Observatory polish (PB-09.1). Verification sweep, Weekly Signal email, protocol adherence, coach-led dashboard restructure across 8 pages, then polish pass (deltas, subtitles, deep collapse, Elena/journaling fix). Also: MCP Lambda 502 fix, AI expert analyzer V3 upgrade, disposable email blocklist, CI fix.
 
 ## What Changed
 
@@ -65,6 +65,21 @@
 - **Phase 2 (Observatory Pages):** Restructured Sleep, Physical, Training, Nutrition, Glucose (Approach B — status bar → coach → trends → detail → cross-domain → depth) and Mind (Approach C — Conti Amendment, hero stays visible).
 - **Phase 3 (Habits + Labs):** Habits V3-lite (editorial collapsed, T1/T2 collapsed). Labs: Dr. Okafor promoted to position 2.
 
+### V3.1 Observatory Polish (PB-09.1) ✅
+- **Item 1 (P0):** Week-over-week deltas — `computeDelta()` + `_renderDelta()` in shared JS with polarity-aware color coding
+- **Item 2 (P0):** Complete depth-section collapse on Nutrition (7 sections) + Training (11 sections) — editorial, hypotheses, protocols, empty placeholders all in `<details>`
+- **Item 3 (P1):** One-line page subtitles on all 6 observatory pages for first-time visitor context
+- **Item 4 (P1):** Specific depth section labels with teasers replacing generic "Deep Dive"
+- **Item 5 (P2):** Section divider CSS (`obs-section-divider`)
+- **Item 6 (P2):** Depth section teaser support in `renderDepth()`
+- **Item 7 (P1):** Mind page Elena quote / journaling prompt separation — fixed `rsplit` parsing order in Lambda, journaling prompt renders in own purple-bordered block
+- **Coach timestamp:** Added "Saturday, April 5, 2026 · 7:00 AM PT · Day 5 Observations" prefix to all coach cards
+
+### Other Fixes
+- **CI/CD fix:** Removed retired `google_calendar` from `lambda_s3_paths.json` — was failing `test_s2` on every push
+- **Disposable email blocklist:** Added domain blocklist to `email_subscriber_lambda.py` — prevents SES bounces from fake signups (example.com, mailinator.com, etc.)
+- **Test subscriber cleanup:** Deleted 9 test/junk DynamoDB subscriber records
+
 ### PB-08: Intelligence Page Rebuild — NOT STARTED (per plan)
 - Gated on SIMP-1 Phase 2 (~April 13)
 
@@ -77,19 +92,20 @@
 | `cdk/stacks/email_stack.py` | Added weekly-signal Lambda (PB-06) |
 | `cdk/stacks/role_policies.py` | Added `email_weekly_signal()` IAM policy |
 | `lambdas/weekly_signal_lambda.py` | NEW — Weekly Signal subscriber email |
-| `lambdas/ai_expert_analyzer_lambda.py` | V3 prompts: rotating lens, enhanced data, max_tokens 1200, week_number, sleep expert |
-| `site/assets/css/observatory-v3.css` | NEW — shared V3 observatory stylesheet |
-| `site/assets/js/observatory-v3.js` | NEW — shared V3 rendering module (6 named exports) |
-| `site/sleep/index.html` | V3 restructure (Approach B) |
-| `site/physical/index.html` | V3 restructure (Approach B) |
-| `site/training/index.html` | V3 restructure (Approach B) |
-| `site/nutrition/index.html` | V3 restructure (Approach B) |
-| `site/glucose/index.html` | V3 restructure (Approach B) |
-| `site/mind/index.html` | V3 restructure (Approach C — Conti Amendment) |
+| `lambdas/ai_expert_analyzer_lambda.py` | V3 prompts, sleep expert, V3.1 rsplit parsing fix for Elena/journaling |
+| `lambdas/site_api_lambda.py` | `sleep` AI key, `sleep_start` in trend, `week_number` in response |
+| `lambdas/email_subscriber_lambda.py` | Disposable domain blocklist |
+| `site/assets/css/observatory-v3.css` | NEW — V3 + V3.1 styles (deltas, subtitles, teasers, journaling prompt) |
+| `site/assets/js/observatory-v3.js` | NEW — V3 + V3.1 module (deltas, teasers, journaling, coach timestamp) |
+| `site/sleep/index.html` | V3 + subtitle + protocol adherence |
+| `site/physical/index.html` | V3 + subtitle |
+| `site/training/index.html` | V3 + V3.1 deep collapse + subtitle |
+| `site/nutrition/index.html` | V3 + V3.1 deep collapse (7 sections) + subtitle |
+| `site/glucose/index.html` | V3 + subtitle |
+| `site/mind/index.html` | V3 Approach C + subtitle + journaling prompt block |
 | `site/habits/index.html` | V3-lite (editorial + T1/T2 collapsed) |
 | `site/labs/index.html` | V3 coach promotion (Dr. Okafor at position 2) |
-| `lambdas/site_api_lambda.py` | Added `sleep` to AI analysis whitelist; added `sleep_start` to sleep trend |
-| `site/sleep/index.html` | AI expert card + data-driven protocol adherence |
+| `ci/lambda_s3_paths.json` | Removed retired google_calendar reference |
 | `site/assets/js/components.js` | Added `sleep` + `glucose` to EXPERTS config |
 | `docs/BACKLOG_HANDOFF_CLAUDE_CODE.md` | DISC-7 + get_nutrition marked ✅ DONE |
 | `docs/ARCHITECTURE.md` | Lambda count 62→63, added weekly-signal |
@@ -130,4 +146,4 @@
 | Lambda Layer | v26 |
 | Architecture Grade | A- (R20) |
 | CDK Stacks | 8 |
-| Version | v5.3.0 |
+| Version | v5.4.0 |
