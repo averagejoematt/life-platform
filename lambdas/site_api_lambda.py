@@ -7198,6 +7198,10 @@ def lambda_handler(event, context):
             resp_data["journaling_prompt"] = ai_item["journaling_prompt"]
         if ai_item.get("elena_quote"):
             resp_data["elena_quote"] = ai_item["elena_quote"]
+        if ai_item.get("week_number"):
+            resp_data["week_number"] = int(ai_item["week_number"])
+        if ai_item.get("days_in_experiment"):
+            resp_data["days_in_experiment"] = int(ai_item["days_in_experiment"])
         return _ok(resp_data, cache_seconds=300)
 
     # Special handling: /api/ask accepts POST

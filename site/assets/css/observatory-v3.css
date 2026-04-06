@@ -1,0 +1,539 @@
+/*
+  observatory-v3.css — Shared V3 observatory design system
+  PB-09: Coach-led dashboard pattern for returning weekly readers.
+
+  Sections (fixed order on every observatory page):
+    1. Status Bar — key metrics with directional deltas
+    2. Coach Analysis — AI expert prose + action callout + Elena quote
+    3. Trends — chart pair with time-range toggles
+    4. This Week's Detail — 3-column card grid
+    5. Cross-Domain — link cards to other observatories
+    6. Depth — collapsible sections (editorial, hypotheses, protocol)
+
+  Depends on: tokens.css (imported first by all pages)
+*/
+
+/* ── Section 1: Status Bar ─────────────────────────────────── */
+
+.obs-status {
+  max-width: var(--max-width, 1280px);
+  margin: 0 auto;
+  padding: var(--space-6) var(--page-padding, 48px) var(--space-8);
+  position: relative;
+}
+
+.obs-status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.obs-status-cell {
+  background: var(--bg);
+  padding: var(--space-5) var(--space-6);
+}
+
+.obs-status-cell__label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: var(--space-2);
+}
+
+.obs-status-cell__value {
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 1;
+  color: var(--text);
+  margin-bottom: var(--space-1);
+}
+
+.obs-status-cell__delta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  margin-bottom: var(--space-1);
+}
+
+.obs-delta-up   { color: #22c55e; }
+.obs-delta-down { color: #ef4444; }
+.obs-delta-flat { color: #f59e0b; }
+
+.obs-status-cell__context {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+}
+
+.obs-status-freshness {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--page-padding, 48px);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.obs-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.obs-status-dot--live  { background: #22c55e; animation: obs-pulse 2s ease-in-out infinite; }
+.obs-status-dot--stale { background: #f59e0b; }
+.obs-status-dot--old   { background: #ef4444; }
+
+@keyframes obs-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+/* ── Section 2: Coach Analysis ─────────────────────────────── */
+
+.obs-coach {
+  max-width: var(--max-width, 1280px);
+  margin: 0 auto;
+  padding: var(--space-10) var(--page-padding, 48px);
+  border-bottom: 1px solid var(--border);
+}
+
+.obs-coach-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.obs-coach-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--bg);
+  flex-shrink: 0;
+}
+
+.obs-coach-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.obs-coach-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.obs-coach-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  letter-spacing: 0.06em;
+}
+
+.obs-coach-prose {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--text);
+  margin-bottom: var(--space-6);
+}
+
+.obs-coach-prose p { margin: 0 0 var(--space-4); }
+.obs-coach-prose p:last-child { margin-bottom: 0; }
+
+.obs-coach-action {
+  border-left: 3px solid var(--obs-accent, var(--accent));
+  background: var(--surface);
+  padding: var(--space-5) var(--space-6);
+  margin-bottom: var(--space-6);
+  border-radius: 0 4px 4px 0;
+}
+
+.obs-coach-action__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--obs-accent, var(--accent));
+  margin-bottom: var(--space-2);
+}
+
+.obs-coach-action__text {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text);
+}
+
+.obs-coach-generated {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  letter-spacing: 0.06em;
+}
+
+/* Elena quote */
+.obs-elena-quote {
+  border-left: 2px solid var(--text-faint);
+  padding: var(--space-3) var(--space-5);
+  margin: var(--space-6) 0;
+  font-family: var(--font-serif);
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+.obs-elena-quote__attr {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-style: normal;
+  color: var(--text-faint);
+  letter-spacing: 0.08em;
+  margin-top: var(--space-2);
+}
+
+.obs-elena-quote__attr a {
+  color: var(--obs-accent, var(--accent));
+  text-decoration: none;
+}
+
+/* Subscribe CTA */
+.obs-subscribe-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-top: var(--space-6);
+}
+
+.obs-subscribe-inline__text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  flex: 1;
+}
+
+.obs-subscribe-inline__btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--bg);
+  background: var(--cta, var(--accent));
+  border: none;
+  padding: var(--space-2) var(--space-4);
+  border-radius: 3px;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* ── Section 3: Trends ─────────────────────────────────────── */
+
+.obs-trends {
+  max-width: var(--max-width, 1280px);
+  margin: 0 auto;
+  padding: var(--space-10) var(--page-padding, 48px);
+  border-bottom: 1px solid var(--border);
+}
+
+.obs-trends__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+}
+
+.obs-trends__title {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs, 10px);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.obs-time-toggles {
+  display: flex;
+  gap: 1px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.obs-time-toggle {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  background: var(--bg);
+  border: none;
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+
+.obs-time-toggle:hover { background: var(--surface); }
+.obs-time-toggle.active {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.obs-trend-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+}
+
+.obs-trend-chart {
+  position: relative;
+}
+
+.obs-trend-chart__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: var(--space-3);
+}
+
+.obs-trend-chart canvas,
+.obs-trend-chart svg {
+  width: 100%;
+  display: block;
+}
+
+/* ── Section 4: This Week's Detail ─────────────────────────── */
+
+.obs-detail {
+  max-width: var(--max-width, 1280px);
+  margin: 0 auto;
+  padding: var(--space-10) var(--page-padding, 48px);
+  border-bottom: 1px solid var(--border);
+}
+
+.obs-detail__title {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs, 10px);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: var(--space-6);
+}
+
+.obs-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.obs-detail-card {
+  background: var(--bg);
+  padding: var(--space-5) var(--space-6);
+}
+
+.obs-detail-card__label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: var(--space-2);
+}
+
+.obs-detail-card__value {
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--text);
+  margin-bottom: var(--space-1);
+}
+
+.obs-detail-card__context {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+}
+
+/* ── Section 5: Cross-Domain ───────────────────────────────── */
+
+.obs-cross {
+  max-width: var(--max-width, 1280px);
+  margin: 0 auto;
+  padding: var(--space-10) var(--page-padding, 48px);
+  border-bottom: 1px solid var(--border);
+}
+
+.obs-cross__title {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs, 10px);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: var(--space-6);
+}
+
+.obs-cross-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+
+.obs-cross-link {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: var(--space-5) var(--space-6);
+  text-decoration: none;
+  transition: background 120ms, border-color 120ms;
+}
+
+.obs-cross-link:hover {
+  background: var(--surface);
+  border-color: var(--obs-accent, var(--accent));
+}
+
+.obs-cross-link__arrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--obs-accent, var(--accent));
+  margin-bottom: var(--space-2);
+}
+
+.obs-cross-link__finding {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* ── Section 6: Depth (Collapsible) ────────────────────────── */
+
+.obs-depth {
+  max-width: var(--max-width, 1280px);
+  margin: 0 auto;
+  padding: var(--space-10) var(--page-padding, 48px);
+}
+
+.obs-depth__title {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs, 10px);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: var(--space-6);
+}
+
+.obs-depth-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.obs-depth-section {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.obs-depth-section summary {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: var(--space-4) var(--space-5);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background 120ms;
+}
+
+.obs-depth-section summary:hover { background: var(--surface); }
+
+.obs-depth-section summary::after {
+  content: '+';
+  font-size: 16px;
+  color: var(--text-faint);
+  transition: transform 200ms;
+}
+
+.obs-depth-section[open] summary::after {
+  content: '−';
+}
+
+.obs-depth-section summary::-webkit-details-marker { display: none; }
+
+.obs-depth-section__body {
+  padding: 0 var(--space-5) var(--space-5);
+  font-family: var(--font-serif);
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text-muted);
+}
+
+.obs-depth-section__body p { margin: 0 0 var(--space-4); }
+
+/* ── Mobile ────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .obs-status-grid    { grid-template-columns: 1fr 1fr; }
+  .obs-trend-row      { grid-template-columns: 1fr; }
+  .obs-detail-grid    { grid-template-columns: 1fr; }
+  .obs-depth-grid     { grid-template-columns: 1fr; }
+  .obs-cross-grid     { grid-template-columns: 1fr; }
+  .obs-coach-header   { flex-wrap: wrap; }
+
+  .obs-status,
+  .obs-coach,
+  .obs-trends,
+  .obs-detail,
+  .obs-cross,
+  .obs-depth {
+    padding-left: var(--page-padding-sm, 24px);
+    padding-right: var(--page-padding-sm, 24px);
+  }
+
+  .obs-status-freshness {
+    right: var(--page-padding-sm, 24px);
+  }
+}
+
+@media (max-width: 480px) {
+  .obs-status-cell__value { font-size: 22px; }
+  .obs-detail-card__value { font-size: 16px; }
+}
