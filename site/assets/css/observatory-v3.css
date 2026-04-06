@@ -190,12 +190,10 @@
 
 .obs-coach-generated {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
   letter-spacing: 0.04em;
-  margin-top: var(--space-4, 16px);
-  padding-top: var(--space-3, 12px);
-  border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+  margin-top: 3px;
 }
 
 /* Elena quote */

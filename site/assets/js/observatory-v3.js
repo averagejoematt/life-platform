@@ -157,11 +157,11 @@ function renderCoachAnalysis(container, expertKey, coachMeta) {
       '<div class="obs-coach-meta">' +
         '<div class="obs-coach-name">' + (coachMeta.name || '') + '</div>' +
         '<div class="obs-coach-title">' + (coachMeta.title || '') + '</div>' +
+        '<div class="obs-coach-generated" id="obs-coach-gen-' + expertKey + '"></div>' +
       '</div>' +
     '</div>' +
     '<div class="obs-coach-prose" id="obs-coach-prose-' + expertKey + '"><div style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:0.1em">LOADING ANALYSIS...</div></div>' +
-    '<div class="obs-coach-action" id="obs-coach-action-' + expertKey + '" style="display:none"></div>' +
-    '<div class="obs-coach-generated" id="obs-coach-gen-' + expertKey + '"></div>';
+    '<div class="obs-coach-action" id="obs-coach-action-' + expertKey + '" style="display:none"></div>';
 
   fetch('/api/ai_analysis?expert=' + expertKey)
     .then(function(r) { return r.ok ? r.json() : null; })
