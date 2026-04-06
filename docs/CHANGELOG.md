@@ -1,3 +1,22 @@
+## v5.4.0 — V3.1 Observatory Polish + Coach Timestamps (2026-04-05)
+
+V3.1 polish pass across all observatory pages.
+
+### V3.1 Observatory Polish (PB-09.1)
+- Week-over-week deltas on status bar metrics with polarity-aware color coding
+- Complete depth-section collapse on Nutrition (7 sections) + Training (11 sections)
+- One-line page subtitles on all 6 observatory pages
+- Specific depth section labels with teasers replacing generic "Deep Dive"
+- Mind page Elena quote / journaling prompt separation (rsplit parsing fix)
+- Coach timestamp prefix: "Saturday, April 5, 2026 · 7:00 AM PT · Day 5 Observations"
+
+### Fixes
+- CI/CD: removed retired google_calendar from lambda_s3_paths.json
+- Disposable email blocklist on subscribe endpoint (example.com, mailinator.com, etc.)
+- Cleaned 9 test/junk subscriber records from DynamoDB
+
+---
+
 ## v5.3.0 — V3 Observatory Redesign + Product Board Sprint (2026-04-05)
 
 Coach-led dashboard redesign across all 8 observatory pages, Product Board sprint (PB-01–07), and AI expert analyzer V3 upgrade.
