@@ -516,20 +516,28 @@ def generate_and_cache(expert_key):
         b["text"] for b in result.get("content", []) if b.get("type") == "text"
     )
 
-    # DPR-1.13: Extract KEY RECOMMENDATION if present
+    # V3.1: Extract tagged fields — split from bottom up to avoid capture leaks
     key_recommendation = ""
     journaling_prompt = ""
     elena_quote = ""
+    # ELENA QUOTE is last in the output
     if "ELENA QUOTE:" in analysis_text:
-        parts = analysis_text.split("ELENA QUOTE:", 1)
+        parts = analysis_text.rsplit("ELENA QUOTE:", 1)
         analysis_text = parts[0].rstrip()
         elena_quote = parts[1].strip().strip('"').strip('\u201c').strip('\u201d')
+        # Extract any JOURNALING PROMPT that leaked into elena_quote
+        if "JOURNALING PROMPT:" in elena_quote:
+            eq_parts = elena_quote.split("JOURNALING PROMPT:", 1)
+            elena_quote = eq_parts[0].strip().strip('"').strip('\u201c').strip('\u201d')
+            if not journaling_prompt:
+                journaling_prompt = eq_parts[1].strip()
+    # JOURNALING PROMPT comes before ELENA QUOTE (Mind page only)
     if "JOURNALING PROMPT:" in analysis_text:
-        parts = analysis_text.split("JOURNALING PROMPT:", 1)
+        parts = analysis_text.rsplit("JOURNALING PROMPT:", 1)
         analysis_text = parts[0].rstrip()
         journaling_prompt = parts[1].strip()
     if "KEY RECOMMENDATION:" in analysis_text:
-        parts = analysis_text.split("KEY RECOMMENDATION:", 1)
+        parts = analysis_text.rsplit("KEY RECOMMENDATION:", 1)
         analysis_text = parts[0].rstrip()
         key_recommendation = parts[1].strip()
 

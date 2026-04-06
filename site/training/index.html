@@ -1259,6 +1259,7 @@
 <body>
 <div id="amj-nav"></div>
 <div id="amj-hierarchy-nav"></div>
+<p class="obs-subtitle">Training for longevity, not aesthetics. A 12-month movement record.</p>
 <!-- Product Board Item 11: Day X context banner -->
 <div id="day-x-banner" style="
   margin:0 var(--page-padding);
@@ -1414,17 +1415,7 @@
   <div class="t-chart-legend" id="t-modality-legend" style="display:flex;gap:var(--space-3);margin-top:var(--space-3);flex-wrap:wrap;justify-content:center;"></div>
 </section>
 
-<!-- ════════════════════════════════════════════════════════════
-     11c: Narrative intro — relationship with exercise
-     ════════════════════════════════════════════════════════════ -->
-<div class="t-pullquote t-pullquote--dynamic reveal">
-  <div class="t-pullquote__text">
-    When I&rsquo;m in it, I&rsquo;m all in &mdash; 5am sessions, compound lifts, rucking mountains at the weekend.
-    The problem has never been the training. It&rsquo;s always been the fall &mdash; how fast
-    the void fills when routine breaks. The data doesn&rsquo;t stop that from happening.
-    But it makes the absence visible, and <em>visibility shortens the distance back</em>.
-  </div>
-</div>
+<!-- V3.1: Narrative intro moved to "About this observatory" collapsed section at bottom -->
 
 <!-- ════════════════════════════════════════════════════════════
      PULL-QUOTE #1 — Zone 2 recovery finding (staggered left)
@@ -1564,102 +1555,75 @@
   <div class="t-weekly-row" id="t-weekly-days"></div>
 </section>
 
-<!-- ════════════════════════════════════════════════════════════
-     RUNNING — COMING SOON
-     ════════════════════════════════════════════════════════════ -->
-<div class="t-coming-soon reveal">
-  <div class="t-coming-soon__title">Running &mdash; Coming Soon</div>
-  <p class="t-coming-soon__body">
-    The data infrastructure is ready. When the first run happens, this section auto-populates
-    with pace trends, distance progression, and running-specific Zone 2 analysis.
-  </p>
-</div>
+<!-- V3.1: Running Coming Soon + Pull-quote #2 moved to collapsed sections at bottom -->
 
-<!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #2 — Rucking finding (staggered right)
-     ════════════════════════════════════════════════════════════ -->
-<div class="t-pullquote t-pullquote--right reveal">
-  <div class="t-pullquote__watermark">02</div>
-  <div class="t-pullquote__text">
-    Rucking is the highest Zone 2 yield per hour &mdash;
-    <em>92% of ruck time</em> in Zone 2 vs 61% walking. The most efficient <a href="/nutrition/" style="color:var(--t-red);text-decoration:none">calorie burn</a> too.
-  </div>
-  <div class="t-pullquote__attr">
-    <span class="t-pullquote__badge">N=1 &middot; Correlational</span>
-    <span class="t-pullquote__source">Garmin HR zones &times; Strava activity type &mdash; 90+ day dataset</span>
-  </div>
-</div>
+<!-- V3.1: Advanced metrics wrapped in details -->
+<details class="obs-depth-section" id="t-advanced-details">
+  <summary>Advanced metrics (populates at week 4+)</summary>
+  <!-- ADVANCED METRICS COLLAPSED PLACEHOLDER (shown when all 3 need 4+ weeks) -->
+  <section class="t-banister-section reveal" id="t-advanced-collapsed" style="display:none">
+    <div class="t-section-header">Advanced Training Metrics</div>
+    <p class="t-context" style="padding:0 0 var(--space-4) 0;max-width:none;color:var(--text-muted)">
+      CTL/ATL/TSB, ACWR, and HR recovery trend require 4+ weeks of training data. These sections will populate automatically.
+    </p>
+  </section>
 
-<!-- ════════════════════════════════════════════════════════════
-     ADVANCED METRICS COLLAPSED PLACEHOLDER (shown when all 3 need 4+ weeks)
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-banister-section reveal" id="t-advanced-collapsed" style="display:none">
-  <div class="t-section-header">Advanced Training Metrics</div>
-  <p class="t-context" style="padding:0 0 var(--space-4) 0;max-width:none;color:var(--text-muted)">
-    CTL/ATL/TSB, ACWR, and HR recovery trend require 4+ weeks of training data. These sections will populate automatically.
-  </p>
-</section>
+  <!-- 11a: CTL/ATL/TSB — Banister Fitness-Fatigue Model -->
+  <section class="t-banister-section reveal" id="t-banister-section">
+    <div class="t-section-header">Fitness-fatigue model (Banister)</div>
+    <p class="t-context" style="padding:0 0 var(--space-4) 0;max-width:none">
+      The Banister model separates training load into <strong>fitness</strong> (slow-building, long-lasting) and
+      <strong>fatigue</strong> (fast-accumulating, fast-decaying). The difference is <strong>form</strong> &mdash; when
+      it is positive, performance rises.
+    </p>
+    <div class="t-banister-cards">
+      <div class="t-banister-card" style="border-left-color:#60a5fa">
+        <div class="t-banister-card__val" id="ctl-val" style="color:#60a5fa">&mdash;</div>
+        <div class="t-banister-card__label">CTL &middot; Fitness</div>
+        <div class="t-banister-card__plain" id="ctl-plain">Loading...</div>
+      </div>
+      <div class="t-banister-card" style="border-left-color:#ef4444">
+        <div class="t-banister-card__val" id="atl-val" style="color:#ef4444">&mdash;</div>
+        <div class="t-banister-card__label">ATL &middot; Fatigue</div>
+        <div class="t-banister-card__plain" id="atl-plain">Loading...</div>
+      </div>
+      <div class="t-banister-card" style="border-left-color:#3ecf8e">
+        <div class="t-banister-card__val" id="tsb-val" style="color:#3ecf8e">&mdash;</div>
+        <div class="t-banister-card__label">TSB &middot; Form</div>
+        <div class="t-banister-card__plain" id="tsb-plain">Loading...</div>
+      </div>
+    </div>
+    <div class="t-banister-legend">
+      <div class="t-legend-item"><div class="t-legend-dot" style="background:#60a5fa"></div> CTL (fitness)</div>
+      <div class="t-legend-item"><div class="t-legend-dot" style="background:#ef4444"></div> ATL (fatigue)</div>
+      <div class="t-legend-item"><div class="t-legend-dot" style="background:#3ecf8e"></div> TSB (form)</div>
+    </div>
+    <canvas class="t-banister-chart" id="t-banister-canvas"></canvas>
+  </section>
 
-<!-- ════════════════════════════════════════════════════════════
-     11a: CTL/ATL/TSB — Banister Fitness-Fatigue Model
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-banister-section reveal" id="t-banister-section">
-  <div class="t-section-header">Fitness-fatigue model (Banister)</div>
-  <p class="t-context" style="padding:0 0 var(--space-4) 0;max-width:none">
-    The Banister model separates training load into <strong>fitness</strong> (slow-building, long-lasting) and
-    <strong>fatigue</strong> (fast-accumulating, fast-decaying). The difference is <strong>form</strong> &mdash; when
-    it is positive, performance rises.
-  </p>
-  <div class="t-banister-cards">
-    <div class="t-banister-card" style="border-left-color:#60a5fa">
-      <div class="t-banister-card__val" id="ctl-val" style="color:#60a5fa">&mdash;</div>
-      <div class="t-banister-card__label">CTL &middot; Fitness</div>
-      <div class="t-banister-card__plain" id="ctl-plain">Loading...</div>
+  <!-- 11e: ACWR Injury Risk Indicator -->
+  <section class="t-acwr-section reveal" id="t-acwr-section">
+    <div class="t-section-header">Acute:Chronic workload ratio</div>
+    <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
+      ACWR compares this week's training load to the 4-week rolling average.
+      <strong>Below 1.2 is the sweet spot.</strong> Above 1.5 means injury risk climbs sharply.
+    </p>
+    <div class="t-acwr-display">
+      <div class="t-acwr-light" id="acwr-light">&mdash;</div>
+      <div class="t-acwr-info">
+        <div class="t-acwr-info__title" id="acwr-title">Loading workload ratio...</div>
+        <div class="t-acwr-info__explain" id="acwr-explain">Calculating acute and chronic training loads.</div>
+      </div>
     </div>
-    <div class="t-banister-card" style="border-left-color:#ef4444">
-      <div class="t-banister-card__val" id="atl-val" style="color:#ef4444">&mdash;</div>
-      <div class="t-banister-card__label">ATL &middot; Fatigue</div>
-      <div class="t-banister-card__plain" id="atl-plain">Loading...</div>
+    <div class="t-acwr-scale">
+      <div class="t-acwr-scale__seg" style="background:rgba(62,207,142,0.3)"></div>
+      <div class="t-acwr-scale__seg" style="background:rgba(245,158,11,0.3)"></div>
+      <div class="t-acwr-scale__seg" style="background:rgba(239,68,68,0.3)"></div>
     </div>
-    <div class="t-banister-card" style="border-left-color:#3ecf8e">
-      <div class="t-banister-card__val" id="tsb-val" style="color:#3ecf8e">&mdash;</div>
-      <div class="t-banister-card__label">TSB &middot; Form</div>
-      <div class="t-banister-card__plain" id="tsb-plain">Loading...</div>
+    <div class="t-acwr-scale__labels">
+      <span>0.0</span><span>0.8</span><span>1.2</span><span>1.5</span><span>2.0+</span>
     </div>
-  </div>
-  <div class="t-banister-legend">
-    <div class="t-legend-item"><div class="t-legend-dot" style="background:#60a5fa"></div> CTL (fitness)</div>
-    <div class="t-legend-item"><div class="t-legend-dot" style="background:#ef4444"></div> ATL (fatigue)</div>
-    <div class="t-legend-item"><div class="t-legend-dot" style="background:#3ecf8e"></div> TSB (form)</div>
-  </div>
-  <canvas class="t-banister-chart" id="t-banister-canvas"></canvas>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════
-     11e: ACWR Injury Risk Indicator
-     ════════════════════════════════════════════════════════════ -->
-<section class="t-acwr-section reveal" id="t-acwr-section">
-  <div class="t-section-header">Acute:Chronic workload ratio</div>
-  <p class="t-context" style="padding:0 0 var(--space-6) 0;max-width:none">
-    ACWR compares this week's training load to the 4-week rolling average.
-    <strong>Below 1.2 is the sweet spot.</strong> Above 1.5 means injury risk climbs sharply.
-  </p>
-  <div class="t-acwr-display">
-    <div class="t-acwr-light" id="acwr-light">&mdash;</div>
-    <div class="t-acwr-info">
-      <div class="t-acwr-info__title" id="acwr-title">Loading workload ratio...</div>
-      <div class="t-acwr-info__explain" id="acwr-explain">Calculating acute and chronic training loads.</div>
-    </div>
-  </div>
-  <div class="t-acwr-scale">
-    <div class="t-acwr-scale__seg" style="background:rgba(62,207,142,0.3)"></div>
-    <div class="t-acwr-scale__seg" style="background:rgba(245,158,11,0.3)"></div>
-    <div class="t-acwr-scale__seg" style="background:rgba(239,68,68,0.3)"></div>
-  </div>
-  <div class="t-acwr-scale__labels">
-    <span>0.0</span><span>0.8</span><span>1.2</span><span>1.5</span><span>2.0+</span>
-  </div>
-</section>
+  </section>
 
 <!-- ════════════════════════════════════════════════════════════
      12-WEEK TREND CHART
@@ -1675,20 +1639,7 @@
   <canvas class="t-chart" id="t-trend-canvas"></canvas>
 </section>
 
-<!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #3 — HRV finding (staggered left)
-     ════════════════════════════════════════════════════════════ -->
-<div class="t-pullquote t-pullquote--left reveal">
-  <div class="t-pullquote__watermark">03</div>
-  <div class="t-pullquote__text">
-    Back-to-back strain above 18 <em>tanks HRV for 48 hours</em> &mdash;
-    a 20% drop that erases the <a href="/sleep/" style="color:var(--t-red);text-decoration:none">sleep</a> gains from the night before.
-  </div>
-  <div class="t-pullquote__attr">
-    <span class="t-pullquote__badge">N=1 &middot; Correlational</span>
-    <span class="t-pullquote__source">Whoop strain &times; HRV &mdash; consecutive high-strain day pairs</span>
-  </div>
-</div>
+<!-- V3.1: Pull-quote #3 moved to "About this observatory" collapsed section at bottom -->
 
 <!-- ════════════════════════════════════════════════════════════
      11b: Centenarian Benchmark Tracker
