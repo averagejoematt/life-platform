@@ -1,3 +1,38 @@
+## v5.3.0 — V3 Observatory Redesign + Product Board Sprint (2026-04-05)
+
+Coach-led dashboard redesign across all 8 observatory pages, Product Board sprint (PB-01–07), and AI expert analyzer V3 upgrade.
+
+### V3 Observatory Redesign (PB-09)
+- Created `observatory-v3.css` + `observatory-v3.js` shared design system (6 named function exports)
+- Restructured 6 observatory pages (Sleep, Physical, Training, Nutrition, Glucose, Mind) to coach-led layout: status bar → coach analysis → trends → detail → cross-domain → collapsed depth sections
+- Mind page uses Approach C (Conti Amendment — hero narrative stays visible)
+- Habits V3-lite: editorial intro + T1/T2 tiers collapsed by default
+- Labs: Dr. Okafor's analysis promoted to position 2
+
+### AI Expert Analyzer V3
+- Rotating analytical lens (7 lenses cycling weekly) prevents repetitive framing
+- Enhanced data gathering: sleep onset times/bed temp/REM, training recovery/modality/rest days, nutrition fiber/zero-cal days
+- Labs-specific context override (spans full history, not just experiment)
+- `max_tokens` 1200 (was 1000), `week_number` + `prior_recommendation` tracking
+- All 8 experts regenerated (1700-2400 chars vs ~1500 before)
+- `site_api_lambda.py`: `week_number` + `days_in_experiment` in ai_analysis response
+
+### Product Board Sprint (PB-01–07)
+- **PB-01** Discoveries verification: timeline live with 7+ events, DISC-7 marked done
+- **PB-02** get_nutrition bug: 8/8 tests pass, marked done
+- **PB-03** OG share cards: all 7 images + meta tags verified
+- **PB-04/05** Sleep/Glucose V2: AI expert cards added (sleep + glucose keys in components.js)
+- **PB-06** Weekly Signal: new `weekly-signal` Lambda, 5-section subscriber email every Sunday 9:30 AM PT
+- **PB-07** Protocol adherence: data-driven sleep onset card with recovery delta + Henning Brandt confidence labels
+
+### Infrastructure
+- MCP Lambda 502 fix: CDK `mcp_stack.py` now stages `mcp_server.py` + `mcp/` into temp directory
+- Added `code` parameter override to `create_platform_lambda` helper
+- New Lambda: `weekly-signal` (63 total)
+- Lambda count updated across 6 docs (62→63)
+
+---
+
 ## v5.0.0 — Design & Product Review + Architecture A- (2026-04-04)
 
 Major milestone: first full design and product review (DPR-1) across 56 items in two phases, architecture review R20 earning A- grade, S3 prefix separation (ADR-046), and 27 production bug fixes.
