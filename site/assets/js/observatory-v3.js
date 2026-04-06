@@ -1,17 +1,17 @@
 /**
  * observatory-v3.js — Shared V3 observatory rendering module.
  * PB-09: Coach-led dashboard pattern.
+ * V3.1: Deltas, subtitles, dividers, teasers, journaling prompt.
  *
  * Named function exports (per Elena Reyes, Tech Board):
- *   renderStatusBar(container, metrics, data)
+ *   renderSubtitle(container, text)
+ *   renderStatusBar(container, metrics, opts)
  *   renderCoachAnalysis(container, expertKey, coachMeta)
  *   renderTrends(container, chartConfigs, trendData)
  *   renderWeekDetail(container, detailCards, data)
  *   renderCrossDomain(container, links)
- *   renderDepth(container, sections, pageContent)
- *
- * Each page's HTML is a thin shell that defines a config object
- * and calls these functions after loading its API data.
+ *   renderDepth(container, sections)
+ *   computeDelta(dataArray, valueKey, daysBack)
  */
 
 /* ── Helpers ───────────────────────────────────────────────── */
@@ -21,18 +21,6 @@ function _el(tag, cls, html) {
   if (cls) d.className = cls;
   if (html) d.innerHTML = html;
   return d;
-}
-
-function _deltaColor(val, inverted) {
-  if (val == null || val === 0) return 'obs-delta-flat';
-  var positive = inverted ? val < 0 : val > 0;
-  return positive ? 'obs-delta-up' : 'obs-delta-down';
-}
-
-function _formatDelta(val, unit) {
-  if (val == null) return '';
-  var sign = val > 0 ? '+' : '';
-  return sign + (typeof val === 'number' ? val.toFixed(1) : val) + (unit || '');
 }
 
 function _freshnessDot(hoursAgo) {
@@ -49,12 +37,72 @@ function _timeSince(isoDate) {
   return { text: Math.round(diff / 24) + 'd ago', hours: diff };
 }
 
+/* ── V3.1 Item 1: Delta computation ───────────────────────── */
+
+/**
+ * Compute week-over-week delta from trend data already on the page.
+ * @param {Array} dataArray — 30-day trend array [{date, ...values}]
+ * @param {string} valueKey — field name to compare (e.g. 'sleep_score')
+ * @param {number} daysBack — comparison window (default 7)
+ * @returns {{delta, currentAvg, priorAvg, label, early}}
+ */
+function computeDelta(dataArray, valueKey, daysBack) {
+  daysBack = daysBack || 7;
+  if (!dataArray || dataArray.length < 3) return { delta: null, label: '\u2014 insufficient data' };
+
+  var now = new Date();
+  var current = [], prior = [];
+  dataArray.forEach(function(d) {
+    if (d[valueKey] == null) return;
+    var daysDiff = (now - new Date(d.date)) / 86400000;
+    if (daysDiff <= daysBack) current.push(d[valueKey]);
+    else if (daysDiff <= daysBack * 2) prior.push(d[valueKey]);
+  });
+
+  if (current.length < 1 || prior.length < 1) return { delta: null, label: '\u2014 insufficient data' };
+
+  var avg = function(arr) { return arr.reduce(function(a,b){return a+b},0) / arr.length; };
+  var currentAvg = avg(current);
+  var priorAvg = avg(prior);
+  var delta = currentAvg - priorAvg;
+  var early = current.length < 4 || prior.length < 4;
+
+  return { delta: delta, currentAvg: currentAvg, priorAvg: priorAvg, early: early };
+}
+
+function _renderDelta(delta, polarity, unit) {
+  // polarity: 'higher_better', 'lower_better', 'neutral'
+  if (delta == null) return '<span class="obs-delta-none">\u2014</span>';
+
+  var absDelta = Math.abs(delta);
+  // Flat threshold: change < 2% of the value or < 0.5 absolute
+  if (absDelta < 0.5) return '<span class="obs-delta-flat">\u2192 flat</span>';
+
+  var sign = delta > 0 ? '+' : '';
+  var arrow = delta > 0 ? '\u2191' : '\u2193';
+  var isGood = polarity === 'higher_better' ? delta > 0 :
+               polarity === 'lower_better' ? delta < 0 : null;
+  var cls = isGood === true ? 'obs-delta-up' :
+            isGood === false ? 'obs-delta-down' : 'obs-delta-flat';
+
+  return '<span class="' + cls + '">' + sign + absDelta.toFixed(1) + (unit || '') + ' ' + arrow + '</span>';
+}
+
+/* ── V3.1 Item 3: Subtitle ────────────────────────────────── */
+
+function renderSubtitle(container, text) {
+  var el = typeof container === 'string' ? document.getElementById(container) : container;
+  if (!el) return;
+  el.innerHTML = '<p class="obs-subtitle">' + text + '</p>';
+}
+
 /* ── Section 1: Status Bar ─────────────────────────────────── */
 
 /**
- * @param {string|HTMLElement} container — element ID or DOM node
- * @param {Array} metrics — [{key, label, unit, value, delta, deltaUnit, context, inverted}]
- * @param {Object} opts — {lastUpdated: ISO string}
+ * @param {string|HTMLElement} container
+ * @param {Array} metrics — [{label, value, unit, delta, deltaUnit, polarity, context, inverted}]
+ *   polarity: 'higher_better' | 'lower_better' | 'neutral' (default: 'higher_better')
+ * @param {Object} opts — {lastUpdated: ISO string, subtitle: string}
  */
 function renderStatusBar(container, metrics, opts) {
   var el = typeof container === 'string' ? document.getElementById(container) : container;
@@ -64,11 +112,15 @@ function renderStatusBar(container, metrics, opts) {
   var grid = _el('div', 'obs-status-grid');
 
   metrics.forEach(function(m) {
+    var polarity = m.polarity || (m.inverted ? 'lower_better' : 'higher_better');
+    var deltaHtml = _renderDelta(m.delta, polarity, m.deltaUnit || '');
+
     var cell = _el('div', 'obs-status-cell');
     cell.innerHTML =
       '<div class="obs-status-cell__label">' + (m.label || '') + '</div>' +
-      '<div class="obs-status-cell__value">' + (m.value != null ? m.value : '—') + (m.unit ? '<span style="font-size:14px;color:var(--text-muted);margin-left:4px">' + m.unit + '</span>' : '') + '</div>' +
-      '<div class="obs-status-cell__delta ' + _deltaColor(m.delta, m.inverted) + '">' + _formatDelta(m.delta, m.deltaUnit || '') + '</div>' +
+      '<div class="obs-status-cell__value">' + (m.value != null ? m.value : '\u2014') +
+        (m.unit ? '<span style="font-size:14px;color:var(--text-muted);margin-left:4px">' + m.unit + '</span>' : '') + '</div>' +
+      '<div class="obs-status-cell__delta">' + deltaHtml + '</div>' +
       '<div class="obs-status-cell__context">' + (m.context || '') + '</div>';
     grid.appendChild(cell);
   });
@@ -77,7 +129,6 @@ function renderStatusBar(container, metrics, opts) {
   el.className = 'obs-status';
   el.appendChild(grid);
 
-  // Freshness indicator
   if (opts.lastUpdated) {
     var ts = _timeSince(opts.lastUpdated);
     var fresh = _el('div', 'obs-status-freshness');
@@ -112,7 +163,6 @@ function renderCoachAnalysis(container, expertKey, coachMeta) {
     '<div class="obs-coach-action" id="obs-coach-action-' + expertKey + '" style="display:none"></div>' +
     '<div class="obs-coach-generated" id="obs-coach-gen-' + expertKey + '"></div>';
 
-  // Fetch analysis
   fetch('/api/ai_analysis?expert=' + expertKey)
     .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(data) {
@@ -122,7 +172,6 @@ function renderCoachAnalysis(container, expertKey, coachMeta) {
       var genEl = document.getElementById('obs-coach-gen-' + expertKey);
 
       if (data.analysis) {
-        // Split analysis into paragraphs
         var paragraphs = data.analysis.split('\n\n').filter(function(p) { return p.trim(); });
         proseEl.innerHTML = paragraphs.map(function(p) { return '<p>' + p + '</p>'; }).join('');
       } else {
@@ -141,13 +190,22 @@ function renderCoachAnalysis(container, expertKey, coachMeta) {
         genEl.textContent = 'Generated ' + genDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       }
 
-      // Elena quote (after coach card)
+      // Elena quote
       if (data.elena_quote) {
         var quoteDiv = _el('div', 'obs-elena-quote');
         quoteDiv.innerHTML =
-          '"' + data.elena_quote + '"' +
-          '<div class="obs-elena-quote__attr">Elena Voss · <a href="/chronicle/">Chronicle →</a></div>';
+          '\u201c' + data.elena_quote + '\u201d' +
+          '<div class="obs-elena-quote__attr">Elena Voss \u00b7 <a href="/chronicle/">Chronicle \u2192</a></div>';
         el.appendChild(quoteDiv);
+      }
+
+      // V3.1 Item 7: Journaling prompt (Mind page only)
+      if (data.journaling_prompt) {
+        var promptDiv = _el('div', 'obs-journaling-prompt');
+        promptDiv.innerHTML =
+          '<span class="obs-journaling-label">THIS WEEK\u2019S JOURNALING PROMPT</span>' +
+          '<p>' + data.journaling_prompt + '</p>';
+        el.appendChild(promptDiv);
       }
 
       // Subscribe CTA
@@ -163,12 +221,8 @@ function renderCoachAnalysis(container, expertKey, coachMeta) {
     });
 }
 
-/* ── Section 3: Trends (container only — charts rendered by page) ── */
+/* ── Section 3: Trends ─────────────────────────────────────── */
 
-/**
- * @param {string|HTMLElement} container
- * @param {Object} opts — {title, chartIds: [id1, id2], labels: [label1, label2]}
- */
 function renderTrends(container, opts) {
   var el = typeof container === 'string' ? document.getElementById(container) : container;
   if (!el) return;
@@ -196,10 +250,6 @@ function renderTrends(container, opts) {
 
 /* ── Section 4: This Week's Detail ─────────────────────────── */
 
-/**
- * @param {string|HTMLElement} container
- * @param {Array} cards — [{label, value, context, colorClass}]
- */
 function renderWeekDetail(container, cards) {
   var el = typeof container === 'string' ? document.getElementById(container) : container;
   if (!el || !cards || !cards.length) return;
@@ -208,22 +258,18 @@ function renderWeekDetail(container, cards) {
   var grid = cards.map(function(c) {
     return '<div class="obs-detail-card">' +
       '<div class="obs-detail-card__label">' + (c.label || '') + '</div>' +
-      '<div class="obs-detail-card__value"' + (c.colorClass ? ' class="' + c.colorClass + '"' : '') + '>' + (c.value != null ? c.value : '—') + '</div>' +
+      '<div class="obs-detail-card__value"' + (c.colorClass ? ' class="' + c.colorClass + '"' : '') + '>' + (c.value != null ? c.value : '\u2014') + '</div>' +
       '<div class="obs-detail-card__context">' + (c.context || '') + '</div>' +
     '</div>';
   }).join('');
 
   el.innerHTML =
-    '<div class="obs-detail__title">This Week\'s Detail</div>' +
+    '<div class="obs-detail__title">This Week\u2019s Detail</div>' +
     '<div class="obs-detail-grid">' + grid + '</div>';
 }
 
 /* ── Section 5: Cross-Domain ───────────────────────────────── */
 
-/**
- * @param {string|HTMLElement} container
- * @param {Array} links — [{title, finding, link}]
- */
 function renderCrossDomain(container, links) {
   var el = typeof container === 'string' ? document.getElementById(container) : container;
   if (!el || !links || !links.length) return;
@@ -245,7 +291,7 @@ function renderCrossDomain(container, links) {
 
 /**
  * @param {string|HTMLElement} container
- * @param {Array} sections — [{label, id, content}]
+ * @param {Array} sections — [{label, id, content, teaser}]
  */
 function renderDepth(container, sections) {
   var el = typeof container === 'string' ? document.getElementById(container) : container;
@@ -253,13 +299,12 @@ function renderDepth(container, sections) {
 
   el.className = 'obs-depth';
   var cards = sections.map(function(s) {
+    var teaserHtml = s.teaser ? '<span class="obs-depth-teaser">' + s.teaser + '</span>' : '';
     return '<details class="obs-depth-section" id="depth-' + s.id + '">' +
-      '<summary>' + s.label + '</summary>' +
+      '<summary>' + s.label + teaserHtml + '</summary>' +
       '<div class="obs-depth-section__body">' + (s.content || '<p>Content loading...</p>') + '</div>' +
     '</details>';
   }).join('');
 
-  el.innerHTML =
-    '<div class="obs-depth__title">Deep Dive</div>' +
-    '<div class="obs-depth-grid">' + cards + '</div>';
+  el.innerHTML = '<div class="obs-depth-grid">' + cards + '</div>';
 }

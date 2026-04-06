@@ -1491,6 +1491,7 @@
 
 <div id="amj-nav"></div>
 <div id="amj-hierarchy-nav"></div>
+<p class="obs-subtitle">Every calorie logged. Every macro tracked. A 12-month nutrition record.</p>
 <!-- Product Board Item 11: Day X context banner -->
 <div id="day-x-banner" style="
   margin:0 var(--page-padding);
@@ -1603,24 +1604,7 @@
 
 <div id="obs-thisweek" style="display:none"></div>
 
-<!-- ════════════════════════════════════════════════════════════
-     10a: NARRATIVE INTRO — the only observatory without one
-     ════════════════════════════════════════════════════════════ -->
-<div class="n-intro reveal">
-  <div class="n-intro__text">
-    Food and I have had a complicated relationship since my twenties. The real shift
-    came around 2017 &mdash; relocation, an MBA, a promotion, my mum getting sick &mdash;
-    when eating stopped being about hunger and started being about quieting everything else.
-    Convenience. Something to fill a feeling. Food that wasn&rsquo;t even that good.
-    <em>MacroFactor</em> didn&rsquo;t fix the psychology. But it made the invisible visible,
-    and awareness is where the change starts.
-  </div>
-  <div class="n-intro__sub">
-    I&rsquo;ve lost 100 lbs before without tracking a single calorie. This isn&rsquo;t about macros &mdash;
-    it&rsquo;s about where my head is. When I&rsquo;m on, this becomes second nature. When I&rsquo;m off,
-    even a DoorDash order can break a streak. The data below captures both.
-  </div>
-</div>
+<!-- Narrative intro moved to collapsed "About this observatory" section at bottom -->
 
 <div id="n-loading" class="n-loading">LOADING NUTRITION DATA&hellip;</div>
 <div id="n-content" style="display:none">
@@ -1647,20 +1631,7 @@
 
 <!-- AI expert analysis now rendered by V3 coach at position 2 (renderCoachAnalysis above) -->
 
-<!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #1 — Breakfast protein finding (10g: staggered left)
-     ════════════════════════════════════════════════════════════ -->
-<div class="n-pullquote n-pullquote--left reveal">
-  <div class="n-pullquote__watermark">01</div>
-  <div class="n-pullquote__text">
-    Testing: does front-loading <em>40g+ protein</em> at breakfast predict hitting daily target?
-    Tracking correlation between breakfast protein load and end-of-day adherence.
-  </div>
-  <div class="n-pullquote__attr">
-    <span class="n-pullquote__badge">Hypothesis &middot; Under Test</span>
-    <span class="n-pullquote__source">MacroFactor data &mdash; pending sufficient sample size</span>
-  </div>
-</div>
+<!-- Pull-quote #1 moved to collapsed sections at bottom -->
 
 <!-- ════════════════════════════════════════════════════════════
      MACRO EDITORIAL — B's 3-column (10g: em-dash section header)
@@ -1767,20 +1738,7 @@
   </div>
 </section>
 
-<!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #2 — Unique nutrition finding (10f: replaced CGM dupe)
-     ════════════════════════════════════════════════════════════ -->
-<div class="n-pullquote n-pullquote--right reveal">
-  <div class="n-pullquote__watermark">02</div>
-  <div class="n-pullquote__text">
-    Testing: does <em>30g+ fiber</em> intake meaningfully reduce glucose variability?
-    Correlating daily fiber logs with CGM standard deviation readings.
-  </div>
-  <div class="n-pullquote__attr">
-    <span class="n-pullquote__badge">Hypothesis &middot; Under Test</span>
-    <span class="n-pullquote__source">MacroFactor fiber data cross-referenced with Dexcom Stelo &mdash; <a href="/glucose/" style="color:var(--n-amber);text-decoration:none">Glucose Observatory</a></span>
-  </div>
-</div>
+<!-- Pull-quote #2 moved to collapsed sections at bottom -->
 
 <!-- ════════════════════════════════════════════════════════════
      10b: TOP MEALS — most frequently logged with macro profile (10k: food icons)
@@ -1999,107 +1957,11 @@
   <canvas class="n-tdee-chart" id="n-tdee-canvas"></canvas>
 </section>
 
-<!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #3 — Deficit finding (10g: staggered left)
-     ════════════════════════════════════════════════════════════ -->
-<div class="n-pullquote n-pullquote--left reveal">
-  <div class="n-pullquote__watermark">03</div>
-  <div class="n-pullquote__text">
-    Testing: does <em>deficit depth</em> predict <a href="/training/" style="color:var(--n-amber);text-decoration:none">training</a> strain decline?
-    Correlating weekly caloric deficit with Whoop strain output.
-  </div>
-  <div class="n-pullquote__attr">
-    <span class="n-pullquote__badge">Hypothesis &middot; Under Test</span>
-    <span class="n-pullquote__source">Whoop strain data cross-referenced with MacroFactor deficit &mdash; pending data</span>
-  </div>
-</div>
+<!-- Pull-quote #3 moved to collapsed sections at bottom -->
 
-<!-- ════════════════════════════════════════════════════════════
-     10d: MICRONUTRIENT GAPS — genomics-informed targets
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-micro-section reveal">
-  <div class="n-section-header">Micronutrient Gaps</div>
-  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
-    Genomics testing flagged specific micronutrient sensitivities. These targets are <strong>personalized</strong>, not RDA defaults. Deficits in these areas have measurable downstream effects.
-  </div>
-  <div class="n-micro-grid">
-    <div class="n-micro-card">
-      <div class="n-micro-card__name">Choline</div>
-      <div class="n-micro-card__why">PEMT variant &mdash; reduced endogenous synthesis. Liver health, methylation.</div>
-      <div class="n-micro-card__values">
-        <div class="n-micro-card__actual">380mg</div>
-        <div class="n-micro-card__target">Target: 550mg+</div>
-      </div>
-      <div class="n-micro-card__bar">
-        <div class="n-micro-card__fill n-micro-card__fill--warn" style="width:69%"></div>
-      </div>
-      <div class="n-micro-card__status n-micro-card__status--warn">Gap: 170mg</div>
-    </div>
-    <div class="n-micro-card">
-      <div class="n-micro-card__name">Vitamin D</div>
-      <div class="n-micro-card__why">VDR polymorphism &mdash; higher dose needed. Immune function, bone density.</div>
-      <div class="n-micro-card__values">
-        <div class="n-micro-card__actual">4,200 IU</div>
-        <div class="n-micro-card__target">Target: 5,000 IU</div>
-      </div>
-      <div class="n-micro-card__bar">
-        <div class="n-micro-card__fill n-micro-card__fill--warn" style="width:84%"></div>
-      </div>
-      <div class="n-micro-card__status n-micro-card__status--warn">Supplemented</div>
-    </div>
-    <div class="n-micro-card">
-      <div class="n-micro-card__name">Omega-3 (EPA+DHA)</div>
-      <div class="n-micro-card__why">FADS1 variant &mdash; poor conversion from ALA. Anti-inflammatory, cardiac.</div>
-      <div class="n-micro-card__values">
-        <div class="n-micro-card__actual">1.8g</div>
-        <div class="n-micro-card__target">Target: 2.0g+</div>
-      </div>
-      <div class="n-micro-card__bar">
-        <div class="n-micro-card__fill n-micro-card__fill--good" style="width:90%"></div>
-      </div>
-      <div class="n-micro-card__status n-micro-card__status--good">Near target</div>
-    </div>
-    <div class="n-micro-card">
-      <div class="n-micro-card__name">Folate</div>
-      <div class="n-micro-card__why">MTHFR C677T &mdash; reduced methylation. Homocysteine clearance, DNA repair.</div>
-      <div class="n-micro-card__values">
-        <div class="n-micro-card__actual">520mcg</div>
-        <div class="n-micro-card__target">Target: 800mcg</div>
-      </div>
-      <div class="n-micro-card__bar">
-        <div class="n-micro-card__fill n-micro-card__fill--warn" style="width:65%"></div>
-      </div>
-      <div class="n-micro-card__status n-micro-card__status--warn">Gap: 280mcg</div>
-    </div>
-  </div>
-</section>
+<!-- Micronutrient Gaps moved to collapsed section at bottom -->
 
-<!-- ════════════════════════════════════════════════════════════
-     10h: BEHAVIORAL TRIGGERS — nutrition misses x sleep/stress/travel
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-triggers-section reveal">
-  <div class="n-section-header">Behavioral Trigger Analysis</div>
-  <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
-    Nutrition failures aren&rsquo;t random. They&rsquo;re predictable. Cross-referencing macro misses with <a href="/sleep/" style="color:var(--n-amber);text-decoration:none">sleep</a>, stress, and travel data reveals the patterns.
-  </div>
-  <div class="n-triggers-grid">
-    <div class="n-trigger-card">
-      <div class="n-trigger-card__trigger">Sleep deprivation</div>
-      <div class="n-trigger-card__finding">Testing: sleep deprivation &times; nutrition compliance correlation</div>
-      <div class="n-trigger-card__evidence">Tracking whether short sleep nights predict caloric overshoot and protein misses &bull; <em>under test</em></div>
-    </div>
-    <div class="n-trigger-card">
-      <div class="n-trigger-card__trigger">Travel days</div>
-      <div class="n-trigger-card__finding">Testing: travel &times; caloric surplus pattern</div>
-      <div class="n-trigger-card__evidence">Tracking whether travel days predict caloric overshoot, protein shortfall, and glucose variability &bull; <em>under test</em></div>
-    </div>
-    <div class="n-trigger-card">
-      <div class="n-trigger-card__trigger">High stress</div>
-      <div class="n-trigger-card__finding">Testing: stress &times; logging compliance and macro drift</div>
-      <div class="n-trigger-card__evidence">Tracking whether low-HRV days predict unlogged meals and carb overshoot &bull; <em>under test</em></div>
-    </div>
-  </div>
-</section>
+<!-- Behavioral Triggers moved to collapsed section at bottom -->
 
 <!-- ════════════════════════════════════════════════════════════
      FOOD DELIVERY ANALYSIS (Phase 2)
@@ -2112,40 +1974,9 @@
   <div class="n-macro-grid" id="n-delivery-grid"></div>
 </section>
 
-<!-- ════════════════════════════════════════════════════════════
-     MACRO DEEP-DIVES: Carbs, Fats, Fiber (Phase 2)
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-macro-section reveal" id="n-macro-deep" style="display:none">
-  <div class="n-section-header">Macro deep-dives &mdash; carbs, fats, fiber</div>
-  <div class="n-macro-grid" id="n-macro-deep-grid"></div>
-</section>
+<!-- Macro Deep-Dives moved to collapsed section at bottom -->
 
-<!-- ════════════════════════════════════════════════════════════
-     10j: HYDRATION — water intake and correlation with energy/recovery
-     ════════════════════════════════════════════════════════════ -->
-<section class="n-hydration-section reveal">
-  <div class="n-section-header">Hydration</div>
-  <div class="n-hydration-grid">
-    <div class="n-hydration-big">
-      <div class="n-hydration-big__num">3.2L</div>
-      <div class="n-hydration-big__unit">daily average</div>
-      <div class="n-hydration-big__sub">Target: 3.5L+</div>
-    </div>
-    <div class="n-hydration-corr">
-      <div class="n-hydration-corr-card">
-        <div class="n-hydration-corr-card__label">Energy correlation</div>
-        <div class="n-hydration-corr-card__finding">Testing: do days above <em>3.5L</em> predict higher Whoop recovery scores? Tracking hydration &times; recovery correlation. <em>Under test.</em></div>
-      </div>
-      <div class="n-hydration-corr-card">
-        <div class="n-hydration-corr-card__label">Recovery impact</div>
-        <div class="n-hydration-corr-card__finding">Testing: does training-day hydration predict next-day HRV improvement? Comparing electrolyte-enhanced vs plain water. <em>Under test.</em></div>
-      </div>
-    </div>
-  </div>
-  <div class="n-context">
-    Hydration is the most undertracked variable in nutrition. It affects glucose readings, recovery scores, and perceived energy &mdash; but rarely gets the same attention as macros.
-  </div>
-</section>
+<!-- Hydration moved to collapsed section at bottom -->
 
 <!-- ════════════════════════════════════════════════════════════
      PULL-QUOTE #4 — Psychological dimension (10i + 10g: dynamic style)
