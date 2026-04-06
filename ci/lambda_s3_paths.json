@@ -18,12 +18,6 @@
       "reason": "Dropbox poll Lambda reads MacroFactor CSV uploads from S3 uploads/ prefix — it's a trigger path, not a raw ingest path",
       "lambda_file": "lambdas/dropbox_poll_lambda.py",
       "evidence": "lambdas/dropbox_poll_lambda.py: s3_key = f\"uploads/macrofactor/{filename}\""
-    },
-    "google_calendar": {
-      "expected_prefix": "raw/google_calendar/",
-      "iam_prefix": "raw/google_calendar/*",
-      "reason": "Google Calendar integration retired (ADR-030, secret deleted 2026-03-15). Lambda file removed. calendar_sync.py handles calendar data now.",
-      "retired": true
     }
   },
 
