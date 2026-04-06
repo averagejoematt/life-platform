@@ -4,7 +4,7 @@
 > For architectural decisions: ARCHITECTURE.md
 > For emergency procedures: RUNBOOK.md
 > For deployment steps: QUICKSTART.md
-> Last updated: 2026-04-04 (v4.9.0)
+> Last updated: 2026-04-05 (v5.3.0)
 
 ---
 

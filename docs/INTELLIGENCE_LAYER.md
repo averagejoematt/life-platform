@@ -635,4 +635,4 @@ These decisions are documented to prevent revisiting:
 
 ---
 
-*Last updated: 2026-04-04 (v4.9.0 — AI Insight Engine Overhaul (v4.8.0) fully documented: anti-repetition, 6 data source wiring, what_worked memory, weekly correlation injection, labs/genome personalization. IC-4/IC-5 activation approaching data gate ~Apr 5. 121 MCP tools, 62 Lambdas.)*
+*Last updated: 2026-04-05 (v5.3.0 — V3 Observatory prompts: rotating analytical lens, enhanced data gathering, prior_recommendation anti-repetition. AI Insight Engine Overhaul (v4.8.0) fully documented. IC-4/IC-5 activation approaching data gate ~May 1. 115 MCP tools, 63 Lambdas.)*
