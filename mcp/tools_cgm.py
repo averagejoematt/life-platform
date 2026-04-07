@@ -5,7 +5,7 @@ import json
 import math
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
 from mcp.config import (
@@ -82,8 +82,8 @@ def _load_cgm_readings(date_str):
 
 def tool_get_cgm_dashboard(args):
     """CGM glucose daily dashboard from DynamoDB aggregates."""
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
 
     items = query_source("apple_health", start_date, end_date)
     if not items:
@@ -156,8 +156,8 @@ def tool_get_cgm_dashboard(args):
 
 def tool_get_glucose_sleep_correlation(args):
     """Correlate daily glucose with same-night Eight Sleep metrics."""
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     sources = parallel_query_sources(["apple_health", "eightsleep"], start_date, end_date)
     ah_items = sources.get("apple_health", [])
@@ -228,8 +228,8 @@ def tool_get_glucose_sleep_correlation(args):
 
 def tool_get_glucose_exercise_correlation(args):
     """Exercise vs rest day glucose comparison + intensity analysis."""
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     sources = parallel_query_sources(["apple_health", "strava"], start_date, end_date)
     ah_items = sources.get("apple_health", [])
@@ -330,8 +330,8 @@ def tool_get_glucose_meal_response(args):
     resistance, inflammation, and accelerated glycation. Fiber, protein, and fat
     blunt the spike; refined carbs and sugar amplify it.
     """
-    end_date   = args.get("end_date",   datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
     meal_gap_minutes = args.get("meal_gap_minutes", 30)
     baseline_window_min = 30  # minutes before meal for baseline
     postprandial_window_min = 120  # 2-hour response window

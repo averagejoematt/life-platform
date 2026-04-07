@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-Last updated: 2026-04-05 (v5.3.0 — 115 MCP tools, 35-module package, 63 Lambdas, 26 data sources, 72 site pages)
+Last updated: 2026-04-06 (v5.5.0 — 115 MCP tools, 35-module package, 71 Lambdas, 26 data sources, 72 site pages)
 
 ---
 
@@ -771,6 +771,96 @@ Consult this when deciding which docs need human edits beyond what sync_doc_meta
 | **Any of the above** | CHANGELOG always |
 
 **Key principle:** `sync_doc_metadata.py` owns the numbers. Humans own the prose. Never manually update tool counts, Lambda counts, version headers, or date stamps — just update PLATFORM_FACTS in the script and run it.
+
+---
+
+## Coach Intelligence Troubleshooting
+
+### 1. Failed coach generation
+
+If a coach output is missing from the daily brief:
+
+1. Check CloudWatch logs for the orchestrator and state updater:
+```bash
+aws logs tail /aws/lambda/coach-narrative-orchestrator --since 4h --region us-west-2
+aws logs tail /aws/lambda/coach-state-updater --since 4h --region us-west-2
+```
+
+2. The coach pipeline is: **computation engine** → **orchestrator** → **generation** (8 parallel coaches) → **state updater** (async). If the orchestrator fails, the affected coach falls back to legacy generation (no crash).
+
+3. Manual re-run of the computation engine:
+```bash
+aws lambda invoke --function-name coach-computation-engine --payload '{}' --region us-west-2 /tmp/coach_compute.json && cat /tmp/coach_compute.json
+```
+
+### 2. Stale observatory coach cards
+
+If the website shows old coach analysis on the observatory:
+
+- `/api/coach_analysis` reads from `COACH#` `OUTPUT#` records in DynamoDB.
+- Falls back to legacy `/api/ai_analysis` if no `COACH#` data exists.
+
+Check the latest output for a coach:
+```bash
+aws dynamodb query --table-name life-platform \
+  --key-condition-expression "pk = :pk" \
+  --expression-attribute-values '{":pk":{"S":"COACH#sleep_coach"}}' \
+  --region us-west-2 \
+  --query 'Items[?begins_with(sk, `OUTPUT#`)].{sk:sk,created_at:created_at}' \
+  --scan-index-forward false --limit 1
+```
+
+Fix: Re-run the daily brief pipeline or manually trigger coach generation.
+
+### 3. Prediction evaluator not running
+
+The prediction evaluator is scheduled daily at 9 AM PT (`cron(0 16 * * ? *)` UTC).
+
+1. Check EventBridge rule status:
+```bash
+aws events describe-rule --name coach-prediction-evaluator-schedule --region us-west-2
+```
+
+2. Manual invocation:
+```bash
+aws lambda invoke --function-name coach-prediction-evaluator --payload '{}' --region us-west-2 /tmp/pred_eval.json && cat /tmp/pred_eval.json
+```
+
+### 4. Voice pattern repetition
+
+If a coach sounds repetitive across multiple days:
+
+1. Check the voice state record:
+```bash
+aws dynamodb get-item --table-name life-platform \
+  --key '{"pk":{"S":"COACH#sleep_coach"},"sk":{"S":"VOICE#state"}}' \
+  --region us-west-2
+```
+
+2. The `overused_patterns` field flags detected repetition. The `recent_openings` field stores recent opening lines.
+
+3. Reset: update `VOICE#state` to clear `recent_openings` and `overused_patterns` arrays. The next generation will produce fresh phrasing.
+
+### 5. Missing USER_ID env var
+
+All coach Lambdas use `os.environ.get("USER_ID", "matthew")` with a safe default. If a Lambda crashes with `KeyError: USER_ID`, it is running old code — redeploy via CDK:
+```bash
+cd cdk && npx cdk deploy --all --require-approval never
+```
+
+### 6. Layer version mismatch
+
+If coach Lambdas use stale shared layer modules:
+
+1. Check layer version consistency:
+```bash
+python3 -m pytest tests/test_integration_aws.py::test_i2_lambda_layer_version_current -v
+```
+
+2. Rebuild and deploy:
+```bash
+bash deploy/build_layer.sh && cd cdk && npx cdk deploy --all --require-approval never
+```
 
 ---
 

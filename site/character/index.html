@@ -1831,7 +1831,7 @@ function hydrate(data) {
     elite: 'Peak performance: all systems integrated'
   };
   document.getElementById('tc-class').innerHTML = `${character.tier} · Level ${character.level}<div class="tc-class-subtitle">${TIER_SUBTITLES[tierSlug] || ''}</div>`;
-  document.getElementById('tc-subtitle').innerHTML = `// ${character.days_active} days active · ${character.xp_total} total XP<div class="tc-xp-hint">Progress points earned from daily health data</div>`;
+  document.getElementById('tc-subtitle').innerHTML = `// ${character.days_active} days active · ${Number(character.xp_total).toFixed(1)} total XP<div class="tc-xp-hint">Progress points earned from daily health data</div>`;
 
   // Composite score
   const scores = pillars.map(p => p.raw_score);
@@ -1862,18 +1862,18 @@ function hydrate(data) {
       <div class="tc-pillar__level">${p.level}</div>
       <div class="tc-pillar__bar"><div class="tc-pillar__bar-fill" data-w="${Math.min(p.raw_score,100)}" style="width:0%;background:${col}"></div></div>
       <div class="tc-pillar__score">${p.raw_score.toFixed(0)}/100</div>
-      <div class="tc-pillar__xp ${xpClass}">${xpSign}${p.xp_delta} XP</div>
+      <div class="tc-pillar__xp ${xpClass}">${xpSign}${Number(p.xp_delta).toFixed(1)} XP</div>
     </div>`;
   }).join('');
 
   // Footer stats
-  document.getElementById('tc-xp').textContent = character.xp_total;
+  document.getElementById('tc-xp').textContent = Number(character.xp_total).toFixed(1);
   document.getElementById('tc-days').textContent = character.days_active;
   var _nextLv = (character.level || 1) + 1;
   var _xpCurrent = character.xp_for_current_level || 0;
   var _xpNext = character.xp_for_next_level || 60;
   var _xpRemaining = Math.max(0, _xpNext - _xpCurrent);
-  document.getElementById('tc-nextlevel').textContent = `Lv ${_nextLv} (${_xpCurrent}/${_xpNext} XP)`;
+  document.getElementById('tc-nextlevel').textContent = `Lv ${_nextLv} (${Number(_xpCurrent).toFixed(1)}/${Number(_xpNext).toFixed(1)} XP)`;
   document.getElementById('tc-nexttier').textContent = `Lv ${character.next_tier_level}`;
 
   // Tier path dots
@@ -1924,7 +1924,7 @@ function hydrate(data) {
       <div class="next-xp-bar">
         <div class="next-xp-bar__label">
           <span>XP progress to Level ${character.level + 1}</span>
-          <span>${xpTotal} / ${xpNext} XP</span>
+          <span>${Number(xpTotal).toFixed(1)} / ${Number(xpNext).toFixed(1)} XP</span>
         </div>
         <div class="next-xp-bar__track"><div class="next-xp-bar__fill" data-w="${Math.min(xpProgress * 100, 100)}"></div></div>
       </div>`;
@@ -1970,7 +1970,7 @@ function hydrate(data) {
     return `<div class="pillar-card">
       <div class="pillar-card__header">
         <div class="pillar-card__name"><span>${p.emoji}</span> ${p.name}</div>
-        <div class="pillar-card__xp ${xpClass}">${xpSign}${p.xp_delta} XP</div>
+        <div class="pillar-card__xp ${xpClass}">${xpSign}${Number(p.xp_delta).toFixed(1)} XP</div>
       </div>
       <div class="pillar-card__level">${p.level}</div>
       <div class="pillar-card__bar"><div class="pillar-card__bar-fill" data-w="${barW}" style="width:0%;background:${col}"></div></div>

@@ -58,9 +58,17 @@
     "lambdas/subscriber_onboarding_lambda.py":   { "function": "subscriber-onboarding" },
     "lambdas/pipeline_health_check_lambda.py":   { "function": "pipeline-health-check" },
     "lambdas/measurements_ingestion_lambda.py":  { "function": "measurements-ingestion" },
-    "lambdas/ai_expert_analyzer_lambda.py":      { "function": "ai-expert-analyzer" },
+    "lambdas/ai_expert_analyzer_lambda.py":      { "function": "ai-expert-analyzer", "deprecated": true, "deprecated_note": "Replaced by Coach Intelligence pipeline (/api/coach_analysis). Safe to delete after 2 weeks of stable operation." },
     "lambdas/journal_analyzer_lambda.py":        { "function": "journal-analyzer" },
-    "lambdas/field_notes_lambda.py":             { "function": "field-notes-generate" }
+    "lambdas/field_notes_lambda.py":             { "function": "field-notes-generate" },
+    "lambdas/coach_computation_engine.py":       { "function": "coach-computation-engine" },
+    "lambdas/coach_narrative_orchestrator.py":   { "function": "coach-narrative-orchestrator" },
+    "lambdas/coach_state_updater.py":            { "function": "coach-state-updater" },
+    "lambdas/coach_ensemble_digest.py":          { "function": "coach-ensemble-digest" },
+    "lambdas/coach_prediction_evaluator.py":     { "function": "coach-prediction-evaluator" },
+    "lambdas/coach_observatory_renderer.py":     { "function": "coach-observatory-renderer" },
+    "lambdas/coach_history_summarizer.py":       { "function": "coach-history-summarizer" },
+    "lambdas/coach_quality_gate.py":             { "function": "coach-quality-gate" }
   },
 
   "mcp": {

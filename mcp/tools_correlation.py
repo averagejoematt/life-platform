@@ -5,7 +5,7 @@ import json
 import math
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
 from mcp.config import (
@@ -33,8 +33,8 @@ def tool_get_caffeine_sleep_correlation(args):
     Whoop sleep metrics (SOT v2.55.0). Splits days into time buckets to show where sleep degrades.
     Based on Huberman & Attia: caffeine timing is one of the highest-leverage sleep interventions.
     """
-    end_date   = args.get("end_date",   datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=89)).strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d"))
 
     mf_items = query_source("macrofactor", start_date, end_date)
     wh_raw   = query_source("whoop",       start_date, end_date)
@@ -345,8 +345,8 @@ def tool_get_exercise_sleep_correlation(args):
     Based on Huberman, Galpin, and Attia: exercise timing is a modifiable lever
     for sleep quality, but the effect is highly individual.
     """
-    end_date   = args.get("end_date",   datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=179)).strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=179)).strftime("%Y-%m-%d"))
     min_duration_min = int(args.get("min_duration_minutes", 15))
     exclude_types = [t.strip().lower() for t in (args.get("exclude_sport_types") or "").split(",") if t.strip()]
 
@@ -821,8 +821,8 @@ def tool_get_zone2_breakdown(args):
     density, fat oxidation capacity, and cardiovascular base. Most people drastically
     undertrain Zone 2 relative to higher intensities.
     """
-    end_date   = args.get("end_date",   datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=89)).strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d"))
     weekly_target_min = int(args.get("weekly_target_minutes", 150))
     min_duration_min  = int(args.get("min_duration_minutes", 10))
 
@@ -914,14 +914,14 @@ def tool_get_zone2_breakdown(args):
 
     def iso_week(date_str):
         """Return ISO year-week string like '2025-W48'."""
-        from datetime import datetime as dt
+        from datetime import datetime as dt, timezone
         d = dt.strptime(date_str, "%Y-%m-%d")
         iso = d.isocalendar()
         return f"{iso[0]}-W{iso[1]:02d}"
 
     def week_start(date_str):
         """Return Monday of the week for a given date."""
-        from datetime import datetime as dt
+        from datetime import datetime as dt, timezone
         d = dt.strptime(date_str, "%Y-%m-%d")
         monday = d - timedelta(days=d.weekday())
         return monday.strftime("%Y-%m-%d")
@@ -1116,8 +1116,8 @@ def tool_get_alcohol_sleep_correlation(args):
     Based on Huberman, Attia, and Walker: even moderate alcohol suppresses REM and
     deep sleep, raises resting HR, and impairs next-day HRV recovery.
     """
-    end_date   = args.get("end_date",   datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=89)).strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d"))
 
     mf_items = query_source("macrofactor", start_date, end_date)
     wh_raw   = query_source("whoop",       start_date, end_date)

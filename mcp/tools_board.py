@@ -4,7 +4,7 @@ Config lives in S3 at config/board_of_directors.json.
 """
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from mcp.config import s3_client, S3_BUCKET, USER_ID, logger
 
@@ -26,7 +26,7 @@ def _load_board():
 
 def _save_board(board):
     """Write the board config back to S3."""
-    board["_meta"]["last_updated"] = datetime.utcnow().strftime("%Y-%m-%d")
+    board["_meta"]["last_updated"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     s3_client.put_object(
         Bucket=S3_BUCKET,
         Key=BOARD_S3_KEY,

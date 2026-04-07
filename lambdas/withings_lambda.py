@@ -29,7 +29,7 @@ except ImportError:
 REGION        = os.environ.get("AWS_REGION", "us-west-2")
 S3_BUCKET     = os.environ["S3_BUCKET"]
 DYNAMO_TABLE  = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID       = os.environ["USER_ID"]
+USER_ID       = os.environ.get("USER_ID", "matthew")
 SECRET_NAME   = os.environ.get("WITHINGS_SECRET_NAME", "life-platform/withings")
 LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "7"))
 DYNAMO_PK     = f"USER#{USER_ID}#SOURCE#withings"

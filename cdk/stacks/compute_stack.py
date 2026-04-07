@@ -230,3 +230,109 @@ class ComputeStack(Stack):
             custom_policies=rp.compute_challenge_generator(),
             **shared,
         )
+
+        # ══════════════════════════════════════════════════════════════
+        # Coach Intelligence Architecture — Phase 1+2
+        # No schedule — invoked by daily-brief pipeline
+        # ══════════════════════════════════════════════════════════════
+        create_platform_lambda(
+            self, "CoachComputationEngine",
+            function_name="coach-computation-engine",
+            handler="coach_computation_engine.lambda_handler",
+            source_file="lambdas/coach_computation_engine.py",
+            timeout_seconds=60, memory_mb=256,
+            custom_policies=rp.compute_coach_computation(),
+            **shared,
+        )
+
+        create_platform_lambda(
+            self, "CoachNarrativeOrchestrator",
+            function_name="coach-narrative-orchestrator",
+            handler="coach_narrative_orchestrator.lambda_handler",
+            source_file="lambdas/coach_narrative_orchestrator.py",
+            timeout_seconds=90, memory_mb=256,
+            environment={
+                "ANTHROPIC_SECRET": "life-platform/ai-keys",
+                "AI_MODEL_HAIKU": AI_MODEL_HAIKU,
+            },
+            custom_policies=rp.compute_coach_orchestrator(),
+            **shared,
+        )
+
+        create_platform_lambda(
+            self, "CoachStateUpdater",
+            function_name="coach-state-updater",
+            handler="coach_state_updater.lambda_handler",
+            source_file="lambdas/coach_state_updater.py",
+            timeout_seconds=60, memory_mb=256,
+            environment={
+                "ANTHROPIC_SECRET": "life-platform/ai-keys",
+                "AI_MODEL_HAIKU": AI_MODEL_HAIKU,
+            },
+            custom_policies=rp.compute_coach_state_updater(),
+            **shared,
+        )
+
+        create_platform_lambda(
+            self, "CoachEnsembleDigest",
+            function_name="coach-ensemble-digest",
+            handler="coach_ensemble_digest.lambda_handler",
+            source_file="lambdas/coach_ensemble_digest.py",
+            timeout_seconds=90, memory_mb=256,
+            environment={
+                "ANTHROPIC_SECRET": "life-platform/ai-keys",
+                "AI_MODEL_HAIKU": AI_MODEL_HAIKU,
+            },
+            custom_policies=rp.compute_coach_orchestrator(),  # same permissions as orchestrator
+            **shared,
+        )
+
+        create_platform_lambda(
+            self, "CoachHistorySummarizer",
+            function_name="coach-history-summarizer",
+            handler="coach_history_summarizer.lambda_handler",
+            source_file="lambdas/coach_history_summarizer.py",
+            schedule="cron(0 17 ? * SUN *)",  # Sunday 10:00 AM PT (before weekly digest)
+            timeout_seconds=120, memory_mb=256,
+            environment={
+                "ANTHROPIC_SECRET": "life-platform/ai-keys",
+                "AI_MODEL_HAIKU": AI_MODEL_HAIKU,
+            },
+            custom_policies=rp.compute_coach_orchestrator(),
+            **shared,
+        )
+
+        create_platform_lambda(
+            self, "CoachQualityGate",
+            function_name="coach-quality-gate",
+            handler="coach_quality_gate.lambda_handler",
+            source_file="lambdas/coach_quality_gate.py",
+            timeout_seconds=30, memory_mb=256,
+            environment={
+                "ANTHROPIC_SECRET": "life-platform/ai-keys",
+                "AI_MODEL_HAIKU": AI_MODEL_HAIKU,
+            },
+            custom_policies=rp.compute_coach_state_updater(),
+            **shared,
+        )
+
+        create_platform_lambda(
+            self, "CoachObservatoryRenderer",
+            function_name="coach-observatory-renderer",
+            handler="coach_observatory_renderer.lambda_handler",
+            source_file="lambdas/coach_observatory_renderer.py",
+            timeout_seconds=30, memory_mb=256,
+            custom_policies=rp.compute_coach_computation(),  # read-only DDB + S3
+            **shared,
+        )
+
+        create_platform_lambda(
+            self, "CoachPredictionEvaluator",
+            function_name="coach-prediction-evaluator",
+            handler="coach_prediction_evaluator.lambda_handler",
+            source_file="lambdas/coach_prediction_evaluator.py",
+            schedule="cron(0 16 * * ? *)",  # 9:00 AM PT daily (before daily brief at 11 AM)
+            timeout_seconds=60, memory_mb=256,
+            custom_policies=rp.compute_coach_computation(),  # same permissions as computation engine
+            **shared,
+        )

@@ -1643,8 +1643,67 @@ def lambda_handler(event, context):
     training_nutrition = {}
     journal_coach_text = ""
     tldr_guidance = {}
+    sleep_coach_v2_text = ""
+    nutrition_coach_v2_text = ""
+    training_coach_v2_text = ""
+    mind_coach_v2_text = ""
+    physical_coach_v2_text = ""
+    glucose_coach_v2_text = ""
+    labs_coach_v2_text = ""
+    explorer_coach_v2_text = ""
 
     if api_key:
+        # Coach Intelligence Pipeline — Full 8-coach system (Phase 5)
+        # Reset computation cache at start of each daily brief cycle
+        ai_calls._comp_results_cache = None
+
+        for _cid, _call_fn, _label in [
+            ("sleep", ai_calls.call_sleep_coach_v2, "Sleep"),
+            ("nutrition", ai_calls.call_nutrition_coach_v2, "Nutrition"),
+            ("training", ai_calls.call_training_coach_v2, "Training"),
+            ("mind", ai_calls.call_mind_coach_v2, "Mind"),
+            ("physical", ai_calls.call_physical_coach_v2, "Physical"),
+            ("glucose", ai_calls.call_glucose_coach_v2, "Glucose"),
+            ("labs", ai_calls.call_labs_coach_v2, "Labs"),
+            ("explorer", ai_calls.call_explorer_coach_v2, "Explorer"),
+        ]:
+            try:
+                _result = _call_fn(data, profile, api_key) or ""
+                if _cid == "sleep":
+                    sleep_coach_v2_text = _result
+                elif _cid == "nutrition":
+                    nutrition_coach_v2_text = _result
+                elif _cid == "training":
+                    training_coach_v2_text = _result
+                elif _cid == "mind":
+                    mind_coach_v2_text = _result
+                elif _cid == "physical":
+                    physical_coach_v2_text = _result
+                elif _cid == "glucose":
+                    glucose_coach_v2_text = _result
+                elif _cid == "labs":
+                    labs_coach_v2_text = _result
+                elif _cid == "explorer":
+                    explorer_coach_v2_text = _result
+                if _result:
+                    print(f"[INFO] {_label} Coach V2: {_result[:80]}")
+                else:
+                    print(f"[INFO] {_label} Coach V2 returned None — will use legacy")
+            except Exception as e:
+                print(f"[WARN] {_label} Coach V2 failed (non-blocking): {e}")
+
+        # Invoke ensemble digest (async) after all v2 coaches complete
+        try:
+            _lc = boto3.client("lambda", region_name="us-west-2")
+            _lc.invoke(
+                FunctionName="coach-ensemble-digest",
+                InvocationType="Event",
+                Payload=json.dumps({"cycle_date": datetime.now(timezone.utc).strftime("%Y-%m-%d")}).encode(),
+            )
+            print("[INFO] Ensemble digest invoked (async)")
+        except Exception as e:
+            print(f"[WARN] Ensemble digest invoke failed (non-blocking): {e}")
+
         try:
             bod_insight = ai_calls.call_board_of_directors(
                 data, profile, day_grade_score, grade, component_scores, api_key,
@@ -1774,7 +1833,15 @@ def lambda_handler(event, context):
             engagement_score=engagement_score,
             triggered_rewards=triggered_rewards, protocol_recs=protocol_recs,
             compute_stale=_compute_stale, compute_age_msg=_compute_age_msg,
-            weekly_habit_review=_weekly_habit_review)
+            weekly_habit_review=_weekly_habit_review,
+            sleep_coach_v2_text=sleep_coach_v2_text,
+            nutrition_coach_v2_text=nutrition_coach_v2_text,
+            training_coach_v2_text=training_coach_v2_text,
+            mind_coach_v2_text=mind_coach_v2_text,
+            physical_coach_v2_text=physical_coach_v2_text,
+            glucose_coach_v2_text=glucose_coach_v2_text,
+            labs_coach_v2_text=labs_coach_v2_text,
+            explorer_coach_v2_text=explorer_coach_v2_text)
     except Exception as e:
         print("[ERROR] build_html crashed, sending minimal brief: " + str(e))
         html = ('<!DOCTYPE html><html><body style="font-family:sans-serif;padding:20px;">'
@@ -1849,7 +1916,7 @@ def lambda_handler(event, context):
             _rec_status = "green" if _rec >= 67 else ("yellow" if _rec >= 34 else "red")
 
             # Journey calc from profile
-            _start_wt = float(profile.get("journey_start_weight_lbs", 302))
+            _start_wt = float(profile.get("journey_start_weight_lbs", 307))
             _goal_wt  = float(profile.get("goal_weight_lbs", 185))
             # G-3/G-4 FIX: fall back to avatar_weight (broader lookback) when latest_weight is None
             _curr_wt  = data.get("latest_weight") or data.get("avatar_weight")  # float or None
@@ -2058,7 +2125,7 @@ def lambda_handler(event, context):
                 # D10: Day 1 baseline from profile — historical constants, not live data
                 baseline={
                     "date":         profile.get("baseline_date") or profile.get("journey_start_date", "2026-04-01"),
-                    "weight_lbs":   float(profile.get("baseline_weight_lbs") or profile.get("journey_start_weight_lbs", 302.0)),
+                    "weight_lbs":   float(profile.get("baseline_weight_lbs") or profile.get("journey_start_weight_lbs", 307.0)),
                     "hrv_ms":       float(profile.get("baseline_hrv_ms", 45)),
                     "rhr_bpm":      float(profile.get("baseline_rhr_bpm", 62)),
                     "recovery_pct": float(profile.get("baseline_recovery_pct", 55)),

@@ -32,7 +32,7 @@ except ImportError:
     logger.setLevel(logging.INFO)
 
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID = os.environ["USER_ID"]
+USER_ID = os.environ.get("USER_ID", "matthew")
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 ALGO_VERSION = "1.0"
 

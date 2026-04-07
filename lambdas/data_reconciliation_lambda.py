@@ -52,7 +52,7 @@ except ImportError:
 REGION    = os.environ.get("AWS_REGION", "us-west-2")
 TABLE     = os.environ.get("TABLE_NAME", "life-platform")
 BUCKET    = os.environ["S3_BUCKET"]
-USER_ID   = os.environ["USER_ID"]
+USER_ID   = os.environ.get("USER_ID", "matthew")
 RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 SENDER    = os.environ["EMAIL_SENDER"]
 ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")

@@ -32,7 +32,7 @@ SECRET_NAME = "life-platform/strava"
 REGION         = os.environ.get("AWS_REGION", "us-west-2")
 S3_BUCKET      = os.environ["S3_BUCKET"]
 DYNAMODB_TABLE = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID        = os.environ["USER_ID"]
+USER_ID        = os.environ.get("USER_ID", "matthew")
 LOOKBACK_DAYS  = int(os.environ.get("LOOKBACK_DAYS", "7"))
 
 secrets_client = boto3.client("secretsmanager", region_name=REGION)

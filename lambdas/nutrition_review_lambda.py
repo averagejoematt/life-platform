@@ -3,9 +3,9 @@ Nutrition Review Lambda — v1.1.0 (Board Centralization)
 Fires Saturday 9:00 AM PT (17:00 UTC via EventBridge).
 
 Weekly nutrition analysis email with expert panel:
-  - Layne Norton: Macros, protein, adherence
-  - Rhonda Patrick: Micronutrients, genome crossover
-  - Peter Attia: Metabolic health, CGM, body composition
+  - Marcus Webb: Macros, protein, adherence
+  - Amara Patel: Micronutrients, genome crossover
+  - James Okafor: Metabolic health, CGM, body composition
   - Unified: Top 3 priorities, grocery list, meal ideas, supplement check
 
 Data sources: MacroFactor (7d food logs), Withings (30d weight), Strava (7d training),
@@ -34,7 +34,7 @@ _logger_std.setLevel(logging.INFO)
 
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ["USER_ID"]
+USER_ID    = os.environ.get("USER_ID", "matthew")
 RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
 SENDER     = os.environ["EMAIL_SENDER"]
 
@@ -452,7 +452,7 @@ Current supplementation vs genome gaps. Redundancies? Additions?
 1. DEXA has age caveat - note scan date and weight change. Benchmark only.
 2. Supplement entries in food_log: analyze for micros but exclude from meal analysis.
 3. Deduce meal names from ingredient clusters at same timestamp.
-4. He gained significant weight over 10+ months. Active recovery. Encouraging but honest.
+4. He is actively losing weight. Be encouraging but honest about progress relative to his stage.
 5. Eating window ~11am-7pm (16:8). Don't suggest 7am breakfast.
 6. If previous week data provided, weave in light trending comparisons naturally.
 
@@ -479,17 +479,17 @@ _FALLBACK_SYSTEM_PROMPT = """You are the Saturday Nutrition Review panel for Mat
 
 Write as three distinct expert voices analyzing the week's nutrition data, followed by a unified tactical section.
 
-### Dr. Layne Norton - Macros, Protein & Adherence
+### Dr. Marcus Webb - Macros, Protein & Adherence
 Analyze: Weekly calorie avg vs target ({calorie_target} kcal) and deficit consistency. Protein total AND distribution (flag meals <30g, praise >40g). Target: {protein_target_g}g. Protein source diversity. Carb/fat balance relative to training. Meal frequency and eating window. Fiber trend.
 Tone: Direct, evidence-based. Reference HIS actual food log entries by deduced meal name.
 Principle: "Build from what's working. Don't overhaul - optimize."
 
-### Dr. Rhonda Patrick - Micronutrients, Genome & Longevity
+### Dr. Amara Patel - Micronutrients, Genome & Longevity
 Analyze: Cross-reference dietary intake against genome SNPs provided. Vitamin D gap + genetics. FADS2 ALA conversion issue. FADS1 omega-6/inflammation. MTHFR methylfolate. Choline (MTHFD1+MTRR+PEMT triple risk, target 550mg+). Vitamin K (VKORC1). Potassium. Any micro <50% for 3+ days.
 Tone: Scientific but accessible. Connect genes to nutrients to foods.
 Principle: "Genomics tells us WHERE to focus. Food logs tell us what's missing."
 
-### Dr. Peter Attia - Metabolic Health & Composition
+### Dr. James Okafor - Metabolic Health & Composition
 Analyze: Weight trend and rate. CGM data if available. Meal glucose impact. Meal timing vs training. Deficit sustainability. DEXA benchmark context. Carb quality/timing.
 Tone: Strategic, longevity-focused.
 Principle: "Rate of loss matters less than body composition trajectory."
@@ -512,7 +512,7 @@ Current supplementation vs genome gaps. Redundancies? Additions?
 1. DEXA has age caveat - note scan date and weight change. Benchmark only.
 2. Supplement entries in food_log: analyze for micros but exclude from meal analysis.
 3. Deduce meal names from ingredient clusters at same timestamp.
-4. He gained significant weight over 10+ months. Active recovery. Encouraging but honest.
+4. He is actively losing weight. Be encouraging but honest about progress relative to his stage.
 5. Eating window ~11am-7pm (16:8). Don't suggest 7am breakfast.
 6. If previous week data provided, weave in light trending comparisons naturally.
 
@@ -762,7 +762,7 @@ def lambda_handler(event, context):
         _start = datetime.strptime(profile.get("journey_start_date", "2026-04-01"), "%Y-%m-%d").date()
         _days_in = max(1, (datetime.now(timezone.utc).date() - _start).days + 1)
         _week_num = max(1, (_days_in + 6) // 7)
-        _start_w = profile.get("journey_start_weight_lbs", 302)
+        _start_w = profile.get("journey_start_weight_lbs", 307)
         _goal_w = profile.get("goal_weight_lbs", 185)
         if _week_num <= 4:
             _stage = "Foundation Stage"

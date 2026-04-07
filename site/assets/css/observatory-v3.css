@@ -543,6 +543,37 @@
   font-family: var(--font-mono);
 }
 
+/* ── Coach Intelligence continuity markers ────────────────── */
+
+.obs-coach-continuity {
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding: var(--space-3) var(--space-5);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.obs-coach-continuity__item {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+  opacity: 0.7;
+}
+
+/* Data availability flag */
+.obs-coach-data-flag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: var(--space-2) 0;
+  margin-bottom: var(--space-2);
+}
+.obs-coach-data-flag--early {
+  color: var(--c-amber-500, #f59e0b);
+  opacity: 0.8;
+}
+
 /* ── V3.1 Item 3: Page subtitle ────────────────────────────── */
 
 .obs-subtitle {

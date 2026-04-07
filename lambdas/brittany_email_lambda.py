@@ -253,7 +253,7 @@ def gather_all():
     weight_latest    = weight_rows[-1][1] if weight_rows else None
     weight_week_start = weight_rows[0][1] if weight_rows else None
     goal             = profile.get("goal_weight_lbs", 185)
-    journey_start    = profile.get("journey_start_weight_lbs", 302)
+    journey_start    = profile.get("journey_start_weight_lbs", 307)
     week_delta       = round(weight_latest - weight_week_start, 1) if weight_latest and weight_week_start else None
     lbs_lost         = round(journey_start - weight_latest, 1) if weight_latest else None
     lbs_to_go        = round(weight_latest - goal, 1) if weight_latest else None
@@ -337,7 +337,7 @@ def gather_all():
             "week_summary": week_summary,
         },
         "dates": {"start": w_start, "end": w_end},
-        "journey_week": max(1, ((today - date(2026, 2, 22)).days // 7) + 1),
+        "journey_week": max(1, ((today - datetime.strptime(profile.get("journey_start_date", "2026-04-01"), "%Y-%m-%d").date()).days // 7) + 1),
         "profile": profile,
     }
 

@@ -36,7 +36,7 @@ _logger_std.setLevel(logging.INFO)
 
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ["USER_ID"]
+USER_ID    = os.environ.get("USER_ID", "matthew")
 RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
 SENDER     = os.environ["EMAIL_SENDER"]
 
@@ -345,7 +345,7 @@ def extract_weight_trend(withings_data):
 def build_weight_context(withings_data, profile):
     """Build human-readable weight context for AI."""
     weight = extract_weight_trend(withings_data)
-    start_w = profile.get("journey_start_weight_lbs", 302)
+    start_w = profile.get("journey_start_weight_lbs", 307)
     goal_w = profile.get("goal_weight_lbs", 185)
     if weight:
         current = weight["latest_weight_lbs"]

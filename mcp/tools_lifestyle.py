@@ -58,7 +58,7 @@ def _tz_offset(tz_name):
 
 def _is_traveling(date_str=None):
     """Check if a given date (or today) falls within an active trip. Returns trip dict or None."""
-    check_date = date_str or datetime.utcnow().strftime("%Y-%m-%d")
+    check_date = date_str or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:
         resp = table.query(
             KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
@@ -247,7 +247,7 @@ def tool_save_insight(args):
     tags   = args.get("tags") or []
     source = args.get("source") or "chat"
 
-    now        = datetime.utcnow()
+    now        = datetime.now(timezone.utc)
     ts         = now.strftime("%Y-%m-%dT%H:%M:%S")
     insight_id = ts  # human-readable, doubles as sort key suffix
     sk         = f"INSIGHT#{ts}"
@@ -282,7 +282,7 @@ def tool_get_insights(args):
     """
     status_filter = args.get("status_filter")  # None = all
     limit         = int(args.get("limit") or 50)
-    today         = datetime.utcnow().date()
+    today         = datetime.now(timezone.utc).date()
 
     resp = table.query(
         KeyConditionExpression=Key("pk").eq(INSIGHTS_PK) & Key("sk").begins_with("INSIGHT#"),
@@ -354,7 +354,7 @@ def tool_update_insight_outcome(args):
         ExpressionAttributeValues={
             ":s": new_status,
             ":o": outcome_notes,
-            ":d": datetime.utcnow().strftime("%Y-%m-%d"),
+            ":d": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         },
     )
     logger.info(f"update_insight_outcome: insight_id={insight_id} status={new_status}")
@@ -372,7 +372,7 @@ def tool_log_supplement(args):
     Log a supplement or medication entry. Writes to DynamoDB supplements partition.
     Supports multiple entries per day (appends to existing list).
     """
-    date = args.get("date", datetime.utcnow().strftime("%Y-%m-%d"))
+    date = args.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     name = args.get("name", "").strip()
     if not name:
         return {"error": "Supplement name is required."}
@@ -390,7 +390,7 @@ def tool_log_supplement(args):
         "timing": timing,
         "category": category,
         "notes": notes,
-        "logged_at": datetime.utcnow().isoformat(),
+        "logged_at": datetime.now(timezone.utc).isoformat(),
     }
     # Remove None values
     entry = {k: v for k, v in entry.items() if v is not None and v != ""}
@@ -408,7 +408,7 @@ def tool_log_supplement(args):
                 ":empty": [],
                 ":date": date,
                 ":src": "supplements",
-                ":ua": datetime.utcnow().isoformat(),
+                ":ua": datetime.now(timezone.utc).isoformat(),
             },
         )
     except Exception as e:
@@ -429,8 +429,8 @@ def tool_get_supplement_log(args):
     Retrieve supplement/medication log for a date range.
     Shows what was taken, dosage, timing, and adherence patterns.
     """
-    end_date = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
     name_filter = (args.get("name") or "").strip().lower()
 
     items = query_source("supplements", start_date, end_date)
@@ -517,8 +517,8 @@ def tool_get_supplement_correlation(args):
     Compares days taking a supplement vs days without across sleep, recovery, glucose, HRV.
     Enhances N=1 experiments with supplement-specific analysis.
     """
-    end_date = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
     supplement_name = (args.get("name") or "").strip().lower()
 
     if not supplement_name:
@@ -665,8 +665,8 @@ def tool_get_weather_correlation(args):
     Walker: Seasonal light changes drive mood, energy, and sleep timing shifts.
     Attia: Barometric pressure changes correlate with joint pain and headaches.
     """
-    end_date = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     def _sf(v):
         if v is None: return None
@@ -845,8 +845,8 @@ def tool_get_social_connection_trend(args):
     Tracks social connection quality, streaks, rolling averages, and
     correlates with health outcomes. Seligman PERMA model.
     """
-    end_date = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     def _sf(v):
         if v is None: return None
@@ -916,7 +916,7 @@ def tool_get_social_connection_trend(args):
             break
 
     days_since_meaningful = None
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     for d in reversed(sorted_dates):
         if daily_social[d]["score"] >= 3:
             days_since_meaningful = (datetime.strptime(today, "%Y-%m-%d") - datetime.strptime(d, "%Y-%m-%d")).days
@@ -997,8 +997,8 @@ def tool_get_social_connection_trend(args):
 
 def tool_get_social_isolation_risk(args):
     """Flags periods of social isolation and correlates with health declines."""
-    end_date = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
     isolation_threshold = int(args.get("consecutive_days", 3))
 
     def _sf(v):
@@ -1094,8 +1094,8 @@ def tool_get_social_isolation_risk(args):
 
 def tool_get_meditation_correlation(args):
     """Correlates mindful_minutes from Apple Health with health metrics."""
-    end_date = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     def _sf(v):
         if v is None: return None
@@ -1233,7 +1233,7 @@ def tool_log_travel(args):
     action: 'start' (default) or 'end'
     """
     action = args.get("action", "start").lower()
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     tbl = table
 
     if action == "end":
@@ -1249,7 +1249,7 @@ def tool_log_travel(args):
                     ExpressionAttributeNames={"#st": "status"},
                     ExpressionAttributeValues={
                         ":ed": end_date, ":st": "completed",
-                        ":ua": datetime.utcnow().isoformat(),
+                        ":ua": datetime.now(timezone.utc).isoformat(),
                     },
                 )
                 return {"status": "trip_ended", "trip_id": trip_id, "end_date": end_date}
@@ -1268,7 +1268,7 @@ def tool_log_travel(args):
                     ExpressionAttributeNames={"#st": "status"},
                     ExpressionAttributeValues={
                         ":ed": end_date, ":st": "completed",
-                        ":ua": datetime.utcnow().isoformat(),
+                        ":ua": datetime.now(timezone.utc).isoformat(),
                     },
                 )
                 return {"status": "trip_ended", "trip_id": sk, "end_date": end_date,
@@ -1315,8 +1315,8 @@ def tool_log_travel(args):
         "status": "active",
         "notes": notes,
         "source": "travel",
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     item = {k: v for k, v in item.items() if v is not None and v != ""}
 
@@ -1747,8 +1747,8 @@ def tool_get_blood_pressure_dashboard(args):
       Stage 2:   >=140 / >=90
       Crisis:    >180 / >120
     """
-    end_date   = args.get("end_date",   datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=29)).strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=29)).strftime("%Y-%m-%d"))
 
     items = query_source("apple_health", start_date, end_date)
     if not items:
@@ -1905,8 +1905,8 @@ def tool_get_blood_pressure_correlation(args):
     Correlate blood pressure with lifestyle factors: sodium, training load, stress,
     sleep quality, caffeine, weight. Pearson r + bucketed comparisons.
     """
-    end_date   = args.get("end_date",   datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=89)).strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d"))
 
     ah_items = query_source("apple_health", start_date, end_date)
     mf_items = query_source("macrofactor",  start_date, end_date)
@@ -2067,8 +2067,8 @@ def tool_get_blood_pressure_correlation(args):
 
 def tool_get_gait_analysis(args):
     """Gait & mobility analysis from Apple Watch passive measurements."""
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     items = query_source("apple_health", start_date, end_date)
     if not items:
@@ -2192,8 +2192,8 @@ def tool_get_gait_analysis(args):
 
 def tool_get_energy_balance(args):
     """Apple Watch TDEE vs MacroFactor intake — daily surplus/deficit."""
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
     target_deficit = args.get("target_deficit_kcal", 500)
 
     ah_items = query_source("apple_health", start_date, end_date)
@@ -2269,8 +2269,8 @@ def tool_get_energy_balance(args):
 
 def tool_get_movement_score(args):
     """Daily movement & NEAT analysis."""
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
     step_target = args.get("step_target", 8000)
 
     sources = parallel_query_sources(["apple_health", "strava"], start_date, end_date)
@@ -2400,7 +2400,7 @@ def tool_create_experiment(args):
     if not hypothesis:
         raise ValueError("hypothesis is required (e.g. 'Will improve deep sleep % by >5%')")
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     if not start_date:
         start_date = now.strftime("%Y-%m-%d")
 
@@ -2482,7 +2482,7 @@ def tool_list_experiments(args):
     Shows days active, whether minimum duration (14d) has been met.
     """
     status_filter = args.get("status")  # None = all
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     resp = table.query(
         KeyConditionExpression=Key("pk").eq(EXPERIMENTS_PK) & Key("sk").begins_with("EXP#"),
@@ -2584,7 +2584,7 @@ def tool_get_experiment_results(args):
         raise ValueError(f"No experiment found with id={exp_id}")
 
     start_date = item.get("start_date", "")
-    end_date = item.get("end_date") or datetime.utcnow().strftime("%Y-%m-%d")
+    end_date = item.get("end_date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     status = item.get("status", "active")
     hypothesis = item.get("hypothesis", "")
 
@@ -2795,7 +2795,7 @@ def tool_end_experiment(args):
         raise ValueError(f"Experiment is already {existing.get('status')} — cannot end again")
 
     if not end_date:
-        end_date = datetime.utcnow().strftime("%Y-%m-%d")
+        end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # Auto-infer grade if not provided
     if not grade:
@@ -2806,7 +2806,7 @@ def tool_end_experiment(args):
         ":s":  status,
         ":o":  outcome,
         ":e":  end_date,
-        ":ea": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"),
+        ":ea": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
         ":g":  grade,
     }
     if compliance_pct is not None:
@@ -2858,7 +2858,7 @@ def tool_log_ruck(args):
     from decimal import Decimal
     import boto3
 
-    date = args.get("date", datetime.utcnow().strftime("%Y-%m-%d"))
+    date = args.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     weight_lbs = args.get("weight_lbs")
     if not weight_lbs or float(weight_lbs) <= 0:
         return {"error": "weight_lbs is required (e.g. 35 for a 35lb ruck)."}
@@ -2963,7 +2963,7 @@ def tool_log_ruck(args):
         "activity_name": name,
         "start_local": start_local,
         "notes": notes,
-        "logged_at": datetime.utcnow().isoformat(),
+        "logged_at": datetime.now(timezone.utc).isoformat(),
     }
     entry = {k: v for k, v in entry.items() if v is not None and v != ""}
 
@@ -2981,7 +2981,7 @@ def tool_log_ruck(args):
                 ":empty": [],
                 ":date": date,
                 ":src": "ruck_log",
-                ":ua": datetime.utcnow().isoformat(),
+                ":ua": datetime.now(timezone.utc).isoformat(),
             },
         )
     except Exception as e:
@@ -3010,8 +3010,8 @@ def tool_get_ruck_log(args):
     """
     Retrieve ruck history: sessions, total miles, load trends, frequency.
     """
-    end = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start = args.get("start_date", (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     resp = table.query(
         KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",

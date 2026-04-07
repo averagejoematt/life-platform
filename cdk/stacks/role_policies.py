@@ -516,6 +516,21 @@ def compute_failure_pattern() -> list[iam.PolicyStatement]:
     )
 
 
+def compute_coach_computation() -> list[iam.PolicyStatement]:
+    """Coach computation engine: reads all source partitions + COACH# predictions, writes COACH#computation results to DDB, reads S3 config."""
+    return _compute_base(needs_kms=True, needs_s3_config=True)
+
+
+def compute_coach_orchestrator() -> list[iam.PolicyStatement]:
+    """Coach narrative orchestrator: reads COACH#/ENSEMBLE#/NARRATIVE# partitions from DDB, reads S3 voice specs, uses ai-keys for Haiku LLM, writes briefs to DDB."""
+    return _compute_base(needs_kms=True, needs_ai_keys=True, needs_s3_config=True)
+
+
+def compute_coach_state_updater() -> list[iam.PolicyStatement]:
+    """Coach state updater: reads S3 voice specs, uses ai-keys for Haiku extraction, writes COACH# state records to DDB."""
+    return _compute_base(needs_kms=True, needs_ai_keys=True, needs_s3_config=True)
+
+
 # ═════════════════════════════════════════════════════════════════════════
 # EMAIL STACK — 8 Lambdas
 # Pattern: DDB read, S3 config (board_of_directors.json), ai-keys, SES send, DLQ
@@ -575,6 +590,7 @@ def email_daily_brief() -> list[iam.PolicyStatement]:
     """Daily brief: DDB read, S3 config, ai-keys, SES, writes dashboard/ + buddy/ + site/ to S3.
     Risk-7: also emits ComputePipelineStaleness metric to CloudWatch.
     site/public_stats.json written via site_writer.py for averagejoematt.com.
+    Coach Intelligence: invokes coach-computation-engine, coach-narrative-orchestrator, coach-state-updater.
     """
     return _email_base(
         needs_s3_write=["dashboard/*", "buddy/*", "site/*", "generated/*"],
@@ -583,6 +599,16 @@ def email_daily_brief() -> list[iam.PolicyStatement]:
                 sid="CloudWatchMetrics",
                 actions=["cloudwatch:PutMetricData"],
                 resources=["*"],
+            ),
+            iam.PolicyStatement(
+                sid="CoachIntelligenceInvoke",
+                actions=["lambda:InvokeFunction"],
+                resources=[
+                    f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-computation-engine",
+                    f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-narrative-orchestrator",
+                    f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-state-updater",
+                    f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-ensemble-digest",
+                ],
             ),
         ],
     )

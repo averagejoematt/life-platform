@@ -8,7 +8,7 @@ pre/post-processing logic added to dispatchers in future phases.
 import json
 import time
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from mcp.config import logger, SOURCES
 from mcp.core import ddb_cache_set, mem_cache_set, parallel_query_sources
@@ -37,9 +37,9 @@ def nightly_cache_warmer():
     Per-step timing is logged so slowdowns are easy to diagnose.
     """
     warmer_start = time.time()
-    today    = datetime.utcnow().strftime("%Y-%m-%d")
-    five_yrs = (datetime.utcnow() - timedelta(days=365 * 5)).strftime("%Y-%m-%d")
-    two_yrs  = (datetime.utcnow() - timedelta(days=365 * 2)).strftime("%Y-%m-%d")
+    today    = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    five_yrs = (datetime.now(timezone.utc) - timedelta(days=365 * 5)).strftime("%Y-%m-%d")
+    two_yrs  = (datetime.now(timezone.utc) - timedelta(days=365 * 2)).strftime("%Y-%m-%d")
     results  = {}
     logger.info(f"[warmer] START date={today} sources={WARMER_CORE_SOURCES}")
 

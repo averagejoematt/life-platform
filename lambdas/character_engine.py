@@ -351,7 +351,7 @@ def compute_movement_raw(data, config):
 def _body_comp_score(current_weight, config):
     """Two-phase body composition scoring: sigmoid during loss, band during maintenance. [F-04]"""
     baseline = config.get("baseline", {})
-    start = baseline.get("start_weight_lbs", 302)
+    start = baseline.get("start_weight_lbs", 307)
     goal = baseline.get("goal_weight_lbs", 185)
     maintenance_band = baseline.get("maintenance_band_lbs", 3)
     phase = baseline.get("weight_phase", "loss")

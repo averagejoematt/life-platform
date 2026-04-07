@@ -2,7 +2,7 @@
 
 > Permanent log of significant architectural, design, and operational decisions.
 > Each ADR captures the decision, context, alternatives considered, and outcome.
-> Last updated: 2026-04-05 (v5.0.0)
+> Last updated: 2026-04-06 (v6.0.0)
 
 ---
 
@@ -980,3 +980,54 @@ Supporting files: `data_sources.json` (source registry), `lint_site_content.py` 
 **Files changed:** `site_writer.py`, `output_writers.py`, `site_stats_refresh_lambda.py`, `og_image_lambda.py`, `wednesday_chronicle_lambda.py`, `chronicle_approve_lambda.py`, `site_api_lambda.py` (S3 key constants), `web_stack.py` (CloudFront origin + behaviors), `role_policies.py` (IAM), `bucket_policy.json`.
 
 **Outcome:** Site deploys are now safe by design, not by exclusion list. The `safe_sync.sh` exclusion list was simplified to only `config/*` (manually-uploaded config files that still live under `site/`).
+
+---
+
+### ADR-047 — Coach Intelligence Architecture: Stateless Prompts → Stateful Agents
+
+**Status:** Active
+**Date:** 2026-04-06 (v6.0.0)
+
+**Context:** The platform's coaching system used stateless prompt templates — each generation cycle operated independently with no memory of prior outputs, no awareness of other coaches' perspectives, and no narrative planning. After 6 days of the experiment, gaps were already visible: repetitive framing, no callbacks to prior observations, no cross-domain synthesis, no prediction accountability.
+
+**Decision:** Replace stateless prompt templates with persistent, stateful AI coaching agents. 8 coaches with episodic memory (output archive, thread registry, learning log), voice differentiation (structural voice specs with few-shot calibration), cross-coach communication (ensemble digest, influence graph, disagreement tracking), prediction accountability (Bayesian confidence, null hypothesis comparison), and narrative orchestration (showrunner producing generation briefs).
+
+**Key design principles:**
+1. **Computation/LLM separation** — All math (EWMA, regression-to-mean, seasonality, autocorrelation) in deterministic Python. LLM receives results and writes about them in character. (Source: Karpathy, Expert Panel)
+2. **DynamoDB state store in existing table** — New PK patterns (COACH#, ENSEMBLE#, NARRATIVE#) in the existing single-table design. No new tables, no external agent frameworks.
+3. **Voice specs as calibration anchors** — Few-shot examples maintain voice consistency across model changes. Structural rules (opening patterns, sentence rhythm, analogy domain) differentiate coaches at the structural level, not just vocabulary.
+4. **Statistical guardrails scale with coaching sophistication** — Decision class ceilings (observational/directional/interventional) enforced by the orchestrator based on data availability.
+5. **Productive disagreement** — Cross-coach disagreement is tracked and surfaced, not smoothed over. Unanimous agreement is flagged as suspicious (S-10).
+
+**Alternatives considered:**
+- External agent framework (LangChain, AutoGen) — rejected: too heavy, vendor dependency, can't customize deeply enough for voice differentiation
+- Vector store for coach memory — rejected: structured state queries (threads, predictions) don't benefit from semantic search; DynamoDB fits the access pattern
+- Single unified coach — rejected: 8 distinct voices with domain expertise create richer coaching than one generalist; cross-coach tension is a feature
+- Fewer coaches (3-4) — rejected: the 8 domains map directly to the platform's data pillars; fewer would create artificial domain merging
+
+**8 Lambdas created:** coach-computation-engine, coach-narrative-orchestrator, coach-state-updater, coach-ensemble-digest, coach-prediction-evaluator, coach-history-summarizer, coach-quality-gate, coach-observatory-renderer.
+
+**Cost impact:** ~$3-5/month additional API cost (Haiku for orchestration/extraction/ensemble, Sonnet for generation). DynamoDB cost negligible.
+
+**Outcome:** All 8 coaches live on both email pipeline and public observatory pages. System accumulates state forward from Day 6 of the experiment.
+
+---
+
+### ADR-048 — Observatory Integration: Coach Intelligence Replaces Expert Analyzer
+
+**Status:** Active
+**Date:** 2026-04-06 (v6.0.0)
+
+**Context:** Observatory pages used `ai_expert_analyzer_lambda.py` — a weekly Lambda that called Sonnet once per coach with a rotating analytical lens and no memory. This was a separate system from the daily brief coaches. After building the Coach Intelligence pipeline, the expert analyzer became redundant — the daily pipeline produces richer, more consistent, voice-differentiated content.
+
+**Decision:** Wire observatory pages to read from the COACH# state store (populated by the daily brief pipeline) via a new `/api/coach_analysis` endpoint. The expert analyzer Lambda is deprecated. Observatory JS tries the new endpoint first, falls back to legacy `/api/ai_analysis` during transition.
+
+**Reasoning:**
+1. **One source of truth** — Coaches write once (daily brief pipeline), observatory and email read the same state. No drift between what the email says and what the website shows.
+2. **Richer content** — Observatory cards now show continuity markers (thread references, revision signals, cross-coach references) that the stateless expert analyzer couldn't produce.
+3. **No additional LLM cost** — The observatory renderer is a pure DynamoDB reader. Content is pre-computed by the daily pipeline.
+4. **Observatory summary** — The state updater now extracts a shorter `observatory_summary` optimized for card format, alongside the full email content.
+
+**Files changed:** `site_api_lambda.py` (new endpoint), `observatory-v3.js` (new fetch + continuity markers + data_availability), `observatory-v3.css` (marker styles), `coach_state_updater.py` (observatory_summary extraction), `coach_observatory_renderer.py` (standalone reader Lambda).
+
+**Outcome:** Observatory pages serve Coach Intelligence content with stateful memory, cross-coach awareness, and data availability constraints. Legacy endpoint retained as fallback.

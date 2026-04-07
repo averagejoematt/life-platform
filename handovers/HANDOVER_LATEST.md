@@ -1,149 +1,127 @@
-# Handover — v5.4.0: Product Board Sprint + V3/V3.1 Observatory Redesign
+# Handover — v6.0.0: Coach Intelligence Architecture
 
-**Date:** 2026-04-05
-**Scope:** Product Board sprint (PB-01–07), V3 Observatory redesign (PB-09), V3.1 Observatory polish (PB-09.1). Verification sweep, Weekly Signal email, protocol adherence, coach-led dashboard restructure across 8 pages, then polish pass (deltas, subtitles, deep collapse, Elena/journaling fix). Also: MCP Lambda 502 fix, AI expert analyzer V3 upgrade, disposable email blocklist, CI fix.
+**Date:** 2026-04-06
+**Scope:** Coach Intelligence Architecture (Phases 1-5 + Observatory Integration) — 8 new Lambdas, 8 AI coaches, new DynamoDB partitions, Observatory wiring, prompt evolution, ai_expert_analyzer deprecated.
 
 ## What Changed
 
-### Pre-Sprint Fix: MCP Lambda 502 (Canary Spam)
+### Coach Intelligence Architecture (Phases 1-5) — 8 NEW LAMBDAS
 
-- **Root cause:** CDK redeploy at 04:39 UTC packaged MCP Lambda from `lambdas/` directory instead of repo root (`mcp_server.py` + `mcp/` package). Caused `ModuleNotFoundError: No module named 'mcp_server'` on every invocation.
-- **Fix:** Redeployed MCP Lambda + warmer with correct code. Fixed CDK `mcp_stack.py` to stage `mcp_server.py` + `mcp/` into a clean temp directory (`_mcp_staging/`) instead of using the generic `../lambdas` code asset. Added `code` parameter override to `create_platform_lambda` helper.
-- **Canary:** All 3 checks pass (DDB, S3, MCP with 115 tools). MCP alarm cleared.
+Built and deployed a multi-stage AI coach pipeline with 8 domain-specific coaches and 8 supporting Lambdas.
 
-### PB-01: Discoveries Verification ✅
-- `/api/journey_timeline` returns 7+ events (4 Day 1 seeds + level_ups + experiments)
-- MCP registry tests pass (7/7) — annotation tools registered
-- DISC-7 marked ✅ DONE in `BACKLOG_HANDOFF_CLAUDE_CODE.md`
+**Coaches (8):**
 
-### PB-02: get_nutrition Bug Closure ✅
-- All 8 tests pass in `test_get_nutrition_args.py`
-- Marked ✅ DONE in backlog
+| Coach ID | Name | Domain |
+|----------|------|--------|
+| `sleep_coach` | Dr. Lisa Park | Sleep & circadian rhythm |
+| `nutrition_coach` | Dr. Marcus Webb | Nutrition & metabolism |
+| `training_coach` | Dr. Sarah Chen | Training & exercise |
+| `mind_coach` | Dr. Nathan Reeves | Mental health & mindfulness |
+| `physical_coach` | Dr. Victor Reyes | Physical health & body composition |
+| `glucose_coach` | Dr. Amara Patel | Glucose regulation & CGM |
+| `labs_coach` | Dr. James Okafor | Lab biomarkers & blood work |
+| `explorer_coach` | Dr. Henning Brandt | Cross-domain patterns & experiments |
 
-### PB-03: OG Share Cards ✅
-- All 7 OG images return 200 (home, sleep, glucose, training, character, nutrition, mind)
-- Homepage meta tags correct: `og:image`, `og:image:width` (1200), `og:image:height` (630), `twitter:card` (summary_large_image)
-- Share button present with Web Share API + clipboard fallback
+**Pipeline Lambdas (8):**
 
-### PB-04: Sleep Observatory V2 ✅
-- **Audit result:** Page was already ~85% aligned with editorial pattern (hero, gauges, pull-quotes, section headers, freshness, reading path nav all present)
-- **Gap closed:** Added AI expert analysis card (`renderAIAnalysisCard` with `sleep` expert key)
-- Added `sleep` to site-api AI analysis whitelist
-- Added `sleep` + `glucose` to `components.js` EXPERTS config (Dr. Park's Sleep Analysis, Dr. Patrick's Metabolic Assessment)
-- Deployed: sleep page to S3, components.js to S3, site-api Lambda
+| Lambda | Purpose |
+|--------|---------|
+| `coach-computation-engine` | EWMA metrics, seasonal adjustments, anomaly detection per domain |
+| `coach-narrative-orchestrator` | Generates coach prose with voice spec, thread continuity, epistemological framing |
+| `coach-state-updater` | Updates relationship state, confidence scores, learning records |
+| `coach-ensemble-digest` | Cross-coach synthesis, disagreement detection, influence graph |
+| `coach-prediction-evaluator` | Scores past predictions, calibrates confidence |
+| `coach-history-summarizer` | Compresses old threads into COMPRESSED#latest |
+| `coach-quality-gate` | Validates output quality (hallucination, voice drift, repetition checks) |
+| `coach-observatory-renderer` | Renders coach analysis for /api/coach_analysis endpoint |
 
-### PB-05: Glucose Observatory V2 ✅
-- **Audit result:** Page was already ~90% aligned — all editorial elements present including AI card
-- **Gap closed:** Added `glucose` to `components.js` EXPERTS config (was calling `renderAIAnalysisCard` but key wasn't registered). AI card now renders with existing analysis data.
+**Pipeline flow:** Computation Engine -> Narrative Orchestrator -> Quality Gate -> State Updater -> (async) Ensemble Digest + Prediction Evaluator + History Summarizer.
 
-### PB-06: Weekly Signal Subscriber Email ✅ — NEW LAMBDA
-- **Lambda:** `weekly-signal` (`lambdas/weekly_signal_lambda.py`)
-- **Schedule:** `cron(30 16 ? * SUN *)` — Sunday 9:30 AM PT (30 min after Matthew's private digest)
-- **5-section email:** The Numbers, Chronicle Preview, What Worked, The Board Says, Observatory Spotlight
-- **Data sources:** `generated/public_stats.json` (S3), `generated/journal/posts.json` (S3), DynamoDB computed_insights
-- **Pattern:** Modeled exactly on `chronicle_email_sender_lambda.py` — same subscriber query, SES rate limiting, per-subscriber error handling, unsubscribe links
-- **Deployed** via `LifePlatformEmail` CDK stack. Test invocation: sent to 1 subscriber successfully.
-- **IAM:** `email_weekly_signal()` in `role_policies.py` — DDB read, S3 read (generated/*), KMS, SES, DLQ
+### New DynamoDB Partitions
 
-### PB-07: Protocol Adherence Card ✅
-- Made the sleep onset card data-driven (was static "70%")
-- Added `sleep_start` to `/api/sleep_detail` trend response (from Whoop DynamoDB records)
-- JavaScript calculates from last 30 days of `sleep_start` data:
-  - Converts UTC → PT, counts days with onset < 11:00 PM
-  - Calculates average recovery on adherent vs non-adherent days
-  - Shows delta with Henning Brandt confidence label when N<30
-- Falls back gracefully with insufficient data messages
+Seeded all new partitions for coach intelligence:
 
-### Sleep AI Expert Analyzer — FIXED POST-SPRINT
-- `sleep` expert was missing from `ai_expert_analyzer_lambda.py` EXPERTS list
-- Added `gather_data_for_expert("sleep")` branch (reads Whoop + Eight Sleep data)
-- Added Dr. Lisa Park persona (sleep & circadian specialist)
-- Generated initial analysis (1503 chars). Dr. Park's card on sleep page now renders content.
+- **COACH#{coach_id}** — per-coach state with SK patterns: OUTPUT#, THREAD#{date}, LEARNING#{date}, PREDICTION#{date}, VOICE#state, RELATIONSHIP#state, CONFIDENCE#{subdomain}, COMPRESSED#latest
+- **ENSEMBLE#digest / CYCLE#{date}** — cross-coach synthesis per generation cycle
+- **ENSEMBLE#influence_graph / CONFIG#v1** — coach influence graph configuration
+- **ENSEMBLE#disagreements / ACTIVE#{slug}** — tracked cross-coach disagreements
+- **NARRATIVE#arc / STATE#current + HISTORY#{date}** — overarching narrative arc tracking
+- **COACH#computation / RESULTS#{date}** — pre-computed EWMA metrics for all coaches
 
-### V3 Observatory Redesign (PB-09) ✅
-- **Phase 1 (Foundation):** Created `observatory-v3.css` + `observatory-v3.js` shared module (6 named function exports). Upgraded `ai_expert_analyzer_lambda.py` to V3: rotating analytical lens, enhanced data gathering (sleep onset/temp/REM, training recovery/modality, nutrition fiber), labs context override, max_tokens 1200, week_number + prior_recommendation anti-repetition. Generated V3 analyses for all 8 experts (1700-2400 chars).
-- **Phase 2 (Observatory Pages):** Restructured Sleep, Physical, Training, Nutrition, Glucose (Approach B — status bar → coach → trends → detail → cross-domain → depth) and Mind (Approach C — Conti Amendment, hero stays visible).
-- **Phase 3 (Habits + Labs):** Habits V3-lite (editorial collapsed, T1/T2 collapsed). Labs: Dr. Okafor promoted to position 2.
+### S3 Configuration Files
 
-### V3.1 Observatory Polish (PB-09.1) ✅
-- **Item 1 (P0):** Week-over-week deltas — `computeDelta()` + `_renderDelta()` in shared JS with polarity-aware color coding
-- **Item 2 (P0):** Complete depth-section collapse on Nutrition (7 sections) + Training (11 sections) — editorial, hypotheses, protocols, empty placeholders all in `<details>`
-- **Item 3 (P1):** One-line page subtitles on all 6 observatory pages for first-time visitor context
-- **Item 4 (P1):** Specific depth section labels with teasers replacing generic "Deep Dive"
-- **Item 5 (P2):** Section divider CSS (`obs-section-divider`)
-- **Item 6 (P2):** Depth section teaser support in `renderDepth()`
-- **Item 7 (P1):** Mind page Elena quote / journaling prompt separation — fixed `rsplit` parsing order in Lambda, journaling prompt renders in own purple-bordered block
-- **Coach timestamp:** Added "Saturday, April 5, 2026 · 7:00 AM PT · Day 5 Observations" prefix to all coach cards
+- `config/coaches/*.json` — 8 voice specification files (one per coach)
+- `config/coaches/influence_graph.json` — directed graph of coach-to-coach influence
+- `config/computation/ewma_params.json` — EWMA smoothing parameters
+- `config/computation/seasonal_adjustments.json` — seasonal adjustment factors
+- `config/narrative/arc_definitions.json` — narrative arc definitions and phase transitions
 
-### Other Fixes
-- **CI/CD fix:** Removed retired `google_calendar` from `lambda_s3_paths.json` — was failing `test_s2` on every push
-- **Disposable email blocklist:** Added domain blocklist to `email_subscriber_lambda.py` — prevents SES bounces from fake signups (example.com, mailinator.com, etc.)
-- **Test subscriber cleanup:** Deleted 9 test/junk DynamoDB subscriber records
+### Observatory Integration
 
-### PB-08: Intelligence Page Rebuild — NOT STARTED (per plan)
-- Gated on SIMP-1 Phase 2 (~April 13)
+- `/api/coach_analysis` endpoint on site-api reads from COACH# DynamoDB partitions
+- `observatory-v3.js` updated: tries `/api/coach_analysis?coach=<id>` first, falls back to legacy `/api/ai_analysis?expert=<key>`
+- `ai_expert_analyzer_lambda.py` deprecated — replaced by `coach-observatory-renderer`
+
+### Prompt Evolution Work
+
+- Bug fixes in coach prompt generation
+- Epistemological framing: coaches express appropriate uncertainty, distinguish observation from inference
+- Fictitious coach names assigned (Dr. Park, Dr. Webb, Dr. Chen, etc.) for consistent voice identity
+- Coach timestamp formatting: date/day/time prefix on coach analysis cards
+- Timestamp placement refinement: moved under name/title, before prose content
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `cdk/stacks/mcp_stack.py` | MCP code asset now uses staging directory |
-| `cdk/stacks/lambda_helpers.py` | Added `code` parameter override |
-| `cdk/stacks/email_stack.py` | Added weekly-signal Lambda (PB-06) |
-| `cdk/stacks/role_policies.py` | Added `email_weekly_signal()` IAM policy |
-| `lambdas/weekly_signal_lambda.py` | NEW — Weekly Signal subscriber email |
-| `lambdas/ai_expert_analyzer_lambda.py` | V3 prompts, sleep expert, V3.1 rsplit parsing fix for Elena/journaling |
-| `lambdas/site_api_lambda.py` | `sleep` AI key, `sleep_start` in trend, `week_number` in response |
-| `lambdas/email_subscriber_lambda.py` | Disposable domain blocklist |
-| `site/assets/css/observatory-v3.css` | NEW — V3 + V3.1 styles (deltas, subtitles, teasers, journaling prompt) |
-| `site/assets/js/observatory-v3.js` | NEW — V3 + V3.1 module (deltas, teasers, journaling, coach timestamp) |
-| `site/sleep/index.html` | V3 + subtitle + protocol adherence |
-| `site/physical/index.html` | V3 + subtitle |
-| `site/training/index.html` | V3 + V3.1 deep collapse + subtitle |
-| `site/nutrition/index.html` | V3 + V3.1 deep collapse (7 sections) + subtitle |
-| `site/glucose/index.html` | V3 + subtitle |
-| `site/mind/index.html` | V3 Approach C + subtitle + journaling prompt block |
-| `site/habits/index.html` | V3-lite (editorial + T1/T2 collapsed) |
-| `site/labs/index.html` | V3 coach promotion (Dr. Okafor at position 2) |
-| `ci/lambda_s3_paths.json` | Removed retired google_calendar reference |
-| `site/assets/js/components.js` | Added `sleep` + `glucose` to EXPERTS config |
-| `docs/BACKLOG_HANDOFF_CLAUDE_CODE.md` | DISC-7 + get_nutrition marked ✅ DONE |
-| `docs/ARCHITECTURE.md` | Lambda count 62→63, added weekly-signal |
-| `CLAUDE.md` | Lambda count 62→63 |
-| `.gitignore` | Added `cdk/_mcp_staging/` |
+| `lambdas/coach_computation_engine/` | NEW — EWMA computation engine |
+| `lambdas/coach_narrative_orchestrator/` | NEW — Voice-spec prose generation |
+| `lambdas/coach_state_updater/` | NEW — State/confidence/learning updates |
+| `lambdas/coach_ensemble_digest/` | NEW — Cross-coach synthesis |
+| `lambdas/coach_prediction_evaluator/` | NEW — Prediction scoring |
+| `lambdas/coach_history_summarizer/` | NEW — Thread compression |
+| `lambdas/coach_quality_gate/` | NEW — Output validation |
+| `lambdas/coach_observatory_renderer/` | NEW — Observatory API renderer |
+| `lambdas/site_api_lambda.py` | Added /api/coach_analysis endpoint |
+| `lambdas/ai_expert_analyzer_lambda.py` | DEPRECATED — replaced by coach-observatory-renderer |
+| `site/assets/js/observatory-v3.js` | Coach analysis fallback chain |
+| `cdk/stacks/compute_stack.py` | 8 new coach Lambda definitions |
+| `cdk/stacks/role_policies.py` | 8 new IAM policies for coach Lambdas |
+| `docs/ARCHITECTURE.md` | Lambda count 63->71, Coach Intelligence Layer section |
+| `docs/SCHEMA.md` | Coach Intelligence Partitions section |
+| `CLAUDE.md` | Lambda count 63->71 |
 
 ## What to Verify
 
 ### Smoke Tests
-- [ ] `curl https://averagejoematt.com/api/sleep_detail` — trend items include `sleep_start`
-- [ ] `curl https://averagejoematt.com/api/ai_analysis?expert=sleep` — returns 200 (analysis may be null)
-- [ ] `curl https://averagejoematt.com/api/ai_analysis?expert=glucose` — returns analysis text
-- [ ] Sleep page — protocol adherence card shows data-driven percentages
-- [ ] Sleep page — AI expert analysis section present
-- [ ] Weekly Signal — test invocation sends to subscribers
+- [ ] `curl https://averagejoematt.com/api/coach_analysis?coach=sleep_coach` — returns coach analysis
+- [ ] `curl https://averagejoematt.com/api/ai_analysis?expert=sleep` — legacy fallback still works
+- [ ] Sleep observatory page — coach card renders from new endpoint
+- [ ] All 8 coach DynamoDB partitions have seeded data
 
 ### CDK
-- [ ] `cdk diff --all` shows no changes (Email + MCP stacks deployed)
+- [ ] `cdk diff --all` shows no changes (compute stack deployed)
 
 ## Known Issues / Carry Forward
 
-- **Protocol adherence on sleep page** — onset < 11pm card is data-driven; other 3 cards (screen-off, temp, alcohol) remain static placeholders. Making them data-driven requires tracking data not yet in the API.
+- **Phase 6 refinement** — coach output tuning, confidence calibration, ensemble weighting adjustments
+- **/coaching/ dashboard page** — standalone coaching dashboard deferred (future sprint)
+- **Coach scheduling** — pipeline trigger schedule not yet on EventBridge (manual invocation for now)
 - **TDEE tracking** — blocked (MacroFactor doesn't export)
-- **Glucose intraday curve** — blocked (no raw 5-min CGM readings)
 - **IC-4/IC-5** (failure pattern + momentum warning) — data gate ~May 1
-- **DPR-1 Phase 3** — not yet scoped
+- **PB-08 Intelligence Page Rebuild** — gated on SIMP-1 Phase 2
 - **PRE-13 Data Publication Review** — deferred
-- **PB-08 Intelligence Page Rebuild** — gated on SIMP-1 Phase 2 (~April 13)
-- **~~Sleep AI analysis~~** — FIXED. Added sleep expert to ai_expert_analyzer_lambda.py, generated initial content.
 
 ## Current System State
 
 | Metric | Value |
 |--------|-------|
 | MCP Tools | 115 |
-| Lambdas | 63 |
+| Lambdas | 71 |
 | Site Pages | 72 |
 | Lambda Layer | v26 |
 | Architecture Grade | A- (R20) |
 | CDK Stacks | 8 |
-| Version | v5.4.0 |
+| AI Coaches | 8 |
+| Coach DDB Partitions | 6 new partition families |
+| Version | v6.0.0 |

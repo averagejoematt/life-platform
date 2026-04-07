@@ -1,0 +1,31 @@
+{
+  "domains": {
+    "sleep": {
+      "decay": 0.85,
+      "rationale": "Recent nights matter most — sleep quality is highly responsive to acute changes",
+      "metrics": ["sleep_duration_hours", "sleep_score", "sleep_efficiency_pct", "deep_pct", "rem_pct"]
+    },
+    "hrv_recovery": {
+      "decay": 0.87,
+      "rationale": "Moderate recency bias — autonomic recovery reflects 3-7 day patterns",
+      "metrics": ["hrv", "recovery_score", "resting_heart_rate"]
+    },
+    "training": {
+      "decay": 0.90,
+      "rationale": "Adaptations take weeks — training stimulus needs longer averaging",
+      "metrics": ["total_moving_time_seconds", "training_load", "steps", "zone2_minutes"]
+    },
+    "nutrition_body_comp": {
+      "decay": 0.95,
+      "rationale": "Changes are gradual — weight and body composition shift over weeks",
+      "metrics": ["total_calories_kcal", "total_protein_g", "weight_lbs", "body_fat_pct"]
+    },
+    "mood_mental": {
+      "decay": 0.80,
+      "rationale": "High day-to-day variability — recent state matters most",
+      "metrics": ["enriched_mood", "enriched_energy", "enriched_stress", "som_avg_valence"]
+    }
+  },
+  "version": "v1",
+  "last_reviewed": "2026-04-06"
+}

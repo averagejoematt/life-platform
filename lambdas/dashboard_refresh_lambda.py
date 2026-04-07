@@ -29,7 +29,7 @@ except ImportError:
 _REGION    = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET  = os.environ["S3_BUCKET"]
-USER_ID    = os.environ["USER_ID"]
+USER_ID    = os.environ.get("USER_ID", "matthew")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 BUDDY_LOOKBACK_DAYS = 7
@@ -191,7 +191,7 @@ def _build_avatar_data(character_sheet, profile, current_weight=None):
     tier = (character_sheet.get("character_tier") or "Foundation").lower().replace(" ", "_")
     pillar_names = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
 
-    start_w = profile.get("journey_start_weight_lbs", 302)
+    start_w = profile.get("journey_start_weight_lbs", 307)
     goal_w = profile.get("goal_weight_lbs", 185)
     cw = current_weight or start_w
     if start_w != goal_w:
@@ -303,7 +303,7 @@ def refresh_dashboard(profile, yesterday, today):
         weekly_delta = round(latest_weight - week_ago_weight, 1) if week_ago_weight else None
         phase = get_current_phase(profile, latest_weight)
         phase_name = phase.get("name", "") if phase else ""
-        journey_start = profile.get("journey_start_weight_lbs", 302)
+        journey_start = profile.get("journey_start_weight_lbs", 307)
         goal_weight = profile.get("goal_weight_lbs", 185)
         total_to_lose = journey_start - goal_weight
         journey_pct = round((journey_start - latest_weight) / total_to_lose * 100) if total_to_lose > 0 else 0
@@ -620,7 +620,7 @@ def refresh_buddy(profile, yesterday, today):
         # --- Journey Stats ---
         journey_start = profile.get("journey_start_date", "2026-04-01")
         goal_weight = safe_float(profile, "goal_weight_lbs") or 185
-        start_weight = safe_float(profile, "start_weight_lbs") or 302
+        start_weight = safe_float(profile, "start_weight_lbs") or 307
         try:
             journey_days = (today - datetime.strptime(journey_start, "%Y-%m-%d").date()).days
         except Exception:

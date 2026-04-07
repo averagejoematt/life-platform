@@ -7,7 +7,7 @@ Social, behavioral, and protocol tools:
 """
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from decimal import Decimal
 
@@ -35,7 +35,7 @@ _LIFE_EVENT_TYPES = [
 
 def tool_log_life_event(args):
     """Log a structured life event (birthday, loss, milestone, etc.)."""
-    date = args.get("date", datetime.utcnow().strftime("%Y-%m-%d"))
+    date = args.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     event_type = args.get("type", "other").lower()
     title = args.get("title", "").strip()
     if not title:
@@ -44,7 +44,7 @@ def tool_log_life_event(args):
     if event_type not in _LIFE_EVENT_TYPES:
         return {"error": f"Invalid type '{event_type}'. Valid: {_LIFE_EVENT_TYPES}"}
 
-    ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     sk = f"EVENT#{date}#{ts}"
 
     item = {
@@ -54,7 +54,7 @@ def tool_log_life_event(args):
         "type": event_type,
         "title": title,
         "source": "life_events",
-        "logged_at": datetime.utcnow().isoformat(),
+        "logged_at": datetime.now(timezone.utc).isoformat(),
     }
 
     # Optional fields
@@ -90,8 +90,8 @@ def tool_log_life_event(args):
 
 def tool_get_life_events(args):
     """Retrieve life events with optional filters."""
-    end = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start = args.get("start_date", (datetime.utcnow() - timedelta(days=365)).strftime("%Y-%m-%d"))
+    end = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=365)).strftime("%Y-%m-%d"))
     filter_type = args.get("type")
     filter_person = args.get("person", "").lower()
 
@@ -157,7 +157,7 @@ _DEPTH_LEVELS = ["surface", "meaningful", "deep"]
 
 def tool_log_interaction(args):
     """Log a meaningful social interaction."""
-    date = args.get("date", datetime.utcnow().strftime("%Y-%m-%d"))
+    date = args.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     person = args.get("person", "").strip()
     if not person:
         return {"error": "person is required."}
@@ -170,7 +170,7 @@ def tool_log_interaction(args):
     if depth not in _DEPTH_LEVELS:
         return {"error": f"Invalid depth '{depth}'. Valid: {_DEPTH_LEVELS}"}
 
-    ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     sk = f"DATE#{date}#INT#{ts}"
 
     item = {
@@ -181,7 +181,7 @@ def tool_log_interaction(args):
         "type": interaction_type,
         "depth": depth,
         "source": "interactions",
-        "logged_at": datetime.utcnow().isoformat(),
+        "logged_at": datetime.now(timezone.utc).isoformat(),
     }
 
     if args.get("duration_min"):
@@ -209,8 +209,8 @@ def tool_log_interaction(args):
 
 def tool_get_social_dashboard(args):
     """Social connection dashboard: frequency, diversity, depth, trends."""
-    end = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start = args.get("start_date", (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     resp = table.query(
         KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
@@ -338,7 +338,7 @@ _TEMPTATION_CATEGORIES = [
 
 def tool_log_temptation(args):
     """Log a temptation moment — resisted or succumbed."""
-    date = args.get("date", datetime.utcnow().strftime("%Y-%m-%d"))
+    date = args.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     category = args.get("category", "other").lower()
     resisted = args.get("resisted")
 
@@ -347,7 +347,7 @@ def tool_log_temptation(args):
     if category not in _TEMPTATION_CATEGORIES:
         return {"error": f"Invalid category '{category}'. Valid: {_TEMPTATION_CATEGORIES}"}
 
-    ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     sk = f"DATE#{date}#T#{ts}"
 
     item = {
@@ -357,7 +357,7 @@ def tool_log_temptation(args):
         "category": category,
         "resisted": bool(resisted),
         "source": "temptations",
-        "logged_at": datetime.utcnow().isoformat(),
+        "logged_at": datetime.now(timezone.utc).isoformat(),
     }
 
     if args.get("trigger"):
@@ -390,8 +390,8 @@ def tool_log_temptation(args):
 
 def tool_get_temptation_trend(args):
     """Temptation trend: resist rate, category breakdown, triggers, patterns."""
-    end = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start = args.get("start_date", (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     resp = table.query(
         KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
@@ -512,14 +512,14 @@ _EXPOSURE_TYPES = ["cold_shower", "cold_plunge", "ice_bath", "sauna", "hot_bath"
 
 def tool_log_exposure(args):
     """Log a cold or heat exposure session."""
-    date = args.get("date", datetime.utcnow().strftime("%Y-%m-%d"))
+    date = args.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     exposure_type = args.get("type", "").lower()
     if not exposure_type:
         return {"error": "type is required."}
     if exposure_type not in _EXPOSURE_TYPES:
         return {"error": f"Invalid type '{exposure_type}'. Valid: {_EXPOSURE_TYPES}"}
 
-    ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     sk = f"DATE#{date}#E#{ts}"
 
     item = {
@@ -528,7 +528,7 @@ def tool_log_exposure(args):
         "date": date,
         "type": exposure_type,
         "source": "exposures",
-        "logged_at": datetime.utcnow().isoformat(),
+        "logged_at": datetime.now(timezone.utc).isoformat(),
     }
 
     is_cold = exposure_type in ("cold_shower", "cold_plunge", "ice_bath")
@@ -564,8 +564,8 @@ def tool_log_exposure(args):
 
 def tool_get_exposure_log(args):
     """Retrieve exposure history and summary stats."""
-    end = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start = args.get("start_date", (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     resp = table.query(
         KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
@@ -630,8 +630,8 @@ def tool_get_exposure_log(args):
 
 def tool_get_exposure_correlation(args):
     """Correlate cold/heat exposure with HRV, sleep, mood, recovery."""
-    end = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start = args.get("start_date", (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     # Get exposures
     resp = table.query(
@@ -802,7 +802,7 @@ def tool_annotate_discovery(args):
         "event_title": title,
         "annotation": annotation,
         "source": "discovery_annotations",
-        "annotated_at": datetime.utcnow().isoformat(),
+        "annotated_at": datetime.now(timezone.utc).isoformat(),
     }
     if action_taken:
         item["action_taken"] = action_taken

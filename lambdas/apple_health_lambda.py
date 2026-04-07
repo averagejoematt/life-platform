@@ -33,7 +33,7 @@ except ImportError:
 S3_BUCKET = os.environ["S3_BUCKET"]
 DYNAMODB_TABLE = os.environ.get("DYNAMODB_TABLE", "life-platform")
 REGION = os.environ.get("AWS_DEFAULT_REGION", "us-west-2")
-USER_ID        = os.environ["USER_ID"]
+USER_ID        = os.environ.get("USER_ID", "matthew")
 OVERLAP_DAYS = 14  # Reprocess last N days to catch late-arriving records
 
 s3_client = boto3.client("s3", region_name=REGION)

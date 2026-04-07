@@ -45,7 +45,7 @@ _logger_std.setLevel(logging.INFO)
 # ── Config ────────────────────────────────────────────────────────────────────
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-USER_ID    = os.environ["USER_ID"]
+USER_ID    = os.environ.get("USER_ID", "matthew")
 RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
 SENDER     = os.environ["EMAIL_SENDER"]
 S3_BUCKET  = os.environ["S3_BUCKET"]
@@ -549,11 +549,12 @@ Display tasks due this week, grouped by pillar. Use the pillar groupings provide
 If a pillar has no tasks this week, note it — absence of planned work in the Relationships or Mind pillar IS information.
 
 ### Section 3: "🎯 Prioritization Intelligence"
-This is the most important section. 4-6 sentences of AI reasoning:
-- Given Matthew's health state (recovery, HRV, Character Sheet pillar gaps), which tasks and pillars deserve extra energy this week?
-- Cross-pillar reasoning: if Sleep pillar is weak, high-cognitive work should be front-loaded to Mon/Tue when recovery is freshest.
-- If there's an overloaded day (P1 + P2 stack) that could create decision fatigue and spill over into habit failures, name it.
-- Ground every recommendation in the specific data provided. No generic advice.
+This is the most important section. 4-6 sentences of structured AI reasoning. Work through these steps:
+1. RECOVERY SIGNAL: Interpret today's readiness (recovery %, HRV trend, sleep quality) against this week's task load. Is Matthew starting the week with capacity or debt?
+2. PILLAR GAPS: Name the 2 lowest-scoring pillars from the Character Sheet and their task implications. If Sleep is lagging, front-load cognitive work to Mon/Tue. If Nutrition is weakest, flag meal prep as a blocking priority.
+3. BLOCKING ANALYSIS: Identify any tasks that unblock others — e.g., grocery shopping enables meal prep which enables protein adherence.
+4. RECOMMENDATION: Name 1-2 highest-leverage areas for the week. Not "do everything" — the specific constraint that, if addressed, improves multiple pillars.
+Ground every recommendation in the specific data provided. No generic advice.
 
 ### Section 4: "🗂️ The Overdue Pile"
 State the overdue count. Group by project/pillar. For each overdue cluster:

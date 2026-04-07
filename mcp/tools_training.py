@@ -5,7 +5,7 @@ import json
 import math
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
 from mcp.config import (
@@ -27,7 +27,7 @@ from mcp.helpers import (
 from mcp.tools_correlation import tool_get_zone2_breakdown
 
 def tool_get_training_load(args):
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_dt   = datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=180)
     start_date = args.get("start_date", start_dt.strftime("%Y-%m-%d"))
     warmup_dt  = datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=84)
@@ -128,7 +128,7 @@ def tool_get_training_load(args):
 
 
 def tool_get_personal_records(args):
-    end_date = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     profile  = get_profile()
     dob_str  = profile.get("date_of_birth")
 
@@ -297,7 +297,7 @@ def tool_get_cross_source_correlation(args):
     source_b   = args.get("source_b")
     field_b    = args.get("field_b")
     start_date = args.get("start_date", "2019-01-01")
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     lag_days   = int(args.get("lag_days", 0))
 
     if not all([source_a, field_a, source_b, field_b]):
@@ -486,7 +486,7 @@ def tool_get_cross_source_correlation(args):
 def tool_get_seasonal_patterns(args):
     source     = args.get("source")
     start_date = args.get("start_date", "2010-01-01")
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
 
     sources_to_query = [source] if source and source in SOURCES else SOURCES
     skip_fields = {"pk", "sk", "source", "ingested_at", "date", "activities", "sport_types"}
@@ -568,7 +568,7 @@ def tool_get_training_periodization(args):
     Attia: Training is the most potent longevity drug — but only with periodization.
     Seiler: 80/20 polarized model — 80% easy, 20% hard for optimal adaptation.
     """
-    end_date = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     weeks_back = int(args.get("weeks", 12))
     start_date = args.get("start_date",
         (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(weeks=weeks_back)).strftime("%Y-%m-%d"))
@@ -865,7 +865,7 @@ def tool_get_training_recommendation(args):
     Based on Galpin (training periodization), Huberman (recovery science),
     Attia (longevity training framework), Seiler (polarized training).
     """
-    target_date = args.get("date", datetime.utcnow().strftime("%Y-%m-%d"))
+    target_date = args.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     d7_start = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
     d14_start = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=14)).strftime("%Y-%m-%d")
     d3_start = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=3)).strftime("%Y-%m-%d")
@@ -1250,8 +1250,8 @@ def tool_get_hr_recovery_trend(args):
     Heart rate recovery tracker — strongest exercise-derived mortality predictor.
     Extracts post-peak HR recovery from Strava activity streams, trends over time.
     """
-    end_date = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.utcnow() - timedelta(days=180)).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=180)).strftime("%Y-%m-%d"))
     sport_filter = (args.get("sport_type") or "").strip().lower()
     cooldown_only = args.get("cooldown_only", False)
 
@@ -1441,8 +1441,8 @@ def tool_get_exercise_variety(args):
     Movement pattern diversity index. Flags staleness when same activity
     types repeat for 4+ weeks. Shannon diversity index + recommendations.
     """
-    end = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    start = args.get("start_date", (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
     window_weeks = int(args.get("window_weeks", 4))
 
     strava = query_source("strava", start, end)
@@ -1603,8 +1603,8 @@ def tool_get_lactate_threshold_estimate(args):
     Linear regression on cardiac_efficiency reveals direction and rate of change.
     Chen: proxy lactate curve from HR drift over repeated steady-state efforts.
     """
-    end   = args.get("end_date",   datetime.utcnow().strftime("%Y-%m-%d"))
-    start = args.get("start_date", (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
     zone2_low      = float(args.get("zone2_hr_low",      110))
     zone2_high     = float(args.get("zone2_hr_high",     139))
     min_duration   = float(args.get("min_duration_min",   20))
@@ -1733,8 +1733,8 @@ def tool_get_exercise_efficiency_trend(args):
     per sport type to detect improvement signal.
     Attia: pace-at-HR over time is the purest fitness signal available from consumer data.
     """
-    end         = args.get("end_date",   datetime.utcnow().strftime("%Y-%m-%d"))
-    start       = args.get("start_date", (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end         = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start       = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
     min_hr      = float(args.get("min_hr", 100))
     min_dur     = float(args.get("min_duration_min", 10))
     sport_type  = (args.get("sport_type") or "").lower()
@@ -1837,7 +1837,7 @@ def tool_get_acwr_status(args):
     Reads pre-computed acwr fields from the computed_metrics partition.
     Falls back to live computation from Whoop strain if pre-computed record is missing.
     """
-    end_date   = args.get("date", (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d"))
+    end_date   = args.get("date", (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"))
     days_back  = int(args.get("days_back", 14))   # how many days of history to return
 
     def _sf(v):

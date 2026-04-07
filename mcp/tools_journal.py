@@ -5,7 +5,7 @@ import json
 import math
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from boto3.dynamodb.conditions import Key
 
@@ -66,8 +66,8 @@ def _query_journal(start_date, end_date, template=None):
 
 def tool_get_journal_entries(args):
     """Retrieve journal entries for a date range with optional template filter."""
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    start = args.get("start_date", (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d"))
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d"))
     end = args.get("end_date", today)
     template = args.get("template")
     include_enriched = args.get("include_enriched", True)
@@ -105,7 +105,7 @@ def tool_search_journal(args):
     if not query:
         raise ValueError("query parameter is required")
 
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     start = args.get("start_date", "2020-01-01")
     end = args.get("end_date", today)
 
@@ -159,8 +159,8 @@ def tool_search_journal(args):
 
 def tool_get_mood_trend(args):
     """Mood/energy/stress scores over time with enriched signals."""
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    start = args.get("start_date", (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d"))
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
     end = args.get("end_date", today)
     metric = args.get("metric", "all")  # mood|energy|stress|all
 
@@ -271,8 +271,8 @@ def tool_get_mood_trend(args):
 
 def tool_get_journal_insights(args):
     """Cross-entry pattern analysis — the 'so what?' tool."""
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    start = args.get("start_date", (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d"))
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
     end = args.get("end_date", today)
 
     items = _query_journal(start, end)
@@ -403,8 +403,8 @@ def tool_get_journal_insights(args):
 
 def tool_get_journal_correlations(args):
     """Correlate journal signals with wearable data."""
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    start = args.get("start_date", (datetime.utcnow() - timedelta(days=60)).strftime("%Y-%m-%d"))
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=60)).strftime("%Y-%m-%d"))
     end = args.get("end_date", today)
     signal = args.get("signal", "all")  # stress|mood|energy|sleep_quality|all
 
@@ -574,10 +574,10 @@ def tool_get_journal_sentiment_trajectory(args):
     Seligman PERMA + Beck CBT: mood-energy divergence is a leading indicator
     of unsustainable effort or suppressed emotional processing.
     """
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     days       = int(args.get("days", 60))
     start_date = args.get("start_date") or (
-        datetime.utcnow() - timedelta(days=days)
+        datetime.now(timezone.utc) - timedelta(days=days)
     ).strftime("%Y-%m-%d")
 
     entries = _query_journal(start_date, end_date)

@@ -56,7 +56,7 @@ DYNAMODB_REGION = os.environ.get("DYNAMODB_REGION", "us-west-2") # DDB table reg
 SES_REGION      = os.environ.get("SES_REGION", "us-west-2")      # SES verified identity region
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET  = os.environ.get("S3_BUCKET", "matthew-life-platform")
-USER_ID    = os.environ["USER_ID"]
+USER_ID    = os.environ.get("USER_ID", "matthew")
 SENDER     = os.environ.get("EMAIL_SENDER", "lifeplatform@mattsusername.com")
 SITE_URL   = os.environ.get("SITE_URL", "https://averagejoematt.com")
 

@@ -119,7 +119,7 @@ def gather_data_for_expert(expert_key):
 
         avg_valence = 0
         if som_items:
-            vals = [float(s.get("valence", 0)) for s in som_items if s.get("valence") is not None]
+            vals = [float(s.get("som_avg_valence", 0)) for s in som_items if s.get("som_avg_valence") is not None]
             avg_valence = round(sum(vals) / len(vals), 2) if vals else 0
 
         return {
@@ -136,15 +136,15 @@ def gather_data_for_expert(expert_key):
         items = _query_source("macrofactor", d30, today)
         if not items:
             return {"expert_key": "nutrition", "period": f"experiment days 1-{days_in_experiment}", "note": "No nutrition data available"}
-        cal_vals = [float(i["calories"]) for i in items if i.get("calories")]
-        pro_vals = [float(i["protein_g"]) for i in items if i.get("protein_g")]
-        fiber_vals = [float(i["fiber_g"]) for i in items if i.get("fiber_g")]
+        cal_vals = [float(i["total_calories_kcal"]) for i in items if i.get("total_calories_kcal")]
+        pro_vals = [float(i["total_protein_g"]) for i in items if i.get("total_protein_g")]
+        fiber_vals = [float(i["total_fiber_g"]) for i in items if i.get("total_fiber_g")]
         avg_cal = round(sum(cal_vals) / len(cal_vals)) if cal_vals else 0
         avg_pro = round(sum(pro_vals) / len(pro_vals), 1) if pro_vals else 0
         avg_fiber = round(sum(fiber_vals) / len(fiber_vals), 1) if fiber_vals else None
         protein_target = 190
         adherence = sum(1 for v in pro_vals if v >= protein_target) / max(len(pro_vals), 1) * 100
-        zero_cal_days = sum(1 for i in items if i.get("calories") is not None and float(i.get("calories", 0)) == 0)
+        zero_cal_days = sum(1 for i in items if i.get("total_calories_kcal") is not None and float(i.get("total_calories_kcal", 0)) == 0)
         return {
             "expert_key": "nutrition",
             "period": f"experiment days 1-{days_in_experiment}",
@@ -166,7 +166,7 @@ def gather_data_for_expert(expert_key):
             steps_items = _query_source("apple_health", d30, today)
             step_vals = [float(s["steps"]) for s in steps_items if s.get("steps") and float(s["steps"]) > 0]
         avg_steps = round(sum(step_vals) / len(step_vals)) if step_vals else 0
-        total_min = sum(float(a.get("duration_min", 0) or a.get("moving_time_min", 0)) for a in activities)
+        total_min = sum(float(a.get("moving_time_seconds") or a.get("elapsed_time_seconds") or 0) / 60 for a in activities)
         recovery_vals = [float(w["recovery_score"]) for w in whoop_items if w.get("recovery_score")]
         avg_recovery = round(sum(recovery_vals) / len(recovery_vals), 1) if recovery_vals else None
         modalities = {}
@@ -247,19 +247,21 @@ def gather_data_for_expert(expert_key):
         }
 
     elif expert_key == "glucose":
-        cgm_items = _query_source("dexcom", d30, today)
-        readings = [float(i.get("glucose_mg_dl", 0)) for i in cgm_items if i.get("glucose_mg_dl")]
-        avg_glucose = round(sum(readings) / len(readings), 1) if readings else None
-        in_range = sum(1 for r in readings if 70 <= r <= 140)
-        tir_pct = round(in_range / len(readings) * 100, 1) if readings else None
-        std_dev = None
-        if len(readings) > 1:
-            mean = sum(readings) / len(readings)
-            std_dev = round((sum((r - mean) ** 2 for r in readings) / len(readings)) ** 0.5, 1)
+        # CGM data is stored under apple_health with pre-aggregated blood_glucose_* fields
+        cgm_items = _query_source("apple_health", d30, today)
+        glucose_days = [i for i in cgm_items if i.get("blood_glucose_avg") is not None]
+        avg_vals = [float(i["blood_glucose_avg"]) for i in glucose_days]
+        avg_glucose = round(sum(avg_vals) / len(avg_vals), 1) if avg_vals else None
+        tir_vals = [float(i["blood_glucose_time_in_range_pct"]) for i in glucose_days if i.get("blood_glucose_time_in_range_pct") is not None]
+        tir_pct = round(sum(tir_vals) / len(tir_vals), 1) if tir_vals else None
+        sd_vals = [float(i["blood_glucose_std_dev"]) for i in glucose_days if i.get("blood_glucose_std_dev") is not None]
+        std_dev = round(sum(sd_vals) / len(sd_vals), 1) if sd_vals else None
+        total_readings = sum(int(float(i.get("blood_glucose_readings_count", 0))) for i in glucose_days)
         return {
             "expert_key": "glucose",
             "period": f"experiment days 1-{days_in_experiment}",
-            "total_readings": len(readings),
+            "total_readings": total_readings,
+            "days_with_data": len(glucose_days),
             "avg_glucose_mg_dl": avg_glucose,
             "time_in_range_pct": tir_pct,
             "std_dev": std_dev,
@@ -317,52 +319,60 @@ def gather_data_for_expert(expert_key):
 
 EXPERT_PERSONAS = {
     "mind": {
-        "name": "Dr. Paul Conti",
-        "title": "Psychiatrist and author of Trauma: The Invisible Epidemic",
+        "name": "Dr. Nathan Reeves",
+        "title": "Psychiatrist specializing in trauma and behavioral patterns",
         "style": "warm but direct, grounded in psychodynamic principles, attentive to patterns beneath the surface",
         "focus": "inner life patterns, emotional regulation, behavioral consistency, what the data reveals about psychological state",
+        "epistemology": "You think psychodynamically. Your question is always 'What is being avoided, protected, or deflected — and what does the data reveal about the inner state that the person hasn't articulated?' not 'How is Matthew's mood score?'",
     },
     "nutrition": {
-        "name": "Dr. Layne Webb",
+        "name": "Dr. Marcus Webb",
         "title": "Nutritional scientist and evidence-based practitioner",
         "style": "precise, data-driven, practical, no-nonsense about what works vs. what doesn't",
         "focus": "adherence patterns, macro optimization, behavior patterns in food choices, practical adjustments",
+        "epistemology": "You think behaviorally. Your question is always 'What's the friction point preventing consistent adherence — and what one practical change would have the highest impact?' not 'Was protein high enough?'",
     },
     "training": {
         "name": "Dr. Sarah Chen",
         "title": "Exercise physiologist and strength coach",
         "style": "encouraging but honest, systems-focused, attentive to load management and recovery",
         "focus": "training load assessment, modality balance, recovery adequacy, progressive overload",
+        "epistemology": "You think in systems and load management. Your question is always 'Is the training stimulus adequate given recovery capacity — and is the system sustainable?' not 'How many workouts happened?'",
     },
     "physical": {
         "name": "Dr. Victor Reyes",
         "title": "Longevity physician specializing in body composition",
         "style": "clinically precise, optimistic but realistic, frames everything through longevity and health-span lens",
         "focus": "body composition trajectory, visceral fat reduction, lean mass preservation, metabolic markers",
+        "epistemology": "You think through the longevity lens. Your question is always 'What does this trajectory mean for healthspan at 60, 70, 80 — and which metric is the leading indicator?' not 'Did he lose weight this week?'",
     },
     "explorer": {
         "name": "Dr. Henning Brandt",
         "title": "Biostatistician and N=1 research methodologist",
         "style": "rigorous but accessible, excited by unexpected findings, careful about causal claims",
         "focus": "cross-domain correlations, surprising signal in the data, what pairs of metrics tell a story that single metrics cannot",
+        "epistemology": "You think like an N=1 researcher. Your question is always 'What surprising relationship does the data suggest that no single domain expert would notice — and what would confirm or refute it?' not 'What are the trends?'",
     },
     "labs": {
         "name": "Dr. James Okafor",
         "title": "Clinical pathologist specializing in preventive lab interpretation",
         "style": "clinical but accessible, connects lab values to lifestyle context, identifies actionable patterns",
         "focus": "flagged biomarkers in context of current nutrition, training, and supplement protocols — what the numbers mean and what to do about them",
+        "epistemology": "You think clinically. Your question is always 'What do these lab values mean in the context of his current lifestyle — and which flagged marker is most actionable right now?' not 'Which values are out of range?'",
     },
     "sleep": {
         "name": "Dr. Lisa Park",
         "title": "Sleep and circadian rhythm specialist",
         "style": "warm but evidence-based, connects sleep architecture to next-day performance, attentive to consistency patterns",
         "focus": "sleep duration and efficiency trends, deep sleep adequacy, HRV recovery correlation, sleep onset consistency, bed temperature optimization, and how sleep quality cascades into every other domain",
+        "epistemology": "You think architecturally. Your question is always 'What does the sleep architecture — stages, consistency, timing, environment — reveal about recovery quality, and how does it cascade into every other domain?' not 'How many hours did he sleep?'",
     },
     "glucose": {
-        "name": "Dr. Rhonda Patrick",
+        "name": "Dr. Amara Patel",
         "title": "Metabolic health researcher specializing in continuous glucose monitoring",
         "style": "science-forward but practical, connects CGM data to dietary choices and metabolic patterns",
         "focus": "glucose variability, time-in-range optimization, meal response patterns, nocturnal glucose behavior, and how metabolic health connects to longevity",
+        "epistemology": "You think mechanistically. Your question is always 'What biological process does this glucose pattern reveal — insulin sensitivity, meal composition, circadian alignment — and what does it mean for metabolic health long-term?' not 'Was glucose in range?'",
     },
 }
 
@@ -414,6 +424,7 @@ experiment" — these are periodic lab draws over time.
 
 Your communication style: {p['style']}.
 Your analytical focus: {p['focus']}.
+{p.get('epistemology', '')}
 
 You are writing your weekly analysis for Matthew's public health experiment (averagejoematt.com).
 This is Week {week_num} of the experiment (started {EXPERIMENT_START}, now day {days_in_experiment}).
@@ -461,7 +472,7 @@ FRESHNESS REQUIREMENTS:
 
 After your analysis, on separate lines write exactly:
 KEY RECOMMENDATION: [One specific behavioral action for this week. 1-2 sentences max. Concrete enough to act on tomorrow.]
-ELENA QUOTE: [One sentence in Elena Voss's voice — third person, clinical precision with literary warmth. She notices patterns, not outcomes. Example: "Five nights of data and his body is already telling a quieter story than the hours suggest." Never aspirational. Just noticing.]
+ELENA QUOTE: [One sentence in Elena Voss's voice — third person, literary journalist. Elena sees what YOUR discipline blinds you to. If you focused on sleep architecture, she notices the journal entry about late-night screen time. If you talked macros, she sees the emotional eating pattern. She names the cross-domain observation you would make if you could see outside your own expertise. Example: "Five nights of data and his body is already telling a quieter story than the hours suggest." Never aspirational — just the observation the expert missed.]
 {"JOURNALING PROMPT: [A single reflective question for Matthew — something he can sit with before writing. Make it specific to what the data revealed this week.]" if expert_key == "mind" else ""}
 
 Write only the analysis — no preamble, no "Here is my analysis:", just paragraphs followed by the tagged lines."""

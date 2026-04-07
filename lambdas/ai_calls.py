@@ -982,9 +982,9 @@ def build_data_summary(data, profile):
         "sleep_efficiency_pct": _safe_float(sleep, "sleep_efficiency_pct"),
         "deep_sleep_pct": _safe_float(sleep, "deep_pct"),
         "rem_sleep_pct": _safe_float(sleep, "rem_pct"),
-        "hrv_yesterday": data["hrv"].get("hrv_yesterday"),
-        "hrv_7d_avg": data["hrv"].get("hrv_7d"),
-        "hrv_30d_avg": data["hrv"].get("hrv_30d"),
+        "hrv_yesterday": data.get("hrv", {}).get("hrv_yesterday"),
+        "hrv_7d_avg": data.get("hrv", {}).get("hrv_7d"),
+        "hrv_30d_avg": data.get("hrv", {}).get("hrv_30d"),
         "calories": _safe_float(mf, "total_calories_kcal"),
         "protein_g": _safe_float(mf, "total_protein_g"),
         "fat_g": _safe_float(mf, "total_fat_g"),
@@ -1838,3 +1838,320 @@ Respond in EXACTLY this JSON format, no other text:
     except Exception as e:
         print("[WARN] TL;DR+Guidance failed: " + str(e))
         return {}
+
+
+# ==============================================================================
+# COACH INTELLIGENCE PIPELINE — Generic + Per-Coach (Phase 2C / Phase 3)
+# Runs computation engine → narrative orchestrator → voice-spec-driven generation
+# → state updater. Falls back to legacy generation on failure.
+# ==============================================================================
+
+# Cache computation results within a single daily brief run to avoid
+# invoking the computation engine Lambda multiple times.
+_comp_results_cache = None
+
+
+def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
+    """
+    Generic Coach Intelligence pipeline for any coach.
+
+    Returns generated text on success, None on failure (caller falls back to legacy).
+    """
+    global _comp_results_cache
+
+    try:
+        lambda_client = boto3.client("lambda", region_name="us-west-2")
+        s3 = boto3.client("s3", region_name="us-west-2")
+
+        # Step 1: Computation engine (cached per daily brief cycle)
+        if _comp_results_cache is None:
+            print(f"[COACH-V2:{coach_id}] Step 1: Invoking computation engine...")
+            try:
+                comp_resp = lambda_client.invoke(
+                    FunctionName="coach-computation-engine",
+                    InvocationType="RequestResponse",
+                    Payload=json.dumps({"source": "daily_brief"}).encode(),
+                )
+                comp_payload = json.loads(comp_resp["Payload"].read())
+                comp_body = comp_payload.get("body")
+                _comp_results_cache = json.loads(comp_body) if isinstance(comp_body, str) else (comp_body or comp_payload)
+                print(f"[COACH-V2:{coach_id}] Computation engine returned {len(str(_comp_results_cache))} chars")
+            except Exception as e:
+                print(f"[COACH-V2:{coach_id}] Computation engine failed: {e} — using empty results")
+                _comp_results_cache = {}
+        comp_results = _comp_results_cache
+
+        # Step 2: Narrative orchestrator
+        print(f"[COACH-V2:{coach_id}] Step 2: Invoking narrative orchestrator...")
+        try:
+            orch_resp = lambda_client.invoke(
+                FunctionName="coach-narrative-orchestrator",
+                InvocationType="RequestResponse",
+                Payload=json.dumps({
+                    "coach_id": coach_id,
+                    "computation_results": comp_results,
+                }).encode(),
+            )
+            orch_payload = json.loads(orch_resp["Payload"].read())
+            orch_body = orch_payload.get("body")
+            generation_brief = json.loads(orch_body) if isinstance(orch_body, str) else (orch_body or orch_payload)
+            print(f"[COACH-V2:{coach_id}] Orchestrator returned brief: {len(str(generation_brief))} chars")
+        except Exception as e:
+            print(f"[COACH-V2:{coach_id}] Orchestrator failed: {e} — falling back to legacy")
+            return None
+
+        # Step 3: Load voice spec from S3
+        try:
+            vs_resp = s3.get_object(Bucket="matthew-life-platform", Key=f"config/coaches/{coach_id}.json")
+            voice_spec = json.loads(vs_resp["Body"].read())
+        except Exception as e:
+            print(f"[COACH-V2:{coach_id}] Voice spec load failed: {e} — falling back to legacy")
+            return None
+
+        # Step 4: Build prompt
+        few_shots = voice_spec.get("few_shot_examples", [])
+        few_shot_block = ""
+        if few_shots:
+            few_shot_block = "\n\nVOICE CALIBRATION EXAMPLES (write in this style):\n"
+            for i, ex in enumerate(few_shots, 1):
+                few_shot_block += f"\nExample {i}:\n{ex}\n"
+
+        voice_rules = voice_spec.get("structural_voice_rules", {})
+        decision_style = voice_spec.get("decision_style", {})
+        anti_patterns = voice_spec.get("anti_pattern_detection", {})
+        brief = generation_brief.get("generation_brief", generation_brief)
+        voice_guidance = brief.get("voice_guidance", {})
+
+        system_prompt = f"""You are {voice_spec['display_name']}, {voice_spec.get('domain', '')} specialist.
+
+VOICE RULES:
+- Sentence rhythm: {voice_rules.get('sentence_rhythm', '')}
+- Uncertainty style: {voice_rules.get('uncertainty_style', '')}
+- Analogy domain: {voice_rules.get('analogy_domain', '')}
+- Paragraph structure: {voice_rules.get('paragraph_structure', '')}
+- Humor style: {voice_rules.get('humor_style', '')}
+- Relationship to other coaches: {voice_rules.get('relationship_to_others', '')}
+
+DECISION STYLE:
+- Evidence threshold: {decision_style.get('default_evidence_threshold', 'moderate')}
+- Bold claims: {decision_style.get('comfort_with_bold_claims', 'low')}
+- Revision style: {decision_style.get('revision_style', 'transparent')}
+
+FORBIDDEN PHRASES: {json.dumps(anti_patterns.get('phrase_blacklist', []))}
+FORBIDDEN STRUCTURES: {json.dumps(anti_patterns.get('structural_blacklist', []))}
+
+OPENING GUIDANCE: {voice_guidance.get('suggested_opening', 'vary your opening')}
+AVOID OPENINGS: {json.dumps(voice_guidance.get('avoid_openings', []))}
+{voice_guidance.get('structural_note', '')}
+
+DECISION CLASS CEILING: {brief.get('decision_class_ceiling', 'observational')}
+EVIDENCE NOTE: {brief.get('evidence_note', 'Early data — use preliminary framing.')}
+{few_shot_block}
+
+Write 2-4 paragraphs of {domain_label} coaching for Matthew. Be specific, reference numbers, and stay within your evidence ceiling. Write in your distinctive voice — not a generic AI coach voice."""
+
+        user_message = f"""GENERATION BRIEF:
+{json.dumps(brief, indent=2, default=str)}
+
+{domain_label.upper()} DATA:
+{json.dumps(domain_data, indent=2, default=str)}
+
+COMPUTATION OUTPUTS:
+{json.dumps(comp_results.get('trends', {}), indent=2, default=str)[:2000]}
+
+Write your {domain_label} coaching section now."""
+
+        # Step 5: Generate with Sonnet
+        print(f"[COACH-V2:{coach_id}] Generating output...")
+        output = call_anthropic(system_prompt + "\n\n" + user_message,
+                                api_key, max_tokens=600)
+        print(f"[COACH-V2:{coach_id}] Output: {len(output)} chars")
+
+        # Step 6: Invoke state updater (async)
+        try:
+            lambda_client.invoke(
+                FunctionName="coach-state-updater",
+                InvocationType="Event",
+                Payload=json.dumps({
+                    "coach_id": coach_id,
+                    "output_text": output,
+                    "output_type": f"daily_brief_{domain_label.lower().replace(' ', '_')}",
+                    "generation_date": _date_cls.today().isoformat(),
+                }).encode(),
+            )
+        except Exception as e:
+            print(f"[COACH-V2:{coach_id}] State updater invoke failed (non-blocking): {e}")
+
+        return output
+
+    except Exception as e:
+        print(f"[COACH-V2:{coach_id}] Pipeline failed: {e} — returning None for legacy fallback")
+        return None
+
+
+def _build_sleep_data(data):
+    """Extract sleep-domain data for the sleep coach."""
+    sleep = data.get("sleep") or {}
+    whoop = data.get("whoop") or {}
+    eight = data.get("eightsleep") or {}
+    return {
+        "sleep_score": _safe_float(sleep, "sleep_score") or _safe_float(whoop, "sleep_score"),
+        "sleep_duration_hours": _safe_float(sleep, "sleep_duration_hours") or _safe_float(whoop, "sleep_duration_hours"),
+        "deep_pct": _safe_float(sleep, "deep_pct") or _safe_float(eight, "deep_pct"),
+        "rem_pct": _safe_float(sleep, "rem_pct") or _safe_float(eight, "rem_pct"),
+        "sleep_efficiency": _safe_float(sleep, "sleep_efficiency_pct"),
+        "hrv": _safe_float(whoop, "hrv") or _safe_float(sleep, "hrv"),
+        "recovery_score": _safe_float(whoop, "recovery_score"),
+        "resting_heart_rate": _safe_float(whoop, "resting_heart_rate"),
+        "bed_temp_f": _safe_float(eight, "bed_temp_f"),
+        "sleep_start": sleep.get("sleep_start") or whoop.get("sleep_start"),
+    }
+
+
+def _build_nutrition_data(data):
+    """Extract nutrition-domain data for the nutrition coach."""
+    mf = data.get("macrofactor") or data.get("nutrition") or {}
+    return {
+        "calories": _safe_float(mf, "total_calories_kcal"),
+        "protein_g": _safe_float(mf, "total_protein_g"),
+        "carbs_g": _safe_float(mf, "total_carbs_g"),
+        "fat_g": _safe_float(mf, "total_fat_g"),
+        "fiber_g": _safe_float(mf, "total_fiber_g"),
+        "sodium_mg": _safe_float(mf, "total_sodium_mg"),
+        "meals_logged": mf.get("meals_logged") or mf.get("entries_logged"),
+        "food_log": (mf.get("food_log") or [])[:10],  # first 10 items for context
+    }
+
+
+def _build_training_data(data):
+    """Extract training-domain data for the training coach."""
+    whoop = data.get("whoop") or {}
+    strava_7d = data.get("strava_7d") or []
+    apple = data.get("apple_health") or data.get("apple") or {}
+    garmin = data.get("garmin") or {}
+    return {
+        "recovery_score": _safe_float(whoop, "recovery_score"),
+        "strain": _safe_float(whoop, "strain"),
+        "hrv": _safe_float(whoop, "hrv"),
+        "steps": _safe_float(apple, "steps") or _safe_float(garmin, "steps"),
+        "recent_activities": [
+            {
+                "type": a.get("type") or a.get("sport_type", "unknown"),
+                "duration_min": round(float(a.get("moving_time_seconds") or a.get("elapsed_time_seconds") or 0) / 60, 1),
+                "distance_miles": round(float(a.get("distance_meters", 0)) / 1609.34, 1) if a.get("distance_meters") else None,
+                "avg_hr": _safe_float(a, "average_heartrate"),
+            }
+            for a in strava_7d[:5]
+        ],
+        "activity_count_7d": len(strava_7d),
+    }
+
+
+def call_sleep_coach_v2(data, profile, api_key):
+    """Run Coach Intelligence pipeline for sleep coach. Returns text or None."""
+    return _run_coach_v2_pipeline("sleep_coach", _build_sleep_data(data), "sleep", data, api_key)
+
+
+def call_nutrition_coach_v2(data, profile, api_key):
+    """Run Coach Intelligence pipeline for nutrition coach. Returns text or None."""
+    return _run_coach_v2_pipeline("nutrition_coach", _build_nutrition_data(data), "nutrition", data, api_key)
+
+
+def call_training_coach_v2(data, profile, api_key):
+    """Run Coach Intelligence pipeline for training coach. Returns text or None."""
+    return _run_coach_v2_pipeline("training_coach", _build_training_data(data), "training", data, api_key)
+
+
+def _build_mind_data(data):
+    """Extract mind-domain data for the mind coach."""
+    journal = data.get("journal_entries") or data.get("journal") or []
+    ja = data.get("journal_analysis") or {}
+    som = data.get("state_of_mind") or data.get("som") or {}
+    return {
+        "journal_entry_count": len(journal) if isinstance(journal, list) else (1 if journal else 0),
+        "enriched_mood": _safe_float(ja, "enriched_mood"),
+        "enriched_energy": _safe_float(ja, "enriched_energy"),
+        "enriched_stress": _safe_float(ja, "enriched_stress"),
+        "enriched_sentiment": ja.get("enriched_sentiment"),
+        "enriched_themes": ja.get("enriched_themes", []),
+        "enriched_avoidance_flags": ja.get("enriched_avoidance_flags", []),
+        "enriched_growth_signals": ja.get("enriched_growth_signals", []),
+        "som_avg_valence": _safe_float(som, "som_avg_valence"),
+        "som_check_in_count": _safe_float(som, "som_check_in_count"),
+    }
+
+
+def _build_physical_data(data):
+    """Extract physical-domain data for the physical coach."""
+    withings = data.get("withings") or {}
+    dexa = data.get("dexa") or {}
+    meas = data.get("measurements") or {}
+    return {
+        "weight_lbs": _safe_float(withings, "weight_lbs"),
+        "body_fat_pct": _safe_float(dexa, "body_fat_pct") or _safe_float(withings, "body_fat_pct"),
+        "lean_mass_lb": _safe_float(dexa, "lean_mass_lb"),
+        "visceral_fat_lb": _safe_float(dexa, "visceral_fat_lb"),
+        "waist_height_ratio": _safe_float(meas, "waist_height_ratio"),
+        "latest_weight": data.get("latest_weight"),
+    }
+
+
+def _build_glucose_data(data):
+    """Extract glucose-domain data for the glucose coach."""
+    apple = data.get("apple_health") or data.get("apple") or {}
+    return {
+        "blood_glucose_avg": _safe_float(apple, "blood_glucose_avg"),
+        "blood_glucose_std_dev": _safe_float(apple, "blood_glucose_std_dev"),
+        "blood_glucose_time_in_range_pct": _safe_float(apple, "blood_glucose_time_in_range_pct"),
+        "blood_glucose_time_above_140_pct": _safe_float(apple, "blood_glucose_time_above_140_pct"),
+        "blood_glucose_readings_count": _safe_float(apple, "blood_glucose_readings_count"),
+        "blood_glucose_min": _safe_float(apple, "blood_glucose_min"),
+        "blood_glucose_max": _safe_float(apple, "blood_glucose_max"),
+    }
+
+
+def _build_labs_data(data):
+    """Extract labs-domain data for the labs coach."""
+    labs = data.get("labs") or {}
+    return {
+        "draw_date": labs.get("draw_date") or labs.get("date"),
+        "flagged_markers": labs.get("flagged_markers", []),
+        "flagged_count": labs.get("flagged_count", 0),
+        "total_draws": labs.get("total_draws", 0),
+    }
+
+
+def _build_explorer_data(data):
+    """Extract cross-domain data for the explorer coach."""
+    corr = data.get("weekly_correlations") or {}
+    return {
+        "significant_correlations": corr.get("significant_correlations", 0),
+        "top_pairs": corr.get("top_pairs", [])[:5],
+        "active_experiments": data.get("active_experiments", 0),
+        "experiment_names": data.get("experiment_names", []),
+    }
+
+
+def call_mind_coach_v2(data, profile, api_key):
+    """Run Coach Intelligence pipeline for mind coach. Returns text or None."""
+    return _run_coach_v2_pipeline("mind_coach", _build_mind_data(data), "mind", data, api_key)
+
+
+def call_physical_coach_v2(data, profile, api_key):
+    """Run Coach Intelligence pipeline for physical coach. Returns text or None."""
+    return _run_coach_v2_pipeline("physical_coach", _build_physical_data(data), "physical", data, api_key)
+
+
+def call_glucose_coach_v2(data, profile, api_key):
+    """Run Coach Intelligence pipeline for glucose coach. Returns text or None."""
+    return _run_coach_v2_pipeline("glucose_coach", _build_glucose_data(data), "glucose", data, api_key)
+
+
+def call_labs_coach_v2(data, profile, api_key):
+    """Run Coach Intelligence pipeline for labs coach. Returns text or None."""
+    return _run_coach_v2_pipeline("labs_coach", _build_labs_data(data), "labs", data, api_key)
+
+
+def call_explorer_coach_v2(data, profile, api_key):
+    """Run Coach Intelligence pipeline for explorer coach. Returns text or None."""
+    return _run_coach_v2_pipeline("explorer_coach", _build_explorer_data(data), "cross-domain exploration", data, api_key)

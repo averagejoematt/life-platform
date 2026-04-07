@@ -57,7 +57,7 @@ _REGION    = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 RECIPIENT  = os.environ["EMAIL_RECIPIENT"]
 SENDER     = os.environ["EMAIL_SENDER"]
-USER_ID    = os.environ["USER_ID"]
+USER_ID    = os.environ.get("USER_ID", "matthew")
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table    = dynamodb.Table(TABLE_NAME)
@@ -822,7 +822,7 @@ def gather_all():
 BOARD_PROMPT = """You are the coordinating intelligence for Matthew's Weekly Health Board of Advisors.
 
 CONTEXT:
-Matthew Walker, 36, Seattle. Senior Director at a SaaS company. Goal: lose ~117 lbs (302→185),
+Matthew Walker, 36, Seattle. Senior Director at a SaaS company. Goal: lose ~117 lbs (307→185),
 build muscle, improve sleep and stress management. He tracks obsessively but struggles with consistency.
 
 {journey_context}
@@ -861,10 +861,10 @@ Long-term trajectory. What does the 4-week trend say? What leading indicator is 
 The gap between knowing and doing. Where did Matthew underperform vs his own standards? Use journal data (mood, themes, avoidance flags, cognitive patterns) + habit data + day grades to connect subjective experience with objective performance. Be direct and human.
 
 🎯 THE CHAIR — VERDICT & PRIORITY
-4–6 sentences. Clear verdict. Reference day grade average and trend. Name ONE priority for next week with specific data justification. One sentence of genuine encouragement grounded in data.
+4–6 sentences. Clear verdict. Reference day grade average and trend. CROSS-DOMAIN SYNTHESIS: Connect the advisors' observations — if Chen says training load is high, Webb says nutrition is low, and Park says sleep is degraded, name the cascade and the single intervention that breaks it. Don't just summarize each advisor — identify the interaction. Name ONE priority for next week with specific data justification. One sentence of genuine encouragement grounded in data.
 
-💡 INSIGHT OF THE WEEK
-One sentence. Concrete. Specific. Actionable in 7 days. Must reference actual numbers.
+💡 PATTERN OF THE WEEK
+2-3 sentences. Not a fact — a PATTERN. Structure: (1) one observable pattern from this week's data, (2) one hypothesis about why it's happening, (3) one forward-looking implication or question. Example: "Sleep efficiency dropped despite longer duration — this often correlates with high training strain the prior 2 days. If next week's deload doesn't restore efficiency, the issue may be circadian, not load." Must reference actual numbers.
 
 Be honest. Be a coach, not a cheerleader."""
 
@@ -906,7 +906,7 @@ def call_haiku(data, profile, api_key):
         _start = datetime.strptime(profile.get("journey_start_date", "2026-04-01"), "%Y-%m-%d").date()
         _days_in = max(1, (datetime.now(timezone.utc).date() - _start).days + 1)
         _week_num = max(1, (_days_in + 6) // 7)
-        _start_w = profile.get("journey_start_weight_lbs", 302)
+        _start_w = profile.get("journey_start_weight_lbs", 307)
         _goal_w = profile.get("goal_weight_lbs", 185)
         _cal = profile.get("calorie_target", 1800)
         _pro = profile.get("protein_target_g", 190)
@@ -929,7 +929,7 @@ def call_haiku(data, profile, api_key):
             f"Week {_week_num} coaching principle: {_coaching_note}"
         )
     except Exception:
-        journey_context = "JOURNEY STAGE: Week 1 of transformation | 302→185 lbs"
+        journey_context = "JOURNEY STAGE: Week 1 of transformation | 307→185 lbs"
 
     payload = json.dumps({
         "model": os.environ.get("AI_MODEL", "claude-sonnet-4-6"), "max_tokens": 1500,
@@ -1390,7 +1390,7 @@ def build_html(data, commentary, profile):
         goal = profile.get("goal_weight_lbs", 185)
         if w.get("weight_latest") and goal:
             to_go = round(w["weight_latest"] - goal, 1)
-            start = profile.get("journey_start_weight_lbs", 302)
+            start = profile.get("journey_start_weight_lbs", 307)
             lost = round(start - w["weight_latest"], 1)
             pct = round(lost / (start - goal) * 100) if start > goal else 0
             wt_rows += row("Journey Progress", f'{lost} lbs lost · {pct}% · {to_go} lbs to go', highlight=True)

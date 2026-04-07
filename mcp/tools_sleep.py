@@ -5,7 +5,7 @@ import json
 import math
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
 from mcp.config import (
@@ -38,11 +38,11 @@ def tool_get_sleep_analysis(args):
     sleep regardless of location (couch, travel, naps), whereas Eight Sleep only
     sees time spent in the pod.
     """
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     days       = int(args.get("days", 90))   # rolling window
     target_h   = float(args.get("target_sleep_hours", 7.5))
     start_date = args.get("start_date") or (
-        datetime.utcnow() - timedelta(days=days)
+        datetime.now(timezone.utc) - timedelta(days=days)
     ).strftime("%Y-%m-%d")
 
     raw_items = query_source("whoop", start_date, end_date)
@@ -347,10 +347,10 @@ def tool_get_sleep_environment_analysis(args):
     Huberman/Walker: core body temperature drop of 1-3°F is the primary
     trigger for sleep onset. Eight Sleep controls this precisely.
     """
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     days       = int(args.get("days", 90))
     start_date = args.get("start_date") or (
-        datetime.utcnow() - timedelta(days=days)
+        datetime.now(timezone.utc) - timedelta(days=days)
     ).strftime("%Y-%m-%d")
 
     data = parallel_query_sources(["eightsleep", "whoop"], start_date, end_date)

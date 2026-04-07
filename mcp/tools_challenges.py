@@ -19,7 +19,7 @@ DynamoDB schema:
 """
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from boto3.dynamodb.conditions import Key
 
@@ -49,11 +49,11 @@ def _slug(name: str) -> str:
 
 
 def _today() -> str:
-    return datetime.utcnow().strftime("%Y-%m-%d")
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
 def _now_iso() -> str:
-    return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -476,7 +476,7 @@ def tool_list_challenges(args):
             if activated_at:
                 try:
                     act_date = datetime.strptime(activated_at[:10], "%Y-%m-%d")
-                    days_since_activation = (datetime.utcnow() - act_date).days
+                    days_since_activation = (datetime.now(timezone.utc) - act_date).days
                     if days_since_activation >= duration:
                         overdue = True
                         days_overdue = days_since_activation - duration
@@ -506,7 +506,7 @@ def tool_list_challenges(args):
             if act_at:
                 try:
                     ad = datetime.strptime(str(act_at)[:10], "%Y-%m-%d")
-                    if (datetime.utcnow() - ad).days >= dur:
+                    if (datetime.now(timezone.utc) - ad).days >= dur:
                         overdue_count += 1
                 except Exception:
                     pass

@@ -6,10 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Deep documentation lives in `docs/`. Start here when context is needed:
 - `docs/ONBOARDING.md` — mental model, key concepts
-- `docs/ARCHITECTURE.md` — full system design, 63 Lambdas, 8 CDK stacks, data flows
+- `docs/ARCHITECTURE.md` — full system design, 71 Lambdas, 8 CDK stacks, data flows
 - `docs/SCHEMA.md` — DynamoDB field reference (authoritative)
 - `docs/RUNBOOK.md` — daily operations, troubleshooting
-- `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-046), why things are the way they are
+- `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-048), why things are the way they are
 
 ## Commands
 

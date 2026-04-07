@@ -48,7 +48,7 @@ DELETE_URL = "https://api.dropboxapi.com/2/files/delete_v2"
 
 # ── Config (env vars with backwards-compatible defaults) ──
 REGION     = os.environ.get("AWS_REGION", "us-west-2")
-USER_ID    = os.environ["USER_ID"]
+USER_ID    = os.environ.get("USER_ID", "matthew")
 
 PK_TRACKER = f"USER#{USER_ID}#SOURCE#dropbox_tracker"
 
