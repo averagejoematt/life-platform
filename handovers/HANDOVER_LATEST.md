@@ -1,7 +1,8 @@
-# Handover — v6.0.0: Coach Intelligence Architecture
+# Handover — v6.0.1: Coach Intelligence + Platform Quality Sweep
 
-**Date:** 2026-04-06
-**Scope:** Coach Intelligence Architecture (Phases 1-5 + Observatory Integration) — 8 new Lambdas, 8 AI coaches, new DynamoDB partitions, Observatory wiring, prompt evolution, ai_expert_analyzer deprecated.
+**Date:** 2026-04-07
+**Session span:** 2026-04-06 → 2026-04-07 (single extended session)
+**Scope:** Coach Intelligence Architecture (Phases 1-6), AI prompt evolution, observatory integration, and full platform quality sweep (AWS architecture, website, code quality).
 
 ## What Changed
 
@@ -102,15 +103,54 @@ Seeded all new partitions for coach intelligence:
 ### CDK
 - [ ] `cdk diff --all` shows no changes (compute stack deployed)
 
+### Platform Quality Sweep (April 7)
+
+**Critical fixes:**
+- `coach_observatory_renderer.py` handler name mismatch (`handler` → `lambda_handler`)
+- `_date_cls` undefined variable in `daily_brief_lambda.py` (ensemble digest invocation)
+- Shared layer version drift — 7 Lambdas on stale layer versions, synced via full CDK deploy
+- DLQ purged — 9 stale messages from `USER_ID` env var failures
+
+**High-severity fixes:**
+- MacroFactor field name bugs in `field_notes_lambda.py` and `site_api_lambda.py` (`calories` → `total_calories_kcal`)
+- 302 → 307 weight fallbacks in 10+ files
+- `os.environ["USER_ID"]` hard-crash pattern → `.get("USER_ID", "matthew")` in 41 Lambda files
+- Experiment `days_in` off-by-one (`.days` → `.days + 1`)
+
+**Deprecation cleanup:**
+- `datetime.utcnow()` → `datetime.now(timezone.utc)` in 206 occurrences across 39 files (lambdas + mcp)
+- Training "Coming Soon" placeholder hidden
+
+**Website fixes:**
+- Homepage ring label "lost" → "lbs lost"
+- Mission page weight overwrite fix (start weight stays at 307)
+- Pulse water glyph wired (was never rendered)
+- Pulse Whoop query Limit 5 → 20 (workout sub-records flooding window)
+- Homepage character data fallback chain (3 API layers)
+- Observatory subtitle positioning (moved below status bar)
+- Mobile scroll-through fix (overscrollBehavior + touchAction on menu)
+- XP values rounded to 1 decimal place on character page
+- "More" bottom nav button delegated click handler
+
+**Documentation updated:**
+- INTELLIGENCE_LAYER.md — full v6.0.0 rewrite
+- ARCHITECTURE.md — 71 Lambdas, Coach Intelligence section
+- SCHEMA.md — COACH#/ENSEMBLE#/NARRATIVE# partitions
+- DECISIONS.md — ADR-047 (Coach Intelligence) + ADR-048 (Observatory Integration)
+- CHANGELOG.md — v6.0.0 entry
+- RUNBOOK.md — coach troubleshooting section
+- ONBOARDING.md — coach mental model + glossary
+
 ## Known Issues / Carry Forward
 
-- **Phase 6 refinement** — coach output tuning, confidence calibration, ensemble weighting adjustments
+- **Character level drop** — Level went 4→1 because character-sheet-compute didn't run April 5-6 (USER_ID env var issue, now fixed). Will recover once daily pipeline runs with full Whoop data.
+- **Smoke test expectations stale** — `deploy/smoke_test_site.sh` has 15 failing checks for old V2/V3 HTML structures. Tests need updating, not the site.
 - **/coaching/ dashboard page** — standalone coaching dashboard deferred (future sprint)
-- **Coach scheduling** — pipeline trigger schedule not yet on EventBridge (manual invocation for now)
+- **Coach Intelligence test coverage** — 8 new Lambda files (~300KB) have no unit tests
 - **TDEE tracking** — blocked (MacroFactor doesn't export)
 - **IC-4/IC-5** (failure pattern + momentum warning) — data gate ~May 1
-- **PB-08 Intelligence Page Rebuild** — gated on SIMP-1 Phase 2
 - **PRE-13 Data Publication Review** — deferred
+- **464 unused imports** — F401 flake8 warnings, cosmetic cleanup
 
 ## Current System State
 
@@ -119,9 +159,10 @@ Seeded all new partitions for coach intelligence:
 | MCP Tools | 115 |
 | Lambdas | 71 |
 | Site Pages | 72 |
-| Lambda Layer | v26 |
+| Lambda Layer | v32 |
 | Architecture Grade | A- (R20) |
 | CDK Stacks | 8 |
 | AI Coaches | 8 |
-| Coach DDB Partitions | 6 new partition families |
-| Version | v6.0.0 |
+| Coach DDB Partitions | 6 partition families |
+| Test Results | 1103 passed, 1 infra-only failure |
+| Version | v6.0.1 |
