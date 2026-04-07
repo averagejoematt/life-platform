@@ -51,7 +51,7 @@ except ImportError:
 # ── Config ─────────────────────────────────────────────────────────────────────
 REGION    = os.environ.get("AWS_REGION", "us-west-2")
 BUCKET    = os.environ["S3_BUCKET"]
-USER_ID   = os.environ["USER_ID"]
+USER_ID   = os.environ.get("USER_ID", "matthew")
 RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 SENDER    = os.environ["EMAIL_SENDER"]
 REQ_S3_PREFIX = os.environ.get("REQ_S3_PREFIX", "config/requirements/")

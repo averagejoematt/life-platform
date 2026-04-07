@@ -1,356 +1,575 @@
 # Life Platform — Intelligence Layer
 
-> Documents the Intelligence Compounding (IC) features: how the platform learns, remembers, and improves over time.
+> Documents the Coach Intelligence Architecture and the legacy Intelligence Compounding (IC) features.
 > For the IC roadmap and future phases, see PROJECT_PLAN.md (Tier 7).
-> Last updated: 2026-04-04 (v4.9.0)
+> Last updated: 2026-04-06 (v6.0.0)
 >
-> **Changes since v3.7.68:** Signal Doctrine (evidence badges, confidence tiers), Challenge System (XP modifiers, weekly cadence), Food Delivery integration (delivery index as IC input), Reader Engagement signals (freshness indicators, "Since Your Last Visit"), Elena Voss pull-quote pipeline across 6 observatory pages, ADR-045 (121 MCP tools accepted as operating state).
->
-> **Changes in v4.8.0 (AI Insight Engine Overhaul):** Anti-repetition via `guidance_given` (prior 3-day dedup), 6 unused data sources wired into coaching prompts, `what_worked` memory pattern, weekly correlation injection, labs/genome personalization modules. See [v4.8.0 AI Overhaul](#v480-ai-insight-engine-overhaul-2026-04-01) section below.
+> **v6.0.0 (Coach Intelligence Architecture):** Full stateful coaching system — 8 domain coaches with persistent state, deterministic computation engine, narrative orchestration, ensemble consensus, prediction tracking with Bayesian evaluation, quality gate, weekly history compression, and observatory rendering. Supersedes the stateless prompt-template approach for daily coaching output.
 
 ---
 
 ## Overview
 
-The Intelligence Layer transforms the platform from a stateless data observer into a compounding intelligence engine. Rather than running the same analysis fresh each day and generating the same generic insight repeatedly, the IC system:
+The Intelligence Layer has evolved through two distinct phases:
 
-1. **Persists** insights and patterns to DynamoDB (`platform_memory`, `insights`, `decisions`, `hypotheses`, `weekly_correlations`)
-2. **Compounds** — each new analysis reads previous findings as context
-3. **Learns** Matthew's specific biology, psychology, and failure patterns over time
-4. **Self-improves** — coaching calibration evolves as evidence accumulates
+**Phase 1 (IC features, v2.86 - v5.3):** Stateless prompt templates with memory injection. Each AI call assembled context from DynamoDB, ran a two-pass chain-of-thought (IC-3), and produced coaching output with no memory of what it said yesterday. Anti-repetition was bolted on via `guidance_given` (v4.8.0), but the fundamental architecture was stateless: same data in, same coaching out, with no voice continuity, no prediction tracking, and no cross-coach coordination.
 
-The architecture decision (ADR-016) is explicit: no vector store, no embeddings, no fine-tuning. Pure DynamoDB key-value + structured context injection + prompt engineering.
+**Phase 2 (Coach Intelligence Architecture, v6.0):** Eight named coaches with persistent state, distinct analytical voices, a deterministic computation engine, narrative arc awareness, formal prediction tracking with Bayesian confidence updates, ensemble consensus, and quality assurance. The system remembers what it said, tracks whether its predictions were right, compresses its own history, and coordinates across domains.
+
+The architecture decision (ADR-016) remains: no vector store, no embeddings, no fine-tuning. Pure DynamoDB key-value + structured context injection + S3 config + prompt engineering + deterministic statistical computation.
 
 ---
 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│  PRE-COMPUTE PIPELINE (runs before Daily Brief)              │
-│                                                              │
-│  9:35 AM  character-sheet-compute                            │
-│  9:40 AM  daily-metrics-compute → computed_metrics DDB       │
-│  9:42 AM  daily-insight-compute → insight_data (JSON)        │
-│           ├─ 7-day habit × outcome correlations              │
-│           ├─ leading indicator flags                         │
-│           ├─ platform_memory pull (relevant records)         │
-│           ├─ anti-repetition: prior 3-day guidance_given (v4.8)│
-│           ├─ what_worked: record conditions on grade ≥85 (v4.8)│
-│           ├─ weekly correlation top-3 injection (v4.8)       │
-│           └─ structured JSON handoff to Daily Brief          │
-│                                                              │
-│  SUNDAY 11:30 AM  weekly-correlation-compute                 │
-│           ├─ 23 Pearson pairs (20 cross-sectional + 3 lagged)│
-│           ├─ Benjamini-Hochberg FDR correction (v3.7.37)     │
-│           └─ writes SOURCE#weekly_correlations | WEEK#<iso>  │
-│                                                              │
-│  SUNDAY 12:00 PM  hypothesis-engine v1.2.0                   │
-│           ├─ reads weekly_correlations as context            │
-│           ├─ cross-domain hypotheses → SOURCE#hypotheses DDB │
-│           ├─ validation: fields + domains + numeric criteria  │
-│           ├─ dedup against active hypotheses                 │
-│           └─ 30-day hard expiry; 3 confirms → permanent      │
-└─────────────────────────────────┬────────────────────────────┘
-                                  │ reads pre-computed data
-┌─────────────────────────────────▼────────────────────────────┐
-│  AI CALL LAYER (all email/digest Lambdas)                    │
-│                                                              │
-│  IC-3: Chain-of-thought two-pass (BoD + TL;DR)               │
-│    Pass 1: identify patterns + connections (JSON)            │
-│    Pass 2: write coaching output using Pass 1 analysis       │
-│                                                              │
-│  IC-7: Cross-pillar trade-off reasoning instruction          │
-│  IC-23: Attention-weighted prompt budgeting (surprise score) │
-│  IC-24: Data quality scoring (flag incomplete sources)       │
-│  IC-25: Diminishing returns detection (per-pillar)           │
-│  IC-17: Red Team / Contrarian Skeptic pass (anti-confirmation│
-│          bias, challenges correlation claims)                │
-│                                                              │
-│  v4.8.0 additions:                                           │
-│  - Anti-repetition: "AVOID REPEATING" from guidance_given    │
-│  - 6 data sources wired: journal, character, adaptive mode,  │
-│    State of Mind, supplements, weather                       │
-│  - Labs/genome coaching context (labs_coaching.py,            │
-│    genome_coaching.py) injected into TL;DR prompt            │
-│                                                              │
-│  W3: ai_output_validator wired to all 12 AI-output Lambdas  │
-│      (validates shape, required fields, disclaimer presence) │
-└─────────────────────────────────┬────────────────────────────┘
-                                  │ writes after generation
-┌─────────────────────────────────▼────────────────────────────┐
-│  MEMORY LAYER                                                │
-│                                                              │
-│  insight_writer.py (shared module in Lambda Layer)           │
-│  → SOURCE#insights — universal write by all email Lambdas    │
-│  → SOURCE#platform_memory — failure patterns, milestones,    │
-│    intention tracking, what_worked (v4.8), coaching calib.    │
-│  → SOURCE#computed_insights — guidance_given feedback (v4.8)  │
-│  → SOURCE#decisions — platform decisions + outcomes          │
-│  → SOURCE#hypotheses — weekly cross-domain hypotheses        │
-│  → SOURCE#weekly_correlations — 23-pair FDR-corrected matrix │
-└──────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  COACH INTELLIGENCE PIPELINE (daily, sequential)                 │
+│                                                                  │
+│  Step 1: COMPUTATION ENGINE (deterministic, no LLM)              │
+│    coach-computation-engine Lambda                               │
+│    ├─ EWMA trends (domain-specific decay from S3 config)         │
+│    ├─ Regression-to-mean detection (z > 1.5 + mean reversion)    │
+│    ├─ Seasonality flags (population baselines from S3 config)    │
+│    ├─ Autocorrelation warnings (HRV/sleep/recovery < 5 pts)     │
+│    ├─ Statistical guardrails (<7d observational, <14d prelim)    │
+│    ├─ Prediction evaluation (Bayesian Beta distribution)         │
+│    └─ Narrative arc transition detection                         │
+│    Writes → COACH#computation | RESULTS#{date}                   │
+│                                                                  │
+│  Step 2: NARRATIVE ORCHESTRATOR (Haiku "showrunner")             │
+│    coach-narrative-orchestrator Lambda                            │
+│    ├─ Reads: all COMPRESSED#latest + ENSEMBLE#digest +           │
+│    │         computation results + NARRATIVE#arc +                │
+│    │         open threads + active predictions                   │
+│    └─ Produces: per-coach generation brief                       │
+│    Writes → COACH#{id} | BRIEF#{date}                            │
+│                                                                  │
+│  Step 3: COACH GENERATION (Sonnet, per coach)                    │
+│    Each coach generates output using:                            │
+│    ├─ S3 voice spec (structural rules, decision style, examples) │
+│    ├─ Generation brief from orchestrator                         │
+│    ├─ Domain-specific data from DynamoDB                         │
+│    ├─ Own compressed history (COMPRESSED#latest)                 │
+│    └─ Active threads and predictions                             │
+│                                                                  │
+│  Step 4: STATE UPDATER (Haiku, async post-generation)            │
+│    coach-state-updater Lambda                                    │
+│    ├─ Extracts: themes, structural fingerprint, threads          │
+│    ├─ Creates: formal PREDICTION# records                        │
+│    ├─ Writes: OUTPUT# with observatory_summary                   │
+│    ├─ Updates: VOICE#state                                       │
+│    └─ Writes: TRACE#{date}#{type} reasoning traces               │
+│                                                                  │
+│  Step 5: ENSEMBLE DIGEST (Haiku, async)                          │
+│    coach-ensemble-digest Lambda                                  │
+│    ├─ Reads all coach outputs for the cycle                      │
+│    ├─ Identifies disagreements between coaches                   │
+│    ├─ Flags unanimous agreement (S-10 threshold)                 │
+│    └─ Writes: ENSEMBLE#digest | CYCLE#{date}                     │
+│                                                                  │
+│  Daily: PREDICTION EVALUATOR (deterministic, no LLM)             │
+│    coach-prediction-evaluator Lambda                             │
+│    ├─ Evaluates: machine/directional/conditional predictions     │
+│    ├─ Null hypothesis comparison                                 │
+│    ├─ Bayesian confidence updates (Beta distribution)            │
+│    └─ Learning log entries                                       │
+│                                                                  │
+│  Weekly: HISTORY SUMMARIZER (Haiku)                              │
+│    coach-history-summarizer Lambda                               │
+│    ├─ Compresses each coach's full history                       │
+│    └─ Writes: 500-token COMPRESSED#latest per coach              │
+│                                                                  │
+│  Advisory: QUALITY GATE (Haiku)                                  │
+│    coach-quality-gate Lambda                                     │
+│    ├─ Anti-pattern detection                                     │
+│    ├─ Decision class compliance check                            │
+│    ├─ Voice distinctiveness scoring                              │
+│    └─ Cross-coach similarity detection                           │
+│                                                                  │
+│  Renderer: OBSERVATORY RENDERER (no LLM)                         │
+│    coach-observatory-renderer Lambda                             │
+│    ├─ Reads COACH# state from DynamoDB                           │
+│    └─ Assembles JSON payloads for observatory page cards          │
+│                                                                  │
+├──────────────────────────────────────────────────────────────────┤
+│  LEGACY PRE-COMPUTE PIPELINE (runs alongside coach system)       │
+│                                                                  │
+│  9:35 AM  character-sheet-compute                                │
+│  9:40 AM  daily-metrics-compute → computed_metrics DDB           │
+│  9:42 AM  daily-insight-compute → insight_data (JSON)            │
+│                                                                  │
+│  SUNDAY 11:30 AM  weekly-correlation-compute                     │
+│  SUNDAY 12:00 PM  hypothesis-engine v1.2.0                       │
+│                                                                  │
+│  These continue to feed the Daily Brief email pipeline.          │
+│  The coach system reads their DynamoDB outputs as data sources.  │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│  OBSERVATORY INTEGRATION                                         │
+│                                                                  │
+│  /api/coach_analysis?domain={domain}                             │
+│    ├─ Reads from COACH# state store via observatory renderer     │
+│    ├─ Falls back to /api/ai_analysis (legacy) if no coach data   │
+│    └─ Cards show continuity markers:                             │
+│         thread_reference, revision_signal, cross_coach_reference │
+│                                                                  │
+│  data_availability constraints:                                  │
+│    observational_only → hides recommendations                    │
+│    preliminary → adds confidence qualifier                       │
+│    established → full coaching output                            │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## IC Features (as of v4.9.0)
+## The Eight Coaches
 
-### IC-1: platform_memory Partition
-**Status:** Live (v2.86.0)
-**What it does:** DDB partition `SOURCE#platform_memory`, SK `MEMORY#<category>#<date>`. The compounding substrate — structured memory written by compute Lambdas and digest Lambdas, read back into AI prompts as context. Enables "the last 4 weeks show X pattern" without re-querying raw data.
+Each coach has a named persona, a domain specialty, a voice specification stored in S3, and persistent state in DynamoDB. All coaches share the same pipeline infrastructure but produce distinct analytical perspectives.
 
-**Memory categories live:** `milestone_architecture`, `intention_tracking`, `what_worked` (v4.8.0), `coaching_calibration`
-**Memory categories coming:** `failure_patterns` (Month 2), `personal_curves` (Month 4)
+| Coach ID | Persona | Domain | Specialty |
+|----------|---------|--------|-----------|
+| `sleep_coach` | Dr. Lisa Park | Sleep | sleep_science |
+| `nutrition_coach` | Dr. Marcus Webb | Nutrition | nutrition |
+| `training_coach` | Dr. Sarah Chen | Training | exercise_physiology |
+| `mind_coach` | Dr. Nathan Reeves | Mind | psychiatry |
+| `physical_coach` | Dr. Victor Reyes | Physical | body_composition |
+| `glucose_coach` | Dr. Amara Patel | Glucose | metabolic_health |
+| `labs_coach` | Dr. James Okafor | Labs | clinical_pathology |
+| `explorer_coach` | Dr. Henning Brandt | Explorer | biostatistics |
 
-### IC-2: Daily Insight Compute Lambda
-**Status:** Live (v2.86.0)
-**Lambda:** `daily-insight-compute` (9:42 AM PT)
-**What it does:** Pre-computes structured insight JSON before Daily Brief runs. Pulls 7 days of metrics, computes habit×outcome correlations, flags leading indicators, pulls relevant platform_memory records. Daily Brief receives curated intelligence rather than raw data.
+### Voice Specifications (S3 Config)
 
-**Key output fields in insight JSON:**
-- `habit_outcome_correlations` — which habit completions correlate with better sleep/recovery
-- `leading_indicators` — early warning signals (e.g., HRV declining 3 consecutive days)
-- `memory_context` — relevant platform_memory records for today's conditions
-- `data_quality` — per-source confidence scores (IC-24)
-- `surprise_scores` — per-metric deviation from rolling baseline (IC-23)
+Each coach's voice spec at `s3://matthew-life-platform/config/coaches/{coach_id}.json` contains:
 
-**Validator:** `ingestion_validator.py` `computed_insights` schema wired since v3.7.25.
+- **structural_voice_rules** — sentence structure, hedging patterns, citation style, characteristic phrasings
+- **decision_style** — how the coach approaches ambiguous data (conservative vs. exploratory, data-first vs. intuition-augmented)
+- **few_shot_examples** — 2-3 exemplar outputs that anchor the voice during generation
+- **anti_pattern_detection** — patterns the quality gate watches for (e.g., Dr. Brandt should never make causal claims without statistical backing; Dr. Reeves should never reduce mental health to biomarkers)
 
-### IC-3: Chain-of-Thought Two-Pass
-**Status:** Live (v2.86.0)
-**What it does:** Board of Directors + TL;DR AI calls use two-pass reasoning. Pass 1 generates structured JSON identifying patterns and connections. Pass 2 writes coaching output using Pass 1 analysis. ~2× token cost but material quality improvement — model reasons before writing.
+### Influence Graph
 
-**Model routing (TB7-23, confirmed 2026-03-13):** Both Pass 1 (analysis) and Pass 2 (output) use `AI_MODEL` = `claude-sonnet-4-6` via `call_anthropic()` in `ai_calls.py`. There is **no quality asymmetry** between the two passes — both run on Sonnet. The Haiku reference at line 515 of `daily_insight_compute_lambda.py` is the IC-8 intent evaluator, which correctly uses Haiku (classification task, not coaching). IC-3 itself has no Haiku dependency.
-
-### IC-4: Failure Pattern Recognition
-**Status:** Data-gated skeleton (not yet live — data gate: `days_available >= 42` in `habit_scores`)
-**Lambda:** `failure_pattern_compute_lambda.py` (CDK-wired and EventBridge-scheduled pending activation ~2026-05-01)
-**What it does:** Identifies recurring failure patterns in habit execution — specifically, which antecedent conditions (high TSB, poor sleep, high Todoist load, travel) consistently precede multi-day habit streaks breaking. Writes failure pattern summaries to `MEMORY#failure_patterns` in `platform_memory`. Coaching AI uses these patterns to preemptively warn: "Last 3 times load exceeded 80 + sleep efficiency dropped below 78%, habits collapsed for 4+ days."
-
-**Activation checklist:**
-1. Verify `days_available >= 42` in `habit_scores` partition
-2. Add to `cdk/stacks/compute_stack.py` with EventBridge rule
-3. Update `ci/lambda_map.json` (remove `not_deployed` flag)
-4. Deploy via CDK + run `post_cdk_reconcile_smoke.sh`
-
-**Key output fields:**
-- `antecedent_conditions` — conditions that preceded failure (list of {metric, threshold, direction})
-- `failure_type` — e.g. `habit_streak_collapse`, `nutrition_drift`, `sleep_degradation`
-- `recurrence_count` — how many times this pattern has been observed
-- `recovery_days` — median days to recover after this pattern fires
+`s3://matthew-life-platform/config/coaches/influence_graph.json` defines 56 directed weights across all 8 coaches, controlling how much each coach's output influences others. The graph is read by the narrative orchestrator to shape generation briefs. Stored in DynamoDB as `ENSEMBLE#influence_graph | CONFIG#v1`.
 
 ---
 
-### IC-5: Momentum Warning
-**Status:** Data-gated skeleton (not yet live — data gate: `days_available >= 42` in `computed_metrics`)
-**Lambda:** `momentum_warning_compute_lambda.py` (CDK-wired and EventBridge-scheduled pending activation ~2026-05-01)
-**What it does:** Early-warning system that detects leading indicators of momentum loss — sustained low habit completion + declining pillar scores + rising TSB — before they manifest as a measurable setback. Writes momentum signals to `MEMORY#momentum_warnings`. Coaching AI surfaces these as forward-looking alerts rather than retrospective observations.
+## Coach Pipeline Lambdas (8)
 
-**Activation checklist:** Same as IC-4 — pair them in the same CDK deploy to share one activation pass.
+### 1. coach-computation-engine
 
-**Key output fields:**
-- `momentum_signal` — `warning` | `at_risk` | `stable` | `building`
-- `leading_indicators` — list of metrics trending unfavorably with direction and days_trending
-- `at_risk_pillars` — pillar names with current trajectory
-- `suggested_intervention` — highest-leverage action to reverse momentum (e.g. `prioritize_sleep`, `reduce_training_load`)
+**Type:** Deterministic (no LLM)
+
+Runs all statistical computation before any AI generation begins. Separates math from narrative to ensure reproducibility.
+
+**Computations performed:**
+- **EWMA trends** — domain-specific exponential decay parameters loaded from `s3://matthew-life-platform/config/computation/ewma_params.json`. Each domain (sleep, training, nutrition, etc.) has its own decay factor calibrated to the biological time constants of that domain.
+- **Regression-to-mean detection** — flags metrics where z > 1.5 AND the current trajectory is moving toward the personal mean. Prevents coaches from attributing normal statistical reversion to interventions.
+- **Seasonality flags** — compares current values against population-level seasonal baselines from `s3://matthew-life-platform/config/computation/seasonal_adjustments.json`. Prevents false attribution of seasonal patterns to behavioral changes.
+- **Autocorrelation warnings** — for HRV, sleep, and recovery metrics with fewer than 5 data points, warns that serial correlation makes trend detection unreliable.
+- **Statistical guardrails** — enforces data maturity tiers:
+  - < 7 days of data: `observational_only` (no directional claims permitted)
+  - < 14 days: `preliminary` (qualified claims only)
+  - 14+ days: `established` (full coaching output)
+- **Prediction evaluation** — evaluates outstanding predictions using Bayesian Beta distribution for confidence updates.
+- **Narrative arc transition detection** — reads arc definitions from `s3://matthew-life-platform/config/narrative/arc_definitions.json` (8 phases) and detects when data patterns suggest a phase transition.
+
+**DynamoDB output:** `COACH#computation | RESULTS#{date}`
+
+### 2. coach-narrative-orchestrator
+
+**Type:** LLM (Haiku) — "showrunner" role
+
+The orchestrator is the creative director of the coaching system. It reads the full state of every coach and produces a generation brief that tells each coach what to focus on, which threads to continue, which to drop, and what narrative arc to follow.
+
+**Inputs:**
+- All 8 coaches' `COMPRESSED#latest` state
+- Current `ENSEMBLE#digest` (latest cycle)
+- Computation results from step 1
+- Current `NARRATIVE#arc | STATE#current`
+- All open `THREAD#` records across coaches
+- All active `PREDICTION#` records
+
+**Output:** One generation brief per coach, written to `COACH#{id} | BRIEF#{date}`. Each brief contains:
+- Focus areas for this cycle
+- Threads to continue or resolve
+- Cross-coach references to make
+- Narrative arc context and phase-appropriate tone
+- Predictions to revisit or update
+
+### 3. coach-state-updater
+
+**Type:** LLM (Haiku) — post-generation extraction
+
+Runs asynchronously after each coach generates output. Performs structured extraction from the generated text to maintain the state graph.
+
+**Extractions:**
+- **Themes** — semantic tags for the current output
+- **Structural fingerprint** — statistical signature of the output's structure (used by quality gate for voice drift detection)
+- **Threads opened/referenced** — which analytical threads the coach started or continued
+- **Predictions made** — extracted and formalized as `PREDICTION#` records with testable criteria
+
+**DynamoDB writes:**
+- `COACH#{id} | OUTPUT#` — full output with `observatory_summary` field
+- `COACH#{id} | VOICE#state` — updated voice state
+- `COACH#{id} | PREDICTION#{id}` — formal prediction records
+- `COACH#{id} | THREAD#{id}` — thread state updates
+- `COACH#{id} | TRACE#{date}#{type}` — reasoning traces for debugging
+
+### 4. coach-ensemble-digest
+
+**Type:** LLM (Haiku) — cross-coach synthesis
+
+Reads all coach outputs for the current cycle and produces a meta-analysis of the coaching panel.
+
+**Key functions:**
+- **Disagreement detection** — identifies where coaches reach different conclusions from the same data (e.g., training coach says increase volume while sleep coach says reduce load). Writes to `ENSEMBLE#disagreements | ACTIVE#{slug}`.
+- **Unanimous agreement flagging** — when all relevant coaches agree on a signal (S-10 threshold), flags it as high-confidence consensus.
+- **Cross-domain insight synthesis** — identifies patterns that no single coach can see in isolation.
+
+**DynamoDB output:** `ENSEMBLE#digest | CYCLE#{date}`
+
+### 5. coach-prediction-evaluator
+
+**Type:** Deterministic (no LLM) — runs daily
+
+Evaluates all outstanding predictions from all coaches against incoming data.
+
+**Prediction types evaluated:**
+- **Machine predictions** — specific numerical forecasts (e.g., "HRV will exceed 45ms within 3 days")
+- **Directional predictions** — trend forecasts (e.g., "sleep efficiency will improve this week")
+- **Conditional predictions** — if-then forecasts (e.g., "if training load drops below X, recovery will rebound within 48 hours")
+
+**Evaluation method:**
+- Bayesian Beta distribution for confidence updates — each prediction outcome updates the coach's domain-specific confidence prior
+- Null hypothesis comparison — was the prediction better than a naive baseline (e.g., "tomorrow will be like today")?
+- Learning log entries written to `COACH#{id} | LEARNING#` for coaches that consistently over- or under-predict
+
+### 6. coach-history-summarizer
+
+**Type:** LLM (Haiku) — runs weekly
+
+Compresses each coach's full output history into a 500-token state summary. This is the mechanism that gives coaches long-term memory without unbounded context growth.
+
+**Output:** `COACH#{id} | COMPRESSED#latest` — replaces the previous compressed state. The full history remains in `OUTPUT#` records; the compressed state is the working memory that feeds into the orchestrator.
+
+### 7. coach-quality-gate
+
+**Type:** LLM (Haiku) — advisory role
+
+Quality assurance Lambda that checks coach outputs for structural and analytical integrity.
+
+**Checks performed:**
+- **Anti-pattern detection** — per-coach anti-patterns defined in voice specs (e.g., making causal claims from correlational data, reducing complex phenomena to single biomarkers)
+- **Decision class compliance** — verifies that coaches respect the statistical guardrails from the computation engine (observational_only coaches should not be making recommendations)
+- **Voice distinctiveness scoring** — measures how distinct each coach's output is from the others. Flags convergence where coaches start sounding alike.
+- **Cross-coach similarity detection** — identifies when multiple coaches are saying the same thing in different words, which wastes the user's attention budget
+
+### 8. coach-observatory-renderer
+
+**Type:** Pure DynamoDB reader (no LLM)
+
+Assembles JSON payloads for the observatory page cards from `COACH#` state in DynamoDB. No AI generation — purely reads and formats existing state for the frontend.
+
+**Output:** JSON payloads consumed by `/api/coach_analysis?domain={domain}` endpoint.
+
+**Card features:**
+- `thread_reference` — shows which analytical thread this card continues
+- `revision_signal` — indicates when the coach has changed its mind about a previous assessment
+- `cross_coach_reference` — shows when the coach is responding to or building on another coach's analysis
+- `data_availability` — controls card rendering (observational_only hides recommendation sections)
 
 ---
 
-### IC-6: Milestone Architecture
-**Status:** Live (v2.86.0)
-**What it does:** 6 weight/health milestones with biological significance for Matthew stored in `platform_memory`. Surfaced in coaching when approaching each threshold. Example: "At 285 lbs: sleep apnea risk drops substantially (genome flag)." Converts abstract goal into biological waypoints.
+## DynamoDB Schema
 
-**Current milestones:** 285 lbs (sleep apnea risk), 270 lbs (walking pace natural improvement), 250 lbs (Zone 2 accessible at real-workout pace), 225 lbs (FFMI crosses athletic range), 200 lbs (visceral fat normalization target), 185 lbs (goal weight).
+All coach data lives in the existing `life-platform` single-table. No new tables or GSIs.
 
-### IC-7: Cross-Pillar Trade-off Reasoning
-**Status:** Live (v2.89.0)
-**What it does:** Explicit instruction added to Board of Directors prompts to reason about trade-offs between pillars rather than analyzing each in isolation. Enables: "Movement is strong but Sleep is degrading — adding training volume at current TSB will compound sleep debt. Optimize sleep first."
+### Coach State Partitions
 
-### IC-8: Intent vs. Execution Gap
-**Status:** Live (v2.90.0)
-**What it does:** Journal analysis pass comparing stated intentions ("going to meal prep Sunday") against next-day metrics. Builds personal intention-completion rate. Writes to `MEMORY#intention_tracking`. Coaching AI told when stated intentions have historically not been followed through.
+| PK | SK Pattern | Contents |
+|----|-----------|----------|
+| `COACH#{coach_id}` | `OUTPUT#` | Latest coach output with observatory_summary |
+| `COACH#{coach_id}` | `THREAD#{thread_id}` | Analytical thread state (open/resolved/dormant) |
+| `COACH#{coach_id}` | `LEARNING#{entry_id}` | Prediction evaluation learning log entries |
+| `COACH#{coach_id}` | `PREDICTION#{prediction_id}` | Formal prediction records with testable criteria |
+| `COACH#{coach_id}` | `VOICE#state` | Current voice state (structural fingerprint, theme history) |
+| `COACH#{coach_id}` | `RELATIONSHIP#state` | Inter-coach relationship state |
+| `COACH#{coach_id}` | `CONFIDENCE#{subdomain}` | Bayesian confidence priors per subdomain |
+| `COACH#{coach_id}` | `COMPRESSED#latest` | 500-token compressed history (weekly update) |
+| `COACH#{coach_id}` | `BRIEF#{date}` | Generation brief from narrative orchestrator |
+| `COACH#{coach_id}` | `TRACE#{date}#{type}` | Reasoning traces for debugging |
 
-### IC-15: Insight Ledger
-**Status:** Live (v2.87.0)
-**What it does:** Universal write-on-generate — every email/digest Lambda appends a structured insight record to `SOURCE#insights` via `insight_writer.py` (shared Layer module). Accumulates the raw material for downstream IC features. Schema: pillar, data_sources, confidence, actionable flag, semantic tags, digest_type, generated_text hash (dedup).
+### Ensemble and Narrative Partitions
 
-### IC-16: Progressive Context — All Digests
-**Status:** Live (v2.88.0)
-**What it does:** Weekly Digest, Monthly Digest, Chronicle, Nutrition Review, and Weekly Plate all retrieve recent high-value insights before generating. Weekly Digest gets 30-day window; Monthly gets quarterly; Chronicle gets narrative-relevant threads. Each digest reads as if written by someone who has followed Matthew for months. ~500-1,500 extra tokens per call.
+| PK | SK Pattern | Contents |
+|----|-----------|----------|
+| `ENSEMBLE#digest` | `CYCLE#{date}` | Cross-coach synthesis for a generation cycle |
+| `ENSEMBLE#influence_graph` | `CONFIG#v1` | 56 directed weights across 8 coaches |
+| `ENSEMBLE#disagreements` | `ACTIVE#{slug}` | Currently unresolved inter-coach disagreements |
+| `NARRATIVE#arc` | `STATE#current` | Current narrative arc phase |
+| `NARRATIVE#arc` | `HISTORY#{date}` | Narrative arc transition history |
+| `COACH#computation` | `RESULTS#{date}` | Deterministic computation results per day |
 
-### IC-17: Red Team / Contrarian Pass
-**Status:** Live (v2.87.0)
-**What it does:** "The Skeptic" persona injected into Board of Directors calls. Explicitly tasked to challenge consensus — question whether correlations are causal, flag misleading data, identify when insights are obvious vs. genuinely novel. Counteracts single-model confirmation bias. Prompt-only change, zero cost.
+---
 
-### IC-18: Hypothesis Engine v1.2.0
-**Status:** Live (v2.89.0 → v1.2.0 validation upgrade v3.7.x)
-**Lambda:** `hypothesis-engine` (Sunday 12:00 PM PT — runs 30 min after weekly-correlation-compute to consume fresh correlation data)
-**What it does:** Weekly Lambda pulls 14 days of all-pillar data plus the current week's correlation matrix. Prompts Claude to identify non-obvious cross-domain connections the existing 121 tools don't explicitly monitor. Writes hypothesis records to `SOURCE#hypotheses`. Subsequent insight compute + digest prompts told to watch for confirming/refuting evidence.
+## S3 Configuration
 
-**Validation rules (v1.2.0):**
-- Required fields + domains + numeric criteria must be present
-- Dedup check against all active hypotheses before write
-- 30-day hard expiry on all hypotheses
-- Minimum 7 days sample data required
-- 3 confirming checks required before promotion to permanent check
-- Weekly correlations read as context to avoid re-hypothesising already-confirmed pairs
+All coach configuration lives in `s3://matthew-life-platform/config/`:
 
-Access: `get_active_hypotheses`, `evaluate_hypothesis`, `get_hypotheses`, `update_hypothesis_outcome` MCP tools.
+| Path | Contents |
+|------|----------|
+| `coaches/{coach_id}.json` | Voice spec: structural_voice_rules, decision_style, few_shot_examples, anti_pattern_detection |
+| `coaches/influence_graph.json` | 56 directed weights across 8 coaches |
+| `computation/ewma_params.json` | Domain-specific EWMA decay parameters |
+| `computation/seasonal_adjustments.json` | Population-level seasonal baselines |
+| `narrative/arc_definitions.json` | 8 narrative arc phase definitions |
 
-### IC-19: Decision Journal
-**Status:** Live (v2.88.0)
-**What it does:** Tracks platform-guided decisions and their outcomes. `log_decision` MCP tool or inferred from journal + metrics. Builds trust-calibration dataset. Access via `log_decision`, `get_decisions`, `update_decision_outcome` MCP tools.
+---
 
-### IC-23: Attention-Weighted Prompt Budgeting
-**Status:** Live (v2.88.0)
-**What it does:** Pre-processing step computes "surprise score" for every metric — deviation from personal rolling baseline. High-surprise metrics get expanded context in AI prompts; low-surprise ones compress to one line or are omitted. `_compute_surprise_scores(data, baselines)` returns metric → surprise_score (0-1). Information theory applied to prompt engineering.
+## Generation Pipeline Flow
 
-### IC-24: Data Quality Scoring
-**Status:** Live (v2.88.0)
-**What it does:** `_compute_data_quality(data)` runs before AI calls. Per-source confidence score based on completeness, recency, and consistency. Outputs compact quality block injected into prompts: "⚠️ Nutrition: 800 cal — likely incomplete (7d avg 1,750)". AI treats flagged sources with skepticism.
+The daily generation pipeline runs in strict sequential order:
 
-### IC-25: Diminishing Returns Detector
-**Status:** Live (v2.88.0)
-**What it does:** Weekly computation of each pillar's score trajectory vs. effort (habit completion rate, active habit count). When high effort + flat trajectory detected, coaching redirects to highest-leverage pillar. "Sleep optimization is mature at 82 — your biggest lever is movement consistency at 45%."
+```
+1. coach-computation-engine          (deterministic math)
+              │
+              ▼
+2. coach-narrative-orchestrator      (Haiku → per-coach briefs)
+              │
+              ▼
+3. Each coach generates output       (Sonnet × 8 coaches)
+              │
+              ▼
+4. coach-state-updater               (Haiku, async post-generation)
+   coach-ensemble-digest             (Haiku, async cross-coach)
+              │
+              ▼
+5. coach-prediction-evaluator        (deterministic, runs daily)
+   coach-quality-gate                (Haiku, advisory)
+   coach-observatory-renderer        (pure reader, assembles cards)
+```
 
-### Weekly Correlation Compute (R8-LT9)
-**Status:** Live (v3.7.20)
-**Lambda:** `weekly-correlation-compute` (Sunday 11:30 AM PT — runs before hypothesis engine)
-**What it does:** Computes 23 Pearson correlation pairs weekly over a 90-day rolling window and writes results to `SOURCE#weekly_correlations | WEEK#<iso_week>`. Results feed directly into hypothesis engine context, are surfaced in `get_schedule_load` coaching notes, and (since v4.8.0) the top 3 FDR-significant pairs are injected into the daily coaching context block.
+**Weekly:** `coach-history-summarizer` compresses each coach's full history into 500-token `COMPRESSED#latest` state.
 
-**Correlation pairs (v3.7.25):**
-- 20 cross-sectional pairs (sleep vs recovery, HRV vs performance, etc.)
-- 3 lagged pairs: `hrv_predicts_next_day_load`, `recovery_predicts_next_day_load`, `load_predicts_next_day_recovery`
-- Each pair includes: `correlation_type` (`cross_sectional` vs `lagged_Nd`), `lag_days`, Pearson r
+**Model routing:**
+- Computation engine, prediction evaluator, observatory renderer: no LLM (deterministic)
+- Narrative orchestrator, state updater, ensemble digest, quality gate, history summarizer: Haiku (structured extraction / classification / compression)
+- Coach generation (step 3): Sonnet (coaching output quality)
 
-**Statistical rigour (v3.7.37):** Benjamini-Hochberg FDR correction applied. With 23 simultaneous tests at α=0.05, naive thresholding produces ~1.15 expected false positives per run; BH controls the false discovery rate instead. Each pair now carries `p_value`, `p_value_fdr`, `fdr_significant` fields.
+---
 
-**N-gating (v3.7.22):** `interpret_r()` is n-gated — `moderate` requires n≥30, `strong` requires n≥50. Prevents spurious strong-labelled correlations during the first 3 months of data accumulation.
+## Statistical Guardrails
 
-### W3: AI Output Validator
-**Status:** Live (v3.7.x)
-**What it does:** `ai_output_validator` wired into all 12 AI-output Lambdas. Validates response shape, required field presence, and health disclaimer footer before any AI-generated content is written to DDB or sent via email. Catches silent prompt failures (empty responses, malformed JSON, missing disclaimer) that would otherwise propagate undetected into the insight ledger.
+> Authored in consultation with the Science Board. These guardrails are enforced by the computation engine and respected by all coaches via the generation brief.
+
+### Data Maturity Tiers
+
+| Days of Data | Classification | Permitted Coaching |
+|-------------|---------------|-------------------|
+| < 7 days | `observational_only` | Describe what the data shows. No directional claims. No recommendations. |
+| 7 - 13 days | `preliminary` | Qualified directional observations. "Early data suggests..." framing required. |
+| 14+ days | `established` | Full coaching output with recommendations. |
+
+### Decision Class Ceiling
+
+Coaches operate under a three-level decision class hierarchy that constrains what kind of guidance they can offer:
+
+1. **Observational** — "Your HRV has been X over the past Y days." (always permitted)
+2. **Directional** — "This trend suggests Z may happen." (requires `preliminary` or `established`)
+3. **Interventional** — "Consider doing W." (requires `established` only)
+
+A coach in `observational_only` mode cannot issue directional or interventional guidance, regardless of how confident the AI is.
+
+### Regression-to-Mean Flagging
+
+When a metric has z > 1.5 AND is currently moving back toward the personal mean, the computation engine flags it as likely regression-to-mean. Coaches are instructed not to attribute this movement to any intervention. This prevents false attribution of normal statistical reversion.
+
+### Autocorrelation Warnings
+
+For serially correlated metrics (HRV, sleep efficiency, recovery score), trend claims with fewer than 5 independent data points are flagged. Health metrics on consecutive days are not independent observations — today's HRV strongly predicts tomorrow's HRV. The effective sample size for trend detection is smaller than the raw day count.
+
+### Seasonality Adjustment
+
+The computation engine compares current metric values against population-level seasonal baselines. A 10% HRV increase in spring may be seasonal rather than behavioral. Coaches receive seasonality flags and are instructed to factor them into their analysis.
+
+### Public Page Constraints
+
+- No numerical confidence scores on public observatory pages
+- Correlational language only ("appears to correlate," not "causes")
+- N=1 constraint always noted
+- Health disclaimer footer on all AI-generated content
+
+---
+
+## Observatory Integration
+
+The observatory (averagejoematt.com) displays coach analysis cards via a new endpoint with legacy fallback:
+
+1. **Primary:** `/api/coach_analysis?domain={domain}` reads from `COACH#` state store via the observatory renderer
+2. **Fallback:** `/api/ai_analysis` (legacy V3 prompt-template analysis) when no coach data exists for a domain
+
+### Card Continuity Markers
+
+Coach cards display three continuity signals that show the observatory reader this is not a stateless daily regeneration:
+
+- **thread_reference** — "Continuing the sleep architecture thread from April 3..."
+- **revision_signal** — "Revising my earlier assessment on recovery trajectory..."
+- **cross_coach_reference** — "Building on Dr. Chen's training load observation..."
+
+### Data Availability Rendering
+
+The `data_availability` field from the computation engine controls card rendering:
+
+- `observational_only` — hides recommendation sections entirely
+- `preliminary` — shows recommendations with qualification badge
+- `established` — full card rendering
+
+---
+
+## IC Features Status (v6.0.0)
+
+The coach system subsumes several IC features that previously ran as standalone prompt-template logic. Others continue to run independently alongside the coach pipeline.
+
+### Subsumed by Coach System
+
+These features are now handled by the computation engine and/or narrative orchestrator. Their logic is no longer needed as separate prompt-template injections for coach-generated output. They continue to run for the legacy Daily Brief email pipeline.
+
+| Feature | What It Did | Now Handled By |
+|---------|-------------|---------------|
+| IC-3: Chain-of-thought two-pass | Two-pass analysis→coaching pattern | Orchestrator brief → Sonnet generation (richer: context includes compressed history, threads, predictions, arc) |
+| IC-7: Cross-pillar trade-off | Prompt instruction for cross-pillar reasoning | Ensemble digest + orchestrator briefs explicitly coordinate cross-domain |
+| IC-23: Attention weighting | Surprise score → prompt budget allocation | Computation engine EWMA trends + orchestrator focus allocation |
+| IC-24: Data quality scoring | Per-source confidence flags | Computation engine statistical guardrails (more granular: per-domain maturity tiers) |
+| IC-25: Diminishing returns | Effort vs trajectory per pillar | Computation engine trend analysis + regression-to-mean detection |
+| v4.8 Anti-repetition | 3-day guidance_given dedup | State updater tracks all threads + compressed history provides full continuity |
+| v4.8 Weekly correlation injection | Top 3 FDR pairs into coaching context | Computation engine reads correlations; orchestrator routes to relevant coaches |
+
+### Running Independently (alongside coach system)
+
+| Feature | Status | Why Independent |
+|---------|--------|----------------|
+| IC-1: platform_memory | Live | General-purpose memory substrate used by many systems beyond coaching |
+| IC-2: daily-insight-compute | Live | Feeds Daily Brief email pipeline (separate from coach pipeline) |
+| IC-6: Milestone Architecture | Live | Weight milestones surfaced in coaching when approaching thresholds |
+| IC-8: Intent vs Execution Gap | Live | Journal analysis writes to platform_memory; read by coaches as data |
+| IC-15: Insight Ledger | Live | Universal insight accumulator for all systems |
+| IC-16: Progressive Context | Live | Digest-specific context windowing (Weekly, Monthly, Chronicle) |
+| IC-17: Red Team / Contrarian | Live | Skeptic persona in Board of Directors calls (separate from coach panel) |
+| IC-18: Hypothesis Engine v1.2.0 | Live | Weekly cross-domain hypothesis generation (independent pipeline) |
+| IC-19: Decision Journal | Live | Decision tracking and calibration dataset |
+| Weekly Correlation Compute | Live | Sunday correlation matrix; results consumed by computation engine |
+| W3: AI Output Validator | Live | Validation gate on all AI-output Lambdas |
+| IC-29: Deficit Sustainability | Live | MCP tools for deficit early warning (standalone) |
+| IC-30: Autonomic Balance | Live | MCP tool for ANS state quadrant mapping (standalone) |
+
+### Data-Gated (not yet live)
+
+| Feature | Data Requirement | Target Date |
+|---------|-----------------|-------------|
+| IC-4: Failure Pattern Recognition | 6-8 weeks behavioral data | ~May 2026 |
+| IC-5: Momentum / Early Warning | 6-8 weeks | ~May 2026 |
+| IC-10: Personal Response Curves | Month 4 | ~July 2026 |
+| IC-11: Coaching Calibration | Month 3 | ~June 2026 |
+| IC-12: Coaching Effectiveness Feedback | Month 5 | ~Aug 2026 |
+| IC-20: Titan Embeddings (Bedrock) | Month 3-4 insight corpus | ~July 2026 |
+| IC-26: Temporal Pattern Mining | 8+ weeks | ~May 2026 |
+| IC-28: Permanent Learnings Distillation | Quarterly | ~June 2026 |
+| IC-31: Meal-Level CGM Response Scorer | 90 days CGM + MacroFactor overlap | ~July 2026 |
+
+### Board Summit Planned Features
+
+| Feature | Status | Summary |
+|---------|--------|---------|
+| IC-27: AI Confidence Scoring (BS-05) | Planned | 3-level confidence badge on every AI insight |
+| IC-28: Habit Cascade Detector (BS-06) | Planned | P(fail Y \| failed X within 48h) conditional probability matrix |
+| Unified Sleep Record (BS-08) | Planned | Reconcile Whoop + Eight Sleep + Apple Health into canonical sleep record |
+| ACWR Training Load Model (BS-09) | Planned | Acute:chronic workload ratio with injury risk alerts |
+| Decision Journal Analytics (BS-T2-6) | Planned | Calibration scoring and regret analysis for IC-19 |
+| Biomarker Trajectory Engine (BS-T2-2) | Planned | Linear regression with 95% CI for lab biomarkers |
 
 ---
 
 ## v4.8.0 AI Insight Engine Overhaul (2026-04-01)
 
-Major overhaul of the AI coaching pipeline in four phases. Closes gaps where rich data was written to DynamoDB but never read by AI prompts. Adds memory to prevent repetition and compounds learning over time.
+> This section documents the pre-coach overhaul that remains active in the Daily Brief email pipeline. The coach system builds on these foundations but replaces the prompt-template approach for observatory-facing output.
 
 ### Phase 1: Anti-Repetition via `guidance_given`
 
-**Problem:** The Daily Brief could repeat the same coaching advice on consecutive days because AI calls had no memory of what was recently said.
+Three-layer anti-repetition system:
 
-**Solution:** Three-layer anti-repetition system:
+1. **`daily_insight_compute_lambda.py`** (step 5j): Reads prior 3 days of `guidance_given` from `computed_insights` records. Builds an "AVOID REPEATING" list (up to 8 items) injected into `ai_context_block`.
 
-1. **`daily_insight_compute_lambda.py`** (step 5j): Reads prior 3 days of `guidance_given` from `computed_insights` records. Builds an "AVOID REPEATING" list (up to 8 items) injected into `ai_context_block`. All 4 AI calls in the Daily Brief receive this list as negative guidance.
+2. **`daily_brief_lambda.py`**: After TL;DR generation, writes current day's coaching points back to `computed_insights` as `guidance_given`.
 
-2. **`daily_brief_lambda.py`**: After TL;DR generation, writes the current day's coaching points back to `computed_insights` as `guidance_given`. This creates the feedback loop — today's advice becomes tomorrow's "avoid" list.
+3. **`ai_expert_analyzer_lambda.py`**: Reads its own prior analysis for the same expert before generating a new one.
 
-3. **`ai_expert_analyzer_lambda.py`**: Reads its own prior analysis for the same expert before generating a new one. Prompts the AI to "find a different angle," preventing the weekly expert panels from recycling the same observations.
-
-**DynamoDB path:** `SOURCE#computed_insights | DATE#<YYYY-MM-DD>` → `guidance_given` field (list of strings).
+**DynamoDB path:** `SOURCE#computed_insights | DATE#<YYYY-MM-DD>` -> `guidance_given` field (list of strings).
 
 ### Phase 2: 6 Unused Data Sources Wired into Coaching
-
-Six data sources were already being ingested and stored in DynamoDB but were never read by AI coaching prompts. v4.8.0 wires all six into the appropriate coaching contexts:
 
 | Data Source | Wired Into | Fields Used |
 |-------------|-----------|-------------|
 | **Journal enrichment** (16 fields) | Journal coach prompt | Defense patterns, cognitive patterns, growth signals, avoidance flags, social quality, locus of control, stress sources |
-| **Character sheet** | Coaching tone adaptation | Conscientiousness, resilience, growth mindset scores — adjusts coaching directness and framing |
-| **Adaptive mode** | Email tone/verbosity | Flourishing/struggling classification changes guidance verbosity and emotional framing |
-| **State of Mind** (Apple Health) | Emotional context priority | Low mood valence triggers nervous-system-reset priority over performance optimization |
-| **Supplements** | Nutrition coach prompt | Active supplement list injected so AI accounts for nutrient adequacy (avoids recommending what's already supplemented) |
-| **Weather** | Training prescription | Daylight hours, barometric pressure, temperature inform training intensity and outdoor recommendations |
+| **Character sheet** | Coaching tone adaptation | Conscientiousness, resilience, growth mindset scores |
+| **Adaptive mode** | Email tone/verbosity | Flourishing/struggling classification |
+| **State of Mind** (Apple Health) | Emotional context priority | Low mood valence triggers nervous-system-reset priority |
+| **Supplements** | Nutrition coach prompt | Active supplement list |
+| **Weather** | Training prescription | Daylight hours, barometric pressure, temperature |
 
-### Phase 3: Memory — `what_worked` + Weekly Correlation Injection
+### Phase 3: Memory -- `what_worked` + Weekly Correlation Injection
 
-**`what_worked` pattern** (step 5k in `daily_insight_compute_lambda.py`):
-- When the weekly grade average >= 85, the Lambda records the current conditions to `MEMORY#what_worked#<date>` in `platform_memory`
-- Recorded conditions include: grade average, declining/improving metrics, strongest/weakest habits
-- `build_memory_context()` reads the most recent 2 `what_worked` records and injects them as "WHAT HAS WORKED (recent episodes)" into coaching context
-- Enables coaching like: "When your conditions looked like this before, here's what worked..."
+**`what_worked` pattern** (step 5k): When weekly grade average >= 85, records current conditions to `MEMORY#what_worked#<date>`. Coaching reads most recent 2 records as "WHAT HAS WORKED" context.
 
-**Weekly correlation injection** (step 5l in `daily_insight_compute_lambda.py`):
-- Reads the most recent `weekly_correlations` record (top 3 significant Pearson r pairs by absolute value)
-- Injects as "WEEKLY CORRELATIONS (statistically significant)" into `ai_context_block`
-- Coaching AI references confirmed statistical relationships rather than speculating about connections
-- Only FDR-significant pairs with |r| >= threshold are surfaced (per BH correction in weekly-correlation-compute)
-
-**Coaching history deduplication:** The `guidance_given` field (Phase 1) doubles as a deduplication index — the platform can now track what was advised and avoid re-advising the same thing within a configurable window.
+**Weekly correlation injection** (step 5l): Reads most recent `weekly_correlations` record (top 3 significant Pearson r pairs by absolute value). Injected as "WEEKLY CORRELATIONS (statistically significant)" into `ai_context_block`.
 
 ### Phase 4: Labs + Genome Personalization Modules
 
-Two new coaching modules imported by `daily_brief_lambda.py`:
+**`lambdas/labs_coaching.py`** — 8 biomarker coaching rules with threshold-based triggers (ferritin, vitamin D, hs-CRP, HbA1c, fasting insulin, ApoB, testosterone, TSH). Generates coaching deltas injected as `labs_coaching_ctx`.
 
-**`lambdas/labs_coaching.py`** — Biomarker coaching rules:
-- Reads latest lab results from DynamoDB (`SOURCE#labs`)
-- 8 coaching rules with threshold-based triggers: ferritin (<40), vitamin D (<30), hs-CRP (>3.0), HbA1c (>5.6), fasting insulin (>10), ApoB (>90), testosterone (<400), TSH (>2.5)
-- Generates coaching delta strings injected into TL;DR prompt as `labs_coaching_ctx`
-- Only fires when biomarkers are out of range — silent when all values are optimal
-
-**`lambdas/genome_coaching.py`** — Genome-personalized guidance:
-- Reads genome SNP data from DynamoDB
-- 7 gene mappings: CYP1A2 (caffeine metabolism), MTHFR (methylation), FTO (satiety), BDNF (exercise timing), FADS1/FADS2 (omega-3 conversion), VKORC1 (vitamin K), MTNR1B (melatonin timing)
-- **Weekly rotation** — cycles which gene insights surface each week to prevent repetition
-- Generates coaching delta strings injected into TL;DR prompt as `genome_coaching_ctx`
-
-**Integration point:** Both modules are called by `daily_brief_lambda.py` before the TL;DR AI call. Their outputs flow through `ai_calls.py` via `data["labs_coaching_ctx"]` and `data["genome_coaching_ctx"]`.
-
-### Infrastructure Impact
-- Shared Lambda layer rebuilt: v15 -> v18 (3 version bumps during the overhaul)
-- `daily-brief` and `daily-insight-compute` Lambdas updated to layer v18
-- No new DynamoDB partitions — all writes use existing `platform_memory`, `computed_insights`, and `labs`/`genome` partitions
+**`lambdas/genome_coaching.py`** — 7 gene mappings (CYP1A2, MTHFR, FTO, BDNF, FADS1/FADS2, VKORC1, MTNR1B) with weekly rotation to prevent repetition. Generates coaching deltas injected as `genome_coaching_ctx`.
 
 ---
 
 ## Prompt Architecture Standards
 
-All IC-era AI calls follow these structural standards:
+All IC-era AI calls and coach generation follow these structural standards:
 
-### 1. Prompt Anatomy (all calls)
+### 1. Prompt Anatomy (legacy Daily Brief calls)
 ```
-[1]  PERSONA / ROLE — who is speaking (Board member, Elena Voss, etc.)
+[1]  PERSONA / ROLE
 [2]  JOURNEY CONTEXT — week number, stage label, stage-appropriate principles
 [3]  DATA QUALITY BLOCK — per-source confidence flags (IC-24)
 [4]  SURPRISE SCORES — which metrics are unusual today (IC-23)
-[5]  PLATFORM MEMORY — relevant memory records (IC-1), what_worked (v4.8.0)
-[6]  INSIGHT CONTEXT — recent high-value insights (IC-16, Progressive Context)
-[7]  ANTI-REPETITION — "AVOID REPEATING" list from prior 3 days (v4.8.0)
-[8]  WEEKLY CORRELATIONS — top 3 FDR-significant Pearson pairs (v4.8.0)
-[9]  LABS/GENOME CONTEXT — biomarker coaching deltas + genome SNP guidance (v4.8.0)
-[10] TODAY'S DATA — actual metrics, weighted by surprise score (IC-23),
-     enriched with journal analysis, character sheet, adaptive mode,
-     State of Mind, supplements, and weather context (v4.8.0)
-[11] INSTRUCTION — what to produce, including:
-     - Cross-pillar trade-off reasoning (IC-7)
-     - Correlative (not causal) framing (AI-2)
-     - Red Team challenge (IC-17)
-     - Health disclaimer footer (AI-1)
+[5]  PLATFORM MEMORY — relevant memory records, what_worked
+[6]  INSIGHT CONTEXT — recent high-value insights (IC-16)
+[7]  ANTI-REPETITION — "AVOID REPEATING" list from prior 3 days
+[8]  WEEKLY CORRELATIONS — top 3 FDR-significant Pearson pairs
+[9]  LABS/GENOME CONTEXT — biomarker coaching deltas + genome SNP guidance
+[10] TODAY'S DATA — actual metrics, enriched with journal, character,
+     adaptive mode, State of Mind, supplements, weather
+[11] INSTRUCTION — output format, cross-pillar trade-offs, correlative
+     framing, Red Team challenge, health disclaimer
 ```
 
-### 2. Chain-of-Thought Structure (BoD + TL;DR)
-```python
-# Pass 1 — analysis (JSON output)
-{
-  "key_patterns": [...],
-  "surprising_findings": [...],
-  "likely_connections": [...],      # not "causal chains" — AI-2 compliance
-  "red_team_challenge": "...",      # IC-17
-  "diminishing_returns_flag": ...,  # IC-25
-  "highest_leverage_action": "..."
-}
-
-# Pass 2 — coaching output (uses Pass 1 JSON as context)
-"Given this analysis: {pass_1_json}\n\nNow write the coaching message..."
+### 2. Coach Generation Prompt Anatomy (new)
+```
+[1]  VOICE SPEC — structural rules, decision style, few-shot examples
+[2]  GENERATION BRIEF — from narrative orchestrator (focus areas, threads,
+     arc phase, cross-coach references to make)
+[3]  COMPUTATION RESULTS — EWMA trends, guardrail classifications,
+     regression-to-mean flags, seasonality adjustments
+[4]  COMPRESSED HISTORY — 500-token compressed state (own prior outputs)
+[5]  ACTIVE THREADS — open analytical threads to continue or resolve
+[6]  ACTIVE PREDICTIONS — outstanding predictions to revisit
+[7]  DOMAIN DATA — domain-specific metrics from DynamoDB
+[8]  ENSEMBLE CONTEXT — latest digest, active disagreements
 ```
 
 ### 3. Causal Language Standards (AI-2)
 All prompts use correlative framing:
-- ✅ "likely connection" / "appears to correlate" / "may be related to"
-- ❌ "causes" / "directly leads to" / "because of" (when inferred, not measured)
+- "likely connection" / "appears to correlate" / "may be related to"
+- Never "causes" / "directly leads to" / "because of" (when inferred, not measured)
 
 ### 4. Health Disclaimer (AI-1)
 All AI-generated emails include footer: *"This platform provides personal health data aggregation and AI-generated insights for informational purposes only. Always consult a qualified healthcare provider for medical advice."*
@@ -363,7 +582,7 @@ Footer presence validated by W3 `ai_output_validator` before send.
 
 Location: `lambdas/insight_writer.py` (in shared Lambda Layer)
 
-Called by all 5 email/digest Lambdas after generation. Writes structured records to `SOURCE#insights`.
+Called by all email/digest Lambdas after generation. Writes structured records to `SOURCE#insights`.
 
 ```python
 from insight_writer import write_insight
@@ -383,25 +602,6 @@ write_insight(
 
 ---
 
-## Data Maturity Roadmap
-
-IC features are gated by how much data exists. Don't build IC features before their data maturity threshold:
-
-| Feature | Data Requirement | Target Date |
-|---------|-----------------|-------------|
-| IC-4 Failure Pattern Recognition | 6-8 weeks behavioral data | ~May 2026 |
-| IC-5 Momentum / Early Warning | 6-8 weeks | ~May 2026 |
-| IC-9 Episodic Memory ("what worked") | ~~Month 3~~ | **Live (v4.8.0)** |
-| IC-10 Personal Response Curves | Month 4 | ~July 2026 |
-| IC-11 Coaching Calibration | Month 3 | ~June 2026 |
-| IC-12 Coaching Effectiveness Feedback | Month 5 | ~Aug 2026 |
-| IC-20 Titan Embeddings (Bedrock) | Month 3-4 insight corpus | ~July 2026 |
-| IC-26 Temporal Pattern Mining | 8+ weeks | ~May 2026 |
-| IC-28 Permanent Learnings Distillation | Quarterly | ~June 2026 |
-| IC-30 Counterfactual Reasoning | Month 5 (after IC-10) | ~Aug 2026 |
-
----
-
 ## Known Statistical Limitations
 
 > Authored in consultation with **Dr. Henning Brandt** (Statistician / Quantitative Methods Lead). Standing question: *"Are the conclusions actually valid?"*
@@ -410,214 +610,175 @@ IC features are gated by how much data exists. Don't build IC features before th
 
 ---
 
-### 1. Exponential Moving Average (EMA) — Banister TSB Model
+### 1. Exponential Moving Average (EMA) -- Banister TSB Model
 
-**Where used:** `daily_metrics_compute_lambda.py` → `compute_tsb()`
-**Parameters:** ATL (Acute Training Load): τ = 7 days, λ = exp(−1/7) ≈ 0.867. CTL (Chronic Training Load): τ = 42 days, λ = exp(−1/42) ≈ 0.976.
+**Where used:** `daily_metrics_compute_lambda.py` -> `compute_tsb()`
+**Parameters:** ATL (Acute Training Load): tau = 7 days, lambda = exp(-1/7) ~ 0.867. CTL (Chronic Training Load): tau = 42 days, lambda = exp(-1/42) ~ 0.976.
 
-**How to read λ and τ:** For any EMA with decay factor λ, the time constant τ = −1/ln(λ) is the *mean age of the data* — the average number of days back that a given observation contributes. A λ of 0.85, for instance, yields τ ≈ 6.2 days (−1/ln(0.85)). The ATL used here (λ ≈ 0.867, τ = 7 days) is slightly longer-memory. Concretely:
+**How to read lambda and tau:** For any EMA with decay factor lambda, the time constant tau = -1/ln(lambda) is the *mean age of the data*. A lambda of 0.85 yields tau ~ 6.2 days. Concretely:
 
-| Parameter | λ | τ (mean age) | Half-life | 95% of weight within |
-|-----------|---|-------------|-----------|----------------------|
-| ATL | ≈ 0.867 | 7 days | 4.85 days | last **21 days** |
-| CTL | ≈ 0.976 | 42 days | 29 days | last **126 days** |
+| Parameter | lambda | tau (mean age) | Half-life | 95% of weight within |
+|-----------|--------|---------------|-----------|----------------------|
+| ATL | ~0.867 | 7 days | 4.85 days | last **21 days** |
+| CTL | ~0.976 | 42 days | 29 days | last **126 days** |
 
-**Common misconception:** the ATL "7-day" label describes the *mean age*, not the window. Yesterdayʼs session carries ~13% of todayʼs ATL; a session 21 days ago still contributes ~5%. TSB is not a 7-day metric — it reaches back weeks.
+**Common misconception:** the ATL "7-day" label describes the *mean age*, not the window. Yesterday's session carries ~13% of today's ATL; a session 21 days ago still contributes ~5%.
 
 **Validity conditions:**
-- Load proxy is continuous and homogeneous. The model uses Strava kilojoule output only. Garmin-only runs, strength sessions, and HIIT are absent from the load signal. TSB underestimates total training stress proportionally to how much training is not recorded in Strava.
-- The 60-day warm-up window is sufficient for ATL (3τ = 21 days needed for 95% stabilisation) but insufficient for CTL (3τ = 126 days). CTL values computed with fewer than ~90 days of consistent Strava history are systematically underestimated.
-- The Banister model assumes load and fatigue accumulate and decay linearly. Non-linear effects (illness recovery, detraining after injury) are not captured.
-- Kilojoule values of zero on rest days are meaningful and correctly handled (zero load); however, if Strava ingestion fails silently for a day, a rest day is assumed. Check ingestion freshness before interpreting a TSB spike.
+- Load proxy is continuous and homogeneous. The model uses Strava kilojoule output only. Garmin-only runs, strength sessions, and HIIT are absent.
+- The 60-day warm-up window is sufficient for ATL (3tau = 21 days) but insufficient for CTL (3tau = 126 days).
+- The Banister model assumes linear load accumulation and decay.
+- Zero-load rest days are correctly handled; silent ingestion failures are not (they masquerade as rest days).
 
-**Known failure modes:** sparse Strava history (early platform days), mixed-device dedup removing legitimate load data, non-cardio training invisible to the model.
+**Known failure modes:** sparse Strava history, mixed-device dedup removing legitimate load data, non-cardio training invisible to the model.
+
+**Coach system integration:** The computation engine uses domain-specific EWMA parameters from `ewma_params.json` rather than the fixed Banister constants. Each domain has decay factors calibrated to its biological time constants.
 
 ---
 
-### 2. Z-Score Anomaly Detection — Adaptive Threshold
+### 2. Z-Score Anomaly Detection -- Adaptive Threshold
 
-**Where used:** `anomaly_detector_lambda.py` → `check_anomalies()`
-**Method:** For each of 13 metrics, compute a 30-day rolling mean (μ) and standard deviation (σ). Flag if z = (x − μ)/σ exceeds the CV-adaptive threshold in the anomalous direction.
+**Where used:** `anomaly_detector_lambda.py` -> `check_anomalies()`
+**Method:** For each of 13 metrics, compute a 30-day rolling mean and standard deviation. Flag if z = (x - mu) / sigma exceeds the CV-adaptive threshold.
 
 **Adaptive thresholds:**
 
-| CV (σ/μ) | Z threshold | One-tailed FP rate (normality assumed) |
-|----------|-------------|----------------------------------------|
-| ≥ 0.30 (high variability) | 2.5 | 0.62% per metric per day |
-| 0.15–0.30 (medium) | 2.0 | 2.28% per metric per day |
+| CV (sigma/mu) | Z threshold | One-tailed FP rate (normality assumed) |
+|---------------|-------------|----------------------------------------|
+| >= 0.30 (high variability) | 2.5 | 0.62% per metric per day |
+| 0.15-0.30 (medium) | 2.0 | 2.28% per metric per day |
 | < 0.15 (low variability) | 2.0 | 2.28% per metric per day |
 
-> **TB7-21 (2026-03-13):** Floor raised from Z=1.5/1.75 to Z=2.0 (`anomaly_detector_lambda.py` v2.5.0). At 13 metrics with Z=1.5 floor, expected daily FP count under independence was ~0.87 (single-metric) before the 2-source gate. Z=2.0 floor reduces this to ~0.30. Sustained streak tracker is unaffected (reads DDB anomaly history, not single-day Z-scores).
+> **TB7-21 (2026-03-13):** Floor raised from Z=1.5/1.75 to Z=2.0. At 13 metrics, expected daily FP count reduced from ~0.87 to ~0.30.
 
-**Normality assumption:** Z-scores are only interpretable as probabilities under a Gaussian distribution. Most health metrics are *not* normally distributed:
-- **HRV**: right-skewed and often lognormal. **Fixed in v2.4.0:** Z-scores for HRV are now computed on log(HRV) rather than raw HRV (see `LOG_TRANSFORM_METRICS` in `anomaly_detector_lambda.py`). Display values (ms) remain in original units; only the Z computation moves to log domain. This reduces false high-HRV flags and makes low-HRV detection more precise.
-- **Steps**: bounded below at zero; heavy right tail on active days. DoW normalisation correctly splits both mean *and* σ by day type — weekday σ is computed on weekday-only values, weekend σ on weekend-only values. The remaining approximation is that the within-day-type distribution is still assumed Gaussian; the right tail on high-step days means the model is mildly under-sensitive on the high end.
-- **Weight**: approximately Gaussian over short windows; the 1.5 lb minimum-absolute-change filter compensates well.
-- **Recovery/sleep scores**: bounded 0–100, effectively truncated normals. Moderate distortion near extremes.
+**Normality assumption:** Z-scores assume Gaussian distribution. Most health metrics are not normally distributed:
+- **HRV**: right-skewed, often lognormal. **Fixed in v2.4.0:** Z-scores computed on log(HRV).
+- **Steps**: bounded below at zero; heavy right tail. DoW normalization splits mean and sigma by day type.
+- **Weight**: approximately Gaussian over short windows; 1.5 lb minimum-absolute-change filter compensates.
+- **Recovery/sleep scores**: bounded 0-100, truncated normals. Moderate distortion near extremes.
 
-**Multiple comparisons:** At 13 metrics and Z=1.5, the expected number of spurious single-metric flags per day under independence and normality is approximately 13 × 0.0668 ≈ 0.87. The **2-source, 2-metric gate** before sending an alert provides a natural intersection filter that substantially reduces the per-day false alert rate. Do not remove this gate.
+**Multiple comparisons:** The **2-source, 2-metric gate** before sending an alert provides a natural intersection filter. Do not remove this gate.
 
-**Minimum baseline days (N = 7):** The code requires at least 7 historical data points to compute a baseline. At N=7, the standard error of σ̂ is σ/√(2(N−1)) ≈ 0.29σ — nearly 30% uncertainty. Z-scores derived from N=7–14 baselines should be treated as directional signals, not precise probability statements. After 30 days of data the baseline is reliable.
-
-**Sustained streak detection (3+ days):** Valid as a pattern signal but does not correct for autocorrelation. Health metrics are serially correlated — a low HRV day predicts the next day's HRV. Consecutive flags therefore understate the novelty of the streak compared to what the naive flag-count implies.
+**Minimum baseline days (N = 7):** At N=7, the standard error of sigma-hat is ~29%. Z-scores at N=7-14 are directional signals, not precise probability statements.
 
 ---
 
 ### 3. Non-Overlapping Window Drift Detection
 
-**Where used:** `daily_insight_compute_lambda.py` → `_compute_slow_drift()`
-**Method:** Compare recent-window mean (days 1–14 before yesterday) against baseline-window mean (days 15–28 before yesterday). Express drift as (recent_mean − baseline_mean) / baseline_SD. Windows are explicitly non-overlapping by design (Henning gate).
+**Where used:** `daily_insight_compute_lambda.py` -> `_compute_slow_drift()`
+**Method:** Compare 14-day recent window mean against 14-day baseline window mean (non-overlapping). Express drift as (recent_mean - baseline_mean) / baseline_SD.
 
-> **TB7-22 (2026-03-13):** Windows equalized from 7d recent/8-28d baseline to 14d recent/15-28d baseline (`daily_insight_compute_lambda.py` v1.4.0). Rationale: asymmetric windows produced a volatile recent mean (N=7) vs stable baseline mean (N=21), inflating apparent drift severity. Equal 14d windows have the same standard error of the mean, making comparisons statistically equivalent.
-
-**Why non-overlapping matters:** Overlapping windows share data points, creating artificial correlation between the two means and inflating the apparent precision of the drift estimate. The 1-day gap between windows (day 7 vs day 8) is the minimum necessary separation.
+> **TB7-22 (2026-03-13):** Windows equalized from 7d/21d to 14d/14d. Equal windows have the same standard error of the mean.
 
 **Validity conditions:**
-- **Minimum N = 14 in the baseline window.** This is enforced by code. At N=14 the standard error of σ̂ is ~19%; at N=21 it falls to ~15%. Both are acceptable for detecting large drifts but insufficient for borderline cases. Drift severity of "mild" (0.5–1.0 SD) at N=14 baseline should not trigger clinical concern.
-- **Metric stationarity.** The drift test assumes the baseline window represents a stable reference state. If Matthew recently changed behaviour (started a new protocol, changed diet significantly), the baseline window may itself contain a trend, making the drift signal uninterpretable. In these cases, the N=1 experiment framework is a better analytical tool than the drift detector.
-- **SD-based severity tiers are uncalibrated.** The thresholds (0.5, 1.0, 1.5 SD) were chosen by expert judgment, not by calibrating against a false positive rate target. A "significant" (1.0–1.5 SD) slow drift flag corresponds to roughly the 16th percentile of the baseline distribution under normality — meaningful, but not alarming in isolation.
-- **No significance test.** The comparison is descriptive: it surfaces the magnitude of change but does not test whether the change exceeds sampling error. Two values are compared without confidence intervals. Treat slow drift flags as hypotheses to investigate, not confirmed findings.
+- Minimum N = 14 in baseline window (code-enforced)
+- Assumes baseline window represents a stable reference state
+- SD-based severity tiers (0.5, 1.0, 1.5 SD) are expert-judged, not calibrated to FP rate
+- No significance test — purely descriptive
 
-**Weight plateau sub-method:** uses linear regression slope over ≥8 weight measurements (Attia gate). Regression slope is valid under this approach but the threshold of −0.2 lbs/week is clinically derived, not statistically calibrated. It will also fire during intentional diet breaks or refeeds. The mandatory recomposition caveat in the output is the correct response to this ambiguity.
+**Weight plateau sub-method:** Linear regression slope over >= 8 weight measurements. Threshold of -0.2 lbs/week is clinically derived.
 
 ---
 
 ### 4. Three-Day Consecutive Trend Signal
 
-**Where used:** `daily_insight_compute_lambda.py` → `detect_metric_trends()`
-**Method:** Detect if a metric has moved monotonically in one direction for 3 consecutive days.
+**Where used:** `daily_insight_compute_lambda.py` -> `detect_metric_trends()`
+**Method:** Detect 3 consecutive days of monotonic movement.
 
-**Statistical validity:** This is an ordinal test, not a parametric one. It makes no distributional assumption, which is a strength. The weakness is sensitivity:
-- Under a random walk, the probability that any 3-day sequence is strictly monotone (either all up or all down) is 2 × (1/2)² = 50% when conditioned on the direction being consistent. For three distinct draws from a continuous distribution, P(x₁ < x₂ < x₃) = 1/6 ≈ 16.7%; P(strictly monotone in either direction) = 1/3 ≈ 33%.
-- With 7 tracked metrics and 7-day windows, spurious 3-day monotone runs are expected roughly once per week under random variation. The signal is a *lead indicator*, not a confirmed trend.
-- Serial correlation in health metrics (today predicts tomorrow) increases the probability of spurious streaks beyond the random walk baseline.
-
-**Correct interpretation:** a 3-day declining signal should prompt inspection of the raw data, not immediate action. It is most meaningful when (a) the delta magnitude is large, (b) it aligns with an anomaly detector flag, or (c) an IC-5 early warning is also active.
+**Statistical validity:** Ordinal test with no distributional assumption. P(strictly monotone in either direction) = 1/3 ~ 33% under random draws. With 7 metrics and 7-day windows, spurious 3-day runs are expected ~once per week. The signal is a lead indicator, not a confirmed trend.
 
 ---
 
 ### 5. IC-23 Surprise Scoring
 
-**Where used:** `ai_calls.py` → `_compute_surprise_scores()`
-**Method:** Compute percentage deviation of todayʼs metric from its 7-day mean. Map linearly to a 0–1 surprise score using metric-specific scaling factors (e.g. HRV: 40% deviation → surprise 1.0; glucose: 20% deviation → surprise 1.0).
+**Where used:** `ai_calls.py` -> `_compute_surprise_scores()`
+**Method:** Percentage deviation from 7-day mean, mapped to 0-1 via metric-specific scaling factors.
 
-**This is not a statistical test.** It is a heuristic attention-allocation mechanism. The scaling factors were chosen by judgment and are not tied to any distributional model. Specifically:
-- The 7-day simple moving average baseline is noisier than the 30-day baseline used by the anomaly detector. A single outlier day in the last 7 days significantly shifts the mean, which can suppress surprise scores for genuinely anomalous events immediately following the outlier.
-- Surprise scores do not account for the SD of the metric — a 20% deviation in a highly variable metric (e.g. steps) carries different information than a 20% deviation in a low-variability metric (e.g. resting heart rate). The anomaly detector handles this correctly via CV-adaptive thresholds; the surprise scorer does not.
-- **Intended use:** prompt-length allocation and attention routing only. Do not use surprise scores as a proxy for statistical significance.
+**This is not a statistical test.** It is a heuristic attention-allocation mechanism. The 7-day SMA baseline is noisier than the anomaly detector's 30-day baseline. Intended use: prompt-length allocation and attention routing only.
 
 ---
 
-### 6. Weekly Correlation Compute — Pearson + BH FDR
+### 6. Weekly Correlation Compute -- Pearson + BH FDR
 
-**Where used:** `weekly_correlation_compute_lambda.py` → `compute_correlations()`
-**Method:** Pearson r over 90-day rolling window, 23 pairs (20 cross-sectional + 3 lagged). Two-tailed p-value from t-distribution (df = n−2). Benjamini-Hochberg FDR correction applied across all 23 pairs simultaneously (v3.7.37).
+**Where used:** `weekly_correlation_compute_lambda.py` -> `compute_correlations()`
+**Method:** Pearson r over 90-day rolling window, 23 pairs (20 cross-sectional + 3 lagged). BH FDR correction across all 23 pairs.
 
-**Pearson r validity conditions:**
-- Assumes a linear relationship. Non-linear associations (e.g. U-shaped HRV vs training load curve) will produce r ≈ 0 even when a real relationship exists.
-- Both variables must have variance. If one metric is near-constant for weeks (e.g. during illness), r is undefined and the pair is excluded.
-- Assumes no extreme outliers dominate the correlation. A single anomalous data point can shift Pearson r by ±0.2 at n=30.
+**N-gating:**
+- `strong` (|r| >= 0.7) requires n >= 50
+- `moderate` (|r| >= 0.4) requires n >= 30
+- `weak` (|r| >= 0.2) requires n >= 14
+- Below threshold: label downgraded one tier
 
-**N-gating (prevents spurious strong labels at low n):**
-- `strong` (|r| ≥ 0.7) requires n ≥ 50
-- `moderate` (|r| ≥ 0.4) requires n ≥ 30
-- `weak` (|r| ≥ 0.2) requires n ≥ 14
-- Below the threshold, the label is downgraded one tier (e.g. r=0.7 at n=35 → `moderate`, not `strong`)
+**FDR correction (BH):** Controls expected proportion of false discoveries among significant results. At typical n=60-90, expect 3-7 FDR-significant pairs per week.
 
-**FDR correction (BH):** With 23 simultaneous tests, testing at α=0.05 without correction yields ~1.15 expected false discoveries. BH ranks p-values and adjusts the threshold: a pair is `fdr_significant` if its sorted p-value rank k satisfies p(k) ≤ (k/23) × 0.05. This controls the expected proportion of false discoveries among significant results, not the per-test false positive rate. At typical n=60-90 early in the platform's life, expect 3-7 FDR-significant pairs per week.
+**Lagged pairs:** Serial autocorrelation is not explicitly corrected; lagged correlations in autocorrelated series have inflated effective n. Treat as directional signals.
 
-**Lagged pairs:** Three lagged correlations track temporal precedence:
-- `hrv_predicts_next_day_load`: does today's HRV predict tomorrow's training load?
-- `recovery_predicts_next_day_load`: does today's Whoop recovery predict tomorrow's effort?
-- `load_predicts_next_day_recovery`: does today's training load predict tomorrow's recovery?
-- Lag computed by shifting one series by 1 day and matching overlapping dates. Serial autocorrelation is not explicitly corrected — lagged correlations in autocorrelated series have inflated effective n. Treat as directional signals, not precise probability statements.
-
-**On-demand correlation tool note (R14-F08):** `tool_get_cross_source_correlation` is a single-pair test with no multiple-comparison correction. When p < 0.05, the tool adds a `_note` field warning that the weekly report applies BH FDR correction across 23 pairs and is more conservative. Do not treat on-demand p-values as equivalent to the weekly report's `fdr_significant` flag.
+**On-demand correlation note (R14-F08):** `tool_get_cross_source_correlation` is a single-pair test with no multiple-comparison correction. Do not treat on-demand p-values as equivalent to the weekly report's `fdr_significant` flag.
 
 ---
 
-### 7. Validity Precondition Summary
+### 7. Coach Computation Engine -- EWMA Trends
+
+**Where used:** `coach_computation_engine.py`
+**Method:** Domain-specific EWMA with decay parameters from `s3://matthew-life-platform/config/computation/ewma_params.json`. Unlike the fixed Banister model (tau = 7/42), each domain uses decay factors calibrated to biological time constants (e.g., sleep metrics have shorter decay than body composition metrics).
+
+**Regression-to-mean detection:** Flags when z > 1.5 AND the metric is moving toward its personal mean. The threshold of 1.5 SD was chosen to balance sensitivity (catching genuine reversion) against specificity (not flagging every fluctuation). Serial correlation in health metrics means some flagged movements will be genuine trends, not reversion.
+
+**Seasonality adjustment:** Population-level baselines. Individual seasonal patterns may differ from population patterns. The adjustment is directional — it shifts the prior expectation — but does not replace individual assessment.
+
+---
+
+### 8. Prediction Evaluation -- Bayesian Beta Distribution
+
+**Where used:** `coach_prediction_evaluator.py`
+**Method:** Each coach-domain pair maintains a Beta(alpha, beta) prior for prediction accuracy. Successful predictions increment alpha; failures increment beta. The posterior mean alpha/(alpha+beta) gives the running accuracy estimate.
+
+**Validity conditions:**
+- Assumes predictions are independent Bernoulli trials. In practice, consecutive predictions about the same metric are correlated.
+- The prior (Beta(1,1) = uniform) is weakly informative. After 20+ evaluated predictions, the prior's influence is negligible.
+- Directional and conditional predictions are evaluated as binary outcomes (correct/incorrect). Partial credit is not modeled.
+
+---
+
+### 9. Validity Precondition Summary
 
 | Method | File | Minimum data for valid output | Key assumption | Known failure mode |
 |--------|------|------------------------------|----------------|--------------------|
-| EMA / ATL (τ=7) | `daily_metrics_compute_lambda.py` | ~21 days of Strava history | Linear load accumulation; Strava = complete load signal | Non-Strava training invisible |
-| EMA / CTL (τ=42) | `daily_metrics_compute_lambda.py` | ~90 days of Strava history | Same as ATL | CTL underestimated until ~126-day warm-up |
-| Z-score anomaly | `anomaly_detector_lambda.py` | 7 days (reliable at 30) | Approximate normality of metric distribution | HRV/steps are non-Gaussian; Z scores are approximate |
-| Non-overlapping drift | `daily_insight_compute_lambda.py` | 14 days baseline (hardcoded gate) | Stationarity of baseline window | Breaks during intentional protocol changes |
-| 3-day trend | `daily_insight_compute_lambda.py` | 3 days (pure ordinal) | None (distribution-free) | High FP rate under serial correlation |
-| Surprise scoring | `ai_calls.py` | 7 days | None (heuristic) | 7-day mean distorted by recent outliers |
-| Weekly Pearson (cross-sectional) | `weekly_correlation_compute_lambda.py` | 30 days (n-gated; weak at 14) | Linear relationship; no extreme outliers | Non-linear relationships invisible; low n inflates r |
-| Weekly Pearson (lagged) | `weekly_correlation_compute_lambda.py` | 30 days + 1 day lag | Same as cross-sectional | Autocorrelation inflates effective n on lagged pairs |
+| EMA / ATL (tau=7) | `daily_metrics_compute_lambda.py` | ~21 days Strava | Linear load accumulation | Non-Strava training invisible |
+| EMA / CTL (tau=42) | `daily_metrics_compute_lambda.py` | ~90 days Strava | Same as ATL | CTL underestimated until ~126 days |
+| Z-score anomaly | `anomaly_detector_lambda.py` | 7 days (reliable at 30) | Approximate normality | HRV/steps non-Gaussian |
+| Non-overlapping drift | `daily_insight_compute_lambda.py` | 14 days baseline | Baseline stationarity | Breaks during protocol changes |
+| 3-day trend | `daily_insight_compute_lambda.py` | 3 days (ordinal) | None | High FP under serial correlation |
+| Surprise scoring | `ai_calls.py` | 7 days | None (heuristic) | 7-day mean distorted by outliers |
+| Weekly Pearson (cross) | `weekly_correlation_compute_lambda.py` | 30 days (n-gated) | Linear relationship | Non-linear invisible; low n inflates r |
+| Weekly Pearson (lagged) | `weekly_correlation_compute_lambda.py` | 30 days + 1 day | Same as cross-sectional | Autocorrelation inflates effective n |
+| Coach EWMA trends | `coach_computation_engine.py` | Domain-specific | Domain-calibrated decay | Miscalibrated decay parameters |
+| Coach stat guardrails | `coach_computation_engine.py` | 7 days minimum | Day count = data quality | Missing days counted as available |
+| Prediction evaluation | `coach_prediction_evaluator.py` | 20+ predictions | Independent Bernoulli | Correlated predictions bias estimate |
 
 ---
 
-### 8. What a New Engineer Must Not Do
+### 10. What a New Engineer Must Not Do
 
-1. **Do not lower Z-score thresholds without recomputing the expected FP rate.** Z=1.0 at 13 metrics produces ~2.6 expected false alerts per day. The 2-source gate will not save you — it shifts the problem to correlated metrics (e.g. HRV and recovery score move together).
+1. **Do not lower Z-score thresholds without recomputing the expected FP rate.** Z=1.0 at 13 metrics produces ~2.6 expected false alerts per day.
 
-2. **Do not interpret TSB as a pure 7-day metric.** Todayʼs TSB reflects 60 days of training history with exponentially decaying weight. A sudden change in TSB after a single hard session is expected.
+2. **Do not interpret TSB as a pure 7-day metric.** Today's TSB reflects 60 days of training history with exponentially decaying weight.
 
-3. **Do not run the drift detector without the N=14 gate.** The gate is in code; do not bypass it when backfilling or running one-off analyses. A drift "signal" at N<14 has an SE of SD large enough to make the severity tier meaningless.
+3. **Do not run the drift detector without the N=14 gate.** A drift "signal" at N<14 has SE large enough to make the severity tier meaningless.
 
-4. **Do not add new metrics to the anomaly detector without checking their distribution.** If the metric is bounded, multimodal, or heavily right-skewed, consider a log-transform or a percentile-rank approach instead of raw Z-scores.
+4. **Do not add new metrics to the anomaly detector without checking their distribution.** Consider log-transform or percentile-rank for bounded/skewed metrics.
 
-5. **Surprise scores are prompt engineering, not statistics.** They should not be persisted to DynamoDB as evidence of anomalous events or used to gate any downstream logic.
+5. **Surprise scores are prompt engineering, not statistics.** Do not persist them as evidence or use them to gate downstream logic.
 
-6. **Do not treat on-demand correlation p-values as equivalent to the weekly report.** The weekly report corrects for 23 simultaneous tests via BH FDR. An on-demand single-pair p=0.04 has not been corrected; the same pair in the weekly report may not be `fdr_significant`.
+6. **Do not treat on-demand correlation p-values as equivalent to the weekly report.** Single-pair tests have no multiple-comparison correction.
 
-7. **Do not remove the W3 ai_output_validator gate.** It is the last line of defence against silent prompt failures (empty responses, missing disclaimers) propagating into the insight ledger and downstream coaching.
+7. **Do not remove the W3 ai_output_validator gate.** It is the last defence against silent prompt failures propagating into the insight ledger.
 
----
+8. **Do not bypass the computation engine's statistical guardrails.** If a coach is classified as `observational_only`, do not override this in the prompt or the rendering. The guardrails exist to prevent false confidence from small samples.
 
-## Board Summit IC Additions (2026-03-16)
+9. **Do not modify voice specifications without running the quality gate.** Voice spec changes can cause cross-coach convergence or anti-pattern violations that are not visible from a single coach's output.
 
-The following IC features were identified by the Joint Board Summit (Health & Personal Results Board × Technical & Product Board). They supplement the existing IC roadmap. Full rationale in `board_summit_2026-03-16.md`.
-
-### IC-27: AI Confidence Scoring (BS-05)
-**Status:** Planned — Board Summit priority #5
-**Target:** Next 90 days
-**What it does:** Attaches a 3-level confidence badge (High / Medium / Low) to every AI-generated insight. Criteria per insight type: data completeness (are all relevant sources present?), sample size (n-gating per Henning's statistical validity flags), effect size (is the observed delta practically meaningful?), and statistical significance (p-value or CI width where applicable). Badge injected into all email digest outputs and MCP coaching responses.
-
-**Henning's rules:**
-- Any correlation with n<30 → Low confidence regardless of p-value
-- Any "trend" label with <12 weekly observations → re-labeled "preliminary pattern"
-- Meal-level CGM claims require minimum 5 repetitions of same meal
-- DEXA-anchored estimates limited to 1 decimal place
-
-### IC-28: Habit Cascade Detector (BS-06)
-**Status:** Planned — Board Summit priority #6
-**Target:** Next 90 days (data gate: 60+ days Habitify data)
-**What it does:** Computes conditional probability matrix from Habitify completion data: P(fail habit Y | failed habit X within 48h). Identifies the top-3 cascade chains where one failure statistically predicts subsequent failures. Writes cascade patterns to `MEMORY#habit_cascades` in `platform_memory`. Daily Brief surfaces proactive warnings: "You skipped Morning Sunlight — your Primary Exercise completion rate drops to 40% when this happens."
-
-**Relationship to IC-4:** Complementary but distinct. IC-4 identifies *antecedent conditions* (external: high TSB, poor sleep) that precede habit collapse. IC-28 identifies *habit-to-habit contagion* (internal: which specific habits drag others down).
-
-### IC-29: Deficit Sustainability + Metabolic Adaptation (BS-12)
-**Status:** Live (v3.7.67)
-**Deployed as:** Two MCP tools in `mcp/tools_nutrition.py`:
-- `tool_get_deficit_sustainability()` — 5-channel real-time deficit early warning (HRV, sleep, recovery, habits, training output). Compares first-third vs last-third of rolling window. 3+ concurrent degradations → severity flag.
-- `tool_get_metabolic_adaptation()` — TDEE divergence tracker. Compares expected weight loss (caloric deficit × 3500 kcal/lb) against actual Withings weight change. Adaptation ratio = actual/expected. Severity classification with diet break recommendations per Trexler/McDonald/Norton.
-
-**Key inputs:** MacroFactor calorie data, Whoop HRV/recovery, Habitify Tier 0 completion rate, Strava training output, Withings weight.
-
-### IC-30: Autonomic Balance Score (BS-MP1)
-**Status:** Live (v3.7.67)
-**Deployed as:** MCP tool `tool_get_autonomic_balance()` in `mcp/tools_health.py`.
-**What it does:** Synthesizes HRV, resting heart rate, respiratory rate, and sleep efficiency into Z-scores against personal baselines, then maps to a 4-quadrant model: Flow (high energy + positive), Stress (high energy + negative), Recovery (low energy + positive), Burnout (low energy + negative). Balance score 0-100. 7-day trend with dominant state. State transition detection. Consecutive days in state tracking. Porges polyvagal + Huberman ANS framework.
-
-### IC-31: Meal-Level CGM Response Scorer (BS-10)
-**Status:** Planned — Board Summit priority #10
-**Target:** 90 days (data gate: sufficient CGM + MacroFactor overlap)
-**What it does:** Matches MacroFactor meal timestamps with CGM glucose curves to score each meal's postprandial response (peak delta from baseline, AUC above baseline, time to return to baseline). Builds a personal food response database over time. Cross-references against genome SNPs (e.g., TCF7L2 variants affecting glucose disposal). Writes to new DDB partition `SOURCE#meal_responses`.
-
-### Planned Enhancements to Existing Features
-
-**Unified Sleep Record (BS-08):** Not an IC feature per se, but a data architecture change that enables downstream IC improvements. Reconcile Whoop (HRV, staging), Eight Sleep (temperature, environment), and Apple Health (duration) into a single canonical sleep record per night. Source-of-truth priority rules per field. Enables sleep environment optimization and circadian compliance scoring.
-
-**ACWR Training Load Model (BS-09):** New scheduled Lambda computing acute:chronic workload ratio from Whoop strain + Strava training impulse. Alerts when ratio >1.3 (injury risk) or <0.8 (detraining). Critical safety feature at Matthew's body weight and deficit.
-
-**Decision Journal Analytics (BS-T2-6):** Enhancement to IC-19. Adds calibration scoring (predicted vs. actual outcomes), decision category breakdown, regret analysis, and time-to-outcome tracking. Requires 50+ decisions with recorded outcomes.
-
-**Biomarker Trajectory Engine (BS-T2-2):** Enhancement to IC-18 hypothesis engine. For each biomarker with 3+ data points, compute linear regression with 95% CI. Flag biomarkers where the CI band crosses a clinical threshold within 2 projected draws. Henning caution: 7 points = wide CIs, report uncertainty prominently.
+10. **Do not remove the orchestrator step.** Without orchestrated briefs, coaches will independently focus on the same obvious signals and produce redundant output. The orchestrator's attention allocation is what makes 8 coaches more valuable than 1 coach repeated 8 times.
 
 ---
 
@@ -625,14 +786,14 @@ The following IC features were identified by the Joint Board Summit (Health & Pe
 
 These decisions are documented to prevent revisiting:
 
-**Vector store / RAG:** Corpus too small (<150 journal entries), cost too high ($70-100/month vs $25 budget), `platform_memory` covers 80% of the use case. Revisit Month 4-5.
+**Vector store / RAG:** Corpus too small, cost too high ($70-100/month vs $25 budget), `platform_memory` + coach compressed state covers the use case. Revisit Month 4-5.
 
-**Local / small LLM:** Quality delta vs. Claude Haiku/Sonnet is large on health coaching, behavioral synthesis, and narrative tasks. Only potential use: embedding generation (IC-20, Bedrock Titan) once corpus is large enough.
+**Local / small LLM:** Quality delta vs. Claude Haiku/Sonnet is large on health coaching. Only potential use: embedding generation (IC-20, Bedrock Titan) once corpus is large enough.
 
-**Fine-tuning:** Addresses style/format consistency, not reasoning quality. The coaching quality gap is a reasoning + context problem. Fine-tuning on 2-week data would overfit to initial state.
+**Fine-tuning:** Addresses style/format consistency, not reasoning quality. The coach voice specifications + quality gate handle style consistency without fine-tuning.
 
-**composite_scores DDB partition (ADR-025):** `write_composite_scores()` removed from active compute pipeline (v3.7.25). The `computed_metrics` partition covers the same use case with less DDB write overhead. Dead code fully deleted v3.7.28. Do not reintroduce.
+**composite_scores DDB partition (ADR-025):** Removed from active pipeline (v3.7.25). Dead code deleted v3.7.28. Do not reintroduce.
 
 ---
 
-*Last updated: 2026-04-05 (v5.3.0 — V3 Observatory prompts: rotating analytical lens, enhanced data gathering, prior_recommendation anti-repetition. AI Insight Engine Overhaul (v4.8.0) fully documented. IC-4/IC-5 activation approaching data gate ~May 1. 115 MCP tools, 63 Lambdas.)*
+*Last updated: 2026-04-06 (v6.0.0 -- Coach Intelligence Architecture: 8 named coaches, deterministic computation engine, narrative orchestration, ensemble consensus, Bayesian prediction tracking, quality gate, weekly compression, observatory rendering. 8 new Lambdas, 10 new DynamoDB partition patterns, 5 S3 config files. 115 MCP tools, 71 Lambdas.)*

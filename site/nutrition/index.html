@@ -1491,7 +1491,6 @@
 
 <div id="amj-nav"></div>
 <div id="amj-hierarchy-nav"></div>
-<p class="obs-subtitle">Every calorie logged. Every macro tracked. A 12-month nutrition record.</p>
 <!-- Product Board Item 11: Day X context banner -->
 <div id="day-x-banner" style="
   margin:0 var(--page-padding);
@@ -1516,6 +1515,7 @@
      V3 Section 1: STATUS BAR — rendered by observatory-v3.js
      ════════════════════════════════════════════════════════════ -->
 <div id="obs-v3-status"></div>
+<p class="obs-subtitle">Every calorie logged. Every macro tracked. A 12-month nutrition record.</p>
 
 <!-- ════════════════════════════════════════════════════════════
      V3 Section 2: COACH ANALYSIS — rendered by observatory-v3.js
@@ -1979,57 +1979,273 @@
 <!-- Hydration moved to collapsed section at bottom -->
 
 <!-- ════════════════════════════════════════════════════════════
-     PULL-QUOTE #4 — Psychological dimension (10i + 10g: dynamic style)
+     V3.1 COLLAPSED DEPTH SECTIONS — editorial content preserved below
      ════════════════════════════════════════════════════════════ -->
-<div class="n-pullquote n-pullquote--dynamic n-pullquote--right reveal">
-  <div class="n-pullquote__watermark">04</div>
-  <div class="n-pullquote__text">
-    The hardest part of tracking nutrition isn&rsquo;t the math.
-    It&rsquo;s the honesty. <em>Logging the bad days</em> is where the real data lives.
-  </div>
-  <div class="n-pullquote__attr">
-    <span class="n-pullquote__badge">N=1 &middot; Reflection</span>
-    <span class="n-pullquote__source">Every meal logged &mdash; even the ones I&rsquo;d rather forget</span>
-  </div>
-</div>
 
-<!-- ════════════════════════════════════════════════════════════
-     NUTRITION HYPOTHESES — left-accent cards (10g: em-dash header)
-     ════════════════════════════════════════════════════════════ -->
-<div class="n-pullquote n-pullquote--right reveal" style="border-bottom:1px solid var(--border);">
-  <blockquote class="n-pullquote__text">
-    &ldquo;The plan is to log everything — including the 3,400-calorie Saturdays. A gap in the data is data too. It usually means something happened worth paying attention to.&rdquo;
-  </blockquote>
-  <div class="n-pullquote__attr">
-    <span class="n-pullquote__badge">&mdash; Matthew</span>
+<!-- 1. About this observatory (narrative intro + pull-quotes) -->
+<details class="obs-depth-section">
+  <summary>About this observatory <span class="obs-depth-section__teaser">The story behind this page and Matthew's reflections</span></summary>
+  <div class="n-intro reveal">
+    <div class="n-intro__text">
+      Food and I have had a complicated relationship since my twenties. The real shift
+      came around 2017 &mdash; relocation, an MBA, a promotion, my mum getting sick &mdash;
+      when eating stopped being about hunger and started being about quieting everything else.
+      Convenience. Something to fill a feeling. Food that wasn&rsquo;t even that good.
+      <em>MacroFactor</em> didn&rsquo;t fix the psychology. But it made the invisible visible,
+      and awareness is where the change starts.
+    </div>
+    <div class="n-intro__sub">
+      I&rsquo;ve lost 100 lbs before without tracking a single calorie. This isn&rsquo;t about macros &mdash;
+      it&rsquo;s about where my head is. When I&rsquo;m on, this becomes second nature. When I&rsquo;m off,
+      even a DoorDash order can break a streak. The data below captures both.
+    </div>
   </div>
-</div>
+  <div class="n-pullquote n-pullquote--left reveal">
+    <div class="n-pullquote__watermark">01</div>
+    <div class="n-pullquote__text">
+      Testing: does front-loading <em>40g+ protein</em> at breakfast predict hitting daily target?
+      Tracking correlation between breakfast protein load and end-of-day adherence.
+    </div>
+    <div class="n-pullquote__attr">
+      <span class="n-pullquote__badge">Hypothesis &middot; Under Test</span>
+      <span class="n-pullquote__source">MacroFactor data &mdash; pending sufficient sample size</span>
+    </div>
+  </div>
+  <div class="n-pullquote n-pullquote--right reveal">
+    <div class="n-pullquote__watermark">02</div>
+    <div class="n-pullquote__text">
+      Testing: does <em>30g+ fiber</em> intake meaningfully reduce glucose variability?
+      Correlating daily fiber logs with CGM standard deviation readings.
+    </div>
+    <div class="n-pullquote__attr">
+      <span class="n-pullquote__badge">Hypothesis &middot; Under Test</span>
+      <span class="n-pullquote__source">MacroFactor fiber data cross-referenced with Dexcom Stelo &mdash; <a href="/glucose/" style="color:var(--n-amber);text-decoration:none">Glucose Observatory</a></span>
+    </div>
+  </div>
+  <div class="n-pullquote n-pullquote--left reveal">
+    <div class="n-pullquote__watermark">03</div>
+    <div class="n-pullquote__text">
+      Testing: does <em>deficit depth</em> predict <a href="/training/" style="color:var(--n-amber);text-decoration:none">training</a> strain decline?
+      Correlating weekly caloric deficit with Whoop strain output.
+    </div>
+    <div class="n-pullquote__attr">
+      <span class="n-pullquote__badge">Hypothesis &middot; Under Test</span>
+      <span class="n-pullquote__source">Whoop strain data cross-referenced with MacroFactor deficit &mdash; pending data</span>
+    </div>
+  </div>
+  <div class="n-pullquote n-pullquote--dynamic n-pullquote--right reveal">
+    <div class="n-pullquote__watermark">04</div>
+    <div class="n-pullquote__text">
+      The hardest part of tracking nutrition isn&rsquo;t the math.
+      It&rsquo;s the honesty. <em>Logging the bad days</em> is where the real data lives.
+    </div>
+    <div class="n-pullquote__attr">
+      <span class="n-pullquote__badge">N=1 &middot; Reflection</span>
+      <span class="n-pullquote__source">Every meal logged &mdash; even the ones I&rsquo;d rather forget</span>
+    </div>
+  </div>
+  <div class="n-pullquote n-pullquote--right reveal" style="border-bottom:1px solid var(--border);">
+    <blockquote class="n-pullquote__text">
+      &ldquo;The plan is to log everything — including the 3,400-calorie Saturdays. A gap in the data is data too. It usually means something happened worth paying attention to.&rdquo;
+    </blockquote>
+    <div class="n-pullquote__attr">
+      <span class="n-pullquote__badge">&mdash; Matthew</span>
+    </div>
+  </div>
+</details>
 
-<section class="n-rules-section reveal">
-  <div class="n-section-header">Nutrition Hypotheses Under Test</div>
-  <div class="n-rule-grid">
-    <div class="n-rule">
-      <div class="n-rule__num">H-01</div>
-      <div class="n-rule__finding">Testing: does front-loading 40g+ protein at breakfast predict hitting daily target?</div>
-      <div class="n-rule__evidence">Correlating breakfast protein load with end-of-day adherence &bull; <em>pending data</em></div>
+<!-- 2. Hypotheses under test -->
+<details class="obs-depth-section">
+  <summary>Hypotheses under test (4) <span class="obs-depth-section__teaser">Protein timing, deficit sustainability, meal frequency, fiber threshold</span></summary>
+  <section class="n-rules-section reveal">
+    <div class="n-section-header">Nutrition Hypotheses Under Test</div>
+    <div class="n-rule-grid">
+      <div class="n-rule">
+        <div class="n-rule__num">H-01</div>
+        <div class="n-rule__finding">Testing: does front-loading 40g+ protein at breakfast predict hitting daily target?</div>
+        <div class="n-rule__evidence">Correlating breakfast protein load with end-of-day adherence &bull; <em>pending data</em></div>
+      </div>
+      <div class="n-rule">
+        <div class="n-rule__num">H-02</div>
+        <div class="n-rule__finding">Testing: fiber intake &times; CGM glucose variability correlation</div>
+        <div class="n-rule__evidence">Tracking 30g+ fiber days vs glucose SD &rarr; <a href="/glucose/">Glucose Observatory</a> &bull; <em>pending data</em></div>
+      </div>
+      <div class="n-rule">
+        <div class="n-rule__num">H-03</div>
+        <div class="n-rule__finding">Testing: deficit depth &times; training strain correlation</div>
+        <div class="n-rule__evidence">Correlating weekly caloric deficit with Whoop strain output &bull; <em>pending data</em></div>
+      </div>
+      <div class="n-rule">
+        <div class="n-rule__num">H-04</div>
+        <div class="n-rule__finding">Testing: meal distribution &times; MPS response tracking</div>
+        <div class="n-rule__evidence">Comparing 4-meal vs 2-meal protein distribution on recovery markers &bull; <em>pending data</em></div>
+      </div>
     </div>
-    <div class="n-rule">
-      <div class="n-rule__num">H-02</div>
-      <div class="n-rule__finding">Testing: fiber intake &times; CGM glucose variability correlation</div>
-      <div class="n-rule__evidence">Tracking 30g+ fiber days vs glucose SD &rarr; <a href="/glucose/">Glucose Observatory</a> &bull; <em>pending data</em></div>
+  </section>
+</details>
+
+<!-- 3. Genomic context & micronutrients -->
+<details class="obs-depth-section">
+  <summary>Genomic context &amp; micronutrients <span class="obs-depth-section__teaser">PEMT, VDR, FADS1 variants — why population averages don't apply</span></summary>
+  <section class="n-micro-section reveal">
+    <div class="n-section-header">Micronutrient Gaps</div>
+    <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
+      Genomics testing flagged specific micronutrient sensitivities. These targets are <strong>personalized</strong>, not RDA defaults. Deficits in these areas have measurable downstream effects.
     </div>
-    <div class="n-rule">
-      <div class="n-rule__num">H-03</div>
-      <div class="n-rule__finding">Testing: deficit depth &times; training strain correlation</div>
-      <div class="n-rule__evidence">Correlating weekly caloric deficit with Whoop strain output &bull; <em>pending data</em></div>
+    <div class="n-micro-grid">
+      <div class="n-micro-card">
+        <div class="n-micro-card__name">Choline</div>
+        <div class="n-micro-card__why">PEMT variant &mdash; reduced endogenous synthesis. Liver health, methylation.</div>
+        <div class="n-micro-card__values">
+          <div class="n-micro-card__actual">380mg</div>
+          <div class="n-micro-card__target">Target: 550mg+</div>
+        </div>
+        <div class="n-micro-card__bar">
+          <div class="n-micro-card__fill n-micro-card__fill--warn" style="width:69%"></div>
+        </div>
+        <div class="n-micro-card__status n-micro-card__status--warn">Gap: 170mg</div>
+      </div>
+      <div class="n-micro-card">
+        <div class="n-micro-card__name">Vitamin D</div>
+        <div class="n-micro-card__why">VDR polymorphism &mdash; higher dose needed. Immune function, bone density.</div>
+        <div class="n-micro-card__values">
+          <div class="n-micro-card__actual">4,200 IU</div>
+          <div class="n-micro-card__target">Target: 5,000 IU</div>
+        </div>
+        <div class="n-micro-card__bar">
+          <div class="n-micro-card__fill n-micro-card__fill--warn" style="width:84%"></div>
+        </div>
+        <div class="n-micro-card__status n-micro-card__status--warn">Supplemented</div>
+      </div>
+      <div class="n-micro-card">
+        <div class="n-micro-card__name">Omega-3 (EPA+DHA)</div>
+        <div class="n-micro-card__why">FADS1 variant &mdash; poor conversion from ALA. Anti-inflammatory, cardiac.</div>
+        <div class="n-micro-card__values">
+          <div class="n-micro-card__actual">1.8g</div>
+          <div class="n-micro-card__target">Target: 2.0g+</div>
+        </div>
+        <div class="n-micro-card__bar">
+          <div class="n-micro-card__fill n-micro-card__fill--good" style="width:90%"></div>
+        </div>
+        <div class="n-micro-card__status n-micro-card__status--good">Near target</div>
+      </div>
+      <div class="n-micro-card">
+        <div class="n-micro-card__name">Folate</div>
+        <div class="n-micro-card__why">MTHFR C677T &mdash; reduced methylation. Homocysteine clearance, DNA repair.</div>
+        <div class="n-micro-card__values">
+          <div class="n-micro-card__actual">520mcg</div>
+          <div class="n-micro-card__target">Target: 800mcg</div>
+        </div>
+        <div class="n-micro-card__bar">
+          <div class="n-micro-card__fill n-micro-card__fill--warn" style="width:65%"></div>
+        </div>
+        <div class="n-micro-card__status n-micro-card__status--warn">Gap: 280mcg</div>
+      </div>
     </div>
-    <div class="n-rule">
-      <div class="n-rule__num">H-04</div>
-      <div class="n-rule__finding">Testing: meal distribution &times; MPS response tracking</div>
-      <div class="n-rule__evidence">Comparing 4-meal vs 2-meal protein distribution on recovery markers &bull; <em>pending data</em></div>
+  </section>
+</details>
+
+<!-- 4. Behavioral triggers -->
+<details class="obs-depth-section">
+  <summary>Behavioral triggers <span class="obs-depth-section__teaser">Sleep deprivation, travel, stress — when nutrition falls apart</span></summary>
+  <section class="n-triggers-section reveal">
+    <div class="n-section-header">Behavioral Trigger Analysis</div>
+    <div class="n-context" style="padding-left:0;padding-right:0;max-width:none">
+      Nutrition failures aren&rsquo;t random. They&rsquo;re predictable. Cross-referencing macro misses with <a href="/sleep/" style="color:var(--n-amber);text-decoration:none">sleep</a>, stress, and travel data reveals the patterns.
+    </div>
+    <div class="n-triggers-grid">
+      <div class="n-trigger-card">
+        <div class="n-trigger-card__trigger">Sleep deprivation</div>
+        <div class="n-trigger-card__finding">Testing: sleep deprivation &times; nutrition compliance correlation</div>
+        <div class="n-trigger-card__evidence">Tracking whether short sleep nights predict caloric overshoot and protein misses &bull; <em>under test</em></div>
+      </div>
+      <div class="n-trigger-card">
+        <div class="n-trigger-card__trigger">Travel days</div>
+        <div class="n-trigger-card__finding">Testing: travel &times; caloric surplus pattern</div>
+        <div class="n-trigger-card__evidence">Tracking whether travel days predict caloric overshoot, protein shortfall, and glucose variability &bull; <em>under test</em></div>
+      </div>
+      <div class="n-trigger-card">
+        <div class="n-trigger-card__trigger">High stress</div>
+        <div class="n-trigger-card__finding">Testing: stress &times; logging compliance and macro drift</div>
+        <div class="n-trigger-card__evidence">Tracking whether low-HRV days predict unlogged meals and carb overshoot &bull; <em>under test</em></div>
+      </div>
+    </div>
+  </section>
+</details>
+
+<!-- 5. Macro deep-dives -->
+<details class="obs-depth-section">
+  <summary>Macro deep-dives <span class="obs-depth-section__teaser">Carbs, fats, fiber — detailed breakdown and targets</span></summary>
+  <section class="n-macro-section reveal" id="n-macro-deep">
+    <div class="n-section-header">Macro deep-dives &mdash; carbs, fats, fiber</div>
+    <div class="n-macro-grid" id="n-macro-deep-grid"></div>
+  </section>
+</details>
+
+<!-- 6. Hydration tracking -->
+<details class="obs-depth-section">
+  <summary>Hydration tracking <span class="obs-depth-section__teaser">Water intake, energy correlation, and recovery impact</span></summary>
+  <section class="n-hydration-section reveal">
+    <div class="n-section-header">Hydration</div>
+    <div class="n-hydration-grid">
+      <div class="n-hydration-big">
+        <div class="n-hydration-big__num">3.2L</div>
+        <div class="n-hydration-big__unit">daily average</div>
+        <div class="n-hydration-big__sub">Target: 3.5L+</div>
+      </div>
+      <div class="n-hydration-corr">
+        <div class="n-hydration-corr-card">
+          <div class="n-hydration-corr-card__label">Energy correlation</div>
+          <div class="n-hydration-corr-card__finding">Testing: do days above <em>3.5L</em> predict higher Whoop recovery scores? Tracking hydration &times; recovery correlation. <em>Under test.</em></div>
+        </div>
+        <div class="n-hydration-corr-card">
+          <div class="n-hydration-corr-card__label">Recovery impact</div>
+          <div class="n-hydration-corr-card__finding">Testing: does training-day hydration predict next-day HRV improvement? Comparing electrolyte-enhanced vs plain water. <em>Under test.</em></div>
+        </div>
+      </div>
+    </div>
+    <div class="n-context">
+      Hydration is the most undertracked variable in nutrition. It affects glucose readings, recovery scores, and perceived energy &mdash; but rarely gets the same attention as macros.
+    </div>
+  </section>
+</details>
+
+<!-- 7. Nutrition protocol -->
+<details class="obs-depth-section">
+  <summary>Nutrition protocol <span class="obs-depth-section__teaser">The 5-rule system behind the data</span></summary>
+  <div class="n-narrative reveal" style="border-bottom:1px solid var(--border);">
+    <div>
+      <div class="n-narrative__title">Losing weight without losing <em>muscle</em></div>
+      <div class="n-narrative__body">
+        The single biggest risk in aggressive weight loss is losing lean mass alongside fat.
+        Protein adequacy is the primary defense &mdash; <strong>1.6&ndash;2.2g per kg of lean body mass</strong> preserves
+        muscle during a caloric deficit.
+      </div>
+    </div>
+    <div class="n-protocol-list">
+      <div class="n-protocol-item">
+        <div class="n-protocol-num">01</div>
+        <div class="n-protocol-text"><strong>180g protein daily</strong> &mdash; non-negotiable. Leucine threshold (2.5g/meal) drives MPS even in deficit.</div>
+      </div>
+      <div class="n-protocol-item">
+        <div class="n-protocol-num">02</div>
+        <div class="n-protocol-text"><strong>500&ndash;750 cal deficit</strong> via adaptive TDEE. Aggressive enough for progress, conservative enough for training quality.</div>
+      </div>
+      <div class="n-protocol-item">
+        <div class="n-protocol-num">03</div>
+        <div class="n-protocol-text"><strong>Protein-first meal ordering</strong> &mdash; protein and fat before carbs. Blunts glucose spike. CGM-confirmed.</div>
+      </div>
+      <div class="n-protocol-item">
+        <div class="n-protocol-num">04</div>
+        <div class="n-protocol-text"><strong>30g+ fiber daily</strong> for satiety, gut health, and glucose stability.</div>
+      </div>
+      <div class="n-protocol-item">
+        <div class="n-protocol-num">05</div>
+        <div class="n-protocol-text"><strong>Every meal logged within 30 minutes.</strong> No cheat meals go unrecorded.</div>
+      </div>
     </div>
   </div>
-</section>
+</details>
 
 </div><!-- /n-content -->
 

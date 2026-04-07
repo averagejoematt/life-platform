@@ -1047,12 +1047,12 @@ def handle_experiments() -> dict:
         except Exception:
             pass
 
-        # Days remaining (for active experiments)
+        # Day number (for active experiments) — April 1 start = Day 1 on April 1, Day 2 on April 2, etc.
         days_in = None
         planned_duration = item.get("planned_duration_days")
         if status == "active" and start:
             try:
-                days_in = (datetime.now(PT).replace(tzinfo=None) - datetime.strptime(start, "%Y-%m-%d")).days
+                days_in = (datetime.now(PT).replace(tzinfo=None) - datetime.strptime(start, "%Y-%m-%d")).days + 1
             except Exception:
                 pass
 
@@ -2919,6 +2919,15 @@ def _ask_fetch_context() -> dict:
     hs_items = _decimal_to_float(hs_resp.get("Items", []))
     if hs_items:
         ctx["tier0_streak"] = int(hs_items[0].get("t0_perfect_streak", 0) or 0)
+    # Fetch start/goal from profile for dynamic prompt injection
+    try:
+        prof_resp = table.get_item(Key={"pk": f"{USER_PREFIX}profile", "sk": "PROFILE"})
+        prof = _decimal_to_float(prof_resp.get("Item", {}))
+        ctx["start_weight"] = float(prof.get("journey_start_weight_lbs", 307))
+        ctx["goal_weight"] = float(prof.get("goal_weight_lbs", 185))
+    except Exception:
+        ctx["start_weight"] = 307
+        ctx["goal_weight"] = 185
     return ctx
 
 
@@ -2952,7 +2961,7 @@ def _ask_build_prompt(ctx: dict) -> str:
     return f"""You are the AI behind Matthew Walker's Life Platform — a personal health intelligence system tracking 19 data sources.
 
 CURRENT DATA:
-  Weight: {ctx.get('weight_lbs', '?')} lbs (started 307, goal 185)
+  Weight: {ctx.get('weight_lbs', '?')} lbs (started {ctx.get('start_weight', 307)}, goal {ctx.get('goal_weight', 185)})
   HRV: {ctx.get('hrv_ms', '?')} ms
   RHR: {ctx.get('rhr_bpm', '?')} bpm
   Recovery: {ctx.get('recovery_pct', '?')}%
@@ -3780,7 +3789,7 @@ def handle_experiment_library() -> dict:
             days_in = None
             if status == "active" and start:
                 try:
-                    days_in = (datetime.now(PT).replace(tzinfo=None) - datetime.strptime(start, "%Y-%m-%d")).days
+                    days_in = (datetime.now(PT).replace(tzinfo=None) - datetime.strptime(start, "%Y-%m-%d")).days + 1
                 except Exception:
                     pass
 
@@ -4180,7 +4189,7 @@ def handle_pulse() -> dict:
     try:
         _w_resp = table.query(
             KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}whoop") & Key("sk").begins_with("DATE#"),
-            ScanIndexForward=False, Limit=5,
+            ScanIndexForward=False, Limit=20,  # Increased from 5 — workout sub-records can push daily records out of window
         )
         for _w_item in _decimal_to_float(_w_resp.get("Items", [])):
             _w_sk = _w_item.get("sk", "")
@@ -4188,7 +4197,13 @@ def handle_pulse() -> dict:
                 whoop = _w_item
                 break
         if not whoop:
-            whoop = _decimal_to_float(_w_resp.get("Items", [{}]))[0] if _w_resp.get("Items") else {}
+            # No record with recovery data found — use most recent daily (non-workout) record
+            for _w_item in _decimal_to_float(_w_resp.get("Items", [])):
+                if "#WORKOUT#" not in _w_item.get("sk", ""):
+                    whoop = _w_item
+                    break
+        if not whoop:
+            whoop = {}
     except Exception:
         whoop = {}
     withings = _latest_item("withings") or {}
@@ -4330,7 +4345,7 @@ def handle_pulse() -> dict:
         _mf_resp = table.query(
             KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}macrofactor") & Key("sk").between(f"DATE#{_d7}", f"DATE#{today_pt}~"),
         )
-        nutrition_logged_7d = sum(1 for i in _mf_resp.get("Items", []) if i.get("calories") and float(str(i["calories"])) > 0)
+        nutrition_logged_7d = sum(1 for i in _mf_resp.get("Items", []) if i.get("total_calories_kcal") and float(str(i["total_calories_kcal"])) > 0)
     except Exception:
         pass
 
@@ -6957,6 +6972,7 @@ ROUTES = {
     "/api/physical_overview":   handle_physical_overview,
     "/api/journal_analysis":    handle_journal_analysis,
     "/api/ai_analysis":         None,  # GET with ?expert= query param, handled in lambda_handler
+    "/api/coach_analysis":      None,  # GET with ?domain= query param, handled in lambda_handler (Coach Intelligence)
     # BL-03: The Ledger / Snake Fund
     "/api/ledger":              handle_ledger,
     # BL-04: Field Notes
@@ -7203,6 +7219,166 @@ def lambda_handler(event, context):
         if ai_item.get("days_in_experiment"):
             resp_data["days_in_experiment"] = int(ai_item["days_in_experiment"])
         return _ok(resp_data, cache_seconds=300)
+
+    # Coach Intelligence Analysis (GET with ?domain= query param)
+    if path == "/api/coach_analysis":
+        qs = event.get("queryStringParameters") or {}
+        domain = qs.get("domain", "sleep")
+        _coach_map = {
+            "sleep": "sleep_coach", "nutrition": "nutrition_coach", "training": "training_coach",
+            "mind": "mind_coach", "physical": "physical_coach", "glucose": "glucose_coach",
+            "labs": "labs_coach", "explorer": "explorer_coach",
+        }
+        coach_id = _coach_map.get(domain)
+        if not coach_id:
+            return _error(400, "Invalid domain")
+
+        _coach_display = {
+            "sleep_coach": {"name": "Dr. Lisa Park", "initials": "LP", "title": "Sleep & Circadian Rhythm Specialist", "color": "#818cf8"},
+            "nutrition_coach": {"name": "Dr. Marcus Webb", "initials": "MW", "title": "Evidence-Based Nutrition", "color": "#10b981"},
+            "training_coach": {"name": "Dr. Sarah Chen", "initials": "SC", "title": "Exercise Physiology & Strength", "color": "#3db88a"},
+            "mind_coach": {"name": "Dr. Nathan Reeves", "initials": "NR", "title": "Psychiatrist \u2014 Behavioral Patterns", "color": "#a78bfa"},
+            "physical_coach": {"name": "Dr. Victor Reyes", "initials": "VR", "title": "Longevity & Body Composition", "color": "#f59e0b"},
+            "glucose_coach": {"name": "Dr. Amara Patel", "initials": "AP", "title": "Metabolic Health & CGM", "color": "#2dd4bf"},
+            "labs_coach": {"name": "Dr. James Okafor", "initials": "JO", "title": "Clinical Pathology & Preventive Labs", "color": "#5ba4cf"},
+            "explorer_coach": {"name": "Dr. Henning Brandt", "initials": "HB", "title": "Biostatistics & N=1 Research", "color": "#e879f9"},
+        }
+
+        try:
+            coach_pk = f"COACH#{coach_id}"
+
+            # 1. Most recent OUTPUT# record
+            out_resp = table.query(
+                KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
+                ScanIndexForward=False, Limit=1,
+            )
+            out_items = out_resp.get("Items", [])
+            if not out_items:
+                return _ok({"coach_id": coach_id, "domain": domain, "analysis": None}, cache_seconds=300)
+
+            output = _decimal_to_float(out_items[0])
+            # Prefer observatory_summary over full content
+            analysis_text = output.get("observatory_summary") or output.get("content", "")
+
+            # 2. Open threads
+            thread_reference = None
+            try:
+                thread_resp = table.query(
+                    KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with("THREAD#"),
+                )
+                threads = [_decimal_to_float(t) for t in thread_resp.get("Items", []) if t.get("status") == "open"]
+                if threads:
+                    # Pick most recently referenced thread
+                    threads.sort(key=lambda t: t.get("last_referenced", ""), reverse=True)
+                    thread_reference = threads[0].get("summary", "")
+            except Exception:
+                pass
+
+            # 3. Ensemble digest — cross-coach references
+            cross_coach_reference = None
+            try:
+                dig_resp = table.query(
+                    KeyConditionExpression=Key("pk").eq("ENSEMBLE#digest") & Key("sk").begins_with("CYCLE#"),
+                    ScanIndexForward=False, Limit=1,
+                )
+                dig_items = dig_resp.get("Items", [])
+                if dig_items:
+                    digest = _decimal_to_float(dig_items[0])
+                    disagreements = digest.get("active_disagreements", [])
+                    for d in disagreements:
+                        coaches = d.get("coaches", [])
+                        if coach_id in coaches:
+                            cross_coach_reference = d.get("topic", "")
+                            break
+            except Exception:
+                pass
+
+            # 4. Computation guardrails — data availability
+            data_availability = "preliminary"
+            try:
+                comp_resp = table.query(
+                    KeyConditionExpression=Key("pk").eq("COACH#computation") & Key("sk").begins_with("RESULTS#"),
+                    ScanIndexForward=False, Limit=1,
+                )
+                comp_items = comp_resp.get("Items", [])
+                if comp_items:
+                    guardrails = _decimal_to_float(comp_items[0]).get("statistical_guardrails", {})
+                    # Find the guardrail for this domain's primary source
+                    for source_name, source_guardrails in guardrails.items():
+                        if isinstance(source_guardrails, dict):
+                            for metric, g in source_guardrails.items():
+                                if isinstance(g, dict):
+                                    data_availability = g.get("data_availability", "preliminary")
+                                    break
+                            break
+            except Exception:
+                pass
+
+            # 5. Revision signal — recent learning records
+            revision_signal = None
+            try:
+                learn_resp = table.query(
+                    KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with("LEARNING#"),
+                    ScanIndexForward=False, Limit=3,
+                )
+                for item in learn_resp.get("Items", []):
+                    item = _decimal_to_float(item)
+                    if item.get("type") == "position_revision":
+                        revision_signal = item.get("revised_position", "")[:100]
+                        break
+            except Exception:
+                pass
+
+            # 6. Confidence language
+            confidence_language = "preliminary"
+            try:
+                themes = output.get("themes", [])
+                # Use the overall confidence from the generation if available
+                conf = output.get("confidence")
+                if conf is not None:
+                    conf_f = float(conf)
+                    if conf_f >= 0.85:
+                        confidence_language = "highly_confident"
+                    elif conf_f >= 0.7:
+                        confidence_language = "fairly_confident"
+                    elif conf_f >= 0.5:
+                        confidence_language = "moderate"
+                    elif conf_f >= 0.3:
+                        confidence_language = "preliminary"
+                    else:
+                        confidence_language = "uncertain"
+            except Exception:
+                pass
+
+            display = _coach_display.get(coach_id, {})
+            resp = {
+                "coach_id": coach_id,
+                "coach_name": display.get("name", ""),
+                "coach_initials": display.get("initials", ""),
+                "coach_title": display.get("title", ""),
+                "coach_color": display.get("color", ""),
+                "domain": domain,
+                "analysis": analysis_text,
+                "key_recommendation": output.get("key_recommendation") or (
+                    output.get("themes", [""])[0] if output.get("themes") else None
+                ),
+                "elena_quote": output.get("elena_quote"),
+                "journaling_prompt": output.get("journaling_prompt"),
+                "thread_reference": thread_reference,
+                "revision_signal": revision_signal,
+                "cross_coach_reference": cross_coach_reference,
+                "confidence_language": confidence_language,
+                "data_availability": data_availability,
+                "generated_at": output.get("created_at") or output.get("generated_at", ""),
+                "week_number": output.get("week_number"),
+                "days_in_experiment": output.get("days_in_experiment"),
+            }
+            # Strip None values for cleaner JSON
+            resp = {k: v for k, v in resp.items() if v is not None}
+            return _ok(resp, cache_seconds=300)
+        except Exception as _e:
+            print(f"[WARN] /api/coach_analysis failed: {_e}")
+            return _ok({"coach_id": coach_id, "domain": domain, "analysis": None}, cache_seconds=60)
 
     # Special handling: /api/ask accepts POST
     if path == "/api/ask":

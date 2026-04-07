@@ -334,7 +334,7 @@ def write_buddy_json(data, profile, yesterday):
         # ── Journey Stats ──
         journey_start = profile.get("journey_start_date", "2026-04-01")
         goal_weight = safe_float(profile, "goal_weight_lbs") or 185
-        start_weight = safe_float(profile, "start_weight_lbs") or 302
+        start_weight = safe_float(profile, "start_weight_lbs") or 307
 
         try:
             journey_days = (today_dt - datetime.strptime(journey_start, "%Y-%m-%d").date()).days

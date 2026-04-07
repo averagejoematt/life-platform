@@ -9,7 +9,7 @@ import urllib.request
 import urllib.parse
 import urllib.error
 import boto3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
 from mcp.config import USER_PREFIX, logger
@@ -83,7 +83,7 @@ def _list_all_tasks(filter_str=None):
 
 def _get_todoist_range(days=30):
     """Fetch todoist records for the last N days. Returns list of day items."""
-    end = datetime.utcnow().date()
+    end = datetime.now(timezone.utc).date()
     start = end - timedelta(days=days - 1)
     return query_source("todoist", str(start), str(end))
 
@@ -278,7 +278,7 @@ def get_decision_fatigue_signal(days: int = 30):
                 }
 
         # Pull habit scores for same range
-        end = datetime.utcnow().date()
+        end = datetime.now(timezone.utc).date()
         start = end - timedelta(days=days - 1)
         habit_items = query_source("habit_scores", str(start), str(end))
 
@@ -371,7 +371,7 @@ def get_todoist_day(date: str = None):
     """
     try:
         if not date:
-            date = (datetime.utcnow().date() - timedelta(days=1)).strftime("%Y-%m-%d")
+            date = (datetime.now(timezone.utc).date() - timedelta(days=1)).strftime("%Y-%m-%d")
 
         items = query_source("todoist", date, date)
         if not items:

@@ -335,7 +335,15 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
                character_sheet=None, brief_mode="standard", engagement_score=None,
                triggered_rewards=None, protocol_recs=None,
                compute_stale=False, compute_age_msg="",
-               weekly_habit_review=None):
+               weekly_habit_review=None,
+               sleep_coach_v2_text=None,
+               nutrition_coach_v2_text=None,
+               training_coach_v2_text=None,
+               mind_coach_v2_text=None,
+               physical_coach_v2_text=None,
+               glucose_coach_v2_text=None,
+               labs_coach_v2_text=None,
+               explorer_coach_v2_text=None):
     """Build the full daily brief HTML email.
 
     triggered_rewards and protocol_recs are pre-computed by lambda_handler
@@ -1287,7 +1295,7 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
             phase = get_current_phase(profile, latest_weight)
             phase_name = phase.get("name", "") if phase else ""
             phase_end = phase.get("end_lbs", 0) if phase else 0
-            journey_start = profile.get("journey_start_weight_lbs", 302)
+            journey_start = profile.get("journey_start_weight_lbs", 307)
             goal_weight = profile.get("goal_weight_lbs", 185)
 
             # Progress bar
@@ -1395,6 +1403,94 @@ def build_html(data, profile, day_grade_score, grade, component_scores, componen
         html += '<!-- /S:journal_coach -->'
     except Exception as _e:
         html += _section_error_html("Journal Coach", _e)
+
+    # --- Sleep Coach V2 (Coach Intelligence Pipeline) ---
+    try:
+        html += '<!-- S:sleep_coach_v2 -->'
+        if sleep_coach_v2_text:
+            _sc_paragraphs = sleep_coach_v2_text.strip().split('\n\n')
+            _sc_body = ''.join(
+                f'<p style="color:#c7d2fe;font-size:13px;line-height:1.6;margin:0 0 8px 0;">{p.strip()}</p>'
+                for p in _sc_paragraphs if p.strip()
+            )
+            html += ('<div style="background:#1e293b;padding:20px 24px;border-bottom:1px solid #2d2d5e;">'
+                     '<p style="color:#64748b;font-size:10px;margin:0 0 8px 0;font-weight:700;letter-spacing:1px;">'
+                     '\U0001F6CF\uFE0F DR. LISA PARK \u2014 SLEEP INTELLIGENCE</p>'
+                     '<div style="background:#16213e;border-left:3px solid #818cf8;border-radius:0 8px 8px 0;'
+                     'padding:12px 16px;">'
+                     + _sc_body +
+                     '</div></div>')
+        html += '<!-- /S:sleep_coach_v2 -->'
+    except Exception as _e:
+        html += _section_error_html("Sleep Coach V2", _e)
+
+    # --- Nutrition Coach V2 (Coach Intelligence Pipeline) ---
+    try:
+        html += '<!-- S:nutrition_coach_v2 -->'
+        if nutrition_coach_v2_text:
+            _nc_paragraphs = nutrition_coach_v2_text.strip().split('\n\n')
+            _nc_body = ''.join(
+                f'<p style="color:#c7d2fe;font-size:13px;line-height:1.6;margin:0 0 8px 0;">{p.strip()}</p>'
+                for p in _nc_paragraphs if p.strip()
+            )
+            html += ('<div style="background:#1e293b;padding:20px 24px;border-bottom:1px solid #2d2d5e;">'
+                     '<p style="color:#64748b;font-size:10px;margin:0 0 8px 0;font-weight:700;letter-spacing:1px;">'
+                     '\U0001F34E DR. MARCUS WEBB \u2014 NUTRITION INTELLIGENCE</p>'
+                     '<div style="background:#16213e;border-left:3px solid #10b981;border-radius:0 8px 8px 0;'
+                     'padding:12px 16px;">'
+                     + _nc_body +
+                     '</div></div>')
+        html += '<!-- /S:nutrition_coach_v2 -->'
+    except Exception as _e:
+        html += _section_error_html("Nutrition Coach V2", _e)
+
+    # --- Training Coach V2 (Coach Intelligence Pipeline) ---
+    try:
+        html += '<!-- S:training_coach_v2 -->'
+        if training_coach_v2_text:
+            _tc_paragraphs = training_coach_v2_text.strip().split('\n\n')
+            _tc_body = ''.join(
+                f'<p style="color:#c7d2fe;font-size:13px;line-height:1.6;margin:0 0 8px 0;">{p.strip()}</p>'
+                for p in _tc_paragraphs if p.strip()
+            )
+            html += ('<div style="background:#1e293b;padding:20px 24px;border-bottom:1px solid #2d2d5e;">'
+                     '<p style="color:#64748b;font-size:10px;margin:0 0 8px 0;font-weight:700;letter-spacing:1px;">'
+                     '\U0001F3CB\uFE0F DR. SARAH CHEN \u2014 TRAINING INTELLIGENCE</p>'
+                     '<div style="background:#16213e;border-left:3px solid #3db88a;border-radius:0 8px 8px 0;'
+                     'padding:12px 16px;">'
+                     + _tc_body +
+                     '</div></div>')
+        html += '<!-- /S:training_coach_v2 -->'
+    except Exception as _e:
+        html += _section_error_html("Training Coach V2", _e)
+
+    # --- Remaining V2 Coaches (Phase 5) ---
+    _v2_coaches = [
+        ("mind_coach_v2", mind_coach_v2_text, "\U0001F9E0 DR. NATHAN REEVES \u2014 MIND INTELLIGENCE", "#a78bfa"),
+        ("physical_coach_v2", physical_coach_v2_text, "\U0001F4AA DR. VICTOR REYES \u2014 PHYSICAL INTELLIGENCE", "#f59e0b"),
+        ("glucose_coach_v2", glucose_coach_v2_text, "\U0001F4C9 DR. AMARA PATEL \u2014 GLUCOSE INTELLIGENCE", "#2dd4bf"),
+        ("labs_coach_v2", labs_coach_v2_text, "\U0001F9EC DR. JAMES OKAFOR \u2014 LABS INTELLIGENCE", "#5ba4cf"),
+        ("explorer_coach_v2", explorer_coach_v2_text, "\U0001F50D DR. HENNING BRANDT \u2014 EXPLORER INTELLIGENCE", "#e879f9"),
+    ]
+    for _sec_id, _sec_text, _sec_title, _sec_color in _v2_coaches:
+        try:
+            html += f'<!-- S:{_sec_id} -->'
+            if _sec_text:
+                _paras = _sec_text.strip().split('\n\n')
+                _body = ''.join(
+                    f'<p style="color:#c7d2fe;font-size:13px;line-height:1.6;margin:0 0 8px 0;">{p.strip()}</p>'
+                    for p in _paras if p.strip()
+                )
+                html += (f'<div style="background:#1e293b;padding:20px 24px;border-bottom:1px solid #2d2d5e;">'
+                         f'<p style="color:#64748b;font-size:10px;margin:0 0 8px 0;font-weight:700;letter-spacing:1px;">'
+                         f'{_sec_title}</p>'
+                         f'<div style="background:#16213e;border-left:3px solid {_sec_color};border-radius:0 8px 8px 0;'
+                         f'padding:12px 16px;">'
+                         + _body +
+                         '</div></div>')
+            html += f'<!-- /S:{_sec_id} -->'
+        except Exception as _e:
+            html += _section_error_html(_sec_id, _e)
 
     # --- Board of Directors ---
     try:

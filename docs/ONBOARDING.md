@@ -1,7 +1,7 @@
 # Life Platform — Onboarding Guide
 
 > Start here. For your first day, also read `docs/QUICKSTART.md` (AWS setup, deploy commands, gotchas).
-> Last updated: 2026-04-05 (v5.3.0)
+> Last updated: 2026-04-06 (v5.5.0)
 
 ---
 
@@ -43,9 +43,12 @@ DynamoDB (single table) + S3 (raw backup)
     ↓
 MCP Lambda (115 tools) ← Claude queries this
     ↓
-46 compute/email/operational Lambdas
-    ↓
-Daily Brief email + Dashboard + Weekly emails + averagejoematt.com
+54 compute/email/coach/operational Lambdas
+    ↓                          ↓
+Daily Brief email        Coach Intelligence Pipeline
+  + Dashboard              Computation → Orchestration →
+  + Weekly emails           Coach Generation (8 parallel) →
+  + averagejoematt.com      State Update → Ensemble Digest
 ```
 
 All infrastructure is AWS, us-west-2. CDK manages all 8 stacks. Monthly cost: ~$13.
@@ -88,6 +91,18 @@ Never create Lambda roles, EventBridge rules, or alarms manually. Everything goe
 ### 5. Secrets are in Secrets Manager
 
 No credentials in code or environment variables. All secrets live under prefix `life-platform/` in Secrets Manager. 11 active secrets as of v4.4.0.
+
+### 6. Coach Intelligence as Persistent Agents
+
+Coaches are not stateless prompt templates. They are persistent agents with continuity across the entire 12-month platform lifecycle. Each coach maintains:
+
+- **Episodic memory** — output archive (`OUTPUT#` records), thread registry, and learning log stored in DynamoDB under `COACH#` partitions
+- **Voice differentiation** — structural voice specs that define each coach's tone, vocabulary, and narrative style, preventing homogeneous output across the 8 coaches
+- **Cross-coach communication** — ensemble digest (`ENSEMBLE#` partition) and influence graph allow coaches to reference each other's findings without duplication
+- **Prediction accountability** — Bayesian confidence tracking with a prediction evaluator that scores past predictions against actual outcomes
+- **Narrative orchestration** — a showrunner (narrative orchestrator) that assigns themes, prevents redundancy, and maintains story arcs (`NARRATIVE#` partition) across days
+
+The pipeline runs daily: computation engine (deterministic math) → orchestrator (assigns briefs) → 8 parallel coach generations (LLM) → state updater (writes memory) → ensemble digest (cross-coach summary). All math happens in the deterministic computation engine — the LLM never does math.
 
 ---
 
@@ -202,6 +217,17 @@ Architecture reviews happen periodically. Run `python3 deploy/generate_review_bu
 | **Character Sheet** | Gamified scoring system aggregating 7 health pillars (Sleep, Movement, Nutrition, Metabolic, Mind, Relationships, Consistency) into a level 1-100 with RPG-style tiers (Foundation → Elite). Computed daily. |
 | **Board of Directors** | 14 fictional AI advisor personas (not real people) that provide domain-specific coaching in emails and the website. Configured in `s3://matthew-life-platform/config/board_of_directors.json`. See ADR-040. |
 | **Day Grade** | Daily score (0-100, A-F letter grade) computed from sleep, nutrition, exercise, habits, hydration, and glucose. Drives the Character Sheet and daily brief email. |
+| **Coach Intelligence** | The system of 8 persistent AI coaching agents (sleep, nutrition, training, etc.) with episodic memory, voice differentiation, cross-coach awareness, and prediction accountability. |
+| **COACH# partition** | DynamoDB partition (`COACH#<coach_id>`) storing each coach's outputs, voice state, learning log, and thread registry. |
+| **ENSEMBLE# digest** | DynamoDB partition (`ENSEMBLE#`) storing the cross-coach summary produced after all 8 coaches generate. Prevents duplication and enables coaches to reference each other. |
+| **NARRATIVE# arc** | DynamoDB partition (`NARRATIVE#`) storing multi-day story arcs and thematic assignments managed by the narrative orchestrator. |
+| **Voice spec** | Structural definition of a coach's tone, vocabulary, sentence patterns, and opening style. Stored in coach configuration and enforced during generation. |
+| **Generation brief** | The per-coach instruction packet assembled by the orchestrator, containing the coach's computation results, voice spec, narrative arc context, and ensemble awareness. |
+| **Computation engine** | Lambda (`coach-computation-engine`) that runs all deterministic math (trends, deltas, percentiles) before coach generation. The LLM never does math. |
+| **Narrative orchestrator** | Lambda (`coach-narrative-orchestrator`) that acts as showrunner — assigns themes, prevents redundancy, and sequences coach generation. |
+| **State updater** | Lambda (`coach-state-updater`) that writes coach outputs, voice state, and learning log entries to DynamoDB after generation completes. |
+| **Ensemble digest** | The cross-coach summary document produced after all coaches generate, identifying consensus findings, contradictions, and combined recommendations. |
+| **Prediction evaluator** | Lambda (`coach-prediction-evaluator`) that scores past coach predictions against actual outcomes using Bayesian confidence updating. Runs daily at 9 AM PT. |
 
 ---
 
@@ -215,3 +241,4 @@ Things that are true but not obvious from reading the code:
 4. **All EventBridge crons are fixed UTC.** Schedules don't drift with DST. The PT times in documentation are for human reference only.
 5. **Pipeline ordering is strict.** Ingestion (6:45-9 AM) must complete before Compute (10:20-10:35), which must complete before Daily Brief (11 AM). Changing schedules without maintaining this order produces stale computed results.
 6. **Budget is $15/month target, $20 AWS Budget cap.** Current actual spend is ~$13/month.
+7. **Coaches are stateful entities with persistent memory, cross-coach awareness, and narrative continuity over 12 months.** All math happens in the deterministic computation engine — the LLM never does math.

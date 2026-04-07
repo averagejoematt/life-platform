@@ -89,7 +89,7 @@ def tool_log_sick_day(args):
 
 def tool_get_sick_days(args):
     """List sick/rest days within a date range."""
-    today     = datetime.utcnow().strftime("%Y-%m-%d")
+    today     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     end_date  = args.get("end_date")  or today
     start_date = args.get("start_date") or (
         datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=90)

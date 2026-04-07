@@ -249,6 +249,15 @@ def _ask_fetch_context() -> dict:
     hs_items = _decimal_to_float(hs_resp.get("Items", []))
     if hs_items:
         ctx["tier0_streak"] = int(hs_items[0].get("t0_perfect_streak", 0) or 0)
+    # Fetch start/goal from profile for dynamic prompt injection
+    try:
+        prof_resp = table.get_item(Key={"pk": f"{USER_PREFIX}profile", "sk": "PROFILE"})
+        prof = _decimal_to_float(prof_resp.get("Item", {}))
+        ctx["start_weight"] = float(prof.get("journey_start_weight_lbs", 307))
+        ctx["goal_weight"] = float(prof.get("goal_weight_lbs", 185))
+    except Exception:
+        ctx["start_weight"] = 307
+        ctx["goal_weight"] = 185
     return ctx
 
 
@@ -282,7 +291,7 @@ def _ask_build_prompt(ctx: dict) -> str:
     return f"""You are the AI behind Matthew Walker's Life Platform — a personal health intelligence system tracking 19 data sources.
 
 CURRENT DATA:
-  Weight: {ctx.get('weight_lbs', '?')} lbs (started 307, goal 185)
+  Weight: {ctx.get('weight_lbs', '?')} lbs (started {ctx.get('start_weight', 307)}, goal {ctx.get('goal_weight', 185)})
   HRV: {ctx.get('hrv_ms', '?')} ms
   RHR: {ctx.get('rhr_bpm', '?')} bpm
   Recovery: {ctx.get('recovery_pct', '?')}%

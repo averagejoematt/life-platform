@@ -5,7 +5,7 @@ import json
 import math
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from decimal import Decimal
 
@@ -34,9 +34,9 @@ from mcp.strength_helpers import classify_exercise
 from mcp.tools_training import tool_get_training_load
 from mcp.helpers import normalize_whoop_sleep
 def tool_get_health_dashboard(args):
-    today     = datetime.utcnow().strftime("%Y-%m-%d")
-    d30_start = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
-    d7_start  = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
+    today     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d30_start = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    d7_start  = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
 
     dashboard = {"as_of": today, "alerts": []}
 
@@ -160,7 +160,7 @@ def tool_get_readiness_score(args):
     Device agreement: Whoop vs Garmin HRV and RHR delta is computed and returned
     as a confidence signal — large disagreement flags lower score reliability.
     """
-    end_date   = args.get("date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     d7_start   = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
     d30_start  = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
     d90_start  = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=90)).strftime("%Y-%m-%d")
@@ -462,7 +462,7 @@ def tool_get_readiness_score(args):
 
 
 def tool_get_weight_loss_progress(args):
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", "2010-01-01")
     profile    = get_profile()
 
@@ -577,7 +577,7 @@ def tool_get_weight_loss_progress(args):
 
     plateau = None
     recent_14 = [pt for pt in weight_series
-                 if (datetime.utcnow() - datetime.strptime(pt["date"], "%Y-%m-%d")).days <= 14]
+                 if (datetime.now(timezone.utc) - datetime.strptime(pt["date"], "%Y-%m-%d")).days <= 14]
     if len(recent_14) >= 3:
         wts = [pt["weight_lbs"] for pt in recent_14]
         spread = max(wts) - min(wts)
@@ -598,7 +598,7 @@ def tool_get_weight_loss_progress(args):
     projection = None
     if goal_weight and avg_weekly and avg_weekly > 0:
         weeks_remaining = (current_weight - goal_weight) / avg_weekly
-        goal_date = datetime.utcnow() + timedelta(weeks=weeks_remaining)
+        goal_date = datetime.now(timezone.utc) + timedelta(weeks=weeks_remaining)
         projection = {
             "goal_weight_lbs":       goal_weight,
             "lbs_remaining":         round(current_weight - goal_weight, 1),
@@ -629,7 +629,7 @@ def tool_get_weight_loss_progress(args):
 
 def tool_get_body_composition_trend(args):
     start_date = args.get("start_date", "2010-01-01")
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     profile    = get_profile()
     journey_start = profile.get("journey_start_date", start_date)
     height_in     = profile.get("height_inches", 70)
@@ -749,9 +749,9 @@ def tool_get_body_composition_trend(args):
 
 
 def tool_get_energy_expenditure(args):
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
-    d30_start  = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
-    d7_start   = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    d30_start  = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    d7_start   = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
     profile    = get_profile()
 
     height_in  = profile.get("height_inches", 70)
@@ -776,7 +776,7 @@ def tool_get_energy_expenditure(args):
     if dob_str:
         try:
             dob = datetime.strptime(dob_str, "%Y-%m-%d")
-            age_years = (datetime.utcnow() - dob).days / 365.25
+            age_years = (datetime.now(timezone.utc) - dob).days / 365.25
         except Exception:
             pass
     age_years = age_years or 35  # Matthew-specific fallback: age 35; only used when profile lookup fails
@@ -843,7 +843,7 @@ def tool_get_energy_expenditure(args):
 
 
 def tool_get_non_scale_victories(args):
-    end_date    = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date    = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     profile     = get_profile()
     journey_start = profile.get("journey_start_date")
 
@@ -853,7 +853,7 @@ def tool_get_non_scale_victories(args):
     js_dt          = datetime.strptime(journey_start, "%Y-%m-%d")
     baseline_start = journey_start
     baseline_end   = (js_dt + timedelta(days=30)).strftime("%Y-%m-%d")
-    recent_start   = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
+    recent_start   = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
 
     victories = []
     comparisons = {}
@@ -1050,7 +1050,7 @@ def tool_get_body_composition_snapshot(args):
                 "flags": flags}
 
     try:
-        from datetime import datetime as _dt, timedelta as _td
+        from datetime import datetime as _dt, timedelta as _td, timezone
         today = _dt.now().strftime("%Y-%m-%d")
         week_ago = (_dt.now() - _td(days=7)).strftime("%Y-%m-%d")
         withings = query_source("withings", week_ago, today)
@@ -1075,7 +1075,7 @@ def tool_get_health_risk_profile(args):
     genome_snps = [s for s in genome if s.get("sk", "").startswith("GENE#")]
     dexa = _query_dexa_scans()
 
-    from datetime import datetime as _dt, timedelta as _td
+    from datetime import datetime as _dt, timedelta as _td, timezone
     today = _dt.now().strftime("%Y-%m-%d")
     result = {"assessment_date": today}
 
@@ -1343,10 +1343,10 @@ def tool_get_day_type_analysis(args):
       - 'Do I eat more on training days?'
       - 'What\'s my average HRV by day type?'
     """
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     days       = int(args.get("days", 90))
     start_date = args.get("start_date") or (
-        datetime.utcnow() - timedelta(days=days)
+        datetime.now(timezone.utc) - timedelta(days=days)
     ).strftime("%Y-%m-%d")
     metrics    = args.get("metrics", ["sleep", "recovery", "nutrition"])
     if isinstance(metrics, str):
@@ -1482,7 +1482,7 @@ def tool_get_health_trajectory(args):
     """
     import statistics
 
-    today = datetime.utcnow()
+    today = datetime.now(timezone.utc)
     today_str = today.strftime("%Y-%m-%d")
     profile = get_profile()
 
@@ -1989,8 +1989,8 @@ def tool_get_hydration_score(args):
     Source: apple_health (water_intake_ml). Bodyweight target: 35ml/kg (Webb).
     Fallback guidance: Habitify manual log if Apple Health sync is incomplete.
     """
-    end   = args.get("end_date",   datetime.utcnow().strftime("%Y-%m-%d"))
-    start = args.get("start_date", (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d"))
+    end   = args.get("end_date",   datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
     target_ml_override = args.get("target_ml")
 
     # Pull water data from apple_health (SOT for water domain)
@@ -2223,7 +2223,7 @@ def tool_get_autonomic_balance(args):
     Provides rolling 7-day trend and state transition detection.
     Porges polyvagal theory + Huberman ANS framework.
     """
-    end_date   = args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date   = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     days       = int(args.get("days", 30))
     start_date = args.get("start_date") or (
         datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days - 1)

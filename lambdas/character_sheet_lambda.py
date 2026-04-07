@@ -48,7 +48,7 @@ except ImportError:
 _REGION    = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET  = os.environ["S3_BUCKET"]
-USER_ID    = os.environ["USER_ID"]
+USER_ID    = os.environ.get("USER_ID", "matthew")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 PILLAR_ORDER = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
@@ -311,7 +311,7 @@ def get_food_delivery_modifier():
         last_order = streak.get('last_order_date', '')
         from datetime import datetime
         # 15% penalty for ordering delivery; graduated bonus at 7/14/30 clean days
-        if last_order == datetime.utcnow().strftime('%Y-%m-%d'):
+        if last_order == datetime.now(timezone.utc).strftime('%Y-%m-%d'):
             return 0.85
         if streak_days >= 30: return 1.10
         if streak_days >= 14: return 1.05

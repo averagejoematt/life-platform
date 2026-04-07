@@ -1,0 +1,61 @@
+{
+  "phases": {
+    "early_baseline": {
+      "description": "Establishing norms, building data",
+      "coaching_tone": "Observational, curious, low-intervention",
+      "risk_tolerance": "low",
+      "decision_class_ceiling": "observational",
+      "typical_duration_weeks": "1-4"
+    },
+    "building_momentum": {
+      "description": "Trends emerging, habits forming",
+      "coaching_tone": "Encouraging, directional",
+      "risk_tolerance": "moderate",
+      "decision_class_ceiling": "directional",
+      "typical_duration_weeks": "5-12"
+    },
+    "plateau": {
+      "description": "Progress stalls",
+      "coaching_tone": "Patient, analytical, thread-deepening",
+      "risk_tolerance": "low",
+      "decision_class_ceiling": "directional",
+      "typical_duration_weeks": "variable"
+    },
+    "breakthrough": {
+      "description": "Clear improvement on key metrics",
+      "coaching_tone": "Celebratory but grounded",
+      "risk_tolerance": "moderate",
+      "decision_class_ceiling": "directional",
+      "typical_duration_weeks": "1-3"
+    },
+    "setback": {
+      "description": "Regression or negative event",
+      "coaching_tone": "Supportive, recalibrating",
+      "risk_tolerance": "low",
+      "decision_class_ceiling": "observational",
+      "typical_duration_weeks": "1-4"
+    },
+    "inflection": {
+      "description": "Major data shift or life event",
+      "coaching_tone": "High-alert, cross-coach coordination",
+      "risk_tolerance": "variable",
+      "decision_class_ceiling": "directional",
+      "typical_duration_weeks": "1-2"
+    },
+    "deep_adaptation": {
+      "description": "Months 6+ — long-term patterns visible",
+      "coaching_tone": "Strategic, periodization-aware",
+      "risk_tolerance": "higher",
+      "decision_class_ceiling": "interventional",
+      "typical_duration_weeks": "ongoing"
+    },
+    "culmination": {
+      "description": "Final months — pulling threads together",
+      "coaching_tone": "Reflective, synthesizing the arc",
+      "risk_tolerance": "moderate",
+      "decision_class_ceiling": "interventional",
+      "typical_duration_weeks": "4-8"
+    }
+  },
+  "version": "v1"
+}

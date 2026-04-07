@@ -6,7 +6,7 @@ import time
 import concurrent.futures
 import logging
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
 from boto3.dynamodb.conditions import Key
 
 from mcp.config import (
@@ -103,7 +103,7 @@ def ddb_cache_set(cache_key: str, data):
             "sk":           f"TOOL#{cache_key}",
             "payload":      json.dumps(data, default=str),
             "ttl":          Decimal(str(ttl_epoch)),
-            "computed_at":  datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "computed_at":  datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         })
         logger.info(f"[cache:ddb] stored — {cache_key}")
     except Exception as e:

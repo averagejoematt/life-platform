@@ -1,3 +1,38 @@
+## v6.0.0 — Coach Intelligence Architecture (2026-04-06)
+
+Major architectural evolution: stateless prompt templates replaced by persistent, stateful AI coaching system with episodic memory, cross-coach communication, prediction tracking, and narrative orchestration.
+
+### Coach Intelligence System (Phases 1-5)
+- **8 stateful coaches** on the intelligence pipeline: Dr. Lisa Park (sleep), Dr. Marcus Webb (nutrition), Dr. Sarah Chen (training), Dr. Nathan Reeves (mind), Dr. Victor Reyes (physical), Dr. Amara Patel (glucose), Dr. James Okafor (labs), Dr. Henning Brandt (explorer)
+- **8 new Lambdas**: coach-computation-engine (deterministic math: EWMA, regression-to-mean, seasonality, autocorrelation, guardrails, arc transitions), coach-narrative-orchestrator (Haiku showrunner producing generation briefs), coach-state-updater (Haiku extraction: themes, threads, predictions, observatory summaries), coach-ensemble-digest (cross-coach summary + disagreement tracking), coach-prediction-evaluator (daily Bayesian confidence updates), coach-history-summarizer (weekly 500-token compression), coach-quality-gate (advisory voice/pattern checking), coach-observatory-renderer (DynamoDB reader for observatory cards)
+- **DynamoDB schema**: COACH#{coach_id} partitions (OUTPUT#, THREAD#, LEARNING#, PREDICTION#, VOICE#state, RELATIONSHIP#state, CONFIDENCE#{subdomain}, COMPRESSED#latest), ENSEMBLE#digest (CYCLE#), ENSEMBLE#influence_graph (CONFIG#v1), ENSEMBLE#disagreements (ACTIVE#), NARRATIVE#arc (STATE#current, HISTORY#)
+- **S3 config**: 8 voice specs with structural_voice_rules + few_shot_examples, influence graph (56 directed weights), EWMA params (5 domains), seasonal adjustments, narrative arc definitions (8 phases)
+- **Seed script**: seeds/seed_coach_state.py — 66 DynamoDB records (coach states, Beta(1,1) priors, narrative arc, influence graph)
+
+### Observatory Integration (Phase 6)
+- New `/api/coach_analysis?domain={domain}` endpoint reads from COACH# state store
+- observatory-v3.js tries Coach Intelligence endpoint first, falls back to legacy /api/ai_analysis
+- Continuity markers rendered as subtle card footer: thread references, revision signals, cross-coach references
+- Data availability constraints: observational_only hides action recommendations, shows "Early data" indicator
+- `ai_expert_analyzer_lambda.py` deprecated (replaced by coach-observatory-renderer)
+
+### AI Prompt Evolution
+- **Bug fixes**: HRV KeyError crash in ai_calls.py, stale "10+ months" narrative in nutrition_review, wrong journey week in brittany_email (Feb 22 → Apr 1), wrong start weight fallbacks (302 → 307), hardcoded context in hypothesis_engine, hardcoded weight in /api/ask
+- **Persona names**: Rhonda Patrick → Dr. Amara Patel, Paul Conti → Dr. Nathan Reeves, Layne Webb → Dr. Marcus Webb (all fictitious names)
+- **Epistemological framing**: Each observatory expert persona now has distinct analytical lens (systems thinking, behavioral, psychodynamic, longevity, mechanistic, etc.)
+- **Elena Quote evolution**: Reframed from stylistic flourish to cross-domain meta-analysis
+- **Chronicle enhancements**: Thesis guardrails, thread tracking, field notes as hypothesis, board interview trigger mapping
+- **Weekly digest**: THE CHAIR gets cross-domain synthesis, "Insight of the Week" → "Pattern of the Week" (pattern + hypothesis + implication)
+- **Monday Compass**: Structured reasoning steps (Recovery Signal → Pillar Gaps → Blocking Analysis → Recommendation)
+
+### Infrastructure
+- Shared layer v28+ (ai_calls.py updated with _run_coach_v2_pipeline + 8 coach wrappers)
+- CDK compute stack: 8 new Lambda definitions + IAM roles
+- CDK email stack: daily-brief Lambda invoke permissions for coach Lambdas
+- ci/lambda_map.json: 8 new entries, ai_expert_analyzer marked deprecated
+
+---
+
 ## v5.4.0 — V3.1 Observatory Polish + Coach Timestamps (2026-04-05)
 
 V3.1 polish pass across all observatory pages.

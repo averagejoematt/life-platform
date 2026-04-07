@@ -163,22 +163,45 @@ function renderCoachAnalysis(container, expertKey, coachMeta) {
     '<div class="obs-coach-prose" id="obs-coach-prose-' + expertKey + '"><div style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:0.1em">LOADING ANALYSIS...</div></div>' +
     '<div class="obs-coach-action" id="obs-coach-action-' + expertKey + '" style="display:none"></div>';
 
-  fetch('/api/ai_analysis?expert=' + expertKey)
+  // Try Coach Intelligence endpoint first, fall back to legacy ai_analysis
+  fetch('/api/coach_analysis?domain=' + expertKey)
     .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(data) {
+      // Fall back to legacy endpoint if new one returns null analysis
+      if (!data || !data.analysis) {
+        return fetch('/api/ai_analysis?expert=' + expertKey)
+          .then(function(r2) { return r2.ok ? r2.json() : null; });
+      }
+      return data;
+    })
+    .then(function(data) {
       if (!data) return;
+
+      // Use coach_name from response if available (Coach Intelligence provides it)
+      if (data.coach_name) {
+        var nameEl = el.querySelector('.obs-coach-name');
+        if (nameEl) nameEl.textContent = data.coach_name;
+      }
+
       var proseEl = document.getElementById('obs-coach-prose-' + expertKey);
       var actionEl = document.getElementById('obs-coach-action-' + expertKey);
       var genEl = document.getElementById('obs-coach-gen-' + expertKey);
 
       if (data.analysis) {
         var paragraphs = data.analysis.split('\n\n').filter(function(p) { return p.trim(); });
-        proseEl.innerHTML = paragraphs.map(function(p) { return '<p>' + p + '</p>'; }).join('');
+        var proseHtml = paragraphs.map(function(p) { return '<p>' + p + '</p>'; }).join('');
+
+        // Data availability indicator
+        if (data.data_availability === 'observational_only') {
+          proseHtml = '<div class="obs-coach-data-flag obs-coach-data-flag--early">\u26f6 Early data \u2014 observing patterns</div>' + proseHtml;
+        }
+
+        proseEl.innerHTML = proseHtml;
       } else {
-        proseEl.innerHTML = '<p style="color:var(--text-faint)">Analysis generates weekly. Check back Monday.</p>';
+        proseEl.innerHTML = '<p style="color:var(--text-faint)">Analysis generates daily. Check back soon.</p>';
       }
 
-      if (data.key_recommendation) {
+      if (data.key_recommendation && data.data_availability !== 'observational_only') {
         actionEl.style.display = '';
         actionEl.innerHTML =
           '<div class="obs-coach-action__label">This week\'s action</div>' +
@@ -191,7 +214,26 @@ function renderCoachAnalysis(container, expertKey, coachMeta) {
         var dateFmt = genDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
         var expStart = new Date('2026-04-01');
         var expDay = Math.max(1, Math.floor((genDate - expStart) / 86400000) + 1);
-        genEl.innerHTML = '<strong>' + dayName + ', ' + dateFmt + '</strong> · 7:00 AM PT · Day ' + expDay + ' Observations';
+        genEl.innerHTML = '<strong>' + dayName + ', ' + dateFmt + '</strong> \u00b7 Day ' + expDay + ' Observations';
+      }
+
+      // Continuity markers — subtle footer with thread, revision, cross-coach signals
+      var markers = [];
+      if (data.thread_reference) {
+        markers.push('\ud83d\udccc ' + data.thread_reference);
+      }
+      if (data.revision_signal) {
+        markers.push('\u21bb ' + data.revision_signal);
+      }
+      if (data.cross_coach_reference) {
+        markers.push('\ud83d\udd17 ' + data.cross_coach_reference);
+      }
+      if (markers.length > 0) {
+        var markerDiv = _el('div', 'obs-coach-continuity');
+        markerDiv.innerHTML = markers.map(function(m) {
+          return '<div class="obs-coach-continuity__item">' + m + '</div>';
+        }).join('');
+        el.appendChild(markerDiv);
       }
 
       // Elena quote
@@ -203,7 +245,7 @@ function renderCoachAnalysis(container, expertKey, coachMeta) {
         el.appendChild(quoteDiv);
       }
 
-      // V3.1 Item 7: Journaling prompt (Mind page only)
+      // Journaling prompt (Mind page only)
       if (data.journaling_prompt) {
         var promptDiv = _el('div', 'obs-journaling-prompt');
         promptDiv.innerHTML =

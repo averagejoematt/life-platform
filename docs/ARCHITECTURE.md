@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-04-05 (v5.3.0 — 115 MCP tools, 35-module MCP package, 26 data sources, 63 Lambdas, 72 site pages, 70+ API endpoints, 8 CDK stacks, shared layer v26)
+Last updated: 2026-04-06 (v6.0.0 — 115 MCP tools, 35-module MCP package, 26 data sources, 71 Lambdas, 72 site pages, 70+ API endpoints, 8 CDK stacks, shared layer v26)
 
 ---
 
@@ -80,7 +80,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | ACM Certificate | TLS | `arn:aws:acm:us-east-1:205930651321:certificate/e85e4b63-...` — `averagejoematt.com` (DNS-validated) |
 | SES Receipt Rule Set | Inbound email routing | `life-platform-inbound` (active) — rule `insight-capture` routes `insight@aws.mattsusername.com` → S3 |
 | CloudWatch | Alarms + logs | **~66 metric alarms**, all Lambdas monitored |
-| CDK | Infrastructure as Code | `cdk/` — 8 stacks deployed. CDK owns all 63 Lambda IAM roles + ~50 EventBridge rules. |
+| CDK | Infrastructure as Code | `cdk/` — 8 stacks deployed. CDK owns all 71 Lambda IAM roles + ~50 EventBridge rules. |
 | CloudTrail | Audit logging | `life-platform-trail` → S3 |
 | AWS Budget | Cost guardrail | $20/mo cap, alerts at 25%/50%/100% |
 
@@ -229,16 +229,55 @@ Compute → store → read pattern. Standalone Lambdas run before Daily Brief, s
 | `nutrition-review` | Sat 10:00 AM | Deep Sonnet nutrition analysis |
 | `hypothesis-engine` | Sun 12:00 PM | IC-18 hypothesis generation |
 
+### Coach Intelligence Layer (v6.0.0)
+
+Eight domain-specific AI coaches generate daily analyses through a multi-stage pipeline. Each coach has a persistent voice, relationship state, and confidence model stored in DynamoDB. The coach pipeline replaces the legacy `ai_expert_analyzer_lambda.py` (deprecated).
+
+**Coaches (8):**
+
+| Coach ID | Name | Domain |
+|----------|------|--------|
+| `sleep_coach` | Dr. Lisa Park | Sleep & circadian rhythm |
+| `nutrition_coach` | Dr. Marcus Webb | Nutrition & metabolism |
+| `training_coach` | Dr. Sarah Chen | Training & exercise |
+| `mind_coach` | Dr. Nathan Reeves | Mental health & mindfulness |
+| `physical_coach` | Dr. Victor Reyes | Physical health & body composition |
+| `glucose_coach` | Dr. Amara Patel | Glucose regulation & CGM |
+| `labs_coach` | Dr. James Okafor | Lab biomarkers & blood work |
+| `explorer_coach` | Dr. Henning Brandt | Cross-domain patterns & experiments |
+
+**Pipeline Lambdas (8):**
+
+| Function | Lambda | Purpose |
+|----------|--------|---------|
+| Computation Engine | `coach-computation-engine` | EWMA metrics, seasonal adjustments, anomaly detection per coach domain |
+| Narrative Orchestrator | `coach-narrative-orchestrator` | Generates coach prose with voice spec, thread continuity, and epistemological framing |
+| State Updater | `coach-state-updater` | Updates relationship state, confidence scores, and learning records |
+| Ensemble Digest | `coach-ensemble-digest` | Cross-coach synthesis, disagreement detection, influence graph |
+| Prediction Evaluator | `coach-prediction-evaluator` | Scores past predictions, calibrates confidence |
+| History Summarizer | `coach-history-summarizer` | Compresses old threads into COMPRESSED#latest |
+| Quality Gate | `coach-quality-gate` | Validates output quality before writes (hallucination, voice drift, repetition) |
+| Observatory Renderer | `coach-observatory-renderer` | Renders coach analysis for /api/coach_analysis endpoint (replaces ai_expert_analyzer) |
+
+**Pipeline flow:** Computation Engine -> Narrative Orchestrator -> Quality Gate -> State Updater -> (async) Ensemble Digest + Prediction Evaluator + History Summarizer. Results stored to `COACH#` and `ENSEMBLE#` DynamoDB partitions and served via `/api/coach_analysis`.
+
+**Observatory integration:** `observatory-v3.js` calls `/api/coach_analysis?coach=<id>` first, with automatic fallback to legacy `/api/ai_analysis?expert=<key>` if the new endpoint is unavailable.
+
+**S3 config:** Voice specifications at `config/coaches/*.json` (8 files), influence graph at `config/coaches/influence_graph.json`, computation params at `config/computation/ewma_params.json` + `config/computation/seasonal_adjustments.json`, narrative arcs at `config/narrative/arc_definitions.json`.
+
+**Deprecated:** `ai_expert_analyzer_lambda.py` — replaced by `coach-observatory-renderer`. Legacy `/api/ai_analysis` endpoint still functional as fallback.
+
 ---
 
 ## IAM Security Model
 
-Each Lambda has a **dedicated, least-privilege IAM role** (49 roles total as of v3.7.80, CDK-managed). No shared roles.
+Each Lambda has a **dedicated, least-privilege IAM role** (57 roles total as of v6.0.0, CDK-managed). No shared roles.
 
 - **Ingestion roles (13):** DDB write, S3 write, Secrets read, SQS DLQ
 - **MCP role:** DDB CRUD + S3 `config/*` + `raw/matthew/cgm_readings/*`
 - **Email/digest roles (7):** DDB read/write, ai-keys, SES, S3 write
 - **Compute roles (5):** DDB read/write, ai-keys
+- **Coach Intelligence roles (8):** DDB read/write on COACH#/ENSEMBLE#/NARRATIVE# partitions, S3 read on config/coaches/*, ai-keys
 - **Operational roles (14):** scoped per function
 - **Site API role:** DDB primarily read-only (`GetItem, Query`) + limited `PutItem` for interactive features (votes, follows, checkins), `kms:Decrypt`, S3 `site/config/*`, Secrets read (`site-api-ai-key` only) — **NO Scan**
 - No role has `dynamodb:Scan` or cross-account permissions
@@ -311,7 +350,10 @@ Target: under $25/month | Current: ~$13/month
     # 12 compute (character_sheet, adaptive_mode, daily_metrics_compute,
     #   daily_insight_compute, hypothesis_engine, weekly_correlation_compute,
     #   acwr_compute, sleep_reconciler, circadian_compliance,
-    #   ai_expert_analyzer, journal_analyzer, field_notes)
+    #   ai_expert_analyzer [deprecated], journal_analyzer, field_notes)
+    # 8 coach intelligence (coach_computation_engine, coach_narrative_orchestrator,
+    #   coach_state_updater, coach_ensemble_digest, coach_prediction_evaluator,
+    #   coach_history_summarizer, coach_quality_gate, coach_observatory_renderer)
     # 21 operational (freshness_checker, dashboard_refresh, data_export,
     #   qa_smoke, key_rotator, mcp_server, insight_email_parser,
     #   site_api_lambda — public web API, us-west-2,

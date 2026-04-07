@@ -896,27 +896,45 @@
       if (statsEl && daysIn >= 0) statsEl.textContent = 'Day ' + Math.max(1, daysIn) + (wLbs ? ' \u00b7 ' + Math.round(wLbs) + ' lbs' : '') + ' \u00b7 Level ' + charLevel;
     }
 
-    // ── Character stats (async fallback — overrides above if API returns richer data) ──
+    // ── Character stats (async — tries character_stats API, falls back to vitals) ──
+    var _charLoaded = !!psChar.level;
     try {
       var cr = await fetch('/api/character_stats');
       if (cr.ok) {
         var cd = await cr.json();
         var cs = cd.character_stats || {};
-        charLevel = Math.round(cs.level || 1);
-        var tier = cs.tier || 'Foundation';
-        var score = 0;
-        if (cd.pillars) {
-          var vals = Object.values(cd.pillars).map(function(p){ return p.raw_score || 0; });
-          score = Math.round(vals.reduce(function(a,b){return a+b;},0) / vals.length);
+        if (cs.level) {
+          charLevel = Math.round(cs.level);
+          var tier = cs.tier || 'Foundation';
+          var score = 0;
+          if (cd.pillars) {
+            var vals = Object.values(cd.pillars).map(function(p){ return p.raw_score || 0; });
+            score = Math.round(vals.reduce(function(a,b){return a+b;},0) / vals.length);
+          }
+          setText('h-g-char-num', charLevel);
+          setArc('h-g-char-arc', Math.min(100, (charLevel / 20) * 100));
+          setText('h-obs-mind', 'Level ' + charLevel + ' \u00b7 ' + tier + (score && daysIn > 0 ? ' \u00b7 ' + score + '/100' : ''));
+          if (statsEl && daysIn >= 0) statsEl.textContent = 'Day ' + Math.max(1, daysIn) + (wLbs ? ' \u00b7 ' + Math.round(wLbs) + ' lbs' : '') + ' \u00b7 Level ' + charLevel;
+          _charLoaded = true;
         }
-        setText('h-g-char-num', charLevel);
-        // Scale character: level 1-20 mapped to 0-100%
-        setArc('h-g-char-arc', Math.min(100, (charLevel / 20) * 100));
-        setText('h-obs-mind', 'Level ' + charLevel + ' \u00b7 ' + tier + (score && daysIn > 0 ? ' \u00b7 ' + score + '/100' : ''));
-        // Update hero stats line with level
-        if (statsEl && daysIn >= 0) statsEl.textContent = 'Day ' + Math.max(1, daysIn) + (wLbs ? ' \u00b7 ' + Math.round(wLbs) + ' lbs' : '') + ' \u00b7 Level ' + charLevel;
       }
     } catch(e) {}
+    // Final fallback: if character still not loaded, try vitals API for basic level
+    if (!_charLoaded) {
+      try {
+        var vr = await fetch('/api/vitals');
+        if (vr.ok) {
+          var vd = await vr.json();
+          var cl = vd.character_level || vd.level;
+          if (cl) {
+            charLevel = Math.round(cl);
+            setText('h-g-char-num', charLevel);
+            setArc('h-g-char-arc', Math.min(100, (charLevel / 20) * 100));
+            if (statsEl && daysIn >= 0) statsEl.textContent = 'Day ' + Math.max(1, daysIn) + (wLbs ? ' \u00b7 ' + Math.round(wLbs) + ' lbs' : '') + ' \u00b7 Level ' + charLevel;
+          }
+        }
+      } catch(e2) {}
+    }
 
     // ── Habit streaks (async) ──
     try {
